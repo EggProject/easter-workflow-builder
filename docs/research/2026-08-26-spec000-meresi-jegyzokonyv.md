@@ -213,6 +213,107 @@ Nincs önálló futás. A teljes mérési munkamenet 113 rögzített tranzakció
 
 Mivel a mérés alatt nem keletkezett `429`, a `retry-after` és `ratelimit`-jellegű headerek megléte erről a szolgáltatásról ebből a mérésből nem állapítható meg.
 
+---
+
+# M-19 - M-25 kiegészítő mérések
+
+Dátum: 2026-08-26 (külön munkamenet, a fenti M-01 - M-18 sorozat lezárása után). SDK verzió (pinelve): `@anthropic-ai/claude-agent-sdk@0.3.245`, változatlan. Modell: `MiniMax-M3`, kivéve M-20, ahol `MiniMax-M3[1m]`. Proxy port: `8787`. A `tools/wire-probe/src/cases/M-19.ts` .. `M-25.ts` forrásában a pontos beállítás minden esethez visszakereshető.
+
+## Harness javítás a kiegészítő mérés közben (nem mérési eredmény)
+
+Az M-20 első futása közben derült ki, hogy a `tools/wire-probe/src/harness/runner.ts` `executeQuery()` a `meta.json`-ba az `Options.env`-et szó szerint kiírja (`describeOptions`), az pedig a `buildBaseOptions()` miatt a teljes `process.env`-et tartalmazza. Ez a mérési munkamenet indításához használt `. ~/envrc` a `GITHUB_TOKEN` és `GH_TOKEN` értékét is beteszi a shell környezetbe, ezek a mérés előtti javítás nélkül **nyers szövegként kerültek volna lemezre** minden egyes `meta.json`-ba (ellenőrizve: `tools/wire-probe/artifacts/harness/M-20/probe-1-chars600000.meta.json` korábbi, javítás előtti verziójában mindkét változó nyers értéke jelen volt). A `redactKnownSecrets()` hívás korábban kizárólag a `MINIMAX_API_KEY`-t fésülte át.
+
+Javítás: `runner.ts` az `executeQuery()`-ben a `redactKnownSecrets()` hívásnak mostantól a `process.env.GITHUB_TOKEN` és `process.env.GH_TOKEN` értékét (ha van) is átadja a `MINIMAX_API_KEY` mellett. `bun run typecheck` a javítás után is hibátlan. A javítás előtt már lemezre írt, érintett `meta.json` fájlokat (11 db, mind a korábbi M-01 - M-18 sorozatból) helyben átfésültem (`sed`) `REDACTED`-re -- ez nem mérési eredmény módosítása, csak titok eltávolítás a már rögzített artefaktumból. Ellenőrzés utána: `grep -rl "$GITHUB_TOKEN" tools/wire-probe/artifacts/ docs/` 0 találat.
+
+Emellett az M-20 első (javítás előtti) próbafutása egy második, valódi mérési megfigyelést is hozott a `CLAUDE_CODE_MAX_OUTPUT_TOKENS` méretezéséről -- lásd az M-20 szekció elején.
+
+## M-19 `Stop` hook kikényszerítés emit_output említése nélkül
+
+Beállítás: az M-10 mintája megismételve úgy, hogy a prompt (`"Számold ki mennyi 2+2."`) nem említi az `emit_output` toolt, `stop_hook_active` loop-védelem plusz kemény `MAX_BLOCKS=3` korlát a blokkolásokra, `maxTurns: 8`, 10 ismétlés. Kimenetel: mind a 10 futás `result` subtype `success`, mindegyikben `blockCount=1` és `emitOutputCalled=true` -- **10/10 sikerarány**. Artefaktumok: `tools/wire-probe/artifacts/harness/M-19/run-1.meta.json` .. `run-10.meta.json` (+ `.sdk-messages.ndjson` mindegyikhez).
+
+A `run-1` négy kimenő kérésének (`tools/wire-probe/artifacts/00002-1787737236766.json` .. `00005-1787737242527.json`) vizsgálata: a **3. kérésben** (`00004-1787737239994.json`) a `messages` tömb utolsó eleme `role: "user"`, tartalma szó szerint: `"Stop hook feedback:\nAz emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel."` (`cache_control: {"type":"ephemeral"}` melléklettel). A Claude Code CLI tehát a hook `reason` szövegét egy `"Stop hook feedback:"` előtaggal, **`user` role-lal** küldi ki a dróton, nem `system` role-lal.
+
+A 2. és 4. kérésben (`00003`, `00005`) a `messages` tömb utolsó eleme szintén `role: "system"`, de a tartalma **nem** a Stop hook szövege, hanem ugyanaz a környezeti jellegű szöveg, mint amit az M-10 mérés is rögzített (`"Available agent types for the Agent tool: ..."`, illetve egy `<total_tokens>...</total_tokens>` jellegű szöveg). HTTP kód mind a 4 kérésnél 200.
+
+A `blockCount=1` és `emitOutputCalled=true` mind a 10 futásnál a harness saját (probe.ts kimeneti sorai alapján rögzített) jelzése; a wire szintű `role` ellenőrzést csak `run-1`-re végeztem el részletesen.
+
+## M-20 Kontextusablak felső korlátja bináris kereséssel
+
+Beállítás: `model: 'MiniMax-M3[1m]'`, bináris keresés legfeljebb 8 kérésben, kiinduló cél 600 000 karakter.
+
+**Első próbafutás (elvetve, nem mérési eredmény):** `CLAUDE_CODE_MAX_OUTPUT_TOKENS=16` mellett a `probe-1` `meta.json`-ja `harnessError: "API Error: Claude's response exceeded the 16 output token maximum..."` hibát rögzített, és a proxy tranzakciók (`tools/wire-probe/artifacts/00002-1787737435226.json` .. `00005-...json`) megmutatták, hogy **egyetlen probe alatt négy külön `POST /v1/messages` ment ki** ugyanazzal a hatalmas prompttal -- a CLI a 16 tokenre levágott választ hibaként kezelte és a teljes kérést (a töltelék szöveggel együtt) újraküldte. Ez a harness saját, túl alacsonyra választott `MINIMAL_MAX_OUTPUT_TOKENS` beállítása volt, nem mérési eredmény. Javítás: az érték 256-ra emelve, a case elölről futtatva.
+
+Kimenetel (a javított futás, egyetlen munkamenetben lement mind a 8 kérés): Artefaktumok: `tools/wire-probe/artifacts/harness/M-20/probe-1-chars600000.meta.json` .. `probe-8-chars2550000.meta.json`, `search-state.json`.
+
+| # | targetChars | HTTP | `usage.input_tokens` | `usage.cache_read_input_tokens` | tranzakció |
+|---|---|---|---|---|---|
+| 1 | 600 000 | 200 | 266699 | 128 | `00003-1787737784634.json` |
+| 2 | 1 200 000 | 200 | 1483 | 505344 | `00006-1787737788764.json` |
+| 3 | 2 400 000 | 200 | 986667 | 160 | `00009-1787737825279.json` |
+| 4 | 4 800 000 | 400 | - | - | (lásd hibaszöveg lent) |
+| 5 | 3 600 000 | 400 | - | - | (lásd hibaszöveg lent) |
+| 6 | 3 000 000 | 400 | - | - | (lásd hibaszöveg lent) |
+| 7 | 2 700 000 | 400 | - | - | (lásd hibaszöveg lent) |
+| 8 | 2 550 000 | 200 | 61483 | 985344 | `00023-1787737855251.json` |
+
+A 4 hibás kérés (4., 5., 6., 7.) mindegyikének `harnessError` mezője szó szerint azonos: `"Claude Code returned an error result: API Error: 400 invalid params, context window exceeds limit (2013)"`. A keresés a `MAX_REQUESTS=8` kemény korlát miatt állt le (nem konvergencia miatt): a legnagyobb sikeres méret (2 550 000 karakter) és a legkisebb hibás méret (2 700 000 karakter) között 150 000 karakternyi rés maradt lezáratlanul.
+
+Nem egyértelmű: az `usage.input_tokens` értéke a targetChars mérettel nem monoton nő (266699 -> 1483 -> 986667 -> 61483), miközben az `usage.cache_read_input_tokens` a kis `input_tokens` értékű probe-oknál nagy (505344, illetve 985344). Mivel a töltelék szöveg minden probe-nál ugyanannak az ismétlődő frázisnak a prefixe, ez összefügghet a MiniMax implicit prompt cache viselkedésével, de ennek a mérésnek nem tárgya ennek eldöntése.
+
+## M-21 `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` hatása
+
+Beállítás: `env: CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`, egyetlen eltérés az alaphoz képest. Kimenetel: **1 db** `POST /v1/messages` (nem 2), HTTP 200, `result` subtype `success` (22 SDKMessage). Artefaktum: `tools/wire-probe/artifacts/harness/M-21/a.meta.json`, tranzakció: `tools/wire-probe/artifacts/00002-1787737359743.json`.
+
+A kimenő kérés `tools` tömbje 25 elemű, **tartalmazza** a `DesignSync` toolt. Az M-08 mérésben a `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` szintén 1 kérésre vitte le a kérésszámot, de ott a `tools` tömb 24 elemű volt, `DesignSync` nélkül. A session cím generáló ("thin") kérés a `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` kapcsolónál is eltűnt, ugyanúgy mint a `NONESSENTIAL_TRAFFIC` kapcsolónál, de a `DesignSync` tool megmaradt.
+
+## M-22 `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja
+
+Beállítás: 4 futás, `CLAUDE_CODE_MAX_OUTPUT_TOKENS` = 4096, 32000, 131072, 524288. Kimenetel: mind HTTP 200 mindkét kérésnél, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-22/max-output-tokens-<érték>.meta.json`.
+
+| env érték | kimenő body `max_tokens` | HTTP |
+|---|---|---|
+| 4096 | 4096 | 200 |
+| 32000 | 32000 | 200 |
+| 131072 | **128000** | 200 |
+| 524288 | **128000** | 200 |
+
+Tranzakciók: `00004`/`00005-...json` (4096), `00007`/`00008-...json` (32000), `00010`/`00011-...json` (131072), `00013`/`00014-...json` (524288, mind `tools/wire-probe/artifacts/`). A 131072 és az 524288 env érték is ugyanarra a 128000 wire `max_tokens` értékre képződött le; a 4096 és 32000 érték változatlanul, egyezően ment ki.
+
+## M-23 Kép bemenet felismerhető tartalommal
+
+Beállítás: az M-16 mintája, 256x256 pixeles, tiszta piros (RGB 255,0,0) PNG, a harness által programozottan generálva (`zlib.crc32` + `zlib.deflateSync`). Kimenetel: HTTP 200, `result` subtype `success` (22 SDKMessage). Artefaktum: `tools/wire-probe/artifacts/harness/M-23/a.meta.json`.
+
+Az asszisztens válaszszövege szó szerint: `"Nincs kép."`. Ugyanaz a mintázat, mint az M-16 mérésnél (`"Nem látok képet a beszélgetésben."`), most egy érvényes méretű és egyértelmű tartalmú képpel is.
+
+## M-24 Prompt cache írás igazolása stream nélküli móddal
+
+Beállítás: az M-15 (a) és (b) futásának megismétlése. A telepített SDK `Options` típusában nincs `stream` mező (`sdk.d.ts`, `Options.includePartialMessages` doksija csak a kliens oldali `SDKMessage` kiadást szabályozza, a drótra kiküldött kérés `stream` mezőjét nem érinti) -- emiatt tényleges `stream: false` kérést nem lehetett kiváltani. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-24/a-first.meta.json`, `b-second-immediately-after.meta.json`.
+
+A kimenő body `stream` mezője mind a 4 kérésnél szó szerint `true`. A `responseBody` mind a 4 tranzakciónál `null`, a válasz SSE eseménysorként érkezett (`streamEvents` nem `null`).
+
+| futás | kérés | `usage.input_tokens` | `usage.cache_read_input_tokens` |
+|---|---|---|---|
+| a-first | thin | 799 | 128 |
+| a-first | full | 29299 | 128 |
+| b-second | thin | 799 | 128 |
+| b-second | full | 29299 | 128 |
+
+A `message_start.message.usage` objektum egyik kérésnél sem tartalmaz `cache_creation_input_tokens` kulcsot (csak `input_tokens`, `output_tokens`, `service_tier`). A `message_delta.usage` objektum sem tartalmaz `cache_creation_input_tokens` kulcsot egyik kérésnél sem.
+
+Nem egyértelmű: a `cache_read_input_tokens` a b (második) futásnál sem nőtt az a (első) futáshoz képest (mindkettő 128) -- ez megegyezik az M-15-nél már rögzített mintával, nem új megfigyelés.
+
+## M-25 Szerver oldali tool magasabb `maxTurns` mellett
+
+Beállítás: az M-17 mintája, `maxTurns: 12` (M-17-nél 3 volt). Kimenetel: HTTP 200 mind a 7 kérésnél, `result` subtype **`success`** (M-17-nél `error_max_turns` volt, 8 kérés után). Artefaktum: `tools/wire-probe/artifacts/harness/M-25/a.meta.json`, tranzakciók: `tools/wire-probe/artifacts/00002-1787737402733.json` .. `00008-1787737418290.json`.
+
+A `web_search_20250305` típusú szerver oldali tool 3 kérésben jelenik meg önálló, egyelemű `tools` tömbben (`00004`, `00006`, `00007`), ugyanúgy mint M-17-nél. **Egyik stream válaszban sem jelent meg `server_tool_use` vagy `web_search_tool_result` blokk**, annak ellenére, hogy a futás sikeresen (`result` subtype: `success`) lezárult, és a `maxTurns` limit nem szakította meg.
+
+## Záró ellenőrzések (M-19 - M-25)
+
+- `grep -rl "$MINIMAX_API_KEY" tools/wire-probe/artifacts/ docs/` (a repo gyökér `.env`-jéből kiolvasott valós kulcsértékkel): **0 találat.**
+- `grep -rl "$GITHUB_TOKEN" tools/wire-probe/artifacts/ docs/`: **0 találat** (a javítás előtt 11 fájlban volt jelen, lásd fent).
+- `bun run typecheck`: hibátlan a `harness javítás` és a hét új case fájl felvétele után is.
+
 ## Záró ellenőrzések
 
 - `grep -r "$MINIMAX_API_KEY" tools/wire-probe/artifacts/ docs/`: **0 találat.**

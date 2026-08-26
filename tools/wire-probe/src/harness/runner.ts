@@ -109,7 +109,14 @@ export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunO
     harnessError,
     options: describeOptions(options),
   };
-  const metaJson = redactKnownSecrets(JSON.stringify(meta, null, 2), [ctx.minimaxApiKey]);
+  // A meta.json az Options.env-et is szó szerint kiírja (describeOptions), az
+  // pedig a teljes process.env-et tartalmazza (buildBaseOptions) -- emiatt a
+  // futtató környezet egyéb titkai (pl. GITHUB_TOKEN, GH_TOKEN a .cc-env-ből)
+  // is a lemezre kerülnének a MINIMAX_API_KEY mellett, ha nem fésülnénk át.
+  const otherKnownSecrets = [process.env.GITHUB_TOKEN, process.env.GH_TOKEN].filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+  const metaJson = redactKnownSecrets(JSON.stringify(meta, null, 2), [ctx.minimaxApiKey, ...otherKnownSecrets]);
   writeFileSync(metaPath, metaJson, 'utf8');
 
   const ok = harnessError === null;

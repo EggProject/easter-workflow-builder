@@ -91,6 +91,12 @@ export interface StreamingCapability {
   readonly sdkReassemblesToolInput: Fact<boolean>;
   /** Nem-first-party base URL mellett az SDK kikapcsolja. */
   readonly fineGrainedToolStreaming: Fact<boolean>;
+  /**
+   * Kikapcsolható-e a kimenő kérés `stream` mezője. Ez SDK szintű tulajdonság,
+   * nem a provideré: ha az `Options` típusban nincs ilyen mező, a nem stream
+   * válasz `usage` objektuma ezen az úton nem figyelhető meg.
+   */
+  readonly streamDisableable: Fact<boolean>;
 }
 
 export interface ServerToolDescriptor {
@@ -106,10 +112,20 @@ export interface ModelDescriptor<TModelId extends string, TFamilyId extends stri
   readonly family: TFamilyId;
   /** Dokumentált kontextusablak. */
   readonly contextWindow: Fact<number>;
-  /** Q11: amit az endpoint ténylegesen jelent, mérésből. */
+  /**
+   * Q11: amit az endpoint ténylegesen kiszolgál, mérésből. **Alsó korlát**:
+   * a legnagyobb sikeresen kiszolgált teljes bemeneti token szám
+   * (`usage.input_tokens` + `usage.cache_read_input_tokens`), nem a pontos határ.
+   */
   readonly effectiveContextWindowOnWire: Fact<number>;
   readonly maxOutputTokensRecommended: Fact<number>;
   readonly maxOutputTokensHard: Fact<number>;
+  /**
+   * A kimenő body `max_tokens` mezőjének kliens oldali felső korlátja. A Claude
+   * Code a saját modelltáblájának cap értékére vágja le a `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
+   * ennél nagyobb értékét is, ezért a provider dokumentált korlátja fölé nem lehet menni.
+   */
+  readonly maxOutputTokensWireCeiling: Fact<number>;
   readonly imageInput: Fact<boolean>;
   readonly videoInput: Fact<boolean>;
   /** Q10: szerepel-e a `GET /v1/models` válaszában. */

@@ -49,3 +49,6 @@ Thumbs.db
 # ideiglenes
 .cache/
 tmp/
+
+# Claude Code helyi beallitasok
+.claude/settings.local.json
