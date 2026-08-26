@@ -1,118 +1,121 @@
 # tools/wire-probe
 
+## Mi ez a mappa
+
 A SPEC-000 (`docs/spec/SPEC-000-provider-wire-measurement.md`) mérőeszköze: egy logoló
 reverse proxy és egy mérési harness a `minimax` provider drótszintű viselkedésének
-felderítéséhez. A gyökér Bun workspace tagja (`tools/*` glob), saját `package.json`-ja
-van, de a `tsconfig.json`-ja a `tooling/tsconfig/node.json` fájlt terjeszti ki, és nincs
-saját `bun.lock`-ja -- a függőségei a gyökér lockfile-ba olvadnak. Nem termékkód, tooling
--- de a projekt szigorú TypeScript szabályai (`strict`, nincs `any`, nincs `as`, valódi
-`#private` mező) rá is vonatkoznak. `test` scriptje nincs, tehát a mérések nem futnak a
-Turborepo `test` taskján keresztül CI-ben.
-
-**Kivétel: `src/no-shadowed-path-import.test.ts`.** Ez az egyetlen Vitest teszt a
-csomagban -- regressziós teszt egy korábban talált valós bugra (két mérési eset fájlban
-egy helyi `const path = ...` eltakarta a `node:path` importot, temporal dead zone
-`ReferenceError` kockázatával). A csomagnak nincs saját `test` npm scriptje, a teszt
-mégis lefut: a gyökér `vitest.config.ts` a `tools/wire-probe/src/**/*.test.ts` mintát
-explicit projektként veszi fel a Vitest saját "Test Projects" mechanizmusán keresztül,
-függetlenül a csomag `package.json`-jától. A `probe`/`proxy`/`summary` (valós API
-hívást tevő) scriptek ettől függetlenül nem futnak CI-ben.
-
-## Miért van itt két külön dolog
+felderítéséhez. Két külön dolog van itt, mert két külön felelősség:
 
 - **A proxy** (`src/proxy.ts`) egy loopback HTTP szerver, amit `ANTHROPIC_BASE_URL`-nek
   állítunk be. Mindent továbbít az upstreamre (`https://api.minimax.io/anthropic`
   alapértelmezésként), bájtszinten, útvonal-fehérlista nélkül, és minden tranzakciót
   maszkolva rögzít.
 - **A harness** (`src/probe.ts` + `src/cases/`) az Agent SDK `query()`-jét hívja a
-  SPEC-000 4. szekciójában felsorolt mérési esetek szerint (M-01 ... M-18), a proxyn
+  SPEC-000 4. szekciójában felsorolt mérési esetek szerint (M-01 ... M-36), a proxyn
   keresztül, hogy a tényleges HTTP forgalom rögzüljön.
 
-## Futtatás
+Ide **nem** tartozik semelyik esetnek a konkrét logikája (`src/cases/`), a proxy vagy a
+harness belső rétegének megvalósítása (`src/proxy/`, `src/harness/`) - azok saját
+`CLAUDE.md`-vel dokumentáltak. Nem termékkód: a gyökér workspace tagja (`tools/*` glob),
+de a `packages/*` fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is
+sorolja fel.
 
-Előfeltétel: a `MINIMAX_API_KEY` elérhető a repo gyökér `.env` fájljában, vagy a
-`process.env`-ben.
+## Fájlok
 
-```bash
-bun install                 # függőségek telepítése (@anthropic-ai/claude-agent-sdk@0.3.245 pontosan pinelve)
-bun run typecheck           # tsc --noEmit, strict, nincs any/as
+| Fájl                                  | Tartalom                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `package.json`                        | csomag manifeszt: `proxy`/`probe`/`summary`/`typecheck`/`lint` script, nincs `test` script |
+| `tsconfig.json`                       | a `tooling/tsconfig/node.json` kiterjesztése                                               |
+| `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                             |
+| `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                 |
+| `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                               |
+| `src/no-shadowed-path-import.test.ts` | regressziós Vitest teszt, lásd Szabályok                                                   |
 
-bun run proxy                                       # a proxy indítása (alapport 8787)
-WIRE_PROBE_PORT=9000 bun run proxy                  # más porton
-WIRE_PROBE_UPSTREAM=https://... bun run proxy       # más upstream
+Az `src/proxy/`, `src/harness/` és `src/cases/` alkönyvtár saját `CLAUDE.md`-vel
+dokumentált, lásd ott a fájllistát és a függőségi irányt.
 
-bun run probe M-01                                  # egy mérési eset
-bun run probe M-01 M-02 M-03                        # több eset
-bun run probe --all                                 # mind a 18
+## Függőségi irány
 
-bun run summary                                     # rövid, token-takarékos összefoglaló
-```
+Mitől függhet: a `tooling/tsconfig` csomagtól (a `tsconfig.json` a `node.json`-t
+terjeszti ki), és a saját `package.json`-jában önállóan pinelt függőségektől
+(`@anthropic-ai/claude-agent-sdk`, `zod` - a pontos verziószám nem itt, hanem a
+`docs/research/2026-08-26-toolchain.md` fájlban van, lásd Szabályok).
 
-A proxy külön processz -- előbb azt kell elindítani, utána a `probe`-ot egy másik
-terminálban. A `probe` a `WIRE_PROBE_PORT` env változóból olvassa, melyik proxy porton
-keresztül menjen (ugyanaz az érték, amit a proxynak is beállítottál).
+Mitől tilos függenie: bármely `packages/*` csomagtól. Nem termékkód, nem fogyaszt
+domain típust, a SPEC-001 3. szekció megengedett függőségi iránya nem is sorolja fel
+ebben a fában.
 
-**Útvonal-konvenció:** a proxy tisztán origin-cserét végez -- a bejövő kérés útvonalát
-(path + query) változatlanul a beállított upstream origin-jéhez fűzi. Emiatt az
-`ANTHROPIC_BASE_URL`-nek, amit a harness a `Options.env`-en keresztül beállít, ugyanazt
-az útvonal-előtagot kell tartalmaznia, mint az upstream URL-nek -- ez alapból mindkét
-oldalon `/anthropic` (lásd SPEC-000 4. szekció "Közös alapbeállítás").
+Ki függhet tőle: senki a workspace-ből. A `typecheck` és a `lint` taskja a Turborepo
+gráf tagja, de más csomag nem importál innen semmit.
 
-## Hova kerülnek az artefaktumok
+## Szabályok
 
-`tools/wire-probe/artifacts/` -- **a `.gitignore`-ban szerepel, sosem kerül gitbe.**
+- A projekt szigorú TypeScript szabályai (`strict`, nincs `any`, nincs `as`, valódi
+  `#private` mező) erre a mappára is vonatkoznak, annak ellenére, hogy nem termékkód.
+- Nincs `test` npm script, tehát a mérések (`probe`/`proxy`/`summary`, valós API hívást
+  tesznek) nem futnak a Turborepo `test` taskján keresztül CI-ben, és a CI nem is kap
+  MiniMax API kulcsot.
+- **Kivétel: `src/no-shadowed-path-import.test.ts`.** Ez az egyetlen Vitest teszt a
+  csomagban - regressziós teszt egy korábban talált valós bugra (két mérési eset fájlban
+  egy helyi `const path = ...` eltakarta a `node:path` importot, temporal dead zone
+  `ReferenceError` kockázatával). A gyökér `vitest.config.ts` a
+  `tools/wire-probe/src/**/*.test.ts` mintát explicit projektként veszi fel a Vitest
+  "Test Projects" mechanizmusán keresztül, függetlenül a csomag `package.json`-jától.
+- **Verziószám: nem itt.** A `@anthropic-ai/claude-agent-sdk` pontos, pinelt verziója a
+  `package.json`-ban és a `docs/research/2026-08-26-toolchain.md` "Rögzített verziók"
+  táblázatában van. Ez a fájl csak a csomag nevére hivatkozik, számra nem: egy
+  verzióemelésnél így csak egy helyen kell a számot módosítani.
+- **Futtatás.** Előfeltétel: a `MINIMAX_API_KEY` elérhető a repo gyökér `.env` fájljában,
+  vagy a `process.env`-ben.
 
-- A proxy minden tranzakciót egy önálló, sorszámozott JSON fájlba ír közvetlenül az
-  `artifacts/` alá: `00001-<epoch-ms>.json`, `00002-...json`, ...
-- A harness minden mérési eset (és futásán belüli minden `run`) SDKMessage folyamát és
-  meta adatait az `artifacts/harness/<caseId>/<runId>.sdk-messages.ndjson` és
-  `artifacts/harness/<caseId>/<runId>.meta.json` fájlokba írja.
-- Az `M-09` eset emellett egy `artifacts/harness/M-09/a.tool-callback-input.json`
-  fájlba is ír, hogy a tool callback ténylegesen megkapott argumentuma bájtszinten
-  összevethető legyen az `sdk-messages.ndjson` assistant `tool_use` inputjával (Q7).
+  ```bash
+  bun install                 # függőségek telepítése
+  bun run typecheck           # tsc --noEmit, strict, nincs any/as
 
-A SPEC-000 3. szekciójában leírt `docs/measurements/2026-08-26-minimax/M-XX/` végleges,
-gitbe kerülő struktúra ezekből az `artifacts/` nyersanyagokból áll össze -- annak
-összeállítása **nem ennek a mappának a feladata**, azt egy külön lépés végzi a teljes
-M-01...M-18 sorozat lefuttatása után.
+  bun run proxy                                       # a proxy indítása (alapport 8787)
+  WIRE_PROBE_PORT=9000 bun run proxy                  # más porton
+  WIRE_PROBE_UPSTREAM=https://... bun run proxy       # más upstream
 
-## Maszkolás
+  bun run probe M-01                                  # egy mérési eset
+  bun run probe M-01 M-02 M-03                        # több eset
+  bun run probe --all                                 # az összes
 
-- `src/proxy/mask.ts`: az `authorization` és `x-api-key` header értéke hossz- és
-  utolsó-4-karakter-megtartó maszkot kap (`maskSecretValue`), hogy azonosítható maradjon
-  melyik kulcs volt, de a titok ne szivárogjon.
-- Emellett a teljes szerializált tranzakció (és a harness `meta.json`-ja) még egyszer át
-  van fésülve a ténylegesen ismert `MINIMAX_API_KEY` értékre: minden előfordulás
-  `REDACTED`-re cserélődik, memóriában, a lemezre írás előtt (`redactKnownSecrets`).
-- Nyers, maszkolatlan artefaktum sosem íródik lemezre.
-- Ellenőrzés commit előtt: `grep -r "$MINIMAX_API_KEY" tools/wire-probe/artifacts/`
-  nulla találatot kell adjon.
+  bun run summary                                     # rövid, token-takarékos összefoglaló
+  ```
 
-## Fájlstruktúra
+  A proxy külön processz - előbb azt kell elindítani, utána a `probe`-ot egy másik
+  terminálban. A `probe` a `WIRE_PROBE_PORT` env változóból olvassa, melyik proxy porton
+  keresztül menjen (ugyanaz az érték, amit a proxynak is beállítottál).
 
-```
-src/
-  proxy.ts               a proxy belépési pontja (CLI: bun run proxy)
-  proxy/
-    types.ts              RecordedTransaction és StreamEventRecord típusok
-    mask.ts                header- és szöveg-maszkoló segédfüggvények
-    recorder.ts             TransactionRecorder: sorszámozott JSON fájlba írás
-  probe.ts                a harness belépési pontja (CLI: bun run probe <eset...>)
-  harness/
-    types.ts               CaseContext, MeasurementCase, CaseRunOutcome
-    environment.ts           MINIMAX_API_KEY betöltése process.env-ből vagy .env-ből
-    sdk-constants.ts         a telepített SDK típusdefiníciójából kiolvasott enumok
-    runner.ts                közös futtató logika: executeQuery(), buildBaseOptions()
-  cases/
-    index.ts                típusos registry: CASE_REGISTRY, CASE_IDS
-    m-01.ts ... m-36.ts      egy mérési eset egy fájlban, a SPEC-000 4. szekció szerint
-  summary.ts               token-takarékos összefoglaló script (CLI: bun run summary)
-  no-shadowed-path-import.test.ts   regressziós teszt, lásd fent
-```
+- **Útvonal-konvenció.** A proxy tisztán origin-cserét végez - a bejövő kérés útvonalát
+  (path + query) változatlanul a beállított upstream origin-jéhez fűzi. Emiatt az
+  `ANTHROPIC_BASE_URL`-nek, amit a harness a `Options.env`-en keresztül beállít, ugyanazt
+  az útvonal-előtagot kell tartalmaznia, mint az upstream URL-nek - ez alapból mindkét
+  oldalon `/anthropic` (lásd SPEC-000 4. szekció "Közös alapbeállítás").
+- **Artefaktumok.** `tools/wire-probe/artifacts/` - a `.gitignore`-ban szerepel, sosem
+  kerül gitbe. A proxy minden tranzakciót egy önálló, sorszámozott JSON fájlba ír
+  közvetlenül az `artifacts/` alá. A harness minden mérési eset (és futásán belüli minden
+  `run`) `SDKMessage` folyamát és meta adatait az
+  `artifacts/harness/<caseId>/<runId>.sdk-messages.ndjson` és
+  `artifacts/harness/<caseId>/<runId>.meta.json` fájlokba írja. A SPEC-000 3. szekciójában
+  leírt `docs/measurements/2026-08-26-minimax/M-XX/` végleges, gitbe kerülő struktúra
+  ezekből a nyersanyagokból áll össze, egy külön lépésben - az nem ennek a mappának a
+  feladata.
+- **Maszkolás.** Az `authorization` és `x-api-key` header értéke hossz- és
+  utolsó-4-karakter-megtartó maszkot kap (`maskSecretValue`, `src/proxy/mask.ts`). A
+  teljes szerializált tranzakció (és a harness `meta.json`-ja) még egyszer át van fésülve
+  a ténylegesen ismert `MINIMAX_API_KEY` értékre: minden előfordulás `REDACTED`-re
+  cserélődik, memóriában, a lemezre írás előtt (`redactKnownSecrets`). Nyers, maszkolatlan
+  artefaktum sosem íródik lemezre. Ellenőrzés commit előtt:
+  `grep -r "$MINIMAX_API_KEY" tools/wire-probe/artifacts/` nulla találatot kell adjon.
+- **Ismert, ellenőrzött korlátozás.** A telepített SDK `Options` típusában **nincs**
+  közvetlen "max kimenő token" mező. A részletes indoklás és a talált alternatívák
+  (`maxTurns`, `maxBudgetUsd`, az alpha `taskBudget`, ami éppen az `output_config` mezőt
+  szennyezné be) a `src/harness/sdk-constants.ts` tetején olvasható forrás-hivatkozásokkal.
 
-## Ismert, ellenőrzött korlátozás
+## Kapcsolódó dokumentumok
 
-A telepített `@anthropic-ai/claude-agent-sdk@0.3.245` `Options` típusában **nincs**
-közvetlen "max kimenő token" mező. A részletes indoklás és a talált alternatívák
-(`maxTurns`, `maxBudgetUsd`, az alpha `taskBudget`, ami éppen az `output_config` mezőt
-szennyezné be) a `src/harness/sdk-constants.ts` tetején olvasható forrás-hivatkozásokkal.
+- [`../../docs/spec/SPEC-000-provider-wire-measurement.md`](../../docs/spec/SPEC-000-provider-wire-measurement.md)
+- [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 13. szekció ("A `tools/wire-probe` viszonya")
+- [`../../docs/research/2026-08-26-agent-sdk-minimax.md`](../../docs/research/2026-08-26-agent-sdk-minimax.md)
+- [`../../docs/research/2026-08-26-toolchain.md`](../../docs/research/2026-08-26-toolchain.md): a `@anthropic-ai/claude-agent-sdk` és a `zod` pontos verziója

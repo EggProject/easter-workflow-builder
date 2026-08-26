@@ -173,7 +173,17 @@ wrapper_extract_error_lines() {
     return
   fi
 
-  # Tartalek: barmilyen mas eszkoz kimenete - a hiba/fail szot tartalmazo
-  # sorokat adjuk vissza valtoztatas nelkul, hogy legyen valami tamponpont.
-  grep -iE 'error|fail' "$log_file" || true
+  # Tartalek: barmilyen mas eszkoz kimenete (pl. egy build plugin uncaught
+  # kivetele) - a hiba/fail szot tartalmazo sorokat adjuk vissza, DE a V8/Node
+  # stack trace keret-sorait ("    at fuggvenynev (fajl:sor:oszlop)" vagy
+  # "    at fajl:sor:oszlop", a szabvanyos Error.stack alak, forras:
+  # https://v8.dev/docs/stack-trace-api) kiszurjuk. Ezek a sorok gyakran maguk
+  # is tartalmazzak az "error"/"fail" szot egy fuggveny- vagy fajlnevben (pl.
+  # "aggregateBindingErrorsIntoJsError"), tehat a naiv grep nelkuluk a teljes
+  # nyers stack trace-t a konzolra irna - a CLAUDE.md szerint a wrapper csak
+  # osszegzest ad, a teljes kimenet (stack trace-szel egyutt) a naplofajlban
+  # marad, aminek utjat a hivo mindig megkapja hiba eseten.
+  grep -iE 'error|fail' "$log_file" \
+    | grep -vE '(^|: )[[:space:]]*at [A-Za-z0-9_#.<>]+ \(.*:[0-9]+:[0-9]+\)[[:space:]]*\{?$|(^|: )[[:space:]]*at .*:[0-9]+:[0-9]+\)?[[:space:]]*$' \
+    || true
 }

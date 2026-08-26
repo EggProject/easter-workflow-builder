@@ -16,14 +16,17 @@ dokumentációban ellenőrizve van, mit csinál.
 
 ## Összesítés
 
-| Állapot                                                                    | Pontok                              | Darab  |
-| -------------------------------------------------------------------------- | ----------------------------------- | ------ |
-| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11 | 7      |
-| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15     | 6      |
-| Lezárva, tárgytalan                                                        | V-4                                 | 1      |
-| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                          | 2      |
-| **Nyitva marad**                                                           | V-14                                | **1**  |
-| Összesen                                                                   |                                     | **17** |
+| Állapot                                                                    | Pontok                                    | Darab  |
+| -------------------------------------------------------------------------- | ----------------------------------------- | ------ |
+| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11, V-18 | 8      |
+| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15           | 6      |
+| Lezárva, tárgytalan                                                        | V-4                                       | 1      |
+| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                                | 2      |
+| **Nyitva marad**                                                           | V-14, V-19                                | **2**  |
+| Összesen                                                                   |                                           | **19** |
+
+V-18 és V-19 az elfogadási kritériumok tételes auditja során merült fel, utólag, a fenti
+pontok eredeti lezárása után - lásd a saját szakaszaikat lent.
 
 ---
 
@@ -557,6 +560,120 @@ nem rögzítünk.
 `retention-days` bemenetet, tehát a repository beállítása érvényesül. Ez tudatos döntés, nem
 hiányosság, és a workflow kommentje ezt jelöli. Ha a projekt később szeretne rövidebb retenciót, azt
 a repository beállítás oldalán kell megtenni, egy helyen, nem a workflow-ban szétszórva.
+
+---
+
+## V-18: a `//#test` gyökér-szkópolt task `dependsOn` értéke
+
+**Kérdés.** A SPEC-001 5. szekció eredeti táblázata a `test` taskra `dependsOn: ["^typecheck"]`
+értéket írt elő, ugyanúgy, mint a `lint`-re. A tényleges `turbo.json`-ban a `test` task
+`//#test` néven, gyökér-szkópolt taskként létezik (mert a Vitest coverage a 9. szekció szerint
+kizárólag a teljes folyamatra vonatkozik), és `dependsOn: []` értékkel. Helyes-e ez az eltérés,
+vagy pótolandó hiba.
+
+**Válasz.** Az eltérés **helyes**, a spec eredeti értéke technikailag nem alkalmazható egy
+gyökér-szkópolt taskra. A `dependsOn: []` marad, a SPEC-001 szövege lett a valósághoz igazítva.
+
+**Bizonyíték, dokumentáció.** A Turborepo "Registering Root Tasks" szakasza szerint a
+gyökérre szkópolt (`//#<task>`) taskok saját, önálló bejegyzések, a hivatalos példa
+(`"//#lint:root": {}`) **nem használ `dependsOn`-t**
+([configuring-tasks#registering-root-tasks](https://turborepo.dev/docs/crafting-your-repository/configuring-tasks#registering-root-tasks)).
+A `^` mikroszintaxis dokumentált jelentése: _"the `^` microsyntax tells Turborepo to run the
+task in **direct dependencies**"_, azaz a csomag `package.json` `dependencies`/`devDependencies`
+mezőjében ténylegesen felsorolt workspace csomagok azonos nevű taskját várja be.
+
+**Bizonyíték, saját mérés.** `turbo run test --dry=json` a `//#test` task `dependsOn:
+["^typecheck"]` mellett (ideiglenes próba, nem került commitba):
+
+```json
+"taskId": "//#test",
+"dependencies": ["eslint-config#typecheck"],
+"resolvedTaskDefinition": { "dependsOn": ["^typecheck"], ... }
+```
+
+A gyökér `package.json`-nak **nincs** `dependencies` mezője, a `devDependencies` mezőben pedig
+kizárólag a `tooling/eslint-config` szerepel workspace hivatkozásként (`"eslint-config":
+"workspace:*"`). A `^typecheck` tehát nem az összes termékcsomag (`packages/core`,
+`packages/providers`, `apps/server` stb.) típusellenőrzését várná be, hanem kizárólag az
+`eslint-config` csomagét - ez a csomag pedig nem is az, amit a Vitestnek ténylegesen be kellene
+várnia. A `^typecheck` a root taskon **hamis biztonságérzetet** adna: úgy tűnne, mintha a teszt
+a teljes workspace típusellenőrzésétől függene, valójában majdnem semmitől nem függ.
+
+**Miért nincs is szükség rá.** A V-1 döntés szerint a könyvtárcsomagok forrás `.ts` alakban
+fogyaszthatók, a `tsc --noEmit` nem termel artefaktumot, amit a Vitest felhasználna - tehát a
+Vitestnek nincs mire várnia buildként vagy típus-ellenőrzésként, a `test` és a `typecheck`
+egymástól ténylegesen független taskok. A CI `verify` jobja (`turbo run format:check typecheck
+lint test`, 12. szekció) mindkettőt lefuttatja egy hívásban, sorrend nélkül is helyes eredménnyel.
+
+**Következmény.** A `turbo.json` `//#test` taskja `dependsOn: []` marad (nem módosult kód). A
+SPEC-001 5. szekció szövege és a 16. szekció 5. kritériuma frissült, hogy ezt a tényt és az
+indoklást tükrözze - ez a spec egy hibás feltételezésének utólagos javítása, nem a kritérium
+megkerülése: a hibás feltételezés (hogy a `test` csomagonként ismétlődő task lesz) még a Vitest
+coverage architektúrájának teljes felderítése előtt került a specbe.
+
+---
+
+## V-19: a Playwright smoke teszt tényleges böngésző-futtatása ebben a sandboxban
+
+**Kérdés.** A `turbo run test:e2e` (illetve `bun run test:e2e` az `apps/web` csomagban) valóban
+lefuttatja-e végig a Playwright smoke tesztet ebben a végrehajtási környezetben, és ha nem, mi a
+pontos hiba.
+
+**Válasz.** **Nem fut le.** A `webServer` és a Playwright-infrastruktúra maga helyesen működik,
+de a Chromium tényleges elindítása ebben a sandboxban meghiúsul, mert a host rendszerből
+hiányoznak a böngésző futtatásához szükséges natív függőségek, és nincs jogosultság a
+telepítésükhöz.
+
+**Bizonyíték, saját mérés.** Két lépésben:
+
+1. `playwright test` közvetlenül (nem `bun run` scripten keresztül) az `apps/web` könyvtárból:
+   `[WebServer] /bin/sh: 1: vite: not found`, kilépési kód 127. Ez **nem** a valódi hiba, hanem a
+   shell PATH-ja nem tartalmazza a helyi `node_modules/.bin`-t, mert a `webServer.command` nyers
+   shell parancsként fut, nem `bun run`/`npm run` szkript-kontextusban.
+2. `bun run test:e2e` (a csomag saját `package.json` scriptje, ami helyesen állítja be a
+   PATH-ot): a `vite build && vite preview` sikeresen elindul, a Playwright eléri a portot, majd:
+
+   ```
+   Error: browserType.launch:
+   ╔══════════════════════════════════════════════════════╗
+   ║ Host system is missing dependencies to run browsers. ║
+   ║ Please install them with the following command:      ║
+   ║     sudo npx playwright install-deps                 ║
+   ║ Alternatively, use apt:                               ║
+   ║     sudo apt-get install libxdamage1                  ║
+   ╚══════════════════════════════════════════════════════╝
+   ```
+
+A javasolt javítás (`sudo npx playwright install-deps`) ellenőrizve, miért nem elvégezhető:
+
+```
+$ id
+uid=1045(vigilant-clever-mendel) gid=1045(vigilant-clever-mendel) groups=1045(vigilant-clever-mendel)
+$ sudo -n true
+sudo: /etc/sudo.conf is owned by uid 65534, should be 0
+sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+sudo: If sudo is running in a container, you may need to adjust the container configuration to disable the flag.
+$ apt-get install -y libxdamage1
+E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are you root?
+```
+
+A sandbox nem-root felhasználóként fut (`uid=1045`), a konténer explicit `no new privileges`
+flaggel tiltja a `sudo`-t, és a csomagkezelő zárolt fájlja sem írható nem-root felhasználóként.
+Ez tehát valóban egy rootless konténer korlátja, nem a Playwright-konfiguráció hibája.
+
+**Amit ez NEM jelent.** A `playwright.config.ts`, a `webServer` beállítás, a smoke teszt saját
+kódja (`e2e/smoke.spec.ts`) és a Chromium bináris telepítése (`~/.cache/ms-playwright/` alatt
+megvan, `playwright --version` sikeres) mind rendben van. Kizárólag a böngésző-folyamat tényleges
+indítása igényel olyan rendszerkönyvtárakat (pl. `libxdamage1`), amik ebben a képben hiányoznak
+és nem telepíthetők jogosultság híján.
+
+**Következmény.** A SPEC-001 16. szekció 22. kritériuma környezetfüggőként jelölve: az
+infrastruktúra-rész igazolt, a tényleges böngésző-futtatás ebben a sandboxban nem igazolható és
+nem javítható itt. GitHub Actions `ubuntu-latest` runneren ez a korlát várhatóan nem áll fenn
+(ott root felhasználóval fut a job, és a runner image tartalmazza az általános grafikus
+függőségeket), de ezt csak egy tényleges CI futtatás igazolhatja - ez a lezárás következő lépése,
+ha a projekt szeretné a V-19-et formálisan is lezárni.
 
 ---
 
