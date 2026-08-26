@@ -15,14 +15,22 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `_lib.sh`      | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                     |
 | `lint.sh`      | `turbo run lint` burkoló                                                                                                                                                |
 | `typecheck.sh` | `turbo run typecheck` burkoló                                                                                                                                           |
-| `test.sh`      | `turbo run test` burkoló                                                                                                                                                |
+| `test.sh`      | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                   |
 | `build.sh`     | `turbo run build` burkoló                                                                                                                                               |
 | `format.sh`    | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi |
 
 ## Szabályok
 
-- A csonkolási határ (`_lib.sh` `WRAPPER_ERROR_LIMIT`, `format.sh` `WRAPPER_FILE_LIMIT`)
-  50, önkényesen választva - nincs rá dokumentált szabály (SPEC-001 11. szekció, V-16).
+- A csonkolási határ (`_lib.sh` `WRAPPER_ERROR_LIMIT`, `format.sh` `WRAPPER_FILE_LIMIT`,
+  `test.sh` `WRAPPER_ERROR_LIMIT` és `WRAPPER_MESSAGE_CHAR_LIMIT`) 50 (sorszám), illetve
+  200 (karakter), önkényesen választva - nincs rá dokumentált szabály (SPEC-001 11.
+  szekció, V-16).
+- A `test.sh` a Vitest `--reporter=json --outputFile=...` kimenetéből olvassa a teszt
+  összegzőt (`numTotalTests`/`numPassedTests`/`numFailedTests`, `jq`-val), a hibás
+  tesztek nevét és üzenetét pedig a `testResults[].assertionResults[]` tömbből. A
+  coverage összegzőt (metrikánként a százalék és a 100%-os küszöb) a
+  `coverage/coverage-summary.json` `total` kulcsából olvassa - ezt a
+  `vitest.config.ts` `coverage.reporter` `json-summary` bejegyzése írja.
 - A hibasor-kinyerés két formátumot ismer fel: az ESLint "stylish" alakot (fájl fejléc +
   behúzott `sor:oszlop severity üzenet szabály` sorok) és a `tsc` klasszikus
   `fájl(sor,oszlop): error TSxxxx: üzenet` alakját. Ami egyiket sem illeszti, ott a
@@ -32,9 +40,22 @@ wrapperek maguk bash fájlok, nem TypeScript).
   hibás csomag ne akassza meg a többi futását, a `--summarize=true` adja a gépileg
   olvasható JSON összegzőt (`execution.success/failed/cached/attempted`), amiből az
   összegző sor épül.
-- A `format:check` gyökér turbo task (`turbo.json` `//#format:check`) nem ezeken a
-  wrappereken keresztül fut a CI-ben, hanem közvetlenül `turbo run format:check`
-  paranccsal - a `format.sh` wrapper a helyi fejlesztői/ad-hoc használatra való.
+- A gyökér `package.json` `format:check` scriptje a `format.sh` wrappert hívja
+  közvetlenül, nem a `turbo.json` `//#format:check` taskján keresztül - ugyanaz az
+  indok, mint fent: a Prettier egyetlen futással fedi a teljes repót, nincs mit a
+  Turborepo taskgráfjára bízni. A CI is a `bun run format:check` scriptet hívja, tehát
+  a fejlesztő helyben és a CI ugyanazt a parancsot futtatja.
+- Ugyanez igaz a `test.sh`-ra: a `turbo.json` `//#test` taskja (nem `test`, hanem a `//#`
+  előtaggal gyökérre skópolt) a gyökér `package.json` `"test": "vitest run --coverage"`
+  scriptjét hívja, CI-ben `turbo run format:check typecheck lint test` paranccsal. A
+  `test.sh` ugyanezt a Vitest parancsot közvetlenül hívja, nem a turbo taskon keresztül -
+  indok: a Vitest a `coverage` blokkot kizárólag a gyökér configban értelmezi
+  (projektenként "Unsupported Option", https://vitest.dev/guide/projects), tehát a
+  lefedettség EGYETLEN, gyökér szintű Vitest folyamatban gyűlik, ahogy a Prettier is
+  egyetlen futással fedi a repót. A `//#test` elnevezés azért nem lehetett sima `test`,
+  mert a gyökér `package.json` `"test"` scriptje maga a Vitest parancs, és ha a task
+  nem-prefixelt lenne, a per-csomag taskgráf a gyökeret sosem érintené (mérve: a
+  Turborepo `--dry=json` kimenete a nem-prefixelt taskoknál kihagyja a `//` csomagot).
 
 ## Kapcsolódó dokumentumok
 

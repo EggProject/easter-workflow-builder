@@ -1,0 +1,255 @@
+name: CI
+
+# A `main` vedett, PR-rel dolgozunk (SPEC-001 12. szekcio). A workflow PR-en
+# es a `main`-re iranyulo push-on fut.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Legszukebb jogosultsag: egyik job sem ir vissza a repoba, csak olvas es
+# artefaktumot tolt fel. (GitHub Security hardening guide alapja, nem
+# specifikus verziohoz kotott, nem tartalmaz becsult szamot.)
+permissions:
+  contents: read
+
+jobs:
+  # A fuggosegek telepitese es a Bun globalis cache elokeszitese. A tobbi
+  # job kulon runneren fut, tehat ujra kell telepitenie a fuggosegeket, de
+  # a `~/.bun/install/cache` cache-bol ez gyors.
+  install:
+    name: Install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      # A `setup-node` `cache` bemenete csak npm/yarn/pnpm erteket ismer, a
+      # `bun` nem tamogatott (SPEC-001 12. szekcio) - a Node verzio
+      # beallitasara hasznaljuk, a fuggoseg-cache-t kulon `actions/cache`
+      # lepes adja.
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '26.7.0'
+
+      # Nem hivatalos recept (SPEC-001 12. szekcio, V-14: meg nincs merve,
+      # hogy nyer-e idot CI-ben). A konyvtar helye hivatalosan dokumentalt:
+      # https://bun.com/docs/pm/global-cache
+      - name: Cache Bun global cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+  # Egyetlen job a format:check + typecheck + lint + test taskoknak, mert a
+  # Turborepo maga oldja fel a taskok kozotti fuggoseget (SPEC-001 12.
+  # szekcio indoklasa). Mindegyik lepes a tooling/scripts alatti token
+  # takarekos wrapper scriptet hivja, nem kozvetlenul a prettier/tsc/eslint/
+  # vitest binarist.
+  verify:
+    name: Verify (format, typecheck, lint, test)
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '26.7.0'
+
+      - name: Cache Bun global cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # Turborepo hivatalos ajanlasa a helyi cache-re, mert nincs Vercel
+      # Remote Cache fiokunk: https://turborepo.dev/docs/guides/ci-vendors/github-actions
+      # ("Remote Caching with GitHub actions/cache" szekcio). A kulcs es a
+      # restore-keys minta onnan szo szerint atveve.
+      - name: Cache Turborepo
+        uses: actions/cache@v6.1.0
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format check
+        run: bun run format:check
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun run test
+
+      # Mindig feltoltjuk, siker es hiba eseten is (SPEC-001 12. szekcio
+      # artefaktum tablazata). A retencios napszamot nem allitjuk be
+      # explicit ertekkel (V-17 nyitva, nincs projekt szintu forras), az
+      # repo alapertelmezese ervenyesul.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: coverage-report
+          path: |
+            **/coverage/**
+          if-no-files-found: warn
+
+  build:
+    name: Build
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '26.7.0'
+
+      - name: Cache Bun global cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Turborepo
+        uses: actions/cache@v6.1.0
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+  # ---------------------------------------------------------------------
+  # e2e: BEKAPCSOLVA, `continue-on-error: true` mellett.
+  #
+  # A Playwright infra (playwright.config.ts, apps/web/e2e/*, a
+  # vite-plugin-istanbul instrumentalas) idokozben elkeszult egy
+  # parhuzamosan dolgozo agent altal. Ez a job most mar futtatja.
+  #
+  # Bongeszo telepites: a hivatalos Playwright CI utmutato
+  # (https://playwright.dev/docs/ci, "Install Playwright" szekcio) ezt irja
+  # elo: `npx playwright install --with-deps`. Itt chromiumra szukitve,
+  # mert a playwright.config.ts jelenleg kizarolag a chromium projektet
+  # definialja. Ugyanez az utmutato kifejezetten ELLENJAVALLJA a bongeszo
+  # binarisok cache-eleset ("Caching browsers" szekcio: "the amount of time
+  # it takes to restore the cache is comparable to the time it takes to
+  # download the binaries... OS dependencies... are not cacheable"), ezert
+  # itt sincs kulon `actions/cache` lepes a bongeszore - ez mar a 12.
+  # szekcio "Cache" tablazataban is igy szerepel.
+  #
+  # HELYI PROBA EBBEN A VEGREHAJTASI KORNYEZETBEN (nem a GitHub Actions
+  # runner!): `npx playwright install --with-deps chromium` majd
+  # `npx playwright test` - a config es a smoke teszt ERVENYES
+  # (`playwright test --list` egyetlen tesztet talal), de a tenyleges
+  # bongeszo-inditas HIBAZIK, mert ez a sandbox rootless konteneben fut,
+  # es a `sudo npx playwright install-deps` nem tud rendszer csomagot
+  # telepiteni ("sudo: the 'no new privileges' flag is set..."). Ez a mi
+  # sajat futtatokornyezetunk korlatja, nem a GitHub-hosztolt
+  # ubuntu-latest runnere, de innen a tenyleges zold futast nem tudtuk
+  # empirikusan igazolni. Ezert a job `continue-on-error: true`: a
+  # hivatalos dokumentaciobol idezve (docs.github.com,
+  # `jobs.<job_id>.continue-on-error`) "Prevents a workflow run from
+  # failing when a job fails" - tehat a job bekapcsolva fut, de nem
+  # blokkolja a workflow-t, amig egy valodi GitHub Actions futtatas nem
+  # igazolja a zold allapotot.
+  # ---------------------------------------------------------------------
+  e2e:
+    name: E2E
+    needs: build
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '26.7.0'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        run: bun run test:e2e
+
+      # A window.__coverage__ nyers adatat az apps/web/e2e/coverage-fixture.ts
+      # menti tesztenkent az apps/web/e2e/.nyc_output ala; ezt fesuli ossze
+      # az apps/web/package.json mar letezo `coverage:e2e:report` scriptje
+      # (nyc report). Kuszob nincs (SPEC-001 10. szekcio, 24. elfogadasi
+      # kriterium), csak riport.
+      - name: Generate e2e coverage report
+        if: always()
+        working-directory: apps/web
+        run: bun run coverage:e2e:report
+
+      - name: Upload e2e coverage report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: e2e-coverage-report
+          path: apps/web/coverage-e2e/**
+          if-no-files-found: warn
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            **/playwright-report/**
+            **/test-results/**
+          if-no-files-found: ignore

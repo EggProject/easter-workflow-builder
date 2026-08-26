@@ -43,6 +43,15 @@ Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `a
 (helyette `satisfies` vagy explicit típusannotáció), a leíró objektum literál
 `satisfies ProviderCapabilityDescriptor<...>` alakban kapcsolódik a típushoz.
 
+**Coverage: ideiglenesen kizárva.** A gyökér `vitest.config.ts` `coverage.exclude` listája
+jelenleg a `packages/providers/src/**` teljes fáját kizárja a 100%-os lefedettségi
+küszöbből, kommenttel indokolva. Nem azért, mert a mappa csak adat literál - az
+`evidence/is-known.ts` és `evidence/is-unknown.ts` valódi, elágazással rendelkező
+typeguard logikát tartalmaz -, hanem mert ehhez a csomaghoz jelenleg nincs egyetlen
+funkcionális Vitest teszt sem. Amint készül egy, a kizárást szűkíteni kell: csak az adat
+literál fájlok (`minimax/**`, `claude-subscription/**`, `capability/**`,
+`evidence/` nem-typeguard fájljai) maradhatnak kizárva, a typeguardok nem.
+
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-000-provider-wire-measurement.md`](../../docs/spec/SPEC-000-provider-wire-measurement.md): a típusterv és a mérési esetek

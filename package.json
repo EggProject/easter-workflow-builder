@@ -13,24 +13,31 @@
   "engines": {
     "node": ">=26.0.0"
   },
+  "overrides": {
+    "type-fest": "4.41.0"
+  },
   "scripts": {
     "build": "bash tooling/scripts/build.sh",
     "typecheck": "bash tooling/scripts/typecheck.sh",
     "lint": "bash tooling/scripts/lint.sh",
     "format": "bash tooling/scripts/format.sh --write",
-    "format:check": "prettier --check .",
-    "test": "bash tooling/scripts/test.sh",
+    "format:check": "bash tooling/scripts/format.sh",
+    "test": "vitest run --coverage",
     "test:e2e": "turbo run test:e2e",
     "dev": "turbo run dev"
   },
   "devDependencies": {
-    "typescript": "6.0.3",
-    "turbo": "2.10.12",
+    "@playwright/test": "1.62.1",
     "@types/node": "^26.0.0",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.9.1",
     "eslint-config": "workspace:*",
     "eslint-config-prettier": "10.1.8",
+    "happy-dom": "20.11.6",
     "jiti": "2.7.0",
-    "prettier": "3.9.6"
+    "prettier": "3.9.6",
+    "turbo": "2.10.12",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
   }
 }

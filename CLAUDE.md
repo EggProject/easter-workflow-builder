@@ -172,3 +172,42 @@ Részletek: `docs/research/2026-08-26-agent-sdk-minimax.md` és `docs/spec/SPEC-
 Az `@anthropic-ai/claude-agent-sdk` verziója **pinelve**, mert a kiküldött request body mezők
 listája verziónként bővül, és egy új mező MiniMax ellen 400-at okozhat. Frissítés előtt a
 SPEC-000 mérései regresszióként futtatandók.
+
+### Teszt infrastruktúra
+
+A gyökér `vitest.config.ts` `test.projects` mezője (`packages/*`, `apps/*`) fogja össze a
+csomagokat, `apps/web` és `packages/ui` saját `vitest.config.ts`-e adja a `happy-dom`
+környezetet, a többi Node alatt fut. A Vitest a `coverage` blokkot kizárólag a gyökér configban
+értelmezi (projekt szinten "Unsupported Option", https://vitest.dev/guide/projects), ezért a
+lefedettség EGYETLEN, gyökér szintű folyamatban gyűlik: a `tooling/scripts/test.sh` és a
+`turbo.json` `//#test` taskja is közvetlenül a gyökér `vitest run --coverage` parancsot hívja,
+nem `turbo run test`-en keresztül csomagonként (ugyanaz az elv, mint a `format:check`-nél: a
+Prettier is közvetlenül fut, nem taskon keresztül).
+
+**Coverage küszöb, jelenlegi állapot.** A csomagok most placeholder tartalommal állnak, a
+`packages/providers/src/**` pedig (van benne valódi logika, `isKnown`/`isUnknown`) egyetlen
+funkcionális Vitest teszttel sincs lefedve. A 100%-os küszöböt ezért egy ideiglenes,
+`vitest.config.ts`-ben kommentezett `coverage.exclude` bejegyzés tartja zölden: a
+`packages/providers/src/**` és az `apps/web/src/main.ts` (Playwright e2e váz belépési pont,
+nem termékkód) teljesen ki van zárva. **Szigorítani kell**, amint valamelyikhez valódi Vitest
+teszt készül: akkor a kizárás törlendő, és a `packages/providers` esetén csak az adat literál
+fájlokra szűkítendő (a typeguardok maradjanak a lefedettségben, SPEC-001 9. szekció eredeti
+szándéka szerint).
+
+A `tools/wire-probe` csomagnak nincs `test` npm scriptje (SPEC-001 13. szekció, a mérések nem
+futhatnak CI-ben MiniMax API kulcs nélkül), de a `no-shadowed-path-import.test.ts` regressziós
+tesztje mégis lefut: a gyökér `vitest.config.ts` a `tools/wire-probe/src/**/*.test.ts` mintát
+explicit projektként veszi fel, függetlenül attól, hogy a csomagnak van-e `test` scriptje.
+
+A Playwright `retries` alapértelmezése (`0`, https://playwright.dev/docs/test-retries) van
+használatban, mert erre nincs saját mérésünk. A `vite-plugin-istanbul@9.0.1` Vite 8-cal
+(Rolldown) való működése SPEC-001-ben nyitott kérdés volt - **empirikusan igazolt** (izolált
+próba: `vite build` sikeres, a kimenetben ténylegesen megjelenik a `window.__coverage__`
+inicializálás `forceBuildInstrument: true` mellett), az `apps/web/vite.config.ts` és a
+`apps/web/e2e/coverage-fixture.ts` be is köti.
+
+A `package.json` gyökér `overrides.type-fest` bejegyzés azért kell, mert a Vitest/Playwright/nyc
+függőségi fa behozza a `hasha@5.2.2` csomagot, ami a `type-fest@^0.8.0`-t igényli, és a Bun ezt
+hoistolta a megosztott `type-fest` helyre - ez ütközött az `eslint-plugin-import-x` láncban lévő
+`eslint-import-context` csomaggal, ami (deklarálatlanul) egy újabb `type-fest` `KebabCase`
+exportját várja. A `hasha` nem típusellenőrzött ebben a repóban, tehát az override biztonságos.
