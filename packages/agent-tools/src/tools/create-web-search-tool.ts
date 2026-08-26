@@ -1,0 +1,48 @@
+import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
+import { ENV_MINIMAX_API_KEY } from '../config/environment-variable-name.ts';
+import { resolveMiniMaxConfig } from '../config/resolve-minimax-config.ts';
+import { callMiniMax } from '../minimax/call-minimax.ts';
+import { PATH_SEARCH } from '../minimax/endpoint-path.ts';
+import { formatSearchResponse } from '../minimax/format-search-response.ts';
+import { isSearchResponse } from '../minimax/is-search-response.ts';
+import { errorToolResult } from '../result/error-tool-result.ts';
+import { isOkOutcome } from '../result/is-ok-outcome.ts';
+import { textToolResult } from '../result/text-tool-result.ts';
+import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+
+// Lapos séma, egyetlen kötelező szöveges mezővel. A mérésünk szerint a MiniMax
+// a tool sémát nem utasítja vissza újrapróbálkozással, ezért egy bonyolultabb
+// séma azonnali hibát okozna, javítási lehetőség nélkül.
+const inputSchema = {
+  query: z.string().min(1).describe('Search query, ideally 3 to 5 keywords.'),
+};
+
+const description =
+  'Search the web and return the ranked organic results with title, link and snippet. Use it whenever the answer depends on current or external information. If the results are not useful, rephrase the query with different keywords.';
+
+/**
+ * Web kereső eszköz a MiniMax kereső végpontja fölött. Azért kell, mert a
+ * MiniMax Anthropic kompatibilis endpontja a szerver oldali keresőt csendben
+ * eldobja, tehát a modell forrás nélkül, a saját tudásából válaszolna.
+ */
+export function createWebSearchTool(dependencies: AgentToolDependencies): SdkMcpToolDefinition<typeof inputSchema> {
+  return tool('web_search', description, inputSchema, async ({ query }) => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length === 0) {
+      return errorToolResult('A keresési kifejezés üres. Adj meg legalább egy kulcsszót.');
+    }
+    const config = resolveMiniMaxConfig(dependencies.environment, ENV_MINIMAX_API_KEY);
+    if (!isOkOutcome(config)) {
+      return errorToolResult(config.message);
+    }
+    const response = await callMiniMax(config.value, PATH_SEARCH, { q: trimmedQuery }, dependencies.fetchFunction);
+    if (!isOkOutcome(response)) {
+      return errorToolResult(response.message);
+    }
+    if (!isSearchResponse(response.value)) {
+      return errorToolResult('A kereső válasza ismeretlen alakú, a találatok nem olvashatók ki belőle.');
+    }
+    return textToolResult(formatSearchResponse(response.value.organic));
+  });
+}

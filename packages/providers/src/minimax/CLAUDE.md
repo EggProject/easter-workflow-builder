@@ -10,23 +10,24 @@ A mérés részletei (mit mértünk, mi jött ki, artefaktum útvonal) a
 
 ## Fájlok
 
-| Fájl                        | Tartalom                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------- |
-| `model-id.ts`               | `MiniMaxModelId`                                                                |
-| `family-id.ts`              | `MiniMaxFamilyId`                                                               |
-| `required-environment.ts`   | `minimaxRequiredEnvironment`                                                    |
-| `disallowed-environment.ts` | `minimaxDisallowedEnvironment`                                                  |
-| `structured-output.ts`      | `minimaxStructuredOutput`                                                       |
-| `tool-choice.ts`            | `minimaxToolChoice`                                                             |
-| `thinking.ts`               | `minimaxThinking`                                                               |
-| `effort.ts`                 | `minimaxEffort`                                                                 |
-| `prompt-caching.ts`         | `minimaxPromptCaching`                                                          |
-| `streaming.ts`              | `minimaxStreaming`                                                              |
-| `server-tools.ts`           | `minimaxServerTools`                                                            |
-| `models.ts`                 | `minimaxModels`                                                                 |
-| `rate-limits.ts`            | `minimaxRateLimits`                                                             |
-| `concurrency.ts`            | `minimaxConcurrency`                                                            |
-| `descriptor.ts`             | `minimaxProvider`, a `satisfies ProviderCapabilityDescriptor<...>` összeállítás |
+| Fájl                         | Tartalom                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| `model-id.ts`                | `MiniMaxModelId`                                                                |
+| `family-id.ts`               | `MiniMaxFamilyId`                                                               |
+| `required-environment.ts`    | `minimaxRequiredEnvironment`                                                    |
+| `disallowed-environment.ts`  | `minimaxDisallowedEnvironment`                                                  |
+| `structured-output.ts`       | `minimaxStructuredOutput`                                                       |
+| `tool-choice.ts`             | `minimaxToolChoice`                                                             |
+| `thinking.ts`                | `minimaxThinking`                                                               |
+| `effort.ts`                  | `minimaxEffort`                                                                 |
+| `prompt-caching.ts`          | `minimaxPromptCaching`                                                          |
+| `streaming.ts`               | `minimaxStreaming`                                                              |
+| `server-tools.ts`            | `minimaxServerTools`                                                            |
+| `recommended-agent-tools.ts` | `minimaxRecommendedAgentTools`                                                  |
+| `models.ts`                  | `minimaxModels`                                                                 |
+| `rate-limits.ts`             | `minimaxRateLimits`                                                             |
+| `concurrency.ts`             | `minimaxConcurrency`                                                            |
+| `descriptor.ts`              | `minimaxProvider`, a `satisfies ProviderCapabilityDescriptor<...>` összeállítás |
 
 ## Függőségi irány
 
