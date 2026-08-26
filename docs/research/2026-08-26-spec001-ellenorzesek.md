@@ -16,17 +16,22 @@ dokumentációban ellenőrizve van, mit csinál.
 
 ## Összesítés
 
-| Állapot                                                                    | Pontok                                    | Darab  |
-| -------------------------------------------------------------------------- | ----------------------------------------- | ------ |
-| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11, V-18 | 8      |
-| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15           | 6      |
-| Lezárva, tárgytalan                                                        | V-4                                       | 1      |
-| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                                | 2      |
-| **Nyitva marad**                                                           | V-14, V-19                                | **2**  |
-| Összesen                                                                   |                                           | **19** |
+| Állapot                                                                    | Pontok                                          | Darab  |
+| -------------------------------------------------------------------------- | ----------------------------------------------- | ------ |
+| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11, V-18, V-19 | 9      |
+| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15                 | 6      |
+| Lezárva, tárgytalan                                                        | V-4                                             | 1      |
+| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                                      | 2      |
+| **Nyitva marad**                                                           | V-14                                            | **1**  |
+| Összesen                                                                   |                                                 | **19** |
 
 V-18 és V-19 az elfogadási kritériumok tételes auditja során merült fel, utólag, a fenti
 pontok eredeti lezárása után - lásd a saját szakaszaikat lent.
+
+A V-19 **kétszer** lett lezárva: először tévesen, "nem javítható környezeti korlát" indoklással,
+másodszor méréssel, a tényleges javítással. A saját szakasza mindkét kört tartalmazza, mert a
+hibás következtetés menete önmagában is tanulság: a `sudo` hiánya nem jelenti azt, hogy egy deb
+csomag tartalma ne lenne telepíthető.
 
 ---
 
@@ -619,12 +624,14 @@ coverage architektúrájának teljes felderítése előtt került a specbe.
 lefuttatja-e végig a Playwright smoke tesztet ebben a végrehajtási környezetben, és ha nem, mi a
 pontos hiba.
 
-**Válasz.** **Nem fut le.** A `webServer` és a Playwright-infrastruktúra maga helyesen működik,
-de a Chromium tényleges elindítása ebben a sandboxban meghiúsul, mert a host rendszerből
-hiányoznak a böngésző futtatásához szükséges natív függőségek, és nincs jogosultság a
-telepítésükhöz.
+**Válasz.** **Lefut.** A pont eredetileg "nem fut le, nem javítható" állapotban volt lezárva; ez
+az állítás **téves volt**, és itt javítjuk. A hiányzó rendszerkönyvtár telepítéséhez valóban nem
+lehet `sudo`-t használni, de a telepítéshez **nem is kell root**: az `apt-get download` és a
+`dpkg -x` nem privilegizált parancs, a kicsomagolt könyvtárat pedig a `LD_LIBRARY_PATH` húzza be.
+A smoke teszt ezzel valódi Chromiumon, zölden lefut, a repó egyetlen fájljának módosítása nélkül.
 
-**Bizonyíték, saját mérés.** Két lépésben:
+**Bizonyíték, saját mérés.** Négy lépésben. Először a hiba reprodukciója (ez a rész az eredeti
+lezárásból változatlan):
 
 1. `playwright test` közvetlenül (nem `bun run` scripten keresztül) az `apps/web` könyvtárból:
    `[WebServer] /bin/sh: 1: vite: not found`, kilépési kód 127. Ez **nem** a valódi hiba, hanem a
@@ -660,20 +667,83 @@ E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are y
 
 A sandbox nem-root felhasználóként fut (`uid=1045`), a konténer explicit `no new privileges`
 flaggel tiltja a `sudo`-t, és a csomagkezelő zárolt fájlja sem írható nem-root felhasználóként.
-Ez tehát valóban egy rootless konténer korlátja, nem a Playwright-konfiguráció hibája.
+Ez a rész igaz. **A hibás következtetés az volt, hogy ebből a telepíthetetlenség következik.**
 
-**Amit ez NEM jelent.** A `playwright.config.ts`, a `webServer` beállítás, a smoke teszt saját
-kódja (`e2e/smoke.spec.ts`) és a Chromium bináris telepítése (`~/.cache/ms-playwright/` alatt
-megvan, `playwright --version` sikeres) mind rendben van. Kizárólag a böngésző-folyamat tényleges
-indítása igényel olyan rendszerkönyvtárakat (pl. `libxdamage1`), amik ebben a képben hiányoznak
-és nem telepíthetők jogosultság híján.
+Másodszor: a hiányzó könyvtárak pontos, teljes listája. Nem a Playwright hibaüzenetéből, hanem
+közvetlenül a dinamikus linkerből, a letöltött binárisokra:
 
-**Következmény.** A SPEC-001 16. szekció 22. kritériuma környezetfüggőként jelölve: az
-infrastruktúra-rész igazolt, a tényleges böngésző-futtatás ebben a sandboxban nem igazolható és
-nem javítható itt. GitHub Actions `ubuntu-latest` runneren ez a korlát várhatóan nem áll fenn
-(ott root felhasználóval fut a job, és a runner image tartalmazza az általános grafikus
-függőségeket), de ezt csak egy tényleges CI futtatás igazolhatja - ez a lezárás következő lépése,
-ha a projekt szeretné a V-19-et formálisan is lezárni.
+```
+$ ldd ~/.cache/ms-playwright/chromium_headless_shell-1234/chrome-linux/headless_shell | grep 'not found'
+	libXdamage.so.1 => not found
+$ ldd ~/.cache/ms-playwright/chromium-1234/chrome-linux/chrome | grep 'not found'
+	libXdamage.so.1 => not found
+```
+
+**Összesen egy darab könyvtár hiányzik**, a `libxdamage1` csomagból. A Playwright teljes
+`nativeDeps` listája (`ubuntu22.04-arm64`, ami a forrásban az `ubuntu22.04-x64` klónja) 22 csomagot
+sorol fel a chromiumhoz, ebből 21 már jelen van a képben.
+
+Harmadszor: telepítés root nélkül. Sem az `apt-get download`, sem a `dpkg -x` nem igényel
+privilégiumot, mert egyik sem nyúl a `/var/lib/dpkg` zárolt állományhoz, csak letölt és kicsomagol
+egy tetszőleges célmappába:
+
+```
+$ apt-get download libxdamage1
+Get:1 http://ports.ubuntu.com/ubuntu-ports jammy/main arm64 libxdamage1 arm64 1:1.1.5-2build2 [6950 B]
+$ dpkg -x libxdamage1_*.deb ~/pwdeps
+$ ldd ~/pwdeps/usr/lib/aarch64-linux-gnu/libXdamage.so.1 | grep -c 'not found'
+0                                    # a kicsomagolt libnek nincs tovabbi hianyzo fuggosege
+$ export LD_LIBRARY_PATH="$HOME/pwdeps/usr/lib/aarch64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+$ ldd ~/.cache/ms-playwright/chromium-1234/chrome-linux/chrome | grep -c 'not found'
+0
+```
+
+Negyedszer: a tényleges futtatás. `LD_LIBRARY_PATH` beállítva, a repó **változatlan**:
+
+```
+$ bun run test:e2e                    # a gyoker, turbo-n keresztul
+web:test:e2e:   ✓  1 [chromium] › e2e/smoke.spec.ts:7:1 › betölti a kezdőlapot ... (82ms)
+web:test:e2e:   1 passed (2.3s)
+ Tasks:    2 successful, 2 total      # kilepesi kod 0
+```
+
+**Miért nem "zöldre hazudás".** A Playwright ismer egy
+`PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env változót, ami átugorja az indulás előtti
+ellenőrzést (`playwright-core/lib/coreBundle.js`,
+[forrás](https://github.com/microsoft/playwright/blob/v1.62.0/packages/playwright-core/src/server/registry/index.ts#L1204-L1211)).
+**Ezt nem használjuk**, mert az csak az ellenőrzést kapcsolná ki, a hiányzó könyvtárat nem
+pótolná. A `LD_LIBRARY_PATH` viszont valóban megoldja a szimbólumot, és a Playwright validátora
+is átmegy tőle, mert a saját `ldd` hívásába maga elé fűzi a `process.env.LD_LIBRARY_PATH`
+értéket (`coreBundle.js:31892`). A javítás terhelő voltát ellenpróba igazolja: ugyanez a parancs
+`LD_LIBRARY_PATH` nélkül továbbra is bukik, immár a valódi, dlopen szintű hibával:
+
+```
+[pid=77][err] .../headless_shell: error while loading shared libraries:
+              libXdamage.so.1: cannot open shared object file: No such file or directory
+  1 failed                                                    # kilepesi kod 1
+```
+
+**Amire nem volt szükség.** A `--no-sandbox` és a `--disable-dev-shm-usage` kapcsolót nem kellett
+hozzáadni: a Playwright mindkettőt alapból kiküldi (a fenti launch log tartalmazza őket), mert a
+`chromiumSandbox` dokumentált alapértelmezése `false`
+([forrás](https://playwright.dev/docs/api/class-browsertype#browser-type-launch)). A rendszeren
+nincs előre telepített chromium vagy chrome (`which chromium chromium-browser google-chrome`
+üres), tehát a `channel`/`executablePath` út nem volt járható, de nem is kellett.
+
+**Következmény.** A SPEC-001 16. szekció 22. kritériuma **teljesül**, nem "környezetfüggő".
+A megoldás **kizárólag környezeti változó**, a repóban nulla módosítás, ezért a CI-re semmilyen
+hatása nincs: a `playwright.config.ts`, a `.github/workflows/ci.yml` és a `turbo.json` érintetlen,
+a GitHub Actions runner változatlanul a rendes, root jogú `install --with-deps` úton kapja meg a
+függőségeket. A helyi beállítás a fejlesztői sandbox `~/envrc` fájljában él, leírva a gyökér
+`CLAUDE.md` "Teszt infrastruktúra" szekciójában és az `apps/web/e2e/CLAUDE.md`-ben.
+
+**Kapcsolódó eredmény: az e2e coverage gyűjtés is igazolt.** A smoke teszt futása után az
+`apps/web/e2e/.nyc_output/` alá ténylegesen kikerült egy nyers JSON, benne az
+`apps/web/src/main.ts` bejegyzése `s: {"0":1,"1":1,"2":1}` értékkel, azaz a böngészőben mind a
+három instrumentált utasítás lefutott. A `bun run --filter web coverage:e2e:report` ebből 100
+százalékos riportot állít elő (`text`, `html`, `lcov`, kilépési kód 0). Ez a `vite-plugin-istanbul`
+Vite 8 (Rolldown) alatti működését a korábbi izolált próbán túl **végponttól végpontig, valódi
+böngészőben** is igazolja (lásd V-11).
 
 ---
 
