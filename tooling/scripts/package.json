@@ -6,5 +6,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

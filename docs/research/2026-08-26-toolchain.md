@@ -73,10 +73,11 @@ Forrás: https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/
 
 ## GitHub Actions verziók
 
-| Action                    | Verzió |
-| ------------------------- | ------ |
-| `actions/checkout`        | v7.0.1 |
-| `actions/setup-node`      | v7.0.0 |
-| `oven-sh/setup-bun`       | v2.2.0 |
-| `actions/cache`           | v6.1.0 |
-| `actions/upload-artifact` | v7.0.1 |
+| Action                      | Verzió |
+| --------------------------- | ------ |
+| `actions/checkout`          | v7.0.1 |
+| `actions/setup-node`        | v7.0.0 |
+| `oven-sh/setup-bun`         | v2.2.0 |
+| `actions/cache`             | v6.1.0 |
+| `actions/upload-artifact`   | v7.0.1 |
+| `actions/download-artifact` | v8.0.1 |

@@ -8,246 +8,227 @@ on:
   push:
     branches: [main]
 
-# Legszukebb jogosultsag: egyik job sem ir vissza a repoba, csak olvas es
-# artefaktumot tolt fel. (GitHub Security hardening guide alapja, nem
-# specifikus verziohoz kotott, nem tartalmaz becsult szamot.)
+# Egy agra (PR-re) egyszerre egy futas: az ujabb futas torli a meg futo
+# regebbit. A `group` + `cancel-in-progress` alak szo szerint a hivatalos
+# dokumentacio "Example: Using concurrency and the default behavior" peldajabol
+# valo. A PR esemenyen a `github.ref` erteke `refs/pull/<szam>/merge`, tehat
+# PR-enkent kulon csoport; a `main` push-on `refs/heads/main`.
+# Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Legszukebb jogosultsag alapertelmezesben. Egyetlen job (`coverage-comment`)
+# ir vissza a PR-re, az sajat, szukitett `permissions` blokkot kap.
 permissions:
   contents: read
 
 jobs:
-  # A fuggosegek telepitese es a Bun globalis cache elokeszitese. A tobbi
-  # job kulon runneren fut, tehat ujra kell telepitenie a fuggosegeket, de
-  # a `~/.bun/install/cache` cache-bol ez gyors.
-  install:
-    name: Install
+  # ---------------------------------------------------------------------------
+  # Minosegi kapuk, MIND PARHUZAMOSAN.
+  #
+  # Korabban ez a negy ellenorzes egyetlen `verify` jobban futott egymas utan,
+  # ezert egy elbukott `typecheck` utan a `lint` es a `test` le sem futott, es
+  # egy PR-en egyszerre csak egy hibaosztaly latszott. Kulon jobokban egy korben
+  # mind a negy eredmenye megjelenik.
+  #
+  # A `fail-fast: false` KOTELEZO ehhez: a dokumentalt alapertelmezes `true`
+  # ("This property defaults to true"), ami "will cancel all in-progress and
+  # queued jobs in the matrix if any job in the matrix fails" - pontosan azt a
+  # viselkedest hozna vissza, amit itt meg akarunk szuntetni.
+  # Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+  #
+  # Minden leg a token takarekos wrapper scriptet hivja a gyoker `package.json`
+  # scriptjen keresztul, ugyanazzal a paranccsal, amit a fejleszto helyben futtat.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: Gate (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # A `name` a cache kulcs es a job cim resze, a `script` a futtatott
+          # gyoker npm script. Ketto azert kell, mert a `format:check` es a
+          # `docs:check` neveben szereplo ketospont nem szerencses cache
+          # kulcsban.
+          - name: format
+            script: format:check
+          - name: typecheck
+            script: typecheck
+          - name: lint
+            script: lint
+          - name: docs
+            script: docs:check
+          # FELTETELEZES: a `check:casing` gyoker scriptet egy parhuzamosan
+          # dolgozo agent vette fel (`tooling/scripts/casing.sh`). Onallo
+          # minosegi kapu, ezert ide tartozik; ha a script neve valtozik, ez az
+          # egy sor kovetendo.
+          - name: casing
+            script: check:casing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache-scope: ${{ matrix.name }}
+
+      - name: bun run ${{ matrix.script }}
+        run: bun run ${{ matrix.script }}
+
+  # ---------------------------------------------------------------------------
+  # Unit teszt es lefedettseg. Fuggetlen a tobbi kaputol, parhuzamosan fut veluk.
+  #
+  # A coverage HAROM csatornan jut el a GitHubra:
+  #   1. `coverage-report` artefaktum: a bongeszheto HTML riport es az `lcov`.
+  #   2. Job summary: markdown tablazat a futas osszegzo oldalan.
+  #   3. PR komment: a `coverage-comment` job rakja ossze az e2e riporttal egyutt.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
+      - name: Setup
+        uses: ./.github/actions/setup
         with:
-          bun-version: 1.4.0
-
-      # A `setup-node` `cache` bemenete csak npm/yarn/pnpm erteket ismer, a
-      # `bun` nem tamogatott (SPEC-001 12. szekcio) - a Node verzio
-      # beallitasara hasznaljuk, a fuggoseg-cache-t kulon `actions/cache`
-      # lepes adja.
-      - name: Setup Node
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: '26.7.0'
-
-      # Nem hivatalos recept (SPEC-001 12. szekcio, V-14: meg nincs merve,
-      # hogy nyer-e idot CI-ben). A konyvtar helye hivatalosan dokumentalt:
-      # https://bun.com/docs/pm/global-cache
-      - name: Cache Bun global cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-  # Egyetlen job a format:check + typecheck + lint + test taskoknak, mert a
-  # Turborepo maga oldja fel a taskok kozotti fuggoseget (SPEC-001 12.
-  # szekcio indoklasa). Mindegyik lepes a tooling/scripts alatti token
-  # takarekos wrapper scriptet hivja, nem kozvetlenul a prettier/tsc/eslint/
-  # vitest binarist.
-  verify:
-    name: Verify (format, typecheck, lint, test)
-    needs: install
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version: 1.4.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: '26.7.0'
-
-      - name: Cache Bun global cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      # Turborepo hivatalos ajanlasa a helyi cache-re, mert nincs Vercel
-      # Remote Cache fiokunk: https://turborepo.dev/docs/guides/ci-vendors/github-actions
-      # ("Remote Caching with GitHub actions/cache" szekcio). A kulcs es a
-      # restore-keys minta onnan szo szerint atveve.
-      - name: Cache Turborepo
-        uses: actions/cache@v6.1.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      # A CLAUDE.md teljesseg ellenorzese (SPEC-001 16. szekcio, 40.
-      # elfogadasi kriterium). A szabalyt, hogy pontosan mely mappakban
-      # kotelezo, a script fejlece irja le. Elol all, mert masodperc alatt
-      # lefut es dokumentacios hianyt jelez, nem kodhibat.
-      - name: CLAUDE.md check
-        run: bun run docs:check
-
-      - name: Format check
-        run: bun run format:check
-
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Lint
-        run: bun run lint
+          turbo-cache-scope: test
 
       - name: Test
         run: bun run test
 
-      # Mindig feltoltjuk, siker es hiba eseten is (SPEC-001 12. szekcio
-      # artefaktum tablazata). A retencios napszamot nem allitjuk be
-      # explicit ertekkel (V-17 nyitva, nincs projekt szintu forras), az
-      # repo alapertelmezese ervenyesul.
+      # `if: always()`, hogy a riport akkor is elkeszuljon, amikor a job azert
+      # bukott el, mert a lefedettseg a kuszob ALATT van - eppen ilyenkor kell a
+      # legjobban latni a szamokat.
+      - name: Coverage job summary
+        if: always()
+        run: |
+          mkdir -p pr-comment
+          node .github/scripts/coverage-summary.mjs > pr-comment/01-unit.md
+          cat pr-comment/01-unit.md
+          cat pr-comment/01-unit.md >> "$GITHUB_STEP_SUMMARY"
+
+      # A retencios napszamot nem allitjuk be explicit ertekkel: nincs ra
+      # projekt szintu forrasunk (SPEC-001 12. szekcio, V-17 nyitva). Az action
+      # sajat `action.yml`-je sem ad `default` erteket a `retention-days`
+      # bemenetre, tehat a repo beallitasa ervenyesul.
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: coverage-report
-          path: |
-            **/coverage/**
+          path: coverage/**
           if-no-files-found: warn
 
+      - name: Upload coverage comment fragment
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: coverage-comment-unit
+          path: pr-comment/01-unit.md
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Build. Onallo minosegi kapu, NINCS `needs`: a tobbi kapuval parhuzamosan fut.
+  # ---------------------------------------------------------------------------
   build:
     name: Build
-    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
+      - name: Setup
+        uses: ./.github/actions/setup
         with:
-          bun-version: 1.4.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: '26.7.0'
-
-      - name: Cache Bun global cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Cache Turborepo
-        uses: actions/cache@v6.1.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          turbo-cache-scope: build
 
       - name: Build
         run: bun run build
 
-  # ---------------------------------------------------------------------
-  # e2e: BEKAPCSOLVA, `continue-on-error: true` mellett.
+  # ---------------------------------------------------------------------------
+  # e2e. NINCS `needs: build`, es NINCS build atadas artefaktumkent.
   #
-  # A Playwright infra (playwright.config.ts, apps/web/e2e/*, a
-  # vite-plugin-istanbul instrumentalas) idokozben elkeszult egy
-  # parhuzamosan dolgozo agent altal. Ez a job most mar futtatja.
+  # Miert nem: az `apps/web/playwright.config.ts` `webServer.command` erteke
+  # `vite build && vite preview --port 4173 --strictPort`, `VITE_COVERAGE=true`
+  # kornyezeti valtozoval. Ez SZANDEKOSAN sajat, ISTANBULLAL INSTRUMENTALT
+  # buildet keszit kozvetlenul a szerver inditasa elott, es feluliria a `dist`
+  # konyvtarat. A `build` job kimenete a normal, instrumentalatlan build, tehat:
+  #   - atadni artefaktumkent felesleges (a `vite build` ugyis feluliria), es
+  #   - felrevezeto is lenne (abbol nem gyulne e2e lefedettseg).
+  # Ezert az e2e nem var a buildre, hanem vele PARHUZAMOSAN indul, es a
+  # Playwright bongeszo telepitese is atlapolodik a tobbi job futasaval.
   #
-  # Bongeszo telepites: a hivatalos Playwright CI utmutato
-  # (https://playwright.dev/docs/ci, "Install Playwright" szekcio) ezt irja
-  # elo: `npx playwright install --with-deps`. Itt chromiumra szukitve,
-  # mert a playwright.config.ts jelenleg kizarolag a chromium projektet
-  # definialja. Ugyanez az utmutato kifejezetten ELLENJAVALLJA a bongeszo
-  # binarisok cache-eleset ("Caching browsers" szekcio: "the amount of time
-  # it takes to restore the cache is comparable to the time it takes to
-  # download the binaries... OS dependencies... are not cacheable"), ezert
-  # itt sincs kulon `actions/cache` lepes a bongeszore - ez mar a 12.
-  # szekcio "Cache" tablazataban is igy szerepel.
-  #
-  # HELYI PROBA EBBEN A VEGREHAJTASI KORNYEZETBEN (nem a GitHub Actions
-  # runner!): `npx playwright install --with-deps chromium` majd
-  # `npx playwright test` - a config es a smoke teszt ERVENYES
-  # (`playwright test --list` egyetlen tesztet talal), de a tenyleges
-  # bongeszo-inditas HIBAZIK, mert ez a sandbox rootless konteneben fut,
-  # es a `sudo npx playwright install-deps` nem tud rendszer csomagot
-  # telepiteni ("sudo: the 'no new privileges' flag is set..."). Ez a mi
-  # sajat futtatokornyezetunk korlatja, nem a GitHub-hosztolt
-  # ubuntu-latest runnere, de innen a tenyleges zold futast nem tudtuk
-  # empirikusan igazolni. Ezert a job `continue-on-error: true`: a
-  # hivatalos dokumentaciobol idezve (docs.github.com,
-  # `jobs.<job_id>.continue-on-error`) "Prevents a workflow run from
-  # failing when a job fails" - tehat a job bekapcsolva fut, de nem
-  # blokkolja a workflow-t, amig egy valodi GitHub Actions futtatas nem
-  # igazolja a zold allapotot.
-  # ---------------------------------------------------------------------
+  # A `continue-on-error: true` INNEN ELTAVOLITVA. Eredetileg azert kellett,
+  # mert a Playwright zold futasat nem tudtuk igazolni (a fejlesztoi sandbox
+  # rootless konteneben a bongeszo nem indult el). Ez azota lezarult: a
+  # CLAUDE.md szerint a `bun run test:e2e` valodi Chromiumot indit, a fixture
+  # kimenti a `window.__coverage__` objektumot, es az e2e coverage riport
+  # vegponttol vegpontig eloall. A repository ruleset miatt a CI zoldsege kapu,
+  # egy kapu pedig nem lehet elnezo: a `continue-on-error` dokumentaltan
+  # "Prevents a workflow run from failing when a job fails", ami itt pontosan a
+  # nem kivant hatas.
+  # Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+  # ---------------------------------------------------------------------------
   e2e:
     name: E2E
-    needs: build
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
+      - name: Setup
+        uses: ./.github/actions/setup
         with:
-          bun-version: 1.4.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: '26.7.0'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          turbo-cache-scope: e2e
 
       # A hivatalos Playwright CI utmutato `npx playwright install --with-deps`
       # alakot ir, de az `npx` ebben a repoban NEM hasznalhato: a gyoker
-      # package.json `devEngines.packageManager` mezoje `bun`-t koveteli, es az
-      # npm 10.9 ota ezt kikenyszeriti (elo meressel igazolva: `npm error
-      # EBADDEVENGINES current: npm, required: bun`). A `bunx` az azonos
-      # funkcioju hivas a repo sajat csomagkezelojevel.
+      # package.json `devEngines.packageManager` mezoje `bun`-t kovetel, es az
+      # npm 10.9 ota ezt kikenyszeriti (`EBADDEVENGINES`). A `bunx` az azonos
+      # funkcioju hivas a repo sajat csomagkezelojevel. Chromiumra szukitve,
+      # mert a playwright.config.ts jelenleg csak a chromium projektet definialja.
+      # A bongeszo binarisokat SZANDEKOSAN nem cache-eljuk: a Playwright CI
+      # utmutatoja ezt kifejezetten ellenjavallja.
+      # Forras: https://playwright.dev/docs/ci
       - name: Install Playwright Browsers
         run: bunx playwright install --with-deps chromium
 
       - name: Run e2e tests
         run: bun run test:e2e
 
-      # A window.__coverage__ nyers adatat az apps/web/e2e/coverage-fixture.ts
-      # menti tesztenkent az apps/web/e2e/.nyc_output ala; ezt fesuli ossze
-      # az apps/web/package.json mar letezo `coverage:e2e:report` scriptje
-      # (nyc report). Kuszob nincs (SPEC-001 10. szekcio, 24. elfogadasi
-      # kriterium), csak riport.
-      - name: Generate e2e coverage report
+      # A `window.__coverage__` nyers adatat az apps/web/e2e/coverage-fixture.ts
+      # menti tesztenkent az `apps/web/e2e/.nyc_output` ala; ezt fesuli ossze az
+      # `apps/web` mar letezo `coverage:e2e:report` scriptje (nyc). Kuszob nincs
+      # (SPEC-001 10. szekcio, 24. elfogadasi kriterium), csak riport.
+      #
+      # Az nyc `text` reportere nem ad gepi olvashato osszegzot (nincs
+      # json-summary), ezert a szoveges tablazat kerul kodblokkban a job
+      # summarybe es a PR kommentbe. A parancs kimenete eloszor fajlba megy, es
+      # onnan naplozzuk is - igy nem kell csovezni, tehat a lepes nem fugg a
+      # `pipefail` beallitastol (a `run:` alapertelmezett shellje `bash -e {0}`,
+      # `-o pipefail` NELKUL).
+      - name: E2E coverage report
         if: always()
-        working-directory: apps/web
-        run: bun run coverage:e2e:report
+        run: |
+          bun run --filter web coverage:e2e:report > "$RUNNER_TEMP/e2e-coverage.txt"
+          cat "$RUNNER_TEMP/e2e-coverage.txt"
+          mkdir -p pr-comment
+          {
+            echo '### E2E coverage (nyc, vite-plugin-istanbul)'
+            echo ''
+            echo '```text'
+            cat "$RUNNER_TEMP/e2e-coverage.txt"
+            echo '```'
+            echo ''
+            echo 'Erre a riportra nincs kuszob (SPEC-001 10. szekcio), csak riport.'
+            echo 'A bongeszheto HTML riport az `e2e-coverage-report` artefaktumban van.'
+          } > pr-comment/02-e2e.md
+          cat pr-comment/02-e2e.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload e2e coverage report
         if: always()
@@ -255,6 +236,14 @@ jobs:
         with:
           name: e2e-coverage-report
           path: apps/web/coverage-e2e/**
+          if-no-files-found: warn
+
+      - name: Upload coverage comment fragment
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: coverage-comment-e2e
+          path: pr-comment/02-e2e.md
           if-no-files-found: warn
 
       - name: Upload Playwright report
@@ -266,3 +255,94 @@ jobs:
             **/playwright-report/**
             **/test-results/**
           if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # A coverage harmadik csatornaja: EGYETLEN, frissulo komment a PR-en, ami az
+  # unit es az e2e riportot is tartalmazza.
+  #
+  # Kulon jobban van, mert igy csak ez az egy job kap `pull-requests: write`
+  # jogot, es igy egyetlen komment kepzodik ket helyett.
+  #
+  # Csak sajat agbol nyitott PR-en fut: fork PR-en a `GITHUB_TOKEN` dokumentaltan
+  # csak olvasasi jogot kap ("The GITHUB_TOKEN has read-only permissions in pull
+  # requests from forked repositories"), tehat a komment kiirasa ugyis hibazna. A
+  # `pull_request_target` esemenyt SZANDEKOSAN nem hasznaljuk, mert a hivatalos
+  # biztonsagi utmutato szerint az nem biztonsagos, ha a PR kodjat is futtatnank.
+  # Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+  #
+  # NEM minosegi kapu, ezert szandekosan NEM szerepel a `ci` job `needs`
+  # listajaban: egy riportalasi hiba nem blokkolhat egy egyebkent zold PR-t.
+  # Kulso szolgaltatas (Codecov, Coveralls) nincs bekotve.
+  # ---------------------------------------------------------------------------
+  coverage-comment:
+    name: Coverage PR comment
+    needs: [test, e2e]
+    if: >-
+      always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name ==
+      github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # A `pattern` es a `merge-multiple` bemenet letezeset az action sajat
+      # v8.0.1 `action.yml`-je igazolja.
+      - name: Download coverage comment fragments
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: coverage-comment-*
+          merge-multiple: true
+          path: pr-comment
+
+      # A `gh` a GitHub-hosztolt runneren elore telepitve van, es a hivatalos
+      # utmutato szerint minden `gh`-t hasznalo lepesnek `GH_TOKEN` kornyezeti
+      # valtozot kell kapnia. A `--edit-last --create-if-none` paros a
+      # dokumentalt alak arra, hogy a komment FRISSULJON, ne szaporodjon:
+      # "Create a new comment if no comments are found. Can be used only with
+      # --edit-last".
+      # Forras: https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-github-cli
+      # Forras: https://cli.github.com/manual/gh_pr_comment
+      - name: Post or update the coverage comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! compgen -G 'pr-comment/*.md' > /dev/null; then
+            echo 'Nincs coverage toredek, nincs mit kommentelni.'
+            exit 0
+          fi
+          {
+            echo '## Coverage'
+            echo ''
+            cat pr-comment/*.md
+          } > "$RUNNER_TEMP/coverage-comment.md"
+          gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/coverage-comment.md" --edit-last --create-if-none
+
+  # ---------------------------------------------------------------------------
+  # Osszesito kapu. A repository ruleset EZT az egy status checket kerheti
+  # kotelezonek, igy egy uj job felvetele nem igenyel ruleset modositast.
+  #
+  # Az `if: always()` nelkul ez a job maga is kimaradna, ha barmelyik `needs`
+  # elbukik ("If a job fails or is skipped, all jobs that need it are skipped
+  # unless the jobs use a conditional expression that causes the job to
+  # continue"), es a ruleset egy "skipped" checket nem tekintene bukasnak.
+  # A `needs.*.result` objektum-szuro es a `contains()` fuggveny is dokumentalt
+  # ("The result of a job that the current job depends on. Possible values are
+  # success, failure, cancelled, or skipped").
+  # Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
+  # Forras: https://docs.github.com/en/actions/reference/workflows-and-actions/expressions
+  # ---------------------------------------------------------------------------
+  ci:
+    name: CI
+    if: always()
+    needs: [gate, test, build, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kapuk eredmenye
+        env:
+          RESULTS: ${{ join(needs.*.result, ', ') }}
+        run: echo "gate, test, build, e2e -> $RESULTS"
+
+      - name: Bukas, ha barmelyik kapu nem sikeres
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1

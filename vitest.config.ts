@@ -45,6 +45,19 @@ export default defineConfig({
           include: ['tools/wire-probe/src/**/*.{test,spec}.ts'],
         },
       },
+      // Ugyanaz az indok, mint a wire-probe-regression projektnél: a
+      // `tooling/scripts` nincs a `packages/*`/`apps/*` mintában, de a
+      // `check-casing.test.ts` (git index fájlnév vs. relatív import
+      // betűzés regressziós tesztje) itt kell fusson, hogy a gyökér
+      // `bun run test` elkapja.
+      {
+        extends: true,
+        test: {
+          name: 'tooling-scripts',
+          environment: 'node',
+          include: ['tooling/scripts/src/**/*.{test,spec}.ts'],
+        },
+      },
     ],
 
     // Jelenleg minden csomag ures, placeholder tartalommal all (lasd

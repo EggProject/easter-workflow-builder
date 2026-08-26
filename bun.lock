@@ -126,6 +126,10 @@
     "tooling/scripts": {
       "name": "scripts",
       "version": "0.0.0",
+      "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
     },
     "tooling/tsconfig": {
       "name": "tsconfig",

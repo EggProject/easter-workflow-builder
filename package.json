@@ -44,6 +44,7 @@
     "format": "bash tooling/scripts/format.sh --write",
     "format:check": "bash tooling/scripts/format.sh",
     "docs:check": "bash tooling/scripts/claude-md.sh",
+    "check:casing": "bash tooling/scripts/casing.sh",
     "test": "vitest run --coverage",
     "test:e2e": "turbo run test:e2e",
     "dev": "turbo run dev"

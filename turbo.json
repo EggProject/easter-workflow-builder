@@ -53,6 +53,7 @@
         "packages/*/src/**",
         "apps/*/src/**",
         "tools/wire-probe/src/**",
+        "tooling/scripts/src/**",
         "vitest.config.ts"
       ],
       "outputs": ["coverage/**"],

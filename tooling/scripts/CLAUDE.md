@@ -10,15 +10,16 @@ wrapperek maguk bash fájlok, nem TypeScript).
 
 ## Fájlok
 
-| Fájl           | Tartalom                                                                                                                                                                |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_lib.sh`      | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                     |
-| `lint.sh`      | `turbo run lint` burkoló                                                                                                                                                |
-| `typecheck.sh` | `turbo run typecheck` burkoló                                                                                                                                           |
-| `test.sh`      | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                   |
-| `build.sh`     | `turbo run build` burkoló                                                                                                                                               |
-| `format.sh`    | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi |
-| `claude-md.sh` | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                             |
+| Fájl           | Tartalom                                                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `_lib.sh`      | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                      |
+| `lint.sh`      | `turbo run lint` burkoló                                                                                                                                                 |
+| `typecheck.sh` | `turbo run typecheck` burkoló                                                                                                                                            |
+| `test.sh`      | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                    |
+| `build.sh`     | `turbo run build` burkoló                                                                                                                                                |
+| `format.sh`    | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi  |
+| `claude-md.sh` | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                              |
+| `casing.sh`    | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/`, lásd ott a `CLAUDE.md`-t |
 
 ## Szabályok
 
@@ -33,6 +34,14 @@ wrapperek maguk bash fájlok, nem TypeScript).
 - A `claude-md.sh` nem turbo taskon keresztül fut, hanem közvetlenül, mert a szabálya a
   teljes repóra vonatkozik és `git ls-files` kimenetéből dolgozik, nem csomagonként. A
   gyökér `package.json` `docs:check` scriptje hívja, és a CI `verify` jobja is ezt futtatja.
+- A `casing.sh` ugyanezért nem turbo taskon keresztül fut: a szabálya a teljes repóra
+  vonatkozik. A tényleges ellenőrzést a `src/casing/check-casing.ts` végzi (Node 26 type
+  stripping), a `casing.sh` csak a kimenetét összegzi. A gyökér `package.json`
+  `check:casing` scriptje hívja. Ugyanaz a logika (`src/casing/find-casing-mismatches.ts`)
+  Vitest tesztként is fut (`src/casing/check-casing.test.ts`), amit a gyökér
+  `vitest.config.ts` `tooling-scripts` projektje vesz fel - a `tooling/scripts` nincs a
+  `packages/*`/`apps/*` mintában, ugyanaz a mechanizmus, mint a `wire-probe-regression`
+  projektnél.
 - A `test.sh` a Vitest `--reporter=json --outputFile=...` kimenetéből olvassa a teszt
   összegzőt (`numTotalTests`/`numPassedTests`/`numFailedTests`, `jq`-val), a hibás
   tesztek nevét és üzenetét pedig a `testResults[].assertionResults[]` tömbből. A

@@ -561,39 +561,94 @@ Action verziók a research fájl szerint: `actions/checkout` v7.0.1, `actions/se
 
 **Ellentmondás lezárva, megerősítve.** Élő ellenőrzés a GitHub API-n (`repos/actions/cache/releases/latest`): az `actions/cache` legfrissebb release-e valóban **v6.1.0** (2026-06-26). A korábbi ellenőrzés, ami a v5.x sorozatot találta legfrissebbnek, elavult volt. A research fájl helyes volt. Ugyanígy megerősítve élő lekérdezéssel: `actions/checkout` v7.0.1, `actions/setup-node` v7.0.0, `oven-sh/setup-bun` v2.2.0, `actions/upload-artifact` v7.0.1. Mind az öt action verzió létező, jelenleg is legfrissebb release tag.
 
+Ezen felül a workflow használ egy hatodik actiont, az `actions/download-artifact` v8.0.1 verzióját (a coverage PR komment összerakásához). Élő ellenőrzés a GitHub API-n (`repos/actions/download-artifact/releases/latest`): a legfrissebb release tag valóban **v8.0.1**. A `pattern` és a `merge-multiple` bemenet létezését az action saját, v8.0.1 tagre kikötött `action.yml` fájlja igazolja.
+
+### Egyidejűség
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+Egy ágra (PR-re) egyszerre egy futás, az újabb törli a még futó régebbit. Ez az alak szó szerint a hivatalos dokumentáció "Example: Using concurrency and the default behavior" példájából való ([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)). PR eseményen a `github.ref` értéke `refs/pull/<szám>/merge`, tehát PR-enként külön csoport.
+
 ### Jobok és sorrend
 
-| Job       | Függ      | Mit csinál                                                                                   |
-| --------- | --------- | -------------------------------------------------------------------------------------------- |
-| `install` | nincs     | checkout, `setup-bun`, `bun install --frozen-lockfile`, cache mentés                         |
-| `verify`  | `install` | `turbo run format:check typecheck lint test` egy futásban, a Turborepo oldja fel a sorrendet |
-| `build`   | `verify`  | `turbo run build`                                                                            |
-| `e2e`     | `build`   | Playwright böngésző telepítés, `turbo run test:e2e`                                          |
+**Minden minőségi kapu külön jobban, párhuzamosan fut. Egyetlen `needs` él van, az összesítőé.**
 
-A `verify` azért egyetlen job, mert a Turborepo a taskok közötti függőséget maga oldja fel, és a négy külön job négyszer telepítené a függőségeket. Ha a futásidő ezt később indokolja, a job szétbontható, de a szétbontás nem alapállapot.
+| Job                | Függ                           | Mit csinál                                                                       |
+| ------------------ | ------------------------------ | -------------------------------------------------------------------------------- |
+| `gate` (matrix)    | nincs                          | `format:check`, `typecheck`, `lint`, `docs:check`, `check:casing` külön legekben |
+| `test`             | nincs                          | `bun run test`, coverage artefaktum, job summary, PR komment töredék             |
+| `build`            | nincs                          | `bun run build`                                                                  |
+| `e2e`              | nincs                          | Playwright böngésző telepítés, `bun run test:e2e`, e2e coverage riport           |
+| `coverage-comment` | `test`, `e2e`                  | egyetlen, frissülő coverage komment a PR-en                                      |
+| `ci`               | `gate`, `test`, `build`, `e2e` | összesítő státusz, a ruleset ezt az egy checket kérheti kötelezőnek              |
+
+**Miért nem egyetlen `verify` job.** A spec korábbi állapota a négy ellenőrzést egy jobba tette azzal az indokkal, hogy a Turborepo maga oldja fel a task-függőséget. A gyakorlat megcáfolta: egy elbukott `typecheck` után a `lint` és a `test` **le sem futott**, ezért egy PR-en egyszerre csak egy hibaosztály látszott, és több körben derült ki minden. A minőségi kapuk egymástól logikailag függetlenek, tehát külön jobokba tartoznak.
+
+**A `fail-fast: false` kötelező a matrixon.** A dokumentált alapértelmezés `true` ("This property defaults to true"), ami "will cancel all in-progress and queued jobs in the matrix if any job in the matrix fails" - pontosan azt a viselkedést hozná vissza, amit a szétbontás megszüntet ([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)).
+
+**Az `install` job megszűnt.** Minden job külön runneren fut, tehát mindegyik újratelepíti a függőségeket; egy előzetes `install` job csak késleltette a többit, és a cache-en kívül semmit nem adott át.
+
+**Az `e2e` nem függ a `build`-tól, és nem kap build artefaktumot.** Az `apps/web/playwright.config.ts` `webServer.command` értéke `vite build && vite preview --port 4173 --strictPort`, `VITE_COVERAGE=true` környezeti változóval. Ez szándékosan saját, Istanbullal **instrumentált** buildet készít közvetlenül a szerver indítása előtt, és felülírja a `dist` könyvtárat. A `build` job kimenete a normál, instrumentálatlan build, tehát átadni felesleges (a `vite build` úgyis felülírja) és félrevezető is lenne (abból nem gyűlne e2e lefedettség).
+
+**Közös `setup` composite action.** A hat job ugyanazt az öt lépést (Bun, Node, két cache, telepítés) ismételné, ezért ezek egy lokális composite actionbe kerültek: `.github/actions/setup/action.yml`. A `uses: ./.github/actions/setup` alak feltétele, hogy a repo már ki legyen checkoutolva, ezért a checkout minden jobban az első lépés ([metadata syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax)).
 
 A `--frozen-lockfile` kötelező: a CI nem módosíthatja a `bun.lock` fájlt.
 
 ### Cache
 
-| Mit                   | Hogyan                                                                                                                     | Forrás                                                                                                                                                                                                      |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Turborepo helyi cache | `actions/cache`, path `.turbo`, kulcs `${{ runner.os }}-turbo-${{ github.sha }}`, `restore-keys` `${{ runner.os }}-turbo-` | [Turborepo GitHub Actions guide](https://turborepo.com/docs/guides/ci-vendors/github-actions), hivatalosan dokumentált                                                                                      |
-| Bun globális cache    | `actions/cache`, path `~/.bun/install/cache`, kulcs a `bun.lock` hasheből                                                  | a könyvtár hivatalos ([Bun global cache](https://bun.com/docs/pm/global-cache)), de az `actions/cache` recept **nem hivatalos**, a végrehajtás során kell összerakni és mérni, hogy nyer-e időt             |
-| Playwright böngészők  | **nem cache-eljük**                                                                                                        | a Playwright CI útmutatója kifejezetten ellenjavallja: a cache visszaállítás ideje összemérhető a letöltéssel, és a Linux rendszerfüggőségek nem cache-elhetők ([CI guide](https://playwright.dev/docs/ci)) |
+| Mit                   | Hogyan                                                                                                                                 | Forrás                                                                                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Turborepo helyi cache | `actions/cache`, path `.turbo`, kulcs `${{ runner.os }}-turbo-<job>-${{ github.sha }}`, `restore-keys` `${{ runner.os }}-turbo-<job>-` | [Turborepo GitHub Actions guide](https://turborepo.dev/docs/guides/ci-vendors/github-actions), hivatalosan dokumentált minta, a `<job>` hatókörrel kiegészítve (lásd lent)                                  |
+| Bun globális cache    | `actions/cache`, path `~/.bun/install/cache`, kulcs a `bun.lock` hasheből                                                              | a könyvtár hivatalos ([Bun global cache](https://bun.com/docs/pm/global-cache)), de az `actions/cache` recept **nem hivatalos**, a végrehajtás során kell összerakni és mérni, hogy nyer-e időt             |
+| Playwright böngészők  | **nem cache-eljük**                                                                                                                    | a Playwright CI útmutatója kifejezetten ellenjavallja: a cache visszaállítás ideje összemérhető a letöltéssel, és a Linux rendszerfüggőségek nem cache-elhetők ([CI guide](https://playwright.dev/docs/ci)) |
+
+**A `<job>` hatókör a kulcsban tudatos eltérés a hivatalos mintától.** A Turborepo útmutatója egyetlen jobot vázol fel; itt hat job fut párhuzamosan, egy cache kulcsot pedig csak egy job tud menteni. Ha több job ugyanazt a kulcsot próbálja írni, a másodiktól kezdve a mentés figyelmeztetéssel kimarad (`ReserveCacheError`: "Unable to reserve cache with key ..., another job may be creating this cache"), a lépést és a jobot **nem** buktatja el ([actions/cache](https://github.com/actions/cache)). A jobonként külön kulcs miatt minden job saját, teljes cache-t ment. A kulcs és a `restore-keys` minta többi része szó szerinti.
 
 Az `actions/setup-node` `cache` bemenete `npm`, `yarn` és `pnpm` értéket ismer, **a `bun` nem támogatott érték**. Ezért a Bun cache-t kézzel, `actions/cache` lépéssel kell kezelni, és a `setup-node` csak a Node verziót adja. A `setup-bun` `no-cache` bemenete csak a Bun bináris cache-ét szabályozza, nem a projekt függőségeit.
 
 A remote cache (Vercel) nincs hatókörben. Nincs `TURBO_TOKEN`, nincs `TURBO_TEAM`.
 
+### Coverage riport, három csatorna
+
+Külső szolgáltatás (Codecov, Coveralls) **nincs bekötve**, mert fiókot és titkot igényelne. Mindhárom csatorna GitHub natív.
+
+| Csatorna    | Unit (Vitest)                                                         | E2E (nyc)                                                           |
+| ----------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Artefaktum  | `coverage-report`, a `coverage/**` HTML és `lcov` riport              | `e2e-coverage-report`, az `apps/web/coverage-e2e/**` HTML és `lcov` |
+| Job summary | markdown táblázat a `coverage/coverage-summary.json` fájlból          | az nyc `text` reporterének kimenete kódblokkban                     |
+| PR komment  | a `coverage-comment` job egyetlen, frissülő kommentbe fűzi mindkettőt | ugyanaz                                                             |
+
+A job summary GitHub Flavored Markdownt fogad, lépésenként legfeljebb 1 MiB méretig ([workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)). A táblázatot a `.github/scripts/coverage-summary.mjs` állítja elő; az nyc oldalán nincs `json-summary` reporter, ezért ott a szöveges tábla megy kódblokkban.
+
+A PR kommentet a `gh pr comment ... --edit-last --create-if-none` alak írja, ami a dokumentált mód arra, hogy a komment **frissüljön, ne szaporodjon** ("Create a new comment if no comments are found. Can be used only with `--edit-last`", [gh pr comment](https://cli.github.com/manual/gh_pr_comment)). A `gh` a GitHub-hosztolt runneren előre telepítve van, és minden `gh`-t használó lépésnek `GH_TOKEN` környezeti változót kell kapnia ([use GitHub CLI](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-github-cli)).
+
+Ez az egyetlen job, ami `pull-requests: write` jogot kap; a workflow szintű alapértelmezés `contents: read`. Csak saját ágból nyitott PR-en fut: fork PR-en a `GITHUB_TOKEN` dokumentáltan csak olvasási jogot kap ("The GITHUB_TOKEN has read-only permissions in pull requests from forked repositories"), tehát a komment kiírása úgyis hibázna. A `pull_request_target` eseményt **szándékosan nem** használjuk, mert a hivatalos biztonsági útmutató szerint az nem biztonságos, ha a PR kódját is futtatnánk ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)).
+
+A `coverage-comment` **nem minőségi kapu**, ezért nem szerepel a `ci` job `needs` listájában: egy riportálási hiba nem blokkolhat egy egyébként zöld PR-t.
+
+### Az összesítő `ci` job
+
+A repository ruleset ezt az egy status checket kérheti kötelezőnek, így egy új job felvétele nem igényel ruleset módosítást. Az `if: always()` nélkül ez a job maga is kimaradna, ha bármelyik `needs` elbukik ("If a job fails or is skipped, all jobs that need it are skipped unless the jobs use a conditional expression that causes the job to continue"), és a ruleset egy `skipped` checket nem tekintene bukásnak. A bukást a `contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')` feltétel adja; a `needs.<job_id>.result` lehetséges értékei dokumentáltak ([contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts)), az objektum-szűrő és a `contains()` szintén ([expressions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions)).
+
+### Az `e2e` job elnézése megszűnt
+
+A `continue-on-error: true` **eltávolítva**. Eredetileg azért kellett, mert a Playwright zöld futását nem tudtuk igazolni (a fejlesztői sandbox rootless konténerében a böngésző nem indult el). Ez azóta lezárult: a `bun run test:e2e` valódi Chromiumot indít, a fixture kimenti a `window.__coverage__` objektumot, és az e2e coverage riport végponttól végpontig előáll (lásd a gyökér `CLAUDE.md` teszt infrastruktúra szekcióját és a V-19 pontot). A repository ruleset miatt a CI zöldsége kapu, egy kapu pedig nem lehet elnéző: a `continue-on-error` dokumentáltan "Prevents a workflow run from failing when a job fails", ami itt pontosan a nem kívánt hatás.
+
 ### Artefaktumok
 
-| Mikor       | Mit                                               | Retenció                      |
-| ----------- | ------------------------------------------------- | ----------------------------- |
-| Mindig      | a `verify` job coverage riportja (`lcov`, `html`) | a végrehajtás során beállítva |
-| Hiba esetén | a `e2e` job Playwright riportja és trace fájljai  | a végrehajtás során beállítva |
+| Mikor       | Mit                                                                   | Retenció                   |
+| ----------- | --------------------------------------------------------------------- | -------------------------- |
+| Mindig      | a `test` job coverage riportja (`lcov`, `html`) és a komment töredéke | nem állítjuk be, lásd lent |
+| Mindig      | az `e2e` job coverage riportja (`lcov`, `html`) és a komment töredéke | nem állítjuk be, lásd lent |
+| Hiba esetén | az `e2e` job Playwright riportja és trace fájljai                     | nem állítjuk be, lásd lent |
 
-Retenciós napszámot itt nem rögzítünk, mert nincs rá projekt szintű forrásunk.
+Retenciós napszámot **nem** rögzítünk, mert nincs rá projekt szintű forrásunk (V-17 nyitva). Az `actions/upload-artifact` v7.0.1 saját `action.yml` fájlja sem ad `default` értéket a `retention-days` bemenetre, tehát a repo beállítása érvényesül.
+
+Ugyanezen okból nem állítunk `timeout-minutes` értéket sem. A Turborepo hivatalos útmutatója mutat egy `timeout-minutes: 15` értéket, de az az ő **egyetlen, build+test** jobjára vonatkozik, nem erre a hat, eltérő terhelésű jobra - átvenni becslés lenne. Az `actions/checkout` `fetch-depth: 2` beállítását szintén nem vesszük át: az az útmutatóban a `--filter=[HEAD^1]` érintettség-szűréshez kell, amit nem használunk.
 
 ### Titok
 
@@ -847,7 +902,7 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 6. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és a wrapper script kimenete ezt sorban jelzi.
 7. Egy `packages/core` fájl módosítása után a `turbo run typecheck` újrafuttatja a `core`-tól függő csomagok taskját, és nem futtatja újra a tőle független csomagokét. Ezt a wrapper kimenete igazolja.
 8. A `tooling/tsconfig` alatt van `base.json`, `node.json` és `react.json`. Egyik sem tartalmaz TS 6.0-ban eltávolított vagy deprecated opciót, és egyik sem használ `"ignoreDeprecations"` kapcsolót.
-9. A `tooling/tsconfig/base.json` nem ismétli meg a TS 6.0 alapértelmezéseit (`strict`, `module`, `types`, `rootDir`), csak az attól eltérő opciókat állítja.
+9. A `tooling/tsconfig/base.json` nem ismétli meg a TS 6.0 alapértelmezéseit (`strict`, `module`, `types`, `rootDir`), csak az attól eltérő opciókat állítja, egyetlen dokumentált kivétellel: a `forceConsistentCasingInFileNames: true` már TS 6.0.3 alapértelmezés, de case-insensitive fejlesztői fájlrendszeren önmagában nem elég védelem egy git index szintű betűzési hiba ellen, ezért szándékosan explicit szerepel, a 48. kritérium `check:casing` ellenőrzésével összhangban.
 10. A `turbo run typecheck` a teljes workspace-en nulla kilépési kóddal fut, beleértve a `tools/wire-probe` csomagot és a migrált `packages/providers` csomagot.
 11. A V-1 döntés eredménye a `docs/research/` alá van vezetve, forrás URL-lel, és a `turbo.json`, a `package.json` `exports` mezői és a `dependsOn` értékek ezzel a döntéssel összhangban vannak.
 12. Az ESLint flat config a 7. szekció mind a hat bázis konfigját tartalmazza, az `eslint-config-prettier/flat` az utolsó elem, és `eslint-plugin-prettier` nincs a függőségek között.
@@ -865,8 +920,8 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 24. A V-11 (Vite 8 kompatibilitás) eredménye dokumentálva van a `docs/research/` alatt. Ha a plugin nem működik Vite 8 alatt, ez a tény és a halasztás indoka le van írva, és ez nem blokkolja a spec elfogadását.
 25. A `tooling/scripts` alatt létezik mind az öt wrapper (`lint`, `typecheck`, `test`, `format`, `build`), mindegyik bash, mindegyik a 11. szekció három blokkos kimeneti szerződését teljesíti, és a burkolt parancs kilépési kódját adja tovább.
 26. Mindegyik wrapper hibás bemenetre nem nulla kilépési kóddal fut, és a kimenete nem tartalmazza a burkolt eszköz teljes stdoutját. Ezt egy szándékosan hibás fájl bevezetése igazolja mind az öt wrapperre.
-27. A GitHub Actions workflow létezik, a 12. szekció négy jobját a megadott sorrendben tartalmazza, és a `bun install --frozen-lockfile` alakot használja.
-28. A workflow `actions/cache` lépése a `.turbo` könyvtárat cache-eli a hivatalosan dokumentált kulcs mintával, és a Playwright böngészőket **nem** cache-eli.
+27. A GitHub Actions workflow (`ci.yml`) hat jobot tartalmaz: a `gate` mátrix (öt minőségi kapu: `format`, `typecheck`, `lint`, `docs`, `casing`), a `test`, a `build`, az `e2e`, a `coverage-comment` és az összesítő `ci` job. A `gate` mátrix öt eleme, a `test`, a `build` és az `e2e` job között **nincs** `needs` kapcsolat: mind a nyolc jobfutás egymástól függetlenül, párhuzamosan indul a checkout után. A `coverage-comment` job `needs: [test, e2e]`, az összesítő `ci` job `needs: [gate, test, build, e2e]`, tehát csak ez a két job vár a többire. Minden checkoutot végző job a `bun install --frozen-lockfile` alakot a `.github/actions/setup` lokális composite actionön keresztül futtatja.
+28. A coverage riport három csatornán jelenik meg. (1) Artefaktum: `coverage-report` (unit, `coverage/**`, HTML és lcov) és `e2e-coverage-report` (`apps/web/coverage-e2e/**`, HTML és lcov). (2) Job summary: a `test` job a `.github/scripts/coverage-summary.mjs` scripttel a Vitest `coverage-summary.json` fájlából markdown táblázatot ír a `$GITHUB_STEP_SUMMARY`-ba, az `e2e` job az nyc szöveges riportját kódblokkban ugyanoda. (3) PR komment: a `coverage-comment` job a `test` és az `e2e` job feltöltött komment-töredékét egyetlen, frissülő kommentbe fűzi össze.
 29. A workflow `actions/setup-node` lépése nem használ `cache: bun` értéket, mert az nem támogatott.
 30. A workflow action verziói a `docs/research/2026-08-26-toolchain.md` táblázatával egyeznek. A V-13 ellentmondás lezárva: az `actions/cache` v6.1.0 létezése élő GitHub API lekérdezéssel igazolt.
 31. A CI nem kap MiniMax API kulcsot, és a `tools/wire-probe` csomagnak nincs `test` scriptje, tehát a mérések nem futnak CI-ben.
@@ -881,6 +936,12 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 40. A `CLAUDE.md` teljességet ellenőrző script létezik, és a teljes repón nulla kilépési kóddal fut.
 41. A 15. szekció mind a 19 `V-*` pontja rendezett: vagy dokumentált forrásra hivatkozó döntéssel lezárva, vagy saját, most futtatott mérésre hivatkozva lezárva, vagy - V-14 és V-19 esetén - explicit, indokolt nyitva-jelöléssel, ami a végrehajtási környezet igazolt korlátjára hivatkozik. Feltételezéssel (mérés vagy dokumentáció nélkül) lezárt pont nincs.
 42. A D-1 döntés lezárva: a user döntése alapján nincsenek TypeScript projekt referenciák a csomagok között, a build sorrendet kizárólag a `turbo.json` `dependsOn` mezője adja.
+43. A `.github/actions/setup` lokális composite action létezik, és a `gate` mátrix mind az öt eleme, a `test`, a `build` és az `e2e` job is ezen keresztül állítja be a Bun 1.4.0-t, a Node 26.7.0-t, a Bun globális cache-t és a Turborepo `.turbo` cache-t, mielőtt lefuttatná a `bun install --frozen-lockfile` parancsot. A `turbo-cache-scope` bemenet kötelező, és jobonként/mátrixelemenként eltérő értéket kap, mert egy `actions/cache` kulcsot csak egy job tud sikeresen menteni. A composite action a Playwright böngészőket nem cache-eli.
+44. A workflow gyökér szintű `concurrency` blokkja `group: ${{ github.workflow }}-${{ github.ref }}` és `cancel-in-progress: true` értékkel fut: ugyanazon ág (PR vagy `main`) egy időben csak egy futása aktív, egy újabb push törli a még futó korábbit.
+45. A `gate` job `strategy.fail-fast` értéke explicit `false`. Ezt egy szándékosan hibás bemenet igazolja: ha a mátrix egyik eleme (például `typecheck`) elbukik, a többi négy elem (`format`, `lint`, `docs`, `casing`) attól függetlenül lefut és jelzi a saját eredményét, nem szakítja meg a teljes mátrixot a dokumentált `fail-fast: true` alapértelmezés szerint.
+46. Az összesítő `ci` job `needs: [gate, test, build, e2e]` és `if: always()` mellett fut, és a `contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')` feltétellel bukik el, ha bármelyik minőségi kapu nem `success` eredménnyel zár. Ez az egyetlen job, amit a repository ruleset kötelező státuszcsekként megkövetelhet, tehát egy új kapu felvétele nem igényel ruleset módosítást.
+47. A `coverage-comment` job `needs: [test, e2e]`, saját, szűkített `permissions` blokkal (`contents: read`, `pull-requests: write`, szemben a workflow szintű `contents: read` alapértelmezéssel), és csak akkor fut, ha az esemény `pull_request` és a PR feje ugyanabból a repóból nyílt (`github.event.pull_request.head.repo.full_name == github.repository`), tehát fork PR-en nem próbál kommentelni. A komment a `gh pr comment ... --edit-last --create-if-none` alakkal frissül, nem szaporodik, és a job szándékosan **nincs** a `ci` job `needs` listájában, mert nem minőségi kapu.
+48. A `tooling/scripts/casing.sh` (`check:casing` script) létezik, a 11. szekció három blokkos kimeneti szerződését teljesíti, és a `git ls-files` alapján ellenőrzi a git index fájlnevek és a rájuk hivatkozó relatív import specifikátorok betűzésének egyezését. Ezt a `tooling/scripts/src/casing/*.test.ts` Vitest regressziós teszt igazolja, ami egy valós, a git index és a lemez betűzése közötti eltérésen alapuló esetet reprodukál.
 
 ## 17. Kockázatok
 
