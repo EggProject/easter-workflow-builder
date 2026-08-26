@@ -203,9 +203,20 @@ A Playwright `retries` alapértelmezése (`0`, https://playwright.dev/docs/test-
 használatban, mert erre nincs saját mérésünk. A `vite-plugin-istanbul@9.0.1` Vite 8-cal
 (Rolldown) való működése SPEC-001-ben nyitott kérdés volt - **empirikusan igazolt**, immár
 végponttól végpontig: a `bun run test:e2e` valódi Chromiumot indít, a fixture kimenti a
-`window.__coverage__` objektumot, és a `bun run --filter web coverage:e2e:report` (nyc) 100
+`window.__coverage__` objektumot, és a `bun run coverage:e2e:report` (nyc) 100
 százalékot jelent az `apps/web/src/main.ts` fájlra. Bekötve: `apps/web/vite.config.ts` és
 `apps/web/e2e/coverage-fixture.ts`.
+
+**Az e2e lefedettségi riport és a Turborepo cache.** A nyers coverage könyvtár
+(`apps/web/e2e/.nyc_output/`) a `turbo.json` `test:e2e` taskjának **deklarált `outputs`-a**, az
+`inputs` pedig `!**/e2e/.nyc_output/**` negációval kizárja. Enélkül cache találatkor a
+Playwright nem indul el (`cache hit, replaying logs`, `>>> FULL TURBO`), a nyers adat nem
+keletkezik újra, és a rákövetkező `nyc report` `ENOENT ... scandir` hibával bukik - pontosan
+ez döntötte el a CI E2E jobját a 32994208280 futásban. A riportot a gyökérből a
+`bun run coverage:e2e:report` script futtatja, ami a `tooling/scripts/e2e-coverage.sh` token
+takarékos wrapper: a **stdout kizárólag az nyc táblázata** (ebből lesz a PR komment
+töredéke), minden hiba a **stderr**-re megy, tehát CI-ben sem tud elrejtőzni. Részletek és
+mérések: `docs/research/2026-08-26-spec001-ellenorzesek.md`, V-20.
 
 **Playwright rootless konténerben, sudo nélkül.** A fejlesztői sandbox nem-root felhasználóként
 fut (`no new privileges`, nincs `sudo`, az `apt-get install` `Permission denied`), a Chromium

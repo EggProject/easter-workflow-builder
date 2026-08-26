@@ -47,6 +47,7 @@
     "check:casing": "bash tooling/scripts/casing.sh",
     "test": "vitest run --coverage",
     "test:e2e": "turbo run test:e2e",
+    "coverage:e2e:report": "bash tooling/scripts/e2e-coverage.sh",
     "dev": "turbo run dev"
   },
   "devDependencies": {

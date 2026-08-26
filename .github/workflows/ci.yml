@@ -198,13 +198,25 @@ jobs:
       - name: Install Playwright Browsers
         run: bunx playwright install --with-deps chromium
 
+      # FONTOS a kovetkezo lepessel valo osszefuggese. Ez a parancs `turbo run
+      # test:e2e`, tehat Turborepo cache talalat eseten a Playwright NEM indul
+      # el ujra, csak a naplo jatszodik vissza ("cache hit, replaying logs",
+      # ">>> FULL TURBO"). Ilyenkor a lemezre KIZAROLAG az kerul ki, amit a
+      # turbo.json `outputs` mezoje felsorol. Ezert szerepel ott az
+      # `e2e/.nyc_output/**` is: e nelkul cache talalatkor nem all helyre a
+      # nyers coverage adat, es a kovetkezo lepes `nyc`-je ENOENT-tel bukik.
+      # Forras: https://turborepo.com/docs/crafting-your-repository/caching
+      #   ("Turborepo caches the file outputs of a task that are defined in the
+      #   `outputs` key of `turbo.json`. When there's a cache hit, Turborepo
+      #   will restore the files from the cache.")
       - name: Run e2e tests
         run: bun run test:e2e
 
       # A `window.__coverage__` nyers adatat az apps/web/e2e/coverage-fixture.ts
-      # menti tesztenkent az `apps/web/e2e/.nyc_output` ala; ezt fesuli ossze az
-      # `apps/web` mar letezo `coverage:e2e:report` scriptje (nyc). Kuszob nincs
-      # (SPEC-001 10. szekcio, 24. elfogadasi kriterium), csak riport.
+      # menti tesztenkent az `apps/web/e2e/.nyc_output` ala; ezt fesuli ossze a
+      # gyoker `coverage:e2e:report` scriptje, azaz a
+      # `tooling/scripts/e2e-coverage.sh` token takarekos wrapper (nyc). Kuszob
+      # nincs (SPEC-001 10. szekcio, 24. elfogadasi kriterium), csak riport.
       #
       # Az nyc `text` reportere nem ad gepi olvashato osszegzot (nincs
       # json-summary), ezert a szoveges tablazat kerul kodblokkban a job
@@ -212,10 +224,25 @@ jobs:
       # onnan naplozzuk is - igy nem kell csovezni, tehat a lepes nem fugg a
       # `pipefail` beallitastol (a `run:` alapertelmezett shellje `bash -e {0}`,
       # `-o pipefail` NELKUL).
+      #
+      # HIBAKERESHETOSEG. Korabban a stdout atiranyitasa miatt egy hibas futas
+      # kimenete a fajlban ragadt, es a naploban csak egy csupasz "Process
+      # completed with exit code 1" latszott. Ket dolog javitja ezt:
+      #   - a wrapper minden diagnosztikat a STDERR-re ir, ami nincs
+      #     atiranyitva, tehat mindig lathato a naploban;
+      #   - a lenti `if !` ag a hibas futas elkapott stdout tartalmat is
+      #     kiirja egy osszecsukhato csoportba, majd a lepest elbuktatja.
+      # A sikeres ag valtozatlanul csak a nyc tablazatot naplozza, tehat a
+      # naplo nem hizik.
       - name: E2E coverage report
         if: always()
         run: |
-          bun run --filter web coverage:e2e:report > "$RUNNER_TEMP/e2e-coverage.txt"
+          if ! bun run coverage:e2e:report > "$RUNNER_TEMP/e2e-coverage.txt"; then
+            echo '::group::A coverage:e2e:report elkapott kimenete'
+            cat "$RUNNER_TEMP/e2e-coverage.txt"
+            echo '::endgroup::'
+            exit 1
+          fi
           cat "$RUNNER_TEMP/e2e-coverage.txt"
           mkdir -p pr-comment
           {
@@ -226,6 +253,9 @@ jobs:
             echo '```'
             echo ''
             echo 'Erre a riportra nincs kuszob (SPEC-001 10. szekcio), csak riport.'
+            # A visszapipa itt markdown kodjeloles, nem parancs-behelyettesites,
+            # ezert kell egyes idezojel es ezert nem alkalmazando az SC2016.
+            # shellcheck disable=SC2016
             echo 'A bongeszheto HTML riport az `e2e-coverage-report` artefaktumban van.'
           } > pr-comment/02-e2e.md
           cat pr-comment/02-e2e.md >> "$GITHUB_STEP_SUMMARY"
