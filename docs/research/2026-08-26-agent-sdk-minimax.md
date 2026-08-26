@@ -133,6 +133,8 @@ Nincs GroupId paraméter ezen az endpointon.
 
 ### Modellek
 
+**A projekt hatókörében kizárólag a `MiniMax-M3` modell van, a táblázat többi sora csak referencia.**
+
 | Modell | Kontextus | Max output | Kép/videó | Thinking |
 |---|---|---|---|---|
 | `MiniMax-M3` | 1 000 000 | ajánlott 131 072, max 524 288 | igen | opcionális (`adaptive`) |
@@ -146,7 +148,7 @@ M3-hoz nincs highspeed variáns.
 `[1m]` suffix (`MiniMax-M3[1m]`): **nem MiniMax paraméter**, a Claude Code kliens saját
 konvenciója. Hogy a kliens leválasztja-e a kérés előtt: nyitott kérdés, lásd Q9.
 
-Rate limit: M3 200 RPM / 10M TPM, a többi 500 RPM / 20M TPM.
+Rate limit: **releváns érték az M3-é: 200 RPM / 10M TPM**, a többi (hatókörön kívül) 500 RPM / 20M TPM.
 
 ### `thinking` (OpenAPI séma, szó szerint)
 
@@ -159,7 +161,7 @@ thinking:
 
 - **Nincs `enabled`, nincs `budget_tokens`.**
 - M3: alapból ki, `adaptive` kapcsolja be.
-- M2.x: mindig be, a `disabled` értéket elfogadja de figyelmen kívül hagyja.
+- M2.x (hatókörön kívül): mindig be, a `disabled` értéket elfogadja de figyelmen kívül hagyja.
 - Stream: `content_block_start` `{type:"thinking"}` blokkal, `thinking_delta` deltákkal,
   záró `signature_delta`, majd `content_block_stop`.
 - Nincs `redacted_thinking`.
@@ -194,6 +196,8 @@ Két rendszer: automatikus/passzív (M3, M2.7, M2.5, M2.1) és explicit `cache_c
 találatnál megújul, max 4 breakpoint kérésenként, 20 blokkos lookback, minimum 512 input token.
 Hierarchia: `tools` → `system` → `messages`.
 `usage` mezők: `cache_creation_input_tokens`, `cache_read_input_tokens`.
+**M3-nál az automatikus/passzív cache a dokumentált út, az explicit `cache_control` M3-on nem
+megerősített.**
 
 ### Hibaformátum
 
@@ -253,15 +257,19 @@ Kulcs doksi: https://code.claude.com/docs/en/llm-gateway-protocol
 
 ### Ismert MiniMax + Claude Code problémák (nem hivatalos, GitHub issue)
 
-- `output_config` (`effort` + `json_schema` format) háttérkérésekben 400-at dob M2.5-nél:
+- `output_config` (`effort` + `json_schema` format) háttérkérésekben 400-at dob M2.5-nél
+  (hatókörön kívüli modellre vonatkozik):
   https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28
-- `"invalid message role: system (2013)"` beszélgetés közbeni system message-nél:
+- `"invalid message role: system (2013)"` beszélgetés közbeni system message-nél
+  (hatókörön kívüli modellre vonatkozik):
   https://github.com/MiniMax-AI/MiniMax-M2.7/issues/43
-- Az `/anthropic` endpoint 200K contextet jelent 1M helyett, ezért túl korai compaction:
+- Az `/anthropic` endpoint 200K contextet jelent 1M helyett, ezért túl korai compaction
+  (hatókörön kívüli modellre vonatkozik):
   https://github.com/MiniMax-AI/MiniMax-M2.7/issues/46
 - Tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M2.7, M3):
   https://github.com/MiniMax-AI/MiniMax-M3/issues/19
-- Végtelen retry loop timeoutnál: https://github.com/MiniMax-AI/MiniMax-M2.7/issues/44
+- Végtelen retry loop timeoutnál (hatókörön kívüli modellre vonatkozik):
+  https://github.com/MiniMax-AI/MiniMax-M2.7/issues/44
 
 ---
 

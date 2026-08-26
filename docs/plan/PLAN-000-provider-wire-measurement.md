@@ -105,7 +105,7 @@ Az esetek tartalmát a SPEC-000 4. szekció írja le, itt csak a futtatás rendj
 | T-000-16 | M-01 | igen | nincs, ez a referencia |
 | T-000-17 | M-02, M-03 | igen, két külön `query()` | M-03-hoz in-process MCP szerver, magasabb `maxTurns`, promptot nem nyitó `permissionMode` |
 | T-000-18 | M-04 | igen, két `query()` | futásonként eltérő `effort` érték a T-000-5-ben kiolvasott enumból |
-| T-000-19 | M-05, M-06 | igen, három `query()` | modellváltás M3 és M2.7 között, plusz `MAX_THINKING_TOKENS=0` az M-06 (b) futásnál |
+| T-000-19 | M-05, M-06 | igen, három `query()` | nincs modellváltás, mindhárom futás `MiniMax-M3`-on megy, az M-06 (b) futása `MAX_THINKING_TOKENS=0` env változóval tér el az (a) futás explicit `thinking` opciójától |
 | T-000-20 | M-07 | igen, négy `query()` | futásonként eltérő env, az egyik futásnál `persistSession: true` |
 | T-000-21 | M-08 | igen, öt `query()` | futásonként pontosan egy env változó eltérés az M-01 alaphoz képest |
 | T-000-22 | M-14 | igen, három `query()` | az M-08 env deltái közül kettő ismétlődik, de az artefaktumok külön esetazonosító alá kerülnek |
@@ -129,7 +129,7 @@ Költségkorlátozás:
 
 - Rövid promptok. Az alapbeállítás promptja tool nélkül megválaszolható kérdés, a hosszú bemenetet igénylő eseteket (M-13, M-15) kivéve nem növeljük a bemenetet.
 - Kimenet korlátozása. A `maxTurns: 1` az esetek többségében egy körre szorítja a beszélgetést. A kimenő token korlát opció pontos nevét és értékkészletét a T-000-5 olvassa ki a telepített SDK típusdefiníciójából; addig konkrét számot nem rögzítünk, mert az tippelés lenne.
-- Modellválasztás. Az alapmodell a SPEC-000 szerinti `MiniMax-M2.7`, és csak azok az esetek váltanak `MiniMax-M3`-ra, ahol a spec kifejezetten előírja (M-05, M-11, M-13, M-16). Fölösleges M3 futás nem indul.
+- Modellválasztás. Minden mérés a SPEC-000 szerinti `MiniMax-M3`-on fut. A költséget rövid promptokkal, alacsony `max_tokens` (illetve a kimenő token korlát opció T-000-5-ben kiolvasott megfelelőjével) és a mérési esetek egy futásba vonásával tartjuk alacsonyan, ahol a spec ezt megengedi.
 - Minden lokálisan ellenőrizhető viselkedést (bájtazonosság, SSE sorrögzítés, maszkolás, időkorlát, harness fájlkészlet) a T-000-9, T-000-10, T-000-11 és T-000-13 lokális echo upstream ellen ellenőriz, valós API hívás nélkül.
 - Ismétlés csak akkor, ha az artefaktum hiányos vagy sérült. Sikeres, rögzített tranzakciót nem futtatunk újra.
 
