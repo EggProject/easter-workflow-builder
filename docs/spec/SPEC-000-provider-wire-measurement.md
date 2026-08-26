@@ -102,7 +102,7 @@ Minden eset ebből indul, az eltéréseket az eset sorolja fel:
 
 ```
 Options: {
-  model: 'MiniMax-M2.7',
+  model: 'MiniMax-M3',
   systemPrompt: { type: 'preset', preset: 'claude_code' },
   maxTurns: 1,
   includePartialMessages: true,
@@ -154,10 +154,10 @@ Az SDK verziót a mérés idejére pinelni kell, a pontos verzió a `meta.json`-
 
 ### M-06 `thinking` kikapcsolva
 
-- **Eltérés**: két futás. (a) `thinking` az SDK szerinti kikapcsolt értékre állítva, `model: 'MiniMax-M3'`. (b) `thinking` opció nélkül, `MAX_THINKING_TOKENS=0` env változóval, `model: 'MiniMax-M2.7'`.
+- **Eltérés**: két futás, mindkettő `model: 'MiniMax-M3'`. (a) `thinking` az SDK szerinti kikapcsolt értékre állítva, explicit `thinking` opcióval. (b) `thinking` opció nélkül, `MAX_THINKING_TOKENS=0` env változóval.
 - **Futtatás**: futásonként egy `query()`, streamelve.
-- **Megfigyelés**: van-e egyáltalán `thinking` kulcs a bodyban, és ha igen, a pontos JSON. A válasz HTTP kódja. A stream tartalmaz-e `thinking` content blockot az M2.7 futásnál, ahol a research szerint a thinking mindig be van kapcsolva és a `disabled` értéket a provider figyelmen kívül hagyja.
-- **Következtetés**: Q4 második fele, és a `thinking.byModelFamily` mező M2.x ágának feltöltése.
+- **Megfigyelés**: van-e egyáltalán `thinking` kulcs a bodyban mindkét futásnál, és ha igen, a pontos JSON. A válasz HTTP kódja. Diff az (a) és (b) futás `thinking` mezője között: a `MAX_THINKING_TOKENS=0` env változó ugyanazt a JSON alakot állítja elő, mint az explicit `thinking` opció, vagy eltérő alakot, vagy egyáltalán nem hat a mezőre.
+- **Következtetés**: Q4 második fele, és annak rögzítése, hogy a `MAX_THINKING_TOKENS=0` env változó a `thinking` mezőn keresztül vagy attól függetlenül fejti-e ki a hatását M3-on.
 
 ### M-07 Háttér modellhívások
 
@@ -320,7 +320,9 @@ interface ToolChoiceCapability {
   readonly sdkSendsForcedChoice: Fact<boolean>;
 }
 
-/** Thinking, modellcsaládonként, mert M3 és M2.x eltér. */
+/** Thinking, modellcsaládonként. A bontás a típus általános része marad, mert más
+ *  provider több modellcsaládot is hozhat; a `minimax` leírónak jelenleg egyetlen
+ *  családja van, `M3`. */
 type ThinkingMode = 'disabled' | 'adaptive' | 'always_on';
 
 interface ThinkingCapability<TFamilyId extends string> {
@@ -466,7 +468,7 @@ interface ProviderCapabilityDescriptor<
 
 ### A `minimax` leíró jelen állapota
 
-A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModelId, MiniMaxFamilyId>` alakban íródik, ahol `MiniMaxModelId` a research modelltáblázatának azonosítóiból álló literál unió, `MiniMaxFamilyId = 'M3' | 'M2x'`. A mérés lezárása előtti állapot:
+A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModelId, MiniMaxFamilyId>` alakban íródik, ahol `MiniMaxModelId = 'MiniMax-M3'`, `MiniMaxFamilyId = 'M3'`. A mérés lezárása előtti állapot:
 
 | Mező | Állapot | Érték / indok | Bizonyíték |
 |---|---|---|---|
@@ -484,7 +486,6 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 | `toolChoice.rejectionBehaviour` | unknown | 400 vagy csendes eldobás, nem mértük | blokkolja M-03 |
 | `toolChoice.sdkSendsForcedChoice` | unknown | Q2 | blokkolja M-03 |
 | `thinking.byModelFamily.M3` | known | `['disabled','adaptive']`, alapból ki | research 2. szekció |
-| `thinking.byModelFamily.M2x` | known | `['always_on']`, a `disabled` értéket elfogadja de figyelmen kívül hagyja | research 2. szekció |
 | `thinking.wireShape` | unknown | Q4, az SDK által küldött JSON nem ismert | blokkolja M-05, M-06 |
 | `thinking.sendsBudgetTokens` | unknown | a provider sémájában nincs `budget_tokens`, de az SDK küldhet | blokkolja M-05 |
 | `thinking.interleavedSignatureRequired` | known | M3-nál a thinking blokkot signature-rel vissza kell adni | research 2. szekció |
@@ -506,9 +507,8 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 | `models[].effectiveContextWindowOnWire` | unknown | Q11, a 200K kontra 1M ellentmondás nyitott | blokkolja M-13 |
 | `models[MiniMax-M3].imageInput` | unknown | a research táblázata összevont kép és videó oszlopot használ, külön kép bizonyíték nincs | blokkolja M-16 |
 | `models[MiniMax-M3].videoInput` | unknown | ugyanaz az összevont oszlop, külön videó bizonyíték nincs | blokkolja M-16 |
-| `models[M2.x].imageInput`, `.videoInput` | known | `false` | research 2. szekció |
 | `models[].listedByModelsEndpoint` | unknown | Q10 | blokkolja M-12 |
-| `rateLimits.buckets` | known | M3: 200 RPM / 10M TPM; M2.x: 500 RPM / 20M TPM | research 2. szekció |
+| `rateLimits.buckets` | known | M3: 200 RPM / 10M TPM | research 2. szekció |
 | `rateLimits.retryAfterHeader` | unknown | a `Retry-After` nincs dokumentálva, mérés kell | blokkolja M-18 |
 | `rateLimits.rateLimitHeaders` | unknown | a megfigyelt headerlista a mérésből jön | blokkolja M-18 |
 | `anthropicBetaHeaders` | unknown | Q12 | blokkolja M-14 |
@@ -538,6 +538,6 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 | A `claude-subscription` provider drótszinten nem mérhető ezzel az eszközzel | erre a providerre nincs azonos minőségű bizonyíték | ott a leíró az SDK oldali `SDKMessage` folyamból és a hivatalos dokumentációból töltődik, és ezt az `evidence` mező típusa megkülönbözteti |
 | Ha a mérés alatt nem keletkezik 429-es válasz | a rate limit headerek ismeretlenek maradnak | a mező `unknown` marad, szándékos rate limit kimerítést nem végzünk |
 | A `[1m]` suffix a research szerint a Claude Code kliens konvenciója, nem MiniMax paraméter | nem tudjuk, hogy az SDK ugyanúgy kezeli-e, mint a CLI | M-11 méri, de ha az SDK-ban egyáltalán nem értelmezett, a kérdés a CLI-re nyitva marad |
-| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M2.7 és M3) | hosszú workflow-k adatátadása romolhat | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell |
+| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M3) | hosszú workflow-k adatátadása romolhat | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell |
 | Végtelen retry loop timeoutnál | a mérés beragadhat | a proxy nem retry-zik, és minden futásra felső időkorlát van, aminek az értéke a `meta.json`-ba kerül |
 | Az `Options.effort` és `Options.thinking` enum értékei nincsenek a research fájlban | a mérés előtt nem definiálható a pontos beállítás | a mérés előtt a telepített SDK típusdefiníciójából kell kiolvasni, és a `meta.json`-ba rögzíteni |
