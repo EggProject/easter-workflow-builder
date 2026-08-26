@@ -83,7 +83,7 @@ kérésé `low` vagy `max` (M-04).
 Az M-08 mind az öt env kapcsolója közül **egyik sem** vette le az `output_config` mezőt.
 
 **Tervezési következmény:** a research által idézett
-[MiniMax-M2.5#28](https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28) 400-as hiba **M3 ellen nem
+[GitHub #28](https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28) 400-as hiba **M3 ellen nem
 reprodukálódott**: mind a 79 kérés HTTP 200. Az `output_config` nem blokkolja a MiniMax
 használatát, de nincs rá kapcsoló sem, tehát ha a MiniMax a jövőben szigorít, nincs kliens oldali
 kikerülés. Ez regressziós kockázat, nem jelenlegi hiba.
@@ -186,7 +186,7 @@ utolsó eleme `role: "system"` (tartalma az agent típusok listája, illetve
 `<total_tokens>...</total_tokens>`), és a válasz HTTP 200 (saját ellenőrzés:
 `00003-1787706973670.json`, `00004-1787706975166.json`). Az SDK a
 `mid-conversation-system-2026-04-07` beta headert küldi hozzá. A research által idézett
-[MiniMax-M2.7#43](https://github.com/MiniMax-AI/MiniMax-M2.7/issues/43)
+[GitHub #43](https://github.com/MiniMax-AI/MiniMax-M2.7/issues/43)
 `invalid message role: system (2013)` hiba tehát M3 ellen nem reprodukálódott.
 
 **Tervezési következmény:** az `emit_output_tool` stratégia `usable` mezője `unknown` marad, mert a
@@ -324,7 +324,7 @@ A minta mind a 32 cím kérésben azonos, és minden mérési esetnél megjeleni
 |---|---|
 | **Költség** | minden `query()` +1 kérés. A 32 cím kérés mérhető input tokenje 799 körül van, output 15 körül. Egy hosszú workflow-ban lépésenként egy ilyen kérés, ez lineárisan skálázódik a lépésszámmal |
 | **Rate limit** | az M3 dokumentált limitje 200 RPM. A cím kérés **duplázza** a kérésszámot, tehát a tényleges lépés-átbocsátás a fele a névlegesnek |
-| **Hibalehetőség** | ez az egyetlen kérés, ami natív `output_config.format` mezőt küld. A MiniMax M3 ma HTTP 200-zal fogadja, de a [MiniMax-M2.5#28](https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28) issue szerint M2.5-nél pont ez a mező dobott 400-at. Ha a MiniMax M3-on is szigorít, **minden `query()` első kérése elhasal**, miközben a fő kérés jó lenne |
+| **Hibalehetőség** | ez az egyetlen kérés, ami natív `output_config.format` mezőt küld. A MiniMax M3 ma HTTP 200-zal fogadja, de a [GitHub #28](https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28) issue szerint pont ez a mező dobott 400-at. Ha a MiniMax M3-on is szigorít, **minden `query()` első kérése elhasal**, miközben a fő kérés jó lenne |
 | **Adatszivárgás** | a felhasználói prompt teljes szövege kimegy egy második kérésben is. Ha valaha nem ugyanaz a provider szolgálja ki a háttérhívást, a prompt egy másik szolgáltatóhoz kerülne |
 
 A hibalehetőség és a rate limit együtt indokolja, hogy a cím kérést a `minimax` providernél

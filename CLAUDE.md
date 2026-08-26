@@ -145,6 +145,16 @@ CRUD felület**, csak választani lehet közülük: `claude-subscription` (Claud
 Választás három szinten: globális alapértelmezés, workflow felülírás, lépés felülírás.
 A provider-választó komponens része a "Kapcsolat teszt" gomb.
 
+**A MiniMax családból kizárólag a `MiniMax-M3` van hatókörben.** A többi MiniMax modellt
+(M2, M2.1, M2.5, M2.7 és a `-highspeed` variánsok) tilos említeni dokumentumban, kódban,
+kommentben és a usernek szóló jelentésben is. Ha egy hivatkozott GitHub issue mégis másik
+modellről szól, a mondat ne nevezze meg a modellt, csak a kockázatot és a saját M3 mérésünk
+eredményét.
+
+**Pusholni nem tudsz.** A futtatókörnyezeted egy izolált Linux sandbox, nincs benne SSH kulcs,
+nincs `gh`, és nem éri el a felhasználó gépét. Ezért minden commit-sorozat után **kötelező
+szólni a usernek, hogy pusholjon**, és megadni a branch nevét.
+
 A MiniMax képességei szűkebbek az Anthropicénál (nincs strukturált kimenet, `tool_choice` csak
 `auto`/`none`, `thinking` csak `adaptive`/`disabled`, az `effort` `output_config`-ként megy ki
 amit a MiniMax elutasít). Ezért van `ProviderCapabilityDescriptor`, és ezért tilos képességet
