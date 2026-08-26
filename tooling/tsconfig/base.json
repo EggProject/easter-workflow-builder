@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    // A TypeScript 6.0.3 alapertelmezeseit (strict, module: esnext, types: [],
+    // rootDir a tsconfig konyvtara stb.) itt nem ismeteljuk meg, csak azokat az
+    // opciokat allitjuk, amik elternek az alapertelmezestol.
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    // A tools/wire-probe/tsconfig.json mintaja: Node 26 type strippinggel
+    // futtatunk, soha nem emittalunk .js-t, a relativ importokban .ts
+    // kiterjesztes van.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  }
+}

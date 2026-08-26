@@ -61,10 +61,10 @@ function readMessageIntervalsInWindow(artifactsDir: string, windowStartMs: numbe
     if (!isRecord(parsed)) {
       continue;
     }
-    const timestampMs = typeof parsed.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
-    const durationMs = typeof parsed.durationMs === 'number' ? parsed.durationMs : 0;
-    const path = typeof parsed.path === 'string' ? parsed.path : '';
-    const method = typeof parsed.method === 'string' ? parsed.method : '';
+    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
+    const durationMs = typeof parsed['durationMs'] === 'number' ? parsed['durationMs'] : 0;
+    const path = typeof parsed['path'] === 'string' ? parsed['path'] : '';
+    const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
     if (Number.isNaN(timestampMs) || timestampMs < windowStartMs - 1000 || timestampMs > windowEndMs + 1000) {
       continue;
     }

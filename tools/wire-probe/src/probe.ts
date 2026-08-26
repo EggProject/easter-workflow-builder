@@ -36,12 +36,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const proxyPort = Number(process.env.WIRE_PROBE_PORT ?? 8787);
+  const proxyPort = Number(process.env['WIRE_PROBE_PORT'] ?? 8787);
   const ctx: CaseContext = {
     proxyPort,
     proxyBaseUrl: `http://127.0.0.1:${String(proxyPort)}/anthropic`,
     minimaxApiKey: loadMinimaxApiKey(),
-    outDir: process.env.WIRE_PROBE_OUT_DIR ?? join(moduleDir, '..', 'artifacts', 'harness'),
+    outDir: process.env['WIRE_PROBE_OUT_DIR'] ?? join(moduleDir, '..', 'artifacts', 'harness'),
     sdkVersion: readInstalledSdkVersion(),
   };
 

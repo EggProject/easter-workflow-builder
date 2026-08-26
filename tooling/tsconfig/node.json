@@ -1,0 +1,8 @@
+{
+  "extends": "./base.json",
+  "compilerOptions": {
+    // A TS 6.0 alapertelmezese ures types tomb, a Node 26 alatt futo
+    // csomagoknak viszont kell a node globalisok es beepitett modulok tipusa.
+    "types": ["node"]
+  }
+}

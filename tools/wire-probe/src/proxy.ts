@@ -22,14 +22,14 @@ import type { StreamEventRecord } from './proxy/types.ts';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-const port = Number(process.env.WIRE_PROBE_PORT ?? 8787);
-const upstream = process.env.WIRE_PROBE_UPSTREAM ?? 'https://api.minimax.io/anthropic';
-const artifactsDir = process.env.WIRE_PROBE_ARTIFACTS_DIR ?? join(moduleDir, '..', 'artifacts');
+const port = Number(process.env['WIRE_PROBE_PORT'] ?? 8787);
+const upstream = process.env['WIRE_PROBE_UPSTREAM'] ?? 'https://api.minimax.io/anthropic';
+const artifactsDir = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? join(moduleDir, '..', 'artifacts');
 
 const upstreamUrl = new URL(upstream);
 const upstreamOrigin = `${upstreamUrl.protocol}//${upstreamUrl.host}`;
 
-const secretEnvValue = process.env.MINIMAX_API_KEY;
+const secretEnvValue = process.env['MINIMAX_API_KEY'];
 const recorder = new TransactionRecorder(artifactsDir, secretEnvValue ? [secretEnvValue] : []);
 
 /** Node http/https headerobjektumot sík string->string alakra hoz (a value string vagy string[] lehet). */

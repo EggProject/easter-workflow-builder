@@ -8,7 +8,7 @@ const moduleDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(moduleDir, '..', '..', '..', '..');
 
 export function loadMinimaxApiKey(): string {
-  const fromEnv = process.env.MINIMAX_API_KEY;
+  const fromEnv = process.env['MINIMAX_API_KEY'];
   if (fromEnv !== undefined && fromEnv.length > 0) {
     return fromEnv;
   }
