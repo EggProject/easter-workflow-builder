@@ -22,6 +22,11 @@ A `base.json` **nem ismétli meg** a TypeScript 6.0.3 alapértelmezéseit (`stri
 vagy deprecated opció (`baseUrl`, `moduleResolution: node`, `target: es5` stb.) ide nem
 kerülhet, és `"ignoreDeprecations"` kapcsolót sem használunk.
 
+**Kivétel: `forceConsistentCasingInFileNames`.** Ez már a TS 6.0.3 alapértelmezése is
+(forrás a `base.json`-ban), mégis explicit szerepel, mert egy valós CI hibát fedez fel
+(`tools/wire-probe/src/cases` git index vs. import betűzés eltérés) - a szándék explicit
+dokumentálása a cél, ne függjünk egy jövőbeli TS alapértelmezés-változástól.
+
 A fogyasztó csomagok a saját `tsconfig.json`-jukban `"extends"` mezővel hivatkoznak
 ide, relatív útvonallal (pl. `"../../tooling/tsconfig/node.json"`).
 

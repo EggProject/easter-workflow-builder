@@ -1,0 +1,74 @@
+name: Setup
+description: Kozos futtatokornyezet minden CI jobhoz - Bun, Node, Bun es Turborepo cache, fuggoseg telepites.
+
+# Ez egy LOKALIS composite action. A `uses: ./.github/actions/setup` alak
+# feltetele, hogy a repo mar ki legyen checkoutolva, ezert a hivo job elso
+# lepese mindig az `actions/checkout`.
+# Forras (metadata syntax, "References a local action"):
+# https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax
+#
+# Miert composite action: a workflow het jobja (negy minosegi kapu a matrixban,
+# `test`, `build`, `e2e`) ugyanezt az ot lepest ismetelne. Egy helyen tartva a
+# verziofrissites is egy helyen tortenik.
+
+inputs:
+  turbo-cache-scope:
+    description: >-
+      A Turborepo helyi cache kulcsanak jobonkenti megkulonbozteto elotagja. Kotelezo, mert az
+      `actions/cache` egy kulcsot csak EGYSZER tud menteni: ha tobb parhuzamos job ugyanazt a kulcsot
+      probalja irni, a masodiktol kezdve a mentes figyelmeztetessel kimarad ("Unable to reserve cache
+      with key ..., another job may be creating this cache", actions/toolkit `ReserveCacheError`, a
+      lepest es a jobot nem bukatja el). A jobonkent kulon kulcs miatt minden job sajat, teljes
+      cache-t ment. Forras: https://github.com/actions/cache
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2.2.0
+      with:
+        bun-version: 1.4.0
+
+    # A `setup-node` `cache` bemenete csak npm/yarn/pnpm erteket ismer, a `bun`
+    # nem tamogatott (SPEC-001 12. szekcio) - itt kizarolag a Node verziot
+    # allitja be, a fuggoseg-cache-t a kovetkezo lepes adja.
+    - name: Setup Node
+      uses: actions/setup-node@v7.0.0
+      with:
+        node-version: '26.7.0'
+
+    # Nem hivatalos recept (SPEC-001 12. szekcio, V-14: meg nincs merve, hogy
+    # nyer-e idot CI-ben). A konyvtar helye hivatalosan dokumentalt:
+    # https://bun.com/docs/pm/global-cache
+    - name: Cache Bun global cache
+      uses: actions/cache@v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+
+    # A Turborepo hivatalos GitHub Actions utmutatojanak "Remote Caching with
+    # GitHub actions/cache" szekcioja pontosan ezt a kulcs + restore-keys
+    # mintat irja: kulcs `${{ runner.os }}-turbo-${{ github.sha }}`,
+    # restore-keys `${{ runner.os }}-turbo-`.
+    # Forras: https://turborepo.dev/docs/guides/ci-vendors/github-actions
+    #
+    # ELTERES a forrastol, tudatosan: a hivatalos pelda EGYETLEN jobot
+    # felvazol, nalunk viszont het job fut parhuzamosan, es egy cache kulcsot
+    # csak egy job tud menteni (lasd a `turbo-cache-scope` bemenet leirasat).
+    # Ezert a kulcsba bekerul a job hatokore is; a minta tobbi resze valtozatlan.
+    - name: Cache Turborepo
+      uses: actions/cache@v6.1.0
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ inputs.turbo-cache-scope }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-${{ inputs.turbo-cache-scope }}-
+
+    # A `--frozen-lockfile` kotelezo: a CI nem modosithatja a `bun.lock` fajlt
+    # (SPEC-001 12. szekcio).
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile

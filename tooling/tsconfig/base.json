@@ -17,6 +17,16 @@
     // futtatunk, soha nem emittalunk .js-t, a relativ importokban .ts
     // kiterjesztes van.
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    // Ez MAR a TS 6.0.3 alapertelmezese (a telepitett compiler forrasa,
+    // typescript.js, `forceConsistentCasingInFileNames: true`-t ad, a TS 5.0
+    // ota, lasd https://github.com/microsoft/TypeScript/pull/52298 es
+    // https://www.typescriptlang.org/tsconfig/forceConsistentCasingInFileNames.html),
+    // itt megis explicit szerepel a fenti "nem ismeteljuk az alapertelmezest"
+    // szabaly alol kivetelkent: ez a kapcsolo egy valos, tools/wire-probe/src/cases
+    // fajlokat erinto CI-hibat (git index es import betuzese eltert) fedez fel
+    // helyben is, ezert a szandek explicit dokumentalasa a cel, ne fuggjunk egy
+    // jovobeni TS alapertelmezes-valtoztatastol.
+    "forceConsistentCasingInFileNames": true
   }
 }
