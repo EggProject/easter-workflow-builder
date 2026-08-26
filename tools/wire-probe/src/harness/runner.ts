@@ -21,10 +21,29 @@ export interface ExecuteQueryParams {
   readonly timeoutMs?: number;
 }
 
-/** Function-értékeket "[function]" placeholderré alakít, hogy az Options JSON-be írható legyen. */
+/**
+ * Function-értékeket "[function]" placeholderré alakít, hogy az Options JSON-be
+ * írható legyen. Emellett körkörös hivatkozásokat is placeholderré alakít: az
+ * `mcpServers` mezőbe ténylegesen átadott, `createSdkMcpServer` által létrehozott
+ * élő szerver objektum önmagára mutató (`root`) mezőt tartalmaz, amit a natív
+ * `JSON.stringify` körkörös hivatkozásként hibával utasítana el (bug, javítva:
+ * ez nem mérési eredmény, hanem a meta.json író kód hibája volt).
+ */
 function describeOptions(options: Options): unknown {
+  const seen = new WeakSet<object>();
   return JSON.parse(
-    JSON.stringify(options, (_key, value: unknown) => (typeof value === 'function' ? '[function]' : value)),
+    JSON.stringify(options, (_key, value: unknown) => {
+      if (typeof value === 'function') {
+        return '[function]';
+      }
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[circular]';
+        }
+        seen.add(value);
+      }
+      return value;
+    }),
   );
 }
 

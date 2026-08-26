@@ -1,0 +1,221 @@
+# SPEC-000 mérési jegyzőkönyv, MiniMax
+
+Dátum: 2026-08-26. SDK verzió (pinelve): `@anthropic-ai/claude-agent-sdk@0.3.245` (`tools/wire-probe/package.json`, ellenőrizve `bun run typecheck` hibátlan futásával). Modell: `MiniMax-M3`, kivéve M-11 (a) futása, ahol `MiniMax-M3[1m]` volt beállítva. Proxy port: `8787` (alapérték, `WIRE_PROBE_PORT` nem volt felülírva egyik futásnál sem). Upstream: `https://api.minimax.io/anthropic`. A proxy 6 különálló processzben futott (a `mcp__workspace__bash` hívások függetlenek), ezért az `artifacts/*.json` fájlok `seq` mezője processzenként 1-től indul újra; minden hivatkozás ezért a teljes fájlnévre (epoch időbélyeggel) mutat, nem a `seq`-re.
+
+Ez a jegyzőkönyv nyers megfigyeléseket rögzít. Nem tartalmaz kiértékelést, nem tölti ki a `ProviderCapabilityDescriptor`-t, az a következő lépés dolga. Ahol egy megfigyelés nem egyértelmű, azt külön jelzem.
+
+Összesítés: 17 eset (M-01 - M-17) valós HTTP forgalmat generált a proxyn keresztül, mindegyikhez van rögzített tranzakció. M-18 spec szerint passzív, nem indít saját kérést, az összes korábbi tranzakcióból elemez.
+
+## Harness javítás a mérés közben (nem mérési eredmény)
+
+Az M-03 első futása harness kivétellel állt le: `Converting circular structure to JSON ... property 'root' closes the circle`. Ez a `tools/wire-probe/src/harness/runner.ts` `describeOptions()` függvényében történt, a `meta.json` összeállításakor, miután a `query()` hívás már sikeresen lefutott (134 SDKMessage már le volt írva az `a.sdk-messages.ndjson`-ba a kivétel pillanatában). Az ok: az `Options.mcpServers` mezőbe ténylegesen átadott, `createSdkMcpServer` által létrehozott élő szerver objektum önmagára mutató `root` mezőt tartalmaz, amit a natív `JSON.stringify` körkörös hivatkozásként utasít el. Ez a harness saját hibája volt, nem mérési eredmény: a hiba a `meta.json` író kódban volt, nem a MiniMax válaszában.
+
+Javítás: `describeOptions()` egy `WeakSet`-alapú ciklus-felismerő replacer-t kapott, ami a körkörös hivatkozást `"[circular]"` placeholderre cseréli, mielőtt a `JSON.stringify` elérné. `bun run typecheck` a javítás után is hibátlan. Az M-03-at ezután újrafuttattam, sikeresen (lásd lent). Ez a javítás minden `mcpServers`-t használó esetet érint (M-03, M-09, M-10, M-17), ezeknél mind sikeresen lefutott a `meta.json` írás a javítás után.
+
+## M-01 Alap body és header leltár
+
+Beállítás: nincs eltérés, referencia futás. Kimenetel: 2 db `POST /v1/messages`, mindkettő HTTP 200. `result` subtype: `success` (17 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-01/a.meta.json`, `tools/wire-probe/artifacts/00002-1787706770143.json` (1. kérés), `tools/wire-probe/artifacts/00003-1787706771598.json` (2. kérés).
+
+Egy `query()` hívás alatt **két** különálló `POST /v1/messages` ment ki, eltérő body-val:
+
+| | 1. kérés (`00002-...json`) | 2. kérés (`00003-...json`) |
+|---|---|---|
+| top-level kulcsok | `model, messages, system, tools, metadata, max_tokens, output_config, stream` | `model, messages, system, tools, metadata, max_tokens, thinking, context_management, output_config, stream` |
+| `tools` tömb hossza | 0 (üres tömb, de a kulcs jelen van) | 25, mind `name` mezővel, egyik elemnek sincs `type` mezője a wire-en |
+| `output_config` | `{"effort":"high","format":{"type":"json_schema","schema":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"],"additionalProperties":false}}}` | `{"effort":"high"}` |
+| `thinking` | nincs jelen | `{"type":"adaptive"}` |
+| `anthropic-beta` (8 vs 7 elem) | `claude-code-20250219, interleaved-thinking-2025-05-14, thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05, mid-conversation-system-2026-04-07, effort-2025-11-24, structured-outputs-2025-12-15` | ugyanaz, `structured-outputs-2025-12-15` nélkül |
+| `anthropic-version` | `2023-06-01` | `2023-06-01` |
+| HTTP kód | 200 | 200 |
+
+Nincs jelen egyik kérésben sem: `effort` (top-level), `tool_choice`, `container`, `top_k`, `stop_sequences`, `mcp_servers`. `output_config` **mindkét** kérésben jelen van, annak ellenére, hogy az M-01 case nem állít be sem `outputFormat`-ot, sem `effort`-öt.
+
+Teljes header lista (1. kérés): `accept, authorization, content-type, user-agent, x-claude-code-session-id, x-stainless-arch, x-stainless-lang, x-stainless-os, x-stainless-package-version, x-stainless-retry-count, x-stainless-runtime, x-stainless-runtime-version, x-stainless-timeout, anthropic-beta, anthropic-dangerous-direct-browser-access, anthropic-version, x-app, connection, host, accept-encoding, content-length`. Az `authorization` érték a rögzített fájlban maszkolva: `"***...iac4"` (hossz- és utolsó-4-karakter-megtartó maszk, a proxy saját maszkolása, nem a mérés tárgya).
+
+Nem egyértelmű: az 1. kérés célja (üres `tools`, kisebb body) nem derül ki magából a tranzakcióból, csak az, hogy létezik, és hogy `output_config.format.schema` egy `title` mezős sémát hordoz, ami NEM egyezik semmilyen, az M-01 case által kért sémával (az M-01 case nem is kér struktúrált kimenetet). Ez a minta minden más esetnél is megjelent (lásd M-02, M-04, M-07, M-08, M-11, M-14 lent), konzisztensen.
+
+## M-02 `outputFormat` drótalakja
+
+Beállítás: `outputFormat: { type: 'json_schema', schema: {label: string, count: number} }`. Kimenetel: 2 db `POST /v1/messages`, mindkettő HTTP 200, de a harness kivétellel zárult: `Claude Code returned an error result: Reached maximum number of turns (1)`, `result` subtype: `error_max_turns` (93 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-02/a.meta.json`, `tools/wire-probe/artifacts/00005-1787706773070.json`, `tools/wire-probe/artifacts/00006-1787706777349.json`.
+
+Ez SDK kivétel, mérési eredmény, nem harness hiba: az M-02 case a SPEC-000 szerint `maxTurns` felülírás nélkül fut (csak M-03 kap explicit magasabb `maxTurns`-t), tehát a `maxTurns: 1` korlát a közös alapbeállításból jön.
+
+- `output_config` az 1. kérésben: `{"effort":"high","format":{"type":"json_schema","schema":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"],"additionalProperties":false}}}` (ugyanaz a `title`-sémás alak, mint M-01-nél, NEM az M-02 case saját `label`/`count` sémája). `tools` tömb ekkor üres.
+- `output_config` a 2. kérésben: `{"effort":"high"}`, séma nélkül. A `tools` tömb 26 elemű: a 25 standard Claude Code tool plusz egy `StructuredOutput` nevű tool, aminek `input_schema`-ja **pontosan** egyezik az M-02 case által megadott sémával: `{"type":"object","properties":{"label":{"type":"string"},"count":{"type":"number"}},"required":["label","count"]}`.
+- HTTP kód mindkét kérésnél 200, nincs 400.
+
+Megfigyelés Q1-hez: a kért `outputFormat` séma nem natív `output_config.format` mezőben, hanem egy szintetikus, `StructuredOutput` nevű tool `input_schema`-jaként utazik a `tools` tömbben, a 2. (fő) kérésben.
+
+## M-03 `tool_choice` az `outputFormat` záró fázisában
+
+Beállítás: M-02 alapjai plusz `mcp__measure__echo` in-process tool, `maxTurns: 5`, `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true`. Első futás harness kivétellel állt le (lásd fenti "Harness javítás" szakasz), újrafuttatva a javítás után sikeres volt. Kimenetel (2. futás): 4 db `POST /v1/messages`, mind HTTP 200, `result` subtype: `success` (332 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-03/a.meta.json`, `tools/wire-probe/artifacts/00002-1787706889829.json` .. `00005-1787706894314.json`.
+
+`tool_choice` mező jelenléte mind a 4 kimenő kérésben: **nincs jelen egyikben sem** (`'tool_choice' in requestBody` mind a 4 kérésnél `false`). A 3-4. kérésben a `tools` tömb 27 elemű: a 25 standard tool, plusz `StructuredOutput` (a séma-tool), plusz `mcp__measure__echo`. Az utolsó (4.) kérés `output_config`-ja: `{"effort":"high"}`, `tool_choice` ott sem jelenik meg.
+
+Megfigyelés Q2-höz: ebben a mérésben az SDK egyetlen kérésben sem küldött `tool_choice` mezőt, sem `auto`, sem `any`, sem `tool` típusút, annak ellenére, hogy a prompt explicit tool hívást kért és `outputFormat` is be volt állítva.
+
+## M-04 `output_config` és `effort` kapcsolata
+
+Beállítás: (a) `effort: 'low'`, (b) `effort: 'max'`, `outputFormat` nélkül. Kimenetel: futásonként 2-2 `POST /v1/messages`, mind HTTP 200, `result` subtype mindkét futásnál `success` (40 és 38 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-04/a-effort-low.meta.json`, `.../b-effort-high.meta.json`, tranzakciók: `00012-1787706783653.json`, `00013-1787706784538.json` (a), `00015-1787706786324.json`, `00016-1787706786958.json` (b).
+
+Egyik kérésben sem jelenik meg `effort` top-level body kulcsként. Az 1. (thin) kérésben mindkét futásnál a szokásos `title`-sémás `output_config` megy ki (`effort` benne mindig `"high"`, függetlenül a case-ben beállított `effort` értéktől). A 2. (fő) kérésben:
+
+| Futás | 2. kérés `output_config` |
+|---|---|
+| a (`effort: 'low'`) | `{"effort":"low"}` |
+| b (`effort: 'max'`) | `{"effort":"max"}` |
+
+Megfigyelés: az `effort` a `output_config.effort` mezőben utazik, sosem top-level `effort` kulcsként. HTTP kód mind a 4 kérésnél 200, nincs 400.
+
+## M-05 `thinking` bekapcsolva
+
+Beállítás: `thinking: { type: 'adaptive' }`, streamelve. Kimenetel: 2 `POST /v1/messages`, HTTP 200 mindkettő, `result` subtype `success` (20 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-05/a.meta.json`, `00018-1787706789138.json` (1., nincs thinking), `00019-1787706790418.json` (2., thinking).
+
+A 2. kérés `thinking` mezője szó szerint: `{"type":"adaptive"}`, nincs benne `budget_tokens`. Stream event típusok (`00019-...json` `streamEvents` mezőjéből, `data:` sorok `type` értékei): `message_start, ping, content_block_start (type: "thinking"), delta:thinking_delta, content_block_delta, delta:signature_delta, content_block_stop, content_block_start (type: "text"), delta:text_delta, message_delta, message_stop`. Van `content_block_start` `thinking` típussal, és van záró `signature_delta`.
+
+## M-06 `thinking` kikapcsolva
+
+Beállítás: (a) `thinking: { type: 'disabled' }` explicit, (b) `thinking` opció nélkül, `MAX_THINKING_TOKENS=0` env. Kimenetel: futásonként 2-2 kérés, mind HTTP 200, mindkét futás `result` subtype `success` (10-10 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-06/a-explicit-disabled.meta.json`, `.../b-max-thinking-tokens-env.meta.json`, tranzakciók: `00021-1787706792224.json`, `00022-1787706792580.json` (a), `00024-1787706794828.json`, `00025-1787706795008.json` (b).
+
+`'thinking' in requestBody`: **`false` mind a 4 kérésnél**, mindkét futásban. Sem az (a), sem a (b) futás egyik kérésében nem jelenik meg a `thinking` kulcs egyáltalán (nem `{"type":"disabled"}` alakban megy ki, hanem teljesen hiányzik).
+
+Megfigyelés: (a) és (b) között a `thinking` mező szempontjából **nincs különbség**, mindkettő ugyanahhoz az eredményhez vezet: a mező hiányzik a bodyból. Ez egyszerre válasz a "melyik body mezőt viszi a `MAX_THINKING_TOKENS=0`" kérdésre is: ugyanazt (a mező hiányát), mint az explicit `thinking: {type:'disabled'}` opció.
+
+## M-07 Háttér modellhívások
+
+Beállítás: (a) alap, (b) `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, (c) `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3`, (d) `persistSession: true`. Kimenetel: mind HTTP 200, mind `result` subtype `success` (17, 24, 24, 64 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-07/{a-base,b-disable-nonessential-traffic,c-default-haiku-model,d-persist-session}.meta.json`.
+
+| Futás | kérésszám | tranzakciók |
+|---|---|---|
+| a-base | 2 | `00007-1787706895917.json`, `00008-1787706897979.json` |
+| b-disable-nonessential-traffic | **1** | `00010-1787706901895.json` |
+| c-default-haiku-model | 2 | `00012-1787706906089.json`, `00013-1787706910973.json` |
+| d-persist-session | 2 | `00015-1787706912444.json`, `00016-1787706913482.json` |
+
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` mellett csak 1 kérés ment ki (a szokásos 1. "thin" kérés hiányzik). A `c-default-haiku-model` futásban (ahol `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3`) mindkét kérés `model` mezője szó szerint `"MiniMax-M3"`, nem jelent meg más alias vagy modellnév. Minden kérés `model` mezője az összes futásban `"MiniMax-M3"` volt, egyik esetben sem jelent meg eltérő (pl. haiku-alias) modellnév a wire-en.
+
+Mind a 4 futásban az 1. kérés `messages` tartalma a felhasználói promptból ered (`"<session>\nMennyi kettő meg kettő?..."`), a 2. kérés (ahol volt) egy `<system-reminder>`-rel kezdődő, a CLAUDE.md-t és projekt kontextust tartalmazó szöveggel bővül, de ugyanahhoz a beszélgetéshez tartozik (nem különálló "session cím generálás" jellegű kérés volt beazonosítható a `messages` tartalma alapján).
+
+Nem egyértelmű: a research által feltételezett, felhasználói szándéktól független "háttér" hívás (pl. session cím generálás, külön modellel) ebben a mérésben nem volt egyértelműen azonosítható; a megfigyelt 2 kérés mintázata (üres `tools` + `title`-sémás `output_config`, majd teli `tools` + valós `thinking`/`context_management`) minden esetnél (M-01, M-04, M-07, M-08, M-11, M-14) konzisztensen megjelenik, de a pontos rendeltetése a rögzített tranzakciókból önmagában nem dönthető el.
+
+## M-08 Env kapcsoló mátrix
+
+Beállítás: 5 futás, egyenként egy env eltérés az M-01 alaphoz képest. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-08/<ENV_VAR>.meta.json`.
+
+Diff az M-01 megfelelő (thin/full) tranzakciójához (`00002-...json` = thin bázis, `00003-...json` = full bázis):
+
+| Env változó | kérésszám | full kérés: eltűnő body kulcs | eltűnő `anthropic-beta` elem(ek) | `cache_control` darabszám (full) | `tools.length` (full) |
+|---|---|---|---|---|---|
+| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` | 2 | `context_management` | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` | 3 (nincs változás) | 25 (nincs változás) |
+| `ENABLE_TOOL_SEARCH=false` | 2 | nincs | nincs | 3 (nincs változás) | 25 (nincs változás) |
+| `DISABLE_PROMPT_CACHING=1` | 2 | nincs | nincs | **0** (bázis: 3) | 25 (nincs változás) |
+| `MAX_THINKING_TOKENS=0` | 2 | `thinking, context_management` | nincs | 3 (nincs változás) | 25 (nincs változás) |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | **1** (a thin kérés hiányzik) | nincs (a maradék kérés egyébként azonos a bázissal) | nincs | 3 (nincs változás) | **24** (bázis: 25, hiányzik: `DesignSync`) |
+
+Fájlok: `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`: `00018-1787706915494.json` (full), `00019-1787706915646.json` (thin). `ENABLE_TOOL_SEARCH`: `00021-1787706917018.json` (thin), `00022-1787706919335.json` (full). `DISABLE_PROMPT_CACHING`: `00024-1787706921048.json` (thin), `00025-1787706921810.json` (full). `MAX_THINKING_TOKENS`: `00027-1787706923939.json` (full), `00029-1787706924770.json` (thin). `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`: `00030-1787706928603.json` (full, egyetlen kérés).
+
+Megjegyzendő eltérés: `MAX_THINKING_TOKENS=0` levette a `thinking` és `context_management` body kulcsokat, de az `anthropic-beta` headerből NEM vette le a `thinking-token-count-2026-05-13` és `context-management-2025-06-27` elemeket (azok a headerben maradtak, a body mezők viszont eltűntek). Ez a header/body "pár" nem szimmetrikus ennél az env változónál.
+
+## M-09 Tool argumentum streaming
+
+Beállítás: `mcp__measure__record_note` (title, tags, hosszú body) in-process tool, `maxTurns: 3`, `includePartialMessages: true`. Kimenetel: HTTP 200, `result` subtype `success` (65 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-09/a.meta.json`, `a.tool-callback-input.json`, tranzakciók `00002-1787706944060.json`, `00003-1787706954233.json`, `00004-1787706956312.json`.
+
+A tool hívást tartalmazó tranzakcióban a `content_block_start` event `{"type":"tool_use"}` blokkjának `input` mezője **üres objektum** (`{}`) a start pillanatában. A rákövetkező delta típusok között (a `content_block_delta` eventek `delta.type` értékei) szerepel: `thinking_delta, signature_delta, input_json_delta`. Tehát a tool argumentum `input_json_delta` formában érkezik.
+
+Bájtszintű összevetés: a tool callback ténylegesen megkapott argumentuma (`a.tool-callback-input.json`, `title: "napi jegyzet"`, `tags: ["teszt","mérés"]`, `body` hossza 1960 karakter) és az `a.sdk-messages.ndjson` assistant `tool_use` blokkjának `input` mezője **JSON string szinten bájtazonos** (`JSON.stringify(cb) === JSON.stringify(toolUseInput)` igaz, és a `body` mező string szinten is azonos).
+
+## M-10 `Stop` hook kikényszerítés
+
+Beállítás: `emit_output` in-process tool, `Stop` hook `decision: 'block'` visszaadással ha az `emit_output` még nem futott le, `stop_hook_active` figyelve, `maxTurns: 6`, 3 ismétlés. Kimenetel: mindhárom futás HTTP 200 minden kérésnél, `result` subtype mindhárom futásnál `success`, `num_turns: 2`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-10/{run-1,run-2,run-3}.meta.json`.
+
+Mindhárom futásban 3-3 `POST /v1/messages` ment ki (`run-1`: `00002-1787706971980.json`, `00003-1787706973670.json`, `00004-1787706975166.json`; `run-2`: `00006-...`, `00007-...`, `00008-...json`; `run-3`: `00010-...`, `00011-...`, `00012-...json`), és mindhárom futásban az `emit_output` tool ténylegesen meghívódott (`mcp__workflow__emit_output` tool_use blokk jelen van az assistant üzenetekben).
+
+A `Stop` hook blokkoló `reason` szövege ("Az emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel.") **egyetlen kimenő kérésben, egyetlen `messages` elemben sem jelenik meg**, sem az `sdk-messages.ndjson`-ban. Ebből az következik (nem kiértékelés, hanem közvetlen megfigyelés): a `Stop` hook blokkoló ága ebben a mérésben egyszer sem lépett működésbe, mert a modell magától, a hook beavatkozása nélkül meghívta az `emit_output`-ot 2 kör alatt, mielőtt a `Stop` hook egyáltalán blokkolhatott volna.
+
+Ugyanakkor `run-1` 2. és 3. kérésében (`00003-...json`, `00004-...json`) a `messages` tömb **utolsó eleme** `role: "system"` értékű, és tartalma nem a fenti blokkoló szöveg, hanem környezeti jellegű szöveg (pl. "Available agent types for the Agent tool: ..." az 1. ilyen kérésben, illetve egy `<total_tokens>...</total_tokens>` jellegű szöveg a másodikban). Ennek eredete és rendeltetése ebből a mérésből nem állapítható meg egyértelműen; nem a case saját `Stop` hook szövege. HTTP kód ezeknél is 200 volt, tehát a `role: "system"` mid-conversation üzenet MiniMax ellen ebben a konkrét esetben nem okozott hibát.
+
+Nem egyértelmű: mivel a blokkoló ág sosem futott le, a Q8 kérdésre ("a blokkolás reason szövege user vagy system role-lal jelenik meg") ez a mérés nem ad közvetlen választ.
+
+## M-11 `[1m]` suffix kezelése
+
+Beállítás: (a) `model: 'MiniMax-M3[1m]'`, (b) `model: 'MiniMax-M3'`. Kimenetel: mindkét futás HTTP 200 mindkét kérésnél, `result` subtype `success` (17-17 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-11/{a-with-suffix,b-without-suffix}.meta.json`, tranzakciók `00006-1787706958183.json`, `00007-1787706958835.json` (a), `00009-1787706960605.json`, `00010-1787706960957.json` (b).
+
+A kimenő body `model` mezője **mindkét futás mindkét kérésénél** szó szerint `"MiniMax-M3"`. A `[1m]` suffix **nem jelenik meg** a dróton az (a) futásnál sem. Az `anthropic-beta` header viszont eltér: az (a) futásnál tartalmazza a `context-1m-2025-08-07` elemet, a (b) futásnál nem (ez az egyetlen megfigyelt különbség a két futás között, a `model` mezőn kívül minden más body kulcs azonos). Nincs 404, egyik futásban sem.
+
+## M-12 Nem-Messages végpontok
+
+Beállítás: nincs `query()` szintű eltérés, `initializationResult()` + `supportedModels()` hívás, `close()`. Kimenetel: harness hiba nélkül. Artefaktum: `tools/wire-probe/artifacts/harness/M-12/a.lifecycle.json`.
+
+A teljes mérési munkamenet alatt (mind a 6 proxy processz, mind a 113 tranzakció) a proxyra **kizárólag** két útvonalra érkezett kérés: `HEAD /anthropic/api/hello` (34x, mind HTTP 404) és `POST /anthropic/v1/messages` (79x, mind HTTP 200). **Egyetlen `GET /v1/models` vagy `POST /v1/messages/count_tokens` kérés sem ment ki** a teljes mérés alatt, M-12 saját futása alatt sem.
+
+A `supportedModels()` visszatérése (helyi, nem drótszintű adat) 6 elemű listát ad: `default, opus[1m], sonnet, sonnet[1m], haiku, MiniMax-M3`, ahol a `MiniMax-M3` bejegyzés `resolvedModel: "MiniMax-M3"`, `displayName: "MiniMax-M3"`, `description: "Custom model"`. Ez a lista a helyi SDK/CLI konfigurációból származik, nem drótszintű `GET /v1/models` válaszból, mert ilyen kérés nem ment ki.
+
+## M-13 Kontextusablak és auto-compact
+
+Beállítás: `persistSession: true`, `maxTurns: 22`, legfeljebb 20 kör, ismétlődő töltelékszöveggel, 5 perces belső időkorlát. Kimenetel: nem lépte túl az időkorlátot (a teljes futás kb. 18 másodperc alatt lezárult), `timedOut: false`, `result` subtype `success`, `num_turns: 1`. Artefaktum: `tools/wire-probe/artifacts/harness/M-13/a.meta.json`.
+
+Mindössze **3** `POST /v1/messages` ment ki (`00002-1787707051566.json`, `00003-1787707057230.json`, `00004-1787707066903.json`), annak ellenére, hogy a promptgenerátor akár 20 kört is küldhetett volna. A `system` típusú SDKMessage-ök subtype-jai: `init, status, thinking_tokens`. **Nincs compact boundary jellegű `system` üzenet** a 100 rögzített SDKMessage között (a "compact" szó egyetlen előfordulása a lokális `initializationResult()` parancslistájában szereplő `/autocompact` és `/compact` slash parancsnevek, nem tényleges compact esemény).
+
+A záró `result` üzenet `usage` mezője: `input_tokens: 32915, cache_creation_input_tokens: 0, cache_read_input_tokens: 128, output_tokens: 444`. `POST /v1/messages/count_tokens` kérés a teljes mérés alatt egyszer sem ment ki (0 db).
+
+Nem egyértelmű: nem állapítható meg ebből a mérésből, hogy a promptgenerátor miért csak 3 kérés (jellemzően 1 valós kört jelentő, tehát a szokásos "thin + full" pár, plusz még egy) után zárult le, miközben 20 kör lett volna elérhető; a `413 request_too_large` hiba nem fordult elő, tehát a leállás oka nem a kontextusablak túllépése volt.
+
+## M-14 `anthropic-beta` header leltár
+
+Beállítás: (a) alap, (b) `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`, (c) `ENABLE_TOOL_SEARCH=false`. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-14/{a-base,b-disable-experimental-betas,c-enable-tool-search-false}.meta.json`.
+
+| Futás | full kérés fájl | eltűnő body kulcs (M-01 full bázishoz képest) | eltűnő `anthropic-beta` elem(ek) |
+|---|---|---|---|
+| a-base | `00033-1787706931339.json` | nincs | nincs |
+| b-disable-experimental-betas | `00035-1787706933819.json` | `context_management` | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` |
+| c-enable-tool-search-false | `00039-1787706936319.json` | nincs | nincs |
+
+`anthropic-version` mindhárom futás mindkét kérésénél `2023-06-01`, nem változik. Ez a mátrix egyezik az M-08-nál `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` és `ENABLE_TOOL_SEARCH` env változókra kapott eredménnyel (kereszt-validálva, 2 független futásból ugyanaz az eltérés adódott).
+
+## M-15 Prompt caching drótalak
+
+Beállítás: (a) és (b) azonos, hosszú system prompt kiegészítéssel, közvetlenül egymás után, (c) ugyanaz `DISABLE_PROMPT_CACHING=1` mellett. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-15/{a-first,b-second-immediately-after,c-cache-disabled}.meta.json`.
+
+| Futás | full kérés fájl | `cache_control` blokkszám | szekció | `usage` (message_delta stream eventből) |
+|---|---|---|---|---|
+| a-first | `00003-1787707038279.json` | 3 | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
+| b-second-immediately-after | `00006-1787707041231.json` | 3 | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
+| c-cache-disabled | `00009-1787707043500.json` | **0** | - | `input_tokens:28950, cache_read_input_tokens:128` |
+
+A `cache_control` blokk alakja szó szerint: `{"type":"ephemeral"}`. A (c) futásnál (`DISABLE_PROMPT_CACHING=1`) a `cache_control` blokkok teljesen eltűnnek a full kérésből (0 db a bázis 3-hoz képest). A válasz `usage`-ban a `cache_creation_input_tokens` mező egyik streamelt `message_delta` eventben sem jelent meg explicit módon (a `cache_read_input_tokens` viszont mindhárom futásnál 128). A "thin" (1.) kérésnél az (a) futásban `cache_read_input_tokens: 128`, a (b) futásnál `cache_read_input_tokens: 768`, a (c) futásnál `cache_read_input_tokens: 128`.
+
+Nem egyértelmű: a válasz `usage` mezőjében nem volt megfigyelhető `cache_creation_input_tokens` kulcs egyik stream eventben sem (csak `cache_read_input_tokens`), ezért nem állapítható meg ebből a mérésből, hogy az (a) futás valóban létrehozott-e cache bejegyzést, vagy a `cache_read_input_tokens: 128` már egy korábbi, session-en kívüli cache találat.
+
+## M-16 Kép bemenet
+
+Beállítás: streaming input módban egy 1x1 pixeles base64 PNG content blokk. Kimenetel: HTTP 200, `result` subtype `success` (73 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-16/a.meta.json`, tranzakciók `00014-1787706989269.json`, `00015-1787706992481.json`.
+
+A kimenő `messages[].content[]` a 2. (fő) kérésben 3 elemű: `{"type":"text",...}` (system-reminder szöveg), `{"type":"text","text":"Milyen színű ez a kép? Egyetlen szóval válaszolj."}`, `{"type":"image","source":{"type":"base64","media_type":"image/png","data_len":92}}` (a `data` mező 92 karakter hosszú base64 string, itt csak a hossza szerepel, nem a teljes érték). HTTP 200, nincs hibaválasz.
+
+Az asszisztens válaszszövege szó szerint: `"Nem látok képet a beszélgetésben."`
+
+## M-17 Szerver oldali tool
+
+Beállítás: webkeresést kérő prompt, `allowedTools: ['WebSearch']`, `maxTurns: 3`. Kimenetel: 8 db `POST /v1/messages`, mind HTTP 200, harness kivétellel zárult: `Claude Code returned an error result: Reached maximum number of turns (3)`, `result` subtype `error_max_turns` (1026 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-17/a.meta.json`, tranzakciók `00017-...json` .. `00024-...json` (8 db, sorban).
+
+A `web_search` tool a kimenő `tools` tömbben **önálló, egyetlen elemű** kérésekben jelenik meg (3 db ilyen kérés: `00019-1787707009344.json`, `00022-1787707027097.json`, `00023-1787707027740.json`), szó szerint: `{"type":"web_search_20250305","name":"web_search","max_uses":8}`. Ez szerver oldali tool típusjelölés (`web_search_20250305`), nincs `input_schema` mezője. A többi kérésben (`00017`, `00018`, `00020`, `00021`, `00024`) a `tools` tömb vagy üres, vagy a 25 standard Claude Code tool, `web_search` nélkül. Egyik stream válaszban sem volt megfigyelhető szerver oldali tool eredmény blokk (`server_tool_use` vagy `web_search_tool_result` string nem fordul elő a rögzített `streamEvents` sorokban).
+
+Nem egyértelmű: a 8 kérésből álló, váltakozó mintázat (üres/teli/csak-web_search tools tömbök felváltva) pontos oka és sorrendi logikája ebből a mérésből nem rekonstruálható egyértelműen, illetve nem derül ki, hogy a `web_search_20250305` tool ténylegesen lefutott-e szerver oldalon (mert nincs eredmény blokk), vagy a `maxTurns: 3` limit megakadályozta a lefutását.
+
+## M-18 Hiba és rate limit header leltár (passzív)
+
+Nincs önálló futás. A teljes mérési munkamenet 113 rögzített tranzakciójából:
+
+- Státuszkód eloszlás: `200`: 79 db, `404`: 34 db. Nincs `429`, nincs `4xx` a `404`-en kívül, nincs `5xx`.
+- Az összes megfigyelt válasz header név (unió, teljes munkamenet): `access-control-allow-origin, alb_receive_time, alb_request_id, cache-control, connection, content-length, content-type, date, expires, minimax-request-id, pragma, trace-id, transfer-encoding, vary, x-from, x-mm-request-id, x-session-id`.
+- `retry-after` vagy `ratelimit` alstringet tartalmazó header: **nincs egyetlen tranzakcióban sem.**
+- A 34 db `404` válasz mindegyike `HEAD /anthropic/api/hello`-ra érkezett, üres törzzsel (`content-length: 18`, de a `HEAD` metódus miatt a proxy `responseBody`-ja `null`; a `content-length` fejléc jelzi, hogy 18 byte törzs tartozna hozzá GET esetén). Nincs Anthropic-alakú (`{"type":"error",...}`) és nincs `base_resp.status_code`-alakú hibatörzs rögzítve, mert egyetlen `POST /v1/messages` sem eredményezett 4xx vagy 5xx választ a teljes mérés alatt.
+
+Mivel a mérés alatt nem keletkezett `429`, a `retry-after` és `ratelimit`-jellegű headerek megléte erről a szolgáltatásról ebből a mérésből nem állapítható meg.
+
+## Záró ellenőrzések
+
+- `grep -r "$MINIMAX_API_KEY" tools/wire-probe/artifacts/ docs/`: **0 találat.**
+- Ez a jegyzőkönyv fájl: nem tartalmazza a kulcsot (csak maszkolt mintát, ld. M-01 header szakasz).
+- `bun run summary` (`tools/wire-probe/src/summary.ts`) lefutott, esetenként egy sort ad: futás azonosító, ok/HIBA/TIMEOUT, a korrelált proxy tranzakciók HTTP kódjai, a kritikus body mezők (`output_config, thinking, tool_choice, context_management`) jelenléte, az `anthropic-beta` érték(ek), a `result` subtype, az SDKMessage és proxy tranzakció darabszám. Minden M-01 - M-17 sor `[ok]` vagy `[HIBA]` (a `[HIBA]` sorok M-02 és M-17, mindkettő `error_max_turns`, fent részletezve, nem harness hiba). Nincs `TIMEOUT` sor.
+- `bun run typecheck`: hibátlan a harness javítás után is.
