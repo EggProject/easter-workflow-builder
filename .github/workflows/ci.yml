@@ -151,17 +151,22 @@ jobs:
         run: bun run build
 
   # ---------------------------------------------------------------------------
-  # e2e. NINCS `needs: build`, es NINCS build atadas artefaktumkent.
+  # e2e. `needs: build`: a user dontese felulirja a korabbi elemzest, ami
+  # szerint ez felesleges lenne. A job csak akkor indul, ha a `build` job mar
+  # sikeresen lefutott.
   #
-  # Miert nem: az `apps/web/playwright.config.ts` `webServer.command` erteke
-  # `vite build && vite preview --port 4173 --strictPort`, `VITE_COVERAGE=true`
-  # kornyezeti valtozoval. Ez SZANDEKOSAN sajat, ISTANBULLAL INSTRUMENTALT
-  # buildet keszit kozvetlenul a szerver inditasa elott, es feluliria a `dist`
-  # konyvtarat. A `build` job kimenete a normal, instrumentalatlan build, tehat:
-  #   - atadni artefaktumkent felesleges (a `vite build` ugyis feluliria), es
-  #   - felrevezeto is lenne (abbol nem gyulne e2e lefedettseg).
-  # Ezert az e2e nem var a buildre, hanem vele PARHUZAMOSAN indul, es a
-  # Playwright bongeszo telepitese is atlapolodik a tobbi job futasaval.
+  # FONTOS, amit a `needs: build` NEM valtoztat meg: nincs build atadas
+  # artefaktumkent, es a `apps/web/playwright.config.ts` `webServer.command`
+  # erteke valtozatlanul `vite build && vite preview --port 4173 --strictPort`,
+  # `VITE_COVERAGE=true` kornyezeti valtozoval. Ez SZANDEKOSAN sajat,
+  # ISTANBULLAL INSTRUMENTALT buildet keszit kozvetlenul a szerver inditasa
+  # elott, es feluliria a `dist` konyvtarat. A `build` job kimenete a normal,
+  # instrumentalatlan build, tehat annak atadasa artefaktumkent tovabbra is
+  # felesleges (a `vite build` ugyis feluliria) es felrevezeto is lenne (abbol
+  # nem gyulne e2e lefedettseg) - ezert a `webServer` beallitas erintetlen.
+  # A `needs: build` tehat kizarolag a JOB INDULASI SORRENDJET valtoztatja meg
+  # (az e2e csak sikeres build utan indul), a Playwright sajat buildjet nem
+  # helyettesiti.
   #
   # A `continue-on-error: true` INNEN ELTAVOLITVA. Eredetileg azert kellett,
   # mert a Playwright zold futasat nem tudtuk igazolni (a fejlesztoi sandbox
@@ -176,6 +181,7 @@ jobs:
   # ---------------------------------------------------------------------------
   e2e:
     name: E2E
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
