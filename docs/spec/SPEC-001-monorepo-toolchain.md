@@ -155,11 +155,38 @@ A `globalPassThroughEnv` azért kell, mert a `passThroughEnv` alatt felsorolt v�
 | `typecheck`    | `["^typecheck"]` | `[]`                                          | `true`  | `false`      | `tsc --noEmit` a csomagra                                     |
 | `lint`         | `["^typecheck"]` | `[]`                                          | `true`  | `false`      | ESLint a csomagra, típusinformációval                         |
 | `format:check` | `[]`             | `[]`                                          | `true`  | `false`      | Prettier `--check`                                            |
-| `test`         | `["^typecheck"]` | `["coverage/**"]`                             | `true`  | `false`      | Vitest futtatás coverage-dzsel                                |
+| `test`         | `[]` (lásd lent) | `["coverage/**"]`                             | `true`  | `false`      | Vitest futtatás coverage-dzsel, gyökér-szkópolt task          |
 | `test:e2e`     | `["build"]`      | `["playwright-report/**", "test-results/**"]` | `true`  | `false`      | Playwright, saját csomagban                                   |
 | `dev`          | `[]`             | nincs                                         | `false` | `true`       | fejlesztői szerver                                            |
 
-A `dependsOn` `^` prefixe a csomag belső függőségeinek azonos nevű taskját várja be. A `lint` és a `test` azért `^typecheck`-től függ és nem `^build`-tól, mert a könyvtárcsomagok forrás `.ts` alakban fogyaszthatók (6. szekció), tehát nincs mire várni buildként; ha a 6. szekció V-1 ellenőrzése a fordított kimenet mellett dönt, ezek `^build`-ra változnak.
+A `dependsOn` `^` prefixe a csomag belső függőségeinek azonos nevű taskját várja be. A `lint` azért `^typecheck`-től függ és nem `^build`-tól, mert a könyvtárcsomagok forrás `.ts` alakban fogyaszthatók (6. szekció), tehát nincs mire várni buildként; ha a 6. szekció V-1 ellenőrzése a fordított kimenet mellett dönt, ez `^build`-ra változik.
+
+**A `test` task, utólag igazítva a végrehajtáshoz: `//#test`, `dependsOn: []`.** A 9. szekció
+(Vitest) szerint a coverage kizárólag a TELJES folyamatra vonatkozik, a Vitest "Test Projects"
+dokumentációja a `coverage` blokkot explicit "Unsupported Option"-ként sorolja fel projekt
+szinten ([Test Projects, "Configuration"](https://vitest.dev/guide/projects): _"coverage:
+coverage is done for the whole process"_). Emiatt a `test` nem lehet a többi taskhoz hasonló,
+csomagonként ismétlődő task: egyetlen, gyökérre szkópolt `//#test` taskként van definiálva
+(Turborepo "Registering Root Tasks" mintája,
+[configuring-tasks#registering-root-tasks](https://turborepo.dev/docs/crafting-your-repository/configuring-tasks#registering-root-tasks)),
+ami a gyökér `package.json` `"test": "vitest run --coverage"` scriptjét futtatja.
+
+Ebből következik, hogy a `^typecheck` (eredeti terv) **nem alkalmazható és félrevezető** lett
+volna: a `^` mikroszintaxis a csomag `package.json` `dependencies`/`devDependencies` mezőjében
+felsorolt workspace csomagok azonos nevű taskját várja be, a gyökér `package.json`-nak viszont
+nincs érdemi függősége a termékcsomagok felé (csak a `tooling/eslint-config`-ra, mint
+`devDependencies` belépés). **Élő méréssel igazolva** (`turbo run test --dry=json`, a `//#test`
+task `dependsOn: ["^typecheck"]` mellett): a feloldott `dependencies` mező kizárólag
+`["eslint-config#typecheck"]`, egyetlen termékcsomag (`packages/core`, `packages/providers`,
+`apps/server` stb.) `typecheck` taskja **nem** kerül be a függőségek közé. A `^typecheck` tehát
+azt a hamis benyomást keltette volna, hogy a teszt bevárja az összes csomag típusellenőrzését,
+miközben ténylegesen csak egy irreleváns eszközcsomagét várná be. Mivel a forrás `.ts`
+fogyasztás (V-1) miatt a Vitestnek amúgy sincs mire várnia build- vagy típus-artefaktumként (a
+`tsc --noEmit` nem termel semmit, amit a Vitest felhasználna), a helyes és a valósággal
+összhangban álló érték `dependsOn: []`. Ez nem a kritérium megkerülése, hanem a spec egy hibás
+feltételezésének javítása: a spec eredetileg a `test`-et csomagonként ismétlődő taskként
+képzelte el, mielőtt a 9. szekció Vitest-coverage megkötése (gyökér-szkópolt, egyetlen folyamat)
+ismertté vált volna. Részletek: [`../research/2026-08-26-spec001-ellenorzesek.md`](../research/2026-08-26-spec001-ellenorzesek.md), V-18.
 
 Az `outputs: []` érvényes és azt jelenti, hogy a task csak a logját cache-eli. A Turborepo saját TypeScript útmutatója pontosan így, `outputs` kulcs nélkül definiálja a típusellenőrző taskot ([TypeScript guide](https://turborepo.dev/docs/guides/tools/typescript)).
 
@@ -194,7 +221,7 @@ Amit a base beállít, mert eltér az alapértelmezéstől:
 
 | Opció                                  | Miért                                                                                                                |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `exactOptionalPropertyTypes`           | a `Fact<T>` és a leírók opcionális mezői (`EnvRequirement.literalValue`) csak így viselkednek helyesen               |
+| `exactOptionalPropertyTypes`           | a `Fact<T>` és a leírók opcionális mezői (`EnvironmentRequirement.literalValue`) csak így viselkednek helyesen       |
 | `noUncheckedIndexedAccess`             | indexelt olvasás `undefined`-dal, typeguard kényszerítés                                                             |
 | `noUnusedLocals`, `noUnusedParameters` | a `CLAUDE.md` szerint a saját változásaink árváit takarítjuk                                                         |
 | `noImplicitOverride`                   | öröklésnél explicit `override`                                                                                       |
@@ -477,13 +504,28 @@ Ha a `vite-plugin-istanbul` és a Vite 8 együttműködése a végrehajtás sor�
 
 A `CLAUDE.md` kötelezővé teszi: minden zajos parancshoz wrapper, ami csak összegzést és a hibákat írja ki. Helyük: `tooling/scripts`.
 
-| Script         | Mit burkol                          |
-| -------------- | ----------------------------------- |
-| `lint.sh`      | `turbo run lint`                    |
-| `typecheck.sh` | `turbo run typecheck`               |
-| `test.sh`      | `turbo run test`                    |
-| `format.sh`    | `prettier --check` és `--write` mód |
-| `build.sh`     | `turbo run build`                   |
+| Script         | Mit burkol                                                                         |
+| -------------- | ---------------------------------------------------------------------------------- |
+| `lint.sh`      | `turbo run lint`                                                                   |
+| `typecheck.sh` | `turbo run typecheck`                                                              |
+| `test.sh`      | közvetlenül a Vitestet (`vitest run --coverage`), nem a `//#test` taskon keresztül |
+| `format.sh`    | `prettier --check` és `--write` mód, közvetlenül                                   |
+| `build.sh`     | `turbo run build`                                                                  |
+
+**A `test.sh` és a `format.sh`, utólag igazítva a végrehajtáshoz: közvetlen hívás, nem
+turbo taskon keresztül.** Mindkét eszköz jellemzője, hogy EGYETLEN futással fedi a teljes
+repót (a Vitest coverage-je a fentebb, az 5. szekcióban leírt okból gyökér-szkópolt; a
+Prettier natívan egy paranccsal fut végig a fán). Egy csomagonként ismétlődő Turborepo
+taskon átvezetni egy már eleve egyetlen, gyökér szintű futást csak indirekciót adna, cache
+előnyt nem: a `turbo.json` `//#test` taskja emiatt is létezik és ugyanezt a Vitest parancsot
+futtatja, de azt a CI `verify` jobja (`turbo run format:check typecheck lint test`, 12.
+szekció) hívja, a Turborepo cache-e kedvéért - a `test.sh` wrapper ettől függetlenül,
+közvetlenül hívja a Vitestet, mert a `--reporter=json --outputFile=...` kapcsolóra van
+szüksége a strukturált, gépileg olvasható összegzőhöz (teszt szám, coverage
+metrikánként), amit egy `turbo run` rétegen át nehezebb kontrollálni. Ez nem a kritérium
+megkerülése: a 11. szekció kimeneti szerződése (fejléc, összegzés, hibablokk, teljes
+kilépési kód átadás) mindkét wrapperre változatlanul teljesül, csak a burkolt parancs nem
+`turbo run <task>` alakú.
 
 ### Közös kimeneti szerződés
 
@@ -608,20 +650,20 @@ packages/providers/
       rate-limit-bucket.ts
       rate-limit-capability.ts
       concurrency-capability.ts
-      env-requirement.ts
-      disallowed-env-requirement.ts
+      environment-requirement.ts
+      disallowed-environment-requirement.ts
       provider-capability-descriptor.ts
     references/
       CLAUDE.md
-      doc-url.ts                   nevesitett hivatalos doksi URL-ek
+      document-url.ts               nevesitett hivatalos doksi URL-ek
       research-section.ts          nevesitett research szekcio azonositok
-      measurement-doc.ts           MeasurementId -> docs horgony lekepezes
+      measurement-document.ts       MeasurementId -> docs horgony lekepezes
     minimax/
       CLAUDE.md
       model-id.ts
       family-id.ts
-      required-env.ts
-      disallowed-env.ts
+      required-environment.ts
+      disallowed-environment.ts
       structured-output.ts
       tool-choice.ts
       thinking.ts
@@ -641,12 +683,14 @@ packages/providers/
 
 Indoklás a bontásra: a `minimax.ts` jelenleg egyetlen 502 soros objektum literál. Csoportonként külön fájlban a diff olvasható marad, egy mérési kör eredménye egyetlen fájlt érint, és az "egy fájlba egy dolog" munkautasítás (7. szekció, `CLAUDE.md` elvárás, nem lint szabály) teljesül.
 
+**Elnevezés, utólag igazítva a végrehajtáshoz.** A fenti fa az `env` és a `doc` rövidítést használja (`env-requirement.ts`, `doc-url.ts`, `measurement-doc.ts`). A végrehajtás ehelyett a teljes szót írta ki (`environment-requirement.ts`, `document-url.ts`, `measurement-document.ts`, és ugyanígy a `minimax/` és `claude-subscription/` alatt `required-environment.ts`, `disallowed-environment.ts`), mert a mappában máshol sehol nincs rövidítés (`concurrency-capability.ts`, `structured-output-capability.ts`, `model-descriptor.ts` mind teljes szót ír ki), és a `references/` mappában két fájl közül az egyiket rövidíteni (`measurement-doc.ts`), a másikat nem (`document-url.ts` -- ha az is rövidítve lenne, `doc-url.ts`) belsőleg következetlen lenne. A típus neve is a teljes szót használja (`EnvironmentRequirement`, lásd 6. szekció), tehát a fájlnév rövidítése a típusnévvel sem lenne összhangban. Ez a spec szövegének utólagos javítása a végrehajtás jobb döntéséhez, nem a fájlok átnevezése a spec szövegéhez: a tényleges kód marad, a fenti fa és a 16. szekció 36. kritériuma lett a valósághoz igazítva.
+
 ### A mérési hivatkozás kiemelése
 
-Új fájl: `references/measurement-doc.ts`. Egyetlen exportált konstans, ami minden `MeasurementId` értéket egyetlen `docs/` horgonyra képez le. Ez teszi lehetővé, hogy a kódban sehol ne legyen próza:
+Új fájl: `references/measurement-document.ts` (elnevezés lásd fent). Egyetlen exportált konstans, ami minden `MeasurementId` értéket egyetlen `docs/` horgonyra képez le. Ez teszi lehetővé, hogy a kódban sehol ne legyen próza:
 
 - Az `EvidenceRef` `measurement` variánsa marad, ahogy van: csak `kind` és `id`.
-- A prózát a `measurement-doc.ts` leképezés oldja fel, a fogyasztó (UI, jelentés) innen kapja a linket.
+- A prózát a `measurement-document.ts` leképezés oldja fel, a fogyasztó (UI, jelentés) innen kapja a linket.
 - A leíró fájlokban a `purpose` és a `reason` mező **egy mondat**, mért szám és artefaktum útvonal nélkül.
 
 Mechanikusan ellenőrizhető szabály, ami ezt kikényszeríti:
@@ -717,27 +761,32 @@ Ha egy mappa fájlkészlete változik, a `CLAUDE.md` `## Fájlok` táblázata ug
 fájlban van**, pontonként a kérdéssel, a válasszal, a bizonyítékkal (forrás URL vagy saját mérés) és
 a következménnyel. Az alábbi táblázat csak az állást összegzi.
 
-**17-ből 16 lezárva, 1 nyitva (V-14).** Feltételezéssel lezárt pont nincs.
+**19-ből 17 lezárva, 2 nyitva (V-14, V-19).** Feltételezéssel lezárt pont nincs: a nyitva
+maradó pontok is explicit, indokolt nyitva-jelöléssel szerepelnek, nem hallgatólagos
+feltételezéssel lezárva. A V-18 és a V-19 az elfogadási kritériumok tételes auditja során
+merült fel, utólag, a V-1 ... V-17 lezárása után.
 
-| ID   | Amit el kellett dönteni                                                | Állás                                                                                                                                                               |
-| ---- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V-1  | Forrás `.ts` fogyasztás szimlinkelt workspace csomagra                 | **Lezárva, méréssel.** Működik. Az (a) forrás fogyasztás út érvényes, minden könyvtárcsomag `exports` mezője `./src/index.ts`, nincs `build` a könyvtárcsomagokban. |
-| V-2  | Elfogadja-e a Turborepo a `devEngines.packageManager` mezőt önmagában  | **Lezárva, méréssel.** Elfogadja. A `packageManager` mező eltávolítva, csak a `devEngines` marad, hogy a Bun verzió egy helyen álljon.                              |
-| V-3  | A `boundaries` és `tags` szintaxisa, a `turbo boundaries` kilépési kód | **Lezárva, méréssel.** Szintaxis igazolt, szabálysértésre 1-es kilépési kód. A funkció kísérleti, ezért **nem vezetjük be**, marad opcionális (3. szekció).         |
-| V-4  | `.tsbuildinfo` és a Turborepo cache viszonya                           | **Lezárva, tárgytalan.** A D-1 döntés szerint nincs projekt referencia, tehát `.tsbuildinfo` nem keletkezik.                                                        |
-| V-5  | A `jsx` compilerOption értéke React 19 és TS 6.0 mellett               | **Lezárva, dokumentációval.** `"jsx": "react-jsx"`, a TS tsconfig referencia és a Vite hivatalos react-ts sablonja alapján.                                         |
-| V-6  | A `projectService: true` viselkedése több tsconfigos monorepóban       | **Lezárva, dokumentációval.** Monorepóhoz nem kell külön konfiguráció. Az `allowDefaultProject` a csomag `include` mintáin kívüli config fájlokra kell.             |
-| V-7  | Jelzi-e az `assertionStyle: 'never'` az `as const` alakot              | **Lezárva, méréssel.** Nem jelzi. Az `as const` szabadon használható, nem kell kivétel és nem kell `eslint-disable`.                                                |
-| V-8  | Jelzi-e a `no-restricted-syntax` szelektor a `private` módosítót       | **Lezárva, méréssel.** Mindhárom szelektor jelez (mező, metódus, parameter property), a `#` alakra nincs jelzés. Saját ESLint plugin nem kell.                      |
-| V-9  | A `sonarjs/cognitive-complexity` alapértelmezett küszöbe               | **Lezárva, forrásból.** A dokumentált alapértelmezés **15**, a `recommended` config `error` szinten hozza. Saját küszöbszámot nem állítunk.                         |
-| V-10 | A Prettier `printWidth` értéke                                         | **Lezárva, méréssel.** **120.** A Prettier előtti 51 fájlon mért diff minimuma egy 120 és 140 közötti fennsík, ezen belül a 120 a legkisebb sorhossz.               |
-| V-11 | A `vite-plugin-istanbul` 9.0.1 és a Vite 8 (Rolldown)                  | **Lezárva, méréssel.** Működik. A `requireEnv` pontosan a dokumentált módon kapcsol, az e2e coverage váz nem halasztódik el.                                        |
-| V-12 | Az e2e coverage összefésülő eszköz                                     | **Lezárva, dokumentációval.** `nyc`, a `nyc report --temp-dir` alakban. A Playwright oldali gyűjtést egyik eszköz doksija sem fedi, azt saját fixture oldja meg.    |
-| V-13 | Az `actions/cache` v6.1.0 létezése                                     | **Lezárva, megerősítve.** Élő GitHub API lekérdezéssel igazolva, a research fájl helyes volt.                                                                       |
-| V-14 | A Bun globális cache `actions/cache` receptje nyer-e időt              | **NYITVA.** A cache könyvtár helye hivatalos, de hivatalos `actions/cache` recept nincs, és a kérdés csak GitHub Actions runneren mérhető. Lásd lent.               |
-| V-15 | A Playwright `retries` CI értéke                                       | **Lezárva, dokumentációval.** Kimondott ajánlás nincs, ezért a dokumentált alapértelmezésen, `0`-n marad. A `workers` CI értéke `1`, arra van kimondott ajánlás.    |
-| V-16 | A wrapper scriptek csonkolási határa                                   | **Lezárva, projekt döntéssel, mérésre támaszkodva.** Marad 50. Dokumentált szabály erre nincs, ezt kimondjuk; a mérés a nagyságrendi keretet adja.                  |
-| V-17 | Az artefaktum retenciós napszám                                        | **Lezárva, projekt döntéssel.** Nem állítunk explicit értéket, a repository alapértelmezése érvényesül. Ajánlott napszámra dokumentált forrás nincs.                |
+| ID   | Amit el kellett dönteni                                                  | Állás                                                                                                                                                                                   |
+| ---- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V-1  | Forrás `.ts` fogyasztás szimlinkelt workspace csomagra                   | **Lezárva, méréssel.** Működik. Az (a) forrás fogyasztás út érvényes, minden könyvtárcsomag `exports` mezője `./src/index.ts`, nincs `build` a könyvtárcsomagokban.                     |
+| V-2  | Elfogadja-e a Turborepo a `devEngines.packageManager` mezőt önmagában    | **Lezárva, méréssel.** Elfogadja. A `packageManager` mező eltávolítva, csak a `devEngines` marad, hogy a Bun verzió egy helyen álljon.                                                  |
+| V-3  | A `boundaries` és `tags` szintaxisa, a `turbo boundaries` kilépési kód   | **Lezárva, méréssel.** Szintaxis igazolt, szabálysértésre 1-es kilépési kód. A funkció kísérleti, ezért **nem vezetjük be**, marad opcionális (3. szekció).                             |
+| V-4  | `.tsbuildinfo` és a Turborepo cache viszonya                             | **Lezárva, tárgytalan.** A D-1 döntés szerint nincs projekt referencia, tehát `.tsbuildinfo` nem keletkezik.                                                                            |
+| V-5  | A `jsx` compilerOption értéke React 19 és TS 6.0 mellett                 | **Lezárva, dokumentációval.** `"jsx": "react-jsx"`, a TS tsconfig referencia és a Vite hivatalos react-ts sablonja alapján.                                                             |
+| V-6  | A `projectService: true` viselkedése több tsconfigos monorepóban         | **Lezárva, dokumentációval.** Monorepóhoz nem kell külön konfiguráció. Az `allowDefaultProject` a csomag `include` mintáin kívüli config fájlokra kell.                                 |
+| V-7  | Jelzi-e az `assertionStyle: 'never'` az `as const` alakot                | **Lezárva, méréssel.** Nem jelzi. Az `as const` szabadon használható, nem kell kivétel és nem kell `eslint-disable`.                                                                    |
+| V-8  | Jelzi-e a `no-restricted-syntax` szelektor a `private` módosítót         | **Lezárva, méréssel.** Mindhárom szelektor jelez (mező, metódus, parameter property), a `#` alakra nincs jelzés. Saját ESLint plugin nem kell.                                          |
+| V-9  | A `sonarjs/cognitive-complexity` alapértelmezett küszöbe                 | **Lezárva, forrásból.** A dokumentált alapértelmezés **15**, a `recommended` config `error` szinten hozza. Saját küszöbszámot nem állítunk.                                             |
+| V-10 | A Prettier `printWidth` értéke                                           | **Lezárva, méréssel.** **120.** A Prettier előtti 51 fájlon mért diff minimuma egy 120 és 140 közötti fennsík, ezen belül a 120 a legkisebb sorhossz.                                   |
+| V-11 | A `vite-plugin-istanbul` 9.0.1 és a Vite 8 (Rolldown)                    | **Lezárva, méréssel.** Működik. A `requireEnv` pontosan a dokumentált módon kapcsol, az e2e coverage váz nem halasztódik el.                                                            |
+| V-12 | Az e2e coverage összefésülő eszköz                                       | **Lezárva, dokumentációval.** `nyc`, a `nyc report --temp-dir` alakban. A Playwright oldali gyűjtést egyik eszköz doksija sem fedi, azt saját fixture oldja meg.                        |
+| V-13 | Az `actions/cache` v6.1.0 létezése                                       | **Lezárva, megerősítve.** Élő GitHub API lekérdezéssel igazolva, a research fájl helyes volt.                                                                                           |
+| V-14 | A Bun globális cache `actions/cache` receptje nyer-e időt                | **NYITVA.** A cache könyvtár helye hivatalos, de hivatalos `actions/cache` recept nincs, és a kérdés csak GitHub Actions runneren mérhető. Lásd lent.                                   |
+| V-15 | A Playwright `retries` CI értéke                                         | **Lezárva, dokumentációval.** Kimondott ajánlás nincs, ezért a dokumentált alapértelmezésen, `0`-n marad. A `workers` CI értéke `1`, arra van kimondott ajánlás.                        |
+| V-16 | A wrapper scriptek csonkolási határa                                     | **Lezárva, projekt döntéssel, mérésre támaszkodva.** Marad 50. Dokumentált szabály erre nincs, ezt kimondjuk; a mérés a nagyságrendi keretet adja.                                      |
+| V-17 | Az artefaktum retenciós napszám                                          | **Lezárva, projekt döntéssel.** Nem állítunk explicit értéket, a repository alapértelmezése érvényesül. Ajánlott napszámra dokumentált forrás nincs.                                    |
+| V-18 | A `//#test` gyökér-szkópolt task `dependsOn` értéke                      | **Lezárva, méréssel.** `[]` a helyes érték, a spec eredeti `^typecheck` javaslata a root taskra nem alkalmazható (lásd 5. szekció, `turbo run test --dry=json` mérés).                  |
+| V-19 | A Playwright smoke teszt tényleges böngésző-futtatása ebben a sandboxban | **NYITVA.** `browserType.launch` hibázik, a host rendszerből hiányoznak a böngésző futtatásához szükséges függőségek, a sandbox rootless konténerben ez itt nem telepíthető. Lásd lent. |
 
 ### A nyitva maradt pont
 
@@ -753,6 +802,35 @@ A lezárásához egy PR kell, ami legalább kétszer lefuttatja a workflow-t, é
 lépés elhagyandó. Ez nem blokkolja a spec elfogadását: a hivatalosan dokumentált `.turbo` cache
 ettől függetlenül működik.
 
+**V-19.** Ami igazolt: az `apps/web` Playwright csomagja, a `playwright.config.ts` és a
+`webServer` konfiguráció önmagában helyes és működik - `bun run test:e2e` a csomagban a
+`vite build && vite preview` párost hibátlanul elindítja, a Playwright a portot eléri. Ami
+nyitva marad: a Chromium tényleges elindítása ebben a végrehajtási sandboxban meghiúsul, a
+pontos hibaüzenet:
+
+```
+Error: browserType.launch:
+Host system is missing dependencies to run browsers.
+Please install them with the following command:
+    sudo npx playwright install-deps
+Alternatively, use apt:
+    sudo apt-get install libxdamage1
+```
+
+A sandbox rootless konténer: `id` szerint `uid=1045(vigilant-clever-mendel)`, nem `0`. A `sudo`
+explicit megtagadja a futást (`sudo: The "no new privileges" flag is set, which prevents sudo
+from running as root.`), az `apt-get install` pedig `Permission denied`-et ad a dpkg lock
+fájlon (`E: Could not open lock file /var/lib/dpkg/lock-frontend`). Nincs jogosultság a hiányzó
+rendszerkönyvtárak telepítésére, és ez a végrehajtási környezet korlátja, nem a konfigurációé.
+
+A lezárásához egy olyan futtatókörnyezet kell, ahol a Playwright rendszerfüggőségei
+telepíthetők (root jogosultsággal vagy a hivatalos Playwright Docker image-dzsel - a `CLAUDE.md`
+Docker-tilalma a termék agent sandboxára vonatkozik, nem a CI futtatókörnyezetére). A GitHub
+Actions `ubuntu-latest` runner alapból tartalmazza a szükséges rendszerkönyvtárakat, tehát a CI-n
+ez a probléma várhatóan nem jelentkezik - ezt viszont csak egy tényleges CI futtatás igazolhatja,
+itt nem. Nem blokkolja a spec elfogadását: a smoke teszt kódja és a Playwright-infrastruktúra
+maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
+
 ### Lezárt döntés
 
 | ID  | Döntés                                           | Állás                                                                                                                                                                                                                                               |
@@ -765,7 +843,7 @@ ettől függetlenül működik.
 2. A gyökérben egyetlen `bun.lock` van, `tools/wire-probe/bun.lock` nem létezik, és a `bun.lockb` alak sehol nem fordul elő.
 3. A `research` fájlban rögzített, több csomagban használt verziók (TypeScript, ESLint és pluginjei, Prettier, Vitest, React, `@types/node`) Bun katalógusban vannak, és a csomagok `"catalog:"` hivatkozással veszik át. Egyetlen csomag sem tartalmaz ezekhez literál verziót.
 4. A 3. szekció mind a 13 csomagja létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja.
-5. A `turbo.json` gyökérkulcsa `tasks`. Nincs benne `pipeline` kulcs. A 7 task (`build`, `typecheck`, `lint`, `format:check`, `test`, `test:e2e`, `dev`) definiált a megadott `dependsOn` és `outputs` értékekkel.
+5. A `turbo.json` gyökérkulcsa `tasks`. Nincs benne `pipeline` kulcs. A 7 task (`build`, `typecheck`, `lint`, `format:check`, `test`, `test:e2e`, `dev`) definiált a megadott `dependsOn` és `outputs` értékekkel; a `test` a `//#test` gyökér-szkópolt taskként létezik, `dependsOn: []` értékkel (lásd 5. szekció "A `test` task, utólag igazítva a végrehajtáshoz" és V-18).
 6. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és a wrapper script kimenete ezt sorban jelzi.
 7. Egy `packages/core` fájl módosítása után a `turbo run typecheck` újrafuttatja a `core`-tól függő csomagok taskját, és nem futtatja újra a tőle független csomagokét. Ezt a wrapper kimenete igazolja.
 8. A `tooling/tsconfig` alatt van `base.json`, `node.json` és `react.json`. Egyik sem tartalmaz TS 6.0-ban eltávolított vagy deprecated opciót, és egyik sem használ `"ignoreDeprecations"` kapcsolót.
@@ -782,7 +860,7 @@ ettől függetlenül működik.
 19. A coverage `provider: 'v8'` és `thresholds[100]: true`. A `coverage.all` opció nem szerepel a configban, mert Vitest 4-ben megszűnt.
 20. A coverage `include` és `exclude` explicit lista, és a 9. szekció táblázatának minden sorához tartozik bejegyzés. Az `isKnown` és az `isUnknown` typeguard **benne van** a coverage hatókörében.
 21. A `turbo run test` egy szándékosan lefedetlen ágat tartalmazó próbafájllal nem nulla kilépési kóddal fut, tehát a 100 százalékos küszöb ténylegesen kikényszerül.
-22. Létezik `playwright.config.ts` az e2e csomagban, a `turbo run test:e2e` task `dependsOn: ["build"]` értékkel van definiálva, és egy triviális smoke teszt lefut.
+22. Létezik `playwright.config.ts` az e2e csomagban, a `turbo run test:e2e` task `dependsOn: ["build"]` értékkel van definiálva, és egy triviális smoke teszt lefut. **Környezetfüggő, részben teljesül.** A `webServer` felállítása (`vite build && vite preview`) és a Playwright-infrastruktúra igazoltan működik, de a böngésző tényleges elindítása ebben a végrehajtási sandboxban nem lehetséges: `browserType.launch: Host system is missing dependencies to run browsers` (a Playwright a `sudo npx playwright install-deps` vagy `sudo apt-get install libxdamage1` parancsot javasolja). A sandbox rootless konténer (`uid=1045`, nem `0`), a `sudo` a "no new privileges" flag miatt explicit megtagadja a futást, az `apt-get` pedig `Permission denied`-et ad a dpkg lock fájlon. Ez a végrehajtási környezet korlátja, nem javítható itt. Részletek: [`../research/2026-08-26-spec001-ellenorzesek.md`](../research/2026-08-26-spec001-ellenorzesek.md), V-19.
 23. A `vite-plugin-istanbul` be van építve `requireEnv: true` mellett, és létezik a Playwright fixture, ami a `window.__coverage__` objektumot fájlba menti.
 24. A V-11 (Vite 8 kompatibilitás) eredménye dokumentálva van a `docs/research/` alatt. Ha a plugin nem működik Vite 8 alatt, ez a tény és a halasztás indoka le van írva, és ez nem blokkolja a spec elfogadását.
 25. A `tooling/scripts` alatt létezik mind az öt wrapper (`lint`, `typecheck`, `test`, `format`, `build`), mindegyik bash, mindegyik a 11. szekció három blokkos kimeneti szerződését teljesíti, és a burkolt parancs kilépési kódját adja tovább.
@@ -796,12 +874,12 @@ ettől függetlenül működik.
 33. A `src/providers` könyvtár megszűnt, és a repóban nincs rá mutató hivatkozás a `docs/` alatti historikus szövegeken kívül.
 34. A migráció után minden `Fact` mező `state`, `value` és `evidence` értéke bitre azonos a migráció előttivel. Ezt egy összehasonlító futtatás igazolja, ami a régi és az új leírót ugyanabba a normalizált JSON alakba szerializálja.
 35. A `packages/providers/src/**/*.ts` fájlokban egyetlen `purpose` vagy `reason` string literál sem tartalmaz `M-` mintájú mérési azonosítót vagy artefaktum útvonalat. Ezt ellenőrző script vagy lint szabály igazolja.
-36. Létezik a `references/measurement-doc.ts`, ami minden a leírókban hivatkozott `MeasurementId` értéket feloldható `docs/` horgonyra képez le, és nincs feloldatlan azonosító.
+36. Létezik a `references/measurement-document.ts`, ami minden a leírókban hivatkozott `MeasurementId` értéket feloldható `docs/` horgonyra képez le, és nincs feloldatlan azonosító.
 37. A `tools/wire-probe` a workspace tagja: szerepel a gyökér `workspaces` glob alatt, a `tsconfig.json`-ja a `tooling/tsconfig/node.json` fájlt terjeszti ki, van `typecheck` és `lint` scriptje, és nincs saját `bun.lock` fájlja.
 38. A `tools/wire-probe` `typecheck` és `lint` taskja a Turborepo gráfban nulla kilépési kóddal fut, és a mérőeszköz forrása nem igényelt `any` vagy `as` bevezetést a szigorítás miatt.
 39. Minden nem generált könyvtárban van `CLAUDE.md`, a 14. szekció kötelező szekcióival, és egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel.
 40. A `CLAUDE.md` teljességet ellenőrző script létezik, és a teljes repón nulla kilépési kóddal fut.
-41. A 15. szekció mind a 17 `V-*` pontja lezárt: vagy dokumentált forrásra hivatkozó döntéssel, vagy saját, most futtatott mérésre hivatkozva. Feltételezéssel lezárt pont nincs.
+41. A 15. szekció mind a 19 `V-*` pontja rendezett: vagy dokumentált forrásra hivatkozó döntéssel lezárva, vagy saját, most futtatott mérésre hivatkozva lezárva, vagy - V-14 és V-19 esetén - explicit, indokolt nyitva-jelöléssel, ami a végrehajtási környezet igazolt korlátjára hivatkozik. Feltételezéssel (mérés vagy dokumentáció nélkül) lezárt pont nincs.
 42. A D-1 döntés lezárva: a user döntése alapján nincsenek TypeScript projekt referenciák a csomagok között, a build sorrendet kizárólag a `turbo.json` `dependsOn` mezője adja.
 
 ## 17. Kockázatok
