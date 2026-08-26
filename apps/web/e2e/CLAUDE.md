@@ -26,9 +26,18 @@ tartalmazza.
   pont). A `coverage-fixture.ts` csak menti a nyers adatot, az összefésülés és jelentés az
   `apps/web/package.json` `coverage:e2e:report` scriptje (`nyc report`), ami külön,
   manuálisan futtatandó a `test:e2e` után.
-- A tesztek nem futottak le ténylegesen ebben a végrehajtási környezetben: a Playwright
-  Chromium letölthető volt, de a rendszerfüggőségei (`sudo` hiányában) nem telepíthetők.
-  A `playwright test --list` viszont igazolta, hogy a konfiguráció és a teszt érvényes.
+- **A smoke teszt ténylegesen lefut** a fejlesztői sandboxban is, valódi Chromiummal
+  (`bun run test:e2e`, 1 passed). Ehhez a repóban semmit nem kell átállítani, csak egy
+  környezeti változót: a rootless konténerből egyetlen rendszerkönyvtár hiányzik
+  (`libXdamage.so.1`, csomag `libxdamage1`), amit `sudo` nélkül is ki lehet csomagolni és
+  a `LD_LIBRARY_PATH`-szal behúzni. A pontos parancsokat és a CI-re gyakorolt (nulla)
+  hatás indoklását a gyökér [`CLAUDE.md`](../../../CLAUDE.md) "Teszt infrastruktúra"
+  szekciója írja le. Ha a launch mégis `libXdamage.so.1: cannot open shared object file`
+  hibával bukik, a `LD_LIBRARY_PATH` nincs beállítva az adott shellben.
+- A `coverage-fixture.ts` működése mérve, nem elméleti: a smoke teszt után az
+  `e2e/.nyc_output/` alá kerül egy nyers JSON, benne az `apps/web/src/main.ts` bejegyzése
+  (`s: {"0":1,"1":1,"2":1}`), és a `bun run coverage:e2e:report` ebből 100 százalékos
+  `text`/`html`/`lcov` riportot állít elő a `coverage-e2e/` alá.
 
 ## Kapcsolódó dokumentumok
 

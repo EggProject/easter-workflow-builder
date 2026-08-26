@@ -201,10 +201,34 @@ explicit projektként veszi fel, függetlenül attól, hogy a csomagnak van-e `t
 
 A Playwright `retries` alapértelmezése (`0`, https://playwright.dev/docs/test-retries) van
 használatban, mert erre nincs saját mérésünk. A `vite-plugin-istanbul@9.0.1` Vite 8-cal
-(Rolldown) való működése SPEC-001-ben nyitott kérdés volt - **empirikusan igazolt** (izolált
-próba: `vite build` sikeres, a kimenetben ténylegesen megjelenik a `window.__coverage__`
-inicializálás `forceBuildInstrument: true` mellett), az `apps/web/vite.config.ts` és a
-`apps/web/e2e/coverage-fixture.ts` be is köti.
+(Rolldown) való működése SPEC-001-ben nyitott kérdés volt - **empirikusan igazolt**, immár
+végponttól végpontig: a `bun run test:e2e` valódi Chromiumot indít, a fixture kimenti a
+`window.__coverage__` objektumot, és a `bun run --filter web coverage:e2e:report` (nyc) 100
+százalékot jelent az `apps/web/src/main.ts` fájlra. Bekötve: `apps/web/vite.config.ts` és
+`apps/web/e2e/coverage-fixture.ts`.
+
+**Playwright rootless konténerben, sudo nélkül.** A fejlesztői sandbox nem-root felhasználóként
+fut (`no new privileges`, nincs `sudo`, az `apt-get install` `Permission denied`), a Chromium
+bináris viszont letölthető. A `bunx playwright install chromium` után **egyetlen** rendszer-
+könyvtár hiányzik, ezt az `ldd` mondja meg pontosan (`libXdamage.so.1`, csomag: `libxdamage1`).
+Root nem kell hozzá: az `apt-get download` és a `dpkg -x` nem privilegizált parancs, a kicsomagolt
+könyvtárat pedig a `LD_LIBRARY_PATH` húzza be:
+
+```
+apt-get download libxdamage1 && dpkg -x libxdamage1_*.deb ~/pwdeps
+export LD_LIBRARY_PATH="$HOME/pwdeps/usr/lib/$(uname -m)-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+```
+
+Ez **kizárólag környezeti változó, a repóban semmit nem kell módosítani**, ezért a CI-re nincs
+hatása: a `playwright.config.ts`, a `.github/workflows/ci.yml` és a `turbo.json` érintetlen, a
+GitHub Actions runner továbbra is a rendes `bunx playwright install --with-deps` úton kapja meg a
+függőségeket. Nem használunk `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et sem: a Playwright
+validátora a `ldd` hívásba maga elé fűzi a `process.env.LD_LIBRARY_PATH` értéket
+(`playwright-core/lib/coreBundle.js`), ezért a hiányzó könyvtár ténylegesen megoldódik, nem az
+ellenőrzés van kikapcsolva. A `--no-sandbox` és a `--disable-dev-shm-usage` kapcsolót nem kell
+kézzel megadni: a Playwright mindkettőt alapból kiküldi (a `chromiumSandbox` dokumentált
+alapértelmezése `false`, https://playwright.dev/docs/api/class-browsertype#browser-type-launch).
+Részletek: `docs/research/2026-08-26-spec001-ellenorzesek.md`, V-19.
 
 A `package.json` gyökér `overrides.type-fest` bejegyzés azért kell, mert a Vitest/Playwright/nyc
 függőségi fa behozza a `hasha@5.2.2` csomagot, ami a `type-fest@^0.8.0`-t igényli, és a Bun ezt

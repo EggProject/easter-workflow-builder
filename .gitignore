@@ -21,6 +21,8 @@ tools/wire-probe/artifacts/
 
 # tesztek és coverage
 coverage/
+# az apps/web `coverage:e2e:report` scriptje ide teszi a nyc riportot
+coverage-e2e/
 .nyc_output/
 test-results/
 playwright-report/
