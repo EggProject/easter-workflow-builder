@@ -3,11 +3,16 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
+  "exports": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
+  "dependencies": {
+    "core": "workspace:*",
+    "protocol": "workspace:*"
+  },
   "devDependencies": {
-    "vitest": "4.1.11"
+    "vitest": "catalog:"
   }
 }

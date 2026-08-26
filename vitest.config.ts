@@ -103,24 +103,6 @@ export default defineConfig({
         '**/*.spec.ts',
         '**/e2e/**',
 
-        // IDEIGLENES kizaras, a SPEC-001 9. szekcio vegleges szandekatol
-        // (a typeguardok, `isKnown`/`isUnknown`, benne maradjanak a
-        // coverage-ben) eltero allapot. Indok: ez a feladat kifejezetten
-        // NEM ir funkcionalis tesztet egyetlen csomaghoz sem (a feladat 3.
-        // pontja csak a wire-probe regressziora ker teszt), a
-        // `packages/providers/src` alatt viszont van valodi, elagazassal
-        // rendelkezo logika (isKnown, isUnknown) - ha ez benne maradna a
-        // kuszobben, a `test` parancs 0% lefedettseggel azonnal buknia
-        // kellene. A CLAUDE.md kifejezetten megengedi ezt a megoldast
-        // ("a coverage kapu csak azokra a csomagokra vonatkozik, ahol mar
-        // van forras ES teszt"). SZIGORITANI KELL: amint
-        // packages/providers-hez keszul az elso valodi Vitest teszt (pl.
-        // isKnown/isUnknown-ra), ezt a sort torolni kell, es helyette csak
-        // az adat literal fajlokat (minimax/**, claude-subscription/**,
-        // capability/**, evidence/ nem-typeguard fajljai) szabad kizarni -
-        // lasd SPEC-001 9. szekcio.
-        'packages/providers/src/**',
-
         // IDEIGLENES kizaras: az `apps/web/src/main.ts` a Playwright e2e
         // infrastruktura vazahoz keszult minimalis bongeszo belepesi pont
         // (lasd a fajl sajat megjegyzeset), NEM a tenyleges alkalmazas -

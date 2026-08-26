@@ -6,5 +6,14 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
+  },
+  "dependencies": {
+    "agent": "workspace:*",
+    "core": "workspace:*",
+    "db": "workspace:*",
+    "engine": "workspace:*",
+    "logger": "workspace:*",
+    "protocol": "workspace:*",
+    "providers": "workspace:*"
   }
 }

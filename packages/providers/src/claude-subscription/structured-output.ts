@@ -7,8 +7,9 @@ export const claudeSubscriptionStructuredOutput: StructuredOutputCapability = {
       id: 'emit_output_tool',
       usable: {
         state: 'unknown',
-        reason:
-          'A SPEC-000 1. szekciója szerint ezt a providert nem mértük drótszinten. A `Stop` hook `decision: "block"` ága MiniMax ellen 10/10 futásban bizonyítottan kikényszeríti a tool hívást (M-19), de a claude-subscription providerre továbbra sem mértünk semmit.',
+        // A prózai mérési narratíva a docs alá tartozik, a hivatkozást a
+        // `blockedBy` hordozza (SPEC-001 13. szekció, 35. elfogadási kritérium).
+        reason: 'Nincs drótszintű mérés ehhez a providerhez.',
         blockedBy: ['M-10'],
       },
       blockingWireDetail: {

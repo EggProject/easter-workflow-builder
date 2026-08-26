@@ -3,11 +3,18 @@
 # Nem onallo script, hanem a tobbi wrapper `source`-olja.
 set -euo pipefail
 
-# A csonkolasi hatar: legfeljebb ennyi hibasort irunk ki a hibablokkban,
-# az osszes csomag hibajat egyutt szamolva. Erre nincs dokumentalt szabaly
-# (SPEC-001 11. szekcio, V-16), az ertek onkenyes valasztas: eleg sok ahhoz,
-# hogy tobb csomag hibaja is lathato legyen egy futasban, de nem annyi, hogy
-# elarassza a hivo agent context ablakat egy nagy, meglevo kodbazison.
+# A csonkolasi hatar: legfeljebb ennyi hibasort irunk ki a hibablokkban, az
+# osszes csomag hibajat egyutt szamolva.
+#
+# Dokumentalt szabaly erre az ertekre NINCS, ezt kimondjuk. Az ertek projekt
+# dontes, aminek a nagysagrendi keretet sajat meres adja (V-16, lasd
+# docs/research/2026-08-26-spec001-ellenorzesek.md): egyetlen, egy okra
+# visszavezetheto tipushiba a legnagyobb csomagban 90 hibasort general 22
+# fajlban, atlagosan 170 karakteres sorokkal, azaz kb. 15 kB-ot. A gyokerok
+# ilyenkor mar az ELSO hibasorbol azonosithato, mert a tsc uzenete megnevezi az
+# elrontott tipust - a csonkolas tehat nem rontja a diagnosztizalhatosagot, es
+# a wrapper amugy is kiirja a kimaradt hibak szamat es a teljes kimenet utjat.
+# A hatar valodi feladata a TOBB oku hibak kimenetenek korlatozasa.
 readonly WRAPPER_ERROR_LIMIT=50
 
 # A turbo teljes JSON futas-osszegzoje ide kerul, a `.turbo/` mintat a gyoker
