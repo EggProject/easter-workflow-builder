@@ -13,6 +13,7 @@ out/
 .env
 .env.*
 !.env.example
+.cc-env
 
 # mérési nyers artefaktumok (SPEC-000)
 tools/wire-probe/artifacts/
