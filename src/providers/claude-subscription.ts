@@ -31,6 +31,7 @@ const DOC_WEB_SEARCH =
 const DOC_VISION = 'https://platform.claude.com/docs/en/build-with-claude/vision';
 const DOC_MODELS_LIST = 'https://platform.claude.com/docs/en/api/models/list';
 const DOC_ENV_VARS = 'https://code.claude.com/docs/en/env-vars';
+const DOC_MODEL_CONFIG = 'https://code.claude.com/docs/en/model-config';
 
 const RESEARCH_GATEWAY = '2026-08-26-agent-sdk-minimax.md 3. szekció, nem-Anthropic endpoint';
 
@@ -236,6 +237,16 @@ export const claudeSubscriptionProvider = {
       value: 'DISABLE_PROMPT_CACHING',
       evidence: [{ kind: 'doc', url: DOC_ENV_VARS }],
     },
+    // Az M-33 kizárólag a MiniMax úton mért kliens viselkedés: ott a
+    // DISABLE_PROMPT_CACHING=1 csak az SDK saját töréspontjait vette le, a hívó fél
+    // sajátját nem. Ez a leíró viszont nem örökölhet a MiniMax leíróból, és a
+    // hivatalos dokumentáció nem mondja ki a kapcsoló hatókörét.
+    callerBreakpointSurvivesDisable: {
+      state: 'unknown',
+      reason:
+        'Az M-33 a hívó fél saját cache_control blokkjának túlélését a MiniMax base URL-en mérte. Hogy a first-party úton a DISABLE_PROMPT_CACHING ugyanígy csak az SDK generálta töréspontokat veszi-e le, nem mértük, és a hivatalos leírás sem mondja ki. Lezárná: az M-33 megismétlése first-party úton, a kimenő cache_control blokkok megszámolásával.',
+      blockedBy: ['M-33'],
+    },
   },
 
   streaming: {
@@ -292,6 +303,17 @@ export const claudeSubscriptionProvider = {
     {
       id: 'claude-opus-5',
       family: 'opus',
+      // A [1m] suffix konvenció dokumentáltan csak a nem "claude-" kezdetű, fel nem
+      // oldható azonosítókra ad automatikus 1M ablakot. Opusnál viszont a tényleges
+      // ablak az előfizetés szintjétől függ (Max, Team és Enterprise: automatikus
+      // felminősítés; Pro: usage credit kell), ezért nem állítható, hogy melyik alak
+      // adja a fenti contextWindow értéket.
+      clientModelIdentifier: {
+        state: 'unknown',
+        reason:
+          'Az Opus 1M ablaka előfizetés függő: Max, Team és Enterprise csomagon automatikus, Pro csomagon usage credit kell hozzá. Ezért a puszta claude-opus-5 azonosító és a [1m] suffixes alak közötti választás nem dönthető el a fiók ismerete nélkül, és first-party úton nem is mértük a kliens által feltételezett contextWindow értéket. Lezárná: az M-11 megismétlése first-party úton, a result.modelUsage.contextWindow összevetésével suffixszel és nélküle.',
+        blockedBy: ['M-11'],
+      },
       contextWindow: {
         state: 'known',
         value: 1_000_000,
@@ -340,6 +362,14 @@ export const claudeSubscriptionProvider = {
     {
       id: 'claude-sonnet-5',
       family: 'sonnet',
+      // A hivatalos leírás szerint a Sonnet 5 mindig az 1M ablakkal fut, nincs 200K
+      // variánsa és nincs választható [1m] suffixe, tehát a kliensnek a puszta
+      // azonosítót kell átadni.
+      clientModelIdentifier: {
+        state: 'known',
+        value: 'claude-sonnet-5',
+        evidence: [{ kind: 'doc', url: DOC_MODEL_CONFIG }],
+      },
       contextWindow: {
         state: 'known',
         value: 1_000_000,
@@ -386,6 +416,16 @@ export const claudeSubscriptionProvider = {
     {
       id: 'claude-haiku-4-5',
       family: 'haiku',
+      // A Haiku 4.5 dokumentált ablaka 200 000 token, 1M variánsa nincs, tehát a
+      // suffixes alak nem értelmezett: a kliensnek a puszta azonosító megy.
+      clientModelIdentifier: {
+        state: 'known',
+        value: 'claude-haiku-4-5',
+        evidence: [
+          { kind: 'doc', url: DOC_MODELS },
+          { kind: 'doc', url: DOC_MODEL_CONFIG },
+        ],
+      },
       contextWindow: {
         state: 'known',
         value: 200_000,
@@ -431,6 +471,27 @@ export const claudeSubscriptionProvider = {
     },
   ],
 
+  modelsEndpoint: {
+    // A Messages API mellett a GET /v1/models végpont dokumentált és listáz.
+    directHttpReachable: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'doc', url: DOC_MODELS_LIST }],
+    },
+    calledBySdk: {
+      state: 'unknown',
+      reason:
+        'Az M-12 és az M-36 route statisztikája a MiniMax base URL-re vonatkozik, first-party úton nem mértünk. A hivatalos leírás a gateway modell felderítést külön kapcsolóhoz köti, de a first-party indulási fázisról nem mond semmit.',
+      blockedBy: ['M-12'],
+    },
+    listedModelCount: {
+      state: 'unknown',
+      reason:
+        'A lista lapozott és az Anthropic modellkínálatával együtt változik, ezért konkrét darabszám dokumentációból nem rögzíthető, mérés pedig nem készült ezen az úton.',
+      blockedBy: ['M-12'],
+    },
+  },
+
   rateLimits: {
     // Az előfizetéses (Pro/Max) út gördülő 5 órás és heti ablakkal működik,
     // publikus RPM/TPM szám nincs hozzá (https://code.claude.com/docs/en/costs),
@@ -447,6 +508,29 @@ export const claudeSubscriptionProvider = {
       reason:
         'Ugyanaz az ok, mint a retryAfterHeader mezőnél: az előfizetéses úton nem mértük, milyen headereket küld a szolgáltatás.',
       blockedBy: ['M-18'],
+    },
+  },
+
+  // A korlátozó env változó neve kliens szintű, ezért dokumentációból ismert. A
+  // ténylegesen megfigyelt egyidejű kérésszám viszont mérés kérdése, és ezen az úton
+  // nem mértünk.
+  concurrency: {
+    subagentCapEnvVar: {
+      state: 'known',
+      value: 'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
+      evidence: [{ kind: 'doc', url: DOC_ENV_VARS }],
+    },
+    measuredSubagentCap: {
+      state: 'unknown',
+      reason:
+        'Nincs drótszintű mérés ehhez a providerhez, ezért nincs olyan korlát érték, ami mellett a kérésszám csúcsa megfigyelhető lett volna.',
+      blockedBy: ['M-31'],
+    },
+    observedMaxConcurrentRequests: {
+      state: 'unknown',
+      reason:
+        'Az M-31 sweep-line számítása a proxyn átmenő kérések időbélyegére épül, first-party úton viszont nincs proxy, tehát nincs mért egyidejű kérésszám. Lezárná: az M-31 megismétlése olyan úton, ahol a kimenő kérések időzítése rögzíthető.',
+      blockedBy: ['M-31'],
     },
   },
 

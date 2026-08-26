@@ -26,6 +26,14 @@ const RESEARCH_GATEWAY = '2026-08-26-agent-sdk-minimax.md 3. szekció, nem-Anthr
  */
 const DOC_ENV_VARS = 'https://code.claude.com/docs/en/env-vars';
 
+/**
+ * A modellazonosító feloldás szabályai. Innen származik a `[1m]` suffix kezelése:
+ * "If the ID doesn't start with claude- but contains [1m], in any casing, and Claude
+ * Code can't resolve it to a Claude model, Claude Code assumes a 1M window for it and
+ * the variable doesn't apply on its own." (a `CLAUDE_CODE_MAX_CONTEXT_TOKENS` változóról)
+ */
+const DOC_MODEL_CONFIG = 'https://code.claude.com/docs/en/model-config';
+
 export const minimaxProvider = {
   id: 'minimax',
   displayName: 'MiniMax',
@@ -161,13 +169,16 @@ export const minimaxProvider = {
       ],
     },
     // 79 POST /v1/messages kérésből 79 hordozott output_config-ot, effort és
-    // outputFormat beállítás nélkül is.
+    // outputFormat beállítás nélkül is. Az M-26 ezt egy irányból is megerősítette:
+    // a CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1 sem tesz hozzá és nem vesz el belőle
+    // semmit, a két futás output_config mezője karakterről karakterre azonos.
     outputConfigAlwaysSent: {
       state: 'known',
       value: true,
       evidence: [
         { kind: 'measurement', id: 'M-01' },
         { kind: 'measurement', id: 'M-04' },
+        { kind: 'measurement', id: 'M-26' },
       ],
     },
     outputConfigWireField: {
@@ -186,11 +197,15 @@ export const minimaxProvider = {
       value: ['auto', 'none'],
       evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
     },
+    // M-34: két közvetlen HTTP hívás az SDK megkerülésével. A {"type":"any"} és a
+    // {"type":"tool","name":"noop"} érték egyaránt HTTP 200-at kapott, a válasz
+    // stop_reason mezője end_turn, a content tömb szöveges, tool_use blokk egyikben
+    // sincs. A MiniMax tehát NEM utasítja el a nem támogatott értéket, hanem csendben
+    // eldobja, és úgy válaszol, mintha auto lett volna beállítva.
     rejectionBehaviour: {
-      state: 'unknown',
-      reason:
-        'Az SDK a teljes mérés alatt egyetlen nem támogatott tool_choice értéket sem küldött, ezért a provider elutasítási viselkedése nem derült ki.',
-      blockedBy: ['M-03'],
+      state: 'known',
+      value: 'silently_dropped',
+      evidence: [{ kind: 'measurement', id: 'M-34' }],
     },
     // 79 kérésből 4 hordozott tool_choice mezőt, mind {"type":"auto"}, mind a
     // WebSearch tool belső alkéréseiben. any és tool típus nem fordult elő.
@@ -248,16 +263,28 @@ export const minimaxProvider = {
   },
 
   effort: {
-    // M-04: effort low és max mellett is HTTP 200, nincs 400.
+    // M-04: effort low és max mellett is HTTP 200, nincs 400. M-26: a
+    // CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1 kapcsolóval és nélküle a kimenő body
+    // bájtazonos, az output_config.effort mindkét esetben kimegy. A dokumentált
+    // szerepe szerint a kapcsoló akkor kellene, ha a kliens nem ismerné fel a modell
+    // azonosítót effort-képesnek; a mérés szerint ezen a kliensverzión a MiniMax-M3
+    // ellen amúgy is kimegy az effort, tehát a kapcsoló hatástalan, és nincs olyan
+    // mérési adat, ami az effort beállítását kockázatosnak mutatná.
     accepted: {
       state: 'known',
       value: true,
-      evidence: [{ kind: 'measurement', id: 'M-04' }],
+      evidence: [
+        { kind: 'measurement', id: 'M-04' },
+        { kind: 'measurement', id: 'M-26' },
+      ],
     },
     wireField: {
       state: 'known',
       value: 'output_config.effort',
-      evidence: [{ kind: 'measurement', id: 'M-04' }],
+      evidence: [
+        { kind: 'measurement', id: 'M-04' },
+        { kind: 'measurement', id: 'M-26' },
+      ],
     },
   },
 
@@ -273,8 +300,8 @@ export const minimaxProvider = {
     mode: {
       state: 'unknown',
       reason:
-        'Az implicit cache olvasás igazolt (M-15 c: nulla cache_control blokk mellett is cache_read_input_tokens: 128), a cache írás ténye is igazolt (M-20 8. probe: 985344 cache_read token), de az explicit cache_control breakpointok önálló hatása nem mérhető: a cache_read érték 3 és 0 breakpoint mellett azonos, a válasz pedig sosem hordoz cache_creation_input_tokens mezőt. Az implicit és az implicit_and_explicit érték között ezen az úton nem lehet dönteni.',
-      blockedBy: ['M-15', 'M-20', 'M-24'],
+        'Az implicit cache olvasás igazolt (M-15 c: nulla cache_control blokk mellett is cache_read_input_tokens: 128), a cache írás ténye is igazolt (M-20 8. probe: 985344 cache_read token), de az explicit cache_control breakpointok önálló hatása nem mérhető: a cache_read érték 3 és 0 breakpoint mellett azonos, a válasz pedig sosem hordoz cache_creation_input_tokens mezőt. Az M-33 a hívó fél saját töréspontjával sem tudta szétválasztani a két módot: a full kérés cache_read_input_tokens értéke 3 és 1 töréspont mellett egyaránt 128. Lezárná: egy olyan válasz, amiben a szolgáltatás cache_creation_input_tokens mezőt is küld, vagy egy stream: false kérés usage objektuma, amit a jelenlegi SDK Options típusa nem enged előállítani.',
+      blockedBy: ['M-15', 'M-20', 'M-24', 'M-33'],
     },
     explicitBreakpointLimit: {
       state: 'known',
@@ -309,6 +336,16 @@ export const minimaxProvider = {
         { kind: 'measurement', id: 'M-08' },
         { kind: 'measurement', id: 'M-15' },
       ],
+    },
+    // M-33: a harness a felhasználói üzenet szöveg blokkjára maga rakott
+    // cache_control: {"type":"ephemeral"} jelölést. A DISABLE_PROMPT_CACHING=1
+    // futásban a system szekció mindkét SDK generálta töréspontja eltűnt, a hívó fél
+    // saját blokkja viszont változatlanul kiment (3 helyett 1 cache_control maradt).
+    // A kapcsoló tehát csak az SDK automatikus töréspontjait veszi le.
+    callerBreakpointSurvivesDisable: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-33' }],
     },
   },
 
@@ -383,6 +420,24 @@ export const minimaxProvider = {
     {
       id: 'MiniMax-M3',
       family: 'M3',
+      // A dróton a model mező mindig a suffix nélküli "MiniMax-M3" (M-11, M-29, M-32),
+      // a kliensnek viszont a suffixes alakot kell átadni. A suffix két dolgot vezérel:
+      // a kliens oldali contextWindow értéket (200 000 helyett 1 000 000, M-11) és a
+      // context-1m-2025-08-07 beta header jelenlétét (M-11, M-32). Az M-29 megmutatta,
+      // hogy a feloldás kérésenként történik: ott a háttérkérés modellje suffix nélküli
+      // env változóból jött, és abból a kérésből a beta header is kimaradt, miközben a
+      // fő kérésben ott volt. A dokumentált szabály ugyanez: a nem "claude-" kezdetű,
+      // fel nem oldható, [1m]-et tartalmazó azonosítóra a kliens 1M ablakot feltételez.
+      clientModelIdentifier: {
+        state: 'known',
+        value: 'MiniMax-M3[1m]',
+        evidence: [
+          { kind: 'measurement', id: 'M-11' },
+          { kind: 'measurement', id: 'M-29' },
+          { kind: 'measurement', id: 'M-32' },
+          { kind: 'doc', url: DOC_MODEL_CONFIG },
+        ],
+      },
       contextWindow: {
         state: 'known',
         value: 1_000_000,
@@ -438,17 +493,49 @@ export const minimaxProvider = {
       videoInput: {
         state: 'unknown',
         reason:
-          'Az SDK-ból nem állítottunk elő videó content blokkot, a research modelltáblázata pedig összevont kép és videó oszlopot használ. Az M-23 csak a kép content blokkra ad bizonyítékot, videóra nem.',
+          'A blokkoló a telepített SDK típusfelülete, nem a szolgáltatás: az @anthropic-ai/sdk ContentBlockParam uniójában nincs video variáns, az ImageBlockParam.source media_type mezője pedig zárt unió (image/jpeg, image/png, image/gif, image/webp). A projekt tiltja az any és az as használatát, ezért típusbiztosan nem állítható elő videó content blokkot hordozó streaming input üzenet. Lezárná: egy olyan SDK verzió, aminek a ContentBlockParam uniója videó variánst is tartalmaz, és az arra épített, az M-23 mintáját követő mérés.',
         blockedBy: ['M-16', 'M-23'],
       },
+      // M-35: közvetlen GET /v1/models hívás a MiniMax végpontra, HTTP 200. A válasz
+      // data tömbjének első eleme szó szerint {"id":"MiniMax-M3", "type":"model", ...},
+      // tehát a modell szerepel a szolgáltatás saját listájában.
       listedByModelsEndpoint: {
-        state: 'unknown',
-        reason:
-          'A teljes mérés 113 tranzakciójában egyetlen GET /v1/models kérés sem ment ki, tehát az endpoint modell-listája ismeretlen. A supportedModels() visszatérése helyi Claude Code konfiguráció, nem drótadat.',
-        blockedBy: ['M-12'],
+        state: 'known',
+        value: true,
+        evidence: [{ kind: 'measurement', id: 'M-35' }],
       },
     },
   ],
+
+  // A végpont válaszol, csak az SDK nem kérdezi meg. Ez a kettő külön mező, mert a
+  // Kapcsolat teszt gomb terve pontosan ezen a különbségen áll: a modell-lista
+  // lekérhető, de saját HTTP hívással, nem az SDK-n keresztül.
+  modelsEndpoint: {
+    directHttpReachable: {
+      state: 'known',
+      value: true,
+      evidence: [{ kind: 'measurement', id: 'M-35' }],
+    },
+    // M-12: a 113 tranzakcióban nulla GET /v1/models. M-36: a második kör 50
+    // tranzakciójában is egyetlen ilyen kérés van, az M-35 saját, SDK-n kívüli hívása.
+    // A hivatalos leírás ezzel egyezik: a gateway modell felderítés alapból ki van
+    // kapcsolva (CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY), és a kötelező
+    // CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 amúgy is letiltaná.
+    calledBySdk: {
+      state: 'known',
+      value: false,
+      evidence: [
+        { kind: 'measurement', id: 'M-12' },
+        { kind: 'measurement', id: 'M-36' },
+        { kind: 'doc', url: DOC_ENV_VARS },
+      ],
+    },
+    listedModelCount: {
+      state: 'known',
+      value: 8,
+      evidence: [{ kind: 'measurement', id: 'M-35' }],
+    },
+  },
 
   rateLimits: {
     buckets: [
@@ -469,20 +556,49 @@ export const minimaxProvider = {
     retryAfterHeader: {
       state: 'unknown',
       reason:
-        'A mérés alatt egyetlen 429-es válasz sem keletkezett, retry-after alstringet tartalmazó header egyetlen tranzakcióban sem fordult elő. Szándékos rate limit kimerítést nem végzünk.',
-      blockedBy: ['M-18'],
+        'Két független mérési körben (M-18: 113 tranzakció, M-36: 50 tranzakció) egyetlen 429-es válasz sem keletkezett, retry-after alstringet tartalmazó header pedig egyetlen tranzakcióban sem fordult elő. Szándékos rate limit kimerítést nem végzünk, ezért ez a mező mérés hiányában marad ismeretlen, nem a szolgáltatás hiányossága miatt.',
+      blockedBy: ['M-18', 'M-36'],
     },
     rateLimitHeaders: {
       state: 'unknown',
       reason:
-        'A 113 tranzakció válasz headereinek uniójában nincs ratelimit alstringet tartalmazó elem, de 429 sem keletkezett, ezért a hiány nem bizonyíték.',
-      blockedBy: ['M-18'],
+        'A két kör válasz headereinek uniójában nincs ratelimit vagy rate-limit alstringet tartalmazó elem (az M-36 kör egyetlen új header neve a set-cookie), de 429 sem keletkezett, ezért a hiány nem bizonyíték. Lezárná: egyetlen rögzített 429-es válasz headerkészlete.',
+      blockedBy: ['M-18', 'M-36'],
     },
   },
 
-  // A fő kérés header listája. A session cím generáló kérés ezen felül a
-  // structured-outputs-2025-12-15 elemet is küldi, de azt a kötelező
-  // CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 levágja.
+  // M-31: CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3 mellett a futás időablakában
+  // sweep-line módszerrel számolt legnagyobb egyidejű kérésszám 4 volt: egy
+  // orchestrátor kérés plusz pontosan három subagent kérés. A korlát tehát tartott,
+  // és a kimenő kérésszám csúcsa a korlát plusz egy. A workflow motor saját
+  // párhuzamos ágai ezen felül jönnek, mert azok külön query() hívások.
+  concurrency: {
+    subagentCapEnvVar: {
+      state: 'known',
+      value: 'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
+      evidence: [
+        { kind: 'measurement', id: 'M-31' },
+        { kind: 'doc', url: DOC_ENV_VARS },
+      ],
+    },
+    measuredSubagentCap: {
+      state: 'known',
+      value: 3,
+      evidence: [{ kind: 'measurement', id: 'M-31' }],
+    },
+    observedMaxConcurrentRequests: {
+      state: 'known',
+      value: 4,
+      evidence: [{ kind: 'measurement', id: 'M-31' }],
+    },
+  },
+
+  // A fő kérés header listája a véglegesített konfigurációval, tehát a
+  // clientModelIdentifier suffixes alakjával. A session cím generáló kérés ezen felül
+  // a structured-outputs-2025-12-15 elemet is küldi, de azt a kötelező
+  // CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 levágja. A context-1m-2025-08-07 elem
+  // kizárólag a [1m] suffixes azonosító mellett megy ki (M-11), és az M-32 a teljes
+  // env blokkal együtt is megerősítette a jelenlétét a megmaradó egyetlen kérésben.
   anthropicBetaHeaders: {
     state: 'known',
     value: [
@@ -493,10 +609,13 @@ export const minimaxProvider = {
       'prompt-caching-scope-2026-01-05',
       'mid-conversation-system-2026-04-07',
       'effort-2025-11-24',
+      'context-1m-2025-08-07',
     ],
     evidence: [
       { kind: 'measurement', id: 'M-01' },
       { kind: 'measurement', id: 'M-14' },
+      { kind: 'measurement', id: 'M-11' },
+      { kind: 'measurement', id: 'M-32' },
     ],
   },
 } satisfies ProviderCapabilityDescriptor<MiniMaxModelId, MiniMaxFamilyId>;

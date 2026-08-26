@@ -79,6 +79,13 @@ export interface PromptCachingCapability {
   readonly usageFields: Fact<readonly string[]>;
   /** Az env változó, amivel a kliens oldali cache jelölés kikapcsolható. */
   readonly disableEnvVar: Fact<string | null>;
+  /**
+   * Kimegy-e a dróton a hívó fél által kézzel, egy content blokkra rakott
+   * `cache_control` jelölés akkor is, ha a `disableEnvVar` be van állítva.
+   * Ha igen, a kapcsoló csak az SDK saját, automatikus töréspontjait veszi le,
+   * tehát a prompt cache egy része a hívó fél kezében marad.
+   */
+  readonly callerBreakpointSurvivesDisable: Fact<boolean>;
 }
 
 export interface StreamingCapability {
@@ -108,8 +115,16 @@ export interface ServerToolDescriptor {
 }
 
 export interface ModelDescriptor<TModelId extends string, TFamilyId extends string> {
+  /** A modell azonosítója úgy, ahogy a kimenő body `model` mezőjében megjelenik. */
   readonly id: TModelId;
   readonly family: TFamilyId;
+  /**
+   * Amit a kliensnek ténylegesen át kell adni (`Options.model` vagy `ANTHROPIC_MODEL`).
+   * Eltérhet az `id` mezőtől: a Claude Code `[1m]` suffixe a dróton lekerül a `model`
+   * mezőről, viszont a kliens oldali kontextusablakot és a `context-1m-2025-08-07`
+   * beta header jelenlétét ez vezérli.
+   */
+  readonly clientModelIdentifier: Fact<string>;
   /** Dokumentált kontextusablak. */
   readonly contextWindow: Fact<number>;
   /**
@@ -132,6 +147,20 @@ export interface ModelDescriptor<TModelId extends string, TFamilyId extends stri
   readonly listedByModelsEndpoint: Fact<boolean>;
 }
 
+/**
+ * A `GET /v1/models` végpont. Külön mezőcsoport, mert a "lekérhető" és a
+ * "az SDK le is kéri" két különböző dolog, és a Kapcsolat teszt gomb terve a
+ * kettő különbségén áll.
+ */
+export interface ModelsEndpointCapability {
+  /** Válaszol-e a végpont közvetlen, SDK-n kívüli HTTP hívásra. */
+  readonly directHttpReachable: Fact<boolean>;
+  /** Meghívja-e az SDK saját maga ezt az útvonalat a mért konfigurációban. */
+  readonly calledBySdk: Fact<boolean>;
+  /** A válasz `data` tömbjének hossza, ha a végpont válaszolt. */
+  readonly listedModelCount: Fact<number>;
+}
+
 export interface RateLimitBucket<TModelId extends string> {
   readonly appliesTo: readonly TModelId[];
   readonly requestsPerMinute: Fact<number>;
@@ -144,6 +173,23 @@ export interface RateLimitCapability<TModelId extends string> {
   readonly retryAfterHeader: Fact<string | null>;
   /** Minden megfigyelt rate limit jellegű header neve. */
   readonly rateLimitHeaders: Fact<readonly string[]>;
+}
+
+/**
+ * Kliens oldali párhuzamosság. Azért providerenkénti mező, mert a megfigyelt
+ * egyidejű kérésszám közvetlenül a provider percenkénti kérés korlátjába számít bele.
+ */
+export interface ConcurrencyCapability {
+  /** Az env változó, ami a kliens belső subagent párhuzamosságát korlátozza. */
+  readonly subagentCapEnvVar: Fact<string | null>;
+  /** A fenti env változó értéke, amivel a megfigyelés készült. */
+  readonly measuredSubagentCap: Fact<number>;
+  /**
+   * A megfigyelt legnagyobb egyidejűleg nyitva lévő kimenő kérésszám egyetlen
+   * `query()` alatt, a fenti korlát mellett. A subagentek kérésein felül az
+   * orchestrátor saját kérése is beleszámít.
+   */
+  readonly observedMaxConcurrentRequests: Fact<number>;
 }
 
 /**
@@ -186,7 +232,9 @@ export interface ProviderCapabilityDescriptor<
   readonly streaming: StreamingCapability;
   readonly serverTools: Fact<readonly ServerToolDescriptor[]>;
   readonly models: readonly ModelDescriptor<TModelId, TFamilyId>[];
+  readonly modelsEndpoint: ModelsEndpointCapability;
   readonly rateLimits: RateLimitCapability<TModelId>;
+  readonly concurrency: ConcurrencyCapability;
   /** Q12: a kimenő `anthropic-beta` header elemei. */
   readonly anthropicBetaHeaders: Fact<readonly string[]>;
 }

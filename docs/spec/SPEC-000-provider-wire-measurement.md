@@ -102,6 +102,18 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 | M-16 kiegészítés: kép bemenet felismerhető tartalommal | M-23 |
 | `promptCaching` kiegészítés: cache írás igazolása stream nélküli móddal | M-24 |
 | `serverTools` kiegészítés: web_search magasabb `maxTurns` mellett | M-25 |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` | M-26 |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_DISABLE_FAST_MODE` | M-27 |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` + `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | M-28 |
+| A felhasználó tényleges indító parancsának env változói: `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélkül | M-29 |
+| A felhasználó tényleges indító parancsának env változói: `API_TIMEOUT_MS` | M-30 |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | M-31 |
+| A felhasználó tényleges indító parancsa, mind a 12 env változóval együtt | M-32 |
+| `promptCaching.mode` kiegészítés: implicit és explicit szétválasztási kísérlet | M-33 |
+| `toolChoice.rejectionBehaviour` (nyitva maradt capability mező) | M-34 |
+| `listedByModelsEndpoint` (nyitva maradt capability mező) | M-35 |
+| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` (nyitva maradt capability mezők) -- passzív elemzés | M-36 |
+| `videoInput` (nyitva maradt capability mező) | nincs mérési eset -- lásd a szöveges indoklást M-25 után |
 
 ### Közös alapbeállítás
 
@@ -299,6 +311,87 @@ Az SDK verziót a mérés idejére pinelni kell, a pontos verzió a `meta.json`-
 - **Megfigyelés**: keletkezik-e `server_tool_use` vagy `web_search_tool_result` blokk a válaszban a magasabb korlát mellett, és a `result` üzenet subtype-ja (`success` vagy `error_max_turns`).
 - **Következtetés**: a `serverTools` mező kiegészítése -- eldönti, hogy az M-17-nél megfigyelt hiányzó eredményblokk a `maxTurns: 3` limit korai megszakítása miatt volt-e, vagy a MiniMax a `web_search_20250305` toolt ténylegesen sosem futtatja le.
 
+### M-26 `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` hatása
+
+- **Eltérés**: két futás. (a) alap, a leíró meglévő env blokkja szerint (csak `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`). (b) `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1`. `Options.effort` egyik futásban sincs explicit beállítva.
+- **Futtatás**: futásonként egy `query()`, azonos prompttal.
+- **Megfigyelés**: a kimenő body `output_config` mezője szó szerint mindkét futásnál, kérésenként (thin és full külön). Van-e `output_config` a `full` kérésben mindkét esetben, és ha van, milyen mezőkkel. A válasz HTTP kódja.
+- **Következtetés**: eldönti, hogy a felhasználó által ténylegesen használt kapcsolónak van-e egyáltalán mérhető hatása M3 ellen, a leírónk jelenlegi `effort` kockázat-jelölése mellett.
+
+### M-27 `CLAUDE_CODE_DISABLE_FAST_MODE` hatása
+
+- **Eltérés**: két futás. (a) alap. (b) `CLAUDE_CODE_DISABLE_FAST_MODE=1`.
+- **Futtatás**: futásonként egy `query()`, azonos prompttal.
+- **Megfigyelés**: diff a két futás `request.body.json` és `request.headers.json` fájljai között (mint M-08): top-level body kulcsok, `anthropic-beta` header lista, kérésszám. A kliens oldali `SDKMessage` folyam típus szerinti eloszlása is rögzítve, mert a jelenség lokális (kliens oldali) is lehet, nem csak drótszintű.
+- **Következtetés**: mi tűnik el vagy jelenik meg a bodyban, a headerekben, vagy a kérések számában a fast mode kikapcsolásakor.
+
+### M-28 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` és `CLAUDE_CODE_AUTO_COMPACT_WINDOW` együtt
+
+- **Eltérés**: az M-13 mintájára, egyetlen session, `persistSession: true`, `[1m]` suffixes modell (mint a felhasználó parancsában), `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50` és `CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000` együtt beállítva. Rövidre fogva (legfeljebb 8 kör), hogy ne égessünk feleslegesen.
+- **Futtatás**: körök egy streaming input generátorból, amíg a kör limit vagy a belső időkorlát el nem éri.
+- **Megfigyelés**: van-e compact boundary jellegű `system` üzenet a rögzített `SDKMessage` folyamban, és ha igen, milyen `usage.input_tokens` értéknél. A `result.modelUsage[...].contextWindow` értéke.
+- **Következtetés**: hol indul a compact ezzel a két kapcsolóval, és mekkora `contextWindow` értékkel dolgozik a kliens.
+
+### M-29 `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélkül, `ANTHROPIC_DEFAULT_SONNET_MODEL`/`ANTHROPIC_DEFAULT_OPUS_MODEL` suffixszel
+
+- **Eltérés**: `Options.model: 'MiniMax-M3[1m]'`, env: `ANTHROPIC_DEFAULT_SONNET_MODEL='MiniMax-M3[1m]'`, `ANTHROPIC_DEFAULT_OPUS_MODEL='MiniMax-M3[1m]'`, `ANTHROPIC_DEFAULT_HAIKU_MODEL='MiniMax-M3'` (suffix nélkül). `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` NINCS beállítva, hogy a thin (háttér) kérés lefusson és összevethető legyen a full kéréssel.
+- **Futtatás**: egy `query()`.
+- **Megfigyelés**: a thin és a full kérés `model` mezője szó szerint, és az `anthropic-beta` header `context-1m-2025-08-07` elemének jelenléte mindkét kérésben külön-külön.
+- **Következtetés**: melyik kérésbe melyik modellnév kerül, és hogy a kliens a két kérést egyformán vagy eltérően kezeli-e, amikor a fő és a háttér modell suffix tekintetében szétválik.
+
+### M-30 `API_TIMEOUT_MS` hatása
+
+- **Eltérés**: két futás. (a) alap. (b) `API_TIMEOUT_MS=3000000`.
+- **Futtatás**: futásonként egy `query()`, azonos rövid prompttal, nincs megvárva a 3 000 000 ms.
+- **Megfigyelés**: a kimenő kérés headerei között a kliens saját HTTP kliense (Stainless) által küldött időkorlát jellegű header (ha van ilyen a header leltárban) értéke mindkét futásnál.
+- **Következtetés**: mérhető-e ésszerű idő alatt a beállítás hatása anélkül, hogy a teljes időkorlátot megvárnánk.
+
+### M-31 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` konkurrens subagentekkel
+
+- **Eltérés**: `Options.agents` néhány triviális, programozottan definiált subagenttel, `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`, olyan prompt, ami az összes subagent egyidejű, egyetlen üzeneten belüli elindítására utasítja a modellt, `permissionMode` a toolt ténylegesen engedélyező módon (lásd `sdk-constants.ts`).
+- **Futtatás**: egy `query()`, magasabb `maxTurns` korláttal.
+- **Megfigyelés**: a proxy artefaktumaiból az adott futás időablakában induló `POST /v1/messages` kérések kezdő és záró időpontja (`timestamp` + `durationMs`), és ezekből sweep-line módszerrel a legnagyobb egyidejűleg nyitva lévő kérésszám.
+- **Következtetés**: hány egyidejű kérés megy ki ténylegesen a proxyn a cap alatt, és ez hogyan viszonyul a beállított `3` értékhez.
+
+### M-32 A teljes felhasználói parancs env változói együtt
+
+- **Eltérés**: egy futás, a felhasználó indító parancsának mind a 12 env változójával egyszerre (`API_TIMEOUT_MS`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, `CLAUDE_CODE_DISABLE_FAST_MODE`, `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, plusz a proxyra mutató `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`). Az `Options.model` szándékosan NINCS beállítva, hogy a kliens env-alapú (`ANTHROPIC_MODEL`) modellfeloldása mérhető legyen.
+- **Futtatás**: egy `query()`, rövid prompttal.
+- **Megfigyelés**: a kimenő body teljes mezőkészlete és a fejléc leltár, mint egy "felhasználói beállítás" alapállapot referenciaként a többi eset mellé.
+- **Következtetés**: van-e a 12 változó együttes hatásának olyan eleme, ami külön-külön mérve nem jelentkezett (pl. két kapcsoló egymást erősítő vagy egymást felülíró hatása).
+
+### M-33 `promptCaching.mode` -- implicit és explicit szétválasztási kísérlet
+
+- **Eltérés**: három futás, streaming input módban egy felhasználói üzenettel, aminek szöveg content blokkjára a harness SAJÁT, explicit `cache_control: {type:'ephemeral'}` jelölést tesz (az SDK a system promptra és a tools tömbre magától is tesz töréspontot, erre a harness nem hat rá közvetlenül -- ez az egyetlen pont, ahol a hívó fél saját maga adhat hozzá töréspontot). (a) és (b) azonos tartalommal, közvetlenül egymás után, cache bekapcsolva. (c) ugyanaz `DISABLE_PROMPT_CACHING=1` mellett.
+- **Futtatás**: futásonként egy `query()`.
+- **Megfigyelés**: a kimenő `messages[].content[]` blokkok közül melyiken van `cache_control` jelen mindhárom futásnál, külön a system/tools szekciótól. A válasz `usage` mezőjében a `cache_read_input_tokens` érték.
+- **Következtetés**: küld-e az SDK egyáltalán a hívó fél által megjelölt `cache_control` blokkot változatlanul, és a `DISABLE_PROMPT_CACHING` kapcsoló csak a saját (SDK generálta) töréspontokat veszi-e le, vagy a hívó fél sajátját is.
+
+### M-34 `toolChoice.rejectionBehaviour` közvetlen HTTP hívással
+
+- **Eltérés**: nincs `query()`. Két közvetlen HTTP hívás (Node natív `fetch`, a proxyn keresztül, hogy a nyers tranzakció automatikusan, maszkolva rögzüljön) a `/v1/messages` végpontra, minimális bodyval és egy triviális toollal. (a) `tool_choice: {"type":"any"}`. (b) `tool_choice: {"type":"tool","name":"noop"}`.
+- **Futtatás**: két HTTP kérés.
+- **Megfigyelés**: mindkét kérés HTTP státuszkódja, a válasz törzse szó szerint (hibaüzenet vagy sikeres `message` objektum), és hogy a válasz tartalmaz-e `tool_use` blokkot.
+- **Következtetés**: mi történik, ha a MiniMax `auto`/`none` szűk enumján kívüli `tool_choice` értéket kap -- elutasítja HTTP 400-zal, vagy elfogadja és figyelmen kívül hagyja.
+
+### M-35 `listedByModelsEndpoint` közvetlen HTTP hívással
+
+- **Eltérés**: nincs `query()`. Egy közvetlen `GET /v1/models` HTTP hívás (Node natív `fetch`, a proxyn keresztül) a MiniMax végpontra.
+- **Futtatás**: egy HTTP kérés.
+- **Megfigyelés**: a válasz HTTP kódja és a `data` tömb szerkezete (mezők, darabszám). A konkrét modellazonosítók közül csak a hatókörben lévő `MiniMax-M3` nevezhető meg a jegyzőkönyvben és bármely jelentésben, a CLAUDE.md szerint.
+- **Következtetés**: milyen alakban listázza a végpont a modelleket, és szerepel-e köztük a `MiniMax-M3`.
+
+### M-36 Rate limit header leltár (M-26 ... M-35 kör)
+
+- **Eltérés**: nincs. Passzív gyűjtés az M-26 ... M-35 kör összes artefaktumából, az M-18 mintájára.
+- **Futtatás**: nincs külön futás.
+- **Megfigyelés**: az M-26 ... M-35 kör rögzített `response.meta.json` headerkészleteinek uniója, van-e `retry-after` vagy `ratelimit` alstringet tartalmazó header.
+- **Következtetés**: kiegészíti-e ez a kör az M-18 eredményét, vagy a mező `unknown` marad.
+
+### `videoInput` -- miért nincs hozzá mérési eset
+
+A telepített `@anthropic-ai/claude-agent-sdk@0.3.245` a `SDKUserMessage.message` mezőt az `@anthropic-ai/sdk` `MessageParam` típusán keresztül tipizálja. Ennek `ContentBlockParam` uniója (`@anthropic-ai/sdk/resources/messages/messages.d.ts`) `TextBlockParam | ImageBlockParam | DocumentBlockParam | ...` -- nincs benne `video` variáns. Az `ImageBlockParam.source` (`Base64ImageSource`) `media_type` mezője zárt unió: `'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'`, videó MIME típus nem írható bele. A projekt szabályai tiltják az `any`/`as` használatát, tehát ez a típuskorlát nem kerülhető meg típusbiztosan. Mivel a `ContentBlockParam` unió maga sem tartalmaz videó variánst, típusbiztos módon `as`/`any` nélkül nem állítható elő olyan streaming input üzenet, ami videó content blokkot hordozna -- a mező emiatt `unknown` marad, blokkoló: a telepített SDK típusfelülete.
+
 ## 5. A `ProviderCapabilityDescriptor` típus terve
 
 ### Alapelvek
@@ -411,6 +504,12 @@ interface PromptCachingCapability {
   readonly usageFields: Fact<readonly string[]>;
   /** Az env változó, amivel a kliens oldali cache jelölés kikapcsolható. */
   readonly disableEnvVar: Fact<string | null>;
+  /**
+   * M-33: kimegy-e a hívó fél által kézzel rakott `cache_control` blokk akkor is,
+   * ha a `disableEnvVar` be van állítva. Ha igen, a kapcsoló csak az SDK saját
+   * töréspontjait veszi le, tehát a prompt cache egy része a hívó fél kezében marad.
+   */
+  readonly callerBreakpointSurvivesDisable: Fact<boolean>;
 }
 
 interface StreamingCapability {
@@ -438,8 +537,16 @@ interface ServerToolDescriptor {
 }
 
 interface ModelDescriptor<TModelId extends string, TFamilyId extends string> {
+  /** A modell azonosítója úgy, ahogy a kimenő body `model` mezőjében megjelenik. */
   readonly id: TModelId;
   readonly family: TFamilyId;
+  /**
+   * M-11, M-29, M-32: amit a kliensnek ténylegesen át kell adni (`Options.model`
+   * vagy `ANTHROPIC_MODEL`). Eltérhet az `id` mezőtől, mert a `[1m]` suffix a
+   * dróton lekerül, viszont a kliens oldali kontextusablakot és a
+   * `context-1m-2025-08-07` beta header jelenlétét ez vezérli.
+   */
+  readonly clientModelIdentifier: Fact<string>;
   /** Dokumentált kontextusablak. */
   readonly contextWindow: Fact<number>;
   /**
@@ -461,6 +568,37 @@ interface ModelDescriptor<TModelId extends string, TFamilyId extends string> {
   readonly videoInput: Fact<boolean>;
   /** Q10: szerepel-e a `GET /v1/models` válaszában. */
   readonly listedByModelsEndpoint: Fact<boolean>;
+}
+
+/**
+ * M-12, M-35: a `GET /v1/models` végpont. Külön mezőcsoport, mert a "lekérhető" és
+ * az "az SDK le is kéri" két különböző dolog, és a Kapcsolat teszt gomb terve
+ * pontosan ezen a különbségen áll.
+ */
+interface ModelsEndpointCapability {
+  /** Válaszol-e a végpont közvetlen, SDK-n kívüli HTTP hívásra. */
+  readonly directHttpReachable: Fact<boolean>;
+  /** Meghívja-e az SDK saját maga ezt az útvonalat a mért konfigurációban. */
+  readonly calledBySdk: Fact<boolean>;
+  /** A válasz `data` tömbjének hossza, ha a végpont válaszolt. */
+  readonly listedModelCount: Fact<number>;
+}
+
+/**
+ * M-31: kliens oldali párhuzamosság. Providerenkénti mező, mert a megfigyelt
+ * egyidejű kérésszám közvetlenül a provider percenkénti kérés korlátjába számít bele.
+ */
+interface ConcurrencyCapability {
+  /** Az env változó, ami a kliens belső subagent párhuzamosságát korlátozza. */
+  readonly subagentCapEnvVar: Fact<string | null>;
+  /** A fenti env változó értéke, amivel a megfigyelés készült. */
+  readonly measuredSubagentCap: Fact<number>;
+  /**
+   * A megfigyelt legnagyobb egyidejűleg nyitva lévő kimenő kérésszám egyetlen
+   * `query()` alatt. A subagentek kérésein felül az orchestrátor saját kérése is
+   * beleszámít.
+   */
+  readonly observedMaxConcurrentRequests: Fact<number>;
 }
 
 interface RateLimitBucket<TModelId extends string> {
@@ -511,7 +649,9 @@ interface ProviderCapabilityDescriptor<
   readonly streaming: StreamingCapability;
   readonly serverTools: Fact<readonly ServerToolDescriptor[]>;
   readonly models: readonly ModelDescriptor<TModelId, TFamilyId>[];
+  readonly modelsEndpoint: ModelsEndpointCapability;
   readonly rateLimits: RateLimitCapability<TModelId>;
+  readonly concurrency: ConcurrencyCapability;
   /** Q12: a kimenő `anthropic-beta` header elemei. */
   readonly anthropicBetaHeaders: Fact<readonly string[]>;
 }
@@ -538,7 +678,11 @@ interface ProviderCapabilityDescriptor<
 | `serverTools` | ténylegesen elérhető szerver oldali toolok, nem elméleti lista | M-17, M-25 |
 | `models` | kontextus és output limitek, kép/videó bemenet, listázottság | research 2. szekció, M-12, M-13, M-16, M-20, M-23 |
 | `models[].maxOutputTokensWireCeiling` | a kimenő `max_tokens` kliens oldali vágása, a provider korlátjától függetlenül | M-22 |
-| `rateLimits` | dokumentált bucketek plusz a megfigyelt headerek | research 2. szekció, M-18 |
+| `models[].clientModelIdentifier` | amit a kliensnek át kell adni, ha az az `id` mezőtől eltér (`[1m]` suffix) | M-11, M-29, M-32 |
+| `promptCaching.callerBreakpointSurvivesDisable` | a hívó fél saját `cache_control` blokkját levágja-e a `disableEnvVar` | M-33 |
+| `modelsEndpoint` | a `GET /v1/models` elérhetősége közvetlen hívással, és hogy az SDK hívja-e | M-12, M-35 |
+| `concurrency` | a subagent korlát env változó, és a mellette megfigyelt egyidejű kérésszám | M-31 |
+| `rateLimits` | dokumentált bucketek plusz a megfigyelt headerek | research 2. szekció, M-18, M-36 |
 | `anthropicBetaHeaders` | Q12, a header elemek, párban a body mezőkkel | M-14 |
 
 ### A `minimax` leíró jelen állapota

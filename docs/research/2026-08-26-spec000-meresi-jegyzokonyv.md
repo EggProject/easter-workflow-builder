@@ -320,3 +320,124 @@ A `web_search_20250305` típusú szerver oldali tool 3 kérésben jelenik meg ö
 - Ez a jegyzőkönyv fájl: nem tartalmazza a kulcsot (csak maszkolt mintát, ld. M-01 header szakasz).
 - `bun run summary` (`tools/wire-probe/src/summary.ts`) lefutott, esetenként egy sort ad: futás azonosító, ok/HIBA/TIMEOUT, a korrelált proxy tranzakciók HTTP kódjai, a kritikus body mezők (`output_config, thinking, tool_choice, context_management`) jelenléte, az `anthropic-beta` érték(ek), a `result` subtype, az SDKMessage és proxy tranzakció darabszám. Minden M-01 - M-17 sor `[ok]` vagy `[HIBA]` (a `[HIBA]` sorok M-02 és M-17, mindkettő `error_max_turns`, fent részletezve, nem harness hiba). Nincs `TIMEOUT` sor.
 - `bun run typecheck`: hibátlan a harness javítás után is.
+
+---
+
+# M-26 - M-36 kiegészítő mérés: a felhasználó tényleges indító parancsa
+
+Dátum: 2026-08-26 (harmadik, külön munkamenet). SDK verzió (pinelve): `@anthropic-ai/claude-agent-sdk@0.3.245`, változatlan (ellenőrizve minden érintett `meta.json` `sdkVersionPin` mezőjében). Modell: `MiniMax-M3`, kivéve M-28/M-29/M-32, ahol a fő modell `MiniMax-M3[1m]`. Proxy port: `8787`, egyetlen processzben futott ehhez a teljes körhöz, ezért az `artifacts/*.json` `seq` mezője 1-től 50-ig egyenletesen nő ebben a körben (proxy leállási log: "rögzített tranzakciók: 50"). Upstream: `https://api.minimax.io/anthropic`. A `tools/wire-probe/src/cases/M-26.ts` .. `M-36.ts` forrásában a pontos beállítás minden esethez visszakereshető.
+
+Ez a mérési kör a felhasználó ténylegesen használt indító parancsának env változóit méri: `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`, `CLAUDE_CODE_DISABLE_FAST_MODE`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `ANTHROPIC_DEFAULT_HAIKU_MODEL` (suffix nélkül), `API_TIMEOUT_MS`, `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, plusz egy referencia futás mind a 12 változóval együtt. Emellett lezárja a hat nyitva maradt capability mezőt, ahol ez mérhető volt.
+
+## M-26 `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` hatása
+
+Beállítás: (a) alap (nincs `Options.effort`, nincs extra env). (b) `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1`, `Options.effort` itt sincs beállítva. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-26/{a-base,b-always-enable-effort}.meta.json`.
+
+| Futás | thin kérés `output_config` | full kérés `output_config` | tranzakciók |
+|---|---|---|---|
+| a-base | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}` | `00002-1787742422775.json`, `00003-1787742425723.json` |
+| b-always-enable-effort | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}` | `00005-1787742427896.json`, `00006-1787742428703.json` |
+
+A két futás `output_config` mezője **karakterről karakterre azonos** mindkét kérésfajtánál. Nincs `output_config` mezőn kívüli eltérés sem a body top-level kulcsaiban, sem az `anthropic-beta` headerben (mindkettő a szokásos, M-01-nél rögzített listát hordozza). A `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1` beállítás jelenléte vagy hiánya ebben a mérésben **semmilyen megfigyelhető különbséget nem okozott a dróton**.
+
+## M-27 `CLAUDE_CODE_DISABLE_FAST_MODE` hatása
+
+Beállítás: (a) alap. (b) `CLAUDE_CODE_DISABLE_FAST_MODE=1`. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-27/{a-base,b-disable-fast-mode}.meta.json`.
+
+Tranzakciók: a-base `00008-1787742431972.json` (thin), `00009-1787742436853.json` (full); b-disable-fast-mode `00011-1787742438656.json` (thin), `00012-1787742441222.json` (full). A négy kérés `output_config`, `thinking` (`{"type":"adaptive"}` a full kérésben), `cache_control` darabszám (3 a full kérésben) és `anthropic-beta` header listája **mind a négy tranzakcióban azonos**. Drótszinten nincs megfigyelhető eltérés.
+
+Ugyanakkor a kliens oldali `SDKMessage` folyam eltér: `a-base.sdk-messages.ndjson` típus szerinti eloszlása `{"system":4,"stream_event":10,"assistant":2,"result":1}`, ezen belül a `system` üzenetek subtype-jai `{"init":1,"status":1,"thinking_tokens":2}`. A `b-disable-fast-mode.sdk-messages.ndjson` eloszlása `{"system":26,"stream_event":33,"assistant":2,"result":1}`, subtype-ok `{"init":1,"status":1,"thinking_tokens":24}`. A `thinking_tokens` típusú `system` üzenetek száma 2-ről 24-re nő, a `stream_event` szám 10-ről 33-ra, miközben a kimenő HTTP kérések száma (2), tartalma és headerei változatlanok.
+
+## M-28 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` és `CLAUDE_CODE_AUTO_COMPACT_WINDOW` együtt
+
+Beállítás: `model: 'MiniMax-M3[1m]'`, `persistSession: true`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000`, legfeljebb 8 kör ismétlődő töltelékszöveggel (az M-13 mintájára, rövidebbre fogva). Kimenetel: `timedOut: false`, `result` subtype `success`, `num_turns: 2`. Artefaktum: `tools/wire-probe/artifacts/harness/M-28/a.meta.json`.
+
+Az `a.sdk-messages.ndjson` 999 SDKMessage-t tartalmaz, típus szerint `{"system":429,"stream_event":563,"assistant":5,"user":1,"result":1}`. A `system` üzenetek subtype-jai kizárólag `init`, `status`, `thinking_tokens` -- **nincs compact boundary jellegű `system` üzenet** (ugyanaz a minta, mint M-13-nál). A záró `result.usage`: `input_tokens:80987, cache_creation_input_tokens:0, cache_read_input_tokens:33490, output_tokens:1562` (ebből `thinking_tokens:959`). A `result.modelUsage["MiniMax-M3[1m]"]` mezője: `contextWindow:1000000, maxOutputTokens:32000, canonicalModel:"minimax-m3[1m]", inputTokens:88358, cacheReadInputTokens:33618, costUSD:0.497899`.
+
+Nem egyértelmű: a `num_turns: 2` -- a promptgenerátor akár 8 kört is küldhetett volna, de a session ugyanúgy 2 valós kör után lezárult, mint M-13-nál (ott 20 lehetséges körből is csak 1 valós kör futott le). A `contextWindow:1000000` érték a `[1m]` suffixből adódik (M-11, M-20 mintájára), nem a két új env kapcsolóból.
+
+## M-29 `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélkül, `ANTHROPIC_DEFAULT_SONNET_MODEL`/`ANTHROPIC_DEFAULT_OPUS_MODEL` suffixszel
+
+Beállítás: `model: 'MiniMax-M3[1m]'`, `ANTHROPIC_DEFAULT_SONNET_MODEL='MiniMax-M3[1m]'`, `ANTHROPIC_DEFAULT_OPUS_MODEL='MiniMax-M3[1m]'`, `ANTHROPIC_DEFAULT_HAIKU_MODEL='MiniMax-M3'` (suffix nélkül), `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` nincs beállítva. Kimenetel: HTTP 200 mindkét kérésnél, `result` subtype `success` (17 SDKMessage). Artefaktum: `tools/wire-probe/artifacts/harness/M-29/a.meta.json`, tranzakciók `00018-1787742458818.json` (thin), `00019-1787742459888.json` (full).
+
+A kimenő body `model` mezője **mindkét kérésnél** szó szerint `"MiniMax-M3"` (a suffix egyik kérésben sem jelenik meg a body szinten, egyezik az M-11 mintával). Az `anthropic-beta` header viszont **eltér a két kérés között**: a thin kérés (`00018`) listájában **nincs** `context-1m-2025-08-07` elem, a full kérésében (`00019`) **van**.
+
+Összevetve az M-11 (a) futásával, ahol a teljes session `model: 'MiniMax-M3[1m]'` volt, **külön haiku env override nélkül**: ott mind a thin (`00006-1787706958183.json`), mind a full (`00007-1787706958835.json`) kérés `anthropic-beta` listája tartalmazta a `context-1m-2025-08-07` elemet, saját ellenőrzéssel megerősítve. Az M-29 és az M-11 (a) közötti egyetlen tervezett eltérés az `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélküli beállítása.
+
+## M-30 `API_TIMEOUT_MS` hatása
+
+Beállítás: (a) alap. (b) `API_TIMEOUT_MS=3000000`. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-30/{a-base,b-api-timeout-3000000}.meta.json`.
+
+| Futás | tranzakció | kérés headerei közt `x-stainless-timeout` |
+|---|---|---|
+| a-base | `00021-1787742461622.json` (thin) | `600` |
+| a-base | `00022-1787742462310.json` (full) | `600` |
+| b-api-timeout-3000000 | `00024-1787742465473.json` (thin) | `3000` |
+| b-api-timeout-3000000 | `00025-1787742465901.json` (full) | `3000` |
+
+A `x-stainless-timeout` header értéke a `600` alapértékről `3000`-re változik, amikor `API_TIMEOUT_MS=3000000`. A `600` a dokumentált 600000 ms (10 perc) alapérték ezredmásodperc helyett másodpercben kifejezve, a `3000` pedig a beállított 3000000 ms másodpercben. Nem kellett megvárni a teljes időkorlátot: a hatás azonnal látszott a kimenő kérés headerében.
+
+## M-31 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` konkurrens subagentekkel
+
+Beállítás: négy programozottan definiált, triviális subagent (`echo-a` .. `echo-d`, `model: 'inherit'`), `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`, prompt, ami mind a négy subagent egyidejű indítására utasítja a modellt egyetlen üzenetben, `maxTurns: 20`, `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true`. Kimenetel: `result` subtype `success` (192 SDKMessage). Artefaktum: `tools/wire-probe/artifacts/harness/M-31/a.meta.json`.
+
+A futás időablakában 10 db `POST /v1/messages` tranzakció esett, sweep-line módszerrel számolt legnagyobb egyidejű darabszám: **4**. Saját ellenőrzés a tranzakciók `system` promptja és időzítése alapján (`durationMs`, `timestamp`): a `00028-1787742478371.json` tranzakció (a fő session orchestrátor kérése, `system` promptja `"You are an interactive agent that helps users with software..."`, indulás +953ms, időtartam 11113ms) átfedésben van három subagent-worker kéréssel: `00029-1787742478940.json`, `00030-1787742479080.json`, `00031-1787742479148.json` (mindhárom `system` promptja szó szerint `"Válaszolj egyetlen mondattal arra a kérdésre, amit a felhasználó feltesz..."`, ez a case-ben definiált subagent prompt), indulásuk +11292ms, +11694ms, +10940ms körül, egymással és a `00028`-cal is átfedésben (a `00028` +12066ms-ig tart). Ez pontosan 1 orchestrátor + 3 egyidejű subagent kérés = 4 összesen. Negyedik, egyidejű **subagent** kérés nem fordult elő ebben az ablakban.
+
+Nem egyértelmű: a promptban mind a négy subagent (`echo-a` .. `echo-d`) indítását kértük, de csak 3 subagent-worker kérés futott egyidejűleg; a 00032/00033/00034/00035/00036 tranzakciók `"Async agent launched succ..."` és `"<retrieval_status>success</retrieval_status>"` tartalmú tool eredményeket hordoznak, ami arra utal, hogy a modell néhány subagentet háttérben (aszinkron) indított, nem feltétlenül mind a négyet szinkron, egyidejű HTTP kérésként. A pontos ütemezési logika ebből a mérésből nem rekonstruálható teljesen.
+
+## M-32 A teljes felhasználói parancs env változói együtt
+
+Beállítás: egy futás, `Options.model` nincs beállítva, env: `API_TIMEOUT_MS=3000000, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1, ANTHROPIC_MODEL=MiniMax-M3[1m], ANTHROPIC_DEFAULT_SONNET_MODEL=MiniMax-M3[1m], ANTHROPIC_DEFAULT_OPUS_MODEL=MiniMax-M3[1m], ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3, CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000, CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1, CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50, CLAUDE_CODE_DISABLE_FAST_MODE=1, CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`, plusz a proxyra mutató `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`. Kimenetel: HTTP 200, `result` subtype `success` (24 SDKMessage). Artefaktum: `tools/wire-probe/artifacts/harness/M-32/a.meta.json`.
+
+Csak **1** `POST /v1/messages` ment ki (`00038-1787742498281.json`) -- a thin (cím generáló) kérés hiányzik, egyezik a `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` korábban rögzített hatásával (M-07, M-08, M-21). A kimenő body `model` mezője `"MiniMax-M3"`, annak ellenére, hogy az `Options.model` SDK mező nem volt beállítva -- a kliens tehát az `ANTHROPIC_MODEL=MiniMax-M3[1m]` env változóból oldotta fel a modellt (a suffix a body szinten itt is lekerül, egyezik M-11-gyel). A `tools` tömb hossza **24** (a `DesignSync` hiányzik, egyezik M-08/M-21-gyel). `output_config: {"effort":"high"}`, `thinking: {"type":"adaptive"}`, `cache_control` darabszám 3, `x-stainless-timeout: 3000`, az `anthropic-beta` lista tartalmazza a `context-1m-2025-08-07` elemet.
+
+## M-33 `promptCaching.mode` -- implicit és explicit szétválasztási kísérlet
+
+Beállítás: három futás, streaming input módban egy felhasználói üzenettel, aminek szöveg content blokkjára a harness saját, explicit `cache_control: {"type":"ephemeral"}` jelölést tesz. (a) és (b) azonos tartalom, közvetlenül egymás után, cache bekapcsolva. (c) ugyanaz `DISABLE_PROMPT_CACHING=1` mellett. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-33/{a-explicit-breakpoint-first,b-explicit-breakpoint-second,c-disable-prompt-caching}.meta.json`.
+
+| Futás | full kérés tranzakció | `cache_control` darabszám és helye | `usage.cache_read_input_tokens` (full) |
+|---|---|---|---|
+| a-explicit-breakpoint-first | `00041-1787742511635.json` | 3: `system` 2 blokkja + a felhasználói üzenet 1 blokkja | 128 |
+| b-explicit-breakpoint-second | `00044-1787742514059.json` | 3: ugyanaz a minta | 128 |
+| c-disable-prompt-caching | `00047-1787742517068.json` | **1**: kizárólag a felhasználói üzenet blokkja, a `system` mindhárom blokkja `cache_control` nélkül | 128 |
+
+Saját ellenőrzés a `messages[].content[]` tömbön mindhárom full kérésben: a felhasználó által (a harness kódjában) explicit módon rárakott `cache_control` blokk **mindhárom futásban jelen van**, a (c) futásban is, annak ellenére, hogy a `DISABLE_PROMPT_CACHING=1` env változó a `system` szekció mindkét (a-ban és b-ben meglévő) `cache_control` blokkját eltávolította. A `tools` tömbben egyik futásban sincs `cache_control` blokk.
+
+A thin kérésekben (`00040`, `00043`, `00046`) a `cache_control` darabszám mindhárom futásban 0. A `usage.cache_read_input_tokens` mező a thin kérésekben: (a) `128`, (b) nincs jelen a mezők közt (a `usage` objektum ekkor `input_tokens`, `output_tokens`, `service_tier` mezőket tartalmazott csak), (c) `4736`.
+
+Nem egyértelmű: a (c) futás thin kérésének `cache_read_input_tokens:4736` értéke jelentősen magasabb, mint az (a)/(b) futásoké; ennek oka ebből a mérésből nem állapítható meg (lehet a session-en kívüli, korábbi mérésekből származó implicit cache találat, mert a thin kérés system promptja rögzített, ismétlődő szöveg minden mérési esetben).
+
+## M-34 `toolChoice.rejectionBehaviour` közvetlen HTTP hívással
+
+Beállítás: két közvetlen HTTP hívás (Node natív `fetch`, a proxyn keresztül), `model: 'MiniMax-M3'`, `max_tokens: 16`, egy `noop` nevű, üres sémájú tool. (a) `tool_choice: {"type":"any"}`. (b) `tool_choice: {"type":"tool","name":"noop"}`. Kimenetel: mindkét kérés HTTP 200. Artefaktumok: `tools/wire-probe/artifacts/harness/M-34/{a-tool-choice-any,b-tool-choice-tool}.json`.
+
+A válasz mindkét esetben `type:"message"`, `stop_reason:"end_turn"`, és **szöveges** `content` tömböt tartalmaz, `tool_use` blokk egyikben sincs. (a) válasza szó szerint `"Asztal."`, (b) válasza szó szerint `"Alma"`. A `usage` mindkét válaszban `input_tokens:266, cache_read_input_tokens:128`. Nincs `error` mező, nincs `base_resp.status_code` eltérés a szokásos `0`-tól.
+
+## M-35 `listedByModelsEndpoint` közvetlen HTTP hívással
+
+Beállítás: egy közvetlen `GET /v1/models` HTTP hívás (Node natív `fetch`, a proxyn keresztül) a MiniMax végpontra. Kimenetel: HTTP 200. Artefaktum: `tools/wire-probe/artifacts/harness/M-35/a-get-models.json`.
+
+A válasz `data` tömbje 8 elemű, minden elem `id`, `type:"model"`, `display_name`, `created_at` mezőkkel, a válasz `has_more: false`. A `data[0].id` mezője szó szerint `"MiniMax-M3"`. A CLAUDE.md szerint a MiniMax családból kizárólag a `MiniMax-M3` nevezhető meg dokumentumban -- a maradék 7 elem a hatókörön kívüli MiniMax családtagokat sorolja fel (ezek konkrét azonosítóit ez a jegyzőkönyv nem ismétli meg), köztük "-highspeed" végződésű variánsokat is.
+
+## M-36 Rate limit header leltár (M-26 - M-35 kör, passzív)
+
+Nincs önálló futás. Az M-26 - M-35 kör teljes 50 tranzakciójából (ugyanaz a proxy processz, `seq` 1-50):
+
+- Útvonal eloszlás: `POST /anthropic/v1/messages`: 36, `HEAD /anthropic/api/hello`: 13, `GET /anthropic/v1/models`: 1 (ez az M-35 saját hívása).
+- Státuszkód eloszlás: `200`: 37, `404`: 13 (mind a `HEAD /api/hello` hívások). Nincs `429`, nincs egyéb `4xx`, nincs `5xx`.
+- Válasz header névunió: `access-control-allow-origin, alb_receive_time, alb_request_id, cache-control, connection, content-length, content-type, date, expires, minimax-request-id, pragma, set-cookie, trace-id, transfer-encoding, vary, x-from, x-mm-request-id, x-session-id`. A `set-cookie` új elem az M-18 korábbi header-uniójához képest (ott nem szerepelt).
+- `retry-after` vagy `ratelimit`/`rate-limit` alstringet tartalmazó header: **nincs egyetlen tranzakcióban sem**, ugyanaz az eredmény, mint M-18-nál.
+
+Mivel ebben a körben sem keletkezett `429`, a `retry-after` és `ratelimit`-jellegű headerek megléte továbbra sem állapítható meg.
+
+## `videoInput` -- típusrendszer alapú vizsgálat, mérési eset nélkül
+
+Saját ellenőrzés a telepített csomagokon: `tools/wire-probe/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts` a `SDKUserMessage.message` mezőt az `@anthropic-ai/sdk` `MessageParam` típusán keresztül tipizálja (import `from '@anthropic-ai/sdk/resources'`). A `tools/wire-probe/node_modules/@anthropic-ai/sdk/resources/messages/messages.d.ts` fájlban a `ContentBlockParam` unió (1750. sor) szó szerint `TextBlockParam | ImageBlockParam | DocumentBlockParam | SearchResultBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam | ToolUseBlockParam | ToolResultBlockParam | ServerToolUseBlockParam | WebSearchToolResultBlockParam | WebFetchToolResultBlockParam | CodeExecutionToolResultBlockParam | BashCodeExecutionToolResultBlockParam | TextEditorCodeExecutionToolResultBlockParam | ToolSearchToolResultBlockParam | ContainerUploadBlockParam` -- nincs benne `video` variáns. Az `ImageBlockParam.source` (`Base64ImageSource`, 95. sor) `media_type` mezője szó szerint `'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'` zárt unió, videó MIME típus nem írható bele típusbiztosan.
+
+Mivel a projekt szabályai tiltják az `any` és `as` használatát, ebből a típusfelületből típusbiztos módon nem állítható elő videó content blokkot hordozó streaming input üzenet. Nem futott mérési eset, a mező blokkolója a telepített SDK típusfelülete, nem a MiniMax szolgáltatás.
+
+## Záró ellenőrzések (M-26 - M-36)
+
+- `grep -rl "$(grep -oP '(?<=MINIMAX_API_KEY=).*' .env)" tools/wire-probe/artifacts/ docs/` (repo gyökérből futtatva): **0 találat.**
+- `bun run typecheck`: hibátlan a tizenegy új case fájl (`M-26.ts` .. `M-36.ts`) és a `cases/index.ts` regisztráció felvétele után is.
+- A jelen szakasz szövege nem tartalmazza a hatókörön kívüli MiniMax modellazonosítókat (M-35), a CLAUDE.md előírása szerint.
