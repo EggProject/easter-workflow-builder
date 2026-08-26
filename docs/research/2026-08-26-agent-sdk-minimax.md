@@ -16,10 +16,7 @@ linux-x64-musl, linux-arm64-musl, darwin-x64, darwin-arm64, win32-x64, win32-arm
 ### `query()`
 
 ```ts
-function query(args: {
-  prompt: string | AsyncIterable<SDKUserMessage>;
-  options?: Options;
-}): Query;
+function query(args: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }): Query;
 ```
 
 `Query` = `AsyncGenerator<SDKMessage, void>` + metódusok: `interrupt`, `setPermissionMode`,
@@ -30,26 +27,26 @@ function query(args: {
 
 ### `Options` fontosabb mezői
 
-| Mező | Leírás |
-|---|---|
-| `systemPrompt` | `string` vagy `{ type:'preset', preset:'claude_code', append?, excludeDynamicSections? }` |
-| `allowedTools` / `disallowedTools` | tool allow/deny, szkópolt szabályokkal (`"Bash(rm *)"`) |
-| `permissionMode` | `default` / `acceptEdits` / `plan` / `dontAsk` / `auto` / a mindent-engedő mód |
-| `canUseTool` | permission callback, **csak akkor hívódik, ha a permission flow promptig jut** |
-| `mcpServers` | `Record<string, McpServerConfig>`: stdio / sse / http / sdk |
-| `hooks` | `Partial<Record<HookEvent, HookCallbackMatcher[]>>` |
-| `agents` | `Record<string, AgentDefinition>`, programozott subagentek |
-| `settingSources` | `('user'\|'project'\|'local')[]` |
-| `skills` | `string[] \| 'all'`, fájlrendszerből töltődnek (`SKILL.md`) |
-| `maxTurns`, `maxBudgetUsd` | limitek |
-| `model`, `fallbackModel`, `effort`, `thinking` | modell és reasoning |
-| `cwd`, `env`, `additionalDirectories` | futtatási környezet |
-| `resume`, `forkSession`, `continue`, `sessionId` | session kezelés |
-| `includePartialMessages`, `includeHookEvents` | streaming és observability |
-| `outputFormat` | `{ type:'json_schema', schema }` |
-| `sandbox` | OS szintű sandbox, lásd lent |
-| `persistSession`, `sessionStore` | perzisztencia |
-| `maxThinkingTokens` | **deprecated**, `thinking` váltja ki |
+| Mező                                             | Leírás                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `systemPrompt`                                   | `string` vagy `{ type:'preset', preset:'claude_code', append?, excludeDynamicSections? }` |
+| `allowedTools` / `disallowedTools`               | tool allow/deny, szkópolt szabályokkal (`"Bash(rm *)"`)                                   |
+| `permissionMode`                                 | `default` / `acceptEdits` / `plan` / `dontAsk` / `auto` / a mindent-engedő mód            |
+| `canUseTool`                                     | permission callback, **csak akkor hívódik, ha a permission flow promptig jut**            |
+| `mcpServers`                                     | `Record<string, McpServerConfig>`: stdio / sse / http / sdk                               |
+| `hooks`                                          | `Partial<Record<HookEvent, HookCallbackMatcher[]>>`                                       |
+| `agents`                                         | `Record<string, AgentDefinition>`, programozott subagentek                                |
+| `settingSources`                                 | `('user'\|'project'\|'local')[]`                                                          |
+| `skills`                                         | `string[] \| 'all'`, fájlrendszerből töltődnek (`SKILL.md`)                               |
+| `maxTurns`, `maxBudgetUsd`                       | limitek                                                                                   |
+| `model`, `fallbackModel`, `effort`, `thinking`   | modell és reasoning                                                                       |
+| `cwd`, `env`, `additionalDirectories`            | futtatási környezet                                                                       |
+| `resume`, `forkSession`, `continue`, `sessionId` | session kezelés                                                                           |
+| `includePartialMessages`, `includeHookEvents`    | streaming és observability                                                                |
+| `outputFormat`                                   | `{ type:'json_schema', schema }`                                                          |
+| `sandbox`                                        | OS szintű sandbox, lásd lent                                                              |
+| `persistSession`, `sessionStore`                 | perzisztencia                                                                             |
+| `maxThinkingTokens`                              | **deprecated**, `thinking` váltja ki                                                      |
 
 ### `SDKMessage` union (real-time UI-hoz)
 
@@ -95,10 +92,10 @@ Ez a mechanizmus a projektben a kötelező `emit_output` tool kikényszerítés�
 ### In-process MCP tool
 
 ```ts
-const t = tool("name", "desc", { arg: z.string() }, async ({ arg }) => ({
-  content: [{ type: "text", text: "..." }]
+const t = tool('name', 'desc', { arg: z.string() }, async ({ arg }) => ({
+  content: [{ type: 'text', text: '...' }],
 }));
-const server = createSdkMcpServer({ name: "my-tools", tools: [t] });
+const server = createSdkMcpServer({ name: 'my-tools', tools: [t] });
 // options: { mcpServers: { "my-tools": server }, allowedTools: ["mcp__my-tools__name"] }
 ```
 
@@ -133,9 +130,9 @@ Nincs GroupId paraméter ezen az endpointon.
 
 ### Modellek
 
-| Modell | Kontextus | Max output | Kép/videó | Thinking |
-|---|---|---|---|---|
-| `MiniMax-M3` | 1 000 000 | ajánlott 131 072, max 524 288 | igen | opcionális (`adaptive`) |
+| Modell       | Kontextus | Max output                    | Kép/videó | Thinking                |
+| ------------ | --------- | ----------------------------- | --------- | ----------------------- |
+| `MiniMax-M3` | 1 000 000 | ajánlott 131 072, max 524 288 | igen      | opcionális (`adaptive`) |
 
 `[1m]` suffix (`MiniMax-M3[1m]`): **nem MiniMax paraméter**, a Claude Code kliens saját
 konvenciója. Hogy a kliens leválasztja-e a kérés előtt: nyitott kérdés, lásd Q9.
@@ -161,15 +158,15 @@ thinking:
 
 ### Paraméter támogatás
 
-| Paraméter | Státusz |
-|---|---|
-| `model`, `messages`, `system`, `stream`, `tools`, `metadata`, `thinking`, `cache_control` | támogatott |
-| `temperature` | támogatott, tartomány **[0, 2]**, default 1 |
-| `top_p` | támogatott, [0, 1], default 0.95 |
-| `service_tier` | `standard` (default) / `priority` (1.5x ár) |
-| `tool_choice` | **CSAK `auto` és `none`.** Nincs `any`, nincs `{type:"tool",name}` |
-| `top_k`, `stop_sequences`, `mcp_servers`, `context_management`, `container` | csendben eldobva |
-| `output_format` / `json_schema` | **nem létezik a sémában** |
+| Paraméter                                                                                 | Státusz                                                            |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `model`, `messages`, `system`, `stream`, `tools`, `metadata`, `thinking`, `cache_control` | támogatott                                                         |
+| `temperature`                                                                             | támogatott, tartomány **[0, 2]**, default 1                        |
+| `top_p`                                                                                   | támogatott, [0, 1], default 0.95                                   |
+| `service_tier`                                                                            | `standard` (default) / `priority` (1.5x ár)                        |
+| `tool_choice`                                                                             | **CSAK `auto` és `none`.** Nincs `any`, nincs `{type:"tool",name}` |
+| `top_k`, `stop_sequences`, `mcp_servers`, `context_management`, `container`               | csendben eldobva                                                   |
+| `output_format` / `json_schema`                                                           | **nem létezik a sémában**                                          |
 
 ### Strukturált kimenet: nincs
 
@@ -228,23 +225,23 @@ Kulcs doksi: https://code.claude.com/docs/en/llm-gateway-protocol
 
 ### Releváns env változók
 
-| Változó | Hatás |
-|---|---|
-| `ANTHROPIC_BASE_URL` | endpoint felülírás |
-| `ANTHROPIC_AUTH_TOKEN` | `Authorization: Bearer` érték |
-| `ANTHROPIC_API_KEY` | `x-api-key` érték |
-| `ANTHROPIC_MODEL` | session induló modell |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` / `_OPUS_MODEL` / `_HAIKU_MODEL` / `_FABLE_MODEL` | alias feloldás |
-| `ANTHROPIC_SMALL_FAST_MODEL` | **deprecated**, helyette `ANTHROPIC_DEFAULT_HAIKU_MODEL` |
-| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` | leveszi a pre-release képességeket és body mezőiket |
-| `ENABLE_TOOL_SEARCH` | `false` / `true` / `auto:N` |
-| `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=1` | **kerülendő** custom base URL mellett |
-| `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` | **kerülendő**, fix budget alakot kényszerít |
-| `API_TIMEOUT_MS` | API timeout, default 10 perc |
-| `MAX_THINKING_TOKENS` | `0` = thinking ki |
-| `DISABLE_PROMPT_CACHING=1` | prompt cache ki |
-| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | auto-compact ablak, csak csökkenteni tud |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | telemetria, error reporting, feature flag, auto-update ki |
+| Változó                                                                            | Hatás                                                     |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `ANTHROPIC_BASE_URL`                                                               | endpoint felülírás                                        |
+| `ANTHROPIC_AUTH_TOKEN`                                                             | `Authorization: Bearer` érték                             |
+| `ANTHROPIC_API_KEY`                                                                | `x-api-key` érték                                         |
+| `ANTHROPIC_MODEL`                                                                  | session induló modell                                     |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` / `_OPUS_MODEL` / `_HAIKU_MODEL` / `_FABLE_MODEL` | alias feloldás                                            |
+| `ANTHROPIC_SMALL_FAST_MODEL`                                                       | **deprecated**, helyette `ANTHROPIC_DEFAULT_HAIKU_MODEL`  |
+| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`                                         | leveszi a pre-release képességeket és body mezőiket       |
+| `ENABLE_TOOL_SEARCH`                                                               | `false` / `true` / `auto:N`                               |
+| `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING=1`                                 | **kerülendő** custom base URL mellett                     |
+| `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1`                                          | **kerülendő**, fix budget alakot kényszerít               |
+| `API_TIMEOUT_MS`                                                                   | API timeout, default 10 perc                              |
+| `MAX_THINKING_TOKENS`                                                              | `0` = thinking ki                                         |
+| `DISABLE_PROMPT_CACHING=1`                                                         | prompt cache ki                                           |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW`                                                  | auto-compact ablak, csak csökkenteni tud                  |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`                                       | telemetria, error reporting, feature flag, auto-update ki |
 
 ### Ismert MiniMax + Claude Code problémák (nem hivatalos, GitHub issue)
 
@@ -267,17 +264,17 @@ Kulcs doksi: https://code.claude.com/docs/en/llm-gateway-protocol
 
 Ezek a SPEC-000 mérési eseteinek forrása. Egyik sem zárható le tippeléssel.
 
-| # | Kérdés | Miért számít |
-|---|---|---|
-| Q1 | Az `outputFormat` kliens oldali szintetikus `StructuredOutput` toolt injektál, vagy natív `output_config.format` mezőt küld? | Ha natív, MiniMax ellen 400 |
-| Q2 | Használ-e az `outputFormat` záró fázisában kényszerített `tool_choice`-t? | MiniMax csak `auto`/`none`-t fogad |
-| Q3 | Kimegy-e `output_config` akkor is, ha nem állítunk `effort`-ot? | Ez dönti el, használható-e a MiniMax egyáltalán |
-| Q4 | Milyen JSON-t küld az SDK `thinking: {type:'adaptive'}` és `{type:'disabled'}` esetén? | A MiniMax enum szűk |
-| Q5 | Az SDK indít-e háttér modellhívást (session cím), és az mit küld? | Dokumentált 400 forrás |
-| Q6 | Melyik env kapcsoló mit vesz le ténylegesen a bodyból? | A provider env blokk tartalma ebből áll össze |
-| Q7 | Küld-e a MiniMax `input_json_delta`-t a tool argumentumokhoz, és ha nem, az SDK helyesen rakja-e össze a tool inputot? | A real-time UI és a tool hívás helyessége múlik rajta |
-| Q8 | A `Stop` hook `decision: "block"` mechanizmus működik-e MiniMax ellen, és mennyi kör kell a kötelező tool kikényszerítéséhez? | Ez az alapértelmezett strukturált kimenet utunk |
-| Q9 | A `[1m]` suffixet a kliens leválasztja-e a modellnévről a kérés előtt? | Rossz modellnév = 404 |
-| Q10 | Mit ad vissza a `GET /v1/models` a MiniMax endpointon? | A Kapcsolat teszt gomb ebből tölti a modell-listát |
-| Q11 | Mekkora kontextusablakot jelent az endpoint, és mikor indul auto-compact? | Korai compaction elrontja a hosszú workflow-kat |
-| Q12 | Küld-e az SDK `anthropic-beta` headert, és melyeket? | Header és body párban utazik, fél pár = 400 |
+| #   | Kérdés                                                                                                                        | Miért számít                                          |
+| --- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Q1  | Az `outputFormat` kliens oldali szintetikus `StructuredOutput` toolt injektál, vagy natív `output_config.format` mezőt küld?  | Ha natív, MiniMax ellen 400                           |
+| Q2  | Használ-e az `outputFormat` záró fázisában kényszerített `tool_choice`-t?                                                     | MiniMax csak `auto`/`none`-t fogad                    |
+| Q3  | Kimegy-e `output_config` akkor is, ha nem állítunk `effort`-ot?                                                               | Ez dönti el, használható-e a MiniMax egyáltalán       |
+| Q4  | Milyen JSON-t küld az SDK `thinking: {type:'adaptive'}` és `{type:'disabled'}` esetén?                                        | A MiniMax enum szűk                                   |
+| Q5  | Az SDK indít-e háttér modellhívást (session cím), és az mit küld?                                                             | Dokumentált 400 forrás                                |
+| Q6  | Melyik env kapcsoló mit vesz le ténylegesen a bodyból?                                                                        | A provider env blokk tartalma ebből áll össze         |
+| Q7  | Küld-e a MiniMax `input_json_delta`-t a tool argumentumokhoz, és ha nem, az SDK helyesen rakja-e össze a tool inputot?        | A real-time UI és a tool hívás helyessége múlik rajta |
+| Q8  | A `Stop` hook `decision: "block"` mechanizmus működik-e MiniMax ellen, és mennyi kör kell a kötelező tool kikényszerítéséhez? | Ez az alapértelmezett strukturált kimenet utunk       |
+| Q9  | A `[1m]` suffixet a kliens leválasztja-e a modellnévről a kérés előtt?                                                        | Rossz modellnév = 404                                 |
+| Q10 | Mit ad vissza a `GET /v1/models` a MiniMax endpointon?                                                                        | A Kapcsolat teszt gomb ebből tölti a modell-listát    |
+| Q11 | Mekkora kontextusablakot jelent az endpoint, és mikor indul auto-compact?                                                     | Korai compaction elrontja a hosszú workflow-kat       |
+| Q12 | Küld-e az SDK `anthropic-beta` headert, és melyeket?                                                                          | Header és body párban utazik, fél pár = 400           |

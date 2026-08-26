@@ -13,11 +13,12 @@ import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runne
 export const M29: MeasurementCase = {
   id: 'M-29',
   title: 'ANTHROPIC_DEFAULT_HAIKU_MODEL suffix nélkül, sonnet/opus suffixszel',
-  question: 'user env: ANTHROPIC_DEFAULT_HAIKU_MODEL (suffix nélkül) vs ANTHROPIC_DEFAULT_SONNET_MODEL/ANTHROPIC_DEFAULT_OPUS_MODEL (suffixszel)',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
+  question:
+    'user env: ANTHROPIC_DEFAULT_HAIKU_MODEL (suffix nélkül) vs ANTHROPIC_DEFAULT_SONNET_MODEL/ANTHROPIC_DEFAULT_OPUS_MODEL (suffixszel)',
+  async run(context) {
+    const base = buildBaseOptions(context);
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-29',
       runId: 'a',
       prompt: DEFAULT_PROMPT,

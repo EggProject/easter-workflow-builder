@@ -8,8 +8,8 @@ konfiguráció egy későbbi specifikáció tárgya.
 
 ## Fájlok
 
-| Fájl | Tartalom |
-|---|---|
+| Fájl           | Tartalom                                              |
+| -------------- | ----------------------------------------------------- |
 | `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson |
 
 ## Függőségi irány

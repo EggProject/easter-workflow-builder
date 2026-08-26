@@ -14,12 +14,16 @@
 
 const SECRET_HEADER_NAMES = new Set(['authorization', 'x-api-key']);
 
-/** Igaz, ha a header neve a jól ismert titkos headerek egyike (kis- és nagybetűtől függetlenül). */
+/**
+Igaz, ha a header neve a jól ismert titkos headerek egyike (kis- és nagybetűtől függetlenül).
+*/
 export function isSecretHeaderName(name: string): boolean {
   return SECRET_HEADER_NAMES.has(name.toLowerCase());
 }
 
-/** Hossz- és utolsó-4-karakter-megtartó maszk: pl. "sk-abcd1234" -> "*******1234". */
+/**
+Hossz- és utolsó-4-karakter-megtartó maszk: pl. "sk-abcd1234" -> "*******1234".
+*/
 export function maskSecretValue(value: string): string {
   if (value.length <= 4) {
     return '*'.repeat(value.length);
@@ -28,7 +32,9 @@ export function maskSecretValue(value: string): string {
   return '*'.repeat(value.length - 4) + visibleSuffix;
 }
 
-/** Headerkészlet maszkolása: a titkos headerek értéke maszkolva, a többi változatlan. */
+/**
+Headerkészlet maszkolása: a titkos headerek értéke maszkolva, a többi változatlan.
+*/
 export function maskHeaders(headers: Readonly<Record<string, string>>): Record<string, string> {
   const masked: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
@@ -37,7 +43,9 @@ export function maskHeaders(headers: Readonly<Record<string, string>>): Record<s
   return masked;
 }
 
-/** Egy szövegben minden ismert titok minden előfordulását "REDACTED"-re cseréli. */
+/**
+Egy szövegben minden ismert titok minden előfordulását "REDACTED"-re cseréli.
+*/
 export function redactKnownSecrets(text: string, secrets: readonly string[]): string {
   let result = text;
   for (const secret of secrets) {

@@ -22,28 +22,31 @@ export const M24: MeasurementCase = {
   id: 'M-24',
   title: 'Prompt cache írás igazolása stream nélküli móddal',
   question: 'promptCaching kiegészítés (nyitva maradt kérdés, kiértékelés 3. szekció 6. pont)',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
+  async run(context) {
+    const base = buildBaseOptions(context);
     const withLongSystem: Options = {
       ...base,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: LONG_SYSTEM_APPEND },
     };
 
-    const outcomes: CaseRunOutcome[] = [];
-    outcomes.push(
-      await executeQuery({ ctx, caseId: 'M-24', runId: 'a-first', prompt: DEFAULT_PROMPT, options: withLongSystem }),
-    );
     // A második futás közvetlenül az első után megy, mert a cache-találat
     // mérése ettől függ (az M-15 mintája szerint).
-    outcomes.push(
+    const outcomes: CaseRunOutcome[] = [
       await executeQuery({
-        ctx,
+        ctx: context,
+        caseId: 'M-24',
+        runId: 'a-first',
+        prompt: DEFAULT_PROMPT,
+        options: withLongSystem,
+      }),
+      await executeQuery({
+        ctx: context,
         caseId: 'M-24',
         runId: 'b-second-immediately-after',
         prompt: DEFAULT_PROMPT,
         options: withLongSystem,
       }),
-    );
+    ];
     return outcomes;
   },
 };

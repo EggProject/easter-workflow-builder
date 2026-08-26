@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Logoló reverse proxy a SPEC-000 drótszintű méréshez.
  *
@@ -12,27 +13,35 @@
  * az útvonal-előtagot kell tartalmaznia, mint az upstream URL-nek (pl. mindkettő
  * végén `/anthropic`), lásd SPEC-000 4. szekció "Közös alapbeállítás".
  */
-import { createServer, request as httpRequest, type IncomingHttpHeaders, type IncomingMessage, type OutgoingHttpHeaders, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type OutgoingHttpHeaders,
+  type ServerResponse,
+} from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { URL } from 'node:url';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { URL, fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { TransactionRecorder } from './proxy/recorder.ts';
 import type { StreamEventRecord } from './proxy/types.ts';
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 const port = Number(process.env['WIRE_PROBE_PORT'] ?? 8787);
 const upstream = process.env['WIRE_PROBE_UPSTREAM'] ?? 'https://api.minimax.io/anthropic';
-const artifactsDir = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? join(moduleDir, '..', 'artifacts');
+const artifactsDirectory = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? path.join(moduleDirectory, '..', 'artifacts');
 
 const upstreamUrl = new URL(upstream);
 const upstreamOrigin = `${upstreamUrl.protocol}//${upstreamUrl.host}`;
 
-const secretEnvValue = process.env['MINIMAX_API_KEY'];
-const recorder = new TransactionRecorder(artifactsDir, secretEnvValue ? [secretEnvValue] : []);
+const secretEnvironmentValue = process.env['MINIMAX_API_KEY'];
+const recorder = new TransactionRecorder(artifactsDirectory, secretEnvironmentValue ? [secretEnvironmentValue] : []);
 
-/** Node http/https headerobjektumot sík string->string alakra hoz (a value string vagy string[] lehet). */
+/**
+Node http/https headerobjektumot sík string->string alakra hoz (a value string vagy string[] lehet).
+*/
 function toPlainHeaders(headers: IncomingHttpHeaders): Record<string, string> {
   const plain: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
@@ -44,19 +53,30 @@ function toPlainHeaders(headers: IncomingHttpHeaders): Record<string, string> {
   return plain;
 }
 
-/** A teljes kérés törzsét bufferbe olvassa, hogy bájtazonosan tovább lehessen küldeni. */
-function readBody(req: IncomingMessage): Promise<Buffer> {
+/**
+A teljes kérés törzsét bufferbe olvassa, hogy bájtazonosan tovább lehessen küldeni.
+*/
+function readBody(request: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    request.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    request.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    request.on('error', reject);
   });
 }
 
-/** JSON-ként próbálja értelmezni a bufferet; ha nem sikerül, nyers stringet ad vissza. */
+/**
+JSON-ként próbálja értelmezni a bufferet; ha nem sikerül, nyers stringet ad vissza.
+*/
 function parseJsonOrRaw(buffer: Buffer): unknown {
   if (buffer.length === 0) {
+    // `undefined` itt JSON.stringify-kor eltuntetne a kulcsot az artefaktumbol;
+    // a rogzitett tranzakcioban a mezonek explicit `null`-kent kell megjelennie.
+    // eslint-disable-next-line unicorn/no-null -- lasd proxy/types.ts requestBody/responseBody dokumentacioja
     return null;
   }
   const text = buffer.toString('utf8');
@@ -67,47 +87,47 @@ function parseJsonOrRaw(buffer: Buffer): unknown {
   }
 }
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const startedAt = Date.now();
   const timestamp = new Date(startedAt).toISOString();
 
-  const requestHeaders = toPlainHeaders(req.headers);
-  const bodyBuffer = await readBody(req);
+  const requestHeaders = toPlainHeaders(request.headers);
+  const bodyBuffer = await readBody(request);
   const requestBody = parseJsonOrRaw(bodyBuffer);
 
-  const targetUrl = new URL(req.url ?? '/', upstreamOrigin);
+  const targetUrl = new URL(request.url ?? '/', upstreamOrigin);
 
   // A továbbított headerek: minden bejövő header változatlanul, a host kivételével.
   const forwardHeaders: OutgoingHttpHeaders = {};
-  for (const [name, value] of Object.entries(req.headers)) {
+  for (const [name, value] of Object.entries(request.headers)) {
     if (value === undefined || name.toLowerCase() === 'host') {
       continue;
     }
     forwardHeaders[name] = value;
   }
-  forwardHeaders['host'] = targetUrl.host;
+  forwardHeaders.host = targetUrl.host;
 
-  const requestFn = targetUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+  const requestFunction = targetUrl.protocol === 'https:' ? httpsRequest : httpRequest;
 
-  const upstreamReq = requestFn(
+  const upstreamRequest = requestFunction(
     targetUrl,
-    { method: req.method, headers: forwardHeaders },
-    (upstreamRes) => {
-      const responseHeaders = toPlainHeaders(upstreamRes.headers);
-      const statusCode = upstreamRes.statusCode ?? 0;
+    { method: request.method, headers: forwardHeaders },
+    (upstreamResponse) => {
+      const responseHeaders = toPlainHeaders(upstreamResponse.headers);
+      const statusCode = upstreamResponse.statusCode ?? 0;
       const contentType = responseHeaders['content-type'] ?? '';
       const isStream = contentType.includes('text/event-stream');
 
       // A válasz státuszkódját és headereit változatlanul adjuk tovább.
-      res.writeHead(statusCode, upstreamRes.headers);
+      response.writeHead(statusCode, upstreamResponse.headers);
 
       const responseChunks: Buffer[] = [];
       const streamEvents: StreamEventRecord[] = [];
       let lineBuffer = '';
 
-      upstreamRes.on('data', (chunk: Buffer) => {
+      upstreamResponse.on('data', (chunk: Buffer) => {
         // Darabonként azonnal továbbítjuk, nem puffereljük a stream mérés miatt.
-        res.write(chunk);
+        response.write(chunk);
         if (isStream) {
           lineBuffer += chunk.toString('utf8');
           const lines = lineBuffer.split('\n');
@@ -120,15 +140,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
         }
       });
 
-      upstreamRes.on('end', () => {
-        res.end();
+      upstreamResponse.on('end', () => {
+        response.end();
         if (isStream && lineBuffer.length > 0) {
           streamEvents.push({ t: Date.now() - startedAt, raw: lineBuffer });
         }
+        // `null`, ha stream: a RecordedTransaction.responseBody dokumentalt
+        // JSON-szerializacios szemantikaja, nem placeholder (lasd proxy/types.ts).
+        // eslint-disable-next-line unicorn/no-null -- explicit JSON `null` kell, nem hianyzo kulcs
         const responseBody = isStream ? null : parseJsonOrRaw(Buffer.concat(responseChunks));
         recorder.record({
           timestamp,
-          method: req.method ?? '',
+          method: request.method ?? '',
           path: targetUrl.pathname,
           query: targetUrl.search.replace(/^\?/, ''),
           requestHeaders,
@@ -136,6 +159,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
           responseStatus: statusCode,
           responseHeaders,
           responseBody,
+          // eslint-disable-next-line unicorn/no-null -- proxy/types.ts: nem stream valasznal dokumentaltan `null`
           streamEvents: isStream ? streamEvents : null,
           durationMs: Date.now() - startedAt,
         });
@@ -143,30 +167,32 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     },
   );
 
-  upstreamReq.on('error', (err: Error) => {
-    console.error(`[wire-probe proxy] upstream hiba: ${err.message}`);
-    if (!res.headersSent) {
-      res.writeHead(502, { 'content-type': 'application/json' });
+  upstreamRequest.on('error', (error: Error) => {
+    console.error(`[wire-probe proxy] upstream hiba: ${error.message}`);
+    if (!response.headersSent) {
+      response.writeHead(502, { 'content-type': 'application/json' });
     }
-    res.end(JSON.stringify({ type: 'error', error: { type: 'wire_probe_proxy_error', message: err.message } }));
+    response.end(JSON.stringify({ type: 'error', error: { type: 'wire_probe_proxy_error', message: error.message } }));
   });
 
-  upstreamReq.write(bodyBuffer);
-  upstreamReq.end();
+  upstreamRequest.write(bodyBuffer);
+  upstreamRequest.end();
 }
 
-const server = createServer((req, res) => {
-  void handleRequest(req, res);
+const server = createServer((request, response) => {
+  void handleRequest(request, response);
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`[wire-probe proxy] figyel: http://127.0.0.1:${port}`);
+  console.log(`[wire-probe proxy] figyel: http://127.0.0.1:${String(port)}`);
   console.log(`[wire-probe proxy] upstream: ${upstream}`);
-  console.log(`[wire-probe proxy] artefaktumok: ${artifactsDir}`);
+  console.log(`[wire-probe proxy] artefaktumok: ${artifactsDirectory}`);
 });
 
 function shutdown(): void {
-  console.log(`[wire-probe proxy] leállítva -- rögzített tranzakciók: ${recorder.count}, könyvtár: ${recorder.artifactsDir}`);
+  console.log(
+    `[wire-probe proxy] leállítva -- rögzített tranzakciók: ${String(recorder.count)}, könyvtár: ${recorder.artifactsDirectory}`,
+  );
   server.close(() => process.exit(0));
 }
 

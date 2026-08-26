@@ -11,13 +11,15 @@
  */
 import type { EffortLevel, PermissionMode, ThinkingAdaptive, ThinkingDisabled } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-const packageRoot = join(moduleDir, '..', '..');
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.join(moduleDirectory, '..', '..');
 
-/** Options.effort enum, sdk.d.ts:576 (`EffortLevel`) és sdk.d.ts:1711 (`Options.effort`). */
+/**
+Options.effort enum, sdk.d.ts:576 (`EffortLevel`) és sdk.d.ts:1711 (`Options.effort`).
+*/
 export const EFFORT_LOWEST: EffortLevel = 'low';
 export const EFFORT_HIGHEST: EffortLevel = 'max';
 
@@ -55,10 +57,12 @@ export const NON_PROMPTING_TOOL_ALLOWING_PERMISSION_MODE: PermissionMode = 'bypa
  * runner.ts saját, AbortController-alapú falóra-időkorlátja (WIRE_PROBE_TIMEOUT_MS).
  */
 
-/** A telepített SDK pontos verziója a saját package.json-jából, találgatás nélkül. */
+/**
+A telepített SDK pontos verziója a saját package.json-jából, találgatás nélkül.
+*/
 export function readInstalledSdkVersion(): string {
-  const pkgPath = join(packageRoot, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'package.json');
-  const raw = readFileSync(pkgPath, 'utf8');
+  const packagePath = path.join(packageRoot, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'package.json');
+  const raw = readFileSync(packagePath, 'utf8');
   const parsed: unknown = JSON.parse(raw);
   if (typeof parsed === 'object' && parsed !== null && 'version' in parsed) {
     const { version } = parsed;
@@ -66,5 +70,5 @@ export function readInstalledSdkVersion(): string {
       return version;
     }
   }
-  throw new Error(`Nem sikerült kiolvasni az SDK verzióját innen: ${pkgPath}`);
+  throw new Error(`Nem sikerült kiolvasni az SDK verzióját innen: ${packagePath}`);
 }

@@ -8,12 +8,12 @@ csomag a többi workspace taggal egységesen `tsc --noEmit`-elhető legyen.
 
 ## Fájlok
 
-| Fájl | Tartalom |
-|---|---|
-| `base.json` | minden csomag közös alapja, a TS 6.0 alapértelmezéstől eltérő opciók |
-| `node.json` | Node 26 alatt futó csomagoknak (`apps/server`, `packages/*`, `tools/wire-probe`), `base.json` kiterjesztése |
-| `react.json` | `apps/web` és `packages/ui` React csomagoknak, `base.json` kiterjesztése |
-| `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson |
+| Fájl           | Tartalom                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| `base.json`    | minden csomag közös alapja, a TS 6.0 alapértelmezéstől eltérő opciók                                        |
+| `node.json`    | Node 26 alatt futó csomagoknak (`apps/server`, `packages/*`, `tools/wire-probe`), `base.json` kiterjesztése |
+| `react.json`   | `apps/web` és `packages/ui` React csomagoknak, `base.json` kiterjesztése                                    |
+| `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson                                                       |
 
 ## Szabályok
 

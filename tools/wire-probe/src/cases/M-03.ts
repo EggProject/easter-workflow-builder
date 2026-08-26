@@ -1,4 +1,6 @@
-/** M-03: tool_choice az outputFormat záró fázisában -- Q2. */
+/**
+M-03: tool_choice az outputFormat záró fázisában -- Q2.
+*/
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import type { MeasurementCase } from '../harness/types.ts';
@@ -14,11 +16,8 @@ const SCHEMA = {
   required: ['label', 'count'],
 } satisfies Record<string, unknown>;
 
-const echoTool = tool(
-  'echo',
-  'Visszaadja a bemeneti szöveget változatlanul.',
-  { text: z.string() },
-  async (args) => ({ content: [{ type: 'text', text: args.text }] }),
+const echoTool = tool('echo', 'Visszaadja a bemeneti szöveget változatlanul.', { text: z.string() }, (arguments_) =>
+  Promise.resolve({ content: [{ type: 'text', text: arguments_.text }] }),
 );
 
 const measureServer = createSdkMcpServer({ name: 'measure', tools: [echoTool] });
@@ -27,15 +26,15 @@ export const M03: MeasurementCase = {
   id: 'M-03',
   title: 'tool_choice az outputFormat záró fázisában',
   question: 'Q2',
-  async run(ctx) {
+  async run(context) {
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-03',
       runId: 'a',
       prompt:
         'Hívd meg a mcp__measure__echo toolt a "teszt" szöveggel, majd foglald össze az eredményt a megadott séma szerint.',
       options: {
-        ...buildBaseOptions(ctx),
+        ...buildBaseOptions(context),
         maxTurns: 5,
         outputFormat: { type: 'json_schema', schema: SCHEMA },
         mcpServers: { measure: measureServer },

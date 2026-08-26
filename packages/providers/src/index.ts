@@ -1,3 +1,18 @@
-// Placeholder export, hogy a csomag lefordulhasson. A tenyleges tartalmat
-// egy kesobbi specifikacio adja.
-export const PROVIDERS_PLACEHOLDER = true;
+// Barrel: csak újraexport, a csomag publikus felülete csak azt adja ki, amire másik csomagnak szüksége van.
+
+export type { MeasurementId } from './evidence/measurement-id.ts';
+export type { EvidenceReference } from './evidence/evidence-reference.ts';
+export type { EvidenceList } from './evidence/evidence-list.ts';
+export type { Fact } from './evidence/fact.ts';
+export { isKnown } from './evidence/is-known.ts';
+export { isUnknown } from './evidence/is-unknown.ts';
+
+export type { ProviderCapabilityDescriptor } from './capability/provider-capability-descriptor.ts';
+
+export type { MiniMaxModelId } from './minimax/model-id.ts';
+export type { MiniMaxFamilyId } from './minimax/family-id.ts';
+export type { ClaudeModelId } from './claude-subscription/model-id.ts';
+export type { ClaudeFamilyId } from './claude-subscription/family-id.ts';
+
+export type { ProviderRegistry } from './registry.ts';
+export { providerRegistry } from './registry.ts';

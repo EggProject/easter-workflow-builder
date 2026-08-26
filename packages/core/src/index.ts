@@ -1,3 +1,3 @@
 // Placeholder export, hogy a csomag lefordulhasson. A tenyleges tartalmat
 // egy kesobbi specifikacio adja.
-export const CORE_PLACEHOLDER = true;
+export const IS_CORE_PLACEHOLDER = true;

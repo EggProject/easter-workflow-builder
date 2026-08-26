@@ -1,11 +1,11 @@
 # SPEC-000 kiértékelés: Q1-Q12 lezárása
 
-| | |
-|---|---|
-| Dátum | 2026-08-26 |
-| Bemenet | [`2026-08-26-agent-sdk-minimax.md`](2026-08-26-agent-sdk-minimax.md) 4. szekció, [`SPEC-000`](../spec/SPEC-000-provider-wire-measurement.md), [`mérési jegyzőkönyv`](2026-08-26-spec000-meresi-jegyzokonyv.md) |
-| Kimenet | `src/providers/*.ts` képességleírók |
-| SDK | `@anthropic-ai/claude-agent-sdk@0.3.245`, CLI `cc_version=2.1.245` (a billing headerből) |
+|             |                                                                                                                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dátum       | 2026-08-26                                                                                                                                                                                                                                                      |
+| Bemenet     | [`2026-08-26-agent-sdk-minimax.md`](2026-08-26-agent-sdk-minimax.md) 4. szekció, [`SPEC-000`](../spec/SPEC-000-provider-wire-measurement.md), [`mérési jegyzőkönyv`](2026-08-26-spec000-meresi-jegyzokonyv.md)                                                  |
+| Kimenet     | `src/providers/*.ts` képességleírók                                                                                                                                                                                                                             |
+| SDK         | `@anthropic-ai/claude-agent-sdk@0.3.245`, CLI `cc_version=2.1.245` (a billing headerből)                                                                                                                                                                        |
 | Mérési alap | M-01 ... M-18: 113 rögzített proxy tranzakció, ebből 79 `POST /v1/messages` (mind HTTP 200) és 34 `HEAD /api/hello` (mind HTTP 404). M-19 ... M-25: külön munkamenet, lásd a 3. szekciót. M-26 ... M-36: harmadik munkamenet, 50 tranzakció, lásd a 6. szekciót |
 
 A jegyzőkönyv nyers megfigyeléseit nem ismétlem meg, csak hivatkozom rájuk. Ahol a jegyzőkönyvön
@@ -15,8 +15,7 @@ Lezárva mind a 12 kérdés (Q1 ... Q12). Az M-19 ... M-25 kiegészítő mérés
 kérdést (Q8, Q11) is lezárták, lásd a 3. szekciót. Az M-26 ... M-36 kör a felhasználó tényleges
 indító parancsának env változóit mérte, a 4. szekció nyitott mezői közül kettőt lezárt
 (`toolChoice.rejectionBehaviour`, `listedByModelsEndpoint`), a maradék háromnak pontosította az
-indoklását, és négy új leíró mezőt hozott be, lásd a 6. szekciót. Ami a leíróban `unknown` maradt, az nem kérdés-szintű, hanem mezőszintű hiány, a
-4. szekció sorolja fel a blokkoló megnevezésével.
+indoklását, és négy új leíró mezőt hozott be, lásd a 6. szekciót. Ami a leíróban `unknown` maradt, az nem kérdés-szintű, hanem mezőszintű hiány, a 4. szekció sorolja fel a blokkoló megnevezésével.
 
 ---
 
@@ -27,10 +26,10 @@ indoklását, és négy új leíró mezőt hozott be, lásd a 6. szekciót. Ami 
 **Válasz: mindkét alak létezik a dróton, de eltérő célra. A felhasználói `outputFormat` kliens
 oldali szintetikus toolként megy ki.**
 
-| Alak | Hol jelenik meg | Séma forrása |
-|---|---|---|
-| `tools[].name = "StructuredOutput"`, `input_schema` = a kért séma | a fő kérésben, M-02 és M-03 | az `Options.outputFormat.schema` |
-| natív `output_config.format.type = "json_schema"` | kizárólag a session cím generáló kérésben | fix `{title: string}` séma |
+| Alak                                                              | Hol jelenik meg                           | Séma forrása                     |
+| ----------------------------------------------------------------- | ----------------------------------------- | -------------------------------- |
+| `tools[].name = "StructuredOutput"`, `input_schema` = a kért séma | a fő kérésben, M-02 és M-03               | az `Options.outputFormat.schema` |
+| natív `output_config.format.type = "json_schema"`                 | kizárólag a session cím generáló kérésben | fix `{title: string}` séma       |
 
 Bizonyíték: M-02 fő kérés (`tools/wire-probe/artifacts/00006-1787706777349.json`). A tool leírása
 szó szerint: `"Use this tool to return your final response in the requested structured format. You
@@ -74,12 +73,12 @@ SDK sosem lép ki ebből a halmazból. A `toolChoice.sdkSendsForcedChoice` mező
 
 Saját ellenőrzés, `output_config` alakok eloszlása:
 
-| Alak | Darab |
-|---|---|
-| `{"effort":"high"}` | 45 |
-| `{"effort":"high","format":{...title séma...}}` | 32 |
-| `{"effort":"low"}` | 1 (M-04 a) |
-| `{"effort":"max"}` | 1 (M-04 b) |
+| Alak                                            | Darab      |
+| ----------------------------------------------- | ---------- |
+| `{"effort":"high"}`                             | 45         |
+| `{"effort":"high","format":{...title séma...}}` | 32         |
+| `{"effort":"low"}`                              | 1 (M-04 a) |
+| `{"effort":"max"}`                              | 1 (M-04 b) |
 
 Az `effort` **soha nem top-level kulcs**, mindig `output_config.effort`. Alapértéke `"high"` akkor
 is, ha a case nem állít `effort`-öt. A cím generáló kérés `effort`-je akkor is `"high"`, ha a fő
@@ -98,12 +97,12 @@ kikerülés. Ez regressziós kockázat, nem jelenlegi hiba.
 **Válasz: `{"type":"adaptive"}` bekapcsolva, és a mező teljes hiánya kikapcsolva. `budget_tokens`
 soha nem megy ki.**
 
-| Beállítás | Kimenő `thinking` | Eset |
-|---|---|---|
-| nincs explicit `thinking` (alap) | `{"type":"adaptive"}` a fő kérésben, a cím kérésben nincs | M-01 |
-| `thinking: {type:'adaptive'}` | `{"type":"adaptive"}` | M-05 |
-| `thinking: {type:'disabled'}` | a kulcs **nem megy ki** | M-06 a |
-| `MAX_THINKING_TOKENS=0` | a kulcs **nem megy ki**, plusz `context_management` is eltűnik | M-06 b, M-08 |
+| Beállítás                        | Kimenő `thinking`                                              | Eset         |
+| -------------------------------- | -------------------------------------------------------------- | ------------ |
+| nincs explicit `thinking` (alap) | `{"type":"adaptive"}` a fő kérésben, a cím kérésben nincs      | M-01         |
+| `thinking: {type:'adaptive'}`    | `{"type":"adaptive"}`                                          | M-05         |
+| `thinking: {type:'disabled'}`    | a kulcs **nem megy ki**                                        | M-06 a       |
+| `MAX_THINKING_TOKENS=0`          | a kulcs **nem megy ki**, plusz `context_management` is eltűnik | M-06 b, M-08 |
 
 Ez pontosan egyezik a hivatalos leírással: `"Set to 0 to disable thinking on the Anthropic API ...
 on third-party providers, 0 omits the thinking parameter instead"`
@@ -141,13 +140,13 @@ viszont ártalmatlan és védekezés a jövőbeli SDK viselkedésváltozás elle
 
 **Válasz: mért mátrix, M-08 és M-14 kereszt-validálva.**
 
-| Env változó | kérésszám | eltűnő body kulcs | eltűnő `anthropic-beta` elem | egyéb |
-|---|---|---|---|---|
-| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` | 2 | `context_management` | `thinking-token-count-2026-05-13`, `context-management-2025-06-27`, `prompt-caching-scope-2026-01-05` | `cache_control` marad 3 |
-| `ENABLE_TOOL_SEARCH=false` | 2 | nincs | nincs | nincs mérhető hatás |
-| `DISABLE_PROMPT_CACHING=1` | 2 | nincs | nincs | `cache_control` 3 -> 0 |
-| `MAX_THINKING_TOKENS=0` | 2 | `thinking`, `context_management` | **nincs** | aszimmetrikus pár |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | **1** | nincs | nincs | a cím kérés eltűnik, `tools` 25 -> 24 (`DesignSync` kiesik) |
+| Env változó                                  | kérésszám | eltűnő body kulcs                | eltűnő `anthropic-beta` elem                                                                          | egyéb                                                       |
+| -------------------------------------------- | --------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`   | 2         | `context_management`             | `thinking-token-count-2026-05-13`, `context-management-2025-06-27`, `prompt-caching-scope-2026-01-05` | `cache_control` marad 3                                     |
+| `ENABLE_TOOL_SEARCH=false`                   | 2         | nincs                            | nincs                                                                                                 | nincs mérhető hatás                                         |
+| `DISABLE_PROMPT_CACHING=1`                   | 2         | nincs                            | nincs                                                                                                 | `cache_control` 3 -> 0                                      |
+| `MAX_THINKING_TOKENS=0`                      | 2         | `thinking`, `context_management` | **nincs**                                                                                             | aszimmetrikus pár                                           |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | **1**     | nincs                            | nincs                                                                                                 | a cím kérés eltűnik, `tools` 25 -> 24 (`DesignSync` kiesik) |
 
 Két kiemelés:
 
@@ -195,7 +194,16 @@ Drótszintű bizonyíték (saját ellenőrzés, `tools/wire-probe/artifacts/0000
 a 3. kérés `messages` tömbje 4 elemű, az utolsó eleme szó szerint
 
 ```json
-{"role": "user", "content": [{"type": "text", "text": "Stop hook feedback:\nAz emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel.", "cache_control": {"type": "ephemeral"}}]}
+{
+  "role": "user",
+  "content": [
+    {
+      "type": "text",
+      "text": "Stop hook feedback:\nAz emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel.",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ]
+}
 ```
 
 A Claude Code tehát `Stop hook feedback:` előtaggal, `user` role-lal továbbítja a hook `reason`
@@ -217,13 +225,13 @@ tehát bizonyítottan használható, de az alapértelmezés így is az `sdk_outp
 
 **Válasz: igen, a dróton, de a suffixnek két érdemi kliens oldali hatása van.**
 
-| | `model: 'MiniMax-M3[1m]'` | `model: 'MiniMax-M3'` |
-|---|---|---|
-| wire `model` mező | `"MiniMax-M3"` | `"MiniMax-M3"` |
-| `anthropic-beta` | tartalmazza a `context-1m-2025-08-07` elemet | nem tartalmazza |
-| kliens oldali `modelUsage.contextWindow` | **1000000** | **200000** |
-| `modelUsage.maxOutputTokens` | 32000 | 32000 |
-| HTTP kód | 200 | 200 |
+|                                          | `model: 'MiniMax-M3[1m]'`                    | `model: 'MiniMax-M3'` |
+| ---------------------------------------- | -------------------------------------------- | --------------------- |
+| wire `model` mező                        | `"MiniMax-M3"`                               | `"MiniMax-M3"`        |
+| `anthropic-beta`                         | tartalmazza a `context-1m-2025-08-07` elemet | nem tartalmazza       |
+| kliens oldali `modelUsage.contextWindow` | **1000000**                                  | **200000**            |
+| `modelUsage.maxOutputTokens`             | 32000                                        | 32000                 |
+| HTTP kód                                 | 200                                          | 200                   |
 
 Saját ellenőrzés a `result` üzenet `modelUsage` mezőjéből (`M-11/a-with-suffix.sdk-messages.ndjson`
 kontra `b-without-suffix`). Ez a hivatalos leírással egyezik: `"If the ID doesn't start with
@@ -272,13 +280,13 @@ tranzakciók `message_delta.usage` objektumán. A "teljes bemeneti token" oszlop
 érték**: `usage.input_tokens` + `usage.cache_read_input_tokens`, mert a cache-ből olvasott tokenek
 is a kontextusablakot foglalják.
 
-| Töltelék karakter | `messages` karakter | HTTP | `input_tokens` | `cache_read_input_tokens` | teljes bemeneti token | karakter/token |
-|---|---|---|---|---|---|---|
-| 600 000 | 621 368 | 200 | 266 699 | 128 | 266 827 | 2,33 |
-| 1 200 000 | 1 221 368 | 200 | 1 483 | 505 344 | 506 827 | 2,41 |
-| 2 400 000 | 2 421 368 | 200 | 986 667 | 160 | 986 827 | 2,45 |
-| 2 550 000 | 2 571 368 | 200 | 61 483 | 985 344 | **1 046 827** | 2,46 |
-| 2 700 000 | - | **400** | - | - | kb. 1 108 000 (számított) | - |
+| Töltelék karakter | `messages` karakter | HTTP    | `input_tokens` | `cache_read_input_tokens` | teljes bemeneti token     | karakter/token |
+| ----------------- | ------------------- | ------- | -------------- | ------------------------- | ------------------------- | -------------- |
+| 600 000           | 621 368             | 200     | 266 699        | 128                       | 266 827                   | 2,33           |
+| 1 200 000         | 1 221 368           | 200     | 1 483          | 505 344                   | 506 827                   | 2,41           |
+| 2 400 000         | 2 421 368           | 200     | 986 667        | 160                       | 986 827                   | 2,45           |
+| 2 550 000         | 2 571 368           | 200     | 61 483         | 985 344                   | **1 046 827**             | 2,46           |
+| 2 700 000         | -                   | **400** | -              | -                         | kb. 1 108 000 (számított) | -              |
 
 Tranzakciók: `00003-1787737784634.json`, `00006-1787737788764.json`, `00009-1787737825279.json`,
 `00023-1787737855251.json`. A 400-as válasz szövege szó szerint: `"API Error: 400 invalid params,
@@ -301,11 +309,11 @@ Három számszerű következtetés:
 Max output token (M-22, saját ellenőrzés a kimenő `max_tokens` mezőn):
 
 | `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | kimenő `max_tokens` | HTTP |
-|---|---|---|
-| 4096 | 4096 | 200 |
-| 32000 | 32000 | 200 |
-| 131072 | **128000** | 200 |
-| 524288 | **128000** | 200 |
+| ------------------------------- | ------------------- | ---- |
+| 4096                            | 4096                | 200  |
+| 32000                           | 32000               | 200  |
+| 131072                          | **128000**          | 200  |
+| 524288                          | **128000**          | 200  |
 
 A vágás **kliens oldali**: a kérés HTTP 200-at kap, tehát nem a MiniMax utasítja el. A MiniMax
 dokumentált 131 072 ajánlott és 524 288 hard output korlátja ezen az SDK verzión **nem érhető el**.
@@ -319,11 +327,11 @@ valóság. A modellazonosító megválasztása és a `CLAUDE_CODE_MAX_OUTPUT_TOK
 
 **Válasz: igen, kérésfajtánként eltérő listát.**
 
-| Kérés | `anthropic-beta` elemek |
-|---|---|
+| Kérés               | `anthropic-beta` elemek                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | cím generáló (thin) | `claude-code-20250219`, `interleaved-thinking-2025-05-14`, `thinking-token-count-2026-05-13`, `context-management-2025-06-27`, `prompt-caching-scope-2026-01-05`, `mid-conversation-system-2026-04-07`, `effort-2025-11-24`, `structured-outputs-2025-12-15` |
-| fő kérés | ugyanaz, `structured-outputs-2025-12-15` nélkül |
-| `[1m]` suffixszel | mindkettő plusz `context-1m-2025-08-07` |
+| fő kérés            | ugyanaz, `structured-outputs-2025-12-15` nélkül                                                                                                                                                                                                              |
+| `[1m]` suffixszel   | mindkettő plusz `context-1m-2025-08-07`                                                                                                                                                                                                                      |
 
 `anthropic-version` minden kérésben `2023-06-01`, nem változik.
 
@@ -352,8 +360,8 @@ Az első ("thin") kérés **bizonyítottan session cím generálás**. Nem köve
 artefaktum tartalma:
 
 - system prompt: `"You are naming a coding session so the user can pick it out of a long list of
-  sessions. The title is a name for what the session is about, not a sentence describing the task:
-  a short noun phrase of two to five words..."`
+sessions. The title is a name for what the session is about, not a sentence describing the task:
+a short noun phrase of two to five words..."`
 - user üzenet: a felhasználói prompt `<session>...</session>` tagbe csomagolva
 - `output_config.format.schema`: `{title: string}`, `additionalProperties: false`
 - `tools: []`, üres tömb, de a kulcs jelen van
@@ -369,21 +377,21 @@ A minta mind a 32 cím kérésben azonos, és minden mérési esetnél megjeleni
 
 ### Amit nem tudunk
 
-| Kérdés | Státusz |
-|---|---|
-| `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` valóban leveszi-e MiniMax ellen | **igen, M-21 mérte.** 2 helyett 1 kérés megy ki. A `DesignSync` toolt viszont nem veszi le, ezért mégsem ezt a kapcsolót választjuk, lásd 5.1 |
-| miért veszi le a `NONESSENTIAL_TRAFFIC` is a cím kérést | a hivatalos leírás felsorolása (auto-update, telemetria, error reporting, `/feedback`, release notes, gateway model discovery, availability check, feature flag) **nem említi** a cím generálást. A mért hatás tehát dokumentálatlan mellékhatás |
-| indít-e az SDK más háttérhívást hosszabb sessionben | nem mértük. A `costs` doksi említ `"Conversation summarization"` háttérfeladatot a `--resume`-hoz, ez a mi 1-2 körös futásainkban nem aktiválódott |
-| miért `MiniMax-M3` a cím kérés modellje | mért tény, hogy az, de a fallback szabály nincs dokumentálva. Ha egy jövőbeli SDK verzió `claude-haiku-*` alias nevet küldene ki, a MiniMax 404-et adna |
+| Kérdés                                                                 | Státusz                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` valóban leveszi-e MiniMax ellen | **igen, M-21 mérte.** 2 helyett 1 kérés megy ki. A `DesignSync` toolt viszont nem veszi le, ezért mégsem ezt a kapcsolót választjuk, lásd 5.1                                                                                                    |
+| miért veszi le a `NONESSENTIAL_TRAFFIC` is a cím kérést                | a hivatalos leírás felsorolása (auto-update, telemetria, error reporting, `/feedback`, release notes, gateway model discovery, availability check, feature flag) **nem említi** a cím generálást. A mért hatás tehát dokumentálatlan mellékhatás |
+| indít-e az SDK más háttérhívást hosszabb sessionben                    | nem mértük. A `costs` doksi említ `"Conversation summarization"` háttérfeladatot a `--resume`-hoz, ez a mi 1-2 körös futásainkban nem aktiválódott                                                                                               |
+| miért `MiniMax-M3` a cím kérés modellje                                | mért tény, hogy az, de a fallback szabály nincs dokumentálva. Ha egy jövőbeli SDK verzió `claude-haiku-*` alias nevet küldene ki, a MiniMax 404-et adna                                                                                          |
 
 ### Kockázat
 
-| Kockázat | Mértéke a mérésből |
-|---|---|
-| **Költség** | minden `query()` +1 kérés. A 32 cím kérés mérhető input tokenje 799 körül van, output 15 körül. Egy hosszú workflow-ban lépésenként egy ilyen kérés, ez lineárisan skálázódik a lépésszámmal |
-| **Rate limit** | az M3 dokumentált limitje 200 RPM. A cím kérés **duplázza** a kérésszámot, tehát a tényleges lépés-átbocsátás a fele a névlegesnek |
+| Kockázat          | Mértéke a mérésből                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Költség**       | minden `query()` +1 kérés. A 32 cím kérés mérhető input tokenje 799 körül van, output 15 körül. Egy hosszú workflow-ban lépésenként egy ilyen kérés, ez lineárisan skálázódik a lépésszámmal                                                                                                                                        |
+| **Rate limit**    | az M3 dokumentált limitje 200 RPM. A cím kérés **duplázza** a kérésszámot, tehát a tényleges lépés-átbocsátás a fele a névlegesnek                                                                                                                                                                                                  |
 | **Hibalehetőség** | ez az egyetlen kérés, ami natív `output_config.format` mezőt küld. A MiniMax M3 ma HTTP 200-zal fogadja, de a [GitHub #28](https://github.com/MiniMax-AI/MiniMax-M2.5/issues/28) issue szerint pont ez a mező dobott 400-at. Ha a MiniMax M3-on is szigorít, **minden `query()` első kérése elhasal**, miközben a fő kérés jó lenne |
-| **Adatszivárgás** | a felhasználói prompt teljes szövege kimegy egy második kérésben is. Ha valaha nem ugyanaz a provider szolgálja ki a háttérhívást, a prompt egy másik szolgáltatóhoz kerülne |
+| **Adatszivárgás** | a felhasználói prompt teljes szövege kimegy egy második kérésben is. Ha valaha nem ugyanaz a provider szolgálja ki a háttérhívást, a prompt egy másik szolgáltatóhoz kerülne                                                                                                                                                        |
 
 A hibalehetőség és a rate limit együtt indokolja, hogy a cím kérést a `minimax` providernél
 alapból kikapcsoljuk.
@@ -433,11 +441,11 @@ toollal. A `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ugyanezt az 1 kérést h
 `00030-1787706928603.json` (M-08 `NONESSENTIAL_TRAFFIC`) kontra `00003-1787706771598.json`
 (M-01 alap). Saját ellenőrzés, `message_delta.usage.input_tokens`:
 
-| Futás | `tools` hossz | hiányzó tool | `input_tokens` |
-|---|---|---|---|
-| M-01 alap | 25 | - | 26 339 |
-| M-21 `DISABLE_TERMINAL_TITLE=1` | 25 | - | 26 693 |
-| M-08 `DISABLE_NONESSENTIAL_TRAFFIC=1` | 24 | `DesignSync` | 24 022 |
+| Futás                                 | `tools` hossz | hiányzó tool | `input_tokens` |
+| ------------------------------------- | ------------- | ------------ | -------------- |
+| M-01 alap                             | 25            | -            | 26 339         |
+| M-21 `DISABLE_TERMINAL_TITLE=1`       | 25            | -            | 26 693         |
+| M-08 `DISABLE_NONESSENTIAL_TRAFFIC=1` | 24            | `DesignSync` | 24 022         |
 
 **Mi az a `DesignSync`?** Saját ellenőrzés a tool leírásán (`00002-1787737359743.json`,
 `tools[]`, `name: "DesignSync"`, 3 724 karakteres `description`): a tool a felhasználó
@@ -489,7 +497,10 @@ HTTP 200.
 `messages[0].content` tömbjén: **3 elemű**, és a harmadik eleme
 
 ```json
-{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8x..."}}
+{
+  "type": "image",
+  "source": { "type": "base64", "media_type": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8x..." }
+}
 ```
 
 1 136 karakteres base64 adattal. A base64 dekódolva 851 bájt, érvényes PNG aláírással, az IHDR
@@ -570,13 +581,13 @@ listából kettőt lezárt: a `toolChoice.rejectionBehaviour` mezőt az M-34 (`k
 Mindkettőt SDK-n kívüli, közvetlen HTTP hívás zárta le, tehát a korábbi "a SPEC-000 hatókörén
 kívül" indoklás megszűnt: a spec 4. szekciója az M-34 és M-35 esetekkel bővült.
 
-| Leíró mező | Mi hiányzik pontosan | Miért nem pótolható a jelenlegi eszközzel |
-|---|---|---|
-| `promptCaching.mode` | annak eldöntése, hogy az explicit `cache_control` breakpointoknak van-e a jelentett `cache_read_input_tokens` értékben megjelenő önálló hatásuk. Az implicit olvasás (M-15 c) és a cache írás (M-20 8. probe) igazolt, a kettő szétválasztása nem | a szolgáltatás egyetlen mért válaszban sem küld `cache_creation_input_tokens` mezőt, az SDK `Options` típusa pedig nem enged `stream: false` kérést (M-24), tehát nincs olyan `usage` objektum, amiben a cache írás külön látszana. Az M-33 a hívó fél saját töréspontjával sem tudta szétválasztani a két módot: a `cache_read` mind a három futásban 128 |
-| `models[MiniMax-M3].videoInput` | egy kimenő videó content blokk és a rá adott válasz | a blokkoló a telepített SDK típusfelülete, nem a szolgáltatás: a `ContentBlockParam` unióban nincs videó variáns, az `ImageBlockParam.source.media_type` pedig zárt unió, és a projekt tiltja az `any` és `as` használatát (6.12). Lezárná: egy videó variánst is tartalmazó SDK verzió és az arra épített, M-23 mintájú mérés |
-| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` | egy 429-es válasz és a hozzá tartozó headerek | két független körben (M-18: 113 tranzakció, M-36: 50 tranzakció) nulla 429 és nulla 5xx keletkezett. Szándékos rate limit kimerítést **nem végzünk**, ez döntés, nem hiány |
-| `claude-subscription` minden drótszintű mezője | drótszintű mérés a first-party úton | a SPEC-000 1. szekciója szerint ez a provider nincs hatókörben: first-party base URL-t és bejelentkezésen alapuló hitelesítést használ, a logoló proxy nem iktatható be |
-| `claude-subscription` `models[claude-opus-5].clientModelIdentifier` | az, hogy a puszta azonosító vagy a `[1m]` suffixes alak adja-e a leíróban szereplő 1M ablakot | az Opus 1M ablaka előfizetés függő (Max, Team és Enterprise csomagon automatikus, Pro csomagon usage credit kell), tehát a válasz fiókfüggő, és first-party úton nem mértük a kliens által feltételezett `contextWindow` értéket |
+| Leíró mező                                                          | Mi hiányzik pontosan                                                                                                                                                                                                                              | Miért nem pótolható a jelenlegi eszközzel                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `promptCaching.mode`                                                | annak eldöntése, hogy az explicit `cache_control` breakpointoknak van-e a jelentett `cache_read_input_tokens` értékben megjelenő önálló hatásuk. Az implicit olvasás (M-15 c) és a cache írás (M-20 8. probe) igazolt, a kettő szétválasztása nem | a szolgáltatás egyetlen mért válaszban sem küld `cache_creation_input_tokens` mezőt, az SDK `Options` típusa pedig nem enged `stream: false` kérést (M-24), tehát nincs olyan `usage` objektum, amiben a cache írás külön látszana. Az M-33 a hívó fél saját töréspontjával sem tudta szétválasztani a két módot: a `cache_read` mind a három futásban 128 |
+| `models[MiniMax-M3].videoInput`                                     | egy kimenő videó content blokk és a rá adott válasz                                                                                                                                                                                               | a blokkoló a telepített SDK típusfelülete, nem a szolgáltatás: a `ContentBlockParam` unióban nincs videó variáns, az `ImageBlockParam.source.media_type` pedig zárt unió, és a projekt tiltja az `any` és `as` használatát (6.12). Lezárná: egy videó variánst is tartalmazó SDK verzió és az arra épített, M-23 mintájú mérés                             |
+| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders`        | egy 429-es válasz és a hozzá tartozó headerek                                                                                                                                                                                                     | két független körben (M-18: 113 tranzakció, M-36: 50 tranzakció) nulla 429 és nulla 5xx keletkezett. Szándékos rate limit kimerítést **nem végzünk**, ez döntés, nem hiány                                                                                                                                                                                 |
+| `claude-subscription` minden drótszintű mezője                      | drótszintű mérés a first-party úton                                                                                                                                                                                                               | a SPEC-000 1. szekciója szerint ez a provider nincs hatókörben: first-party base URL-t és bejelentkezésen alapuló hitelesítést használ, a logoló proxy nem iktatható be                                                                                                                                                                                    |
+| `claude-subscription` `models[claude-opus-5].clientModelIdentifier` | az, hogy a puszta azonosító vagy a `[1m]` suffixes alak adja-e a leíróban szereplő 1M ablakot                                                                                                                                                     | az Opus 1M ablaka előfizetés függő (Max, Team és Enterprise csomagon automatikus, Pro csomagon usage credit kell), tehát a válasz fiókfüggő, és first-party úton nem mértük a kliens által feltételezett `contextWindow` értéket                                                                                                                           |
 
 Három olyan tétel, ami nem leíró mező, de nyitva maradt, és a jövőbeli regressziónál számít:
 
@@ -600,35 +611,34 @@ Három olyan tétel, ami nem leíró mező, de nyitva maradt, és a jövőbeli r
 
 **Ez a végleges env blokk.** Az M-26 ... M-36 kör a felhasználó indító parancsának mind a 12
 változóját megmérte, és **egyetlen új változót sem tett kötelezővé**: amelyiknek volt mérhető
-hatása, az vagy már bent volt, vagy a hatása nem indokolja a beállítást. A körönkénti indoklás a
-6. szekcióban áll, az összesítés az alábbi második táblázatban.
+hatása, az vagy már bent volt, vagy a hatása nem indokolja a beállítást. A körönkénti indoklás a 6. szekcióban áll, az összesítés az alábbi második táblázatban.
 
-| Változó | Érték | Miért | Bizonyíték |
-|---|---|---|---|
-| `ANTHROPIC_BASE_URL` | `https://api.minimax.io/anthropic` | endpoint | research 2. szekció |
-| `ANTHROPIC_AUTH_TOKEN` | `MINIMAX_API_KEY` process env átvétel, **csak a NÉV perzisztálódik** | auth | research 2. és 3. szekció |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | levette a session cím generáló kérést, ezzel felezi a kérésszámot és megszünteti az egyetlen natív `output_config.format` kockázatot, **ezen felül a `DesignSync` toolt is**. A hivatalos felsorolás szerint a "gateway model discovery" letiltása is idetartozik, ami egybevág azzal, hogy a mérés alatt egyetlen `GET /v1/models` sem ment ki az SDK-tól (M-12, M-36) | M-07 b, M-08, M-21, M-35 |
-| `DISABLE_PROMPT_CACHING` | **nem állítjuk be** | a `cache_control` blokkok kimennek és a MiniMax fogadja őket, a cache olcsóbbá teszi a hosszú workflow-t. Az M-33 óta azt is tudjuk, hogy a kapcsoló amúgy sem venné le a saját, kézzel rakott töréspontjainkat, csak az SDK sajátjait | M-08, M-15, M-20, M-33 |
+| Változó                                    | Érték                                                                | Miért                                                                                                                                                                                                                                                                                                                                                                   | Bizonyíték                |
+| ------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `ANTHROPIC_BASE_URL`                       | `https://api.minimax.io/anthropic`                                   | endpoint                                                                                                                                                                                                                                                                                                                                                                | research 2. szekció       |
+| `ANTHROPIC_AUTH_TOKEN`                     | `MINIMAX_API_KEY` process env átvétel, **csak a NÉV perzisztálódik** | auth                                                                                                                                                                                                                                                                                                                                                                    | research 2. és 3. szekció |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1`                                                                  | levette a session cím generáló kérést, ezzel felezi a kérésszámot és megszünteti az egyetlen natív `output_config.format` kockázatot, **ezen felül a `DesignSync` toolt is**. A hivatalos felsorolás szerint a "gateway model discovery" letiltása is idetartozik, ami egybevág azzal, hogy a mérés alatt egyetlen `GET /v1/models` sem ment ki az SDK-tól (M-12, M-36) | M-07 b, M-08, M-21, M-35  |
+| `DISABLE_PROMPT_CACHING`                   | **nem állítjuk be**                                                  | a `cache_control` blokkok kimennek és a MiniMax fogadja őket, a cache olcsóbbá teszi a hosszú workflow-t. Az M-33 óta azt is tudjuk, hogy a kapcsoló amúgy sem venné le a saját, kézzel rakott töréspontjainkat, csak az SDK sajátjait                                                                                                                                  | M-08, M-15, M-20, M-33    |
 
 Modellazonosító, nem env változó, de a config blokk része: `Options.model` értéke
 `MiniMax-M3[1m]` (lásd lent és 6.4). A dróton ebből `MiniMax-M3` lesz.
 
 **A felhasználó indító parancsának 12 változója, mezőnként, a mi döntésünkkel:**
 
-| Változó | Mért hatás | Döntés és indok |
-|---|---|---|
-| `ANTHROPIC_BASE_URL` | endpoint | **kell**, ez a provider definíciója |
-| `ANTHROPIC_AUTH_TOKEN` | auth | **kell**, csak a név perzisztálódik |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | 2 kérés helyett 1, `tools` 25 helyett 24 (M-08, M-21, M-32) | **kell**, lásd fent |
-| `ANTHROPIC_MODEL=MiniMax-M3[1m]` | a kliens ebből is feloldja a modellt, `Options.model` nélkül is, a suffix ugyanúgy hat (M-32) | **nem kell**, mert az `Options.model` utat használjuk: a lépés szintű modellfelülírás így hívási paraméter, nem env manipuláció. Az M-32 igazolja, hogy az env út is járható, ha valaha kell |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` | a dróton alias modellnév egyszer sem jelent meg (M-05, M-07, M-29) | **nem kell**, a fallback a session modelljére esik. Beállításuk ártalmatlan, védekezés jövőbeli SDK viselkedésváltozás ellen |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3` | a háttérkérésből kimarad a `context-1m-2025-08-07` header, ha itt suffix nélküli az azonosító (M-29) | **nem kell**, mert a háttérkérést a `NONESSENTIAL_TRAFFIC` kapcsoló amúgy is levágja. Ha valaki mégis beállítja, suffixszel tegye, különben a két kérés eltérő ablak feltételezéssel fut |
-| `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1` | **semmilyen drótszintű eltérés**, a body bájtazonos (M-26) | **nem kell**, hatástalan ezen a kliensverzión, M3 ellen (6.1) |
-| `CLAUDE_CODE_DISABLE_FAST_MODE=1` | drótszinten semmi, kliens oldalon sűrűbb `SDKMessage` folyam (M-27) | **nem kell**, drótszintű hatása nincs (6.2) |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50` | nem figyelhető meg, a session meg sem közelítette a küszöböt (M-28) | **nem kell**, mérhető hatás nélkül nem állítunk be értéket (6.3) |
-| `CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000` | ugyanaz, a `contextWindow: 1000000` a `[1m]` suffixből jön, nem ebből (M-28) | **nem kell**, a kontextusablakot a modellazonosító állítja (6.3) |
-| `API_TIMEOUT_MS=3000000` | `x-stainless-timeout` 600 helyett 3000 (M-30) | **nem kell**, nincs mérés a 10 perces alapérték elégtelenségéről, és megalapozatlan értéket nem javaslunk (6.5) |
-| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3` | a korlát tartott, a kimenő kérésszám csúcsa 4 (M-31) | **nem kell a provider blokkban**, mert nem provider tulajdonság: a workflow motor párhuzamosság kezeléséhez tartozik (5.6) |
+| Változó                                                          | Mért hatás                                                                                           | Döntés és indok                                                                                                                                                                              |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_BASE_URL`                                             | endpoint                                                                                             | **kell**, ez a provider definíciója                                                                                                                                                          |
+| `ANTHROPIC_AUTH_TOKEN`                                           | auth                                                                                                 | **kell**, csak a név perzisztálódik                                                                                                                                                          |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`                     | 2 kérés helyett 1, `tools` 25 helyett 24 (M-08, M-21, M-32)                                          | **kell**, lásd fent                                                                                                                                                                          |
+| `ANTHROPIC_MODEL=MiniMax-M3[1m]`                                 | a kliens ebből is feloldja a modellt, `Options.model` nélkül is, a suffix ugyanúgy hat (M-32)        | **nem kell**, mert az `Options.model` utat használjuk: a lépés szintű modellfelülírás így hívási paraméter, nem env manipuláció. Az M-32 igazolja, hogy az env út is járható, ha valaha kell |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` | a dróton alias modellnév egyszer sem jelent meg (M-05, M-07, M-29)                                   | **nem kell**, a fallback a session modelljére esik. Beállításuk ártalmatlan, védekezés jövőbeli SDK viselkedésváltozás ellen                                                                 |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3`                       | a háttérkérésből kimarad a `context-1m-2025-08-07` header, ha itt suffix nélküli az azonosító (M-29) | **nem kell**, mert a háttérkérést a `NONESSENTIAL_TRAFFIC` kapcsoló amúgy is levágja. Ha valaki mégis beállítja, suffixszel tegye, különben a két kérés eltérő ablak feltételezéssel fut     |
+| `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1`                             | **semmilyen drótszintű eltérés**, a body bájtazonos (M-26)                                           | **nem kell**, hatástalan ezen a kliensverzión, M3 ellen (6.1)                                                                                                                                |
+| `CLAUDE_CODE_DISABLE_FAST_MODE=1`                                | drótszinten semmi, kliens oldalon sűrűbb `SDKMessage` folyam (M-27)                                  | **nem kell**, drótszintű hatása nincs (6.2)                                                                                                                                                  |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50`                             | nem figyelhető meg, a session meg sem közelítette a küszöböt (M-28)                                  | **nem kell**, mérhető hatás nélkül nem állítunk be értéket (6.3)                                                                                                                             |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000`                        | ugyanaz, a `contextWindow: 1000000` a `[1m]` suffixből jön, nem ebből (M-28)                         | **nem kell**, a kontextusablakot a modellazonosító állítja (6.3)                                                                                                                             |
+| `API_TIMEOUT_MS=3000000`                                         | `x-stainless-timeout` 600 helyett 3000 (M-30)                                                        | **nem kell**, nincs mérés a 10 perces alapérték elégtelenségéről, és megalapozatlan értéket nem javaslunk (6.5)                                                                              |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3`                         | a korlát tartott, a kimenő kérésszám csúcsa 4 (M-31)                                                 | **nem kell a provider blokkban**, mert nem provider tulajdonság: a workflow motor párhuzamosság kezeléséhez tartozik (5.6)                                                                   |
 
 **Az env blokk végső döntése: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, nem
 `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`.** A célzottabb kapcsoló ugyanazt az egy hatást adja
@@ -671,7 +681,7 @@ azt mérés nélkül nem vezetjük be.
   alapértéke. Ha egy lépésnek hosszú kimenet kell, a mérésből az adódik, hogy **128 000 fölé nincs
   értelme állítani**: 131 072 és 524 288 egyaránt 128 000-re vágódik a dróton (M-22). Ez nem
   ingyenes: a hivatalos leírás szerint `"Increasing this value reduces the effective context
-  window available before auto-compaction triggers"`
+window available before auto-compaction triggers"`
   (https://code.claude.com/docs/en/env-vars), tehát a nagyobb output a kontextusablakból vesz el.
 - Alias feloldó változók (`ANTHROPIC_DEFAULT_HAIKU_MODEL` stb.): nem kötelezőek, mert a dróton
   soha nem jelent meg alias név. Ha mégis beállítja valaki, a suffixet ott is tartani kell (M-29).
@@ -690,14 +700,14 @@ azt mérés nélkül nem vezetjük be.
 
 **Mindkét stratégia bizonyítottan használható. Az alapértelmezés így is `sdk_output_format`.**
 
-| | `sdk_output_format` | `emit_output_tool` |
-|---|---|---|
-| végigfutott MiniMax ellen | **igen**, M-03, `subtype: success`, kitöltött `structured_output` | **igen**, M-19, 10/10 futás `success` |
-| kikényszerítés bizonyított | nem is kell, a tool leírása elég | **igen**, M-19: 10/10 futásban aktiválódott a `decision: "block"` ág |
-| megfigyelt körszám | `num_turns: 4` (M-03) | `num_turns: 3`, ebből 1 kör kizárólag a hook blokkolása (M-19 kontra M-10 2 köre) |
-| kényszerített `tool_choice` kimegy-e | nem, 79/79 kérésben | nem releváns |
-| séma validáció | az SDK végzi, `error_max_structured_output_retries` result subtype létezik | saját kód |
-| `role: "system"` kockázat | nem érinti | nem érinti: a hook `reason` szövege `role: "user"` üzenetként megy ki (M-19) |
+|                                      | `sdk_output_format`                                                        | `emit_output_tool`                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| végigfutott MiniMax ellen            | **igen**, M-03, `subtype: success`, kitöltött `structured_output`          | **igen**, M-19, 10/10 futás `success`                                             |
+| kikényszerítés bizonyított           | nem is kell, a tool leírása elég                                           | **igen**, M-19: 10/10 futásban aktiválódott a `decision: "block"` ág              |
+| megfigyelt körszám                   | `num_turns: 4` (M-03)                                                      | `num_turns: 3`, ebből 1 kör kizárólag a hook blokkolása (M-19 kontra M-10 2 köre) |
+| kényszerített `tool_choice` kimegy-e | nem, 79/79 kérésben                                                        | nem releváns                                                                      |
+| séma validáció                       | az SDK végzi, `error_max_structured_output_retries` result subtype létezik | saját kód                                                                         |
+| `role: "system"` kockázat            | nem érinti                                                                 | nem érinti: a hook `reason` szövege `role: "user"` üzenetként megy ki (M-19)      |
 
 **A saját `emit_output` stratégia mostantól bizonyított**, a leíróban `usable: known true`,
 `observedRoundTrips: known [3]`. Az alapértelmezés mégis az `sdk_output_format` marad, három
@@ -726,16 +736,16 @@ mezőtől független; és az SDK frissítési regressziónak explicit módon ell
 
 ### 5.3 Letiltandó UI vezérlők a `minimax` provider választásakor
 
-| Vezérlő | Miért |
-|---|---|
-| `tool_choice` `any` és `tool` opció | a MiniMax ezt az értéket **csendben eldobja**, nem utasítja el: HTTP 200 jön, `tool_use` blokk nélkül (M-34, 6.9). Emiatt a tiltás **szigorúbban indokolt**, mint korábban gondoltuk: nincs hibaüzenet, ami a felhasználót figyelmeztetné, a kényszerítés egyszerűen nem történik meg |
-| `thinking` fix budget (`budget_tokens`) | a MiniMax sémájában nincs ilyen kulcs, az SDK sem küldi. Csak `adaptive` és `disabled` maradhat |
-| `WebSearch` tool engedélyezése | **kritikus**, lásd 5.4 |
-| modell-lista **az SDK-n keresztül** | az SDK nem hívja a `GET /v1/models` útvonalat (M-12, M-36), a `supportedModels()` pedig helyi Claude Code konfigurációt ad vissza. A lista a config fájlból jön, és saját HTTP hívással ellenőrizhető (M-35, 6.10) |
-| kép csatolás | **véglegesen letiltva.** Az M-23 bizonyította, hogy a kép content blokk kimegy a dróton (256x256 piros PNG, 1 136 karakteres base64), a szolgáltatás HTTP 200-at ad, a modell mégis azt állítja, hogy nincs kép. Nem figyelmeztetés kell, hanem tiltás: a felhasználó máskülönben azt hinné, hogy a modell látta a képet |
-| max output token 128 000 fölé | a kliens úgyis 128 000-re vágja (M-22). A UI ne engedjen olyan értéket beállítani, ami csendben elvész |
-| kép csatolás (ismétlés a teljesség kedvéért) | lásd fent, M-23 |
-| videó csatolás | nincs is ilyen vezérlő: az SDK típusfelületéből videó content blokk nem állítható elő (6.12) |
+| Vezérlő                                      | Miért                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tool_choice` `any` és `tool` opció          | a MiniMax ezt az értéket **csendben eldobja**, nem utasítja el: HTTP 200 jön, `tool_use` blokk nélkül (M-34, 6.9). Emiatt a tiltás **szigorúbban indokolt**, mint korábban gondoltuk: nincs hibaüzenet, ami a felhasználót figyelmeztetné, a kényszerítés egyszerűen nem történik meg                                    |
+| `thinking` fix budget (`budget_tokens`)      | a MiniMax sémájában nincs ilyen kulcs, az SDK sem küldi. Csak `adaptive` és `disabled` maradhat                                                                                                                                                                                                                          |
+| `WebSearch` tool engedélyezése               | **kritikus**, lásd 5.4                                                                                                                                                                                                                                                                                                   |
+| modell-lista **az SDK-n keresztül**          | az SDK nem hívja a `GET /v1/models` útvonalat (M-12, M-36), a `supportedModels()` pedig helyi Claude Code konfigurációt ad vissza. A lista a config fájlból jön, és saját HTTP hívással ellenőrizhető (M-35, 6.10)                                                                                                       |
+| kép csatolás                                 | **véglegesen letiltva.** Az M-23 bizonyította, hogy a kép content blokk kimegy a dróton (256x256 piros PNG, 1 136 karakteres base64), a szolgáltatás HTTP 200-at ad, a modell mégis azt állítja, hogy nincs kép. Nem figyelmeztetés kell, hanem tiltás: a felhasználó máskülönben azt hinné, hogy a modell látta a képet |
+| max output token 128 000 fölé                | a kliens úgyis 128 000-re vágja (M-22). A UI ne engedjen olyan értéket beállítani, ami csendben elvész                                                                                                                                                                                                                   |
+| kép csatolás (ismétlés a teljesség kedvéért) | lásd fent, M-23                                                                                                                                                                                                                                                                                                          |
+| videó csatolás                               | nincs is ilyen vezérlő: az SDK típusfelületéből videó content blokk nem állítható elő (6.12)                                                                                                                                                                                                                             |
 
 **Amit kifejezetten NEM tiltunk le: az `effort` vezérlőt.** A korábbi óvatosság alapja az volt,
 hogy az `output_config` mező 400-at okozhat. Az M-04 szerint `low` és `max` értékkel egyaránt
@@ -935,10 +945,10 @@ Claude model, Claude Code assumes a 1M window for it"` (https://code.claude.com/
 
 **Tervezési következmény:** a config rétegnek **két külön azonosítót** kell hordoznia:
 
-| Mező | Érték | Hol jelenik meg |
-|---|---|---|
-| wire azonosító (`models[].id`) | `MiniMax-M3` | a kimenő body `model` mezője, és a `GET /v1/models` lista eleme (M-35) |
-| kliensnek átadott azonosító (`models[].clientModelIdentifier`) | `MiniMax-M3[1m]` | `Options.model` (M-11) vagy `ANTHROPIC_MODEL` (M-32) |
+| Mező                                                           | Érték            | Hol jelenik meg                                                        |
+| -------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| wire azonosító (`models[].id`)                                 | `MiniMax-M3`     | a kimenő body `model` mezője, és a `GET /v1/models` lista eleme (M-35) |
+| kliensnek átadott azonosító (`models[].clientModelIdentifier`) | `MiniMax-M3[1m]` | `Options.model` (M-11) vagy `ANTHROPIC_MODEL` (M-32)                   |
 
 Válasz a feltett kérdésre: **igen, a config rétegnek a suffixes alakot kell használnia**, de csak
 azon a felületen, amit a kliensnek ad át. A leíróba ezért került be a `models[].clientModelIdentifier`

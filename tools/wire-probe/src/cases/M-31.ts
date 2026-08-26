@@ -5,7 +5,7 @@
  * /v1/messages kérés megy ki a proxyn a cap alatt.
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { CaseContext, MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
@@ -39,11 +39,62 @@ interface Interval {
   readonly endMs: number;
 }
 
-/** A proxy artifacts/*.json tranzakcióinak POST .../v1/messages időintervallumai a megadott ablakban. */
-function readMessageIntervalsInWindow(artifactsDir: string, windowStartMs: number, windowEndMs: number): Interval[] {
+interface ParsedTransactionTiming {
+  readonly timestampMs: number;
+  readonly durationMs: number;
+  readonly method: string;
+  readonly requestPath: string;
+}
+
+/**
+Egy proxy artifacts/*.json tranzakció fájl időzítés-adatainak beolvasása; `undefined`, ha nem elemezhető.
+*/
+function parseTransactionTiming(fullPath: string): ParsedTransactionTiming | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(fullPath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) {
+    return undefined;
+  }
+  const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : NaN;
+  const durationMs = typeof parsed['durationMs'] === 'number' ? parsed['durationMs'] : 0;
+  const requestPath = typeof parsed['path'] === 'string' ? parsed['path'] : '';
+  const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
+  return { timestampMs, durationMs, method, requestPath };
+}
+
+/**
+A tranzakció a mérési ablakba esik-e (1s tolerancia), és POST .../v1/messages hívás-e.
+*/
+function isMessagesRequestInWindow(
+  timing: ParsedTransactionTiming,
+  windowStartMs: number,
+  windowEndMs: number,
+): boolean {
+  if (
+    Number.isNaN(timing.timestampMs) ||
+    timing.timestampMs < windowStartMs - 1000 ||
+    timing.timestampMs > windowEndMs + 1000
+  ) {
+    return false;
+  }
+  return timing.method === 'POST' && timing.requestPath.endsWith('/v1/messages');
+}
+
+/**
+A proxy artifacts/*.json tranzakcióinak POST .../v1/messages időintervallumai a megadott ablakban.
+*/
+function readMessageIntervalsInWindow(
+  artifactsDirectory: string,
+  windowStartMs: number,
+  windowEndMs: number,
+): Interval[] {
   let entries: string[];
   try {
-    entries = readdirSync(artifactsDir);
+    entries = readdirSync(artifactsDirectory);
   } catch {
     return [];
   }
@@ -52,33 +103,20 @@ function readMessageIntervalsInWindow(artifactsDir: string, windowStartMs: numbe
     if (!entry.endsWith('.json')) {
       continue;
     }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(join(artifactsDir, entry), 'utf8'));
-    } catch {
+    const timing = parseTransactionTiming(path.join(artifactsDirectory, entry));
+    if (timing === undefined || !isMessagesRequestInWindow(timing, windowStartMs, windowEndMs)) {
       continue;
     }
-    if (!isRecord(parsed)) {
-      continue;
-    }
-    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
-    const durationMs = typeof parsed['durationMs'] === 'number' ? parsed['durationMs'] : 0;
-    const path = typeof parsed['path'] === 'string' ? parsed['path'] : '';
-    const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
-    if (Number.isNaN(timestampMs) || timestampMs < windowStartMs - 1000 || timestampMs > windowEndMs + 1000) {
-      continue;
-    }
-    if (method !== 'POST' || !path.endsWith('/v1/messages')) {
-      continue;
-    }
-    result.push({ startMs: timestampMs, endMs: timestampMs + durationMs });
+    result.push({ startMs: timing.timestampMs, endMs: timing.timestampMs + timing.durationMs });
   }
   return result;
 }
 
-/** Sweep-line: a legtöbb egyidejűleg nyitva lévő intervallum száma. */
+/**
+Sweep-line: a legtöbb egyidejűleg nyitva lévő intervallum száma.
+*/
 function maxOverlap(intervals: readonly Interval[]): number {
-  const events: Array<[number, 1 | -1]> = [];
+  const events: [number, 1 | -1][] = [];
   for (const iv of intervals) {
     events.push([iv.startMs, 1], [iv.endMs, -1]);
   }
@@ -96,11 +134,11 @@ export const M31: MeasurementCase = {
   id: 'M-31',
   title: 'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS konkurrens subagentekkel',
   question: 'user env: CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
-  async run(ctx: CaseContext) {
-    const base = buildBaseOptions(ctx);
+  async run(context: CaseContext) {
+    const base = buildBaseOptions(context);
     const startedAtMs = Date.now();
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-31',
       runId: 'a',
       prompt: PROMPT,
@@ -115,8 +153,8 @@ export const M31: MeasurementCase = {
       timeoutMs: 3 * 60_000,
     });
     const endedAtMs = Date.now();
-    const artifactsDir = join(ctx.outDir, '..');
-    const intervals = readMessageIntervalsInWindow(artifactsDir, startedAtMs, endedAtMs);
+    const artifactsDirectory = path.join(context.outDir, '..');
+    const intervals = readMessageIntervalsInWindow(artifactsDirectory, startedAtMs, endedAtMs);
     const maxConcurrent = maxOverlap(intervals);
     return [
       outcome,

@@ -11,11 +11,17 @@ export const M26: MeasurementCase = {
   id: 'M-26',
   title: 'CLAUDE_CODE_ALWAYS_ENABLE_EFFORT hatása',
   question: 'user env: CLAUDE_CODE_ALWAYS_ENABLE_EFFORT',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
-    const a = await executeQuery({ ctx, caseId: 'M-26', runId: 'a-base', prompt: DEFAULT_PROMPT, options: base });
+  async run(context) {
+    const base = buildBaseOptions(context);
+    const a = await executeQuery({
+      ctx: context,
+      caseId: 'M-26',
+      runId: 'a-base',
+      prompt: DEFAULT_PROMPT,
+      options: base,
+    });
     const b = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-26',
       runId: 'b-always-enable-effort',
       prompt: DEFAULT_PROMPT,

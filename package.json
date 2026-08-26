@@ -4,22 +4,33 @@
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.0",
-  "workspaces": ["apps/*", "packages/*", "tooling/*", "tools/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tooling/*",
+    "tools/*"
+  ],
   "engines": {
     "node": ">=26.0.0"
   },
   "scripts": {
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
-    "format:check": "turbo run format:check",
-    "test": "turbo run test",
+    "build": "bash tooling/scripts/build.sh",
+    "typecheck": "bash tooling/scripts/typecheck.sh",
+    "lint": "bash tooling/scripts/lint.sh",
+    "format": "bash tooling/scripts/format.sh --write",
+    "format:check": "prettier --check .",
+    "test": "bash tooling/scripts/test.sh",
     "test:e2e": "turbo run test:e2e",
     "dev": "turbo run dev"
   },
   "devDependencies": {
     "typescript": "6.0.3",
     "turbo": "2.10.12",
-    "@types/node": "^26.0.0"
+    "@types/node": "^26.0.0",
+    "eslint": "10.9.1",
+    "eslint-config": "workspace:*",
+    "eslint-config-prettier": "10.1.8",
+    "jiti": "2.7.0",
+    "prettier": "3.9.6"
   }
 }

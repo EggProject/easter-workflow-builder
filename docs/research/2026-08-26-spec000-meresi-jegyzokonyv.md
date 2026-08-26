@@ -18,15 +18,15 @@ Beállítás: nincs eltérés, referencia futás. Kimenetel: 2 db `POST /v1/mess
 
 Egy `query()` hívás alatt **két** különálló `POST /v1/messages` ment ki, eltérő body-val:
 
-| | 1. kérés (`00002-...json`) | 2. kérés (`00003-...json`) |
-|---|---|---|
-| top-level kulcsok | `model, messages, system, tools, metadata, max_tokens, output_config, stream` | `model, messages, system, tools, metadata, max_tokens, thinking, context_management, output_config, stream` |
-| `tools` tömb hossza | 0 (üres tömb, de a kulcs jelen van) | 25, mind `name` mezővel, egyik elemnek sincs `type` mezője a wire-en |
-| `output_config` | `{"effort":"high","format":{"type":"json_schema","schema":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"],"additionalProperties":false}}}` | `{"effort":"high"}` |
-| `thinking` | nincs jelen | `{"type":"adaptive"}` |
-| `anthropic-beta` (8 vs 7 elem) | `claude-code-20250219, interleaved-thinking-2025-05-14, thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05, mid-conversation-system-2026-04-07, effort-2025-11-24, structured-outputs-2025-12-15` | ugyanaz, `structured-outputs-2025-12-15` nélkül |
-| `anthropic-version` | `2023-06-01` | `2023-06-01` |
-| HTTP kód | 200 | 200 |
+|                                | 1. kérés (`00002-...json`)                                                                                                                                                                                                                     | 2. kérés (`00003-...json`)                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| top-level kulcsok              | `model, messages, system, tools, metadata, max_tokens, output_config, stream`                                                                                                                                                                  | `model, messages, system, tools, metadata, max_tokens, thinking, context_management, output_config, stream` |
+| `tools` tömb hossza            | 0 (üres tömb, de a kulcs jelen van)                                                                                                                                                                                                            | 25, mind `name` mezővel, egyik elemnek sincs `type` mezője a wire-en                                        |
+| `output_config`                | `{"effort":"high","format":{"type":"json_schema","schema":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"],"additionalProperties":false}}}`                                                                      | `{"effort":"high"}`                                                                                         |
+| `thinking`                     | nincs jelen                                                                                                                                                                                                                                    | `{"type":"adaptive"}`                                                                                       |
+| `anthropic-beta` (8 vs 7 elem) | `claude-code-20250219, interleaved-thinking-2025-05-14, thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05, mid-conversation-system-2026-04-07, effort-2025-11-24, structured-outputs-2025-12-15` | ugyanaz, `structured-outputs-2025-12-15` nélkül                                                             |
+| `anthropic-version`            | `2023-06-01`                                                                                                                                                                                                                                   | `2023-06-01`                                                                                                |
+| HTTP kód                       | 200                                                                                                                                                                                                                                            | 200                                                                                                         |
 
 Nincs jelen egyik kérésben sem: `effort` (top-level), `tool_choice`, `container`, `top_k`, `stop_sequences`, `mcp_servers`. `output_config` **mindkét** kérésben jelen van, annak ellenére, hogy az M-01 case nem állít be sem `outputFormat`-ot, sem `effort`-öt.
 
@@ -60,10 +60,10 @@ Beállítás: (a) `effort: 'low'`, (b) `effort: 'max'`, `outputFormat` nélkül.
 
 Egyik kérésben sem jelenik meg `effort` top-level body kulcsként. Az 1. (thin) kérésben mindkét futásnál a szokásos `title`-sémás `output_config` megy ki (`effort` benne mindig `"high"`, függetlenül a case-ben beállított `effort` értéktől). A 2. (fő) kérésben:
 
-| Futás | 2. kérés `output_config` |
-|---|---|
-| a (`effort: 'low'`) | `{"effort":"low"}` |
-| b (`effort: 'max'`) | `{"effort":"max"}` |
+| Futás               | 2. kérés `output_config` |
+| ------------------- | ------------------------ |
+| a (`effort: 'low'`) | `{"effort":"low"}`       |
+| b (`effort: 'max'`) | `{"effort":"max"}`       |
 
 Megfigyelés: az `effort` a `output_config.effort` mezőben utazik, sosem top-level `effort` kulcsként. HTTP kód mind a 4 kérésnél 200, nincs 400.
 
@@ -85,12 +85,12 @@ Megfigyelés: (a) és (b) között a `thinking` mező szempontjából **nincs k�
 
 Beállítás: (a) alap, (b) `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, (c) `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3`, (d) `persistSession: true`. Kimenetel: mind HTTP 200, mind `result` subtype `success` (17, 24, 24, 64 SDKMessage). Artefaktumok: `tools/wire-probe/artifacts/harness/M-07/{a-base,b-disable-nonessential-traffic,c-default-haiku-model,d-persist-session}.meta.json`.
 
-| Futás | kérésszám | tranzakciók |
-|---|---|---|
-| a-base | 2 | `00007-1787706895917.json`, `00008-1787706897979.json` |
-| b-disable-nonessential-traffic | **1** | `00010-1787706901895.json` |
-| c-default-haiku-model | 2 | `00012-1787706906089.json`, `00013-1787706910973.json` |
-| d-persist-session | 2 | `00015-1787706912444.json`, `00016-1787706913482.json` |
+| Futás                          | kérésszám | tranzakciók                                            |
+| ------------------------------ | --------- | ------------------------------------------------------ |
+| a-base                         | 2         | `00007-1787706895917.json`, `00008-1787706897979.json` |
+| b-disable-nonessential-traffic | **1**     | `00010-1787706901895.json`                             |
+| c-default-haiku-model          | 2         | `00012-1787706906089.json`, `00013-1787706910973.json` |
+| d-persist-session              | 2         | `00015-1787706912444.json`, `00016-1787706913482.json` |
 
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` mellett csak 1 kérés ment ki (a szokásos 1. "thin" kérés hiányzik). A `c-default-haiku-model` futásban (ahol `ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M3`) mindkét kérés `model` mezője szó szerint `"MiniMax-M3"`, nem jelent meg más alias vagy modellnév. Minden kérés `model` mezője az összes futásban `"MiniMax-M3"` volt, egyik esetben sem jelent meg eltérő (pl. haiku-alias) modellnév a wire-en.
 
@@ -104,13 +104,13 @@ Beállítás: 5 futás, egyenként egy env eltérés az M-01 alaphoz képest. Ki
 
 Diff az M-01 megfelelő (thin/full) tranzakciójához (`00002-...json` = thin bázis, `00003-...json` = full bázis):
 
-| Env változó | kérésszám | full kérés: eltűnő body kulcs | eltűnő `anthropic-beta` elem(ek) | `cache_control` darabszám (full) | `tools.length` (full) |
-|---|---|---|---|---|---|
-| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` | 2 | `context_management` | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` | 3 (nincs változás) | 25 (nincs változás) |
-| `ENABLE_TOOL_SEARCH=false` | 2 | nincs | nincs | 3 (nincs változás) | 25 (nincs változás) |
-| `DISABLE_PROMPT_CACHING=1` | 2 | nincs | nincs | **0** (bázis: 3) | 25 (nincs változás) |
-| `MAX_THINKING_TOKENS=0` | 2 | `thinking, context_management` | nincs | 3 (nincs változás) | 25 (nincs változás) |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | **1** (a thin kérés hiányzik) | nincs (a maradék kérés egyébként azonos a bázissal) | nincs | 3 (nincs változás) | **24** (bázis: 25, hiányzik: `DesignSync`) |
+| Env változó                                  | kérésszám                     | full kérés: eltűnő body kulcs                       | eltűnő `anthropic-beta` elem(ek)                                                                  | `cache_control` darabszám (full) | `tools.length` (full)                      |
+| -------------------------------------------- | ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------ |
+| `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`   | 2                             | `context_management`                                | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` | 3 (nincs változás)               | 25 (nincs változás)                        |
+| `ENABLE_TOOL_SEARCH=false`                   | 2                             | nincs                                               | nincs                                                                                             | 3 (nincs változás)               | 25 (nincs változás)                        |
+| `DISABLE_PROMPT_CACHING=1`                   | 2                             | nincs                                               | nincs                                                                                             | **0** (bázis: 3)                 | 25 (nincs változás)                        |
+| `MAX_THINKING_TOKENS=0`                      | 2                             | `thinking, context_management`                      | nincs                                                                                             | 3 (nincs változás)               | 25 (nincs változás)                        |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | **1** (a thin kérés hiányzik) | nincs (a maradék kérés egyébként azonos a bázissal) | nincs                                                                                             | 3 (nincs változás)               | **24** (bázis: 25, hiányzik: `DesignSync`) |
 
 Fájlok: `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`: `00018-1787706915494.json` (full), `00019-1787706915646.json` (thin). `ENABLE_TOOL_SEARCH`: `00021-1787706917018.json` (thin), `00022-1787706919335.json` (full). `DISABLE_PROMPT_CACHING`: `00024-1787706921048.json` (thin), `00025-1787706921810.json` (full). `MAX_THINKING_TOKENS`: `00027-1787706923939.json` (full), `00029-1787706924770.json` (thin). `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`: `00030-1787706928603.json` (full, egyetlen kérés).
 
@@ -164,11 +164,11 @@ Nem egyértelmű: nem állapítható meg ebből a mérésből, hogy a promptgene
 
 Beállítás: (a) alap, (b) `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`, (c) `ENABLE_TOOL_SEARCH=false`. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-14/{a-base,b-disable-experimental-betas,c-enable-tool-search-false}.meta.json`.
 
-| Futás | full kérés fájl | eltűnő body kulcs (M-01 full bázishoz képest) | eltűnő `anthropic-beta` elem(ek) |
-|---|---|---|---|
-| a-base | `00033-1787706931339.json` | nincs | nincs |
-| b-disable-experimental-betas | `00035-1787706933819.json` | `context_management` | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` |
-| c-enable-tool-search-false | `00039-1787706936319.json` | nincs | nincs |
+| Futás                        | full kérés fájl            | eltűnő body kulcs (M-01 full bázishoz képest) | eltűnő `anthropic-beta` elem(ek)                                                                  |
+| ---------------------------- | -------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| a-base                       | `00033-1787706931339.json` | nincs                                         | nincs                                                                                             |
+| b-disable-experimental-betas | `00035-1787706933819.json` | `context_management`                          | `thinking-token-count-2026-05-13, context-management-2025-06-27, prompt-caching-scope-2026-01-05` |
+| c-enable-tool-search-false   | `00039-1787706936319.json` | nincs                                         | nincs                                                                                             |
 
 `anthropic-version` mindhárom futás mindkét kérésénél `2023-06-01`, nem változik. Ez a mátrix egyezik az M-08-nál `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` és `ENABLE_TOOL_SEARCH` env változókra kapott eredménnyel (kereszt-validálva, 2 független futásból ugyanaz az eltérés adódott).
 
@@ -176,11 +176,11 @@ Beállítás: (a) alap, (b) `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`, (c) `ENA
 
 Beállítás: (a) és (b) azonos, hosszú system prompt kiegészítéssel, közvetlenül egymás után, (c) ugyanaz `DISABLE_PROMPT_CACHING=1` mellett. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-15/{a-first,b-second-immediately-after,c-cache-disabled}.meta.json`.
 
-| Futás | full kérés fájl | `cache_control` blokkszám | szekció | `usage` (message_delta stream eventből) |
-|---|---|---|---|---|
-| a-first | `00003-1787707038279.json` | 3 | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
-| b-second-immediately-after | `00006-1787707041231.json` | 3 | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
-| c-cache-disabled | `00009-1787707043500.json` | **0** | - | `input_tokens:28950, cache_read_input_tokens:128` |
+| Futás                      | full kérés fájl            | `cache_control` blokkszám | szekció                | `usage` (message_delta stream eventből)           |
+| -------------------------- | -------------------------- | ------------------------- | ---------------------- | ------------------------------------------------- |
+| a-first                    | `00003-1787707038279.json` | 3                         | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
+| b-second-immediately-after | `00006-1787707041231.json` | 3                         | `system:2, messages:1` | `input_tokens:28950, cache_read_input_tokens:128` |
+| c-cache-disabled           | `00009-1787707043500.json` | **0**                     | -                      | `input_tokens:28950, cache_read_input_tokens:128` |
 
 A `cache_control` blokk alakja szó szerint: `{"type":"ephemeral"}`. A (c) futásnál (`DISABLE_PROMPT_CACHING=1`) a `cache_control` blokkok teljesen eltűnnek a full kérésből (0 db a bázis 3-hoz képest). A válasz `usage`-ban a `cache_creation_input_tokens` mező egyik streamelt `message_delta` eventben sem jelent meg explicit módon (a `cache_read_input_tokens` viszont mindhárom futásnál 128). A "thin" (1.) kérésnél az (a) futásban `cache_read_input_tokens: 128`, a (b) futásnál `cache_read_input_tokens: 768`, a (c) futásnál `cache_read_input_tokens: 128`.
 
@@ -245,16 +245,16 @@ Beállítás: `model: 'MiniMax-M3[1m]'`, bináris keresés legfeljebb 8 kérésb
 
 Kimenetel (a javított futás, egyetlen munkamenetben lement mind a 8 kérés): Artefaktumok: `tools/wire-probe/artifacts/harness/M-20/probe-1-chars600000.meta.json` .. `probe-8-chars2550000.meta.json`, `search-state.json`.
 
-| # | targetChars | HTTP | `usage.input_tokens` | `usage.cache_read_input_tokens` | tranzakció |
-|---|---|---|---|---|---|
-| 1 | 600 000 | 200 | 266699 | 128 | `00003-1787737784634.json` |
-| 2 | 1 200 000 | 200 | 1483 | 505344 | `00006-1787737788764.json` |
-| 3 | 2 400 000 | 200 | 986667 | 160 | `00009-1787737825279.json` |
-| 4 | 4 800 000 | 400 | - | - | (lásd hibaszöveg lent) |
-| 5 | 3 600 000 | 400 | - | - | (lásd hibaszöveg lent) |
-| 6 | 3 000 000 | 400 | - | - | (lásd hibaszöveg lent) |
-| 7 | 2 700 000 | 400 | - | - | (lásd hibaszöveg lent) |
-| 8 | 2 550 000 | 200 | 61483 | 985344 | `00023-1787737855251.json` |
+| #   | targetChars | HTTP | `usage.input_tokens` | `usage.cache_read_input_tokens` | tranzakció                 |
+| --- | ----------- | ---- | -------------------- | ------------------------------- | -------------------------- |
+| 1   | 600 000     | 200  | 266699               | 128                             | `00003-1787737784634.json` |
+| 2   | 1 200 000   | 200  | 1483                 | 505344                          | `00006-1787737788764.json` |
+| 3   | 2 400 000   | 200  | 986667               | 160                             | `00009-1787737825279.json` |
+| 4   | 4 800 000   | 400  | -                    | -                               | (lásd hibaszöveg lent)     |
+| 5   | 3 600 000   | 400  | -                    | -                               | (lásd hibaszöveg lent)     |
+| 6   | 3 000 000   | 400  | -                    | -                               | (lásd hibaszöveg lent)     |
+| 7   | 2 700 000   | 400  | -                    | -                               | (lásd hibaszöveg lent)     |
+| 8   | 2 550 000   | 200  | 61483                | 985344                          | `00023-1787737855251.json` |
 
 A 4 hibás kérés (4., 5., 6., 7.) mindegyikének `harnessError` mezője szó szerint azonos: `"Claude Code returned an error result: API Error: 400 invalid params, context window exceeds limit (2013)"`. A keresés a `MAX_REQUESTS=8` kemény korlát miatt állt le (nem konvergencia miatt): a legnagyobb sikeres méret (2 550 000 karakter) és a legkisebb hibás méret (2 700 000 karakter) között 150 000 karakternyi rés maradt lezáratlanul.
 
@@ -271,11 +271,11 @@ A kimenő kérés `tools` tömbje 25 elemű, **tartalmazza** a `DesignSync` tool
 Beállítás: 4 futás, `CLAUDE_CODE_MAX_OUTPUT_TOKENS` = 4096, 32000, 131072, 524288. Kimenetel: mind HTTP 200 mindkét kérésnél, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-22/max-output-tokens-<érték>.meta.json`.
 
 | env érték | kimenő body `max_tokens` | HTTP |
-|---|---|---|
-| 4096 | 4096 | 200 |
-| 32000 | 32000 | 200 |
-| 131072 | **128000** | 200 |
-| 524288 | **128000** | 200 |
+| --------- | ------------------------ | ---- |
+| 4096      | 4096                     | 200  |
+| 32000     | 32000                    | 200  |
+| 131072    | **128000**               | 200  |
+| 524288    | **128000**               | 200  |
 
 Tranzakciók: `00004`/`00005-...json` (4096), `00007`/`00008-...json` (32000), `00010`/`00011-...json` (131072), `00013`/`00014-...json` (524288, mind `tools/wire-probe/artifacts/`). A 131072 és az 524288 env érték is ugyanarra a 128000 wire `max_tokens` értékre képződött le; a 4096 és 32000 érték változatlanul, egyezően ment ki.
 
@@ -291,12 +291,12 @@ Beállítás: az M-15 (a) és (b) futásának megismétlése. A telepített SDK 
 
 A kimenő body `stream` mezője mind a 4 kérésnél szó szerint `true`. A `responseBody` mind a 4 tranzakciónál `null`, a válasz SSE eseménysorként érkezett (`streamEvents` nem `null`).
 
-| futás | kérés | `usage.input_tokens` | `usage.cache_read_input_tokens` |
-|---|---|---|---|
-| a-first | thin | 799 | 128 |
-| a-first | full | 29299 | 128 |
-| b-second | thin | 799 | 128 |
-| b-second | full | 29299 | 128 |
+| futás    | kérés | `usage.input_tokens` | `usage.cache_read_input_tokens` |
+| -------- | ----- | -------------------- | ------------------------------- |
+| a-first  | thin  | 799                  | 128                             |
+| a-first  | full  | 29299                | 128                             |
+| b-second | thin  | 799                  | 128                             |
+| b-second | full  | 29299                | 128                             |
 
 A `message_start.message.usage` objektum egyik kérésnél sem tartalmaz `cache_creation_input_tokens` kulcsot (csak `input_tokens`, `output_tokens`, `service_tier`). A `message_delta.usage` objektum sem tartalmaz `cache_creation_input_tokens` kulcsot egyik kérésnél sem.
 
@@ -333,10 +333,10 @@ Ez a mérési kör a felhasználó ténylegesen használt indító parancsának 
 
 Beállítás: (a) alap (nincs `Options.effort`, nincs extra env). (b) `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1`, `Options.effort` itt sincs beállítva. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-26/{a-base,b-always-enable-effort}.meta.json`.
 
-| Futás | thin kérés `output_config` | full kérés `output_config` | tranzakciók |
-|---|---|---|---|
-| a-base | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}` | `00002-1787742422775.json`, `00003-1787742425723.json` |
-| b-always-enable-effort | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}` | `00005-1787742427896.json`, `00006-1787742428703.json` |
+| Futás                  | thin kérés `output_config`                      | full kérés `output_config` | tranzakciók                                            |
+| ---------------------- | ----------------------------------------------- | -------------------------- | ------------------------------------------------------ |
+| a-base                 | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}`        | `00002-1787742422775.json`, `00003-1787742425723.json` |
+| b-always-enable-effort | `{"effort":"high","format":{...title séma...}}` | `{"effort":"high"}`        | `00005-1787742427896.json`, `00006-1787742428703.json` |
 
 A két futás `output_config` mezője **karakterről karakterre azonos** mindkét kérésfajtánál. Nincs `output_config` mezőn kívüli eltérés sem a body top-level kulcsaiban, sem az `anthropic-beta` headerben (mindkettő a szokásos, M-01-nél rögzített listát hordozza). A `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1` beállítás jelenléte vagy hiánya ebben a mérésben **semmilyen megfigyelhető különbséget nem okozott a dróton**.
 
@@ -368,12 +368,12 @@ A kimenő body `model` mezője **mindkét kérésnél** szó szerint `"MiniMax-M
 
 Beállítás: (a) alap. (b) `API_TIMEOUT_MS=3000000`. Kimenetel: mindkét futás HTTP 200 mindkét kérésénél, `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-30/{a-base,b-api-timeout-3000000}.meta.json`.
 
-| Futás | tranzakció | kérés headerei közt `x-stainless-timeout` |
-|---|---|---|
-| a-base | `00021-1787742461622.json` (thin) | `600` |
-| a-base | `00022-1787742462310.json` (full) | `600` |
-| b-api-timeout-3000000 | `00024-1787742465473.json` (thin) | `3000` |
-| b-api-timeout-3000000 | `00025-1787742465901.json` (full) | `3000` |
+| Futás                 | tranzakció                        | kérés headerei közt `x-stainless-timeout` |
+| --------------------- | --------------------------------- | ----------------------------------------- |
+| a-base                | `00021-1787742461622.json` (thin) | `600`                                     |
+| a-base                | `00022-1787742462310.json` (full) | `600`                                     |
+| b-api-timeout-3000000 | `00024-1787742465473.json` (thin) | `3000`                                    |
+| b-api-timeout-3000000 | `00025-1787742465901.json` (full) | `3000`                                    |
 
 A `x-stainless-timeout` header értéke a `600` alapértékről `3000`-re változik, amikor `API_TIMEOUT_MS=3000000`. A `600` a dokumentált 600000 ms (10 perc) alapérték ezredmásodperc helyett másodpercben kifejezve, a `3000` pedig a beállított 3000000 ms másodpercben. Nem kellett megvárni a teljes időkorlátot: a hatás azonnal látszott a kimenő kérés headerében.
 
@@ -395,11 +395,11 @@ Csak **1** `POST /v1/messages` ment ki (`00038-1787742498281.json`) -- a thin (c
 
 Beállítás: három futás, streaming input módban egy felhasználói üzenettel, aminek szöveg content blokkjára a harness saját, explicit `cache_control: {"type":"ephemeral"}` jelölést tesz. (a) és (b) azonos tartalom, közvetlenül egymás után, cache bekapcsolva. (c) ugyanaz `DISABLE_PROMPT_CACHING=1` mellett. Kimenetel: mind HTTP 200, mind `result` subtype `success`. Artefaktumok: `tools/wire-probe/artifacts/harness/M-33/{a-explicit-breakpoint-first,b-explicit-breakpoint-second,c-disable-prompt-caching}.meta.json`.
 
-| Futás | full kérés tranzakció | `cache_control` darabszám és helye | `usage.cache_read_input_tokens` (full) |
-|---|---|---|---|
-| a-explicit-breakpoint-first | `00041-1787742511635.json` | 3: `system` 2 blokkja + a felhasználói üzenet 1 blokkja | 128 |
-| b-explicit-breakpoint-second | `00044-1787742514059.json` | 3: ugyanaz a minta | 128 |
-| c-disable-prompt-caching | `00047-1787742517068.json` | **1**: kizárólag a felhasználói üzenet blokkja, a `system` mindhárom blokkja `cache_control` nélkül | 128 |
+| Futás                        | full kérés tranzakció      | `cache_control` darabszám és helye                                                                  | `usage.cache_read_input_tokens` (full) |
+| ---------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| a-explicit-breakpoint-first  | `00041-1787742511635.json` | 3: `system` 2 blokkja + a felhasználói üzenet 1 blokkja                                             | 128                                    |
+| b-explicit-breakpoint-second | `00044-1787742514059.json` | 3: ugyanaz a minta                                                                                  | 128                                    |
+| c-disable-prompt-caching     | `00047-1787742517068.json` | **1**: kizárólag a felhasználói üzenet blokkja, a `system` mindhárom blokkja `cache_control` nélkül | 128                                    |
 
 Saját ellenőrzés a `messages[].content[]` tömbön mindhárom full kérésben: a felhasználó által (a harness kódjában) explicit módon rárakott `cache_control` blokk **mindhárom futásban jelen van**, a (c) futásban is, annak ellenére, hogy a `DISABLE_PROMPT_CACHING=1` env változó a `system` szekció mindkét (a-ban és b-ben meglévő) `cache_control` blokkját eltávolította. A `tools` tömbben egyik futásban sincs `cache_control` blokk.
 

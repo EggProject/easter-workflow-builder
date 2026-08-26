@@ -19,18 +19,18 @@ export const M32: MeasurementCase = {
   id: 'M-32',
   title: 'A teljes felhasználói parancs env változói együtt',
   question: 'user env: mind a 12 változó egyszerre, referencia body',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
-    const { model: _unusedBaseModel, ...baseWithoutModel } = base;
+  async run(context) {
+    const baseWithoutModel = buildBaseOptions(context);
+    delete baseWithoutModel.model;
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-32',
       runId: 'a',
       prompt: DEFAULT_PROMPT,
       options: {
         ...baseWithoutModel,
         env: {
-          ...base.env,
+          ...baseWithoutModel.env,
           API_TIMEOUT_MS: '3000000',
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
           ANTHROPIC_MODEL: 'MiniMax-M3[1m]',

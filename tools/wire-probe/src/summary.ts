@@ -9,12 +9,12 @@
  * intervallumába esik az időbélyege.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-const artifactsDir = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? join(moduleDir, '..', 'artifacts');
-const harnessDir = process.env['WIRE_PROBE_OUT_DIR'] ?? join(artifactsDir, 'harness');
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const artifactsDirectory = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? path.join(moduleDirectory, '..', 'artifacts');
+const harnessDirectory = process.env['WIRE_PROBE_OUT_DIR'] ?? path.join(artifactsDirectory, 'harness');
 
 const CRITICAL_BODY_FIELDS: readonly string[] = ['output_config', 'thinking', 'tool_choice', 'context_management'];
 
@@ -26,14 +26,55 @@ interface ProxyTransactionSummary {
   readonly timestampMs: number;
   readonly status: number;
   readonly criticalFields: readonly string[];
-  readonly anthropicBeta: string | null;
+  readonly anthropicBeta: string | undefined;
 }
 
-/** A proxy artifacts/*.json tranzakcióinak beolvasása (a harness alkönyvtár nélkül). */
+/**
+A requestHeaders objektumból az anthropic-beta header értékét olvassa ki, ha van.
+*/
+function parseAnthropicBetaHeader(requestHeaders: unknown): string | undefined {
+  if (!isRecord(requestHeaders)) {
+    return undefined;
+  }
+  let anthropicBeta: string | undefined;
+  for (const [name, value] of Object.entries(requestHeaders)) {
+    if (typeof value === 'string' && name.toLowerCase() === 'anthropic-beta') {
+      anthropicBeta = value;
+    }
+  }
+  return anthropicBeta;
+}
+
+/**
+Egy proxy artifacts/*.json tranzakció fájl beolvasása és összefoglalása; `undefined`, ha nem elemezhető.
+*/
+function parseProxyTransactionFile(fullPath: string): ProxyTransactionSummary | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(fullPath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) {
+    return undefined;
+  }
+  const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : NaN;
+  const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
+  const requestBody = parsed['requestBody'];
+  const criticalFields = isRecord(requestBody)
+    ? CRITICAL_BODY_FIELDS.filter((field) => Object.hasOwn(requestBody, field))
+    : [];
+  const anthropicBeta = parseAnthropicBetaHeader(parsed['requestHeaders']);
+  return { timestampMs, status, criticalFields, anthropicBeta };
+}
+
+/**
+A proxy artifacts/*.json tranzakcióinak beolvasása (a harness alkönyvtár nélkül).
+*/
 function readProxyTransactions(): ProxyTransactionSummary[] {
   let entries: string[];
   try {
-    entries = readdirSync(artifactsDir);
+    entries = readdirSync(artifactsDirectory);
   } catch {
     return [];
   }
@@ -42,35 +83,14 @@ function readProxyTransactions(): ProxyTransactionSummary[] {
     if (!entry.endsWith('.json')) {
       continue;
     }
-    const fullPath = join(artifactsDir, entry);
+    const fullPath = path.join(artifactsDirectory, entry);
     if (statSync(fullPath).isDirectory()) {
       continue;
     }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(fullPath, 'utf8'));
-    } catch {
-      continue;
+    const transaction = parseProxyTransactionFile(fullPath);
+    if (transaction !== undefined) {
+      transactions.push(transaction);
     }
-    if (!isRecord(parsed)) {
-      continue;
-    }
-    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
-    const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
-    const requestBody = parsed['requestBody'];
-    const criticalFields = isRecord(requestBody)
-      ? CRITICAL_BODY_FIELDS.filter((field) => field in requestBody)
-      : [];
-    const requestHeaders = parsed['requestHeaders'];
-    let anthropicBeta: string | null = null;
-    if (isRecord(requestHeaders)) {
-      for (const [name, value] of Object.entries(requestHeaders)) {
-        if (name.toLowerCase() === 'anthropic-beta' && typeof value === 'string') {
-          anthropicBeta = value;
-        }
-      }
-    }
-    transactions.push({ timestampMs, status, criticalFields, anthropicBeta });
   }
   return transactions;
 }
@@ -80,64 +100,92 @@ interface HarnessRunSummary {
   readonly runId: string;
   readonly ok: boolean;
   readonly timedOut: boolean;
-  readonly resultSubtype: string | null;
+  readonly resultSubtype: string | undefined;
   readonly messageCount: number;
   readonly startedAtMs: number;
   readonly endedAtMs: number;
 }
 
-/** A harness <caseId>/<runId>.meta.json fájljainak beolvasása. */
-function readHarnessRuns(): HarnessRunSummary[] {
-  let caseDirs: string[];
+/**
+Egy harness <caseId>/<runId>.meta.json fájl beolvasása és összefoglalása; `undefined`, ha nem elemezhető.
+*/
+function parseHarnessMetaFile(
+  caseId: string,
+  caseDirectoryPath: string,
+  fileName: string,
+): HarnessRunSummary | undefined {
+  if (!fileName.endsWith('.meta.json')) {
+    return undefined;
+  }
+  let parsed: unknown;
   try {
-    caseDirs = readdirSync(harnessDir);
+    parsed = JSON.parse(readFileSync(path.join(caseDirectoryPath, fileName), 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) {
+    return undefined;
+  }
+  const runId = typeof parsed['runId'] === 'string' ? parsed['runId'] : fileName;
+  // A `null` és a `undefined` egyaránt "nincs harness hiba"-t jelent: a
+  // runner.ts korábban `null`-t írt, a jelenlegi verzió `undefined`-et (ami
+  // JSON.stringify-kor hiányzó kulcsként jelenik meg) -- mindkét alak érvényes.
+  const isOk = parsed['harnessError'] === null || parsed['harnessError'] === undefined;
+  const isTimedOut = parsed['timedOut'] === true;
+  const resultSubtype = typeof parsed['resultSubtype'] === 'string' ? parsed['resultSubtype'] : undefined;
+  const messageCount = typeof parsed['messageCount'] === 'number' ? parsed['messageCount'] : 0;
+  const startedAtMs = typeof parsed['startedAt'] === 'string' ? Date.parse(parsed['startedAt']) : NaN;
+  const endedAtMs = typeof parsed['endedAt'] === 'string' ? Date.parse(parsed['endedAt']) : NaN;
+  return { caseId, runId, ok: isOk, timedOut: isTimedOut, resultSubtype, messageCount, startedAtMs, endedAtMs };
+}
+
+/**
+A harness <caseId>/<runId>.meta.json fájljainak beolvasása.
+*/
+function readHarnessRuns(): HarnessRunSummary[] {
+  let caseDirectories: string[];
+  try {
+    caseDirectories = readdirSync(harnessDirectory);
   } catch {
     return [];
   }
   const runs: HarnessRunSummary[] = [];
-  for (const caseId of caseDirs) {
-    const caseDirPath = join(harnessDir, caseId);
-    if (!statSync(caseDirPath).isDirectory()) {
+  for (const caseId of caseDirectories) {
+    const caseDirectoryPath = path.join(harnessDirectory, caseId);
+    if (!statSync(caseDirectoryPath).isDirectory()) {
       continue;
     }
-    for (const fileName of readdirSync(caseDirPath)) {
-      if (!fileName.endsWith('.meta.json')) {
-        continue;
+    for (const fileName of readdirSync(caseDirectoryPath)) {
+      const run = parseHarnessMetaFile(caseId, caseDirectoryPath, fileName);
+      if (run !== undefined) {
+        runs.push(run);
       }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(readFileSync(join(caseDirPath, fileName), 'utf8'));
-      } catch {
-        continue;
-      }
-      if (!isRecord(parsed)) {
-        continue;
-      }
-      const runId = typeof parsed['runId'] === 'string' ? parsed['runId'] : fileName;
-      const ok = parsed['harnessError'] === null || parsed['harnessError'] === undefined;
-      const timedOut = parsed['timedOut'] === true;
-      const resultSubtype = typeof parsed['resultSubtype'] === 'string' ? parsed['resultSubtype'] : null;
-      const messageCount = typeof parsed['messageCount'] === 'number' ? parsed['messageCount'] : 0;
-      const startedAtMs = typeof parsed['startedAt'] === 'string' ? Date.parse(parsed['startedAt']) : Number.NaN;
-      const endedAtMs = typeof parsed['endedAt'] === 'string' ? Date.parse(parsed['endedAt']) : Number.NaN;
-      runs.push({ caseId, runId, ok, timedOut, resultSubtype, messageCount, startedAtMs, endedAtMs });
     }
   }
   return runs;
 }
 
-function isNonNull(value: string | null): value is string {
-  return value !== null;
+function isDefined(value: string | undefined): value is string {
+  return value !== undefined;
+}
+
+/**
+A `timedOut` / `ok` mezőkből a rövid állapotcímke, beágyazott feltétel nélkül.
+*/
+function runStatusLabel(run: HarnessRunSummary): string {
+  if (run.timedOut) {
+    return 'TIMEOUT';
+  }
+  return run.ok ? 'ok' : 'HIBA';
 }
 
 function formatRunLine(run: HarnessRunSummary, transactions: readonly ProxyTransactionSummary[]): string {
   const related = transactions.filter((t) => t.timestampMs >= run.startedAtMs && t.timestampMs <= run.endedAtMs);
   const statuses = [...new Set(related.map((t) => t.status))].join(',') || 'nincs proxy tranzakció';
   const criticalSeen = [...new Set(related.flatMap((t) => t.criticalFields))].join(',') || '-';
-  const betaValues = [...new Set(related.map((t) => t.anthropicBeta).filter(isNonNull))].join(' | ') || '-';
-  const okLabel = run.timedOut ? 'TIMEOUT' : run.ok ? 'ok' : 'HIBA';
+  const betaValues = [...new Set(related.map((t) => t.anthropicBeta).filter(isDefined))].join(' | ') || '-';
   return (
-    `${run.caseId}/${run.runId}: [${okLabel}] HTTP=${statuses} kritikus_mezők=[${criticalSeen}] ` +
+    `${run.caseId}/${run.runId}: [${runStatusLabel(run)}] HTTP=${statuses} kritikus_mezők=[${criticalSeen}] ` +
     `anthropic-beta=[${betaValues}] result=${run.resultSubtype ?? '-'} ` +
     `(${String(run.messageCount)} üzenet, ${String(related.length)} proxy tranzakció)`
   );
@@ -148,15 +196,15 @@ function main(): void {
   const runs = readHarnessRuns();
 
   if (runs.length === 0) {
-    console.log(`Nincs rögzített harness futás a ${harnessDir} alatt.`);
+    console.log(`Nincs rögzített harness futás a ${harnessDirectory} alatt.`);
   } else {
-    const sorted = [...runs].sort((a, b) => a.startedAtMs - b.startedAtMs);
+    const sorted = runs.toSorted((a, b) => a.startedAtMs - b.startedAtMs);
     for (const run of sorted) {
       console.log(formatRunLine(run, transactions));
     }
   }
   console.log('---');
-  console.log(`Proxy tranzakciók összesen: ${String(transactions.length)} (${artifactsDir})`);
+  console.log(`Proxy tranzakciók összesen: ${String(transactions.length)} (${artifactsDirectory})`);
 }
 
 main();
