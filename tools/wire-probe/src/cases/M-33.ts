@@ -16,16 +16,25 @@ import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
 
-/** Minimum ~512 token, hogy a cache töréspont ténylegesen aktiválódjon (research 2. szekció). */
+/**
+Minimum ~512 token, hogy a cache töréspont ténylegesen aktiválódjon (research 2. szekció).
+*/
 const FILLER = 'M-33 cache elválasztás mérés, egyedi ismétlődő töltelék szöveg minden futáshoz azonos. '.repeat(120);
 
 async function* explicitBreakpointPrompt(): AsyncGenerator<SDKUserMessage> {
+  // Nincs valodi aszinkron munka; az `await` csak azert kell, hogy a
+  // fuggveny tenylegesen async generator maradjon (AsyncIterable<SDKUserMessage>).
+  await Promise.resolve();
   yield {
     type: 'user',
     message: {
       role: 'user',
-      content: [{ type: 'text', text: `${FILLER}\n\nVálaszolj egyetlen szóval: OK`, cache_control: { type: 'ephemeral' } }],
+      content: [
+        { type: 'text', text: `${FILLER}\n\nVálaszolj egyetlen szóval: OK`, cache_control: { type: 'ephemeral' } },
+      ],
     },
+    // Az SDKUserMessage tipusa kotelezoen `string | null`-t var itt (sdk.d.ts).
+    // eslint-disable-next-line unicorn/no-null -- SDK altal megkovetelt ertek, nem placeholder
     parent_tool_use_id: null,
   };
 }
@@ -34,24 +43,24 @@ export const M33: MeasurementCase = {
   id: 'M-33',
   title: 'promptCaching.mode -- implicit és explicit szétválasztás',
   question: 'promptCaching.mode (nyitva maradt capability mező)',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
+  async run(context) {
+    const base = buildBaseOptions(context);
     const a = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-33',
       runId: 'a-explicit-breakpoint-first',
       prompt: explicitBreakpointPrompt(),
       options: base,
     });
     const b = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-33',
       runId: 'b-explicit-breakpoint-second',
       prompt: explicitBreakpointPrompt(),
       options: base,
     });
     const c = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-33',
       runId: 'c-disable-prompt-caching',
       prompt: explicitBreakpointPrompt(),

@@ -9,6 +9,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
+
 - State your assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
@@ -32,12 +33,14 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 **Touch only what you must. Clean up only your own mess.**
 
 When editing existing code:
+
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code, mention it - don't delete it.
 
 When your changes create orphans:
+
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
@@ -48,11 +51,13 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
+
 - "Add validation" → "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
+
 ```
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
@@ -62,11 +67,13 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 ## 5. When suspicious of an analysis
+
 "I'm not sure about this. Which specific file and line number
 supports your claim that the authentication check is missing?
 Quote the exact code."
 
 ## 6. Szabályok amiket soha nem törsz meg:
+
 - Nincs gondolatjel (em dash). Soha.
 - Nincs AI klisé. Soha ne mondd: "Természetesen!", "Remek kérdés!", "Szívesen segítek", "Mint mesterséges intelligencia".
 - Nincs talpas.
@@ -79,23 +86,24 @@ Quote the exact code."
 - Ha nem tudsz valamit, mondd meg szimplán.
 - Te csak kordinálsz és mindig subagentek dolgoznak a megfelelő model és effort beállítással
 - MODEL ROUTING (kötelező, minden subagentnél és workflow agentnél explicit `model` kell):
-    - webkeresés, dokumentáció-ellenőrzés, forrás-feltérképezés, grep/recon: `sonnet`
-    - kódolás, ha a specifikáció részletes és nem kell hozzá gondolkodni: `sonnet`
-    - `opus` csak akkor, ha tényleg gondolkodni kell: architektúra, tervezés, adverzariális
-      ellenőrzés, hibakeresés, vagy olyan kódolás ahol a megoldást ki kell találni
-    - soha ne hagyd el a `model` mezőt abban a hitben, hogy majd örököl valamit
+  - webkeresés, dokumentáció-ellenőrzés, forrás-feltérképezés, grep/recon: `sonnet`
+  - kódolás, ha a specifikáció részletes és nem kell hozzá gondolkodni: `sonnet`
+  - `opus` csak akkor, ha tényleg gondolkodni kell: architektúra, tervezés, adverzariális
+    ellenőrzés, hibakeresés, vagy olyan kódolás ahol a megoldást ki kell találni
+  - soha ne hagyd el a `model` mezőt abban a hitben, hogy majd örököl valamit
 - KÖTELEZŐ MINDIG A WEBES VALIDALÁS!
 - SOSEM ajánlasz konkrét konfigurációs értéket, küszöböt, beállítást vagy számot addig,
   amíg le nem ellenőrizted a tényleges forráskódban vagy a hivatalos dokumentációban, hogy
   az az érték mit csinál. Tilos becsülni, extrapolálni, "valószínűleg ennyi jó lesz"
   alapon javasolni. Ha nincs dokumentált szabály az értékre, azt kimondod, és nem adsz
-  számot. 
+  számot.
 - Minden állítást, ami nem a saját, most futtatott mérésedből származik, webes kereséssel
   vagy a telepített forrás olvasásával kell megerősíteni, MIELŐTT kiírod. Ha nincs
   megerősítés, akkor a mondat nem hangzik el, vagy kifejezetten "nem ellenőrzött"
   jelöléssel megy ki.
 
 ## 7. Kódolási elvárások:
+
 - jól dokumentált kódbázis legyen, de ne túlmagyarázott
 - minden mappában a CLAUDE.md fájlt vezetni kell
 - Strict generics TypeScript kód legyen, tilos az `as` használata helyette `satisfies` -t kell használni és tiltott az `any` helyette `unknown` kell használni
@@ -164,4 +172,3 @@ Részletek: `docs/research/2026-08-26-agent-sdk-minimax.md` és `docs/spec/SPEC-
 Az `@anthropic-ai/claude-agent-sdk` verziója **pinelve**, mert a kiküldött request body mezők
 listája verziónként bővül, és egy új mező MiniMax ellen 400-at okozhat. Frissítés előtt a
 SPEC-000 mérései regresszióként futtatandók.
-

@@ -6,26 +6,29 @@
  * (M-12), ezért ezt is csak a kliens megkerülésével lehet előállítani.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import type { CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 
 export const M35: MeasurementCase = {
   id: 'M-35',
   title: 'listedByModelsEndpoint közvetlen HTTP hívással',
   question: 'listedByModelsEndpoint (nyitva maradt capability mező)',
-  async run(ctx) {
-    const caseDir = join(ctx.outDir, 'M-35');
-    mkdirSync(caseDir, { recursive: true });
+  async run(context) {
+    const caseDirectory = path.join(context.outDir, 'M-35');
+    mkdirSync(caseDirectory, { recursive: true });
 
-    const response = await fetch(`${ctx.proxyBaseUrl}/v1/models`, {
-      method: 'GET',
+    const response = await fetch(`${context.proxyBaseUrl}/v1/models`, {
       headers: {
-        'x-api-key': ctx.minimaxApiKey,
+        'x-api-key': context.minimaxApiKey,
         'anthropic-version': '2023-06-01',
       },
     });
     const bodyText = await response.text();
-    writeFileSync(join(caseDir, 'a-get-models.json'), JSON.stringify({ status: response.status, bodyText }, null, 2), 'utf8');
+    writeFileSync(
+      path.join(caseDirectory, 'a-get-models.json'),
+      JSON.stringify({ status: response.status, bodyText }, undefined, 2),
+      'utf8',
+    );
 
     const outcomes: CaseRunOutcome[] = [{ runId: 'a-get-models', ok: true, note: `HTTP ${String(response.status)}` }];
     return outcomes;

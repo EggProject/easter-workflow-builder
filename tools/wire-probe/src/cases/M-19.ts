@@ -12,7 +12,9 @@ import type { CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
 import { NON_PROMPTING_TOOL_ALLOWING_PERMISSION_MODE } from '../harness/sdk-constants.ts';
 
-/** A sikerarányhoz a kiértékelés 3. szekciója szerint 10 futás kell. */
+/**
+A sikerarányhoz a kiértékelés 3. szekciója szerint 10 futás kell.
+*/
 const REPEAT_COUNT = 10;
 /**
  * Kemény felső korlát a blokkolások számára, a stop_hook_active loop-védelem
@@ -26,46 +28,46 @@ export const M19: MeasurementCase = {
   id: 'M-19',
   title: 'Stop hook kikényszerítés emit_output említése nélkül',
   question: 'Q8 kiegészítés (nyitva maradt kérdés, kiértékelés 3. szekció 1. pont)',
-  async run(ctx) {
+  async run(context) {
     const outcomes: CaseRunOutcome[] = [];
-    for (let i = 0; i < REPEAT_COUNT; i += 1) {
-      let emitOutputCalled = false;
+    for (let index = 0; index < REPEAT_COUNT; index += 1) {
+      let isEmitOutputCalled = false;
       let blockCount = 0;
 
       const emitOutputTool = tool(
         'emit_output',
         'Jelzi, hogy a végső strukturált kimenet elkészült.',
         { result: z.string() },
-        async (args) => {
-          emitOutputCalled = true;
-          return { content: [{ type: 'text', text: `kimenet rögzítve: ${args.result}` }] };
+        (arguments_) => {
+          isEmitOutputCalled = true;
+          return Promise.resolve({ content: [{ type: 'text', text: `kimenet rögzítve: ${arguments_.result}` }] });
         },
       );
       const workflowServer = createSdkMcpServer({ name: 'workflow', tools: [emitOutputTool] });
 
-      const stopHook: HookCallback = async (input) => {
+      const stopHook: HookCallback = (input) => {
         if (input.hook_event_name !== 'Stop') {
-          return { continue: true };
+          return Promise.resolve({ continue: true });
         }
-        if (emitOutputCalled || input.stop_hook_active || blockCount >= MAX_BLOCKS) {
-          return { continue: true };
+        if (isEmitOutputCalled || input.stop_hook_active || blockCount >= MAX_BLOCKS) {
+          return Promise.resolve({ continue: true });
         }
         blockCount += 1;
-        return {
+        return Promise.resolve({
           decision: 'block',
           reason: 'Az emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel.',
-        };
+        });
       };
 
       const outcome = await executeQuery({
-        ctx,
+        ctx: context,
         caseId: 'M-19',
-        runId: `run-${String(i + 1)}`,
+        runId: `run-${String(index + 1)}`,
         // Szándékosan nem említi az emit_output toolt -- a blokkoló ágnak
         // kell kikényszerítenie a meghívását, nem a promptnak.
         prompt: 'Számold ki mennyi 2+2.',
         options: {
-          ...buildBaseOptions(ctx),
+          ...buildBaseOptions(context),
           maxTurns: 8,
           mcpServers: { workflow: workflowServer },
           allowedTools: ['mcp__workflow__emit_output'],
@@ -78,7 +80,7 @@ export const M19: MeasurementCase = {
       outcomes.push({
         runId: outcome.runId,
         ok: outcome.ok,
-        note: `${outcome.note}; blockCount=${String(blockCount)}; emitOutputCalled=${String(emitOutputCalled)}`,
+        note: `${outcome.note}; blockCount=${String(blockCount)}; emitOutputCalled=${String(isEmitOutputCalled)}`,
       });
     }
     return outcomes;

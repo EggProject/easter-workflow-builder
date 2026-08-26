@@ -7,15 +7,15 @@ import type { MeasurementCase } from '../harness/types.ts';
 export const M36: MeasurementCase = {
   id: 'M-36',
   title: 'Rate limit header leltár (M-26 ... M-35 kör)',
-  question: 'rateLimits.retryAfterHeader, rateLimits.rateLimitHeaders (nyitva maradt capability mezők) -- passzív elemzés',
-  async run() {
-    return [
+  question:
+    'rateLimits.retryAfterHeader, rateLimits.rateLimitHeaders (nyitva maradt capability mezők) -- passzív elemzés',
+  run() {
+    return Promise.resolve([
       {
         runId: 'passive',
         ok: true,
-        note:
-          'M-36 nem indít saját kérést -- futtasd a summary.ts-t vagy elemezd kézzel az artifacts/*.json response headereit az M-26 ... M-35 kör tranzakcióira.',
+        note: 'M-36 nem indít saját kérést -- futtasd a summary.ts-t vagy elemezd kézzel az artifacts/*.json response headereit az M-26 ... M-35 kör tranzakcióira.',
       },
-    ];
+    ]);
   },
 };

@@ -6,11 +6,13 @@
  * mérete uralja, ne a kimenet.
  */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import type { CaseContext, CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
 
-/** Legfeljebb ennyi kérést küldünk -- a feladatleírás szerinti kemény korlát. */
+/**
+Legfeljebb ennyi kérést küldünk -- a feladatleírás szerinti kemény korlát.
+*/
 const MAX_REQUESTS = 8;
 /**
  * A futtatókörnyezet egyetlen bash hívása korlátozott fali idejű -- egy nagy
@@ -27,7 +29,9 @@ const PER_INVOCATION_BUDGET_MS = 100_000;
  */
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const INITIAL_TARGET_CHARS = 150_000 * CHARS_PER_TOKEN_ESTIMATE;
-/** Ha a sikeres/hibás határ ennél szűkebb karakterre szűkül, nem érdemes több kérést elkölteni. */
+/**
+Ha a sikeres/hibás határ ennél szűkebb karakterre szűkül, nem érdemes több kérést elkölteni.
+*/
 const CONVERGED_THRESHOLD_CHARS = 4000;
 /**
  * A kimenő max_tokens minimális legyen, hogy az input domináljon a
@@ -56,9 +60,11 @@ interface RunWindow {
   readonly endedAtMs: number;
 }
 
-/** A runner.ts által az executeQuery végén már lemezre írt meta.json startedAt/endedAt mezői. */
-function readRunWindow(ctx: CaseContext, caseId: string, runId: string): RunWindow {
-  const metaPath = join(ctx.outDir, caseId, `${runId}.meta.json`);
+/**
+A runner.ts által az executeQuery végén már lemezre írt meta.json startedAt/endedAt mezői.
+*/
+function readRunWindow(context: CaseContext, caseId: string, runId: string): RunWindow {
+  const metaPath = path.join(context.outDir, caseId, `${runId}.meta.json`);
   const parsed: unknown = JSON.parse(readFileSync(metaPath, 'utf8'));
   if (!isRecord(parsed) || typeof parsed['startedAt'] !== 'string' || typeof parsed['endedAt'] !== 'string') {
     throw new Error(`Váratlan meta.json alak: ${metaPath}`);
@@ -68,7 +74,44 @@ function readRunWindow(ctx: CaseContext, caseId: string, runId: string): RunWind
 
 interface ProxyTransactionLite {
   readonly status: number;
-  readonly inputTokens: number | null;
+  readonly inputTokens: number | undefined;
+}
+
+/**
+Egy SSE `data:` sor JSON-ra parszolva, ha érvényes; `undefined`, ha nem.
+*/
+function parseStreamEventData(event: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(event) || typeof event['raw'] !== 'string' || !event['raw'].startsWith('data:')) {
+    return undefined;
+  }
+  try {
+    const data: unknown = JSON.parse(event['raw'].slice('data:'.length).trim());
+    return isRecord(data) ? data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+A pozitív usage.input_tokens kiolvasása egy SSE `data:` esemény törzséből, akár a legfelső, akár a `message` mezőn keresztül.
+*/
+function extractPositiveInputTokensFromStreamData(data: Record<string, unknown>): number | undefined {
+  if (
+    isRecord(data['usage']) &&
+    typeof data['usage']['input_tokens'] === 'number' &&
+    data['usage']['input_tokens'] > 0
+  ) {
+    return data['usage']['input_tokens'];
+  }
+  if (
+    isRecord(data['message']) &&
+    isRecord(data['message']['usage']) &&
+    typeof data['message']['usage']['input_tokens'] === 'number' &&
+    data['message']['usage']['input_tokens'] > 0
+  ) {
+    return data['message']['usage']['input_tokens'];
+  }
+  return undefined;
 }
 
 /**
@@ -78,46 +121,78 @@ interface ProxyTransactionLite {
  * (helyőrző), a valós érték a záró `message_delta.usage.input_tokens`
  * mezőben jelenik meg -- ezt a mintát az M-15 is megerősítette.
  */
-function extractInputTokens(responseBody: unknown, streamEvents: unknown): number | null {
-  if (isRecord(responseBody) && isRecord(responseBody['usage']) && typeof responseBody['usage']['input_tokens'] === 'number') {
+function extractInputTokens(responseBody: unknown, streamEvents: unknown): number | undefined {
+  if (
+    isRecord(responseBody) &&
+    isRecord(responseBody['usage']) &&
+    typeof responseBody['usage']['input_tokens'] === 'number'
+  ) {
     return responseBody['usage']['input_tokens'];
   }
   if (!Array.isArray(streamEvents)) {
-    return null;
+    return undefined;
   }
-  let found: number | null = null;
-  for (const ev of streamEvents) {
-    if (!isRecord(ev) || typeof ev['raw'] !== 'string' || !ev['raw'].startsWith('data:')) {
+  let found: number | undefined;
+  for (const event of streamEvents) {
+    const data = parseStreamEventData(event);
+    if (data === undefined) {
       continue;
     }
-    let data: unknown;
-    try {
-      data = JSON.parse(ev['raw'].slice('data:'.length).trim());
-    } catch {
-      continue;
-    }
-    if (!isRecord(data)) {
-      continue;
-    }
-    if (isRecord(data['usage']) && typeof data['usage']['input_tokens'] === 'number' && data['usage']['input_tokens'] > 0) {
-      found = data['usage']['input_tokens'];
-    } else if (
-      isRecord(data['message']) &&
-      isRecord(data['message']['usage']) &&
-      typeof data['message']['usage']['input_tokens'] === 'number' &&
-      data['message']['usage']['input_tokens'] > 0
-    ) {
-      found = data['message']['usage']['input_tokens'];
-    }
+    found = extractPositiveInputTokensFromStreamData(data) ?? found;
   }
   return found;
 }
 
-/** A proxy artifacts/*.json tranzakciói közül a POST .../v1/messages kérések, amik a megadott időablakban érkeztek. */
-function readMessagesTransactionsInWindow(artifactsDir: string, window: RunWindow): ProxyTransactionLite[] {
+interface ParsedMessagesTransaction {
+  readonly timestampMs: number;
+  readonly method: string;
+  readonly requestPath: string;
+  readonly status: number;
+  readonly inputTokens: number | undefined;
+}
+
+/**
+Egy proxy artifacts/*.json tranzakció fájl beolvasása; `undefined`, ha nem elemezhető.
+*/
+function parseMessagesTransactionFile(fullPath: string): ParsedMessagesTransaction | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(fullPath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) {
+    return undefined;
+  }
+  const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : NaN;
+  const requestPath = typeof parsed['path'] === 'string' ? parsed['path'] : '';
+  const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
+  const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
+  const inputTokens = extractInputTokens(parsed['responseBody'], parsed['streamEvents']);
+  return { timestampMs, method, requestPath, status, inputTokens };
+}
+
+/**
+A tranzakció a megadott mérési ablakba esik-e (1s tolerancia), és POST .../v1/messages hívás-e.
+*/
+function isMessagesRequestInWindow(transaction: ParsedMessagesTransaction, window: RunWindow): boolean {
+  if (
+    Number.isNaN(transaction.timestampMs) ||
+    transaction.timestampMs < window.startedAtMs - 1000 ||
+    transaction.timestampMs > window.endedAtMs + 1000
+  ) {
+    return false;
+  }
+  return transaction.method === 'POST' && transaction.requestPath.endsWith('/v1/messages');
+}
+
+/**
+A proxy artifacts/*.json tranzakciói közül a POST .../v1/messages kérések, amik a megadott időablakban érkeztek.
+*/
+function readMessagesTransactionsInWindow(artifactsDirectory: string, window: RunWindow): ProxyTransactionLite[] {
   let entries: string[];
   try {
-    entries = readdirSync(artifactsDir);
+    entries = readdirSync(artifactsDirectory);
   } catch {
     return [];
   }
@@ -126,30 +201,11 @@ function readMessagesTransactionsInWindow(artifactsDir: string, window: RunWindo
     if (!entry.endsWith('.json')) {
       continue;
     }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(join(artifactsDir, entry), 'utf8'));
-    } catch {
+    const transaction = parseMessagesTransactionFile(path.join(artifactsDirectory, entry));
+    if (transaction === undefined || !isMessagesRequestInWindow(transaction, window)) {
       continue;
     }
-    if (!isRecord(parsed)) {
-      continue;
-    }
-    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
-    const path = typeof parsed['path'] === 'string' ? parsed['path'] : '';
-    const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
-    if (
-      Number.isNaN(timestampMs) ||
-      timestampMs < window.startedAtMs - 1000 ||
-      timestampMs > window.endedAtMs + 1000 ||
-      method !== 'POST' ||
-      !path.endsWith('/v1/messages')
-    ) {
-      continue;
-    }
-    const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
-    const inputTokens = extractInputTokens(parsed['responseBody'], parsed['streamEvents']);
-    result.push({ status, inputTokens });
+    result.push({ status: transaction.status, inputTokens: transaction.inputTokens });
   }
   return result;
 }
@@ -164,6 +220,11 @@ interface SearchState {
   readonly converged: boolean;
 }
 
+// A harom `null` mezo a `search-state.json` lemezre irt, korabbi futasok kozott
+// megmarado allapot resze: a `loadState` beolvaso ellenorzese (lentebb) explicit
+// `=== null`-t var, ha meg nincs meghatarozott ertek, tehat ez a "nincs meg
+// meghatarozva" szandekos, tipusosan ertelmezett jelolese, nem placeholder.
+/* eslint-disable unicorn/no-null -- lasd a SearchState mezok dokumentaciojat feljebb */
 const INITIAL_STATE: SearchState = {
   requestsDone: 0,
   lowSuccessChars: 0,
@@ -173,15 +234,18 @@ const INITIAL_STATE: SearchState = {
   targetChars: INITIAL_TARGET_CHARS,
   converged: false,
 };
+/* eslint-enable unicorn/no-null */
 
-function stateFilePath(ctx: CaseContext): string {
-  return join(ctx.outDir, 'M-20', 'search-state.json');
+function stateFilePath(context: CaseContext): string {
+  return path.join(context.outDir, 'M-20', 'search-state.json');
 }
 
-/** Az előző invokálás állapota, ha volt -- híján a friss kiindulás. */
-function loadState(ctx: CaseContext): SearchState {
+/**
+Az előző invokálás állapota, ha volt -- híján a friss kiindulás.
+*/
+function loadState(context: CaseContext): SearchState {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(stateFilePath(ctx), 'utf8'));
+    const parsed: unknown = JSON.parse(readFileSync(stateFilePath(context), 'utf8'));
     if (
       isRecord(parsed) &&
       typeof parsed['requestsDone'] === 'number' &&
@@ -208,19 +272,58 @@ function loadState(ctx: CaseContext): SearchState {
   return INITIAL_STATE;
 }
 
-function saveState(ctx: CaseContext, state: SearchState): void {
-  const dir = join(ctx.outDir, 'M-20');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(stateFilePath(ctx), JSON.stringify(state, null, 2), 'utf8');
+function saveState(context: CaseContext, state: SearchState): void {
+  const directory = path.join(context.outDir, 'M-20');
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(stateFilePath(context), JSON.stringify(state, undefined, 2), 'utf8');
+}
+
+/**
+ * Egy próba (`targetChars` méretű kérés) eredményéből számolja a bináris
+ * keresés következő állapotát: sikeres próbánál az alsó határt tolja fel,
+ * hibásnál a felső határt tolja le, és eldönti, konvergált-e.
+ */
+function computeNextState(
+  state: SearchState,
+  requestIndex: number,
+  targetChars: number,
+  isSuccess: boolean,
+  status: number | null,
+  maxInputTokens: number | undefined,
+): SearchState {
+  let { lowSuccessChars, lowSuccessTokens, highFailChars, firstFailStatus } = state;
+  let nextTargetChars: number;
+  if (isSuccess) {
+    lowSuccessChars = targetChars;
+    lowSuccessTokens = maxInputTokens ?? lowSuccessTokens;
+    nextTargetChars = highFailChars === null ? targetChars * 2 : Math.floor((targetChars + highFailChars) / 2);
+  } else {
+    firstFailStatus ??= status;
+    highFailChars = targetChars;
+    nextTargetChars =
+      lowSuccessChars === 0 ? Math.floor(targetChars / 2) : Math.floor((lowSuccessChars + targetChars) / 2);
+  }
+  const isConverged =
+    highFailChars !== null && lowSuccessChars > 0 && highFailChars - lowSuccessChars < CONVERGED_THRESHOLD_CHARS;
+
+  return {
+    requestsDone: requestIndex,
+    lowSuccessChars,
+    lowSuccessTokens,
+    highFailChars,
+    firstFailStatus,
+    targetChars: nextTargetChars,
+    converged: isConverged,
+  };
 }
 
 export const M20: MeasurementCase = {
   id: 'M-20',
   title: 'Kontextusablak felső korlátja bináris kereséssel',
   question: 'Q11 szerver oldali fele (nyitva maradt kérdés, kiértékelés 3. szekció 2. pont)',
-  async run(ctx) {
-    const artifactsDir = join(ctx.outDir, '..');
-    const base = buildBaseOptions(ctx);
+  async run(context) {
+    const artifactsDirectory = path.join(context.outDir, '..');
+    const base = buildBaseOptions(context);
     const options = {
       ...base,
       // [1m] suffix, hogy a kliens oldali 200K-s feltételezett kontextusablak
@@ -231,7 +334,7 @@ export const M20: MeasurementCase = {
     };
 
     const outcomes: CaseRunOutcome[] = [];
-    let state = loadState(ctx);
+    let state = loadState(context);
     const invocationStartedMs = Date.now();
 
     while (
@@ -243,22 +346,27 @@ export const M20: MeasurementCase = {
       const targetChars = state.targetChars;
       const runId = `probe-${String(requestIndex)}-chars${String(targetChars)}`;
       const outcome = await executeQuery({
-        ctx,
+        ctx: context,
         caseId: 'M-20',
         runId,
         prompt: buildFillerPrompt(targetChars),
         options,
         timeoutMs: 90_000,
       });
-      const window = readRunWindow(ctx, 'M-20', runId);
-      const transactions = readMessagesTransactionsInWindow(artifactsDir, window);
+      const window = readRunWindow(context, 'M-20', runId);
+      const transactions = readMessagesTransactionsInWindow(artifactsDirectory, window);
       const failed = transactions.find((t) => t.status !== 200);
-      const success = transactions.length > 0 && failed === undefined;
-      const status = failed !== undefined ? failed.status : (transactions[0]?.status ?? null);
-      const maxInputTokens = transactions.reduce<number | null>(
-        (acc, t) => (t.inputTokens !== null && (acc === null || t.inputTokens > acc) ? t.inputTokens : acc),
-        null,
-      );
+      const isSuccess = transactions.length > 0 && failed === undefined;
+      // A `status` a SearchState.firstFailStatus mezobe kerulhet (lentebb),
+      // aminek a lemezre irt allapot-kontraktusa `number | null`.
+      // eslint-disable-next-line unicorn/no-null -- lasd a SearchState mezok dokumentaciojat
+      const status = failed === undefined ? (transactions[0]?.status ?? null) : failed.status;
+      let maxInputTokens: number | undefined;
+      for (const t of transactions) {
+        if (t.inputTokens !== undefined && (maxInputTokens === undefined || t.inputTokens > maxInputTokens)) {
+          maxInputTokens = t.inputTokens;
+        }
+      }
 
       outcomes.push({
         runId: outcome.runId,
@@ -266,31 +374,8 @@ export const M20: MeasurementCase = {
         note: `${outcome.note}; targetChars=${String(targetChars)}; httpStatus=${String(status)}; measuredInputTokens=${String(maxInputTokens)}`,
       });
 
-      let { lowSuccessChars, lowSuccessTokens, highFailChars, firstFailStatus } = state;
-      let nextTargetChars: number;
-      if (success) {
-        lowSuccessChars = targetChars;
-        lowSuccessTokens = maxInputTokens ?? lowSuccessTokens;
-        nextTargetChars = highFailChars === null ? targetChars * 2 : Math.floor((targetChars + highFailChars) / 2);
-      } else {
-        if (firstFailStatus === null) {
-          firstFailStatus = status;
-        }
-        highFailChars = targetChars;
-        nextTargetChars = lowSuccessChars === 0 ? Math.floor(targetChars / 2) : Math.floor((lowSuccessChars + targetChars) / 2);
-      }
-      const converged = highFailChars !== null && lowSuccessChars > 0 && highFailChars - lowSuccessChars < CONVERGED_THRESHOLD_CHARS;
-
-      state = {
-        requestsDone: requestIndex,
-        lowSuccessChars,
-        lowSuccessTokens,
-        highFailChars,
-        firstFailStatus,
-        targetChars: nextTargetChars,
-        converged,
-      };
-      saveState(ctx, state);
+      state = computeNextState(state, requestIndex, targetChars, isSuccess, status, maxInputTokens);
+      saveState(context, state);
     }
 
     if (state.requestsDone >= MAX_REQUESTS || state.converged) {

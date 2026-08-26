@@ -2,4 +2,4 @@
 // base.json, node.json es react.json fajl, ezeket a fogyaszto csomagok a
 // sajat tsconfig.json "extends" mezojevel hasznaljak, nem ezen a forrason
 // keresztul.
-export const TSCONFIG_PACKAGE_PLACEHOLDER = true;
+export const IS_TSCONFIG_PACKAGE_PLACEHOLDER = true;

@@ -11,11 +11,17 @@ export const M30: MeasurementCase = {
   id: 'M-30',
   title: 'API_TIMEOUT_MS hatása',
   question: 'user env: API_TIMEOUT_MS',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
-    const a = await executeQuery({ ctx, caseId: 'M-30', runId: 'a-base', prompt: DEFAULT_PROMPT, options: base });
+  async run(context) {
+    const base = buildBaseOptions(context);
+    const a = await executeQuery({
+      ctx: context,
+      caseId: 'M-30',
+      runId: 'a-base',
+      prompt: DEFAULT_PROMPT,
+      options: base,
+    });
     const b = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-30',
       runId: 'b-api-timeout-3000000',
       prompt: DEFAULT_PROMPT,

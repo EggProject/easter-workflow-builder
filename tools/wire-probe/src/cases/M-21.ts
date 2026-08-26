@@ -10,10 +10,10 @@ export const M21: MeasurementCase = {
   id: 'M-21',
   title: 'CLAUDE_CODE_DISABLE_TERMINAL_TITLE hatása',
   question: 'Q5 kiegészítés (nyitva maradt kérdés, kiértékelés 3. szekció 3. pont)',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
+  async run(context) {
+    const base = buildBaseOptions(context);
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-21',
       runId: 'a',
       prompt: DEFAULT_PROMPT,

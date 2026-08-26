@@ -4,20 +4,22 @@
  * Falóra-időkorlát AbortController-rel, retry nincs (SPEC-000 3. szekció).
  */
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { redactKnownSecrets } from '../proxy/mask.ts';
 import type { CaseContext, CaseRunOutcome } from './types.ts';
 
 const DEFAULT_TIMEOUT_MS = Number(process.env['WIRE_PROBE_TIMEOUT_MS'] ?? 60_000);
 
-export interface ExecuteQueryParams {
+export interface ExecuteQueryParameters {
   readonly ctx: CaseContext;
   readonly caseId: string;
   readonly runId: string;
   readonly prompt: string | AsyncIterable<SDKUserMessage>;
   readonly options: Options;
-  /** Egyedi időkorlát ehhez a futáshoz; ha nincs megadva, WIRE_PROBE_TIMEOUT_MS / 60s. */
+  /**
+  Egyedi időkorlát ehhez a futáshoz; ha nincs megadva, WIRE_PROBE_TIMEOUT_MS / 60s.
+  */
   readonly timeoutMs?: number;
 }
 
@@ -54,24 +56,26 @@ function describeOptions(options: Options): unknown {
  * `errorMessage` mezőben jelenik meg, és a futás ennek ellenére "ok"-nak számít,
  * amíg a harness maga nem hibázott.
  */
-export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunOutcome> {
-  const { ctx, caseId, runId, prompt, options } = params;
-  const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+export async function executeQuery(parameters: ExecuteQueryParameters): Promise<CaseRunOutcome> {
+  const { ctx, caseId, runId, prompt, options } = parameters;
+  const timeoutMs = parameters.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const caseDir = join(ctx.outDir, caseId);
-  mkdirSync(caseDir, { recursive: true });
-  const messagesPath = join(caseDir, `${runId}.sdk-messages.ndjson`);
-  const metaPath = join(caseDir, `${runId}.meta.json`);
+  const caseDirectory = path.join(ctx.outDir, caseId);
+  mkdirSync(caseDirectory, { recursive: true });
+  const messagesPath = path.join(caseDirectory, `${runId}.sdk-messages.ndjson`);
+  const metaPath = path.join(caseDirectory, `${runId}.meta.json`);
   writeFileSync(messagesPath, '', 'utf8');
 
   const abortController = new AbortController();
-  const timer = setTimeout(() => abortController.abort(), timeoutMs);
+  const timer = setTimeout(() => {
+    abortController.abort();
+  }, timeoutMs);
 
   const startedAt = new Date();
-  let timedOut = false;
-  let resultSubtype: string | null = null;
+  let isTimedOut = false;
+  let resultSubtype: string | undefined;
   let messageCount = 0;
-  let harnessError: string | null = null;
+  let harnessError: string | undefined;
 
   try {
     const stream = query({ prompt, options: { ...options, abortController } });
@@ -82,11 +86,11 @@ export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunO
         resultSubtype = message.subtype;
       }
     }
-  } catch (err) {
+  } catch (error) {
     if (abortController.signal.aborted) {
-      timedOut = true;
+      isTimedOut = true;
     } else {
-      harnessError = err instanceof Error ? err.message : String(err);
+      harnessError = error instanceof Error ? error.message : String(error);
     }
   } finally {
     clearTimeout(timer);
@@ -97,13 +101,13 @@ export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunO
     caseId,
     runId,
     sdkVersionPin: ctx.sdkVersion,
-    model: options.model ?? null,
+    model: options.model,
     proxyBaseUrl: ctx.proxyBaseUrl,
     proxyPort: ctx.proxyPort,
     startedAt: startedAt.toISOString(),
     endedAt: endedAt.toISOString(),
     timeoutMs,
-    timedOut,
+    timedOut: isTimedOut,
     messageCount,
     resultSubtype,
     harnessError,
@@ -116,21 +120,26 @@ export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunO
   const otherKnownSecrets = [process.env['GITHUB_TOKEN'], process.env['GH_TOKEN']].filter(
     (value): value is string => typeof value === 'string' && value.length > 0,
   );
-  const metaJson = redactKnownSecrets(JSON.stringify(meta, null, 2), [ctx.minimaxApiKey, ...otherKnownSecrets]);
+  const metaJson = redactKnownSecrets(JSON.stringify(meta, undefined, 2), [ctx.minimaxApiKey, ...otherKnownSecrets]);
   writeFileSync(metaPath, metaJson, 'utf8');
 
-  const ok = harnessError === null;
-  const note = timedOut
-    ? `timeout ${String(timeoutMs)}ms után megszakítva`
-    : harnessError !== null
-      ? `harness hiba: ${harnessError}`
-      : `result subtype: ${resultSubtype ?? 'nincs result üzenet'} (${String(messageCount)} SDKMessage)`;
+  const isOk = harnessError === undefined;
+  let note: string;
+  if (isTimedOut) {
+    note = `timeout ${String(timeoutMs)}ms után megszakítva`;
+  } else if (harnessError === undefined) {
+    note = `result subtype: ${resultSubtype ?? 'nincs result üzenet'} (${String(messageCount)} SDKMessage)`;
+  } else {
+    note = `harness hiba: ${harnessError}`;
+  }
 
-  return { runId, ok, note };
+  return { runId, ok: isOk, note };
 }
 
-/** A SPEC-000 4. szekció "Közös alapbeállítása", a ctx-ből feltöltve. */
-export function buildBaseOptions(ctx: CaseContext): Options {
+/**
+A SPEC-000 4. szekció "Közös alapbeállítása", a ctx-ből feltöltve.
+*/
+export function buildBaseOptions(context: CaseContext): Options {
   return {
     model: 'MiniMax-M3',
     systemPrompt: { type: 'preset', preset: 'claude_code' },
@@ -139,11 +148,13 @@ export function buildBaseOptions(ctx: CaseContext): Options {
     persistSession: false,
     env: {
       ...process.env,
-      ANTHROPIC_BASE_URL: ctx.proxyBaseUrl,
-      ANTHROPIC_AUTH_TOKEN: ctx.minimaxApiKey,
+      ANTHROPIC_BASE_URL: context.proxyBaseUrl,
+      ANTHROPIC_AUTH_TOKEN: context.minimaxApiKey,
     },
   };
 }
 
-/** Rövid, tool nélkül megválaszolható alapprompt a SPEC-000 közös alapbeállításához. */
+/**
+Rövid, tool nélkül megválaszolható alapprompt a SPEC-000 közös alapbeállításához.
+*/
 export const DEFAULT_PROMPT = 'Mennyi kettő meg kettő? Válaszolj egyetlen számjeggyel, magyarázat nélkül.';

@@ -19,13 +19,13 @@ export const M22: MeasurementCase = {
   id: 'M-22',
   title: 'CLAUDE_CODE_MAX_OUTPUT_TOKENS felső korlátja',
   question: 'Q11 kiegészítés (nyitva maradt kérdés, kiértékelés 3. szekció 4. pont)',
-  async run(ctx) {
-    const base = buildBaseOptions(ctx);
+  async run(context) {
+    const base = buildBaseOptions(context);
     const outcomes: CaseRunOutcome[] = [];
     for (const value of OUTPUT_TOKEN_VALUES) {
       outcomes.push(
         await executeQuery({
-          ctx,
+          ctx: context,
           caseId: 'M-22',
           runId: `max-output-tokens-${value}`,
           prompt: DEFAULT_PROMPT,

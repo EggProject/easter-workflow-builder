@@ -5,28 +5,28 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 
 ## Rögzített verziók
 
-| Csomag | Verzió | Forrás / megjegyzés |
-|---|---|---|
-| `@anthropic-ai/claude-agent-sdk` | 0.3.245 | **pinelve**, lásd lent |
-| TypeScript | **6.0.3** | fix, nem frissítjük 7-re |
-| Bun | 1.4.0 | csak csomagkezelő és workspace |
-| Node.js | 26.7.0 | runtime, `.nvmrc` = v26.0.0 |
-| Turborepo | 2.10.12 | `tasks` séma, nem `pipeline` |
-| React | 19.2.8 | nincs React 20 |
-| Vite | 8.2.2 | Rolldown alapú |
-| `@xyflow/react` | 12.11.5 | MIT, React 19 kompatibilis |
-| Vitest | 4.1.11 | v8 coverage provider |
-| `@playwright/test` | 1.62.1 | |
-| ESLint | 10.9.1 | csak flat config, `.eslintrc` megszűnt |
-| `typescript-eslint` | 8.68.0 | peer: `typescript >=4.8.4 <6.1.0` |
-| `eslint-plugin-unicorn` | 73.0.0 | peer: `eslint >=10.4` |
-| `eslint-plugin-import-x` | 4.17.1 | az `eslint-plugin-import` karbantartott forkja |
-| `eslint-plugin-sonarjs` | 4.2.0 | **LGPL-3.0-only**, dev függőség |
-| Prettier | 3.9.6 | nincs 4.0 |
-| Drizzle ORM | 0.45.2 | még 0.x |
-| `better-sqlite3` | 13.0.3 | natív modul |
-| `ws` | 8.21.3 | |
-| `pino` / `pino-roll` | 10.3.1 / 4.0.0 | log rotation |
+| Csomag                           | Verzió         | Forrás / megjegyzés                            |
+| -------------------------------- | -------------- | ---------------------------------------------- |
+| `@anthropic-ai/claude-agent-sdk` | 0.3.245        | **pinelve**, lásd lent                         |
+| TypeScript                       | **6.0.3**      | fix, nem frissítjük 7-re                       |
+| Bun                              | 1.4.0          | csak csomagkezelő és workspace                 |
+| Node.js                          | 26.7.0         | runtime, `.nvmrc` = v26.0.0                    |
+| Turborepo                        | 2.10.12        | `tasks` séma, nem `pipeline`                   |
+| React                            | 19.2.8         | nincs React 20                                 |
+| Vite                             | 8.2.2          | Rolldown alapú                                 |
+| `@xyflow/react`                  | 12.11.5        | MIT, React 19 kompatibilis                     |
+| Vitest                           | 4.1.11         | v8 coverage provider                           |
+| `@playwright/test`               | 1.62.1         |                                                |
+| ESLint                           | 10.9.1         | csak flat config, `.eslintrc` megszűnt         |
+| `typescript-eslint`              | 8.68.0         | peer: `typescript >=4.8.4 <6.1.0`              |
+| `eslint-plugin-unicorn`          | 73.0.0         | peer: `eslint >=10.4`                          |
+| `eslint-plugin-import-x`         | 4.17.1         | az `eslint-plugin-import` karbantartott forkja |
+| `eslint-plugin-sonarjs`          | 4.2.0          | **LGPL-3.0-only**, dev függőség                |
+| Prettier                         | 3.9.6          | nincs 4.0                                      |
+| Drizzle ORM                      | 0.45.2         | még 0.x                                        |
+| `better-sqlite3`                 | 13.0.3         | natív modul                                    |
+| `ws`                             | 8.21.3         |                                                |
+| `pino` / `pino-roll`             | 10.3.1 / 4.0.0 | log rotation                                   |
 
 ## Miért TypeScript 6.0.3 és nem 7
 
@@ -73,10 +73,10 @@ Forrás: https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/
 
 ## GitHub Actions verziók
 
-| Action | Verzió |
-|---|---|
-| `actions/checkout` | v7.0.1 |
-| `actions/setup-node` | v7.0.0 |
-| `oven-sh/setup-bun` | v2.2.0 |
-| `actions/cache` | v6.1.0 |
+| Action                    | Verzió |
+| ------------------------- | ------ |
+| `actions/checkout`        | v7.0.1 |
+| `actions/setup-node`      | v7.0.0 |
+| `oven-sh/setup-bun`       | v2.2.0 |
+| `actions/cache`           | v6.1.0 |
 | `actions/upload-artifact` | v7.0.1 |

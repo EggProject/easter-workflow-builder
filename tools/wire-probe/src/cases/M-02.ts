@@ -1,8 +1,12 @@
-/** M-02: az outputFormat drótalakja -- Q1. */
+/**
+M-02: az outputFormat drótalakja -- Q1.
+*/
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, DEFAULT_PROMPT, executeQuery } from '../harness/runner.ts';
 
-/** Kétmezős séma: egy string és egy number mező, ahogy a SPEC-000 M-02 előírja. */
+/**
+Kétmezős séma: egy string és egy number mező, ahogy a SPEC-000 M-02 előírja.
+*/
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -16,14 +20,14 @@ export const M02: MeasurementCase = {
   id: 'M-02',
   title: 'outputFormat drótalakja',
   question: 'Q1',
-  async run(ctx) {
+  async run(context) {
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-02',
       runId: 'a',
       prompt: DEFAULT_PROMPT,
       options: {
-        ...buildBaseOptions(ctx),
+        ...buildBaseOptions(context),
         outputFormat: { type: 'json_schema', schema: SCHEMA },
       },
     });

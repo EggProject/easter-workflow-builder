@@ -7,7 +7,7 @@
  * a bemenetet csak a kliens megkerülésével lehet előállítani.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import path from 'node:path';
 import type { CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 
 interface DirectCallResult {
@@ -15,11 +15,14 @@ interface DirectCallResult {
   readonly bodyText: string;
 }
 
-async function callMessages(ctx: { readonly proxyBaseUrl: string; readonly minimaxApiKey: string }, body: unknown): Promise<DirectCallResult> {
-  const response = await fetch(`${ctx.proxyBaseUrl}/v1/messages`, {
+async function callMessages(
+  context: { readonly proxyBaseUrl: string; readonly minimaxApiKey: string },
+  body: unknown,
+): Promise<DirectCallResult> {
+  const response = await fetch(`${context.proxyBaseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
-      'x-api-key': ctx.minimaxApiKey,
+      'x-api-key': context.minimaxApiKey,
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
@@ -29,33 +32,41 @@ async function callMessages(ctx: { readonly proxyBaseUrl: string; readonly minim
   return { status: response.status, bodyText };
 }
 
-const NOOP_TOOL = { name: 'noop', description: 'Nem csinál semmit, csak a tool_choice kikényszerítéshez kell.', input_schema: { type: 'object', properties: {} } };
+const NOOP_TOOL = {
+  name: 'noop',
+  description: 'Nem csinál semmit, csak a tool_choice kikényszerítéshez kell.',
+  input_schema: { type: 'object', properties: {} },
+};
 
 export const M34: MeasurementCase = {
   id: 'M-34',
   title: 'toolChoice.rejectionBehaviour közvetlen HTTP hívással',
   question: 'toolChoice.rejectionBehaviour (nyitva maradt capability mező)',
-  async run(ctx) {
-    const caseDir = join(ctx.outDir, 'M-34');
-    mkdirSync(caseDir, { recursive: true });
+  async run(context) {
+    const caseDirectory = path.join(context.outDir, 'M-34');
+    mkdirSync(caseDirectory, { recursive: true });
 
-    const anyResult = await callMessages(ctx, {
+    const anyResult = await callMessages(context, {
       model: 'MiniMax-M3',
       max_tokens: 16,
       messages: [{ role: 'user', content: 'Mondj egy szót.' }],
       tools: [NOOP_TOOL],
       tool_choice: { type: 'any' },
     });
-    writeFileSync(join(caseDir, 'a-tool-choice-any.json'), JSON.stringify(anyResult, null, 2), 'utf8');
+    writeFileSync(path.join(caseDirectory, 'a-tool-choice-any.json'), JSON.stringify(anyResult, undefined, 2), 'utf8');
 
-    const toolResult = await callMessages(ctx, {
+    const toolResult = await callMessages(context, {
       model: 'MiniMax-M3',
       max_tokens: 16,
       messages: [{ role: 'user', content: 'Mondj egy szót.' }],
       tools: [NOOP_TOOL],
       tool_choice: { type: 'tool', name: 'noop' },
     });
-    writeFileSync(join(caseDir, 'b-tool-choice-tool.json'), JSON.stringify(toolResult, null, 2), 'utf8');
+    writeFileSync(
+      path.join(caseDirectory, 'b-tool-choice-tool.json'),
+      JSON.stringify(toolResult, undefined, 2),
+      'utf8',
+    );
 
     const outcomes: CaseRunOutcome[] = [
       { runId: 'a-tool-choice-any', ok: true, note: `HTTP ${String(anyResult.status)}` },

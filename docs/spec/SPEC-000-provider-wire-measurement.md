@@ -1,11 +1,11 @@
 # SPEC-000: Provider drótszintű mérés
 
-| | |
-|---|---|
-| Státusz | tervezet |
-| Dátum | 2026-08-26 |
+|         |                                                                                                                  |
+| ------- | ---------------------------------------------------------------------------------------------------------------- |
+| Státusz | tervezet                                                                                                         |
+| Dátum   | 2026-08-26                                                                                                       |
 | Bemenet | [`../research/2026-08-26-agent-sdk-minimax.md`](../research/2026-08-26-agent-sdk-minimax.md) 4. szekció (Q1-Q12) |
-| Kimenet | `ProviderCapabilityDescriptor` típusterv + kitöltött `minimax` leíró |
+| Kimenet | `ProviderCapabilityDescriptor` típusterv + kitöltött `minimax` leíró                                             |
 
 ---
 
@@ -49,15 +49,15 @@ Követelmények a proxyval szemben:
 
 Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alkönyvtár (`M-01/`, `M-02/`, ...), tranzakciónként egy sorszámozott alkönyvtár:
 
-| Fájl | Tartalom |
-|---|---|
-| `meta.json` | mérési eset azonosító, SDK verzió, modell, upstream URL, proxy port, futtatás kezdő és záró időbélyege, az esetre beállított `Options` mezők és env változók |
-| `request.headers.json` | a bejövő kérés headerei, maszkolva |
-| `request.body.json` | a kérés törzse szó szerint |
-| `response.meta.json` | HTTP státuszkód, válasz headerek, időzítés |
-| `response.body.json` | nem stream válasz törzse szó szerint |
-| `stream.ndjson` | stream válasznál soronként egy SSE event: `{ "t": <ms>, "raw": "<sor>" }` |
-| `sdk-messages.ndjson` | az SDK oldali `SDKMessage` folyam ugyanahhoz a futáshoz, hogy a drót és az SDK nézet összevethető legyen |
+| Fájl                   | Tartalom                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `meta.json`            | mérési eset azonosító, SDK verzió, modell, upstream URL, proxy port, futtatás kezdő és záró időbélyege, az esetre beállított `Options` mezők és env változók |
+| `request.headers.json` | a bejövő kérés headerei, maszkolva                                                                                                                           |
+| `request.body.json`    | a kérés törzse szó szerint                                                                                                                                   |
+| `response.meta.json`   | HTTP státuszkód, válasz headerek, időzítés                                                                                                                   |
+| `response.body.json`   | nem stream válasz törzse szó szerint                                                                                                                         |
+| `stream.ndjson`        | stream válasznál soronként egy SSE event: `{ "t": <ms>, "raw": "<sor>" }`                                                                                    |
+| `sdk-messages.ndjson`  | az SDK oldali `SDKMessage` folyam ugyanahhoz a futáshoz, hogy a drót és az SDK nézet összevethető legyen                                                     |
 
 ### Maszkolás
 
@@ -68,11 +68,11 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 
 ### Mi kerül gitbe
 
-| Bemegy | Nem megy be |
-|---|---|
-| `docs/measurements/2026-08-26-minimax/**` maszkolt artefaktumai | proxy futásidejű naplója |
-| `meta.json` a beállításokkal | bármi, ami a kulcs értékét tartalmazhatja |
-| `tools/wire-proxy/` forrás | `.env` fájl |
+| Bemegy                                                          | Nem megy be                               |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `docs/measurements/2026-08-26-minimax/**` maszkolt artefaktumai | proxy futásidejű naplója                  |
+| `meta.json` a beállításokkal                                    | bármi, ami a kulcs értékét tartalmazhatja |
+| `tools/wire-proxy/` forrás                                      | `.env` fájl                               |
 
 `.gitignore` bejegyzés kell a proxy naplójára és a `.env` fájlra. A commit előtt kötelező ellenőrzés: a mérési könyvtárban a `MINIMAX_API_KEY` értékére futtatott keresés nulla találatot ad.
 
@@ -80,40 +80,40 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 
 ### Kérdés és eset megfeleltetés
 
-| Kérdés | Esetek |
-|---|---|
-| Q1 `outputFormat` drótalakja | M-02 |
-| Q2 kényszerített `tool_choice` a záró fázisban | M-03 |
-| Q3 `output_config` `effort` nélkül is | M-01, M-04 |
-| Q4 `thinking` JSON alakja | M-05, M-06 |
-| Q5 háttér modellhívás | M-07 |
-| Q6 env kapcsolók hatása a bodyra | M-08, M-14 |
-| Q7 `input_json_delta` tool argumentumokhoz | M-09 |
-| Q8 `Stop` hook `decision: "block"` | M-10 |
-| Q9 `[1m]` suffix | M-11 |
-| Q10 `GET /v1/models` | M-12 |
-| Q11 kontextusablak és auto-compact | M-13 |
-| Q12 `anthropic-beta` header | M-14 |
-| Descriptor kiegészítő mezők | M-15, M-16, M-17, M-18 |
-| Q8 kiegészítés: `Stop` hook kikényszerítés emit_output említése nélkül | M-19 |
-| Q11 kiegészítés: kontextusablak szerver oldali felső korlátja | M-20 |
-| Q5 kiegészítés: `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` tényleges hatása | M-21 |
-| Q11 kiegészítés: `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja | M-22 |
-| M-16 kiegészítés: kép bemenet felismerhető tartalommal | M-23 |
-| `promptCaching` kiegészítés: cache írás igazolása stream nélküli móddal | M-24 |
-| `serverTools` kiegészítés: web_search magasabb `maxTurns` mellett | M-25 |
-| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` | M-26 |
-| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_DISABLE_FAST_MODE` | M-27 |
-| A felhasználó tényleges indító parancsának env változói: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` + `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | M-28 |
-| A felhasználó tényleges indító parancsának env változói: `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélkül | M-29 |
-| A felhasználó tényleges indító parancsának env változói: `API_TIMEOUT_MS` | M-30 |
-| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | M-31 |
-| A felhasználó tényleges indító parancsa, mind a 12 env változóval együtt | M-32 |
-| `promptCaching.mode` kiegészítés: implicit és explicit szétválasztási kísérlet | M-33 |
-| `toolChoice.rejectionBehaviour` (nyitva maradt capability mező) | M-34 |
-| `listedByModelsEndpoint` (nyitva maradt capability mező) | M-35 |
-| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` (nyitva maradt capability mezők) -- passzív elemzés | M-36 |
-| `videoInput` (nyitva maradt capability mező) | nincs mérési eset -- lásd a szöveges indoklást M-25 után |
+| Kérdés                                                                                                                         | Esetek                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| Q1 `outputFormat` drótalakja                                                                                                   | M-02                                                     |
+| Q2 kényszerített `tool_choice` a záró fázisban                                                                                 | M-03                                                     |
+| Q3 `output_config` `effort` nélkül is                                                                                          | M-01, M-04                                               |
+| Q4 `thinking` JSON alakja                                                                                                      | M-05, M-06                                               |
+| Q5 háttér modellhívás                                                                                                          | M-07                                                     |
+| Q6 env kapcsolók hatása a bodyra                                                                                               | M-08, M-14                                               |
+| Q7 `input_json_delta` tool argumentumokhoz                                                                                     | M-09                                                     |
+| Q8 `Stop` hook `decision: "block"`                                                                                             | M-10                                                     |
+| Q9 `[1m]` suffix                                                                                                               | M-11                                                     |
+| Q10 `GET /v1/models`                                                                                                           | M-12                                                     |
+| Q11 kontextusablak és auto-compact                                                                                             | M-13                                                     |
+| Q12 `anthropic-beta` header                                                                                                    | M-14                                                     |
+| Descriptor kiegészítő mezők                                                                                                    | M-15, M-16, M-17, M-18                                   |
+| Q8 kiegészítés: `Stop` hook kikényszerítés emit_output említése nélkül                                                         | M-19                                                     |
+| Q11 kiegészítés: kontextusablak szerver oldali felső korlátja                                                                  | M-20                                                     |
+| Q5 kiegészítés: `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` tényleges hatása                                                          | M-21                                                     |
+| Q11 kiegészítés: `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja                                                                | M-22                                                     |
+| M-16 kiegészítés: kép bemenet felismerhető tartalommal                                                                         | M-23                                                     |
+| `promptCaching` kiegészítés: cache írás igazolása stream nélküli móddal                                                        | M-24                                                     |
+| `serverTools` kiegészítés: web_search magasabb `maxTurns` mellett                                                              | M-25                                                     |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT`                                    | M-26                                                     |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_DISABLE_FAST_MODE`                                       | M-27                                                     |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` + `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | M-28                                                     |
+| A felhasználó tényleges indító parancsának env változói: `ANTHROPIC_DEFAULT_HAIKU_MODEL` suffix nélkül                         | M-29                                                     |
+| A felhasználó tényleges indító parancsának env változói: `API_TIMEOUT_MS`                                                      | M-30                                                     |
+| A felhasználó tényleges indító parancsának env változói: `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`                                | M-31                                                     |
+| A felhasználó tényleges indító parancsa, mind a 12 env változóval együtt                                                       | M-32                                                     |
+| `promptCaching.mode` kiegészítés: implicit és explicit szétválasztási kísérlet                                                 | M-33                                                     |
+| `toolChoice.rejectionBehaviour` (nyitva maradt capability mező)                                                                | M-34                                                     |
+| `listedByModelsEndpoint` (nyitva maradt capability mező)                                                                       | M-35                                                     |
+| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` (nyitva maradt capability mezők) -- passzív elemzés               | M-36                                                     |
+| `videoInput` (nyitva maradt capability mező)                                                                                   | nincs mérési eset -- lásd a szöveges indoklást M-25 után |
 
 ### Közös alapbeállítás
 
@@ -425,9 +425,7 @@ type Fact<TValue> =
   | { readonly state: 'unknown'; readonly reason: string; readonly blockedBy: readonly MeasurementId[] };
 
 /** Typeguard, hogy a fogyasztó oldal ne olvashasson értéket ismeretlen mezőből. */
-function isKnown<TValue>(
-  fact: Fact<TValue>,
-): fact is Extract<Fact<TValue>, { readonly state: 'known' }> {
+function isKnown<TValue>(fact: Fact<TValue>): fact is Extract<Fact<TValue>, { readonly state: 'known' }> {
   return fact.state === 'known';
 }
 ```
@@ -629,10 +627,7 @@ interface EnvRequirement {
   readonly evidence: EvidenceList;
 }
 
-interface ProviderCapabilityDescriptor<
-  TModelId extends string,
-  TFamilyId extends string,
-> {
+interface ProviderCapabilityDescriptor<TModelId extends string, TFamilyId extends string> {
   readonly id: 'claude-subscription' | 'minimax';
   readonly displayName: string;
   /** Az SDK verzió, amivel a mérés készült. Frissítés előtt regresszió kell. */
@@ -640,7 +635,11 @@ interface ProviderCapabilityDescriptor<
   readonly measuredAt: string;
   readonly requiredEnv: readonly EnvRequirement[];
   /** Env változók, amiket ezzel a providerrel tilos beállítani. */
-  readonly disallowedEnv: readonly { readonly name: string; readonly reason: string; readonly evidence: EvidenceList }[];
+  readonly disallowedEnv: readonly {
+    readonly name: string;
+    readonly reason: string;
+    readonly evidence: EvidenceList;
+  }[];
   readonly structuredOutput: StructuredOutputCapability;
   readonly toolChoice: ToolChoiceCapability;
   readonly thinking: ThinkingCapability<TFamilyId>;
@@ -659,78 +658,78 @@ interface ProviderCapabilityDescriptor<
 
 ### Mezőmagyarázatok
 
-| Mező | Mit ír le | Honnan jön |
-|---|---|---|
-| `sdkVersionPin` | melyik SDK verzióval érvényes a leíró, mert a body mezőlista verziónként bővül | `meta.json` |
-| `requiredEnv` | a provider config env blokkja, `secret: true` esetén csak a NÉV perzisztálódik | M-08, M-14 |
-| `disallowedEnv` | amit tilos beállítani, mert rontja a kompatibilitást | research 3. szekció |
-| `structuredOutput.strategies` | stratégiánként külön használhatóság és a blokkoló drótrészlet | M-02, M-03, M-10 |
-| `structuredOutput.defaultStrategy` | melyik lesz a lépések alapértelmezése ennél a providernél | M-02, M-03, M-10 |
-| `structuredOutput.outputConfigAlwaysSent` | Q3, ez dönti el, használható-e egyáltalán a provider | M-01, M-04 |
-| `toolChoice.accepted` | a provider által elfogadott értékek | research 2. szekció, M-03 |
-| `toolChoice.sdkSendsForcedChoice` | Q2, küld-e az SDK olyat, amit a provider nem fogad | M-03 |
-| `thinking.byModelFamily` | modellcsaládonkénti thinking módok | research 2. szekció, M-05, M-06 |
-| `thinking.wireShape` | a kimenő JSON pontos alakja, nem parafrázis | M-05, M-06 |
-| `effort` | elfogadott-e, és melyik body mezőben utazik | M-04 |
-| `promptCaching` | mód, breakpoint limit, TTL, minimum token, usage mezők | research 2. szekció, M-15 |
-| `streaming.toolInputDelta` | Q7, a tool argumentum delta alakja | M-09 |
-| `streaming.streamDisableable` | kikapcsolható-e a `stream` a dróton, SDK szintű tulajdonság | M-24 |
-| `serverTools` | ténylegesen elérhető szerver oldali toolok, nem elméleti lista | M-17, M-25 |
-| `models` | kontextus és output limitek, kép/videó bemenet, listázottság | research 2. szekció, M-12, M-13, M-16, M-20, M-23 |
-| `models[].maxOutputTokensWireCeiling` | a kimenő `max_tokens` kliens oldali vágása, a provider korlátjától függetlenül | M-22 |
-| `models[].clientModelIdentifier` | amit a kliensnek át kell adni, ha az az `id` mezőtől eltér (`[1m]` suffix) | M-11, M-29, M-32 |
-| `promptCaching.callerBreakpointSurvivesDisable` | a hívó fél saját `cache_control` blokkját levágja-e a `disableEnvVar` | M-33 |
-| `modelsEndpoint` | a `GET /v1/models` elérhetősége közvetlen hívással, és hogy az SDK hívja-e | M-12, M-35 |
-| `concurrency` | a subagent korlát env változó, és a mellette megfigyelt egyidejű kérésszám | M-31 |
-| `rateLimits` | dokumentált bucketek plusz a megfigyelt headerek | research 2. szekció, M-18, M-36 |
-| `anthropicBetaHeaders` | Q12, a header elemek, párban a body mezőkkel | M-14 |
+| Mező                                            | Mit ír le                                                                      | Honnan jön                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------- |
+| `sdkVersionPin`                                 | melyik SDK verzióval érvényes a leíró, mert a body mezőlista verziónként bővül | `meta.json`                                       |
+| `requiredEnv`                                   | a provider config env blokkja, `secret: true` esetén csak a NÉV perzisztálódik | M-08, M-14                                        |
+| `disallowedEnv`                                 | amit tilos beállítani, mert rontja a kompatibilitást                           | research 3. szekció                               |
+| `structuredOutput.strategies`                   | stratégiánként külön használhatóság és a blokkoló drótrészlet                  | M-02, M-03, M-10                                  |
+| `structuredOutput.defaultStrategy`              | melyik lesz a lépések alapértelmezése ennél a providernél                      | M-02, M-03, M-10                                  |
+| `structuredOutput.outputConfigAlwaysSent`       | Q3, ez dönti el, használható-e egyáltalán a provider                           | M-01, M-04                                        |
+| `toolChoice.accepted`                           | a provider által elfogadott értékek                                            | research 2. szekció, M-03                         |
+| `toolChoice.sdkSendsForcedChoice`               | Q2, küld-e az SDK olyat, amit a provider nem fogad                             | M-03                                              |
+| `thinking.byModelFamily`                        | modellcsaládonkénti thinking módok                                             | research 2. szekció, M-05, M-06                   |
+| `thinking.wireShape`                            | a kimenő JSON pontos alakja, nem parafrázis                                    | M-05, M-06                                        |
+| `effort`                                        | elfogadott-e, és melyik body mezőben utazik                                    | M-04                                              |
+| `promptCaching`                                 | mód, breakpoint limit, TTL, minimum token, usage mezők                         | research 2. szekció, M-15                         |
+| `streaming.toolInputDelta`                      | Q7, a tool argumentum delta alakja                                             | M-09                                              |
+| `streaming.streamDisableable`                   | kikapcsolható-e a `stream` a dróton, SDK szintű tulajdonság                    | M-24                                              |
+| `serverTools`                                   | ténylegesen elérhető szerver oldali toolok, nem elméleti lista                 | M-17, M-25                                        |
+| `models`                                        | kontextus és output limitek, kép/videó bemenet, listázottság                   | research 2. szekció, M-12, M-13, M-16, M-20, M-23 |
+| `models[].maxOutputTokensWireCeiling`           | a kimenő `max_tokens` kliens oldali vágása, a provider korlátjától függetlenül | M-22                                              |
+| `models[].clientModelIdentifier`                | amit a kliensnek át kell adni, ha az az `id` mezőtől eltér (`[1m]` suffix)     | M-11, M-29, M-32                                  |
+| `promptCaching.callerBreakpointSurvivesDisable` | a hívó fél saját `cache_control` blokkját levágja-e a `disableEnvVar`          | M-33                                              |
+| `modelsEndpoint`                                | a `GET /v1/models` elérhetősége közvetlen hívással, és hogy az SDK hívja-e     | M-12, M-35                                        |
+| `concurrency`                                   | a subagent korlát env változó, és a mellette megfigyelt egyidejű kérésszám     | M-31                                              |
+| `rateLimits`                                    | dokumentált bucketek plusz a megfigyelt headerek                               | research 2. szekció, M-18, M-36                   |
+| `anthropicBetaHeaders`                          | Q12, a header elemek, párban a body mezőkkel                                   | M-14                                              |
 
 ### A `minimax` leíró jelen állapota
 
 A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModelId, MiniMaxFamilyId>` alakban íródik, ahol `MiniMaxModelId = 'MiniMax-M3'`, `MiniMaxFamilyId = 'M3'`. A mérés lezárása előtti állapot:
 
-| Mező | Állapot | Érték / indok | Bizonyíték |
-|---|---|---|---|
-| `id`, `displayName` | known | `'minimax'` | konfigdöntés |
-| `sdkVersionPin` | known | a mérés `meta.json`-jából | M-01 |
-| `requiredEnv[ANTHROPIC_BASE_URL]` | known | `literal`, `https://api.minimax.io/anthropic`, `secret: false` | research 2. szekció |
-| `requiredEnv[ANTHROPIC_AUTH_TOKEN]` | known | `process_env_passthrough` a `MINIMAX_API_KEY` névből, `secret: true` | research 2. és 3. szekció |
-| `requiredEnv` további elemei | unknown | az env kapcsoló mátrix eredményéből áll össze | blokkolja M-08, M-14, M-07 |
-| `disallowedEnv` | known | `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING`, `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`, mindkettő kerülendő custom base URL mellett | research 3. szekció |
-| `structuredOutput.strategies[emit_output_tool].usable` | unknown | a `Stop` hook viselkedése MiniMax ellen nem ismert | blokkolja M-10 |
-| `structuredOutput.strategies[sdk_output_format].usable` | unknown | a séma drótalakja nem ismert | blokkolja M-02, M-03 |
-| `structuredOutput.defaultStrategy` | unknown | a két stratégia mérése után dől el | blokkolja M-02, M-03, M-10 |
-| `structuredOutput.outputConfigAlwaysSent` | unknown | Q3 | blokkolja M-01, M-04 |
-| `toolChoice.accepted` | known | `['auto','none']` | research 2. szekció |
-| `toolChoice.rejectionBehaviour` | unknown | 400 vagy csendes eldobás, nem mértük | blokkolja M-03 |
-| `toolChoice.sdkSendsForcedChoice` | unknown | Q2 | blokkolja M-03 |
-| `thinking.byModelFamily.M3` | known | `['disabled','adaptive']`, alapból ki | research 2. szekció |
-| `thinking.wireShape` | unknown | Q4, az SDK által küldött JSON nem ismert | blokkolja M-05, M-06 |
-| `thinking.sendsBudgetTokens` | unknown | a provider sémájában nincs `budget_tokens`, de az SDK küldhet | blokkolja M-05 |
-| `thinking.interleavedSignatureRequired` | known | M3-nál a thinking blokkot signature-rel vissza kell adni | research 2. szekció |
-| `thinking.streamEventTypes` | known | `content_block_start` thinking blokkal, `thinking_delta`, `signature_delta`, `content_block_stop` | research 2. szekció |
-| `effort.accepted` | unknown | az `output_config` 400 kockázata miatt kritikus | blokkolja M-04 |
-| `effort.wireField` | unknown | nem ismert, melyik body mezőben utazik | blokkolja M-04 |
-| `promptCaching.mode` | known | `implicit_and_explicit` | research 2. szekció |
-| `promptCaching.explicitBreakpointLimit` | known | 4 | research 2. szekció |
-| `promptCaching.ttlSeconds` | known | 300 | research 2. szekció |
-| `promptCaching.minimumInputTokens` | known | 512 | research 2. szekció |
-| `promptCaching.usageFields` | known | `cache_creation_input_tokens`, `cache_read_input_tokens` | research 2. szekció |
-| `promptCaching.disableEnvVar` | known | `DISABLE_PROMPT_CACHING` | research 3. szekció |
-| `streaming.sse` | known | `true` | research 2. szekció |
-| `streaming.toolInputDelta` | unknown | Q7 | blokkolja M-09 |
-| `streaming.sdkReassemblesToolInput` | unknown | Q7 | blokkolja M-09 |
-| `streaming.fineGrainedToolStreaming` | known | `false`, nem-first-party base URL mellett az SDK kikapcsolja | research 3. szekció |
-| `serverTools` | unknown | a béta `web_search` elérhetősége a mi hívási utunkon nem ismert | blokkolja M-17 |
-| `models[].contextWindow`, `maxOutputTokens*` | known | a research modelltáblázata szerint | research 2. szekció |
-| `models[].effectiveContextWindowOnWire` | unknown | Q11, a 200K kontra 1M ellentmondás nyitott | blokkolja M-13 |
-| `models[MiniMax-M3].imageInput` | unknown | a research táblázata összevont kép és videó oszlopot használ, külön kép bizonyíték nincs | blokkolja M-16 |
-| `models[MiniMax-M3].videoInput` | unknown | ugyanaz az összevont oszlop, külön videó bizonyíték nincs | blokkolja M-16 |
-| `models[].listedByModelsEndpoint` | unknown | Q10 | blokkolja M-12 |
-| `rateLimits.buckets` | known | M3: 200 RPM / 10M TPM | research 2. szekció |
-| `rateLimits.retryAfterHeader` | unknown | a `Retry-After` nincs dokumentálva, mérés kell | blokkolja M-18 |
-| `rateLimits.rateLimitHeaders` | unknown | a megfigyelt headerlista a mérésből jön | blokkolja M-18 |
-| `anthropicBetaHeaders` | unknown | Q12 | blokkolja M-14 |
+| Mező                                                    | Állapot | Érték / indok                                                                                                                          | Bizonyíték                 |
+| ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `id`, `displayName`                                     | known   | `'minimax'`                                                                                                                            | konfigdöntés               |
+| `sdkVersionPin`                                         | known   | a mérés `meta.json`-jából                                                                                                              | M-01                       |
+| `requiredEnv[ANTHROPIC_BASE_URL]`                       | known   | `literal`, `https://api.minimax.io/anthropic`, `secret: false`                                                                         | research 2. szekció        |
+| `requiredEnv[ANTHROPIC_AUTH_TOKEN]`                     | known   | `process_env_passthrough` a `MINIMAX_API_KEY` névből, `secret: true`                                                                   | research 2. és 3. szekció  |
+| `requiredEnv` további elemei                            | unknown | az env kapcsoló mátrix eredményéből áll össze                                                                                          | blokkolja M-08, M-14, M-07 |
+| `disallowedEnv`                                         | known   | `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING`, `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`, mindkettő kerülendő custom base URL mellett | research 3. szekció        |
+| `structuredOutput.strategies[emit_output_tool].usable`  | unknown | a `Stop` hook viselkedése MiniMax ellen nem ismert                                                                                     | blokkolja M-10             |
+| `structuredOutput.strategies[sdk_output_format].usable` | unknown | a séma drótalakja nem ismert                                                                                                           | blokkolja M-02, M-03       |
+| `structuredOutput.defaultStrategy`                      | unknown | a két stratégia mérése után dől el                                                                                                     | blokkolja M-02, M-03, M-10 |
+| `structuredOutput.outputConfigAlwaysSent`               | unknown | Q3                                                                                                                                     | blokkolja M-01, M-04       |
+| `toolChoice.accepted`                                   | known   | `['auto','none']`                                                                                                                      | research 2. szekció        |
+| `toolChoice.rejectionBehaviour`                         | unknown | 400 vagy csendes eldobás, nem mértük                                                                                                   | blokkolja M-03             |
+| `toolChoice.sdkSendsForcedChoice`                       | unknown | Q2                                                                                                                                     | blokkolja M-03             |
+| `thinking.byModelFamily.M3`                             | known   | `['disabled','adaptive']`, alapból ki                                                                                                  | research 2. szekció        |
+| `thinking.wireShape`                                    | unknown | Q4, az SDK által küldött JSON nem ismert                                                                                               | blokkolja M-05, M-06       |
+| `thinking.sendsBudgetTokens`                            | unknown | a provider sémájában nincs `budget_tokens`, de az SDK küldhet                                                                          | blokkolja M-05             |
+| `thinking.interleavedSignatureRequired`                 | known   | M3-nál a thinking blokkot signature-rel vissza kell adni                                                                               | research 2. szekció        |
+| `thinking.streamEventTypes`                             | known   | `content_block_start` thinking blokkal, `thinking_delta`, `signature_delta`, `content_block_stop`                                      | research 2. szekció        |
+| `effort.accepted`                                       | unknown | az `output_config` 400 kockázata miatt kritikus                                                                                        | blokkolja M-04             |
+| `effort.wireField`                                      | unknown | nem ismert, melyik body mezőben utazik                                                                                                 | blokkolja M-04             |
+| `promptCaching.mode`                                    | known   | `implicit_and_explicit`                                                                                                                | research 2. szekció        |
+| `promptCaching.explicitBreakpointLimit`                 | known   | 4                                                                                                                                      | research 2. szekció        |
+| `promptCaching.ttlSeconds`                              | known   | 300                                                                                                                                    | research 2. szekció        |
+| `promptCaching.minimumInputTokens`                      | known   | 512                                                                                                                                    | research 2. szekció        |
+| `promptCaching.usageFields`                             | known   | `cache_creation_input_tokens`, `cache_read_input_tokens`                                                                               | research 2. szekció        |
+| `promptCaching.disableEnvVar`                           | known   | `DISABLE_PROMPT_CACHING`                                                                                                               | research 3. szekció        |
+| `streaming.sse`                                         | known   | `true`                                                                                                                                 | research 2. szekció        |
+| `streaming.toolInputDelta`                              | unknown | Q7                                                                                                                                     | blokkolja M-09             |
+| `streaming.sdkReassemblesToolInput`                     | unknown | Q7                                                                                                                                     | blokkolja M-09             |
+| `streaming.fineGrainedToolStreaming`                    | known   | `false`, nem-first-party base URL mellett az SDK kikapcsolja                                                                           | research 3. szekció        |
+| `serverTools`                                           | unknown | a béta `web_search` elérhetősége a mi hívási utunkon nem ismert                                                                        | blokkolja M-17             |
+| `models[].contextWindow`, `maxOutputTokens*`            | known   | a research modelltáblázata szerint                                                                                                     | research 2. szekció        |
+| `models[].effectiveContextWindowOnWire`                 | unknown | Q11, a 200K kontra 1M ellentmondás nyitott                                                                                             | blokkolja M-13             |
+| `models[MiniMax-M3].imageInput`                         | unknown | a research táblázata összevont kép és videó oszlopot használ, külön kép bizonyíték nincs                                               | blokkolja M-16             |
+| `models[MiniMax-M3].videoInput`                         | unknown | ugyanaz az összevont oszlop, külön videó bizonyíték nincs                                                                              | blokkolja M-16             |
+| `models[].listedByModelsEndpoint`                       | unknown | Q10                                                                                                                                    | blokkolja M-12             |
+| `rateLimits.buckets`                                    | known   | M3: 200 RPM / 10M TPM                                                                                                                  | research 2. szekció        |
+| `rateLimits.retryAfterHeader`                           | unknown | a `Retry-After` nincs dokumentálva, mérés kell                                                                                         | blokkolja M-18             |
+| `rateLimits.rateLimitHeaders`                           | unknown | a megfigyelt headerlista a mérésből jön                                                                                                | blokkolja M-18             |
+| `anthropicBetaHeaders`                                  | unknown | Q12                                                                                                                                    | blokkolja M-14             |
 
 ## 6. Elfogadási kritériumok
 
@@ -749,14 +748,14 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 
 ## 7. Kockázatok és amit nem tudunk lezárni ebben a specben
 
-| Kockázat | Hatás | Kezelés |
-|---|---|---|
-| A proxy közbeiktatása megváltoztatja a transzport paramétereket (protokoll verzió, tömörítés, kapcsolat újrahasznosítás) | a mért viselkedés eltérhet a proxy nélkülitől | a `meta.json` rögzíti a transzport jellemzőit; a kritikus eseteket proxy nélkül, csak a HTTP kód szintjén ellenőrizzük |
-| Az SDK verzió frissítése bővíti a body mezőlistát | a lezárt Q kérdések újranyílnak | `sdkVersionPin` a leíróban, és minden SDK frissítés előtt a teljes M-01 ... M-18 sor újrafuttatása |
-| A MiniMax szerver oldalon változtat, dokumentáció nélkül | a leíró csendben elavul | a `measuredAt` mező és a mérés újrafuttathatósága; a Kapcsolat teszt gomb eltérés esetén jelez |
-| A `claude-subscription` provider drótszinten nem mérhető ezzel az eszközzel | erre a providerre nincs azonos minőségű bizonyíték | ott a leíró az SDK oldali `SDKMessage` folyamból és a hivatalos dokumentációból töltődik, és ezt az `evidence` mező típusa megkülönbözteti |
-| Ha a mérés alatt nem keletkezik 429-es válasz | a rate limit headerek ismeretlenek maradnak | a mező `unknown` marad, szándékos rate limit kimerítést nem végzünk |
-| A `[1m]` suffix a research szerint a Claude Code kliens konvenciója, nem MiniMax paraméter | nem tudjuk, hogy az SDK ugyanúgy kezeli-e, mint a CLI | M-11 méri, de ha az SDK-ban egyáltalán nem értelmezett, a kérdés a CLI-re nyitva marad |
-| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M3) | hosszú workflow-k adatátadása romolhat | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell |
-| Végtelen retry loop timeoutnál | a mérés beragadhat | a proxy nem retry-zik, és minden futásra felső időkorlát van, aminek az értéke a `meta.json`-ba kerül |
-| Az `Options.effort` és `Options.thinking` enum értékei nincsenek a research fájlban | a mérés előtt nem definiálható a pontos beállítás | a mérés előtt a telepített SDK típusdefiníciójából kell kiolvasni, és a `meta.json`-ba rögzíteni |
+| Kockázat                                                                                                                 | Hatás                                                 | Kezelés                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A proxy közbeiktatása megváltoztatja a transzport paramétereket (protokoll verzió, tömörítés, kapcsolat újrahasznosítás) | a mért viselkedés eltérhet a proxy nélkülitől         | a `meta.json` rögzíti a transzport jellemzőit; a kritikus eseteket proxy nélkül, csak a HTTP kód szintjén ellenőrizzük                     |
+| Az SDK verzió frissítése bővíti a body mezőlistát                                                                        | a lezárt Q kérdések újranyílnak                       | `sdkVersionPin` a leíróban, és minden SDK frissítés előtt a teljes M-01 ... M-18 sor újrafuttatása                                         |
+| A MiniMax szerver oldalon változtat, dokumentáció nélkül                                                                 | a leíró csendben elavul                               | a `measuredAt` mező és a mérés újrafuttathatósága; a Kapcsolat teszt gomb eltérés esetén jelez                                             |
+| A `claude-subscription` provider drótszinten nem mérhető ezzel az eszközzel                                              | erre a providerre nincs azonos minőségű bizonyíték    | ott a leíró az SDK oldali `SDKMessage` folyamból és a hivatalos dokumentációból töltődik, és ezt az `evidence` mező típusa megkülönbözteti |
+| Ha a mérés alatt nem keletkezik 429-es válasz                                                                            | a rate limit headerek ismeretlenek maradnak           | a mező `unknown` marad, szándékos rate limit kimerítést nem végzünk                                                                        |
+| A `[1m]` suffix a research szerint a Claude Code kliens konvenciója, nem MiniMax paraméter                               | nem tudjuk, hogy az SDK ugyanúgy kezeli-e, mint a CLI | M-11 méri, de ha az SDK-ban egyáltalán nem értelmezett, a kérdés a CLI-re nyitva marad                                                     |
+| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M3)                                        | hosszú workflow-k adatátadása romolhat                | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell                                   |
+| Végtelen retry loop timeoutnál                                                                                           | a mérés beragadhat                                    | a proxy nem retry-zik, és minden futásra felső időkorlát van, aminek az értéke a `meta.json`-ba kerül                                      |
+| Az `Options.effort` és `Options.thinking` enum értékei nincsenek a research fájlban                                      | a mérés előtt nem definiálható a pontos beállítás     | a mérés előtt a telepített SDK típusdefiníciójából kell kiolvasni, és a `meta.json`-ba rögzíteni                                           |

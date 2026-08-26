@@ -9,14 +9,13 @@ export const M18: MeasurementCase = {
   id: 'M-18',
   title: 'Hiba és rate limit header leltár',
   question: 'rateLimits (descriptor kiegészítő mező) -- passzív elemzés az összes korábbi eset artefaktumából',
-  async run() {
-    return [
+  run() {
+    return Promise.resolve([
       {
         runId: 'passive',
         ok: true,
-        note:
-          'M-18 nem indít saját kérést -- futtasd a summary.ts-t az összes korábbi proxy tranzakció headerkészletének és hibaválaszainak elemzéséhez.',
+        note: 'M-18 nem indít saját kérést -- futtasd a summary.ts-t az összes korábbi proxy tranzakció headerkészletének és hibaválaszainak elemzéséhez.',
       },
-    ];
+    ]);
   },
 };

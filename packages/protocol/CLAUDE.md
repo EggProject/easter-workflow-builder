@@ -8,8 +8,8 @@ placeholder export van benne, hogy a csomag lefordulhasson.
 
 ## Fájlok
 
-| Fájl | Tartalom |
-|---|---|
+| Fájl           | Tartalom                                              |
+| -------------- | ----------------------------------------------------- |
 | `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson |
 
 ## Függőségi irány

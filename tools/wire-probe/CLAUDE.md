@@ -91,12 +91,12 @@ src/
   probe.ts                a harness belépési pontja (CLI: bun run probe <eset...>)
   harness/
     types.ts               CaseContext, MeasurementCase, CaseRunOutcome
-    env.ts                  MINIMAX_API_KEY betöltése process.env-ből vagy .env-ből
+    environment.ts           MINIMAX_API_KEY betöltése process.env-ből vagy .env-ből
     sdk-constants.ts         a telepített SDK típusdefiníciójából kiolvasott enumok
     runner.ts                közös futtató logika: executeQuery(), buildBaseOptions()
   cases/
     index.ts                típusos registry: CASE_REGISTRY, CASE_IDS
-    M-01.ts ... M-18.ts      egy mérési eset egy fájlban, a SPEC-000 4. szekció szerint
+    m-01.ts ... m-36.ts      egy mérési eset egy fájlban, a SPEC-000 4. szekció szerint
   summary.ts               token-takarékos összefoglaló script (CLI: bun run summary)
 ```
 

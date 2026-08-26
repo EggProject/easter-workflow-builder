@@ -8,8 +8,8 @@ hogy a csomag lefordulhasson. A tényleges alkalmazás egy későbbi specifikác
 
 ## Fájlok
 
-| Fájl | Tartalom |
-|---|---|
+| Fájl           | Tartalom                                              |
+| -------------- | ----------------------------------------------------- |
 | `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson |
 
 ## Függőségi irány

@@ -9,20 +9,22 @@
 import type { MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
 
-/** Az M-17 nyolc kérés után elfogyott maxTurns: 3 mellett -- a case saját döntése alapján ez magasabb korlát. */
+/**
+Az M-17 nyolc kérés után elfogyott maxTurns: 3 mellett -- a case saját döntése alapján ez magasabb korlát.
+*/
 const HIGHER_MAX_TURNS = 12;
 
 export const M25: MeasurementCase = {
   id: 'M-25',
   title: 'Szerver oldali tool magasabb maxTurns mellett',
   question: 'serverTools kiegészítés (nyitva maradt kérdés, kiértékelés 3. szekció 8. pont)',
-  async run(ctx) {
+  async run(context) {
     const outcome = await executeQuery({
-      ctx,
+      ctx: context,
       caseId: 'M-25',
       runId: 'a',
       prompt: 'Keress rá webes keresővel, hogy mennyi ma a Bitcoin árfolyama dollárban.',
-      options: { ...buildBaseOptions(ctx), maxTurns: HIGHER_MAX_TURNS, allowedTools: ['WebSearch'] },
+      options: { ...buildBaseOptions(context), maxTurns: HIGHER_MAX_TURNS, allowedTools: ['WebSearch'] },
       timeoutMs: 120_000,
     });
     return [outcome];

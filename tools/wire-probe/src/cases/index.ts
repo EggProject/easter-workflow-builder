@@ -1,41 +1,43 @@
-/** Az összes mérési eset típusos registrybe gyűjtve. */
+/**
+Az összes mérési eset típusos registrybe gyűjtve.
+*/
 import type { MeasurementCase } from '../harness/types.ts';
-import { M01 } from './M-01.ts';
-import { M02 } from './M-02.ts';
-import { M03 } from './M-03.ts';
-import { M04 } from './M-04.ts';
-import { M05 } from './M-05.ts';
-import { M06 } from './M-06.ts';
-import { M07 } from './M-07.ts';
-import { M08 } from './M-08.ts';
-import { M09 } from './M-09.ts';
-import { M10 } from './M-10.ts';
-import { M11 } from './M-11.ts';
-import { M12 } from './M-12.ts';
-import { M13 } from './M-13.ts';
-import { M14 } from './M-14.ts';
-import { M15 } from './M-15.ts';
-import { M16 } from './M-16.ts';
-import { M17 } from './M-17.ts';
-import { M18 } from './M-18.ts';
-import { M19 } from './M-19.ts';
-import { M20 } from './M-20.ts';
-import { M21 } from './M-21.ts';
-import { M22 } from './M-22.ts';
-import { M23 } from './M-23.ts';
-import { M24 } from './M-24.ts';
-import { M25 } from './M-25.ts';
-import { M26 } from './M-26.ts';
-import { M27 } from './M-27.ts';
-import { M28 } from './M-28.ts';
-import { M29 } from './M-29.ts';
-import { M30 } from './M-30.ts';
-import { M31 } from './M-31.ts';
-import { M32 } from './M-32.ts';
-import { M33 } from './M-33.ts';
-import { M34 } from './M-34.ts';
-import { M35 } from './M-35.ts';
-import { M36 } from './M-36.ts';
+import { M01 } from './m-01.ts';
+import { M02 } from './m-02.ts';
+import { M03 } from './m-03.ts';
+import { M04 } from './m-04.ts';
+import { M05 } from './m-05.ts';
+import { M06 } from './m-06.ts';
+import { M07 } from './m-07.ts';
+import { M08 } from './m-08.ts';
+import { M09 } from './m-09.ts';
+import { M10 } from './m-10.ts';
+import { M11 } from './m-11.ts';
+import { M12 } from './m-12.ts';
+import { M13 } from './m-13.ts';
+import { M14 } from './m-14.ts';
+import { M15 } from './m-15.ts';
+import { M16 } from './m-16.ts';
+import { M17 } from './m-17.ts';
+import { M18 } from './m-18.ts';
+import { M19 } from './m-19.ts';
+import { M20 } from './m-20.ts';
+import { M21 } from './m-21.ts';
+import { M22 } from './m-22.ts';
+import { M23 } from './m-23.ts';
+import { M24 } from './m-24.ts';
+import { M25 } from './m-25.ts';
+import { M26 } from './m-26.ts';
+import { M27 } from './m-27.ts';
+import { M28 } from './m-28.ts';
+import { M29 } from './m-29.ts';
+import { M30 } from './m-30.ts';
+import { M31 } from './m-31.ts';
+import { M32 } from './m-32.ts';
+import { M33 } from './m-33.ts';
+import { M34 } from './m-34.ts';
+import { M35 } from './m-35.ts';
+import { M36 } from './m-36.ts';
 
 export const CASE_REGISTRY: Readonly<Record<string, MeasurementCase>> = {
   'M-01': M01,
