@@ -300,8 +300,25 @@ jobs:
       # dokumentalt alak arra, hogy a komment FRISSULJON, ne szaporodjon:
       # "Create a new comment if no comments are found. Can be used only with
       # --edit-last".
+      #
+      # Ez a job NEM csekkolja ki a repot (csak artefaktumot tolt le), ezert a
+      # munkakonyvtarban nincs `.git`, es a `gh` nem tudja kitalalni melyik
+      # repora vonatkozik a parancs ("fatal: not a git repository"). A javitas
+      # a `--repo` kapcsolo: explicit megadja a repot git kontextus nelkul is,
+      # a `GITHUB_REPOSITORY` pedig minden jobban elerheto alapertelmezett
+      # kornyezeti valtozo `owner/repo` formatumban, tehat nem kell kulon
+      # `env:`-ben leabazolni. Ez gyorsabb es kevesebb eroforrast hasznal,
+      # mint egy plusz checkout lepes felvetele csak a git kontextus miatt.
       # Forras: https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-github-cli
+      #   (a `track_pr` pelda job SEM csekkol ki semmit, es `gh issue create
+      #   --repo $GITHUB_REPOSITORY` alakot hasznal ugyanezert)
       # Forras: https://cli.github.com/manual/gh_pr_comment
+      #   (`-R`, `--repo <[HOST/]OWNER/REPO>`: "Select another repository
+      #   using the [HOST/]OWNER/REPO format", oroklodik minden `gh pr`
+      #   alparancsba)
+      # Forras: https://cli.github.com/manual/gh_help_environment
+      #   (`GH_REPO`: "specify the GitHub repository ... for commands that
+      #   otherwise operate on a local repository")
       - name: Post or update the coverage comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -316,7 +333,7 @@ jobs:
             echo ''
             cat pr-comment/*.md
           } > "$RUNNER_TEMP/coverage-comment.md"
-          gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/coverage-comment.md" --edit-last --create-if-none
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/coverage-comment.md" --edit-last --create-if-none
 
   # ---------------------------------------------------------------------------
   # Osszesito kapu. A repository ruleset EZT az egy status checket kerheti
