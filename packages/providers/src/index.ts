@@ -8,6 +8,8 @@ export { isKnownFact } from './evidence/is-known-fact.ts';
 export { isUnknownFact } from './evidence/is-unknown-fact.ts';
 
 export type { ProviderCapabilityDescriptor } from './capability/provider-capability-descriptor.ts';
+export type { AgentToolId } from './capability/agent-tool-id.ts';
+export type { AgentToolRecommendation } from './capability/agent-tool-recommendation.ts';
 
 export type { MiniMaxModelId } from './minimax/model-id.ts';
 export type { MiniMaxFamilyId } from './minimax/family-id.ts';

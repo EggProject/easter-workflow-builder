@@ -22,6 +22,8 @@ kitöltött leírók a `../minimax` és a `../claude-subscription` alatt vannak.
 | `prompt-caching-capability.ts`          | `PromptCachingCapability`                                              |
 | `streaming-capability.ts`               | `StreamingCapability`                                                  |
 | `server-tool-descriptor.ts`             | `ServerToolDescriptor`                                                 |
+| `agent-tool-id.ts`                      | `AgentToolId`                                                          |
+| `agent-tool-recommendation.ts`          | `AgentToolRecommendation`                                              |
 | `model-descriptor.ts`                   | `ModelDescriptor<TModelId, TFamilyId>`                                 |
 | `models-endpoint-capability.ts`         | `ModelsEndpointCapability`                                             |
 | `rate-limit-bucket.ts`                  | `RateLimitBucket<TModelId>`                                            |

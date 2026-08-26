@@ -9,23 +9,24 @@ méréssel eldönthető mező `unknown`. A `minimax` leíró értékei ide **nem
 
 ## Fájlok
 
-| Fájl                        | Tartalom                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------ |
-| `model-id.ts`               | `ClaudeModelId`                                                                            |
-| `family-id.ts`              | `ClaudeFamilyId`                                                                           |
-| `required-environment.ts`   | `claudeSubscriptionRequiredEnvironment`, üres lista                                        |
-| `disallowed-environment.ts` | `claudeSubscriptionDisallowedEnvironment`                                                  |
-| `structured-output.ts`      | `claudeSubscriptionStructuredOutput`                                                       |
-| `tool-choice.ts`            | `claudeSubscriptionToolChoice`                                                             |
-| `thinking.ts`               | `claudeSubscriptionThinking`                                                               |
-| `effort.ts`                 | `claudeSubscriptionEffort`                                                                 |
-| `prompt-caching.ts`         | `claudeSubscriptionPromptCaching`                                                          |
-| `streaming.ts`              | `claudeSubscriptionStreaming`                                                              |
-| `server-tools.ts`           | `claudeSubscriptionServerTools`                                                            |
-| `models.ts`                 | `claudeSubscriptionModels`                                                                 |
-| `rate-limits.ts`            | `claudeSubscriptionRateLimits`                                                             |
-| `concurrency.ts`            | `claudeSubscriptionConcurrency`                                                            |
-| `descriptor.ts`             | `claudeSubscriptionProvider`, a `satisfies ProviderCapabilityDescriptor<...>` összeállítás |
+| Fájl                         | Tartalom                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `model-id.ts`                | `ClaudeModelId`                                                                            |
+| `family-id.ts`               | `ClaudeFamilyId`                                                                           |
+| `required-environment.ts`    | `claudeSubscriptionRequiredEnvironment`, üres lista                                        |
+| `disallowed-environment.ts`  | `claudeSubscriptionDisallowedEnvironment`                                                  |
+| `structured-output.ts`       | `claudeSubscriptionStructuredOutput`                                                       |
+| `tool-choice.ts`             | `claudeSubscriptionToolChoice`                                                             |
+| `thinking.ts`                | `claudeSubscriptionThinking`                                                               |
+| `effort.ts`                  | `claudeSubscriptionEffort`                                                                 |
+| `prompt-caching.ts`          | `claudeSubscriptionPromptCaching`                                                          |
+| `streaming.ts`               | `claudeSubscriptionStreaming`                                                              |
+| `server-tools.ts`            | `claudeSubscriptionServerTools`                                                            |
+| `recommended-agent-tools.ts` | `claudeSubscriptionRecommendedAgentTools`                                                  |
+| `models.ts`                  | `claudeSubscriptionModels`                                                                 |
+| `rate-limits.ts`             | `claudeSubscriptionRateLimits`                                                             |
+| `concurrency.ts`             | `claudeSubscriptionConcurrency`                                                            |
+| `descriptor.ts`              | `claudeSubscriptionProvider`, a `satisfies ProviderCapabilityDescriptor<...>` összeállítás |
 
 ## Függőségi irány
 
