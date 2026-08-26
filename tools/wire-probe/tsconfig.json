@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "types": ["node"],
+    // Node 26 natívan futtatja a .ts fájlokat (type stripping), a relatív
+    // import specifierekben ezért kötelező a .ts kiterjesztés -- ehhez kell
+    // ez a két kapcsoló, mert soha nem emittálunk .js-t, csak típusellenőrzünk.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  }
+}
