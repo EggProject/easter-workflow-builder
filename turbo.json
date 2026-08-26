@@ -46,8 +46,15 @@
       "cache": true,
       "persistent": false
     },
-    "test": {
-      "dependsOn": ["^typecheck"],
+    "//#test": {
+      "dependsOn": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "packages/*/src/**",
+        "apps/*/src/**",
+        "tools/wire-probe/src/**",
+        "vitest.config.ts"
+      ],
       "outputs": ["coverage/**"],
       "cache": true,
       "persistent": false

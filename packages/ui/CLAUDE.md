@@ -8,9 +8,10 @@ specifikáció tárgyai, a `tooling/tsconfig/react.json`-t használja (JSX runti
 
 ## Fájlok
 
-| Fájl           | Tartalom                                              |
-| -------------- | ----------------------------------------------------- |
-| `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson |
+| Fájl               | Tartalom                                                           |
+| ------------------ | ------------------------------------------------------------------ |
+| `src/index.ts`     | placeholder export, csak hogy a csomag lefordulhasson              |
+| `vitest.config.ts` | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció) |
 
 ## Függőségi irány
 

@@ -9,6 +9,15 @@ saját `bun.lock`-ja -- a függőségei a gyökér lockfile-ba olvadnak. Nem ter
 `#private` mező) rá is vonatkoznak. `test` scriptje nincs, tehát a mérések nem futnak a
 Turborepo `test` taskján keresztül CI-ben.
 
+**Kivétel: `src/no-shadowed-path-import.test.ts`.** Ez az egyetlen Vitest teszt a
+csomagban -- regressziós teszt egy korábban talált valós bugra (két mérési eset fájlban
+egy helyi `const path = ...` eltakarta a `node:path` importot, temporal dead zone
+`ReferenceError` kockázatával). A csomagnak nincs saját `test` npm scriptje, a teszt
+mégis lefut: a gyökér `vitest.config.ts` a `tools/wire-probe/src/**/*.test.ts` mintát
+explicit projektként veszi fel a Vitest saját "Test Projects" mechanizmusán keresztül,
+függetlenül a csomag `package.json`-jától. A `probe`/`proxy`/`summary` (valós API
+hívást tevő) scriptek ettől függetlenül nem futnak CI-ben.
+
 ## Miért van itt két külön dolog
 
 - **A proxy** (`src/proxy.ts`) egy loopback HTTP szerver, amit `ANTHROPIC_BASE_URL`-nek
@@ -98,6 +107,7 @@ src/
     index.ts                típusos registry: CASE_REGISTRY, CASE_IDS
     m-01.ts ... m-36.ts      egy mérési eset egy fájlban, a SPEC-000 4. szekció szerint
   summary.ts               token-takarékos összefoglaló script (CLI: bun run summary)
+  no-shadowed-path-import.test.ts   regressziós teszt, lásd fent
 ```
 
 ## Ismert, ellenőrzött korlátozás
