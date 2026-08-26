@@ -6,12 +6,14 @@
 | Bemenet | [`2026-08-26-agent-sdk-minimax.md`](2026-08-26-agent-sdk-minimax.md) 4. szekció, [`SPEC-000`](../spec/SPEC-000-provider-wire-measurement.md), [`mérési jegyzőkönyv`](2026-08-26-spec000-meresi-jegyzokonyv.md) |
 | Kimenet | `src/providers/*.ts` képességleírók |
 | SDK | `@anthropic-ai/claude-agent-sdk@0.3.245`, CLI `cc_version=2.1.245` (a billing headerből) |
-| Mérési alap | 113 rögzített proxy tranzakció, ebből 79 `POST /v1/messages` (mind HTTP 200) és 34 `HEAD /api/hello` (mind HTTP 404) |
+| Mérési alap | M-01 ... M-18: 113 rögzített proxy tranzakció, ebből 79 `POST /v1/messages` (mind HTTP 200) és 34 `HEAD /api/hello` (mind HTTP 404). M-19 ... M-25: külön munkamenet, lásd a 3. szekciót |
 
 A jegyzőkönyv nyers megfigyeléseit nem ismétlem meg, csak hivatkozom rájuk. Ahol a jegyzőkönyvön
 túl saját artefaktum-ellenőrzést végeztem, azt a "saját ellenőrzés" jelölés mutatja.
 
-Lezárva: 10 kérdés (Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q9, Q10, Q12). Nyitva: 2 kérdés (Q8, Q11).
+Lezárva mind a 12 kérdés (Q1 ... Q12). Az M-19 ... M-25 kiegészítő mérések a két utolsó nyitott
+kérdést (Q8, Q11) is lezárták, lásd a 3. szekciót. Ami a leíróban `unknown` maradt, az nem
+kérdés-szintű, hanem mezőszintű hiány, a 4. szekció sorolja fel a blokkoló megnevezésével.
 
 ---
 
@@ -154,8 +156,9 @@ Két kiemelés:
    ki van kapcsolva, ha `ANTHROPIC_BASE_URL` nem first-party hosztra mutat
    (https://code.claude.com/docs/en/env-vars), tehát a beállítás redundáns, nem hatástalan.
 
-**Tervezési következmény:** a `minimax` provider `env` blokkjába kötelezően bekerülő elemek a 4.
-szekcióban.
+**Tervezési következmény:** a `minimax` provider `env` blokkjába kötelezően bekerülő elemek az
+5.1 szekcióban. Az M-21 ezt a mátrixot egy sorral bővíti: a `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`
+szintén 1 kérésre viszi le a kérésszámot, de a `tools` tömb nála 25 elemű marad (3. szekció).
 
 ### Q7: küld-e a MiniMax `input_json_delta`-t, és jól rakja-e össze az SDK?
 
@@ -169,30 +172,43 @@ argumentuma (`a.tool-callback-input.json`, 1960 karakteres `body` mezővel) és 
 **Tervezési következmény:** a real-time transcript panel **építhet** a `stream_event` folyamra,
 nem kell megvárnia a lezárt `assistant` üzenetet. Ez a UI szempontjából a legjobb kimenetel.
 
-### Q8: működik-e a `Stop` hook `decision: "block"` kikényszerítés? NEM DÖNTHETŐ EL
+### Q8: működik-e a `Stop` hook `decision: "block"` kikényszerítés? LEZÁRVA
 
-**Válasz: nyitva marad. A mérés csak a happy pathot igazolta, a kikényszerítő mechanizmust nem.**
+**Válasz: igen. Az M-19 10 futásból 10-ben aktiválta a blokkoló ágat, és a `reason` szöveg
+`role: "user"` üzenetként megy ki, nem `system`-ként.**
 
-M-10 mindhárom futása sikeres (`subtype: success`, `num_turns: 2`, 3-3 kérés), és mindháromban
-lefutott az `emit_output`. **De a blokkoló ág egyszer sem aktiválódott**: a `reason` szöveg egyetlen
-kimenő kérés `messages` tömbjében sem jelenik meg. Az ok a case forrásában látszik
-(`tools/wire-probe/src/cases/M-10.ts`): a prompt szó szerint `"Számold ki mennyi 2+2, majd hívd meg
-a mcp__workflow__emit_output toolt az eredménnyel."`, tehát a modell utasításra hívta meg a toolt,
-nem a hook kényszerítette rá.
+M-10 önmagában nem tudta eldönteni: mindhárom futása sikeres volt (`subtype: success`,
+`num_turns: 2`, 3-3 kérés), de a blokkoló ág egyszer sem aktiválódott, mert a prompt szó szerint
+`"Számold ki mennyi 2+2, majd hívd meg a mcp__workflow__emit_output toolt az eredménnyel."`
+(`tools/wire-probe/src/cases/M-10.ts`), tehát a modell utasításra hívta meg a toolt.
 
-Amit a mérés **mégis** hozott, és Q8 szempontjából fontos: a `role: "system"` mid-conversation
-üzenet a MiniMax M3 ellen **nem hibázik**. Az M-10 run-1 2. és 3. kérésében a `messages` tömb
-utolsó eleme `role: "system"` (tartalma az agent típusok listája, illetve
-`<total_tokens>...</total_tokens>`), és a válasz HTTP 200 (saját ellenőrzés:
-`00003-1787706973670.json`, `00004-1787706975166.json`). Az SDK a
+M-19 ugyanezt a hookot futtatta olyan prompttal, ami **nem említi** a toolt (`"Számold ki mennyi
+2+2."`). Eredmény: 10/10 `success`, futásonként pontosan `blockCount=1`, és mind a 10 futás
+`num_turns` értéke **3** (saját ellenőrzés a `run-1` ... `run-10.sdk-messages.ndjson` `result`
+üzenetein), szemben az M-10 kikényszerítés nélküli 2 körével. A blokkolás tehát
+determinisztikusan pontosan egy plusz modellkörbe kerül.
+
+Drótszintű bizonyíték (saját ellenőrzés, `tools/wire-probe/artifacts/00004-1787737239994.json`):
+a 3. kérés `messages` tömbje 4 elemű, az utolsó eleme szó szerint
+
+```json
+{"role": "user", "content": [{"type": "text", "text": "Stop hook feedback:\nAz emit_output tool még nem futott le -- kérlek hívd meg a végeredménnyel.", "cache_control": {"type": "ephemeral"}}]}
+```
+
+A Claude Code tehát `Stop hook feedback:` előtaggal, `user` role-lal továbbítja a hook `reason`
+szövegét. A `role: "system"` mid-conversation üzenet külön kérdés, és a MiniMax M3 ellen az sem
+hibázik: az M-10 run-1 2. és 3. kérésében a `messages` utolsó eleme `role: "system"` (az agent
+típusok listája, illetve `<total_tokens>...</total_tokens>`), a válasz HTTP 200 (saját ellenőrzés:
+`00003-1787706973670.json`, `00004-1787706975166.json`), az SDK a
 `mid-conversation-system-2026-04-07` beta headert küldi hozzá. A research által idézett
 [GitHub #43](https://github.com/MiniMax-AI/MiniMax-M2.7/issues/43)
-`invalid message role: system (2013)` hiba tehát M3 ellen nem reprodukálódott.
+`invalid message role: system (2013)` hiba M3 ellen nem reprodukálódott.
 
-**Tervezési következmény:** az `emit_output_tool` stratégia `usable` mezője `unknown` marad, mert a
-kikényszerítés bizonyítatlan. Az alapértelmezett stratégia ezért nem ez lesz. A `role: "system"`
-kockázat viszont mérési bizonyítékkal cáfolható, tehát ha a hook későbbi mérésben blokkol, a
-`reason` szövegének továbbítása nem fog önmagában elhasalni.
+**Tervezési következmény:** az `emit_output_tool` stratégia `usable` mezője `known: true`,
+`blockingWireDetail` mezője `known: null`, `observedRoundTrips` mezője `known: [3]`. A stratégia
+tehát bizonyítottan használható, de az alapértelmezés így is az `sdk_output_format` marad, lásd
+5.2. A `role: "system"` kockázat ezt a stratégiát fel sem tudja érinteni, mert a hook szövege
+`user` role-lal utazik.
 
 ### Q9: leválasztja-e a kliens a `[1m]` suffixet?
 
@@ -214,7 +230,8 @@ Claude Code assumes a 1M window for it"` (https://code.claude.com/docs/en/model-
 **Tervezési következmény:** a suffix nem 404 kockázat, hanem a kontextusablak kliens oldali
 vezérlője. Ha 1M kontextussal akarunk dolgozni, a `[1m]` suffixes azonosítót kell a modellnek
 átadni. A SPEC-000 hatóköre szerint a `minimax` leíró modell-listája kizárólag `MiniMax-M3`, ezért
-a suffix használata külön döntés, lásd 4. szekció.
+a suffix használata külön döntés, lásd 5.1. Az M-20 után ez a döntés megszületett: a suffixes
+azonosítót használjuk.
 
 ### Q10: mit ad vissza a `GET /v1/models` a MiniMax endpointon?
 
@@ -235,27 +252,65 @@ modell-listát a provider config fájlba kell drótozni. A kapcsolat teszt maga 
 `query()` hívás lehet, mert az SDK csak `POST /v1/messages`-t használ. A `HEAD /api/hello` 404
 nem hiba: a MiniMax nem implementálja, és ez nem akadályozza a működést.
 
-### Q11: mekkora kontextusablakot jelent az endpoint, mikor indul auto-compact? RÉSZBEN NYITVA
+### Q11: mekkora kontextusablakot jelent az endpoint, mikor indul auto-compact? LEZÁRVA
 
-**Válasz: a kliens oldali feltételezés mért és dokumentált, a szerver oldali valóság nem.**
+**Válasz: a kliens 200 000 / 32 000 értékkel tervez, a szerver viszont bizonyítottan legalább
+1 046 827 bemeneti tokent szolgál ki. A kliens oldali max output token 128 000-nél elvágódik.**
 
-Mért, kliens oldali oldal (saját ellenőrzés az összes `result.modelUsage` mezőn, 33 futás):
+Kliens oldal (saját ellenőrzés az összes `result.modelUsage` mezőn, 33 futás):
 `contextWindow: 200000`, `maxOutputTokens: 32000`, `canonicalModel: "minimax-m3"`,
-`provider: "firstParty"`. A kimenő body `max_tokens` mezője **mind a 79 kérésben 32000**.
+`provider: "firstParty"`. A kimenő body `max_tokens` mezője az M-01 ... M-18 sorozat **mind a 79
+kérésében 32000**. Ez a dokumentált viselkedés: `"Claude Code defaults to 32000 for model IDs it
+doesn't recognize, such as gateway-specific names, and lowers values above a model's cap to the
+cap"` (https://code.claude.com/docs/en/env-vars, `CLAUDE_CODE_MAX_OUTPUT_TOKENS`).
 
-Ez pontosan a dokumentált viselkedés: `"Claude Code defaults to 32000 for model IDs it doesn't
-recognize, such as gateway-specific names"` (https://code.claude.com/docs/en/env-vars,
-`CLAUDE_CODE_MAX_OUTPUT_TOKENS`).
+Szerver oldal (M-20, `model: 'MiniMax-M3[1m]'`, bináris keresés). Saját ellenőrzés a rögzített
+tranzakciók `message_delta.usage` objektumán. A "teljes bemeneti token" oszlop **számított
+érték**: `usage.input_tokens` + `usage.cache_read_input_tokens`, mert a cache-ből olvasott tokenek
+is a kontextusablakot foglalják.
 
-Amit **nem** tudunk: M-13 nem érte el a compact határt. Mindössze 3 kérés ment ki, a záró
-`usage.input_tokens` 32915, `413 request_too_large` nem fordult elő, compact boundary `system`
-üzenet nem keletkezett. `POST /v1/messages/count_tokens` egyszer sem ment ki, tehát a kliens nem is
-kérdezte meg az endpointot a token számról.
+| Töltelék karakter | `messages` karakter | HTTP | `input_tokens` | `cache_read_input_tokens` | teljes bemeneti token | karakter/token |
+|---|---|---|---|---|---|---|
+| 600 000 | 621 368 | 200 | 266 699 | 128 | 266 827 | 2,33 |
+| 1 200 000 | 1 221 368 | 200 | 1 483 | 505 344 | 506 827 | 2,41 |
+| 2 400 000 | 2 421 368 | 200 | 986 667 | 160 | 986 827 | 2,45 |
+| 2 550 000 | 2 571 368 | 200 | 61 483 | 985 344 | **1 046 827** | 2,46 |
+| 2 700 000 | - | **400** | - | - | kb. 1 108 000 (számított) | - |
 
-**Tervezési következmény:** a MiniMax dokumentált 1 000 000 kontextusa és a dokumentált 131 072
-ajánlott output token **nem érvényesül** alapbeállítással. A kliens 200 000 / 32 000 értékekkel
-tervez. Ez javítható a `[1m]` suffixszel (kontextus) és a `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
-változóval (output), de konkrét értéket csak külön mérés után adunk, lásd 3. szekció.
+Tranzakciók: `00003-1787737784634.json`, `00006-1787737788764.json`, `00009-1787737825279.json`,
+`00023-1787737855251.json`. A 400-as válasz szövege szó szerint: `"API Error: 400 invalid params,
+context window exceeds limit (2013)"`. A 2 700 000 karakteres sor token értéke **nem mért, hanem
+számított**: a legnagyobb két sikeres kérésből adódó 2,46 karakter/token aránnyal skálázva.
+
+Három számszerű következtetés:
+
+1. A szolgáltatás **igazoltan kiszolgált 1 046 827 bemeneti tokent**. Ez a mért alsó korlát, nem a
+   pontos határ: a valódi határ 1 046 827 és kb. 1 108 000 között van, a bináris keresés a
+   `MAX_REQUESTS=8` korlát miatt állt le, nem konvergencia miatt.
+2. Ez **5,2-szerese** annak a 200 000-es `contextWindow` értéknek, amivel a kliens suffix nélkül
+   tervez. Suffix nélkül tehát az auto-compact a ténylegesen elérhető ablak kevesebb mint
+   ötödénél indulna el, feleslegesen.
+3. A `[1m]` suffixszel a kliens 1 000 000-rel tervez, ami már csak 4,5 százalékkal marad el a mért
+   értéktől. **Figyelmeztetés:** az M-20 a `[1m]` suffixszel futott, tehát a
+   `context-1m-2025-08-07` beta header jelen volt. Hogy a szolgáltatás e header nélkül is
+   kiszolgálna-e 200 000 fölött, nem mértük.
+
+Max output token (M-22, saját ellenőrzés a kimenő `max_tokens` mezőn):
+
+| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | kimenő `max_tokens` | HTTP |
+|---|---|---|
+| 4096 | 4096 | 200 |
+| 32000 | 32000 | 200 |
+| 131072 | **128000** | 200 |
+| 524288 | **128000** | 200 |
+
+A vágás **kliens oldali**: a kérés HTTP 200-at kap, tehát nem a MiniMax utasítja el. A MiniMax
+dokumentált 131 072 ajánlott és 524 288 hard output korlátja ezen az SDK verzión **nem érhető el**.
+
+**Tervezési következmény:** a `models[MiniMax-M3].effectiveContextWindowOnWire` mező
+`known: 1046827`, a `maxOutputTokensWireCeiling` mező `known: 128000`. A dokumentált 1 000 000
+kontextus és 131 072 / 524 288 output korlát a leíróban megmarad, de mellette ott áll a mért
+valóság. A modellazonosító megválasztása és a `CLAUDE_CODE_MAX_OUTPUT_TOKENS` kezelése: 5.1.
 
 ### Q12: küld-e az SDK `anthropic-beta` headert, és melyeket?
 
@@ -313,7 +368,7 @@ A minta mind a 32 cím kérésben azonos, és minden mérési esetnél megjeleni
 
 | Kérdés | Státusz |
 |---|---|
-| `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` valóban leveszi-e MiniMax ellen | **nem mértük.** Dokumentált, de nálunk a `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` volt az, ami levette |
+| `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` valóban leveszi-e MiniMax ellen | **igen, M-21 mérte.** 2 helyett 1 kérés megy ki. A `DesignSync` toolt viszont nem veszi le, ezért mégsem ezt a kapcsolót választjuk, lásd 5.1 |
 | miért veszi le a `NONESSENTIAL_TRAFFIC` is a cím kérést | a hivatalos leírás felsorolása (auto-update, telemetria, error reporting, `/feedback`, release notes, gateway model discovery, availability check, feature flag) **nem említi** a cím generálást. A mért hatás tehát dokumentálatlan mellékhatás |
 | indít-e az SDK más háttérhívást hosszabb sessionben | nem mértük. A `costs` doksi említ `"Conversation summarization"` háttérfeladatot a `--resume`-hoz, ez a mi 1-2 körös futásainkban nem aktiválódott |
 | miért `MiniMax-M3` a cím kérés modellje | mért tény, hogy az, de a fallback szabály nincs dokumentálva. Ha egy jövőbeli SDK verzió `claude-haiku-*` alias nevet küldene ki, a MiniMax 404-et adna |
@@ -332,52 +387,233 @@ alapból kikapcsoljuk.
 
 ---
 
-## 3. Nyitva maradt kérdések
+## 3. Az M-19 ... M-25 kiegészítő mérések kiértékelése
 
-1. **Q8: a `Stop` hook `decision: "block"` kikényszerítés.** Javasolt mérés: **M-19**. Az M-10
-   megismétlése úgy, hogy a prompt **nem említi** az `emit_output` toolt (például "Számold ki
-   mennyi 2+2."). Megfigyelés: aktiválódik-e a blokkoló ág, a `reason` szöveg milyen `role`-lal
-   kerül a következő kérés `messages` tömbjébe, hány kör kell, és mennyi a sikerarány 10 futáson.
-2. **Q11 szerver oldali fele: mennyi kontextust szolgál ki ténylegesen az endpoint.** Javasolt
-   mérés: **M-20**. `model: 'MiniMax-M3[1m]'`, egyetlen session, addig növelt promptmérettel, amíg
-   a `413 request_too_large` meg nem érkezik vagy a 200 000 tokent át nem lépi a sikeres kérés.
-   Megfigyelés: a legnagyobb sikeres `usage.input_tokens`, és hogy a compact hol indul.
-3. **A `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` tényleges hatása.** Javasolt mérés: **M-21**. Egy
-   futás ezzel az egyetlen env eltéréssel. Megfigyelés: eltűnik-e a cím kérés, és eltűnik-e vele a
-   `DesignSync` tool (ami a `NONESSENTIAL_TRAFFIC` kapcsolónál eltűnt). Ez dönti el, hogy a
-   célzottabb kapcsolót használhatjuk-e a durvább helyett.
-4. **A `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja MiniMax ellen.** Javasolt mérés: **M-22**.
-   Futások növekvő értékekkel, a MiniMax dokumentált ajánlott 131 072 és hard 524 288 értékei
-   mentén. Megfigyelés: a kimenő `max_tokens` mező értéke és a válasz HTTP kódja. Konkrét
-   javasolt érték addig nincs, amíg ez nem fut le.
-5. **M-16 kép bemenet érvénytelen tesztképpel.** A mérés 1x1 pixeles PNG-t küldött, és a modell
-   `"Nem látok képet a beszélgetésben."` választ adott. Ebből **nem** dönthető el, hogy a MiniMax
-   eldobta a képet, vagy a modell egy egypixeles képről nem tud mit mondani. Javasolt mérés:
-   **M-23**, felismerhető tartalmú képpel (például egy nagy, egyszínű négyzet ismert színnel).
-6. **Prompt cache létrehozás igazolása.** M-15 egyik futásában sem jelent meg
-   `cache_creation_input_tokens` a stream `message_delta` eventjeiben, csak
-   `cache_read_input_tokens`. Javasolt mérés: **M-24**, a nem stream `usage` objektum rögzítése
-   (`stream: false` kérés), hogy a cache írás igazolható legyen.
-7. **Rate limit és hiba headerek.** A mérés alatt nulla 429 és nulla 5xx keletkezett, ezért
-   `retry-after` és `ratelimit` jellegű header nem figyelhető meg. Javasolt mérés: **nincs.**
-   Szándékos rate limit kimerítést nem végzünk, a mező `unknown` marad.
-8. **Szerver oldali `web_search` tényleges lefutása.** M-17 nyolc kérése között három olyan van,
-   ami csak a `web_search_20250305` toolt küldi, de egyik válasz sem tartalmaz `server_tool_use`
-   vagy `web_search_tool_result` blokkot. Javasolt mérés: **M-25**, magasabb `maxTurns` értékkel,
-   hogy a limit ne zavarjon bele. Bár a 4. szekció döntése ettől független, lásd lent.
+Nyers megfigyelések: a [mérési jegyzőkönyv](2026-08-26-spec000-meresi-jegyzokonyv.md)
+"M-19 - M-25 kiegészítő mérések" szakasza. Itt csak a kiértékelés áll.
+
+### M-19: a `Stop` hook blokkoló ága működik, és `user` role-lal utazik
+
+**Megfigyelés:** 10/10 futás `success`, futásonként pontosan egy blokkolás, mind a 10 futás
+`num_turns` értéke 3.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-19/run-1.meta.json` ... `run-10.meta.json`
+és a hozzájuk tartozó `.sdk-messages.ndjson` fájlok; drótszinten
+`tools/wire-probe/artifacts/00004-1787737239994.json`.
+
+**Következtetés és tervezési következmény:** lásd a lezárt Q8 blokkot az 1. szekcióban. Az
+`emit_output_tool` stratégia mostantól bizonyított.
+
+### M-20: a szolgáltatás legalább 1 046 827 bemeneti tokent szolgál ki
+
+**Megfigyelés:** 2 550 000 karakternyi töltelékkel HTTP 200, 2 700 000 karaktertől
+`400 invalid params, context window exceeds limit (2013)`.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-20/probe-1-chars600000.meta.json` ...
+`probe-8-chars2550000.meta.json`, `search-state.json`; drótszinten
+`00003-1787737784634.json`, `00006-1787737788764.json`, `00009-1787737825279.json`,
+`00023-1787737855251.json`.
+
+**Következtetés és tervezési következmény:** a részletes token átszámítás és a három számszerű
+következtetés a lezárt Q11 blokkban van az 1. szekcióban. A lényeg: a mérés **karakterben** zárult
+le, a leíróba **tokenben** számított érték került, és a nyers alap a `usage.input_tokens` plusz
+`usage.cache_read_input_tokens` összeg.
+
+### M-21: a célzottabb env kapcsoló kevesebbet vesz le, ezért nem ezt választjuk
+
+**Megfigyelés:** `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` mellett 1 kérés megy ki 2 helyett (a
+session cím generáló kérés eltűnik), de a `tools` tömb 25 elemű marad, benne a `DesignSync`
+toollal. A `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ugyanezt az 1 kérést hagyja meg, de a
+`tools` tömb ott 24 elemű, `DesignSync` nélkül.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/00002-1787737359743.json` (M-21) kontra
+`00030-1787706928603.json` (M-08 `NONESSENTIAL_TRAFFIC`) kontra `00003-1787706771598.json`
+(M-01 alap). Saját ellenőrzés, `message_delta.usage.input_tokens`:
+
+| Futás | `tools` hossz | hiányzó tool | `input_tokens` |
+|---|---|---|---|
+| M-01 alap | 25 | - | 26 339 |
+| M-21 `DISABLE_TERMINAL_TITLE=1` | 25 | - | 26 693 |
+| M-08 `DISABLE_NONESSENTIAL_TRAFFIC=1` | 24 | `DesignSync` | 24 022 |
+
+**Mi az a `DesignSync`?** Saját ellenőrzés a tool leírásán (`00002-1787737359743.json`,
+`tools[]`, `name: "DesignSync"`, 3 724 karakteres `description`): a tool a felhasználó
+claude.ai/design design-system projektjeit olvassa és írja, **a felhasználó claude.ai
+bejelentkezésén keresztül** (`list_projects`, `get_file`, `create_project`, `write_files`,
+`delete_files` metódusokkal).
+
+**Következtetés:** a `DesignSync` két okból nem kívánatos a `minimax` providernél. Egy: kérésenként
+mért 2 317 input token pluszt jelent (26 339 mínusz 24 022), ami minden lépésre rárakódik. Kettő,
+és ez a súlyosabb: egy harmadik fél modelljének adna a kezébe olyan toolt, ami a felhasználó
+claude.ai fiókjában ír és töröl. A workflow futtatónak egyikre sincs szüksége.
+
+A `DesignSync` eltűnése a `NONESSENTIAL_TRAFFIC` kapcsolónál **dokumentálatlan mellékhatás**: a
+hivatalos leírás (https://code.claude.com/docs/en/env-vars) a kapcsolóhoz auto-update, telemetria,
+error reporting, `/feedback`, release notes, gateway model discovery, availability check, plugin
+`command` háttérfuttatás és feature flag lekérés letiltását sorolja fel, a
+"Features that need feature-flag fetching" szekció felsorolása pedig **nem tartalmazza** a
+`DesignSync` toolt. A hatás mért, nem dokumentált.
+
+**Tervezési következmény:** a `minimax` provider env blokkjában marad a
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` szigorúan
+gyengébb: ugyanazt az egy hatást adja, a `DesignSync` levételét viszont nem. Részletes indoklás:
+5.1.
+
+### M-22: a kimenő `max_tokens` kliens oldalon 128 000-nél elvágódik
+
+**Megfigyelés:** 4096 és 32000 változatlanul megy ki, 131072 és 524288 egyaránt 128000-re
+képződik le, minden kérés HTTP 200.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-22/max-output-tokens-4096.meta.json` ...
+`-524288.meta.json`; drótszinten `00004`/`00005`, `00007`/`00008`, `00010`/`00011`,
+`00013`/`00014-1787737...json`.
+
+**Következtetés:** a vágás kliens oldali, mert a kérés 200-at kap. A dokumentált szabály
+(`"lowers values above a model's cap to the cap"`, https://code.claude.com/docs/en/env-vars) a
+Claude Code **saját** modelltáblájának cap értékére vág, nem a provider dokumentált korlátjára:
+a MiniMax dokumentált 131 072 ajánlott és 524 288 hard értéke ezen az SDK verzión elérhetetlen.
+
+**Tervezési következmény:** `models[MiniMax-M3].maxOutputTokensWireCeiling` mező felvétele a
+típusba, értéke `known: 128000`. Az env blokk ajánlása: 5.1.
+
+### M-23: a képet az SDK kiküldi, a szolgáltatás dobja el
+
+**Megfigyelés:** érvényes, 256x256 pixeles, tiszta piros PNG mellett is `"Nincs kép."` a válasz,
+HTTP 200.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-23/a.meta.json`, drótszinten
+`tools/wire-probe/artifacts/00003-1787737383569.json`. Saját ellenőrzés a kimenő body
+`messages[0].content` tömbjén: **3 elemű**, és a harmadik eleme
+
+```json
+{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8x..."}}
+```
+
+1 136 karakteres base64 adattal. A base64 dekódolva 851 bájt, érvényes PNG aláírással, az IHDR
+chunk szerint 256x256, 8 bites, 2-es (truecolor RGB) színtípus, az első IDAT scanline pixelei
+`255, 0, 0`.
+
+**Következtetés, és ez a kulcs:** a kép content blokk **ott van a kimenő kérésben**. Nem az SDK és
+nem a harness dobja el, hanem a szolgáltatás: a kérés HTTP 200-at kap, a modell mégis azt állítja,
+hogy nincs kép. Ez gyökeresen más következtetés, mint amit az M-16 alapján lehetett volna levonni,
+és a leíróban is máshogy jelöljük: nem `unknown` (nem tudjuk, mi történt), hanem `known: false`
+(tudjuk, hogy a képbemenet ezen az úton nem működik).
+
+**Tervezési következmény:** `models[MiniMax-M3].imageInput` mező `known: false`, bizonyíték M-23
+és M-16. A kép csatolás UI vezérlő a `minimax` providernél letiltva, nem figyelmeztetéssel, hanem
+véglegesen.
+
+### M-24: a `stream` nem kapcsolható ki, de a cache írás máshonnan igazolódott
+
+**Megfigyelés:** a kimenő body `stream` mezője mind a 4 kérésben `true`, és sem a
+`message_start.message.usage`, sem a `message_delta.usage` objektum nem tartalmaz
+`cache_creation_input_tokens` kulcsot.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-24/a-first.meta.json`,
+`b-second-immediately-after.meta.json`. A telepített SDK típusa: saját ellenőrzés a
+`tools/wire-probe/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts` fájlon, az `Options`
+típusban (1369. sor) **nincs `stream` mező**, a `stream` szó csak az `includeHookEvents`,
+`includePartialMessages` és a `result` üzenet doksijában fordul elő, mind a kliens oldali
+`SDKMessage` kiadásra vonatkozik.
+
+**Következtetés, két részben.** Egy: `stream: false` kérés ezzel az SDK verzióval nem állítható
+elő, tehát a nem stream `usage` objektum ezen az úton **elvi okból** megfigyelhetetlen. A
+`promptCaching.usageFields` mező ezért marad `['cache_read_input_tokens']`, és ez nem a mérés
+hiánya, hanem az SDK felületének korlátja.
+
+Kettő, és ez az M-24 legfontosabb hozadéka: a cache írás igazolásához **nem is kellett** a nem
+stream `usage`. Az M-20 bináris keresés véletlenül megadta. A 8. probe (`00023-1787737855251.json`)
+`cache_read_input_tokens` értéke **985 344**, közvetlenül a 7. probe után, ami majdnem azonos
+prefixű töltelékkel futott. Ekkora cache olvasás csak úgy állhat elő, ha a megelőző kérés beírta a
+cache-t. A cache írás tehát megtörténik, csak a szolgáltatás nem jelenti külön mezőben.
+
+Ami továbbra sem eldönthető: hogy az **explicit** `cache_control` breakpointoknak van-e önálló
+hatásuk. Az M-15 (c) futásban nulla `cache_control` blokk mellett is `cache_read_input_tokens: 128`
+jött vissza, ami implicit cache olvasást bizonyít, viszont a `cache_read` érték 3 és 0 breakpoint
+mellett **azonos** volt.
+
+**Tervezési következmény:** új `streaming.streamDisableable` mező a típusban, értéke `known: false`
+mindkét providernél (SDK szintű tulajdonság). A `promptCaching.mode` mező `unknown` marad, de az
+indoklás megváltozik: már nem a cache írás bizonyítatlansága a blokkoló, hanem az implicit és az
+explicit mód szétválaszthatatlansága.
+
+### M-25: a szerver oldali `web_search` valóban nem fut le
+
+**Megfigyelés:** `maxTurns: 12` mellett a futás `result` subtype-ja `success` (nem
+`error_max_turns`), 7 kérés ment ki, mind HTTP 200, és egyik stream válaszban sincs
+`server_tool_use` vagy `web_search_tool_result` blokk.
+
+**Bizonyíték:** `tools/wire-probe/artifacts/harness/M-25/a.meta.json`, drótszinten
+`00002-1787737402733.json` ... `00008-1787737418290.json`. Saját ellenőrzés: a 7 tranzakció
+`streamEvents` mezőjében a `server_tool_use` és a `web_search_tool_result` alstring előfordulása
+**0**. Három kérés `tools` tömbje egyetlen elemű, `web_search_20250305` típussal.
+
+**Következtetés:** az M-17-nél megfigyelt hiányzó eredményblokk **nem** a `maxTurns: 3` korai
+megszakítása miatt volt. A MiniMax a `web_search_20250305` szerver oldali toolt elfogadja a
+kérésben, de sosem futtatja le.
+
+**Tervezési következmény:** a `serverTools[web_search].available` mező `known: false` marad, most
+már M-17 és M-25 bizonyítékkal. Az 5.4 szekció `WebSearch` tiltása változatlanul érvényes, immár
+kereszt-validált alapon.
 
 ---
 
-## 4. Tervezési következmények
+## 4. Ami továbbra is nyitva marad
 
-### 4.1 A `minimax` provider kötelező `env` blokkja
+Kérdés szinten nincs nyitott tétel: Q1 ... Q12 mind lezárt. Ami nyitva maradt, az mezőszintű, és a
+leíróban `unknown` állapotban van, a blokkoló megnevezésével.
+
+| Leíró mező | Mi hiányzik pontosan | Miért nem pótolható a jelenlegi eszközzel |
+|---|---|---|
+| `promptCaching.mode` | annak eldöntése, hogy az explicit `cache_control` breakpointoknak van-e a jelentett `cache_read_input_tokens` értékben megjelenő önálló hatásuk. Az implicit olvasás (M-15 c) és a cache írás (M-20 8. probe) igazolt, a kettő szétválasztása nem | a szolgáltatás egyetlen mért válaszban sem küld `cache_creation_input_tokens` mezőt, az SDK `Options` típusa pedig nem enged `stream: false` kérést (M-24), tehát nincs olyan `usage` objektum, amiben a cache írás külön látszana |
+| `models[MiniMax-M3].videoInput` | egy kimenő videó content blokk és a rá adott válasz | az SDK streaming input felületéből nem állítottunk elő videó content blokkot. Az M-23 kizárólag a kép blokkra ad bizonyítékot |
+| `models[MiniMax-M3].listedByModelsEndpoint` | egy `GET /v1/models` válasz a MiniMax endpointról | az SDK a teljes mérés alatt egyszer sem hívta meg ezt az útvonalat (M-12). SDK-n kívüli, közvetlen HTTP hívás kellene hozzá, ami a SPEC-000 hatókörén kívül van (a spec az SDK drótszintű viselkedését méri) |
+| `toolChoice.rejectionBehaviour` | egy `tool_choice: {"type":"any"}` vagy `{"type":"tool",...}` kérés és a rá kapott státuszkód | az SDK sosem küld ilyen értéket (79/79 kérés, M-03, M-17), tehát a saját hívási utunkon ez a bemenet elő sem áll |
+| `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` | egy 429-es válasz és a hozzá tartozó headerek | a mérés alatt nulla 429 és nulla 5xx keletkezett. Szándékos rate limit kimerítést **nem végzünk**, ez döntés, nem hiány |
+| `claude-subscription` minden drótszintű mezője | drótszintű mérés a first-party úton | a SPEC-000 1. szekciója szerint ez a provider nincs hatókörben: first-party base URL-t és bejelentkezésen alapuló hitelesítést használ, a logoló proxy nem iktatható be |
+
+Két olyan tétel, ami nem leíró mező, de nyitva maradt, és a jövőbeli regressziónál számít:
+
+1. **A kontextusablak pontos határa.** A bináris keresés a `MAX_REQUESTS=8` kemény korlát miatt
+   állt le, 150 000 karakternyi rés maradt a legnagyobb sikeres (2 550 000) és a legkisebb hibás
+   (2 700 000) méret között. A leíróban ezért a mért **alsó korlát** áll, nem a határ.
+2. **A `context-1m-2025-08-07` beta header szerepe.** Az M-20 a `[1m]` suffixszel futott, tehát
+   ezzel a headerrel. Hogy a szolgáltatás e header nélkül is kiszolgálna-e 200 000 fölött, nem
+   mértük. Ez azért fontos, mert az 5.1 ajánlás a suffixes modellazonosítóra épül.
+
+---
+
+## 5. Tervezési következmények
+
+### 5.1 A `minimax` provider kötelező `env` blokkja és a modellazonosító
 
 | Változó | Érték | Miért | Bizonyíték |
 |---|---|---|---|
 | `ANTHROPIC_BASE_URL` | `https://api.minimax.io/anthropic` | endpoint | research 2. szekció |
 | `ANTHROPIC_AUTH_TOKEN` | `MINIMAX_API_KEY` process env átvétel, **csak a NÉV perzisztálódik** | auth | research 2. és 3. szekció |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | **ez a mérésben igazoltan levette a session cím generáló kérést**, ezzel felezi a kérésszámot és megszünteti az egyetlen natív `output_config.format` kockázatot | M-07 b, M-08 |
-| `DISABLE_PROMPT_CACHING` | **nem állítjuk be** | a `cache_control` blokkok kimennek és a MiniMax fogadja őket, a cache olcsóbbá teszi a hosszú workflow-t | M-08, M-15 |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | levette a session cím generáló kérést, ezzel felezi a kérésszámot és megszünteti az egyetlen natív `output_config.format` kockázatot, **ezen felül a `DesignSync` toolt is** | M-07 b, M-08, M-21 |
+| `DISABLE_PROMPT_CACHING` | **nem állítjuk be** | a `cache_control` blokkok kimennek és a MiniMax fogadja őket, a cache olcsóbbá teszi a hosszú workflow-t | M-08, M-15, M-20 |
+
+**Az env blokk végső döntése: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, nem
+`CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`.** A célzottabb kapcsoló ugyanazt az egy hatást adja
+(a cím kérés eltűnik), de szigorúan kevesebbet: a `DesignSync` tool nála bent marad a `tools`
+tömbben. Az M-21 mért különbsége kérésenként 2 317 input token (26 693 kontra 24 022), és a
+`DesignSync` az a tool, ami a felhasználó claude.ai fiókjában olvas, ír és töröl a felhasználó
+bejelentkezésén keresztül. Egy harmadik fél modelljének ilyen toolt átadni nem indokolható, a
+workflow futtatónak pedig nincs rá szüksége. Részletes elemzés: 3. szekció, M-21.
+
+Az ára: a `NONESSENTIAL_TRAFFIC` a dokumentáció szerint auto-update, telemetria, error reporting,
+`/feedback`, release notes, gateway model discovery, availability check, plugin `command`
+háttérfuttatás és feature flag lekérés letiltását is magával hozza
+(https://code.claude.com/docs/en/env-vars). Headless workflow futtatóban ezek egyike sem kell.
+
+**Modellazonosító: `MiniMax-M3[1m]`.** A suffix nem 404 kockázat, mert a kimenő body `model`
+mezője mindkét esetben `MiniMax-M3` (M-11), viszont a kliens oldali `contextWindow` értéket
+200 000-ről 1 000 000-re emeli. Az M-20 mérés szerint a szolgáltatás legalább 1 046 827 bemeneti
+tokent kiszolgál, tehát suffix nélkül az auto-compact a ténylegesen elérhető ablak kevesebb mint
+ötödénél indulna el. Egy nyitott kockázat marad: az M-20 a suffixszel, tehát a
+`context-1m-2025-08-07` beta header jelenlétében futott, a header nélküli viselkedést nem mértük
+(4. szekció, 2. pont).
 
 **Amit szándékosan nem teszünk bele:**
 
@@ -386,43 +622,58 @@ alapból kikapcsoljuk.
 - `MAX_THINKING_TOKENS=0`: aszimmetrikus (body mezőt vesz le, headert nem), és kikapcsolná az M3
   adaptív thinkingjét.
 - `ENABLE_TOOL_SEARCH=false`: mérhetetlen hatás, custom base URL mellett amúgy is kikapcsolt.
-- `CLAUDE_CODE_MAX_OUTPUT_TOKENS`: **konkrét értéket nem adunk**, amíg az M-22 mérés le nem fut.
+- `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`: szigorúan gyengébb a fenti kapcsolónál, lásd fent.
+- `CLAUDE_CODE_MAX_OUTPUT_TOKENS`: **alapból nem állítjuk be**, marad a kliens 32 000-es
+  alapértéke. Ha egy lépésnek hosszú kimenet kell, a mérésből az adódik, hogy **128 000 fölé nincs
+  értelme állítani**: 131 072 és 524 288 egyaránt 128 000-re vágódik a dróton (M-22). Ez nem
+  ingyenes: a hivatalos leírás szerint `"Increasing this value reduces the effective context
+  window available before auto-compaction triggers"`
+  (https://code.claude.com/docs/en/env-vars), tehát a nagyobb output a kontextusablakból vesz el.
 - Alias feloldó változók (`ANTHROPIC_DEFAULT_HAIKU_MODEL` stb.): nem kötelezőek, mert a dróton
   soha nem jelent meg alias név.
 
 **Tiltott változók** (research 3. szekció): `CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING`,
 `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`.
 
-### 4.2 Alapértelmezett strukturált kimenet stratégia
+### 5.2 Alapértelmezett strukturált kimenet stratégia
 
-**Az alapértelmezés `sdk_output_format` legyen.**
+**Mindkét stratégia bizonyítottan használható. Az alapértelmezés így is `sdk_output_format`.**
 
 | | `sdk_output_format` | `emit_output_tool` |
 |---|---|---|
-| végigfutott MiniMax ellen | **igen**, M-03, `subtype: success`, kitöltött `structured_output` | igen, M-10, 3/3 futás |
-| kényszerítés bizonyított | nem is kell, a tool leírása elég | **nem**, a blokkoló ág sosem futott |
+| végigfutott MiniMax ellen | **igen**, M-03, `subtype: success`, kitöltött `structured_output` | **igen**, M-19, 10/10 futás `success` |
+| kikényszerítés bizonyított | nem is kell, a tool leírása elég | **igen**, M-19: 10/10 futásban aktiválódott a `decision: "block"` ág |
+| megfigyelt körszám | `num_turns: 4` (M-03) | `num_turns: 3`, ebből 1 kör kizárólag a hook blokkolása (M-19 kontra M-10 2 köre) |
 | kényszerített `tool_choice` kimegy-e | nem, 79/79 kérésben | nem releváns |
 | séma validáció | az SDK végzi, `error_max_structured_output_retries` result subtype létezik | saját kód |
+| `role: "system"` kockázat | nem érinti | nem érinti: a hook `reason` szövege `role: "user"` üzenetként megy ki (M-19) |
 
-Indoklás: a `sdk_output_format` mellett mérési bizonyíték áll a teljes láncra, az
-`emit_output_tool` mellett csak a happy pathra. Az `emit_output_tool` `usable` mezője ezért
-`unknown` marad, nem `false`: a mechanizmus lehet hogy működik, csak nem mértük.
+**A saját `emit_output` stratégia mostantól bizonyított**, a leíróban `usable: known true`,
+`observedRoundTrips: known [3]`. Az alapértelmezés mégis az `sdk_output_format` marad, három
+okból: nem igényel `Stop` hookot a lépés futtatóban, a séma validációt az SDK végzi saját kód
+helyett, és nem ír elő determinisztikus plusz modellkört (az M-19 mind a 10 futásában pontosan
+egy blokkolás kellett, tehát a kikényszerítés ára mindig egy extra kör).
+
+Az `emit_output_tool` innentől nem "nem mértük" státuszú tartalék, hanem működő alternatíva: ha
+egy jövőbeli SDK verzió elrontja az `outputFormat` láncot, van hova váltani, mérési bizonyítékkal.
 
 **Kötelező kísérő beállítás:** `maxTurns` legalább 2. Az M-02 futás azért esett
 `error_max_turns`-be, mert `maxTurns: 1` mellett a `StructuredOutput` tool hívása külön kört
-igényel. Ez a lépés-futtató alapértelmezésébe be kell épüljön.
+igényel. Ez a lépés-futtató alapértelmezésébe be kell épüljön. Az `emit_output_tool` ágon a
+mért igény `maxTurns` legalább 3.
 
-### 4.3 Letiltandó UI vezérlők a `minimax` provider választásakor
+### 5.3 Letiltandó UI vezérlők a `minimax` provider választásakor
 
 | Vezérlő | Miért |
 |---|---|
 | `tool_choice` `any` és `tool` opció | a MiniMax csak `auto`/`none` értéket fogad, és az SDK sem küld mást. A UI ne kínálja fel |
 | `thinking` fix budget (`budget_tokens`) | a MiniMax sémájában nincs ilyen kulcs, az SDK sem küldi. Csak `adaptive` és `disabled` maradhat |
-| `WebSearch` tool engedélyezése | **kritikus**, lásd 4.4 |
+| `WebSearch` tool engedélyezése | **kritikus**, lásd 5.4 |
 | modell-lista lekérés az endpointról | nincs `GET /v1/models` hívás, a lista config fájlból jön (Q10) |
-| kép csatolás | Q11 nyitott: az M-16 mérés érvénytelen tesztképpel futott. A vezérlő addig letiltva vagy figyelmeztetéssel |
+| kép csatolás | **véglegesen letiltva.** Az M-23 bizonyította, hogy a kép content blokk kimegy a dróton (256x256 piros PNG, 1 136 karakteres base64), a szolgáltatás HTTP 200-at ad, a modell mégis azt állítja, hogy nincs kép. Nem figyelmeztetés kell, hanem tiltás: a felhasználó máskülönben azt hinné, hogy a modell látta a képet |
+| max output token 128 000 fölé | a kliens úgyis 128 000-re vágja (M-22). A UI ne engedjen olyan értéket beállítani, ami csendben elvész |
 
-### 4.4 A `WebSearch` tool tiltása a `minimax` providerrel
+### 5.4 A `WebSearch` tool tiltása a `minimax` providerrel
 
 **Ez a mérés második legfontosabb, önálló megállapítása, és nem szerepel a Q1-Q12 listán.**
 
@@ -436,11 +687,15 @@ A MiniMax ezt a szerver oldali toolt **csendben eldobja**: HTTP 200, de a válas
 válaszol. A rögzített válasz szó szerint felajánlja, hogy `"searches for more specific
 information"`, tehát a felhasználó felé úgy néz ki, mintha keresés történt volna.
 
+Az M-25 kizárta az egyetlen alternatív magyarázatot: `maxTurns: 12` mellett a futás `success`
+subtype-tal zárult, a `maxTurns` tehát nem szakította félbe, és a 7 kérés egyikének stream
+válaszában sincs eredményblokk. A jelenség nem a mérés artefaktuma.
+
 **Következmény: a `WebSearch` toolt a `minimax` providernél a `disallowedTools` listára kell tenni.**
 Nem hibázik, hanem hallgatólagosan hamis, forrás nélküli választ ad, ami a projekt
 "minden állítást validálni kell" alapelvével összeegyeztethetetlen.
 
-### 4.5 Költségjelentés
+### 5.5 Költségjelentés
 
 A `result.total_cost_usd` és a `modelUsage` **first-party árazással** számol
 (`provider: "firstParty"`, `canonicalModel: "minimax-m3"`). Az M-13 futás triviális prompttal
@@ -448,9 +703,18 @@ A `result.total_cost_usd` és a `modelUsage` **first-party árazással** számol
 workflow futtató UI vagy elrejti, vagy saját, MiniMax árazású számítást használ. Konkrét árat
 ebbe a dokumentumba nem írunk, mert nem mértük.
 
-### 4.6 SDK verzió pinelés
+### 5.6 SDK verzió pinelés
 
 A leírók `sdkVersionPin` mezője `0.3.245`. A mérésből látszik, hogy a body mezőlista bővül
 (`output_config`, `context_management` a research fájl írásakor még nem volt megerősítve
-kimenőként). Minden SDK frissítés előtt az M-01 ... M-18 sor újrafuttatandó, és a jelen
+kimenőként). Minden SDK frissítés előtt az **M-01 ... M-25** sor újrafuttatandó, és a jelen
 dokumentum Q1-Q12 lezárásai újranyitandók.
+
+Két kiegészítő mérés kifejezetten SDK verzióhoz kötött, ezért a frissítési regresszió kötelező
+része:
+
+- **M-22**, mert a 128 000-es `max_tokens` vágás a Claude Code kliens modelltáblájából jön, nem a
+  providertől. Egy új kliensverzió más cap értéket hozhat.
+- **M-24**, mert a `stream` kikapcsolhatatlansága az `Options` típus jelenlegi alakjából
+  következik. Ha egy új SDK verzió ad `stream` mezőt, a `promptCaching.mode` mező azonnal
+  mérhetővé válik.

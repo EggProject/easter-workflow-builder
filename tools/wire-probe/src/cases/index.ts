@@ -18,6 +18,13 @@ import { M15 } from './M-15.ts';
 import { M16 } from './M-16.ts';
 import { M17 } from './M-17.ts';
 import { M18 } from './M-18.ts';
+import { M19 } from './M-19.ts';
+import { M20 } from './M-20.ts';
+import { M21 } from './M-21.ts';
+import { M22 } from './M-22.ts';
+import { M23 } from './M-23.ts';
+import { M24 } from './M-24.ts';
+import { M25 } from './M-25.ts';
 
 export const CASE_REGISTRY: Readonly<Record<string, MeasurementCase>> = {
   'M-01': M01,
@@ -38,6 +45,13 @@ export const CASE_REGISTRY: Readonly<Record<string, MeasurementCase>> = {
   'M-16': M16,
   'M-17': M17,
   'M-18': M18,
+  'M-19': M19,
+  'M-20': M20,
+  'M-21': M21,
+  'M-22': M22,
+  'M-23': M23,
+  'M-24': M24,
+  'M-25': M25,
 };
 
 export const CASE_IDS: readonly string[] = Object.keys(CASE_REGISTRY);

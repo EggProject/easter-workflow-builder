@@ -95,6 +95,13 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 | Q11 kontextusablak és auto-compact | M-13 |
 | Q12 `anthropic-beta` header | M-14 |
 | Descriptor kiegészítő mezők | M-15, M-16, M-17, M-18 |
+| Q8 kiegészítés: `Stop` hook kikényszerítés emit_output említése nélkül | M-19 |
+| Q11 kiegészítés: kontextusablak szerver oldali felső korlátja | M-20 |
+| Q5 kiegészítés: `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` tényleges hatása | M-21 |
+| Q11 kiegészítés: `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja | M-22 |
+| M-16 kiegészítés: kép bemenet felismerhető tartalommal | M-23 |
+| `promptCaching` kiegészítés: cache írás igazolása stream nélküli móddal | M-24 |
+| `serverTools` kiegészítés: web_search magasabb `maxTurns` mellett | M-25 |
 
 ### Közös alapbeállítás
 
@@ -243,6 +250,55 @@ Az SDK verziót a mérés idejére pinelni kell, a pontos verzió a `meta.json`-
 - **Megfigyelés**: minden rögzített `response.meta.json` headerkészletének halmaza. Van-e `retry-after`, van-e bármilyen `ratelimit` alstringet tartalmazó header. Minden 4xx és 5xx válasz törzse: Anthropic alakú `{"type":"error","request_id":...,"error":{...}}` objektum, vagy natív `base_resp.status_code` alak. Az `error.type` értékek halmaza a hozzájuk tartozó HTTP kódokkal.
 - **Következtetés**: a `rateLimits.retryAfterHeader` és `rateLimits.rateLimitHeaders` mezők. Ha a mérés alatt nem keletkezik 429-es válasz, ezek a mezők `unknown` állapotban maradnak, becslés nélkül.
 
+### M-19 `Stop` hook kikényszerítés emit_output említése nélkül
+
+- **Eltérés**: az M-10 megismétlése úgy, hogy a prompt **nem említi** az `emit_output` toolt (`"Számold ki mennyi 2+2."`). A `Stop` hook `decision: 'block'` ága ugyanúgy be van kötve, `stop_hook_active` loop-védelemmel, plusz egy kemény felső korláttal a blokkolások számára, hogy a mérés ne ragadjon be végtelen ciklusba.
+- **Futtatás**: 10 ismételt `query()` hívás azonos, triviálisan rövid prompttal, a sikerarányhoz.
+- **Megfigyelés**: futásonként aktiválódott-e a blokkoló ág, hány blokkolásra és hány körre volt szükség, sikerült-e végül az `emit_output` meghívása, és a `reason` szöveg milyen `role`-lal jelenik meg a következő kimenő kérés `messages` tömbjében. A 10 futásra vetített sikerarány.
+- **Következtetés**: Q8 lezárása arra az ágra, amit az M-10 nem tudott megmérni, mert ott a prompt maga utasította a modellt a tool hívására.
+
+### M-20 Kontextusablak szerver oldali felső korlátja bináris kereséssel
+
+- **Eltérés**: `model: 'MiniMax-M3[1m]'`, növekvő méretű prompt, bináris kereséssel (nem lineáris növeléssel), legfeljebb 8 kérésben, kb. 150 000 token körüli becsült kiinduló mérettel. A kimenő `max_tokens` minimális (`CLAUDE_CODE_MAX_OUTPUT_TOKENS` env alacsony értéken), hogy a bemenet mérete uralja a költséget, ne a kimenet.
+- **Futtatás**: legfeljebb 8, egymást bináris kereséssel követő `query()` hívás.
+- **Megfigyelés**: a legnagyobb sikeres kérés mért `usage.input_tokens` értéke, és az első hibás kérés HTTP státusza (pl. `413 request_too_large`).
+- **Következtetés**: Q11 szerver oldali fele -- mennyi kontextust szolgál ki ténylegesen az endpoint, a kliens oldali 200 000-es feltételezéstől függetlenül.
+
+### M-21 `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` tényleges hatása
+
+- **Eltérés**: egyetlen env eltérés az alaphoz képest: `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`.
+- **Futtatás**: egy `query()`.
+- **Megfigyelés**: eltűnik-e a session cím generáló ("thin") kérés, és eltűnik-e vele a `DesignSync` tool (ami a `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` kapcsolónál M-07/M-08 szerint eltűnt).
+- **Következtetés**: eldönti, hogy a célzottabb kapcsoló használható-e a durvább (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`) helyett a `minimax` provider env blokkjában.
+
+### M-22 `CLAUDE_CODE_MAX_OUTPUT_TOKENS` felső korlátja
+
+- **Eltérés**: négy futás, növekvő `CLAUDE_CODE_MAX_OUTPUT_TOKENS` értékkel (a kliens alapértéke körüli, a MiniMax dokumentált ajánlott és max értéke mentén). A prompt rövid választ vált ki, mert a kimenő `max_tokens` mező értéke és a HTTP kód érdekes, nem a tényleges generálás hossza.
+- **Futtatás**: futásonként egy `query()`, legfeljebb 4 futás.
+- **Megfigyelés**: a kimenő body `max_tokens` mezőjének értéke és a válasz HTTP kódja értékenként.
+- **Következtetés**: Q11 kiegészítés -- konkrét felső korlát a `CLAUDE_CODE_MAX_OUTPUT_TOKENS`-re a `minimax` providernél, mérési bizonyítékkal.
+
+### M-23 Kép bemenet felismerhető tartalommal
+
+- **Eltérés**: az M-16 megismétlése úgy, hogy az érvénytelenül kicsi (1x1 pixeles) teszt PNG helyett a harness programozottan generál egy legalább 256x256 pixeles, egyszínű (tiszta piros) PNG-t, és a prompt megkérdezi a modellt, milyen színt lát.
+- **Futtatás**: egy `query()`, streaming input módban egy base64 kódolt kép content blockkal.
+- **Megfigyelés**: a válasz szövege utal-e ténylegesen a kép piros színére, vagy ugyanazt az "nem látok képet" választ adja, mint az M-16.
+- **Következtetés**: eldönti, hogy az M-16 "nem látok képet" válasza a kép érvénytelen mérete miatt volt-e, vagy a MiniMax valóban eldobja a kép content blockot.
+
+### M-24 Prompt cache írás igazolása stream nélküli móddal
+
+- **Eltérés**: az M-15 megismétlése `stream: false` móddal, hogy a nem stream `usage` objektumban látszódjon a `cache_creation_input_tokens`. Ha a telepített SDK `Options` típusa nem enged stream nélküli hívást, ez a `meta.json`-ban és a jegyzőkönyvben megfigyelésként rögzül, és a proxy oldali rögzített kérés `stream` mezőjéből olvasható ki, mi ment ki ténylegesen.
+- **Futtatás**: az M-15 (a) és (b) futásának megismétlése, közvetlenül egymás után.
+- **Megfigyelés**: a kimenő body `stream` mezőjének értéke, és hogy a válasz egyetlen JSON törzsként vagy SSE eseménysorként érkezik-e. Ha SSE marad, a `cache_creation_input_tokens` mező jelenléte a `message_start` esemény `message.usage` objektumában (nem csak a `message_delta` eseményekben, amit az M-15 vizsgált).
+- **Következtetés**: a `promptCaching.usageFields` mező kiegészítése, vagy annak rögzítése, hogy a nem stream `usage` objektum ezzel az SDK verzióval nem érhető el.
+
+### M-25 Szerver oldali tool magasabb `maxTurns` mellett
+
+- **Eltérés**: az M-17 megismétlése magasabb `maxTurns` értékkel, hogy a limit ne szakítsa meg a `web_search` folyamatot, mielőtt eldőlne, hogy az ténylegesen lefutott-e szerver oldalon.
+- **Futtatás**: egy `query()`.
+- **Megfigyelés**: keletkezik-e `server_tool_use` vagy `web_search_tool_result` blokk a válaszban a magasabb korlát mellett, és a `result` üzenet subtype-ja (`success` vagy `error_max_turns`).
+- **Következtetés**: a `serverTools` mező kiegészítése -- eldönti, hogy az M-17-nél megfigyelt hiányzó eredményblokk a `maxTurns: 3` limit korai megszakítása miatt volt-e, vagy a MiniMax a `web_search_20250305` toolt ténylegesen sosem futtatja le.
+
 ## 5. A `ProviderCapabilityDescriptor` típus terve
 
 ### Alapelvek
@@ -365,6 +421,12 @@ interface StreamingCapability {
   readonly sdkReassemblesToolInput: Fact<boolean>;
   /** Nem-first-party base URL mellett az SDK kikapcsolja. */
   readonly fineGrainedToolStreaming: Fact<boolean>;
+  /**
+   * M-24: kikapcsolható-e a kimenő kérés `stream` mezője. SDK szintű tulajdonság,
+   * nem a provideré. Ha nem, a nem stream válasz `usage` objektuma ezen az úton
+   * nem figyelhető meg, ami a `promptCaching.usageFields` mérését korlátozza.
+   */
+  readonly streamDisableable: Fact<boolean>;
 }
 
 interface ServerToolDescriptor {
@@ -380,10 +442,21 @@ interface ModelDescriptor<TModelId extends string, TFamilyId extends string> {
   readonly family: TFamilyId;
   /** Dokumentált kontextusablak. */
   readonly contextWindow: Fact<number>;
-  /** Q11: amit az endpoint ténylegesen jelent, mérésből. */
+  /**
+   * Q11: amit az endpoint ténylegesen kiszolgál, mérésből. **Alsó korlát**: a
+   * legnagyobb sikeresen kiszolgált teljes bemeneti token szám
+   * (`usage.input_tokens` + `usage.cache_read_input_tokens`), nem a pontos határ.
+   */
   readonly effectiveContextWindowOnWire: Fact<number>;
   readonly maxOutputTokensRecommended: Fact<number>;
   readonly maxOutputTokensHard: Fact<number>;
+  /**
+   * M-22: a kimenő body `max_tokens` mezőjének kliens oldali felső korlátja. A
+   * Claude Code a saját modelltáblájának cap értékére vágja le a
+   * `CLAUDE_CODE_MAX_OUTPUT_TOKENS` ennél nagyobb értékét is, ezért a provider
+   * dokumentált korlátja fölé nem lehet menni.
+   */
+  readonly maxOutputTokensWireCeiling: Fact<number>;
   readonly imageInput: Fact<boolean>;
   readonly videoInput: Fact<boolean>;
   /** Q10: szerepel-e a `GET /v1/models` válaszában. */
@@ -461,8 +534,10 @@ interface ProviderCapabilityDescriptor<
 | `effort` | elfogadott-e, és melyik body mezőben utazik | M-04 |
 | `promptCaching` | mód, breakpoint limit, TTL, minimum token, usage mezők | research 2. szekció, M-15 |
 | `streaming.toolInputDelta` | Q7, a tool argumentum delta alakja | M-09 |
-| `serverTools` | ténylegesen elérhető szerver oldali toolok, nem elméleti lista | M-17 |
-| `models` | kontextus és output limitek, kép/videó bemenet, listázottság | research 2. szekció, M-12, M-13, M-16 |
+| `streaming.streamDisableable` | kikapcsolható-e a `stream` a dróton, SDK szintű tulajdonság | M-24 |
+| `serverTools` | ténylegesen elérhető szerver oldali toolok, nem elméleti lista | M-17, M-25 |
+| `models` | kontextus és output limitek, kép/videó bemenet, listázottság | research 2. szekció, M-12, M-13, M-16, M-20, M-23 |
+| `models[].maxOutputTokensWireCeiling` | a kimenő `max_tokens` kliens oldali vágása, a provider korlátjától függetlenül | M-22 |
 | `rateLimits` | dokumentált bucketek plusz a megfigyelt headerek | research 2. szekció, M-18 |
 | `anthropicBetaHeaders` | Q12, a header elemek, párban a body mezőkkel | M-14 |
 

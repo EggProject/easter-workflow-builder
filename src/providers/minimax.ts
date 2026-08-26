@@ -19,6 +19,13 @@ export type MiniMaxFamilyId = 'M3';
 const RESEARCH_MINIMAX = '2026-08-26-agent-sdk-minimax.md 2. szekció, MiniMax endpoint';
 const RESEARCH_GATEWAY = '2026-08-26-agent-sdk-minimax.md 3. szekció, nem-Anthropic endpoint';
 
+/**
+ * A Claude Code env változó referencia. Innen származik a max_tokens vágás szabálya:
+ * "Claude Code defaults to 32000 for model IDs it doesn't recognize, such as
+ * gateway-specific names, and lowers values above a model's cap to the cap."
+ */
+const DOC_ENV_VARS = 'https://code.claude.com/docs/en/env-vars';
+
 export const minimaxProvider = {
   id: 'minimax',
   displayName: 'MiniMax',
@@ -51,10 +58,11 @@ export const minimaxProvider = {
       literalValue: '1',
       secret: false,
       purpose:
-        'Levágja a session cím generáló háttérkérést. Ezzel felezi a kérésszámot (rate limit) és megszünteti az egyetlen olyan kérést, ami natív output_config.format mezőt küld.',
+        'Levágja a session cím generáló háttérkérést. Ezzel felezi a kérésszámot (rate limit) és megszünteti az egyetlen olyan kérést, ami natív output_config.format mezőt küld. Ráadásul a DesignSync toolt is leveszi a tools tömbből (25 -> 24 elem, mért 2317 input token megtakarítás kérésenként), amit a célzottabb CLAUDE_CODE_DISABLE_TERMINAL_TITLE nem tesz meg.',
       evidence: [
         { kind: 'measurement', id: 'M-07' },
         { kind: 'measurement', id: 'M-08' },
+        { kind: 'measurement', id: 'M-21' },
       ],
     },
   ],
@@ -90,25 +98,30 @@ export const minimaxProvider = {
     strategies: [
       {
         id: 'emit_output_tool',
-        // A blokkoló ág sosem futott le: az M-10 promptja maga kérte a tool hívását,
-        // ezért csak a happy path bizonyított, a kikényszerítés nem.
+        // M-19: a prompt nem említette az emit_output toolt, ezért a Stop hook
+        // blokkoló ága ténylegesen aktiválódott. 10/10 futás sikeres, mindegyikben
+        // pontosan 1 blokkolás után hívta meg a modell a toolt.
         usable: {
-          state: 'unknown',
-          reason:
-            'Az M-10 mindhárom futása sikeres, de a Stop hook decision:"block" ága egyszer sem aktiválódott, mert a prompt maga kérte az emit_output hívását. A kikényszerítő mechanizmus bizonyítatlan.',
-          blockedBy: ['M-10'],
+          state: 'known',
+          value: true,
+          evidence: [
+            { kind: 'measurement', id: 'M-19' },
+            { kind: 'measurement', id: 'M-10' },
+          ],
         },
+        // A hook reason szövege "Stop hook feedback:" előtaggal, role:"user"
+        // üzenetként megy ki (M-19 run-1, 3. kérés), nem role:"system"-ként,
+        // tehát a MiniMax system role kockázata ezen az úton fel sem merül.
         blockingWireDetail: {
-          state: 'unknown',
-          reason:
-            'Blokkoló drótrészlet nem azonosítható, amíg a blokkoló ág nem fut le. Annyi mérésből tudható, hogy a mid-conversation role:"system" üzenet MiniMax M3 ellen HTTP 200-at kap.',
-          blockedBy: ['M-10'],
+          state: 'known',
+          value: null,
+          evidence: [{ kind: 'measurement', id: 'M-19' }],
         },
+        // num_turns: 3 a blokkolással, szemben az M-10 kikényszerítés nélküli 2 körével.
         observedRoundTrips: {
-          state: 'unknown',
-          reason:
-            'Az M-10 futásainak 2 köre a happy pathhoz kellett, nem a kikényszerítéshez. Kikényszerített körszám nincs megfigyelve.',
-          blockedBy: ['M-10'],
+          state: 'known',
+          value: [3],
+          evidence: [{ kind: 'measurement', id: 'M-19' }],
         },
       },
       {
@@ -134,13 +147,17 @@ export const minimaxProvider = {
         },
       },
     ],
+    // Mindkét stratégia bizonyítottan használható. Az alapértelmezés azért marad
+    // az sdk_output_format, mert nem igényel Stop hookot, a séma validációt az SDK
+    // végzi, és nem kell hozzá plusz modellkör a blokkoláshoz (M-03: 4 kör tool
+    // hívással, M-19: 3 kör, amiből 1 kizárólag a hook blokkolása miatt kellett).
     defaultStrategy: {
       state: 'known',
       value: 'sdk_output_format',
       evidence: [
         { kind: 'measurement', id: 'M-02' },
         { kind: 'measurement', id: 'M-03' },
-        { kind: 'measurement', id: 'M-10' },
+        { kind: 'measurement', id: 'M-19' },
       ],
     },
     // 79 POST /v1/messages kérésből 79 hordozott output_config-ot, effort és
@@ -245,13 +262,19 @@ export const minimaxProvider = {
   },
 
   promptCaching: {
-    // A cache_control blokkok kimennek és HTTP 200-at kapnak, de a cache írás
-    // nem igazolt: cache_creation_input_tokens egyetlen stream eventben sem jelent meg.
+    // A cache írás ténye az M-20 bináris keresésből igazolt: a 8. probe
+    // cache_read_input_tokens értéke 985344, ami csak úgy állhatott elő, hogy az
+    // előző, majdnem azonos prefixű probe beírta a cache-t. Az implicit mód is
+    // igazolt: az M-15 (c) futásban nulla cache_control blokk mellett is
+    // cache_read_input_tokens: 128 jött vissza. Ami NEM eldönthető: hogy az
+    // explicit cache_control breakpointoknak van-e önálló hatásuk, mert a
+    // cache_read érték 3 és 0 blokk mellett egyaránt 128 volt, és a szolgáltatás
+    // sosem jelent cache_creation_input_tokens mezőt.
     mode: {
       state: 'unknown',
       reason:
-        'M3-on az explicit cache_control blokkok kimennek és a provider elfogadja őket, de a válaszban csak cache_read_input_tokens figyelhető meg, cache_creation_input_tokens nem, ezért a cache írás nem igazolt. Nem stream válasz usage objektumának rögzítése kell hozzá.',
-      blockedBy: ['M-15'],
+        'Az implicit cache olvasás igazolt (M-15 c: nulla cache_control blokk mellett is cache_read_input_tokens: 128), a cache írás ténye is igazolt (M-20 8. probe: 985344 cache_read token), de az explicit cache_control breakpointok önálló hatása nem mérhető: a cache_read érték 3 és 0 breakpoint mellett azonos, a válasz pedig sosem hordoz cache_creation_input_tokens mezőt. Az implicit és az implicit_and_explicit érték között ezen az úton nem lehet dönteni.',
+      blockedBy: ['M-15', 'M-20', 'M-24'],
     },
     explicitBreakpointLimit: {
       state: 'known',
@@ -268,12 +291,16 @@ export const minimaxProvider = {
       value: 512,
       evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
     },
-    // Kizárólag a ténylegesen megfigyelt mezőnév. A cache_creation_input_tokens
-    // dokumentált, de a mérésben a dróton nem jelent meg, lásd a mode mezőt.
+    // Kizárólag a ténylegesen megfigyelt mezőnév. Az M-24 külön ellenőrizte a
+    // message_start.message.usage és a message_delta.usage objektumot is:
+    // cache_creation_input_tokens egyikben sem szerepel.
     usageFields: {
       state: 'known',
       value: ['cache_read_input_tokens'],
-      evidence: [{ kind: 'measurement', id: 'M-15' }],
+      evidence: [
+        { kind: 'measurement', id: 'M-15' },
+        { kind: 'measurement', id: 'M-24' },
+      ],
     },
     disableEnvVar: {
       state: 'known',
@@ -315,11 +342,21 @@ export const minimaxProvider = {
         { kind: 'measurement', id: 'M-14' },
       ],
     },
+    // M-24: a telepített SDK Options típusában nincs stream mező (az
+    // includePartialMessages csak a kliens oldali SDKMessage kiadást szabályozza),
+    // és a kimenő body stream mezője mind a 4 mért kérésben true.
+    streamDisableable: {
+      state: 'known',
+      value: false,
+      evidence: [{ kind: 'measurement', id: 'M-24' }],
+    },
   },
 
   // M-17: a web_search tool kimegy a dróton, HTTP 200 jön vissza, de a válasz nem
   // tartalmaz server_tool_use vagy web_search_tool_result blokkot. A MiniMax
-  // csendben eldobja, a modell keresés nélkül válaszol.
+  // csendben eldobja, a modell keresés nélkül válaszol. M-25 kizárta, hogy ezt a
+  // maxTurns limit okozta volna: maxTurns 12 mellett a futás result subtype-ja
+  // success, és a 7 kérés egyikének stream válaszában sincs eredményblokk.
   serverTools: {
     state: 'known',
     value: [
@@ -329,11 +366,17 @@ export const minimaxProvider = {
         available: {
           state: 'known',
           value: false,
-          evidence: [{ kind: 'measurement', id: 'M-17' }],
+          evidence: [
+            { kind: 'measurement', id: 'M-17' },
+            { kind: 'measurement', id: 'M-25' },
+          ],
         },
       },
     ],
-    evidence: [{ kind: 'measurement', id: 'M-17' }],
+    evidence: [
+      { kind: 'measurement', id: 'M-17' },
+      { kind: 'measurement', id: 'M-25' },
+    ],
   },
 
   models: [
@@ -345,13 +388,17 @@ export const minimaxProvider = {
         value: 1_000_000,
         evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
       },
-      // A kliens oldal 200000-rel tervez, de az endpoint tényleges határa nem mért:
-      // M-13 nem érte el sem a compact boundaryt, sem a 413 request_too_large hibát.
+      // MÉRT ALSÓ KORLÁT, nem a pontos határ. M-20 8. probe: a sikeres kérés
+      // usage.input_tokens 61483 + cache_read_input_tokens 985344 = 1046827 token,
+      // HTTP 200. A következő lépcső (2 700 000 karakter, a mért 2,46 kar/token
+      // arányból kb. 1,10M token) már "400 invalid params, context window exceeds
+      // limit (2013)" hibát adott, tehát a valódi határ 1046827 és kb. 1,10M között
+      // van. FONTOS: ez MiniMax-M3[1m] modellazonosítóval mért érték, tehát a
+      // context-1m-2025-08-07 beta header jelenlétében.
       effectiveContextWindowOnWire: {
-        state: 'unknown',
-        reason:
-          'M-13 mindössze 3 kérés után lezárult, compact boundary és 413 request_too_large nem fordult elő, count_tokens kérés egyszer sem ment ki. A kliens oldali modelUsage.contextWindow 200000, de ez helyi feltételezés, nem az endpoint jelentése.',
-        blockedBy: ['M-13'],
+        state: 'known',
+        value: 1_046_827,
+        evidence: [{ kind: 'measurement', id: 'M-20' }],
       },
       maxOutputTokensRecommended: {
         state: 'known',
@@ -363,17 +410,36 @@ export const minimaxProvider = {
         value: 524_288,
         evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
       },
+      // M-22: a CLAUDE_CODE_MAX_OUTPUT_TOKENS 4096 és 32000 értéke változatlanul
+      // ment ki, a 131072 és az 524288 viszont egyaránt 128000-re vágódott. A
+      // fenti két dokumentált MiniMax korlát tehát az SDK-n keresztül nem érhető el.
+      maxOutputTokensWireCeiling: {
+        state: 'known',
+        value: 128_000,
+        evidence: [
+          { kind: 'measurement', id: 'M-22' },
+          { kind: 'doc', url: DOC_ENV_VARS },
+        ],
+      },
+      // M-23: a harness egy érvényes, 256x256 pixeles, tiszta piros (255,0,0) PNG-t
+      // küldött. A kimenő body messages[0].content[2] eleme ténylegesen
+      // {"type":"image","source":{"type":"base64","media_type":"image/png",...}} volt,
+      // 1136 karakteres base64 adattal, tehát az SDK KIKÜLDTE a képet. A válasz
+      // HTTP 200, a modell szövege mégis "Nincs kép." A képet a szolgáltatás dobja el,
+      // nem az SDK, és nem a tesztkép mérete okozta az M-16 eredményt.
       imageInput: {
-        state: 'unknown',
-        reason:
-          'M-16 egy 1x1 pixeles PNG-vel futott. A kérés HTTP 200-at kapott és a kép base64 tartalma kiment a dróton, de a modell "Nem látok képet a beszélgetésben." választ adott. Ebből nem dönthető el, hogy a provider eldobta a képet, vagy a modell egy egypixeles képről nem tud mit mondani.',
-        blockedBy: ['M-16'],
+        state: 'known',
+        value: false,
+        evidence: [
+          { kind: 'measurement', id: 'M-23' },
+          { kind: 'measurement', id: 'M-16' },
+        ],
       },
       videoInput: {
         state: 'unknown',
         reason:
-          'Az SDK-ból nem állítottunk elő videó content blokkot, a research modelltáblázata pedig összevont kép és videó oszlopot használ.',
-        blockedBy: ['M-16'],
+          'Az SDK-ból nem állítottunk elő videó content blokkot, a research modelltáblázata pedig összevont kép és videó oszlopot használ. Az M-23 csak a kép content blokkra ad bizonyítékot, videóra nem.',
+        blockedBy: ['M-16', 'M-23'],
       },
       listedByModelsEndpoint: {
         state: 'unknown',

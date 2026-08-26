@@ -261,6 +261,15 @@ export const claudeSubscriptionProvider = {
         'Az API támogatja (tool szintű eager_input_streaming kapcsoló), de hogy a Claude Code first-party úton bekapcsolja-e, nem mértük.',
       blockedBy: ['M-09'],
     },
+    // Ez SDK szintű tulajdonság, nem provideré: a telepített
+    // @anthropic-ai/claude-agent-sdk@0.3.245 sdk.d.ts Options típusában nincs
+    // stream mező, az includePartialMessages csak a kliens oldali SDKMessage
+    // kiadást szabályozza. Ezért ez az érték providertől függetlenül false.
+    streamDisableable: {
+      state: 'known',
+      value: false,
+      evidence: [{ kind: 'measurement', id: 'M-24' }],
+    },
   },
 
   serverTools: {
@@ -306,6 +315,12 @@ export const claudeSubscriptionProvider = {
         value: 128_000,
         evidence: [{ kind: 'doc', url: DOC_MODELS }],
       },
+      maxOutputTokensWireCeiling: {
+        state: 'unknown',
+        reason:
+          'A Claude Code dokumentáltan a modell cap értékére vágja le a CLAUDE_CODE_MAX_OUTPUT_TOKENS-t, de az M-22 megmutatta, hogy a vágás a kliens SAJÁT modelltáblájából jön, nem a provider dokumentált korlátjából. First-party úton a kimenő max_tokens értékét nem mértük, ezért konkrét szám nem állítható.',
+        blockedBy: ['M-22'],
+      },
       imageInput: {
         state: 'known',
         value: true,
@@ -346,6 +361,12 @@ export const claudeSubscriptionProvider = {
         value: 128_000,
         evidence: [{ kind: 'doc', url: DOC_MODELS }],
       },
+      maxOutputTokensWireCeiling: {
+        state: 'unknown',
+        reason:
+          'A Claude Code dokumentáltan a modell cap értékére vágja le a CLAUDE_CODE_MAX_OUTPUT_TOKENS-t, de az M-22 megmutatta, hogy a vágás a kliens SAJÁT modelltáblájából jön, nem a provider dokumentált korlátjából. First-party úton a kimenő max_tokens értékét nem mértük, ezért konkrét szám nem állítható.',
+        blockedBy: ['M-22'],
+      },
       imageInput: {
         state: 'known',
         value: true,
@@ -385,6 +406,12 @@ export const claudeSubscriptionProvider = {
         state: 'known',
         value: 64_000,
         evidence: [{ kind: 'doc', url: DOC_MODELS }],
+      },
+      maxOutputTokensWireCeiling: {
+        state: 'unknown',
+        reason:
+          'A Claude Code dokumentáltan a modell cap értékére vágja le a CLAUDE_CODE_MAX_OUTPUT_TOKENS-t, de az M-22 megmutatta, hogy a vágás a kliens SAJÁT modelltáblájából jön, nem a provider dokumentált korlátjából. First-party úton a kimenő max_tokens értékét nem mértük, ezért konkrét szám nem állítható.',
+        blockedBy: ['M-22'],
       },
       imageInput: {
         state: 'known',

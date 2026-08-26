@@ -44,6 +44,17 @@ kapcsolódik a típushoz.
 
 Ezeket a típus javításakor kell rendezni, addig `unknown` marad a mező.
 
+## Mezők, amiket az M-19 ... M-25 mérés adott a típushoz
+
+| Mező | Mit ír le | Miért kellett |
+|---|---|---|
+| `models[].maxOutputTokensWireCeiling` | a kimenő `max_tokens` **kliens oldali** felső korlátja | az M-22 megmutatta, hogy a Claude Code a saját modelltáblájának cap értékére vág (MiniMax ellen 128 000-re), tehát a provider dokumentált korlátja nem érhető el. Erre a különbségre nem volt mező |
+| `streaming.streamDisableable` | kikapcsolható-e a kimenő `stream` mező | az M-24 szerint a telepített SDK `Options` típusában nincs `stream` mező, ezért a nem stream `usage` objektum elvi okból megfigyelhetetlen. Ez korlátozza a `promptCaching` mérhetőségét, tehát a leíróban látszania kell |
+
+A `models[].effectiveContextWindowOnWire` mező jelentése is pontosodott: **mért alsó korlát**, a
+legnagyobb sikeresen kiszolgált teljes bemeneti token szám (`usage.input_tokens` plusz
+`usage.cache_read_input_tokens`), nem a pontos határ.
+
 ## Típusellenőrzés
 
 A gyökér `tsconfig.json` fogja be ezt a mappát (`include: ["src/**/*.ts"]`). Futtatás a jelenlegi
