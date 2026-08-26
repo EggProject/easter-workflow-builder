@@ -1,0 +1,214 @@
+# PLAN-001: Monorepo, toolchain, CI végrehajtási terv
+
+| | |
+|---|---|
+| Státusz | tervezet |
+| Dátum | 2026-08-26 |
+| Spec | [`../spec/SPEC-001-monorepo-toolchain.md`](../spec/SPEC-001-monorepo-toolchain.md) |
+| Verzióforrás | [`../research/2026-08-26-toolchain.md`](../research/2026-08-26-toolchain.md) |
+| Branch | `feat/spec-001-monorepo-toolchain` |
+
+Ez a terv a SPEC-001-et végrehajtható, egyenként ellenőrizhető lépésekre bontja. Minden lépéshez tartozik azonosító, egymondatos leírás, függőség, a végrehajtó subagent `model` beállítása és elfogadási kritérium.
+
+## 1. Előfeltételek
+
+| Feltétel | Elvárt érték | Ellenőrzés |
+|---|---|---|
+| Feature branch | `feat/spec-001-monorepo-toolchain` a friss `main`-ről | `git rev-parse --abbrev-ref HEAD` |
+| SPEC-000 lezárva | a `src/providers` és a `tools/wire-probe` a helyén, típusellenőrzés zöld | `tsc --noEmit -p tsconfig.json` |
+| Node.js | 26.7.0 | `node -v` |
+| Bun | 1.4.0, csak csomagkezelő | `bun -v` |
+| Tiszta munkakönyvtár | nincs uncommitted változás | `git status --porcelain` üres |
+
+A verziók egyetlen forrása a research fájl. Verziót ebben a munkában nem találunk ki, és nem frissítünk anélkül, hogy a research fájlba is átvezetnénk.
+
+A `main` védett, közvetlen push tiltott, a zárás PR-rel történik.
+
+## 2. Modell hozzárendelés
+
+| Modell | Mikor |
+|---|---|
+| `sonnet` | részletes specifikáció alapján végzett kódolás, konfiguráció írás, recon, dokumentáció ellenőrzés, webes verzió ellenőrzés |
+| `opus` | architektúra, tervezés, adverzariális ellenőrzés, hibakeresés, olyan kódolás ahol a megoldást ki kell találni (saját ESLint szabály, migrációs stratégia) |
+
+A `model` mező soha nem hagyható üresen abban a hitben, hogy örököl valamit.
+
+## 3. Todo lépések
+
+### F1 fázis: előkészítés és a nyitott pontok lezárása
+
+Ez a fázis a SPEC-001 15. szekció `V-*` pontjait zárja le. Amíg a V-1 nyitva van, workspace szerkezet nem épül, mert a döntés a `turbo.json` és a `package.json` `exports` mezőit is meghatározza.
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-1 | Feature branch `feat/spec-001-monorepo-toolchain` kiválasztása a friss `main`-ről. | nincs | sonnet | `git rev-parse --abbrev-ref HEAD` a branch nevét adja, `git status --porcelain` üres, a `main` ref nem mozdult. |
+| T-001-2 | A research fájl verzióinak ellenőrzése a futtatókörnyezet ellen és az npm registry ellen. | T-001-1 | sonnet | `node -v`, `bun -v` egyezik a research értékeivel; minden research táblázatbeli csomagverzió létező npm verzió; minden eltérés listázva, találgatás nélkül. |
+| T-001-3 | V-13 lezárása: az `actions/cache` v6.1.0 tag létezésének megerősítése a GitHub release listából, és a többi action verzió ellenőrzése. | T-001-2 | sonnet | Mind az öt action verziójához tartozik létező release URL, vagy a research fájl javítási javaslata elkészül a tényleges legfrissebb tag megnevezésével. Tippelt verzió nincs. |
+| T-001-4 | V-1 lezárása: minimálpélda két csomaggal annak eldöntésére, hogy a Node 26 type stripping működik-e szimlinkelt workspace csomagra. | T-001-2 | opus | Létezik futtatott próba, kimenettel; a döntés (forrás fogyasztás vagy fordított kimenet) a `docs/research/` alá van vezetve a Node dokumentáció forrás URL-jével együtt; a döntés nem feltételezésen alapul. |
+| T-001-5 | V-2 lezárása: a Turborepo 2.10.12 elfogadja-e a `devEngines.packageManager` deklarációt önmagában, a `packageManager` mező nélkül. | T-001-2 | sonnet | Futtatott `turbo run` kimenete rögzítve, plusz a Turborepo konfigurációs referencia hivatkozása; ha nem fogadja el, a `packageManager` mező kerül be helyette, indoklással. |
+| T-001-6 | V-5, V-6, V-9 lezárása webes ellenőrzéssel: a `jsx` compilerOption értéke React 19 és TS 6.0 mellett, a `projectService` viselkedése több tsconfigos monorepóban, és a `sonarjs/cognitive-complexity` dokumentált alapértelmezése. | T-001-2 | sonnet | Mindhárom kérdésre van hivatalos dokumentációs URL-lel alátámasztott válasz, vagy explicit "nem dokumentált" megállapítás. Számot dokumentáció nélkül nem rögzítünk. |
+| T-001-7 | D-1 előkészítése: a Turborepo projekt referenciákra vonatkozó ellenjavallatának és a projekt igényének szembeállítása, döntési javaslat a usernek. | T-001-4 | opus | Elkészül a két út összehasonlítása konkrét hivatkozásokkal, és a javaslat, hogy a V-4 mérés melyik ponton dönt. A user elé kerülő kérdés kisebb, önállóan megválaszolható kérdésekre van bontva. |
+
+### F2 fázis: workspace váz
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-8 | Gyökér `package.json` létrehozása `private`, `type: "module"`, `workspaces`, csomagkezelő deklaráció és `engines.node` mezőkkel. | T-001-5 | sonnet | `bun install --frozen-lockfile` hibátlanul lefut, a `workspaces` glob mind a négy könyvtárcsoportot fedi (`apps/*`, `packages/*`, `tooling/*`, `tools/*`). |
+| T-001-9 | Bun katalógus felállítása a több csomagban használt verziókhoz (TypeScript, ESLint és pluginjei, Prettier, Vitest, React, `@types/node`), a research fájl értékeivel. | T-001-8 | sonnet | Egyetlen csomag sem tartalmaz literál verziót a katalógusban szereplő csomagokhoz; `bun install` után a telepített verziók egyeznek a research táblázattal. |
+| T-001-10 | A 13 csomag váza: könyvtár, `package.json` a névvel és a SPEC-001 3. szekció szerinti `dependencies` mezővel, üres `src`. | T-001-9 | sonnet | Mind a 13 csomag felismerhető workspace tagként; egyetlen `package.json` `dependencies` mezője sem sért a 3. szekció függőségi irányán; a `bun install` hibátlan. |
+| T-001-11 | `tooling/tsconfig` csomag: `base.json`, `node.json`, `react.json`, a SPEC-001 6. szekció opciólistájával, a TS 6.0 alapértelmezéseinek ismétlése nélkül. | T-001-10, T-001-6 | opus | Egyik config sem tartalmaz eltávolított vagy deprecated opciót és `"ignoreDeprecations"` kapcsolót; a `base.json` nem állítja be a `strict`, `module`, `types`, `rootDir` opciókat; a `node.json` beállítja a `types: ["node"]` értéket. |
+| T-001-12 | Csomagonkénti `tsconfig.json` létrehozása a megfelelő `tooling/tsconfig` alapra, a V-1 döntésének megfelelő `exports` mezővel a `package.json`-ban. | T-001-11, T-001-4 | sonnet | `tsc --noEmit` minden csomagra külön futtatva hibátlan; az `exports` mező a V-1 döntésével összhangban van; egyetlen csomag sem használ `paths` aliast. |
+| T-001-13 | `turbo.json` létrehozása a SPEC-001 5. szekció 7 taskjával, gyökérkulcsokkal, `globalDependencies` és `globalPassThroughEnv` mezőkkel. | T-001-12 | opus | A gyökérkulcs `tasks`, `pipeline` kulcs nincs; `turbo run typecheck` végigfut a teljes workspace-en; a `globalPassThroughEnv` tartalmazza a provider env változóit. |
+| T-001-14 | Turborepo cache viselkedés ellenőrzése: kétszeri futtatás cache találata, és a szelektív újrafuttatás egy `packages/core` módosítás után. | T-001-13 | sonnet | Második futásra teljes cache találat; `core` módosítás után csak a `core`-tól függő csomagok taskja fut újra, a függetlenek nem; a kimenet ezt sorban igazolja. |
+| T-001-15 | V-4 lezárása: a projekt referenciák és a Turborepo cache együttes viselkedésének mérése, és a D-1 döntés lezárása a userrel. | T-001-14, T-001-7 | opus | Mérési eredmény rögzítve; a döntés vagy a referenciák megtartása a mérés indoklásával, vagy a user explicit döntése az elhagyásukról. Csendes eltérés nincs. |
+| T-001-16 | V-3 lezárása: a `turbo.json` `boundaries` kulcs `tags` szintaxisának és a `turbo boundaries` kilépési kódjának ellenőrzése, és bevezetése ha alkalmas. | T-001-13 | sonnet | Vagy a `boundaries` beállítva és a `turbo boundaries` egy szándékos irányszegésre nem nulla kilépési kódot ad, vagy dokumentált indok, hogy miért nem használható. |
+
+### F3 fázis: minőségi kapuk
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-17 | `tooling/eslint-config` csomag váza a SPEC-001 7. szekció hat bázis konfigjával, `projectService: true` beállítással, `eslint-config-prettier/flat` utolsó elemként. | T-001-13 | sonnet | `eslint` a teljes repón lefut, `eslint-plugin-prettier` nincs a függőségek között, az `eslint-config-prettier/flat` a config tömb utolsó eleme. |
+| T-001-18 | A `no-explicit-any` és a nyolc `no-unsafe-*` szabály explicit felvétele `error` szinten, preset öröklésre hagyatkozás nélkül. | T-001-17 | sonnet | Mind a kilenc szabály explicit szerepel; egy szándékosan `any` típust tartalmazó próbafájlon a lint hibát ad; a hibaüzenetben a szabály neve látszik. |
+| T-001-19 | V-7 lezárása és az `as` tiltás bevezetése: `consistent-type-assertions` `assertionStyle: 'never'`, `no-unsafe-type-assertion` `error`, az `as const` viselkedés próbafájlos ellenőrzésével. | T-001-18 | sonnet | Egy `as X` alakot tartalmazó próbafájlon a lint hibát ad; az `as const` viselkedés dokumentálva; ha jelezve van, a megoldás `satisfies` átírás, nem `eslint-disable`. |
+| T-001-20 | A `one-export-per-file` saját ESLint szabály megtervezése: a SPEC-001 7. szekció öt követelménye, a barrel és a diszkriminált unió kivételével együtt. | T-001-17 | opus | Elkészül a szabály viselkedési leírása minden bemeneti alakra (egy export, több export, barrel, unió variánsokkal, nem exportált segéd), és a hibaüzenet formátuma. |
+| T-001-21 | A `one-export-per-file` szabály implementálása és unit tesztelése a T-001-20 terv szerint. | T-001-20, T-001-30 | sonnet | Minden T-001-20 bemeneti alakra van teszt; a szabály két exportos fájlon hibát ad, barrel fájlon nem; a hibaüzenet megnevezi az exportok számát és sorait. |
+| T-001-22 | V-8 lezárása: a `private` kulcsszó tiltása `no-restricted-syntax` AST szelektorral, próbafájlos ellenőrzéssel. | T-001-17 | opus | Egy `private` módosítót tartalmazó próbafájlon a lint hibát ad, a `#` alakon nem; ha a szelektor nem működik megbízhatóan, a döntés a saját szabály felé megy, indoklással. |
+| T-001-23 | Ha a T-001-22 a saját szabály felé dönt: a `require-native-private-fields` szabály implementálása és unit tesztelése. | T-001-22, T-001-30 | sonnet | A szabály jelzi a `private` mezőt, a `private` metódust és a `private` parameter propertyt; a `protected` és a `public` módosítót nem jelzi; minden esethez van teszt. |
+| T-001-24 | Az egyéb, a `CLAUDE.md`-ből következő szabályok felvétele (`switch-exhaustiveness-check`, `no-non-null-assertion`, `explicit-module-boundary-types`, `consistent-type-imports`, `import-x/no-cycle`, `import-x/no-extraneous-dependencies`, `sonarjs/cognitive-complexity`). | T-001-19, T-001-22 | sonnet | Minden szabály `error` szinten szerepel; a `cognitive-complexity` küszöbe a plugin dokumentált alapértelmezésén marad, saját szám nélkül; a lint a teljes repón lefut. |
+| T-001-25 | Fájlminta szerinti eltérések beállítása (tesztfájlok, `tooling/**` és `tools/wire-probe/**`, `*.config.ts`). | T-001-24 | sonnet | Mindhárom minta érvényesül; a `one-export-per-file` a `tooling` és a `tools` alatt is aktív; a config fájlok default exportja nem ad hibát. |
+| T-001-26 | V-10 lezárása és a Prettier bevezetése: config fájl, `.prettierignore`, a `printWidth` mérése a meglévő kódra. | T-001-13 | sonnet | A `printWidth` érték a meglévő fájlokon mért minimális diffre hivatkozik, nem tippelésre; `prettier --check` a teljes repón nulla kilépési kóddal fut; a `.prettierignore` létezik. |
+| T-001-27 | Adverzariális lint ellenőrzés: minden `CLAUDE.md` kódolási elváráshoz megnevezni a konkrét, ténylegesen aktív szabályt, vagy kimondani hogy nincs rá szabály. | T-001-25, T-001-26 | opus | Elkészül a leképezés elvárás és szabály között; minden sor mellett vagy szabálynév és próbafájlos igazolás, vagy explicit "nincs mechanikus kikényszerítés" megállapítás. Feltételezett szabálynév nincs. |
+
+### F4 fázis: teszt infrastruktúra
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-28 | Gyökér `vitest.config.ts` létrehozása `test.projects` mezővel a `packages/*` és `apps/*` alá, `vitest.workspace.ts` fájl nélkül. | T-001-13 | sonnet | `bun run vitest` felismeri a projekteket; `vitest.workspace.ts` fájl nem létezik; a Node környezetű és a böngésző jellegű projektek szét vannak választva. |
+| T-001-29 | Coverage konfiguráció: `provider: 'v8'`, `thresholds[100]: true`, explicit `include` és `exclude` a SPEC-001 9. szekció táblázata szerint. | T-001-28 | opus | A `coverage.all` opció nem szerepel a configban; az `exclude` lista minden sorához tartozik a specben szereplő indok; az `isKnown` és az `isUnknown` typeguard benne van a coverage hatókörében. |
+| T-001-30 | Egy triviális, valódi teszt írása a coverage lánc igazolására, és a küszöb kikényszerülésének ellenőrzése szándékosan lefedetlen ággal. | T-001-29 | sonnet | Teljes lefedettségnél a `test` task nulla kilépési kóddal fut; egy szándékosan lefedetlen ág bevezetése után nem nulla kilépési kóddal fut. |
+| T-001-31 | Playwright csomag és `playwright.config.ts` létrehozása, `webServer` bekötéssel és egy smoke teszttel; V-15 lezárása a `retries` értékre. | T-001-13 | sonnet | A `test:e2e` task `dependsOn: ["build"]` értékkel definiált; a smoke teszt lefut; a `workers` CI értéke a Playwright CI útmutatójára hivatkozik, a `retries` érték döntése dokumentálva. |
+| T-001-32 | V-11 lezárása: a `vite-plugin-istanbul` 9.0.1 és a Vite 8 (Rolldown) együttműködésének próbája. | T-001-31 | opus | Vagy futtatott próba build igazolja a működést, vagy dokumentált megállapítás a hiányzó kompatibilitásról; az eredmény a `docs/research/` alá van vezetve; a spec elfogadását nem blokkolja. |
+| T-001-33 | Ha a T-001-32 működést igazol: a `vite-plugin-istanbul` bekötése `requireEnv: true` mellett, Playwright fixture a `window.__coverage__` mentésére, és V-12 lezárása az összefésülő eszközre. | T-001-32 | sonnet | Az instrumentálás csak a coverage env változó mellett aktív; a fixture minden teszt után fájlba menti a coverage objektumot; az összefésülő eszköz választása dokumentált forrásra hivatkozik. E2E küszöb nem kerül bevezetésre. |
+
+### F5 fázis: token takarékos wrapper scriptek
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-34 | A wrapper kimeneti szerződés véglegesítése: a három blokk pontos alakja, a hibasor formátuma, és V-16 lezárása a csonkolási határra. | T-001-13 | opus | Elkészül a kimeneti sablon mind az öt wrapperre; a csonkolási határ valós hibalistákon mért értékre hivatkozik, nem tippelésre; a szerződés tiltó listája (mit nem ír ki) explicit. |
+| T-001-35 | Az öt bash wrapper implementálása a `tooling/scripts` alatt: `lint`, `typecheck`, `test`, `format`, `build`. | T-001-34, T-001-26, T-001-30 | sonnet | Mind az öt bash script; mindegyik továbbadja a burkolt parancs kilépési kódját; a teljes kimenet `.gitignore`-olt fájlba megy, és az útja csak hiba esetén jelenik meg. |
+| T-001-36 | A wrapper viselkedés ellenőrzése szándékosan hibás bemenettel, mind az öt scriptre. | T-001-35 | sonnet | Mindegyik wrapper nem nulla kilépési kóddal fut hibás bemenetre; a kimenete nem tartalmazza a burkolt eszköz teljes stdoutját; a hibasorok fájl, sor és szabály azonosítót tartalmaznak. |
+
+### F6 fázis: a `src/providers` migrációja
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-37 | A migráció előtti állapot rögzítése: a négy jelenlegi fájl leírói normalizált JSON alakba szerializálva, referencia pillanatképként. | T-001-12 | sonnet | Létezik a szerializált pillanatkép mindkét leíróra; a szerializálás determinisztikus, kulcsrendezéssel; a pillanatkép a T-001-43 összehasonlítás bemenete. |
+| T-001-38 | A `packages/providers` belső mappaszerkezetének véglegesítése a SPEC-001 13. szekció fája szerint, fájlonként pontosan egy exportált dologgal. | T-001-37 | opus | Elkészül a teljes fájllista a jelenlegi exportok leképezésével; minden jelenlegi exportált szimbólumhoz pontosan egy cél fájl tartozik; feloldatlan szimbólum nincs. |
+| T-001-39 | Az `evidence/` és a `capability/` könyvtárak létrehozása: a `fact.ts` és a `capability-descriptor.ts` szétbontása fájlonként egy típusra. | T-001-38 | sonnet | Az `evidence/` 6 fájlja és a `capability/` 20 fájlja létezik; `tsc --noEmit` hibátlan; a `one-export-per-file` szabály zölden fut rajtuk. |
+| T-001-40 | A `references/` könyvtár létrehozása: `doc-url.ts`, `research-section.ts`, és a `measurement-doc.ts` `MeasurementId` és `docs` horgony leképezéssel. | T-001-39 | sonnet | Minden a leírókban hivatkozott `MeasurementId` szerepel a leképezésben; egyetlen feloldatlan azonosító sincs; a horgonyok létező `docs/` fájlra és szekcióra mutatnak. |
+| T-001-41 | A `minimax/` könyvtár létrehozása: a leíró szétbontása capability csoportonként külön fájlba, a `descriptor.ts` `satisfies` kapcsolással. | T-001-40 | sonnet | A 15 fájl létezik; `tsc --noEmit` hibátlan; a `descriptor.ts` `satisfies` operátorral kapcsolódik a típushoz; nincs `any`, nincs `as`. |
+| T-001-42 | A `claude-subscription/` könyvtár létrehozása ugyanezzel a bontással, és a `registry.ts` a két leíróval. | T-001-41 | sonnet | A `claude-subscription` bontása szerkezetileg egyezik a `minimax` bontásával; a `registry.ts` mindkét leírót `readonly` rekordban adja; `tsc --noEmit` hibátlan. |
+| T-001-43 | Tartalmi azonosság igazolása: a migrált leírók normalizált JSON alakjának összehasonlítása a T-001-37 pillanatképpel. | T-001-42 | opus | A két szerializált alak bitre azonos; ha eltérés van, azt soronként meg kell nevezni és javítani, mielőtt a fázis lezárul; egyetlen `Fact` sem váltott állapotot. |
+| T-001-44 | A mérési próza kiemelése a kódból: a több mondatos `purpose` és `reason` stringek egymondatosra rövidítése, a prózás `M-*` kommentek átvezetése a `docs/research/` alá. | T-001-43 | opus | Egyetlen `purpose` vagy `reason` string sem tartalmaz `M-` mintájú azonosítót vagy artefaktum útvonalat; a kivett próza hiánytalanul megjelenik a `docs/research/` fájlokban; a T-001-43 azonosság továbbra is fennáll a `Fact` értékekre. |
+| T-001-45 | Ellenőrző script vagy lint szabály a T-001-44 két mechanikus szabályára (nincs `M-` minta és nincs artefaktum útvonal a `purpose` és `reason` stringekben). | T-001-44 | sonnet | Az ellenőrzés a teljes `packages/providers/src` alatt nulla kilépési kóddal fut; egy szándékosan visszahelyezett `M-` hivatkozáson hibát ad. |
+| T-001-46 | A `src/providers` könyvtár és a gyökér `tsconfig.json` megszüntetése, a hivatkozások átvezetése. | T-001-45 | sonnet | A `src/` könyvtár nem létezik; a gyökér `tsconfig.json` megszűnt vagy csak a workspace referenciákat tartalmazza; a repóban nincs `src/providers` hivatkozás a `docs/` alatti historikus szövegeken kívül. |
+
+### F7 fázis: a `tools/wire-probe` workspace illesztése és regresszió
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-47 | A `tools/wire-probe` bevonása a workspace-be: saját `bun.lock` megszüntetése, függőségek a gyökér lockfile-ba, `tsconfig.json` a `tooling/tsconfig/node.json` alapra. | T-001-12 | sonnet | `tools/wire-probe/bun.lock` nem létezik; a gyökér `bun install --frozen-lockfile` hibátlan; a `tsconfig.json` a megosztott alapot terjeszti ki, és a `types: ["node"]`, `noEmit`, `allowImportingTsExtensions` beállítás onnan jön. |
+| T-001-48 | `typecheck` és `lint` script felvétele a `tools/wire-probe` csomagba, `test` script nélkül, és a coverage `exclude` kiegészítése. | T-001-47, T-001-29 | sonnet | A `turbo run typecheck lint` a mérőeszközre is lefut; a csomagnak nincs `test` scriptje, tehát a mérések nem futnak CI-ben; a coverage `exclude` kizárja a `tools/wire-probe/**` mintát. |
+| T-001-49 | A mérőeszköz forrásának átvizsgálása az ultra strict lint és a szigorított `tsconfig` ellen, javítással ahol kell. | T-001-48, T-001-25 | opus | `turbo run typecheck lint` a `tools/wire-probe` csomagra nulla kilépési kóddal fut; a javítás nem vezetett be `any` vagy `as` használatot, és nem használt `eslint-disable` kommentet a szabály elnémítására. |
+| T-001-50 | Regressziós ellenőrzés a migráció után: `tsc --noEmit` a teljes workspace-en, és a mérőeszköz működésének igazolása lokális echo upstream ellen, valós API hívás nélkül. | T-001-49, T-001-46 | opus | `turbo run typecheck` a teljes workspace-en nulla kilépési kóddal fut; a `proxy` és a `probe` egy lokális echo upstream ellen létrehozza a SPEC-000 3. szekció szerinti artefaktum készletet; valós MiniMax hívás nem történt. |
+
+### F8 fázis: CI
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-51 | GitHub Actions workflow váza: a négy job (`install`, `verify`, `build`, `e2e`) a SPEC-001 12. szekció sorrendjével, a T-001-3-ban igazolt action verziókkal. | T-001-35, T-001-31, T-001-3 | sonnet | A workflow PR-en és `main`-re irányuló push-on fut; a `bun install --frozen-lockfile` alakot használja; a job függőségek a specben leírt sorrendet adják. |
+| T-001-52 | Cache lépések: a `.turbo` könyvtár a hivatalosan dokumentált kulcsmintával, a Bun globális cache (V-14), és a Playwright böngészők cache-elésének szándékos elhagyása. | T-001-51 | sonnet | A `.turbo` cache lépés a Turborepo dokumentált kulcsmintáját használja; a Playwright böngészőkre nincs cache lépés; a Bun cache lépés mért időnyereséggel indokolt, vagy elhagyva indoklással. |
+| T-001-53 | Artefaktum feltöltés: coverage riport mindig, Playwright riport és trace hiba esetén; V-17 lezárása a retenciós napszámra. | T-001-52 | sonnet | Sikeres futásnál elérhető a coverage artefaktum; szándékosan elrontott e2e futásnál elérhető a Playwright riport; a retenciós érték dokumentált forrásra vagy explicit projekt döntésre hivatkozik. |
+| T-001-54 | A CI teljes futásának igazolása egy PR-en, zöld és szándékosan piros ágon egyaránt. | T-001-53 | opus | Zöld PR-en mind a négy job sikeres; egy szándékosan bevezetett lint, típus és teszt hiba mindegyike megbuktatja a `verify` jobot, és a wrapper kimenete azonosítja a hibát; a CI nem kap MiniMax API kulcsot. |
+
+### F9 fázis: dokumentáció és zárás
+
+| ID | Leírás | Függőség | Modell | Elfogadási kritérium |
+|---|---|---|---|---|
+| T-001-55 | `CLAUDE.md` írása minden nem generált könyvtárba, a SPEC-001 14. szekció kötelező szekcióival. | T-001-46, T-001-49 | sonnet | Minden nem generált könyvtárban van `CLAUDE.md`; egyik sem ismétli meg a gyökér szabályait; egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel. |
+| T-001-56 | A `CLAUDE.md` teljességet ellenőrző script megírása: létezik-e minden könyvtárban, és egyezik-e a `## Fájlok` táblázat a könyvtár tartalmával. | T-001-55 | sonnet | A script a teljes repón nulla kilépési kóddal fut; egy szándékosan törölt `CLAUDE.md` és egy elavult `## Fájlok` táblázat egyaránt hibát ad. |
+| T-001-57 | A SPEC-001 15. szekció mind a 17 `V-*` pontjának lezárása és a lezárások átvezetése a `docs/research/` alá. | T-001-54, T-001-33, T-001-15 | opus | Mind a 17 pont lezárt, vagy dokumentált forrásra, vagy saját, futtatott mérésre hivatkozva; feltételezéssel lezárt pont nincs; a lezárások forrás URL-lel a research fájlokban vannak. |
+| T-001-58 | Adverzariális átvizsgálás: van-e olyan konfigurációs érték, küszöb vagy verzió a repóban, ami nem vezethető vissza dokumentációra vagy saját mérésre. | T-001-57 | opus | Minden számhoz és verzióhoz megnevezhető a forrás; ahol nem, az érték eltávolításra kerül vagy explicit "nem ellenőrzött" jelölést kap; a jelentés listázza a talált pontokat. |
+| T-001-59 | Teljes minőségi kapu futtatása a wrappereken keresztül: `format:check`, `typecheck`, `lint`, `test`, `build`. | T-001-58 | sonnet | Mind az öt parancs nulla kilépési kóddal fut a teljes workspace-en; a kimenetek csak összegzést tartalmaznak, hibalista nélkül. |
+| T-001-60 | Commit a feature branchre logikai egységenként (workspace váz, lint, teszt, wrapperek, migráció, CI, dokumentáció). | T-001-59 | sonnet | `git status --porcelain` üres; a `.env` és a `.turbo` nincs a commitokban; a commit üzenetek a SPEC-001-re hivatkoznak; a user értesítve, hogy pusholnia kell, a branch nevével együtt. |
+| T-001-61 | PR nyitása a `feat/spec-001-monorepo-toolchain` branchről a `main` ellen. | T-001-60 | sonnet | A PR leírása hivatkozik a SPEC-001 16. szekció 42 elfogadási kritériumára, felsorolja a lezárt `V-*` pontokat és a D-1 döntés kimenetelét, valamint a halasztott elemeket (ha az e2e coverage elhalasztódott). |
+
+## 4. Fázis függőségek
+
+| Fázis | Bemenete | Miért nem indulhat előbb |
+|---|---|---|
+| F1 | nincs | ez zárja a V-1, V-2, V-13 pontokat |
+| F2 | F1 | a V-1 döntés határozza meg az `exports` mezőt és a `dependsOn` értékeket |
+| F3 | F2 | a lint típusinformációt igényel, ami tsconfigot és workspace szerkezetet feltételez |
+| F4 | F2 | a Vitest a workspace projekteken dolgozik |
+| F5 | F2, F3, F4 | a wrapper azt burkolja, ami már létezik |
+| F6 | F2 | a migráció cél mappaszerkezete a workspace része |
+| F7 | F2, F3, F6 | a mérőeszköz a szigorított lint és a migrált leírók mellett kell hogy működjön |
+| F8 | F3, F4, F5 | a CI a wrappereket és a taskokat futtatja |
+| F9 | minden | zárás |
+
+Az F3 és az F4 párhuzamosítható, mert nincs közöttük függőség. Az F6 az F3-tól függetlenül indítható, de az F3 szabályai (`one-export-per-file`) a migráció elfogadási kritériumában szerepelnek, ezért a két fázis eredménye az F7-ben találkozik.
+
+Két visszamutató függőség szándékos: a T-001-21 és a T-001-23 saját ESLint szabályok unit tesztje a T-001-30-tól függ, mert addig nincs működő teszt futtató.
+
+## 5. Kockázat kezelés a végrehajtás alatt
+
+| Helyzet | Mit teszünk |
+|---|---|
+| A V-1 a fordított kimenet mellett dönt | a `turbo.json` `dependsOn` értékei `^build`-ra változnak, a könyvtárcsomagok `build` scriptet kapnak, az `isolatedDeclarations` bekapcsol. A T-001-13 ezt már a döntés ismeretében írja meg, nem utólag javítjuk. |
+| A `vite-plugin-istanbul` nem működik Vite 8 alatt | a T-001-33 elmarad, a tény a `docs/research/` alá kerül, és a PR leírása felsorolja. A spec elfogadását nem blokkolja. |
+| A `projectService` lassú vagy hibás a monorepóban | visszaesés a `project` tömbre, ami dokumentáltan még támogatott. A döntés indoklása a `tooling/eslint-config/CLAUDE.md` fájlba kerül. |
+| A `one-export-per-file` sok fals pozitívot ad | a kivételek a szabályba kerülnek, nem `eslint-disable` kommentekbe. Ha a szabály nem stabilizálható, a bevezetése halasztódik, és ezt a PR leírása kimondja. |
+| A T-001-43 tartalmi eltérést talál a migráció után | a fázis nem zárható le. Az eltérést soronként meg kell nevezni és javítani, mielőtt a T-001-44 próza kiemelés elindul. |
+| Egy research fájlbeli verzió nem létezik az npm-en vagy a GitHubon | a research fájlt javítjuk a tényleges verzióval és forrás URL-lel, nem a konfigurációt írjuk át találomra. |
+| A 100 százalékos coverage küszöb triviális teszteket kényszerítene ki | az `exclude` lista bővül az érintett adat literál fájlokkal, indoklással. A küszöböt nem csökkentjük. |
+
+## 6. Definition of Done
+
+1. A gyökérben van `package.json` a négy workspace glob-bal és csomagkezelő deklarációval, és a `bun install --frozen-lockfile` hibátlanul lefut (T-001-8).
+2. Egyetlen `bun.lock` van a repóban, a `tools/wire-probe` saját lockfile-ja megszűnt, `bun.lockb` sehol nincs (T-001-8, T-001-47).
+3. A több csomagban használt verziók Bun katalógusban vannak, a research fájl értékeivel, és egyetlen csomag sem tartalmaz hozzájuk literál verziót (T-001-9).
+4. Mind a 13 csomag létezik a SPEC-001 3. szekció útvonalain, `package.json`, `tsconfig.json` és `CLAUDE.md` fájllal, és a `dependencies` mezők nem sértik a függőségi irányt (T-001-10, T-001-55).
+5. A `turbo.json` gyökérkulcsa `tasks`, a 7 task definiált, és a cache viselkedés igazolt: második futásra teljes találat, `core` módosítás után szelektív újrafuttatás (T-001-13, T-001-14).
+6. A `tooling/tsconfig` három configja nem tartalmaz eltávolított vagy deprecated opciót, nem ismétli a TS 6.0 alapértelmezéseit, és nem használ `"ignoreDeprecations"` kapcsolót (T-001-11).
+7. A `turbo run typecheck` a teljes workspace-en nulla kilépési kóddal fut, a `tools/wire-probe` és a `packages/providers` csomagot is beleértve (T-001-50).
+8. A D-1 döntés lezárva: a projekt referenciák vagy bent maradnak a V-4 mérés indoklásával, vagy a user explicit döntött az elhagyásukról. Csendes eltérés nincs (T-001-15).
+9. Az ESLint flat config hat bázis konfigot tartalmaz, `eslint-config-prettier/flat` az utolsó elem, és `eslint-plugin-prettier` nincs a függőségek között (T-001-17).
+10. A `no-explicit-any` és a nyolc `no-unsafe-*` szabály explicit `error` szinten szerepel, és próbafájlon igazoltan jelez (T-001-18).
+11. Az `as` tiltás működik: `consistent-type-assertions` `assertionStyle: 'never'` plusz `no-unsafe-type-assertion`, próbafájlon igazolva, az `as const` viselkedés dokumentálva (T-001-19).
+12. A `one-export-per-file` saját szabály létezik, unit tesztelt, és a teljes forrásfán zölden fut; barrel fájlon és diszkriminált unión nem ad fals pozitívot (T-001-21).
+13. A `private` kulcsszó tiltása működik, próbafájlon igazolva; a megoldás (szelektor vagy saját szabály) dokumentált a V-8 eredménye alapján (T-001-22, T-001-23).
+14. Minden `CLAUDE.md` kódolási elváráshoz vagy megnevezhető egy ténylegesen aktív szabály, vagy explicit megállapítás, hogy nincs mechanikus kikényszerítés (T-001-27).
+15. A Prettier config és a `.prettierignore` létezik, a `format:check` a teljes repón zöld, és a `printWidth` mért értékre hivatkozik (T-001-26).
+16. A gyökér `vitest.config.ts` `test.projects` mezőt használ, `vitest.workspace.ts` fájl nem létezik (T-001-28).
+17. A coverage `provider: 'v8'` és `thresholds[100]: true`, `coverage.all` nélkül; az `include` és `exclude` explicit, és a typeguardok a hatókörben maradnak (T-001-29).
+18. A 100 százalékos küszöb ténylegesen kikényszerül: szándékosan lefedetlen ágon a `test` task nem nulla kilépési kóddal fut (T-001-30).
+19. Létezik `playwright.config.ts`, a `test:e2e` task `dependsOn: ["build"]` értékkel, és egy smoke teszt lefut (T-001-31).
+20. A V-11 lezárva: a `vite-plugin-istanbul` és a Vite 8 viszonya dokumentálva. Ha működik, az instrumentálás és a Playwright coverage fixture bekötve; ha nem, a halasztás indoka le van írva (T-001-32, T-001-33).
+21. Az öt bash wrapper létezik a `tooling/scripts` alatt, teljesíti a három blokkos kimeneti szerződést, továbbadja a kilépési kódot, és hibás bemenetre igazoltan nem nulla kóddal fut (T-001-35, T-001-36).
+22. A `packages/providers` a SPEC-001 13. szekció mappaszerkezete szerint áll fel, fájlonként egy exportált dologgal, és a `one-export-per-file` rajta zölden fut (T-001-39, T-001-41, T-001-42).
+23. A migráció tartalmilag azonos: a normalizált JSON összehasonlítás bitre egyezést ad, egyetlen `Fact` sem váltott állapotot (T-001-43).
+24. A mérési próza kikerült a kódból: egyetlen `purpose` vagy `reason` string sem tartalmaz `M-` mintájú azonosítót vagy artefaktum útvonalat, és ezt ellenőrzés igazolja (T-001-44, T-001-45).
+25. A `references/measurement-doc.ts` minden hivatkozott `MeasurementId` értéket feloldható `docs/` horgonyra képez le, feloldatlan azonosító nélkül (T-001-40).
+26. A `src/providers` könyvtár és a gyökér `tsconfig.json` megszűnt, és nincs rájuk mutató hivatkozás a historikus dokumentumokon kívül (T-001-46).
+27. A `tools/wire-probe` a workspace tagja, `typecheck` és `lint` scripttel, `test` script nélkül, és az ultra strict lint zölden fut rajta `any`, `as` és `eslint-disable` bevezetése nélkül (T-001-47, T-001-48, T-001-49).
+28. A mérőeszköz a migráció után is működik: lokális echo upstream ellen létrehozza a SPEC-000 szerinti artefaktum készletet, valós API hívás nélkül (T-001-50).
+29. A GitHub Actions workflow négy jobja a specben leírt sorrendben fut, a research fájl action verzióival, `--frozen-lockfile` telepítéssel (T-001-51).
+30. A `.turbo` cache a hivatalosan dokumentált kulcsmintával működik, a Playwright böngészők nincsenek cache-elve, és a `setup-node` nem használ `cache: bun` értéket (T-001-52).
+31. A CI zöld PR-en mind a négy jobra sikeres, és szándékosan bevezetett lint, típus és teszt hibát egyaránt megfog (T-001-54).
+32. A CI nem kap MiniMax API kulcsot, és a mérések nem futnak benne (T-001-48, T-001-54).
+33. Minden nem generált könyvtárban van `CLAUDE.md` a kötelező szekciókkal, verziószám nélkül, és az ellenőrző script a teljes repón zöld (T-001-55, T-001-56).
+34. A SPEC-001 15. szekció mind a 17 `V-*` pontja lezárt, dokumentált forrásra vagy futtatott mérésre hivatkozva; feltételezéssel lezárt pont nincs (T-001-57).
+35. Az adverzariális átvizsgálás nem talált forrás nélküli konfigurációs értéket, küszöböt vagy verziót; ahol talált, az eltávolítva vagy "nem ellenőrzött" jelöléssel ellátva (T-001-58).
+36. Mind az öt minőségi kapu nulla kilépési kóddal fut a wrappereken keresztül (T-001-59).
+37. A munka commitolva van a `feat/spec-001-monorepo-toolchain` branchen, a user értesítve a push szükségességéről, és a PR nyitva a `main` ellen, a lezárt `V-*` pontokkal, a D-1 kimenetelével és a halasztott elemekkel (T-001-60, T-001-61).

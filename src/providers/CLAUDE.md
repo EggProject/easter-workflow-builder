@@ -55,6 +55,15 @@ A `models[].effectiveContextWindowOnWire` mező jelentése is pontosodott: **mé
 legnagyobb sikeresen kiszolgált teljes bemeneti token szám (`usage.input_tokens` plusz
 `usage.cache_read_input_tokens`), nem a pontos határ.
 
+## Mezők, amiket az M-26 ... M-36 mérés adott a típushoz
+
+| Mező | Mit ír le | Miért kellett |
+|---|---|---|
+| `models[].clientModelIdentifier` | amit a kliensnek át kell adni, ha az a wire `id` mezőtől eltér | az M-29 megmutatta, hogy az alias feloldás nem a `model` stringen hat, hanem a `context-1m-2025-08-07` beta header jelenlétén, és kérésenként eltérhet. A config rétegnek tehát más azonosítót kell tárolnia, mint ami a dróton megjelenik |
+| `promptCaching.callerBreakpointSurvivesDisable` | a hívó fél saját `cache_control` blokkját levágja-e a `disableEnvVar` | az M-33 szerint a `DISABLE_PROMPT_CACHING=1` csak az SDK automatikus töréspontjait veszi le, a kézzel rakottat nem. A prompt cache tehát részben a mi kezünkben van, és ez a leíróból eddig nem látszott |
+| `modelsEndpoint` | a `GET /v1/models` elérhetősége közvetlen hívással, és hogy az SDK hívja-e | az M-35 szerint a végpont HTTP 200-at ad, csak az SDK nem hívja (M-12, M-36). A per modell `listedByModelsEndpoint` mező ezt a kettősséget nem tudta kifejezni, a Kapcsolat teszt gomb terve viszont pont ezen áll |
+| `concurrency` | a subagent korlát env változó neve, a mért korlát érték és a mellette megfigyelt egyidejű kérésszám | az M-31 szerint `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=3` mellett a kimenő kérésszám csúcsa 4 (orchestrátor plusz három subagent). Ez a provider percenkénti kérés korlátjába számít bele, tehát a leíróhoz tartozik |
+
 ## Típusellenőrzés
 
 A gyökér `tsconfig.json` fogja be ezt a mappát (`include: ["src/**/*.ts"]`). Futtatás a jelenlegi
