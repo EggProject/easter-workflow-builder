@@ -212,9 +212,18 @@ Az (a) út blokkoló kockázata: a Node type stripping viselkedése a `node_modu
 
 ### Projekt referenciák
 
-**D-1, nyitott döntés, a userrel egyeztetendő.** A cél a csomagok közötti TypeScript projekt referencia (`references` mező), ahogy a feladat kiírja. A Turborepo hivatalos TypeScript útmutatója viszont kifejezetten ellenjavallja: *"We don't recommend using TypeScript Project References as they introduce both another point of configuration as well as another caching layer to your workspace"* ([TypeScript guide](https://turborepo.dev/docs/guides/tools/typescript)). A két cache réteg (Turborepo és a `.tsbuildinfo`) egymás mellett futása valós, dokumentált kockázat.
+**D-1, lezárt döntés.** A user a Turborepo hivatalos ajánlását választotta: **nincs TypeScript
+projekt referencia** (`references` mező) a csomagok között, és egyetlen `tsconfig.json` sem
+használ `composite: true` vagy `tsc --build` alapú fordítást. Minden csomagnak önálló
+tsconfigja van egy közös base-ből (`tooling/tsconfig`), és a build sorrendet kizárólag a
+`turbo.json` `dependsOn` mezője adja.
 
-A spec alapállása: a projekt referenciák bekerülnek, mert a feladat kéri, de a `typecheck` task Turborepo cache-e és a `.tsbuildinfo` viszonyát a végrehajtás során mérni kell (T-001-9 elfogadási kritériuma), és ha a két réteg egymás ellen dolgozik, a referenciák elhagyása kerül a user elé döntésre. Csendes eltérés nincs.
+Az indok a Turborepo hivatalos TypeScript útmutatója: *"We don't recommend using TypeScript
+Project References as they introduce both another point of configuration as well as another
+caching layer to your workspace"* ([TypeScript guide](https://turborepo.dev/docs/guides/tools/typescript)).
+A user ezt az ajánlást fogadta el, ezért a Turborepo cache és a `.tsbuildinfo` egymás elleni,
+dokumentált kockázata nem áll fenn: `.tsbuildinfo` sehol nem keletkezik, mert nincs `composite`
+build. A V-4 pont (15. szekció) ezzel tárgytalanná vált.
 
 ## 7. ESLint
 
@@ -266,7 +275,12 @@ Kivétel: az `as const` nem típuskényszerítés, hanem const assertion. Hogy a
 
 #### Egy fájlba egy dolog
 
-**Nincs kész community szabály erre.** Ellenőrzött és elvetett jelöltek:
+**Nem ESLint szabály, munkautasítás.** A user tisztázta: ez neki szóló elvárás, nem gépi
+kényszer. A `CLAUDE.md`-ben marad mint kódolási elvárás, de a lint ezt nem ellenőrzi, és a
+`tooling/eslint-config` alatt **nem** készül hozzá saját szabály.
+
+Ellenőrzött és elvetett community szabály jelöltek, csak dokumentációs célból (ha a döntés
+valaha megváltozna, ezekből egyik sem alkalmas közvetlenül):
 
 | Jelölt | Mit csinál valójában |
 |---|---|
@@ -276,30 +290,48 @@ Kivétel: az `as const` nem típuskényszerítés, hanem const assertion. Hogy a
 | `import-x/no-default-export`, `import-x/prefer-default-export` | a default export stílusáról szól, nem a darabszámról |
 | `eslint-plugin-unicorn` 73.0.0, `eslint-plugin-sonarjs` 4.2.0 | nincs ilyen szabályuk |
 
-**Saját szabályt kell írni**, `tooling/eslint-config` alatt, `one-export-per-file` néven. Amit ellenőriznie kell:
-
-1. A modul legfelső szintjén pontosan egy exportált deklaráció áll (`export const`, `export function`, `export class`, `export type`, `export interface` vagy `export default`).
-2. Kivétel a barrel fájl: az a fájl, ami kizárólag `export ... from '...'` alakú újraexportokat tartalmaz és saját deklarációt nem, korlátlan számú újraexportot tartalmazhat. A barrel fájlok neve a configban felsorolt minta (`index.ts`).
-3. Kivétel a diszkriminált unió: egy exportált unió típus és a variánsai ugyanabban a fájlban maradhatnak, ha a variánsok nincsenek külön exportálva.
-4. A szabály nem tiltja a nem exportált, fájl lokális segédeket.
-5. Az üzenet megnevezi, hány export van és melyik sorokban.
-
-A szabályt a `packages/providers` migrációja után a teljes forrásfán zölden kell futtatni, tehát a 13. szekció mappaszerkezete és ez a szabály együtt érvényes.
+A `packages/providers` migrációja (13. szekció) a fájlonként egy exportot ettől
+függetlenül, kézi fegyelemként követi: minden exportált típus, konstans és leíró szekció
+külön fájlba kerül, de ezt lint nem kényszeríti ki.
 
 #### Valódi privát mező a `private` kulcsszó helyett
 
-**Nincs kész community szabály erre.** A typescript-eslint oldalán a "prefer native private class field" szabályjavaslat (`typescript-eslint` issue #10944) **not planned** státusszal lezárva, tehát nem várható.
+**Lezárva, kész szabállyal megoldva.** Nem kell saját ESLint plugin csomag. A typescript-eslint
+oldalán a "prefer native private class field" szabályjavaslat (`typescript-eslint` issue #10944)
+**not planned** státusszal lezárva, tehát community szabály nem várható, de a megoldás az ESLint
+core `no-restricted-syntax` szabálya, AST szelektorral. A typescript-eslint AST-jában a
+`PropertyDefinition`, a `MethodDefinition` és a `TSParameterProperty` csomópont hordoz
+`accessibility` mezőt, aminek értékkészlete `'private' | 'protected' | 'public'` ([AST spec](https://typescript-eslint.io/packages/typescript-estree/ast-spec)).
 
-Két lehetőség, mindkettőt a végrehajtás során kell kipróbálni és a működőt választani:
+A pontos, használandó konfiguráció:
 
-1. **ESLint core `no-restricted-syntax` AST szelektorral.** A typescript-eslint AST-jában a `PropertyDefinition`, a `MethodDefinition` és a `TSParameterProperty` csomópont hordoz `accessibility` mezőt, aminek értékkészlete `'private' | 'protected' | 'public'` ([AST spec](https://typescript-eslint.io/packages/typescript-estree/ast-spec)). A szelektor alakja ebből levezethető, de **hivatalos példával nem igazolt**, ezért a végrehajtás során egy próbafájllal kell ellenőrizni, hogy ténylegesen jelez-e.
-2. **Saját szabály** `tooling/eslint-config` alatt, `require-native-private-fields` néven, ha az 1. út nem működik megbízhatóan.
+```js
+'no-restricted-syntax': [
+  'error',
+  {
+    selector: "PropertyDefinition[accessibility='private']",
+    message: "Use native ECMAScript private fields (e.g., #field) instead of the TypeScript 'private' modifier.",
+  },
+  {
+    selector: "MethodDefinition[accessibility='private']",
+    message: "Use native ECMAScript private methods (e.g., #method) instead of the TypeScript 'private' modifier.",
+  },
+  {
+    selector: "TSParameterProperty[accessibility='private']",
+    message: "Do not use 'private' in constructor parameter properties. Define a native private field (#field) and assign the value manually.",
+  },
+],
+```
 
-Amit ellenőriznie kell, akármelyik úton:
+Amit ellenőriznie kell:
 
 - Osztálymező vagy metódus `private` accessibility módosítóval: hiba, a `#` alak az elvárt.
 - Konstruktor parameter property `private` módosítóval: hiba. Ezt egyébként az `erasableSyntaxOnly` TypeScript kapcsoló is fordítási hibává teszi (6. szekció), tehát itt két réteg fedi ugyanazt.
 - A `protected` és a `public` módosító nem tárgya ennek a szabálynak.
+
+A végrehajtás során egy próbafájllal még ellenőrizendő, hogy a szelektor ténylegesen jelez-e
+(V-8), de a saját szabály fallback út (`require-native-private-fields`) elesett: ez a
+konfiguráció a kötelezően használandó megoldás.
 
 #### Egyéb, a CLAUDE.md-ből következő szabályok
 
@@ -320,7 +352,7 @@ A `sonarjs/cognitive-complexity` küszöbét a plugin dokumentált alapértelmez
 | Minta | Eltérés |
 |---|---|
 | `**/*.test.ts`, `**/*.spec.ts` | a `sonarjs/no-duplicate-string` és a `max-lines` jellegű szabályok lazíthatók, mert a teszt ismétlődése szándékos |
-| `tooling/**`, `tools/wire-probe/**` | a `one-export-per-file` szabály itt is érvényes, de az `import-x/no-extraneous-dependencies` a `devDependencies` importot engedi |
+| `tooling/**`, `tools/wire-probe/**` | az `import-x/no-extraneous-dependencies` a `devDependencies` importot engedi |
 | `**/*.config.ts` | default export engedett |
 
 ## 8. Prettier
@@ -470,7 +502,7 @@ A `main` védett, PR-rel dolgozunk. A workflow PR-en és a `main`-re irányuló 
 
 Action verziók a research fájl szerint: `actions/checkout` v7.0.1, `actions/setup-node` v7.0.0, `oven-sh/setup-bun` v2.2.0, `actions/cache` v6.1.0, `actions/upload-artifact` v7.0.1.
 
-**Ellentmondás, ellenőrizendő.** A végrehajtás során az `actions/cache` v6.1.0 létezését a GitHub release listából meg kell erősíteni, mert egy ellenőrzés a v5.x sorozatot találta legfrissebbnek. A research fájl a projekt verzióforrása, ezért a v6.1.0 marad a kiinduló érték, de ha a tag nem létezik, a research fájlt kell javítani, nem a workflow-t találomra átírni.
+**Ellentmondás lezárva, megerősítve.** Élő ellenőrzés a GitHub API-n (`repos/actions/cache/releases/latest`): az `actions/cache` legfrissebb release-e valóban **v6.1.0** (2026-06-26). A korábbi ellenőrzés, ami a v5.x sorozatot találta legfrissebbnek, elavult volt. A research fájl helyes volt. Ugyanígy megerősítve élő lekérdezéssel: `actions/checkout` v7.0.1, `actions/setup-node` v7.0.0, `oven-sh/setup-bun` v2.2.0, `actions/upload-artifact` v7.0.1. Mind az öt action verzió létező, jelenleg is legfrissebb release tag.
 
 ### Jobok és sorrend
 
@@ -592,7 +624,7 @@ packages/providers/
     registry.ts                    a ket leiro egyetlen readonly rekordban
 ```
 
-Indoklás a bontásra: a `minimax.ts` jelenleg egyetlen 502 soros objektum literál. Csoportonként külön fájlban a diff olvasható marad, egy mérési kör eredménye egyetlen fájlt érint, és a `one-export-per-file` szabály (7. szekció) teljesül.
+Indoklás a bontásra: a `minimax.ts` jelenleg egyetlen 502 soros objektum literál. Csoportonként külön fájlban a diff olvasható marad, egy mérési kör eredménye egyetlen fájlt érint, és az "egy fájlba egy dolog" munkautasítás (7. szekció, `CLAUDE.md` elvárás, nem lint szabály) teljesül.
 
 ### A mérési hivatkozás kiemelése
 
@@ -673,26 +705,26 @@ Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec
 | V-1 | A könyvtárcsomagok forrás `.ts` alakban fogyaszthatók-e, azaz a Node 26 type stripping működik-e szimlinkelt workspace csomagra | két csomagos minimálpélda futtatása, plusz a Node dokumentáció type stripping szekciója |
 | V-2 | A Turborepo 2.10.12 elfogadja-e a `devEngines.packageManager` deklarációt önmagában | `turbo run` futtatás, plusz a Turborepo konfigurációs referencia |
 | V-3 | A `turbo.json` `boundaries` kulcs `tags` szintaxisa és a `turbo boundaries` kilépési kódja | Turborepo dokumentáció |
-| V-4 | A `.tsbuildinfo` és a Turborepo cache viszonya projekt referenciák mellett (D-1) | mérés, plusz a Turborepo TypeScript útmutató |
+| V-4 | **Lezárva, tárgytalan.** A D-1 döntés szerint nincs projekt referencia, tehát nincs `.tsbuildinfo`, és nincs mit mérni a Turborepo cache viszonyából. | D-1 döntés, ld. 6. szekció |
 | V-5 | A `jsx` compilerOption pontos értéke React 19 és TS 6.0 mellett | React és TypeScript dokumentáció |
 | V-6 | A `projectService: true` viselkedése több tsconfigos monorepóban | typescript-eslint dokumentáció |
 | V-7 | Az `assertionStyle: 'never'` jelzi-e az `as const` alakot | próbafájl, plusz a szabály dokumentációja |
-| V-8 | A `no-restricted-syntax` AST szelektor valóban jelzi-e a `private` módosítót | próbafájl a typescript-eslint playgrounddal |
+| V-8 | A `no-restricted-syntax` AST szelektor (7. szekció, adott konfiguráció) valóban jelzi-e a `private` módosítót | próbafájl a typescript-eslint playgrounddal; a konfiguráció maga már nem nyitott, csak a próbafájlos megerősítés van hátra |
 | V-9 | A `sonarjs/cognitive-complexity` dokumentált alapértelmezett küszöbe | plugin dokumentáció |
 | V-10 | A Prettier `printWidth` értéke, ami a meglévő kódra minimális diffet ad | mérés a meglévő fájlokon |
 | V-11 | A `vite-plugin-istanbul` 9.0.1 működik-e Vite 8 (Rolldown) alatt | próba build, plusz a plugin kiadási jegyzetei |
 | V-12 | Az e2e coverage összefésülő eszköz kiválasztása | eszközök dokumentációja |
-| V-13 | Az `actions/cache` v6.1.0 létezik-e; ha nem, a research fájl javítása | GitHub release lista |
+| V-13 | **Lezárva, megerősítve.** Az `actions/cache` v6.1.0 létezik, élő GitHub API lekérdezéssel igazolva, a research fájl helyes volt. | GitHub release lista, 12. szekció |
 | V-14 | A Bun globális cache `actions/cache` receptje nyer-e időt | mérés a CI-ben |
 | V-15 | A Playwright `retries` CI értéke | Playwright dokumentáció, plusz saját mérés |
 | V-16 | A wrapper scriptek csonkolási határa | mérés a valós hibalistákon |
 | V-17 | Az artefaktum retenciós napszám | GitHub Actions dokumentáció, plusz projekt döntés |
 
-### Nyitott döntés
+### Lezárt döntés
 
 | ID | Döntés | Állás |
 |---|---|---|
-| D-1 | TypeScript projekt referenciák a csomagok között | a feladat kéri, a Turborepo hivatalos útmutatója ellenjavallja. A spec alapállása a bevezetés, de a V-4 mérés után a user elé kerül, ha a két cache réteg egymás ellen dolgozik. |
+| D-1 | TypeScript projekt referenciák a csomagok között | **Lezárva.** A user a Turborepo hivatalos ajánlását választotta: nincs projekt referencia. Minden csomagnak önálló tsconfigja van egy közös base-ből, `composite` és `references` nélkül, a build sorrendet a `turbo.json` `dependsOn` mezője adja. |
 
 ## 16. Elfogadási kritériumok
 
@@ -710,8 +742,8 @@ Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec
 12. Az ESLint flat config a 7. szekció mind a hat bázis konfigját tartalmazza, az `eslint-config-prettier/flat` az utolsó elem, és `eslint-plugin-prettier` nincs a függőségek között.
 13. A `no-explicit-any` és a nyolc `no-unsafe-*` szabály explicit `error` szinten szerepel a configban, nem csak preset öröklésen keresztül.
 14. A `consistent-type-assertions` `assertionStyle: 'never'` beállítással és a `no-unsafe-type-assertion` `error` szinten szerepel. Egy szándékosan `as X` alakot tartalmazó próbafájlon a lint hibát ad.
-15. Létezik a `one-export-per-file` saját szabály a `tooling/eslint-config` alatt, saját unit tesztekkel, és a teljes forrásfán zölden fut. Egy szándékosan két exportot tartalmazó próbafájlon hibát ad, egy barrel fájlon nem ad hibát.
-16. A `private` kulcsszó tiltása működik: egy szándékosan `private` módosítót tartalmazó próbafájlon a lint hibát ad, a `#` alakon nem. A megoldás vagy `no-restricted-syntax` szelektor, vagy saját szabály; a választás a V-8 eredményén alapul és dokumentálva van.
+15. Az "egy fájlba egy dolog" a `CLAUDE.md`-ben szerepel mint kódolási elvárás. Nincs hozzá ESLint szabály és nincs `tooling/eslint-config` alatti saját implementáció; a betartás code review kérdése.
+16. A `private` kulcsszó tiltása működik: egy szándékosan `private` módosítót tartalmazó próbafájlon a lint hibát ad, a `#` alakon nem. A megoldás a 7. szekcióban rögzített `no-restricted-syntax` szelektor, saját ESLint plugin nélkül.
 17. A Prettier config és a `.prettierignore` létezik, a `turbo run format:check` nulla kilépési kóddal fut a teljes repón, és a `printWidth` értéke a V-10 mérésre hivatkozik, nem tippelésre.
 18. A gyökér `vitest.config.ts` `test.projects` mezőt használ. `vitest.workspace.ts` fájl nem létezik a repóban.
 19. A coverage `provider: 'v8'` és `thresholds[100]: true`. A `coverage.all` opció nem szerepel a configban, mert Vitest 4-ben megszűnt.
@@ -725,9 +757,9 @@ Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec
 27. A GitHub Actions workflow létezik, a 12. szekció négy jobját a megadott sorrendben tartalmazza, és a `bun install --frozen-lockfile` alakot használja.
 28. A workflow `actions/cache` lépése a `.turbo` könyvtárat cache-eli a hivatalosan dokumentált kulcs mintával, és a Playwright böngészőket **nem** cache-eli.
 29. A workflow `actions/setup-node` lépése nem használ `cache: bun` értéket, mert az nem támogatott.
-30. A workflow action verziói a `docs/research/2026-08-26-toolchain.md` táblázatával egyeznek. A V-13 ellentmondás lezárva: vagy az `actions/cache` v6.1.0 létezése igazolt, vagy a research fájl javítva.
+30. A workflow action verziói a `docs/research/2026-08-26-toolchain.md` táblázatával egyeznek. A V-13 ellentmondás lezárva: az `actions/cache` v6.1.0 létezése élő GitHub API lekérdezéssel igazolt.
 31. A CI nem kap MiniMax API kulcsot, és a `tools/wire-probe` csomagnak nincs `test` scriptje, tehát a mérések nem futnak CI-ben.
-32. A `packages/providers` a 13. szekció mappaszerkezete szerint áll fel, minden fájl pontosan egy dolgot exportál, és a `one-export-per-file` szabály rajta zölden fut.
+32. A `packages/providers` a 13. szekció mappaszerkezete szerint áll fel, minden fájl pontosan egy dolgot exportál (kézi fegyelem, nem lint-kikényszerített).
 33. A `src/providers` könyvtár megszűnt, és a repóban nincs rá mutató hivatkozás a `docs/` alatti historikus szövegeken kívül.
 34. A migráció után minden `Fact` mező `state`, `value` és `evidence` értéke bitre azonos a migráció előttivel. Ezt egy összehasonlító futtatás igazolja, ami a régi és az új leírót ugyanabba a normalizált JSON alakba szerializálja.
 35. A `packages/providers/src/**/*.ts` fájlokban egyetlen `purpose` vagy `reason` string literál sem tartalmaz `M-` mintájú mérési azonosítót vagy artefaktum útvonalat. Ezt ellenőrző script vagy lint szabály igazolja.
@@ -737,7 +769,7 @@ Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec
 39. Minden nem generált könyvtárban van `CLAUDE.md`, a 14. szekció kötelező szekcióival, és egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel.
 40. A `CLAUDE.md` teljességet ellenőrző script létezik, és a teljes repón nulla kilépési kóddal fut.
 41. A 15. szekció mind a 17 `V-*` pontja lezárt: vagy dokumentált forrásra hivatkozó döntéssel, vagy saját, most futtatott mérésre hivatkozva. Feltételezéssel lezárt pont nincs.
-42. A D-1 döntés lezárva: vagy a projekt referenciák bent maradnak a V-4 mérés eredményével együtt dokumentálva, vagy a user döntött az elhagyásukról. Csendes eltérés nincs.
+42. A D-1 döntés lezárva: a user döntése alapján nincsenek TypeScript projekt referenciák a csomagok között, a build sorrendet kizárólag a `turbo.json` `dependsOn` mezője adja.
 
 ## 17. Kockázatok
 
@@ -746,9 +778,6 @@ Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec
 | A Node 26 type stripping nem működik szimlinkelt workspace csomagra (V-1) | a forrás fogyasztás elesik, minden könyvtárcsomag buildet igényel | a spec mindkét utat leírja, a `turbo.json` `dependsOn` értékei a döntéstől függenek, a bevezetés nem indul a V-1 lezárása előtt |
 | A `vite-plugin-istanbul` nem működik Vite 8 alatt (V-11) | nincs e2e coverage | a spec ezt nem teszi blokkolóvá, a unit coverage 100 százalékos küszöbe független tőle |
 | A `projectService` több tsconfigos monorepóban lassú vagy hibás (V-6) | a típusinformációt igénylő lint nem futtatható a teljes repón | visszaesés a `project` tömbre, ami dokumentáltan még támogatott, csak nem ajánlott |
-| A `one-export-per-file` saját szabály sok fals pozitívot ad | a lint zaja elnyomja a valódi hibát | a szabály saját unit tesztekkel készül, és a kivételei (barrel, diszkriminált unió) a szabályban vannak, nem `eslint-disable` kommentekben |
 | A 100 százalékos coverage küszöb triviális tesztek írására ösztönöz | álbiztonság | az explicit `exclude` lista kiveszi az adat literálokat és a barrel fájlokat, tehát a küszöb valódi logikára vonatkozik |
-| A projekt referenciák és a Turborepo cache egymás ellen dolgoznak (D-1, V-4) | lassú vagy hibás inkrementális futás | mérés a bevezetés után, és ha a mérés ezt mutatja, a döntés a user elé kerül |
-| Az action verziók a research fájlban elavulnak vagy hibásak (V-13) | a CI nem indul | a research fájl a verziók egyetlen forrása, tehát javítani ott kell, nem a workflow-ban |
 | A `packages/providers` szétbontása során elveszik vagy elmozdul egy `Fact` érték | a mérési eredmény csendben elromlik | a 16. szekció 34. kritériuma normalizált JSON összehasonlítást ír elő a migráció előtti és utáni állapotra |
 | A Bun globális cache recept nem hivatalos (V-14) | a CI lassabb marad, vagy a cache lépés hibázik | mérés, és ha nem nyer időt, elhagyjuk; a `.turbo` cache hivatalosan dokumentált, az marad |

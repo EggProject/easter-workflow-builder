@@ -1,0 +1,9 @@
+{
+  "extends": "./base.json",
+  "compilerOptions": {
+    // React 19 automatikus JSX runtime, TS >=4.1 ota tamogatott mod. Elo
+    // forrassal ellenorizve: a Vite hivatalos react-ts sablonja is ezt hasznalja
+    // (vitejs/vite, packages/create-vite/template-react-ts/tsconfig.app.json).
+    "jsx": "react-jsx"
+  }
+}

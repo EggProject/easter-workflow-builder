@@ -60,10 +60,10 @@ interface RunWindow {
 function readRunWindow(ctx: CaseContext, caseId: string, runId: string): RunWindow {
   const metaPath = join(ctx.outDir, caseId, `${runId}.meta.json`);
   const parsed: unknown = JSON.parse(readFileSync(metaPath, 'utf8'));
-  if (!isRecord(parsed) || typeof parsed.startedAt !== 'string' || typeof parsed.endedAt !== 'string') {
+  if (!isRecord(parsed) || typeof parsed['startedAt'] !== 'string' || typeof parsed['endedAt'] !== 'string') {
     throw new Error(`Váratlan meta.json alak: ${metaPath}`);
   }
-  return { startedAtMs: Date.parse(parsed.startedAt), endedAtMs: Date.parse(parsed.endedAt) };
+  return { startedAtMs: Date.parse(parsed['startedAt']), endedAtMs: Date.parse(parsed['endedAt']) };
 }
 
 interface ProxyTransactionLite {
@@ -79,35 +79,35 @@ interface ProxyTransactionLite {
  * mezőben jelenik meg -- ezt a mintát az M-15 is megerősítette.
  */
 function extractInputTokens(responseBody: unknown, streamEvents: unknown): number | null {
-  if (isRecord(responseBody) && isRecord(responseBody.usage) && typeof responseBody.usage.input_tokens === 'number') {
-    return responseBody.usage.input_tokens;
+  if (isRecord(responseBody) && isRecord(responseBody['usage']) && typeof responseBody['usage']['input_tokens'] === 'number') {
+    return responseBody['usage']['input_tokens'];
   }
   if (!Array.isArray(streamEvents)) {
     return null;
   }
   let found: number | null = null;
   for (const ev of streamEvents) {
-    if (!isRecord(ev) || typeof ev.raw !== 'string' || !ev.raw.startsWith('data:')) {
+    if (!isRecord(ev) || typeof ev['raw'] !== 'string' || !ev['raw'].startsWith('data:')) {
       continue;
     }
     let data: unknown;
     try {
-      data = JSON.parse(ev.raw.slice('data:'.length).trim());
+      data = JSON.parse(ev['raw'].slice('data:'.length).trim());
     } catch {
       continue;
     }
     if (!isRecord(data)) {
       continue;
     }
-    if (isRecord(data.usage) && typeof data.usage.input_tokens === 'number' && data.usage.input_tokens > 0) {
-      found = data.usage.input_tokens;
+    if (isRecord(data['usage']) && typeof data['usage']['input_tokens'] === 'number' && data['usage']['input_tokens'] > 0) {
+      found = data['usage']['input_tokens'];
     } else if (
-      isRecord(data.message) &&
-      isRecord(data.message.usage) &&
-      typeof data.message.usage.input_tokens === 'number' &&
-      data.message.usage.input_tokens > 0
+      isRecord(data['message']) &&
+      isRecord(data['message']['usage']) &&
+      typeof data['message']['usage']['input_tokens'] === 'number' &&
+      data['message']['usage']['input_tokens'] > 0
     ) {
-      found = data.message.usage.input_tokens;
+      found = data['message']['usage']['input_tokens'];
     }
   }
   return found;
@@ -135,9 +135,9 @@ function readMessagesTransactionsInWindow(artifactsDir: string, window: RunWindo
     if (!isRecord(parsed)) {
       continue;
     }
-    const timestampMs = typeof parsed.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
-    const path = typeof parsed.path === 'string' ? parsed.path : '';
-    const method = typeof parsed.method === 'string' ? parsed.method : '';
+    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
+    const path = typeof parsed['path'] === 'string' ? parsed['path'] : '';
+    const method = typeof parsed['method'] === 'string' ? parsed['method'] : '';
     if (
       Number.isNaN(timestampMs) ||
       timestampMs < window.startedAtMs - 1000 ||
@@ -147,8 +147,8 @@ function readMessagesTransactionsInWindow(artifactsDir: string, window: RunWindo
     ) {
       continue;
     }
-    const status = typeof parsed.responseStatus === 'number' ? parsed.responseStatus : -1;
-    const inputTokens = extractInputTokens(parsed.responseBody, parsed.streamEvents);
+    const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
+    const inputTokens = extractInputTokens(parsed['responseBody'], parsed['streamEvents']);
     result.push({ status, inputTokens });
   }
   return result;
@@ -184,22 +184,22 @@ function loadState(ctx: CaseContext): SearchState {
     const parsed: unknown = JSON.parse(readFileSync(stateFilePath(ctx), 'utf8'));
     if (
       isRecord(parsed) &&
-      typeof parsed.requestsDone === 'number' &&
-      typeof parsed.lowSuccessChars === 'number' &&
-      (typeof parsed.lowSuccessTokens === 'number' || parsed.lowSuccessTokens === null) &&
-      (typeof parsed.highFailChars === 'number' || parsed.highFailChars === null) &&
-      (typeof parsed.firstFailStatus === 'number' || parsed.firstFailStatus === null) &&
-      typeof parsed.targetChars === 'number' &&
-      typeof parsed.converged === 'boolean'
+      typeof parsed['requestsDone'] === 'number' &&
+      typeof parsed['lowSuccessChars'] === 'number' &&
+      (typeof parsed['lowSuccessTokens'] === 'number' || parsed['lowSuccessTokens'] === null) &&
+      (typeof parsed['highFailChars'] === 'number' || parsed['highFailChars'] === null) &&
+      (typeof parsed['firstFailStatus'] === 'number' || parsed['firstFailStatus'] === null) &&
+      typeof parsed['targetChars'] === 'number' &&
+      typeof parsed['converged'] === 'boolean'
     ) {
       return {
-        requestsDone: parsed.requestsDone,
-        lowSuccessChars: parsed.lowSuccessChars,
-        lowSuccessTokens: parsed.lowSuccessTokens,
-        highFailChars: parsed.highFailChars,
-        firstFailStatus: parsed.firstFailStatus,
-        targetChars: parsed.targetChars,
-        converged: parsed.converged,
+        requestsDone: parsed['requestsDone'],
+        lowSuccessChars: parsed['lowSuccessChars'],
+        lowSuccessTokens: parsed['lowSuccessTokens'],
+        highFailChars: parsed['highFailChars'],
+        firstFailStatus: parsed['firstFailStatus'],
+        targetChars: parsed['targetChars'],
+        converged: parsed['converged'],
       };
     }
   } catch {

@@ -9,7 +9,7 @@ import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-a
 import { redactKnownSecrets } from '../proxy/mask.ts';
 import type { CaseContext, CaseRunOutcome } from './types.ts';
 
-const DEFAULT_TIMEOUT_MS = Number(process.env.WIRE_PROBE_TIMEOUT_MS ?? 60_000);
+const DEFAULT_TIMEOUT_MS = Number(process.env['WIRE_PROBE_TIMEOUT_MS'] ?? 60_000);
 
 export interface ExecuteQueryParams {
   readonly ctx: CaseContext;
@@ -113,7 +113,7 @@ export async function executeQuery(params: ExecuteQueryParams): Promise<CaseRunO
   // pedig a teljes process.env-et tartalmazza (buildBaseOptions) -- emiatt a
   // futtató környezet egyéb titkai (pl. GITHUB_TOKEN, GH_TOKEN a .cc-env-ből)
   // is a lemezre kerülnének a MINIMAX_API_KEY mellett, ha nem fésülnénk át.
-  const otherKnownSecrets = [process.env.GITHUB_TOKEN, process.env.GH_TOKEN].filter(
+  const otherKnownSecrets = [process.env['GITHUB_TOKEN'], process.env['GH_TOKEN']].filter(
     (value): value is string => typeof value === 'string' && value.length > 0,
   );
   const metaJson = redactKnownSecrets(JSON.stringify(meta, null, 2), [ctx.minimaxApiKey, ...otherKnownSecrets]);

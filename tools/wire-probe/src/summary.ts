@@ -13,8 +13,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
-const artifactsDir = process.env.WIRE_PROBE_ARTIFACTS_DIR ?? join(moduleDir, '..', 'artifacts');
-const harnessDir = process.env.WIRE_PROBE_OUT_DIR ?? join(artifactsDir, 'harness');
+const artifactsDir = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? join(moduleDir, '..', 'artifacts');
+const harnessDir = process.env['WIRE_PROBE_OUT_DIR'] ?? join(artifactsDir, 'harness');
 
 const CRITICAL_BODY_FIELDS: readonly string[] = ['output_config', 'thinking', 'tool_choice', 'context_management'];
 
@@ -55,13 +55,13 @@ function readProxyTransactions(): ProxyTransactionSummary[] {
     if (!isRecord(parsed)) {
       continue;
     }
-    const timestampMs = typeof parsed.timestamp === 'string' ? Date.parse(parsed.timestamp) : Number.NaN;
-    const status = typeof parsed.responseStatus === 'number' ? parsed.responseStatus : -1;
-    const requestBody = parsed.requestBody;
+    const timestampMs = typeof parsed['timestamp'] === 'string' ? Date.parse(parsed['timestamp']) : Number.NaN;
+    const status = typeof parsed['responseStatus'] === 'number' ? parsed['responseStatus'] : -1;
+    const requestBody = parsed['requestBody'];
     const criticalFields = isRecord(requestBody)
       ? CRITICAL_BODY_FIELDS.filter((field) => field in requestBody)
       : [];
-    const requestHeaders = parsed.requestHeaders;
+    const requestHeaders = parsed['requestHeaders'];
     let anthropicBeta: string | null = null;
     if (isRecord(requestHeaders)) {
       for (const [name, value] of Object.entries(requestHeaders)) {
@@ -113,13 +113,13 @@ function readHarnessRuns(): HarnessRunSummary[] {
       if (!isRecord(parsed)) {
         continue;
       }
-      const runId = typeof parsed.runId === 'string' ? parsed.runId : fileName;
-      const ok = parsed.harnessError === null || parsed.harnessError === undefined;
-      const timedOut = parsed.timedOut === true;
-      const resultSubtype = typeof parsed.resultSubtype === 'string' ? parsed.resultSubtype : null;
-      const messageCount = typeof parsed.messageCount === 'number' ? parsed.messageCount : 0;
-      const startedAtMs = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN;
-      const endedAtMs = typeof parsed.endedAt === 'string' ? Date.parse(parsed.endedAt) : Number.NaN;
+      const runId = typeof parsed['runId'] === 'string' ? parsed['runId'] : fileName;
+      const ok = parsed['harnessError'] === null || parsed['harnessError'] === undefined;
+      const timedOut = parsed['timedOut'] === true;
+      const resultSubtype = typeof parsed['resultSubtype'] === 'string' ? parsed['resultSubtype'] : null;
+      const messageCount = typeof parsed['messageCount'] === 'number' ? parsed['messageCount'] : 0;
+      const startedAtMs = typeof parsed['startedAt'] === 'string' ? Date.parse(parsed['startedAt']) : Number.NaN;
+      const endedAtMs = typeof parsed['endedAt'] === 'string' ? Date.parse(parsed['endedAt']) : Number.NaN;
       runs.push({ caseId, runId, ok, timedOut, resultSubtype, messageCount, startedAtMs, endedAtMs });
     }
   }

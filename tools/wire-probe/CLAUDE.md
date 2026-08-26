@@ -2,9 +2,12 @@
 
 A SPEC-000 (`docs/spec/SPEC-000-provider-wire-measurement.md`) mérőeszköze: egy logoló
 reverse proxy és egy mérési harness a `minimax` provider drótszintű viselkedésének
-felderítéséhez. Önálló csomag, saját `package.json`/`tsconfig.json`, `bun install`-lal
-telepítve. Nem termékkód, tooling -- de a projekt szigorú TypeScript szabályai
-(`strict`, nincs `any`, nincs `as`, valódi `#private` mező) rá is vonatkoznak.
+felderítéséhez. A gyökér Bun workspace tagja (`tools/*` glob), saját `package.json`-ja
+van, de a `tsconfig.json`-ja a `tooling/tsconfig/node.json` fájlt terjeszti ki, és nincs
+saját `bun.lock`-ja -- a függőségei a gyökér lockfile-ba olvadnak. Nem termékkód, tooling
+-- de a projekt szigorú TypeScript szabályai (`strict`, nincs `any`, nincs `as`, valódi
+`#private` mező) rá is vonatkoznak. `test` scriptje nincs, tehát a mérések nem futnak a
+Turborepo `test` taskján keresztül CI-ben.
 
 ## Miért van itt két külön dolog
 

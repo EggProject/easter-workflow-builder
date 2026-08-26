@@ -1,0 +1,60 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": ["bun.lock", "tooling/tsconfig/**", "tooling/eslint-config/**", "turbo.json"],
+  "globalEnv": ["CI", "NODE_ENV"],
+  "globalPassThroughEnv": [
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_AUTH_TOKEN",
+    "MINIMAX_API_KEY",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+    "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING",
+    "MAX_THINKING_TOKENS"
+  ],
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "cache": true,
+      "persistent": false
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": [],
+      "cache": true,
+      "persistent": false
+    },
+    "lint": {
+      "dependsOn": ["^typecheck"],
+      "outputs": [],
+      "cache": true,
+      "persistent": false
+    },
+    "format:check": {
+      "dependsOn": [],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": [],
+      "cache": true,
+      "persistent": false
+    },
+    "test": {
+      "dependsOn": ["^typecheck"],
+      "outputs": ["coverage/**"],
+      "cache": true,
+      "persistent": false
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "**/e2e/**", "**/playwright.config.ts"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "cache": true,
+      "persistent": false
+    },
+    "dev": {
+      "dependsOn": [],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
