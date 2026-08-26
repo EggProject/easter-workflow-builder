@@ -109,3 +109,49 @@ Quote the exact code."
 
 ## Project-Specific Guidelines
 
+### Mi ez a projekt
+
+Vizuális workflow tervező és futtató a `@anthropic-ai/claude-agent-sdk` felett. A felhasználó
+gráf-szerkesztőben rakja össze a workflow-t, elindítja, és real-time látja a rajzon hol tart,
+mellette egy Claude Code CLI-szerű transcript panelen, hogy az agent mit csinál.
+
+### Stack, rögzítve
+
+Részletek és források: `docs/research/2026-08-26-toolchain.md`. Röviden:
+TypeScript **6.0.3** (fix, nem frissítjük 7-re, mert a typescript-eslint nem támogatja),
+Bun 1.4.0 **csak csomagkezelő és workspace**, Node 26 a runtime, Turborepo, React 19 + Vite 8,
+`@xyflow/react`, Drizzle + better-sqlite3, `ws`, pino + pino-roll, Vitest + Playwright,
+ESLint 10 flat config. **Nincs Docker**, az agent sandboxot az SDK `sandbox` opciója adja.
+
+**Tilos `bun:` prefixű modult használni a termékkódban** (`bun:sqlite`, `Bun.serve`), mert a
+Vitest Node alatt fut és nem tudja importálni őket.
+
+### Munkamenet
+
+- `docs/spec/SPEC-<n>-*.md` a specifikáció, `docs/plan/PLAN-<n>-*.md` a végrehajtási terv,
+  a plan linkeli a specet, Todo lépésekre bontva, függőségekkel és elfogadási kritériumokkal.
+- `docs/research/` a verifikált kutatási tények tárolója, forrás URL-ekkel. Új tényt ide vezess.
+- **Feature branchben dolgozunk, a `main` védett.** Branch minta: `feat/spec-<n>-<rövid-név>`.
+  Zárás PR-rel.
+- Minden zajos parancshoz (lint, teszt, prettier, build, mérés) **kötelező token-takarékos bash
+  wrapper**, ami csak összegzést és a hibákat írja ki. A `tooling/scripts` alatt élnek.
+- Titok soha nem kerül adatbázisba vagy gitbe. A DB csak env változó NEVET tárol.
+
+### Provider réteg
+
+Két provider az első verzióban, backend TypeScript config fájlokban rögzítve, **nincs hozzájuk
+CRUD felület**, csak választani lehet közülük: `claude-subscription` (Claude Code bejelentkezés)
+és `minimax` (`ANTHROPIC_BASE_URL=https://api.minimax.io/anthropic`).
+Választás három szinten: globális alapértelmezés, workflow felülírás, lépés felülírás.
+A provider-választó komponens része a "Kapcsolat teszt" gomb.
+
+A MiniMax képességei szűkebbek az Anthropicénál (nincs strukturált kimenet, `tool_choice` csak
+`auto`/`none`, `thinking` csak `adaptive`/`disabled`, az `effort` `output_config`-ként megy ki
+amit a MiniMax elutasít). Ezért van `ProviderCapabilityDescriptor`, és ezért tilos képességet
+megtippelni: minden mező mögött mérés vagy hivatkozott hivatalos doksi áll, különben `unknown`.
+Részletek: `docs/research/2026-08-26-agent-sdk-minimax.md` és `docs/spec/SPEC-000-*.md`.
+
+Az `@anthropic-ai/claude-agent-sdk` verziója **pinelve**, mert a kiküldött request body mezők
+listája verziónként bővül, és egy új mező MiniMax ellen 400-at okozhat. Frissítés előtt a
+SPEC-000 mérései regresszióként futtatandók.
+

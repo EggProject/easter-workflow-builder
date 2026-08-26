@@ -1,0 +1,50 @@
+# függőségek
+node_modules/
+.pnp.*
+
+# build kimenet
+dist/
+build/
+out/
+.turbo/
+*.tsbuildinfo
+
+# titkok
+.env
+.env.*
+!.env.example
+
+# mérési nyers artefaktumok (SPEC-000)
+tools/wire-probe/artifacts/
+*.har
+
+# tesztek és coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# logok
+logs/
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# adatbázis
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# IDE és OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ideiglenes
+.cache/
+tmp/
