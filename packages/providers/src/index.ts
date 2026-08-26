@@ -4,8 +4,8 @@ export type { MeasurementId } from './evidence/measurement-id.ts';
 export type { EvidenceReference } from './evidence/evidence-reference.ts';
 export type { EvidenceList } from './evidence/evidence-list.ts';
 export type { Fact } from './evidence/fact.ts';
-export { isKnown } from './evidence/is-known.ts';
-export { isUnknown } from './evidence/is-unknown.ts';
+export { isKnownFact } from './evidence/is-known-fact.ts';
+export { isUnknownFact } from './evidence/is-unknown-fact.ts';
 
 export type { ProviderCapabilityDescriptor } from './capability/provider-capability-descriptor.ts';
 

@@ -29,7 +29,7 @@ importál a `core`-ból, mert a leírók önmagukban típusok és adat literálo
 **Tilos bizonyíték nélküli értéket beírni.** Minden képességmező vagy `known` egy nem üres
 `evidence` listával, vagy `unknown` indoklással és a blokkoló mérési esettel. A típusrendszer
 ezt kikényszeríti: az `EvidenceList` tuple alak miatt üres bizonyítéklistával a `known` ág nem
-fordul le, és az `isKnown` typeguard nélkül a `value` mező nem olvasható.
+fordul le, és az `isKnownFact` typeguard nélkül a `value` mező nem olvasható.
 
 **A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-19`, doksi URL, research
 szekció azonosító) és egy rövid, egymondatos `purpose`/`reason` marad. A mérés leírása, a nyers
@@ -46,7 +46,7 @@ Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `a
 **Coverage: ideiglenesen kizárva.** A gyökér `vitest.config.ts` `coverage.exclude` listája
 jelenleg a `packages/providers/src/**` teljes fáját kizárja a 100%-os lefedettségi
 küszöbből, kommenttel indokolva. Nem azért, mert a mappa csak adat literál - az
-`evidence/is-known.ts` és `evidence/is-unknown.ts` valódi, elágazással rendelkező
+`evidence/is-known-fact.ts` és `evidence/is-unknown-fact.ts` valódi, elágazással rendelkező
 typeguard logikát tartalmaz -, hanem mert ehhez a csomaghoz jelenleg nincs egyetlen
 funkcionális Vitest teszt sem. Amint készül egy, a kizárást szűkíteni kell: csak az adat
 literál fájlok (`minimax/**`, `claude-subscription/**`, `capability/**`,

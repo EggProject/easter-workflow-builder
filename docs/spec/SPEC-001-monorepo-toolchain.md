@@ -63,6 +63,7 @@ Ami nincs: gyökér `package.json`, `turbo.json`, lint, formázó, teszt futtat�
 | `packages/protocol`     | könyvtár   | REST és WebSocket kontraktus, egy forrás a két oldalnak |
 | `packages/logger`       | könyvtár   | pino és pino-roll, rotációval                           |
 | `packages/ui`           | könyvtár   | eggproject-design alapú komponensek                     |
+| `packages/typeguards`   | könyvtár   | általános, újrahasznosítható typeguardok, üres váz      |
 | `tooling/eslint-config` | eszköz     | megosztott flat config                                  |
 | `tooling/tsconfig`      | eszköz     | megosztott TypeScript alapok                            |
 | `tooling/scripts`       | eszköz     | token takarékos wrapper scriptek                        |
@@ -70,20 +71,27 @@ Ami nincs: gyökér `package.json`, `turbo.json`, lint, formázó, teszt futtat�
 
 ### Megengedett függőségi irány
 
-| Csomag      | Amitől függhet                                                     |
-| ----------- | ------------------------------------------------------------------ |
-| `core`      | semmitől a futásidejű függőségek közül                             |
-| `logger`    | semmitől a workspace csomagok közül                                |
-| `protocol`  | `core`                                                             |
-| `providers` | `core`                                                             |
-| `db`        | `core`, `logger`                                                   |
-| `agent`     | `core`, `providers`, `logger`                                      |
-| `engine`    | `core`, `db`, `agent`, `logger`                                    |
-| `ui`        | `core`, `protocol`                                                 |
-| `server`    | `core`, `protocol`, `db`, `engine`, `agent`, `providers`, `logger` |
-| `web`       | `core`, `protocol`, `ui`                                           |
+| Csomag       | Amitől függhet                                                     |
+| ------------ | ------------------------------------------------------------------ |
+| `core`       | semmitől a futásidejű függőségek közül                             |
+| `logger`     | semmitől a workspace csomagok közül                                |
+| `protocol`   | `core`                                                             |
+| `providers`  | `core`                                                             |
+| `db`         | `core`, `logger`                                                   |
+| `agent`      | `core`, `providers`, `logger`                                      |
+| `engine`     | `core`, `db`, `agent`, `logger`                                    |
+| `ui`         | `core`, `protocol`                                                 |
+| `typeguards` | semmitől a futásidejű függőségek közül                             |
+| `server`     | `core`, `protocol`, `db`, `engine`, `agent`, `providers`, `logger` |
+| `web`        | `core`, `protocol`, `ui`                                           |
 
 Tiltott: bármely visszafelé mutató él, bármely kör, és az `apps/web` függése a `db`, `engine`, `agent` vagy `server` csomagtól. A `packages/protocol` a kontraktus egyetlen forrása, tehát a `server` és a `web` ugyanabból a csomagból veszi a típusokat, nem duplikálja őket.
+
+**A `packages/typeguards`, utólag felvéve.** A fenti csomagtérkép eredetileg 13 csomagot
+sorolt fel; a `typeguards` egy utólagos, a user által kért kiegészítés (általános,
+újrahasznosítható typeguardok gyűjtőhelye, a `packages/core` mintájára üres vázként
+felállítva). A `core`-hoz hasonlóan semmilyen workspace futásidejű függőségtől nem függ,
+tehát bármelyik más csomag függhet tőle anélkül, hogy ez kört okozna.
 
 ### A függőségi irány kikényszerítése
 
@@ -160,6 +168,17 @@ A `globalPassThroughEnv` azért kell, mert a `passThroughEnv` alatt felsorolt v�
 | `dev`          | `[]`             | nincs                                         | `false` | `true`       | fejlesztői szerver                                            |
 
 A `dependsOn` `^` prefixe a csomag belső függőségeinek azonos nevű taskját várja be. A `lint` azért `^typecheck`-től függ és nem `^build`-tól, mert a könyvtárcsomagok forrás `.ts` alakban fogyaszthatók (6. szekció), tehát nincs mire várni buildként; ha a 6. szekció V-1 ellenőrzése a fordított kimenet mellett dönt, ez `^build`-ra változik.
+
+**A `test:e2e` task `dependsOn: ["build"]` mezője és a CI job szintű `needs: build` két
+különböző réteg.** A `dependsOn` a Turborepo saját feladatgráfja: a `web` csomag `test:e2e`
+taskja a saját `build` taskját (`vite build`) várja be, a felfelé mutató csomagfüggőségek
+(`core`, `protocol`, `ui`) `build` taskjával együtt. Ez nem helyettesíti, és nem is teszi
+feleslegessé a `ci.yml` `e2e` jobjának `needs: build` sorát (12. szekció): az utóbbi a **CI job
+indulási sorrendjét** rögzíti, a user kifejezett döntése szerint. Élő méréssel igazolva: a
+`turbo run test:e2e --dry=json --filter=web` parancs három egymást követő, kódváltozás nélküli
+futtatása mindháromszor pontosan ugyanazt a `web#test:e2e` task hasht adta
+(`338dc6be2072b976`), tehát a feladatgráf hashe stabil, a job szintű `needs` felvétele nem
+rontja el a Turborepo cache viselkedését.
 
 **A `test` task, utólag igazítva a végrehajtáshoz: `//#test`, `dependsOn: []`.** A 9. szekció
 (Vitest) szerint a coverage kizárólag a TELJES folyamatra vonatkozik, a Vitest "Test Projects"
@@ -460,7 +479,7 @@ Mivel a Vitest 4 alapértelmezése üres, a következőket **nekünk** kell kiz�
 
 **A `packages/providers` NEM kizárt.** A spec korábban azt mérlegelte, hogy a leíró fájlokat adat literálként kizárja. A végrehajtás ezt elvetette, és helyette tesztet írt: a `packages/providers/src/**` teljes egészében a coverage hatókörében van, a 100 százalékos küszöb rá is vonatkozik, és teljesül. Amit ez ad:
 
-- Az `isKnown` és az `isUnknown` typeguard valódi unit tesztet kapott (`is-known.test.ts`, `is-unknown.test.ts`), mindkét ágra plusz a típusszűkítésre.
+- Az `isKnownFact` és az `isUnknownFact` typeguard valódi unit tesztet kapott (`is-known-fact.test.ts`, `is-unknown-fact.test.ts`), mindkét ágra plusz a típusszűkítésre.
 - A leíró fájlokat egy bejáró regressziós teszt (`registry.test.ts`) tölti be, ami a teljes `providerRegistry` fán végigmegy, és minden `Fact` értékre invariánst ellenőriz: pontosan az egyik ágon áll, a `known` ág nem üres bizonyítéklistát hordoz, az `unknown` ág indoklást és blokkoló mérést. Ez nem lefedettség kedvéért írt üres teszt, hanem a SPEC-000 leíró invariánsainak kikényszerítése.
 - Ugyanez a teszt fogja meg a 35. elfogadási kritériumot (nincs prózai `M-` hivatkozás a `reason` mezőkben) és a 36. kritériumot (minden hivatkozott `MeasurementId` feloldható `docs/` horgonyra).
 
@@ -575,14 +594,16 @@ Egy ágra (PR-re) egyszerre egy futás, az újabb törli a még futó régebbit.
 
 ### Jobok és sorrend
 
-**Minden minőségi kapu külön jobban, párhuzamosan fut. Egyetlen `needs` él van, az összesítőé.**
+**A minőségi kapuk többsége külön jobban, párhuzamosan fut. Egy kivétel van: az `e2e` a
+`build` jobra vár.** User döntés, felülírja azt a korábbi elemzést, ami szerint ez a várakozás
+felesleges lenne, mert a Playwright a saját, instrumentált buildjét úgyis maga készíti el.
 
 | Job                | Függ                           | Mit csinál                                                                       |
 | ------------------ | ------------------------------ | -------------------------------------------------------------------------------- |
 | `gate` (matrix)    | nincs                          | `format:check`, `typecheck`, `lint`, `docs:check`, `check:casing` külön legekben |
 | `test`             | nincs                          | `bun run test`, coverage artefaktum, job summary, PR komment töredék             |
 | `build`            | nincs                          | `bun run build`                                                                  |
-| `e2e`              | nincs                          | Playwright böngésző telepítés, `bun run test:e2e`, e2e coverage riport           |
+| `e2e`              | `build`                        | Playwright böngésző telepítés, `bun run test:e2e`, e2e coverage riport           |
 | `coverage-comment` | `test`, `e2e`                  | egyetlen, frissülő coverage komment a PR-en                                      |
 | `ci`               | `gate`, `test`, `build`, `e2e` | összesítő státusz, a ruleset ezt az egy checket kérheti kötelezőnek              |
 
@@ -592,7 +613,18 @@ Egy ágra (PR-re) egyszerre egy futás, az újabb törli a még futó régebbit.
 
 **Az `install` job megszűnt.** Minden job külön runneren fut, tehát mindegyik újratelepíti a függőségeket; egy előzetes `install` job csak késleltette a többit, és a cache-en kívül semmit nem adott át.
 
-**Az `e2e` nem függ a `build`-tól, és nem kap build artefaktumot.** Az `apps/web/playwright.config.ts` `webServer.command` értéke `vite build && vite preview --port 4173 --strictPort`, `VITE_COVERAGE=true` környezeti változóval. Ez szándékosan saját, Istanbullal **instrumentált** buildet készít közvetlenül a szerver indítása előtt, és felülírja a `dist` könyvtárat. A `build` job kimenete a normál, instrumentálatlan build, tehát átadni felesleges (a `vite build` úgyis felülírja) és félrevezető is lenne (abból nem gyűlne e2e lefedettség).
+**Az `e2e` a `build` jobra vár, de nem kap build artefaktumot.** Egy korábbi elemzés azzal
+érvelt, hogy ez a várakozás felesleges, mert a Playwright a saját buildjét úgyis maga készíti
+el - a user döntése felülírja ezt az érvet, és a job sorrendjét a `needs: build` rögzíti: az
+`e2e` csak akkor indul, ha a `build` job sikeresen lefutott.
+
+Amit ez a `needs` **nem** változtat meg: az `apps/web/playwright.config.ts` `webServer.command`
+értéke változatlanul `vite build && vite preview --port 4173 --strictPort`, `VITE_COVERAGE=true`
+környezeti változóval. Ez szándékosan saját, Istanbullal **instrumentált** buildet készít
+közvetlenül a szerver indítása előtt, és felülírja a `dist` könyvtárat. A `build` job kimenete a
+normál, instrumentálatlan build, tehát átadni artefaktumként továbbra is felesleges (a
+`vite build` úgyis felülírja) és félrevezető is lenne (abból nem gyűlne e2e lefedettség) - ezért
+a `webServer` beállítás érintetlen marad.
 
 **Közös `setup` composite action.** A hat job ugyanazt az öt lépést (Bun, Node, két cache, telepítés) ismételné, ezért ezek egy lokális composite actionbe kerültek: `.github/actions/setup/action.yml`. A `uses: ./.github/actions/setup` alak feltétele, hogy a repo már ki legyen checkoutolva, ezért a checkout minden jobban az első lépés ([metadata syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax)).
 
@@ -684,8 +716,8 @@ packages/providers/
       evidence-ref.ts              EvidenceRef
       evidence-list.ts             EvidenceList
       fact.ts                      Fact<TValue>
-      is-known.ts                  isKnown
-      is-unknown.ts                isUnknown
+      is-known-fact.ts              isKnownFact
+      is-unknown-fact.ts            isUnknownFact
     capability/
       CLAUDE.md
       structured-output-strategy-id.ts
@@ -897,7 +929,7 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 1. A gyökérben van `package.json`, `private: true`, `type: "module"`, `workspaces: ["apps/*", "packages/*", "tooling/*", "tools/*"]` és csomagkezelő deklaráció. A `bun install --frozen-lockfile` hibátlanul lefut.
 2. A gyökérben egyetlen `bun.lock` van, `tools/wire-probe/bun.lock` nem létezik, és a `bun.lockb` alak sehol nem fordul elő.
 3. A `research` fájlban rögzített, több csomagban használt verziók (TypeScript, ESLint és pluginjei, Prettier, Vitest, React, `@types/node`) Bun katalógusban vannak, és a csomagok `"catalog:"` hivatkozással veszik át. Egyetlen csomag sem tartalmaz ezekhez literál verziót.
-4. A 3. szekció mind a 13 csomagja létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja.
+4. A 3. szekció mind a 14 csomagja (a `packages/typeguards`-szal együtt) létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja.
 5. A `turbo.json` gyökérkulcsa `tasks`. Nincs benne `pipeline` kulcs. A 7 task (`build`, `typecheck`, `lint`, `format:check`, `test`, `test:e2e`, `dev`) definiált a megadott `dependsOn` és `outputs` értékekkel; a `test` a `//#test` gyökér-szkópolt taskként létezik, `dependsOn: []` értékkel (lásd 5. szekció "A `test` task, utólag igazítva a végrehajtáshoz" és V-18).
 6. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és a wrapper script kimenete ezt sorban jelzi.
 7. Egy `packages/core` fájl módosítása után a `turbo run typecheck` újrafuttatja a `core`-tól függő csomagok taskját, és nem futtatja újra a tőle független csomagokét. Ezt a wrapper kimenete igazolja.
@@ -913,14 +945,14 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 17. A Prettier config és a `.prettierignore` létezik, a `turbo run format:check` nulla kilépési kóddal fut a teljes repón, és a `printWidth` értéke a V-10 mérésre hivatkozik, nem tippelésre.
 18. A gyökér `vitest.config.ts` `test.projects` mezőt használ. `vitest.workspace.ts` fájl nem létezik a repóban.
 19. A coverage `provider: 'v8'` és `thresholds[100]: true`. A `coverage.all` opció nem szerepel a configban, mert Vitest 4-ben megszűnt.
-20. A coverage `include` és `exclude` explicit lista, és a 9. szekció táblázatának minden sorához tartozik bejegyzés. Az `isKnown` és az `isUnknown` typeguard **benne van** a coverage hatókörében.
+20. A coverage `include` és `exclude` explicit lista, és a 9. szekció táblázatának minden sorához tartozik bejegyzés. Az `isKnownFact` és az `isUnknownFact` typeguard **benne van** a coverage hatókörében.
 21. A `turbo run test` egy szándékosan lefedetlen ágat tartalmazó próbafájllal nem nulla kilépési kóddal fut, tehát a 100 százalékos küszöb ténylegesen kikényszerül.
 22. Létezik `playwright.config.ts` az e2e csomagban, a `turbo run test:e2e` task `dependsOn: ["build"]` értékkel van definiálva, és egy triviális smoke teszt lefut. **Teljesül, méréssel igazolva.** A `bun run test:e2e` valódi Chromiumot indít és zölden fut le (`1 passed`, kilépési kód 0). Egy korábbi lezárás ezt tévesen "környezetfüggő, nem javítható" állapotúnak jelölte: a rootless sandboxból (`uid=1045`, nincs `sudo`) valóban hiányzik egy rendszerkönyvtár, de pontosan **egy** (`libXdamage.so.1`, csomag `libxdamage1`, az `ldd` szerint), és a telepítéséhez nem kell root. Az `apt-get download` és a `dpkg -x` nem privilegizált parancs, a kicsomagolt könyvtárat a `LD_LIBRARY_PATH` húzza be, amit a Playwright saját függőség-validátora is figyelembe vesz. A megoldás **kizárólag környezeti változó, a repóban nulla módosítás**, ezért a CI-re nincs hatása. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk. Részletek: [`../research/2026-08-26-spec001-ellenorzesek.md`](../research/2026-08-26-spec001-ellenorzesek.md), V-19.
 23. A `vite-plugin-istanbul` be van építve `requireEnv: true` mellett, és létezik a Playwright fixture, ami a `window.__coverage__` objektumot fájlba menti.
 24. A V-11 (Vite 8 kompatibilitás) eredménye dokumentálva van a `docs/research/` alatt. Ha a plugin nem működik Vite 8 alatt, ez a tény és a halasztás indoka le van írva, és ez nem blokkolja a spec elfogadását.
 25. A `tooling/scripts` alatt létezik mind az öt wrapper (`lint`, `typecheck`, `test`, `format`, `build`), mindegyik bash, mindegyik a 11. szekció három blokkos kimeneti szerződését teljesíti, és a burkolt parancs kilépési kódját adja tovább.
 26. Mindegyik wrapper hibás bemenetre nem nulla kilépési kóddal fut, és a kimenete nem tartalmazza a burkolt eszköz teljes stdoutját. Ezt egy szándékosan hibás fájl bevezetése igazolja mind az öt wrapperre.
-27. A GitHub Actions workflow (`ci.yml`) hat jobot tartalmaz: a `gate` mátrix (öt minőségi kapu: `format`, `typecheck`, `lint`, `docs`, `casing`), a `test`, a `build`, az `e2e`, a `coverage-comment` és az összesítő `ci` job. A `gate` mátrix öt eleme, a `test`, a `build` és az `e2e` job között **nincs** `needs` kapcsolat: mind a nyolc jobfutás egymástól függetlenül, párhuzamosan indul a checkout után. A `coverage-comment` job `needs: [test, e2e]`, az összesítő `ci` job `needs: [gate, test, build, e2e]`, tehát csak ez a két job vár a többire. Minden checkoutot végző job a `bun install --frozen-lockfile` alakot a `.github/actions/setup` lokális composite actionön keresztül futtatja.
+27. A GitHub Actions workflow (`ci.yml`) hat jobot tartalmaz: a `gate` mátrix (öt minőségi kapu: `format`, `typecheck`, `lint`, `docs`, `casing`), a `test`, a `build`, az `e2e`, a `coverage-comment` és az összesítő `ci` job. A `gate` mátrix öt eleme, a `test` és a `build` job között **nincs** `needs` kapcsolat: ez a hét jobfutás egymástól függetlenül, párhuzamosan indul a checkout után. Az `e2e` job kivétel: `needs: build`, user döntés, tehát csak a `build` job sikeres lezárása után indul. A `coverage-comment` job `needs: [test, e2e]`, az összesítő `ci` job `needs: [gate, test, build, e2e]`, tehát ez a két job vár a többire, az `e2e` pedig a `build`-ra. Minden checkoutot végző job a `bun install --frozen-lockfile` alakot a `.github/actions/setup` lokális composite actionön keresztül futtatja.
 28. A coverage riport három csatornán jelenik meg. (1) Artefaktum: `coverage-report` (unit, `coverage/**`, HTML és lcov) és `e2e-coverage-report` (`apps/web/coverage-e2e/**`, HTML és lcov). (2) Job summary: a `test` job a `.github/scripts/coverage-summary.mjs` scripttel a Vitest `coverage-summary.json` fájlából markdown táblázatot ír a `$GITHUB_STEP_SUMMARY`-ba, az `e2e` job az nyc szöveges riportját kódblokkban ugyanoda. (3) PR komment: a `coverage-comment` job a `test` és az `e2e` job feltöltött komment-töredékét egyetlen, frissülő kommentbe fűzi össze.
 29. A workflow `actions/setup-node` lépése nem használ `cache: bun` értéket, mert az nem támogatott.
 30. A workflow action verziói a `docs/research/2026-08-26-toolchain.md` táblázatával egyeznek. A V-13 ellentmondás lezárva: az `actions/cache` v6.1.0 létezése élő GitHub API lekérdezéssel igazolt.
@@ -942,6 +974,8 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 46. Az összesítő `ci` job `needs: [gate, test, build, e2e]` és `if: always()` mellett fut, és a `contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')` feltétellel bukik el, ha bármelyik minőségi kapu nem `success` eredménnyel zár. Ez az egyetlen job, amit a repository ruleset kötelező státuszcsekként megkövetelhet, tehát egy új kapu felvétele nem igényel ruleset módosítást.
 47. A `coverage-comment` job `needs: [test, e2e]`, saját, szűkített `permissions` blokkal (`contents: read`, `pull-requests: write`, szemben a workflow szintű `contents: read` alapértelmezéssel), és csak akkor fut, ha az esemény `pull_request` és a PR feje ugyanabból a repóból nyílt (`github.event.pull_request.head.repo.full_name == github.repository`), tehát fork PR-en nem próbál kommentelni. A komment a `gh pr comment ... --edit-last --create-if-none` alakkal frissül, nem szaporodik, és a job szándékosan **nincs** a `ci` job `needs` listájában, mert nem minőségi kapu.
 48. A `tooling/scripts/casing.sh` (`check:casing` script) létezik, a 11. szekció három blokkos kimeneti szerződését teljesíti, és a `git ls-files` alapján ellenőrzi a git index fájlnevek és a rájuk hivatkozó relatív import specifikátorok betűzésének egyezését. Ezt a `tooling/scripts/src/casing/*.test.ts` Vitest regressziós teszt igazolja, ami egy valós, a git index és a lemez betűzése közötti eltérésen alapuló esetet reprodukál.
+49. A `packages/typeguards` csomag (utólag felvéve, 3. szekció) létezik `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájllal, a `packages/*` workspace glob automatikusan felveszi. A csomag üres váz: nincs benne kitalált guard. A `CLAUDE.md` rögzíti, hogy ide csak általános, újrahasznosítható typeguard kerül, hogy fájlonként egy guard a szabály, hogy minden guardhoz kötelező unit teszt, és hogy a domain-specifikus guard a saját csomagjába tartozik, nem ide.
+50. Az `e2e` job `needs: build` a `ci.yml`-ben (12. szekció), a user döntése alapján, felülírva a korábbi elemzést, ami szerint ez felesleges lenne. A `turbo.json` `test:e2e` taskjának `dependsOn: ["build"]` mezője már ezt megelőzően is fennállt; élő méréssel igazolt (`turbo run test:e2e --dry=json --filter=web` három egymást követő futása azonos task hasht ad), hogy ez a feladatgráf-szintű függőség nem instabil, tehát a job szintű `needs` felvétele nem rontja el a Turborepo cache viselkedését.
 
 ## 17. Kockázatok
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Fact } from './evidence/fact.ts';
-import { isKnown } from './evidence/is-known.ts';
-import { isUnknown } from './evidence/is-unknown.ts';
+import { isKnownFact } from './evidence/is-known-fact.ts';
+import { isUnknownFact } from './evidence/is-unknown-fact.ts';
 import { measurementDocument } from './references/measurement-document.ts';
 import { providerRegistry } from './registry.ts';
 
@@ -48,8 +48,8 @@ function collectFacts(node: unknown, found: Fact<unknown>[]): void {
 const allFacts: Fact<unknown>[] = [];
 collectFacts(providerRegistry, allFacts);
 
-const knownFacts = allFacts.filter((fact) => isKnown(fact));
-const unknownFacts = allFacts.filter((fact) => isUnknown(fact));
+const knownFacts = allFacts.filter((fact) => isKnownFact(fact));
+const unknownFacts = allFacts.filter((fact) => isUnknownFact(fact));
 
 describe('providerRegistry', () => {
   it('mindkét provider leírót tartalmazza', () => {
@@ -63,7 +63,7 @@ describe('providerRegistry', () => {
 
   it('minden Fact pontosan az egyik ágon áll', () => {
     for (const fact of allFacts) {
-      expect(isKnown(fact)).toBe(!isUnknown(fact));
+      expect(isKnownFact(fact)).toBe(!isUnknownFact(fact));
     }
   });
 

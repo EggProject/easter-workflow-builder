@@ -15,8 +15,8 @@ provider-specifikus vagy képesség-specifikus típus, azok a `../capability` al
 | `evidence-reference.ts` | `EvidenceReference` diszkriminált unió (mérés, doksi, research szekció) |
 | `evidence-list.ts`      | `EvidenceList` nem üres tuple                                           |
 | `fact.ts`               | `Fact<TValue>` a `known` / `unknown` ággal                              |
-| `is-known.ts`           | `isKnown` typeguard                                                     |
-| `is-unknown.ts`         | `isUnknown` typeguard                                                   |
+| `is-known-fact.ts`      | `isKnownFact` typeguard                                                 |
+| `is-unknown-fact.ts`    | `isUnknownFact` typeguard                                               |
 
 ## Függőségi irány
 
