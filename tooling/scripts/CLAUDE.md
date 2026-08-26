@@ -18,13 +18,21 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `test.sh`      | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                   |
 | `build.sh`     | `turbo run build` burkoló                                                                                                                                               |
 | `format.sh`    | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi |
+| `claude-md.sh` | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                             |
 
 ## Szabályok
 
 - A csonkolási határ (`_lib.sh` `WRAPPER_ERROR_LIMIT`, `format.sh` `WRAPPER_FILE_LIMIT`,
   `test.sh` `WRAPPER_ERROR_LIMIT` és `WRAPPER_MESSAGE_CHAR_LIMIT`) 50 (sorszám), illetve
-  200 (karakter), önkényesen választva - nincs rá dokumentált szabály (SPEC-001 11.
-  szekció, V-16).
+  200 (karakter). **Dokumentált szabály erre nincs**, ez projekt döntés, aminek a
+  nagyságrendi keretét saját mérés adja: egyetlen, egy okra visszavezethető típushiba a
+  legnagyobb csomagban 90 hibasort generál 22 fájlban, átlagosan 170 karakteres sorokkal.
+  A gyökérok ilyenkor már az első hibasorból azonosítható. Részletek: SPEC-001 15.
+  szekció, V-16 és
+  [`../../docs/research/2026-08-26-spec001-ellenorzesek.md`](../../docs/research/2026-08-26-spec001-ellenorzesek.md).
+- A `claude-md.sh` nem turbo taskon keresztül fut, hanem közvetlenül, mert a szabálya a
+  teljes repóra vonatkozik és `git ls-files` kimenetéből dolgozik, nem csomagonként. A
+  gyökér `package.json` `docs:check` scriptje hívja, és a CI `verify` jobja is ezt futtatja.
 - A `test.sh` a Vitest `--reporter=json --outputFile=...` kimenetéből olvassa a teszt
   összegzőt (`numTotalTests`/`numPassedTests`/`numFailedTests`, `jq`-val), a hibás
   tesztek nevét és üzenetét pedig a `testResults[].assertionResults[]` tömbből. A

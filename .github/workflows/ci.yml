@@ -99,6 +99,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # A CLAUDE.md teljesseg ellenorzese (SPEC-001 16. szekcio, 40.
+      # elfogadasi kriterium). A szabalyt, hogy pontosan mely mappakban
+      # kotelezo, a script fejlece irja le. Elol all, mert masodperc alatt
+      # lefut es dokumentacios hianyt jelez, nem kodhibat.
+      - name: CLAUDE.md check
+        run: bun run docs:check
+
       - name: Format check
         run: bun run format:check
 
@@ -220,8 +227,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # A hivatalos Playwright CI utmutato `npx playwright install --with-deps`
+      # alakot ir, de az `npx` ebben a repoban NEM hasznalhato: a gyoker
+      # package.json `devEngines.packageManager` mezoje `bun`-t koveteli, es az
+      # npm 10.9 ota ezt kikenyszeriti (elo meressel igazolva: `npm error
+      # EBADDEVENGINES current: npm, required: bun`). A `bunx` az azonos
+      # funkcioju hivas a repo sajat csomagkezelojevel.
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Run e2e tests
         run: bun run test:e2e

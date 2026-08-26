@@ -7,9 +7,11 @@
 set -euo pipefail
 
 readonly WRAPPER_LOG_DIR=".turbo/wrapper-logs"
-# Onkenyes hatar, ugyanaz az indoklas mint a turbo-alapu wrappereknel
-# (_lib.sh WRAPPER_ERROR_LIMIT): eleg sok fajlnev lathato legyen, de ne
-# arassza el a hivo agent context ablakat egy nagy, meg formazatlan repon.
+# Ugyanaz az indoklas, mint a turbo-alapu wrappereknel (_lib.sh
+# WRAPPER_ERROR_LIMIT): dokumentalt szabaly nincs, az ertek projekt dontes,
+# amit a V-16 meres keretez (docs/research/2026-08-26-spec001-ellenorzesek.md).
+# Itt a sorok fajlnevek, tehat rovidebbek mint egy tsc hibasor, a 15 kB-os
+# nagysagrendi keret bosegesen tartja ezt a hatart.
 readonly WRAPPER_FILE_LIMIT=50
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -40,9 +42,15 @@ if [[ "$mode" == "check" ]]; then
   if [[ "$exit_code" -eq 0 ]]; then
     echo "minden fajl formazott"
   else
-    # A Prettier --check kimenetenek utolso sora:
-    # "[warn] Code style issues found in N files. Run Prettier with --write to fix."
-    file_count=$(grep -oE 'Code style issues found in [0-9]+ files' "$full_log" | grep -oE '[0-9]+' || echo "?")
+    # A nem formazott fajlokat a Prettier soronkent "[warn] <ut>" alakban irja
+    # ki, majd egy zaro osszegzo sorral. A darabszamot a fajlsorok
+    # megszamolasabol vesszuk, NEM az osszegzo sorbol: az osszegzo egyes es
+    # tobbes szamban is elofordul ("... in the above file." vs "... in 3
+    # files."), es a korabbi, csak tobbes szamra illeszkedo minta egyetlen
+    # hibas fajlnal ures erteket adott, amitol az also aritmetika
+    # "syntax error: operand expected" hibaval elszallt.
+    file_count=$(grep '^\[warn\]' "$full_log" | grep -vc 'Code style issues found' || true)
+    [[ -z "$file_count" ]] && file_count=0
     echo "${file_count} fajl nincs formazva"
     echo
     grep '^\[warn\]' "$full_log" | grep -v 'Code style issues found' | head -n "$WRAPPER_FILE_LIMIT" | sed 's/^\[warn\] /nem formazott: /'

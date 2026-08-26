@@ -3,8 +3,15 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
+  "exports": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
+  },
+  "dependencies": {
+    "agent": "workspace:*",
+    "core": "workspace:*",
+    "db": "workspace:*",
+    "logger": "workspace:*"
   }
 }

@@ -110,13 +110,23 @@ Kötelező mezők:
 | `devEngines.packageManager` | `{ "name": "bun", "version": "1.4.0" }`            | [Turborepo structuring a repository](https://turborepo.dev/docs/crafting-your-repository/structuring-a-repository) |
 | `engines.node`              | a `.nvmrc` értékével összhangban                   | `.nvmrc` = `v26.0.0`                                                                                               |
 
-A Turborepo 2.0 megköveteli a csomagkezelő deklarációját a workspace-ben, ezért a `devEngines.packageManager` nem elhagyható. A régi, gyökérszintű `packageManager` mező is támogatott marad; hogy a Turborepo 2.10.12 a `devEngines` alakot fogadja-e el önmagában, a végrehajtás során `turbo run` futtatással ellenőrizendő, és ha nem, a `packageManager` mező kerül be helyette.
+A Turborepo megköveteli a csomagkezelő deklarációját a workspace-ben, ezért a `devEngines.packageManager` nem elhagyható.
+
+**V-2 lezárva, méréssel.** A Turborepo 2.10.12 a `devEngines.packageManager` alakot **önmagában elfogadja**, a régi `packageManager` mező nélkül is. Mindkét mező hiányában a `turbo run` nem nulla kóddal hibázik, és a hibaüzenete maga is a `devEngines` alakot nevezi meg elsőként, a `packageManager` mezőt pedig `legacy` jelzővel. Ezért a gyökér `package.json` **csak** a `devEngines.packageManager` mezőt tartalmazza: két mező azt jelentené, hogy a Bun verziószám két helyen áll, és egy verzióemelésnél szétcsúszhat.
+
+Következmény, amit tudni kell: a `devEngines` mezőt az npm 10.9 óta kikényszeríti, ezért ebben a repóban az `npm` és az `npx` megtagadja a futást (`EBADDEVENGINES`). Ez a mező szándékolt működése. A CI-ben és helyben `bunx` vagy `bun run` használandó, `npx` nem. Részletek: [`../research/2026-08-26-spec001-ellenorzesek.md`](../research/2026-08-26-spec001-ellenorzesek.md), V-2.
 
 A lockfile `bun.lock` (JSONC, szöveges), nem a bináris `bun.lockb`. A `tools/wire-probe/bun.lock` a workspace felállítása után megszűnik, a függőségek a gyökér lockfile-ba olvadnak.
 
 ### Verziók egyben tartása
 
 A Bun 1.4 ismeri a `catalog` és `catalogs` mezőt ([Bun catalogs](https://bun.com/docs/pm/catalogs)), amivel a `research` fájlban rögzített verziók egyetlen helyen élnek, és a csomagok `"catalog:"` hivatkozással veszik át. Ezt a spec **kötelezővé teszi** azokra a csomagokra, amik több workspace tagban is szerepelnek: TypeScript, ESLint és pluginjei, Prettier, Vitest, React, `@types/node`. Indok: a `research` fájl az egyetlen verzióforrás, és a katalógus ezt kódban is egyetlen hellyé teszi.
+
+**Bevezetve, a következő alakban.** A katalógus a gyökér `package.json` felső szintű `catalog` kulcsa alatt áll. A dokumentáció szerint a `catalog` és a `catalogs` kulcs a `workspaces` objektumon belül és a `package.json` tetején egyaránt működik, és a `catalog:` hivatkozás a gyökér és a workspace tag `package.json` fájlokban is feloldódik. Utóbbit **élő futtatás igazolta**: a gyökér saját `devDependencies` mezőjében is működik, a `bun.lock` pedig önálló `catalog` blokkban rögzíti a definíciókat.
+
+Ami **literál marad**, és miért: `turbo`, `jiti`, `happy-dom`, `vite`, `vite-plugin-istanbul`, `nyc`, `zod`, `@anthropic-ai/claude-agent-sdk`. Mindegyik pontosan egy `package.json` fájlban szerepel, tehát nincs mit egyetlen forrásba terelni; katalógusba emelésük csak egy indirekciós réteget adna. Az `@anthropic-ai/claude-agent-sdk` külön is szándékosan marad a `tools/wire-probe` csomagban: a pinelése SPEC-000 döntés, és ott kell látszania, ahol a mérés fut.
+
+**Ismert mellékhatás, nem blokkoló.** Az `eslint-plugin-sonarjs` a repo `package.json` fájljait beolvassa a saját függőség-feloldó rétegében, és a Bun `catalog:` protokollt csak a **szülő** `package.json` katalógusából oldja fel. A gyökér `package.json` saját `catalog:` hivatkozásaihoz nincs szülő, ezért a plugin fájlonként `Dependency "X" could not be resolved for catalog "default"` sort ír a stdoutra. Ez a plugin telepített forrásában ellenőrizve (`cjs/helpers/dependency-manifests/resolvers/package-json.js`, a `findClosestParentPackageJsonWithCatalogs` függvény `dir === topDir` ágon azonnal `undefined`-ot ad). Nem hiba, nem befolyásolja a lint kilépési kódját, és a `tooling/scripts/lint.sh` kimenetébe sem szivárog be, mert a wrapper csak az ESLint hibaformátumra illeszkedő sorokat emeli ki.
 
 Tilos `bun:` prefixű modul a termékkódban, tilos `bun test`. A Vitest futtatása `bun run vitest`.
 
@@ -409,20 +419,25 @@ A `coverage.experimentalAstAwareRemapping` opciót nem állítjuk be: Vitest 4-b
 
 Mivel a Vitest 4 alapértelmezése üres, a következőket **nekünk** kell kizárni, és mindegyikhez tartozik indok:
 
-| Minta                                        | Indok                                          |
-| -------------------------------------------- | ---------------------------------------------- |
-| `**/node_modules/**`                         | idegen kód                                     |
-| `**/dist/**`, `**/build/**`                  | generált                                       |
-| `**/*.config.{ts,js,mts}`                    | konfiguráció, nem viselkedés                   |
-| `**/*.d.ts`                                  | csak típus, nincs futásidejű sor               |
-| `**/index.ts` barrel fájlok                  | csak újraexport, futásidejű elágazás nélkül    |
-| `tools/wire-probe/**`                        | mérőeszköz, nem termékkód, a SPEC-000 hatóköre |
-| `tooling/**`                                 | build eszköz                                   |
-| `packages/db/**/migrations/**`               | generált Drizzle migráció                      |
-| `**/*.test.ts`, `**/*.spec.ts`, `**/e2e/**`  | maga a teszt                                   |
-| `packages/providers/**` adat literál fájljai | lásd lent                                      |
+| Minta                                       | Indok                                          |
+| ------------------------------------------- | ---------------------------------------------- |
+| `**/node_modules/**`                        | idegen kód                                     |
+| `**/dist/**`, `**/build/**`                 | generált                                       |
+| `**/*.config.{ts,js,mts}`                   | konfiguráció, nem viselkedés                   |
+| `**/*.d.ts`                                 | csak típus, nincs futásidejű sor               |
+| `**/index.ts` barrel fájlok                 | csak újraexport, futásidejű elágazás nélkül    |
+| `tools/wire-probe/**`                       | mérőeszköz, nem termékkód, a SPEC-000 hatóköre |
+| `tooling/**`                                | build eszköz                                   |
+| `packages/db/**/migrations/**`              | generált Drizzle migráció                      |
+| `**/*.test.ts`, `**/*.spec.ts`, `**/e2e/**` | maga a teszt                                   |
 
-A `packages/providers` leíró fájljai adat literálok, nincs bennük elágazás. A 100 százalékos küszöb ott vagy triviálisan teljesül, vagy értelmetlen. A pontos kizárási mintát a 13. szekció mappaszerkezetére kell illeszteni úgy, hogy a typeguardok (`isKnown`, `isUnknown`) **benne maradjanak** a coverage-ben, mert azok valódi logikát tartalmaznak.
+**A `packages/providers` NEM kizárt.** A spec korábban azt mérlegelte, hogy a leíró fájlokat adat literálként kizárja. A végrehajtás ezt elvetette, és helyette tesztet írt: a `packages/providers/src/**` teljes egészében a coverage hatókörében van, a 100 százalékos küszöb rá is vonatkozik, és teljesül. Amit ez ad:
+
+- Az `isKnown` és az `isUnknown` typeguard valódi unit tesztet kapott (`is-known.test.ts`, `is-unknown.test.ts`), mindkét ágra plusz a típusszűkítésre.
+- A leíró fájlokat egy bejáró regressziós teszt (`registry.test.ts`) tölti be, ami a teljes `providerRegistry` fán végigmegy, és minden `Fact` értékre invariánst ellenőriz: pontosan az egyik ágon áll, a `known` ág nem üres bizonyítéklistát hordoz, az `unknown` ág indoklást és blokkoló mérést. Ez nem lefedettség kedvéért írt üres teszt, hanem a SPEC-000 leíró invariánsainak kikényszerítése.
+- Ugyanez a teszt fogja meg a 35. elfogadási kritériumot (nincs prózai `M-` hivatkozás a `reason` mezőkben) és a 36. kritériumot (minden hivatkozott `MeasurementId` feloldható `docs/` horgonyra).
+
+A tisztán típusdeklarációt tartalmazó fájlok (`capability/**`, `model-id.ts`, `family-id.ts`, `fact.ts`, `evidence-list.ts`, `evidence-reference.ts`, `measurement-id.ts`) nincsenek kizárva, és nem is kell kizárni őket: futásidejű utasítás nélkül nulla darab utasítással szerepelnek a riportban, tehát sem nem rontják, sem nem javítják a százalékot.
 
 ### Modulfeloldás a monorepóban
 
@@ -696,29 +711,47 @@ A `CLAUDE.md` projekt szabály szerint minden mappában vezetni kell egy `CLAUDE
 
 Ha egy mappa fájlkészlete változik, a `CLAUDE.md` `## Fájlok` táblázata ugyanabban a commitban változik. Ezt a végrehajtás során egy ellenőrző script fogja meg, ami minden nem generált könyvtárra megnézi, hogy létezik-e `CLAUDE.md`, és hogy a `## Fájlok` táblázatban felsorolt nevek megegyeznek-e a könyvtár tartalmával.
 
-## 15. Nyitott pontok, a végrehajtás során webes ellenőrzéssel
+## 15. Ellenőrizendő pontok, állás
 
-Ezekre ma nincs igazolt forrásunk, tehát értéket vagy állítást ide a spec nem rögzít.
+**A tételes lezárás a [`../research/2026-08-26-spec001-ellenorzesek.md`](../research/2026-08-26-spec001-ellenorzesek.md)
+fájlban van**, pontonként a kérdéssel, a válasszal, a bizonyítékkal (forrás URL vagy saját mérés) és
+a következménnyel. Az alábbi táblázat csak az állást összegzi.
 
-| ID   | Amit el kell dönteni                                                                                                                                  | Hogyan                                                                                                                     |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| V-1  | A könyvtárcsomagok forrás `.ts` alakban fogyaszthatók-e, azaz a Node 26 type stripping működik-e szimlinkelt workspace csomagra                       | két csomagos minimálpélda futtatása, plusz a Node dokumentáció type stripping szekciója                                    |
-| V-2  | A Turborepo 2.10.12 elfogadja-e a `devEngines.packageManager` deklarációt önmagában                                                                   | `turbo run` futtatás, plusz a Turborepo konfigurációs referencia                                                           |
-| V-3  | A `turbo.json` `boundaries` kulcs `tags` szintaxisa és a `turbo boundaries` kilépési kódja                                                            | Turborepo dokumentáció                                                                                                     |
-| V-4  | **Lezárva, tárgytalan.** A D-1 döntés szerint nincs projekt referencia, tehát nincs `.tsbuildinfo`, és nincs mit mérni a Turborepo cache viszonyából. | D-1 döntés, ld. 6. szekció                                                                                                 |
-| V-5  | A `jsx` compilerOption pontos értéke React 19 és TS 6.0 mellett                                                                                       | React és TypeScript dokumentáció                                                                                           |
-| V-6  | A `projectService: true` viselkedése több tsconfigos monorepóban                                                                                      | typescript-eslint dokumentáció                                                                                             |
-| V-7  | Az `assertionStyle: 'never'` jelzi-e az `as const` alakot                                                                                             | próbafájl, plusz a szabály dokumentációja                                                                                  |
-| V-8  | A `no-restricted-syntax` AST szelektor (7. szekció, adott konfiguráció) valóban jelzi-e a `private` módosítót                                         | próbafájl a typescript-eslint playgrounddal; a konfiguráció maga már nem nyitott, csak a próbafájlos megerősítés van hátra |
-| V-9  | A `sonarjs/cognitive-complexity` dokumentált alapértelmezett küszöbe                                                                                  | plugin dokumentáció                                                                                                        |
-| V-10 | A Prettier `printWidth` értéke, ami a meglévő kódra minimális diffet ad                                                                               | mérés a meglévő fájlokon                                                                                                   |
-| V-11 | A `vite-plugin-istanbul` 9.0.1 működik-e Vite 8 (Rolldown) alatt                                                                                      | próba build, plusz a plugin kiadási jegyzetei                                                                              |
-| V-12 | Az e2e coverage összefésülő eszköz kiválasztása                                                                                                       | eszközök dokumentációja                                                                                                    |
-| V-13 | **Lezárva, megerősítve.** Az `actions/cache` v6.1.0 létezik, élő GitHub API lekérdezéssel igazolva, a research fájl helyes volt.                      | GitHub release lista, 12. szekció                                                                                          |
-| V-14 | A Bun globális cache `actions/cache` receptje nyer-e időt                                                                                             | mérés a CI-ben                                                                                                             |
-| V-15 | A Playwright `retries` CI értéke                                                                                                                      | Playwright dokumentáció, plusz saját mérés                                                                                 |
-| V-16 | A wrapper scriptek csonkolási határa                                                                                                                  | mérés a valós hibalistákon                                                                                                 |
-| V-17 | Az artefaktum retenciós napszám                                                                                                                       | GitHub Actions dokumentáció, plusz projekt döntés                                                                          |
+**17-ből 16 lezárva, 1 nyitva (V-14).** Feltételezéssel lezárt pont nincs.
+
+| ID   | Amit el kellett dönteni                                                | Állás                                                                                                                                                               |
+| ---- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V-1  | Forrás `.ts` fogyasztás szimlinkelt workspace csomagra                 | **Lezárva, méréssel.** Működik. Az (a) forrás fogyasztás út érvényes, minden könyvtárcsomag `exports` mezője `./src/index.ts`, nincs `build` a könyvtárcsomagokban. |
+| V-2  | Elfogadja-e a Turborepo a `devEngines.packageManager` mezőt önmagában  | **Lezárva, méréssel.** Elfogadja. A `packageManager` mező eltávolítva, csak a `devEngines` marad, hogy a Bun verzió egy helyen álljon.                              |
+| V-3  | A `boundaries` és `tags` szintaxisa, a `turbo boundaries` kilépési kód | **Lezárva, méréssel.** Szintaxis igazolt, szabálysértésre 1-es kilépési kód. A funkció kísérleti, ezért **nem vezetjük be**, marad opcionális (3. szekció).         |
+| V-4  | `.tsbuildinfo` és a Turborepo cache viszonya                           | **Lezárva, tárgytalan.** A D-1 döntés szerint nincs projekt referencia, tehát `.tsbuildinfo` nem keletkezik.                                                        |
+| V-5  | A `jsx` compilerOption értéke React 19 és TS 6.0 mellett               | **Lezárva, dokumentációval.** `"jsx": "react-jsx"`, a TS tsconfig referencia és a Vite hivatalos react-ts sablonja alapján.                                         |
+| V-6  | A `projectService: true` viselkedése több tsconfigos monorepóban       | **Lezárva, dokumentációval.** Monorepóhoz nem kell külön konfiguráció. Az `allowDefaultProject` a csomag `include` mintáin kívüli config fájlokra kell.             |
+| V-7  | Jelzi-e az `assertionStyle: 'never'` az `as const` alakot              | **Lezárva, méréssel.** Nem jelzi. Az `as const` szabadon használható, nem kell kivétel és nem kell `eslint-disable`.                                                |
+| V-8  | Jelzi-e a `no-restricted-syntax` szelektor a `private` módosítót       | **Lezárva, méréssel.** Mindhárom szelektor jelez (mező, metódus, parameter property), a `#` alakra nincs jelzés. Saját ESLint plugin nem kell.                      |
+| V-9  | A `sonarjs/cognitive-complexity` alapértelmezett küszöbe               | **Lezárva, forrásból.** A dokumentált alapértelmezés **15**, a `recommended` config `error` szinten hozza. Saját küszöbszámot nem állítunk.                         |
+| V-10 | A Prettier `printWidth` értéke                                         | **Lezárva, méréssel.** **120.** A Prettier előtti 51 fájlon mért diff minimuma egy 120 és 140 közötti fennsík, ezen belül a 120 a legkisebb sorhossz.               |
+| V-11 | A `vite-plugin-istanbul` 9.0.1 és a Vite 8 (Rolldown)                  | **Lezárva, méréssel.** Működik. A `requireEnv` pontosan a dokumentált módon kapcsol, az e2e coverage váz nem halasztódik el.                                        |
+| V-12 | Az e2e coverage összefésülő eszköz                                     | **Lezárva, dokumentációval.** `nyc`, a `nyc report --temp-dir` alakban. A Playwright oldali gyűjtést egyik eszköz doksija sem fedi, azt saját fixture oldja meg.    |
+| V-13 | Az `actions/cache` v6.1.0 létezése                                     | **Lezárva, megerősítve.** Élő GitHub API lekérdezéssel igazolva, a research fájl helyes volt.                                                                       |
+| V-14 | A Bun globális cache `actions/cache` receptje nyer-e időt              | **NYITVA.** A cache könyvtár helye hivatalos, de hivatalos `actions/cache` recept nincs, és a kérdés csak GitHub Actions runneren mérhető. Lásd lent.               |
+| V-15 | A Playwright `retries` CI értéke                                       | **Lezárva, dokumentációval.** Kimondott ajánlás nincs, ezért a dokumentált alapértelmezésen, `0`-n marad. A `workers` CI értéke `1`, arra van kimondott ajánlás.    |
+| V-16 | A wrapper scriptek csonkolási határa                                   | **Lezárva, projekt döntéssel, mérésre támaszkodva.** Marad 50. Dokumentált szabály erre nincs, ezt kimondjuk; a mérés a nagyságrendi keretet adja.                  |
+| V-17 | Az artefaktum retenciós napszám                                        | **Lezárva, projekt döntéssel.** Nem állítunk explicit értéket, a repository alapértelmezése érvényesül. Ajánlott napszámra dokumentált forrás nincs.                |
+
+### A nyitva maradt pont
+
+**V-14.** Ami igazolt: a Bun globális cache könyvtára `~/.bun/install/cache`
+([Bun global cache](https://bun.com/docs/pm/global-cache)), az `oven-sh/setup-bun` kizárólag a Bun
+binárist cache-eli, és az `actions/setup-node` `cache` bemenete dokumentáltan csak `npm`, `yarn`,
+`pnpm` értéket ismer. Ami nyitva marad: hivatalos `actions/cache` recept nincs, és hogy a lépés
+nyer-e időt, az csak GitHub Actions runneren mérhető, hideg és meleg cache összehasonlításával. A
+végrehajtási környezet nem GitHub Actions runner, ezért itt nem mérhető, becsülni pedig tilos.
+
+A lezárásához egy PR kell, ami legalább kétszer lefuttatja a workflow-t, és összeveti a
+`Cache Bun global cache` plusz `Install dependencies` lépés együttes idejét. Ha nem nyer időt, a
+lépés elhagyandó. Ez nem blokkolja a spec elfogadását: a hivatalosan dokumentált `.turbo` cache
+ettől függetlenül működik.
 
 ### Lezárt döntés
 
