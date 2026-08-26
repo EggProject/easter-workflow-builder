@@ -62,8 +62,8 @@
     },
     "test:e2e": {
       "dependsOn": ["build"],
-      "inputs": ["$TURBO_DEFAULT$", "**/e2e/**", "**/playwright.config.ts"],
-      "outputs": ["playwright-report/**", "test-results/**"],
+      "inputs": ["$TURBO_DEFAULT$", "**/e2e/**", "!**/e2e/.nyc_output/**", "**/playwright.config.ts"],
+      "outputs": ["playwright-report/**", "test-results/**", "e2e/.nyc_output/**"],
       "cache": true,
       "persistent": false
     },

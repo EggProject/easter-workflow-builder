@@ -16,17 +16,18 @@ dokumentációban ellenőrizve van, mit csinál.
 
 ## Összesítés
 
-| Állapot                                                                    | Pontok                                          | Darab  |
-| -------------------------------------------------------------------------- | ----------------------------------------------- | ------ |
-| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11, V-18, V-19 | 9      |
-| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15                 | 6      |
-| Lezárva, tárgytalan                                                        | V-4                                             | 1      |
-| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                                      | 2      |
-| **Nyitva marad**                                                           | V-14                                            | **1**  |
-| Összesen                                                                   |                                                 | **19** |
+| Állapot                                                                    | Pontok                                                | Darab  |
+| -------------------------------------------------------------------------- | ----------------------------------------------------- | ------ |
+| Lezárva méréssel                                                           | V-1, V-2, V-3, V-7, V-8, V-10, V-11, V-18, V-19, V-20 | 10     |
+| Lezárva dokumentált forrással                                              | V-5, V-6, V-9, V-12, V-13, V-15                       | 6      |
+| Lezárva, tárgytalan                                                        | V-4                                                   | 1      |
+| Lezárva projekt döntéssel, mérésre támaszkodva, dokumentált szabály nélkül | V-16, V-17                                            | 2      |
+| **Nyitva marad**                                                           | V-14                                                  | **1**  |
+| Összesen                                                                   |                                                       | **20** |
 
 V-18 és V-19 az elfogadási kritériumok tételes auditja során merült fel, utólag, a fenti
-pontok eredeti lezárása után - lásd a saját szakaszaikat lent.
+pontok eredeti lezárása után - lásd a saját szakaszaikat lent. V-20 még későbbi: egy éles
+GitHub Actions futás bukásából, nem auditból.
 
 A V-19 **kétszer** lett lezárva: először tévesen, "nem javítható környezeti korlát" indoklással,
 másodszor méréssel, a tényleges javítással. A saját szakasza mindkét kört tartalmazza, mert a
@@ -501,6 +502,12 @@ Saját mérés a `retries` értékére nem lehetséges: ebben a futtatókörnyez
 (rootless konténer, a `sudo playwright install-deps` tiltva). Ha egy valós CI futtatás
 instabilitást mutat, a `retries` emelése akkor és csak akkor indokolt, a mért flakiness alapján.
 
+**Utólagos kiegészítés (a böngésző azóta indul, lásd V-19).** Az első éles CI E2E bukás
+(32994208280) **nem flakiness**, hanem determinisztikus konfigurációs hiba volt, ezért **nem
+nyitja újra ezt a pontot**: nem a Playwright teszt bukott, hanem az azt követő lefedettségi
+riport, és a hibaok lokálisan száz százalékban reprodukálható (V-20). A `retries` értéke marad
+`0`, továbbra sincs mért flakiness, ami az emelést indokolná.
+
 ---
 
 ## V-16: a wrapper scriptek csonkolási határa
@@ -747,15 +754,142 @@ böngészőben** is igazolja (lásd V-11).
 
 ---
 
+## V-20: a Turborepo cache találat és az e2e lefedettségi riport ütközése
+
+**Kérdés.** Miért bukott az `E2E` job "E2E coverage report" lépése a
+[32994208280](https://github.com/EggProject/easter-workflow-builder/actions/runs/32994208280)
+futásban, miközben az előző futásban
+([32993421389](https://github.com/EggProject/easter-workflow-builder/actions/runs/32993421389))
+ugyanez a lépés zöld volt, és a két futás között egyetlen változás a `gh pr comment --repo`
+kapcsoló felvétele volt.
+
+**Válasz.** **Turborepo cache találat.** A `bun run test:e2e` valójában `turbo run test:e2e`,
+és cache találatkor a Playwright **nem indul el**, csak a napló játszódik vissza. A lemezre
+ilyenkor kizárólag az kerül ki, amit a `turbo.json` `outputs` mezője felsorol - abban pedig
+nem szerepelt a nyers coverage könyvtár. A rákövetkező `nyc report --temp-dir e2e/.nyc_output`
+így egy nem létező könyvtárat próbált beolvasni.
+
+**Bizonyíték, 1: a két CI napló különbsége.** Ugyanaz a task hash mindkét futásban
+(`8edba6961267f6d2`), de a viselkedés más:
+
+```
+# 32993421389 (zold), E2E > Setup:
+Cache not found for input keys: Linux-turbo-e2e-86940656..., Linux-turbo-e2e-
+# 32993421389, E2E > Run e2e tests:
+web:test:e2e: cache miss, executing 8edba6961267f6d2
+  Time:    5.045s
+# 32993421389, E2E > E2E coverage report:
+web coverage:e2e:report: All files |     100 |      100 |     100 |     100
+web coverage:e2e:report: Exited with code 0
+
+# 32994208280 (bukott), E2E > Setup:
+Cache restored from key: Linux-turbo-e2e-86940656b2e97e0ac4a1a410e7d41ed10b985d7f
+# 32994208280, E2E > Run e2e tests:
+web:test:e2e: cache hit, replaying logs 8edba6961267f6d2
+  Time:    33ms >>> FULL TURBO
+# 32994208280, E2E > E2E coverage report:
+##[error]Process completed with exit code 1
+```
+
+A `gh pr comment --repo` commit tehát csak **közvetve** hatott: nem változtatta meg a
+`test:e2e` task hash-ét (a `.github/**` nincs a `globalDependencies` között és nincs a `web`
+csomagon belül), viszont az általa kiváltott új futás már megtalálta az előző futás által
+feltöltött `.turbo` cache-t. A hiba tehát **a második futástól kezdve determinisztikus**,
+nem flaky.
+
+Ugyanezt igazolja a két kísérő figyelmeztetés is, amit a job feltöltő lépései írtak:
+`No files were found with the provided path: apps/web/coverage-e2e/**` és
+`No files were found with the provided path: pr-comment/02-e2e.md`. Az utóbbi azt is
+megmondja, hogy a `pr-comment/02-e2e.md` **nem** készült el: a `bash -e` shell az első
+paranccsal (`bun run ... > $RUNNER_TEMP/e2e-coverage.txt`) megállt, tehát sem a fájl, sem a
+`$GITHUB_STEP_SUMMARY` hozzáfűzés nem futott le. A `coverage-comment` job ennek megfelelően
+csak az unit töredéket töltötte le (`ARTIFACTS: coverage-comment-unit, coverage-report`),
+és mivel nem minőségi kapu, ő maga zöld maradt.
+
+**Bizonyíték, 2: helyi reprodukció.** A CI-t utánozva (először friss cache, majd a
+`.nyc_output` törlése, ami a friss checkoutot modellezi):
+
+```
+$ rm -rf .turbo/cache apps/web/e2e/.nyc_output && CI=true turbo run test:e2e
+web:test:e2e: cache miss, executing ...      # a Playwright tenylegesen fut
+$ rm -rf apps/web/e2e/.nyc_output && CI=true turbo run test:e2e
+web:test:e2e: cache hit, replaying logs ...  # >>> FULL TURBO
+$ ls apps/web/e2e/.nyc_output
+ls: cannot access 'apps/web/e2e/.nyc_output': No such file or directory
+$ bun run --filter web coverage:e2e:report
+web coverage:e2e:report: ENOENT: no such file or directory, scandir '.../apps/web/e2e/.nyc_output'
+web coverage:e2e:report: Exited with code 1   # kilepesi kod 1
+```
+
+**Bizonyíték, 3: a dokumentált szabály.** A Turborepo "Caching" oldala szó szerint:
+_"Turborepo caches the file outputs of a task that are defined in the `outputs` key of
+`turbo.json`. When there's a cache hit, Turborepo will restore the files from the cache."_
+([turborepo.com/docs/crafting-your-repository/caching](https://turborepo.com/docs/crafting-your-repository/caching))
+A "Configuring tasks" oldal ugyanezt megfordítva is kimondja: _"Without this key defined,
+Turborepo will not cache any files. Hitting cache on subsequent runs will not restore any
+file outputs."_
+([turborepo.com/docs/crafting-your-repository/configuring-tasks](https://turborepo.com/docs/crafting-your-repository/configuring-tasks))
+
+**Javítás.** A `turbo.json` `test:e2e` taskja két ponton változott:
+
+| Mező      | Előtte                                                    | Utána                                  |
+| --------- | --------------------------------------------------------- | -------------------------------------- |
+| `outputs` | `playwright-report/**`, `test-results/**`                 | plusz `e2e/.nyc_output/**`             |
+| `inputs`  | `$TURBO_DEFAULT$`, `**/e2e/**`, `**/playwright.config.ts` | plusz `!**/e2e/.nyc_output/**` negáció |
+
+A negáció **nem kozmetika**. Explicit `inputs` glob esetén a Turborepo dokumentáltan **nem
+veszi figyelembe a `.gitignore`-t**: _"Using the `inputs` key opts you out of `turbo`'s
+default behavior of considering `.gitignore`. You must reconstruct the globs from
+`.gitignore` as desired"_
+([turborepo.com/docs/reference/configuration#inputs](https://turborepo.com/docs/reference/configuration#inputs)),
+és a task saját `outputs`-a sem kerül automatikusan kizárásra az `inputs`-ból
+([vercel/turborepo#7480](https://github.com/vercel/turborepo/discussions/7480), a karbantartó
+válasza: _"I would prefer Turborepo do exactly what I told it to do."_). A `**/e2e/**` minta
+tehát a visszaállított, UUID nevű nyers JSON-t is behúzná a hash-be. Mérve, a negáció nélkül:
+
+```
+# negacio NELKUL
+web:test:e2e: cache miss, executing 0bf79d9dbf53afc9   # ures .nyc_output
+web:test:e2e: cache miss, executing 9938c234fe752699   # .nyc_output jelen van -> mas hash
+
+# negacioval
+web:test:e2e: cache miss, executing 64a823f2ea95e9bf   # elso futas
+web:test:e2e: cache hit,  replaying 64a823f2ea95e9bf   # .nyc_output torolve, HELYREALL
+web:test:e2e: cache hit,  replaying 64a823f2ea95e9bf   # .nyc_output jelen, hash valtozatlan
+web:test:e2e: cache hit,  replaying 64a823f2ea95e9bf   # negyedik futas, stabil
+```
+
+**Következmény a hibakereshetőségre.** A bukott lépés naplója **egyetlen hibaüzenetet sem
+tartalmazott**, mert a parancs stdout-ja fájlba ment (`> "$RUNNER_TEMP/e2e-coverage.txt"`), a
+`bash -e` pedig azonnal megölte a lépést, mielőtt a fájlt bárki kiírta volna. Ez önmagában is
+hiba volt, ezért két, egymástól független javítás készült:
+
+1. Új token takarékos wrapper, a `tooling/scripts/e2e-coverage.sh` (gyökér script:
+   `bun run coverage:e2e:report`). **A stdout kizárólag az `nyc` táblázata**, minden más
+   (fejléc, időmérés, hibaüzenet) a **stderr**-re megy - a stderr nincs átirányítva, tehát a
+   hiba mindig látszik a naplóban. A wrapper ezen felül külön ellenőrzi a nyers coverage
+   fájlok meglétét, és beszédes üzenettel áll meg helyettük, nem az `nyc` csupasz
+   `ENOENT ... scandir` sorával.
+2. A CI lépés `if !` ágban futtatja a parancsot, és bukás esetén a fájlba fogott kimenetet is
+   kiírja egy összecsukható `::group::` blokkba, mielőtt elbuktatja a lépést. Sikeres ágon a
+   napló változatlan méretű marad.
+
+Sem `|| true`, sem `continue-on-error` nem került a lépésre: a CI kapu marad kapu.
+
+---
+
 ## Melléklet: a lezárás során talált és javított hibák
 
-A pontok ellenőrzése három valós hibát hozott a felszínre.
+A pontok ellenőrzése öt valós hibát hozott a felszínre. Az utolsó kettőt nem az audit
+találta meg, hanem egy éles GitHub Actions futás bukása (V-20).
 
-| Hiba                                                                                                                                                      | Hol                                        | Javítás                                                                 |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
-| Egyetlen csomag `package.json`-ja sem deklarálta a workspace függőségeit, ezért a Turborepo függőségi gráfja üres volt és a cache soha nem invalidálódott | minden `package.json`                      | a SPEC-001 3. szekció függőségi iránya felvéve `workspace:*` alakban    |
-| A `devEngines.packageManager` bevezetése után az `npx` megtagadja a futást, a CI e2e jobja viszont `npx playwright install` parancsot hívott              | `.github/workflows/ci.yml`                 | `bunx playwright install` alakra átírva                                 |
-| Egy `unknown` `Fact` `reason` mezője prózai mérési hivatkozást és mért számot tartalmazott, amit a SPEC-001 35. kritériuma tilt                           | `claude-subscription/structured-output.ts` | a `reason` egy mondatra rövidítve, a hivatkozást a `blockedBy` hordozza |
+| Hiba                                                                                                                                                                     | Hol                                        | Javítás                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Egyetlen csomag `package.json`-ja sem deklarálta a workspace függőségeit, ezért a Turborepo függőségi gráfja üres volt és a cache soha nem invalidálódott                | minden `package.json`                      | a SPEC-001 3. szekció függőségi iránya felvéve `workspace:*` alakban                      |
+| A `devEngines.packageManager` bevezetése után az `npx` megtagadja a futást, a CI e2e jobja viszont `npx playwright install` parancsot hívott                             | `.github/workflows/ci.yml`                 | `bunx playwright install` alakra átírva                                                   |
+| Egy `unknown` `Fact` `reason` mezője prózai mérési hivatkozást és mért számot tartalmazott, amit a SPEC-001 35. kritériuma tilt                                          | `claude-subscription/structured-output.ts` | a `reason` egy mondatra rövidítve, a hivatkozást a `blockedBy` hordozza                   |
+| A `test:e2e` task `outputs` mezője nem sorolta fel a nyers e2e coverage könyvtárat, ezért Turborepo cache találatkor a rákövetkező `nyc report` ENOENT-tel bukott (V-20) | `turbo.json`                               | `e2e/.nyc_output/**` felvéve az `outputs` közé, `!**/e2e/.nyc_output/**` az `inputs` közé |
+| A CI e2e coverage lépése fájlba irányította a stdout-ot, ezért bukás esetén a naplóban egyetlen hibaüzenet sem jelent meg (V-20)                                         | `.github/workflows/ci.yml`                 | `tooling/scripts/e2e-coverage.sh` wrapper (hibák a stderr-re) + `::group::` dump bukáskor |
 
 Az utolsó hibát a `packages/providers/src/registry.test.ts` regressziós tesztje találta meg, és
 ugyanaz a teszt akadályozza meg, hogy visszatérjen.

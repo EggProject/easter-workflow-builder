@@ -10,16 +10,17 @@ wrapperek maguk bash fájlok, nem TypeScript).
 
 ## Fájlok
 
-| Fájl           | Tartalom                                                                                                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `_lib.sh`      | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                      |
-| `lint.sh`      | `turbo run lint` burkoló                                                                                                                                                 |
-| `typecheck.sh` | `turbo run typecheck` burkoló                                                                                                                                            |
-| `test.sh`      | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                    |
-| `build.sh`     | `turbo run build` burkoló                                                                                                                                                |
-| `format.sh`    | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi  |
-| `claude-md.sh` | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                              |
-| `casing.sh`    | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/`, lásd ott a `CLAUDE.md`-t |
+| Fájl              | Tartalom                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `_lib.sh`         | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                      |
+| `lint.sh`         | `turbo run lint` burkoló                                                                                                                                                 |
+| `typecheck.sh`    | `turbo run typecheck` burkoló                                                                                                                                            |
+| `test.sh`         | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                    |
+| `build.sh`        | `turbo run build` burkoló                                                                                                                                                |
+| `format.sh`       | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi  |
+| `claude-md.sh`    | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                              |
+| `casing.sh`       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/`, lásd ott a `CLAUDE.md`-t |
+| `e2e-coverage.sh` | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                    |
 
 ## Szabályok
 
@@ -73,6 +74,31 @@ wrapperek maguk bash fájlok, nem TypeScript).
   mert a gyökér `package.json` `"test"` scriptje maga a Vitest parancs, és ha a task
   nem-prefixelt lenne, a per-csomag taskgráf a gyökeret sosem érintené (mérve: a
   Turborepo `--dry=json` kimenete a nem-prefixelt taskoknál kihagyja a `//` csomagot).
+- Az `e2e-coverage.sh` a többi wrappertől eltérően **szétválasztja a két kimeneti
+  csatornát**: a stdout kizárólag az `nyc` szöveges táblázatát tartalmazza, minden más
+  (fejléc, időmérés, hibaüzenet) a stderr-re megy. Indok: a CI ennek a scriptnek a
+  stdout-ját irányítja fájlba, és abból készül a PR komment töredéke és a job summary
+  kódblokkja, tehát a stdout nem szennyezhető. Mellékhatásként a hiba **soha nem tud
+  elrejtőzni**: a stderr nincs átirányítva, tehát a CI naplóban akkor is látszik, ha a
+  stdout fájlba megy. Ez a viselkedés javítja azt a hibát, amikor a lépés `exit code 1`-gyel
+  bukott, de a naplóban egyetlen hibaüzenet sem jelent meg.
+- Az `e2e-coverage.sh` a futás előtt **külön ellenőrzi, hogy van-e nyers coverage adat** az
+  `apps/web/e2e/.nyc_output/` alatt, és ha nincs, beszédes üzenettel áll meg. Az `nyc` saját
+  hibája (`ENOENT: no such file or directory, scandir ...`) ugyanis nem árulja el, hogy a
+  valódi ok a le nem futott `test:e2e`. A nyers adat cache találat esetén is helyreáll,
+  mert a `turbo.json` `test:e2e` taskjának `outputs` listájában szerepel az
+  `e2e/.nyc_output/**`.
+- A `src/turbo-e2e-coverage-outputs.test.ts` regressziós teszt őrzi a fenti javítás
+  konfigurációs felét: a `turbo.json` `test:e2e` taskjának `outputs` listájában szerepelnie
+  kell az `e2e/.nyc_output/**` bejegyzésnek, az `inputs` listájában pedig a
+  `!**/e2e/.nyc_output/**` negációnak. Ugyanaz a mechanizmus futtatja, mint a
+  `check-casing.test.ts`-t: a gyökér `vitest.config.ts` `tooling-scripts` projektje.
+- Az `e2e-coverage.sh` az `apps/web` könyvtárából, `bun run --silent`-tel hívja a csomag
+  saját `coverage:e2e:report` scriptjét, nem `bun run --filter web`-bel. Indok: a
+  `--filter` minden kimeneti sor elé `web coverage:e2e:report:` előtagot fűz, ami a PR
+  kommentbe kerülő táblázatot olvashatatlanná tenné, a `--silent` pedig a bun
+  `$ <parancs>` visszhangját némítja el. Az `nyc` kapcsolói így egyetlen helyen, az
+  `apps/web/package.json`-ben maradnak.
 
 ## Kapcsolódó dokumentumok
 
