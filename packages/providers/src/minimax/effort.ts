@@ -1,4 +1,4 @@
-import type { EffortCapability } from '../capability/effort-capability.ts';
+import type { EffortCapability } from '@easter-workflow-builder/provider-capability';
 
 export const minimaxEffort: EffortCapability = {
   // Az effort minden mért beállítás mellett kimegy, a kényszerítő env kapcsoló hatástalan.

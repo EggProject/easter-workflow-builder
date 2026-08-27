@@ -1,4 +1,4 @@
-import type { StructuredOutputCapability } from '../capability/structured-output-capability.ts';
+import type { StructuredOutputCapability } from '@easter-workflow-builder/provider-capability';
 
 export const minimaxStructuredOutput: StructuredOutputCapability = {
   strategies: [

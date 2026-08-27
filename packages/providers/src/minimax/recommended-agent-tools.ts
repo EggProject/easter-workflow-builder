@@ -1,4 +1,4 @@
-import type { AgentToolRecommendation } from '../capability/agent-tool-recommendation.ts';
+import type { AgentToolRecommendation } from '@easter-workflow-builder/provider-capability';
 import type { Fact } from '@easter-workflow-builder/evidence';
 
 /**

@@ -1,4 +1,4 @@
-import type { ProviderCapabilityDescriptor } from '../capability/provider-capability-descriptor.ts';
+import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
 import { minimaxConcurrency } from './concurrency.ts';

@@ -1,4 +1,4 @@
-import type { ConcurrencyCapability } from '../capability/concurrency-capability.ts';
+import type { ConcurrencyCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
 
 // A megfigyelt kérésszám csúcsa a subagent korlát plusz egy, az orchestrátor kérésével együtt.

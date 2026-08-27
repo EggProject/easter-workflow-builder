@@ -55,10 +55,10 @@ mindegyik mellett megjelölve, hogy dokumentált vagy önkényes.
 
 ## Függőségi irány
 
-Az `agent-tools` a `providers` (az `AgentToolId` szótár miatt) és a `typeguards` csomagtól
-függ, valamint az `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagoktól. Semmilyen
-más workspace csomagtól nem függ, és egyetlen workspace csomag sem függhet tőle úgy, hogy az
-kört okozna.
+Az `agent-tools` az `@easter-workflow-builder/agent-tool-id` (az `AgentToolId` szótár miatt) és
+a `typeguards` csomagtól függ, valamint az `@anthropic-ai/claude-agent-sdk` és a `zod` külső
+csomagoktól. Semmilyen más workspace csomagtól nem függ, és egyetlen workspace csomag sem
+függhet tőle úgy, hogy az kört okozna.
 
 ## Szabályok
 

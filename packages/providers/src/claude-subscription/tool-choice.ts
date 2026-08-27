@@ -1,4 +1,4 @@
-import type { ToolChoiceCapability } from '../capability/tool-choice-capability.ts';
+import type { ToolChoiceCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_TOOL_USE } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionToolChoice: ToolChoiceCapability = {

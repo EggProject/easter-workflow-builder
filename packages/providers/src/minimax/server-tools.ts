@@ -1,5 +1,5 @@
 import type { Fact } from '@easter-workflow-builder/evidence';
-import type { ServerToolDescriptor } from '../capability/server-tool-descriptor.ts';
+import type { ServerToolDescriptor } from '@easter-workflow-builder/provider-capability';
 
 // A web_search szerver oldali tool kimegy a dróton, de a MiniMax nem futtatja le.
 export const minimaxServerTools: Fact<readonly ServerToolDescriptor[]> = {

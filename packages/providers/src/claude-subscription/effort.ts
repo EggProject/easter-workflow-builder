@@ -1,4 +1,4 @@
-import type { EffortCapability } from '../capability/effort-capability.ts';
+import type { EffortCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_EFFORT, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionEffort: EffortCapability = {

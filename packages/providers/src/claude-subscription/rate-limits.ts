@@ -1,4 +1,4 @@
-import type { RateLimitCapability } from '../capability/rate-limit-capability.ts';
+import type { RateLimitCapability } from '@easter-workflow-builder/provider-capability';
 import type { ClaudeModelId } from './model-id.ts';
 
 export const claudeSubscriptionRateLimits: RateLimitCapability<ClaudeModelId> = {

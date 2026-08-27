@@ -57,12 +57,21 @@
         "@easter-workflow-builder/providers": "workspace:*",
       },
     },
+    "packages/agent-tool-id": {
+      "name": "@easter-workflow-builder/agent-tool-id",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/agent-tools": {
       "name": "@easter-workflow-builder/agent-tools",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "@easter-workflow-builder/providers": "workspace:*",
+        "@easter-workflow-builder/agent-tool-id": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
         "zod": "^4.0.0",
       },
@@ -126,13 +135,28 @@
         "@easter-workflow-builder/core": "workspace:*",
       },
     },
+    "packages/provider-capability": {
+      "name": "@easter-workflow-builder/provider-capability",
+      "version": "0.0.0",
+      "dependencies": {
+        "@easter-workflow-builder/agent-tool-id": "workspace:*",
+        "@easter-workflow-builder/evidence": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/providers": {
       "name": "@easter-workflow-builder/providers",
       "version": "0.0.0",
       "dependencies": {
+        "@easter-workflow-builder/agent-tool-id": "workspace:*",
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/evidence": "workspace:*",
         "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
       },
       "devDependencies": {
         "vitest": "catalog:",
@@ -272,6 +296,8 @@
 
     "@easter-workflow-builder/agent": ["@easter-workflow-builder/agent@workspace:packages/agent"],
 
+    "@easter-workflow-builder/agent-tool-id": ["@easter-workflow-builder/agent-tool-id@workspace:packages/agent-tool-id"],
+
     "@easter-workflow-builder/agent-tools": ["@easter-workflow-builder/agent-tools@workspace:packages/agent-tools"],
 
     "@easter-workflow-builder/core": ["@easter-workflow-builder/core@workspace:packages/core"],
@@ -289,6 +315,8 @@
     "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
 
     "@easter-workflow-builder/protocol": ["@easter-workflow-builder/protocol@workspace:packages/protocol"],
+
+    "@easter-workflow-builder/provider-capability": ["@easter-workflow-builder/provider-capability@workspace:packages/provider-capability"],
 
     "@easter-workflow-builder/providers": ["@easter-workflow-builder/providers@workspace:packages/providers"],
 
