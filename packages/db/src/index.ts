@@ -10,3 +10,20 @@ export { ensureDatabaseDirectory } from './database-file/ensure-database-directo
 // sqlite-connection: az adatbázis kapcsolat megnyitása, tranzakció, zárás.
 export { openDatabase } from './sqlite-connection/open-database.ts';
 export type { DatabaseContext } from './sqlite-connection/database-context.ts';
+
+// workflow-graph: a WorkflowRepository publikus felülete (T-003-12). A
+// factory függvényt (`createWorkflowRepository`) szándékosan nem exportáljuk,
+// csak a típust (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+export type {
+  WorkflowRepository,
+  WorkflowRecord,
+  CreateWorkflowInput,
+  UpdateWorkflowInput,
+  WorkflowNodeInput,
+  WorkflowNodeRecord,
+  WorkflowEdgeInput,
+  WorkflowEdgeRecord,
+  WorkflowGraph,
+  DeletionSummary,
+  DeleteWorkflowInput,
+} from './workflow-graph/workflow-repository.ts';

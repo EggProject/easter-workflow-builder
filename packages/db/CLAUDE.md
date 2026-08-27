@@ -9,12 +9,12 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                      |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                  |
-| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                |
-| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` a következő lépésben kerül ide |
+| Mappa                | Tartalom                                                                                                                                                                                                          |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                  |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide              |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                            |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12) |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -69,6 +69,44 @@ Amit a guard **kikényszerít**: a `loop.maxIterations`, az `error_handler.maxAt
 `backoffMs` minden eleme egész és pozitív (SPEC-003 4.3, alapérték nélkül), a `join` mindhárom
 módja a saját alobjektum alakját kapja, és a tíz ágú `switch` a
 `@typescript-eslint/switch-exhaustiveness-check` szabály miatt nem tud lemaradni egy típusról.
+
+## A `WorkflowRepository` (T-003-12)
+
+A `workflow-repository.ts` a `createWorkflow`, `updateWorkflow`, `getWorkflow`, `listWorkflows`,
+`replaceGraph`, `readGraph`, `summarizeDeletion`, `deleteWorkflow` műveletet adja, `openDatabase`
+kötve be a `DatabaseContext.workflows` mezőbe (`sqlite-connection/open-database.ts`, ugyanazzal a
+`transaction()` függvénnyel, amit a `replaceGraph` és a `deleteWorkflow` is használ). A barrel csak
+a `WorkflowRepository` típust és a hozzá tartozó bemeneti/kimeneti típusokat exportálja, a
+`createWorkflowRepository` factory függvényt nem (SPEC-003 9.3).
+
+**Döntések, ahol a spec nem volt kimerítő.** Az `id` a repositoryban generált UUID
+(`node:crypto` `randomUUID()`), a `createdAtMs`/`updatedAtMs` a hívás pillanatában generált
+`Date` (a `timestamp_ms` mód ezt várja, lásd `workflow.ts`). A `listWorkflows` az
+`updated_at_ms` oszlop szerint **csökkenő** sorrendben ad listát, mert ez az egyetlen index a
+táblán, és a legutóbb módosított workflow a leghasznosabb elöl. Az `updateWorkflow` a `name`,
+`description`, `providerId` mezőt **együtt** várja (teljes csere, nem részleges patch): a spec
+nem részletezi, és egy valódi részleges patch nem tudná typeszinten megkülönböztetni a "mezőt
+nem küldtem" és a "mezőt explicit null-ra állítom" esetet `| null` mezőkkel. A `replaceGraph`
+bemeneti node alakja (`WorkflowNodeInput`) nem hordoz külön `type` mezőt: a `config.type`
+diszkriminátor már megadja, a `workflow_node.type` oszlopot ebből tölti a repository.
+
+**A `provider_id` typeguard határa csak olvasáskor él.** A `workflow.provider_id` oszlopnak
+nincs DB szintű `CHECK`-je (4.1 szekció), a séma szinten sima `string | null`. Íráskor
+(`createWorkflow`/`updateWorkflow`) a bemenet már TypeScript szinten `ProviderId | null`, nincs
+mit szűkíteni. Olvasáskor (`getWorkflow`/`listWorkflows`) a nyers oszlopérték nem bizonyíték a
+típusra, ezért az `isProviderId` guard szűkíti; ha egy sor korrupt (pl. egy időközben törölt
+provider azonosítója maradt bent), `invalid_provider_id` hibaágat ad. Ugyanez a minta a
+`readGraph`-ban a node `config` oszlopára (`isNodeConfig`, `corrupt_node_config` hibaosztály).
+
+**Két nyitott pont, a T-003-16 zárja le őket (PLAN-003, a T-003-12 sora utáni bekezdés).**
+
+- `summarizeDeletion`: a `runCount`/`eventCount`/`snapshotCount` mező kényszerűen `0`, mert a
+  `workflow_run`/`run_event`/`graph_snapshot` tábla még nem létezik (F5 fázis). Jelölve: magyar
+  "NYITOTT PONT" komment a `summarizeDeletion` függvényben, `workflow-repository.ts`.
+- `deleteWorkflow`: a `graph_snapshot` árva söprése (4.15 szekció) nem futtatható, mert a
+  `graph_snapshot` tábla még nem létezik. Jelölve: magyar "NYITOTT PONT" komment a
+  `deleteWorkflow` függvény végén, a `DELETE FROM graph_snapshot WHERE hash NOT IN (...)` SQL
+  szó szerint a kommentben, `workflow-repository.ts`.
 
 ## `Outcome` hibaosztály konvenció
 
