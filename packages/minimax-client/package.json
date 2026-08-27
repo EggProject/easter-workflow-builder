@@ -1,5 +1,5 @@
 {
-  "name": "@easter-workflow-builder/agent-tools",
+  "name": "@easter-workflow-builder/minimax-client",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,16 +9,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.245",
-    "@easter-workflow-builder/agent-tool-id": "workspace:*",
     "@easter-workflow-builder/env-reader": "workspace:*",
     "@easter-workflow-builder/http-client": "workspace:*",
-    "@easter-workflow-builder/image-source": "workspace:*",
-    "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
-    "@easter-workflow-builder/minimax-client": "workspace:*",
     "@easter-workflow-builder/result": "workspace:*",
-    "@easter-workflow-builder/typeguards": "workspace:*",
-    "zod": "^4.0.0"
+    "@easter-workflow-builder/typeguards": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

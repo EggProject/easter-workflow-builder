@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
-import { ENV_MINIMAX_API_KEY } from '../config/environment-variable-name.ts';
+import { ENV_MINIMAX_API_KEY } from '@easter-workflow-builder/minimax-client';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { createWebSearchTool } from './create-web-search-tool.ts';
 
