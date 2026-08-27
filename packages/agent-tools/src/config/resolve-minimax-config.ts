@@ -1,10 +1,8 @@
+import { readBaseUrl, readTimeoutMs, type EnvironmentReader } from '@easter-workflow-builder/env-reader';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
 import { DEFAULT_MINIMAX_BASE_URL, DEFAULT_MINIMAX_TIMEOUT_MS } from './default-config-value.ts';
-import type { EnvironmentReader } from './environment-reader.ts';
 import { ENV_MINIMAX_BASE_URL, ENV_MINIMAX_TIMEOUT_MS } from './environment-variable-name.ts';
 import type { MiniMaxConfig } from './minimax-config.ts';
-import { readBaseUrl } from './read-base-url.ts';
-import { readTimeoutMs } from './read-timeout-ms.ts';
 
 /**
  * A MiniMax hívás konfigurációjának feloldása. Az API kulcs változó NEVE

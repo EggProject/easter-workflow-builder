@@ -27,16 +27,15 @@ ezért a szolgáltatás eldobó viselkedése nem érinti.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti hat mappa felelőssége:
+Az `src/` alatti öt mappa felelőssége:
 
-| Mappa        | Felelősség                                                                 |
-| ------------ | -------------------------------------------------------------------------- |
-| `config/`    | környezeti változó olvasás, a három eszköz futásidejű konfigurációja       |
-| `http/`      | a beépített `fetch` fölötti közös HTTP réteg                               |
-| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                 |
-| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                               |
-| `image/`     | a képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64) |
-| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója           |
+| Mappa        | Felelősség                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `config/`    | a MiniMax és a Firecrawl szolgáltatás specifikus konfigurációja (a generikus olvasás a `@easter-workflow-builder/env-reader` csomagban) |
+| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                                                                              |
+| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                                                                                            |
+| `image/`     | a képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64)                                                              |
+| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója                                                                        |
 
 ## Környezeti változók
 
@@ -55,6 +54,8 @@ mindegyik mellett megjelölve, hogy dokumentált vagy önkényes.
 ## Függőségi irány
 
 Az `agent-tools` az `@easter-workflow-builder/agent-tool-id` (az `AgentToolId` szótár miatt), a
+`@easter-workflow-builder/env-reader` (a generikus környezeti változó olvasás miatt), a
+`@easter-workflow-builder/http-client` (a `fetch` fölötti HTTP réteg miatt), a
 `@easter-workflow-builder/mcp-tool-kit` (az MCP válasz konstruktorok miatt), a
 `@easter-workflow-builder/result` (az `Outcome<TValue>` eredménytípus miatt) és a `typeguards`
 csomagtól függ, valamint az `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagoktól.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import { ENV_MINIMAX_CODING_PLAN_API_KEY } from '../config/environment-variable-name.ts';
-import type { FetchFunction } from '../http/fetch-function.ts';
 import type { ReadFileFunction } from '../image/read-file-function.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';

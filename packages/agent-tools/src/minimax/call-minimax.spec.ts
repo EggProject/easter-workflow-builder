@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { MiniMaxConfig } from '../config/minimax-config.ts';
-import type { FetchFunction } from '../http/fetch-function.ts';
 import { callMiniMax } from './call-minimax.ts';
 import { PATH_SEARCH } from './endpoint-path.ts';
 

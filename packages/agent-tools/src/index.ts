@@ -1,7 +1,6 @@
 // Barrel: csak újraexport, a csomag publikus felülete a lépésenként kapcsolható
 // eszközkészlet összeállítója és a hozzá tartozó típusok.
 
-export type { EnvironmentReader } from './config/environment-reader.ts';
 export {
   ENV_FIRECRAWL_BASE_URL,
   ENV_FIRECRAWL_TIMEOUT_MS,
