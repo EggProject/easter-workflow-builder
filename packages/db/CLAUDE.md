@@ -9,13 +9,13 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                                                                                                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                           |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                                                                                                       |
-| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                     |
-| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                          |
-| `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla a T-003-15 lépésben kerül ide |
+| Mappa                | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                                                                                                                                                                                                                                                                                                                                             |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                                                                                                                                                                                                                                                                |
+| `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla (`hash` elsődleges kulcs, `graph_snapshot_version_idx` index, nincs idegen kulcsa) és a `graph_snapshot_no_update` `BEFORE UPDATE` trigger, ami minden módosítási kísérletet `SQLITE_CONSTRAINT_TRIGGER` hibával buktat meg (SPEC-003 4.9 és 5.5 szekció, T-003-15) |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -143,6 +143,36 @@ egytagú. A szerkezet nem díszítés: az `if` alakra a `switch-exhaustiveness-c
 hibát, tehát csak a `switch` kényszeríti ki, hogy egy jövőbeli verzió felvétele fordítási
 hibát adjon, amíg az ág hiányzik. Az ismeretlen verziót a hívó **a `switch` előtt** zárja ki
 az `isGraphSnapshotDocumentVersion` guarddal, `unknown_graph_document_version` hibaággal.
+
+## A `graph_snapshot` tábla és a megváltoztathatatlansági trigger (T-003-15)
+
+A `graph-snapshot.ts` a `graph_snapshot` tábla Drizzle definíciója: `hash` elsődleges kulcs
+(a `document` sha256 lenyomata, 64 karakter kisbetűs hex), `document_version`, `document`
+(`text('document', { mode: 'json' }).$type<unknown>()`) és `first_captured_at_ms`, plusz a
+`graph_snapshot_version_idx` index a `document_version` oszlopon. **Nincs idegen kulcsa
+kifelé**: ez a szülő tábla, a `workflow_run` (T-003-13) fog rá mutatni. A `graphSnapshotTable`
+objektum **nem** kerül a barrelbe (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+
+A tábla migrációja a `drizzle-kit generate` géppel generált `drizzle/0001_yellow_calypso.sql`.
+A megváltoztathatatlansági trigger a T-003-5/O-6 próbában már ellenőrzött, szó szerinti SQL,
+a `drizzle-kit generate --custom --name=block-graph-snapshot-update` üres migrációba kézzel
+beírva (`drizzle/0002_block-graph-snapshot-update.sql`):
+
+```sql
+CREATE TRIGGER graph_snapshot_no_update
+BEFORE UPDATE ON graph_snapshot
+BEGIN
+  SELECT RAISE(ABORT, 'graph_snapshot is immutable');
+END;
+```
+
+A `graph-snapshot-immutability.spec.ts` egy saját `better-sqlite3` + `drizzle()` példányt nyit
+(a `DatabaseContext` nem exportálja a nyers handle-t), lefuttatja rajta a commitolt
+migrációkat, majd nyers SQL `UPDATE`-tel próbálkozik: a hívás `SqliteDatabase.SqliteError`
+példányt dob, `code: 'SQLITE_CONSTRAINT_TRIGGER'` és `message: 'graph_snapshot is immutable'`
+értékkel, a sor tartalma változatlan marad, az azonos tesztben lefuttatott `INSERT` és `DELETE`
+sikeres. Ezzel a SPEC-003 5.5 szekció mindkét védelme megvalósult: a repository szintű
+zártság (a barrel nem exportál módosító műveletet a táblára) és az adatbázis szintű trigger is.
 
 ## `Outcome` hibaosztály konvenció
 
