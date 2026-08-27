@@ -1,5 +1,4 @@
-import type { StreamingCapability } from '@easter-workflow-builder/provider-capability';
-import { DOC_STREAMING } from '@easter-workflow-builder/evidence-sources';
+import { DOC_STREAMING, type StreamingCapability } from '@easter-workflow-builder/provider-capability';
 
 export const claudeSubscriptionStreaming: StreamingCapability = {
   sse: {

@@ -7,7 +7,7 @@ függvények, amik nem egyetlen domainhez kötöttek, hanem bármelyik workspace
 használhatja őket. Ide **nem**
 tartozik domain-specifikus typeguard: az a saját csomagjában marad. Például a `Fact`
 `known`/`unknown` állapotát ellenőrző `isKnownFact` és `isUnknownFact` a
-`@easter-workflow-builder/evidence` csomag `fact/` témájában van, mert kizárólag a `Fact`
+`@easter-workflow-builder/provider-capability` csomag `evidence/fact/` témájában van, mert kizárólag a `Fact`
 típushoz kötött, nem általános.
 
 ## Fájlok

@@ -1,5 +1,4 @@
-import type { ToolChoiceCapability } from '@easter-workflow-builder/provider-capability';
-import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
+import { RESEARCH_MINIMAX, type ToolChoiceCapability } from '@easter-workflow-builder/provider-capability';
 
 export const minimaxToolChoice: ToolChoiceCapability = {
   accepted: {

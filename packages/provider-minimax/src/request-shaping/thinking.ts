@@ -1,5 +1,4 @@
-import type { ThinkingCapability } from '@easter-workflow-builder/provider-capability';
-import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
+import { RESEARCH_MINIMAX, type ThinkingCapability } from '@easter-workflow-builder/provider-capability';
 import type { MiniMaxFamilyId } from '../model-catalog/family-id.ts';
 
 export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {

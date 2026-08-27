@@ -1,5 +1,4 @@
-import type { AgentToolRecommendation } from '@easter-workflow-builder/provider-capability';
-import type { Fact } from '@easter-workflow-builder/evidence';
+import type { AgentToolRecommendation, Fact } from '@easter-workflow-builder/provider-capability';
 
 /**
  * Ehhez a providerhez nincs drótszintű mérésünk, tehát nincs bizonyíték arra,

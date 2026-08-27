@@ -1,6 +1,4 @@
-import type { ServerToolDescriptor } from '@easter-workflow-builder/provider-capability';
-import type { Fact } from '@easter-workflow-builder/evidence';
-import { DOC_WEB_SEARCH } from '@easter-workflow-builder/evidence-sources';
+import { DOC_WEB_SEARCH, type ServerToolDescriptor, type Fact } from '@easter-workflow-builder/provider-capability';
 
 export const claudeSubscriptionServerTools: Fact<readonly ServerToolDescriptor[]> = {
   state: 'known',

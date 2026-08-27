@@ -1,5 +1,4 @@
-import type { AgentToolRecommendation } from '@easter-workflow-builder/provider-capability';
-import type { Fact } from '@easter-workflow-builder/evidence';
+import type { AgentToolRecommendation, Fact } from '@easter-workflow-builder/provider-capability';
 
 /**
  * A listában csak az az eszköz szerepel, amire bizonyíték van. Ami nincs benne,

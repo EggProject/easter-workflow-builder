@@ -1,4 +1,4 @@
-import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
+import type { AgentToolId } from '@easter-workflow-builder/provider-capability';
 import { AGENT_TOOLS_SERVER_NAME } from './agent-tools-server-name.ts';
 
 /**

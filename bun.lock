@@ -62,21 +62,12 @@
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "@easter-workflow-builder/agent-tool-id": "workspace:*",
         "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
         "@easter-workflow-builder/tool-understand-image": "workspace:*",
         "@easter-workflow-builder/tool-web-fetch": "workspace:*",
         "@easter-workflow-builder/tool-web-search": "workspace:*",
       },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/agent-tool-id": {
-      "name": "@easter-workflow-builder/agent-tool-id",
-      "version": "0.0.0",
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -108,27 +99,6 @@
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/db": "workspace:*",
         "@easter-workflow-builder/logger": "workspace:*",
-      },
-    },
-    "packages/evidence": {
-      "name": "@easter-workflow-builder/evidence",
-      "version": "0.0.0",
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/evidence-sources": {
-      "name": "@easter-workflow-builder/evidence-sources",
-      "version": "0.0.0",
-      "dependencies": {
-        "@easter-workflow-builder/evidence": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/firecrawl-client": {
@@ -180,10 +150,6 @@
     "packages/provider-capability": {
       "name": "@easter-workflow-builder/provider-capability",
       "version": "0.0.0",
-      "dependencies": {
-        "@easter-workflow-builder/agent-tool-id": "workspace:*",
-        "@easter-workflow-builder/evidence": "workspace:*",
-      },
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -194,8 +160,6 @@
       "name": "@easter-workflow-builder/provider-claude-subscription",
       "version": "0.0.0",
       "dependencies": {
-        "@easter-workflow-builder/evidence": "workspace:*",
-        "@easter-workflow-builder/evidence-sources": "workspace:*",
         "@easter-workflow-builder/provider-capability": "workspace:*",
       },
       "devDependencies": {
@@ -208,8 +172,6 @@
       "name": "@easter-workflow-builder/provider-minimax",
       "version": "0.0.0",
       "dependencies": {
-        "@easter-workflow-builder/evidence": "workspace:*",
-        "@easter-workflow-builder/evidence-sources": "workspace:*",
         "@easter-workflow-builder/provider-capability": "workspace:*",
       },
       "devDependencies": {
@@ -226,8 +188,7 @@
         "@easter-workflow-builder/provider-minimax": "workspace:*",
       },
       "devDependencies": {
-        "@easter-workflow-builder/evidence": "workspace:*",
-        "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -417,8 +378,6 @@
 
     "@easter-workflow-builder/agent-tool-bundle": ["@easter-workflow-builder/agent-tool-bundle@workspace:packages/agent-tool-bundle"],
 
-    "@easter-workflow-builder/agent-tool-id": ["@easter-workflow-builder/agent-tool-id@workspace:packages/agent-tool-id"],
-
     "@easter-workflow-builder/core": ["@easter-workflow-builder/core@workspace:packages/core"],
 
     "@easter-workflow-builder/db": ["@easter-workflow-builder/db@workspace:packages/db"],
@@ -426,10 +385,6 @@
     "@easter-workflow-builder/engine": ["@easter-workflow-builder/engine@workspace:packages/engine"],
 
     "@easter-workflow-builder/eslint-config": ["@easter-workflow-builder/eslint-config@workspace:tooling/eslint-config"],
-
-    "@easter-workflow-builder/evidence": ["@easter-workflow-builder/evidence@workspace:packages/evidence"],
-
-    "@easter-workflow-builder/evidence-sources": ["@easter-workflow-builder/evidence-sources@workspace:packages/evidence-sources"],
 
     "@easter-workflow-builder/firecrawl-client": ["@easter-workflow-builder/firecrawl-client@workspace:packages/firecrawl-client"],
 

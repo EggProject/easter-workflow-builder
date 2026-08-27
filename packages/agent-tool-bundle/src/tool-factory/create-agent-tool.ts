@@ -1,4 +1,4 @@
-import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
+import type { AgentToolId } from '@easter-workflow-builder/provider-capability';
 import { createImageUnderstandingTool } from '@easter-workflow-builder/tool-understand-image';
 import { createWebFetchTool } from '@easter-workflow-builder/tool-web-fetch';
 import { createWebSearchTool } from '@easter-workflow-builder/tool-web-search';

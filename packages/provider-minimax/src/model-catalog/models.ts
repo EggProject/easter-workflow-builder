@@ -1,6 +1,9 @@
-import type { ModelDescriptor } from '@easter-workflow-builder/provider-capability';
-import { DOC_ENV_VARS, DOC_MODEL_CONFIG } from '@easter-workflow-builder/evidence-sources';
-import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
+import {
+  DOC_ENV_VARS,
+  DOC_MODEL_CONFIG,
+  RESEARCH_MINIMAX,
+  type ModelDescriptor,
+} from '@easter-workflow-builder/provider-capability';
 import type { MiniMaxFamilyId } from './family-id.ts';
 import type { MiniMaxModelId } from './model-id.ts';
 

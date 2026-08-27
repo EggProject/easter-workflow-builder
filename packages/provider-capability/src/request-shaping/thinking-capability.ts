@@ -1,4 +1,4 @@
-import type { Fact } from '@easter-workflow-builder/evidence';
+import type { Fact } from '../evidence/fact/fact.ts';
 import type { ThinkingMode } from './thinking-mode.ts';
 
 export interface ThinkingCapability<TFamilyId extends string> {

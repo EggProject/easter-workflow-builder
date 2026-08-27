@@ -8,10 +8,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "dependencies": {
-    "@easter-workflow-builder/evidence": "workspace:*",
-    "@easter-workflow-builder/agent-tool-id": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",

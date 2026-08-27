@@ -17,13 +17,10 @@ export type PackageLayer = 0 | 1 | 2 | 3 | 4 | 5 | 'tool';
 export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   // L0
   typeguards: 0,
-  evidence: 0,
-  'agent-tool-id': 0,
   'mcp-tool-kit': 0,
   core: 0,
   logger: 0,
   // L1
-  'evidence-sources': 1,
   'provider-capability': 1,
   protocol: 1,
   // L2

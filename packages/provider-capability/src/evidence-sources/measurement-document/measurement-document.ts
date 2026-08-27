@@ -1,4 +1,4 @@
-import type { MeasurementId } from '@easter-workflow-builder/evidence';
+import type { MeasurementId } from '../../evidence/evidence-reference/measurement-id.ts';
 
 /**
 Egy mérési azonosító docs horgonya: a jegyzőkönyv fájl relatív útja és a pontos fejléc szövege.
