@@ -1,6 +1,9 @@
 import { Buffer } from 'node:buffer';
-import { describeError, getBinary, type FetchFunction } from '@easter-workflow-builder/http-client';
-import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
+import { describeError } from '../../http-client/error-description/describe-error.ts';
+import type { FetchFunction } from '../../http-client/request/fetch-function.ts';
+import { getBinary } from '../../http-client/request/get-binary.ts';
+import { isOkOutcome } from '../../result/outcome/is-ok-outcome.ts';
+import type { Outcome } from '../../result/outcome/outcome.ts';
 import type { ImageMediaType } from '../media-type/image-media-type.ts';
 import { mediaTypeFromContentType } from '../media-type/media-type-from-content-type.ts';
 import { mediaTypeFromExtension } from '../media-type/media-type-from-extension.ts';

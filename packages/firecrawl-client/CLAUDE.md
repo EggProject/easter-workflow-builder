@@ -33,8 +33,8 @@ szolgál ki, ezért a `PATH_SEARCH` és a `PATH_VLM` a `minimax-client` publikus
 
 ## Függőségi irány
 
-Az `@easter-workflow-builder/http-client`, az `@easter-workflow-builder/env-reader`, az
-`@easter-workflow-builder/result` és az `@easter-workflow-builder/typeguards` csomagtól függ,
+Az `@easter-workflow-builder/core` (HTTP réteg, környezeti változó olvasás, `Outcome`) és az
+`@easter-workflow-builder/typeguards` csomagtól függ,
 L2 réteg (SPEC-002 4. szekció). A barrel újraexportálja az `EnvironmentReader` és a
 `FetchFunction` típust, mert megjelennek a `resolveFirecrawlConfig` és a `scrapePage` saját
 publikus szignatúrájában (SPEC-002 6.6 pont 7. szabálya).

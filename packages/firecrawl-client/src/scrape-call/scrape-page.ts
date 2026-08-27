@@ -1,5 +1,4 @@
-import { postJson, type FetchFunction } from '@easter-workflow-builder/http-client';
-import type { Outcome } from '@easter-workflow-builder/result';
+import { postJson, type FetchFunction, type Outcome } from '@easter-workflow-builder/core';
 import type { FirecrawlConfig } from '../firecrawl-config/firecrawl-config.ts';
 import { PATH_SCRAPE } from './endpoint-path.ts';
 

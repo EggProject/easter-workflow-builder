@@ -1,5 +1,4 @@
-import { postJson, type FetchFunction } from '@easter-workflow-builder/http-client';
-import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
+import { postJson, isOkOutcome, type FetchFunction, type Outcome } from '@easter-workflow-builder/core';
 import { isMiniMaxEnvelope } from '../envelope/is-minimax-envelope.ts';
 import type { MiniMaxConfig } from '../minimax-config/minimax-config.ts';
 

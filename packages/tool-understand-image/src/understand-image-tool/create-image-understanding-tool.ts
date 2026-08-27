@@ -1,8 +1,7 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { resolveImageDataUrl } from '@easter-workflow-builder/image-source';
+import { resolveImageDataUrl, isOkOutcome } from '@easter-workflow-builder/core';
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import { callMiniMax, isVlmResponse, PATH_VLM, resolveMiniMaxConfig } from '@easter-workflow-builder/minimax-client';
-import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
 import type { UnderstandImageToolDependencies } from './understand-image-tool-dependencies.ts';
 
