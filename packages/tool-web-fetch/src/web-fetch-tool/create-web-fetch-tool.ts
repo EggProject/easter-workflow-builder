@@ -8,7 +8,7 @@ import {
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import type { WebFetchToolDependencies } from './web-fetch-tool-dependencies.ts';
 
 // Lapos séma: csak a cím. A kimeneti formátum mindig markdown, mert az agentnek
 // az olvasható szöveg kell, és minden további séma mező a visszautasítás
@@ -23,7 +23,7 @@ const description =
 /**
 Oldalletöltő eszköz a felhasználó saját Firecrawl példánya fölött.
 */
-export function createWebFetchTool(dependencies: AgentToolDependencies): SdkMcpToolDefinition<typeof inputSchema> {
+export function createWebFetchTool(dependencies: WebFetchToolDependencies): SdkMcpToolDefinition<typeof inputSchema> {
   return tool('web_fetch', description, inputSchema, async ({ url }) => {
     const trimmedUrl = url.trim();
     if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
