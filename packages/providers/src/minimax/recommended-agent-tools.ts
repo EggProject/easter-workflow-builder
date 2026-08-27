@@ -1,5 +1,5 @@
 import type { AgentToolRecommendation } from '../capability/agent-tool-recommendation.ts';
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 
 /**
  * A listában csak az az eszköz szerepel, amire bizonyíték van. Ami nincs benne,

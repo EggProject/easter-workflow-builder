@@ -16,20 +16,24 @@ az artefaktum hivatkozás: azok a `docs/research/` alatt maradnak.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti öt mappa felelőssége:
+Az `src/` alatti négy mappa felelőssége:
 
 | Mappa                  | Felelősség                                                                    |
 | ---------------------- | ----------------------------------------------------------------------------- |
-| `evidence/`            | a háromállapotú `Fact<T>` bizonyíték típus és a hozzá tartozó typeguardok     |
 | `capability/`          | a `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai            |
 | `references/`          | nevesített doksi URL-ek, research szekció azonosítók, mérés -> docs leképezés |
 | `minimax/`             | a `minimax` provider kitöltött, mérési adatokra épülő képességleírója         |
 | `claude-subscription/` | a `claude-subscription` provider kitöltött, hivatalos doksira épülő leírója   |
 
+A háromállapotú `Fact<T>` bizonyíték típus és a hozzá tartozó typeguardok kiköltöztek az
+`@easter-workflow-builder/evidence` csomagba (SPEC-002 5.2 szekció, T-002-6 lépés), erre a
+csomag `workspace:*` függőséggel hivatkozik.
+
 ## Függőségi irány
 
-A `core` csomagtól függhet, mástól nem (SPEC-001 3. szekció). Jelenleg egyetlen fájl sem
-importál a `core`-ból, mert a leírók önmagukban típusok és adat literálok.
+A `core` és az `@easter-workflow-builder/evidence` csomagtól függhet, mástól nem (SPEC-002 4.
+szekció). A `core`-tól jelenleg egyetlen fájl sem importál, ez holt függőség, amit a SPEC-002
+5.19 szekciója megfigyelt, de nem ennek a specnek a hatóköre javítani.
 
 ## Szabályok
 
@@ -50,14 +54,8 @@ Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `a
 (helyette `satisfies` vagy explicit típusannotáció), a leíró objektum literál
 `satisfies ProviderCapabilityDescriptor<...>` alakban kapcsolódik a típushoz.
 
-**Coverage: ideiglenesen kizárva.** A gyökér `vitest.config.ts` `coverage.exclude` listája
-jelenleg a `packages/providers/src/**` teljes fáját kizárja a 100%-os lefedettségi
-küszöbből, kommenttel indokolva. Nem azért, mert a mappa csak adat literál - az
-`evidence/is-known-fact.ts` és `evidence/is-unknown-fact.ts` valódi, elágazással rendelkező
-typeguard logikát tartalmaz -, hanem mert ehhez a csomaghoz jelenleg nincs egyetlen
-funkcionális Vitest teszt sem. Amint készül egy, a kizárást szűkíteni kell: csak az adat
-literál fájlok (`minimax/**`, `claude-subscription/**`, `capability/**`,
-`evidence/` nem-typeguard fájljai) maradhatnak kizárva, a typeguardok nem.
+**Coverage: nincs kizárva.** A gyökér `vitest.config.ts` `coverage.exclude` listájában nincs
+`packages/providers` bejegyzés, a csomag a 100 százalékos küszöb hatókörében van.
 
 ## Kapcsolódó dokumentumok
 

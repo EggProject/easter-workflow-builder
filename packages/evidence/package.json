@@ -1,5 +1,5 @@
 {
-  "name": "@easter-workflow-builder/providers",
+  "name": "@easter-workflow-builder/evidence",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -8,11 +8,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "dependencies": {
-    "@easter-workflow-builder/core": "workspace:*",
-    "@easter-workflow-builder/evidence": "workspace:*"
-  },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

@@ -1,11 +1,11 @@
 // Barrel: csak újraexport, a csomag publikus felülete csak azt adja ki, amire másik csomagnak szüksége van.
 
-export type { MeasurementId } from './evidence/measurement-id.ts';
-export type { EvidenceReference } from './evidence/evidence-reference.ts';
-export type { EvidenceList } from './evidence/evidence-list.ts';
-export type { Fact } from './evidence/fact.ts';
-export { isKnownFact } from './evidence/is-known-fact.ts';
-export { isUnknownFact } from './evidence/is-unknown-fact.ts';
+export type { MeasurementId } from '@easter-workflow-builder/evidence';
+export type { EvidenceReference } from '@easter-workflow-builder/evidence';
+export type { EvidenceList } from '@easter-workflow-builder/evidence';
+export type { Fact } from '@easter-workflow-builder/evidence';
+export { isKnownFact } from '@easter-workflow-builder/evidence';
+export { isUnknownFact } from '@easter-workflow-builder/evidence';
 
 export type { ProviderCapabilityDescriptor } from './capability/provider-capability-descriptor.ts';
 export type { AgentToolId } from './capability/agent-tool-id.ts';

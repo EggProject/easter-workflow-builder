@@ -1,4 +1,4 @@
-import type { EvidenceList } from '../evidence/evidence-list.ts';
+import type { EvidenceList } from '@easter-workflow-builder/evidence';
 
 /**
 Env változó, amit ezzel a providerrel tilos beállítani.

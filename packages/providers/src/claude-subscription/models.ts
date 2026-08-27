@@ -1,5 +1,5 @@
 import type { ModelDescriptor } from '../capability/model-descriptor.ts';
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 import { DOC_MODEL_CONFIG, DOC_MODELS, DOC_MODELS_LIST, DOC_VISION } from '../references/document-url.ts';
 import type { ClaudeFamilyId } from './family-id.ts';
 import type { ClaudeModelId } from './model-id.ts';

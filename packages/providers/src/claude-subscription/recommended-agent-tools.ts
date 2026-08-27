@@ -1,5 +1,5 @@
 import type { AgentToolRecommendation } from '../capability/agent-tool-recommendation.ts';
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 
 /**
  * Ehhez a providerhez nincs drótszintű mérésünk, tehát nincs bizonyíték arra,

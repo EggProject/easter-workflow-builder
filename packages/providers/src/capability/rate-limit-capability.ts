@@ -1,4 +1,4 @@
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 import type { RateLimitBucket } from './rate-limit-bucket.ts';
 
 export interface RateLimitCapability<TModelId extends string> {
