@@ -1,12 +1,14 @@
 import type { Outcome } from '@easter-workflow-builder/core';
+import type { WorkflowRepository } from '../workflow-graph/workflow-repository.ts';
 
 /**
- * Az adatbázis kapcsolat felülete. A repository mezők a következő témák
- * elkészültével bővülnek ide (`workflow-graph`, `graph-snapshot`, ...); a
- * `sqlite-connection` téma egyelőre csak a tranzakciót és a zárást adja
- * (SPEC-003 9.1 szekció).
+ * Az adatbázis kapcsolat felülete. A `workflows` mező a `WorkflowRepository`-t
+ * adja (T-003-12); a többi repository mező a következő témák elkészültével
+ * bővül ide (`graph-snapshot`, `workflow-run`, ...), a SPEC-003 9.1 szekció
+ * `DatabaseContext` alakja szerint.
  */
 export interface DatabaseContext {
+  readonly workflows: WorkflowRepository;
   transaction<TValue>(work: () => Outcome<TValue>): Outcome<TValue>;
   close(): void;
 }

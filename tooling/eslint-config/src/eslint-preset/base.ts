@@ -93,6 +93,19 @@ export const base = [
       // tiltja a forras nelkuli szamertek rogzitest, ezert sajat kuszobot
       // nem allitunk.
       'sonarjs/cognitive-complexity': 'error',
+
+      // A `unicorn/name-replacements` alapertelmezett listaja a "repository"
+      // szot "repo"-ra cserelne (identifikatorban ES fajlnevben egyarant,
+      // `checkFilenames` alapertelmezetten bekapcsolt) - ez utkozne a
+      // SPEC-003 9.1/9.2 szekciojanak dokumentumban rogzitett szokincsevel,
+      // ami a repository reteg minden interfeszet kovetkezetesen
+      // "XxxRepository" alakban nevezi (`WorkflowRepository`,
+      // `WorkflowRunRepository`, `StepRunRepository`, ...), es ez a SPEC-003
+      // vegrehajtas soran tobbszor visszater. A `repository: false` csak ezt
+      // az egy bejegyzest kapcsolja ki a mergeelt alapertelmezett listabol
+      // (`extendDefaultReplacements` alapertelmezetten `true` marad), a tobbi
+      // roviditest tovabbra is jelzi a szabaly.
+      'unicorn/name-replacements': ['error', { replacements: { repository: false } }],
     },
   },
 ];

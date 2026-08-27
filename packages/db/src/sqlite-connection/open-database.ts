@@ -4,6 +4,7 @@ import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { ensureDatabaseDirectory } from '../database-file/ensure-database-directory.ts';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
+import { createWorkflowRepository } from '../workflow-graph/workflow-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -84,5 +85,7 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
     sqlite.close();
   }
 
-  return { kind: 'ok', value: { transaction, close } };
+  const workflows = createWorkflowRepository(database, transaction);
+
+  return { kind: 'ok', value: { workflows, transaction, close } };
 }
