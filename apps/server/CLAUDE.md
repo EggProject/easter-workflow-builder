@@ -15,8 +15,10 @@ későbbi specifikáció tárgya.
 ## Függőségi irány
 
 A `server` a `core`, a `protocol`, a `db`, az `engine`, az `agent`, a `provider-registry` és a
-`logger` csomagtól függ, L5 réteg (SPEC-002 4. szekció, "A frissített SPEC-001 függőségi
-tábla"). Ez megegyezik a `package.json` tényleges tartalmával.
+`logger` csomagtól függ, L6 réteg (SPEC-002 4. szekció, "A frissített SPEC-001 függőségi
+tábla"). Ez megegyezik a `package.json` tényleges tartalmával. Az `engine` L5 rétegre, a `server`
+L6 rétegre a 2026-08-27-i user döntés emelte, ami a szigorúan csökkenő rétegszám szabályt zárta
+le az `engine -> agent` élen.
 
 ## Szabályok
 

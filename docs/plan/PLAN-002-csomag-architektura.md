@@ -413,7 +413,7 @@ A user a 26 csomagos állapotra két kifogást emelt (SPEC-002 1. szekció, 4. �
 
 ## Definition of Done
 
-1. A SPEC-002 minden elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás. Egyetlen kivétel a 13. kritérium `engine` -> `agent` éle, ami a spec 4. szekciójában nyitva jelölt, a userre váró besorolási ellentmondás.
+1. A SPEC-002 minden elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás. A 13. kritérium `engine` -> `agent` éle, ami korábban a spec 4. szekciójában nyitva jelölt, a userre váró besorolási ellentmondás volt, a user döntésével (2026-08-27) lezárult: az `engine` L5, a `server` L6 rétegre került, a `bun run check:graph` nulla eltérést ad.
 2. Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e`.
 3. A workspace 25 csomagból áll (19 `packages`, 2 `apps`, 3 `tooling`, 1 `tools`), mindegyik neve `@easter-workflow-builder/` prefixszel kezdődik, és mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. `src/index.ts` és `exports` mező minden `packages/*` alatti könyvtárcsomagban van; az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagban ez a migráció előtti állapotnak megfelelően nem kötelező, a SPEC-002 12. kritériuma szerint.
 4. A `packages/agent-tools` és a `packages/providers` könyvtár nem létezik, és nincs helyettük átirányító barrel csomag.
@@ -424,4 +424,4 @@ A user a 26 csomagos állapotra két kifogást emelt (SPEC-002 1. szekció, 4. �
 9. A migrált csomagokban pontosan 45 téma mappa áll, névre és tartalomra a SPEC-002 5. szekció táblázatai szerint (a `typeguards` 17 guard mappájával együtt 62 a repóban), egyikben sincs saját `CLAUDE.md` (SPEC-002 6.7 pont). Minden csomag gyökerében van `CLAUDE.md`. Egyetlen téma mappában sincs további alkönyvtár, és egyetlen fájl sem áll a `src/` tetején az `index.ts` barrelen kívül.
 10. A `src/` alatti szerkezet legfeljebb kétszintű, és pontosan két csomagban kétszintű: a `core` négy, a `provider-capability` három beolvadt tárgykört hordoz (SPEC-002 6.1 pont 8. szabálya). Duplikált mappaszint (`<x>/<x>/`) sehol nincs.
 11. Minden szolgáltatóhoz köthető csomag neve megnevezi a szolgáltatót (SPEC-002 6.9), és az MCP eszköznevek változatlanok.
-12. Az `agent-tool-bundle` önálló csomag, nem olvadt be az `mcp-tool-kit` csomagba: a beolvasztás kört hozna létre, ez futtatott ellenőrzővel bizonyított (SPEC-002 4. szekció). A feloldás a userre vár, nyitott kérdésként.
+12. Az `agent-tool-bundle` önálló csomag, nem olvadt be az `mcp-tool-kit` csomagba: a beolvasztás kört hozna létre, ez futtatott ellenőrzővel bizonyított (SPEC-002 4. szekció). Lezárva: a user végleges döntése (2026-08-27) is az önálló csomagot tartja meg, tudatos döntésként.

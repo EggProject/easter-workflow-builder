@@ -15,19 +15,19 @@ specifikáció tárgya.
 ## Függőségi irány
 
 Az `engine` a `core`, a `db`, az `agent` és a `logger` csomagtól függ ténylegesen (lásd
-`package.json`).
+`package.json`), L5 réteg (SPEC-002 4. szekció).
 
-**Ellentmondás a SPEC-002-ben, nyitva jelölve.** A SPEC-002 4. szekció "Rétegbesorolás, mind a
-32 csomagra" táblázata az `engine`-t és az `agent`-et **azonos** L4 rétegbe sorolja, miközben a
-szöveges indoklás ("Az `engine` L4, mert a `db` és az `agent` fölött áll") azt sugallja, hogy az
-`engine` szigorúan az `agent` fölött áll. A két állítás egymásnak ellentmond: a táblázat szerint
-az `engine -> agent` él azonos rétegen belüli él lenne, ami a 4. szekció saját szabálya szerint
-tilos ("Rétegen belüli él nincs"), a szöveg szerint viszont pontosan ez a függés indokolja az
-`engine` L4 besorolását. Ez a tényleges, `package.json`-ban is meglévő `engine -> agent` függés
-a SPEC-001 óta változatlan, a SPEC-002 hatóköre kifejezetten nem tervezi újra ("Nem tervezi meg
-... az `engine`, az `agent` ... csomagok tartalmát"). A T-002-24 gráf ellenőrző ezt az élt a
-táblázat szerint jelzi majd - a felbontás (az `agent` rétegszámának csökkentése, vagy a
-táblázat/szöveg összhangba hozása) egy jövőbeli specifikáció döntése.
+**Ellentmondás a SPEC-002-ben, lezárva (2026-08-27).** A SPEC-002 4. szekció "Rétegbesorolás,
+mind a 25 csomagra" táblázata korábban az `engine`-t és az `agent`-et **azonos** L4 rétegbe
+sorolta, miközben a szöveges indoklás azt sugallta, hogy az `engine` szigorúan az `agent` fölött
+áll - a két állítás ellentmondott egymásnak. A user döntése ezt lezárta: **az `engine` az
+`agent` fölött van**, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK
+adaptert. A tényleges, `package.json`-ban is meglévő `engine -> agent` függés nem változott, a
+SPEC-002 réteg táblázata igazodott hozzá: az `engine` L5 rétegre, a rá épülő `apps/server` -
+mert a `server` az `engine`-től is függ - L6 rétegre került. A `bun run check:graph` ez után
+nulla eltérést ad. Részletek:
+[`../../docs/research/2026-08-27-spec002-migracio-zaras.md`](../../docs/research/2026-08-27-spec002-migracio-zaras.md),
+"Lezárás, 2026-08-27" szakasz.
 
 ## Szabályok
 
