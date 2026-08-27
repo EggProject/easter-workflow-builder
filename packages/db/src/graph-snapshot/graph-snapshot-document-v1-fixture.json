@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "sdkVersionPin": "0.3.245",
+  "workflow": {
+    "id": "5f2b7c1a-0d2e-4a51-9c3f-6b8e1d4a7c20",
+    "name": "Cikk vazlat es lektoralas",
+    "description": "Ket agens lepes, kozottuk emberi jovahagyassal."
+  },
+  "nodes": [
+    {
+      "id": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f601",
+      "type": "start",
+      "label": "Indulas",
+      "position": { "x": -120.5, "y": 40 },
+      "config": {
+        "type": "start",
+        "inputFields": [
+          { "name": "tema", "label": "Tema", "valueKind": "text", "required": true },
+          { "name": "hossz", "label": "Hossz", "valueKind": "number", "required": false }
+        ]
+      },
+      "effectiveProviderId": "claude-subscription"
+    },
+    {
+      "id": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f602",
+      "type": "agent_step",
+      "label": "Vazlat irasa",
+      "position": { "x": 180, "y": 40 },
+      "config": {
+        "type": "agent_step",
+        "promptTemplate": "Irj vazlatot a kovetkezo temarol: {{tema}}",
+        "providerId": null,
+        "modelId": "MiniMax-M3",
+        "effort": null,
+        "thinking": "adaptive",
+        "allowedTools": ["Read", "Write"],
+        "disallowedTools": [],
+        "permissionMode": null,
+        "maxTurns": 3,
+        "maxBudgetUsd": null,
+        "systemPrompt": null,
+        "agents": {},
+        "skills": null,
+        "mcpServers": {
+          "kereso": {
+            "type": "http",
+            "url": "https://example.invalid/mcp",
+            "authEnvName": "EASTER_MCP_TOKEN"
+          }
+        },
+        "enabledEngineHooks": [],
+        "cwd": null,
+        "additionalDirectories": [],
+        "sandbox": null,
+        "agentTools": ["web_search"],
+        "sessionMode": "isolated",
+        "structuredOutput": null
+      },
+      "effectiveProviderId": "minimax"
+    },
+    {
+      "id": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f603",
+      "type": "human_approval",
+      "label": "Jovahagyas",
+      "position": { "x": 480, "y": 40 },
+      "config": {
+        "type": "human_approval",
+        "title": "Elfogadod a vazlatot?",
+        "bodyTemplate": "{{elozo_lepes_kimenete}}"
+      },
+      "effectiveProviderId": "claude-subscription"
+    }
+  ],
+  "edges": [
+    {
+      "id": "9a8b7c6d-5e4f-4031-9281-a1b2c3d4e5f1",
+      "sourceNodeId": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f601",
+      "targetNodeId": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f602",
+      "sourceHandle": null,
+      "targetHandle": null,
+      "branchKey": null
+    },
+    {
+      "id": "9a8b7c6d-5e4f-4031-9281-a1b2c3d4e5f2",
+      "sourceNodeId": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f602",
+      "targetNodeId": "0f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f603",
+      "sourceHandle": "ok",
+      "targetHandle": "be",
+      "branchKey": "sikeres"
+    }
+  ]
+}

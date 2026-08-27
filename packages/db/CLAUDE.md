@@ -9,12 +9,13 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                                                          |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                  |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide              |
-| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                            |
-| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12) |
+| Mappa                | Tartalom                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                           |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                                                                                                       |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                     |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                          |
+| `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla a T-003-15 lépésben kerül ide |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -23,9 +24,9 @@ elhasalna egy `./src/**/*.ts` mintán, a hivatalos config doksi pedig nem dokume
 glob mintát erre a mezőre. Új tábla fájlt ezért a `drizzle.config.ts` listájába is fel kell
 venni.
 
-A további, a SPEC-003 8. szekciója szerinti téma mappák (`graph-snapshot`, `workflow-run`,
-`step-run`, `run-event`, `human-approval`, `app-setting`, `provider-concurrency`,
-`run-recovery`) a végrehajtás további lépéseiben keletkeznek.
+A további, a SPEC-003 8. szekciója szerinti téma mappák (`workflow-run`, `step-run`,
+`run-event`, `human-approval`, `app-setting`, `provider-concurrency`, `run-recovery`) a
+végrehajtás további lépéseiben keletkeznek.
 
 **Tábla séma tesztelése: `getTableConfig` kell a 100%-os function coverage-höz.** A
 `sqliteTable()` harmadik argumentuma (index lista) és a `.references(() => ...)` idegen kulcs
@@ -107,6 +108,41 @@ provider azonosítója maradt bent), `invalid_provider_id` hibaágat ad. Ugyanez
   `graph_snapshot` tábla még nem létezik. Jelölve: magyar "NYITOTT PONT" komment a
   `deleteWorkflow` függvény végén, a `DELETE FROM graph_snapshot WHERE hash NOT IN (...)` SQL
   szó szerint a kommentben, `workflow-repository.ts`.
+
+## A gráf pillanatkép kanonizálása és a fixture (T-003-14)
+
+A `graph-snapshot` téma mappa ebben a lépésben **tisztán TypeScript logika**, se Drizzle
+tábla, se SQLite import nincs benne; a `graph_snapshot` tábla a T-003-15 lépésé. Egyik
+fájlja sem kerül a barrelbe: a következő lépés (`WorkflowRunRepository`, T-003-16) belső,
+relatív importtal használja őket, ugyanúgy, ahogy a `workflow-graph` node config típusai sem
+kerültek ki.
+
+**A kanonizáló a kulcsokat maga fűzi össze.** A `canonicalizeSnapshotDocument` kulcsonként
+`JSON.stringify(kulcs) + ':' + kanonikus(érték)` alakban építi a kimenetet, és **soha nem ad
+újraépített objektumot a `JSON.stringify` hívásnak**. Ez nem stílus kérdés (SPEC-003 5.6, 2.
+pont, F-26): az egész indexű kulcsokat (`"9"`, `"10"`) a `JSON.stringify` mindig növekvő
+számsorrendben írja ki, az RFC 8785 viszont UTF-16 sorrendet ír elő, ahol a `"10"` megelőzi a
+`"9"` kulcsot. A rendezés `toSorted(compareUtf16CodeUnits)` hívással történik: az explicit
+összehasonlító pontosan az alapértelmezett `sort()` UTF-16 sorrendjét adja, de a
+`unicorn/require-array-sort-compare` szabály összehasonlító nélkül nem engedné, a
+`sonarjs/no-alphabetical-sort` pedig `localeCompare`-t javasolna, ami locale függő, tehát erre
+a feladatra hibás lenne.
+
+**Fixture fájl a téma mappában, alkönyvtár nélkül.** A commitolt regressziós fixture a
+`graph-snapshot-document-v1-fixture.json`, közvetlenül a téma mappában (a SPEC-003 1.
+kritériuma tiltja az alkönyvtárat), mellette a `graph-snapshot-document-v1-fixture.spec.ts`,
+ami betölti, kanonizálja, és a kapott lenyomatot egy **kódba írt 64 karakteres literállal**
+veti össze (48. kritérium). Ez a teszt bukik meg, ha a kanonizálás vagy a lenyomat algoritmus
+valaha észrevétlenül megváltozik; ilyenkor a kanonizálót kell visszaállítani, a literált nem
+szabad felülírni. Új dokumentumverzió felvételekor új fixture fájl és új literál kell, a régi
+marad.
+
+**A `readGraphSnapshot` `switch`-e két lint kivétellel áll** (`sonarjs/no-small-switch`,
+`@typescript-eslint/no-unnecessary-condition`), mert a `GraphSnapshotDocumentVersion` unió ma
+egytagú. A szerkezet nem díszítés: az `if` alakra a `switch-exhaustiveness-check` nem ad
+hibát, tehát csak a `switch` kényszeríti ki, hogy egy jövőbeli verzió felvétele fordítási
+hibát adjon, amíg az ág hiányzik. Az ismeretlen verziót a hívó **a `switch` előtt** zárja ki
+az `isGraphSnapshotDocumentVersion` guarddal, `unknown_graph_document_version` hibaággal.
 
 ## `Outcome` hibaosztály konvenció
 
