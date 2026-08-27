@@ -9,7 +9,7 @@ import {
 } from '@easter-workflow-builder/minimax-client';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import type { WebSearchToolDependencies } from './web-search-tool-dependencies.ts';
 
 // Lapos séma, egyetlen kötelező szöveges mezővel. A mérésünk szerint a MiniMax
 // a tool sémát nem utasítja vissza újrapróbálkozással, ezért egy bonyolultabb
@@ -26,7 +26,7 @@ const description =
  * MiniMax Anthropic kompatibilis endpontja a szerver oldali keresőt csendben
  * eldobja, tehát a modell forrás nélkül, a saját tudásából válaszolna.
  */
-export function createWebSearchTool(dependencies: AgentToolDependencies): SdkMcpToolDefinition<typeof inputSchema> {
+export function createWebSearchTool(dependencies: WebSearchToolDependencies): SdkMcpToolDefinition<typeof inputSchema> {
   return tool('web_search', description, inputSchema, async ({ query }) => {
     const trimmedQuery = query.trim();
     if (trimmedQuery.length === 0) {
