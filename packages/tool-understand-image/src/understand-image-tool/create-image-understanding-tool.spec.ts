@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
-import { ENV_MINIMAX_API_KEY } from '@easter-workflow-builder/minimax-client';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import { ENV_MINIMAX_API_KEY, type FetchFunction } from '@easter-workflow-builder/minimax-client';
+import type { UnderstandImageToolDependencies } from './understand-image-tool-dependencies.ts';
 import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';
 
 const failingReadFile: ReadFileFunction = () => Promise.reject(new Error('nincs ilyen fajl'));
@@ -19,7 +18,7 @@ function dependencies(
   fetchFunction: FetchFunction,
   environment: Record<string, string>,
   readFileFunction: ReadFileFunction = failingReadFile,
-): AgentToolDependencies {
+): UnderstandImageToolDependencies {
   return { fetchFunction, environment, readFileFunction };
 }
 

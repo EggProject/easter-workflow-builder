@@ -4,7 +4,7 @@ import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-to
 import { callMiniMax, isVlmResponse, PATH_VLM, resolveMiniMaxConfig } from '@easter-workflow-builder/minimax-client';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import type { UnderstandImageToolDependencies } from './understand-image-tool-dependencies.ts';
 
 // Lapos séma két kötelező szöveges mezővel, felsorolás és beágyazott objektum
 // nélkül.
@@ -22,7 +22,7 @@ const description =
  * azt állítja, hogy nem kapott képet.
  */
 export function createImageUnderstandingTool(
-  dependencies: AgentToolDependencies,
+  dependencies: UnderstandImageToolDependencies,
 ): SdkMcpToolDefinition<typeof inputSchema> {
   return tool('understand_image', description, inputSchema, async ({ prompt, image_source }) => {
     const trimmedPrompt = prompt.trim();

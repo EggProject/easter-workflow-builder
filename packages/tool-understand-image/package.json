@@ -1,0 +1,24 @@
+{
+  "name": "@easter-workflow-builder/tool-understand-image",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.245",
+    "@easter-workflow-builder/image-source": "workspace:*",
+    "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+    "@easter-workflow-builder/minimax-client": "workspace:*",
+    "@easter-workflow-builder/result": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
