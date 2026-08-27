@@ -8,10 +8,10 @@ tartozik egyetlen konkrét provider egyetlen konkrét értéke sem: a típus mon
 mezők vannak, az érték az `@easter-workflow-builder/provider-minimax` és az
 `@easter-workflow-builder/provider-claude-subscription` csomagban áll.
 
-A csomag hat saját téma mappája mellett három beolvadt tárgykör áll a `src/` alatt (`evidence`,
-`evidence-sources`, `agent-tool-id`), a korábbi azonos nevű csomagokból (SPEC-002 5.2, 5.3,
-5.4). Az `evidence` és az `evidence-sources` tárgykör megtartotta a saját téma mappáit, ezért
-kétszintű.
+A csomag hét saját téma mappája (a `provider-id` a SPEC-003 8. szekciója szerint bővült ide)
+mellett három beolvadt tárgykör áll a `src/` alatt (`evidence`, `evidence-sources`,
+`agent-tool-id`), a korábbi azonos nevű csomagokból (SPEC-002 5.2, 5.3, 5.4). Az `evidence` és
+az `evidence-sources` tárgykör megtartotta a saját téma mappáit, ezért kétszintű.
 
 ## Fájlok
 
@@ -27,6 +27,7 @@ kétszintű.
 | `evidence/fact/`                         | a háromállapotú `Fact<T>` típus és a két ágát szűkítő guard, a saját `.spec.ts` fájljaikkal                                                                                                                                                                                                                 |
 | `evidence-sources/measurement-document/` | a bizonyítékok nevesített forráskatalógusa: doksi URL-ek, research szekciók, `MeasurementId` feloldás                                                                                                                                                                                                       |
 | `agent-tool-id/`                         | az `AgentToolId` union, a workflow lépéshez kapcsolható eszközök közös szótára                                                                                                                                                                                                                              |
+| `provider-id/`                           | a `ProviderId` union, a két támogatott provider azonosítója (SPEC-003 8. szekció)                                                                                                                                                                                                                           |
 
 A hat képességleíró téma mappa mind a 21 fájlja típus-only, ahogy az `evidence-reference/`, a
 `fact/fact.ts` és az `agent-tool-id/` is, nincs hozzájuk `.spec.ts` (SPEC-002 6.3 pont). A
