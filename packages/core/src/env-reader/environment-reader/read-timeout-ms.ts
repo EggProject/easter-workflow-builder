@@ -1,4 +1,4 @@
-import type { Outcome } from '@easter-workflow-builder/result';
+import type { Outcome } from '../../result/outcome/outcome.ts';
 import type { EnvironmentReader } from './environment-reader.ts';
 
 /**

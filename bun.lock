@@ -63,9 +63,7 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
         "@easter-workflow-builder/agent-tool-id": "workspace:*",
-        "@easter-workflow-builder/env-reader": "workspace:*",
-        "@easter-workflow-builder/http-client": "workspace:*",
-        "@easter-workflow-builder/image-source": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/tool-understand-image": "workspace:*",
         "@easter-workflow-builder/tool-web-fetch": "workspace:*",
         "@easter-workflow-builder/tool-web-search": "workspace:*",
@@ -88,6 +86,11 @@
     "packages/core": {
       "name": "@easter-workflow-builder/core",
       "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@easter-workflow-builder/db",
@@ -105,18 +108,6 @@
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/db": "workspace:*",
         "@easter-workflow-builder/logger": "workspace:*",
-      },
-    },
-    "packages/env-reader": {
-      "name": "@easter-workflow-builder/env-reader",
-      "version": "0.0.0",
-      "dependencies": {
-        "@easter-workflow-builder/result": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/evidence": {
@@ -144,35 +135,8 @@
       "name": "@easter-workflow-builder/firecrawl-client",
       "version": "0.0.0",
       "dependencies": {
-        "@easter-workflow-builder/env-reader": "workspace:*",
-        "@easter-workflow-builder/http-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/http-client": {
-      "name": "@easter-workflow-builder/http-client",
-      "version": "0.0.0",
-      "dependencies": {
-        "@easter-workflow-builder/result": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/image-source": {
-      "name": "@easter-workflow-builder/image-source",
-      "version": "0.0.0",
-      "dependencies": {
-        "@easter-workflow-builder/http-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "catalog:",
@@ -197,9 +161,7 @@
       "name": "@easter-workflow-builder/minimax-client",
       "version": "0.0.0",
       "dependencies": {
-        "@easter-workflow-builder/env-reader": "workspace:*",
-        "@easter-workflow-builder/http-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
       },
       "devDependencies": {
@@ -271,24 +233,14 @@
         "vitest": "catalog:",
       },
     },
-    "packages/result": {
-      "name": "@easter-workflow-builder/result",
-      "version": "0.0.0",
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
     "packages/tool-understand-image": {
       "name": "@easter-workflow-builder/tool-understand-image",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "@easter-workflow-builder/image-source": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
         "@easter-workflow-builder/minimax-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -302,9 +254,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/firecrawl-client": "workspace:*",
         "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -318,9 +270,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
         "@easter-workflow-builder/minimax-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -473,8 +425,6 @@
 
     "@easter-workflow-builder/engine": ["@easter-workflow-builder/engine@workspace:packages/engine"],
 
-    "@easter-workflow-builder/env-reader": ["@easter-workflow-builder/env-reader@workspace:packages/env-reader"],
-
     "@easter-workflow-builder/eslint-config": ["@easter-workflow-builder/eslint-config@workspace:tooling/eslint-config"],
 
     "@easter-workflow-builder/evidence": ["@easter-workflow-builder/evidence@workspace:packages/evidence"],
@@ -482,10 +432,6 @@
     "@easter-workflow-builder/evidence-sources": ["@easter-workflow-builder/evidence-sources@workspace:packages/evidence-sources"],
 
     "@easter-workflow-builder/firecrawl-client": ["@easter-workflow-builder/firecrawl-client@workspace:packages/firecrawl-client"],
-
-    "@easter-workflow-builder/http-client": ["@easter-workflow-builder/http-client@workspace:packages/http-client"],
-
-    "@easter-workflow-builder/image-source": ["@easter-workflow-builder/image-source@workspace:packages/image-source"],
 
     "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
 
@@ -502,8 +448,6 @@
     "@easter-workflow-builder/provider-minimax": ["@easter-workflow-builder/provider-minimax@workspace:packages/provider-minimax"],
 
     "@easter-workflow-builder/provider-registry": ["@easter-workflow-builder/provider-registry@workspace:packages/provider-registry"],
-
-    "@easter-workflow-builder/result": ["@easter-workflow-builder/result@workspace:packages/result"],
 
     "@easter-workflow-builder/scripts": ["@easter-workflow-builder/scripts@workspace:tooling/scripts"],
 

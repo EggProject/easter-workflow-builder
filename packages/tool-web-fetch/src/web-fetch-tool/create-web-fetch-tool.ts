@@ -6,7 +6,7 @@ import {
   scrapePage,
 } from '@easter-workflow-builder/firecrawl-client';
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
-import { isOkOutcome } from '@easter-workflow-builder/result';
+import { isOkOutcome } from '@easter-workflow-builder/core';
 import { z } from 'zod';
 import type { WebFetchToolDependencies } from './web-fetch-tool-dependencies.ts';
 

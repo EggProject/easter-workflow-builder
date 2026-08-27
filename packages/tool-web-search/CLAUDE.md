@@ -20,11 +20,12 @@ A `web-search-tool/web-search-tool-dependencies.ts` típus-only fájl, nincs hoz
 ## Függőségi irány
 
 Az `@easter-workflow-builder/mcp-tool-kit`, az `@easter-workflow-builder/minimax-client` és az
-`@easter-workflow-builder/result` csomagtól függ, plusz a `@anthropic-ai/claude-agent-sdk` és a
-`zod` külső csomagtól, L3 réteg (SPEC-002 4. szekció). A `FetchFunction` és az
-`EnvironmentReader` típust a `@easter-workflow-builder/minimax-client` barreljéből veszi
-(SPEC-002 6.6 pont 7. szabálya), ezért az `@easter-workflow-builder/http-client` és az
-`@easter-workflow-builder/env-reader` **nem** szerepel a függőségei között. Nem függ másik
+`@easter-workflow-builder/core` csomagtól függ (az utóbbitól az `Outcome` szűkítő guard miatt),
+plusz a `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagtól, L3 réteg (SPEC-002 4.
+szekció). A `FetchFunction` és az `EnvironmentReader` típust a
+`@easter-workflow-builder/minimax-client` barreljéből veszi, nem közvetlenül a `core`
+csomagból (SPEC-002 6.6 pont 7. szabálya): a tool nem hív HTTP réteget, csak átadja a
+befecskendezett függvényt a kliensnek. Nem függ másik
 `tool-*` csomagtól, és nem függ az `@easter-workflow-builder/agent-tool-bundle` csomagtól
 (SPEC-002 4. szekció, "Új tiltás").
 

@@ -12,5 +12,4 @@ export { formatFirecrawlDocument } from './scrape-document/format-firecrawl-docu
 
 // A `resolveFirecrawlConfig` és a `scrapePage` szignatúrájában megjelenő idegen típusok, a
 // SPEC-002 6.6 pont 7. szabálya szerint.
-export type { EnvironmentReader } from '@easter-workflow-builder/env-reader';
-export type { FetchFunction } from '@easter-workflow-builder/http-client';
+export type { EnvironmentReader, FetchFunction } from '@easter-workflow-builder/core';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
+import type { ReadFileFunction } from '@easter-workflow-builder/core';
 import { ENV_MINIMAX_API_KEY, type FetchFunction } from '@easter-workflow-builder/minimax-client';
 import type { UnderstandImageToolDependencies } from './understand-image-tool-dependencies.ts';
 import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';

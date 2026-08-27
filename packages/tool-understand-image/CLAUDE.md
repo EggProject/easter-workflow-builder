@@ -5,8 +5,8 @@
 Az `understand_image` MCP eszköz definíciója: Zod séma, leírás, a kép feloldása és a MiniMax
 képértelmező hívása. A `packages/agent-tools` csomag szétbontásából jött létre (SPEC-002 5.16
 szekció). Ide **nem** tartozik a kép base64 data URL alakra hozása (az a
-`@easter-workflow-builder/image-source` csomagban van) és a MiniMax HTTP hívás (az a
-`@easter-workflow-builder/minimax-client` csomagban van).
+`@easter-workflow-builder/core` csomag `image-source` tárgykörében van) és a MiniMax HTTP hívás
+(az a `@easter-workflow-builder/minimax-client` csomagban van).
 
 ## Fájlok
 
@@ -21,12 +21,12 @@ A mappa neve az eszköz neve (`understand_image`), nem a benne álló gyártóf�
 
 ## Függőségi irány
 
-Az `@easter-workflow-builder/image-source`, az `@easter-workflow-builder/mcp-tool-kit`, az
-`@easter-workflow-builder/minimax-client` és az `@easter-workflow-builder/result` csomagtól
-függ, plusz a `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagtól, L3 réteg (SPEC-002 4.
-szekció). A `FetchFunction` és az `EnvironmentReader` típust a
-`@easter-workflow-builder/minimax-client`, a `ReadFileFunction` típust a
-`@easter-workflow-builder/image-source` barreljéből veszi (SPEC-002 6.6 pont 7. szabálya). Nem
+Az `@easter-workflow-builder/mcp-tool-kit`, az `@easter-workflow-builder/minimax-client` és az
+`@easter-workflow-builder/core` csomagtól függ, plusz a `@anthropic-ai/claude-agent-sdk` és a
+`zod` külső csomagtól, L3 réteg (SPEC-002 4. szekció). A `FetchFunction` és az
+`EnvironmentReader` típust a `@easter-workflow-builder/minimax-client` barreljéből veszi
+(SPEC-002 6.6 pont 7. szabálya), a `resolveImageDataUrl` függvényt és a `ReadFileFunction`
+típust viszont közvetlenül a `core` csomagból, mert a kép feloldását maga hívja. Nem
 függ másik `tool-*` csomagtól, és nem függ az `@easter-workflow-builder/agent-tool-bundle`
 csomagtól (SPEC-002 4. szekció, "Új tiltás").
 
@@ -37,7 +37,7 @@ Plan token végül nem valósult meg (T-002-17): a hívás közvetlenül a `MINI
 változóból dolgozik.
 
 **Ismeretlen képformátum nem tippelhető el.** Ismeretlen kiterjesztés és ismeretlen
-`content-type` esetén a `@easter-workflow-builder/image-source` hibaágat ad, ami megnevezi a
+`content-type` esetén a `core` csomag `image-source` tárgyköre hibaágat ad, ami megnevezi a
 támogatott formátumokat, nem feltételez egy alapértelmezettet.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés

@@ -9,9 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@easter-workflow-builder/env-reader": "workspace:*",
-    "@easter-workflow-builder/http-client": "workspace:*",
-    "@easter-workflow-builder/result": "workspace:*",
+    "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/typeguards": "workspace:*"
   },
   "devDependencies": {

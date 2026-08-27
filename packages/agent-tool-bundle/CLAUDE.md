@@ -25,9 +25,8 @@ típus-only fájl, nincs hozzájuk `.spec.ts` (SPEC-002 6.3 pont).
 
 Az `@easter-workflow-builder/agent-tool-id`, az `@easter-workflow-builder/tool-web-search`, az
 `@easter-workflow-builder/tool-web-fetch` és az `@easter-workflow-builder/tool-understand-image`
-csomagtól függ, plusz az `@easter-workflow-builder/env-reader` (az `EnvironmentReader` típus),
-az `@easter-workflow-builder/http-client` (a `FetchFunction` típus) és az
-`@easter-workflow-builder/image-source` (a `ReadFileFunction` típus) csomagtól, valamint a
+csomagtól függ, plusz az `@easter-workflow-builder/core` csomagtól (az `EnvironmentReader`, a
+`FetchFunction` és a `ReadFileFunction` típus miatt), valamint a
 `@anthropic-ai/claude-agent-sdk` külső csomagtól, L4 réteg (SPEC-002 4. szekció). Ez az egyetlen
 csomag, ami mindhárom eszközt ismeri, ezért ez az egyetlen hely, ahol a három futásidejű
 függőség egy objektumban (`AgentToolDependencies`) áll.

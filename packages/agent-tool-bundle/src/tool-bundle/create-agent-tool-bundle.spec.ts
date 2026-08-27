@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchFunction } from '@easter-workflow-builder/http-client';
-import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
+import type { FetchFunction, ReadFileFunction } from '@easter-workflow-builder/core';
 import type { AgentToolDependencies } from '../tool-dependencies/agent-tool-dependencies.ts';
 import { AGENT_TOOLS_SERVER_NAME } from '../tool-reference/agent-tools-server-name.ts';
 import { createAgentToolBundle } from './create-agent-tool-bundle.ts';

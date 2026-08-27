@@ -7,7 +7,7 @@ import {
   PATH_SEARCH,
   resolveMiniMaxConfig,
 } from '@easter-workflow-builder/minimax-client';
-import { isOkOutcome } from '@easter-workflow-builder/result';
+import { isOkOutcome } from '@easter-workflow-builder/core';
 import { z } from 'zod';
 import type { WebSearchToolDependencies } from './web-search-tool-dependencies.ts';
 

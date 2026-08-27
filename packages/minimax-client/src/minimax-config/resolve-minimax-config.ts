@@ -1,5 +1,10 @@
-import { readBaseUrl, readTimeoutMs, type EnvironmentReader } from '@easter-workflow-builder/env-reader';
-import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
+import {
+  readBaseUrl,
+  readTimeoutMs,
+  isOkOutcome,
+  type EnvironmentReader,
+  type Outcome,
+} from '@easter-workflow-builder/core';
 import { DEFAULT_MINIMAX_BASE_URL, DEFAULT_MINIMAX_TIMEOUT_MS } from './default-config-value.ts';
 import { ENV_MINIMAX_API_KEY, ENV_MINIMAX_BASE_URL, ENV_MINIMAX_TIMEOUT_MS } from './environment-variable-name.ts';
 import type { MiniMaxConfig } from './minimax-config.ts';

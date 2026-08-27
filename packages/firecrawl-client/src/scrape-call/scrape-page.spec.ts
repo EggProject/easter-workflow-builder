@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchFunction } from '@easter-workflow-builder/http-client';
+import type { FetchFunction } from '@easter-workflow-builder/core';
 import type { FirecrawlConfig } from '../firecrawl-config/firecrawl-config.ts';
 import { scrapePage } from './scrape-page.ts';
 

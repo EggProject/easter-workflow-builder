@@ -1,4 +1,4 @@
-import type { Outcome } from '@easter-workflow-builder/result';
+import type { Outcome } from '@easter-workflow-builder/core';
 import { isNonEmptyString, isRecord } from '@easter-workflow-builder/typeguards';
 import type { FirecrawlDocument } from './firecrawl-document.ts';
 
