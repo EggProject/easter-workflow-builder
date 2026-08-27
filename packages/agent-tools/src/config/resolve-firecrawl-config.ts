@@ -1,5 +1,4 @@
-import { isOkOutcome } from '../result/is-ok-outcome.ts';
-import type { Outcome } from '../result/outcome.ts';
+import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
 import { DEFAULT_FIRECRAWL_BASE_URL, DEFAULT_FIRECRAWL_TIMEOUT_MS } from './default-config-value.ts';
 import type { EnvironmentReader } from './environment-reader.ts';
 import { ENV_FIRECRAWL_BASE_URL, ENV_FIRECRAWL_TIMEOUT_MS } from './environment-variable-name.ts';

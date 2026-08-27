@@ -72,6 +72,7 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
         "@easter-workflow-builder/agent-tool-id": "workspace:*",
+        "@easter-workflow-builder/result": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
         "zod": "^4.0.0",
       },
@@ -186,6 +187,15 @@
       "devDependencies": {
         "@easter-workflow-builder/evidence": "workspace:*",
         "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/result": {
+      "name": "@easter-workflow-builder/result",
+      "version": "0.0.0",
+      "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -352,6 +362,8 @@
     "@easter-workflow-builder/provider-minimax": ["@easter-workflow-builder/provider-minimax@workspace:packages/provider-minimax"],
 
     "@easter-workflow-builder/provider-registry": ["@easter-workflow-builder/provider-registry@workspace:packages/provider-registry"],
+
+    "@easter-workflow-builder/result": ["@easter-workflow-builder/result@workspace:packages/result"],
 
     "@easter-workflow-builder/scripts": ["@easter-workflow-builder/scripts@workspace:tooling/scripts"],
 

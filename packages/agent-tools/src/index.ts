@@ -11,8 +11,6 @@ export {
   ENV_MINIMAX_TIMEOUT_MS,
 } from './config/environment-variable-name.ts';
 
-export type { Outcome } from './result/outcome.ts';
-export { isOkOutcome } from './result/is-ok-outcome.ts';
 export type { ToolCallResult } from './result/tool-call-result.ts';
 
 export type { AgentToolDependencies } from './tools/agent-tool-dependencies.ts';

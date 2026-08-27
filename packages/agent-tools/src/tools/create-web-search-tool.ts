@@ -1,4 +1,5 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
 import { ENV_MINIMAX_API_KEY } from '../config/environment-variable-name.ts';
 import { resolveMiniMaxConfig } from '../config/resolve-minimax-config.ts';
@@ -7,7 +8,6 @@ import { PATH_SEARCH } from '../minimax/endpoint-path.ts';
 import { formatSearchResponse } from '../minimax/format-search-response.ts';
 import { isSearchResponse } from '../minimax/is-search-response.ts';
 import { errorToolResult } from '../result/error-tool-result.ts';
-import { isOkOutcome } from '../result/is-ok-outcome.ts';
 import { textToolResult } from '../result/text-tool-result.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 
