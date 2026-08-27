@@ -33,10 +33,6 @@ Az `src/` alatt egyetlen mappa áll:
 | -------- | ---------------------------------------------------------------- |
 | `tools/` | a három MCP eszköz definíciója és az eszközkészlet összeállítója |
 
-A `tools/environment-variable-name.ts` egyetlen konstanst tartalmaz, az
-`ENV_MINIMAX_CODING_PLAN_API_KEY` változónevet: ez **átmeneti**, a T-002-17 lépés törli a
-konstanst és vele ezt a fájlt is.
-
 A MiniMax kereső és képértelmező végpont drótszintű alakja a
 `@easter-workflow-builder/minimax-client`, a Firecrawl scrape végpont drótszintű alakja a
 `@easter-workflow-builder/firecrawl-client`, a képértelmező eszköz bemenetének feloldása
@@ -44,14 +40,19 @@ A MiniMax kereső és képértelmező végpont drótszintű alakja a
 
 ## Környezeti változók
 
-| Változó                       | Kinek kell             | Alapértelmezés                                 |
-| ----------------------------- | ---------------------- | ---------------------------------------------- |
-| `MINIMAX_API_KEY`             | web keresés            | nincs, hiánya esetén az eszköz hibát ad        |
-| `MINIMAX_CODING_PLAN_API_KEY` | képértelmezés          | nincs, hiánya esetén az eszköz hibát ad        |
-| `MINIMAX_API_BASE_URL`        | mindkét MiniMax eszköz | a nemzetközi MiniMax endpont                   |
-| `MINIMAX_TIMEOUT_MS`          | mindkét MiniMax eszköz | önkényes, mert nincs rá dokumentált forrás     |
-| `FIRECRAWL_BASE_URL`          | oldal letöltés         | a felhasználó helyi Firecrawl példánya         |
-| `FIRECRAWL_TIMEOUT_MS`        | oldal letöltés         | a Firecrawl dokumentált scrape alapértelmezése |
+| Változó                | Kinek kell                      | Alapértelmezés                                 |
+| ---------------------- | ------------------------------- | ---------------------------------------------- |
+| `MINIMAX_API_KEY`      | web keresés és képértelmezés is | nincs, hiánya esetén az eszköz hibát ad        |
+| `MINIMAX_API_BASE_URL` | mindkét MiniMax eszköz          | a nemzetközi MiniMax endpont                   |
+| `MINIMAX_TIMEOUT_MS`   | mindkét MiniMax eszköz          | önkényes, mert nincs rá dokumentált forrás     |
+| `FIRECRAWL_BASE_URL`   | oldal letöltés                  | a felhasználó helyi Firecrawl példánya         |
+| `FIRECRAWL_TIMEOUT_MS` | oldal letöltés                  | a Firecrawl dokumentált scrape alapértelmezése |
+
+A korábban tervezett, a képértelmezéshez szánt külön Coding Plan token végül nem valósult meg
+(T-002-17, SPEC-002 5.10 szekció): a saját mérés szerint ugyanaz a pay-as-you-go platform kulcs
+mindkét MiniMax végponton működött, tehát a külön kulcsot a mérés nem igazolta. A
+`resolveMiniMaxConfig` mostantól paraméter nélkül, közvetlenül a `MINIMAX_API_KEY` változóból
+dolgozik.
 
 A Firecrawl konkrét értékei a `@easter-workflow-builder/firecrawl-client` csomag
 `firecrawl-config/default-config-value.ts` fájljában, a MiniMax konkrét értékei a

@@ -56,21 +56,22 @@ A méréseket közvetlen `curl` hívással futtattuk a `.env` fájlban lévő
 3. **Az üres keresési kifejezés nem a szolgáltatásra bízható**, mert értelmezhetetlen
    rendszerhibát ad vissza.
 
-## 4. Nyitott kérdés: kell-e külön Coding Plan token
+## 4. Lezárva: nem kell külön Coding Plan token
 
 A felhasználó felvetése szerint a `/v1/coding_plan/vlm` végpont külön Coding Plan tokent
 igényel, ami nem azonos a `.env` fájlban lévő platform kulccsal. **A 3. szekció mérése ezt nem
 igazolta**: ugyanaz a pay-as-you-go platform kulcs mindkét végponton HTTP 200-at és
 `status_code: 0` értéket adott.
 
-Ettől függetlenül a kód a képértelmezéshez **külön környezeti változót** használ
-(`MINIMAX_CODING_PLAN_API_KEY`), a felhasználó kifejezett kérése szerint. Ez akkor is helyes
-marad, ha a MiniMax később szétválasztja a két jogosultságot; ha nem válik szét, a felhasználó
-ugyanazt az értéket adhatja meg mindkét változónak.
+**Döntés (SPEC-002, T-002-17):** a mérés nem igazolta a külön kulcsot, ezért a
+`MINIMAX_CODING_PLAN_API_KEY` környezeti változó megszűnt. A `resolveMiniMaxConfig` mostantól
+paraméter nélkül, közvetlenül a `MINIMAX_API_KEY` változóból dolgozik, és mindkét MiniMax
+eszköz (kereső, képértelmező) ugyanazt a kulcsot használja. Ha a MiniMax később ténylegesen
+szétválasztja a két jogosultságot, ez a döntés újramérendő.
 
-**Ami nyitva marad:** hogy a Coding Plan előfizetés és a pay-as-you-go egyenleg között van-e
-elszámolási különbség ezen a két végponton. Erre nincs dokumentált forrás, és mérni sem tudtuk,
-mert csak egyféle kulcs áll rendelkezésre.
+Ami nyitva marad, de a döntést nem befolyásolja: hogy a Coding Plan előfizetés és a
+pay-as-you-go egyenleg között van-e elszámolási különbség ezen a két végponton. Erre nincs
+dokumentált forrás, és mérni sem tudtuk, mert csak egyféle kulcs állt rendelkezésre.
 
 ## 5. Nyitott kérdés: a MiniMax kliens oldali timeout
 

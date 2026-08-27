@@ -2,7 +2,6 @@ import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk'
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import {
   callMiniMax,
-  ENV_MINIMAX_API_KEY,
   formatSearchResponse,
   isSearchResponse,
   PATH_SEARCH,
@@ -33,7 +32,7 @@ export function createWebSearchTool(dependencies: AgentToolDependencies): SdkMcp
     if (trimmedQuery.length === 0) {
       return errorToolResult('A keresési kifejezés üres. Adj meg legalább egy kulcsszót.');
     }
-    const config = resolveMiniMaxConfig(dependencies.environment, ENV_MINIMAX_API_KEY);
+    const config = resolveMiniMaxConfig(dependencies.environment);
     if (!isOkOutcome(config)) {
       return errorToolResult(config.message);
     }

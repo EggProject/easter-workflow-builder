@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
-import { ENV_MINIMAX_CODING_PLAN_API_KEY } from './environment-variable-name.ts';
+import { ENV_MINIMAX_API_KEY } from '@easter-workflow-builder/minimax-client';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';
 
@@ -11,7 +11,7 @@ const failingFetch: FetchFunction = () => Promise.reject(new Error('halozati hib
 const emptyEnvelopeFetch: FetchFunction = () =>
   Promise.resolve(Response.json({ base_resp: { status_code: 0, status_msg: 'success' } }));
 
-const withKey = { [ENV_MINIMAX_CODING_PLAN_API_KEY]: 'coding-plan-kulcs' };
+const withKey = { [ENV_MINIMAX_API_KEY]: 'kulcs' };
 const DATA_URL = 'data:image/png;base64,AQID';
 const LOCAL_IMAGE = '/adat/kep.png';
 
@@ -40,13 +40,13 @@ describe('createImageUnderstandingTool', () => {
     expect(result.isError).toBe(true);
   });
 
-  it('hibát ad, ha hiányzik a Coding Plan kulcs, és megnevezi a változót', async () => {
+  it('hibát ad, ha hiányzik a kulcs, és megnevezi a változót', async () => {
     const result = await createImageUnderstandingTool(dependencies(failingFetch, {})).handler(
       { prompt: 'mi ez', image_source: DATA_URL },
       undefined,
     );
     expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toContain(ENV_MINIMAX_CODING_PLAN_API_KEY);
+    expect(JSON.stringify(result.content)).toContain(ENV_MINIMAX_API_KEY);
   });
 
   it('továbbadja a képforrás feloldásának hibáját', async () => {

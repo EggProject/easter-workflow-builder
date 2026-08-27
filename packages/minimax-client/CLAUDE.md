@@ -41,10 +41,13 @@ publikus szignatúrájában (SPEC-002 6.6 pont 7. szabálya).
 érkezik, és a hiba csak a `base_resp.status_code` mezőben látszik. Ezért a `callMiniMax`
 minden választ először a burkolón enged át, mielőtt sikeresnek minősítené.
 
-**Az `apiKeyVariableName` paraméter a `MINIMAX_CODING_PLAN_API_KEY` megszűnésével (T-002-17)
-törlendő.** Ez a csomag jelenleg még a paraméterrel költözött ide (SPEC-002 5.10 szekció),
-mert a kereső és a képértelmező eszköz a migráció ezen fázisában még külön változót használ. A
-paraméter megszüntetése a `docs/plan/PLAN-002` T-002-17 lépésének feladata.
+**`resolveMiniMaxConfig` paraméter nélkül olvassa a kulcsot.** A korábban tervezett, a
+képértelmezéshez szánt külön Coding Plan token végül nem valósult meg (T-002-17): a saját
+mérés szerint ugyanaz a pay-as-you-go platform kulcs mindkét MiniMax végponton
+`status_code: 0` értéket adott, tehát a mérés a külön kulcsot nem igazolta. A
+`resolveMiniMaxConfig` ezért a paraméter helyett közvetlenül a `MINIMAX_API_KEY` változót
+olvassa, és mindkét hívó (`tool-web-search`, `tool-understand-image`) ugyanabból a változóból
+dolgozik.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

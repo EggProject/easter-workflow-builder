@@ -5,7 +5,7 @@ import { resolveMiniMaxConfig } from './resolve-minimax-config.ts';
 
 describe('resolveMiniMaxConfig', () => {
   it('hibaágat ad, ha a kulcs változó hiányzik', () => {
-    const outcome = resolveMiniMaxConfig({}, ENV_MINIMAX_API_KEY);
+    const outcome = resolveMiniMaxConfig({});
     if (outcome.kind !== 'error') {
       throw new Error('hibaágat vártunk');
     }
@@ -13,33 +13,27 @@ describe('resolveMiniMaxConfig', () => {
   });
 
   it('hibaágat ad, ha a kulcs változó csak szóközt tartalmaz', () => {
-    expect(resolveMiniMaxConfig({ [ENV_MINIMAX_API_KEY]: ' ' }, ENV_MINIMAX_API_KEY).kind).toBe('error');
+    expect(resolveMiniMaxConfig({ [ENV_MINIMAX_API_KEY]: ' ' }).kind).toBe('error');
   });
 
   it('továbbadja a hibás timeout hibaágát', () => {
-    const outcome = resolveMiniMaxConfig(
-      { [ENV_MINIMAX_API_KEY]: 'kulcs', [ENV_MINIMAX_TIMEOUT_MS]: 'sok' },
-      ENV_MINIMAX_API_KEY,
-    );
+    const outcome = resolveMiniMaxConfig({ [ENV_MINIMAX_API_KEY]: 'kulcs', [ENV_MINIMAX_TIMEOUT_MS]: 'sok' });
     expect(outcome.kind).toBe('error');
   });
 
   it('alapértelmezésekkel oldja fel a konfigurációt', () => {
-    expect(resolveMiniMaxConfig({ [ENV_MINIMAX_API_KEY]: ' kulcs ' }, ENV_MINIMAX_API_KEY)).toStrictEqual({
+    expect(resolveMiniMaxConfig({ [ENV_MINIMAX_API_KEY]: ' kulcs ' })).toStrictEqual({
       kind: 'ok',
       value: { apiKey: 'kulcs', baseUrl: DEFAULT_MINIMAX_BASE_URL, timeoutMs: DEFAULT_MINIMAX_TIMEOUT_MS },
     });
   });
 
   it('figyelembe veszi a felülírásokat', () => {
-    const outcome = resolveMiniMaxConfig(
-      {
-        SAJAT_KULCS: 'abc',
-        [ENV_MINIMAX_BASE_URL]: 'https://sajat.example/',
-        [ENV_MINIMAX_TIMEOUT_MS]: '1000',
-      },
-      'SAJAT_KULCS',
-    );
+    const outcome = resolveMiniMaxConfig({
+      [ENV_MINIMAX_API_KEY]: 'abc',
+      [ENV_MINIMAX_BASE_URL]: 'https://sajat.example/',
+      [ENV_MINIMAX_TIMEOUT_MS]: '1000',
+    });
     expect(outcome).toStrictEqual({
       kind: 'ok',
       value: { apiKey: 'abc', baseUrl: 'https://sajat.example', timeoutMs: 1000 },
