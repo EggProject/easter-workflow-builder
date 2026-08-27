@@ -14,7 +14,7 @@ specifikáció tárgya.
 
 ## Függőségi irány
 
-Az `agent` a `core`, a `providers` és a `logger` csomagtól függhet.
+Az `agent` a `core`, a `provider-registry` és a `logger` csomagtól függhet.
 
 ## Szabályok
 

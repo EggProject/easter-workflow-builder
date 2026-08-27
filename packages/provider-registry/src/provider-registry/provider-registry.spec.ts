@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { isKnownFact, isUnknownFact } from '@easter-workflow-builder/evidence';
 import { measurementDocument } from '@easter-workflow-builder/evidence-sources';
-import { providerRegistry } from './registry.ts';
+import { providerRegistry } from './provider-registry.ts';
 
 /**
  * Objektum-e (a tömb is az). Azért kell, mert a bejárás `unknown` értékeken

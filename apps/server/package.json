@@ -14,6 +14,6 @@
     "@easter-workflow-builder/engine": "workspace:*",
     "@easter-workflow-builder/logger": "workspace:*",
     "@easter-workflow-builder/protocol": "workspace:*",
-    "@easter-workflow-builder/providers": "workspace:*"
+    "@easter-workflow-builder/provider-registry": "workspace:*"
   }
 }
