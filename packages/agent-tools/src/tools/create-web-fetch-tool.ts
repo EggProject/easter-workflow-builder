@@ -1,12 +1,13 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { postJson } from '@easter-workflow-builder/http-client';
+import {
+  formatFirecrawlDocument,
+  interpretScrapeResponse,
+  resolveFirecrawlConfig,
+  scrapePage,
+} from '@easter-workflow-builder/firecrawl-client';
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import { resolveFirecrawlConfig } from '../config/resolve-firecrawl-config.ts';
-import { PATH_SCRAPE } from '../firecrawl/endpoint-path.ts';
-import { formatFirecrawlDocument } from '../firecrawl/format-firecrawl-document.ts';
-import { interpretScrapeResponse } from '../firecrawl/interpret-scrape-response.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 
 // Lapos séma: csak a cím. A kimeneti formátum mindig markdown, mert az agentnek
@@ -32,15 +33,7 @@ export function createWebFetchTool(dependencies: AgentToolDependencies): SdkMcpT
     if (!isOkOutcome(config)) {
       return errorToolResult(config.message);
     }
-    const response = await postJson(
-      {
-        url: `${config.value.baseUrl}${PATH_SCRAPE}`,
-        headers: {},
-        body: { url: trimmedUrl, formats: ['markdown'] },
-        timeoutMs: config.value.timeoutMs,
-      },
-      dependencies.fetchFunction,
-    );
+    const response = await scrapePage(trimmedUrl, config.value, dependencies.fetchFunction);
     if (!isOkOutcome(response)) {
       return errorToolResult(`${response.message} Ellenőriztesd a felhasználóval, hogy a Firecrawl példány fut-e.`);
     }
