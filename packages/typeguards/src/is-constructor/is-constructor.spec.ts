@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isConstructor } from './is-constructor';
-import { POSITIVE_INT_ZERO, TEST_NUMBER_FLOAT } from '../test-constants';
+import { POSITIVE_INT_ZERO, TEST_NUMBER_FLOAT } from '../test-constants/test-constants';
 
 function namedFunction(): void {
   /*

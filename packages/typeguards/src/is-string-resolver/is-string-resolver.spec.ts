@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isStringResolver } from './is-string-resolver';
-import { POSITIVE_INT_ZERO, TEST_NUMBER_FLOAT } from '../test-constants';
+import { POSITIVE_INT_ZERO, TEST_NUMBER_FLOAT } from '../test-constants/test-constants';
 
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class -- konstruktor teszt fixture, szándékosan üres
 class CustomClass {}

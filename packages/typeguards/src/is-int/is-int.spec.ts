@@ -12,7 +12,7 @@ import {
   POSITIVE_FLOAT_MEDIUM,
   NEGATIVE_FLOAT_MEDIUM,
   POSITIVE_FLOAT_LARGE,
-} from '../test-constants';
+} from '../test-constants/test-constants';
 
 describe('isInt', () => {
   it('should return true for positive integers', () => {

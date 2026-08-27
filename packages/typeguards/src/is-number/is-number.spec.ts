@@ -13,7 +13,7 @@ import {
   POSITIVE_FLOAT_LARGE,
   NEGATIVE_FLOAT_MEDIUM,
   NEGATIVE_FLOAT_LARGE,
-} from '../test-constants';
+} from '../test-constants/test-constants';
 
 describe('isNumber', () => {
   describe('integers', () => {

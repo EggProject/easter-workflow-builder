@@ -11,7 +11,7 @@ import {
   NEGATIVE_INT_SMALL,
   NEGATIVE_FLOAT_SMALL,
   NEGATIVE_FLOAT_LARGE,
-} from '../test-constants';
+} from '../test-constants/test-constants';
 
 describe('isFloat', () => {
   it('should return true for positive floating-point numbers', () => {

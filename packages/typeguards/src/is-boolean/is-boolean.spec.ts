@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isBoolean } from './is-boolean';
-import { POSITIVE_INT_ZERO, POSITIVE_INT_ONE, POSITIVE_INT_SMALL } from '../test-constants';
+import { POSITIVE_INT_ZERO, POSITIVE_INT_ONE, POSITIVE_INT_SMALL } from '../test-constants/test-constants';
 
 function isTrueTestValue(): boolean {
   return true;

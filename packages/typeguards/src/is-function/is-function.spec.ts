@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isFunction } from './is-function';
-import { MAGIC_NUMBER_123, POSITIVE_INT_ZERO } from '../test-constants';
+import { MAGIC_NUMBER_123, POSITIVE_INT_ZERO } from '../test-constants/test-constants';
 
 function regularFunction(): string {
   return 'test';

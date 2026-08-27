@@ -1,5 +1,5 @@
 import { isFunction } from '../is-function/is-function';
-import type { Constructor } from '../types';
+import type { Constructor } from './constructor';
 import { isNil } from '../is-nil/is-nil';
 
 /**
