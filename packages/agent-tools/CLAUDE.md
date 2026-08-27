@@ -27,17 +27,16 @@ ezért a szolgáltatás eldobó viselkedése nem érinti.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti hét mappa felelőssége:
+Az `src/` alatti hat mappa felelőssége:
 
-| Mappa        | Felelősség                                                                                                                    |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `config/`    | környezeti változó olvasás, a három eszköz futásidejű konfigurációja                                                          |
-| `result/`    | az MCP `ToolCallResult` válasz alakja és a két konstruktora (`Outcome<TValue>` a `@easter-workflow-builder/result` csomagban) |
-| `http/`      | a beépített `fetch` fölötti közös HTTP réteg                                                                                  |
-| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                                                                    |
-| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                                                                                  |
-| `image/`     | a képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64)                                                    |
-| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója                                                              |
+| Mappa        | Felelősség                                                                 |
+| ------------ | -------------------------------------------------------------------------- |
+| `config/`    | környezeti változó olvasás, a három eszköz futásidejű konfigurációja       |
+| `http/`      | a beépített `fetch` fölötti közös HTTP réteg                               |
+| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                 |
+| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                               |
+| `image/`     | a képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64) |
+| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója           |
 
 ## Környezeti változók
 
@@ -56,6 +55,7 @@ mindegyik mellett megjelölve, hogy dokumentált vagy önkényes.
 ## Függőségi irány
 
 Az `agent-tools` az `@easter-workflow-builder/agent-tool-id` (az `AgentToolId` szótár miatt), a
+`@easter-workflow-builder/mcp-tool-kit` (az MCP válasz konstruktorok miatt), a
 `@easter-workflow-builder/result` (az `Outcome<TValue>` eredménytípus miatt) és a `typeguards`
 csomagtól függ, valamint az `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagoktól.
 Semmilyen más workspace csomagtól nem függ, és egyetlen workspace csomag sem függhet tőle úgy,

@@ -1,4 +1,5 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
 import { resolveFirecrawlConfig } from '../config/resolve-firecrawl-config.ts';
@@ -6,8 +7,6 @@ import { PATH_SCRAPE } from '../firecrawl/endpoint-path.ts';
 import { formatFirecrawlDocument } from '../firecrawl/format-firecrawl-document.ts';
 import { interpretScrapeResponse } from '../firecrawl/interpret-scrape-response.ts';
 import { postJson } from '../http/post-json.ts';
-import { errorToolResult } from '../result/error-tool-result.ts';
-import { textToolResult } from '../result/text-tool-result.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 
 // Lapos séma: csak a cím. A kimeneti formátum mindig markdown, mert az agentnek
