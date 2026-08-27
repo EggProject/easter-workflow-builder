@@ -17,11 +17,12 @@ meg, minek a regisztere.
 
 ## Függőségi irány
 
-Az `@easter-workflow-builder/provider-minimax` és az
-`@easter-workflow-builder/provider-claude-subscription` csomagtól függ (`dependencies`), L3
-réteg (SPEC-002 4. szekció). A `.spec.ts` további dev függősége az
-`@easter-workflow-builder/provider-capability` (`devDependencies`), mert a bejárás a `Fact`
-invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi.
+Az `@easter-workflow-builder/provider-minimax`, az
+`@easter-workflow-builder/provider-claude-subscription` és az
+`@easter-workflow-builder/provider-capability` csomagtól függ (`dependencies`), L3 réteg
+(SPEC-002 4. szekció). A `provider-capability` a `ProviderRegistry` interfész `ProviderId`
+kulcstípusa miatt vált éles függőséggé (SPEC-003 T-003-6); a `.spec.ts` ugyanebből a csomagból
+a `Fact` invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi.
 
 ## Szabályok
 

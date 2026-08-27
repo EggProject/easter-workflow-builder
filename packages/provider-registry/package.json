@@ -9,11 +9,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@easter-workflow-builder/provider-capability": "workspace:*",
     "@easter-workflow-builder/provider-minimax": "workspace:*",
     "@easter-workflow-builder/provider-claude-subscription": "workspace:*"
   },
   "devDependencies": {
-    "@easter-workflow-builder/provider-capability": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
