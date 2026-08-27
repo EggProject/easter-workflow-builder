@@ -66,6 +66,12 @@ jobs:
           # egy sor kovetendo.
           - name: casing
             script: check:casing
+          # A `check:graph` (`tooling/scripts/check-dependency-graph.sh`) a
+          # csomag fuggosegi graf retegzeset es kormentesseget orzi
+          # (SPEC-002 4. es 13. szekcio). Lokalisan letezett, de kimaradt a
+          # CI gate matrixbol - ez a sor potolja, a `casing` mintajara.
+          - name: graph
+            script: check:graph
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
