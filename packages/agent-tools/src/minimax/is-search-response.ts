@@ -1,4 +1,4 @@
-import { isRecord } from 'typeguards';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { MiniMaxSearchResponse, MiniMaxSearchResult } from './search-response.ts';
 
 function isSearchResult(value: unknown): value is MiniMaxSearchResult {

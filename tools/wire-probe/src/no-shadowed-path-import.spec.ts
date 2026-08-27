@@ -50,7 +50,7 @@ function listTypeScriptFiles(directory: string): readonly string[] {
       files.push(...listTypeScriptFiles(fullPath));
       continue;
     }
-    if (entry.endsWith('.ts') && !entry.endsWith('.test.ts')) {
+    if (entry.endsWith('.ts') && !entry.endsWith('.test.ts') && !entry.endsWith('.spec.ts')) {
       files.push(fullPath);
     }
   }

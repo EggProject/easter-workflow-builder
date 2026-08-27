@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@easter-workflow-builder/web",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -13,9 +13,9 @@
     "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov"
   },
   "dependencies": {
-    "core": "workspace:*",
-    "protocol": "workspace:*",
-    "ui": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*",
+    "@easter-workflow-builder/protocol": "workspace:*",
+    "@easter-workflow-builder/ui": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

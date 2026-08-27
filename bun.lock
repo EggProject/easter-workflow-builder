@@ -5,11 +5,11 @@
     "": {
       "name": "easter-workflow-builder",
       "devDependencies": {
+        "@easter-workflow-builder/eslint-config": "workspace:*",
         "@playwright/test": "catalog:",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
         "eslint": "catalog:",
-        "eslint-config": "workspace:*",
         "eslint-config-prettier": "catalog:",
         "happy-dom": "20.11.6",
         "jiti": "2.7.0",
@@ -20,25 +20,25 @@
       },
     },
     "apps/server": {
-      "name": "server",
+      "name": "@easter-workflow-builder/server",
       "version": "0.0.0",
       "dependencies": {
-        "agent": "workspace:*",
-        "core": "workspace:*",
-        "db": "workspace:*",
-        "engine": "workspace:*",
-        "logger": "workspace:*",
-        "protocol": "workspace:*",
-        "providers": "workspace:*",
+        "@easter-workflow-builder/agent": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/db": "workspace:*",
+        "@easter-workflow-builder/engine": "workspace:*",
+        "@easter-workflow-builder/logger": "workspace:*",
+        "@easter-workflow-builder/protocol": "workspace:*",
+        "@easter-workflow-builder/providers": "workspace:*",
       },
     },
     "apps/web": {
-      "name": "web",
+      "name": "@easter-workflow-builder/web",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
-        "protocol": "workspace:*",
-        "ui": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/protocol": "workspace:*",
+        "@easter-workflow-builder/ui": "workspace:*",
       },
       "devDependencies": {
         "@playwright/test": "catalog:",
@@ -49,21 +49,21 @@
       },
     },
     "packages/agent": {
-      "name": "agent",
+      "name": "@easter-workflow-builder/agent",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
-        "logger": "workspace:*",
-        "providers": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/logger": "workspace:*",
+        "@easter-workflow-builder/providers": "workspace:*",
       },
     },
     "packages/agent-tools": {
-      "name": "agent-tools",
+      "name": "@easter-workflow-builder/agent-tools",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "providers": "workspace:*",
-        "typeguards": "workspace:*",
+        "@easter-workflow-builder/providers": "workspace:*",
+        "@easter-workflow-builder/typeguards": "workspace:*",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -73,65 +73,68 @@
       },
     },
     "packages/core": {
-      "name": "core",
+      "name": "@easter-workflow-builder/core",
       "version": "0.0.0",
     },
     "packages/db": {
-      "name": "db",
+      "name": "@easter-workflow-builder/db",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
-        "logger": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/logger": "workspace:*",
       },
     },
     "packages/engine": {
-      "name": "engine",
+      "name": "@easter-workflow-builder/engine",
       "version": "0.0.0",
       "dependencies": {
-        "agent": "workspace:*",
-        "core": "workspace:*",
-        "db": "workspace:*",
-        "logger": "workspace:*",
+        "@easter-workflow-builder/agent": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/db": "workspace:*",
+        "@easter-workflow-builder/logger": "workspace:*",
       },
     },
     "packages/logger": {
-      "name": "logger",
+      "name": "@easter-workflow-builder/logger",
       "version": "0.0.0",
     },
     "packages/protocol": {
-      "name": "protocol",
+      "name": "@easter-workflow-builder/protocol",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
       },
     },
     "packages/providers": {
-      "name": "providers",
+      "name": "@easter-workflow-builder/providers",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
       },
       "devDependencies": {
         "vitest": "catalog:",
       },
     },
     "packages/typeguards": {
-      "name": "typeguards",
+      "name": "@easter-workflow-builder/typeguards",
       "version": "0.0.0",
+      "devDependencies": {
+        "vitest": "catalog:",
+      },
     },
     "packages/ui": {
-      "name": "ui",
+      "name": "@easter-workflow-builder/ui",
       "version": "0.0.0",
       "dependencies": {
-        "core": "workspace:*",
-        "protocol": "workspace:*",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/protocol": "workspace:*",
       },
       "devDependencies": {
         "vitest": "catalog:",
       },
     },
     "tooling/eslint-config": {
-      "name": "eslint-config",
+      "name": "@easter-workflow-builder/eslint-config",
       "version": "0.0.0",
       "devDependencies": {
         "eslint": "catalog:",
@@ -143,7 +146,7 @@
       },
     },
     "tooling/scripts": {
-      "name": "scripts",
+      "name": "@easter-workflow-builder/scripts",
       "version": "0.0.0",
       "devDependencies": {
         "typescript": "catalog:",
@@ -151,11 +154,11 @@
       },
     },
     "tooling/tsconfig": {
-      "name": "tsconfig",
+      "name": "@easter-workflow-builder/tsconfig",
       "version": "0.0.0",
     },
     "tools/wire-probe": {
-      "name": "wire-probe",
+      "name": "@easter-workflow-builder/wire-probe",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
@@ -243,6 +246,38 @@
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
+
+    "@easter-workflow-builder/agent": ["@easter-workflow-builder/agent@workspace:packages/agent"],
+
+    "@easter-workflow-builder/agent-tools": ["@easter-workflow-builder/agent-tools@workspace:packages/agent-tools"],
+
+    "@easter-workflow-builder/core": ["@easter-workflow-builder/core@workspace:packages/core"],
+
+    "@easter-workflow-builder/db": ["@easter-workflow-builder/db@workspace:packages/db"],
+
+    "@easter-workflow-builder/engine": ["@easter-workflow-builder/engine@workspace:packages/engine"],
+
+    "@easter-workflow-builder/eslint-config": ["@easter-workflow-builder/eslint-config@workspace:tooling/eslint-config"],
+
+    "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
+
+    "@easter-workflow-builder/protocol": ["@easter-workflow-builder/protocol@workspace:packages/protocol"],
+
+    "@easter-workflow-builder/providers": ["@easter-workflow-builder/providers@workspace:packages/providers"],
+
+    "@easter-workflow-builder/scripts": ["@easter-workflow-builder/scripts@workspace:tooling/scripts"],
+
+    "@easter-workflow-builder/server": ["@easter-workflow-builder/server@workspace:apps/server"],
+
+    "@easter-workflow-builder/tsconfig": ["@easter-workflow-builder/tsconfig@workspace:tooling/tsconfig"],
+
+    "@easter-workflow-builder/typeguards": ["@easter-workflow-builder/typeguards@workspace:packages/typeguards"],
+
+    "@easter-workflow-builder/ui": ["@easter-workflow-builder/ui@workspace:packages/ui"],
+
+    "@easter-workflow-builder/web": ["@easter-workflow-builder/web@workspace:apps/web"],
+
+    "@easter-workflow-builder/wire-probe": ["@easter-workflow-builder/wire-probe@workspace:tools/wire-probe"],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 
@@ -454,10 +489,6 @@
 
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
 
-    "agent": ["agent@workspace:packages/agent"],
-
-    "agent-tools": ["agent-tools@workspace:packages/agent-tools"],
-
     "aggregate-error": ["aggregate-error@3.1.0", "", { "dependencies": { "clean-stack": "^2.0.0", "indent-string": "^4.0.0" } }, "sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA=="],
 
     "ajv": ["ajv@6.15.0", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw=="],
@@ -534,15 +565,11 @@
 
     "cookie-signature": ["cookie-signature@1.2.2", "", {}, "sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg=="],
 
-    "core": ["core@workspace:packages/core"],
-
     "core-js-compat": ["core-js-compat@3.50.0", "", { "dependencies": { "browserslist": "^4.28.7" } }, "sha512-XGpFGbMLHwSt74YLTKho7Ib242qi6O8MSX+sRokV4oz7iKXvQWGYZthjIhjRGMxjzVkAubBO512dKGYcefmX3Q=="],
 
     "cors": ["cors@2.8.6", "", { "dependencies": { "object-assign": "^4", "vary": "^1" } }, "sha512-tJtZBBHA6vjIAaF6EnIaq6laBBP9aq/Y3ouVJjEfoHbRBcHBAHYcMh/w8LDrk2PvIMMq8gmopa5D4V8RmbrxGw=="],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
-
-    "db": ["db@workspace:packages/db"],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" }, "peerDependencies": { "supports-color": "*" }, "optionalPeers": ["supports-color"] }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 
@@ -568,8 +595,6 @@
 
     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
 
-    "engine": ["engine@workspace:packages/engine"],
-
     "entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
 
     "es-define-property": ["es-define-property@1.0.1", "", {}, "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g=="],
@@ -589,8 +614,6 @@
     "escape-string-regexp": ["escape-string-regexp@4.0.0", "", {}, "sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA=="],
 
     "eslint": ["eslint@10.9.1", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.8.0", "@eslint-community/regexpp": "^4.12.2", "@eslint/config-array": "^0.23.5", "@eslint/config-helpers": "^0.7.0", "@eslint/core": "^1.2.1", "@eslint/plugin-kit": "^0.7.2", "@humanfs/node": "^0.16.6", "@humanwhocodes/module-importer": "^1.0.1", "@humanwhocodes/retry": "^0.4.2", "@types/estree": "^1.0.6", "ajv": "^6.14.0", "cross-spawn": "^7.0.6", "debug": "^4.3.2", "escape-string-regexp": "^4.0.0", "eslint-scope": "^9.1.2", "eslint-visitor-keys": "^5.0.1", "espree": "^11.2.0", "esquery": "^1.7.0", "esutils": "^2.0.2", "fast-deep-equal": "^3.1.3", "file-entry-cache": "^8.0.0", "find-up": "^5.0.0", "glob-parent": "^6.0.2", "ignore": "^5.2.0", "imurmurhash": "^0.1.4", "is-glob": "^4.0.0", "json-stable-stringify-without-jsonify": "^1.0.1", "minimatch": "^10.2.5", "natural-compare": "^1.4.0", "optionator": "^0.9.3" }, "peerDependencies": { "jiti": "*" }, "optionalPeers": ["jiti"], "bin": { "eslint": "bin/eslint.js" } }, "sha512-9VaAkDURekixUQJy0oJYl2DcN6oKMfxay7XzaGYAWQwsb6qfKf+x76R2k1L8kb1boc+FyCAaTA9GmiKaaiaF+A=="],
-
-    "eslint-config": ["eslint-config@workspace:tooling/eslint-config"],
 
     "eslint-config-prettier": ["eslint-config-prettier@10.1.8", "", { "peerDependencies": { "eslint": ">=7.0.0" }, "bin": { "eslint-config-prettier": "bin/cli.js" } }, "sha512-82GZUjRS0p/jganf6q1rEO25VSoHH0hKPCTrgillPjdI/3bgBhAE1QzHrHTizjpRvy6pGAvKjDJtk2pF9NDq8w=="],
 
@@ -824,8 +847,6 @@
 
     "lodash.merge": ["lodash.merge@4.6.2", "", {}, "sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ=="],
 
-    "logger": ["logger@workspace:packages/logger"],
-
     "lru-cache": ["lru-cache@11.5.2", "", {}, "sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
@@ -930,10 +951,6 @@
 
     "process-on-spawn": ["process-on-spawn@1.1.0", "", { "dependencies": { "fromentries": "^1.2.0" } }, "sha512-JOnOPQ/8TZgjs1JIH/m9ni7FfimjNa/PRx7y/Wb5qdItsnhO0jE4AT7fC0HjC28DUQWDr50dwSYZLdRMlqDq3Q=="],
 
-    "protocol": ["protocol@workspace:packages/protocol"],
-
-    "providers": ["providers@workspace:packages/providers"],
-
     "proxy-addr": ["proxy-addr@2.0.7", "", { "dependencies": { "forwarded": "0.2.0", "ipaddr.js": "1.9.1" } }, "sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg=="],
 
     "punycode": ["punycode@2.3.1", "", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
@@ -974,8 +991,6 @@
 
     "safer-buffer": ["safer-buffer@2.1.2", "", {}, "sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg=="],
 
-    "scripts": ["scripts@workspace:tooling/scripts"],
-
     "scslre": ["scslre@0.3.0", "", { "dependencies": { "@eslint-community/regexpp": "^4.8.0", "refa": "^0.12.0", "regexp-ast-analysis": "^0.7.0" } }, "sha512-3A6sD0WYP7+QrjbfNA2FN3FsOaGGFoekCVgTyypy53gPxhbkCIjtO6YWgdrfM+n/8sI8JeXZOIxsHjMTNxQ4nQ=="],
 
     "semver": ["semver@7.8.5", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="],
@@ -983,8 +998,6 @@
     "send": ["send@1.2.1", "", { "dependencies": { "debug": "^4.4.3", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "etag": "^1.8.1", "fresh": "^2.0.0", "http-errors": "^2.0.1", "mime-types": "^3.0.2", "ms": "^2.1.3", "on-finished": "^2.4.1", "range-parser": "^1.2.1", "statuses": "^2.0.2" } }, "sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ=="],
 
     "serve-static": ["serve-static@2.2.1", "", { "dependencies": { "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "parseurl": "^1.3.3", "send": "^1.2.0" } }, "sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw=="],
-
-    "server": ["server@workspace:apps/server"],
 
     "set-blocking": ["set-blocking@2.0.0", "", {}, "sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw=="],
 
@@ -1054,8 +1067,6 @@
 
     "ts-api-utils": ["ts-api-utils@2.5.0", "", { "peerDependencies": { "typescript": ">=4.8.4" } }, "sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA=="],
 
-    "tsconfig": ["tsconfig@workspace:tooling/tsconfig"],
-
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
     "turbo": ["turbo@2.10.12", "", { "optionalDependencies": { "@turbo/darwin-64": "2.10.12", "@turbo/darwin-arm64": "2.10.12", "@turbo/linux-64": "2.10.12", "@turbo/linux-arm64": "2.10.12", "@turbo/windows-64": "2.10.12", "@turbo/windows-arm64": "2.10.12" }, "bin": { "turbo": "bin/turbo" } }, "sha512-AswgMPnpOoaVZHrrSBejETzEbuIA69OVGwfkHwfrY0A23VjWXBANzgq9+OymWOHAIArB7D1+1z498WY8fGg1Jw=="],
@@ -1068,13 +1079,9 @@
 
     "typedarray-to-buffer": ["typedarray-to-buffer@3.1.5", "", { "dependencies": { "is-typedarray": "^1.0.0" } }, "sha512-zdu8XMNEDepKKR+XYOXAVPtWui0ly0NtohUscw+UmaHiAWT8hrV1rr//H6V+0DvJ3OQ19S979M0laLfX8rm82Q=="],
 
-    "typeguards": ["typeguards@workspace:packages/typeguards"],
-
     "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "typescript-eslint": ["typescript-eslint@8.68.0", "", { "dependencies": { "@typescript-eslint/eslint-plugin": "8.68.0", "@typescript-eslint/parser": "8.68.0", "@typescript-eslint/typescript-estree": "8.68.0", "@typescript-eslint/utils": "8.68.0" }, "peerDependencies": { "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.1.0" } }, "sha512-MHy0Y0ynqeEbx/S45+i/bBssdy3X6KNBfmJAP35GrgtNxu2TQ5K5xsFDhAnmsq1jvpdoZOPG1LGtJo0HWqYCrQ=="],
-
-    "ui": ["ui@workspace:packages/ui"],
 
     "undici-types": ["undici-types@8.3.0", "", {}, "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ=="],
 
@@ -1094,8 +1101,6 @@
 
     "vitest": ["vitest@4.1.11", "", { "dependencies": { "@vitest/expect": "4.1.11", "@vitest/mocker": "4.1.11", "@vitest/pretty-format": "4.1.11", "@vitest/runner": "4.1.11", "@vitest/snapshot": "4.1.11", "@vitest/spy": "4.1.11", "@vitest/utils": "4.1.11", "es-module-lexer": "^2.0.0", "expect-type": "^1.3.0", "magic-string": "^0.30.21", "obug": "^2.1.1", "pathe": "^2.0.3", "picomatch": "^4.0.3", "std-env": "^4.0.0-rc.1", "tinybench": "^2.9.0", "tinyexec": "^1.0.2", "tinyglobby": "^0.2.15", "tinyrainbow": "^3.1.0", "vite": "^6.0.0 || ^7.0.0 || ^8.0.0", "why-is-node-running": "^2.3.0" }, "peerDependencies": { "@edge-runtime/vm": "*", "@opentelemetry/api": "^1.9.0", "@types/node": "^20.0.0 || ^22.0.0 || >=24.0.0", "@vitest/browser-playwright": "4.1.11", "@vitest/browser-preview": "4.1.11", "@vitest/browser-webdriverio": "4.1.11", "@vitest/coverage-istanbul": "4.1.11", "@vitest/coverage-v8": "4.1.11", "@vitest/ui": "4.1.11", "happy-dom": "*", "jsdom": "*" }, "optionalPeers": ["@edge-runtime/vm", "@opentelemetry/api", "@types/node", "@vitest/browser-playwright", "@vitest/browser-preview", "@vitest/browser-webdriverio", "@vitest/coverage-istanbul", "@vitest/coverage-v8", "@vitest/ui", "happy-dom", "jsdom"], "bin": { "vitest": "./vitest.mjs" } }, "sha512-fhACrNXUidIbGSBr5FlbuBkO7VWC1ZyLl0DO4CU2DrQoAPxX84Ysxs+HeGQpii5lZWV1Q4gBZTTu49mF+A6Edw=="],
 
-    "web": ["web@workspace:apps/web"],
-
     "web-worker": ["web-worker@1.5.0", "", {}, "sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw=="],
 
     "whatwg-mimetype": ["whatwg-mimetype@3.0.0", "", {}, "sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q=="],
@@ -1105,8 +1110,6 @@
     "which-module": ["which-module@2.0.1", "", {}, "sha512-iBdZ57RDvnOR9AGBhML2vFZf7h8vmBjhoaZqODJBFWHVtKkDmKuHai3cx5PgVMrX5YDNp27AofYbAwctSS+vhQ=="],
 
     "why-is-node-running": ["why-is-node-running@2.3.0", "", { "dependencies": { "siginfo": "^2.0.0", "stackback": "0.0.2" }, "bin": { "why-is-node-running": "cli.js" } }, "sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w=="],
-
-    "wire-probe": ["wire-probe@workspace:tools/wire-probe"],
 
     "word-wrap": ["word-wrap@1.2.5", "", {}, "sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA=="],
 

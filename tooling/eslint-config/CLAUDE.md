@@ -12,13 +12,18 @@ ez után jönnek a tömbben.
 
 ## Fájlok
 
-| Fájl                | Tartalom                                                                                                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`      | barrel, csak újraexport                                                                                                                                                                           |
-| `src/base.ts`       | minden könyvtárcsomagra érvényes alap: típusinformációt használó typescript-eslint, unicorn, import-x, sonarjs presetek, plusz a `CLAUDE.md` kódolási elvárásait kikényszerítő explicit szabályok |
-| `src/react.ts`      | `apps/web` és `packages/ui` réteg: a `unicorn/filename-case` lazítása kebab-case és PascalCase egyidejű engedélyezésére                                                                           |
-| `src/relaxed.ts`    | `tooling/**` és `tools/wire-probe/**` réteg (devDependencies import engedélyezve), plusz a `*.config.ts` fájlok típusinformáció nélküli linteléséhez a `disableTypeChecked` beillesztése          |
-| `src/test-files.ts` | `*.test.ts`/`*.spec.ts` réteg: `sonarjs/no-duplicate-string` kikapcsolva                                                                                                                          |
+| Fájl                              | Tartalom                                                                                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                    | barrel, csak újraexport                                                                                                                                                                           |
+| `src/eslint-preset/base.ts`       | minden könyvtárcsomagra érvényes alap: típusinformációt használó typescript-eslint, unicorn, import-x, sonarjs presetek, plusz a `CLAUDE.md` kódolási elvárásait kikényszerítő explicit szabályok |
+| `src/eslint-preset/react.ts`      | `apps/web` és `packages/ui` réteg: a `unicorn/filename-case` lazítása kebab-case és PascalCase egyidejű engedélyezésére                                                                           |
+| `src/eslint-preset/relaxed.ts`    | `tooling/**` és `tools/wire-probe/**` réteg (devDependencies import engedélyezve), plusz a `*.config.ts` fájlok típusinformáció nélküli linteléséhez a `disableTypeChecked` beillesztése          |
+| `src/eslint-preset/test-files.ts` | `*.test.ts`/`*.spec.ts` réteg: `sonarjs/no-duplicate-string` kikapcsolva                                                                                                                          |
+
+A négy fájl egyetlen témát alkot (`eslint-preset/`): mind a négy ugyanannak a flat confignak
+a rétege, a `test-files.ts` pedig a másik három által használt fájlmintákat adja. A `src/`
+alatt a téma mappa a `docs/spec/SPEC-002-csomag-architektura.md` 6.7 pontja szerint nem kap
+saját `CLAUDE.md`-t.
 
 ## Függőségi irány
 

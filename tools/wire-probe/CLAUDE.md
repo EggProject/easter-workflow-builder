@@ -28,7 +28,7 @@ fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is sorol
 | `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                             |
 | `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                 |
 | `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                               |
-| `src/no-shadowed-path-import.test.ts` | regressziós Vitest teszt, lásd Szabályok                                                   |
+| `src/no-shadowed-path-import.spec.ts` | regressziós Vitest teszt, lásd Szabályok                                                   |
 
 Az `src/` alatti három mappa felelőssége:
 
@@ -63,11 +63,11 @@ gráf tagja, de más csomag nem importál innen semmit.
 - Nincs `test` npm script, tehát a mérések (`probe`/`proxy`/`summary`, valós API hívást
   tesznek) nem futnak a Turborepo `test` taskján keresztül CI-ben, és a CI nem is kap
   MiniMax API kulcsot.
-- **Kivétel: `src/no-shadowed-path-import.test.ts`.** Ez az egyetlen Vitest teszt a
+- **Kivétel: `src/no-shadowed-path-import.spec.ts`.** Ez az egyetlen Vitest teszt a
   csomagban - regressziós teszt egy korábban talált valós bugra (két mérési eset fájlban
   egy helyi `const path = ...` eltakarta a `node:path` importot, temporal dead zone
   `ReferenceError` kockázatával). A gyökér `vitest.config.ts` a
-  `tools/wire-probe/src/**/*.test.ts` mintát explicit projektként veszi fel a Vitest
+  `tools/wire-probe/src/**/*.{test,spec}.ts` mintát veszi fel explicit projektként a Vitest
   "Test Projects" mechanizmusán keresztül, függetlenül a csomag `package.json`-jától.
 - **Verziószám: nem itt.** A `@anthropic-ai/claude-agent-sdk` pontos, pinelt verziója a
   `package.json`-ban és a `docs/research/2026-08-26-toolchain.md` "Rögzített verziók"

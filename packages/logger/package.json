@@ -1,5 +1,5 @@
 {
-  "name": "logger",
+  "name": "@easter-workflow-builder/logger",
   "version": "0.0.0",
   "type": "module",
   "private": true,

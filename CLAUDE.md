@@ -145,6 +145,13 @@ Vitest Node alatt fut és nem tudja importálni őket.
   wrapper**, ami csak összegzést és a hibákat írja ki. A `tooling/scripts` alatt élnek.
 - Titok soha nem kerül adatbázisba vagy gitbe. A DB csak env változó NEVET tárol.
 
+### Csomag és mappa konvenció
+
+A `packages/*/src` alatti mappaszerkezet kötelező, téma szerinti konvenciót követ (nem
+fájlonként vagy technikai réteg szerint tagolt mappa), a workspace csomagok neve
+`@easter-workflow-builder/` névtér prefixet visel, és a teszt fájlok `.spec.ts` végződésűek.
+A szabályokat a [`docs/spec/SPEC-002-csomag-architektura.md`](docs/spec/SPEC-002-csomag-architektura.md) 6. szekciója rögzíti részletesen.
+
 ### Provider réteg
 
 Két provider az első verzióban, backend TypeScript config fájlokban rögzítve, **nincs hozzájuk
@@ -195,9 +202,9 @@ fájlokra szűkítendő (a typeguardok maradjanak a lefedettségben, SPEC-001 9.
 szándéka szerint).
 
 A `tools/wire-probe` csomagnak nincs `test` npm scriptje (SPEC-001 13. szekció, a mérések nem
-futhatnak CI-ben MiniMax API kulcs nélkül), de a `no-shadowed-path-import.test.ts` regressziós
-tesztje mégis lefut: a gyökér `vitest.config.ts` a `tools/wire-probe/src/**/*.test.ts` mintát
-explicit projektként veszi fel, függetlenül attól, hogy a csomagnak van-e `test` scriptje.
+futhatnak CI-ben MiniMax API kulcs nélkül), de a `no-shadowed-path-import.spec.ts` regressziós
+tesztje mégis lefut: a gyökér `vitest.config.ts` a `tools/wire-probe/src/**/*.{test,spec}.ts`
+mintát explicit projektként veszi fel, függetlenül attól, hogy a csomagnak van-e `test` scriptje.
 
 A Playwright `retries` alapértelmezése (`0`, https://playwright.dev/docs/test-retries) van
 használatban, mert erre nincs saját mérésünk. A `vite-plugin-istanbul@9.0.1` Vite 8-cal

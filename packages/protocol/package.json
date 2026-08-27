@@ -1,5 +1,5 @@
 {
-  "name": "protocol",
+  "name": "@easter-workflow-builder/protocol",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,6 +9,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "core": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*"
   }
 }

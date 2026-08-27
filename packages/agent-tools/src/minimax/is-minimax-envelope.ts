@@ -1,4 +1,4 @@
-import { isRecord } from 'typeguards';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { MiniMaxEnvelope } from './base-response.ts';
 
 /**

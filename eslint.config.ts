@@ -5,7 +5,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import prettierConfig from 'eslint-config-prettier/flat';
-import { base, react, relaxed, testFiles } from 'eslint-config';
+import { base, react, relaxed, testFiles } from '@easter-workflow-builder/eslint-config';
 import type { Linter } from 'eslint';
 
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
