@@ -14,11 +14,10 @@ felderítéséhez. Két külön dolog van itt, mert két külön felelősség:
   SPEC-000 4. szekciójában felsorolt mérési esetek szerint (M-01 ... M-36), a proxyn
   keresztül, hogy a tényleges HTTP forgalom rögzüljön.
 
-Ide **nem** tartozik semelyik esetnek a konkrét logikája (`src/cases/`), a proxy vagy a
-harness belső rétegének megvalósítása (`src/proxy/`, `src/harness/`) - azok saját
-`CLAUDE.md`-vel dokumentáltak. Nem termékkód: a gyökér workspace tagja (`tools/*` glob),
-de a `packages/*` fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is
-sorolja fel.
+Ide **nem** tartozik semelyik esetnek a konkrét logikája (`src/cases/`), sem a proxy vagy a
+harness belső rétegének megvalósítása (`src/proxy/`, `src/harness/`) - ezek felelősségét
+lásd lent. Nem termékkód: a gyökér workspace tagja (`tools/*` glob), de a `packages/*`
+fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is sorolja fel.
 
 ## Fájlok
 
@@ -31,8 +30,17 @@ sorolja fel.
 | `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                               |
 | `src/no-shadowed-path-import.test.ts` | regressziós Vitest teszt, lásd Szabályok                                                   |
 
-Az `src/proxy/`, `src/harness/` és `src/cases/` alkönyvtár saját `CLAUDE.md`-vel
-dokumentált, lásd ott a fájllistát és a függőségi irányt.
+Az `src/` alatti három mappa felelőssége:
+
+| Mappa      | Felelősség                                                                            |
+| ---------- | ------------------------------------------------------------------------------------- |
+| `proxy/`   | a rögzített HTTP tranzakció típusa, lemezre írása és a titok-maszkoló segédfüggvények |
+| `harness/` | a mérési esetek közös futtató rétege: `query()` lefuttatása, `meta.json` írása        |
+| `cases/`   | az egyes SPEC-000 mérési esetek (M-01 ... M-36) implementációja                       |
+
+A három mappa egyirányban rétegzett: a `cases/` a `harness/`-tól függ, a `harness/` a
+`proxy/mask.ts` titok-átfésülő függvényétől, a `proxy/` pedig a legalsó réteg, semmitől
+nem függ a mappák közül. Fordított irányú függés tilos.
 
 ## Függőségi irány
 

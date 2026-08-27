@@ -22,7 +22,7 @@ spec lecseréli a valódi UI-ra.
 | `vite.config.ts`       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`) |
 | `vitest.config.ts`     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                      |
 | `playwright.config.ts` | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt   |
-| `e2e/`                 | Playwright tesztek és a coverage fixture, lásd `e2e/CLAUDE.md`                          |
+| `e2e/`                 | Playwright tesztek és a coverage fixture                                                |
 
 ## Függőségi irány
 
@@ -38,6 +38,11 @@ stb.), és ez eltér a `src/` böngésző-jellegű (DOM) környezetétől - ezé
 script két `tsc` hívást futtat egymás után. A `vite.config.ts` és a `playwright.config.ts`
 egyik tsconfig `include`-jában sincs benne, ezek az ESLint `allowDefaultProject`
 mechanizmusán keresztül vannak lintelve (lásd a gyökér `eslint.config.ts` megjegyzését).
+
+Az `e2e/coverage-fixture.ts` `declare global { var __coverage__: unknown }` ambiens
+deklarációja szükséges, mert a `page.evaluate()` callback a böngészőben fut, és a
+`unicorn/prefer-global-this` szabály miatt `globalThis`-en keresztül kell hivatkozni rá,
+nem `window`-n.
 
 ## Kapcsolódó dokumentumok
 
