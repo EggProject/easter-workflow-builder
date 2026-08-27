@@ -5,7 +5,6 @@ import { callMiniMax, isVlmResponse, PATH_VLM, resolveMiniMaxConfig } from '@eas
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
-import { ENV_MINIMAX_CODING_PLAN_API_KEY } from './environment-variable-name.ts';
 
 // Lapos séma két kötelező szöveges mezővel, felsorolás és beágyazott objektum
 // nélkül.
@@ -31,7 +30,7 @@ export function createImageUnderstandingTool(
     if (trimmedPrompt.length === 0 || trimmedSource.length === 0) {
       return errorToolResult('A kérdés és a kép forrása is kötelező, egyik sem lehet üres.');
     }
-    const config = resolveMiniMaxConfig(dependencies.environment, ENV_MINIMAX_CODING_PLAN_API_KEY);
+    const config = resolveMiniMaxConfig(dependencies.environment);
     if (!isOkOutcome(config)) {
       return errorToolResult(config.message);
     }
