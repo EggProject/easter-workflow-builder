@@ -1,13 +1,15 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
+import {
+  callMiniMax,
+  ENV_MINIMAX_API_KEY,
+  formatSearchResponse,
+  isSearchResponse,
+  PATH_SEARCH,
+  resolveMiniMaxConfig,
+} from '@easter-workflow-builder/minimax-client';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import { ENV_MINIMAX_API_KEY } from '../config/environment-variable-name.ts';
-import { resolveMiniMaxConfig } from '../config/resolve-minimax-config.ts';
-import { callMiniMax } from '../minimax/call-minimax.ts';
-import { PATH_SEARCH } from '../minimax/endpoint-path.ts';
-import { formatSearchResponse } from '../minimax/format-search-response.ts';
-import { isSearchResponse } from '../minimax/is-search-response.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 
 // Lapos séma, egyetlen kötelező szöveges mezővel. A mérésünk szerint a MiniMax

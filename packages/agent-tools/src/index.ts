@@ -4,10 +4,7 @@
 export {
   ENV_FIRECRAWL_BASE_URL,
   ENV_FIRECRAWL_TIMEOUT_MS,
-  ENV_MINIMAX_API_KEY,
-  ENV_MINIMAX_BASE_URL,
   ENV_MINIMAX_CODING_PLAN_API_KEY,
-  ENV_MINIMAX_TIMEOUT_MS,
 } from './config/environment-variable-name.ts';
 
 export type { AgentToolDependencies } from './tools/agent-tool-dependencies.ts';

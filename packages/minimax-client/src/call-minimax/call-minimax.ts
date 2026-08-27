@@ -1,7 +1,7 @@
 import { postJson, type FetchFunction } from '@easter-workflow-builder/http-client';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
-import type { MiniMaxConfig } from '../config/minimax-config.ts';
-import { isMiniMaxEnvelope } from './is-minimax-envelope.ts';
+import { isMiniMaxEnvelope } from '../envelope/is-minimax-envelope.ts';
+import type { MiniMaxConfig } from '../minimax-config/minimax-config.ts';
 
 /**
  * Közös MiniMax hívás a kereső és a képértelmező végponthoz.

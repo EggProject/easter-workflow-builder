@@ -76,6 +76,7 @@
         "@easter-workflow-builder/http-client": "workspace:*",
         "@easter-workflow-builder/image-source": "workspace:*",
         "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+        "@easter-workflow-builder/minimax-client": "workspace:*",
         "@easter-workflow-builder/result": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
         "zod": "^4.0.0",
@@ -173,6 +174,21 @@
     "packages/mcp-tool-kit": {
       "name": "@easter-workflow-builder/mcp-tool-kit",
       "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/minimax-client": {
+      "name": "@easter-workflow-builder/minimax-client",
+      "version": "0.0.0",
+      "dependencies": {
+        "@easter-workflow-builder/env-reader": "workspace:*",
+        "@easter-workflow-builder/http-client": "workspace:*",
+        "@easter-workflow-builder/result": "workspace:*",
+        "@easter-workflow-builder/typeguards": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -410,6 +426,8 @@
     "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
 
     "@easter-workflow-builder/mcp-tool-kit": ["@easter-workflow-builder/mcp-tool-kit@workspace:packages/mcp-tool-kit"],
+
+    "@easter-workflow-builder/minimax-client": ["@easter-workflow-builder/minimax-client@workspace:packages/minimax-client"],
 
     "@easter-workflow-builder/protocol": ["@easter-workflow-builder/protocol@workspace:packages/protocol"],
 

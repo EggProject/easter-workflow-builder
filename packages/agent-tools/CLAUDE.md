@@ -27,17 +27,17 @@ ezért a szolgáltatás eldobó viselkedése nem érinti.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti négy mappa felelőssége:
+Az `src/` alatti három mappa felelőssége:
 
-| Mappa        | Felelősség                                                                                                                              |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `config/`    | a MiniMax és a Firecrawl szolgáltatás specifikus konfigurációja (a generikus olvasás a `@easter-workflow-builder/env-reader` csomagban) |
-| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                                                                              |
-| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                                                                                            |
-| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója                                                                        |
+| Mappa        | Felelősség                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config/`    | a Firecrawl szolgáltatás specifikus konfigurációja és a `MINIMAX_CODING_PLAN_API_KEY` változónév (a generikus olvasás a `@easter-workflow-builder/env-reader` csomagban) |
+| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                                                                                                                             |
+| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója                                                                                                         |
 
-A képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64) a
-`@easter-workflow-builder/image-source` csomagban van.
+A MiniMax kereső és képértelmező végpont drótszintű alakja a
+`@easter-workflow-builder/minimax-client`, a képértelmező eszköz bemenetének feloldása
+(data URL/HTTP/fájl -> base64) a `@easter-workflow-builder/image-source` csomagban van.
 
 ## Környezeti változók
 
@@ -50,8 +50,10 @@ A képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64
 | `FIRECRAWL_BASE_URL`          | oldal letöltés         | a felhasználó helyi Firecrawl példánya         |
 | `FIRECRAWL_TIMEOUT_MS`        | oldal letöltés         | a Firecrawl dokumentált scrape alapértelmezése |
 
-A konkrét értékek és az indoklásuk a `src/config/default-config-value.ts` fájlban vannak,
-mindegyik mellett megjelölve, hogy dokumentált vagy önkényes.
+A Firecrawl konkrét értékei és indoklásuk a `src/config/default-config-value.ts` fájlban
+vannak, a MiniMax konkrét értékei a `@easter-workflow-builder/minimax-client` csomag
+`minimax-config/default-config-value.ts` fájljában, mindegyik mellett megjelölve, hogy
+dokumentált vagy önkényes.
 
 ## Függőségi irány
 
@@ -60,6 +62,7 @@ Az `agent-tools` az `@easter-workflow-builder/agent-tool-id` (az `AgentToolId` s
 `@easter-workflow-builder/http-client` (a `fetch` fölötti HTTP réteg miatt), a
 `@easter-workflow-builder/image-source` (a kép feloldása miatt), a
 `@easter-workflow-builder/mcp-tool-kit` (az MCP válasz konstruktorok miatt), a
+`@easter-workflow-builder/minimax-client` (a MiniMax hívások miatt), a
 `@easter-workflow-builder/result` (az `Outcome<TValue>` eredménytípus miatt) és a `typeguards`
 csomagtól függ, valamint az `@anthropic-ai/claude-agent-sdk` és a `zod` külső csomagoktól.
 Semmilyen más workspace csomagtól nem függ, és egyetlen workspace csomag sem függhet tőle úgy,
@@ -81,8 +84,8 @@ mert a visszautasított tool séma nem eredményez újrapróbálkozást.
 
 **Ismeretlen képformátum nem tippelhető el.** A referencia implementáció ismeretlen
 kiterjesztés és ismeretlen `content-type` esetén JPEG-et feltételezett, ami néma hibához
-vezetett volna: az `image/` mappa ilyenkor hibaágat ad, ami megnevezi a támogatott
-formátumokat.
+vezetett volna: a `@easter-workflow-builder/image-source` csomag ilyenkor hibaágat ad, ami
+megnevezi a támogatott formátumokat.
 
 ## Kapcsolódó dokumentumok
 
