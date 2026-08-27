@@ -5,7 +5,7 @@
 Firecrawl HTTP kliens: konfiguráció feloldás, scrape hívás, a válasz szűkítése és markdownná
 formázása. A `packages/agent-tools` csomag szétbontásából jött létre (SPEC-002 5.11 szekció).
 Ide **nem** tartozik az MCP eszköz definíció: a `web_fetch` eszköz a
-`@easter-workflow-builder/tool-web-fetch` csomagban áll.
+`@easter-workflow-builder/tool-firecrawl-web-fetch` csomagban áll.
 
 ## Fájlok
 

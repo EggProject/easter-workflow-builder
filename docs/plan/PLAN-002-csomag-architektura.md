@@ -252,7 +252,7 @@ Ezen felül: a `resolveMiniMaxConfig` `apiKeyVariableName` paraméterének törl
 
 ### T-002-18
 
-**Leírás.** `@easter-workflow-builder/tool-web-search` csomag létrehozása (SPEC-002 5.14): a `create-web-search-tool.ts` és `.spec.ts` költöztetése, plusz az ÚJ, típus-only `web-search-tool-dependencies.ts` fájl, ami csak a `fetchFunction` és az `environment` mezőt tartalmazza. Mindhárom fájl egy téma mappában áll (`web-search-tool`). Az `agent-tools/src/tools/create-web-search-tool.*` fájlok megszűnnek, a `create-agent-tool.ts` az új csomagból importál.
+**Leírás.** `@easter-workflow-builder/tool-minimax-web-search` csomag létrehozása (SPEC-002 5.14): a `create-web-search-tool.ts` és `.spec.ts` költöztetése, plusz az ÚJ, típus-only `web-search-tool-dependencies.ts` fájl, ami csak a `fetchFunction` és az `environment` mezőt tartalmazza. Mindhárom fájl egy téma mappában áll (`web-search-tool`). Az `agent-tools/src/tools/create-web-search-tool.*` fájlok megszűnnek, a `create-agent-tool.ts` az új csomagból importál.
 
 **A `.spec.ts` tartalmi igazítása kötelező** (SPEC-002 5. szekció, "Az importok átírása kötelező"): a `create-web-search-tool.spec.ts` ma importálja a `../image/read-file-function.ts` típust a közös függőség objektum miatt. Az új, szűk interfész mellett ez a típus nem kell, tehát az importot **törölni** kell, nem áthelyezni. A bent hagyott import a `noUnusedLocals` beállítás miatt fordítási hiba.
 
@@ -260,27 +260,27 @@ Ezen felül: a `resolveMiniMaxConfig` `apiKeyVariableName` paraméterének törl
 
 **Model.** `sonnet`
 
-**Elfogadási kritérium.** `packages/tool-web-search/` egy téma mappával (`web-search-tool`) létezik, benne három fájllal. A csomag `dependencies` mezőjében nem szerepel `@easter-workflow-builder/http-client`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/image-source`, másik `tool-*` csomag vagy `@easter-workflow-builder/agent-tool-bundle`. A tool minden hibaága változatlan üzenettel, `isError: true` jelzéssel tér vissza. Mind a hét kapu zöld.
+**Elfogadási kritérium.** `packages/tool-minimax-web-search/` egy téma mappával (`web-search-tool`) létezik, benne három fájllal. A csomag `dependencies` mezőjében nem szerepel `@easter-workflow-builder/http-client`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/image-source`, másik `tool-*` csomag vagy `@easter-workflow-builder/agent-tool-bundle`. A tool minden hibaága változatlan üzenettel, `isError: true` jelzéssel tér vissza. Mind a hét kapu zöld.
 
 ### T-002-19
 
-**Leírás.** `@easter-workflow-builder/tool-web-fetch` csomag létrehozása (SPEC-002 5.15), ugyanezzel a mintával, a `scrape-call` téma `scrapePage` függvényét használva, egy téma mappával (`web-fetch-tool`). A `create-web-fetch-tool.spec.ts` fájlból ugyanúgy törlendő a `ReadFileFunction` import, mint a T-002-18 lépésben.
+**Leírás.** `@easter-workflow-builder/tool-firecrawl-web-fetch` csomag létrehozása (SPEC-002 5.15), ugyanezzel a mintával, a `scrape-call` téma `scrapePage` függvényét használva, egy téma mappával (`web-fetch-tool`). A `create-web-fetch-tool.spec.ts` fájlból ugyanúgy törlendő a `ReadFileFunction` import, mint a T-002-18 lépésben.
 
 **Függőség.** T-002-18
 
 **Model.** `sonnet`
 
-**Elfogadási kritérium.** `packages/tool-web-fetch/` egy téma mappával (`web-fetch-tool`) létezik, benne három fájllal. A csomag `dependencies` mezőjében **nem** szerepel a `@easter-workflow-builder/http-client`. A tool hibaágai és üzenetei változatlanok. Mind a hét kapu zöld.
+**Elfogadási kritérium.** `packages/tool-firecrawl-web-fetch/` egy téma mappával (`web-fetch-tool`) létezik, benne három fájllal. A csomag `dependencies` mezőjében **nem** szerepel a `@easter-workflow-builder/http-client`. A tool hibaágai és üzenetei változatlanok. Mind a hét kapu zöld.
 
 ### T-002-20
 
-**Leírás.** `@easter-workflow-builder/tool-understand-image` csomag létrehozása (SPEC-002 5.16), az `understand-image-tool-dependencies.ts` típus-only fájllal, ami mindhárom függőség mezőt tartalmazza. Mindhárom fájl egy téma mappában áll (`understand-image-tool`), a mappa neve az eszköz neve, nem a gyártófüggvényé. Az `agent-tools/src/tools/` alatt már csak az összeállító fájlok maradnak.
+**Leírás.** `@easter-workflow-builder/tool-minimax-understand-image` csomag létrehozása (SPEC-002 5.16), az `understand-image-tool-dependencies.ts` típus-only fájllal, ami mindhárom függőség mezőt tartalmazza. Mindhárom fájl egy téma mappában áll (`understand-image-tool`), a mappa neve az eszköz neve, nem a gyártófüggvényé. Az `agent-tools/src/tools/` alatt már csak az összeállító fájlok maradnak.
 
 **Függőség.** T-002-19
 
 **Model.** `sonnet`
 
-**Elfogadási kritérium.** `packages/tool-understand-image/` egy téma mappával (`understand-image-tool`) létezik, benne három fájllal. A tool a `resolveMiniMaxConfig` paraméter nélküli alakját hívja. Minden hibaág (üres bemenet, hiányzó kulcs, feloldhatatlan kép, elérhetetlen szolgáltatás, ismeretlen válasz alak) fedve van. Mind a hét kapu zöld.
+**Elfogadási kritérium.** `packages/tool-minimax-understand-image/` egy téma mappával (`understand-image-tool`) létezik, benne három fájllal. A tool a `resolveMiniMaxConfig` paraméter nélküli alakját hívja. Minden hibaág (üres bemenet, hiányzó kulcs, feloldhatatlan kép, elérhetetlen szolgáltatás, ismeretlen válasz alak) fedve van. Mind a hét kapu zöld.
 
 ### T-002-21
 

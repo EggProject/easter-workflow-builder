@@ -6,7 +6,7 @@ MiniMax HTTP kliens: konfiguráció feloldás, a `base_resp` burkoló kezelése,
 képértelmező válaszok szűkítése és formázása. A `packages/agent-tools` csomag szétbontásából
 jött létre (SPEC-002 5.10 szekció). Ide **nem** tartozik az MCP eszköz definíció: a
 `web_search` és az `understand_image` eszköz külön csomagokban áll
-(`@easter-workflow-builder/tool-web-search`, `@easter-workflow-builder/tool-understand-image`).
+(`@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-minimax-understand-image`).
 
 ## Fájlok
 
@@ -46,7 +46,7 @@ képértelmezéshez szánt külön Coding Plan token végül nem valósult meg (
 mérés szerint ugyanaz a pay-as-you-go platform kulcs mindkét MiniMax végponton
 `status_code: 0` értéket adott, tehát a mérés a külön kulcsot nem igazolta. A
 `resolveMiniMaxConfig` ezért a paraméter helyett közvetlenül a `MINIMAX_API_KEY` változót
-olvassa, és mindkét hívó (`tool-web-search`, `tool-understand-image`) ugyanabból a változóból
+olvassa, és mindkét hívó (`tool-minimax-web-search`, `tool-minimax-understand-image`) ugyanabból a változóból
 dolgozik.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés

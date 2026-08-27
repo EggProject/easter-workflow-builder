@@ -1,4 +1,4 @@
-# packages/tool-understand-image
+# packages/tool-minimax-understand-image
 
 ## Mi ez a mappa
 

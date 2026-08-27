@@ -31,9 +31,9 @@ export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   db: 2,
   ui: 2,
   // L3
-  'tool-web-search': 3,
-  'tool-web-fetch': 3,
-  'tool-understand-image': 3,
+  'tool-minimax-web-search': 3,
+  'tool-firecrawl-web-fetch': 3,
+  'tool-minimax-understand-image': 3,
   'provider-registry': 3,
   // L4
   'agent-tool-bundle': 4,
