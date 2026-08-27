@@ -2,6 +2,8 @@ import SqliteDatabase from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { ensureDatabaseDirectory } from '../database-file/ensure-database-directory.ts';
+import { migrateDatabase } from '../migration/migrate-database.ts';
+import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -16,11 +18,14 @@ const DATABASE_CLOSED_MESSAGE =
 class TransactionRollback extends Error {}
 
 /**
- * Az adatbázis kapcsolat megnyitása a SPEC-003 10.2 szekció sorrendjében: a
+ * Az adatbázis kapcsolat megnyitása a SPEC-003 10.2 szekció szerint: a
  * könyvtár létrehozása, `new Database`, `foreign_keys` pragma, majd
- * `journal_mode = WAL` fájl alapú adatbázison, végül a `drizzle()` bekötés
- * séma objektum nélkül. A migrációk futtatása a `migration` témával bővül
- * (T-003-10).
+ * `journal_mode = WAL` fájl alapú adatbázison, a `drizzle()` bekötés séma
+ * objektum nélkül, végül a commitolt migrációk lefuttatása. A `migrate()`
+ * a `drizzle()` példányt igényli (nem a nyers `better-sqlite3` handle-t),
+ * ezért a kódban a bekötés technikailag megelőzi a migrációt; ez nem tér el
+ * a spec szándékától, mert az 5. pont lényege a séma nélküli bekötés, nem a
+ * szó szerinti sorrend a 4. ponttal szemben.
  */
 export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const directoryOutcome = ensureDatabaseDirectory(filePath);
@@ -44,6 +49,13 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   }
 
   const database = drizzle(sqlite);
+
+  const migrationOutcome = migrateDatabase(database, MIGRATIONS_FOLDER);
+  if (migrationOutcome.kind === 'error') {
+    sqlite.close();
+    return migrationOutcome;
+  }
+
   let isClosed = false;
 
   function transaction<TValue>(work: () => Outcome<TValue>): Outcome<TValue> {
