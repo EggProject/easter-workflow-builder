@@ -148,6 +148,34 @@
         "vitest": "catalog:",
       },
     },
+    "packages/provider-claude-subscription": {
+      "name": "@easter-workflow-builder/provider-claude-subscription",
+      "version": "0.0.0",
+      "dependencies": {
+        "@easter-workflow-builder/evidence": "workspace:*",
+        "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/provider-minimax": {
+      "name": "@easter-workflow-builder/provider-minimax",
+      "version": "0.0.0",
+      "dependencies": {
+        "@easter-workflow-builder/evidence": "workspace:*",
+        "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/providers": {
       "name": "@easter-workflow-builder/providers",
       "version": "0.0.0",
@@ -157,6 +185,8 @@
         "@easter-workflow-builder/evidence": "workspace:*",
         "@easter-workflow-builder/evidence-sources": "workspace:*",
         "@easter-workflow-builder/provider-capability": "workspace:*",
+        "@easter-workflow-builder/provider-claude-subscription": "workspace:*",
+        "@easter-workflow-builder/provider-minimax": "workspace:*",
       },
       "devDependencies": {
         "vitest": "catalog:",
@@ -317,6 +347,10 @@
     "@easter-workflow-builder/protocol": ["@easter-workflow-builder/protocol@workspace:packages/protocol"],
 
     "@easter-workflow-builder/provider-capability": ["@easter-workflow-builder/provider-capability@workspace:packages/provider-capability"],
+
+    "@easter-workflow-builder/provider-claude-subscription": ["@easter-workflow-builder/provider-claude-subscription@workspace:packages/provider-claude-subscription"],
+
+    "@easter-workflow-builder/provider-minimax": ["@easter-workflow-builder/provider-minimax@workspace:packages/provider-minimax"],
 
     "@easter-workflow-builder/providers": ["@easter-workflow-builder/providers@workspace:packages/providers"],
 

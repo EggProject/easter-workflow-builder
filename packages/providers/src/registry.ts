@@ -1,5 +1,5 @@
-import { claudeSubscriptionProvider } from './claude-subscription/descriptor.ts';
-import { minimaxProvider } from './minimax/descriptor.ts';
+import { claudeSubscriptionProvider } from '@easter-workflow-builder/provider-claude-subscription';
+import { minimaxProvider } from '@easter-workflow-builder/provider-minimax';
 
 /**
 A két provider leíró típusa, providerenként eltérő modell- és családazonosítóval.

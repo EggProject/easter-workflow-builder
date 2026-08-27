@@ -11,10 +11,10 @@ export type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/prov
 export type { AgentToolRecommendation } from '@easter-workflow-builder/provider-capability';
 export type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 
-export type { MiniMaxModelId } from './minimax/model-id.ts';
-export type { MiniMaxFamilyId } from './minimax/family-id.ts';
-export type { ClaudeModelId } from './claude-subscription/model-id.ts';
-export type { ClaudeFamilyId } from './claude-subscription/family-id.ts';
+export type { MiniMaxModelId } from '@easter-workflow-builder/provider-minimax';
+export type { MiniMaxFamilyId } from '@easter-workflow-builder/provider-minimax';
+export type { ClaudeModelId } from '@easter-workflow-builder/provider-claude-subscription';
+export type { ClaudeFamilyId } from '@easter-workflow-builder/provider-claude-subscription';
 
 export type { ProviderRegistry } from './registry.ts';
 export { providerRegistry } from './registry.ts';
