@@ -24,6 +24,7 @@ describe('migrateDatabase', () => {
     expect(result).toStrictEqual({ kind: 'ok', value: undefined });
     expect(readTableNames(sqlite)).toStrictEqual([
       '__drizzle_migrations',
+      'graph_snapshot',
       'workflow',
       'workflow_edge',
       'workflow_node',
