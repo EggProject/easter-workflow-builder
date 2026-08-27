@@ -1,11 +1,11 @@
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 import type { AgentToolBundle } from './agent-tool-bundle.ts';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
-import { agentToolReference } from './agent-tool-reference.ts';
-import { AGENT_TOOLS_SERVER_NAME } from './agent-tools-server-name.ts';
-import { createAgentTool } from './create-agent-tool.ts';
-import { defaultAgentToolDependencies } from './default-agent-tool-dependencies.ts';
+import type { AgentToolDependencies } from '../tool-dependencies/agent-tool-dependencies.ts';
+import { defaultAgentToolDependencies } from '../tool-dependencies/default-agent-tool-dependencies.ts';
+import { agentToolReference } from '../tool-reference/agent-tool-reference.ts';
+import { AGENT_TOOLS_SERVER_NAME } from '../tool-reference/agent-tools-server-name.ts';
+import { createAgentTool } from '../tool-factory/create-agent-tool.ts';
 
 /**
  * Lépésenként kapcsolható eszközkészlet összeállítása. A hívó megadja, mely

@@ -57,30 +57,28 @@
         "@easter-workflow-builder/provider-registry": "workspace:*",
       },
     },
-    "packages/agent-tool-id": {
-      "name": "@easter-workflow-builder/agent-tool-id",
+    "packages/agent-tool-bundle": {
+      "name": "@easter-workflow-builder/agent-tool-bundle",
       "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/agent-tool-id": "workspace:*",
+        "@easter-workflow-builder/env-reader": "workspace:*",
+        "@easter-workflow-builder/http-client": "workspace:*",
+        "@easter-workflow-builder/image-source": "workspace:*",
+        "@easter-workflow-builder/tool-understand-image": "workspace:*",
+        "@easter-workflow-builder/tool-web-fetch": "workspace:*",
+        "@easter-workflow-builder/tool-web-search": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
     },
-    "packages/agent-tools": {
-      "name": "@easter-workflow-builder/agent-tools",
+    "packages/agent-tool-id": {
+      "name": "@easter-workflow-builder/agent-tool-id",
       "version": "0.0.0",
-      "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "@easter-workflow-builder/agent-tool-id": "workspace:*",
-        "@easter-workflow-builder/env-reader": "workspace:*",
-        "@easter-workflow-builder/firecrawl-client": "workspace:*",
-        "@easter-workflow-builder/http-client": "workspace:*",
-        "@easter-workflow-builder/image-source": "workspace:*",
-        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
-        "@easter-workflow-builder/minimax-client": "workspace:*",
-        "@easter-workflow-builder/result": "workspace:*",
-        "zod": "^4.0.0",
-      },
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -282,6 +280,55 @@
         "vitest": "catalog:",
       },
     },
+    "packages/tool-understand-image": {
+      "name": "@easter-workflow-builder/tool-understand-image",
+      "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/image-source": "workspace:*",
+        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+        "@easter-workflow-builder/minimax-client": "workspace:*",
+        "@easter-workflow-builder/result": "workspace:*",
+        "zod": "^4.0.0",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/tool-web-fetch": {
+      "name": "@easter-workflow-builder/tool-web-fetch",
+      "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/firecrawl-client": "workspace:*",
+        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+        "@easter-workflow-builder/result": "workspace:*",
+        "zod": "^4.0.0",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/tool-web-search": {
+      "name": "@easter-workflow-builder/tool-web-search",
+      "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+        "@easter-workflow-builder/minimax-client": "workspace:*",
+        "@easter-workflow-builder/result": "workspace:*",
+        "zod": "^4.0.0",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/typeguards": {
       "name": "@easter-workflow-builder/typeguards",
       "version": "0.0.0",
@@ -416,9 +463,9 @@
 
     "@easter-workflow-builder/agent": ["@easter-workflow-builder/agent@workspace:packages/agent"],
 
-    "@easter-workflow-builder/agent-tool-id": ["@easter-workflow-builder/agent-tool-id@workspace:packages/agent-tool-id"],
+    "@easter-workflow-builder/agent-tool-bundle": ["@easter-workflow-builder/agent-tool-bundle@workspace:packages/agent-tool-bundle"],
 
-    "@easter-workflow-builder/agent-tools": ["@easter-workflow-builder/agent-tools@workspace:packages/agent-tools"],
+    "@easter-workflow-builder/agent-tool-id": ["@easter-workflow-builder/agent-tool-id@workspace:packages/agent-tool-id"],
 
     "@easter-workflow-builder/core": ["@easter-workflow-builder/core@workspace:packages/core"],
 
@@ -461,6 +508,12 @@
     "@easter-workflow-builder/scripts": ["@easter-workflow-builder/scripts@workspace:tooling/scripts"],
 
     "@easter-workflow-builder/server": ["@easter-workflow-builder/server@workspace:apps/server"],
+
+    "@easter-workflow-builder/tool-understand-image": ["@easter-workflow-builder/tool-understand-image@workspace:packages/tool-understand-image"],
+
+    "@easter-workflow-builder/tool-web-fetch": ["@easter-workflow-builder/tool-web-fetch@workspace:packages/tool-web-fetch"],
+
+    "@easter-workflow-builder/tool-web-search": ["@easter-workflow-builder/tool-web-search@workspace:packages/tool-web-search"],
 
     "@easter-workflow-builder/tsconfig": ["@easter-workflow-builder/tsconfig@workspace:tooling/tsconfig"],
 

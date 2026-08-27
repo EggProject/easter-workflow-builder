@@ -1,8 +1,8 @@
 import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
-import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';
-import { createWebFetchTool } from './create-web-fetch-tool.ts';
-import { createWebSearchTool } from './create-web-search-tool.ts';
+import { createImageUnderstandingTool } from '@easter-workflow-builder/tool-understand-image';
+import { createWebFetchTool } from '@easter-workflow-builder/tool-web-fetch';
+import { createWebSearchTool } from '@easter-workflow-builder/tool-web-search';
+import type { AgentToolDependencies } from '../tool-dependencies/agent-tool-dependencies.ts';
 
 // A három eszköz sémája eltér, ezért a közös visszatérési típus unió. Nem
 // exportált: a hívónak az egész csomagot leíró `AgentToolBundle` a felülete.
