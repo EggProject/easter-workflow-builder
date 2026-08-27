@@ -14,12 +14,19 @@ specifikáció tárgya.
 
 ## Függőségi irány
 
-Az `agent` a `core`, a `provider-registry` és a `logger` csomagtól függhet.
+Az `agent` a `core`, a `logger`, a `provider-registry` és az `agent-tool-bundle` csomagtól
+függhet (SPEC-002 4. szekció, "A frissített SPEC-001 függőségi tábla"), L4 réteg. A
+`package.json` ma csak a `core`, a `logger` és a `provider-registry` csomagot listázza
+ténylegesen: az `agent-tool-bundle` a placeholder tartalom miatt még nincs használatban, a
+felvétele a tényleges adapter réteg specifikációjának a feladata.
 
 ## Szabályok
 
-Nincs csomagra jellemző kiegészítő szabály a gyökér `CLAUDE.md`-hez képest.
+Ha a csomag valódi tartalmat kap, a `src/index.ts` `IS_AGENT_PLACEHOLDER` konstansát törölni
+kell. A `src/` alatti mappaszerkezet a téma szerinti konvenciót követi, a részletek a lenti
+SPEC-002 hivatkozásban.
 
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 3. szekció
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció
