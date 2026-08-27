@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FetchFunction } from '@easter-workflow-builder/http-client';
+import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
 import { ENV_FIRECRAWL_BASE_URL, ENV_FIRECRAWL_TIMEOUT_MS } from '../config/environment-variable-name.ts';
-import type { ReadFileFunction } from '../image/read-file-function.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { createWebFetchTool } from './create-web-fetch-tool.ts';
 

@@ -13,6 +13,7 @@
     "@easter-workflow-builder/agent-tool-id": "workspace:*",
     "@easter-workflow-builder/env-reader": "workspace:*",
     "@easter-workflow-builder/http-client": "workspace:*",
+    "@easter-workflow-builder/image-source": "workspace:*",
     "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
     "@easter-workflow-builder/result": "workspace:*",
     "@easter-workflow-builder/typeguards": "workspace:*",
