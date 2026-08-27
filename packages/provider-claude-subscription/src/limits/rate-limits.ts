@@ -1,5 +1,5 @@
 import type { RateLimitCapability } from '@easter-workflow-builder/provider-capability';
-import type { ClaudeModelId } from './model-id.ts';
+import type { ClaudeModelId } from '../model-catalog/model-id.ts';
 
 export const claudeSubscriptionRateLimits: RateLimitCapability<ClaudeModelId> = {
   // Az előfizetéses (Pro/Max) út gördülő 5 órás és heti ablakkal működik, publikus RPM/TPM szám nincs hozzá (https://code.claude.com/docs/en/costs), ezért nincs bucket.

@@ -1,6 +1,6 @@
 import type { RateLimitCapability } from '@easter-workflow-builder/provider-capability';
 import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
-import type { MiniMaxModelId } from './model-id.ts';
+import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
 
 export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
   buckets: [

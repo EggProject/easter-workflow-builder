@@ -1,21 +1,21 @@
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
-import { minimaxConcurrency } from './concurrency.ts';
-import { minimaxDisallowedEnvironment } from './disallowed-environment.ts';
-import { minimaxEffort } from './effort.ts';
-import type { MiniMaxFamilyId } from './family-id.ts';
-import type { MiniMaxModelId } from './model-id.ts';
-import { minimaxModels } from './models.ts';
-import { minimaxPromptCaching } from './prompt-caching.ts';
-import { minimaxRateLimits } from './rate-limits.ts';
-import { minimaxRecommendedAgentTools } from './recommended-agent-tools.ts';
-import { minimaxRequiredEnvironment } from './required-environment.ts';
-import { minimaxServerTools } from './server-tools.ts';
-import { minimaxStreaming } from './streaming.ts';
-import { minimaxStructuredOutput } from './structured-output.ts';
-import { minimaxThinking } from './thinking.ts';
-import { minimaxToolChoice } from './tool-choice.ts';
+import { minimaxConcurrency } from '../limits/concurrency.ts';
+import { minimaxDisallowedEnvironment } from '../environment/disallowed-environment.ts';
+import { minimaxEffort } from '../request-shaping/effort.ts';
+import type { MiniMaxFamilyId } from '../model-catalog/family-id.ts';
+import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
+import { minimaxModels } from '../model-catalog/models.ts';
+import { minimaxPromptCaching } from '../request-shaping/prompt-caching.ts';
+import { minimaxRateLimits } from '../limits/rate-limits.ts';
+import { minimaxRecommendedAgentTools } from '../tool-support/recommended-agent-tools.ts';
+import { minimaxRequiredEnvironment } from '../environment/required-environment.ts';
+import { minimaxServerTools } from '../tool-support/server-tools.ts';
+import { minimaxStreaming } from '../request-shaping/streaming.ts';
+import { minimaxStructuredOutput } from '../request-shaping/structured-output.ts';
+import { minimaxThinking } from '../request-shaping/thinking.ts';
+import { minimaxToolChoice } from '../request-shaping/tool-choice.ts';
 
 // A fő kérés header listája a véglegesített konfigurációval, suffixes modellazonosítóval mérve.
 const anthropicBetaHeaders: Fact<readonly string[]> = {

@@ -13,7 +13,9 @@
     "@easter-workflow-builder/evidence": "workspace:*",
     "@easter-workflow-builder/evidence-sources": "workspace:*",
     "@easter-workflow-builder/agent-tool-id": "workspace:*",
-    "@easter-workflow-builder/provider-capability": "workspace:*"
+    "@easter-workflow-builder/provider-capability": "workspace:*",
+    "@easter-workflow-builder/provider-minimax": "workspace:*",
+    "@easter-workflow-builder/provider-claude-subscription": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"

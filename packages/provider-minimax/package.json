@@ -1,0 +1,21 @@
+{
+  "name": "@easter-workflow-builder/provider-minimax",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@easter-workflow-builder/provider-capability": "workspace:*",
+    "@easter-workflow-builder/evidence": "workspace:*",
+    "@easter-workflow-builder/evidence-sources": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

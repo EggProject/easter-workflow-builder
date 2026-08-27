@@ -1,6 +1,6 @@
 import type { ThinkingCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_STREAMING, DOC_THINKING, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
-import type { ClaudeFamilyId } from './family-id.ts';
+import type { ClaudeFamilyId } from '../model-catalog/family-id.ts';
 
 export const claudeSubscriptionThinking: ThinkingCapability<ClaudeFamilyId> = {
   // Az aktuális modellgeneráció adaptív thinkinget használ, a régi fix budget mód a legacy manual módhoz tartozik.

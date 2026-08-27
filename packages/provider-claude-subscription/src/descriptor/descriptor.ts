@@ -1,21 +1,21 @@
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { DOC_MODELS_LIST } from '@easter-workflow-builder/evidence-sources';
-import { claudeSubscriptionConcurrency } from './concurrency.ts';
-import { claudeSubscriptionDisallowedEnvironment } from './disallowed-environment.ts';
-import { claudeSubscriptionEffort } from './effort.ts';
-import type { ClaudeFamilyId } from './family-id.ts';
-import type { ClaudeModelId } from './model-id.ts';
-import { claudeSubscriptionModels } from './models.ts';
-import { claudeSubscriptionPromptCaching } from './prompt-caching.ts';
-import { claudeSubscriptionRateLimits } from './rate-limits.ts';
-import { claudeSubscriptionRecommendedAgentTools } from './recommended-agent-tools.ts';
-import { claudeSubscriptionRequiredEnvironment } from './required-environment.ts';
-import { claudeSubscriptionServerTools } from './server-tools.ts';
-import { claudeSubscriptionStreaming } from './streaming.ts';
-import { claudeSubscriptionStructuredOutput } from './structured-output.ts';
-import { claudeSubscriptionThinking } from './thinking.ts';
-import { claudeSubscriptionToolChoice } from './tool-choice.ts';
+import { claudeSubscriptionConcurrency } from '../limits/concurrency.ts';
+import { claudeSubscriptionDisallowedEnvironment } from '../environment/disallowed-environment.ts';
+import { claudeSubscriptionEffort } from '../request-shaping/effort.ts';
+import type { ClaudeFamilyId } from '../model-catalog/family-id.ts';
+import type { ClaudeModelId } from '../model-catalog/model-id.ts';
+import { claudeSubscriptionModels } from '../model-catalog/models.ts';
+import { claudeSubscriptionPromptCaching } from '../request-shaping/prompt-caching.ts';
+import { claudeSubscriptionRateLimits } from '../limits/rate-limits.ts';
+import { claudeSubscriptionRecommendedAgentTools } from '../tool-support/recommended-agent-tools.ts';
+import { claudeSubscriptionRequiredEnvironment } from '../environment/required-environment.ts';
+import { claudeSubscriptionServerTools } from '../tool-support/server-tools.ts';
+import { claudeSubscriptionStreaming } from '../request-shaping/streaming.ts';
+import { claudeSubscriptionStructuredOutput } from '../request-shaping/structured-output.ts';
+import { claudeSubscriptionThinking } from '../request-shaping/thinking.ts';
+import { claudeSubscriptionToolChoice } from '../request-shaping/tool-choice.ts';
 
 const anthropicBetaHeaders: Fact<readonly string[]> = {
   state: 'unknown',
