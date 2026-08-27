@@ -1,5 +1,5 @@
 {
-  "name": "agent",
+  "name": "@easter-workflow-builder/agent",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,8 +9,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "core": "workspace:*",
-    "logger": "workspace:*",
-    "providers": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*",
+    "@easter-workflow-builder/logger": "workspace:*",
+    "@easter-workflow-builder/providers": "workspace:*"
   }
 }

@@ -10,17 +10,19 @@ wrapperek maguk bash fájlok, nem TypeScript).
 
 ## Fájlok
 
-| Fájl              | Tartalom                                                                                                                                                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_lib.sh`         | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                                                            |
-| `lint.sh`         | `turbo run lint` burkoló                                                                                                                                                                                       |
-| `typecheck.sh`    | `turbo run typecheck` burkoló                                                                                                                                                                                  |
-| `test.sh`         | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                                                          |
-| `build.sh`        | `turbo run build` burkoló                                                                                                                                                                                      |
-| `format.sh`       | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi                                        |
-| `claude-md.sh`    | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                                                                    |
-| `casing.sh`       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/find-casing-mismatches.ts`, a szabály indoklása a fájl fejlécében |
-| `e2e-coverage.sh` | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                                                          |
+| Fájl                              | Tartalom                                                                                                                                                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_lib.sh`                         | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                                                            |
+| `lint.sh`                         | `turbo run lint` burkoló                                                                                                                                                                                       |
+| `typecheck.sh`                    | `turbo run typecheck` burkoló                                                                                                                                                                                  |
+| `test.sh`                         | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                                                          |
+| `build.sh`                        | `turbo run build` burkoló                                                                                                                                                                                      |
+| `format.sh`                       | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi                                        |
+| `claude-md.sh`                    | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                                                                    |
+| `casing.sh`                       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/find-casing-mismatches.ts`, a szabály indoklása a fájl fejlécében |
+| `e2e-coverage.sh`                 | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                                                          |
+| `src/casing/`                     | téma mappa: a `casing.sh` mögötti tényleges ellenőrzés (`check-casing.ts`) és a rá épülő `.spec.ts` regressziós teszt                                                                                          |
+| `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                     |
 
 ## Szabályok
 
@@ -39,7 +41,7 @@ wrapperek maguk bash fájlok, nem TypeScript).
   vonatkozik. A tényleges ellenőrzést a `src/casing/check-casing.ts` végzi (Node 26 type
   stripping), a `casing.sh` csak a kimenetét összegzi. A gyökér `package.json`
   `check:casing` scriptje hívja. Ugyanaz a logika (`src/casing/find-casing-mismatches.ts`)
-  Vitest tesztként is fut (`src/casing/check-casing.test.ts`), amit a gyökér
+  Vitest tesztként is fut (`src/casing/check-casing.spec.ts`), amit a gyökér
   `vitest.config.ts` `tooling-scripts` projektje vesz fel - a `tooling/scripts` nincs a
   `packages/*`/`apps/*` mintában, ugyanaz a mechanizmus, mint a `wire-probe-regression`
   projektnél.
@@ -88,11 +90,14 @@ wrapperek maguk bash fájlok, nem TypeScript).
   valódi ok a le nem futott `test:e2e`. A nyers adat cache találat esetén is helyreáll,
   mert a `turbo.json` `test:e2e` taskjának `outputs` listájában szerepel az
   `e2e/.nyc_output/**`.
-- A `src/turbo-e2e-coverage-outputs.test.ts` regressziós teszt őrzi a fenti javítás
-  konfigurációs felét: a `turbo.json` `test:e2e` taskjának `outputs` listájában szerepelnie
-  kell az `e2e/.nyc_output/**` bejegyzésnek, az `inputs` listájában pedig a
-  `!**/e2e/.nyc_output/**` negációnak. Ugyanaz a mechanizmus futtatja, mint a
-  `check-casing.test.ts`-t: a gyökér `vitest.config.ts` `tooling-scripts` projektje.
+- A `src/turbo-e2e-coverage-outputs/turbo-e2e-coverage-outputs.spec.ts` regressziós teszt
+  őrzi a fenti javítás konfigurációs felét: a `turbo.json` `test:e2e` taskjának `outputs`
+  listájában szerepelnie kell az `e2e/.nyc_output/**` bejegyzésnek, az `inputs` listájában
+  pedig a `!**/e2e/.nyc_output/**` negációnak. Ugyanaz a mechanizmus futtatja, mint a
+  `check-casing.spec.ts`-t: a gyökér `vitest.config.ts` `tooling-scripts` projektje. A
+  `turbo-e2e-coverage-outputs/` mappának nincs megvalósítás fájlja, mert a teszt egy
+  konfigurációs invariánst őriz, nem egy egységet fed le
+  (`docs/spec/SPEC-002-csomag-architektura.md` 6.2 pont 5. szabálya).
 - Az `e2e-coverage.sh` az `apps/web` könyvtárából, `bun run --silent`-tel hívja a csomag
   saját `coverage:e2e:report` scriptjét, nem `bun run --filter web`-bel. Indok: a
   `--filter` minden kimeneti sor elé `web coverage:e2e:report:` előtagot fűz, ami a PR

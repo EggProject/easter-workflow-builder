@@ -51,11 +51,11 @@
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "@easter-workflow-builder/eslint-config": "workspace:*",
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
-    "eslint-config": "workspace:*",
     "eslint-config-prettier": "catalog:",
     "happy-dom": "20.11.6",
     "jiti": "2.7.0",

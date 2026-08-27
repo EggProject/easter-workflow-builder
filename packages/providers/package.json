@@ -1,5 +1,5 @@
 {
-  "name": "providers",
+  "name": "@easter-workflow-builder/providers",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,7 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "core": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"

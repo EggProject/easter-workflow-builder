@@ -1,5 +1,5 @@
 {
-  "name": "typeguards",
+  "name": "@easter-workflow-builder/typeguards",
   "version": "0.0.0",
   "type": "module",
   "private": true,

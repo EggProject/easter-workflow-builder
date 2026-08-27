@@ -1,5 +1,5 @@
 {
-  "name": "ui",
+  "name": "@easter-workflow-builder/ui",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,8 +9,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "core": "workspace:*",
-    "protocol": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*",
+    "@easter-workflow-builder/protocol": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"
