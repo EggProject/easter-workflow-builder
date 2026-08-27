@@ -1,5 +1,5 @@
 import type { StructuredOutputCapability } from '../capability/structured-output-capability.ts';
-import { DOC_EFFORT, DOC_STRUCTURED, DOC_THINKING_STEER } from '../references/document-url.ts';
+import { DOC_EFFORT, DOC_STRUCTURED, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionStructuredOutput: StructuredOutputCapability = {
   strategies: [

@@ -1,5 +1,5 @@
 import type { DisallowedEnvironmentRequirement } from '../capability/disallowed-environment-requirement.ts';
-import { RESEARCH_GATEWAY } from '../references/research-section.ts';
+import { RESEARCH_GATEWAY } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionDisallowedEnvironment: readonly DisallowedEnvironmentRequirement[] = [
   {

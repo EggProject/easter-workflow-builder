@@ -1,5 +1,5 @@
 import type { ConcurrencyCapability } from '../capability/concurrency-capability.ts';
-import { DOC_ENV_VARS } from '../references/document-url.ts';
+import { DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
 
 // A megfigyelt kérésszám csúcsa a subagent korlát plusz egy, az orchestrátor kérésével együtt.
 export const minimaxConcurrency: ConcurrencyCapability = {

@@ -1,6 +1,6 @@
 import type { ProviderCapabilityDescriptor } from '../capability/provider-capability-descriptor.ts';
 import type { Fact } from '@easter-workflow-builder/evidence';
-import { DOC_MODELS_LIST } from '../references/document-url.ts';
+import { DOC_MODELS_LIST } from '@easter-workflow-builder/evidence-sources';
 import { claudeSubscriptionConcurrency } from './concurrency.ts';
 import { claudeSubscriptionDisallowedEnvironment } from './disallowed-environment.ts';
 import { claudeSubscriptionEffort } from './effort.ts';

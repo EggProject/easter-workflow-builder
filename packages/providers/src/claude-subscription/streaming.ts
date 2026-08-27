@@ -1,5 +1,5 @@
 import type { StreamingCapability } from '../capability/streaming-capability.ts';
-import { DOC_STREAMING } from '../references/document-url.ts';
+import { DOC_STREAMING } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionStreaming: StreamingCapability = {
   sse: {

@@ -1,5 +1,5 @@
 import type { ThinkingCapability } from '../capability/thinking-capability.ts';
-import { DOC_STREAMING, DOC_THINKING, DOC_THINKING_STEER } from '../references/document-url.ts';
+import { DOC_STREAMING, DOC_THINKING, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
 import type { ClaudeFamilyId } from './family-id.ts';
 
 export const claudeSubscriptionThinking: ThinkingCapability<ClaudeFamilyId> = {

@@ -1,5 +1,5 @@
 import type { DisallowedEnvironmentRequirement } from '../capability/disallowed-environment-requirement.ts';
-import { RESEARCH_GATEWAY, RESEARCH_MINIMAX } from '../references/research-section.ts';
+import { RESEARCH_GATEWAY, RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
 
 export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequirement[] = [
   {

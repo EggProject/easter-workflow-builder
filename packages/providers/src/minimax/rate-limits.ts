@@ -1,5 +1,5 @@
 import type { RateLimitCapability } from '../capability/rate-limit-capability.ts';
-import { RESEARCH_MINIMAX } from '../references/research-section.ts';
+import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
 import type { MiniMaxModelId } from './model-id.ts';
 
 export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
