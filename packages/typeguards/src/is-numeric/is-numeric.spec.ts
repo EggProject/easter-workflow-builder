@@ -7,7 +7,7 @@ import {
   POSITIVE_FLOAT_LARGE,
   MAGIC_NUMBER_123,
   TEST_STRING_NUMERIC,
-} from '../test-constants';
+} from '../test-constants/test-constants';
 
 describe('isNumeric - valid numeric strings', () => {
   describe('integers', () => {

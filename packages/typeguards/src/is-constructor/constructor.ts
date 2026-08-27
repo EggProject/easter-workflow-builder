@@ -12,6 +12,9 @@
  * eredetileg ezt importálta a `@pct/ts-typing`-ből is, de mivel nálunk ez
  * pusztán `string` alias lenne, a `sonarjs/redundant-type-aliases` szabály
  * elutasítja - ezért az `is-numeric.ts` közvetlenül `string`-et használ.
+ *
+ * A `StringResolver<T>` típus a saját témájába, az `is-string-resolver/
+ * string-resolver.ts` fájlba került (SPEC-002 6.1 pont, T-002-23).
  */
 
 /**
@@ -25,8 +28,3 @@
  * => unknown` visszatérési predikátuma is.
  */
 export type Constructor<T> = new (...arguments_: never[]) => T;
-
-/**
- * String, vagy egy `T` kontextusból stringet előállító függvény.
- */
-export type StringResolver<T> = string | ((context: T) => string);

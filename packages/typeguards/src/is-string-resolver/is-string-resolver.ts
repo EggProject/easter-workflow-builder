@@ -1,7 +1,7 @@
 import { isFunction } from '../is-function/is-function';
 import { isConstructor } from '../is-constructor/is-constructor';
 import { isString } from '../is-string/is-string';
-import type { StringResolver } from '../types';
+import type { StringResolver } from './string-resolver';
 
 /**
  * Type guard that checks if a value is a StringResolver.

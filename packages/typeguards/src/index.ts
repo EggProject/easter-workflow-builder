@@ -1,7 +1,4 @@
-// Placeholder export, hogy a csomag lefordulhasson. A tenyleges guardokat a
-// felhasznalo masolja be, ez a fajl csak a publikus felulet (barrel) helye.
-export const IS_TYPEGUARDS_PLACEHOLDER = true;
-
+// Barrel: csak ujraexport, a csomag publikus felulete a typeguardok.
 export { isRecord } from './is-record/is-record.ts';
 export { isNonEmptyString } from './is-non-empty-string/is-non-empty-string.ts';
 export { isBoolean } from './is-boolean/is-boolean.ts';

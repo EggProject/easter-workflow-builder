@@ -9,7 +9,7 @@ import {
   DATE_YEAR_2023,
   DATE_MONTH_APRIL,
   DATE_DAY_15,
-} from '../test-constants';
+} from '../test-constants/test-constants';
 
 describe('isValidDate function', () => {
   it('should return true for valid Date objects', () => {
