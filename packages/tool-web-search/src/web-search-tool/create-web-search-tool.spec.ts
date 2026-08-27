@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchFunction } from '@easter-workflow-builder/http-client';
-import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
-import { ENV_MINIMAX_API_KEY } from '@easter-workflow-builder/minimax-client';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import { ENV_MINIMAX_API_KEY, type FetchFunction } from '@easter-workflow-builder/minimax-client';
+import type { WebSearchToolDependencies } from './web-search-tool-dependencies.ts';
 import { createWebSearchTool } from './create-web-search-tool.ts';
 
-const readFileFunction: ReadFileFunction = () => Promise.reject(new Error('nem hasznalt'));
 const failingFetch: FetchFunction = () => Promise.reject(new Error('halozati hiba'));
 const emptyEnvelopeFetch: FetchFunction = () =>
   Promise.resolve(Response.json({ base_resp: { status_code: 0, status_msg: 'success' } }));
@@ -19,8 +16,8 @@ const oneResultFetch: FetchFunction = () =>
 
 const withKey = { [ENV_MINIMAX_API_KEY]: 'kulcs' };
 
-function dependencies(fetchFunction: FetchFunction, environment: Record<string, string>): AgentToolDependencies {
-  return { fetchFunction, environment, readFileFunction };
+function dependencies(fetchFunction: FetchFunction, environment: Record<string, string>): WebSearchToolDependencies {
+  return { fetchFunction, environment };
 }
 
 describe('createWebSearchTool', () => {
