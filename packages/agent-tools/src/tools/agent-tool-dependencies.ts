@@ -1,6 +1,6 @@
 import type { EnvironmentReader } from '@easter-workflow-builder/env-reader';
 import type { FetchFunction } from '@easter-workflow-builder/http-client';
-import type { ReadFileFunction } from '../image/read-file-function.ts';
+import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
 
 /**
  * Az eszközök futásidejű függőségei. Mindhárom befecskendezhető, hogy a unit

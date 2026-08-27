@@ -1,9 +1,9 @@
 import { Buffer } from 'node:buffer';
 import { describeError, getBinary, type FetchFunction } from '@easter-workflow-builder/http-client';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/result';
-import type { ImageMediaType } from './image-media-type.ts';
-import { mediaTypeFromContentType } from './media-type-from-content-type.ts';
-import { mediaTypeFromExtension } from './media-type-from-extension.ts';
+import type { ImageMediaType } from '../media-type/image-media-type.ts';
+import { mediaTypeFromContentType } from '../media-type/media-type-from-content-type.ts';
+import { mediaTypeFromExtension } from '../media-type/media-type-from-extension.ts';
 import type { ReadFileFunction } from './read-file-function.ts';
 
 const SUPPORTED_FORMATS_HINT = 'Támogatott formátumok: JPEG, PNG, WebP.';

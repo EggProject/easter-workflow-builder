@@ -74,6 +74,7 @@
         "@easter-workflow-builder/agent-tool-id": "workspace:*",
         "@easter-workflow-builder/env-reader": "workspace:*",
         "@easter-workflow-builder/http-client": "workspace:*",
+        "@easter-workflow-builder/image-source": "workspace:*",
         "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
         "@easter-workflow-builder/result": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
@@ -144,6 +145,19 @@
       "name": "@easter-workflow-builder/http-client",
       "version": "0.0.0",
       "dependencies": {
+        "@easter-workflow-builder/result": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/image-source": {
+      "name": "@easter-workflow-builder/image-source",
+      "version": "0.0.0",
+      "dependencies": {
+        "@easter-workflow-builder/http-client": "workspace:*",
         "@easter-workflow-builder/result": "workspace:*",
       },
       "devDependencies": {
@@ -390,6 +404,8 @@
     "@easter-workflow-builder/evidence-sources": ["@easter-workflow-builder/evidence-sources@workspace:packages/evidence-sources"],
 
     "@easter-workflow-builder/http-client": ["@easter-workflow-builder/http-client@workspace:packages/http-client"],
+
+    "@easter-workflow-builder/image-source": ["@easter-workflow-builder/image-source@workspace:packages/image-source"],
 
     "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
 
