@@ -1,0 +1,375 @@
+# PLAN-002: Csomag architektúra és mappa konvenció, végrehajtás
+
+|              |                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------ |
+| Specifikáció | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md) |
+| Előzmény     | [`../spec/SPEC-001-monorepo-toolchain.md`](../spec/SPEC-001-monorepo-toolchain.md)   |
+| Branch       | `feat/spec-002-csomag-architektura`, a `main` védett                                 |
+| Lépések      | 26, nyolc fázisban                                                                   |
+
+---
+
+## A hét minőségi kapu
+
+Minden lépés végén, kivétel nélkül, mind a hét parancsnak nulla kilépési kóddal kell futnia:
+
+| #   | Parancs                | Mit véd                                            |
+| --- | ---------------------- | -------------------------------------------------- |
+| 1   | `bun run format:check` | Prettier formázás, `printWidth: 120`               |
+| 2   | `bun run typecheck`    | TypeScript 6.0.3, teljes workspace                 |
+| 3   | `bun run lint`         | ESLint 10, típusinformációval                      |
+| 4   | `bun run docs:check`   | `CLAUDE.md` minden kötelező helyen                 |
+| 5   | `bun run check:casing` | git index fájlnevek és relatív importok betűzése   |
+| 6   | `bun run test`         | Vitest, 100 százalékos lefedettség, kizárás nélkül |
+| 7   | `bun run build`        | Vite build                                         |
+
+A `bun run test:e2e` nyolcadik kapu, de ez a migráció az `apps/web` csomagot nem érinti, ezért a fázisonkénti futtatása nem kötelező. A záró fázisban egyszer le kell futnia.
+
+**Ez a lista a "zöld" definíciója minden lépés elfogadási kritériumában.** Ahol egy lépés elfogadási kritériuma azt mondja, hogy "mind a hét kapu zöld", ott ezt a hét parancsot kell érteni.
+
+**Commit lépésenként.** Minden lépés önálló, zöld commit. Kézi fájltörlés és újralétrehozás helyett `git mv`, hogy a git az átnevezést átnevezésként lássa, és a `check:casing` kapu ne bukjon el egy indexben maradt régi betűzésen.
+
+**Pusholni a végrehajtó agent nem tud.** Minden fázis végén szólni kell a usernek, hogy pusholjon, és megadni a branch nevét.
+
+---
+
+## F0 fázis: kiindulás
+
+### T-002-1
+
+**Leírás.** Alapállapot rögzítése méréssel, mielőtt bármi mozdul. A SPEC-002 2. szekció táblázatának minden számát újra kell mérni, mert a `packages/typeguards` csomagon a spec írásával párhuzamosan egy másik agent dolgozott, és a számok azóta változhattak. A mért értékeket a SPEC-002 2. szekciójába kell visszavezetni, ha eltérnek.
+
+Mérendő: `git ls-files packages/agent-tools/src | grep -v CLAUDE.md | wc -l`, ugyanez a `providers` csomagra, `git ls-files '*.test.ts' | wc -l`, `git ls-files '*.spec.ts' | wc -l`, `git ls-files '*/package.json' | wc -l`, és mind a hét kapu kilépési kódja.
+
+**Függőség.** Nincs, de **koordinációt igényel**: a `packages/typeguards` csomagon egy másik agent dolgozott. Ez a lépés csak akkor indul, ha az a munka lezárult és commitolva van. Ha a `docs:check` piros, ebben a lépésben kell zöldre állítani.
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** Mind a hét kapu zöld, és a SPEC-002 2. szekciójának minden száma megegyezik a most mért értékkel. A `bun run docs:check` kimenete `N/N kotelezo helyen van CLAUDE.md, 0 hianyzik` alakú.
+
+### T-002-2
+
+**Leírás.** A gyökér `CLAUDE.md` kiegészítése egy rövid, hivatkozó bekezdéssel a mappa konvencióról, a SPEC-002 6. szekciójára mutató relatív linkkel, a tartalom megismétlése nélkül.
+
+**Függőség.** T-002-1
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** A gyökér `CLAUDE.md` tartalmaz linket a `docs/spec/SPEC-002-csomag-architektura.md` fájlra, és nem ismétli meg a 6. szekció szabályait. Mind a hét kapu zöld.
+
+---
+
+## F1 fázis: konvenció, kockázatmentes rész
+
+### T-002-3
+
+**Leírás.** A T-002-1 lépésben mért összes `.test.ts` fájl (a mérés pillanatában 33 darab) átnevezése `.spec.ts` alakra, `git mv` paranccsal, változatlan tartalommal.
+
+**Függőség.** T-002-2
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `git ls-files '*.test.ts'` üres kimenetet ad. A `bun run test` ugyanannyi tesztet futtat le, mint előtte, és a lefedettség változatlanul 100 százalék. A `vitest.config.ts`, az `eslint.config.ts` és a `tooling/eslint-config/src/test-files.ts` **nem** módosult. Mind a hét kapu zöld.
+
+### T-002-4
+
+**Leírás.** A `tooling/eslint-config` és a `tooling/scripts` csomag `src/` fája a SPEC-002 6. szekció konvenciójára állítva: minden fájl saját, a nevével egyező mappába, egység szintű `CLAUDE.md` fájlokkal, a `casing/` csoportosító alkönyvtár feloldásával. A `tooling/scripts/casing.sh` fájlban a `check-casing.ts` útvonala ennek megfelelően frissül.
+
+Érintett fájlok: `tooling/eslint-config/src/{base,react,relaxed,test-files}.ts` (4 egység), `tooling/scripts/src/casing/{check-casing,find-casing-mismatches,find-relative-import-specifiers}.ts` plusz a `check-casing.spec.ts` (3 egység), és a `tooling/scripts/src/turbo-e2e-coverage-outputs.spec.ts`. Az utóbbi **megvalósítás fájl nélküli** regressziós teszt, tehát a SPEC-002 6.2 pont 5. szabálya vonatkozik rá: a mappa neve annak a dolognak a neve, amit őriz (`turbo-e2e-coverage-outputs`), a mappában egyetlen fájl áll, és a `CLAUDE.md` kimondja, hogy nincs megvalósítás párja.
+
+**Függőség.** T-002-3
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** A `tooling/eslint-config/src` és a `tooling/scripts/src` közvetlen gyermekei kizárólag az `index.ts` és egység mappák. Nincs `casing/` nevű mappa. A `bun run check:casing` ugyanazt a `0 eltérés` üzenetet adja, mint előtte. Mind a hét kapu zöld.
+
+### T-002-5
+
+**Leírás.** A `@easter/` névtér bevezetése mind a 16 meglévő workspace csomagra: a `package.json` `name` mező átírása, minden hivatkozó `dependencies` és `devDependencies` kulcs átírása, és minden import specifikátor frissítése a forrásban.
+
+A csomagnevek változása miatt a `bun.lock` újragenerálódik. A regenerált lockfile **ugyanabba a commitba** kerül, mint a `package.json` változások, különben a `bun install --frozen-lockfile` és vele a CI elbukna.
+
+**Függőség.** T-002-4
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** Minden `package.json` `name` mezője `@easter/` prefixszel kezdődik. A `bun.lock` a commit része, és a `bun install --frozen-lockfile` hibátlanul lefut. `grep -rn "from 'providers'\|from 'typeguards'\|from 'eslint-config'"` a forrásfájlokban nulla találatot ad. Mind a hét kapu zöld.
+
+---
+
+## F2 fázis: a `providers` csomag szétbontása
+
+Minden lépés ugyanazt a mintát követi: az új csomag létrejön, a `packages/providers` a kikerült fájlok helyett az új csomagra hivatkozik `workspace:*` függőséggel, és a `packages/providers/src` alól az érintett mappa törlődik. Így a lépés végén a `providerRegistry` fa változatlanul összeáll, és a kapuk zöldek.
+
+### T-002-6
+
+**Leírás.** `@easter/evidence` csomag létrehozása a `packages/providers/src/evidence/` alatti 8 fájlból (SPEC-002 5.2), és a `packages/providers` átállítása rá.
+
+**Függőség.** T-002-5
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/evidence/` létezik `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájllal, hat egység mappával, mindegyikben `CLAUDE.md`. A `packages/providers/src/evidence/` nem létezik. A `packages/providers/package.json` `dependencies` mezőjében szerepel az `@easter/evidence": "workspace:*"`. Mind a hét kapu zöld, a lefedettség 100 százalék, a `vitest.config.ts` `coverage.exclude` listája változatlan.
+
+### T-002-7
+
+**Leírás.** `@easter/evidence-sources` csomag létrehozása a `packages/providers/src/references/` alatti 3 fájlból (SPEC-002 5.3), és a `packages/providers` átállítása rá.
+
+**Függőség.** T-002-6
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/evidence-sources/` létezik három egység mappával. A `packages/providers/src/references/` nem létezik. A `measurementDocument` leképezés minden bejegyzése változatlan. Mind a hét kapu zöld.
+
+### T-002-8
+
+**Leírás.** `@easter/agent-tool-id` és `@easter/provider-capability` csomag létrehozása a `packages/providers/src/capability/` alatti 22 fájlból (SPEC-002 5.4 és 5.5), és a `packages/providers` valamint a `packages/agent-tools` átállítása rájuk. Az `agent-tools` mostantól az `@easter/agent-tool-id` csomagból veszi az `AgentToolId` típust, nem a `providers` barrelből.
+
+**Függőség.** T-002-7
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/agent-tool-id/` egyetlen egység mappával, `packages/provider-capability/` 21 egység mappával létezik. Egyik `provider-capability` egységhez sincs `.spec.ts`, mert mind típus-only. A `packages/providers/src/capability/` nem létezik. A `packages/agent-tools` forrásában nincs `from '@easter/providers'` import. Mind a hét kapu zöld.
+
+### T-002-9
+
+**Leírás.** `@easter/provider-minimax` és `@easter/provider-claude-subscription` csomag létrehozása a `packages/providers/src/minimax/` és `packages/providers/src/claude-subscription/` alatti 16 plusz 16 fájlból (SPEC-002 5.6), és a `packages/providers/src/registry.ts` átállítása rájuk.
+
+**Függőség.** T-002-8
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** Mindkét csomag 16 egység mappával létezik. A `packages/providers/src` alatt már csak az `index.ts`, a `registry.ts` és a `registry.spec.ts` áll. A `registry.spec.ts` bejáró tesztje változatlan invariánsokkal zöld. Mind a hét kapu zöld.
+
+### T-002-10
+
+**Leírás.** `@easter/provider-registry` csomag létrehozása a `registry.ts` és `registry.spec.ts` fájlból, `provider-registry` néven (SPEC-002 5.7), a `packages/providers` könyvtár teljes törlése, és a migráció tartalmi azonosságának igazolása: a szétbontás előtti és utáni `providerRegistry` fa normalizált JSON alakja bitre azonos.
+
+**Függőség.** T-002-9
+
+**Model.** `opus`, mert a bizonyítás módját ki kell találni: a szétbontás előtti állapot már csak a git történetből érhető el, és a normalizált szerializálás sorrendfüggetlenségét is meg kell oldani.
+
+**Elfogadási kritérium.** A `packages/providers` könyvtár nem létezik. A `packages/provider-registry/src/provider-registry/` tartalmazza a megvalósítást és a `.spec.ts` fájlt. A normalizált JSON összehasonlítás eredménye üres diff, és a diff futtatás módja dokumentálva van a `docs/research/` alatt. Mind a hét kapu zöld, a lefedettség 100 százalék.
+
+---
+
+## F3 fázis: az `agent-tools` alaprétegei
+
+### T-002-11
+
+**Leírás.** `@easter/result` csomag létrehozása az `agent-tools/src/result/` alatti `outcome.ts`, `is-ok-outcome.ts` és `is-ok-outcome.spec.ts` fájlból (SPEC-002 5.1), és az `agent-tools` átállítása rá.
+
+**Függőség.** T-002-10
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/result/` két egység mappával létezik. Az `agent-tools/src/result/` alatt már csak a `tool-call-result.ts`, a `text-tool-result.*` és az `error-tool-result.*` áll. Mind a hét kapu zöld.
+
+### T-002-12
+
+**Leírás.** `@easter/mcp-tool-kit` csomag létrehozása az `agent-tools/src/result/` maradék öt fájljából (SPEC-002 5.13), és az `agent-tools` átállítása rá. Az `agent-tools/src/result/` könyvtár megszűnik.
+
+**Függőség.** T-002-11
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/mcp-tool-kit/` három egység mappával létezik. Az `agent-tools/src/result/` nem létezik. A `mcp-tool-kit` csomag `dependencies` mezője üres a workspace csomagok tekintetében. Mind a hét kapu zöld.
+
+### T-002-13
+
+**Leírás.** `@easter/http-client` és `@easter/env-reader` csomag létrehozása az `agent-tools/src/http/` alatti 8 fájlból és az `agent-tools/src/config/` alatti 5 generikus fájlból (SPEC-002 5.8 és 5.9), és az `agent-tools` átállítása rájuk. Az `agent-tools/src/http/` könyvtár megszűnik, a `config/` megmarad a szolgáltatás specifikus fájlokkal.
+
+**Függőség.** T-002-12
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/http-client/` öt, `packages/env-reader/` három egység mappával létezik. Az `agent-tools/src/http/` nem létezik. Egyik új csomag `dependencies` mezőjében sem szerepel a másik. Mind a hét kapu zöld.
+
+### T-002-14
+
+**Leírás.** `@easter/image-source` csomag létrehozása az `agent-tools/src/image/` alatti 8 fájlból (SPEC-002 5.12), és az `agent-tools` átállítása rá.
+
+**Függőség.** T-002-13
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/image-source/` öt egység mappával létezik. Az `agent-tools/src/image/` nem létezik. A csomag `dependencies` mezője `@easter/http-client` és `@easter/result`, más workspace csomag nem. Mind a hét kapu zöld.
+
+---
+
+## F4 fázis: a kliens csomagok
+
+### T-002-15
+
+**Leírás.** `@easter/minimax-client` csomag létrehozása az `agent-tools/src/minimax/` alatti 14 fájlból, az `agent-tools/src/config/` MiniMax specifikus 3 fájljából, valamint az `environment-variable-name.ts` és a `default-config-value.ts` MiniMax feléből (SPEC-002 5.10), és az `agent-tools` átállítása rá. A `resolveMiniMaxConfig` **változatlan szignatúrával**, az `apiKeyVariableName` paraméterrel költözik: a paraméter megszüntetése külön lépés (T-002-17).
+
+**Függőség.** T-002-14
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/minimax-client/` létezik, benne a `resolve-minimax-config`, `minimax-config`, `environment-variable-name`, `default-config-value`, `base-response`, `endpoint-path`, `is-minimax-envelope`, `call-minimax`, `search-response`, `is-search-response`, `format-search-response`, `vlm-response`, `is-vlm-response` egység mappa. Az `agent-tools/src/minimax/` nem létezik. Mind a hét kapu zöld.
+
+### T-002-16
+
+**Leírás.** `@easter/firecrawl-client` csomag létrehozása az `agent-tools/src/firecrawl/` alatti 6 fájlból, az `agent-tools/src/config/` Firecrawl specifikus 3 fájljából, valamint a kettéváló két konstans fájl Firecrawl feléből (SPEC-002 5.11). Ezen felül létrejön az ÚJ `scrape-page` egység: a `create-web-fetch-tool.ts` fájlban álló `postJson` hívás átkerül ide, `Promise<Outcome<unknown>>` szerződéssel, és a `PATH_SCRAPE` konstans kikerül a barrelből. Az `agent-tools/src/config/` és az `agent-tools/src/firecrawl/` könyvtár megszűnik.
+
+**Függőség.** T-002-15
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/firecrawl-client/` létezik a `scrape-page` egység mappával együtt, benne `scrape-page.ts` és `scrape-page.spec.ts`. A `scrapePage` mindkét ágát (sikeres hívás, elérhetetlen szolgáltatás) befecskendezett `fetch` függvénnyel fedi teszt, élő hálózat nélkül. A `PATH_SCRAPE` nem szerepel a `src/index.ts` barrelben. A `create-web-fetch-tool.spec.ts` elvárt hibaüzenetei **változatlanok**. Az `agent-tools/src/config/` és `agent-tools/src/firecrawl/` nem létezik. Mind a hét kapu zöld, a lefedettség 100 százalék.
+
+### T-002-17
+
+**Leírás.** A `MINIMAX_CODING_PLAN_API_KEY` környezeti változó megszüntetése (SPEC-002 5.10). A név a migráció kiindulópontján hét helyen fordul elő, mindegyiket kezelni kell:
+
+| Hely                                                 | Mit                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| `environment-variable-name.ts`                       | az `ENV_MINIMAX_CODING_PLAN_API_KEY` konstans törlése |
+| `packages/agent-tools/src/index.ts`                  | a barrel export törlése                               |
+| `create-image-understanding-tool.ts`, két sor        | átállítás az `ENV_MINIMAX_API_KEY` változóra          |
+| `create-image-understanding-tool.spec.ts`, három sor | fixture kulcs, bemenet és elvárt hibaüzenet átírása   |
+| `packages/agent-tools/CLAUDE.md:38`                  | az env táblázat sorának törlése                       |
+| `turbo.json:17`                                      | a `globalPassThroughEnv` lista sorának törlése        |
+
+Ezen felül: a `resolveMiniMaxConfig` `apiKeyVariableName` paraméterének törlése, és a `docs/research/2026-08-26-agent-tools.md` 4. szekciójának lezárása.
+
+**Figyelem.** A `packages/agent-tools/CLAUDE.md` fájl csak a T-002-21 lépésben törlődik a csomaggal együtt, ezért ha ez a lépés nem javítja, a saját elfogadási kritériuma bukik el.
+
+**Függőség.** T-002-16
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `grep -rn "MINIMAX_CODING_PLAN_API_KEY"` a `docs/` fán kívül nulla találatot ad, és a `docs/` fán belül csak lezárt, historikus kontextusban fordul elő. A `resolveMiniMaxConfig` nulla paraméterrel hívható a környezeti olvasón kívül. A hiányzó kulcs hibaága továbbra is fedve van, és a hibaüzenet a `MINIMAX_API_KEY` változót nevezi meg. A `turbo.json` `globalPassThroughEnv` listája öt `MINIMAX_`/`FIRECRAWL_` változót tartalmaz. Mind a hét kapu zöld.
+
+---
+
+## F5 fázis: a tool csomagok és az összeállító
+
+### T-002-18
+
+**Leírás.** `@easter/tool-web-search` csomag létrehozása (SPEC-002 5.14): a `create-web-search-tool.ts` és `.spec.ts` költöztetése, plusz az ÚJ, típus-only `web-search-tool-dependencies` egység, ami csak a `fetchFunction` és az `environment` mezőt tartalmazza. Az `agent-tools/src/tools/create-web-search-tool.*` fájlok megszűnnek, a `create-agent-tool.ts` az új csomagból importál.
+
+**A `.spec.ts` tartalmi igazítása kötelező** (SPEC-002 5. szekció, "Az importok átírása kötelező"): a `create-web-search-tool.spec.ts` ma importálja a `../image/read-file-function.ts` típust a közös függőség objektum miatt. Az új, szűk interfész mellett ez a típus nem kell, tehát az importot **törölni** kell, nem áthelyezni. A bent hagyott import a `noUnusedLocals` beállítás miatt fordítási hiba.
+
+**Függőség.** T-002-17
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/tool-web-search/` két egység mappával létezik. A csomag `dependencies` mezőjében nem szerepel `@easter/http-client`, `@easter/firecrawl-client`, `@easter/image-source`, másik `tool-*` csomag vagy `@easter/agent-tool-bundle`. A tool minden hibaága változatlan üzenettel, `isError: true` jelzéssel tér vissza. Mind a hét kapu zöld.
+
+### T-002-19
+
+**Leírás.** `@easter/tool-web-fetch` csomag létrehozása (SPEC-002 5.15), ugyanezzel a mintával, a `scrapePage` egységet használva. A `create-web-fetch-tool.spec.ts` fájlból ugyanúgy törlendő a `ReadFileFunction` import, mint a T-002-18 lépésben.
+
+**Függőség.** T-002-18
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/tool-web-fetch/` két egység mappával létezik. A csomag `dependencies` mezőjében **nem** szerepel a `@easter/http-client`. A tool hibaágai és üzenetei változatlanok. Mind a hét kapu zöld.
+
+### T-002-20
+
+**Leírás.** `@easter/tool-understand-image` csomag létrehozása (SPEC-002 5.16), az `understand-image-tool-dependencies` típus-only egységgel, ami mindhárom függőség mezőt tartalmazza. Az `agent-tools/src/tools/` alatt már csak az összeállító fájlok maradnak.
+
+**Függőség.** T-002-19
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** `packages/tool-understand-image/` két egység mappával létezik. A tool a `resolveMiniMaxConfig` paraméter nélküli alakját hívja. Minden hibaág (üres bemenet, hiányzó kulcs, feloldhatatlan kép, elérhetetlen szolgáltatás, ismeretlen válasz alak) fedve van. Mind a hét kapu zöld.
+
+### T-002-21
+
+**Leírás.** `@easter/agent-tool-bundle` csomag létrehozása az `agent-tools/src/tools/` maradék 11 fájljából (SPEC-002 5.17), a `createAgentTool` switch átkötése a három tool csomagra és a szűk függőség interfészekre, majd a `packages/agent-tools` könyvtár teljes törlése.
+
+**Függőség.** T-002-20
+
+**Model.** `opus`, mert a közös `AgentToolDependencies` objektum szétosztása három, egymástól eltérő szűk interfészre a `exactOptionalPropertyTypes` és a `strictTypeChecked` beállítás mellett nem mechanikus, és a `createAgentTool` teljes switch visszatérési uniója is átalakul.
+
+**Elfogadási kritérium.** A `packages/agent-tools` könyvtár nem létezik. A `packages/agent-tool-bundle/` hét egység mappával létezik. A `createAgentToolBundle` ismétlődő azonosítóra nem duplikálja az eszközt, ezt teszt igazolja. Egyetlen `as` és egyetlen `any` sem került a kódba. Mind a hét kapu zöld, a lefedettség 100 százalék, a `vitest.config.ts` `coverage.exclude` listája a migráció eleje óta változatlan.
+
+---
+
+## F6 fázis: a többi csomag átvizsgálása
+
+### T-002-22
+
+**Leírás.** A placeholder csomagok (`core`, `db`, `engine`, `agent`, `protocol`, `logger`, `ui`, `server`, `web`) `CLAUDE.md` fájljainak frissítése: a mappa konvenció rögzítése hivatkozásként, a függőségi irány tábla igazítása a SPEC-002 4. szekciójához, és annak kimondása, hogy az első valódi export felvételekor a `IS_<CSOMAG>_PLACEHOLDER` konstans törlendő.
+
+**Függőség.** T-002-21
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** Mind a kilenc csomag `CLAUDE.md` fájlja tartalmazza a SPEC-002 relatív linkjét és a frissített függőségi irány táblát. Egyetlen `src/index.ts` sem változott. Mind a hét kapu zöld.
+
+### T-002-23
+
+**Leírás.** A `@easter/typeguards` csomag átvizsgálása a SPEC-002 6. szekció konvenciója ellen: minden fájl saját, a nevével egyező mappában áll-e, minden egység mappában van-e `CLAUDE.md`, és a `src/` tetején maradt-e bármi az `index.ts` fájlon kívül.
+
+Két fájl **biztosan** eltér, ezeket kell mappába vinni: `packages/typeguards/src/types.ts` és `packages/typeguards/src/test-constants.ts`. Az utóbbi teszt fixture, de a neve nem `.spec.ts`, tehát a coverage hatókörében van, és a lefedettségét a rá hivatkozó `.spec.ts` fájloknak kell adniuk. Ha a `types.ts` több, egymással nem összefüggő típust exportál, a 6.4 pont szerint fel kell bontani egységenként.
+
+**Függőség.** T-002-22, és a `packages/typeguards` csomagon dolgozó párhuzamos munka lezárása.
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** A `packages/typeguards/src` közvetlen gyermekei kizárólag az `index.ts` és egység mappák, tehát sem a `types.ts`, sem a `test-constants.ts` nem áll a `src/` tetején. A barrelben nincs `IS_TYPEGUARDS_PLACEHOLDER` konstans. Minden futásidejű sort tartalmazó guardhoz tartozik `.spec.ts`. Mind a hét kapu zöld, a lefedettség 100 százalék.
+
+---
+
+## F7 fázis: zárás
+
+### T-002-24
+
+**Leírás.** Függőségi gráf ellenőrző készítése a `tooling/scripts` alá: a workspace `package.json` fájlok `dependencies` mezőiből felépíti a gráfot, kimutatja hogy aciklikus, és ellenőrzi, hogy minden él a SPEC-002 4. szekció rétegábrája szerinti irányba mutat. Token takarékos bash wrapper a `tooling/scripts` alatt, a SPEC-001 11. szekció három blokkos kimeneti szerződésével, plusz gyökér npm script.
+
+**Függőség.** T-002-23
+
+**Model.** `opus`, mert a rétegzés gépi ellenőrzéséhez ki kell találni, hogyan tárolódik a réteg-hozzárendelés úgy, hogy egy új csomag felvételekor ne lehessen elfelejteni.
+
+**Elfogadási kritérium.** A script a jelenlegi gráfra nulla kilépési kóddal fut, egy szándékosan bevezetett kör vagy visszafelé mutató él esetén nem nulla kilépési kóddal, és a hibát egy sorban nevezi meg. A hozzá tartozó Vitest regressziós teszt a `tooling/scripts` projektben fut. Mind a hét kapu zöld.
+
+### T-002-25
+
+**Leírás.** Dokumentáció zárás: a SPEC-001 érintett elfogadási kritériumainak (4., 51., 54., 55.) megjelölése azzal, hogy a SPEC-002 melyik kritériuma váltja ki őket; a SPEC-001 3. szekció csomagtérképének hivatkozása a SPEC-002 4. szekciójára; a `docs/research/` alá egy új fájl a migráció során mért tényekkel (csomagszám, `turbo run typecheck` idő hideg és meleg cache mellett, a normalizált JSON diff eredménye).
+
+**Függőség.** T-002-24
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** A SPEC-001 nem tartalmaz olyan kritériumot, ami ellentmond a SPEC-002 állapotának, jelölés nélkül. Az új research fájl minden számadata saját, most futtatott mérésből származik, becslés nincs benne. Mind a hét kapu zöld.
+
+### T-002-26
+
+**Leírás.** Adverzariális záró audit a SPEC-002 mind a 36 elfogadási kritériuma ellen, tételesen, bizonyítékkal. Aki auditál, ne az legyen, aki a migrációt végezte.
+
+**Függőség.** T-002-25
+
+**Model.** `opus`
+
+**Elfogadási kritérium.** Mind a 36 kritériumhoz tartozik vagy egy most futtatott parancs kimenete, vagy egy konkrét fájl és sor hivatkozás. Feltételezéssel lezárt kritérium nincs. Ha valamelyik nem teljesül, az javító lépésként rögzül, nem magyarázatként. A `bun run test:e2e` egyszer, ebben a lépésben lefut, nulla kilépési kóddal.
+
+---
+
+## Fázis összefoglaló
+
+| Fázis | Lépések          | Mit ad                                                                                 |
+| ----- | ---------------- | -------------------------------------------------------------------------------------- |
+| F0    | T-002-1, 2       | zöld kiindulópont, a konvenció rögzítve a gyökér `CLAUDE.md`-ben                       |
+| F1    | T-002-3, 4, 5    | `.spec.ts` végződés, a `tooling/*` csomagok konvención, `@easter/` névtér              |
+| F2    | T-002-6 ... 10   | a `providers` hét csomagra bomlik, a tartalmi azonosság igazolva                       |
+| F3    | T-002-11 ... 14  | az alaprétegek (`result`, `mcp-tool-kit`, `http-client`, `env-reader`, `image-source`) |
+| F4    | T-002-15, 16, 17 | a két kliens csomag, a Coding Plan env megszűnése                                      |
+| F5    | T-002-18 ... 21  | három tool csomag plusz az összeállító, az `agent-tools` megszűnik                     |
+| F6    | T-002-22, 23     | a többi csomag átvizsgálva a konvenció ellen                                           |
+| F7    | T-002-24, 25, 26 | gépi gráf ellenőrzés, dokumentáció zárás, adverzariális audit                          |
+
+## Definition of Done
+
+1. A SPEC-002 mind a 36 elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás.
+2. Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e`.
+3. A workspace 32 csomagból áll, mindegyik neve `@easter/` prefixszel kezdődik, és mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. `src/index.ts` és `exports` mező minden `packages/*` alatti könyvtárcsomagban van; az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagban ez a migráció előtti állapotnak megfelelően nem kötelező, a SPEC-002 12. kritériuma szerint.
+4. A `packages/agent-tools` és a `packages/providers` könyvtár nem létezik, és nincs helyettük átirányító barrel csomag.
+5. A lefedettség mind a négy metrikán 100 százalék, és a `vitest.config.ts` `coverage.exclude` listája a migráció eleje óta egyetlen sorral sem bővült.
+6. A `.github/workflows/ci.yml`, a `.github/actions/setup/action.yml`, a `tooling/tsconfig/*.json` és a `tooling/scripts/*.sh` fájlokban a migráció miatt csak a T-002-4 és a T-002-24 lépésben leírt, indokolt változás történt.
+7. Minden lépés önálló, zöld commiton áll, és minden fázis után szólt a végrehajtó a usernek, hogy pusholjon.
+8. Nyitva maradt kérdés nincs, vagy ha van, az explicit, indokolt nyitva jelöléssel áll a `docs/research/` alatt, a végrehajtási környezet igazolt korlátjára hivatkozva.
