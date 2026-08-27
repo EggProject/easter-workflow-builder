@@ -11,8 +11,6 @@ export {
   ENV_MINIMAX_TIMEOUT_MS,
 } from './config/environment-variable-name.ts';
 
-export type { ToolCallResult } from './result/tool-call-result.ts';
-
 export type { AgentToolDependencies } from './tools/agent-tool-dependencies.ts';
 export { defaultAgentToolDependencies } from './tools/default-agent-tool-dependencies.ts';
 export { AGENT_TOOLS_SERVER_NAME } from './tools/agent-tools-server-name.ts';

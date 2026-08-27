@@ -1,4 +1,5 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-tool-kit';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
 import { ENV_MINIMAX_CODING_PLAN_API_KEY } from '../config/environment-variable-name.ts';
@@ -7,8 +8,6 @@ import { resolveImageDataUrl } from '../image/resolve-image-data-url.ts';
 import { callMiniMax } from '../minimax/call-minimax.ts';
 import { PATH_VLM } from '../minimax/endpoint-path.ts';
 import { isVlmResponse } from '../minimax/is-vlm-response.ts';
-import { errorToolResult } from '../result/error-tool-result.ts';
-import { textToolResult } from '../result/text-tool-result.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 
 // Lapos séma két kötelező szöveges mezővel, felsorolás és beágyazott objektum
