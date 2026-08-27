@@ -1,4 +1,4 @@
-import type { ServerToolDescriptor } from '../capability/server-tool-descriptor.ts';
+import type { ServerToolDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { DOC_WEB_SEARCH } from '@easter-workflow-builder/evidence-sources';
 

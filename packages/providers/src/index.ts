@@ -7,9 +7,9 @@ export type { Fact } from '@easter-workflow-builder/evidence';
 export { isKnownFact } from '@easter-workflow-builder/evidence';
 export { isUnknownFact } from '@easter-workflow-builder/evidence';
 
-export type { ProviderCapabilityDescriptor } from './capability/provider-capability-descriptor.ts';
-export type { AgentToolId } from './capability/agent-tool-id.ts';
-export type { AgentToolRecommendation } from './capability/agent-tool-recommendation.ts';
+export type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
+export type { AgentToolRecommendation } from '@easter-workflow-builder/provider-capability';
+export type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 
 export type { MiniMaxModelId } from './minimax/model-id.ts';
 export type { MiniMaxFamilyId } from './minimax/family-id.ts';

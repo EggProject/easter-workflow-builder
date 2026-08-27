@@ -1,4 +1,4 @@
-import type { PromptCachingCapability } from '../capability/prompt-caching-capability.ts';
+import type { PromptCachingCapability } from '@easter-workflow-builder/provider-capability';
 import { RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
 
 export const minimaxPromptCaching: PromptCachingCapability = {

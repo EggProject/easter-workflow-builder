@@ -1,18 +1,18 @@
 import type { Fact } from '@easter-workflow-builder/evidence';
-import type { AgentToolRecommendation } from './agent-tool-recommendation.ts';
-import type { ConcurrencyCapability } from './concurrency-capability.ts';
-import type { DisallowedEnvironmentRequirement } from './disallowed-environment-requirement.ts';
-import type { EffortCapability } from './effort-capability.ts';
-import type { EnvironmentRequirement } from './environment-requirement.ts';
-import type { ModelDescriptor } from './model-descriptor.ts';
-import type { ModelsEndpointCapability } from './models-endpoint-capability.ts';
-import type { PromptCachingCapability } from './prompt-caching-capability.ts';
-import type { RateLimitCapability } from './rate-limit-capability.ts';
-import type { ServerToolDescriptor } from './server-tool-descriptor.ts';
-import type { StreamingCapability } from './streaming-capability.ts';
-import type { StructuredOutputCapability } from './structured-output-capability.ts';
-import type { ThinkingCapability } from './thinking-capability.ts';
-import type { ToolChoiceCapability } from './tool-choice-capability.ts';
+import type { AgentToolRecommendation } from '../tool-support/agent-tool-recommendation.ts';
+import type { ConcurrencyCapability } from '../limits/concurrency-capability.ts';
+import type { DisallowedEnvironmentRequirement } from '../environment/disallowed-environment-requirement.ts';
+import type { EffortCapability } from '../request-shaping/effort-capability.ts';
+import type { EnvironmentRequirement } from '../environment/environment-requirement.ts';
+import type { ModelDescriptor } from '../model-catalog/model-descriptor.ts';
+import type { ModelsEndpointCapability } from '../model-catalog/models-endpoint-capability.ts';
+import type { PromptCachingCapability } from '../request-shaping/prompt-caching-capability.ts';
+import type { RateLimitCapability } from '../limits/rate-limit-capability.ts';
+import type { ServerToolDescriptor } from '../tool-support/server-tool-descriptor.ts';
+import type { StreamingCapability } from '../request-shaping/streaming-capability.ts';
+import type { StructuredOutputCapability } from '../request-shaping/structured-output-capability.ts';
+import type { ThinkingCapability } from '../request-shaping/thinking-capability.ts';
+import type { ToolChoiceCapability } from '../request-shaping/tool-choice-capability.ts';
 
 /**
  * Egy provider drótszintű képességeinek leírója. Minden képességmező `Fact<T>`

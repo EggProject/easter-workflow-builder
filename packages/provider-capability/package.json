@@ -1,5 +1,5 @@
 {
-  "name": "@easter-workflow-builder/agent-tools",
+  "name": "@easter-workflow-builder/provider-capability",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,10 +9,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.245",
-    "@easter-workflow-builder/agent-tool-id": "workspace:*",
-    "@easter-workflow-builder/typeguards": "workspace:*",
-    "zod": "^4.0.0"
+    "@easter-workflow-builder/evidence": "workspace:*",
+    "@easter-workflow-builder/agent-tool-id": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

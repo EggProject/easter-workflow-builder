@@ -1,4 +1,4 @@
-import type { AgentToolId } from '@easter-workflow-builder/providers';
+import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { createImageUnderstandingTool } from './create-image-understanding-tool.ts';
 import { createWebFetchTool } from './create-web-fetch-tool.ts';

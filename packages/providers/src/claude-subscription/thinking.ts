@@ -1,4 +1,4 @@
-import type { ThinkingCapability } from '../capability/thinking-capability.ts';
+import type { ThinkingCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_STREAMING, DOC_THINKING, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
 import type { ClaudeFamilyId } from './family-id.ts';
 

@@ -11,7 +11,9 @@
   "dependencies": {
     "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/evidence": "workspace:*",
-    "@easter-workflow-builder/evidence-sources": "workspace:*"
+    "@easter-workflow-builder/evidence-sources": "workspace:*",
+    "@easter-workflow-builder/agent-tool-id": "workspace:*",
+    "@easter-workflow-builder/provider-capability": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"

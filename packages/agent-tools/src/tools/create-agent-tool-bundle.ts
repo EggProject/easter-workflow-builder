@@ -1,5 +1,5 @@
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
-import type { AgentToolId } from '@easter-workflow-builder/providers';
+import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 import type { AgentToolBundle } from './agent-tool-bundle.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
 import { agentToolReference } from './agent-tool-reference.ts';

@@ -1,4 +1,4 @@
-import type { EnvironmentRequirement } from '../capability/environment-requirement.ts';
+import type { EnvironmentRequirement } from '@easter-workflow-builder/provider-capability';
 import { RESEARCH_GATEWAY, RESEARCH_MINIMAX } from '@easter-workflow-builder/evidence-sources';
 
 export const minimaxRequiredEnvironment: readonly EnvironmentRequirement[] = [

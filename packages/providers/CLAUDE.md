@@ -16,11 +16,10 @@ az artefaktum hivatkozás: azok a `docs/research/` alatt maradnak.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti három mappa felelőssége:
+Az `src/` alatti két mappa felelőssége:
 
 | Mappa                  | Felelősség                                                                  |
 | ---------------------- | --------------------------------------------------------------------------- |
-| `capability/`          | a `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai          |
 | `minimax/`             | a `minimax` provider kitöltött, mérési adatokra épülő képességleírója       |
 | `claude-subscription/` | a `claude-subscription` provider kitöltött, hivatalos doksira épülő leírója |
 
@@ -28,11 +27,15 @@ A háromállapotú `Fact<T>` bizonyíték típus és a hozzá tartozó typeguard
 `@easter-workflow-builder/evidence` csomagba (SPEC-002 5.2 szekció, T-002-6 lépés). A nevesített
 doksi URL-ek, research szekció azonosítók és a `MeasurementId` -> docs horgony leképezés
 kiköltöztek az `@easter-workflow-builder/evidence-sources` csomagba (SPEC-002 5.3 szekció,
-T-002-7 lépés). Mindkettőre `workspace:*` függőséggel hivatkozik.
+T-002-7 lépés). A `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai kiköltöztek
+az `@easter-workflow-builder/provider-capability` csomagba, az `AgentToolId` szótár pedig az
+`@easter-workflow-builder/agent-tool-id` csomagba (SPEC-002 5.4 és 5.5 szekció, T-002-8 lépés).
+Mind a négyre `workspace:*` függőséggel hivatkozik.
 
 ## Függőségi irány
 
-A `core`, az `@easter-workflow-builder/evidence` és az `@easter-workflow-builder/evidence-sources`
+A `core`, az `@easter-workflow-builder/evidence`, az `@easter-workflow-builder/evidence-sources`,
+az `@easter-workflow-builder/agent-tool-id` és az `@easter-workflow-builder/provider-capability`
 csomagtól függhet, mástól nem (SPEC-002 4. szekció). A `core`-tól jelenleg egyetlen fájl sem
 importál, ez holt függőség, amit a SPEC-002 5.19 szekciója megfigyelt, de nem ennek a specnek a
 hatóköre javítani.

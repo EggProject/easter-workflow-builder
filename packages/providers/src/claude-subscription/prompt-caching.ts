@@ -1,4 +1,4 @@
-import type { PromptCachingCapability } from '../capability/prompt-caching-capability.ts';
+import type { PromptCachingCapability } from '@easter-workflow-builder/provider-capability';
 import { DOC_CACHING, DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionPromptCaching: PromptCachingCapability = {

@@ -1,5 +1,5 @@
 import type { Fact } from '@easter-workflow-builder/evidence';
-import type { AgentToolId } from './agent-tool-id.ts';
+import type { AgentToolId } from '@easter-workflow-builder/agent-tool-id';
 
 /**
  * Egy saját folyamatban futó eszköz ajánlása egy providerhez. A `recommended`
