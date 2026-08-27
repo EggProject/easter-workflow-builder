@@ -14,7 +14,7 @@ későbbi specifikáció tárgya.
 
 ## Függőségi irány
 
-A `server` a `core`, a `protocol`, a `db`, az `engine`, az `agent`, a `providers` és a
+A `server` a `core`, a `protocol`, a `db`, az `engine`, az `agent`, a `provider-registry` és a
 `logger` csomagtól függhet.
 
 ## Szabályok

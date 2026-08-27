@@ -11,6 +11,6 @@
   "dependencies": {
     "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/logger": "workspace:*",
-    "@easter-workflow-builder/providers": "workspace:*"
+    "@easter-workflow-builder/provider-registry": "workspace:*"
   }
 }

@@ -29,7 +29,7 @@
         "@easter-workflow-builder/engine": "workspace:*",
         "@easter-workflow-builder/logger": "workspace:*",
         "@easter-workflow-builder/protocol": "workspace:*",
-        "@easter-workflow-builder/providers": "workspace:*",
+        "@easter-workflow-builder/provider-registry": "workspace:*",
       },
     },
     "apps/web": {
@@ -54,7 +54,7 @@
       "dependencies": {
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/logger": "workspace:*",
-        "@easter-workflow-builder/providers": "workspace:*",
+        "@easter-workflow-builder/provider-registry": "workspace:*",
       },
     },
     "packages/agent-tool-id": {
@@ -176,19 +176,18 @@
         "vitest": "catalog:",
       },
     },
-    "packages/providers": {
-      "name": "@easter-workflow-builder/providers",
+    "packages/provider-registry": {
+      "name": "@easter-workflow-builder/provider-registry",
       "version": "0.0.0",
       "dependencies": {
-        "@easter-workflow-builder/agent-tool-id": "workspace:*",
-        "@easter-workflow-builder/core": "workspace:*",
-        "@easter-workflow-builder/evidence": "workspace:*",
-        "@easter-workflow-builder/evidence-sources": "workspace:*",
-        "@easter-workflow-builder/provider-capability": "workspace:*",
         "@easter-workflow-builder/provider-claude-subscription": "workspace:*",
         "@easter-workflow-builder/provider-minimax": "workspace:*",
       },
       "devDependencies": {
+        "@easter-workflow-builder/evidence": "workspace:*",
+        "@easter-workflow-builder/evidence-sources": "workspace:*",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
         "vitest": "catalog:",
       },
     },
@@ -352,7 +351,7 @@
 
     "@easter-workflow-builder/provider-minimax": ["@easter-workflow-builder/provider-minimax@workspace:packages/provider-minimax"],
 
-    "@easter-workflow-builder/providers": ["@easter-workflow-builder/providers@workspace:packages/providers"],
+    "@easter-workflow-builder/provider-registry": ["@easter-workflow-builder/provider-registry@workspace:packages/provider-registry"],
 
     "@easter-workflow-builder/scripts": ["@easter-workflow-builder/scripts@workspace:tooling/scripts"],
 
