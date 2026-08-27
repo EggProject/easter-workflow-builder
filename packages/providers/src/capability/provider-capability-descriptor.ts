@@ -1,4 +1,4 @@
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 import type { AgentToolRecommendation } from './agent-tool-recommendation.ts';
 import type { ConcurrencyCapability } from './concurrency-capability.ts';
 import type { DisallowedEnvironmentRequirement } from './disallowed-environment-requirement.ts';

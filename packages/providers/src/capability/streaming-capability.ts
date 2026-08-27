@@ -1,4 +1,4 @@
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 
 export interface StreamingCapability {
   readonly sse: Fact<boolean>;

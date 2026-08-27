@@ -1,4 +1,4 @@
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 
 export interface ModelDescriptor<TModelId extends string, TFamilyId extends string> {
   /**

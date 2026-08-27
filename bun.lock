@@ -94,6 +94,15 @@
         "@easter-workflow-builder/logger": "workspace:*",
       },
     },
+    "packages/evidence": {
+      "name": "@easter-workflow-builder/evidence",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/logger": {
       "name": "@easter-workflow-builder/logger",
       "version": "0.0.0",
@@ -110,6 +119,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/evidence": "workspace:*",
       },
       "devDependencies": {
         "vitest": "catalog:",
@@ -258,6 +268,8 @@
     "@easter-workflow-builder/engine": ["@easter-workflow-builder/engine@workspace:packages/engine"],
 
     "@easter-workflow-builder/eslint-config": ["@easter-workflow-builder/eslint-config@workspace:tooling/eslint-config"],
+
+    "@easter-workflow-builder/evidence": ["@easter-workflow-builder/evidence@workspace:packages/evidence"],
 
     "@easter-workflow-builder/logger": ["@easter-workflow-builder/logger@workspace:packages/logger"],
 

@@ -1,5 +1,5 @@
-import type { EvidenceList } from './evidence-list.ts';
-import type { MeasurementId } from './measurement-id.ts';
+import type { EvidenceList } from '../evidence-reference/evidence-list.ts';
+import type { MeasurementId } from '../evidence-reference/measurement-id.ts';
 
 /**
  * Háromállapotú bizonyíték típus a provider képességleírókhoz. Vagy `known` egy

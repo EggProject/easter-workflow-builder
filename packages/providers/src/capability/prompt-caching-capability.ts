@@ -1,4 +1,4 @@
-import type { Fact } from '../evidence/fact.ts';
+import type { Fact } from '@easter-workflow-builder/evidence';
 import type { PromptCacheMode } from './prompt-cache-mode.ts';
 
 export interface PromptCachingCapability {
