@@ -25,8 +25,26 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | Prettier                         | 3.9.6          | nincs 4.0                                      |
 | Drizzle ORM                      | 0.45.2         | még 0.x                                        |
 | `better-sqlite3`                 | 13.0.3         | natív modul                                    |
+| `drizzle-kit`                    | 0.31.10        | npm `latest`, T-003-2, lásd lent               |
+| `@types/better-sqlite3`          | 9.6.0          | npm `latest`, T-003-2, lásd lent               |
 | `ws`                             | 8.21.3         |                                                |
 | `pino` / `pino-roll`             | 10.3.1 / 4.0.0 | log rotation                                   |
+
+## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
+
+Élő npm registry lekérdezés, két független forrással mindkét csomagra:
+
+| Csomag                  | Verzió    | Forrás 1                                                           | Forrás 2                                                                  |
+| ----------------------- | --------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `drizzle-kit`           | `0.31.10` | https://registry.npmjs.org/drizzle-kit/latest (`dist-tags.latest`) | https://unpkg.com/drizzle-kit/package.json (301 -> `drizzle-kit@0.31.10`) |
+| `@types/better-sqlite3` | `9.6.0`   | https://registry.npmjs.org/@types/better-sqlite3/latest            | https://unpkg.com/@types/better-sqlite3/package.json (301 -> `@9.6.0`)    |
+
+Mindkét lekérdezés ugyanazt a verziót adta a két forrásból, tippelés nem történt. A
+`drizzle-kit` saját `devDependencies` bejegyzése a `@types/better-sqlite3@^7.6.13` és a
+`better-sqlite3@^11.9.1` sort tartalmazza a fejlesztéséhez, ez a projekt saját
+`better-sqlite3@13.0.3` és `@types/better-sqlite3@9.6.0` választását nem befolyásolja, mert
+ezek a `drizzle-kit` CLI belső build függőségei, nem futásidejű peer követelmény a
+felhasználó felé.
 
 ## Miért TypeScript 6.0.3 és nem 7
 
