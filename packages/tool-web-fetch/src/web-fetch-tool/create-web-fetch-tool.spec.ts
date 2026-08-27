@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ENV_FIRECRAWL_BASE_URL, ENV_FIRECRAWL_TIMEOUT_MS } from '@easter-workflow-builder/firecrawl-client';
-import type { FetchFunction } from '@easter-workflow-builder/http-client';
-import type { ReadFileFunction } from '@easter-workflow-builder/image-source';
-import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import {
+  ENV_FIRECRAWL_BASE_URL,
+  ENV_FIRECRAWL_TIMEOUT_MS,
+  type FetchFunction,
+} from '@easter-workflow-builder/firecrawl-client';
+import type { WebFetchToolDependencies } from './web-fetch-tool-dependencies.ts';
 import { createWebFetchTool } from './create-web-fetch-tool.ts';
 
-const readFileFunction: ReadFileFunction = () => Promise.reject(new Error('nem hasznalt'));
 const failingFetch: FetchFunction = () => Promise.reject(new Error('ECONNREFUSED'));
 const refusedByFirecrawlFetch: FetchFunction = () =>
   Promise.resolve(Response.json({ success: false, error: 'nem tolthetobe' }));
 
-function dependencies(fetchFunction: FetchFunction, environment: Record<string, string>): AgentToolDependencies {
-  return { fetchFunction, environment, readFileFunction };
+function dependencies(fetchFunction: FetchFunction, environment: Record<string, string>): WebFetchToolDependencies {
+  return { fetchFunction, environment };
 }
 
 describe('createWebFetchTool', () => {
