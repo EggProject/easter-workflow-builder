@@ -1,4 +1,4 @@
-import type { Fact } from '@easter-workflow-builder/evidence';
+import type { Fact } from '../evidence/fact/fact.ts';
 
 /**
  * A `GET /v1/models` végpont. Külön mezőcsoport, mert a "lekérhető" és a

@@ -1,4 +1,4 @@
-import type { Fact } from '@easter-workflow-builder/evidence';
+import type { Fact } from '../evidence/fact/fact.ts';
 import type { StructuredOutputStrategyId } from './structured-output-strategy-id.ts';
 
 export interface StructuredOutputStrategy {

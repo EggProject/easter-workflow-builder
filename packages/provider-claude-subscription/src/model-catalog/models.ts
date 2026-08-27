@@ -1,6 +1,11 @@
-import type { ModelDescriptor } from '@easter-workflow-builder/provider-capability';
-import type { Fact } from '@easter-workflow-builder/evidence';
-import { DOC_MODEL_CONFIG, DOC_MODELS, DOC_MODELS_LIST, DOC_VISION } from '@easter-workflow-builder/evidence-sources';
+import {
+  DOC_MODEL_CONFIG,
+  DOC_MODELS,
+  DOC_MODELS_LIST,
+  DOC_VISION,
+  type ModelDescriptor,
+  type Fact,
+} from '@easter-workflow-builder/provider-capability';
 import type { ClaudeFamilyId } from './family-id.ts';
 import type { ClaudeModelId } from './model-id.ts';
 

@@ -20,9 +20,8 @@ meg, minek a regisztere.
 Az `@easter-workflow-builder/provider-minimax` és az
 `@easter-workflow-builder/provider-claude-subscription` csomagtól függ (`dependencies`), L3
 réteg (SPEC-002 4. szekció). A `.spec.ts` további dev függősége az
-`@easter-workflow-builder/evidence` és az `@easter-workflow-builder/evidence-sources`
-(`devDependencies`), mert a bejárás a `Fact` invariánsokat és a `MeasurementId`
-feloldhatóságot ellenőrzi.
+`@easter-workflow-builder/provider-capability` (`devDependencies`), mert a bejárás a `Fact`
+invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi.
 
 ## Szabályok
 

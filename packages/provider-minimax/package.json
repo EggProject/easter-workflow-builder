@@ -9,9 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@easter-workflow-builder/provider-capability": "workspace:*",
-    "@easter-workflow-builder/evidence": "workspace:*",
-    "@easter-workflow-builder/evidence-sources": "workspace:*"
+    "@easter-workflow-builder/provider-capability": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

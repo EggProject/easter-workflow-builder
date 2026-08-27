@@ -20,8 +20,8 @@ az `@easter-workflow-builder/provider-registry` feladata.
 
 ## Függőségi irány
 
-Az `@easter-workflow-builder/provider-capability`, az `@easter-workflow-builder/evidence` és az
-`@easter-workflow-builder/evidence-sources` csomagtól függ, L2 réteg (SPEC-002 4. szekció).
+Az `@easter-workflow-builder/provider-capability` csomagtól függ (a leíró típusok, a `Fact` és
+a bizonyítékok forráskatalógusa mind ott áll), L2 réteg (SPEC-002 4. szekció).
 
 ## Szabályok
 

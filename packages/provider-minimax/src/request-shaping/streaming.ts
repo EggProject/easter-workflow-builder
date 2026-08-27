@@ -1,5 +1,4 @@
-import type { StreamingCapability } from '@easter-workflow-builder/provider-capability';
-import { RESEARCH_GATEWAY } from '@easter-workflow-builder/evidence-sources';
+import { RESEARCH_GATEWAY, type StreamingCapability } from '@easter-workflow-builder/provider-capability';
 
 export const minimaxStreaming: StreamingCapability = {
   sse: {

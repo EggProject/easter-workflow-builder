@@ -1,5 +1,9 @@
-import type { ThinkingCapability } from '@easter-workflow-builder/provider-capability';
-import { DOC_STREAMING, DOC_THINKING, DOC_THINKING_STEER } from '@easter-workflow-builder/evidence-sources';
+import {
+  DOC_STREAMING,
+  DOC_THINKING,
+  DOC_THINKING_STEER,
+  type ThinkingCapability,
+} from '@easter-workflow-builder/provider-capability';
 import type { ClaudeFamilyId } from '../model-catalog/family-id.ts';
 
 export const claudeSubscriptionThinking: ThinkingCapability<ClaudeFamilyId> = {

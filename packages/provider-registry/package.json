@@ -13,8 +13,7 @@
     "@easter-workflow-builder/provider-claude-subscription": "workspace:*"
   },
   "devDependencies": {
-    "@easter-workflow-builder/evidence": "workspace:*",
-    "@easter-workflow-builder/evidence-sources": "workspace:*",
+    "@easter-workflow-builder/provider-capability": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
