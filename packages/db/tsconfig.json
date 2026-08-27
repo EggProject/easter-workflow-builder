@@ -1,4 +1,17 @@
 {
   "extends": "../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    // A drizzle-orm@0.45.2 egyetlen csomagban szállítja az összes dialektus
+    // (pg, mysql, gel, singlestore, sqlite) deklarációs fájlját, és ezek
+    // EGYMÁS KÖZÖTT is típushibásak `skipLibCheck` nélkül (a mi
+    // `drizzle-orm/better-sqlite3` importunk ettől függetlenül eléri a
+    // csomag teljes .d.ts fáját) - ez dokumentált, ismert felsőáramú hiba,
+    // nem a mi kódunk hibája: https://github.com/drizzle-team/drizzle-orm/issues/879,
+    // https://github.com/drizzle-team/drizzle-orm/issues/4299,
+    // https://github.com/drizzle-team/drizzle-orm/issues/4818 (mind a
+    // `skipLibCheck: true` beállítást ajánlja megoldásként). Csak ebben a
+    // csomagban kell, mert csak ez függ a `drizzle-orm`-tól.
+    "skipLibCheck": true
+  },
   "include": ["src/**/*.ts"]
 }
