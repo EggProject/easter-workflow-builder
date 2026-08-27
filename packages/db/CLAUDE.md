@@ -9,14 +9,33 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide |
+| Mappa                | Tartalom                                                                                                                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                     |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                               |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió és a `WorkflowRepository` a következő lépésekben bővül ide                |
 
-A további, a SPEC-003 8. szekciója szerinti téma mappák (`migration`, `workflow-graph`,
-`graph-snapshot`, `workflow-run`, `step-run`, `run-event`, `human-approval`, `app-setting`,
-`provider-concurrency`, `run-recovery`) a végrehajtás további lépéseiben keletkeznek.
+A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
+migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
+nem glob: a `.spec.ts` fájlok `vitest` importja miatt a drizzle-kit esbuild alapú CJS bundlere
+elhasalna egy `./src/**/*.ts` mintán, a hivatalos config doksi pedig nem dokumentál negációs
+glob mintát erre a mezőre. Új tábla fájlt ezért a `drizzle.config.ts` listájába is fel kell
+venni.
+
+A további, a SPEC-003 8. szekciója szerinti téma mappák (`graph-snapshot`, `workflow-run`,
+`step-run`, `run-event`, `human-approval`, `app-setting`, `provider-concurrency`,
+`run-recovery`) a végrehajtás további lépéseiben keletkeznek.
+
+**Tábla séma tesztelése: `getTableConfig` kell a 100%-os function coverage-höz.** A
+`sqliteTable()` harmadik argumentuma (index lista) és a `.references(() => ...)` idegen kulcs
+callback lusta függvény: sima insert/select lekérdezés soha nem hívja meg őket, a
+`drizzle-orm/sqlite-core` `getTableConfig(table)` viszont igen, és visszaadja az
+`indexes`/`foreignKeys` tömböt is ellenőrzésre. Minden tábla saját `.spec.ts` fájljában ezért
+a valós SQLite ellen futó insert/select tesztek mellett egy `getTableConfig`-ra épülő teszt is
+kell, ami az index nevét/oszlopát és az idegen kulcs `onDelete`/cél tábla párját assertálja
+(lásd `workflow.spec.ts`, `workflow-node.spec.ts`, `workflow-edge.spec.ts`), különben a
+`workflow-graph` mappa function/line coverage-e a spec 12.4 100%-os küszöbe alatt marad.
 
 ## `Outcome` hibaosztály konvenció
 
@@ -36,6 +55,13 @@ csomagtól függ (`dependencies`, lásd `package.json`), L2 réteg (SPEC-002 4. 
 futásidejű függősége a `drizzle-orm` és a `better-sqlite3`, fejlesztői függősége a
 `@types/better-sqlite3` és a `drizzle-kit`, mind a négy literál verzióval rögzítve (SPEC-003
 10.4 szekció, T-003-7).
+
+**`skipLibCheck: true` a `tsconfig.json`-ban.** A `drizzle-orm@0.45.2` egyetlen csomagban
+szállítja az összes dialektus deklarációs fájlját, és ezek egymás között típushibásak
+`skipLibCheck` nélkül, dokumentált felsőáramú hiba
+(https://github.com/drizzle-team/drizzle-orm/issues/879,
+https://github.com/drizzle-team/drizzle-orm/issues/4299,
+https://github.com/drizzle-team/drizzle-orm/issues/4818), nem a saját kódunké.
 
 ## Szabályok
 

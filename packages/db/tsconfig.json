@@ -13,5 +13,9 @@
     // csomagban kell, mert csak ez függ a `drizzle-orm`-tól.
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  // A `drizzle.config.ts` a `src/` fán kívül áll, tehát a Vitest
+  // coverage.include mintája nem fogja meg (SPEC-003 12.4 szekció), de a
+  // típusellenőrzésbe be kell vonni, hogy ne maradjon ellenőrizetlen fájl a
+  // csomagban.
+  "include": ["src/**/*.ts", "drizzle.config.ts"]
 }

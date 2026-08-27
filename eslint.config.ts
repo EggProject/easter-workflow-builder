@@ -38,6 +38,24 @@ const config: Linter.Config[] = [
     // sajat proba fajllal, live futtatassal.
     languageOptions: {
       parserOptions: {
+        tsconfigRootDir: rootDirectory,
+      },
+    },
+  },
+  {
+    // `packages/db/drizzle.config.ts` KIVETEL: azt mar lefedi a sajat
+    // `packages/db/tsconfig.json` `include` listaja (SPEC-003 12.4 szekcio,
+    // hogy a `bun run typecheck` ne hagyjon ellenorizetlen fajlt a
+    // csomagban). A typescript-eslint tiltja, hogy egy fajl egyszerre legyen
+    // `allowDefaultProject` altal engedelyezett ES egy valodi tsconfig resze
+    // ("Files that match allowDefaultProject may not also be included in
+    // their nearest tsconfig.json") - ezert ez a konfig objektum `ignores`-
+    // szal kulon zarja ki, negacios glob helyett (azt kiprobaltuk, elo
+    // futtatassal: egyetlen `!`-lal kezdodo bejegyzes az `allowDefaultProject`
+    // tombben az EGESZ mechanizmust elrontotta, nem csak azt az egy fajlt).
+    ignores: ['packages/db/drizzle.config.ts'],
+    languageOptions: {
+      parserOptions: {
         // A glob nem tartalmazhat `**`-ot, a typescript-eslint ezt tul
         // tagnak es teljesitmeny-kockazatnak tekinti (elo teszttel
         // igazolva). A `*.config.ts` a csomag GYOKERENEL levo config
@@ -46,7 +64,6 @@ const config: Linter.Config[] = [
         projectService: {
           allowDefaultProject: ['*.config.ts', '*/*/*.config.ts'],
         },
-        tsconfigRootDir: rootDirectory,
       },
     },
   },

@@ -69,6 +69,25 @@ describe('openDatabase', () => {
     expect(outcome.kind).toBe('error');
   });
 
+  it('hibaágat ad és lezárja a kapcsolatot, ha a migráció sikertelen', () => {
+    const baseDirectory = mkdtempSync(path.join(tmpdir(), 'easter-db-open-'));
+    cleanupDirectories.push(baseDirectory);
+    const filePath = path.join(baseDirectory, 'easter.sqlite');
+
+    // A drizzle-orm migrate() a saját `__drizzle_migrations` könyvelő
+    // tábláját olvassa vissza a `hash` oszloppal (sqlite-core dialect.js).
+    // Egy előre, hiányos sémával létrehozott azonos nevű tábla ezt a
+    // SELECT-et valós SQLite hibára futtatja, tehát ez a teszt a
+    // `migrationOutcome.kind === 'error'` ágat mock nélkül, a nyilvános
+    // `openDatabase` API-n keresztül éri el.
+    const preSeeded = new SqliteDatabase(filePath);
+    preSeeded.exec('CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY)');
+    preSeeded.close();
+
+    const outcome = openDatabase(filePath);
+    expect(outcome.kind).toBe('error');
+  });
+
   it('database_closed hibaágat ad, ha a zárás után hívjuk a tranzakciót', () => {
     const context = openOrThrow(':memory:');
     context.close();
