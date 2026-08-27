@@ -122,14 +122,16 @@ packages.ts` egy olyan csomagot talál, ami nincs benne, a `find-dependency-grap
 violations.ts` "hiányzó réteg-hozzárendelés" hibát ad - így egy új csomag felvétele
   nem maradhat csendben lekövetetlen.
 - A `find-dependency-graph-violations.spec.ts` **szintetikus, kézzel összeállított**
-  csomaglistákkal teszteli a logikát, nem a valós repó gráfjával. Ennek oka egy valós,
-  nyitva jelölt talált ellentmondás: a SPEC-002 4. szekció "Rétegbesorolás, mind a 32
-  csomagra" táblázata az `engine`-t és az `agent`-et azonos L4 rétegbe sorolja, miközben
-  az `engine` `package.json`-ja (a SPEC-001 óta változatlanul) ténylegesen függ az
-  `agent`-től - ez a `check-dependency-graph.sh` valós futtatásakor egy jelzett,
-  `not-strictly-decreasing-layer` eltérést ad, nem elhallgatott hibát. Részletek:
+  csomaglistákkal teszteli a logikát, nem a valós repó gráfjával, hogy a négy szabály
+  (hiányzó réteg-hozzárendelés, eszköz csomag `dependencies` helyen, nem szigorúan
+  csökkenő él, kör) mindegyike külön, célzottan reprodukálható legyen. Korábban itt egy
+  valós, nyitva jelölt ellentmondás is állt: a SPEC-002 4. szekció "Rétegbesorolás, mind a
+  25 csomagra" táblázata az `engine`-t és az `agent`-et azonos L4 rétegbe sorolta, miközben
+  az `engine` `package.json`-ja ténylegesen függ az `agent`-től. Ezt a user döntése
+  (2026-08-27) lezárta: az `engine` L5, a rá épülő `apps/server` L6 rétegre került, a
+  `bun run check:graph` valós futtatása azóta nulla eltérést ad. Részletek:
   [`../../packages/engine/CLAUDE.md`](../../packages/engine/CLAUDE.md), "Ellentmondás a
-  SPEC-002-ben".
+  SPEC-002-ben, lezárva".
 
 ## Kapcsolódó dokumentumok
 

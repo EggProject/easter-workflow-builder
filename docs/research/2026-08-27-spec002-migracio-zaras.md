@@ -134,3 +134,20 @@ kezelni). Mindkettő tartalmi döntés, ami a SPEC-002 hatókörén kívül esik
 specifikációra vár. Részletek és a döntésig szóló dokumentáció:
 [`../../packages/engine/CLAUDE.md`](../../packages/engine/CLAUDE.md), "Ellentmondás a
 SPEC-002-ben, nyitva jelölve".
+
+## Lezárás, 2026-08-27
+
+A fenti nyitott tétel eldőlt. A user döntése: **az `engine` az `agent` fölött van**, mert a
+végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert - ez a döntés adja a
+felbontást a fenti két lehetőség közül a második irányban, azzal a különbséggel, hogy nem az
+`engine` L5-re tolása önmagában volt a lépés, hanem az, hogy a rá épülő `apps/server` is
+szigorúan magasabb rétegre került, mert a `server` az `engine`-től is függ.
+
+A mért tényeken (csomagszám, `turbo run typecheck` idő, cache invalidáció, `providerRegistry`
+JSON diff) ez a lezárás nem változtat, azok a fenti, eredeti méréskor rögzített állapotot
+tükrözik. Ami változott: a `tooling/scripts/src/dependency-graph/package-layer.ts` térképében
+az `engine` L4-ről L5-re, az `apps/server` L5-ről L6-ra került (az `agent` L4 rétegen maradt,
+mert az L3 `provider-registry` csomagtól függ, tehát nem mehetett L3-ra). A `bun run check:graph`
+ez után nulla eltérést ad. A táblázat és a hozzá tartozó szöveges indoklás a
+`docs/spec/SPEC-002-csomag-architektura.md` 4. szekciójában ennek megfelelően frissült, a
+`packages/engine/CLAUDE.md` "Ellentmondás a SPEC-002-ben" szakasza pedig lezárt állapotra váltott.

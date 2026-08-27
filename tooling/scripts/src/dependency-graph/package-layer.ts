@@ -12,7 +12,7 @@
  * réteg-hozzárendelés" hibát ad, nem hagyja csendben át - ez a mechanizmus
  * zárja ki, hogy egy új csomag felvétele elfelejtődjön (T-002-24).
  */
-export type PackageLayer = 0 | 1 | 2 | 3 | 4 | 5 | 'tool';
+export type PackageLayer = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 'tool';
 
 export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   // L0
@@ -38,10 +38,11 @@ export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   // L4
   'agent-tool-bundle': 4,
   agent: 4,
-  engine: 4,
   // L5
-  server: 5,
+  engine: 5,
   web: 5,
+  // L6
+  server: 6,
   // eszköz csomagok, réteg nélkül
   'eslint-config': 'tool',
   tsconfig: 'tool',

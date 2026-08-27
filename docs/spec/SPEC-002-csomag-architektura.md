@@ -113,16 +113,18 @@ L4  osszeallito
     agent-tool-bundle ->  provider-capability, tool-minimax-web-search,
                           tool-firecrawl-web-fetch, tool-minimax-understand-image, core
     agent  ->  core, logger, provider-registry
-    engine ->  agent, core, db, logger
 
-L5  alkalmazasok
-    server ->  agent, core, db, engine, logger, protocol, provider-registry
+L5  vegrehajto motor es a web alkalmazas
+    engine ->  agent, core, db, logger
     web    ->  core, protocol, ui
+
+L6  szerver alkalmazas
+    server ->  agent, core, db, engine, logger, protocol, provider-registry
 ```
 
 A gráf aciklikus és egyirányú: minden él lefelé mutat, magasabb rétegből alacsonyabb felé. A `provider-capability` L1 rétegszámot kap, noha az összevonás után egyetlen workspace éle sincs: a szám nem sorszám, hanem felső korlát a kifelé mutató éleire, és a 13. kritérium csak azt követeli meg, hogy minden él szigorúan kisebb rétegszám felé mutasson.
 
-**Egy ismert, nyitott ellentmondás.** Az `engine` és az `agent` egyaránt L4, miközben az `engine` függ az `agent` csomagtól, tehát a szigorúan csökkenő szabály sérül. Ez a `bun run check:graph` egyetlen eltérése, és **nem** a jelen összevonás következménye: a besorolás már a 26 csomagos állapotban is ilyen volt. A feloldás (az `agent` L3-ra vitele, vagy az `engine` L5-re) tartalmi döntés a két csomag szerepéről, ezért a userre vár, és a jelen spec nem hozza meg.
+**A rétegbesorolási ellentmondás lezárva, user döntés, 2026-08-27.** Korábban ezen a helyen az állt, hogy az `engine` és az `agent` egyaránt L4, miközben az `engine` függ az `agent` csomagtól, ami a szigorúan csökkenő szabályt sértette (a `bun run check:graph` egyetlen eltérése, nem a csomag-összevonás következménye: a besorolás már a 26 csomagos állapotban is ilyen volt). A user döntése: az `engine` az `agent` fölött áll, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert. A kód nem változott, a valós `engine -> agent` függés helyes volt már korábban is; a réteg táblázat igazodott hozzá: az `engine` L5 rétegre került, és a rá épülő `apps/server` - mert az `engine`-től függ - L6 rétegre csúszott, hogy az `engine -> agent` és a `server -> engine` él is szigorúan csökkenő rétegszám felé mutasson. A `bun run check:graph` ez után nulla eltérést ad. Részletek: [`../research/2026-08-27-spec002-migracio-zaras.md`](../research/2026-08-27-spec002-migracio-zaras.md), "Nyitva jelölt kérdés" szakasz lezárása.
 
 ### Az összevont csomagok
 
@@ -140,7 +142,7 @@ Nyolc csomag szűnt meg, a tartalmuk egy befogadó csomag `src/` fájában él t
 
 **A tárgyköri határok nem sérültek.** A segéd továbbra sem lakik egy csomagban a kész toollal (a `mcp-tool-kit` váz és a három `tool-*` csomag külön áll), és a kliens továbbra is külön csomag a tooltól (`minimax-client` és `firecrawl-client`). Az összevonás kizárólag olyan csomagokat érintett, amik ugyanannak a tárgykörnek a rétegei voltak.
 
-**A nyolcadik tervezett összevonás nem hajtható végre.** Az `agent-tool-bundle` beolvasztása a `mcp-tool-kit` csomagba **kört hoz létre**, ezért nem történt meg. Az ok szerkezeti: az összeállító a három `tool-*` csomagot hívja, a három `tool-*` csomag viszont a `mcp-tool-kit` válaszkonstruktorait (`textToolResult`, `errorToolResult`) használja. A `check-dependency-graph.ts` a szándékosan bevezetett éllel futtatva pontosan ezt jelentette: `cycle: kör a függőségi gráfban: tool-minimax-understand-image -> mcp-tool-kit -> tool-minimax-understand-image`. Ugyanezt az `import-x/no-cycle` ESLint szabály is hibaként adná, mert a `mcp-tool-kit` barrelje a `tool-*` barrelekre hivatkozna, azok pedig vissza rá. Az `agent-tool-bundle` ezért **önálló csomag marad**, a feloldás a user döntése.
+**A nyolcadik tervezett összevonás nem hajtható végre.** Az `agent-tool-bundle` beolvasztása a `mcp-tool-kit` csomagba **kört hoz létre**, ezért nem történt meg. Az ok szerkezeti: az összeállító a három `tool-*` csomagot hívja, a három `tool-*` csomag viszont a `mcp-tool-kit` válaszkonstruktorait (`textToolResult`, `errorToolResult`) használja. A `check-dependency-graph.ts` a szándékosan bevezetett éllel futtatva pontosan ezt jelentette: `cycle: kör a függőségi gráfban: tool-minimax-understand-image -> mcp-tool-kit -> tool-minimax-understand-image`. Ugyanezt az `import-x/no-cycle` ESLint szabály is hibaként adná, mert a `mcp-tool-kit` barrelje a `tool-*` barrelekre hivatkozna, azok pedig vissza rá. Az `agent-tool-bundle` ezért **önálló csomag marad**, ez a user végleges döntése (2026-08-27), **tudatos döntés**, nem csak a kör kényszere. Indoka: az összeállító egy réteggel a toolok fölött áll, ami logikus - ő tud a toolokról, a toolok nem tudnak róla. Egy jövőbeli olvasó ezért ne akarja jóhiszeműen összevonni a két csomagot: a szétválasztás szándékos, nem ideiglenes állapot.
 
 ### A változatlanul maradó csomagok
 
@@ -156,13 +158,14 @@ A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van réteg
 | L1     | `provider-capability`, `protocol`                                                                                                                         |
 | L2     | `minimax-client`, `firecrawl-client`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                                      |
 | L3     | `tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `provider-registry`                                               |
-| L4     | `agent-tool-bundle`, `agent`, `engine`                                                                                                                    |
-| L5     | `server`, `web`                                                                                                                                           |
+| L4     | `agent-tool-bundle`, `agent`                                                                                                                              |
+| L5     | `engine`, `web`                                                                                                                                           |
+| L6     | `server`                                                                                                                                                  |
 | eszköz | `eslint-config`, `tsconfig`, `scripts`, `wire-probe`, réteg nélkül, mert nem termékkód és egyetlen termékcsomag sem függhet tőlük futásidejű függőségként |
 
 Összesen 19 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 25 workspace csomag.
 
-A `protocol` L1, mert csak a `core` csomagtól függhet. A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
+A `protocol` L1, mert csak a `core` csomagtól függhet. A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L5, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert, tehát az `agent` (L4) fölött áll; a `server` emiatt L6, mert az `engine`-től is függ. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
 
 ### A megszűnt két kiinduló csomag
 
@@ -893,7 +896,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 10. A `packages/*` és az `apps/*` csomagokban a `src/` alatti mappaszerkezet legfeljebb kétszintű, és egyetlen téma mappában sincs további alkönyvtár. Kétszintű pontosan két csomag, a `core` és a `provider-capability`, a 6.1 pont 8. szabálya szerinti tárgykör tagolással; a maradék 17 termékcsomag lapos. Duplikált mappaszint (`<x>/<x>/`) sehol nincs, a 6.1 pont 9. szabálya szerint. A `tooling/*` csomagokra ugyanez érvényes, a `tools/wire-probe` a 6.8 pont szerint kivétel.
 11. Minden csomag `src/index.ts` fájlja csak nevesített újraexportot tartalmaz. `export *` egyetlen barrelben sem szerepel.
 12. Minden `packages/*` alatti könyvtárcsomag `package.json` `exports` mezője a `./src/index.ts` fájlra mutat. Az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagnak nincs `exports` mezője, és nem is kap: ezeket egyetlen másik csomag sem importálja csomagnév szerint, ez a migráció előtti állapot, és nem változik.
-13. A függőségi gráf aciklikus, és minden él szigorúan csökkenő rétegszám felé mutat, a 4. szekció "Rétegbesorolás, mind a 25 csomagra" táblázata szerint. Az eszköz csomagok (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`) kizárólag `devDependencies` helyen jelenhetnek meg. Ezt az `import-x/no-cycle` szabály, a `package.json` `dependencies` mezők, és a `bun run check:graph` együtt igazolja. **Ez a kritérium jelenleg egyetlen ponton nem teljesül**, az `engine` (L4) `agent` (L4) élén, a 4. szekcióban leírt, a userre váró besorolási ellentmondás miatt. A körmentesség viszont teljesül: a `check:graph` egyetlen `cycle:` sort sem ad.
+13. A függőségi gráf aciklikus, és minden él szigorúan csökkenő rétegszám felé mutat, a 4. szekció "Rétegbesorolás, mind a 25 csomagra" táblázata szerint. Az eszköz csomagok (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`) kizárólag `devDependencies` helyen jelenhetnek meg. Ezt az `import-x/no-cycle` szabály, a `package.json` `dependencies` mezők, és a `bun run check:graph` együtt igazolja. **Teljesül.** A korábban itt jelzett `engine` (L4) -> `agent` (L4) eltérést a user döntése zárta le (2026-08-27, 4. szekció): az `engine` L5 rétegre, a rá épülő `server` L6 rétegre került, a `bun run check:graph` nulla eltérést ad.
 14. Egyetlen `tool-*` csomag `dependencies` mezőjében sem szerepel másik `tool-*` csomag vagy a `@easter-workflow-builder/agent-tool-bundle`.
 15. A `@easter-workflow-builder/core` csomag `dependencies` mezője üres: nem szerepel benne `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/provider-capability` vagy bármely `tool-*` csomag. A `core` `http-client` tárgyköre egyetlen konkrét szolgáltatás egyetlen végpontját sem ismeri.
 16. A `@easter-workflow-builder/mcp-tool-kit` csomagban nincs egyetlen kész MCP eszköz definíció sem, és nem hivatkozik egyetlen `tool-*` csomagra sem.
@@ -921,7 +924,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 38. A `packages/tool-web-search`, a `packages/tool-understand-image` és a `packages/tool-web-fetch` könyvtár nem létezik; a három csomag neve `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-minimax-understand-image` és `@easter-workflow-builder/tool-firecrawl-web-fetch`. Az általuk kiadott MCP eszköznevek (`web_search`, `understand_image`, `web_fetch`), a gyártófüggvények neve és a téma mappák neve **változatlan**, a 6.9 szekció utolsó bekezdése szerint.
 39. Minden olyan csomag neve, ami egy konkrét külső szolgáltatóhoz köthető, megnevezi a szolgáltatót, a 6.9 szekció táblázata szerint. Egyetlen csomagnév sem hagyja el a szolgáltatót ott, ahol egy második implementáció ütközne vele.
 40. Az összevonás nem változtatta meg a viselkedést: a `bun run test` ugyanannyi teszt fájlt (52) és ugyanannyi tesztet (367) futtat le, mint az összevonás előtt, mind a négy lefedettségi metrikán 100 százalékkal, és a `vitest.config.ts` `coverage.exclude` listája változatlan.
-41. A `@easter-workflow-builder/agent-tool-bundle` **önálló csomag**, nem olvadt be a `@easter-workflow-builder/mcp-tool-kit` csomagba, és az `mcp-tool-kit` `dependencies` mezője üres. Az ok a 4. szekcióban dokumentált kör, futtatott ellenőrzővel bizonyítva; a feloldás a userre vár.
+41. A `@easter-workflow-builder/agent-tool-bundle` **önálló csomag**, nem olvadt be a `@easter-workflow-builder/mcp-tool-kit` csomagba, és az `mcp-tool-kit` `dependencies` mezője üres. Az ok a 4. szekcióban dokumentált kör, futtatott ellenőrzővel bizonyítva. **Lezárva:** a user végleges döntése (2026-08-27) is ezt tartja meg, tudatos döntésként, nem csak a kör kényszereként.
 
 ## 12. Kapcsolódó dokumentumok
 
