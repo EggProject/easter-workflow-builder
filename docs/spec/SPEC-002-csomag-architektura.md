@@ -1,12 +1,12 @@
 # SPEC-002: Csomag architektúra és mappa konvenció
 
-|          |                                                                                                                                          |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet                                                                                                                                 |
-| Dátum    | 2026-08-27                                                                                                                               |
-| Előzmény | [`SPEC-001-monorepo-toolchain.md`](SPEC-001-monorepo-toolchain.md), 3. szekció csomagtérkép és 13. szekció mappaszerkezet                |
-| Bemenet  | [`../research/2026-08-26-agent-tools.md`](../research/2026-08-26-agent-tools.md), a `packages/typeguards` bemásolt kód mappa konvenciója |
-| Kimenet  | 18 új csomag, 2 megszűnő csomag, repóra kiterjesztett `src/<téma>/` konvenció, `.spec.ts` tesztvégződés                                  |
+|          |                                                                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Státusz  | tervezet                                                                                                                                  |
+| Dátum    | 2026-08-27                                                                                                                                |
+| Előzmény | [`SPEC-001-monorepo-toolchain.md`](SPEC-001-monorepo-toolchain.md), 3. szekció csomagtérkép és 13. szekció mappaszerkezet                 |
+| Bemenet  | [`../research/2026-08-26-agent-tools.md`](../research/2026-08-26-agent-tools.md), a `packages/typeguards` bemásolt kód mappa konvenciója  |
+| Kimenet  | 19 termékcsomag a `packages/` alatt, 25 workspace csomag összesen, repóra kiterjesztett `src/<téma>/` konvenció, `.spec.ts` tesztvégződés |
 
 ---
 
@@ -35,6 +35,13 @@
 1. A `packages/*/src` alatt minden egy mappába került. A `packages/agent-tools/src` hét alkönyvtára összesen 75 fájlt fog össze, egy mappa átlagosan 10 fájlt, mappán belüli tagolás nélkül.
 2. A segédréteg és a kész tool egy csomagban lakik. Az `agent-tools` csomag egyszerre tartalmaz HTTP réteget, MiniMax klienst, Firecrawl klienst, kép feloldót, MCP eredmény konstruktorokat és a három kész eszközt.
 3. A mappanevek nem informatívak. Az `agent-tools/src/minimax` névből nem derül ki, hogy MiniMax HTTP kliens van benne, és nem MiniMax provider leíró (az utóbbi a `providers/src/minimax` mappa).
+
+### A user két további kifogása, amit ez a spec kezel
+
+Az első szétbontás után, a 26 csomagos állapotra a user két további kifogást emelt. Mindkettő jogos, és mindkettőre ő adta meg a döntést. A jelen spec ezt a végállapotot írja le.
+
+4. **Túl sok csomag lett.** A kérés nem az volt, hogy minden almappa külön csomag legyen, hanem hogy a csomagokon **belül** legyenek almappákba rendezve a dolgok. A 26 csomagból 19 marad: nyolc csomag beolvad egy befogadó csomagba, tárgykör szerinti almappaként. A tárgyköri határok nem sérülnek: a segéd továbbra sem lakik egy csomagban a kész toollal, és a kliens továbbra is külön csomag a tooltól. A leképezést a 4. szekció "Az összevont csomagok" táblázata adja.
+5. **A tool csomagok neve nem mondja meg a szolgáltatót.** A `tool-web-search` névből nem derül ki, hogy MiniMax keresőt hív, a `tool-web-fetch` névből, hogy Firecrawl scrape-et. Ha holnap egy második kereső is jön, a két csomag megkülönböztethetetlen lenne. A három tool csomag ezért a provider csomagoknál már jóváhagyott mintára áll át: előbb a szolgáltató, utána a funkció. Az elv a 6.9 szekcióban áll, kötelező érvénnyel az egész repóra.
 
 ## 2. Kiinduló állapot, mérve
 
@@ -65,7 +72,7 @@ A 18 `.spec.ts` közül 17 a `packages/typeguards` csomag bemásolt kódja, 1 az
 
 Minden workspace csomag neve `@easter-workflow-builder/` névtér prefixet kap. Ez érinti a jelenlegi 16 csomagot is. A prefix a user döntése, és a repo nevével egyezik.
 
-Indok, hivatalos forrással: a Turborepo dokumentációja szó szerint ezt írja a belső csomagok `name` mezőjéről: _"It's best practice to use a namespace prefix for your Internal Packages to avoid conflicts with other packages on the npm registry"_ ([structuring a repository](https://turborepo.dev/docs/crafting-your-repository/structuring-a-repository)). A jelen migráció után 32 workspace csomag lesz, köztük olyan nevekkel, amik az npm registryben is léteznek (`result`, `evidence`, `http-client`). A prefix nélkül egy jövőbeli `bun add` vagy egy elgépelt import csendben registry csomagra oldódhat fel.
+Indok, hivatalos forrással: a Turborepo dokumentációja szó szerint ezt írja a belső csomagok `name` mezőjéről: _"It's best practice to use a namespace prefix for your Internal Packages to avoid conflicts with other packages on the npm registry"_ ([structuring a repository](https://turborepo.dev/docs/crafting-your-repository/structuring-a-repository)). A jelen migráció után 25 workspace csomag van, köztük olyan nevekkel, amik az npm registryben is léteznek (`core`, `logger`, `protocol`). A prefix nélkül egy jövőbeli `bun add` vagy egy elgépelt import csendben registry csomagra oldódhat fel.
 
 A `catalog:` hivatkozás scoped csomagnév mellett is működik, a Bun dokumentációja saját példája is scoped csomagot használ (`"name": "@monorepo/ui"`, [Bun catalogs](https://bun.com/docs/pm/catalogs)).
 
@@ -80,67 +87,91 @@ A csomagneveket a rovid alak jeloli, a teljes nev minden esetben
 @easter-workflow-builder/<rovid nev>.
 
 L0  nincs workspace fuggosege
-    typeguards        result        evidence
-    agent-tool-id     mcp-tool-kit
+    typeguards        mcp-tool-kit
     core              logger
 
 L1  csak L0-ra epul
-    env-reader           ->  result
-    http-client          ->  result
-    evidence-sources     ->  evidence
-    provider-capability  ->  evidence, agent-tool-id
+    provider-capability  ->  nincs workspace ele
+    protocol             ->  core
 
 L2  L0 es L1 folott
-    minimax-client   ->  http-client, env-reader, result, typeguards
-    firecrawl-client ->  http-client, env-reader, result, typeguards
-    image-source     ->  http-client, result
-    provider-minimax             ->  provider-capability, evidence, evidence-sources
-    provider-claude-subscription ->  provider-capability, evidence, evidence-sources
+    minimax-client   ->  core, typeguards
+    firecrawl-client ->  core, typeguards
+    provider-minimax             ->  provider-capability
+    provider-claude-subscription ->  provider-capability
+    db  ->  core, logger
+    ui  ->  core, protocol
 
 L3  kesz egysegek
-    tool-minimax-web-search       ->  mcp-tool-kit, minimax-client, result
-    tool-firecrawl-web-fetch        ->  mcp-tool-kit, firecrawl-client, result
-    tool-minimax-understand-image ->  mcp-tool-kit, minimax-client, image-source, result
-    provider-registry     ->  provider-minimax, provider-claude-subscription,
-                              evidence, evidence-sources
+    tool-minimax-web-search       ->  mcp-tool-kit, minimax-client, core
+    tool-firecrawl-web-fetch      ->  mcp-tool-kit, firecrawl-client, core
+    tool-minimax-understand-image ->  mcp-tool-kit, minimax-client, core
+    provider-registry             ->  provider-minimax, provider-claude-subscription,
+                                      provider-capability (devDependencies)
 
 L4  osszeallito
-    agent-tool-bundle ->  agent-tool-id, tool-minimax-web-search, tool-firecrawl-web-fetch,
-                          tool-minimax-understand-image, env-reader, http-client, image-source
+    agent-tool-bundle ->  provider-capability, tool-minimax-web-search,
+                          tool-firecrawl-web-fetch, tool-minimax-understand-image, core
+    agent  ->  core, logger, provider-registry
+    engine ->  agent, core, db, logger
+
+L5  alkalmazasok
+    server ->  agent, core, db, engine, logger, protocol, provider-registry
+    web    ->  core, protocol, ui
 ```
 
-A gráf aciklikus és egyirányú: minden él lefelé mutat, magasabb rétegből alacsonyabb felé. Rétegen belüli él nincs.
+A gráf aciklikus és egyirányú: minden él lefelé mutat, magasabb rétegből alacsonyabb felé. A `provider-capability` L1 rétegszámot kap, noha az összevonás után egyetlen workspace éle sincs: a szám nem sorszám, hanem felső korlát a kifelé mutató éleire, és a 13. kritérium csak azt követeli meg, hogy minden él szigorúan kisebb rétegszám felé mutasson.
 
-A `provider-registry` `evidence` és `evidence-sources` éle a `provider-registry.spec.ts` bejáró tesztjéből ered: a teszt a `Fact` invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi, tehát mindkét csomagra szüksége van. A `package.json` `devDependencies` mezőjében áll, nem a `dependencies` mezőben.
+**Egy ismert, nyitott ellentmondás.** Az `engine` és az `agent` egyaránt L4, miközben az `engine` függ az `agent` csomagtól, tehát a szigorúan csökkenő szabály sérül. Ez a `bun run check:graph` egyetlen eltérése, és **nem** a jelen összevonás következménye: a besorolás már a 26 csomagos állapotban is ilyen volt. A feloldás (az `agent` L3-ra vitele, vagy az `engine` L5-re) tartalmi döntés a két csomag szerepéről, ezért a userre vár, és a jelen spec nem hozza meg.
 
-### Rétegbesorolás, mind a 32 csomagra
+### Az összevont csomagok
 
-A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van rétegszáma, a most nem érintett csomagoknak is. A besorolás a `tooling/scripts` alatti gráf ellenőrző bemenete.
+Nyolc csomag szűnt meg, a tartalmuk egy befogadó csomag `src/` fájában él tovább, tárgykör szerinti almappaként. Egyetlen fájl tartalma és egyetlen exportált szimbólum sem veszett el, csak a barrel neve változott, amiből a fogyasztó importál.
+
+| Megszűnő csomag    | Befogadó csomag       | Hol áll a tartalma                                               |
+| ------------------ | --------------------- | ---------------------------------------------------------------- |
+| `result`           | `core`                | `core/src/result/outcome/`                                       |
+| `env-reader`       | `core`                | `core/src/env-reader/environment-reader/`                        |
+| `http-client`      | `core`                | `core/src/http-client/{request,error-description}/`              |
+| `image-source`     | `core`                | `core/src/image-source/{media-type,data-url}/`                   |
+| `evidence`         | `provider-capability` | `provider-capability/src/evidence/{evidence-reference,fact}/`    |
+| `evidence-sources` | `provider-capability` | `provider-capability/src/evidence-sources/measurement-document/` |
+| `agent-tool-id`    | `provider-capability` | `provider-capability/src/agent-tool-id/`                         |
+
+**A tárgyköri határok nem sérültek.** A segéd továbbra sem lakik egy csomagban a kész toollal (a `mcp-tool-kit` váz és a három `tool-*` csomag külön áll), és a kliens továbbra is külön csomag a tooltól (`minimax-client` és `firecrawl-client`). Az összevonás kizárólag olyan csomagokat érintett, amik ugyanannak a tárgykörnek a rétegei voltak.
+
+**A nyolcadik tervezett összevonás nem hajtható végre.** Az `agent-tool-bundle` beolvasztása a `mcp-tool-kit` csomagba **kört hoz létre**, ezért nem történt meg. Az ok szerkezeti: az összeállító a három `tool-*` csomagot hívja, a három `tool-*` csomag viszont a `mcp-tool-kit` válaszkonstruktorait (`textToolResult`, `errorToolResult`) használja. A `check-dependency-graph.ts` a szándékosan bevezetett éllel futtatva pontosan ezt jelentette: `cycle: kör a függőségi gráfban: tool-minimax-understand-image -> mcp-tool-kit -> tool-minimax-understand-image`. Ugyanezt az `import-x/no-cycle` ESLint szabály is hibaként adná, mert a `mcp-tool-kit` barrelje a `tool-*` barrelekre hivatkozna, azok pedig vissza rá. Az `agent-tool-bundle` ezért **önálló csomag marad**, a feloldás a user döntése.
+
+### A változatlanul maradó csomagok
+
+`@easter-workflow-builder/db`, `@easter-workflow-builder/engine`, `@easter-workflow-builder/agent`, `@easter-workflow-builder/protocol`, `@easter-workflow-builder/logger`, `@easter-workflow-builder/ui`, `@easter-workflow-builder/server`, `@easter-workflow-builder/web`, `@easter-workflow-builder/eslint-config`, `@easter-workflow-builder/tsconfig`, `@easter-workflow-builder/scripts`, `@easter-workflow-builder/wire-probe`. Ezek tartalma nem változik, és a 6. szekció mappa konvenciója rájuk is érvényes, amint valódi tartalmat kapnak. A `@easter-workflow-builder/typeguards` már ma követi a konvenciót.
+
+### Rétegbesorolás, mind a 25 csomagra
+
+A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van rétegszáma, a most nem érintett csomagoknak is. A besorolás a `tooling/scripts/src/dependency-graph/package-layer.ts` fájlban áll, és a gráf ellenőrző bemenete. Egy újonnan felvett csomagnak kötelező itt szerepelnie, különben az ellenőrző "hiányzó réteg-hozzárendelés" hibát ad.
 
 | Réteg  | Csomagok                                                                                                                                                  |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L0     | `typeguards`, `result`, `evidence`, `agent-tool-id`, `mcp-tool-kit`, `core`, `logger`                                                                     |
-| L1     | `env-reader`, `http-client`, `evidence-sources`, `provider-capability`, `protocol`                                                                        |
-| L2     | `minimax-client`, `firecrawl-client`, `image-source`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                      |
+| L0     | `typeguards`, `mcp-tool-kit`, `core`, `logger`                                                                                                            |
+| L1     | `provider-capability`, `protocol`                                                                                                                         |
+| L2     | `minimax-client`, `firecrawl-client`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                                      |
 | L3     | `tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `provider-registry`                                               |
 | L4     | `agent-tool-bundle`, `agent`, `engine`                                                                                                                    |
 | L5     | `server`, `web`                                                                                                                                           |
 | eszköz | `eslint-config`, `tsconfig`, `scripts`, `wire-probe`, réteg nélkül, mert nem termékkód és egyetlen termékcsomag sem függhet tőlük futásidejű függőségként |
 
-A `protocol` L1, mert csak a `core` csomagtól függhet. A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L4, mert a `db` és az `agent` fölött áll. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
+Összesen 19 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 25 workspace csomag.
 
-### A megszűnő két csomag
+A `protocol` L1, mert csak a `core` csomagtól függhet. A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
 
-| Csomag                 | Mi lesz vele                                                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `packages/agent-tools` | megszűnik, 11 csomagra bomlik. A könyvtár és a `package.json` törlődik, nem marad átirányító barrel |
-| `packages/providers`   | megszűnik, 7 csomagra bomlik. Ugyanígy, átirányító barrel nélkül                                    |
+### A megszűnt két kiinduló csomag
 
-Átirányító barrel csomagot szándékosan nem hagyunk: az pontosan az a "minden egy helyre" minta lenne, amit a user kifogásolt, és a fogyasztók száma jelenleg nulla (a `core`, `agent`, `server` placeholder tartalommal áll).
+| Csomag                 | Mi lett vele                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent-tools` | megszűnt, a tartalma a `core`, a `mcp-tool-kit`, a két kliens, a három `tool-*` és az `agent-tool-bundle` csomagba került. A könyvtár és a `package.json` törlődött, nem maradt átirányító barrel |
+| `packages/providers`   | megszűnt, a tartalma a `provider-capability`, a két provider leíró és a `provider-registry` csomagba került. Ugyanígy, átirányító barrel nélkül                                                   |
 
-### A változatlanul maradó csomagok
-
-`@easter-workflow-builder/core`, `@easter-workflow-builder/db`, `@easter-workflow-builder/engine`, `@easter-workflow-builder/agent`, `@easter-workflow-builder/protocol`, `@easter-workflow-builder/logger`, `@easter-workflow-builder/ui`, `@easter-workflow-builder/server`, `@easter-workflow-builder/web`, `@easter-workflow-builder/eslint-config`, `@easter-workflow-builder/tsconfig`, `@easter-workflow-builder/scripts`, `@easter-workflow-builder/wire-probe`. Ezek tartalma nem változik, csak a nevük kap prefixet, és a 6. szekció mappa konvenciója rájuk is érvényes, amint valódi tartalmat kapnak. A `@easter-workflow-builder/typeguards` már ma követi a konvenciót.
+Átirányító barrel csomagot szándékosan nem hagyunk: az pontosan az a "minden egy helyre" minta lenne, amit a user kifogásolt, és a fogyasztók száma jelenleg nulla (az `agent` és a `server` placeholder tartalommal áll).
 
 ### A frissített SPEC-001 függőségi tábla
 
@@ -154,6 +185,8 @@ A SPEC-001 3. szekció "Megengedett függőségi irány" táblája a következő
 
 Tiltott továbbra is: bármely visszafelé mutató él, bármely kör, és az `@easter-workflow-builder/web` függése a `db`, `engine`, `agent` vagy `server` csomagtól. Új tiltás: egy `tool-*` csomag nem függhet másik `tool-*` csomagtól, és nem függhet az `agent-tool-bundle` csomagtól.
 
+A `core` az összevonás után is L0: nincs egyetlen workspace éle sem, és nem is lehet, mert minden más termékcsomag rá épül. Ez az összevonás legfontosabb kényszere: a `core` csak olyan tárgykört fogadhat be, aminek nincs kifelé mutató éle. A `result`, az `env-reader`, a `http-client` és az `image-source` mind ilyen volt, mert egymáson kívül semmitől nem függtek.
+
 ## 5. Csomagonkénti leírás és fájlszintű leképezés
 
 ### Leképezési szabály
@@ -161,10 +194,10 @@ Tiltott továbbra is: bármely visszafelé mutató él, bármely kör, és az `@
 Minden áthelyezett fájl a 6. szekció konvenciója szerint a **témája** mappájába kerül, nem a saját nevével egyező mappába. Egy témába több fájl kerül, ez a normális eset. Például:
 
 ```
-packages/agent-tools/src/http/post-json.ts       ->  packages/http-client/src/request/post-json.ts
-packages/agent-tools/src/http/post-json.test.ts  ->  packages/http-client/src/request/post-json.spec.ts
-packages/agent-tools/src/http/get-binary.ts      ->  packages/http-client/src/request/get-binary.ts
-packages/agent-tools/src/http/fetch-function.ts  ->  packages/http-client/src/request/fetch-function.ts
+packages/agent-tools/src/http/post-json.ts       ->  packages/core/src/http-client/request/post-json.ts
+packages/agent-tools/src/http/post-json.test.ts  ->  packages/core/src/http-client/request/post-json.spec.ts
+packages/agent-tools/src/http/get-binary.ts      ->  packages/core/src/http-client/request/get-binary.ts
+packages/agent-tools/src/http/fetch-function.ts  ->  packages/core/src/http-client/request/fetch-function.ts
 ```
 
 Az alábbi táblázatokban ezért a **cél téma mappa** szerepel. A fájlnév változatlan marad, a `.test.ts` végződés `.spec.ts` alakra változik. Ahol egy fájl kettéválik vagy új fájl keletkezik, azt külön jelölöm. Minden csomagnál külön táblázat sorolja fel a témákat és a hozzájuk tartozó fájlokat, és ez a táblázat a 11. szekció 8. elfogadási kritériumának bemenete.
@@ -180,58 +213,58 @@ Ez a **teszt fájlokra is** vonatkozik, és ott két konkrét eset kézi dönté
 
 ---
 
-### 5.1 `@easter-workflow-builder/result`
+### 5.1 A `core` csomag `result` tárgyköre
 
 **Felelősség.** A kétállapotú `Outcome<TValue>` eredménytípus és a hozzá tartozó szűkítő typeguard, hogy a rétegek kivétel helyett hibaágat adjanak vissza.
 
-| Jelenlegi fájl                                 | Cél                                                   |
-| ---------------------------------------------- | ----------------------------------------------------- |
-| `agent-tools/src/result/outcome.ts`            | `packages/result/src/outcome/outcome.ts` (típus-only) |
-| `agent-tools/src/result/is-ok-outcome.ts`      | `packages/result/src/outcome/is-ok-outcome.ts`        |
-| `agent-tools/src/result/is-ok-outcome.test.ts` | `packages/result/src/outcome/is-ok-outcome.spec.ts`   |
+| Jelenlegi fájl                                 | Cél                                                        |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| `agent-tools/src/result/outcome.ts`            | `packages/core/src/result/outcome/outcome.ts` (típus-only) |
+| `agent-tools/src/result/is-ok-outcome.ts`      | `packages/core/src/result/outcome/is-ok-outcome.ts`        |
+| `agent-tools/src/result/is-ok-outcome.test.ts` | `packages/core/src/result/outcome/is-ok-outcome.spec.ts`   |
 
-**Téma.** Egy téma, `outcome`: az eredménytípus és a rá szűkítő guard. Három fájl, egy mappa.
+**Téma.** Egy téma, `outcome`: az eredménytípus és a rá szűkítő guard. Három fájl, egy mappa, a `core/src/result/` tárgykör mappa alatt.
 
-**Függőség.** Nincs workspace függősége, L0.
+**Függőség.** Nincs, sem csomagon belül, sem kívül. Ez a legalsó tárgykör a repóban.
 
 **NEM tartalmazza.** Az MCP `tools/call` válasz alakját (`ToolCallResult`) és annak konstruktorait. Azok MCP protokoll specifikusak, a helyük a `@easter-workflow-builder/mcp-tool-kit`.
 
 ---
 
-### 5.2 `@easter-workflow-builder/evidence`
+### 5.2 A `provider-capability` csomag `evidence` tárgyköre
 
 **Felelősség.** A provider képességleírók háromállapotú bizonyíték típusa és a hozzá tartozó typeguardok.
 
-| Jelenlegi fájl                                   | Cél                                                                           |
-| ------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `providers/src/evidence/measurement-id.ts`       | `packages/evidence/src/evidence-reference/measurement-id.ts` (típus-only)     |
-| `providers/src/evidence/evidence-reference.ts`   | `packages/evidence/src/evidence-reference/evidence-reference.ts` (típus-only) |
-| `providers/src/evidence/evidence-list.ts`        | `packages/evidence/src/evidence-reference/evidence-list.ts` (típus-only)      |
-| `providers/src/evidence/fact.ts`                 | `packages/evidence/src/fact/fact.ts` (típus-only)                             |
-| `providers/src/evidence/is-known-fact.ts`        | `packages/evidence/src/fact/is-known-fact.ts`                                 |
-| `providers/src/evidence/is-known-fact.test.ts`   | `packages/evidence/src/fact/is-known-fact.spec.ts`                            |
-| `providers/src/evidence/is-unknown-fact.ts`      | `packages/evidence/src/fact/is-unknown-fact.ts`                               |
-| `providers/src/evidence/is-unknown-fact.test.ts` | `packages/evidence/src/fact/is-unknown-fact.spec.ts`                          |
+| Jelenlegi fájl                                   | Cél                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `providers/src/evidence/measurement-id.ts`       | `packages/provider-capability/src/evidence/evidence-reference/measurement-id.ts` (típus-only)     |
+| `providers/src/evidence/evidence-reference.ts`   | `packages/provider-capability/src/evidence/evidence-reference/evidence-reference.ts` (típus-only) |
+| `providers/src/evidence/evidence-list.ts`        | `packages/provider-capability/src/evidence/evidence-reference/evidence-list.ts` (típus-only)      |
+| `providers/src/evidence/fact.ts`                 | `packages/provider-capability/src/evidence/fact/fact.ts` (típus-only)                             |
+| `providers/src/evidence/is-known-fact.ts`        | `packages/provider-capability/src/evidence/fact/is-known-fact.ts`                                 |
+| `providers/src/evidence/is-known-fact.test.ts`   | `packages/provider-capability/src/evidence/fact/is-known-fact.spec.ts`                            |
+| `providers/src/evidence/is-unknown-fact.ts`      | `packages/provider-capability/src/evidence/fact/is-unknown-fact.ts`                               |
+| `providers/src/evidence/is-unknown-fact.test.ts` | `packages/provider-capability/src/evidence/fact/is-unknown-fact.spec.ts`                          |
 
-**Témák.** Kettő. Az `evidence-reference` a hivatkozás oldala: mire mutat egy bizonyíték és hogyan áll listába. A `fact` a háromállapotú érték: maga a típus és a két ágát szűkítő guard a két spec fájllal.
+**Témák.** Kettő, a `provider-capability/src/evidence/` tárgykör mappa alatt. Az `evidence-reference` a hivatkozás oldala: mire mutat egy bizonyíték és hogyan áll listába. A `fact` a háromállapotú érték: maga a típus és a két ágát szűkítő guard a két spec fájllal.
 
-**Függőség.** Nincs workspace függősége, L0.
+**Függőség.** Nincs, sem csomagon belül, sem kívül.
 
-**NEM tartalmazza.** A bizonyítékok feloldását dokumentum útvonalra. Az a `@easter-workflow-builder/evidence-sources` feladata. Az `evidence` csak a típusokat és az állapotot ismeri, azt nem, hogy hol olvasható el a mérés.
+**NEM tartalmazza.** A bizonyítékok feloldását dokumentum útvonalra. Az az `evidence-sources` tárgykör feladata (5.3). Az `evidence` csak a típusokat és az állapotot ismeri, azt nem, hogy hol olvasható el a mérés. A két tárgykör egy csomagban él, de nem keveredik: az `evidence-sources` importálhat az `evidence` tárgykörből, fordítva nem.
 
 ---
 
-### 5.3 `@easter-workflow-builder/evidence-sources`
+### 5.3 A `provider-capability` csomag `evidence-sources` tárgyköre
 
 **Felelősség.** A bizonyítékok nevesített forráskatalógusa: hivatalos doksi URL-ek, research szekció azonosítók, és a `MeasurementId` feloldása `docs/` horgonyra.
 
-| Jelenlegi fájl                                     | Cél                                                                          |
-| -------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `providers/src/references/document-url.ts`         | `packages/evidence-sources/src/measurement-document/document-url.ts`         |
-| `providers/src/references/research-section.ts`     | `packages/evidence-sources/src/measurement-document/research-section.ts`     |
-| `providers/src/references/measurement-document.ts` | `packages/evidence-sources/src/measurement-document/measurement-document.ts` |
+| Jelenlegi fájl                                     | Cél                                                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `providers/src/references/document-url.ts`         | `packages/provider-capability/src/evidence-sources/measurement-document/document-url.ts`         |
+| `providers/src/references/research-section.ts`     | `packages/provider-capability/src/evidence-sources/measurement-document/research-section.ts`     |
+| `providers/src/references/measurement-document.ts` | `packages/provider-capability/src/evidence-sources/measurement-document/measurement-document.ts` |
 
-**Függőség.** `@easter-workflow-builder/evidence` (a `MeasurementId` típus miatt).
+**Függőség.** Nincs csomagon kívüli függősége. A `MeasurementId` típust a befogadó csomagon belülről, az `evidence` tárgykörből veszi.
 
 **NEM tartalmazza.** A mérés prózai leírását. A SPEC-001 13. szekció szabálya változatlan: a kódban csak a stabil azonosító és a horgony áll, a próza a `docs/research/` alatt.
 
@@ -239,19 +272,19 @@ Ez a **teszt fájlokra is** vonatkozik, és ott két konkrét eset kézi dönté
 
 ---
 
-### 5.4 `@easter-workflow-builder/agent-tool-id`
+### 5.4 A `provider-capability` csomag `agent-tool-id` tárgyköre
 
 **Felelősség.** Az egyetlen `AgentToolId` union típus, ami a workflow lépéshez kapcsolható in-process MCP eszközök közös szótára.
 
-| Jelenlegi fájl                              | Cél                                                                      |
-| ------------------------------------------- | ------------------------------------------------------------------------ |
-| `providers/src/capability/agent-tool-id.ts` | `packages/agent-tool-id/src/agent-tool-id/agent-tool-id.ts` (típus-only) |
+| Jelenlegi fájl                              | Cél                                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `providers/src/capability/agent-tool-id.ts` | `packages/provider-capability/src/agent-tool-id/agent-tool-id.ts` (típus-only) |
 
-**Téma.** Egy téma, `agent-tool-id`, egyetlen fájllal. Ez nem a régi, fájlonkénti konvenció maradványa: a csomagnak egyetlen témája van, mert egyetlen szótárat hordoz. Ha később bővül (például az azonosítókhoz tartozó megjelenítendő névvel), az a fájl ugyanebbe a mappába kerül.
+**Téma.** Egy téma, `agent-tool-id`, egyetlen fájllal. A tárgykör és a téma neve egybeesik, ezért **nincs** duplikált mappaszint (`agent-tool-id/agent-tool-id/`), a fájl közvetlenül a tárgykör mappában áll. Ez a 6.1 pont 7. szabályának kimondott kivétele. Ha a szótár később bővül (például az azonosítókhoz tartozó megjelenítendő névvel), az a fájl ugyanebbe a mappába kerül.
 
-**Függőség.** Nincs, L0.
+**Függőség.** Nincs, sem csomagon belül, sem kívül.
 
-**Miért önálló csomag.** Két, egymástól független fa használja: a képességleíró réteg (`provider-capability`, az `AgentToolRecommendation` miatt) és a futásidejű eszköz-összeállító (`agent-tool-bundle`). Ha a szótár a `provider-capability` csomagban maradna, az eszköz-összeállítónak a teljes képességleíró típusrétegtől kellene függnie, ami rossz irányú függés: a futásidejű összeállítás nem a leíró metaadatra épül. Egy közös, tartalom nélküli szótár csomag ezt megszünteti anélkül, hogy kört okozna.
+**Miért lett a `provider-capability` a befogadó.** Két, egymástól független fa használja: a képességleíró réteg (az `AgentToolRecommendation` miatt) és a futásidejű eszköz-összeállító (`agent-tool-bundle`). A korábbi, önálló szótár csomag azért állt fenn, hogy az összeállító ne függjön a teljes képességleíró típusrétegtől. A user döntése ezt felülírja, és a szótár a `provider-capability` csomagba került: az `agent-tool-bundle` mostantól erre a csomagra hivatkozik, kizárólag az `AgentToolId` típus miatt. Kört ez nem okoz (a `provider-capability` L1, az `agent-tool-bundle` L4), a költsége egy szélesebb, de nem használt felület.
 
 **NEM tartalmazza.** Az eszköz teljes MCP nevét (`mcp__<szerver>__<eszköz>`). Az a szervernév ismeretét igényli, tehát az `agent-tool-bundle` csomagban van.
 
@@ -259,7 +292,7 @@ Ez a **teszt fájlokra is** vonatkozik, és ott két konkrét eset kézi dönté
 
 ### 5.5 `@easter-workflow-builder/provider-capability`
 
-**Felelősség.** A provider képességleíró típusai. Kizárólag típus, egyetlen futásidejű sor nélkül.
+**Felelősség.** A provider képességleíró típusai. Kizárólag típus, egyetlen futásidejű sor nélkül. Ez a csomag hat saját téma mappája; a csomag emellett három beolvadt tárgykört is hordoz (5.2, 5.3, 5.4).
 
 A `providers/src/capability/` alatti mind a 21 fájl ide kerül, az `agent-tool-id.ts` kivételével (az az 5.4 pontba került). A témák a `ProviderCapabilityDescriptor` saját mezőcsoportjai, tehát a leíró típus szerkezete és a mappaszerkezet ugyanaz. A cél útvonalak a `packages/provider-capability/src/` alatt értendők.
 
@@ -272,11 +305,11 @@ A `providers/src/capability/` alatti mind a 21 fájl ide kerül, az `agent-tool-
 | `limits/`          | `concurrency-capability.ts`, `rate-limit-capability.ts`, `rate-limit-bucket.ts`                                                                                                                                                                                                                                      |
 | `request-shaping/` | `effort-capability.ts`, `thinking-capability.ts`, `thinking-mode.ts`, `tool-choice-capability.ts`, `tool-choice-value.ts`, `structured-output-capability.ts`, `structured-output-strategy.ts`, `structured-output-strategy-id.ts`, `streaming-capability.ts`, `prompt-caching-capability.ts`, `prompt-cache-mode.ts` |
 
-**Témák.** Hat téma, 21 fájl. A `descriptor` az összefogó típus, a másik öt a leíró egy-egy mezőcsoportja: a `requiredEnv` és a `disallowedEnv` mező az `environment`, a `serverTools` és a `recommendedAgentTools` a `tool-support`, a `models` és a `modelsEndpoint` a `model-catalog`, a `rateLimits` és a `concurrency` a `limits`, a kimenő kérés alakját meghatározó hat mező (`structuredOutput`, `toolChoice`, `thinking`, `effort`, `promptCaching`, `streaming`) pedig a `request-shaping` téma. Ugyanez a hat témanév ismétlődik az 5.6 két leíró csomagjában, hogy a típus és a hozzá tartozó kitöltött érték egymás mellett legyen navigálható.
+**Témák.** Hat téma, 21 fájl, közvetlenül a `src/` alatt. A `descriptor` az összefogó típus, a másik öt a leíró egy-egy mezőcsoportja: a `requiredEnv` és a `disallowedEnv` mező az `environment`, a `serverTools` és a `recommendedAgentTools` a `tool-support`, a `models` és a `modelsEndpoint` a `model-catalog`, a `rateLimits` és a `concurrency` a `limits`, a kimenő kérés alakját meghatározó hat mező (`structuredOutput`, `toolChoice`, `thinking`, `effort`, `promptCaching`, `streaming`) pedig a `request-shaping` téma. Ugyanez a hat témanév ismétlődik az 5.6 két leíró csomagjában, hogy a típus és a hozzá tartozó kitöltött érték egymás mellett legyen navigálható.
 
-**Függőség.** `@easter-workflow-builder/evidence`, `@easter-workflow-builder/agent-tool-id`.
+**Függőség.** Nincs workspace függősége. A `Fact`, az `EvidenceList` és az `AgentToolId` típus az összevonás óta a csomagon belül, az `evidence` és az `agent-tool-id` tárgykörben áll.
 
-**Spec fájl.** Egyik fájlhoz sem tartozik `.spec.ts`, mert mind típus-only (6.3 szekció).
+**Spec fájl.** A hat képességleíró téma egyik fájljához sem tartozik `.spec.ts`, mert mind típus-only (6.3 szekció). A beolvadt `evidence/fact/` és `evidence-sources/` tárgykörnek van futásidejű sora, azoknak van.
 
 **NEM tartalmazza.** Egyetlen konkrét provider egyetlen konkrét értékét sem. A típus mondja meg, milyen mezők vannak, az érték a két leíró csomagban áll.
 
@@ -304,7 +337,7 @@ Mindkét csomag ugyanazt a 16 fájlt kapja meg a saját forrásmappájából, é
 
 A `descriptor` téma azért áll külön, mert az a fájl fogja össze a másik ötöt: minden mezője a többi téma egy-egy exportjára hivatkozik. Egyetlen fájl van benne, és ez nem a régi konvenció maradványa.
 
-**Függőség.** `@easter-workflow-builder/provider-capability`, `@easter-workflow-builder/evidence`, `@easter-workflow-builder/evidence-sources`.
+**Függőség.** `@easter-workflow-builder/provider-capability`, egyedül. A leíró típusok, a `Fact` és a bizonyítékok forráskatalógusa mind ott áll.
 
 **Tartalmi változás nincs.** Minden `Fact` `state`, `value` és `evidence` értéke bitre azonos marad, ahogy a SPEC-001 34. kritériuma előírta a korábbi migrációra.
 
@@ -323,7 +356,7 @@ A `descriptor` téma azért áll külön, mert az a fájl fogja össze a másik 
 
 **Téma.** Egy téma, `provider-registry`, két fájllal: a rekord és a rá épülő bejáró regressziós teszt.
 
-**Függőség.** `@easter-workflow-builder/provider-minimax`, `@easter-workflow-builder/provider-claude-subscription`. A `.spec.ts` további dev függősége `@easter-workflow-builder/evidence` és `@easter-workflow-builder/evidence-sources`, mert a bejárás a `Fact` invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi.
+**Függőség.** `@easter-workflow-builder/provider-minimax`, `@easter-workflow-builder/provider-claude-subscription`. A `.spec.ts` további dev függősége `@easter-workflow-builder/provider-capability`, mert a bejárás a `Fact` invariánsokat és a `MeasurementId` feloldhatóságot ellenőrzi.
 
 **Átnevezés.** A `registry` név `provider-registry`-re változik, mert a csomagon belül a `registry` szó önmagában nem mondja meg, minek a regisztere, és az exportált típus neve is `ProviderRegistry`.
 
@@ -331,44 +364,44 @@ A `descriptor` téma azért áll külön, mert az a fájl fogja össze a másik 
 
 ---
 
-### 5.8 `@easter-workflow-builder/env-reader`
+### 5.8 A `core` csomag `env-reader` tárgyköre
 
 **Felelősség.** Környezeti változó olvasás típusos, alapértelmezéssel és hibaággal. Nem tud egyetlen konkrét szolgáltatásról sem.
 
-| Jelenlegi fájl                                   | Cél                                                                             |
-| ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `agent-tools/src/config/environment-reader.ts`   | `packages/env-reader/src/environment-reader/environment-reader.ts` (típus-only) |
-| `agent-tools/src/config/read-base-url.ts`        | `packages/env-reader/src/environment-reader/read-base-url.ts`                   |
-| `agent-tools/src/config/read-base-url.test.ts`   | ugyanoda, `read-base-url.spec.ts` néven                                         |
-| `agent-tools/src/config/read-timeout-ms.ts`      | `packages/env-reader/src/environment-reader/read-timeout-ms.ts`                 |
-| `agent-tools/src/config/read-timeout-ms.test.ts` | ugyanoda, `read-timeout-ms.spec.ts` néven                                       |
+| Jelenlegi fájl                                   | Cél                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `agent-tools/src/config/environment-reader.ts`   | `packages/core/src/env-reader/environment-reader/environment-reader.ts` (típus-only) |
+| `agent-tools/src/config/read-base-url.ts`        | `packages/core/src/env-reader/environment-reader/read-base-url.ts`                   |
+| `agent-tools/src/config/read-base-url.test.ts`   | ugyanoda, `read-base-url.spec.ts` néven                                              |
+| `agent-tools/src/config/read-timeout-ms.ts`      | `packages/core/src/env-reader/environment-reader/read-timeout-ms.ts`                 |
+| `agent-tools/src/config/read-timeout-ms.test.ts` | ugyanoda, `read-timeout-ms.spec.ts` néven                                            |
 
 **Téma.** Egy téma, `environment-reader`: a beolvasó függvény típusa és a rá épülő két olvasó, a két spec fájllal. Öt fájl, egy mappa.
 
-**Függőség.** `@easter-workflow-builder/result` (a `readTimeoutMs` `Outcome`-ot ad).
+**Függőség.** Nincs csomagon kívüli függősége. Az `Outcome` típust, amit a `readTimeoutMs` visszaad, a befogadó csomagon belülről, a `result` tárgykörből veszi.
 
 **NEM tartalmazza.** A konkrét változóneveket (`MINIMAX_API_KEY`, `FIRECRAWL_BASE_URL`) és a konkrét alapértelmezéseket. Azok annál a kliensnél vannak, amelyik használja őket. Ez a lényegi különbség a mai `agent-tools/src/config` mappához képest, ami egyszerre tartalmazta a generikus olvasót és a két szolgáltatás konkrét beállításait.
 
 ---
 
-### 5.9 `@easter-workflow-builder/http-client`
+### 5.9 A `core` csomag `http-client` tárgyköre
 
 **Felelősség.** Vékony HTTP réteg a Node beépített `fetch` fölött: JSON POST, bináris GET, hibaleírás. Nem dob, nem próbálkozik újra.
 
-| Jelenlegi fájl                                | Cél                                                               |
-| --------------------------------------------- | ----------------------------------------------------------------- |
-| `agent-tools/src/http/fetch-function.ts`      | `packages/http-client/src/request/fetch-function.ts` (típus-only) |
-| `agent-tools/src/http/binary-payload.ts`      | `packages/http-client/src/request/binary-payload.ts` (típus-only) |
-| `agent-tools/src/http/post-json.ts`           | `packages/http-client/src/request/post-json.ts`                   |
-| `agent-tools/src/http/post-json.test.ts`      | ugyanoda, `post-json.spec.ts` néven                               |
-| `agent-tools/src/http/get-binary.ts`          | `packages/http-client/src/request/get-binary.ts`                  |
-| `agent-tools/src/http/get-binary.test.ts`     | ugyanoda, `get-binary.spec.ts` néven                              |
-| `agent-tools/src/http/describe-error.ts`      | `packages/http-client/src/error-description/describe-error.ts`    |
-| `agent-tools/src/http/describe-error.test.ts` | ugyanoda, `describe-error.spec.ts` néven                          |
+| Jelenlegi fájl                                | Cél                                                                    |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| `agent-tools/src/http/fetch-function.ts`      | `packages/core/src/http-client/request/fetch-function.ts` (típus-only) |
+| `agent-tools/src/http/binary-payload.ts`      | `packages/core/src/http-client/request/binary-payload.ts` (típus-only) |
+| `agent-tools/src/http/post-json.ts`           | `packages/core/src/http-client/request/post-json.ts`                   |
+| `agent-tools/src/http/post-json.test.ts`      | ugyanoda, `post-json.spec.ts` néven                                    |
+| `agent-tools/src/http/get-binary.ts`          | `packages/core/src/http-client/request/get-binary.ts`                  |
+| `agent-tools/src/http/get-binary.test.ts`     | ugyanoda, `get-binary.spec.ts` néven                                   |
+| `agent-tools/src/http/describe-error.ts`      | `packages/core/src/http-client/error-description/describe-error.ts`    |
+| `agent-tools/src/http/describe-error.test.ts` | ugyanoda, `describe-error.spec.ts` néven                               |
 
 **Témák.** Kettő. A `request` a kérésküldés: a befecskendezett `fetch` típusa, a JSON POST, a bináris GET és a bináris válasz alakja, hat fájl. Az `error-description` a hibaüzenet előállítása egy elbukott hívásból, két fájl. A kettő azért válik el, mert a hibaleírót a hívó akkor is használja, amikor nem ez a réteg küldte a kérést.
 
-**Függőség.** `@easter-workflow-builder/result`.
+**Függőség.** Nincs csomagon kívüli függősége. Az `Outcome` típust a befogadó csomagon belülről, a `result` tárgykörből veszi.
 
 **NEM tartalmazza.** Egyetlen konkrét szolgáltatás egyetlen végpontját sem. A `PATH_SEARCH`, `PATH_VLM`, `PATH_SCRAPE` konstansok a megfelelő kliens csomagokban vannak. Nincs benne `axios` és nincs `dotenv`, a SPEC-001 alatt hozott szabály változatlan.
 
@@ -407,7 +440,7 @@ Ezen felül két fájl **kettéválik**, a MiniMax része ide kerül:
 
 **Témák.** Öt, 19 fájllal. A `minimax-config` a beállítás feloldása: a konfiguráció típusa, a feloldó, a változónevek és az alapértelmezések. Az `envelope` a MiniMax `base_resp` burkolója és a rá szűkítő guard. A `call-minimax` maga a hívás, a két végpont útvonalával együtt. A `search` a kereső válasz alakja, szűkítése és formázása. A `vlm` ugyanez a képértelmező válaszra. Ez a csomag a példa arra, amiért a régi `agent-tools/src/minimax` mappanév rossz volt: abból nem derült ki, mi van benne, a `search`, a `vlm` és az `envelope` névből viszont igen.
 
-**Függőség.** `@easter-workflow-builder/http-client`, `@easter-workflow-builder/env-reader`, `@easter-workflow-builder/result`, `@easter-workflow-builder/typeguards`.
+**Függőség.** `@easter-workflow-builder/core` (HTTP réteg, környezeti változó olvasás, `Outcome`) és `@easter-workflow-builder/typeguards`.
 
 **Tartalmi változás, a user döntése.** Az `ENV_MINIMAX_CODING_PLAN_API_KEY` konstans **megszűnik**. Ennek következményei:
 
@@ -458,24 +491,24 @@ A szerződése szándékosan azonos a `callMiniMax` szerződésével: `Promise<O
 
 ---
 
-### 5.12 `@easter-workflow-builder/image-source`
+### 5.12 A `core` csomag `image-source` tárgyköre
 
 **Felelősség.** Kép feloldása base64 data URL alakra `https` címről, helyi fájlból vagy már kész data URL-ből, plusz a média típus megállapítása.
 
-| Jelenlegi fájl                                               | Cél                                                                     |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `agent-tools/src/image/image-media-type.ts`                  | `packages/image-source/src/media-type/image-media-type.ts` (típus-only) |
-| `agent-tools/src/image/media-type-from-content-type.ts`      | `packages/image-source/src/media-type/media-type-from-content-type.ts`  |
-| `agent-tools/src/image/media-type-from-content-type.test.ts` | ugyanoda, `media-type-from-content-type.spec.ts` néven                  |
-| `agent-tools/src/image/media-type-from-extension.ts`         | `packages/image-source/src/media-type/media-type-from-extension.ts`     |
-| `agent-tools/src/image/media-type-from-extension.test.ts`    | ugyanoda, `media-type-from-extension.spec.ts` néven                     |
-| `agent-tools/src/image/read-file-function.ts`                | `packages/image-source/src/data-url/read-file-function.ts` (típus-only) |
-| `agent-tools/src/image/resolve-image-data-url.ts`            | `packages/image-source/src/data-url/resolve-image-data-url.ts`          |
-| `agent-tools/src/image/resolve-image-data-url.test.ts`       | ugyanoda, `resolve-image-data-url.spec.ts` néven                        |
+| Jelenlegi fájl                                               | Cél                                                                          |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `agent-tools/src/image/image-media-type.ts`                  | `packages/core/src/image-source/media-type/image-media-type.ts` (típus-only) |
+| `agent-tools/src/image/media-type-from-content-type.ts`      | `packages/core/src/image-source/media-type/media-type-from-content-type.ts`  |
+| `agent-tools/src/image/media-type-from-content-type.test.ts` | ugyanoda, `media-type-from-content-type.spec.ts` néven                       |
+| `agent-tools/src/image/media-type-from-extension.ts`         | `packages/core/src/image-source/media-type/media-type-from-extension.ts`     |
+| `agent-tools/src/image/media-type-from-extension.test.ts`    | ugyanoda, `media-type-from-extension.spec.ts` néven                          |
+| `agent-tools/src/image/read-file-function.ts`                | `packages/core/src/image-source/data-url/read-file-function.ts` (típus-only) |
+| `agent-tools/src/image/resolve-image-data-url.ts`            | `packages/core/src/image-source/data-url/resolve-image-data-url.ts`          |
+| `agent-tools/src/image/resolve-image-data-url.test.ts`       | ugyanoda, `resolve-image-data-url.spec.ts` néven                             |
 
 **Témák.** Kettő. A `media-type` a média típus megállapítása: a típus maga és a két megállapító, `Content-Type` fejlécből és fájlkiterjesztésből. A `data-url` a kép beolvasása és data URL alakra hozása, a befecskendezett fájlolvasó típusával együtt.
 
-**Függőség.** `@easter-workflow-builder/http-client`, `@easter-workflow-builder/result`.
+**Függőség.** Nincs csomagon kívüli függősége. A HTTP réteget és az `Outcome` típust a befogadó csomagon belülről, a `http-client` és a `result` tárgykörből veszi.
 
 **NEM tartalmazza.** A MiniMax képértelmező hívást. A kép előkészítése és a modell hívása két különböző dolog: az előbbi bármelyik képes providerrel használható, az utóbbi MiniMax specifikus.
 
@@ -499,6 +532,8 @@ A szerződése szándékosan azonos a `callMiniMax` szerződésével: `Promise<O
 
 **NEM tartalmazza.** Egyetlen kész eszközt sem, és nem tartalmazza az in-process MCP szerver nevét sem. A user kifogása pontosan erre vonatkozott: a váz és a kész tool nem lakhat egy csomagban.
 
+**Az `agent-tool-bundle` NEM olvadt be ide.** A tervezett összevonás kört hozott volna létre, a 4. szekció "Az összevont csomagok" pontjában bizonyított módon: az összeállító a három `tool-*` csomagot hívja, azok pedig ennek a csomagnak a válaszkonstruktorait. Az összeállító ezért önálló csomag maradt (5.17).
+
 ---
 
 ### 5.14 `@easter-workflow-builder/tool-minimax-web-search`
@@ -516,7 +551,7 @@ A szerződése szándékosan azonos a `callMiniMax` szerződésével: `Promise<O
 
 A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`, `environment`, `readFileFunction`), de a `web_search` eszköznek csak kettő kell. Ha a közös típus egy alacsonyabb csomagba kerülne, minden eszköz csomag függene tőle, és az összeállító csomagtól való függés kört okozna. Ezért minden eszköz csomag a saját, szűk függőség interfészét deklarálja, és az összeállító adja át a megfelelő mezőket. Ez a "a segéd soha nem lakik egy csomagban a kész toollal" elv következménye a függőség objektumra is.
 
-**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/result`, plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/minimax-client` barreljéből veszi, a 6.6 pont 7. szabálya szerint, tehát a `@easter-workflow-builder/http-client` és a `@easter-workflow-builder/env-reader` **nem** szerepel a függőségei között.
+**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/core` (az `isOkOutcome` guard miatt), plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/minimax-client` barreljéből veszi, **nem** közvetlenül a `core` csomagból, a 6.6 pont 7. szabálya szerint: a tool nem hív HTTP réteget, csak átadja a befecskendezett függvényt a kliensnek.
 
 **NEM tartalmazza.** A MiniMax HTTP hívást, a válasz szűkítést és formázást. Azok a kliens csomagban vannak, ez a csomag csak séma, leírás és a hibaágak megfogalmazása az agent felé.
 
@@ -535,7 +570,7 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 **Téma.** Egy téma, `web-fetch-tool`, három fájllal.
 
-**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/result`, plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/firecrawl-client` barreljéből veszi, a 6.6 pont 7. szabálya szerint.
+**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/core` (az `isOkOutcome` guard miatt), plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/firecrawl-client` barreljéből veszi, **nem** közvetlenül a `core` csomagból, a 6.6 pont 7. szabálya szerint.
 
 **Változás a mai kódhoz képest.** A `postJson` hívás átkerül a `scrape-call` téma `scrapePage` fájljába (5.11), tehát ez a fájl megszűnik közvetlenül HTTP réteget használni. A `@easter-workflow-builder/http-client` és a `@easter-workflow-builder/env-reader` **nem** szerepel a csomag függőségei között.
 
@@ -554,13 +589,15 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 **Téma.** Egy téma, `understand-image-tool`, három fájllal. A mappa neve az eszköz neve (`understand_image`), nem a benne álló gyártófüggvényé (`createImageUnderstandingTool`): a téma konvenció nem követeli meg a névazonosságot, és itt az eszköz neve a felismerhető.
 
-**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/image-source`, `@easter-workflow-builder/result`, plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/minimax-client`, a `ReadFileFunction` típust a `@easter-workflow-builder/image-source` barreljéből veszi, a 6.6 pont 7. szabálya szerint.
+**Függőség.** `@easter-workflow-builder/mcp-tool-kit`, `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/core`, plusz `@anthropic-ai/claude-agent-sdk` és `zod`. A `FetchFunction` és az `EnvironmentReader` típust a `@easter-workflow-builder/minimax-client` barreljéből veszi, a 6.6 pont 7. szabálya szerint. A `resolveImageDataUrl` függvényt és a `ReadFileFunction` típust viszont közvetlenül a `core` csomagból, mert a kép feloldását maga hívja.
 
 **Változás a mai kódhoz képest.** Az `ENV_MINIMAX_CODING_PLAN_API_KEY` helyett nincs változónév paraméter: a `resolveMiniMaxConfig` hívás argumentum nélkül történik, és az `ENV_MINIMAX_API_KEY` változóból dolgozik (5.10).
 
 ---
 
 ### 5.17 `@easter-workflow-builder/agent-tool-bundle`
+
+**Önálló csomag marad.** Az `mcp-tool-kit` csomagba való beolvasztása kört hozna létre, mert az itt álló `createAgentTool` a három `tool-*` csomagot hívja, azok pedig az `mcp-tool-kit` válaszkonstruktorait. A bizonyítás a 4. szekció "Az összevont csomagok" pontjában áll, futtatott ellenőrzővel.
 
 **Felelősség.** A lépésenként kapcsolható eszközkészlet összeállítása: az azonosítókból in-process MCP szerver konfiguráció és `allowedTools` lista.
 
@@ -580,7 +617,7 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 **Témák.** Négy, 11 fájllal. A `tool-reference` az MCP név összerakása a szervernévből és az eszköz azonosítóból. A `tool-dependencies` a futásidejű függőség objektum típusa és az alapértelmezett példánya. A `tool-factory` az egyetlen hely, ami tudja, melyik azonosítóhoz melyik gyártófüggvény tartozik. A `tool-bundle` a kész készlet alakja és összeállítása.
 
-**Függőség.** `@easter-workflow-builder/agent-tool-id`, `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-firecrawl-web-fetch`, `@easter-workflow-builder/tool-minimax-understand-image`, `@easter-workflow-builder/env-reader` (az `EnvironmentReader` típus), `@easter-workflow-builder/http-client` (a `FetchFunction` típus), `@easter-workflow-builder/image-source` (a `ReadFileFunction` típus), plusz `@anthropic-ai/claude-agent-sdk`.
+**Függőség.** `@easter-workflow-builder/provider-capability` (kizárólag az `AgentToolId` szótár miatt), `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-firecrawl-web-fetch`, `@easter-workflow-builder/tool-minimax-understand-image`, `@easter-workflow-builder/core` (az `EnvironmentReader`, a `FetchFunction` és a `ReadFileFunction` típus), plusz `@anthropic-ai/claude-agent-sdk`.
 
 **Az `AgentToolDependencies` szerepe itt.** Ez a csomag az egyetlen hely, ahol a három futásidejű függőség egy objektumban áll, mert ez az egyetlen hely, ami mindhárom eszközt ismeri. A `createAgentTool` switch ágai a teljes objektumból választják ki az adott eszköz szűk függőség interfészének megfelelő mezőket.
 
@@ -594,16 +631,20 @@ Mindkét barrel törlődik. A jelenleg belőlük exportált szimbólumok az alá
 
 | Ma exportált szimbólum                                                                                                                               | Új csomag                                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `EnvironmentReader`                                                                                                                                  | `@easter-workflow-builder/env-reader`                   |
+| `EnvironmentReader`                                                                                                                                  | `@easter-workflow-builder/core`                         |
 | `ENV_MINIMAX_API_KEY`, `ENV_MINIMAX_BASE_URL`, `ENV_MINIMAX_TIMEOUT_MS`                                                                              | `@easter-workflow-builder/minimax-client`               |
+| `mediaTypeFromContentType`, `mediaTypeFromExtension`, `resolveImageDataUrl`, `ImageMediaType`, `ReadFileFunction`                                    | `@easter-workflow-builder/core`                         |
+| `postJson`, `getBinary`, `describeError`, `FetchFunction`, `BinaryPayload`, `PostJsonRequest`                                                        | `@easter-workflow-builder/core`                         |
+| `readBaseUrl`, `readTimeoutMs`                                                                                                                       | `@easter-workflow-builder/core`                         |
+| `DOC_*`, `RESEARCH_*`, `measurementDocument`, `MeasurementDocumentAnchor`                                                                            | `@easter-workflow-builder/provider-capability`          |
 | `ENV_MINIMAX_CODING_PLAN_API_KEY`                                                                                                                    | megszűnik (5.10)                                        |
 | `ENV_FIRECRAWL_BASE_URL`, `ENV_FIRECRAWL_TIMEOUT_MS`                                                                                                 | `@easter-workflow-builder/firecrawl-client`             |
-| `Outcome`, `isOkOutcome`                                                                                                                             | `@easter-workflow-builder/result`                       |
+| `Outcome`, `isOkOutcome`                                                                                                                             | `@easter-workflow-builder/core`                         |
 | `ToolCallResult`                                                                                                                                     | `@easter-workflow-builder/mcp-tool-kit`                 |
 | `AgentToolDependencies`, `defaultAgentToolDependencies`, `AGENT_TOOLS_SERVER_NAME`, `agentToolReference`, `AgentToolBundle`, `createAgentToolBundle` | `@easter-workflow-builder/agent-tool-bundle`            |
-| `MeasurementId`, `EvidenceReference`, `EvidenceList`, `Fact`, `isKnownFact`, `isUnknownFact`                                                         | `@easter-workflow-builder/evidence`                     |
+| `MeasurementId`, `EvidenceReference`, `EvidenceList`, `Fact`, `isKnownFact`, `isUnknownFact`                                                         | `@easter-workflow-builder/provider-capability`          |
 | `ProviderCapabilityDescriptor`, `AgentToolRecommendation`                                                                                            | `@easter-workflow-builder/provider-capability`          |
-| `AgentToolId`                                                                                                                                        | `@easter-workflow-builder/agent-tool-id`                |
+| `AgentToolId`                                                                                                                                        | `@easter-workflow-builder/provider-capability`          |
 | `MiniMaxModelId`, `MiniMaxFamilyId`                                                                                                                  | `@easter-workflow-builder/provider-minimax`             |
 | `ClaudeModelId`, `ClaudeFamilyId`                                                                                                                    | `@easter-workflow-builder/provider-claude-subscription` |
 | `ProviderRegistry`, `providerRegistry`                                                                                                               | `@easter-workflow-builder/provider-registry`            |
@@ -640,7 +681,31 @@ Szabályok:
 4. A téma mappa neve kebab-case, és a domain fogalmat nevezi meg, nem feltétlenül a benne álló valamelyik fájlt. Az `understand-image-tool` mappában a `create-image-understanding-tool.ts` áll, és ez rendben van.
 5. A fájlnevek változatlanok maradnak: egy fájl egy exportált egység, ahogy eddig is. A téma konvenció a mappákról szól, nem a fájlok felbontásáról.
 6. Egyetlen fájl sem állhat közvetlenül a `src/` alatt, az `index.ts` barrel kivételével.
-7. Nincs téma mappán belüli `index.ts`, és nincs téma mappán belüli további alkönyvtár. A csomagnak egyetlen belépési pontja van, és a `src/` alatti mappaszerkezet egy szint mély.
+7. Nincs téma mappán belüli `index.ts`. A csomagnak egyetlen belépési pontja van.
+8. **A `src/` alatti mappaszerkezet alapesetben egy szint mély, és kétszintű ott, ahol a csomag több tárgykört fog össze.** A tárgykör a témánál egy szinttel tágabb fogalom: az a terület, ami korábban önálló csomag volt, vagy önálló csomag lehetne. Ha egy csomagban egyetlen tárgykör van, a téma mappák közvetlenül a `src/` alatt állnak (ez az eset a `minimax-client`, a `firecrawl-client`, a `mcp-tool-kit`, a három `tool-*` és a `provider-registry` csomagban). Ha több, akkor minden tárgykör kap egy `src/<tárgykör>/` mappát, és a téma mappái az alatt állnak. Kettőnél mélyebb szerkezet tilos.
+9. **Ha egy tárgykörnek egyetlen témája van, és a kettő neve megegyezik, a mappaszint nem duplázódik.** A `provider-capability/src/agent-tool-id/agent-tool-id.ts` az egyetlen ilyen eset a repóban; az `agent-tool-id/agent-tool-id/` alak tilos, mert nulla információt hordoz.
+
+A 8. szabály alá eső két csomag, tételesen:
+
+```
+packages/core/src/
+  result/outcome/
+  env-reader/environment-reader/
+  http-client/request/
+  http-client/error-description/
+  image-source/media-type/
+  image-source/data-url/
+
+packages/provider-capability/src/
+  descriptor/            model-catalog/       environment/
+  tool-support/          limits/              request-shaping/
+  evidence/evidence-reference/
+  evidence/fact/
+  evidence-sources/measurement-document/
+  agent-tool-id/
+```
+
+A `provider-capability` a vegyes eset: hat téma mappája közvetlenül a `src/` alatt áll (ez a csomag saját tárgyköre, a képességleíró típusok), és három beolvadt tárgykör mappája mellettük. Ez megengedett, mert a saját tárgykörnek nincs külön neve: az maga a csomag.
 
 **A `packages/typeguards` jelenlegi szerkezete helyes és marad.** Ott azért áll 17 mappa 17 guardhoz, mert **egy adott typeguard típus maga egy téma**: az `is-string` téma az, hogy mi számít stringnek. Ugyanezt mutatja az `is-function/` mappa, amiben két fájl áll (`is-function.ts` és `is-function-return-any.ts`) a két saját spec fájljával: egy téma, több fájl. Ez a szerkezet nem sablon a többi csomagra, mert máshol a téma nem esik egybe egyetlen fájllal.
 
@@ -678,7 +743,9 @@ A téma mappa neve domain fogalmat nevez meg. Az alábbi nevek soha nem azt tesz
 
 A `config` tiltása a **puszta** névre vonatkozik. A `minimax-config/` és a `firecrawl-config/` téma mappa megengedett és helyes: megnevezi, melyik szolgáltatás beállításáról van szó, és pontosan azt a keveredést zárja ki, ami miatt a `config/` tiltott.
 
-**Fő szabály.** A téma mappák egy szinten állnak, közvetlenül a `src/` alatt. Ha egy csomagban a témák fölé is csoportosítani kellene, az majdnem biztosan azt jelenti, hogy a csomag két csomag, és először a szétbontást kell mérlegelni. A jelen migráció után egyetlen új csomagban sincs téma mappán belüli alkönyvtár: mind a 18 csomag lapos, `src/<téma>/` szintű.
+**Fő szabály.** A csoportosítás legfeljebb kétszintű: `src/<téma>/` egy tárgykörű csomagban, `src/<tárgykör>/<téma>/` több tárgykörűben (6.1 pont 8. szabálya). Harmadik szint nincs. Ha egy csomagban a tárgykörök fölé is csoportosítani kellene, az azt jelenti, hogy a csomag két csomag, és a szétbontást kell mérlegelni.
+
+A 19 termékcsomagból 17 egy tárgykörű, tehát lapos, `src/<téma>/` szintű. Kettő kétszintű, a `core` és a `provider-capability`, mert a user döntése szerint több, korábban önálló tárgykört fognak össze.
 
 ### 6.6 A csomag publikus felülete
 
@@ -702,9 +769,9 @@ A `ReadFileFunction` a `@easter-workflow-builder/image-source` saját típusa, t
 
 ### 6.7 `CLAUDE.md` a csomag gyökerében
 
-A gyökér `CLAUDE.md` szabálya - "CLAUDE.md kizárólag a csomag gyökerében kell, arról hogy miről szól a csomag; alkönyvtárakba nem kell" - és a `tooling/scripts/claude-md.sh` ellenőrzés együtt azt jelenti, hogy **a téma mappák NEM kapnak saját `CLAUDE.md` fájlt**, kizárólag a csomag gyökere. A 18 új csomag mindegyike egy gyökér `CLAUDE.md`-t kap, összesen 18 új fájl. Mélyebbre nincs mit tenni: a téma mappa alatt nincs további könyvtár, és a téma mappa sem kap fájlt.
+A gyökér `CLAUDE.md` szabálya - "CLAUDE.md kizárólag a csomag gyökerében kell, arról hogy miről szól a csomag; alkönyvtárakba nem kell" - és a `tooling/scripts/claude-md.sh` ellenőrzés együtt azt jelenti, hogy **a téma mappák NEM kapnak saját `CLAUDE.md` fájlt**, kizárólag a csomag gyökere. Minden csomag gyökere egy `CLAUDE.md`-t kap. Mélyebbre nincs mit tenni: sem a tárgykör mappa, sem a téma mappa nem kap fájlt. A `bun run docs:check` pontosan ezt kényszeríti ki: a `git ls-files '*/package.json'` kimenetéből képzett csomaggyökér lista minden elemében kell legyen `CLAUDE.md`, alkönyvtárban nem.
 
-A csomag szintű `CLAUDE.md` a SPEC-001 14. szekció mind a hat kötelező szekcióját tartalmazza, és a `## Fájlok` táblázata a **téma mappákat** sorolja fel, mappánként egy-két mondatos felelősség leírással, nem az egyes fájlokat. Az 5. szekció csomagonkénti táblázatai adják a téma -> fájl leképezést, ez a forrás, nem a `CLAUDE.md`.
+A csomag szintű `CLAUDE.md` a SPEC-001 14. szekció mind a hat kötelező szekcióját tartalmazza, és a `## Fájlok` táblázata a **téma mappákat** sorolja fel (kétszintű csomagban a tárgykörrel együtt, `<tárgykör>/<téma>/` alakban), mappánként egy-két mondatos felelősség leírással, nem az egyes fájlokat. Az 5. szekció csomagonkénti táblázatai adják a téma -> fájl leképezést, ez a forrás, nem a `CLAUDE.md`.
 
 ### 6.8 Két kivétel a hatókör alól
 
@@ -726,6 +793,28 @@ Indok, négy pontban:
 4. **A `src/proxy.ts` és a `src/proxy/` mappa együtt él.** A konvenció szerinti `proxy/proxy.ts` alak ütközne a meglévő mappával, és pontosan azt az árnyékolt útvonal hibát hozná vissza, amit a `no-shadowed-path-import.spec.ts` regressziós teszt őriz.
 
 Ami a `tools/wire-probe` csomagra **mégis** vonatkozik: a `@easter-workflow-builder/` névtér (3. szekció) és a `.spec.ts` végződés a `no-shadowed-path-import` regressziós tesztre (6.2 pont 5. szabálya, mappába vitel nélkül). A `CLAUDE.md` kötelezettség a 6.7 pont szerinti általános szabályra szűkül: csak a csomag gyökerében kell, a `src/cases/`, a `src/harness/` és a `src/proxy/` mappa nem kap saját fájlt. A csomagnak nincs `src/index.ts` fájlja és nincs `exports` mezője, mert soha senki nem importálja csomagnév szerint; ez így marad.
+
+### 6.9 Csomagnév konvenció: a szolgáltatót meg kell nevezni
+
+**Ami egy konkrét külső szolgáltatóhoz köthető, azt a csomag nevében meg kell nevezni, előbb a szolgáltató, utána a funkció.** A név akkor jó, ha a csomaglistából, a fájl megnyitása nélkül el lehet dönteni, melyik szolgáltatással beszél.
+
+Ez a user döntése, és a provider csomagoknál már alkalmazott, jóváhagyott mintát terjeszti ki a repo egészére:
+
+| Csomagnév                       | Szolgáltató | Funkció                   |
+| ------------------------------- | ----------- | ------------------------- |
+| `provider-minimax`              | MiniMax     | provider képességleíró    |
+| `provider-claude-subscription`  | Claude      | provider képességleíró    |
+| `minimax-client`                | MiniMax     | HTTP kliens               |
+| `firecrawl-client`              | Firecrawl   | HTTP kliens               |
+| `tool-minimax-web-search`       | MiniMax     | `web_search` MCP eszköz   |
+| `tool-minimax-understand-image` | MiniMax     | `understand_image` eszköz |
+| `tool-firecrawl-web-fetch`      | Firecrawl   | `web_fetch` MCP eszköz    |
+
+A három tool csomag korábbi neve (`tool-web-search`, `tool-understand-image`, `tool-web-fetch`) ezt a szabályt sértette: a névből nem derült ki, hogy a keresést a MiniMax, a lekérést a Firecrawl adja. A próba, ami ezt kimutatja: **ha holnap egy második implementáció érkezik ugyanarra a funkcióra, megkülönböztethető marad-e a kettő.** Egy Brave alapú kereső csomagja `tool-brave-web-search` lenne, és a listában egymás mellett állna a `tool-minimax-web-search` mellett. A régi névvel a második csomagnak nem lett volna neve.
+
+Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`) és azokat, amik a saját domain fogalmukról szólnak (`provider-capability`, `provider-registry`, `agent-tool-bundle`). Ha egy ilyen csomag egyszer mégis egyetlen szolgáltatóhoz kötődne, az azt jelentené, hogy rossz helyre került a tartalma.
+
+**Az MCP eszköznevek nem változnak.** A `web_search`, a `web_fetch` és az `understand_image` az agent felé kimenő szerződés, ahogy a `createWebSearchTool` és társai a gyártófüggvények neve, és a `web-search-tool/` a téma mappa neve. A konvenció a **csomagnévről** szól, ami a repo belső dolga; az eszköz neve az agentnek szól, és annak egy szolgáltatóváltás nem látszódhat.
 
 ## 7. Amit a migráció NEM változtat meg
 
@@ -780,54 +869,59 @@ Ami a `tools/wire-probe` csomagra **mégis** vonatkozik: a `@easter-workflow-bui
 | A `scrapePage` kiemelése megváltoztatja a `web_fetch` hibaüzeneteit                                        | az agent más szöveget kap, a teszt elvárások elcsúsznak                           | a `scrapePage` szerződése `Outcome<unknown>`, a szűkítés a hívónál marad, tehát a két hibaág és a két üzenet változatlan (5.11)                                                                                                                                                                                             |
 | A `docs:check` egy új csomag gyökerének hiányzó `CLAUDE.md`-je miatt pirosra vált                          | a kapu elbukik, a lépés nem zárható le                                            | a `CLAUDE.md` a csomag gyökerével **együtt**, ugyanabban a lépésben keletkezik, nem utólag                                                                                                                                                                                                                                  |
 | A `@easter-workflow-builder/` névtér átírása kimarad egy `dependencies` kulcsból                           | `bun install` hibázik, vagy egy import registry csomagra oldódik fel              | a névtér átírás önálló, atomi lépés, a végén `bun install --frozen-lockfile` plusz mind a hét kapu                                                                                                                                                                                                                          |
-| A 32 csomagos gráf lelassítja a Turborepo futást                                                           | lassabb helyi és CI futás                                                         | dokumentált felső korlát vagy teljesítmény-figyelmeztetés a csomagszámra a Turborepo dokumentációjában **nincs**, ezért számot itt nem rögzítünk; a lépések végén mért `turbo run typecheck` idő a tény                                                                                                                     |
+| A 25 csomagos gráf lelassítja a Turborepo futást                                                           | lassabb helyi és CI futás                                                         | dokumentált felső korlát vagy teljesítmény-figyelmeztetés a csomagszámra a Turborepo dokumentációjában **nincs**, ezért számot itt nem rögzítünk; a lépések végén mért `turbo run typecheck` idő a tény                                                                                                                     |
 | A `packages/typeguards` csomagon párhuzamosan dolgozik egy másik agent                                     | ütköző szerkesztés                                                                | a typeguards érintő lépés a terv legvégén áll, és csak akkor indul, ha a párhuzamos munka lezárult                                                                                                                                                                                                                          |
 | A tisztán típus-only csomagok (`agent-tool-id`, `provider-capability`) barrelje futásidőben üres modult ad | a Vitest projekt vagy a Node type stripping nem tudja betölteni a csomagot        | a `verbatimModuleSyntax` mellett az `export type { X } from '...'` alak érvényes modult képez, tehát nem üres fájl. A `passWithNoTests: true` már ma be van állítva a gyökér configban, tehát a teszt nélküli projekt nem bukik el. Ha a betöltés mégis hibázna, a barrelbe egyetlen `export {}` sor kerül, kizárás helyett |
 
 ## 11. Elfogadási kritériumok
 
 1. A `packages/agent-tools` és a `packages/providers` könyvtár nem létezik, és a repóban nincs rájuk mutató import a `docs/` alatti historikus szövegeken kívül.
-2. A 4. szekció mind a 18 új csomagja létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájlja.
+2. A `packages/` alatt pontosan 19 csomag áll, névre a 4. szekció rétegbesorolási táblázata szerint, mindegyiknek van `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájlja. A workspace összesen 25 csomagból áll (19 `packages`, 2 `apps`, 3 `tooling`, 1 `tools`).
 3. Minden workspace csomag neve `@easter-workflow-builder/` prefixszel kezdődik, kivétel nélkül, a `tooling/*` és a `tools/*` csomagokat is beleértve.
-4. Az 5. szekció mind a 143 leképezett fájlja (75 az `agent-tools`, 68 a `providers` csomagból) elszámolt: 139 fájl a megadott cél téma mappában, a megadott fájlnéven áll, 2 fájl (`environment-variable-name.ts`, `default-config-value.ts`) szolgáltatásonként kettévált és mind a négy fele megvan, 2 fájl (a két `src/index.ts` barrel) szándékosan törölve. Egyetlen fájl sem maradt le, és egyetlen exportált szimbólum sem veszett el, az 5.18 táblázat szerint.
+4. Az 5. szekció mind a 143 leképezett fájlja (75 az `agent-tools`, 68 a `providers` csomagból) elszámolt: 139 fájl a megadott cél mappában, a megadott fájlnéven áll, 2 fájl (`environment-variable-name.ts`, `default-config-value.ts`) szolgáltatásonként kettévált és mind a négy fele megvan, 2 fájl (a két `src/index.ts` barrel) szándékosan törölve. Egyetlen fájl sem maradt le, és egyetlen exportált szimbólum sem veszett el, az 5.18 táblázat szerint. Az összevonás egyetlen fájlt sem szüntetett meg és egyetlen fájl tartalmát sem írta át a benne álló import specifikátorokon túl.
 5. A repóban nincs `.test.ts` végződésű fájl. A `git ls-files '*.test.ts'` kimenete üres.
 6. Minden Vitest teszt fájl a megvalósítás mellett, azonos téma mappában áll, a megvalósítás fájlnevével plusz `.spec.ts` végződéssel. Három kivétel: az `apps/web/e2e/` fa (Playwright tesztek), a 6.2 pont 5. szabálya szerinti, megvalósítás nélküli regressziós teszt, és a `tools/wire-probe` a 6.8 pont szerint.
-7. A `src/` közvetlen gyermekei minden csomagban kizárólag az `index.ts` fájl és téma mappák, a 6.8 pont két kivételével. Ezt a következő parancs igazolja, aminek üres eredményt kell adnia:
+7. A `src/` közvetlen gyermekei minden csomagban kizárólag az `index.ts` fájl és mappák (téma vagy tárgykör), a 6.8 pont két kivételével. Ezt a következő parancs igazolja, aminek üres eredményt kell adnia:
 
    ```
    find packages apps tooling -path '*/src/*' -maxdepth 3 -type f -name '*.ts' \
      -not -name 'index.ts' -not -path 'apps/web/src/main.ts' -not -path '*/node_modules/*'
    ```
 
-8. A 18 új csomagban keletkezett téma mappák halmaza névre és tartalomra pontosan megegyezik az 5. szekció táblázataiban felsorolt 45 téma mappával: nincs olyan téma mappa, ami az 5. szekcióban nem szerepel, nincs olyan felsorolt téma, aminek a mappája hiányzik, és egyetlen mappa tartalma sem tér el a felsorolttól. Egyetlen téma mappa sem tartalmaz egyetlen fájlt pusztán azért, mert az a fájl máshova nem fért be; az 5. szekció minden egy fájlos témát külön megindokol (`agent-tool-id`, `descriptor`).
+8. A keletkezett téma mappák halmaza névre és tartalomra pontosan megegyezik az 5. szekció táblázataiban felsorolt 45 téma mappával: nincs olyan téma mappa, ami az 5. szekcióban nem szerepel, nincs olyan felsorolt téma, aminek a mappája hiányzik, és egyetlen mappa tartalma sem tér el a felsorolttól. Az összevonás a téma mappák nevét és tartalmát nem változtatta meg, csak egy tárgykör mappát fűzött eléjük a 6.1 pont 8. szabálya szerint. Egyetlen téma mappa sem tartalmaz egyetlen fájlt pusztán azért, mert az a fájl máshova nem fért be; az 5. szekció minden egy fájlos témát külön megindokol (`agent-tool-id`, `descriptor`).
 9. Egyetlen csomagban sincs `types/`, `utils/`, `helpers/`, `lib/`, `common/`, `shared/`, `internal/` vagy `config/` nevű alkönyvtár, a 6.8 pont szerinti `tools/wire-probe` kivételével. A tiltás a puszta nevekre vonatkozik: a `minimax-config/` és a `firecrawl-config/` téma mappa a 6.5 pont szerint megengedett.
-10. A `packages/*` és az `apps/*` csomagokban minden téma mappa közvetlenül a `src/` alatt áll, és egyetlen téma mappában sincs további alkönyvtár. A `tooling/*` csomagokra ugyanez érvényes, a `tools/wire-probe` a 6.8 pont szerint kivétel.
+10. A `packages/*` és az `apps/*` csomagokban a `src/` alatti mappaszerkezet legfeljebb kétszintű, és egyetlen téma mappában sincs további alkönyvtár. Kétszintű pontosan két csomag, a `core` és a `provider-capability`, a 6.1 pont 8. szabálya szerinti tárgykör tagolással; a maradék 17 termékcsomag lapos. Duplikált mappaszint (`<x>/<x>/`) sehol nincs, a 6.1 pont 9. szabálya szerint. A `tooling/*` csomagokra ugyanez érvényes, a `tools/wire-probe` a 6.8 pont szerint kivétel.
 11. Minden csomag `src/index.ts` fájlja csak nevesített újraexportot tartalmaz. `export *` egyetlen barrelben sem szerepel.
 12. Minden `packages/*` alatti könyvtárcsomag `package.json` `exports` mezője a `./src/index.ts` fájlra mutat. Az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagnak nincs `exports` mezője, és nem is kap: ezeket egyetlen másik csomag sem importálja csomagnév szerint, ez a migráció előtti állapot, és nem változik.
-13. A függőségi gráf aciklikus, és minden él szigorúan csökkenő rétegszám felé mutat, a 4. szekció "Rétegbesorolás, mind a 32 csomagra" táblázata szerint. Az eszköz csomagok (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`) kizárólag `devDependencies` helyen jelenhetnek meg. Ezt az `import-x/no-cycle` szabály, a `package.json` `dependencies` mezők, és a T-002-24 lépésben készülő gráf ellenőrző együtt igazolja.
+13. A függőségi gráf aciklikus, és minden él szigorúan csökkenő rétegszám felé mutat, a 4. szekció "Rétegbesorolás, mind a 25 csomagra" táblázata szerint. Az eszköz csomagok (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`) kizárólag `devDependencies` helyen jelenhetnek meg. Ezt az `import-x/no-cycle` szabály, a `package.json` `dependencies` mezők, és a `bun run check:graph` együtt igazolja. **Ez a kritérium jelenleg egyetlen ponton nem teljesül**, az `engine` (L4) `agent` (L4) élén, a 4. szekcióban leírt, a userre váró besorolási ellentmondás miatt. A körmentesség viszont teljesül: a `check:graph` egyetlen `cycle:` sort sem ad.
 14. Egyetlen `tool-*` csomag `dependencies` mezőjében sem szerepel másik `tool-*` csomag vagy a `@easter-workflow-builder/agent-tool-bundle`.
-15. A `@easter-workflow-builder/http-client` csomag `dependencies` mezőjében nem szerepel `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/firecrawl-client` vagy bármely `tool-*` csomag.
+15. A `@easter-workflow-builder/core` csomag `dependencies` mezője üres: nem szerepel benne `@easter-workflow-builder/minimax-client`, `@easter-workflow-builder/firecrawl-client`, `@easter-workflow-builder/provider-capability` vagy bármely `tool-*` csomag. A `core` `http-client` tárgyköre egyetlen konkrét szolgáltatás egyetlen végpontját sem ismeri.
 16. A `@easter-workflow-builder/mcp-tool-kit` csomagban nincs egyetlen kész MCP eszköz definíció sem, és nem hivatkozik egyetlen `tool-*` csomagra sem.
-17. A `@easter-workflow-builder/evidence` csomag nem hivatkozik a `@easter-workflow-builder/evidence-sources` csomagra, és a `@easter-workflow-builder/provider-capability` nem hivatkozik egyetlen konkrét provider csomagra sem.
-18. Egyetlen téma mappában sincs `CLAUDE.md`, a 6.7 pont szerint. Minden új csomag gyökerében van `CLAUDE.md`, a 18 új csomagban összesen 18 új fájl. A `bun run docs:check` nulla kilépési kóddal fut a teljes repón.
-19. Minden csomag szintű `CLAUDE.md` tartalmazza a SPEC-001 14. szekció mind a hat kötelező szekcióját, és a `## Fájlok` táblázata a téma mappákat sorolja fel.
+17. A `@easter-workflow-builder/provider-capability` nem hivatkozik egyetlen konkrét provider csomagra sem, és `dependencies` mezője üres. A csomagon belül az `evidence` tárgykör nem importál az `evidence-sources` tárgykörből (az irány csak fordítva megengedett), és a hat képességleíró téma nem importál egymásba a `descriptor/` összefogó típuson kívül.
+18. Egyetlen téma vagy tárgykör mappában sincs `CLAUDE.md`, a 6.7 pont szerint. Minden csomag gyökerében van `CLAUDE.md`. A `bun run docs:check` nulla kilépési kóddal fut a teljes repón, `26/26 kotelezo helyen van CLAUDE.md, 0 hianyzik` kimenettel (25 csomaggyökér plusz a repo gyökere).
+19. Minden csomag szintű `CLAUDE.md` tartalmazza a SPEC-001 14. szekció mind a hat kötelező szekcióját, és a `## Fájlok` táblázata a téma mappákat sorolja fel, kétszintű csomagban a tárgykörrel együtt.
 20. A `bun run check:casing` nulla kilépési kóddal fut, tehát a git indexben tárolt fájlnevek betűzése megegyezik a rájuk hivatkozó relatív importokéval.
 21. A `bun run test` nulla kilépési kóddal fut, és a lefedettség mind a négy metrikán 100 százalék.
 22. A `vitest.config.ts` `coverage.exclude` listája nem bővült egyetlen sorral sem a migráció során. Az összehasonlítás alapja a migráció előtti fájl.
-23. A `bun run typecheck`, a `bun run lint` és a `bun run format:check` nulla kilépési kóddal fut a teljes workspace-en, mind a 32 csomagra.
+23. A `bun run typecheck`, a `bun run lint` és a `bun run format:check` nulla kilépési kóddal fut a teljes workspace-en, mind a 25 csomagra.
 24. A `bun run build` nulla kilépési kóddal fut.
 25. A `bun install --frozen-lockfile` hibátlanul lefut, és a `bun.lock` egyetlen fájl a gyökérben.
-26. Minden új csomag `devDependencies` mezője `catalog:` hivatkozással veszi át a `typescript`, `vitest` és `@types/node` csomagot. Literál verzió egyetlen új csomagban sincs ezekre.
+26. Minden csomag `devDependencies` mezője `catalog:` hivatkozással veszi át a `typescript`, `vitest` és `@types/node` csomagot. Literál verzió egyetlen csomagban sincs ezekre.
 27. A `MINIMAX_CODING_PLAN_API_KEY` név nem fordul elő sem a kódban, sem a `turbo.json` fájlban, sem egyetlen `CLAUDE.md` fájlban. A migráció kiindulópontján hét helyen fordul elő: `environment-variable-name.ts`, `index.ts`, `create-image-understanding-tool.ts` (két sor), `create-image-understanding-tool.test.ts` (három sor), `packages/agent-tools/CLAUDE.md:38` és `turbo.json:17`. Az `agent-tools` csomagok által használt környezeti változók száma öt, és mind az öt szerepel a `turbo.json` `globalPassThroughEnv` listájában. Ez a SPEC-001 55. kritériumát váltja ki.
 28. A `resolveMiniMaxConfig` függvénynek nincs változónév paramétere, és a `@easter-workflow-builder/tool-minimax-understand-image` valamint a `@easter-workflow-builder/tool-minimax-web-search` ugyanabból a környezeti változóból dolgozik.
 29. A `docs/research/2026-08-26-agent-tools.md` 4. szekciója lezárt állapotú: rögzíti a saját mérés eredményét, a user döntését, és azt, hogy a külön változó megszűnt. A mérési táblázat sorai változatlanok.
 30. Minden `Fact` mező `state`, `value` és `evidence` értéke bitre azonos a migráció előttivel. Ezt egy normalizált JSON összehasonlítás igazolja a migráció előtti és utáni `providerRegistry` fán.
 31. A `provider-registry` csomag bejáró regressziós tesztje (`provider-registry.spec.ts`) változatlan invariánsokkal fut le: minden `Fact` pontosan az egyik ágon áll, a `known` ág nem üres bizonyítéklistát hordoz, az `unknown` ág indoklást és blokkoló mérést, egyetlen `purpose` vagy `reason` string sem tartalmaz `M-` mintájú azonosítót, és minden hivatkozott `MeasurementId` feloldható `docs/` horgonyra.
 32. Az `@easter-workflow-builder/firecrawl-client` `scrape-call` témájában álló `scrapePage` `Outcome<unknown>` típussal tér vissza, és a `PATH_SCRAPE` konstans nem szerepel a csomag `src/index.ts` barreljében.
-33. Egyetlen `tool-*` csomag `dependencies` mezőjében sem szerepel a `@easter-workflow-builder/http-client` és a `@easter-workflow-builder/env-reader`. A `FetchFunction` és az `EnvironmentReader` típust mindhárom tool csomag a hívott kliens csomag barreljéből veszi, a 6.6 pont 7. szabálya szerint, és a három kliens csomag barrelje tartalmazza a szabály táblázatában felsorolt re-exportokat.
-34. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és egy `@easter-workflow-builder/result` fájl módosítása után csak a `result` csomagtól függő csomagok taskja fut újra.
+33. Egyetlen `tool-*` csomag forrásában sem szerepel a `FetchFunction` vagy az `EnvironmentReader` típus `@easter-workflow-builder/core` csomagból importálva: mindhárom tool a hívott kliens csomag barreljéből veszi, a 6.6 pont 7. szabálya szerint, és a két kliens csomag barrelje tartalmazza a szabály táblázatában felsorolt re-exportokat. A `@easter-workflow-builder/core` a három tool `dependencies` mezőjében szerepel, de kizárólag az `isOkOutcome` guard, illetve a `tool-minimax-understand-image` esetén a `resolveImageDataUrl` és a `ReadFileFunction` miatt.
+34. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és egy `@easter-workflow-builder/core` fájl módosítása után csak a `core` csomagtól függő csomagok taskja fut újra.
 35. A `.github/workflows/ci.yml`, a `.github/actions/setup/action.yml` és a `tooling/tsconfig/*.json` fájlok **nem** változtak a migráció során. A `tooling/scripts/*.sh` fájlokban pontosan egy, előre dokumentált változás történt: egy új wrapper a gráf ellenőrzőhöz (T-002-24). A `casing.sh` **változatlan**, mert a `tooling/scripts/src/casing/` mappa a téma konvenció szerint helyes és marad. Az összehasonlítás alapja a migráció előtti fájl.
-36. A gyökér `CLAUDE.md` hivatkozik erre a specre a mappa konvenció forrásaként, és nem ismétli meg a 6. szekció tartalmát.
+36. A gyökér `CLAUDE.md` hivatkozik erre a specre a mappa konvenció és a csomagnév konvenció forrásaként, és nem ismétli meg a 6. szekció tartalmát.
+37. A `packages/result`, a `packages/env-reader`, a `packages/http-client`, a `packages/image-source`, a `packages/evidence`, a `packages/evidence-sources` és a `packages/agent-tool-id` könyvtár nem létezik, és a repóban nincs rájuk mutató import vagy `dependencies` kulcs. Nem maradt átirányító barrel csomag sem.
+38. A `packages/tool-web-search`, a `packages/tool-understand-image` és a `packages/tool-web-fetch` könyvtár nem létezik; a három csomag neve `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-minimax-understand-image` és `@easter-workflow-builder/tool-firecrawl-web-fetch`. Az általuk kiadott MCP eszköznevek (`web_search`, `understand_image`, `web_fetch`), a gyártófüggvények neve és a téma mappák neve **változatlan**, a 6.9 szekció utolsó bekezdése szerint.
+39. Minden olyan csomag neve, ami egy konkrét külső szolgáltatóhoz köthető, megnevezi a szolgáltatót, a 6.9 szekció táblázata szerint. Egyetlen csomagnév sem hagyja el a szolgáltatót ott, ahol egy második implementáció ütközne vele.
+40. Az összevonás nem változtatta meg a viselkedést: a `bun run test` ugyanannyi teszt fájlt (52) és ugyanannyi tesztet (367) futtat le, mint az összevonás előtt, mind a négy lefedettségi metrikán 100 százalékkal, és a `vitest.config.ts` `coverage.exclude` listája változatlan.
+41. A `@easter-workflow-builder/agent-tool-bundle` **önálló csomag**, nem olvadt be a `@easter-workflow-builder/mcp-tool-kit` csomagba, és az `mcp-tool-kit` `dependencies` mezője üres. Az ok a 4. szekcióban dokumentált kör, futtatott ellenőrzővel bizonyítva; a feloldás a userre vár.
 
 ## 12. Kapcsolódó dokumentumok
 

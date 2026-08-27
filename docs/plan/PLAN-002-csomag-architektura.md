@@ -5,7 +5,7 @@
 | Specifikáció | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md) |
 | Előzmény     | [`../spec/SPEC-001-monorepo-toolchain.md`](../spec/SPEC-001-monorepo-toolchain.md)   |
 | Branch       | `feat/spec-002-csomag-architektura`, a `main` védett                                 |
-| Lépések      | 26, nyolc fázisban                                                                   |
+| Lépések      | 29, kilenc fázisban                                                                  |
 
 ---
 
@@ -347,37 +347,81 @@ Két fájl áll a `src/` tetején, ez a kettő mozdul:
 
 ### T-002-26
 
-**Leírás.** Adverzariális záró audit a SPEC-002 mind a 36 elfogadási kritériuma ellen, tételesen, bizonyítékkal. Aki auditál, ne az legyen, aki a migrációt végezte.
+**Leírás.** Adverzariális záró audit a SPEC-002 elfogadási kritériumai ellen, tételesen, bizonyítékkal. Aki auditál, ne az legyen, aki a migrációt végezte.
 
 **Függőség.** T-002-25
 
 **Model.** `opus`
 
-**Elfogadási kritérium.** Mind a 36 kritériumhoz tartozik vagy egy most futtatott parancs kimenete, vagy egy konkrét fájl és sor hivatkozás. Feltételezéssel lezárt kritérium nincs. Ha valamelyik nem teljesül, az javító lépésként rögzül, nem magyarázatként. A `bun run test:e2e` egyszer, ebben a lépésben lefut, nulla kilépési kóddal.
+**Elfogadási kritérium.** Minden kritériumhoz tartozik vagy egy most futtatott parancs kimenete, vagy egy konkrét fájl és sor hivatkozás. Feltételezéssel lezárt kritérium nincs. Ha valamelyik nem teljesül, az javító lépésként rögzül, nem magyarázatként. A `bun run test:e2e` egyszer, ebben a lépésben lefut, nulla kilépési kóddal.
+
+---
+
+---
+
+## F8 fázis: a csomagok összevonása és a tool csomagok átnevezése
+
+A user a 26 csomagos állapotra két kifogást emelt (SPEC-002 1. szekció, 4. és 5. pont), és mindkettőre megadta a döntést. Ez a fázis azt hajtja végre. A fázis nem ír át egyetlen sor viselkedést sem: fájlokat mozgat, csomagokat nevez át, és importokat vezet át.
+
+### T-002-27
+
+**Leírás.** A `result`, az `env-reader`, a `http-client` és az `image-source` csomag beolvasztása a `@easter-workflow-builder/core` csomagba, tárgykör szerinti almappaként, a téma mappák megtartásával (SPEC-002 4. szekció "Az összevont csomagok", 5.1, 5.8, 5.9, 5.12 és 6.1 pont 8. szabálya). A négy megszűnő csomag könyvtára és `package.json` fájlja törlődik, átirányító barrel nélkül. A `core` barrelje felveszi mind a négy tárgykör exportjait, és a `IS_CORE_PLACEHOLDER` konstans törlődik (SPEC-002 6.6 pont 6. szabálya). Minden fogyasztó `dependencies` kulcsa és import specifikátora `@easter-workflow-builder/core` alakra vált; ahol egy fájl korábban két megszűnő csomagból importált, a két import egy sorrá vonódik össze.
+
+**Függőség.** T-002-26
+
+**Model.** `opus`, mert a beolvasztás iránya nem mechanikus: azt kell eldönteni, mely tárgykör vihető be a `core` csomagba anélkül, hogy a `core` L0 besorolása sérülne, és a barrel névütközéseit is fel kell oldani.
+
+**Elfogadási kritérium.** A `packages/result`, `packages/env-reader`, `packages/http-client` és `packages/image-source` könyvtár nem létezik. A `packages/core/src` alatt hat téma mappa áll négy tárgykörben, a SPEC-002 4. szekció táblázata szerint. A `packages/core/package.json` `dependencies` mezője nem létezik, tehát a `core` L0 marad. A `bun run test` ugyanannyi teszt fájlt és tesztet futtat le, mint a lépés előtt, 100 százalékos lefedettséggel. Mind a hét kapu zöld.
+
+### T-002-28
+
+**Leírás.** Az `evidence`, az `evidence-sources` és az `agent-tool-id` csomag beolvasztása a `@easter-workflow-builder/provider-capability` csomagba, ugyanezzel a mintával (SPEC-002 5.2, 5.3, 5.4). Az `agent-tool-id` tárgykör esetén a mappaszint nem duplázódik, mert a tárgykör és a téma neve megegyezik (SPEC-002 6.1 pont 9. szabálya). A `provider-minimax`, a `provider-claude-subscription`, a `provider-registry` és az `agent-tool-bundle` a `@easter-workflow-builder/provider-capability` csomagra vált.
+
+**Függőség.** T-002-27
+
+**Model.** `sonnet`, mert a leképezés az előző lépés mintáját követi, és a döntések már megszülettek.
+
+**Elfogadási kritérium.** A `packages/evidence`, `packages/evidence-sources` és `packages/agent-tool-id` könyvtár nem létezik. A `packages/provider-capability/src` alatt hat saját téma mappa és három beolvadt tárgykör áll. A `packages/provider-capability/package.json` `dependencies` mezője nem létezik. A `provider-registry.spec.ts` bejáró tesztje változatlan invariánsokkal zöld, tehát egyetlen `Fact` érték sem mozdult el. Mind a hét kapu zöld.
+
+### T-002-29
+
+**Leírás.** A három tool csomag átnevezése a SPEC-002 6.9 szekció konvenciója szerint: `tool-web-search` -> `tool-minimax-web-search`, `tool-understand-image` -> `tool-minimax-understand-image`, `tool-web-fetch` -> `tool-firecrawl-web-fetch`. `git mv` a könyvtárra, `name` mező, minden hivatkozó `dependencies` kulcs, minden import specifikátor, a `CLAUDE.md` címsora és a `package-layer.ts` bejegyzése.
+
+**Az MCP eszköznevek nem változnak.** A `web_search`, a `web_fetch` és az `understand_image` az agent felé kimenő szerződés, ahogy a gyártófüggvények és a téma mappák neve is. A `git mv` kötelező, és a lépés végén a `bun run check:casing` futtatása is, mert a fájlrendszer nem kis- és nagybetű érzékeny.
+
+**Függőség.** T-002-28
+
+**Model.** `sonnet`
+
+**Elfogadási kritérium.** A három régi könyvtárnév nem létezik, a három új igen. A `git ls-files` egyetlen `tool-web-search`, `tool-understand-image` vagy `tool-web-fetch` útvonalat sem ad. A `web_search`, a `web_fetch` és az `understand_image` eszköznév, a három gyártófüggvény neve és a három téma mappa neve a `git diff` szerint változatlan. Mind a hét kapu zöld.
 
 ---
 
 ## Fázis összefoglaló
 
-| Fázis | Lépések          | Mit ad                                                                                     |
-| ----- | ---------------- | ------------------------------------------------------------------------------------------ |
-| F0    | T-002-1, 2       | zöld kiindulópont, a konvenció rögzítve a gyökér `CLAUDE.md`-ben                           |
-| F1    | T-002-3, 4, 5    | `.spec.ts` végződés, a `tooling/*` csomagok konvención, `@easter-workflow-builder/` névtér |
-| F2    | T-002-6 ... 10   | a `providers` hét csomagra bomlik, a tartalmi azonosság igazolva                           |
-| F3    | T-002-11 ... 14  | az alaprétegek (`result`, `mcp-tool-kit`, `http-client`, `env-reader`, `image-source`)     |
-| F4    | T-002-15, 16, 17 | a két kliens csomag, a Coding Plan env megszűnése                                          |
-| F5    | T-002-18 ... 21  | három tool csomag plusz az összeállító, az `agent-tools` megszűnik                         |
-| F6    | T-002-22, 23     | a többi csomag átvizsgálva a konvenció ellen                                               |
-| F7    | T-002-24, 25, 26 | gépi gráf ellenőrzés, dokumentáció zárás, adverzariális audit                              |
+| Fázis | Lépések          | Mit ad                                                                                                                            |
+| ----- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| F0    | T-002-1, 2       | zöld kiindulópont, a konvenció rögzítve a gyökér `CLAUDE.md`-ben                                                                  |
+| F1    | T-002-3, 4, 5    | `.spec.ts` végződés, a `tooling/*` csomagok konvención, `@easter-workflow-builder/` névtér                                        |
+| F2    | T-002-6 ... 10   | a `providers` hét csomagra bomlik, a tartalmi azonosság igazolva                                                                  |
+| F3    | T-002-11 ... 14  | az alaprétegek (`result`, `mcp-tool-kit`, `http-client`, `env-reader`, `image-source`)                                            |
+| F4    | T-002-15, 16, 17 | a két kliens csomag, a Coding Plan env megszűnése                                                                                 |
+| F5    | T-002-18 ... 21  | három tool csomag plusz az összeállító, az `agent-tools` megszűnik                                                                |
+| F6    | T-002-22, 23     | a többi csomag átvizsgálva a konvenció ellen                                                                                      |
+| F7    | T-002-24, 25, 26 | gépi gráf ellenőrzés, dokumentáció zárás, adverzariális audit                                                                     |
+| F8    | T-002-27, 28, 29 | 26 csomagból 19: a `core` és a `provider-capability` befogadja a beolvadó tárgyköröket, a tool csomagok megnevezik a szolgáltatót |
 
 ## Definition of Done
 
-1. A SPEC-002 mind a 36 elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás.
+1. A SPEC-002 minden elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás. Egyetlen kivétel a 13. kritérium `engine` -> `agent` éle, ami a spec 4. szekciójában nyitva jelölt, a userre váró besorolási ellentmondás.
 2. Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e`.
-3. A workspace 32 csomagból áll, mindegyik neve `@easter-workflow-builder/` prefixszel kezdődik, és mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. `src/index.ts` és `exports` mező minden `packages/*` alatti könyvtárcsomagban van; az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagban ez a migráció előtti állapotnak megfelelően nem kötelező, a SPEC-002 12. kritériuma szerint.
+3. A workspace 25 csomagból áll (19 `packages`, 2 `apps`, 3 `tooling`, 1 `tools`), mindegyik neve `@easter-workflow-builder/` prefixszel kezdődik, és mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. `src/index.ts` és `exports` mező minden `packages/*` alatti könyvtárcsomagban van; az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagban ez a migráció előtti állapotnak megfelelően nem kötelező, a SPEC-002 12. kritériuma szerint.
 4. A `packages/agent-tools` és a `packages/providers` könyvtár nem létezik, és nincs helyettük átirányító barrel csomag.
 5. A lefedettség mind a négy metrikán 100 százalék, és a `vitest.config.ts` `coverage.exclude` listája a migráció eleje óta egyetlen sorral sem bővült.
 6. A `.github/workflows/ci.yml`, a `.github/actions/setup/action.yml`, a `tooling/tsconfig/*.json` és a `tooling/scripts/*.sh` fájlokban a migráció miatt csak a T-002-24 lépésben leírt, indokolt változás történt: egy új wrapper a gráf ellenőrzőhöz. A `casing.sh` változatlan.
 7. Minden lépés önálló, zöld commiton áll, és minden fázis után szólt a végrehajtó a usernek, hogy pusholjon.
 8. Nyitva maradt kérdés nincs, vagy ha van, az explicit, indokolt nyitva jelöléssel áll a `docs/research/` alatt, a végrehajtási környezet igazolt korlátjára hivatkozva.
-9. A 18 új csomagban pontosan 45 téma mappa áll, névre és tartalomra a SPEC-002 5. szekció táblázatai szerint, egyikben sincs saját `CLAUDE.md` (SPEC-002 6.7 pont). Mind a 18 új csomag gyökerében van `CLAUDE.md`, összesen 18 új fájl. Egyetlen téma mappában sincs további alkönyvtár, és egyetlen fájl sem áll a `src/` tetején az `index.ts` barrelen kívül.
+9. A migrált csomagokban pontosan 45 téma mappa áll, névre és tartalomra a SPEC-002 5. szekció táblázatai szerint (a `typeguards` 17 guard mappájával együtt 62 a repóban), egyikben sincs saját `CLAUDE.md` (SPEC-002 6.7 pont). Minden csomag gyökerében van `CLAUDE.md`. Egyetlen téma mappában sincs további alkönyvtár, és egyetlen fájl sem áll a `src/` tetején az `index.ts` barrelen kívül.
+10. A `src/` alatti szerkezet legfeljebb kétszintű, és pontosan két csomagban kétszintű: a `core` négy, a `provider-capability` három beolvadt tárgykört hordoz (SPEC-002 6.1 pont 8. szabálya). Duplikált mappaszint (`<x>/<x>/`) sehol nincs.
+11. Minden szolgáltatóhoz köthető csomag neve megnevezi a szolgáltatót (SPEC-002 6.9), és az MCP eszköznevek változatlanok.
+12. Az `agent-tool-bundle` önálló csomag, nem olvadt be az `mcp-tool-kit` csomagba: a beolvasztás kört hozna létre, ez futtatott ellenőrzővel bizonyított (SPEC-002 4. szekció). A feloldás a userre vár, nyitott kérdésként.
