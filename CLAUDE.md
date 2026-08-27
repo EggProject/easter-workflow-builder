@@ -152,6 +152,25 @@ fájlonként vagy technikai réteg szerint tagolt mappa), a workspace csomagok n
 `@easter-workflow-builder/` névtér prefixet visel, és a teszt fájlok `.spec.ts` végződésűek.
 A szabályokat a [`docs/spec/SPEC-002-csomag-architektura.md`](docs/spec/SPEC-002-csomag-architektura.md) 6. szekciója rögzíti részletesen.
 
+**A csomagon belül kell tagolni, nem új csomaggal.** A workspace 25 csomagból áll (19
+`packages`, 2 `apps`, 3 `tooling`, 1 `tools`). A `src/` alatti szerkezet alapesetben egy szint
+mély (`src/<téma>/`), és ott kétszintű (`src/<tárgykör>/<téma>/`), ahol a csomag több
+tárgykört fog össze. Ilyen pontosan kettő van: a `core` (`result`, `env-reader`,
+`http-client`, `image-source`) és a `provider-capability` (`evidence`, `evidence-sources`,
+`agent-tool-id`). Harmadik szint tilos.
+
+**Ami egy konkrét szolgáltatóhoz köthető, azt a csomag nevében meg kell nevezni**, előbb a
+szolgáltató, utána a funkció: `provider-minimax`, `minimax-client`, `firecrawl-client`,
+`tool-minimax-web-search`, `tool-minimax-understand-image`, `tool-firecrawl-web-fetch`. A
+próba: ha holnap egy második implementáció érkezik ugyanarra a funkcióra, megkülönböztethető
+marad-e a kettő. Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) ettől
+függetlenek, azok az agent felé kimenő szerződés részei, és nem változnak. Részletek:
+SPEC-002 6.9 szekció.
+
+A rétegzést a `bun run check:graph` gépi ellenőrzés kényszeríti ki, a
+`tooling/scripts/src/dependency-graph/package-layer.ts` térkép alapján. Új csomagnak
+**kötelező** felkerülnie oda, különben az ellenőrző hibát ad.
+
 ### Provider réteg
 
 Két provider az első verzióban, backend TypeScript config fájlokban rögzítve, **nincs hozzájuk
@@ -192,7 +211,7 @@ nem `turbo run test`-en keresztül csomagonként (ugyanaz az elv, mint a `format
 Prettier is közvetlenül fut, nem taskon keresztül).
 
 **Coverage küszöb, a SPEC-002 utáni állapot.** A `packages/providers` és a `packages/agent-tools`
-csomag megszűnt (SPEC-002), a belőlük kivált 18 új csomag mindegyike valódi funkcionális Vitest
+csomag megszűnt (SPEC-002), a belőlük kivált csomagok mindegyike valódi funkcionális Vitest
 teszttel fedett, kizárás nélkül. A `vitest.config.ts` `coverage.exclude` listáján egyetlen
 csomag-specifikus bejegyzés sincs: az egyetlen megmaradt ideiglenes kizárás az
 `apps/web/src/main.ts` (Playwright e2e váz belépési pont, nem termékkód). **Szigorítani kell**,
