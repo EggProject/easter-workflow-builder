@@ -16,8 +16,15 @@ az artefaktum hivatkozás: azok a `docs/research/` alatt maradnak.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti öt alkönyvtár (`evidence/`, `capability/`, `references/`, `minimax/`,
-`claude-subscription/`) saját `CLAUDE.md`-vel dokumentált, lásd ott a fájllistát.
+Az `src/` alatti öt mappa felelőssége:
+
+| Mappa                  | Felelősség                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `evidence/`            | a háromállapotú `Fact<T>` bizonyíték típus és a hozzá tartozó typeguardok     |
+| `capability/`          | a `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai            |
+| `references/`          | nevesített doksi URL-ek, research szekció azonosítók, mérés -> docs leképezés |
+| `minimax/`             | a `minimax` provider kitöltött, mérési adatokra épülő képességleírója         |
+| `claude-subscription/` | a `claude-subscription` provider kitöltött, hivatalos doksira épülő leírója   |
 
 ## Függőségi irány
 

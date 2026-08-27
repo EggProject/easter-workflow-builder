@@ -27,8 +27,17 @@ ezért a szolgáltatás eldobó viselkedése nem érinti.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti hét alkönyvtár (`config/`, `result/`, `http/`, `minimax/`, `firecrawl/`,
-`image/`, `tools/`) saját `CLAUDE.md`-vel dokumentált, lásd ott a fájllistát.
+Az `src/` alatti hét mappa felelőssége:
+
+| Mappa        | Felelősség                                                                 |
+| ------------ | -------------------------------------------------------------------------- |
+| `config/`    | környezeti változó olvasás, a három eszköz futásidejű konfigurációja       |
+| `result/`    | `Outcome<TValue>` eredménytípus és az MCP `ToolCallResult` előállítói      |
+| `http/`      | a beépített `fetch` fölötti közös HTTP réteg                               |
+| `minimax/`   | a MiniMax kereső és képértelmező végpont drótszintű alakja                 |
+| `firecrawl/` | a Firecrawl scrape végpont drótszintű alakja                               |
+| `image/`     | a képértelmező eszköz bemenetének feloldása (data URL/HTTP/fájl -> base64) |
+| `tools/`     | a három MCP eszköz definíciója és az eszközkészlet összeállítója           |
 
 ## Környezeti változók
 
@@ -64,6 +73,11 @@ szolgáltatás, ismeretlen válasz alak: mind `isError: true` jelzésű, magyar�
 
 **A séma lapos.** Csak kötelező szöveges mezők, nincs felsorolás, tömb és beágyazott objektum,
 mert a visszautasított tool séma nem eredményez újrapróbálkozást.
+
+**Ismeretlen képformátum nem tippelhető el.** A referencia implementáció ismeretlen
+kiterjesztés és ismeretlen `content-type` esetén JPEG-et feltételezett, ami néma hibához
+vezetett volna: az `image/` mappa ilyenkor hibaágat ad, ami megnevezi a támogatott
+formátumokat.
 
 ## Kapcsolódó dokumentumok
 

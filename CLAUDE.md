@@ -105,7 +105,7 @@ Quote the exact code."
 ## 7. Kódolási elvárások:
 
 - jól dokumentált kódbázis legyen, de ne túlmagyarázott
-- minden mappában a CLAUDE.md fájlt vezetni kell
+- CLAUDE.md kizárólag a csomag gyökerében kell, arról hogy miről szól a csomag; alkönyvtárakba nem kell
 - Strict generics TypeScript kód legyen, tilos az `as` használata helyette `satisfies` -t kell használni és tiltott az `any` helyette `unknown` kell használni
 - kötelező mindig a typeguard -okat használni amik léteznek a projectben és ha nincs akkor írjunk ha valamihez szükséges
 - mindig azt kell csinálni ami a user kér, és duplán ellenőrizni, ha el akarunk térni akkor a userrel kötelező megbeszélni

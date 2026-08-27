@@ -4,9 +4,9 @@
 #
 # ============================ A KIKENYSZERITETT SZABALY ======================
 #
-# A gyoker CLAUDE.md eloirja, hogy "minden mappaban a CLAUDE.md fajlt vezetni
-# kell", a SPEC-001 14. szekcio "Hol kell" tablazata pedig ezt szintekre
-# bontja. A ketto egyutt a kovetkezo, mechanikusan ellenorizheto szabalyt adja.
+# A gyoker CLAUDE.md eloirja: "CLAUDE.md kizarolag a csomag gyokereben kell,
+# arrol hogy mirol szol a csomag; alkonyvtarakba nem kell". A ket mondat egyutt
+# a kovetkezo, mechanikusan ellenorizheto szabalyt adja.
 #
 # KOTELEZO a CLAUDE.md:
 #
@@ -14,14 +14,12 @@
 #   2. Minden workspace csomag gyokereben, azaz minden konyvtarban, ami sajat
 #      package.json fajlt tartalmaz. Ez fedi a SPEC-001 14. szekcio
 #      "Alkalmazas", "Csomag", "Eszkoz" es "Merooeszkoz" sorait.
-#   3. Minden olyan csomagon BELULI konyvtarban, ami kozvetlenul tartalmaz
-#      legalabb egy .ts vagy .tsx forrasfajlt. Ez a "Csomag alkonyvtar" sor:
-#      ha egy konyvtarban sajat forras all, akkor onallo felelossege van.
 #
 # NEM kotelezo, es miert:
 #
-#   - A csomag sajat `src/` konyvtaranak TETEJEN. A felelosseget a csomag
-#     szintu CLAUDE.md mar leirja, egy `src/CLAUDE.md` csak megismetelne. A
+#   - Egyetlen csomagon BELULI alkonyvtarban sem, forrasfajlt tartalmazo
+#     mappaban sem (pl. `src/<tema>/`). A felelosseget a csomag szintu
+#     CLAUDE.md mar leirja, egy alkonyvtarbeli peldany csak megismetelne. A
 #     SPEC-001 14. szekcio "Amit tilos beleirni" pontja tiltja az ismetlest.
 #   - Generalt vagy gitignore-olt konyvtarakban (node_modules, dist, coverage,
 #     .turbo, test-results, artifacts). A SPEC-001 14. szekcio "Generalt
@@ -46,42 +44,7 @@ start_ts=$(date +%s)
 # (`*/package.json`) szandekosan nem fogja meg, azt az 1. szabaly adja.
 mapfile -t package_dirs < <(git ls-files '*/package.json' | xargs -r -n1 dirname | sort -u)
 
-# 3. szabaly jeloltjei: minden konyvtar, ami kozvetlenul tartalmaz .ts vagy
-# .tsx fajlt.
-mapfile -t source_dirs < <(git ls-files '*.ts' '*.tsx' | xargs -r -n1 dirname | sort -u)
-
-# Megkeresi a leghosszabb csomag-eloforduast, ami az adott konyvtart tartalmazza.
-# Ures stringet ad, ha a konyvtar egyetlen csomagon belul sincs.
-owning_package() {
-  local dir="$1"
-  local best=""
-  local candidate
-  for candidate in "${package_dirs[@]}"; do
-    if [[ "$dir" == "$candidate" || "$dir" == "$candidate"/* ]]; then
-      if [[ "${#candidate}" -gt "${#best}" ]]; then
-        best="$candidate"
-      fi
-    fi
-  done
-  printf '%s' "$best"
-}
-
 required_dirs=("." "${package_dirs[@]}")
-
-for dir in "${source_dirs[@]}"; do
-  # A docs fa nincs a hatokorben.
-  [[ "$dir" == docs || "$dir" == docs/* ]] && continue
-
-  owner="$(owning_package "$dir")"
-  # Csomagon kivuli forras (pl. gyoker szintu eslint.config.ts): az 1. szabaly fedi.
-  [[ -z "$owner" ]] && continue
-  # Maga a csomag gyokere: a 2. szabaly mar felvette.
-  [[ "$dir" == "$owner" ]] && continue
-  # A csomag sajat src/ teteje: kivetel, lasd a fejlecet.
-  [[ "$dir" == "$owner/src" ]] && continue
-
-  required_dirs+=("$dir")
-done
 
 mapfile -t required_dirs < <(printf '%s\n' "${required_dirs[@]}" | sort -u)
 

@@ -10,17 +10,17 @@ wrapperek maguk bash fájlok, nem TypeScript).
 
 ## Fájlok
 
-| Fájl              | Tartalom                                                                                                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `_lib.sh`         | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                      |
-| `lint.sh`         | `turbo run lint` burkoló                                                                                                                                                 |
-| `typecheck.sh`    | `turbo run typecheck` burkoló                                                                                                                                            |
-| `test.sh`         | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                    |
-| `build.sh`        | `turbo run build` burkoló                                                                                                                                                |
-| `format.sh`       | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi  |
-| `claude-md.sh`    | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                              |
-| `casing.sh`       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/`, lásd ott a `CLAUDE.md`-t |
-| `e2e-coverage.sh` | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                    |
+| Fájl              | Tartalom                                                                                                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_lib.sh`         | közös függvények: `turbo run <task>` futtatása, JSON összegző beolvasása, hibasorok kinyerése ESLint és `tsc` kimenetből, csonkolás                                                                            |
+| `lint.sh`         | `turbo run lint` burkoló                                                                                                                                                                                       |
+| `typecheck.sh`    | `turbo run typecheck` burkoló                                                                                                                                                                                  |
+| `test.sh`         | a Vitest közvetlen burkolója, coverage összegzővel - **nem** `turbo run test`-en keresztül, lásd lent                                                                                                          |
+| `build.sh`        | `turbo run build` burkoló                                                                                                                                                                                      |
+| `format.sh`       | a Prettier közvetlen burkolója, `--check` (alapértelmezett) és `--write` móddal - **nem** turbo taskon keresztül, mert a Prettier egyetlen futással a teljes repót fedi                                        |
+| `claude-md.sh`    | ellenőrzi, hogy van-e `CLAUDE.md` ott, ahol a projekt szabálya szerint kötelező; a pontos szabályt a script fejléce írja le                                                                                    |
+| `casing.sh`       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/find-casing-mismatches.ts`, a szabály indoklása a fájl fejlécében |
+| `e2e-coverage.sh` | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                                                          |
 
 ## Szabályok
 
