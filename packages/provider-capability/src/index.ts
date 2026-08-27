@@ -31,8 +31,9 @@ export { measurementDocument } from './evidence-sources/measurement-document/mea
 // agent-tool-id: a workflow lépéshez kapcsolható in-process MCP eszközök közös szótára.
 export type { AgentToolId } from './agent-tool-id/agent-tool-id.ts';
 
-// provider-id: a két támogatott provider azonosítója.
+// provider-id: a két támogatott provider azonosítója és a hozzá tartozó guard.
 export type { ProviderId } from './provider-id/provider-id.ts';
+export { isProviderId } from './provider-id/is-provider-id.ts';
 
 export type { ProviderCapabilityDescriptor } from './descriptor/provider-capability-descriptor.ts';
 

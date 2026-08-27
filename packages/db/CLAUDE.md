@@ -9,12 +9,12 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                                             |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                     |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide |
-| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                               |
-| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió és a `WorkflowRepository` a következő lépésekben bővül ide                |
+| Mappa                | Tartalom                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                      |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                  |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` a következő lépésben kerül ide |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -36,6 +36,39 @@ a valós SQLite ellen futó insert/select tesztek mellett egy `getTableConfig`-r
 kell, ami az index nevét/oszlopát és az idegen kulcs `onDelete`/cél tábla párját assertálja
 (lásd `workflow.spec.ts`, `workflow-node.spec.ts`, `workflow-edge.spec.ts`), különben a
 `workflow-graph` mappa function/line coverage-e a spec 12.4 100%-os küszöbe alatt marad.
+
+## A node config unió és az `AgentStepConfig` (T-003-11)
+
+A `workflow-graph` téma mappában a domain típusok és a typeguardjaik egy koncepció egy fájl
+bontásban állnak, alkönyvtár nélkül (SPEC-002 6. szekció, egy szint mély): `node-type.ts`,
+`node-config.ts` (az unió és mind a tíz ág), `agent-step-config.ts`, `storable-mcp-server.ts`,
+`sandbox-config.ts`, `engine-hook-id.ts`, `session-mode.ts`, `script-config.ts`, és a guardok
+`is-` előtaggal (`is-node-type.ts`, `is-node-config.ts`, `is-agent-step-config.ts`, plusz a
+`is-string-array.ts` segéd, amit a téma több guardja használ). Egyik sem kerül a barrelbe: a
+publikus felületet a repository réteg adja majd (T-003-12).
+
+**Titok nem tárolható.** A `StorableMcpServer` a négy SDK variánsból hármat enged (`stdio`,
+`sse`, `http`); az `sdk` variáns élő objektumpéldányt hordoz, tehát nem szerializálható. A
+`stdio` ág `env` értékrekord helyett `envNames`, az `sse`/`http` ág fejléc érték helyett
+`authEnvName` mezőt tárol, mindkettő env változó NÉV. A guard elutasítja azt az alakot, ami
+`env` értékrekordot hozna.
+
+**Nyitott alakok, amiket a guard szándékosan nem szűkít.** Ahol a research és a hivatalos
+dokumentáció nem rögzíti a pontos alakot, ott tippelés helyett nyitott a típus, és ez a lista
+zárja le majd egy külön lépés:
+
+| Hol                                                                       | Mi nyitott                                                                                                                                |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `SandboxConfig.network`, `.filesystem`                                    | a hivatalos sandbox doksi szerint összetett objektum (allowlist, deny szabályok, `disabled` kapcsoló); az SDK `Options` alakja nem ismert |
+| `SandboxConfig.allowUnsandboxedCommands`, `.ignoreViolations`, `.ripgrep` | a lista és a logikai alak között nincs döntő forrás                                                                                       |
+| `JoinMergeSettings`                                                       | a SPEC-003 4.3 egyetlen mezőt sem nevez meg az összefűzési szabályra                                                                      |
+| `StartInputField.valueKind`                                               | a SPEC-003 nem sorolja fel az értékkészletet, ezért szabad szöveg                                                                         |
+| `AgentStepConfig.agents` értékei                                          | a research nem rögzíti az `AgentDefinition` mezőlistáját, és az SDK verzióhoz kötött                                                      |
+
+Amit a guard **kikényszerít**: a `loop.maxIterations`, az `error_handler.maxAttempts` és a
+`backoffMs` minden eleme egész és pozitív (SPEC-003 4.3, alapérték nélkül), a `join` mindhárom
+módja a saját alobjektum alakját kapja, és a tíz ágú `switch` a
+`@typescript-eslint/switch-exhaustiveness-check` szabály miatt nem tud lemaradni egy típusról.
 
 ## `Outcome` hibaosztály konvenció
 
