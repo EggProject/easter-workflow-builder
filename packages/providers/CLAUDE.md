@@ -16,24 +16,26 @@ az artefaktum hivatkozás: azok a `docs/research/` alatt maradnak.
 | `tsconfig.json` | a `tooling/tsconfig/node.json` kiterjesztése |
 | `src/index.ts`  | barrel, csak újraexport                      |
 
-Az `src/` alatti négy mappa felelőssége:
+Az `src/` alatti három mappa felelőssége:
 
-| Mappa                  | Felelősség                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| `capability/`          | a `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai            |
-| `references/`          | nevesített doksi URL-ek, research szekció azonosítók, mérés -> docs leképezés |
-| `minimax/`             | a `minimax` provider kitöltött, mérési adatokra épülő képességleírója         |
-| `claude-subscription/` | a `claude-subscription` provider kitöltött, hivatalos doksira épülő leírója   |
+| Mappa                  | Felelősség                                                                  |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `capability/`          | a `ProviderCapabilityDescriptor` generikus típus és mezőcsoportjai          |
+| `minimax/`             | a `minimax` provider kitöltött, mérési adatokra épülő képességleírója       |
+| `claude-subscription/` | a `claude-subscription` provider kitöltött, hivatalos doksira épülő leírója |
 
 A háromállapotú `Fact<T>` bizonyíték típus és a hozzá tartozó typeguardok kiköltöztek az
-`@easter-workflow-builder/evidence` csomagba (SPEC-002 5.2 szekció, T-002-6 lépés), erre a
-csomag `workspace:*` függőséggel hivatkozik.
+`@easter-workflow-builder/evidence` csomagba (SPEC-002 5.2 szekció, T-002-6 lépés). A nevesített
+doksi URL-ek, research szekció azonosítók és a `MeasurementId` -> docs horgony leképezés
+kiköltöztek az `@easter-workflow-builder/evidence-sources` csomagba (SPEC-002 5.3 szekció,
+T-002-7 lépés). Mindkettőre `workspace:*` függőséggel hivatkozik.
 
 ## Függőségi irány
 
-A `core` és az `@easter-workflow-builder/evidence` csomagtól függhet, mástól nem (SPEC-002 4.
-szekció). A `core`-tól jelenleg egyetlen fájl sem importál, ez holt függőség, amit a SPEC-002
-5.19 szekciója megfigyelt, de nem ennek a specnek a hatóköre javítani.
+A `core`, az `@easter-workflow-builder/evidence` és az `@easter-workflow-builder/evidence-sources`
+csomagtól függhet, mástól nem (SPEC-002 4. szekció). A `core`-tól jelenleg egyetlen fájl sem
+importál, ez holt függőség, amit a SPEC-002 5.19 szekciója megfigyelt, de nem ennek a specnek a
+hatóköre javítani.
 
 ## Szabályok
 
@@ -44,8 +46,9 @@ fordul le, és az `isKnownFact` typeguard nélkül a `value` mező nem olvashat�
 
 **A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-19`, doksi URL, research
 szekció azonosító) és egy rövid, egymondatos `purpose`/`reason` marad. A mérés leírása, a nyers
-szám és az artefaktum hivatkozás a `docs/research/` alatt van; a `references/measurement-document.ts`
-oldja fel a `MeasurementId` -> docs horgony leképezést, ide nem szabad prózát átmásolni.
+szám és az artefaktum hivatkozás a `docs/research/` alatt van; az
+`@easter-workflow-builder/evidence-sources` csomag `measurement-document.ts` fájlja oldja fel a
+`MeasurementId` -> docs horgony leképezést, ide nem szabad prózát átmásolni.
 
 Egy fájlba egy exportált dolog (munkautasítás, nem lint szabály). Tippelni, extrapolálni tilos:
 ha nincs dokumentált szabály vagy mérés, a mező `unknown` marad.

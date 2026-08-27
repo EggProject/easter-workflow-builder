@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Fact } from '@easter-workflow-builder/evidence';
 import { isKnownFact, isUnknownFact } from '@easter-workflow-builder/evidence';
-import { measurementDocument } from './references/measurement-document.ts';
+import { measurementDocument } from '@easter-workflow-builder/evidence-sources';
 import { providerRegistry } from './registry.ts';
 
 /**

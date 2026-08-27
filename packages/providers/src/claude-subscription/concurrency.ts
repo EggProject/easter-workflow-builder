@@ -1,5 +1,5 @@
 import type { ConcurrencyCapability } from '../capability/concurrency-capability.ts';
-import { DOC_ENV_VARS } from '../references/document-url.ts';
+import { DOC_ENV_VARS } from '@easter-workflow-builder/evidence-sources';
 
 // A korlátozó env változó neve kliens szintű, ezért dokumentációból ismert; a megfigyelt egyidejű kérésszám mérés kérdése, és ezen az úton nem mértünk.
 export const claudeSubscriptionConcurrency: ConcurrencyCapability = {

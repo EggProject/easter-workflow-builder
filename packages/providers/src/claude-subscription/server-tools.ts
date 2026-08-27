@@ -1,6 +1,6 @@
 import type { ServerToolDescriptor } from '../capability/server-tool-descriptor.ts';
 import type { Fact } from '@easter-workflow-builder/evidence';
-import { DOC_WEB_SEARCH } from '../references/document-url.ts';
+import { DOC_WEB_SEARCH } from '@easter-workflow-builder/evidence-sources';
 
 export const claudeSubscriptionServerTools: Fact<readonly ServerToolDescriptor[]> = {
   state: 'known',
