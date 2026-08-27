@@ -1,7 +1,7 @@
 import type { AgentToolId } from '@easter-workflow-builder/provider-capability';
-import { createImageUnderstandingTool } from '@easter-workflow-builder/tool-understand-image';
-import { createWebFetchTool } from '@easter-workflow-builder/tool-web-fetch';
-import { createWebSearchTool } from '@easter-workflow-builder/tool-web-search';
+import { createImageUnderstandingTool } from '@easter-workflow-builder/tool-minimax-understand-image';
+import { createWebFetchTool } from '@easter-workflow-builder/tool-firecrawl-web-fetch';
+import { createWebSearchTool } from '@easter-workflow-builder/tool-minimax-web-search';
 import type { AgentToolDependencies } from '../tool-dependencies/agent-tool-dependencies.ts';
 
 // A három eszköz sémája eltér, ezért a közös visszatérési típus unió. Nem

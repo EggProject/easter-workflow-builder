@@ -1,4 +1,4 @@
-# packages/tool-web-fetch
+# packages/tool-firecrawl-web-fetch
 
 ## Mi ez a mappa
 

@@ -1,4 +1,4 @@
-# packages/tool-web-search
+# packages/tool-minimax-web-search
 
 ## Mi ez a mappa
 

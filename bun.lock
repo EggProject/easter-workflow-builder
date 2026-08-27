@@ -64,9 +64,9 @@
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/provider-capability": "workspace:*",
-        "@easter-workflow-builder/tool-understand-image": "workspace:*",
-        "@easter-workflow-builder/tool-web-fetch": "workspace:*",
-        "@easter-workflow-builder/tool-web-search": "workspace:*",
+        "@easter-workflow-builder/tool-firecrawl-web-fetch": "workspace:*",
+        "@easter-workflow-builder/tool-minimax-understand-image": "workspace:*",
+        "@easter-workflow-builder/tool-minimax-web-search": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "catalog:",
@@ -194,24 +194,8 @@
         "vitest": "catalog:",
       },
     },
-    "packages/tool-understand-image": {
-      "name": "@easter-workflow-builder/tool-understand-image",
-      "version": "0.0.0",
-      "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "0.3.245",
-        "@easter-workflow-builder/core": "workspace:*",
-        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
-        "@easter-workflow-builder/minimax-client": "workspace:*",
-        "zod": "^4.0.0",
-      },
-      "devDependencies": {
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/tool-web-fetch": {
-      "name": "@easter-workflow-builder/tool-web-fetch",
+    "packages/tool-firecrawl-web-fetch": {
+      "name": "@easter-workflow-builder/tool-firecrawl-web-fetch",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
@@ -226,8 +210,24 @@
         "vitest": "catalog:",
       },
     },
-    "packages/tool-web-search": {
-      "name": "@easter-workflow-builder/tool-web-search",
+    "packages/tool-minimax-understand-image": {
+      "name": "@easter-workflow-builder/tool-minimax-understand-image",
+      "version": "0.0.0",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.245",
+        "@easter-workflow-builder/core": "workspace:*",
+        "@easter-workflow-builder/mcp-tool-kit": "workspace:*",
+        "@easter-workflow-builder/minimax-client": "workspace:*",
+        "zod": "^4.0.0",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/tool-minimax-web-search": {
+      "name": "@easter-workflow-builder/tool-minimax-web-search",
       "version": "0.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "0.3.245",
@@ -408,11 +408,11 @@
 
     "@easter-workflow-builder/server": ["@easter-workflow-builder/server@workspace:apps/server"],
 
-    "@easter-workflow-builder/tool-understand-image": ["@easter-workflow-builder/tool-understand-image@workspace:packages/tool-understand-image"],
+    "@easter-workflow-builder/tool-firecrawl-web-fetch": ["@easter-workflow-builder/tool-firecrawl-web-fetch@workspace:packages/tool-firecrawl-web-fetch"],
 
-    "@easter-workflow-builder/tool-web-fetch": ["@easter-workflow-builder/tool-web-fetch@workspace:packages/tool-web-fetch"],
+    "@easter-workflow-builder/tool-minimax-understand-image": ["@easter-workflow-builder/tool-minimax-understand-image@workspace:packages/tool-minimax-understand-image"],
 
-    "@easter-workflow-builder/tool-web-search": ["@easter-workflow-builder/tool-web-search@workspace:packages/tool-web-search"],
+    "@easter-workflow-builder/tool-minimax-web-search": ["@easter-workflow-builder/tool-minimax-web-search@workspace:packages/tool-minimax-web-search"],
 
     "@easter-workflow-builder/tsconfig": ["@easter-workflow-builder/tsconfig@workspace:tooling/tsconfig"],
 

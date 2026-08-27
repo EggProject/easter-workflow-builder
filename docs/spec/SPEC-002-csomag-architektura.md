@@ -98,15 +98,15 @@ L2  L0 es L1 folott
     provider-claude-subscription ->  provider-capability, evidence, evidence-sources
 
 L3  kesz egysegek
-    tool-web-search       ->  mcp-tool-kit, minimax-client, result
-    tool-web-fetch        ->  mcp-tool-kit, firecrawl-client, result
-    tool-understand-image ->  mcp-tool-kit, minimax-client, image-source, result
+    tool-minimax-web-search       ->  mcp-tool-kit, minimax-client, result
+    tool-firecrawl-web-fetch        ->  mcp-tool-kit, firecrawl-client, result
+    tool-minimax-understand-image ->  mcp-tool-kit, minimax-client, image-source, result
     provider-registry     ->  provider-minimax, provider-claude-subscription,
                               evidence, evidence-sources
 
 L4  osszeallito
-    agent-tool-bundle ->  agent-tool-id, tool-web-search, tool-web-fetch,
-                          tool-understand-image, env-reader, http-client, image-source
+    agent-tool-bundle ->  agent-tool-id, tool-minimax-web-search, tool-firecrawl-web-fetch,
+                          tool-minimax-understand-image, env-reader, http-client, image-source
 ```
 
 A gráf aciklikus és egyirányú: minden él lefelé mutat, magasabb rétegből alacsonyabb felé. Rétegen belüli él nincs.
@@ -122,7 +122,7 @@ A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van réteg
 | L0     | `typeguards`, `result`, `evidence`, `agent-tool-id`, `mcp-tool-kit`, `core`, `logger`                                                                     |
 | L1     | `env-reader`, `http-client`, `evidence-sources`, `provider-capability`, `protocol`                                                                        |
 | L2     | `minimax-client`, `firecrawl-client`, `image-source`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                      |
-| L3     | `tool-web-search`, `tool-web-fetch`, `tool-understand-image`, `provider-registry`                                                                         |
+| L3     | `tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `provider-registry`                                               |
 | L4     | `agent-tool-bundle`, `agent`, `engine`                                                                                                                    |
 | L5     | `server`, `web`                                                                                                                                           |
 | eszköz | `eslint-config`, `tsconfig`, `scripts`, `wire-probe`, réteg nélkül, mert nem termékkód és egyetlen termékcsomag sem függhet tőlük futásidejű függőségként |
@@ -175,7 +175,7 @@ A "költözik" nem azt jelenti, hogy a fájl tartalma érintetlen. Minden áthel
 
 Ez a **teszt fájlokra is** vonatkozik, és ott két konkrét eset kézi döntést igényel:
 
-1. Mind a négy `create-*-tool.test.ts` és a `create-agent-tool*.test.ts` importálja a `../http/fetch-function.ts` és a `../image/read-file-function.ts` típust, mert ma a közös `AgentToolDependencies` objektumot építik fel. Az új szűk függőség interfészek mellett a `tool-web-search` és a `tool-web-fetch` spec fájljának **nincs szüksége** a `ReadFileFunction` típusra, tehát azt az importot törölni kell, nem áthelyezni. A `noUnusedLocals` beállítás mellett a bent hagyott import fordítási hiba.
+1. Mind a négy `create-*-tool.test.ts` és a `create-agent-tool*.test.ts` importálja a `../http/fetch-function.ts` és a `../image/read-file-function.ts` típust, mert ma a közös `AgentToolDependencies` objektumot építik fel. Az új szűk függőség interfészek mellett a `tool-minimax-web-search` és a `tool-firecrawl-web-fetch` spec fájljának **nincs szüksége** a `ReadFileFunction` típusra, tehát azt az importot törölni kell, nem áthelyezni. A `noUnusedLocals` beállítás mellett a bent hagyott import fordítási hiba.
 2. A `create-image-understanding-tool.test.ts` három sorban használja az `ENV_MINIMAX_CODING_PLAN_API_KEY` konstanst (bemenet felépítés, elvárt hibaüzenet, fixture kulcs). Ez a T-002-17 lépésben `ENV_MINIMAX_API_KEY` értékre változik, és a hiányzó kulcs hibaágának lefedettsége nem csökkenhet.
 
 ---
@@ -448,7 +448,7 @@ Kettéváló fájlok Firecrawl része:
 
 **ÚJ fájl, áthelyezett kóddal.** `packages/firecrawl-client/src/scrape-call/scrape-page.ts` és `scrape-page.spec.ts`.
 
-Ez az egyetlen új logika fájl a teljes migrációban, és nem új viselkedés: a mai `create-web-fetch-tool.ts` fájlban álló `postJson` hívást (URL összerakás a `PATH_SCRAPE` konstansból, `{ url, formats: ['markdown'] }` törzs, `timeoutMs`) emeli át. Indok: a user "Firecrawl kliens" csomagot kért, egy kliens pedig hív, nem csak válaszalakot értelmez. Enélkül a `tool-web-fetch` csomagnak közvetlenül a `@easter-workflow-builder/http-client` csomagtól kellene függnie, és a Firecrawl kliens felelőssége két csomag között oszlana meg.
+Ez az egyetlen új logika fájl a teljes migrációban, és nem új viselkedés: a mai `create-web-fetch-tool.ts` fájlban álló `postJson` hívást (URL összerakás a `PATH_SCRAPE` konstansból, `{ url, formats: ['markdown'] }` törzs, `timeoutMs`) emeli át. Indok: a user "Firecrawl kliens" csomagot kért, egy kliens pedig hív, nem csak válaszalakot értelmez. Enélkül a `tool-firecrawl-web-fetch` csomagnak közvetlenül a `@easter-workflow-builder/http-client` csomagtól kellene függnie, és a Firecrawl kliens felelőssége két csomag között oszlana meg.
 
 A szerződése szándékosan azonos a `callMiniMax` szerződésével: `Promise<Outcome<unknown>>`, azaz a nyers JSON választ adja vissza, a szűkítést az `interpretScrapeResponse` végzi a hívó oldalon. Így a jelenlegi két, egymástól elkülönülő hibaág (elérhetetlen szolgáltatás, illetve értelmezhetetlen válasz) és a hozzájuk tartozó két külön hibaüzenet változatlan marad, tehát a `create-web-fetch-tool` tesztjeinek elvárásai nem módosulnak.
 
@@ -501,16 +501,16 @@ A szerződése szándékosan azonos a `callMiniMax` szerződésével: `Promise<O
 
 ---
 
-### 5.14 `@easter-workflow-builder/tool-web-search`
+### 5.14 `@easter-workflow-builder/tool-minimax-web-search`
 
 **Felelősség.** A `web_search` MCP eszköz definíciója: Zod séma, leírás, és a MiniMax kereső hívása.
 
-| Jelenlegi fájl                                         | Cél                                                                      |
-| ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `agent-tools/src/tools/create-web-search-tool.ts`      | `packages/tool-web-search/src/web-search-tool/create-web-search-tool.ts` |
-| `agent-tools/src/tools/create-web-search-tool.test.ts` | ugyanoda, `create-web-search-tool.spec.ts` néven                         |
+| Jelenlegi fájl                                         | Cél                                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `agent-tools/src/tools/create-web-search-tool.ts`      | `packages/tool-minimax-web-search/src/web-search-tool/create-web-search-tool.ts` |
+| `agent-tools/src/tools/create-web-search-tool.test.ts` | ugyanoda, `create-web-search-tool.spec.ts` néven                                 |
 
-**ÚJ fájl.** `packages/tool-web-search/src/web-search-tool/web-search-tool-dependencies.ts`, típus-only.
+**ÚJ fájl.** `packages/tool-minimax-web-search/src/web-search-tool/web-search-tool-dependencies.ts`, típus-only.
 
 **Téma.** Egy téma, `web-search-tool`, három fájllal: a gyártófüggvény, a spec fájlja, és a szűk függőség interfész. A mappa neve nem a gyártófüggvény neve, hanem azé az eszközé, amit előállít.
 
@@ -522,16 +522,16 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 ---
 
-### 5.15 `@easter-workflow-builder/tool-web-fetch`
+### 5.15 `@easter-workflow-builder/tool-firecrawl-web-fetch`
 
 **Felelősség.** A `web_fetch` MCP eszköz definíciója: Zod séma, leírás, és a Firecrawl scrape hívása.
 
-| Jelenlegi fájl                                        | Cél                                                                   |
-| ----------------------------------------------------- | --------------------------------------------------------------------- |
-| `agent-tools/src/tools/create-web-fetch-tool.ts`      | `packages/tool-web-fetch/src/web-fetch-tool/create-web-fetch-tool.ts` |
-| `agent-tools/src/tools/create-web-fetch-tool.test.ts` | ugyanoda, `create-web-fetch-tool.spec.ts` néven                       |
+| Jelenlegi fájl                                        | Cél                                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `agent-tools/src/tools/create-web-fetch-tool.ts`      | `packages/tool-firecrawl-web-fetch/src/web-fetch-tool/create-web-fetch-tool.ts` |
+| `agent-tools/src/tools/create-web-fetch-tool.test.ts` | ugyanoda, `create-web-fetch-tool.spec.ts` néven                                 |
 
-**ÚJ fájl.** `packages/tool-web-fetch/src/web-fetch-tool/web-fetch-tool-dependencies.ts`, típus-only, `fetchFunction` és `environment` mezővel.
+**ÚJ fájl.** `packages/tool-firecrawl-web-fetch/src/web-fetch-tool/web-fetch-tool-dependencies.ts`, típus-only, `fetchFunction` és `environment` mezővel.
 
 **Téma.** Egy téma, `web-fetch-tool`, három fájllal.
 
@@ -541,16 +541,16 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 ---
 
-### 5.16 `@easter-workflow-builder/tool-understand-image`
+### 5.16 `@easter-workflow-builder/tool-minimax-understand-image`
 
 **Felelősség.** Az `understand_image` MCP eszköz definíciója: Zod séma, leírás, a kép feloldása és a MiniMax képértelmező hívása.
 
-| Jelenlegi fájl                                                  | Cél                                                                                           |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `agent-tools/src/tools/create-image-understanding-tool.ts`      | `packages/tool-understand-image/src/understand-image-tool/create-image-understanding-tool.ts` |
-| `agent-tools/src/tools/create-image-understanding-tool.test.ts` | ugyanoda, `create-image-understanding-tool.spec.ts` néven                                     |
+| Jelenlegi fájl                                                  | Cél                                                                                                   |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `agent-tools/src/tools/create-image-understanding-tool.ts`      | `packages/tool-minimax-understand-image/src/understand-image-tool/create-image-understanding-tool.ts` |
+| `agent-tools/src/tools/create-image-understanding-tool.test.ts` | ugyanoda, `create-image-understanding-tool.spec.ts` néven                                             |
 
-**ÚJ fájl.** `packages/tool-understand-image/src/understand-image-tool/understand-image-tool-dependencies.ts`, típus-only, mindhárom mezővel (`fetchFunction`, `environment`, `readFileFunction`).
+**ÚJ fájl.** `packages/tool-minimax-understand-image/src/understand-image-tool/understand-image-tool-dependencies.ts`, típus-only, mindhárom mezővel (`fetchFunction`, `environment`, `readFileFunction`).
 
 **Téma.** Egy téma, `understand-image-tool`, három fájllal. A mappa neve az eszköz neve (`understand_image`), nem a benne álló gyártófüggvényé (`createImageUnderstandingTool`): a téma konvenció nem követeli meg a névazonosságot, és itt az eszköz neve a felismerhető.
 
@@ -580,7 +580,7 @@ A mai közös `AgentToolDependencies` három mezőt fog össze (`fetchFunction`,
 
 **Témák.** Négy, 11 fájllal. A `tool-reference` az MCP név összerakása a szervernévből és az eszköz azonosítóból. A `tool-dependencies` a futásidejű függőség objektum típusa és az alapértelmezett példánya. A `tool-factory` az egyetlen hely, ami tudja, melyik azonosítóhoz melyik gyártófüggvény tartozik. A `tool-bundle` a kész készlet alakja és összeállítása.
 
-**Függőség.** `@easter-workflow-builder/agent-tool-id`, `@easter-workflow-builder/tool-web-search`, `@easter-workflow-builder/tool-web-fetch`, `@easter-workflow-builder/tool-understand-image`, `@easter-workflow-builder/env-reader` (az `EnvironmentReader` típus), `@easter-workflow-builder/http-client` (a `FetchFunction` típus), `@easter-workflow-builder/image-source` (a `ReadFileFunction` típus), plusz `@anthropic-ai/claude-agent-sdk`.
+**Függőség.** `@easter-workflow-builder/agent-tool-id`, `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-firecrawl-web-fetch`, `@easter-workflow-builder/tool-minimax-understand-image`, `@easter-workflow-builder/env-reader` (az `EnvironmentReader` típus), `@easter-workflow-builder/http-client` (a `FetchFunction` típus), `@easter-workflow-builder/image-source` (a `ReadFileFunction` típus), plusz `@anthropic-ai/claude-agent-sdk`.
 
 **Az `AgentToolDependencies` szerepe itt.** Ez a csomag az egyetlen hely, ahol a három futásidejű függőség egy objektumban áll, mert ez az egyetlen hely, ami mindhárom eszközt ismeri. A `createAgentTool` switch ágai a teljes objektumból választják ki az adott eszköz szűk függőség interfészének megfelelő mezőket.
 
@@ -758,7 +758,7 @@ Ami a `tools/wire-probe` csomagra **mégis** vonatkozik: a `@easter-workflow-bui
 
 1. Minden új csomag `devDependencies` mezője a közös eszközöket `catalog:` hivatkozással veszi át: `typescript`, `vitest`, `@types/node`. Literál verzió egyik új csomagba sem kerülhet, ez a SPEC-001 3. elfogadási kritériuma.
 2. Minden workspace közötti függőség `"workspace:*"` alakban áll a `dependencies` mezőben. Ami nincs deklarálva, azt az `import-x/no-extraneous-dependencies` szabály hibaként jelzi.
-3. Az `@anthropic-ai/claude-agent-sdk` verziója **pinelve** marad, és csak azokban a csomagokban szerepel, amik ténylegesen importálják: `@easter-workflow-builder/tool-web-search`, `@easter-workflow-builder/tool-web-fetch`, `@easter-workflow-builder/tool-understand-image`, `@easter-workflow-builder/agent-tool-bundle`. A SPEC-001 döntése szerint nem kerül katalógusba.
+3. Az `@anthropic-ai/claude-agent-sdk` verziója **pinelve** marad, és csak azokban a csomagokban szerepel, amik ténylegesen importálják: `@easter-workflow-builder/tool-minimax-web-search`, `@easter-workflow-builder/tool-firecrawl-web-fetch`, `@easter-workflow-builder/tool-minimax-understand-image`, `@easter-workflow-builder/agent-tool-bundle`. A SPEC-001 döntése szerint nem kerül katalógusba.
 4. A `zod` szintén csak a három tool csomagban szerepel.
 5. A `bun.lock` egyetlen fájl marad a gyökérben, és a `bun install --frozen-lockfile` minden lépés után hibátlanul lefut.
 
@@ -819,7 +819,7 @@ Ami a `tools/wire-probe` csomagra **mégis** vonatkozik: a `@easter-workflow-bui
 25. A `bun install --frozen-lockfile` hibátlanul lefut, és a `bun.lock` egyetlen fájl a gyökérben.
 26. Minden új csomag `devDependencies` mezője `catalog:` hivatkozással veszi át a `typescript`, `vitest` és `@types/node` csomagot. Literál verzió egyetlen új csomagban sincs ezekre.
 27. A `MINIMAX_CODING_PLAN_API_KEY` név nem fordul elő sem a kódban, sem a `turbo.json` fájlban, sem egyetlen `CLAUDE.md` fájlban. A migráció kiindulópontján hét helyen fordul elő: `environment-variable-name.ts`, `index.ts`, `create-image-understanding-tool.ts` (két sor), `create-image-understanding-tool.test.ts` (három sor), `packages/agent-tools/CLAUDE.md:38` és `turbo.json:17`. Az `agent-tools` csomagok által használt környezeti változók száma öt, és mind az öt szerepel a `turbo.json` `globalPassThroughEnv` listájában. Ez a SPEC-001 55. kritériumát váltja ki.
-28. A `resolveMiniMaxConfig` függvénynek nincs változónév paramétere, és a `@easter-workflow-builder/tool-understand-image` valamint a `@easter-workflow-builder/tool-web-search` ugyanabból a környezeti változóból dolgozik.
+28. A `resolveMiniMaxConfig` függvénynek nincs változónév paramétere, és a `@easter-workflow-builder/tool-minimax-understand-image` valamint a `@easter-workflow-builder/tool-minimax-web-search` ugyanabból a környezeti változóból dolgozik.
 29. A `docs/research/2026-08-26-agent-tools.md` 4. szekciója lezárt állapotú: rögzíti a saját mérés eredményét, a user döntését, és azt, hogy a külön változó megszűnt. A mérési táblázat sorai változatlanok.
 30. Minden `Fact` mező `state`, `value` és `evidence` értéke bitre azonos a migráció előttivel. Ezt egy normalizált JSON összehasonlítás igazolja a migráció előtti és utáni `providerRegistry` fán.
 31. A `provider-registry` csomag bejáró regressziós tesztje (`provider-registry.spec.ts`) változatlan invariánsokkal fut le: minden `Fact` pontosan az egyik ágon áll, a `known` ág nem üres bizonyítéklistát hordoz, az `unknown` ág indoklást és blokkoló mérést, egyetlen `purpose` vagy `reason` string sem tartalmaz `M-` mintájú azonosítót, és minden hivatkozott `MeasurementId` feloldható `docs/` horgonyra.
