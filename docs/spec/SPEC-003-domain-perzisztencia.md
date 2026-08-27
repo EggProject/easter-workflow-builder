@@ -115,23 +115,79 @@ Az SDK oldali tények (az `SDKMessage` unió, a session kezelés, a hookok, a `u
 
 Tíz saját tábla, plusz a drizzle-kit által kezelt `__drizzle_migrations` (F-18), ami nem a mi sémánk része.
 
-```
-workflow  1 --- n  workflow_node
-workflow  1 --- n  workflow_edge   (source_node_id, target_node_id -> workflow_node)
-workflow  1 --- n  workflow_run
-workflow_run  n --- 1  graph_snapshot   (graph_snapshot_hash, tartalom szerint cimzett, megosztott)
-workflow_run  1 --- n  step_run
-workflow_run  1 --- n  run_event
-workflow_run  1 --- n  human_approval
-workflow_run  1 --- n  workflow_run       (root_run_id, al-workflow futasok)
-step_run      1 --- n  step_run           (parent_step_run_id, vegrehajtasi fa)
-step_run      0 --- 1  workflow_run       (sub_workflow_run_id, al-workflow hivas)
-step_run      1 --- n  run_event
-step_run      0 --- 1  human_approval
+Az alábbi Mermaid `erDiagram` a korábbi ASCII vázlatot váltja fel, nem egészíti ki: pontosan ugyanazt a kapcsolatrendszert írja le, de kardinalitással, kulcsokkal és törlési viselkedéssel együtt, így egyetlen forrás marad a kapcsolatok leírására, és a kettő nem futhat szét egymástól. A `__drizzle_migrations` tábla nem szerepel rajta: nincs idegen kulcsa sem befelé, sem kifelé (3. szekció fenti mondata), tehát a kapcsolati rajzon nem hordozna kapcsolati információt, csak zajt.
 
-app_setting                     egysoros, globalis alapertelmezesek
-provider_concurrency_limit      providerenkent legfeljebb egy sor
+```mermaid
+erDiagram
+    workflow ||--o{ workflow_node : "workflow_id, CASCADE"
+    workflow ||--o{ workflow_edge : "workflow_id, CASCADE"
+    workflow ||--o{ workflow_run : "workflow_id, CASCADE"
+    workflow_node ||--o{ workflow_edge : "source_node_id, CASCADE"
+    workflow_node ||--o{ workflow_edge : "target_node_id, CASCADE"
+    graph_snapshot ||--o{ workflow_run : "graph_snapshot_hash, megosztott, RESTRICT"
+    workflow_run ||--o{ step_run : "run_id, CASCADE"
+    workflow_run ||--o{ run_event : "run_id, CASCADE"
+    workflow_run ||--o{ human_approval : "run_id, CASCADE"
+    workflow_run ||--o{ workflow_run : "root_run_id, al-workflow futások, CASCADE"
+    workflow_run o|..o{ workflow_run : "restarted_from_run_id, újraindítás származása, SET NULL"
+    step_run o|..o{ step_run : "parent_step_run_id, végrehajtási fa, CASCADE"
+    workflow_run o|..o{ step_run : "sub_workflow_run_id, al-workflow hívás, SET NULL"
+    step_run o|..o{ run_event : "step_run_id, opcionális, CASCADE"
+    step_run ||--o| human_approval : "step_run_id, CASCADE, UNIQUE"
+
+    workflow {
+        text id PK
+    }
+    workflow_node {
+        text id PK
+        text workflow_id FK
+    }
+    workflow_edge {
+        text id PK
+        text workflow_id FK
+        text source_node_id FK
+        text target_node_id FK
+    }
+    workflow_run {
+        text id PK
+        text workflow_id FK
+        text graph_snapshot_hash FK
+        text root_run_id FK
+        text restarted_from_run_id FK "opcionális"
+    }
+    graph_snapshot {
+        text hash PK "sha256, 64 hex"
+    }
+    step_run {
+        text id PK
+        text run_id FK
+        text parent_step_run_id FK "opcionális"
+        text sub_workflow_run_id FK "opcionális"
+        text node_id "pillanatképbeli node, NEM FK"
+    }
+    run_event {
+        integer id PK "AUTOINCREMENT"
+        text run_id FK
+        text step_run_id FK "opcionális"
+    }
+    human_approval {
+        text id PK
+        text run_id FK
+        text step_run_id FK,UK
+    }
+    app_setting {
+        integer id PK "CHECK id = 1"
+    }
+    provider_concurrency_limit {
+        text provider_id PK
+    }
 ```
+
+**Mit mutat a rajz.** A folytonos vonal _azonosító_ kapcsolat: a gyerek sor nem létezhet a hivatkozott szülő sor nélkül, mert a mutató idegen kulcs kötelező (`NOT NULL`). A szaggatott vonal _nem azonosító_: a mutató mező opcionális, a gyerek sor a hivatkozás nélkül is létezhet. Négy kapcsolat szaggatott, mindegyik opcionális mezőn áll: a `workflow_run.restarted_from_run_id` (önhivatkozás, az újraindítás származása), a `step_run.parent_step_run_id` (önhivatkozás, a végrehajtási fa), a `workflow_run` felől a `step_run.sub_workflow_run_id` (az al-workflow hívást indító lépés) és a `run_event.step_run_id` (futás szintű eseménynél NULL, 6.2). A többi tizenegy kapcsolat folytonos. Minden kapcsolat címkéje a hordozó oszlop nevét és a törlési viselkedést adja meg, a 4.15 szekció lánca szerint. A `graph_snapshot` és a `workflow_run` közötti kapcsolat iránya szándékosan a pillanatképtől a futás felé mutat: minden `workflow_run` pontosan egy `graph_snapshot` sorra hivatkozik (a `graph_snapshot` oldali "pontosan egy" jelölés), egy `graph_snapshot` sorra viszont tetszőleges sok `workflow_run` hivatkozhat (a `workflow_run` oldali "nulla vagy több" jelölés). Ez a **megosztott pillanatkép**, az 5. döntés lényege.
+
+**Mely mezők kerültek a rajzra.** Kizárólag az elsődleges kulcsok, az idegen kulcsok, és két kivétel, ami a kapcsolat megértéséhez kell: a `step_run.node_id`, mert szándékosan **nem** idegen kulcs (4.10), és ezt a rajzon külön meg kell jegyezni, nehogy valaki tévesen kapcsolatnak olvassa; valamint a `graph_snapshot.hash`, ahol a megjegyzés a lenyomat alakját mondja ki. A teljes mezőlista a 4. szekcióban áll; minden más leíró mező (név, státusz, időbélyeg, JSON konfiguráció) szándékosan hiányzik a rajzról, mert a célja a kapcsolatok bemutatása, nem a teljes séma megismétlése.
+
+**Az `app_setting` és a `provider_concurrency_limit` a rajzon kapcsolat nélkül áll.** Egyik táblának sincs idegen kulcsa, és egyik táblára sem mutat idegen kulcs máshonnan (4.13, 4.14). A Mermaid megengedi kapcsolat nélküli entitás felvételét; ez itt szándékos, a teljesség kedvéért szerepelnek, a rajz nem állít róluk mást, mint hogy önállóak.
 
 **Az irány egyirányú.** A `workflow_run` táblának nincs idegen kulcsa a `step_run` felé, a kapcsolatot a `step_run.sub_workflow_run_id` hordozza. Ez azért fontos, mert így a tábla létrehozási sorrend egyértelmű, és nem kell az F-12 szerinti előre hivatkozásra támaszkodni.
 
@@ -1136,6 +1192,10 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 59. A szűrés nem megkerülhető: az `appendSdkEvent` bemeneti típusa **nem tartalmaz** delta kapcsoló mezőt, tehát a hívó nem tud a futás beállításától eltérőt kérni, és a döntés a futás sorában tárolt értékből jön. Kikapcsolt állapotban a hívás `skipped` eredményt ad, nem hibát, és nem keletkezik sor; bekapcsolt állapotban ugyanaz a hívás sort ír. Mindkét ág tesztelt, ugyanazzal a bemenettel.
 60. Kikapcsolt állapotban ugyanaz a bemeneti sorozat **szigorúan kevesebb** `run_event` sort eredményez, mint bekapcsolva, a visszaolvasott transcript viszont tartalmazza minden `sdk_assistant`, `sdk_user`, `sdk_result` és `sdk_system` sorát, és a `step_run` négy token oszlopa a kapcsoló mindkét állásában azonos értéket vesz fel. Egy teszt, két ág, ugyanaz a bemenet.
 61. A négy `usage` oszlopot a normalizáló kizárólag `sdk_assistant` és `sdk_result` eredetű sorból tölti, `sdk_stream_event` sorból soha. Ezért az `aggregateRunTokens` értéke a kapcsoló mindkét állásában azonos, és ezt futtatott teszt igazolja.
+
+### Entitás kapcsolati diagram, a 3. szekció Mermaid rajza
+
+62. A 3. szekció Mermaid `erDiagram`-ja mind a tíz saját táblát tartalmazza, a migrált adatbázis `sqlite_master` és `PRAGMA foreign_key_list` kimenetével egyező kapcsolatokkal: minden ott szereplő idegen kulcshoz pontosan egy rajzbeli kapcsolat tartozik, a 4.15 szekció `ON DELETE` láncával megegyező címkével, és a rajzon nincs olyan kapcsolat, aminek nincs idegen kulcs megfelelője a sémában. Ez a code review kötelező ellenőrzési pontja minden olyan változtatásnál, ami a `packages/db` séma idegen kulcsait vagy a 4.15 láncot érinti; gépi ellenőrzés jelenleg nincs rá, mert a rajz szövegének és a séma tényleges `PRAGMA foreign_key_list` kimenetének összevetése egy külön eszközt igényelne, amit ez a spec nem rendel meg.
 
 ## 16. Kapcsolódó dokumentumok
 
