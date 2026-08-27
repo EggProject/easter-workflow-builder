@@ -1,11 +1,7 @@
 // Barrel: csak újraexport, a csomag publikus felülete a lépésenként kapcsolható
 // eszközkészlet összeállítója és a hozzá tartozó típusok.
 
-export {
-  ENV_FIRECRAWL_BASE_URL,
-  ENV_FIRECRAWL_TIMEOUT_MS,
-  ENV_MINIMAX_CODING_PLAN_API_KEY,
-} from './config/environment-variable-name.ts';
+export { ENV_MINIMAX_CODING_PLAN_API_KEY } from './tools/environment-variable-name.ts';
 
 export type { AgentToolDependencies } from './tools/agent-tool-dependencies.ts';
 export { defaultAgentToolDependencies } from './tools/default-agent-tool-dependencies.ts';

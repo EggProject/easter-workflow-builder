@@ -4,8 +4,8 @@ import { errorToolResult, textToolResult } from '@easter-workflow-builder/mcp-to
 import { callMiniMax, isVlmResponse, PATH_VLM, resolveMiniMaxConfig } from '@easter-workflow-builder/minimax-client';
 import { isOkOutcome } from '@easter-workflow-builder/result';
 import { z } from 'zod';
-import { ENV_MINIMAX_CODING_PLAN_API_KEY } from '../config/environment-variable-name.ts';
 import type { AgentToolDependencies } from './agent-tool-dependencies.ts';
+import { ENV_MINIMAX_CODING_PLAN_API_KEY } from './environment-variable-name.ts';
 
 // Lapos séma két kötelező szöveges mezővel, felsorolás és beágyazott objektum
 // nélkül.
