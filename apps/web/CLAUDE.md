@@ -26,10 +26,15 @@ spec lecseréli a valódi UI-ra.
 
 ## Függőségi irány
 
-A `web` a `core`, a `protocol` és az `ui` csomagtól függhet. **Tilos** a `db`, az
-`engine`, az `agent` vagy a `server` csomagtól függenie.
+A `web` a `core`, a `protocol` és az `ui` csomagtól függ, L5 réteg (SPEC-002 4. szekció). **Tilos**
+a `db`, az `engine`, az `agent` vagy a `server` csomagtól függenie. Ez megegyezik a
+`package.json` tényleges tartalmával.
 
 ## Szabályok
+
+Ha a csomag valódi tartalmat kap, a `src/index.ts` `IS_WEB_PLACEHOLDER` konstansát törölni
+kell. A `src/` alatti mappaszerkezet a téma szerinti konvenciót követi, a részletek a lenti
+SPEC-002 hivatkozásban.
 
 A `tsc --noEmit` (a `typecheck` script) csak a `src/**/*.ts` fát fedi. Az `e2e/` saját
 `tsconfig.json`-nal rendelkezik (Node környezet, `tooling/tsconfig/node.json` alap), mert
@@ -47,3 +52,4 @@ nem `window`-n.
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 3. és 10. szekció
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció (a `src/main.ts` kivétel a 6.8 pontban)

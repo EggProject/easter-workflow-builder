@@ -14,13 +14,16 @@ modellt egy későbbi specifikáció adja, ide nem tartozik adatbázis séma, HT
 
 ## Függőségi irány
 
-A `core` a workspace futásidejű függőségei közül semmitől nem függhet. Ez a legalsó
-csomag a függőségi gráfban, minden más csomag ebből építkezhet.
+A `core` a workspace futásidejű függőségei közül semmitől nem függhet, L0 réteg (SPEC-002 4.
+szekció). Ez a legalsó csomag a függőségi gráfban, minden más csomag ebből építkezhet.
 
 ## Szabályok
 
-Nincs csomagra jellemző kiegészítő szabály a gyökér `CLAUDE.md`-hez képest.
+Ha a csomag valódi tartalmat kap, a `src/index.ts` `IS_CORE_PLACEHOLDER` konstansát törölni
+kell. A `src/` alatti mappaszerkezet a téma szerinti konvenciót követi, a részletek a lenti
+SPEC-002 hivatkozásban.
 
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 3. szekció
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció
