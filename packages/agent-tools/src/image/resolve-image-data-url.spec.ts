@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchFunction } from '../http/fetch-function.ts';
+import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { ReadFileFunction } from './read-file-function.ts';
 import { resolveImageDataUrl } from './resolve-image-data-url.ts';
 

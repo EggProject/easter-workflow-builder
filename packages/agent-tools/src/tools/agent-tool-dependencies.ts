@@ -1,5 +1,5 @@
-import type { EnvironmentReader } from '../config/environment-reader.ts';
-import type { FetchFunction } from '../http/fetch-function.ts';
+import type { EnvironmentReader } from '@easter-workflow-builder/env-reader';
+import type { FetchFunction } from '@easter-workflow-builder/http-client';
 import type { ReadFileFunction } from '../image/read-file-function.ts';
 
 /**

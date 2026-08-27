@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/result';
+import { describeError } from '../error-description/describe-error.ts';
 import type { BinaryPayload } from './binary-payload.ts';
-import { describeError } from './describe-error.ts';
 import type { FetchFunction } from './fetch-function.ts';
 
 /**
