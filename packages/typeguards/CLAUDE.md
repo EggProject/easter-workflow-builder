@@ -12,13 +12,27 @@ tartozik domain-specifikus typeguard: az a saját csomagjában marad. Például 
 
 ## Fájlok
 
-| Fájl                              | Tartalom                                                    |
-| --------------------------------- | ----------------------------------------------------------- |
-| `src/index.ts`                    | barrel, újraexport és a csomag eredeti placeholder exportja |
-| `src/is-record.ts`                | `isRecord`, kulcs-érték objektum szűkítése                  |
-| `src/is-record.test.ts`           | az `isRecord` unit tesztje                                  |
-| `src/is-non-empty-string.ts`      | `isNonEmptyString`                                          |
-| `src/is-non-empty-string.test.ts` | az `isNonEmptyString` unit tesztje                          |
+| Fájl                                                                                                                                                                                                                                                                 | Tartalom                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/index.ts`                                                                                                                                                                                                                                                       | barrel, újraexport és a csomag eredeti placeholder exportja                                    |
+| `src/types.ts`                                                                                                                                                                                                                                                       | `Constructor`, `StringResolver` - helyi pótlás a hiányzó `@pct/ts-typing` csomagra (lásd lent) |
+| `src/test-constants.ts`                                                                                                                                                                                                                                              | megosztott szám/dátum konstansok a `.spec.ts` fájloknak (`sonarjs/no-magic-numbers` miatt)     |
+| `src/is-record/is-record.ts` (+ `.spec.ts`)                                                                                                                                                                                                                          | `isRecord`, kulcs-érték objektum szűkítése                                                     |
+| `src/is-non-empty-string/is-non-empty-string.ts` (+ `.spec.ts`)                                                                                                                                                                                                      | `isNonEmptyString`                                                                             |
+| `src/is-boolean/`, `is-constructor/`, `is-date-array/`, `is-float/`, `is-function/` (`isFunction` + `isFunctionReturnAny`), `is-instanceof/`, `is-int/`, `is-nil/`, `is-number/`, `is-numeric/`, `is-object/`, `is-string/`, `is-string-resolver/`, `is-valid-date/` | felhasználó által bemásolt guardok, mindegyik saját mappában, `<név>.ts` + `<név>.spec.ts`     |
+
+A bemásolt guardok `.spec.ts` végződésűek (nem `.test.ts`); az `isRecord`/`isNonEmptyString` párt
+ehhez a mintához igazítottuk (mappánként egy egység, lásd lent a fájl konvenciót).
+
+### A hiányzó `@pct/ts-typing` csomag
+
+Négy bemásolt fájl (`is-constructor.ts`, `is-instanceof.ts`, `is-numeric.ts`,
+`is-string-resolver.ts`) egy `@pct/ts-typing` nevű csomagból importált típusokat, ami nem
+létezik a monorepóban (nincs `package.json` bejegyzés, nincs workspace tag, nincs a
+`bun.lock`-ban). A `src/types.ts` pótolja helyben a `Constructor<T>` és `StringResolver<T>`
+típusokat. A `NumericString` szándékosan hiányzik onnan: nálunk pusztán `string` alias lenne,
+amit a `sonarjs/redundant-type-aliases` elutasítana, ezért az `is-numeric.ts` közvetlenül
+`string`-et használ.
 
 ## Függőségi irány
 
