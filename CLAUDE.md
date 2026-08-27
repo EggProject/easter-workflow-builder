@@ -191,15 +191,13 @@ lefedettség EGYETLEN, gyökér szintű folyamatban gyűlik: a `tooling/scripts/
 nem `turbo run test`-en keresztül csomagonként (ugyanaz az elv, mint a `format:check`-nél: a
 Prettier is közvetlenül fut, nem taskon keresztül).
 
-**Coverage küszöb, jelenlegi állapot.** A csomagok most placeholder tartalommal állnak, a
-`packages/providers/src/**` pedig (van benne valódi logika, `isKnown`/`isUnknown`) egyetlen
-funkcionális Vitest teszttel sincs lefedve. A 100%-os küszöböt ezért egy ideiglenes,
-`vitest.config.ts`-ben kommentezett `coverage.exclude` bejegyzés tartja zölden: a
-`packages/providers/src/**` és az `apps/web/src/main.ts` (Playwright e2e váz belépési pont,
-nem termékkód) teljesen ki van zárva. **Szigorítani kell**, amint valamelyikhez valódi Vitest
-teszt készül: akkor a kizárás törlendő, és a `packages/providers` esetén csak az adat literál
-fájlokra szűkítendő (a typeguardok maradjanak a lefedettségben, SPEC-001 9. szekció eredeti
-szándéka szerint).
+**Coverage küszöb, a SPEC-002 utáni állapot.** A `packages/providers` és a `packages/agent-tools`
+csomag megszűnt (SPEC-002), a belőlük kivált 18 új csomag mindegyike valódi funkcionális Vitest
+teszttel fedett, kizárás nélkül. A `vitest.config.ts` `coverage.exclude` listáján egyetlen
+csomag-specifikus bejegyzés sincs: az egyetlen megmaradt ideiglenes kizárás az
+`apps/web/src/main.ts` (Playwright e2e váz belépési pont, nem termékkód). **Szigorítani kell**,
+amint a valódi UI belépési pont felváltja ezt a fájlt: akkor ez a sor törlendő (SPEC-001 9.
+szekció eredeti szándéka szerint).
 
 A `tools/wire-probe` csomagnak nincs `test` npm scriptje (SPEC-001 13. szekció, a mérések nem
 futhatnak CI-ben MiniMax API kulcs nélkül), de a `no-shadowed-path-import.spec.ts` regressziós
