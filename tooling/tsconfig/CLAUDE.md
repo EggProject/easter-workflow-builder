@@ -15,6 +15,13 @@ csomag a többi workspace taggal egységesen `tsc --noEmit`-elhető legyen.
 | `react.json`   | `apps/web` és `packages/ui` React csomagoknak, `base.json` kiterjesztése                                    |
 | `src/index.ts` | placeholder export, csak hogy a csomag lefordulhasson                                                       |
 
+## Függőségi irány
+
+Csak fejlesztői eszköz, a workspace futásidejű csomagjai közül semelyiktől nem függ, réteg
+nélküli "eszköz" csomag (SPEC-002 4. szekció). Bármelyik másik csomag hivatkozhat rá a saját
+`tsconfig.json` `extends` mezőjéből, de futásidejű `dependencies` helyen sosem jelenhet meg,
+csak `devDependencies`-ként.
+
 ## Szabályok
 
 A `base.json` **nem ismétli meg** a TypeScript 6.0.3 alapértelmezéseit (`strict`,
@@ -34,3 +41,4 @@ ide, relatív útvonallal (pl. `"../../tooling/tsconfig/node.json"`).
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 6. szekció
 - [`../../docs/plan/PLAN-001-monorepo-toolchain.md`](../../docs/plan/PLAN-001-monorepo-toolchain.md)
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. szekció (eszköz csomagok rétege)

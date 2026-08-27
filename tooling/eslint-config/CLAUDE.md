@@ -47,3 +47,4 @@ keresztül).
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 7. szekció
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 6.7 pont (az `eslint-preset/` téma mappa nem kap saját `CLAUDE.md`-t), T-002-4

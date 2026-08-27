@@ -125,5 +125,6 @@ gráf tagja, de más csomag nem importál innen semmit.
 
 - [`../../docs/spec/SPEC-000-provider-wire-measurement.md`](../../docs/spec/SPEC-000-provider-wire-measurement.md)
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 13. szekció ("A `tools/wire-probe` viszonya")
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 6.8 pont (a mappa konvenció alóli kivétel indoklása)
 - [`../../docs/research/2026-08-26-agent-sdk-minimax.md`](../../docs/research/2026-08-26-agent-sdk-minimax.md)
 - [`../../docs/research/2026-08-26-toolchain.md`](../../docs/research/2026-08-26-toolchain.md): a `@anthropic-ai/claude-agent-sdk` és a `zod` pontos verziója

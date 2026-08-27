@@ -26,6 +26,13 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `src/dependency-graph/`           | téma mappa: a `check-dependency-graph.sh` mögötti réteg-hozzárendelés (`package-layer.ts`), a `package.json`-ok beolvasása (`read-workspace-packages.ts`), a tiszta ellenőrző logika (`find-dependency-graph-violations.ts`, `.spec.ts`-sel) és a CLI belépési pont (`check-dependency-graph.ts`) |
 | `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                                                                                                        |
 
+## Függőségi irány
+
+Csak fejlesztői eszköz, a workspace futásidejű csomagjai közül semelyiktől nem függ, réteg
+nélküli "eszköz" csomag (SPEC-002 4. szekció). A gyökér `package.json` scriptjei hívják, és
+bármelyik másik csomag `devDependencies`-ként hivatkozhatna rá, futásidejű `dependencies`
+helyen sosem jelenhet meg.
+
 ## Szabályok
 
 - A csonkolási határ (`_lib.sh` `WRAPPER_ERROR_LIMIT`, `format.sh` `WRAPPER_FILE_LIMIT`,
