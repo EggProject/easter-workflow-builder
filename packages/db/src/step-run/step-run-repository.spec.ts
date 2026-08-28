@@ -755,6 +755,42 @@ describe('createStepRunRepository', () => {
       sqlite.close();
     });
   });
+
+  /**
+   * A `sub_workflow` végrehajtó (SPEC-004 5.9) utólagos oszlopírása: a gyerek
+   * futás azonosítója csak a `startRun` lefutása után ismert, a lépés sora
+   * viszont már előbb létrejön. Lásd a `attachSubWorkflowRun` doksiját.
+   */
+  describe('attachSubWorkflowRun', () => {
+    it('beállítja a subWorkflowRunId mezőt, a status érintése nélkül', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      insertRun(database, 'w1', 'gyerek-futas');
+      const step = create(repository, 'run-1', { nodeType: 'sub_workflow' });
+      okOrThrow(repository.markStepRunning(step.id));
+      expect(step.subWorkflowRunId).toBeNull();
+
+      const attached = okOrThrow(repository.attachSubWorkflowRun(step.id, 'gyerek-futas'));
+
+      expect(attached.subWorkflowRunId).toBe('gyerek-futas');
+      // Nem állapotváltás: a status változatlan marad.
+      expect(attached.status).toBe('running');
+
+      sqlite.close();
+    });
+
+    it('not_found hibaágat ad ismeretlen stepRunId-ra', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'gyerek-futas');
+
+      const outcome = repository.attachSubWorkflowRun('nincs-ilyen', 'gyerek-futas');
+
+      expect(errorOrThrow(outcome)).toContain('not_found');
+      sqlite.close();
+    });
+  });
 });
 
 /**

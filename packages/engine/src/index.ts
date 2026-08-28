@@ -254,3 +254,15 @@ export type { ApprovalWaitRegistry } from './node-executor/approval-wait-registr
 export { createApprovalWaitRegistry } from './node-executor/approval-wait-registry.ts';
 export type { ExecuteHumanApprovalInput } from './node-executor/execute-human-approval.ts';
 export { executeHumanApproval } from './node-executor/execute-human-approval.ts';
+// T-005-23: a `sub_workflow` végrehajtó (SPEC-004 5.9), az ancestry alapú
+// rekurzióvédelem tiszta függvénye, és a `ChildWorkflowRunner` port alakú,
+// motoron BELÜLI függőség, amit a `run-supervisor` (T-005-25) önmagára
+// hivatkozva tölt majd ki - a kilenc befecskendezett portnak NEM tagja.
+export type {
+  ChildWorkflowRunner,
+  ChildWorkflowRunRequest,
+  ChildWorkflowRunResult,
+} from './node-executor/child-workflow-runner.ts';
+export { detectWorkflowRecursion } from './node-executor/detect-workflow-recursion.ts';
+export type { ExecuteSubWorkflowInput } from './node-executor/execute-sub-workflow.ts';
+export { executeSubWorkflow } from './node-executor/execute-sub-workflow.ts';
