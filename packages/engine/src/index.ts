@@ -64,6 +64,29 @@ export { validateScopeBalance } from './branch-scope/validate-scope-balance.ts';
 // PLAN-005 T-005-12).
 export { resolveEffectiveProvider } from './provider-resolution/resolve-effective-provider.ts';
 
+// run-validation: a futás indítási validációja. A SPEC-004 4.7 táblázatának
+// mind a tíz ellenőrzése, a 4.2 fenntartott `branch_key` szabálya, a 4.8
+// 2. lépésének node-onkénti provider feloldása, és a 4.7 "A validáció
+// eredménye típusszintű szűkítés" bekezdésének `ExecutableNodeConfig` uniója
+// (PLAN-005 T-005-15). A `validateRun` az egyetlen belépési pont; a
+// tizenegy ellenőrző függvény azért is szerepel a barrelben, mert
+// mindegyik önállóan futtatható, adatbázis nélküli tiszta függvény.
+export type { ExecutableNodeConfig } from './run-validation/executable-node-config.ts';
+export type { ValidatedRun } from './run-validation/validated-run.ts';
+export { validateRun } from './run-validation/validate-run.ts';
+export { validateStartNode } from './run-validation/validate-start-node.ts';
+export { validateEdgeEndpoints } from './run-validation/validate-edge-endpoints.ts';
+export { validateNodeReachability } from './run-validation/validate-node-reachability.ts';
+export { validateNodeConfigs } from './run-validation/validate-node-configs.ts';
+export { validateImplementedNodeTypes } from './run-validation/validate-implemented-node-types.ts';
+export { validateBranchEdgeKeys } from './run-validation/validate-branch-edge-keys.ts';
+export { validateDefaultBranchKey } from './run-validation/validate-default-branch-key.ts';
+export { validateErrorHandlerEdges } from './run-validation/validate-error-handler-edges.ts';
+export { validateUnhandledErrorPolicy } from './run-validation/validate-unhandled-error-policy.ts';
+export { validateJoinMergeSettings } from './run-validation/validate-join-merge-settings.ts';
+export { validateReservedBranchKeys } from './run-validation/validate-reserved-branch-keys.ts';
+export { resolveNodeProviders } from './run-validation/resolve-node-providers.ts';
+
 // capability-policy: a `Fact` három állapotának egységes kezelése, és a
 // SPEC-004 11.3 táblázat leírótól függő viselkedései, viselkedésenként egy
 // tiszta függvényben (SPEC-004 11.2, 11.3, PLAN-005 T-005-13).
