@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a hét nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a nyolc nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -70,6 +70,10 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         'openDatabase',
         'isRunEventKind',
         'isApprovalDecision',
+        // A nyolcadik a T-005-15 óta: az `engine` csomag `run-validation`
+        // témája ezzel dönti el a `malformed_node_config` ellenőrzést
+        // (SPEC-004 4.7).
+        'isNodeConfig',
       ]),
     );
   });
