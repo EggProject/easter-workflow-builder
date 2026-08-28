@@ -10,6 +10,7 @@ import type { NodeConfig } from './node-config.ts';
 import type { NodeType } from './node-type.ts';
 import { isNodeConfig } from './is-node-config.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
+import { runEventTable } from '../run-event/run-event.ts';
 
 /**
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1
@@ -86,11 +87,9 @@ export interface WorkflowGraph {
  * A törlés előtti megerősítő párbeszédhez (SPEC-003 4.15 szekció, 28.
  * kritérium): mi veszne el, ha a hívó ténylegesen törli a workflow-t.
  *
- * A `runCount` és a `snapshotCount` mezőt a `summarizeDeletion` lezárta
- * (T-003-16), miután a `workflow_run` és a `graph_snapshot` tábla létrejött
- * (F5 fázis). NYITOTT PONT marad az `eventCount`: a `run_event` tábla a
- * T-003-19 lépésig nem létezik, tehát a ténylegesen törlődő esemény
- * darabszám itt még nem számolható, a mező addig kényszerűen `0` értéket ad.
+ * Mind a három mező ténylegesen törlődő sorok darabszáma: a `runCount` és a
+ * `snapshotCount` a T-003-16, az `eventCount` a T-003-27 óta. A számítás
+ * részleteit a `summarizeDeletion` dokumentációja írja le.
  */
 export interface DeletionSummary {
   readonly runCount: number;
@@ -371,6 +370,17 @@ export function createWorkflowRepository(
    * egyetlen, a törlendő halmazon kívüli sor is ugyanarra a lenyomatra
    * mutat (mert két workflow gráfja bájtra azonos, és megosztja a sort), a
    * pillanatkép megmarad.
+   *
+   * **`eventCount`** (T-003-27): a `run_event.run_id` idegen kulcs
+   * `ON DELETE CASCADE` a `workflow_run` táblára (4.15 szekció lánca,
+   * `run-event.ts`), tehát pontosan a fenti `deletedRunIds` halmazhoz tartozó
+   * esemény sorok törlődnek - `SELECT COUNT(*) FROM run_event WHERE run_id IN
+   * (...)`. A `snapshotCount`-tal ellentétben itt nem kell kaszkád-számítás:
+   * a `run_event` a futás gyereke, nem a szülője, és nincs olyan sor, amit
+   * egy megmaradó futás megoszthatna a törlődővel (a `run_id` egyértékű).
+   * A `step_run_id` szerinti második út sem hoz be új sort: a `step_run` maga
+   * is `ON DELETE CASCADE` a `workflow_run` táblára, tehát minden lépéshez
+   * kötött esemény ugyanannak a törlődő futásnak a `run_id`-jét hordozza.
    */
   function summarizeDeletion(workflowId: string): Outcome<DeletionSummary> {
     return transaction(() => {
@@ -423,12 +433,26 @@ export function createWorkflowRepository(
         }
       }
 
-      // NYITOTT PONT (T-003-19 zárja le): lásd a `DeletionSummary` fenti
-      // dokumentációját. A `run_event` tábla hiányában az esemény darabszám
-      // itt kényszerűen nulla.
+      // Nyers `sql` aggregát, NEM a típusos select-builder, ugyanaz a minta,
+      // mint a `RunEventRepository.aggregateRunTokens`-nél: a `GROUP BY`
+      // nélküli aggregát SQLite-ban mindig pontosan egy sort ad, akkor is, ha
+      // nulla sor illeszkedik a szűrésre, tehát a `database.get<T>()`
+      // deklarált, `undefined`-et nem tartalmazó típusa itt a valós
+      // viselkedést tükrözi. A select-builder `.get()`-je ezzel szemben
+      // `T | undefined`, ami egy soha be nem következő, tehát tesztelhetetlen
+      // ágat kényszerítene ide (SPEC-003 12.4, 100 százalékos lefedettség).
+      // Az `inArray` üres halmazra `false` feltételt generál (drizzle-orm
+      // 0.45.2, `sql/expressions/conditions.js`, forrásból ellenőrizve), tehát
+      // futás nélküli workflow-ra sem kell külön ág.
+      const eventCountRow = database.get<{ eventCount: number }>(sql`
+        SELECT COUNT(*) AS eventCount
+          FROM run_event
+         WHERE ${inArray(runEventTable.runId, [...deletedRunIds])}
+      `);
+
       return {
         kind: 'ok',
-        value: { runCount: deletedRunIds.size, eventCount: 0, snapshotCount },
+        value: { runCount: deletedRunIds.size, eventCount: eventCountRow.eventCount, snapshotCount },
       };
     });
   }
