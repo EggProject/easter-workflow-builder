@@ -1180,7 +1180,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 41. A `provider_concurrency_limit` tábla a migráció után **üres**, és sem a kódban, sem a migrációban nincs szállított párhuzamossági alapérték. Az `app_setting` tábla a migráció után **üres**, és a `readSettings` ilyenkor NULL `default_provider_id` értéket ad. Az egyetlen szállított alapértékkel rendelkező **beállítás** az `app_setting.persist_stream_deltas` hamis értéke, ami a 6. user döntés, nem kitalált konfiguráció; ez nem érinti a `step_run` séma szintű technikai alapértékeit (`iteration`, `attempt`, `forked_session`).
 42. A `readEventsSince` `limit` paramétere kötelező, alapérték nélkül.
 43. A 13. szekció mind a tizenegy nyitott kérdése vagy lezárt (futtatott mérés vagy hivatalos forrás megnevezésével, a `docs/research/` alá vezetve), vagy nyitottként áll, a "mi a viselkedés addig" és a "mi zárná le" mezővel kitöltve. Tippeléssel lezárt pont nincs.
-44. A `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run test`, `bun run build`, `bun run docs:check`, `bun run check:casing` és `bun run check:graph` mind a nyolc parancs nulla kilépési kóddal fut a teljes workspace-en.
+44. A `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run test`, `bun run build`, `bun run docs:check`, `bun run check:casing`, `bun run check:graph` és `bun run check:db-drift` mind a kilenc parancs nulla kilépési kóddal fut a teljes workspace-en. A kapuk mérvadó listája a `.claude/CLAUDE.md` 8. szekciója.
 
 ### Tartalom szerinti címzés, az 5. döntés
 
