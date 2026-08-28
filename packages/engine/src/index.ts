@@ -39,3 +39,15 @@ export type { SubWorkflowStartedPayload } from './engine-event/sub-workflow-star
 export type { SubWorkflowFinishedPayload } from './engine-event/sub-workflow-finished-payload.ts';
 export type { EngineEvent } from './engine-event/engine-event.ts';
 export { writeEngineEvent } from './engine-event/write-engine-event.ts';
+
+// run-graph: az `ExecutableGraph` felépítése a pillanatképből, a visszaél
+// keresés, a kör keresés a visszaélek elhagyása után, a `loop` node alakjának
+// két ellenőrzése és az elérhetőség számítás (SPEC-004 4.1, 4.6,
+// PLAN-005 T-005-10).
+export type { ExecutableGraph } from './run-graph/executable-graph.ts';
+export { buildExecutableGraph } from './run-graph/build-executable-graph.ts';
+export { computeReachableNodeIds } from './run-graph/compute-reachable-node-ids.ts';
+export { findLoopBackEdges } from './run-graph/find-loop-back-edges.ts';
+export { detectGraphCycle } from './run-graph/detect-graph-cycle.ts';
+export { validateLoopBackEdgeBody } from './run-graph/validate-loop-back-edge-body.ts';
+export { validateLoopBranchEdges } from './run-graph/validate-loop-branch-edges.ts';
