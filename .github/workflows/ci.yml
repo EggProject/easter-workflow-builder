@@ -72,6 +72,13 @@ jobs:
           # CI gate matrixbol - ez a sor potolja, a `casing` mintajara.
           - name: graph
             script: check:graph
+          # A `check:db-drift` (`tooling/scripts/db-drift.sh`) azt orzi, hogy
+          # a `packages/db` sema es a commitolt `packages/db/drizzle`
+          # migraciok szinkronban vannak-e (SPEC-003 10.3 szekcio "Drift
+          # ellenorzes" bekezdese, 15. szekcio 36. kriterium). NEM resze a
+          # nyolc kotelezo minosegi kapunak, kilencedik, kulon ellenorzes.
+          - name: db-drift
+            script: check:db-drift
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1

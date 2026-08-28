@@ -46,6 +46,7 @@
     "docs:check": "bash tooling/scripts/claude-md.sh",
     "check:casing": "bash tooling/scripts/casing.sh",
     "check:graph": "bash tooling/scripts/check-dependency-graph.sh",
+    "check:db-drift": "bash tooling/scripts/db-drift.sh",
     "test": "vitest run --coverage",
     "test:e2e": "turbo run test:e2e",
     "coverage:e2e:report": "bash tooling/scripts/e2e-coverage.sh",

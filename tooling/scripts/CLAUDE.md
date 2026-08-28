@@ -22,6 +22,7 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `casing.sh`                       | ellenőrzi, hogy a git indexben tárolt fájlnevek betűzése megegyezik-e a rájuk hivatkozó relatív importokéval; a tényleges logika `src/casing/find-casing-mismatches.ts`, a szabály indoklása a fájl fejlécében                                                                                    |
 | `check-dependency-graph.sh`       | ellenőrzi, hogy a workspace függőségi gráfja aciklikus-e, és minden éle a SPEC-002 4. szekció rétegbesorolása szerint szigorúan csökkenő rétegszám felé mutat-e; a tényleges logika `src/dependency-graph/`                                                                                       |
 | `e2e-coverage.sh`                 | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                                                                                                                                             |
+| `db-drift.sh`                     | ellenőrzi, hogy a `packages/db` séma (a `.ts` tábla fájlok) és a commitolt `packages/db/drizzle` migrációk szinkronban vannak-e (SPEC-003 10.3 szekció, 15. szekció 36. kritérium); **stdout: csak összegzés, stderr: minden hiba** - lásd lent                                                   |
 | `src/casing/`                     | téma mappa: a `casing.sh` mögötti tényleges ellenőrzés (`check-casing.ts`) és a rá épülő `.spec.ts` regressziós teszt                                                                                                                                                                             |
 | `src/dependency-graph/`           | téma mappa: a `check-dependency-graph.sh` mögötti réteg-hozzárendelés (`package-layer.ts`), a `package.json`-ok beolvasása (`read-workspace-packages.ts`), a tiszta ellenőrző logika (`find-dependency-graph-violations.ts`, `.spec.ts`-sel) és a CLI belépési pont (`check-dependency-graph.ts`) |
 | `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                                                                                                        |
@@ -132,8 +133,21 @@ violations.ts` "hiányzó réteg-hozzárendelés" hibát ad - így egy új csoma
   `bun run check:graph` valós futtatása azóta nulla eltérést ad. Részletek:
   [`../../packages/engine/CLAUDE.md`](../../packages/engine/CLAUDE.md), "Ellentmondás a
   SPEC-002-ben, lezárva".
+- A `db-drift.sh` a `packages/db` könyvtárból `bun x drizzle-kit generate` parancsot
+  futtat, majd a `git status --porcelain packages/db/drizzle` kimenetét nézi: ha üres, a
+  séma és a commitolt migrációk szinkronban vannak (a mért viselkedés szerint séma
+  változás nélkül a `drizzle-kit generate` nem módosítja a `drizzle/` mappát, lásd
+  `docs/research/2026-08-27-spec003-f1-nyitott-kerdesek.md` O-5 szekció). Ha a próba drift
+  miatt új migrációs fájlt hozna létre, a script a diagnosztikai kiírás UTÁN, a kilépés
+  ELŐTT `git checkout` + `git clean -fd` paranccsal visszaállítja a `drizzle/` mappát, hogy
+  a repo munkakönyvtára ne maradjon piszkosan. Ugyanúgy szétválasztja a két kimeneti
+  csatornát, mint az `e2e-coverage.sh`: stdout kizárólag az összegzés, minden diagnosztika
+  a stderr-en. A gyökér `package.json` `check:db-drift` scriptje hívja; **nem** tagja a
+  nyolc kötelező minőségi kapunak, kilencedik, kiegészítő ellenőrzés, a `check:graph`
+  mintájára.
 
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 11. szekció
+- [`../../docs/spec/SPEC-003-domain-perzisztencia.md`](../../docs/spec/SPEC-003-domain-perzisztencia.md), 10.3 szekció, T-003-25
 - [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. szekció, T-002-24
