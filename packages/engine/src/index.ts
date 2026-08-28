@@ -82,6 +82,10 @@ export { validateImplementedNodeTypes } from './run-validation/validate-implemen
 export { validateBranchEdgeKeys } from './run-validation/validate-branch-edge-keys.ts';
 export { validateDefaultBranchKey } from './run-validation/validate-default-branch-key.ts';
 export { validateErrorHandlerEdges } from './run-validation/validate-error-handler-edges.ts';
+// A 4.7 táblázaton kívüli, tizenegyedik config szintű ellenőrzés: a
+// `backoffMs` lista hossza legalább `maxAttempts - 1` (SPEC-004 8.2 3. pont,
+// `insufficient_backoff_list`, PLAN-005 T-005-24).
+export { validateErrorHandlerBackoff } from './run-validation/validate-error-handler-backoff.ts';
 export { validateUnhandledErrorPolicy } from './run-validation/validate-unhandled-error-policy.ts';
 export { validateJoinMergeSettings } from './run-validation/validate-join-merge-settings.ts';
 export { validateReservedBranchKeys } from './run-validation/validate-reserved-branch-keys.ts';
@@ -213,14 +217,9 @@ export { runAgentStep } from './agent-step/run-agent-step.ts';
 // felszabadításával (7. szekció) - ez a téma belső segéde, nincs a barrelben.
 // **A T-005-22 hozzátette a `human_approval` végrehajtóját**, a korlátlan és
 // a korlátos várakozással (5.8), plusz a döntésre várás
-// `ApprovalWaitRegistry`-jét. A kimerítő `switch`-es diszpécsert **még mindig
-// nem** ez a lépés írja meg: a `sub_workflow` (T-005-23) végrehajtója
-// hiányzik, és egy most megírt diszpécser vagy nem lenne kimerítő (lint hiba),
-// vagy kódot nélkülöző placeholder ágat tartalmazna (rossz gyakorlat,
-// `.claude/CLAUDE.md` 5. szekció "nincs hibakezelés lehetetlen esetre" elve
-// fordítva). **A diszpécsert a T-005-24 (error-policy) végrehajtójának kell
-// összeraknia**, miután mind a kilenc ág (a `join` három módjával együtt)
-// elkészült.
+// `ApprovalWaitRegistry`-jét. **A T-005-24 zárta le a témát**: az
+// `error_handler` végrehajtójával és a kimerítő `switch`-es diszpécserrel
+// (`executeNode`), ami mind a tíz végrehajtható node típust lefedi.
 export type { NodeExecutorPorts } from './node-executor/node-executor-ports.ts';
 export type { NodeExecutionInstance } from './node-executor/node-executor-instance.ts';
 export type { NodeExecutionOutcome } from './node-executor/node-executor-outcome.ts';
@@ -266,3 +265,30 @@ export type {
 export { detectWorkflowRecursion } from './node-executor/detect-workflow-recursion.ts';
 export type { ExecuteSubWorkflowInput } from './node-executor/execute-sub-workflow.ts';
 export { executeSubWorkflow } from './node-executor/execute-sub-workflow.ts';
+// T-005-24: az `error_handler` végrehajtója (SPEC-004 8.2), és a téma VÉGSŐ,
+// kimerítő diszpécsere (`executeNode`), ami mind a tíz végrehajtható node
+// típust lefedi (a `join` két módjával kilenc `switch` ág, plusz az
+// `error_handler` külön diszkriminált kérés ága). Ez a `run-supervisor`
+// (T-005-25) belépési pontja egy futtathatónak talált node PÉLDÁNY
+// végrehajtásához.
+export type { ExecuteErrorHandlerInput } from './node-executor/execute-error-handler.ts';
+export { executeErrorHandler } from './node-executor/execute-error-handler.ts';
+export type { NodeExecutorDependencies } from './node-executor/node-executor-dependencies.ts';
+export type { ExecuteNodeRequest } from './node-executor/execute-node-request.ts';
+export { executeNode } from './node-executor/execute-node.ts';
+
+// error-policy: az `on_error` útvonal, az `error_handler` kísérlet vezérlése,
+// a `fail_run` és a `fail_branch` politika, és a futás záró állapota
+// (SPEC-004 8.1 ... 8.4, PLAN-005 T-005-24). Tiszta függvények: a téma
+// egyetlen sora sem érint adatbázist, nem hív portot és nem szakít meg
+// futó lépést - csak kimondja a döntést, amit a `run-supervisor` (T-005-25)
+// hajt végre.
+export type { ErrorRoute } from './error-policy/error-route.ts';
+export type { FailureEscapeKey, ResolveErrorRouteInput } from './error-policy/resolve-error-route.ts';
+export { resolveErrorRoute } from './error-policy/resolve-error-route.ts';
+export type { RetryDecision } from './error-policy/retry-decision.ts';
+export type { ResolveRetryDecisionInput } from './error-policy/resolve-retry-decision.ts';
+export { resolveRetryDecision } from './error-policy/resolve-retry-decision.ts';
+export type { UnhandledErrorRecord } from './error-policy/unhandled-error-record.ts';
+export type { RunCompletion } from './error-policy/run-completion.ts';
+export { resolveRunCompletion } from './error-policy/resolve-run-completion.ts';
