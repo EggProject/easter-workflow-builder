@@ -9,6 +9,7 @@ import { createWorkflowRunRepository } from '../workflow-run/workflow-run-reposi
 import { createStepRunRepository } from '../step-run/step-run-repository.ts';
 import { createAppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import { createProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
+import { createRunEventRepository } from '../run-event/run-event-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -92,8 +93,9 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const workflows = createWorkflowRepository(database, transaction);
   const runs = createWorkflowRunRepository(database, transaction);
   const stepRuns = createStepRunRepository(database, transaction);
+  const events = createRunEventRepository(database, transaction);
   const settings = createAppSettingRepository(database, transaction);
   const concurrencyLimits = createProviderConcurrencyRepository(database, transaction);
 
-  return { kind: 'ok', value: { workflows, runs, stepRuns, settings, concurrencyLimits, transaction, close } };
+  return { kind: 'ok', value: { workflows, runs, stepRuns, events, settings, concurrencyLimits, transaction, close } };
 }

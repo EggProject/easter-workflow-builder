@@ -53,6 +53,23 @@ export type {
   StepRunRecord,
 } from './step-run/step-run-repository.ts';
 
+// run-event: a RunEventRepository publikus felülete (T-003-21). A factory
+// függvényt (`createRunEventRepository`) szándékosan nem exportáljuk, csak a
+// típust, ugyanaz a minta, mint a `WorkflowRunRepository`-nél (SPEC-002 6.6
+// 5. szabálya, SPEC-003 9.3 szekció). A `RunEventKind`/`isRunEventKind` is
+// itt kerül ki először a barrelbe (eddig csak a téma mappán belül élt).
+export type {
+  RunEventRepository,
+  EngineRunEventKind,
+  AppendSdkEventInput,
+  AppendSdkEventResult,
+  AppendEngineEventInput,
+  RunEventRecord,
+  RunEventTokenAggregate,
+} from './run-event/run-event-repository.ts';
+export type { RunEventKind } from './run-event/run-event-kind.ts';
+export { isRunEventKind } from './run-event/is-run-event-kind.ts';
+
 // app-setting: az AppSettingRepository publikus felülete (T-003-23). A
 // factory függvényt (`createAppSettingRepository`) szándékosan nem
 // exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
