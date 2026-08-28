@@ -556,6 +556,41 @@ describe('createStepRunRepository', () => {
       sqlite.close();
     });
 
+    it('markStepInterrupted: pending, running és waiting_approval állapotból is engedett, beállítja a finishedAtMs mezőt', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+
+      const fromPending = create(repository, 'run-1', { nodeId: 'a' });
+      const interruptedFromPending = okOrThrow(repository.markStepInterrupted(fromPending.id));
+      expect(interruptedFromPending.status).toBe('interrupted');
+      expect(interruptedFromPending.finishedAtMs).toBeInstanceOf(Date);
+
+      const fromRunning = create(repository, 'run-1', { nodeId: 'b' });
+      okOrThrow(repository.markStepRunning(fromRunning.id));
+      expect(okOrThrow(repository.markStepInterrupted(fromRunning.id)).status).toBe('interrupted');
+
+      const fromWaiting = create(repository, 'run-1', { nodeId: 'c', nodeType: 'human_approval' });
+      okOrThrow(repository.markStepRunning(fromWaiting.id));
+      okOrThrow(repository.markStepWaitingApproval(fromWaiting.id));
+      expect(okOrThrow(repository.markStepInterrupted(fromWaiting.id)).status).toBe('interrupted');
+
+      sqlite.close();
+    });
+
+    it('markStepInterrupted illegal_status_transition hibaágat ad terminális állapotból', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      const step = create(repository, 'run-1');
+      okOrThrow(repository.markStepRunning(step.id));
+      okOrThrow(repository.markStepSucceeded(step.id));
+
+      expect(errorOrThrow(repository.markStepInterrupted(step.id))).toContain('illegal_status_transition');
+
+      sqlite.close();
+    });
+
     it('a token oszlopok a terminális átmenettel egyszer íródnak, és utána nem módosíthatók', () => {
       const { sqlite, database, repository } = openRepository();
       insertWorkflow(database, 'w1');
