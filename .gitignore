@@ -36,6 +36,7 @@ npm-debug.log*
 bun-debug.log*
 
 # adatbázis
+.data/
 *.sqlite
 *.sqlite-journal
 *.sqlite-wal
