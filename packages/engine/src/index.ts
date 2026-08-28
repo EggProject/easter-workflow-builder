@@ -59,3 +59,7 @@ export type { BranchScope, BranchContext } from './branch-scope/branch-scope.ts'
 export type { StaticScopeFrame, StaticScopeStack } from './branch-scope/static-scope-stack.ts';
 export type { FanOutJoinPairing } from './branch-scope/fan-out-join-pairing.ts';
 export { validateScopeBalance } from './branch-scope/validate-scope-balance.ts';
+
+// provider-resolution: a háromszintű provider feloldás (SPEC-004 11.1,
+// PLAN-005 T-005-12).
+export { resolveEffectiveProvider } from './provider-resolution/resolve-effective-provider.ts';
