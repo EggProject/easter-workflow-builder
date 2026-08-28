@@ -38,3 +38,17 @@ export type {
   StartRunParentContext,
   WorkflowRunRecord,
 } from './workflow-run/workflow-run-repository.ts';
+
+// step-run: a StepRunRepository publikus felülete (T-003-18). A factory
+// függvényt (`createStepRunRepository`) szándékosan nem exportáljuk, csak a
+// típust, ugyanaz a minta, mint a `WorkflowRunRepository`-nél (SPEC-002 6.6
+// 5. szabálya, SPEC-003 9.3 szekció).
+export type {
+  StepRunRepository,
+  CreateStepRunInput,
+  StepRunTokenUsage,
+  MarkStepSucceededInput,
+  MarkStepFailedInput,
+  AttachSessionInput,
+  StepRunRecord,
+} from './step-run/step-run-repository.ts';
