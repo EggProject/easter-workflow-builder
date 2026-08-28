@@ -61,6 +61,63 @@ function query(args: { prompt: string | AsyncIterable<SDKUserMessage>; options?:
   (`includeHookEvents: true`), `SDKInformationalMessage`, `SDKCommandsChangedMessage`,
   `SDKRateLimitEvent`, `SDKContextUsage`
 
+### Az `SDKMessage` ágak drótalakja és a normalizáláshoz használt mezők
+
+A fenti felsorolás az SDK **típusneveit** adja. A `run_event` tábla normalizálásához
+(SPEC-003 6.2 és 6.4 szekció) a `type` és a `subtype` mező tényleges **értéke** kell, ezt a
+pinelt csomag saját típusdefiníciója rögzíti szó szerint. Forrás:
+https://unpkg.com/@anthropic-ai/claude-agent-sdk@0.3.245/sdk.d.ts (8347 sor; a
+`tools/wire-probe/node_modules` alá telepített példány ezzel bájtra egyező).
+
+| SDK típus                    | `type`             | `subtype`                                                                                                  |
+| ---------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `SDKSystemMessage`           | `system`           | `init`                                                                                                     |
+| `SDKAssistantMessage`        | `assistant`        | nincs                                                                                                      |
+| `SDKUserMessage`             | `user`             | nincs                                                                                                      |
+| `SDKPartialAssistantMessage` | `stream_event`     | nincs                                                                                                      |
+| `SDKResultSuccess`           | `result`           | `success`                                                                                                  |
+| `SDKResultError`             | `result`           | `error_during_execution`, `error_max_turns`, `error_max_budget_usd`, `error_max_structured_output_retries` |
+| `SDKHookStartedMessage`      | `system`           | `hook_started`                                                                                             |
+| `SDKHookProgressMessage`     | `system`           | `hook_progress`                                                                                            |
+| `SDKHookResponseMessage`     | `system`           | `hook_response`                                                                                            |
+| `SDKInformationalMessage`    | `system`           | `informational`                                                                                            |
+| `SDKCommandsChangedMessage`  | `system`           | `commands_changed`                                                                                         |
+| `SDKRateLimitEvent`          | `rate_limit_event` | nincs                                                                                                      |
+
+Két pontosítás a fenti, típusnév szerinti felsoroláshoz képest:
+
+1. **Az öt observability üzenet `type` mezője `system`**, nem saját top-level típus; kizárólag a
+   `subtype` különbözteti meg őket a `system` `init` üzenettől. Egyedül az `SDKRateLimitEvent`
+   visel saját top-level `type` értéket (`rate_limit_event`).
+2. **Az `SDKContextUsage` nem `SDKMessage` ág.** A 0.3.245 `SDKMessage` uniójában nem szerepel; a
+   típus az `SDKAssistantMessage.context_usage` opcionális mezőjének az alakja. `context_usage`
+   értékű `type` vagy `subtype` a csomagban nem létezik (a `get_context_usage` egy control request
+   subtype, nem SDKMessage). Ezért erre a `SPEC-003` 6.4 listájában szereplő `sdk_context_usage`
+   `kind` értékre ebben az SDK verzióban nincs leképezés.
+
+A normalizálás által olvasott mezők, ugyanebből a forrásból:
+
+- `session_id: string` és `uuid: UUID` mind a fenti ágon; az `SDKUserMessage`-en mindkettő
+  **opcionális** (`uuid?`, `session_id?`).
+- `parent_tool_use_id: string | null` az `assistant`, a `user` és a `stream_event` ágon.
+- `num_turns: number` és `total_cost_usd: number` a `result` ágon.
+- `usage`: a `result` ágon top-level mező (`NonNullableUsage`), az `assistant` ágon a beágyazott
+  Anthropic `Message` objektumon (`message.usage`, `BetaMessage`).
+
+Az asszisztens üzenet `message.content` **tömb**, elemei `type` diszkriminátorú content blokkok, és
+a `tool_use` blokk `id`, `name` és `input` mezőt hordoz. Elsődleges forrás:
+https://unpkg.com/@anthropic-ai/sdk@0.120.0/resources/beta/messages/messages.d.ts
+(`BetaToolUseBlock`, `BetaMessage.content: Array<BetaContentBlock>`, `BetaMessage.usage: BetaUsage`).
+Megerősítés: https://docs.claude.com/en/docs/agents-and-tools/tool-use/handle-tool-calls
+("`id`: A unique identifier for this particular tool use block", `name`, `input`) és
+https://docs.claude.com/en/docs/build-with-claude/streaming
+(`{"type":"tool_use","id":"toolu_01T1x1fJ34qAmk2tNTrN7Up6","name":"get_weather","input":{}}`).
+
+A négy `usage` mezőnév (`input_tokens`, `output_tokens`, `cache_read_input_tokens`,
+`cache_creation_input_tokens`) ugyanebben a `BetaUsage` definícióban áll, megerősítve a
+https://docs.claude.com/en/docs/build-with-claude/prompt-caching oldal "Tracking cache performance"
+JSON példájával és a fenti streaming oldal `message_start` eseményével.
+
 ### Session kezelés
 
 - `continue: true` legutóbbi session folytatása
