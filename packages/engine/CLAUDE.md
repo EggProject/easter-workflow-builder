@@ -6,11 +6,12 @@ DAG ütemező, node végrehajtók, hibakezelés és a párhuzamossági szabályo
 motor (SPEC-004). A csomag **egy tárgykörű**, ezért a téma mappák közvetlenül a `src/` alatt
 állnak, egy szint mélyen, tárgykör mappa nélkül (SPEC-004 12. szekció).
 
-A csomag a PLAN-005 F3 fázisában épül fel, lépésenként egy-egy téma mappával. Ma négy téma áll
+A csomag a PLAN-005 F3 fázisában épül fel, lépésenként egy-egy téma mappával. Ma öt téma áll
 készen: a kilenc befecskendezett port típusa és a motor hibaosztályainak szótára (T-005-8), a
-motor eseményei (T-005-9), és a végrehajtható gráf szerkezete a gráf alak ellenőrzéseivel
-(T-005-10). A tényleges ütemező, a node végrehajtók és a spec 12. szekciójában felsorolt további
-téma mappák a PLAN-005 hátralévő lépéseiben készülnek.
+motor eseményei (T-005-9), a végrehajtható gráf szerkezete a gráf alak ellenőrzéseivel
+(T-005-10) és az ág hatókör verem a kiegyensúlyozottság ellenőrzésével (T-005-11). A tényleges
+ütemező, a node végrehajtók és a spec 12. szekciójában felsorolt további téma mappák a PLAN-005
+hátralévő lépéseiben készülnek.
 
 ## Fájlok
 
@@ -20,6 +21,7 @@ téma mappák a PLAN-005 hátralévő lépéseiben készülnek.
 | `engine-error/` | a motor hibaosztályainak `EngineErrorKind` uniója (nyitott, később bővülhet), az `isEngineErrorKind` guard és a `formatEngineErrorMessage` hibaüzenet formázó (F-24 konvenció), mindkettő saját `.spec.ts` párral                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `engine-event/` | a 13, motor eredetű `run_event` `kind` payload alakja (egy fájl egy payload típus), az összefogó `EngineEvent` diszkriminált unió és a `writeEngineEvent` motor esemény író, ami a `database.events.appendEngineEvent`-et hívja, `occurredAtMs`-t a `clock` portból számítva (SPEC-004 13. szekció, PLAN-005 T-005-9). A `StepStartedPayload` ma csak az öt kötelező mezőt hordozza; a SPEC-004 11.3 táblázat jelölő mezőit a `capability-policy` téma (T-005-13) veszi fel egy KÉSŐBBI lépésben. Az `EngineEvent['kind']` unió pontosan 13 tagú tesztje és a `writeEngineEvent` `.spec.ts`-e valós `:memory:` adatbázis ellen fut |
 | `run-graph/`    | a pillanatkép átindexelése `ExecutableGraph` alakra (`buildExecutableGraph`), a visszaél keresés (`findLoopBackEdges`), a kör keresés a visszaélek elhagyása után (`detectGraphCycle`), a `loop` node alakjának két ellenőrzése (`validateLoopBackEdgeBody`, `validateLoopBranchEdges`) és az elérhetőség számítás (`computeReachableNodeIds`), a SPEC-004 4.1 és 4.6 szekciója szerint (PLAN-005 T-005-10). Tiszta függvények, a téma egyetlen sora sem érint adatbázist. Az `executable-graph.ts` **típus-only, nincs `.spec.ts`**                                                                                               |
+| `branch-scope/` | a hatókör verem két alakja (`branch-scope.ts` a futáskori, `static-scope-stack.ts` a futás indítás előtti, validációs), a `validateScopeBalance` kiegyensúlyozottság ellenőrzés és a belőle levezetett `FanOutJoinPairing` (SPEC-004 4.3 és 4.5, PLAN-005 T-005-11). Tiszta függvény, adatbázis nélkül. A három típusfájl **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                         |
 
 ## Függőségi irány
 
@@ -66,6 +68,26 @@ SPEC-004 4.6 szekció négy lépését végzi el. Ami tudatosan kimarad: a `dang
 nyers halmaza tartozik), a hatókör verem és a fan-out/join párosítás (`branch-scope` téma,
 T-005-11), és a node config vizsgálata (a `SnapshotNode.config` `unknown` marad, a node típusa a
 típusos `type` mezőből jön).
+
+**A `branch-scope` téma két alakja.** A `BranchScope` a **futáskori** verem (SPEC-004 4.3 szó
+szerinti alakja), amiben a bejegyzést nyitó lépés `stepRunId` értéke áll; ezt a `run-context` és a
+`scheduling` téma tölti majd fel (T-005-16, T-005-17). A `StaticScopeFrame` ugyanannak a veremnek a
+**futás indítás előtti** alakja: ott még nincs `step_run` sor (SPEC-004 4.8, "Az 1 ... 5. lépés
+egyetlen adatot sem ír"), ezért a keret a hatókört nyitó gráf csomópont azonosítóját hordozza. A
+két alak ugyanazt a fogalmat írja le, más életciklusban, ezért a validáció nem tudja a futáskori
+típust használni.
+
+**Két értelmezési döntés a hatókör bejárásban**, mindkettő a SPEC-004 szövegéből vezetve, mert a
+spec nem mondja ki tételesen:
+
+- A terminális node ellenőrzése **kizárólag a `fan_out` keretet** nézi, ahogy a 4.5 szekció írja, a
+  `loop` keretet nem. A visszaél elhagyása után a ciklustörzs visszaélt kibocsátó node-ja
+  terminálisnak látszana, nyitott `loop` kerettel, holott a ciklus a saját `exit` ágán szabályosan
+  zár. Ugyanezért áll a terminális jelző a **teljes** kimenő él listán, a visszaéleket is
+  beleértve: a visszaél futásidőben valódi folytatás (4.6).
+- A `fan_out` node `on_error` éle **nem** kap új hatókör keretet, minden más kimenő éle igen. A 4.4 5. pontja szerint a hibára futó példány az `on_error` élére tesz `live` jelölést, tehát nem bomlik
+  elemekre és nem is nyit hatókört; keret nélkül a hibaág vissza tud találkozni a `join` utáni
+  ágakkal, kerettel viszont minden ilyen gráf `unbalanced_fan_out_scope` hibát adna.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

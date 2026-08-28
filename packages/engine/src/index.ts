@@ -51,3 +51,11 @@ export { findLoopBackEdges } from './run-graph/find-loop-back-edges.ts';
 export { detectGraphCycle } from './run-graph/detect-graph-cycle.ts';
 export { validateLoopBackEdgeBody } from './run-graph/validate-loop-back-edge-body.ts';
 export { validateLoopBranchEdges } from './run-graph/validate-loop-branch-edges.ts';
+
+// branch-scope: a futáskori hatókör verem típusa, a statikus, validációs
+// párja, a hatókör kiegyensúlyozottság ellenőrzése és a belőle levezetett
+// fan-out/join párosítás (SPEC-004 4.3, 4.5, PLAN-005 T-005-11).
+export type { BranchScope, BranchContext } from './branch-scope/branch-scope.ts';
+export type { StaticScopeFrame, StaticScopeStack } from './branch-scope/static-scope-stack.ts';
+export type { FanOutJoinPairing } from './branch-scope/fan-out-join-pairing.ts';
+export { validateScopeBalance } from './branch-scope/validate-scope-balance.ts';
