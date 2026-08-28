@@ -21,6 +21,7 @@ export default defineConfig({
     './src/workflow-graph/workflow-edge.ts',
     './src/graph-snapshot/graph-snapshot.ts',
     './src/workflow-run/workflow-run.ts',
+    './src/step-run/step-run.ts',
   ],
   out: './drizzle',
 });
