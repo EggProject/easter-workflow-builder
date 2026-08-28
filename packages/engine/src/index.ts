@@ -162,3 +162,12 @@ export { resolveFanOutItem } from './scheduling/resolve-fan-out-item.ts';
 export { collectJoinInputs } from './scheduling/collect-join-inputs.ts';
 export { buildFanOutItemContext } from './scheduling/build-fan-out-item-context.ts';
 export { buildScopedKey } from './scheduling/build-scoped-key.ts';
+
+// concurrency-gate: a providerenkénti, minden futásra közös, szigorúan
+// érkezési sorrendű párhuzamossági szabályozó, a hely kérésével és
+// felszabadításával (SPEC-004 7.1 ... 7.3, PLAN-005 T-005-18). A korlátot a
+// `ConcurrencyLimitLookup` adja, tehát a téma egyetlen sora sem érint
+// adatbázist, és nem szerepel benne párhuzamossági szám.
+export type { ConcurrencyGate } from './concurrency-gate/concurrency-gate.ts';
+export type { ConcurrencyLimitLookup } from './concurrency-gate/concurrency-limit-lookup.ts';
+export { createConcurrencyGate } from './concurrency-gate/create-concurrency-gate.ts';
