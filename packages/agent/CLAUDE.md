@@ -14,19 +14,30 @@ fordítási idejű ellenőrzés őrzi.
 
 ## Fájlok
 
-| Mappa           | Felelősség                                                                                                                                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `query-runner/` | a futtató port három típusa (`AgentQueryRequest`, `AgentQuery`, `AgentQueryRunner`), az SDK függvény port-kompatibilis alakja, a `createAgentQueryRunner` adapter, és a fordítási idejű őr, ami az SDK illeszkedését ellenőrzi |
+| Mappa                | Felelősség                                                                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `query-runner/`      | a futtató port három típusa (`AgentQueryRequest`, `AgentQuery`, `AgentQueryRunner`), az SDK függvény port-kompatibilis alakja, a `createAgentQueryRunner` adapter, és a fordítási idejű őr, ami az SDK illeszkedését ellenőrzi                                                       |
+| `sdk-message-shape/` | a `messages: AsyncIterable<unknown>` folyamból a motor által ténylegesen kiolvasott három dolog typeguardja: a `system` `init` üzenet `session_id`-je, a `result` üzenet öt lehetséges `subtype` értéke, és a `structured_output` mező jelenléte (SPEC-004 3.3, 2. szekció F-3 tény) |
 
 A `query-runner/` hat típus-only fájljához nincs `.spec.ts` (SPEC-002 6.3 pont); az egyetlen
 futásidejű sort tartalmazó fájl a `create-agent-query-runner.ts`, aminek a `.spec.ts` párja
 mellette áll.
 
+Az `sdk-message-shape/` három típus-only fájlja (`sdk-system-init-message.ts`,
+`sdk-result-subtype.ts`, `sdk-result-message.ts`) mellé nem tartozik `.spec.ts` (SPEC-002 6.3
+pont); a másik négy fájl futtatható sort tartalmaz (három typeguard és a `hasStructuredOutput`
+segédfüggvény), mindegyik a `.spec.ts` párjával együtt.
+
 ## Függőségi irány
 
 Az `agent` a `core`, a `logger`, a `provider-registry` és az `agent-tool-bundle` csomagtól
-függhet (SPEC-002 4. szekció), L4 réteg. A `package.json` ma a `core`, a `logger` és a
-`provider-registry` workspace csomagot listázza, plusz külső függőségként az Agent SDK-t. Az
+függhet (SPEC-002 4. szekció), L4 réteg. A `package.json` ma a `core`, a `logger`, a
+`provider-registry` és a `typeguards` workspace csomagot listázza, plusz külső függőségként az
+Agent SDK-t. A `typeguards` (L0) felvétele az `sdk-message-shape/` téma typeguardjaihoz kellett
+(`isRecord`, `isString`); ugyanez a minta a `packages/db` csomagban is áll, ami szintén nem
+szerepelt a SPEC-002 4. szekció "cél csomagtérkép" pillanatképében, mégis felvette a `typeguards`
+függőséget, mert a "kötelező a meglévő typeguardot használni, nem újraírni" szabály (gyökér
+`CLAUDE.md` 7., `.claude/CLAUDE.md` 5.) erősebb, mint egy tervezési pillanatkép. Az
 `agent-tool-bundle` felvétele a naplózási és eszközkötési tárgykör későbbi specifikációjának a
 feladata.
 

@@ -1,6 +1,8 @@
-// Barrel: csak nevesített újraexport. A csomag egyetlen témája ma a
-// `query-runner`: a motorba befecskendezett futtató port típusai és a valódi
-// Agent SDK `query()` függvényét paraméterként fogadó adapter (SPEC-004 3.3).
+// Barrel: csak nevesített újraexport. A csomag két témája: a `query-runner`
+// (a motorba befecskendezett futtató port típusai és a valódi Agent SDK
+// `query()` függvényét paraméterként fogadó adapter) és az `sdk-message-shape`
+// (a `messages: AsyncIterable<unknown>` folyamból a motor által ténylegesen
+// kiolvasott mezők typeguardjai), SPEC-004 3.3.
 
 // A port szerződése, amit a motor (L5) importál.
 export type { AgentQueryRequest } from './query-runner/agent-query-request.ts';
@@ -12,3 +14,15 @@ export type { AgentQueryRunner } from './query-runner/agent-query-runner.ts';
 export type { SdkQueryHandle } from './query-runner/sdk-query-handle.ts';
 export type { SdkQueryFunction } from './query-runner/sdk-query-function.ts';
 export { createAgentQueryRunner } from './query-runner/create-agent-query-runner.ts';
+
+// A `system` `init` üzenet alakja, amiből a motor a `session_id`-t olvassa.
+export type { SdkSystemInitMessage } from './sdk-message-shape/sdk-system-init-message.ts';
+export { isSdkSystemInitMessage } from './sdk-message-shape/is-sdk-system-init-message.ts';
+
+// A `result` üzenet `subtype` értékkészlete és alakja, plusz a strukturált
+// kimenet jelenlétét eldöntő segédfüggvény.
+export type { SdkResultSubtype } from './sdk-message-shape/sdk-result-subtype.ts';
+export { isSdkResultSubtype } from './sdk-message-shape/is-sdk-result-subtype.ts';
+export type { SdkResultMessage } from './sdk-message-shape/sdk-result-message.ts';
+export { isSdkResultMessage } from './sdk-message-shape/is-sdk-result-message.ts';
+export { hasStructuredOutput } from './sdk-message-shape/has-structured-output.ts';
