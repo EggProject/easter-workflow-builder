@@ -10,6 +10,7 @@ import { readGraphSnapshot } from '../graph-snapshot/read-graph-snapshot.ts';
 import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import type { GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
 import { isStringArray } from '../workflow-graph/is-string-array.ts';
+import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import { canTransitionRunStatus } from './can-transition-run-status.ts';
 import { isRunStatus } from './is-run-status.ts';
@@ -229,6 +230,29 @@ export function createWorkflowRunRepository(
   }
 
   /**
+   * A globális `persist_stream_deltas` beállítás olvasása, ugyanabban a
+   * tranzakcióban, mint a `startRun` többi lépése (SPEC-003 6.6 szekció:
+   * "A `startRun` a saját tranzakcióján belül olvassa ki az akkor érvényes
+   * globális beállítást, és beírja a futás sorába"). Nem az
+   * `AppSettingRepository.readSettings()`-et hívja: az egy saját, önálló
+   * `transaction()` hívást indítana ugyanazon a `better-sqlite3` kapcsolaton,
+   * amíg a `startRun` tranzakciója már fut - ehelyett közvetlen, típusos
+   * `select` az `app_setting` táblára, ugyanaz az elv, mint a
+   * `readStoredCanonicalText`-nél (a `graph_snapshot` táblát is közvetlenül
+   * olvassa a saját fájlján belül, nem egy másik repository-n át). Üres
+   * táblán (nincs sor, 4.13 szekció "A sor életciklusa") a séma szintű
+   * `DEFAULT`-tal egyező hamis alapértéket ad.
+   */
+  function isPersistStreamDeltasEnabled(): boolean {
+    const row = database
+      .select({ persistStreamDeltas: appSettingTable.persistStreamDeltas })
+      .from(appSettingTable)
+      .where(eq(appSettingTable.id, APP_SETTING_ROW_ID))
+      .get();
+    return row === undefined ? false : row.persistStreamDeltas;
+  }
+
+  /**
    * `startRun`, az egyetlen beszúrási út a `workflow_run` táblára (SPEC-003
    * 15. kritérium). Egy tranzakcióban:
    *
@@ -247,7 +271,12 @@ export function createWorkflowRunRepository(
    *    lett, és a 45. kritérium (`crypto.hash('sha256', document) = hash`
    *    minden sorra) sérülne. A nyers `sql` INSERT a kanonikus szöveget
    *    változtatás nélkül, bájtra pontosan írja be a `document` oszlopba.
-   * 3. A delta kapcsoló NYITOTT PONT (lásd lent).
+   * 3. A delta kapcsoló befagyasztása: a globális `app_setting.persist_stream_deltas`
+   *    beállítás olvasása ugyanebben a tranzakcióban (`isPersistStreamDeltasEnabled`,
+   *    lent), és az akkor érvényes érték beírása a `workflow_run.persisted_stream_deltas`
+   *    oszlopba (SPEC-003 6.6 szekció, "Futás közben nem változhat"; T-003-23
+   *    zárta le a korábbi NYITOTT PONTot, ami a szállított hamis alapértéket
+   *    írta be helyette).
    * 4. A `workflow_run` sor beszúrása, `status: 'pending'` kezdő állapottal
    *    (7.1 táblázat): a `startRun` nem viszi `running`-ba, azt a motor teszi
    *    a `markRunRunning` hívással, amikor ténylegesen elindítja az első
@@ -294,14 +323,10 @@ export function createWorkflowRunRepository(
         depth,
         workflowAncestry,
         graphSnapshotHash: hash,
-        // NYITOTT PONT (T-003-23 zárja le): a globális `persist_stream_deltas`
-        // beállítás (`app_setting` tábla) ebben a fázisban (F5) még nem
-        // létezik, tehát itt nem olvasható ki. A `startRun` addig a
-        // specifikáció szerinti szállított hamis alapértéket írja a futás
-        // sorába (SPEC-003 6.6 szekció, PLAN-003 F5 fázis bevezető szövege
-        // és a T-003-16 sora utáni bekezdés). A T-003-23 köti be a tényleges
-        // beállítás olvasását, ugyanide.
-        persistedStreamDeltas: false,
+        // A globális beállítás befagyasztott értéke, ugyanebben a
+        // tranzakcióban olvasva (lásd `isPersistStreamDeltasEnabled` fent,
+        // SPEC-003 6.6 szekció, 38. és 57. kritérium).
+        persistedStreamDeltas: isPersistStreamDeltasEnabled(),
         // `input.restartedFromRunId` a `StartRunInput`-ban opcionális
         // (`?: string`, tehát hiányzó mezőnél `undefined`), a DB oszlop
         // viszont nullázható (`string | null`, SPEC-003 4.8): a `null` itt

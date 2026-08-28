@@ -22,6 +22,8 @@ export default defineConfig({
     './src/graph-snapshot/graph-snapshot.ts',
     './src/workflow-run/workflow-run.ts',
     './src/step-run/step-run.ts',
+    './src/app-setting/app-setting.ts',
+    './src/provider-concurrency/provider-concurrency.ts',
   ],
   out: './drizzle',
 });

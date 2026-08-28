@@ -11,6 +11,7 @@ import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import { canonicalizeSnapshotDocument } from '../graph-snapshot/canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
 import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
+import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import {
   createWorkflowRunRepository,
@@ -205,6 +206,40 @@ describe('createWorkflowRunRepository', () => {
       const restarted = start(repository, 'w1', 'V1', { restartedFromRunId: original.id });
 
       expect(restarted.restartedFromRunId).toBe(original.id);
+
+      sqlite.close();
+    });
+
+    it('a globális persist_stream_deltas beállítást fagyasztja be indításkor; a későbbi átállítás a már elindult futást nem érinti (38., 57. kritérium)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+
+      // Nincs még app_setting sor, tehát a séma szintű hamis alapérték él
+      // (4.13 szekció, "A sor életciklusa").
+      const first = start(repository, 'w1', 'Elso');
+      expect(first.persistedStreamDeltas).toBe(false);
+
+      // Globális átállítás igazra, közvetlen upsert az app_setting táblára:
+      // ez a teszt a WorkflowRunRepository-t önmagában, AppSettingRepository
+      // nélkül teszteli, ugyanúgy, ahogy a korrupt adat teszteknél is a nyers
+      // `database`-t használja.
+      database
+        .insert(appSettingTable)
+        .values({ id: APP_SETTING_ROW_ID, persistStreamDeltas: true, updatedAtMs: new Date(0) })
+        .onConflictDoUpdate({
+          target: appSettingTable.id,
+          set: { persistStreamDeltas: true, updatedAtMs: new Date(0) },
+        })
+        .run();
+
+      const second = start(repository, 'w1', 'Masodik');
+      expect(second.persistedStreamDeltas).toBe(true);
+
+      // Az első futás visszaolvasva továbbra is a saját, indításkor
+      // befagyasztott értékét mutatja, nem a globális beállítás új állását
+      // (SPEC-003 6.6 szekció, "Futás közben nem változhat").
+      const rereadFirst = okOrThrow(repository.getRun(first.id));
+      expect(rereadFirst.persistedStreamDeltas).toBe(false);
 
       sqlite.close();
     });

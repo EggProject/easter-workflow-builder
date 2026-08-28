@@ -7,6 +7,8 @@ import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { createWorkflowRepository } from '../workflow-graph/workflow-repository.ts';
 import { createWorkflowRunRepository } from '../workflow-run/workflow-run-repository.ts';
 import { createStepRunRepository } from '../step-run/step-run-repository.ts';
+import { createAppSettingRepository } from '../app-setting/app-setting-repository.ts';
+import { createProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -90,6 +92,8 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const workflows = createWorkflowRepository(database, transaction);
   const runs = createWorkflowRunRepository(database, transaction);
   const stepRuns = createStepRunRepository(database, transaction);
+  const settings = createAppSettingRepository(database, transaction);
+  const concurrencyLimits = createProviderConcurrencyRepository(database, transaction);
 
-  return { kind: 'ok', value: { workflows, runs, stepRuns, transaction, close } };
+  return { kind: 'ok', value: { workflows, runs, stepRuns, settings, concurrencyLimits, transaction, close } };
 }
