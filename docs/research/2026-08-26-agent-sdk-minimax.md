@@ -146,6 +146,23 @@ közös `decision` / `reason` / `continue` mezőkkel.
 A `stop_hook_active` input mező jelzi, ha már egy blokkolás miatt fut, ezzel védhető a loop.
 Ez a mechanizmus a projektben a kötelező `emit_output` tool kikényszerítésére szolgál.
 
+**A `HookCallbackMatcher` alakja** (2026-08-28-i kiegészítés, a motor `agent-step` témájához). Az
+`Options.hooks` értéke eseménynév szerinti rekord, aminek az értéke matcher objektumok **tömbje**.
+A matcher mezői: `hooks: HookCallback[]` **kötelező**, `matcher?: string` és `timeout?: number`
+(másodpercben) opcionális. TypeScript alak, szó szerint a hivatalos példából:
+`hooks: { PreToolUse: [{ matcher: "Write|Edit", hooks: [protectEnvFiles] }] }`, matcher nélkül
+`{ hooks: [globalLogger] }`. A `Stop` esemény a `matcher` mintát **figyelmen kívül hagyja**, tehát
+`Stop` alatt a bejegyzés kizárólag a visszahívást hordozza.
+
+A `Stop` hook JSON kimenete: `decision` értéke `"block"` vagy hiányzik, és `"block"` mellett a
+`reason` **kötelező**; a `reason` mondja meg a modellnek, mit tegyen tovább.
+
+Források (elsődleges plusz két független megerősítés):
+https://code.claude.com/docs/en/agent-sdk/hooks ("Configure hooks", "Matchers" táblázat és a "Hook
+not firing" szakasz, ami a `Stop` matcher figyelmen kívül hagyását kimondja),
+https://platform.claude.com/docs/en/agent-sdk/typescript (`HookCallbackMatcher`),
+https://code.claude.com/docs/en/hooks (a `Stop` esemény JSON kimenete, `decision` és `reason`).
+
 ### In-process MCP tool
 
 ```ts

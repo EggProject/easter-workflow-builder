@@ -1,0 +1,87 @@
+{
+  "megjegyzes": "Commitolt SDK uzenet sorozatok az agent lepes tesztjeihez (SPEC-004 14.1, 67. elfogadasi kriterium). A `type` es a `subtype` ertekek szo szerint a 2. szekcio F-3 tablazatabol valok. A fajl sem kulcsot, sem valos szolgaltatoi valaszszoveget nem tartalmaz.",
+  "sikeres": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "session-uj-1",
+      "uuid": "fixture-sikeres-1"
+    },
+    {
+      "type": "assistant",
+      "session_id": "session-uj-1",
+      "uuid": "fixture-sikeres-2",
+      "message": { "content": [] }
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "session_id": "session-uj-1",
+      "uuid": "fixture-sikeres-3",
+      "num_turns": 3,
+      "usage": {
+        "input_tokens": 11,
+        "output_tokens": 22,
+        "cache_read_input_tokens": 33,
+        "cache_creation_input_tokens": 44
+      },
+      "structured_output": { "osszeg": 4 }
+    }
+  ],
+  "strukturaltKimenetNelkul": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "session-uj-2",
+      "uuid": "fixture-kimenet-nelkul-1"
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "session_id": "session-uj-2",
+      "uuid": "fixture-kimenet-nelkul-2",
+      "num_turns": 2,
+      "usage": {
+        "input_tokens": 1,
+        "output_tokens": 2,
+        "cache_read_input_tokens": 3,
+        "cache_creation_input_tokens": 4
+      }
+    }
+  ],
+  "hibasSubtype": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "session-uj-3",
+      "uuid": "fixture-hibas-1"
+    },
+    {
+      "type": "result",
+      "subtype": "error_max_turns",
+      "session_id": "session-uj-3",
+      "uuid": "fixture-hibas-2",
+      "num_turns": 8,
+      "usage": {
+        "input_tokens": 5,
+        "output_tokens": 6,
+        "cache_read_input_tokens": 7,
+        "cache_creation_input_tokens": 8
+      }
+    }
+  ],
+  "resultNelkul": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "session-uj-4",
+      "uuid": "fixture-result-nelkul-1"
+    },
+    {
+      "type": "assistant",
+      "session_id": "session-uj-4",
+      "uuid": "fixture-result-nelkul-2",
+      "message": { "content": [] }
+    }
+  ]
+}
