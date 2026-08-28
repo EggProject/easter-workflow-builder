@@ -22,16 +22,15 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 | `provider-concurrency/` | a `provider_concurrency_limit` tábla (SPEC-003 4.14 és 11. szekció): `provider_id` elsődleges kulcs, `CHECK (max_concurrent_steps > 0)` (F-15); a migráció üresen indul, sem a kódban, sem a migrációban nincs szállított párhuzamossági alapérték (41. kritérium). A `ProviderConcurrencyRepository`: `readLimit`, `readAllLimits`, `setLimit` (upsert, a `CHECK` megsértését a `better-sqlite3` `SQLITE_CONSTRAINT_CHECK` hibájának elkapásával `invalid_max_concurrent_steps` `Outcome` hibaágra fordítja, nem duplikálja a `> 0` szabályt TypeScript oldalon) és `clearLimit` (nem hiba, ha a sor nem is létezett, T-003-23)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `run-event/`            | a `run_event` tábla (SPEC-003 6.2 szekció): `id` `INTEGER PRIMARY KEY AUTOINCREMENT` (F-9, F-13, 9. kritérium, NEM sima `INTEGER PRIMARY KEY`), `run_id` idegen kulcs `ON DELETE CASCADE` a `workflow_run` táblára, opcionális `step_run_id` idegen kulcs `ON DELETE CASCADE` a `step_run` táblára (futás szintű eseménynél NULL), három index (`run_event_run_id_idx`, `run_event_step_run_id_idx`, `run_event_run_uuid_uq` **egyedi** a `(run_id, sdk_uuid)` páron, F-10: több NULL `sdk_uuid` sor is beszúrható ugyanahhoz a `run_id`-hez). A `kind` oszlopon **nincs** `CHECK` constraint (6.4 szekció); a huszonöt értékű `RunEventKind` uniót és az `isRunEventKind` guardot a `run-event-kind.ts` és az `is-run-event-kind.ts` adja, egyik sincs a barrelben (a `RunEventRepository` dönt az exportról, T-003-21). A nyers SDK üzenet normalizálását a `normalize-sdk-message.ts` (`normalizeSdkMessage`) és a hozzá tartozó `is-sdk-message-envelope.ts` boríték guard adja (T-003-20, lásd lent). A `RunEventRepository`: `appendSdkEvent` (a delta kapcsolót megkerülhetetlenül érvényesítő, egyetlen `INSERT ... SELECT` utasítás, `written`/`skipped` eredménnyel, `duplicate_event` hibaággal), `appendEngineEvent`, `readEventsSince` (kötelező `limit`), `readEventsForStep` és `aggregateRunTokens` (T-003-21); a `RunEventKind`/`isRunEventKind` innentől a barrelben is szerepel. |
 | `human-approval/`       | a `human_approval` tábla (SPEC-003 4.12 szekció): `run_id` idegen kulcs `ON DELETE CASCADE` a `workflow_run` táblára, `step_run_id` idegen kulcs `ON DELETE CASCADE` a `step_run` táblára, két index (`human_approval_step_uq` **egyedi** a `(step_run_id)` oszlopon, `human_approval_pending_idx` a `(decision, requested_at_ms)` páron, F-10: SQLite az indexben tárolja a NULL `decision` értéket is). Az `ApprovalDecision` unió (`'approved' \| 'rejected'`) és az `isApprovalDecision` guard a barrelben is szerepel. A `HumanApprovalRepository`: `requestApproval` (beszúrja a sort `decision: null` értékkel, ÉS ugyanabban a tranzakcióban `running -> waiting_approval` állapotba viszi a lépés futást a `StepRunRepository.markStepWaitingApproval` hívásával), `decideApproval` (compare-and-set `UPDATE ... WHERE step_run_id = ? AND decision IS NULL`, majd `markStepSucceeded`/`markStepRejected`, ugyanabban a tranzakcióban - ha az állapotváltás hibázik, a döntés írása is visszagördül), `getApprovalForStep` és `listPendingApprovals` (`WHERE decision IS NULL ORDER BY requested_at_ms`, a `human_approval_pending_idx` indexből kiszolgálva, T-003-22).                                                                                                                                                                                                                   |
+| `run-recovery/`         | **nincs saját tábla**: a szerver indulási helyreállítása (SPEC-003 7.4 szekció, "Szerver leállás"), ami a `workflow_run` ÉS a `step_run` táblát EGYÜTT érinti, ezért egyik témába sem tartozik (8. szekció). A `RunRecovery.recoverInterruptedRuns()` egyetlen tranzakcióban: minden `pending`/`running` futás `interrupted` állapotba, a hozzájuk tartozó minden nem terminális (`pending`/`running`/`waiting_approval`) lépés futás szintén, majd futásonként EGY `run_interrupted` motor esemény (`origin: 'engine'`, `stepRunId: null`) - tömeges `UPDATE ... WHERE status IN (...) RETURNING id` alakban, NEM a `markRunInterrupted`/`markStepInterrupted` egyenkénti hívásával iterálva (lásd lent, T-003-24). A `DatabaseContext.recovery` mező adja, ez az utolsó mező, amivel mind a 12 téma mappa elkészült. Az `openDatabase` **nem** hívja automatikusan: a `packages/db` csak a képességet adja, a hívás az `apps/server` felelőssége lesz egy KÉSŐBBI specifikációban, a szerver indulásakor, hálózati kapcsolat fogadása előtt.                                                                                                                                                                                                                                                                                                                                                      |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
 nem glob: a `.spec.ts` fájlok `vitest` importja miatt a drizzle-kit esbuild alapú CJS bundlere
 elhasalna egy `./src/**/*.ts` mintán, a hivatalos config doksi pedig nem dokumentál negációs
 glob mintát erre a mezőre. Új tábla fájlt ezért a `drizzle.config.ts` listájába is fel kell
-venni.
-
-A további, a SPEC-003 8. szekciója szerinti téma mappa (`run-recovery`) a végrehajtás további
-lépésében keletkezik.
+venni. A `run-recovery` témának nincs saját tábla fájlja, ezért a `drizzle.config.ts` listáját
+nem érinti.
 
 **Tábla séma tesztelése: `getTableConfig` kell a 100%-os function coverage-höz.** A
 `sqliteTable()` harmadik argumentuma (index lista) és a `.references(() => ...)` idegen kulcs
@@ -611,6 +610,75 @@ alakban fut**, a `RETURNING` záradékkal. Nulla módosított sor esetén egy k�
 el, hogy a sor hiányzik-e (`not_found`) vagy már el van döntve (`already_decided`) - ez a
 diagnosztikai olvasás ugyanabban, a hívó számára láthatatlan tranzakcióban fut, tehát nem
 versenyhelyzet-érzékeny.
+
+## A `markRunInterrupted`/`markStepInterrupted` és a `RunRecovery` (T-003-24)
+
+**Két hiányzó, nevesített állapotváltó pótlása.** A SPEC-003 9.2 szekció `WorkflowRunRepository`/
+`StepRunRepository` táblázata nem sorolt fel `markRunInterrupted`/`markStepInterrupted` metódust
+(csak a `markRun*`/`markStep*` négy, illetve hat aktív útvonalát), holott a `canTransitionRunStatus`/
+`canTransitionStepRunStatus` a `pending`/`running`(/`waiting_approval`) -> `interrupted` átmenetet a
+T-003-13/T-003-17 óta ismeri (7.1, 7.2 táblázat). A T-003-24 ezt a hiányt zárja le: mindkét
+repository kapott egy `markRunInterrupted(runId)`/`markStepInterrupted(stepRunId)` metódust, szó
+szerint ugyanazzal a compare-and-set mintával (`transitionRun`/`transitionStep` belső segéd,
+`finishedAtMs: new Date()` extra oszloppal), mint a többi `markRun*`/`markStep*` függvény -
+`illegal_status_transition` hibaágukat a saját `.spec.ts` fájljuk (`workflow-run-repository.spec.ts`,
+`step-run-repository.spec.ts`) teszteli, közvetlen, valódi hívással egy már terminális sorra.
+
+**A `run-recovery` téma (`run-recovery.ts`) SZÁNDÉKOSAN NEM ezt a két metódust hívja soronként
+iterálva**, hanem két tömeges `UPDATE ... WHERE status IN (...)` utasítást ad ki (SPEC-003 7.4
+szekció pszeudokódja, PLAN-003 T-003-24 "Compare and set jelentése itt" bekezdése, ami expliciten
+mindkét alakot megengedte, "a meglévő kód stílusa alapján" döntésre bízva). Az indok nem
+stílus: ha `recoverInterruptedRuns` a `markRunInterrupted`/`markStepInterrupted` hívás
+`Outcome`-ját ellenőrizné, az `illegal_status_transition` ág EBBEN a hívási kontextusban
+garantáltan holt lenne - a `runId`/`stepRunId` ugyanabban a tranzakcióban, ugyanazon a
+`better-sqlite3` kapcsolaton lett kiválasztva `pending`/`running`(/`waiting_approval`) szűréssel,
+és WAL módban is csak egy író van (F-8), tehát a compare-and-set mindig talál sort. Egy ilyen,
+sosem futó ág bevezetése a SPEC-003 12.4 szekció 100 százalékos, kizárás nélküli lefedettségi
+küszöbét sértené. A két nevesített metódus emiatt önmagában létezik és önmagában tesztelt, a
+`run-recovery` témának nem függősége.
+
+**`recoverInterruptedRuns()` lépései, egyetlen tranzakcióban** (`run-recovery.ts`):
+
+1. `UPDATE workflow_run SET status = 'interrupted', finished_at_ms = :now WHERE status IN
+('pending', 'running') RETURNING id` - a `NON_TERMINAL_RUN_STATUSES` konstans (`readonly
+RunStatus[]`) adja a listát, típusosan, nem szabad szövegként. A `RETURNING id` egy kérésben
+   adja vissza az érintett futások azonosítóját (`.returning({ id: ... }).all()`), tehát nincs
+   szükség külön `SELECT`-re előtte - ugyanaz az elv, mint a `transitionRun` egysoros
+   `RETURNING`-jánál, csak itt sok sorra egyszerre.
+2. Nulla érintett futásnál azonnali `{ recoveredRunCount: 0 }` visszatérés, esemény írása nélkül.
+3. `UPDATE step_run SET status = 'interrupted', finished_at_ms = :now WHERE run_id IN (:runIds)
+AND status IN ('pending', 'running', 'waiting_approval')` - a `NON_TERMINAL_STEP_RUN_STATUSES`
+   konstans adja a listát. Csak a fenti 1. lépésben ténylegesen megszakított futások lépés
+   futásait érinti: egy már terminális futáshoz tartozó, adatilag inkonzisztens nem terminális
+   lépés futás (ha volna ilyen) érintetlen marad, mert a `runId` nincs a listában.
+4. Futásonként EGY `run_interrupted` motor esemény (`origin: 'engine'`, `stepRunId: null`,
+   `payload: { runId }`), az `insertEngineEventRow` (`run-event/insert-engine-event-row.ts`)
+   PLAIN, tranzakció nélküli segédfüggvénnyel - ugyanaz a minta, mint a
+   `workflow-run-repository.ts` `startRun`-jában a `run_started` eseménynél, beleértve azt is,
+   hogy a visszaadott `Outcome`-ot itt sem ágaztatjuk el (a `not_found` ág logikailag kizárt,
+   mert a `runId` az imént, ugyanebben a tranzakcióban lett kiolvasva).
+
+**Terminális futás és a hozzá tartozó terminális lépés futás érintetlen marad** (kulcsteszt,
+`run-recovery.spec.ts`): egy `succeeded` futás és `succeeded` lépés futás egy őrjel
+`finished_at_ms` értékkel előre megjelölve, a helyreállítás után a sor bitre változatlan - ez
+bizonyítja, hogy a `WHERE status IN (...)` szűrés ténylegesen kizárja a terminális sorokat, nem
+csak véletlenül marad ugyanaz az érték.
+
+**A `DatabaseContext.recovery` mező, az utolsó.** Az `open-database.ts` a `createRunRecovery(database,
+transaction)` hívással köti be - a függvény NEM kapja meg a `WorkflowRunRepository`/
+`StepRunRepository` példányt (ellentétben a `HumanApprovalRepository`-val, ami a `stepRuns`
+példányt kapja), mert a fenti tömeges `UPDATE` közvetlenül a Drizzle tábla objektumokra
+(`workflowRunTable`, `stepRunTable`) épül, nem a repository rétegen át. Ezzel a `run-recovery`
+a `packages/db/src` alatti 12., egyben utolsó téma mappa (SPEC-003 8. szekció); a barrel a
+`RunRecovery` és a `RecoverInterruptedRunsResult` típust exportálja, a `createRunRecovery`
+factory függvényt nem (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+
+**Az `openDatabase` NEM hívja meg automatikusan a `recoverInterruptedRuns`-t.** A SPEC-003 7.4
+szekció szó szerint: "a szerver indulásakor, mielőtt bármilyen hálózati kapcsolatot fogadna,
+lefut a helyreállítás" - a `packages/db` egy adatbázis csomag, nem tudja, mikor "fogad hálózati
+kapcsolatot". A `packages/db` csak a képességet adja
+(`DatabaseContext.recovery.recoverInterruptedRuns()`), a tényleges hívás az `apps/server`
+felelőssége lesz, egy KÉSŐBBI specifikációban.
 
 ## `Outcome` hibaosztály konvenció
 

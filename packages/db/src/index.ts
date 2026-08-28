@@ -95,3 +95,10 @@ export type {
 } from './human-approval/human-approval-repository.ts';
 export type { ApprovalDecision } from './human-approval/approval-decision.ts';
 export { isApprovalDecision } from './human-approval/is-approval-decision.ts';
+
+// run-recovery: a RunRecovery publikus felülete (T-003-24). A factory
+// függvényt (`createRunRecovery`) szándékosan nem exportáljuk, csak a
+// típust, ugyanaz a minta, mint a `WorkflowRepository`-nél (SPEC-002 6.6
+// 5. szabálya, SPEC-003 9.3 szekció). Ez a `packages/db/src` alatti 12.,
+// egyben utolsó téma mappa (SPEC-003 8. szekció).
+export type { RunRecovery, RecoverInterruptedRunsResult } from './run-recovery/run-recovery.ts';

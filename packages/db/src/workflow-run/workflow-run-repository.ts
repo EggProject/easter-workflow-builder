@@ -97,6 +97,7 @@ export interface WorkflowRunRepository {
   markRunSucceeded(runId: string): Outcome<WorkflowRunRecord>;
   markRunFailed(runId: string, errorKind: string, errorMessage: string): Outcome<WorkflowRunRecord>;
   markRunCancelled(runId: string): Outcome<WorkflowRunRecord>;
+  markRunInterrupted(runId: string): Outcome<WorkflowRunRecord>;
   readSnapshot(runId: string): Outcome<GraphSnapshotDocument>;
 }
 
@@ -496,6 +497,21 @@ export function createWorkflowRunRepository(
   }
 
   /**
+   * `pending -> interrupted` és `running -> interrupted` (SPEC-003 7.1
+   * táblázat, "indulási helyreállítás", 7.4 szekció). A `canTransitionRunStatus`
+   * ezt az átmenetet a T-003-13 óta ismeri, csak a nevesített metódus
+   * hiányzott a felületről (T-003-24). A `run-recovery` téma (`run-recovery.ts`)
+   * a szerver indulási helyreállítását **nem** ezen az egyenkénti hívón át,
+   * hanem tömeges `UPDATE ... WHERE status IN (...)` utasítással végzi (lásd
+   * ott a dokumentációt): ez a metódus önmagában, egyetlen futásra hívva
+   * marad a nyilvános, tesztelt állapotváltó, ugyanazzal a compare-and-set
+   * mintával, mint a többi `markRun*` függvény.
+   */
+  function markRunInterrupted(runId: string): Outcome<WorkflowRunRecord> {
+    return transitionRun(runId, 'interrupted', { finishedAtMs: new Date() });
+  }
+
+  /**
    * A futás pillanatképének visszaolvasása: `workflow_run.graph_snapshot_hash`
    * -> `graph_snapshot.document` -> `readGraphSnapshot` verziódiszpécser
    * (SPEC-003 9.2 szekció). Itt a típusos Drizzle `select` elég (nem kell a
@@ -545,6 +561,7 @@ export function createWorkflowRunRepository(
     markRunSucceeded,
     markRunFailed,
     markRunCancelled,
+    markRunInterrupted,
     readSnapshot,
   };
 }

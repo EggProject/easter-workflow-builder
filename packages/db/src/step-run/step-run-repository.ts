@@ -135,6 +135,7 @@ export interface StepRunRepository {
   ): Outcome<StepRunRecord>;
   markStepRejected(stepRunId: string): Outcome<StepRunRecord>;
   markStepCancelled(stepRunId: string): Outcome<StepRunRecord>;
+  markStepInterrupted(stepRunId: string): Outcome<StepRunRecord>;
   attachSession(stepRunId: string, input: AttachSessionInput): Outcome<StepRunRecord>;
 }
 
@@ -461,6 +462,22 @@ export function createStepRunRepository(
   }
 
   /**
+   * `pending -> interrupted`, `running -> interrupted` és `waiting_approval ->
+   * interrupted` (SPEC-003 7.2 táblázat, "indulási helyreállítás", 7.4
+   * szekció). A `canTransitionStepRunStatus` ezt az átmenetet a T-003-17 óta
+   * ismeri, csak a nevesített metódus hiányzott a felületről (T-003-24). A
+   * `run-recovery` téma (`run-recovery.ts`) a szerver indulási
+   * helyreállítását **nem** ezen az egyenkénti hívón át, hanem tömeges
+   * `UPDATE ... WHERE status IN (...)` utasítással végzi (lásd ott a
+   * dokumentációt): ez a metódus önmagában, egyetlen lépés futásra hívva
+   * marad a nyilvános, tesztelt állapotváltó, ugyanazzal a compare-and-set
+   * mintával, mint a többi `markStep*` függvény.
+   */
+  function markStepInterrupted(stepRunId: string): Outcome<StepRunRecord> {
+    return transitionStep(stepRunId, 'interrupted', { finishedAtMs: new Date() });
+  }
+
+  /**
    * Nem állapotváltás (SPEC-003 4.5 szekció): a `system` `init` üzenet
    * feldolgozásakor a motor már egy `running` lépés futáson tölti ki a
    * session mezőket, ezért itt nincs compare-and-set `status IN (...)`
@@ -499,6 +516,7 @@ export function createStepRunRepository(
     markStepFailed,
     markStepRejected,
     markStepCancelled,
+    markStepInterrupted,
     attachSession,
   };
 }

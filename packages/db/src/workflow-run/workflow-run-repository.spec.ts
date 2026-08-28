@@ -618,6 +618,35 @@ describe('createWorkflowRunRepository', () => {
 
       sqlite.close();
     });
+
+    it('markRunInterrupted: pending -> interrupted és running -> interrupted is engedett, beállítja a finishedAtMs mezőt', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+
+      const runFromPending = start(repository, 'w1', 'Int1');
+      const interruptedFromPending = okOrThrow(repository.markRunInterrupted(runFromPending.id));
+      expect(interruptedFromPending.status).toBe('interrupted');
+      expect(interruptedFromPending.finishedAtMs).toBeInstanceOf(Date);
+
+      const runFromRunning = start(repository, 'w1', 'Int2');
+      okOrThrow(repository.markRunRunning(runFromRunning.id));
+      const interruptedFromRunning = okOrThrow(repository.markRunInterrupted(runFromRunning.id));
+      expect(interruptedFromRunning.status).toBe('interrupted');
+
+      sqlite.close();
+    });
+
+    it('markRunInterrupted illegal_status_transition hibaágat ad terminális állapotból', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      const run = start(repository, 'w1', 'Int3');
+      okOrThrow(repository.markRunRunning(run.id));
+      okOrThrow(repository.markRunSucceeded(run.id));
+
+      expect(errorOrThrow(repository.markRunInterrupted(run.id))).toContain('illegal_status_transition');
+
+      sqlite.close();
+    });
   });
 
   describe('readSnapshot', () => {

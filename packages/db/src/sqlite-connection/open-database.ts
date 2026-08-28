@@ -11,6 +11,7 @@ import { createAppSettingRepository } from '../app-setting/app-setting-repositor
 import { createProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
 import { createRunEventRepository } from '../run-event/run-event-repository.ts';
 import { createHumanApprovalRepository } from '../human-approval/human-approval-repository.ts';
+import { createRunRecovery } from '../run-recovery/run-recovery.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -103,9 +104,10 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const approvals = createHumanApprovalRepository(database, transaction, stepRuns);
   const settings = createAppSettingRepository(database, transaction);
   const concurrencyLimits = createProviderConcurrencyRepository(database, transaction);
+  const recovery = createRunRecovery(database, transaction);
 
   return {
     kind: 'ok',
-    value: { workflows, runs, stepRuns, events, approvals, settings, concurrencyLimits, transaction, close },
+    value: { workflows, runs, stepRuns, events, approvals, settings, concurrencyLimits, recovery, transaction, close },
   };
 }
