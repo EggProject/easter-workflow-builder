@@ -114,6 +114,8 @@ Gyökér: `docs/measurements/2026-08-26-minimax/`. Mérési esetenként egy alk�
 | `listedByModelsEndpoint` (nyitva maradt capability mező)                                                                       | M-35                                                     |
 | `rateLimits.retryAfterHeader`, `rateLimits.rateLimitHeaders` (nyitva maradt capability mezők) -- passzív elemzés               | M-36                                                     |
 | `videoInput` (nyitva maradt capability mező)                                                                                   | nincs mérési eset -- lásd a szöveges indoklást M-25 után |
+| Task #31: lépésenkénti kérésszám és időtartam, egyszerű és összetett lépésen                                                   | M-37, M-38                                               |
+| Task #31: `concurrency`/`rateLimits` kiegészítés -- szándékos konkurrencia ramp az első 429-ig                                 | M-39                                                     |
 
 ### Közös alapbeállítás
 
@@ -387,6 +389,28 @@ Az SDK verziót a mérés idejére pinelni kell, a pontos verzió a `meta.json`-
 - **Futtatás**: nincs külön futás.
 - **Megfigyelés**: az M-26 ... M-35 kör rögzített `response.meta.json` headerkészleteinek uniója, van-e `retry-after` vagy `ratelimit` alstringet tartalmazó header.
 - **Következtetés**: kiegészíti-e ez a kör az M-18 eredményét, vagy a mező `unknown` marad.
+
+### M-37 Lépésenkénti kérésszám és időtartam -- egyszerű lépés
+
+- **Eltérés**: a `minimax` provider végleges env blokkja szerint (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, hogy a cím generáló háttérkérés ne torzítsa a kérésszámot), plusz egy in-process tool, amit a prompt pontosan egyszer kényszerít ki.
+- **Futtatás**: 3, egymást szekvenciálisan követő `query()`, azonos beállítással, a szórás megfigyeléséhez.
+- **Megfigyelés**: futásonként a proxy artefaktumaiból az időablakba eső `POST /v1/messages` kérések száma, és a `query()` teljes falóra időtartama.
+- **Következtetés**: egy tipikus, egy tool hívást tartalmazó agent lépés kérésszáma és időtartama -- ez az alap a lépésenkénti kérésráta számításához (Task #31).
+
+### M-38 Lépésenkénti kérésszám és időtartam -- összetett lépés
+
+- **Eltérés**: az M-37 mintája, két láncolt in-process toollal (a második tool bemenete az első kimenetétől függ), hogy a modellnek több kört kelljen megtennie.
+- **Futtatás**: 3, egymást szekvenciálisan követő `query()`.
+- **Megfigyelés**: mint M-37.
+- **Következtetés**: a kérésszám/időtartam szórása egy tipikusnál összetettebb lépésen, hogy a lépésenkénti kérésráta becslésének legyen alsó és felső sávja (Task #31).
+
+### M-39 Egyidejű lépések rate limitig -- konkurrencia ramp
+
+- **Eltérés a SPEC-000 7. szekció eredeti döntéséhez képest**: a 7. szekció "Ha a mérés alatt nem keletkezik 429-es válasz" sora eredetileg kimondta, hogy szándékos rate limit kimerítést nem végzünk. A Task #31 ezt tudatosan felülírja: a `provider_concurrency_limit` tábla alapértelmezéséhez mért adat kell, ezért ez a mérés kifejezetten a limit megkereséséért indul.
+- **Eltérés**: nincs `Options` szintű eltérés az M-37-hez képest a lépés maga (`DEFAULT_PROMPT`, `maxTurns: 1`, tool nélkül, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`), viszont a `run()` egyszerre, `Promise.allSettled`-del indít `N` egyidejű, önálló `query()` hívást, ahol `N` a `WIRE_PROBE_M39_STAGE_SIZE` env változóból jön.
+- **Futtatás**: fokozatonként egy `node src/probe.ts M-39` hívás, a fokozatok sorozatát és a leállási feltételt (első 429, vagy a mérőgép memóriakorlátja) a hívó bash szkript vezérli, nem a case. Ez azért fontos, hogy egy esetleges OOM csak az adott fokozat adatait vigye el, a korábbi fokozatokét ne.
+- **Megfigyelés**: a proxy artefaktumaiból az időablakba eső összes `POST /v1/messages` tranzakció HTTP státuszkódja. Az első 429 esetén a teljes, maszkolt tranzakció (státusz, headerek, törzs) külön fájlba másolva (`artifacts/harness/M-39/stage-<N>-first-429.json`).
+- **Következtetés**: hány egyidejű agent lépésnél jelenik meg az első 429, és mi a válasz pontos alakja (van-e `retry-after` vagy `ratelimit` jellegű header) -- ez zárja le vagy nyitja tovább a `rateLimits.retryAfterHeader`/`rateLimitHeaders` mezőt, és ez adja a `provider_concurrency_limit` alapértelmezés mérési alapját.
 
 ### `videoInput` -- miért nincs hozzá mérési eset
 
@@ -748,14 +772,14 @@ A leíró objektum literál `satisfies ProviderCapabilityDescriptor<MiniMaxModel
 
 ## 7. Kockázatok és amit nem tudunk lezárni ebben a specben
 
-| Kockázat                                                                                                                 | Hatás                                                 | Kezelés                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| A proxy közbeiktatása megváltoztatja a transzport paramétereket (protokoll verzió, tömörítés, kapcsolat újrahasznosítás) | a mért viselkedés eltérhet a proxy nélkülitől         | a `meta.json` rögzíti a transzport jellemzőit; a kritikus eseteket proxy nélkül, csak a HTTP kód szintjén ellenőrizzük                     |
-| Az SDK verzió frissítése bővíti a body mezőlistát                                                                        | a lezárt Q kérdések újranyílnak                       | `sdkVersionPin` a leíróban, és minden SDK frissítés előtt a teljes M-01 ... M-18 sor újrafuttatása                                         |
-| A MiniMax szerver oldalon változtat, dokumentáció nélkül                                                                 | a leíró csendben elavul                               | a `measuredAt` mező és a mérés újrafuttathatósága; a Kapcsolat teszt gomb eltérés esetén jelez                                             |
-| A `claude-subscription` provider drótszinten nem mérhető ezzel az eszközzel                                              | erre a providerre nincs azonos minőségű bizonyíték    | ott a leíró az SDK oldali `SDKMessage` folyamból és a hivatalos dokumentációból töltődik, és ezt az `evidence` mező típusa megkülönbözteti |
-| Ha a mérés alatt nem keletkezik 429-es válasz                                                                            | a rate limit headerek ismeretlenek maradnak           | a mező `unknown` marad, szándékos rate limit kimerítést nem végzünk                                                                        |
-| A `[1m]` suffix a research szerint a Claude Code kliens konvenciója, nem MiniMax paraméter                               | nem tudjuk, hogy az SDK ugyanúgy kezeli-e, mint a CLI | M-11 méri, de ha az SDK-ban egyáltalán nem értelmezett, a kérdés a CLI-re nyitva marad                                                     |
-| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M3)                                        | hosszú workflow-k adatátadása romolhat                | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell                                   |
-| Végtelen retry loop timeoutnál                                                                                           | a mérés beragadhat                                    | a proxy nem retry-zik, és minden futásra felső időkorlát van, aminek az értéke a `meta.json`-ba kerül                                      |
-| Az `Options.effort` és `Options.thinking` enum értékei nincsenek a research fájlban                                      | a mérés előtt nem definiálható a pontos beállítás     | a mérés előtt a telepített SDK típusdefiníciójából kell kiolvasni, és a `meta.json`-ba rögzíteni                                           |
+| Kockázat                                                                                                                 | Hatás                                                 | Kezelés                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A proxy közbeiktatása megváltoztatja a transzport paramétereket (protokoll verzió, tömörítés, kapcsolat újrahasznosítás) | a mért viselkedés eltérhet a proxy nélkülitől         | a `meta.json` rögzíti a transzport jellemzőit; a kritikus eseteket proxy nélkül, csak a HTTP kód szintjén ellenőrizzük                                                                                                   |
+| Az SDK verzió frissítése bővíti a body mezőlistát                                                                        | a lezárt Q kérdések újranyílnak                       | `sdkVersionPin` a leíróban, és minden SDK frissítés előtt a teljes M-01 ... M-18 sor újrafuttatása                                                                                                                       |
+| A MiniMax szerver oldalon változtat, dokumentáció nélkül                                                                 | a leíró csendben elavul                               | a `measuredAt` mező és a mérés újrafuttathatósága; a Kapcsolat teszt gomb eltérés esetén jelez                                                                                                                           |
+| A `claude-subscription` provider drótszinten nem mérhető ezzel az eszközzel                                              | erre a providerre nincs azonos minőségű bizonyíték    | ott a leíró az SDK oldali `SDKMessage` folyamból és a hivatalos dokumentációból töltődik, és ezt az `evidence` mező típusa megkülönbözteti                                                                               |
+| Ha a mérés alatt nem keletkezik 429-es válasz                                                                            | a rate limit headerek ismeretlenek maradnak           | a mező `unknown` marad, szándékos rate limit kimerítést ebben a specben nem végzünk -- a Task #31 (M-37 ... M-39, `docs/research/2026-08-28-parhuzamossagi-korlat.md`) ezt a döntést önálló, célzott méréssel írja felül |
+| A `[1m]` suffix a research szerint a Claude Code kliens konvenciója, nem MiniMax paraméter                               | nem tudjuk, hogy az SDK ugyanúgy kezeli-e, mint a CLI | M-11 méri, de ha az SDK-ban egyáltalán nem értelmezett, a kérdés a CLI-re nyitva marad                                                                                                                                   |
+| A tool-láncban a modell nem adja tovább megbízhatóan az előző tool kimenetét (M3)                                        | hosszú workflow-k adatátadása romolhat                | ez viselkedésbeli megbízhatóság, nem drótszintű kérdés, ebben a specben nem zárható le, külön mérés kell                                                                                                                 |
+| Végtelen retry loop timeoutnál                                                                                           | a mérés beragadhat                                    | a proxy nem retry-zik, és minden futásra felső időkorlát van, aminek az értéke a `meta.json`-ba kerül                                                                                                                    |
+| Az `Options.effort` és `Options.thinking` enum értékei nincsenek a research fájlban                                      | a mérés előtt nem definiálható a pontos beállítás     | a mérés előtt a telepített SDK típusdefiníciójából kell kiolvasni, és a `meta.json`-ba rögzíteni                                                                                                                         |

@@ -38,6 +38,9 @@ import { M33 } from './m-33.ts';
 import { M34 } from './m-34.ts';
 import { M35 } from './m-35.ts';
 import { M36 } from './m-36.ts';
+import { M37 } from './m-37.ts';
+import { M38 } from './m-38.ts';
+import { M39 } from './m-39.ts';
 
 export const CASE_REGISTRY: Readonly<Record<string, MeasurementCase>> = {
   'M-01': M01,
@@ -76,6 +79,9 @@ export const CASE_REGISTRY: Readonly<Record<string, MeasurementCase>> = {
   'M-34': M34,
   'M-35': M35,
   'M-36': M36,
+  'M-37': M37,
+  'M-38': M38,
+  'M-39': M39,
 };
 
 export const CASE_IDS: readonly string[] = Object.keys(CASE_REGISTRY);
