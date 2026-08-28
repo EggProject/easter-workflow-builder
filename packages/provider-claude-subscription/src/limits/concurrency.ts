@@ -19,4 +19,9 @@ export const claudeSubscriptionConcurrency: ConcurrencyCapability = {
       'A sweep-line számítás proxyn átmenő kérésekre épül, first-party úton nincs proxy, tehát nincs mért egyidejű kérésszám.',
     blockedBy: ['M-31'],
   },
+  measuredMaxConcurrentSteps: {
+    state: 'unknown',
+    reason: 'Erre a providerre nem futott párhuzamossági mérés.',
+    blockedBy: ['M-39'],
+  },
 };

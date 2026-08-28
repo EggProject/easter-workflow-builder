@@ -19,4 +19,12 @@ export interface ConcurrencyCapability {
    * orchestrátor saját kérése is beleszámít.
    */
   readonly observedMaxConcurrentRequests: Fact<number>;
+  /**
+   * A workflow motor lépésenkénti, szerver oldali párhuzamossági korlátjára vonatkozó
+   * javaslat -- nem a kliens belső subagent korlátja, ami a fenti három mező témája.
+   * A `minimax` providernél ez a szám **alsó korlát**: a mérés során a mérőgép szabad
+   * memóriája fogyott el, nem a MiniMax korlátja lépett életbe, ezért a tényleges,
+   * biztonságosan kihasználható felső határ ennél magasabb is lehet.
+   */
+  readonly measuredMaxConcurrentSteps: Fact<number>;
 }
