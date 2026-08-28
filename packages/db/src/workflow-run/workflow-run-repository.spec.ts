@@ -12,7 +12,7 @@ import { canonicalizeSnapshotDocument } from '../graph-snapshot/canonicalize-sna
 import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
 import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
-import { runEventTable } from '../run-event/run-event.ts';
+import { runEventTable } from '../run-event/event-record/run-event.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import {
   createWorkflowRunRepository,

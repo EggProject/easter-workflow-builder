@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { describeTransactionError } from './describe-transaction-error.ts';
 
 /**
- * Közvetlen, szintetikus egységteszt (a `run-event/extract-error-cause.spec.ts`
+ * Közvetlen, szintetikus egységteszt (a `run-event/event-record/extract-error-cause.spec.ts`
  * mintáját követve), a `workflow-repository.spec.ts` valós, végponttól
  * végpontig futó idegen kulcs sértéses tesztje MELLETT: itt a szelektivitást
  * (a `SQLITE_CONSTRAINT_FOREIGNKEY`-től eltérő kód érintetlen marad) izoláltan,

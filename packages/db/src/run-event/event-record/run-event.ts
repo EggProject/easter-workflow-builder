@@ -1,6 +1,6 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { stepRunTable } from '../step-run/step-run.ts';
-import { workflowRunTable } from '../workflow-run/workflow-run.ts';
+import { stepRunTable } from '../../step-run/step-run.ts';
+import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
 
 /**
  * A `run_event` tábla (SPEC-003 6.2 szekció). Egy sor egyetlen eseményt ír

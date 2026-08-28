@@ -13,7 +13,7 @@ import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import type { RunStatus } from '../workflow-run/run-status.ts';
 import { stepRunTable } from '../step-run/step-run.ts';
 import type { StepRunStatus } from '../step-run/step-run-status.ts';
-import { runEventTable } from '../run-event/run-event.ts';
+import { runEventTable } from '../run-event/event-record/run-event.ts';
 import { createRunRecovery, type RunRecovery } from './run-recovery.ts';
 
 /**

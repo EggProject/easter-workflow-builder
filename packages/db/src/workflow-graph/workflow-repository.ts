@@ -10,7 +10,7 @@ import type { NodeConfig } from './node-config.ts';
 import type { NodeType } from './node-type.ts';
 import { isNodeConfig } from './is-node-config.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
-import { runEventTable } from '../run-event/run-event.ts';
+import { runEventTable } from '../run-event/event-record/run-event.ts';
 
 /**
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1

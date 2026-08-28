@@ -5,7 +5,7 @@ import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import type { RunStatus } from '../workflow-run/run-status.ts';
 import { stepRunTable } from '../step-run/step-run.ts';
 import type { StepRunStatus } from '../step-run/step-run-status.ts';
-import { insertEngineEventRow } from '../run-event/insert-engine-event-row.ts';
+import { insertEngineEventRow } from '../run-event/event-record/insert-engine-event-row.ts';
 
 /**
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1
@@ -113,7 +113,7 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
       // 3. Futásonként EGY `run_interrupted` motor esemény (SPEC-003 7.4
       // szekció szó szerint: "futásonként egy `run_interrupted` motor
       // esemény íródik", `origin: 'engine'`, `stepRunId: null`). Az
-      // `insertEngineEventRow` (`run-event/insert-engine-event-row.ts`)
+      // `insertEngineEventRow` (`run-event/event-record/insert-engine-event-row.ts`)
       // PLAIN, tranzakció nélküli segédfüggvény, ugyanúgy hívható itt, mint
       // a `workflow-run-repository.ts` `startRun`-jában a `run_started`
       // eseménynél. A visszaadott `Outcome`-ot ugyanazon okból nem

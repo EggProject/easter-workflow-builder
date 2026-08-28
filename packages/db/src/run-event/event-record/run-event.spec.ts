@@ -4,13 +4,13 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { asc, eq } from 'drizzle-orm';
 import { getTableConfig, type ForeignKey } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
-import { migrateDatabase } from '../migration/migrate-database.ts';
-import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
-import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
-import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
-import { workflowRunTable } from '../workflow-run/workflow-run.ts';
-import { stepRunTable } from '../step-run/step-run.ts';
+import { migrateDatabase } from '../../migration/migrate-database.ts';
+import { MIGRATIONS_FOLDER } from '../../migration/migrations-folder.ts';
+import { computeSnapshotHash } from '../../graph-snapshot/compute-snapshot-hash.ts';
+import { graphSnapshotTable } from '../../graph-snapshot/graph-snapshot.ts';
+import { workflowTable } from '../../workflow-graph/workflow.ts';
+import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
+import { stepRunTable } from '../../step-run/step-run.ts';
 import { runEventTable } from './run-event.ts';
 
 /**

@@ -10,7 +10,7 @@ import { createWorkflowRunRepository } from '../workflow-run/workflow-run-reposi
 import { createStepRunRepository } from '../step-run/step-run-repository.ts';
 import { createAppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import { createProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
-import { createRunEventRepository } from '../run-event/run-event-repository.ts';
+import { createRunEventRepository } from '../run-event/event-record/run-event-repository.ts';
 import { createHumanApprovalRepository } from '../human-approval/human-approval-repository.ts';
 import { createRunRecovery } from '../run-recovery/run-recovery.ts';
 import type { DatabaseContext } from './database-context.ts';

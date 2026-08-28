@@ -10,7 +10,7 @@ import { workflowTable } from '../workflow-graph/workflow.ts';
 import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
-import { createRunEventRepository, type RunEventRepository } from '../run-event/run-event-repository.ts';
+import { createRunEventRepository, type RunEventRepository } from '../run-event/event-record/run-event-repository.ts';
 import { stepRunTable } from './step-run.ts';
 import {
   createStepRunRepository,

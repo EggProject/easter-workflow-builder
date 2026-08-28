@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { RunEventKind } from './run-event-kind.ts';
+import type { RunEventKind } from '../event-kind/run-event-kind.ts';
 
 /**
  * Egy motor eredetű (`origin = 'engine'`) `run_event` sor beszúrásához
