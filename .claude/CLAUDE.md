@@ -487,6 +487,13 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **`skipLibCheck: true` a `packages/db` tsconfigjában.** A `drizzle-orm` egyetlen csomagban
   szállítja az összes dialektus deklarációját, és ezek egymás között típushibásak; dokumentált
   felsőáramú hiba, nem a mi kódunké (`packages/db` CLAUDE.md).
+- **Ugyanez a hiba a `db`-t forrás szinten fogyasztó csomagokban is jelentkezik.** A `db`
+  `exports` mezője a `./src/index.ts`-re mutat, build lépés nélkül (7. szekció "Forrás
+  fogyasztás"), tehát a `db` teljes forrásfája, a `drizzle-orm` importjával együtt, bekerül a
+  fogyasztó csomag TypeScript programjába is. Az `engine` csomag a `DatabaseContext` port típus
+  importjakor futott bele elsőként (T-005-8): a `skipLibCheck: true` ott is kellett, saját
+  indoklással (`packages/engine` CLAUDE.md). Minden jövőbeli, `db`-től függő csomag ugyanezt a
+  kapcsolót fogja igényelni.
 - **Tábla séma tesztelése `getTableConfig` nélkül nem ad 100 százalékot.** Az index lista és a
   `.references(() => ...)` callback lusta: sima insert vagy select soha nem hívja meg őket
   (`packages/db` CLAUDE.md).
