@@ -124,3 +124,16 @@ export { validateSdkVersionMatch } from './capability-policy/validate-sdk-versio
 // (PLAN-005 T-005-14).
 export { buildProviderEnvironmentBlock } from './provider-environment/build-provider-environment-block.ts';
 export { resolveRequiredEnvironmentValue } from './provider-environment/resolve-required-environment-value.ts';
+
+// run-context: a `RunContext` összeállítása és a `steps` hivatkozás feloldása
+// ős példányokra (SPEC-004 6.1, 6.2, PLAN-005 T-005-16). A két exportált
+// függvény ugyanazt a feloldási szabályt használja, más hibakezeléssel: a
+// `buildRunContext` a fel nem oldható őst kihagyja a `steps` rekordból, a
+// `resolveStepReference` viszont `unresolvable_step_reference` hibát ad, mert
+// azt a `sub_workflow` `inputMapping` feloldása hívja (5.9 2. pont).
+export type { RunContext } from './run-context/run-context.ts';
+export type { StepInstanceReference } from './run-context/step-instance-reference.ts';
+export type { ExecutedStepInstance } from './run-context/executed-step-instance.ts';
+export type { BuildRunContextInput } from './run-context/build-run-context.ts';
+export { buildRunContext } from './run-context/build-run-context.ts';
+export { resolveStepReference } from './run-context/resolve-step-reference.ts';
