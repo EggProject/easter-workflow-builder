@@ -6,14 +6,15 @@ DAG ütemező, node végrehajtók, hibakezelés és a párhuzamossági szabályo
 motor (SPEC-004). A csomag **egy tárgykörű**, ezért a téma mappák közvetlenül a `src/` alatt
 állnak, egy szint mélyen, tárgykör mappa nélkül (SPEC-004 12. szekció).
 
-A csomag a PLAN-005 F3 fázisában épül fel, lépésenként egy-egy téma mappával. Ma kilenc téma áll
-készen: a kilenc befecskendezett port típusa és a motor hibaosztályainak szótára (T-005-8), a
-motor eseményei (T-005-9), a végrehajtható gráf szerkezete a gráf alak ellenőrzéseivel
-(T-005-10), az ág hatókör verem a kiegyensúlyozottság ellenőrzésével (T-005-11), a háromszintű
-provider feloldás (T-005-12), a leírótól függő viselkedések (T-005-13), a kötelező/tiltott env
-változók feldolgozása (T-005-14) és a futás indítási validációja, ami az előző hatot egyetlen
-`validateRun` menetbe fogja (T-005-15). A tényleges ütemező, a node végrehajtók és a spec 12.
-szekciójában felsorolt további téma mappák a PLAN-005 hátralévő lépéseiben készülnek.
+A csomag a PLAN-005 F3 fázisában épült fel, lépésenként egy-egy téma mappával. **Az F3 fázis
+lezárult**, tíz téma áll készen: a kilenc befecskendezett port típusa és a motor hibaosztályainak
+szótára (T-005-8), a motor eseményei (T-005-9), a végrehajtható gráf szerkezete a gráf alak
+ellenőrzéseivel (T-005-10), az ág hatókör verem a kiegyensúlyozottság ellenőrzésével (T-005-11), a
+háromszintű provider feloldás (T-005-12), a leírótól függő viselkedések (T-005-13), a
+kötelező/tiltott env változók feldolgozása (T-005-14), a futás indítási validációja, ami az előző
+hatot egyetlen `validateRun` menetbe fogja (T-005-15), és a futás kontextus összeállítása a
+`steps` hivatkozás feloldásával (T-005-16). A tényleges ütemező, a node végrehajtók és a spec 12.
+szekciójában felsorolt további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 
 ## Fájlok
 
@@ -27,6 +28,7 @@ szekciójában felsorolt további téma mappák a PLAN-005 hátralévő lépése
 | `capability-policy/`    | a SPEC-004 11.3 táblázat leírótól függő viselkedései, viselkedésenként egy tiszta függvényben, plusz a döntések eredmény típusai (PLAN-005 T-005-13). Ami itt áll, a táblázat sorszámával: 1. `resolveStructuredOutputStrategy`, 3. `validateMaxTurnsFloor`, 4. `validateForcedToolChoiceRisk`, 5. `resolveModelWireIdentifier`, 6. `requireModelSelection`, 7. `validateModelId`, 8. `resolveThinkingMode`, 9. `resolveEffortInclusion`, 12. `resolveDisallowedServerTools`, 13. `shouldIncludePartialMessages`, 14. `resolveConcurrencySuggestion`, 15. `RATE_LIMIT_RETRY_POLICY`, 16. `resolveConnectionTestMode`, 17. `validateSdkVersionMatch`. A 10. és a 11. sor a `provider-environment` témáé, a 2. sor az `agent-step` témáé, lásd "Szabályok". Az öt eredmény típusfájl **típus-only, nincs `.spec.ts`**                                                                                             |
 | `provider-resolution/`  | a `resolveEffectiveProvider` háromszintű provider feloldás: lépés felülírás > workflow felülírás > globális alapértelmezés, egyik hiányában sem `no_default_provider` hiba (SPEC-004 11.1, PLAN-005 T-005-12). Tiszta függvény, egyetlen node/lépés szintű hívás; a több node-ra való végigfuttatás a `run-validation` téma dolga (T-005-15). Nincs önálló leíró kereső wrapper, lásd "Szabályok"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `run-validation/`       | a futás indítási validációja: a SPEC-004 4.7 táblázat mind a tíz ellenőrzése (`validateStartNode`, `validateEdgeEndpoints`, `validateNodeReachability`, `validateImplementedNodeTypes`, `validateBranchEdgeKeys`, `validateDefaultBranchKey`, `validateErrorHandlerEdges`, `validateNodeConfigs`, `validateUnhandledErrorPolicy`, `validateJoinMergeSettings`), a 4.2 fenntartott `branch_key` szabálya (`validateReservedBranchKeys`), a 4.8 2. lépésének node-onkénti provider feloldása (`resolveNodeProviders`), és az ezeket a `run-graph` és a `branch-scope` téma ellenőrzéseivel egyetlen menetbe fogó `validateRun` (PLAN-005 T-005-15). Az `executable-node-config.ts` és a `validated-run.ts` **típus-only**; az előbbi mégis kap `.spec.ts`-t, mert a garanciája fordítási idejű, lásd "Szabályok". **A SPEC-004 11.2 provider validáció bedrótozása itt tudatosan nem történt meg**, lásd ugyanott |
+| `run-context/`          | a `RunContext` összeállítása (`buildRunContext`) és a `steps` hivatkozás feloldása ős példányokra, a SPEC-004 6.1 és 6.2 szekciója szerint (PLAN-005 T-005-16). A feloldás két segéddel dolgozik: a `collectAncestorNodeIds` a gráfbeli ős halmazt adja a bejövő él térképen visszafelé haladva, a `findVisibleStepInstance` az ág kontextus előtag feltételt és a legbelső példány kiválasztását. Az egyetlen node hivatkozást feloldó, `unresolvable_step_reference` hibát adó `resolveStepReference` külön exportált függvény, mert azt a `sub_workflow` `inputMapping` feloldása hívja majd (5.9 2. pont, T-005-23). Tiszta függvények, adatbázis nélkül. A `run-context.ts`, a `step-instance-ref.ts` és az `executed-step-instance.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                   |
 | `provider-environment/` | a SPEC-004 11.3 táblázat 10. és 11. sora: a `buildProviderEnvironmentBlock` a lépés kimenő `Options.env` blokkját állítja össze a `requiredEnv[]` és a `disallowedEnv[]` leíró mezőből, a `processEnvironment` porton át (PLAN-005 T-005-14). A `resolveRequiredEnvironmentValue` egyetlen `requiredEnv` bejegyzést old fel: `literal` forrásnál a leíró `literalValue` mezőjét, `process_env_passthrough` forrásnál a port olvasott értékét adja, hiányzó változóra `missing_provider_env` hibával, kizárólag a névvel. A `disallowedEnv[]` neve a feloldás **előtt** kizár, hogy egy tiltott, de hiányzó változó se okozzon hibát. Tiszta függvény, adatbázis és esemény nélkül: sem üzenetben, sem eseményben nem ad vissza env **értéket**, csak nevet (17. szekció 33. és 64. kritérium)                                                                                                                   |
 
 ## Függőségi irány
@@ -182,6 +184,34 @@ pontosan a típus a viselkedés: az `ExecutableNodeConfig` garanciája fordítá
 ("Unused '@ts-expect-error' directive"), tehát a `bun run typecheck` kapu azonnal pirosra vált, ha
 a `script` ágak visszakerülnek az unióba. A `@ts-expect-error` a `ban-ts-comment` szabály alatt
 leírással megengedett, ezért minden direktíva mellett ott az indok.
+
+**A `run-context` téma három értelmezési döntése.** A SPEC-004 6.2 szekció két feltételt szab a
+`steps` rekordra ("az ág kontextusa a jelenlegi példány kontextusának előtagja" **és** "a node a
+jelenlegi node egyik gráfbeli őse"), de nem mondja meg, hogyan mérjük őket:
+
+- **Az előtag egyezés a hatókör bejegyzés mind a három mezőjét hasonlítja**, a `kind` és a
+  diszkrimináló szám (`itemIndex`, `iteration`) mellett a `stepRunId` értéket is. A `stepRunId`
+  nélkül két **különböző** `fan_out` node azonos sorszámú eleme azonos kontextusnak látszana: egy
+  `f1 -> A -> j1 -> f2 -> B -> j2` alakú gráfban az `A` és a `B` verme egyaránt egyetlen `fan_out`
+  keret, azonos `itemIndex` értékkel is előfordulhat, `A` kimenete mégsem címezhető `B`-ből (6.2
+  zárómondata). A keretet a hatókört nyitó lépés egyszer állítja elő, és a leszármazottak másolják,
+  ezért a hatókörön belül a `stepRunId` minden példányban azonos; iterációnként új `step_run` sor
+  keletkezik (4.6), de az azonos iterációban futott példányok kerete így is egyezik.
+- **A gráfbeli ős halmazt lokális, visszafelé haladó bejárás adja**, nem a `run-graph` téma
+  `computeReachableNodeIds` függvénye. Az utóbbi az élek irányában számol, tehát csak úgy adná meg
+  ugyanezt, ha a gráf minden node-jára külön lefutna; a bejövő él térképen egyetlen menet elég. A
+  bejárás a **teljes** élhalmazon megy, a visszaéleket is követve: ez nem tágítja a láthatóságot,
+  mert a ciklustörzs kölcsönös ős viszonyát az előtag feltétel `iteration` összehasonlítása
+  metszi le.
+- **Az `item` mező a hívótól érkezik, nem a veremből.** A `BranchScope` alakja a 4.3 szekcióban szó
+  szerint áll, és a `fan_out` keret az elem **értékét** nem hordozza, csak az `itemIndex`
+  sorszámot; a spec pedig sehol nem mondja ki, hogy a `fan_out` node kimenete maga a kiértékelt
+  lista lenne. Az értéket tehát vagy megtippelnénk a `fan_out` node kimenetének alakjáról, vagy a
+  hívótól kérjük. A `joinInputs` és az `error` mező ugyanígy bemenet, ott viszont maga a spec köti
+  őket node típushoz (5.6, 8.2). Az `itemIndex` és az `iteration` ezzel szemben számított érték, és
+  a 6.1 szó szerinti megfogalmazása szerint a **legbelső azonos fajtájú** keretből jön, nem a verem
+  tetejéről: egy `fan_out` hatókörben nyitott `loop` esetén a tetőn `loop` keret áll, az
+  `itemIndex` mégis látszik.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).
