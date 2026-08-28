@@ -211,8 +211,10 @@ export { runAgentStep } from './agent-step/run-agent-step.ts';
 // hozzátette az `agent_step` és a `join` `ai_synthesis` végrehajtóját**, a
 // közös `agent-node-lifecycle.ts` menettel és a hely kérésével/
 // felszabadításával (7. szekció) - ez a téma belső segéde, nincs a barrelben.
-// A kimerítő `switch`-es diszpécsert **még mindig nem** ez a lépés írja meg:
-// a `human_approval` (T-005-22) és a `sub_workflow` (T-005-23) végrehajtója
+// **A T-005-22 hozzátette a `human_approval` végrehajtóját**, a korlátlan és
+// a korlátos várakozással (5.8), plusz a döntésre várás
+// `ApprovalWaitRegistry`-jét. A kimerítő `switch`-es diszpécsert **még mindig
+// nem** ez a lépés írja meg: a `sub_workflow` (T-005-23) végrehajtója
 // hiányzik, és egy most megírt diszpécser vagy nem lenne kimerítő (lint hiba),
 // vagy kódot nélkülöző placeholder ágat tartalmazna (rossz gyakorlat,
 // `.claude/CLAUDE.md` 5. szekció "nincs hibakezelés lehetetlen esetre" elve
@@ -243,3 +245,12 @@ export type { ExecuteAgentStepInput } from './node-executor/execute-agent-step.t
 export { executeAgentStep } from './node-executor/execute-agent-step.ts';
 export type { ExecuteJoinAiSynthesisInput } from './node-executor/execute-join-ai-synthesis.ts';
 export { executeJoinAiSynthesis } from './node-executor/execute-join-ai-synthesis.ts';
+// T-005-22: a `human_approval` végrehajtó, plusz a döntésre várás
+// regisztere (`ApprovalWaitRegistry`, SPEC-004 5.8, "Az időkorlát verseny").
+// A `createApprovalWaitRegistry` a hívó (jövőbeli `run-supervisor`,
+// T-005-25) által EGYETLEN példányban létrehozandó, minden futás által
+// megosztott állapot - ugyanaz a minta, mint a `createConcurrencyGate`.
+export type { ApprovalWaitRegistry } from './node-executor/approval-wait-registry.ts';
+export { createApprovalWaitRegistry } from './node-executor/approval-wait-registry.ts';
+export type { ExecuteHumanApprovalInput } from './node-executor/execute-human-approval.ts';
+export { executeHumanApproval } from './node-executor/execute-human-approval.ts';

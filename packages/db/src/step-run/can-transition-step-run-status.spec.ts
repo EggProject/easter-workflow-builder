@@ -14,11 +14,13 @@ const ALL_STEP_RUN_STATUSES: readonly StepRunStatus[] = [
   'interrupted',
 ];
 
-// A 7.2 táblázat pontosan tizenkettő érvényes átmenete, szó szerint átemelve
-// (3 a `pending`, 5 a `running`, 4 a `waiting_approval` sorból). Ez a lista a
-// teszt saját, a vizsgált függvénytől független elvárása: nem a
-// `canTransitionStepRunStatus` kimenetéből származtatjuk, hogy a teszt ne
-// tautológiává váljon.
+// A 7.2 táblázat pontosan tizenhárom érvényes átmenete (3 a `pending`, 5 a
+// `running`, 5 a `waiting_approval` sorból). A `waiting_approval->failed` a
+// SPEC-003 eredeti táblázatában nem szerepelt: a SPEC-004 5.8 szekció
+// (`human_approval` időkorlát, PLAN-005 T-005-22) vezette be, lásd
+// `can-transition-step-run-status.ts` doksiját. Ez a lista a teszt saját, a
+// vizsgált függvénytől független elvárása: nem a `canTransitionStepRunStatus`
+// kimenetéből származtatjuk, hogy a teszt ne tautológiává váljon.
 const VALID_TRANSITIONS: ReadonlySet<`${StepRunStatus}->${StepRunStatus}`> = new Set([
   'pending->running',
   'pending->cancelled',
@@ -30,13 +32,14 @@ const VALID_TRANSITIONS: ReadonlySet<`${StepRunStatus}->${StepRunStatus}`> = new
   'running->interrupted',
   'waiting_approval->succeeded',
   'waiting_approval->rejected',
+  'waiting_approval->failed',
   'waiting_approval->cancelled',
   'waiting_approval->interrupted',
 ]);
 
 describe('canTransitionStepRunStatus', () => {
   // A teljes 8x8 kereszttábla mind a 64 kombinációja, egyenként saját
-  // teszteset. A 12 érvényes átmenetre igazat, a maradék 52 érvénytelenre
+  // teszteset. A 13 érvényes átmenetre igazat, a maradék 51 érvénytelenre
   // hamisat várunk; egyetlen kombináció sincs kihagyva.
   for (const from of ALL_STEP_RUN_STATUSES) {
     for (const to of ALL_STEP_RUN_STATUSES) {
@@ -48,7 +51,7 @@ describe('canTransitionStepRunStatus', () => {
     }
   }
 
-  it('a tizenkettő érvényes átmenetet tartalmazza a vizsgálati lista', () => {
-    expect(VALID_TRANSITIONS.size).toBe(12);
+  it('a tizenhárom érvényes átmenetet tartalmazza a vizsgálati lista', () => {
+    expect(VALID_TRANSITIONS.size).toBe(13);
   });
 });
