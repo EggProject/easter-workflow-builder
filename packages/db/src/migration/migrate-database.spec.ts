@@ -28,6 +28,7 @@ describe('migrateDatabase', () => {
       'workflow',
       'workflow_edge',
       'workflow_node',
+      'workflow_run',
     ]);
 
     sqlite.close();

@@ -20,6 +20,7 @@ export default defineConfig({
     './src/workflow-graph/workflow-node.ts',
     './src/workflow-graph/workflow-edge.ts',
     './src/graph-snapshot/graph-snapshot.ts',
+    './src/workflow-run/workflow-run.ts',
   ],
   out: './drizzle',
 });
