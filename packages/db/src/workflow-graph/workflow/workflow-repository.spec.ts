@@ -138,7 +138,7 @@ function errorOrThrow<TValue>(outcome: Outcome<TValue>): string {
   return outcome.message;
 }
 
-const startConfig: NodeConfig = { type: 'start', inputFields: [] };
+const startConfig: NodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
 
 function twoNodesOneEdge(): { nodes: readonly WorkflowNodeInput[]; edges: readonly WorkflowEdgeInput[] } {
   const nodes: readonly WorkflowNodeInput[] = [
@@ -148,7 +148,7 @@ function twoNodesOneEdge(): { nodes: readonly WorkflowNodeInput[]; edges: readon
       label: 'B',
       positionX: 1,
       positionY: 1,
-      config: { type: 'branch', expression: 'true', branches: [], defaultBranchKey: null },
+      config: { type: 'branch', expression: 'true', branches: [], defaultBranchKey: null, onUnhandledError: null },
     },
   ];
   const edges: readonly WorkflowEdgeInput[] = [
