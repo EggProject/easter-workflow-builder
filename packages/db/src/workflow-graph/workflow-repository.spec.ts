@@ -2,8 +2,9 @@
 import SqliteDatabase from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { describeError, type Outcome } from '@easter-workflow-builder/core';
+import type { Outcome } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
+import { describeTransactionError } from '../sqlite-connection/describe-transaction-error.ts';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { workflowTable } from './workflow.ts';
@@ -52,7 +53,7 @@ function makeTransaction(database: BetterSQLite3Database) {
       if (error instanceof TransactionRollback) {
         return { kind: 'error', message: error.message };
       }
-      return { kind: 'error', message: describeError(error) };
+      return { kind: 'error', message: describeTransactionError(error) };
     }
   };
 }
@@ -397,7 +398,7 @@ describe('createWorkflowRepository', () => {
       sqlite.close();
     });
 
-    it('hibaágat ad és visszagörget, ha egy él nem létező node-ra hivatkozik (idegen kulcs sértés)', () => {
+    it('foreign_key_violation hibaágat ad és visszagörget, ha egy él nem létező node-ra hivatkozik (idegen kulcs sértés, T-003-28 / 40. kritérium)', () => {
       const { sqlite, repository } = openRepository();
       const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
 
@@ -415,7 +416,14 @@ describe('createWorkflowRepository', () => {
           },
         ],
       );
-      expect(outcome.kind).toBe('error');
+      // A `workflow_edge.target_node_id` idegen kulcs sértése a Drizzle
+      // típusos insert-builder `.run()`-ján át a `transaction()` (`open-
+      // database.ts`) általános fallback ágáig repül (a `workflow-
+      // repository.ts` `replaceGraph`-ja nem kapja el), amit a
+      // `describeTransactionError` fordít nevesített hibaosztályra: az
+      // üzenet TARTALMAZZA a `(foreign_key_violation)` jelölést, a
+      // `packages/db/CLAUDE.md` "Outcome hibaosztály konvenció" szerint.
+      expect(errorOrThrow(outcome)).toContain('(foreign_key_violation)');
 
       // A tranzakció visszagörgetése miatt a node sem íródott be.
       const graph = okOrThrow(repository.readGraph(workflow.id));

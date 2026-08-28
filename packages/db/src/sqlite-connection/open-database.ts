@@ -1,6 +1,7 @@
 import SqliteDatabase from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describeError, type Outcome } from '@easter-workflow-builder/core';
+import { describeTransactionError } from './describe-transaction-error.ts';
 import { ensureDatabaseDirectory } from '../database-file/ensure-database-directory.ts';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
@@ -83,7 +84,7 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
       if (error instanceof TransactionRollback) {
         return { kind: 'error', message: error.message };
       }
-      return { kind: 'error', message: describeError(error) };
+      return { kind: 'error', message: describeTransactionError(error) };
     }
   }
 
