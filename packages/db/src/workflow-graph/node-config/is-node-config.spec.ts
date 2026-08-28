@@ -30,24 +30,58 @@ const agentStepConfig: AgentStepConfig = {
 
 // Mind a tíz ág egy-egy érvényes példánya. A `NodeConfig[]` annotáció
 // fordítási idejű állítás is: az unió minden ágának le kell fednie egy elemet.
+// Az `onUnhandledError` értéke végig váltakozik (`fail_run` / `fail_branch` /
+// `null`), hogy mindhárom állapot lefedve legyen legalább egy érvényes configon.
 const validConfigs: readonly NodeConfig[] = [
-  { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }] },
-  { ...agentStepConfig, type: 'agent_step' },
+  {
+    type: 'start',
+    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true }],
+    onUnhandledError: 'fail_run',
+  },
+  { ...agentStepConfig, type: 'agent_step', onUnhandledError: 'fail_branch' },
   {
     type: 'branch',
     expression: 'input.score > 5',
     branches: [{ key: 'high', label: 'Magas' }],
     defaultBranchKey: 'high',
+    onUnhandledError: null,
   },
-  { type: 'fan_out', itemsExpression: 'input.items', branchLabelTemplate: '{{item}}' },
-  { type: 'join', mode: 'merge', settings: {} },
-  { type: 'join', mode: 'script', settings: { source: 'a + b', runtime: 'expression' } },
-  { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig },
-  { type: 'loop', maxIterations: 3, continueExpression: 'state.retry' },
-  { type: 'human_approval', title: 'Jóváhagyás', bodyTemplate: '{{summary}}' },
-  { type: 'error_handler', maxAttempts: 2, backoffMs: [1000, 5000], handledErrorKinds: ['rate_limit'] },
-  { type: 'sub_workflow', targetWorkflowId: 'workflow-1', inputMapping: { topic: 'input.topic' } },
-  { type: 'script', source: 'a + b', runtime: 'expression' },
+  {
+    type: 'fan_out',
+    itemsExpression: 'input.items',
+    branchLabelTemplate: '{{item}}',
+    onUnhandledError: 'fail_run',
+  },
+  { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_branch' },
+  {
+    type: 'join',
+    mode: 'script',
+    settings: { source: 'a + b', runtime: 'expression' },
+    onUnhandledError: null,
+  },
+  { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig, onUnhandledError: 'fail_run' },
+  { type: 'loop', maxIterations: 3, continueExpression: 'state.retry', onUnhandledError: 'fail_branch' },
+  {
+    type: 'human_approval',
+    title: 'Jóváhagyás',
+    bodyTemplate: '{{summary}}',
+    timeoutMs: null,
+    onUnhandledError: null,
+  },
+  {
+    type: 'error_handler',
+    maxAttempts: 2,
+    backoffMs: [1000, 5000],
+    handledErrorKinds: ['rate_limit'],
+    onUnhandledError: 'fail_run',
+  },
+  {
+    type: 'sub_workflow',
+    targetWorkflowId: 'workflow-1',
+    inputMapping: { topic: 'input.topic' },
+    onUnhandledError: 'fail_branch',
+  },
+  { type: 'script', source: 'a + b', runtime: 'expression', onUnhandledError: null },
 ];
 
 describe('isNodeConfig', () => {
@@ -58,8 +92,22 @@ describe('isNodeConfig', () => {
   });
 
   it('igazat ad üres start bemeneti mezőlistára és üres branch listára', () => {
-    expect(isNodeConfig({ type: 'start', inputFields: [] })).toBe(true);
-    expect(isNodeConfig({ type: 'branch', expression: 'x', branches: [], defaultBranchKey: null })).toBe(true);
+    expect(isNodeConfig({ type: 'start', inputFields: [], onUnhandledError: null })).toBe(true);
+    expect(
+      isNodeConfig({ type: 'branch', expression: 'x', branches: [], defaultBranchKey: null, onUnhandledError: null }),
+    ).toBe(true);
+  });
+
+  it('igazat ad számmal megadott human_approval timeoutMs értékre', () => {
+    expect(
+      isNodeConfig({
+        type: 'human_approval',
+        title: 'Jóváhagyás',
+        bodyTemplate: '{{summary}}',
+        timeoutMs: 5000,
+        onUnhandledError: 'fail_run',
+      }),
+    ).toBe(true);
   });
 
   it('hamisat ad nem rekord bemenetre', () => {
@@ -92,7 +140,12 @@ describe('isNodeConfig', () => {
       'start: required nem logikai',
       { type: 'start', inputFields: [{ name: 'topic', label: 'T', valueKind: 'text', required: 'igen' }] },
     ],
+    ['start: onUnhandledError érvénytelen', { type: 'start', inputFields: [], onUnhandledError: 'unknown_policy' }],
     ['agent_step: hibás belső config', { type: 'agent_step', promptTemplate: 7 }],
+    [
+      'agent_step: onUnhandledError érvénytelen (isAgentStepConfig önmagában nem ellenőrzi)',
+      { ...agentStepConfig, type: 'agent_step', onUnhandledError: 7 },
+    ],
     ['branch: expression rossz típusú', { type: 'branch', expression: 7, branches: [], defaultBranchKey: null }],
     ['branch: branches nem tömb', { type: 'branch', expression: 'x', branches: {}, defaultBranchKey: null }],
     ['branch: ág nem rekord', { type: 'branch', expression: 'x', branches: ['high'], defaultBranchKey: null }],
@@ -105,20 +158,69 @@ describe('isNodeConfig', () => {
       { type: 'branch', expression: 'x', branches: [{ key: 'high', label: 7 }], defaultBranchKey: null },
     ],
     ['branch: defaultBranchKey rossz típusú', { type: 'branch', expression: 'x', branches: [], defaultBranchKey: 7 }],
+    [
+      'branch: onUnhandledError érvénytelen',
+      { type: 'branch', expression: 'x', branches: [], defaultBranchKey: null, onUnhandledError: 'unknown_policy' },
+    ],
     ['fan_out: itemsExpression rossz típusú', { type: 'fan_out', itemsExpression: 7, branchLabelTemplate: '{{item}}' }],
     ['fan_out: branchLabelTemplate hiányzik', { type: 'fan_out', itemsExpression: 'input.items' }],
+    [
+      'fan_out: onUnhandledError érvénytelen',
+      { type: 'fan_out', itemsExpression: 'input.items', branchLabelTemplate: '{{item}}', onUnhandledError: 7 },
+    ],
     ['join: ismeretlen mód', { type: 'join', mode: 'concat', settings: {} }],
     ['join: hiányzó mód', { type: 'join', settings: {} }],
     ['join: merge alobjektum nem rekord', { type: 'join', mode: 'merge', settings: 'first' }],
     ['join: script alobjektum hibás', { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'js' } }],
     ['join: ai_synthesis alobjektum hibás', { type: 'join', mode: 'ai_synthesis', settings: { promptTemplate: 7 } }],
+    [
+      'join: merge onUnhandledError érvénytelen',
+      { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'unknown_policy' },
+    ],
+    [
+      'join: script onUnhandledError érvénytelen (isScriptConfig önmagában nem ellenőrzi)',
+      {
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'a + b', runtime: 'expression' },
+        onUnhandledError: 7,
+      },
+    ],
+    [
+      'join: ai_synthesis onUnhandledError érvénytelen (isAgentStepConfig önmagában nem ellenőrzi)',
+      { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig, onUnhandledError: 'unknown_policy' },
+    ],
     ['loop: maxIterations nulla', { type: 'loop', maxIterations: 0, continueExpression: 'x' }],
     ['loop: maxIterations negatív', { type: 'loop', maxIterations: -1, continueExpression: 'x' }],
     ['loop: maxIterations tört', { type: 'loop', maxIterations: 1.5, continueExpression: 'x' }],
     ['loop: maxIterations nem szám', { type: 'loop', maxIterations: '3', continueExpression: 'x' }],
     ['loop: continueExpression rossz típusú', { type: 'loop', maxIterations: 3, continueExpression: 7 }],
+    [
+      'loop: onUnhandledError érvénytelen',
+      { type: 'loop', maxIterations: 3, continueExpression: 'x', onUnhandledError: 7 },
+    ],
     ['human_approval: title rossz típusú', { type: 'human_approval', title: 7, bodyTemplate: 'x' }],
     ['human_approval: bodyTemplate hiányzik', { type: 'human_approval', title: 'Jóváhagyás' }],
+    [
+      'human_approval: onUnhandledError érvénytelen',
+      {
+        type: 'human_approval',
+        title: 'Jóváhagyás',
+        bodyTemplate: 'x',
+        timeoutMs: null,
+        onUnhandledError: 'unknown_policy',
+      },
+    ],
+    [
+      'human_approval: timeoutMs érvénytelen',
+      {
+        type: 'human_approval',
+        title: 'Jóváhagyás',
+        bodyTemplate: 'x',
+        timeoutMs: '5000',
+        onUnhandledError: 'fail_run',
+      },
+    ],
     [
       'error_handler: maxAttempts nulla',
       { type: 'error_handler', maxAttempts: 0, backoffMs: [1000], handledErrorKinds: [] },
@@ -135,6 +237,10 @@ describe('isNodeConfig', () => {
       'error_handler: handledErrorKinds nem szövegtömb',
       { type: 'error_handler', maxAttempts: 2, backoffMs: [1000], handledErrorKinds: [7] },
     ],
+    [
+      'error_handler: onUnhandledError érvénytelen',
+      { type: 'error_handler', maxAttempts: 2, backoffMs: [1000], handledErrorKinds: [], onUnhandledError: 7 },
+    ],
     ['sub_workflow: targetWorkflowId rossz típusú', { type: 'sub_workflow', targetWorkflowId: 7, inputMapping: {} }],
     [
       'sub_workflow: inputMapping nem rekord',
@@ -144,8 +250,21 @@ describe('isNodeConfig', () => {
       'sub_workflow: inputMapping értéke nem szöveg',
       { type: 'sub_workflow', targetWorkflowId: 'workflow-1', inputMapping: { topic: 7 } },
     ],
+    [
+      'sub_workflow: onUnhandledError érvénytelen',
+      {
+        type: 'sub_workflow',
+        targetWorkflowId: 'workflow-1',
+        inputMapping: {},
+        onUnhandledError: 'unknown_policy',
+      },
+    ],
     ['script: source rossz típusú', { type: 'script', source: 7, runtime: 'expression' }],
     ['script: ismeretlen runtime', { type: 'script', source: 'a + b', runtime: 'javascript' }],
+    [
+      'script: onUnhandledError érvénytelen (isScriptConfig önmagában nem ellenőrzi)',
+      { type: 'script', source: 'a + b', runtime: 'expression', onUnhandledError: 7 },
+    ],
   ];
 
   for (const [description, config] of rejectedConfigs) {
