@@ -13,12 +13,43 @@ import { workflowNodeTable } from './workflow-node.ts';
  * kerekre fordul (`mode: 'json'`), és a `workflow_id` idegen kulcs
  * `ON DELETE CASCADE` tényleg törli a gyerek sort (SPEC-003 4.2 szekció).
  */
-function openMigratedDatabase(): { sqlite: SqliteDatabase.Database; database: BetterSQLite3Database } {
+function openMigratedDatabase(options: { foreignKeys?: boolean } = {}): {
+  sqlite: SqliteDatabase.Database;
+  database: BetterSQLite3Database;
+} {
   const sqlite = new SqliteDatabase(':memory:');
-  sqlite.pragma('foreign_keys = ON');
+  // A `better-sqlite3` 13.0.3 ténylegesen bekapcsolt `foreign_keys` pragmával
+  // nyit (saját mérés, nem az F-1 által hivatkozott, a puszta SQLite
+  // könyvtárra vonatkozó kikapcsolt alapértelmezés), ezért a "pragma nélküli"
+  // ághoz **explicit ki kell kapcsolni**, nem elég kihagyni a bekapcsolást.
+  sqlite.pragma(options.foreignKeys === false ? 'foreign_keys = OFF' : 'foreign_keys = ON');
   const database = drizzle(sqlite);
   migrateDatabase(database, MIGRATIONS_FOLDER);
   return { sqlite, database };
+}
+
+/**
+ * Egy workflow és egy hozzá tartozó node sor, a kaszkád vizsgálatához.
+ */
+function seedWorkflowWithNode(database: BetterSQLite3Database, workflowId: string, nodeId: string): void {
+  database
+    .insert(workflowTable)
+    .values({ id: workflowId, name: workflowId, createdAtMs: new Date(0), updatedAtMs: new Date(0) })
+    .run();
+  database
+    .insert(workflowNodeTable)
+    .values({
+      id: nodeId,
+      workflowId,
+      type: 'start',
+      label: 'Node',
+      positionX: 0,
+      positionY: 0,
+      config: {},
+      createdAtMs: new Date(0),
+      updatedAtMs: new Date(0),
+    })
+    .run();
 }
 
 describe('workflowNodeTable', () => {
@@ -80,6 +111,35 @@ describe('workflowNodeTable', () => {
     expect(rows).toStrictEqual([]);
 
     sqlite.close();
+  });
+
+  it('kikapcsolt foreign_keys pragma mellett a kaszkád NEM fut le, bekapcsolt mellett igen (12. kritérium)', () => {
+    // Ugyanaz a séma, ugyanaz a törlés, egyetlen különbség a kapcsolatonként
+    // beállított `foreign_keys` pragma (F-1, F-2). Ez az a teszt, ami
+    // igazolja, hogy a pragma nem díszítés: nélküle a törlés csendben árva
+    // sort hagy, tehát a 3. user döntés (végleges törlés mindennel együtt)
+    // sérülne, ha az `openDatabase` valaha kihagyná a bekapcsolást (10.2).
+    const withoutForeignKeys = openMigratedDatabase({ foreignKeys: false });
+    seedWorkflowWithNode(withoutForeignKeys.database, 'workflow-fk-off', 'node-fk-off');
+    withoutForeignKeys.database.delete(workflowTable).where(eq(workflowTable.id, 'workflow-fk-off')).run();
+    const orphanRows = withoutForeignKeys.database
+      .select()
+      .from(workflowNodeTable)
+      .where(eq(workflowNodeTable.workflowId, 'workflow-fk-off'))
+      .all();
+    expect(orphanRows).toHaveLength(1);
+    withoutForeignKeys.sqlite.close();
+
+    const withForeignKeys = openMigratedDatabase();
+    seedWorkflowWithNode(withForeignKeys.database, 'workflow-fk-on', 'node-fk-on');
+    withForeignKeys.database.delete(workflowTable).where(eq(workflowTable.id, 'workflow-fk-on')).run();
+    const cascadedRows = withForeignKeys.database
+      .select()
+      .from(workflowNodeTable)
+      .where(eq(workflowNodeTable.workflowId, 'workflow-fk-on'))
+      .all();
+    expect(cascadedRows).toStrictEqual([]);
+    withForeignKeys.sqlite.close();
   });
 
   it('a workflow_id idegen kulcs ON DELETE CASCADE-del a workflow táblára mutat', () => {
