@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                    |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet, végrehajtás előtt user jóváhagyást igényel                                                                                                                                               |
+| Státusz  | végrehajtva (F0-F6, a 4.4 szekció is-string-array javaslatával, a barrel-exports.spec.ts javaslat nélkül)                                                                                          |
 | Dátum    | 2026-08-28                                                                                                                                                                                         |
 | Ág       | `feat/spec-003-domain-perzisztencia`                                                                                                                                                               |
 | Előzmény | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md) 6. szekció, [`../spec/SPEC-003-domain-perzisztencia.md`](../spec/SPEC-003-domain-perzisztencia.md) 8. szekció |
@@ -484,6 +484,15 @@ F5: részlegesen kész, csak a 4.5 szekció szerinti javaslat: `isStringArray` �
 A 4.4 szekció első javaslata (`barrel-exports.spec.ts` külön mappába) NEM hajtódott végre:
 a user jóváhagyása nem terjedt ki rá explicit módon, a plan 4.4 szekciója ezt "user külön
 döntését igénylő" tételként jelöli. Mind a kilenc kapu zöld, 912 teszt, 100% lefedettség.
+F6: kész, zárás. Fájlonkénti elszámolás: a `packages/db/src` 106 fájlt tartalmaz (105 plusz az
+`index.ts` barrel), pontosan 12 mappa közvetlenül a `src/` alatt (9 lapos téma, 3 tárgykör 10
+téma alkönyvtárral), ez a 108 fájlos kiindulási állapot (107 plusz a barrel) mínusz a 2, F5-ben
+a `typeguards` csomagba költözött fájl. A `packages/typeguards/src` fájlszáma 37-ről 39-re nőtt
+(plusz a barrel, 40 összesen), az új mappa `is-string-array/`. Sem `docs/research/`, sem az
+`apps/`, sem a többi `packages/` alatt nem maradt hivatkozás a régi lapos útvonalakra
+(repó-szintű grep igazolja). Mind a kilenc kapu zöld a záró futáson: `format:check`,
+`typecheck`, `lint` (`--concurrency=2`-vel), `test` (99 fájl, 912 teszt, 100% lefedettség mind
+a négy metrikán), `build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
 
 **Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha
