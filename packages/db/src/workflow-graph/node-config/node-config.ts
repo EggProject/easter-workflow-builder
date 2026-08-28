@@ -1,4 +1,4 @@
-import type { AgentStepConfig } from './agent-step-config.ts';
+import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import type { ScriptConfig } from './script-config.ts';
 
 /**

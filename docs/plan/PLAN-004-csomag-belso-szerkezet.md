@@ -476,6 +476,9 @@ F2: kész (`run-event/` -> `event-record/`, `event-kind/`, `sdk-message/`, 15 f�
 kilenc kapu zöld, 912 teszt, 100% lefedettség).
 F3: kész (`graph-snapshot/` -> `stored-snapshot/`, `snapshot-document/`, `snapshot-hash/`,
 18 fájl, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
+F4: kész (`workflow-graph/` -> `workflow/`, `node-type/`, `node-config/`, `agent-step-config/`,
+24 fájl, az `is-string-array.ts` egyelőre a `node-config/` alatt, a 4.5 szekció szerinti
+fallback helyen, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
 
 **Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha

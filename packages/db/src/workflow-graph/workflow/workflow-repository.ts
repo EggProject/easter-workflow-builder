@@ -6,11 +6,11 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
-import type { NodeConfig } from './node-config.ts';
-import type { NodeType } from './node-type.ts';
-import { isNodeConfig } from './is-node-config.ts';
-import { workflowRunTable } from '../workflow-run/workflow-run.ts';
-import { runEventTable } from '../run-event/event-record/run-event.ts';
+import type { NodeConfig } from '../node-config/node-config.ts';
+import type { NodeType } from '../node-type/node-type.ts';
+import { isNodeConfig } from '../node-config/is-node-config.ts';
+import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
+import { runEventTable } from '../../run-event/event-record/run-event.ts';
 
 /**
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1

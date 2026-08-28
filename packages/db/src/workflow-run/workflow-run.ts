@@ -1,6 +1,6 @@
 import { type AnySQLiteColumn, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
+import { workflowTable } from '../workflow-graph/workflow/workflow.ts';
 
 /**
  * A `workflow_run` tábla (SPEC-003 4.8 szekció). Egy sor egyetlen futást ír

@@ -7,8 +7,8 @@ import {
   type StructuredOutputStrategyId,
 } from '@easter-workflow-builder/provider-capability';
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { NodeType } from '../workflow-graph/node-type.ts';
-import type { SessionMode } from '../workflow-graph/session-mode.ts';
+import type { NodeType } from '../workflow-graph/node-type/node-type.ts';
+import type { SessionMode } from '../workflow-graph/agent-step-config/session-mode.ts';
 import { stepRunTable } from './step-run.ts';
 import { canTransitionStepRunStatus } from './can-transition-step-run-status.ts';
 import { isStepRunStatus } from './is-step-run-status.ts';

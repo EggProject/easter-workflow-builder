@@ -1,5 +1,5 @@
 import type { ProviderId } from '@easter-workflow-builder/provider-capability';
-import type { NodeType } from '../../workflow-graph/node-type.ts';
+import type { NodeType } from '../../workflow-graph/node-type/node-type.ts';
 
 /**
  * A kiadott pillanatkép dokumentum verziók szűk uniója (SPEC-003 5.2

@@ -16,9 +16,9 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
   dialect: 'sqlite',
   schema: [
-    './src/workflow-graph/workflow.ts',
-    './src/workflow-graph/workflow-node.ts',
-    './src/workflow-graph/workflow-edge.ts',
+    './src/workflow-graph/workflow/workflow.ts',
+    './src/workflow-graph/workflow/workflow-node.ts',
+    './src/workflow-graph/workflow/workflow-edge.ts',
     './src/graph-snapshot/stored-snapshot/graph-snapshot.ts',
     './src/workflow-run/workflow-run.ts',
     './src/step-run/step-run.ts',

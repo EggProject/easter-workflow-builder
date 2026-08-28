@@ -6,7 +6,7 @@ import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
+import { workflowTable } from '../workflow-graph/workflow/workflow.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import { canonicalizeSnapshotDocument } from '../graph-snapshot/snapshot-hash/canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
@@ -25,7 +25,7 @@ import {
 } from './workflow-run-repository.ts';
 
 /**
- * Ugyanaz a minta, mint a `workflow-graph/workflow-repository.spec.ts`-ben:
+ * Ugyanaz a minta, mint a `workflow-graph/workflow/workflow-repository.spec.ts`-ben:
  * a `.spec.ts` fájl a `createWorkflowRunRepository`-t közvetlenül teszteli,
  * nem az `openDatabase` kompozíción keresztül, hogy legyen közvetlen
  * `database` hozzáférés a nyers beszúrásokhoz (korrupt adat, FK nélküli

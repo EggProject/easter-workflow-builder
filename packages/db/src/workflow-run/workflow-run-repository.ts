@@ -9,7 +9,7 @@ import { resolveSnapshotReuse } from '../graph-snapshot/stored-snapshot/resolve-
 import { readGraphSnapshot } from '../graph-snapshot/snapshot-document/read-graph-snapshot.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import type { GraphSnapshotDocument } from '../graph-snapshot/snapshot-document/graph-snapshot-document.ts';
-import { isStringArray } from '../workflow-graph/is-string-array.ts';
+import { isStringArray } from '../workflow-graph/node-config/is-string-array.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
 import { insertEngineEventRow } from '../run-event/event-record/insert-engine-event-row.ts';
 import { workflowRunTable } from './workflow-run.ts';
@@ -21,7 +21,7 @@ import type { RunStatus } from './run-status.ts';
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1
  * szekció). Nem onnan importáljuk, hogy elkerüljük a kört (`database-context.ts`
  * a `WorkflowRunRepository` típust importálja innen), ugyanaz a minta, mint a
- * `workflow-graph/workflow-repository.ts`-ben.
+ * `workflow-graph/workflow/workflow-repository.ts`-ben.
  */
 type TransactionFunction = <TValue>(work: () => Outcome<TValue>) => Outcome<TValue>;
 
