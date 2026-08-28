@@ -12,6 +12,7 @@ import { canonicalizeSnapshotDocument } from '../graph-snapshot/canonicalize-sna
 import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
 import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
+import { runEventTable } from '../run-event/run-event.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import {
   createWorkflowRunRepository,
@@ -177,6 +178,22 @@ describe('createWorkflowRunRepository', () => {
       expect(run.errorMessage).toBeNull();
       expect(run.restartedFromRunId).toBeNull();
       expect(run.persistedStreamDeltas).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('ugyanabban a tranzakcióban egy run_started motor eseményt is ír a run_event táblába (T-003-21)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+
+      const run = start(repository, 'w1', 'Doc');
+
+      const events = database.select().from(runEventTable).where(eq(runEventTable.runId, run.id)).all();
+      expect(events).toHaveLength(1);
+      expect(events[0]?.kind).toBe('run_started');
+      expect(events[0]?.origin).toBe('engine');
+      expect(events[0]?.stepRunId).toBeNull();
+      expect(events[0]?.payload).toStrictEqual({ runId: run.id, workflowId: 'w1' });
 
       sqlite.close();
     });

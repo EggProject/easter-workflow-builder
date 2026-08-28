@@ -11,6 +11,7 @@ import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import type { GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
 import { isStringArray } from '../workflow-graph/is-string-array.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
+import { insertEngineEventRow } from '../run-event/insert-engine-event-row.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import { canTransitionRunStatus } from './can-transition-run-status.ts';
 import { isRunStatus } from './is-run-status.ts';
@@ -281,7 +282,8 @@ export function createWorkflowRunRepository(
    *    (7.1 táblázat): a `startRun` nem viszi `running`-ba, azt a motor teszi
    *    a `markRunRunning` hívással, amikor ténylegesen elindítja az első
    *    lépést.
-   * 5. A `run_started` esemény írása NYITOTT PONT (lásd lent).
+   * 5. A `run_started` esemény írása, ugyanebben a tranzakcióban
+   *    (`insertEngineEventRow`, lásd lent).
    */
   function startRun(input: StartRunInput): Outcome<WorkflowRunRecord> {
     return transaction(() => {
@@ -338,17 +340,36 @@ export function createWorkflowRunRepository(
 
       database.insert(workflowRunTable).values(row).run();
 
-      // NYITOTT PONT (T-003-21 zárja le): a `run_started` esemény írása a
-      // `run_event` táblára a T-003-19 lépésig nem lehetséges, mert az a
-      // tábla ebben a fázisban (F5) még nem létezik (SPEC-003 6.6 szekció).
-      // A T-003-21 ugyanebben a tranzakcióban, itt fogja beírni, a 6.6
-      // szekció vázlata szerint:
-      //   INSERT INTO run_event (...)
-      //   SELECT ..., ...
-      //     FROM workflow_run
-      //    WHERE id = :run_id
-      //      AND (:kind <> 'sdk_stream_event' OR persisted_stream_deltas = 1)
-      // `kind = 'run_started'`, `origin = 'engine'` értékkel meghívva.
+      // A `run_started` esemény írása, ugyanabban a tranzakcióban, mint a
+      // fenti futás sor (SPEC-003 6.6 szekció, T-003-21 zárja le a T-003-16
+      // "NYITOTT PONT" kommentjét). Az `insertEngineEventRow`
+      // (`run-event/insert-engine-event-row.ts`) PLAIN, tranzakció nélküli
+      // segédfüggvény - nem nyit saját `database.transaction()`-t, ezért itt,
+      // a `startRun` saját tranzakciós kontextusában közvetlenül hívható,
+      // beágyazott tranzakció nélkül. Ugyanezt a függvényt használja a
+      // `RunEventRepository.appendEngineEvent` is, a saját `transaction()`
+      // hívásába csomagolva. `stepRunId: null`, mert ez futás szintű esemény
+      // (6.2 szekció).
+      //
+      // A visszaadott `Outcome`-ot szándékosan nem ágaztatjuk el: a
+      // `not_found` hibaág kizárólag akkor jönne, ha a `row.id` futás nem
+      // létezne a `workflow_run` táblában, ez viszont a fenti `insert()`
+      // sikeres lefutása után, UGYANEBBEN a tranzakcióban, UGYANAZON a
+      // kapcsolaton logikailag kizárt (a SQLite egy kapcsolat egy, még nem
+      // commitolt tranzakcióján belül mindig látja a saját írását). Egy
+      // elágazás ide egy soha nem futó ágat vinne be, amit a SPEC-003 12.4
+      // szekció 100 százalékos, kizárás nélküli lefedettségi küszöbe nem
+      // engedne meg; a `not_found` ág valós tesztje a
+      // `run-event-repository.spec.ts` `appendEngineEvent`-jén fut, ismeretlen
+      // `runId`-val.
+      insertEngineEventRow(database, {
+        runId: row.id,
+        // eslint-disable-next-line unicorn/no-null -- futás szintű esemény: a run_event.step_run_id valódi NULL értéke, nem helyőrző (SPEC-003 6.2 szekció)
+        stepRunId: null,
+        kind: 'run_started',
+        occurredAtMs: now,
+        payload: { runId: row.id, workflowId: row.workflowId },
+      });
 
       return {
         kind: 'ok',
