@@ -37,7 +37,19 @@ export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 // szűkítést. A többi ág típusa szándékosan **nem** kerül ki: a szűkítés az
 // unióból számol, a validáció pedig a diszkriminátorokon (`type`, `mode`)
 // keresztül szűkít, tehát az ágakat névvel egyetlen szignatúra sem említi.
-export type { NodeConfig, ScriptNodeConfig, JoinScriptNodeConfig } from './workflow-graph/node-config/node-config.ts';
+//
+// **Két kivétel a T-005-24 óta**: az `ErrorHandlerNodeConfig` és az
+// `UnhandledErrorPolicy`. Az előbbi az `execute-error-handler` és a
+// `resolveRetryDecision` publikus szignatúrájában áll (SPEC-004 8.2), az
+// utóbbi a `resolveErrorRoute` bemenetében (8.3): mindkettőt névvel említi
+// egy motor felület, tehát az `Exclude`-alapú szűkítés itt nem elég.
+export type {
+  NodeConfig,
+  ScriptNodeConfig,
+  JoinScriptNodeConfig,
+  ErrorHandlerNodeConfig,
+  UnhandledErrorPolicy,
+} from './workflow-graph/node-config/node-config.ts';
 export { isNodeConfig } from './workflow-graph/node-config/is-node-config.ts';
 // Az agent lépés beállításai (T-005-19, SPEC-004 5.2 4. pont): az `engine`
 // csomag `agent-step` témája ebből állítja össze a kimenő SDK `Options`

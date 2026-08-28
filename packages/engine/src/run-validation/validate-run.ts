@@ -11,6 +11,7 @@ import { resolveNodeProviders } from './resolve-node-providers.ts';
 import { validateBranchEdgeKeys } from './validate-branch-edge-keys.ts';
 import { validateDefaultBranchKey } from './validate-default-branch-key.ts';
 import { validateEdgeEndpoints } from './validate-edge-endpoints.ts';
+import { validateErrorHandlerBackoff } from './validate-error-handler-backoff.ts';
 import { validateErrorHandlerEdges } from './validate-error-handler-edges.ts';
 import { validateImplementedNodeTypes } from './validate-implemented-node-types.ts';
 import { validateJoinMergeSettings } from './validate-join-merge-settings.ts';
@@ -71,7 +72,8 @@ function firstError(checks: readonly (() => Outcome<void>)[]): Outcome<void> {
  *    párosítás.
  * 5. Config szint: előbb az érvényesség (`validateNodeConfigs`), utána a
  *    végrehajthatóság (`validateImplementedNodeTypes`), és csak az így
- *    szűkített unión a maradék hat config ellenőrzés.
+ *    szűkített unión a maradék hét config ellenőrzés. A hetedik a 4.7
+ *    táblázaton kívüli `validateErrorHandlerBackoff` (8.2 3. pont).
  * 6. `resolveNodeProviders` (4.8 2. lépés): a feloldás node-onként.
  */
 export function validateRun(
@@ -121,6 +123,7 @@ export function validateRun(
     () => validateDefaultBranchKey(nodeConfigsById),
     () => validateReservedBranchKeys(nodeConfigsById),
     () => validateErrorHandlerEdges(graph),
+    () => validateErrorHandlerBackoff(nodeConfigsById),
     () => validateJoinMergeSettings(nodeConfigsById),
   ]);
   if (semantics.kind === 'error') {

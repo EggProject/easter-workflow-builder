@@ -43,6 +43,21 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
  *   csak a `stepRun` rekordot (a `db` `decideApproval` már elvégezte a
  *   `waiting_approval -> succeeded`/`rejected` átmenetet, ezt a végrehajtó
  *   `getStepRun`-nal olvassa vissza) és a döntést adja vissza.
+ * - `retry_scheduled` -> az `error_handler` node végrehajtója ütemezett egy
+ *   újabb kísérletet (SPEC-004 8.2 4. pont). A `stepRun` az `error_handler`
+ *   **saját**, `succeeded` állapotban lezárt sora, a `retryStepRun` pedig a
+ *   hibát adó node **új**, `pending` állapotú `step_run` sora `attempt + 1`
+ *   értékkel. A vezérlés a **megismételt node** saját kimenő élein megy
+ *   tovább, NEM az `error_handler` élein (8.2 5. pont), tehát ebből az ágból
+ *   a hívó nem épít `SchedulingEvent`-et az `error_handler` node-ra: a
+ *   megismételt példányt kell futtatnia.
+ * - `retry_exhausted` -> minden kísérlet elfogyott (8.2 2. pont). Az
+ *   `error_handler` saját sora `failed` állapotban zárt
+ *   `retry_attempts_exhausted` osztállyal, és a vezérlés az `exhausted` élre
+ *   megy, ha van ilyen; ha nincs, a 8.3 politika következik. Ez a
+ *   megkülönböztetés azért külön ág és nem a `failed` ág, mert itt a
+ *   menekülő él `branch_key` értéke `exhausted`, nem `on_error`
+ *   (`resolveErrorRoute` `escapeKey` paramétere).
  * - `failed` -> a hívó dönt (8.1, 8.3 szekció, `error-policy` téma,
  *   T-005-24): van-e `on_error` él, és ha nincs, `fail_run` vagy
  *   `fail_branch` a node config `onUnhandledError` mezője szerint. A
@@ -60,6 +75,13 @@ export type NodeExecutionOutcome =
   | { readonly kind: 'fan_out_expanded'; readonly stepRun: StepRunRecord; readonly items: readonly unknown[] }
   | { readonly kind: 'loop_advanced'; readonly stepRun: StepRunRecord; readonly shouldContinue: boolean }
   | { readonly kind: 'approval_decided'; readonly stepRun: StepRunRecord; readonly decision: ApprovalDecision }
+  | { readonly kind: 'retry_scheduled'; readonly stepRun: StepRunRecord; readonly retryStepRun: StepRunRecord }
+  | {
+      readonly kind: 'retry_exhausted';
+      readonly stepRun: StepRunRecord;
+      readonly errorKind: 'retry_attempts_exhausted';
+      readonly errorMessage: string;
+    }
   | {
       readonly kind: 'failed';
       readonly stepRun: StepRunRecord;
