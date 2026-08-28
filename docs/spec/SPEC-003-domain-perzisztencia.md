@@ -311,7 +311,7 @@ A `structuredOutput.strategy` értékkészlete a meglévő `StructuredOutputStra
 
 A `schema` mező JSON Schema dokumentum, `unknown` a séma szintjén, typeguarddal szűkítve.
 
-**Mért kísérő megkötés, ami validációként épül be.** A research 5.2 szekciója szerint a `maxTurns` legalább 2 kell legyen az `sdk_output_format` ágon (az M-02 futás `maxTurns: 1` mellett `error_max_turns`-be esett), és legalább 3 az `emit_output_tool` ágon (M-19 mért igénye). A futás indítási validáció ezt ellenőrzi, és `insufficient_max_turns` hibával utasít el. Ez a két szám **mérésből** jön, nem becslésből.
+**Mért kísérő megkötés, ami validációként épül be.** A `maxTurns` alsó korlátja stratégiánként a `ProviderCapabilityDescriptor` `structuredOutput.strategies[].observedRoundTrips` mezőjéből jön, nem a domain rétegben tárolt számból (SPEC-004 11.3 táblázat 3. sora). A mérési eredet megmarad: a research 5.2 szekciója szerint az `sdk_output_format` ágon az M-02 futás `maxTurns: 1` mellett `error_max_turns`-be esett, az `emit_output_tool` ág igénye pedig M-19 mérésből jön. A futás indítási validáció (a motor `capability-policy` témája) ezt a leíróból olvasott minimumot ellenőrzi, és `insufficient_max_turns` hibával utasít el. Ez a szám **mérésből** jön, nem becslésből, és nincs beégetve a domain rétegbe.
 
 ### 4.7 `workflow_edge`
 
