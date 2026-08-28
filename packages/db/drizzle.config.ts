@@ -24,6 +24,7 @@ export default defineConfig({
     './src/step-run/step-run.ts',
     './src/app-setting/app-setting.ts',
     './src/provider-concurrency/provider-concurrency.ts',
+    './src/run-event/run-event.ts',
   ],
   out: './drizzle',
 });
