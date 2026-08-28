@@ -17,7 +17,7 @@ import * as barrel from '../index.ts';
  * szimbólumokat (`drizzle()` példány és `better-sqlite3` handle az
  * `open-database.ts` lezárásában, SPEC-003 9.1 szekció), tehát a zártságot
  * itt kell bizonyítani. Az implementációs pár nélküli `.spec.ts` fájlnak van
- * előzménye a csomagban (`graph-snapshot/graph-snapshot-immutability.spec.ts`).
+ * előzménye a csomagban (`graph-snapshot/stored-snapshot/graph-snapshot-immutability.spec.ts`).
  *
  * Két, egymást kiegészítő ellenőrzés kell, mert a barrel túlnyomó része
  * `export type`, ami fordításkor törlődik, tehát futásidőben nem

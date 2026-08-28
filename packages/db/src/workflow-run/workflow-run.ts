@@ -1,5 +1,5 @@
 import { type AnySQLiteColumn, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
+import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import { workflowTable } from '../workflow-graph/workflow.ts';
 
 /**

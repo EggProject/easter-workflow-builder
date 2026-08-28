@@ -474,6 +474,8 @@ miatt ehhez **kilencedikként a `bun run check:db-drift`** is minden fázis vég
 **Végrehajtás állapota.** F1: kész (a SPEC-002, a SPEC-003 és a `.claude/CLAUDE.md` átvezetve).
 F2: kész (`run-event/` -> `event-record/`, `event-kind/`, `sdk-message/`, 15 fájl, mind a
 kilenc kapu zöld, 912 teszt, 100% lefedettség).
+F3: kész (`graph-snapshot/` -> `stored-snapshot/`, `snapshot-document/`, `snapshot-hash/`,
+18 fájl, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
 
 **Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha

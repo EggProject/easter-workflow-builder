@@ -11,8 +11,11 @@ import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
 import type { NodeConfig } from './node-config.ts';
-import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
-import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
+import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
+import {
+  GRAPH_DOCUMENT_VERSION,
+  type GraphSnapshotDocument,
+} from '../graph-snapshot/snapshot-document/graph-snapshot-document.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import {
   createWorkflowRunRepository,

@@ -7,10 +7,13 @@ import { describe, expect, it } from 'vitest';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { workflowTable } from '../workflow-graph/workflow.ts';
-import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
-import { canonicalizeSnapshotDocument } from '../graph-snapshot/canonicalize-snapshot-document.ts';
-import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
-import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
+import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
+import { canonicalizeSnapshotDocument } from '../graph-snapshot/snapshot-hash/canonicalize-snapshot-document.ts';
+import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
+import {
+  GRAPH_DOCUMENT_VERSION,
+  type GraphSnapshotDocument,
+} from '../graph-snapshot/snapshot-document/graph-snapshot-document.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
 import { runEventTable } from '../run-event/event-record/run-event.ts';
 import { workflowRunTable } from './workflow-run.ts';

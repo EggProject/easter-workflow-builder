@@ -1,6 +1,6 @@
 import { isNumber, isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { isProviderId } from '@easter-workflow-builder/provider-capability';
-import { isNodeType } from '../workflow-graph/is-node-type.ts';
+import { isNodeType } from '../../workflow-graph/is-node-type.ts';
 import { GRAPH_DOCUMENT_VERSION } from './graph-snapshot-document.ts';
 import type { GraphSnapshotDocumentV1 } from './graph-snapshot-document.ts';
 
