@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { isProviderId, type ProviderId } from '@easter-workflow-builder/provider-capability';
 import type { Outcome } from '@easter-workflow-builder/core';
@@ -9,6 +9,7 @@ import { workflowEdgeTable } from './workflow-edge.ts';
 import type { NodeConfig } from './node-config.ts';
 import type { NodeType } from './node-type.ts';
 import { isNodeConfig } from './is-node-config.ts';
+import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 
 /**
  * Ugyanaz az aláírás, mint a `DatabaseContext.transaction` (SPEC-003 9.1
@@ -82,11 +83,14 @@ export interface WorkflowGraph {
 }
 
 /**
- * NYITOTT PONT (T-003-12 -> T-003-16 zárja le): a `workflow_run`, `run_event`
- * és `graph_snapshot` tábla ebben a fázisban (F4) még nem létezik (F5 fázis,
- * T-003-13/14/15/19), ezért a ténylegesen elveszíthető futás-, esemény- és
- * pillanatkép-darabszám itt nem számolható. A mezők a T-003-16-ig kényszerűen
- * `0` értéket adnak, lásd `summarizeDeletion`.
+ * A törlés előtti megerősítő párbeszédhez (SPEC-003 4.15 szekció, 28.
+ * kritérium): mi veszne el, ha a hívó ténylegesen törli a workflow-t.
+ *
+ * A `runCount` és a `snapshotCount` mezőt a `summarizeDeletion` lezárta
+ * (T-003-16), miután a `workflow_run` és a `graph_snapshot` tábla létrejött
+ * (F5 fázis). NYITOTT PONT marad az `eventCount`: a `run_event` tábla a
+ * T-003-19 lépésig nem létezik, tehát a ténylegesen törlődő esemény
+ * darabszám itt még nem számolható, a mező addig kényszerűen `0` értéket ad.
  */
 export interface DeletionSummary {
   readonly runCount: number;
@@ -342,24 +346,110 @@ export function createWorkflowRepository(
     });
   }
 
+  /**
+   * A `runCount` és a `snapshotCount` pontos, tényleges darabszám (T-003-16).
+   *
+   * **`runCount`**: nem elég a `workflow_id = ?` szűrés. A `workflow`
+   * törlése a `workflow_run.workflow_id` `ON DELETE CASCADE` miatt közvetlenül
+   * elviszi az ehhez a workflow-hoz tartozó sorokat, de ha ezek közül
+   * bármelyik **gyökér** futás (`root_run_id = id`), a `root_run_id`
+   * önhivatkozó `ON DELETE CASCADE` (4.15 szekció, F-11) továbbviszi a
+   * törlést az al-workflow futásaira is - **akkor is, ha azok más
+   * workflow-hoz tartoznak** (lásd `workflow-run.spec.ts`, "egy gyökér
+   * workflow_run sor törlése kaszkádban elviszi... al-workflow futásokat").
+   * A pontos halmaz ezért: az ehhez a workflow-hoz tartozó összes sor, UNIÓ
+   * mindazok a sorok (bármelyik workflow-hoz tartozzanak), amiknek a
+   * `root_run_id`-je egy, az ehhez a workflow-hoz tartozó **gyökér** futásra
+   * mutat. Rekurzív bejárás nem kell: egy `root_run_id` mindig a végső
+   * gyökérre mutat, nem a közvetlen szülőre (4.8 szekció), tehát egyetlen
+   * szint elég.
+   *
+   * **`snapshotCount`**: egy `graph_snapshot` sor pontosan akkor válik
+   * árvává ebben a törlésben, ha **minden** rá mutató `workflow_run` sor a
+   * fenti törlendő halmazban van (4.15 szekció, "hivatkozásszámláló oszlop
+   * nincs, a hivatkozottság a `workflow_run` sorokból vezethető le"). Ha akár
+   * egyetlen, a törlendő halmazon kívüli sor is ugyanarra a lenyomatra
+   * mutat (mert két workflow gráfja bájtra azonos, és megosztja a sort), a
+   * pillanatkép megmarad.
+   */
   function summarizeDeletion(workflowId: string): Outcome<DeletionSummary> {
     return transaction(() => {
       const existing = database.select().from(workflowTable).where(eq(workflowTable.id, workflowId)).get();
       if (existing === undefined) {
         return { kind: 'error', message: notFoundMessage(workflowId) };
       }
-      // NYITOTT PONT (T-003-16 zárja le): lásd a `DeletionSummary` fenti
-      // dokumentációját. A `workflow_run`/`run_event`/`graph_snapshot` tábla
-      // hiányában a darabszám itt kényszerűen nulla.
-      return { kind: 'ok', value: { runCount: 0, eventCount: 0, snapshotCount: 0 } };
+
+      const ownedRootRunRows = database
+        .select({ id: workflowRunTable.id })
+        .from(workflowRunTable)
+        .where(and(eq(workflowRunTable.workflowId, workflowId), eq(workflowRunTable.rootRunId, workflowRunTable.id)))
+        .all();
+      const ownedRootRunIds = ownedRootRunRows.map((row) => row.id);
+
+      const directRunRows = database
+        .select({ id: workflowRunTable.id, graphSnapshotHash: workflowRunTable.graphSnapshotHash })
+        .from(workflowRunTable)
+        .where(eq(workflowRunTable.workflowId, workflowId))
+        .all();
+
+      const deletedRunIds = new Set(directRunRows.map((row) => row.id));
+      const deletedRunHashes = new Set(directRunRows.map((row) => row.graphSnapshotHash));
+
+      if (ownedRootRunIds.length > 0) {
+        const cascadedRunRows = database
+          .select({ id: workflowRunTable.id, graphSnapshotHash: workflowRunTable.graphSnapshotHash })
+          .from(workflowRunTable)
+          .where(inArray(workflowRunTable.rootRunId, ownedRootRunIds))
+          .all();
+        for (const row of cascadedRunRows) {
+          deletedRunIds.add(row.id);
+          deletedRunHashes.add(row.graphSnapshotHash);
+        }
+      }
+
+      let snapshotCount = 0;
+      if (deletedRunIds.size > 0) {
+        for (const hash of deletedRunHashes) {
+          const survivingReference = database
+            .select({ id: workflowRunTable.id })
+            .from(workflowRunTable)
+            .where(
+              and(eq(workflowRunTable.graphSnapshotHash, hash), notInArray(workflowRunTable.id, [...deletedRunIds])),
+            )
+            .get();
+          if (survivingReference === undefined) {
+            snapshotCount += 1;
+          }
+        }
+      }
+
+      // NYITOTT PONT (T-003-19 zárja le): lásd a `DeletionSummary` fenti
+      // dokumentációját. A `run_event` tábla hiányában az esemény darabszám
+      // itt kényszerűen nulla.
+      return {
+        kind: 'ok',
+        value: { runCount: deletedRunIds.size, eventCount: 0, snapshotCount },
+      };
     });
   }
 
   /**
    * Az egyetlen törlési út (SPEC-003 9.2, 9.3). A `workflow` sor törlése a
    * bekapcsolt `foreign_keys` pragma (F-1) és az `ON DELETE CASCADE` lánc
-   * (4.15) miatt automatikusan elviszi a `workflow_node` és `workflow_edge`
-   * sorokat is, kézi törlés nélkül.
+   * (4.15) miatt automatikusan elviszi a `workflow_node`, `workflow_edge` és
+   * `workflow_run` sorokat is (utóbbi a `root_run_id` önhivatkozó kaszkádon
+   * át az al-workflow futásokat is, akkor is, ha más workflow-hoz tartoznak),
+   * kézi törlés nélkül.
+   *
+   * **Záró lépés: az árva pillanatkép söprés** (4.15 szekció, szó szerint,
+   * T-003-16 zárja le). A `graph_snapshot` nem a futás gyereke, hanem a
+   * szülője (5.6 szekció), tehát kaszkád nem viheti el: a fenti törlés UTÁN,
+   * ugyanabban a tranzakcióban egyetlen söprő utasítás fut, ami minden olyan
+   * sort elvisz, amire immár egyetlen `workflow_run` sor sem mutat. A
+   * második, adatbázis szintű védelem (`ON DELETE RESTRICT` a
+   * `workflow_run.graph_snapshot_hash` idegen kulcson, F-27) visszagörgetné
+   * a tranzakciót, ha a söprés feltétele valaha hibás lenne, tehát hivatkozott
+   * sor soha nem tűnhet el.
    */
   function deleteWorkflow(input: DeleteWorkflowInput): Outcome<void> {
     return transaction(() => {
@@ -367,12 +457,7 @@ export function createWorkflowRepository(
       if (deleted.changes === 0) {
         return { kind: 'error', message: notFoundMessage(input.workflowId) };
       }
-      // NYITOTT PONT (T-003-16 zárja le): a `graph_snapshot` tábla (SPEC-003
-      // 4.15 szekció) ebben a fázisban (F4) még nem létezik, ezért az árva
-      // pillanatkép söprés itt nem futtatható:
-      //   DELETE FROM graph_snapshot WHERE hash NOT IN (SELECT graph_snapshot_hash FROM workflow_run)
-      // A T-003-16 köti be ezt a söprést, ugyanebben a tranzakcióban, miután
-      // a `graph_snapshot` és a `workflow_run` tábla létrejön (F5 fázis).
+      database.run(sql`DELETE FROM graph_snapshot WHERE hash NOT IN (SELECT graph_snapshot_hash FROM workflow_run)`);
       return { kind: 'ok', value: undefined };
     });
   }

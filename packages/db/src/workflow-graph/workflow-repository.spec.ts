@@ -1,6 +1,7 @@
 /* eslint-disable unicorn/no-null -- a `WorkflowRecord`/`NodeConfig` nullázható mezői (description, providerId, sourceHandle, ...) tárolt/visszaadott `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import SqliteDatabase from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { eq } from 'drizzle-orm';
 import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
 import { migrateDatabase } from '../migration/migrate-database.ts';
@@ -9,6 +10,15 @@ import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
 import type { NodeConfig } from './node-config.ts';
+import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
+import { GRAPH_DOCUMENT_VERSION, type GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
+import { workflowRunTable } from '../workflow-run/workflow-run.ts';
+import {
+  createWorkflowRunRepository,
+  type StartRunInput,
+  type WorkflowRunRecord,
+  type WorkflowRunRepository,
+} from '../workflow-run/workflow-run-repository.ts';
 import {
   createWorkflowRepository,
   type WorkflowEdgeInput,
@@ -49,13 +59,56 @@ function openRepository(): {
   sqlite: SqliteDatabase.Database;
   database: BetterSQLite3Database;
   repository: WorkflowRepository;
+  runs: WorkflowRunRepository;
 } {
   const sqlite = new SqliteDatabase(':memory:');
   sqlite.pragma('foreign_keys = ON');
   const database = drizzle(sqlite);
   migrateDatabase(database, MIGRATIONS_FOLDER);
-  const repository = createWorkflowRepository(database, makeTransaction(database));
-  return { sqlite, database, repository };
+  const transaction = makeTransaction(database);
+  const repository = createWorkflowRepository(database, transaction);
+  const runs = createWorkflowRunRepository(database, transaction);
+  return { sqlite, database, repository, runs };
+}
+
+/**
+ * Minimális, érvényes gráf pillanatkép dokumentum a `startRun` bemenetéhez.
+ * A `name` argumentum tartalmi különbséget visz a dokumentumba, hogy két
+ * hívás **szándékosan** azonos vagy **szándékosan** eltérő lenyomatot adjon,
+ * a hívó választása szerint (a `summarizeDeletion`/`deleteWorkflow`
+ * teszteknek mindkettő kell: a megosztott pillanatkép eset azonos `name`-mel
+ * épül két különböző workflow alatt).
+ */
+function minimalDocument(workflowId: string, name: string): GraphSnapshotDocument {
+  return {
+    version: GRAPH_DOCUMENT_VERSION,
+    sdkVersionPin: '0.0.0-test',
+    workflow: { id: workflowId, name, description: null },
+    nodes: [],
+    edges: [],
+  };
+}
+
+function startRunInput(workflowId: string, document: GraphSnapshotDocument): StartRunInput {
+  return { workflowId, input: {}, providerId: 'minimax', graphSnapshotDocument: document };
+}
+
+/**
+ * Kényelmi függvény, ami elindít egy futást és kicsomagolja az `Outcome`-ot;
+ * ez tartja alacsonyan a beágyazási mélységet (`unicorn/max-nested-calls`,
+ * max 3) azokon a hívási helyeken, amik különben
+ * `okOrThrow(runs.startRun(startRunInput(id, minimalDocument(id, name))))`
+ * alakban négy szintet érnének el.
+ */
+function startRun(
+  runs: WorkflowRunRepository,
+  workflowId: string,
+  name: string,
+  extra: Partial<StartRunInput> = {},
+): WorkflowRunRecord {
+  const document = minimalDocument(workflowId, name);
+  const input: StartRunInput = { ...startRunInput(workflowId, document), ...extra };
+  return okOrThrow(runs.startRun(input));
 }
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -391,7 +444,7 @@ describe('createWorkflowRepository', () => {
   });
 
   describe('summarizeDeletion', () => {
-    it('nulla darabszámot ad meglévő workflow-ra (nyitott pont, T-003-16 zárja le)', () => {
+    it('nulla darabszámot ad egy futás nélküli workflow-ra', () => {
       const { sqlite, repository } = openRepository();
       const workflow = okOrThrow(repository.createWorkflow({ name: 'W', description: null, providerId: null }));
 
@@ -407,6 +460,54 @@ describe('createWorkflowRepository', () => {
       expect(message).toContain('not_found');
       sqlite.close();
     });
+
+    it('a workflow-hoz tartozó futásokat SZÁMOLJA, saját snapshot sora árvává válik (nincs al-workflow)', () => {
+      const { sqlite, repository, runs } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'W', description: null, providerId: null }));
+      startRun(runs, workflow.id, 'sole');
+
+      const summary = okOrThrow(repository.summarizeDeletion(workflow.id));
+      expect(summary).toStrictEqual({ runCount: 1, eventCount: 0, snapshotCount: 1 });
+
+      sqlite.close();
+    });
+
+    it(
+      'a gyökér futás root_run_id kaszkádja miatt a MÁSIK workflow-hoz tartozó al-workflow futását is beleszámolja ' +
+        'a runCount-ba, a megosztott snapshot pedig NEM árva, ha egy másik, túlélő futás is hivatkozik rá (52. kritérium előkészítése)',
+      () => {
+        const { sqlite, repository, runs } = openRepository();
+        const workflowA = okOrThrow(repository.createWorkflow({ name: 'A', description: null, providerId: null }));
+        const workflowB = okOrThrow(repository.createWorkflow({ name: 'B', description: null, providerId: null }));
+
+        // R1: workflow-a gyökér futása.
+        const r1 = startRun(runs, workflowA.id, 'root-of-a');
+        // R2: workflow-a hívja al-workflowként workflow-b-t; a dokumentum
+        // tartalma (a workflow-b gráfja) MEGEGYEZIK R3-éval, tehát R2 és R3
+        // ugyanarra a graph_snapshot sorra mutat (5.1 szekció: a dokumentum
+        // a `workflow.id`-t hordozza, ami mindkettőnél workflow-b azonosítója).
+        const r2 = startRun(runs, workflowB.id, 'shared', {
+          parent: { rootRunId: r1.rootRunId, depth: r1.depth, workflowAncestry: r1.workflowAncestry },
+        });
+        // R3: workflow-b saját, önállóan indított futása, bájtra azonos
+        // dokumentummal.
+        const r3 = startRun(runs, workflowB.id, 'shared');
+        expect(r2.graphSnapshotHash).toBe(r3.graphSnapshotHash);
+        expect(r2.rootRunId).toBe(r1.id);
+        expect(r3.rootRunId).toBe(r3.id);
+
+        const summary = okOrThrow(repository.summarizeDeletion(workflowA.id));
+        // runCount: R1 (direkt) + R2 (a root_run_id kaszkádja viszi, más
+        // workflow-hoz tartozik) = 2. R3 NEM tartozik ide.
+        expect(summary.runCount).toBe(2);
+        // snapshotCount: R1 saját snapshotja árvává válna (csak R1
+        // hivatkozik rá) = 1. A megosztott (R2/R3) snapshot NEM árva, mert
+        // R3 túlél, tehát nem számít bele.
+        expect(summary.snapshotCount).toBe(1);
+
+        sqlite.close();
+      },
+    );
   });
 
   describe('deleteWorkflow', () => {
@@ -439,5 +540,65 @@ describe('createWorkflowRepository', () => {
       expect(message).toContain('not_found');
       sqlite.close();
     });
+
+    it('egyetlen futásra sem hivatkozott snapshot sort söpri, egyetlen hivatkozottat sem visz el (4.15 szekció)', () => {
+      const { sqlite, database, repository, runs } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'W', description: null, providerId: null }));
+      const run = startRun(runs, workflow.id, 'sole');
+
+      okOrThrow(repository.deleteWorkflow({ workflowId: workflow.id, acknowledgeIrreversible: true }));
+
+      expect(database.select().from(workflowRunTable).all()).toStrictEqual([]);
+      expect(
+        database.select().from(graphSnapshotTable).where(eq(graphSnapshotTable.hash, run.graphSnapshotHash)).all(),
+      ).toStrictEqual([]);
+
+      sqlite.close();
+    });
+
+    it(
+      'a gyökér futás törlése kaszkádban elviszi a más workflow-hoz tartozó al-workflow futását is, a ' +
+        'megosztott snapshot sor viszont MEGMARAD, mert egy másik, túlélő futás még hivatkozik rá (52. kritérium)',
+      () => {
+        const { sqlite, database, repository, runs } = openRepository();
+        const workflowA = okOrThrow(repository.createWorkflow({ name: 'A', description: null, providerId: null }));
+        const workflowB = okOrThrow(repository.createWorkflow({ name: 'B', description: null, providerId: null }));
+
+        const r1 = startRun(runs, workflowA.id, 'root-of-a');
+        const r2 = startRun(runs, workflowB.id, 'shared', {
+          parent: { rootRunId: r1.rootRunId, depth: r1.depth, workflowAncestry: r1.workflowAncestry },
+        });
+        const r3 = startRun(runs, workflowB.id, 'shared');
+        const ownSnapshotHash = r1.graphSnapshotHash;
+        const sharedSnapshotHash = r2.graphSnapshotHash;
+        expect(sharedSnapshotHash).toBe(r3.graphSnapshotHash);
+
+        okOrThrow(repository.deleteWorkflow({ workflowId: workflowA.id, acknowledgeIrreversible: true }));
+
+        // R1 és R2 törlődött (kaszkád), R3 megmaradt (más workflow-hoz
+        // tartozik, és nem a workflow-a fájának a része).
+        const remainingRunIds = database
+          .select({ id: workflowRunTable.id })
+          .from(workflowRunTable)
+          .all()
+          .map((row) => row.id);
+        expect(remainingRunIds).toStrictEqual([r3.id]);
+
+        // A workflow-a saját (nem megosztott) snapshotja árva lett, a
+        // söprés elvitte.
+        expect(
+          database.select().from(graphSnapshotTable).where(eq(graphSnapshotTable.hash, ownSnapshotHash)).all(),
+        ).toStrictEqual([]);
+        // A megosztott snapshot MEGMARADT, mert R3 még hivatkozik rá.
+        expect(
+          database.select().from(graphSnapshotTable).where(eq(graphSnapshotTable.hash, sharedSnapshotHash)).all(),
+        ).toHaveLength(1);
+
+        // workflow-b maga (és R3 workflowja) érintetlen.
+        expect(database.select().from(workflowTable).where(eq(workflowTable.id, workflowB.id)).all()).toHaveLength(1);
+
+        sqlite.close();
+      },
+    );
   });
 });

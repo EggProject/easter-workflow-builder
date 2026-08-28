@@ -9,14 +9,14 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 
 ## Fájlok
 
-| Mappa                | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                                                                                                                                                                                                                                                                                                                                             |
-| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                                                                                                                                                                                                                                                                |
-| `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla (`hash` elsődleges kulcs, `graph_snapshot_version_idx` index, nincs idegen kulcsa) és a `graph_snapshot_no_update` `BEFORE UPDATE` trigger, ami minden módosítási kísérletet `SQLITE_CONSTRAINT_TRIGGER` hibával buktat meg (SPEC-003 4.9 és 5.5 szekció, T-003-15) |
-| `workflow-run/`      | a `workflow_run` tábla (SPEC-003 4.8 szekció): önhivatkozó `root_run_id` (`ON DELETE CASCADE`) és `restarted_from_run_id` (`ON DELETE SET NULL`) idegen kulcs, `graph_snapshot_hash` idegen kulcs `ON DELETE RESTRICT` viselkedéssel a `graph_snapshot` táblára (F-27, F-28, 51. kritérium), négy index; a `RunStatus` hat állapota és a `canTransitionRunStatus` átmeneti szabály függvény, kimerítő `switch` szerkezettel (SPEC-003 7.1 és 7.3 szekció, T-003-13); a `WorkflowRunRepository` a következő lépésé (T-003-16)                                     |
+| Mappa                | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `database-file/`     | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `sqlite-connection/` | `openDatabase`, a `DatabaseContext` felület, a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; a repository mezők a következő témák elkészültével bővülnek ide                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla (`hash` elsődleges kulcs, `graph_snapshot_version_idx` index, nincs idegen kulcsa) és a `graph_snapshot_no_update` `BEFORE UPDATE` trigger, ami minden módosítási kísérletet `SQLITE_CONSTRAINT_TRIGGER` hibával buktat meg (SPEC-003 4.9 és 5.5 szekció, T-003-15)                                                                                                                         |
+| `workflow-run/`      | a `workflow_run` tábla (SPEC-003 4.8 szekció): önhivatkozó `root_run_id` (`ON DELETE CASCADE`) és `restarted_from_run_id` (`ON DELETE SET NULL`) idegen kulcs, `graph_snapshot_hash` idegen kulcs `ON DELETE RESTRICT` viselkedéssel a `graph_snapshot` táblára (F-27, F-28, 51. kritérium), négy index; a `RunStatus` hat állapota és a `canTransitionRunStatus` átmeneti szabály függvény, kimerítő `switch` szerkezettel (SPEC-003 7.1 és 7.3 szekció, T-003-13); a `WorkflowRunRepository`: `startRun` (az egyetlen beszúrási út, a pillanatkép feloldásával, T-003-16), `getRun`/`listRuns`/`listRunsForWorkflow`, a négy compare-and-set állapotváltó és `readSnapshot` (T-003-16) |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -100,15 +100,27 @@ típusra, ezért az `isProviderId` guard szűkíti; ha egy sor korrupt (pl. egy 
 provider azonosítója maradt bent), `invalid_provider_id` hibaágat ad. Ugyanez a minta a
 `readGraph`-ban a node `config` oszlopára (`isNodeConfig`, `corrupt_node_config` hibaosztály).
 
-**Két nyitott pont, a T-003-16 zárja le őket (PLAN-003, a T-003-12 sora utáni bekezdés).**
+**A T-003-12 két nyitott pontja lezárva (T-003-16, PLAN-003, a T-003-12 sora utáni bekezdés).**
 
-- `summarizeDeletion`: a `runCount`/`eventCount`/`snapshotCount` mező kényszerűen `0`, mert a
-  `workflow_run`/`run_event`/`graph_snapshot` tábla még nem létezik (F5 fázis). Jelölve: magyar
-  "NYITOTT PONT" komment a `summarizeDeletion` függvényben, `workflow-repository.ts`.
-- `deleteWorkflow`: a `graph_snapshot` árva söprése (4.15 szekció) nem futtatható, mert a
-  `graph_snapshot` tábla még nem létezik. Jelölve: magyar "NYITOTT PONT" komment a
-  `deleteWorkflow` függvény végén, a `DELETE FROM graph_snapshot WHERE hash NOT IN (...)` SQL
-  szó szerint a kommentben, `workflow-repository.ts`.
+- `summarizeDeletion`: a `runCount` a ténylegesen törlődő `workflow_run` sorok pontos száma,
+  a `workflow_id = ?` közvetlen találatok **és** a `root_run_id` önhivatkozó kaszkádja miatt
+  törlődő, más workflow-hoz tartozó al-workflow futások uniója (4.15 szekció, F-11: egy gyökér
+  futás törlése a saját al-workflow futásait is elviszi, azok workflow-jától függetlenül). A
+  `snapshotCount` azon `graph_snapshot` sorok száma, amikre a törlés után **egyetlen** megmaradó
+  `workflow_run` sor sem hivatkozna (tehát árvává válnának); egy megosztott sor, amire egy
+  túlélő, más workflow-hoz tartozó futás is mutat, nem számít bele. Az `eventCount` NYITOTT PONT
+  marad, mert a `run_event` tábla a T-003-19 lépésig nem létezik; jelölve magyar "NYITOTT PONT"
+  komment a `summarizeDeletion` függvényben, `workflow-repository.ts`.
+- `deleteWorkflow`: a `workflow` sor törlése (és vele a kaszkád) után, ugyanabban a
+  tranzakcióban lefut az árva pillanatkép söprés, szó szerint a 4.15 szekció SQL-jével:
+  `DELETE FROM graph_snapshot WHERE hash NOT IN (SELECT graph_snapshot_hash FROM workflow_run)`,
+  nyers `sql` sablonnal (`drizzle-orm` `sql` export), nem a típusos Drizzle delete-builderrel,
+  mert a feltétel egy korrelálatlan alkérdés a másik táblára.
+
+Mindkét függvény most már importálja a `workflowRunTable`-t a `workflow-run` témából
+(`../workflow-run/workflow-run.ts`), ugyanaz a mintát, mint amit a `workflow-run.ts` már
+alkalmazott a `workflow-graph` és a `graph-snapshot` téma felé (SPEC-003 8. szekció: a téma
+mappák egy csomagon belüli, relatív importtal hivatkoznak egymásra, a barrelen kívül).
 
 ## A gráf pillanatkép kanonizálása és a fixture (T-003-14)
 
@@ -174,6 +186,79 @@ példányt dob, `code: 'SQLITE_CONSTRAINT_TRIGGER'` és `message: 'graph_snapsho
 értékkel, a sor tartalma változatlan marad, az azonos tesztben lefuttatott `INSERT` és `DELETE`
 sikeres. Ezzel a SPEC-003 5.5 szekció mindkét védelme megvalósult: a repository szintű
 zártság (a barrel nem exportál módosító műveletet a táblára) és az adatbázis szintű trigger is.
+
+## A `WorkflowRunRepository` (T-003-16)
+
+A `workflow-run-repository.ts` a `startRun`, `getRun`, `listRuns`, `listRunsForWorkflow`, a négy
+compare-and-set állapotváltó (`markRunRunning`, `markRunSucceeded`, `markRunFailed`,
+`markRunCancelled`) és a `readSnapshot` műveletet adja, `openDatabase` köti be a
+`DatabaseContext.runs` mezőbe, ugyanazzal a `transaction()` függvénnyel, amit a `workflows` mező
+is használ. A barrel csak a `WorkflowRunRepository`, `StartRunInput`, `StartRunParentContext` és
+`WorkflowRunRecord` típust exportálja, a `createWorkflowRunRepository` factory függvényt nem
+(SPEC-003 9.3, ugyanaz a minta, mint a `WorkflowRepository`-nél).
+
+**A `StartRunInput` alakja, a spec nem volt kimerítő.** A `graphSnapshotDocument` már kész,
+feloldott `GraphSnapshotDocument`: a háromszintű provider feloldást és a pillanatkép
+ÖSSZEÁLLÍTÁSÁT (a workflow gráfjának kiolvasását és dokumentummá alakítását) a motor
+(`@easter-workflow-builder/engine`) végzi egy későbbi specifikációban, a `startRun` csak a kész
+dokumentumot fogadja. A `providerId` (`ProviderId`, kötelező) szintén a motor által már feloldott
+érték. Az al-workflow hívás szülő kontextusát a `parent?: StartRunParentContext` mező hordozza
+(`{ rootRunId, depth, workflowAncestry }`), NEM külön `parentRunId` mező: a `workflow_run`
+táblának nincs ilyen oszlopa (a szülő-gyerek kapcsolatot a `step_run.sub_workflow_run_id` fogja
+hordozni, T-003-17/18), a `workflow_run` csak a `root_run_id`-t és a `depth`/`workflow_ancestry`
+származtatott mezőket tárolja. Ha a hívó nem ad meg `parent`-et, a futás gyökér: `rootRunId` a
+saját, most generált `id`, `depth` `0`, `workflowAncestry` a `[workflowId]` egyelemű lista
+(SPEC-003 4.8 szekció). Ha megadja, a repository ebből vezeti le a gyerek futás mezőit: azonos
+`rootRunId`, `depth + 1`, `[...szülő lista, workflowId]`.
+
+**A pillanatkép beszúrás bájt-egyezése (45. kritérium), a kritikus tervezési döntés.** A
+`graph_snapshot.document` Drizzle oszlop `mode: 'json'`, tehát a típusos `insert(graphSnapshotTable)`
+íráskor `JSON.stringify`-t futtatna a kanonikus szövegből visszaparsolt objektumon
+(`drizzle-orm/sqlite-core/columns/text.js`, `SQLiteTextJson.mapToDriverValue`). Ez **nem**
+garantáltan ugyanaz a bájtsor, mint a kanonikus szöveg: a `JSON.stringify` az egész indexű
+kulcsokat (`"9"`, `"10"`) mindig növekvő számsorrendben írja ki, az RFC 8785 viszont UTF-16
+sorrendet ír elő, ahol a `"10"` megelőzi a `"9"` kulcsot (F-26). A `startRun` ezért **nyers `sql`
+sablonnal** ír be (`import { sql } from 'drizzle-orm'`, `database.run(sql\`INSERT INTO
+graph_snapshot ...\`)`), ami a kanonikus szöveget változtatás nélkül köti a paraméterbe, és
+ugyanígy **nyers `sql` SELECT-tel** olvassa vissza az ütközés-ellenőrzéshez (`resolveSnapshotReuse`bájtra pontos szöveg-összehasonlítást igényel, nem parsolt objektumot). A`workflow-run-repository.spec.ts` "a beszúrt document oszlop bájtra a kanonikus szöveg" tesztje
+egy egész indexű kulcsokat tartalmazó fixture-rel (`documentWithIntegerLikeKeys`) igazolja ezt,
+és külön asszerciót tesz arra, hogy a naiv `JSON.parse`+`JSON.stringify` kör **más** szöveget
+adna - ez bizonyítja, hogy a teszt nem üres, és hogy a hiba valóban létezne a nyers SQL nélkül.
+
+**Drizzle típusdefiníciós pontatlanság: a `.get<T>()` és a `.returning().get()` deklarált típusa
+nem tartalmaz `undefined`-et.** A `BaseSQLiteDatabase.get<T = unknown>(query): DBResult<'sync', T>`
+`sync` módban pontosan `T`-re oldódik fel (`drizzle-orm/sqlite-core/session.d.ts`,
+`DBResult<TKind, TResult> = { sync: TResult; ... }[TKind]`), holott a mögöttes `better-sqlite3`
+`stmt.get()` ténylegesen `undefined`-et ad nulla találatra
+(`drizzle-orm/better-sqlite3/session.js`, `PreparedQuery.get`). Ez Drizzle 0.45.2 saját
+típusdefiníciójának a pontatlansága, nem a mi kódunké (hasonló jellegű, mint a `CLAUDE.md`
+"Függőségi irány" szakasz `skipLibCheck` bejegyzése). A `readStoredCanonicalText` és a
+`transitionRun` ezért `row === undefined` ellenőrzést végez egy olyan típuson, amit a fordító
+sosem `undefined`-nek jelez: az `@typescript-eslint/no-unnecessary-condition` és a
+`sonarjs/different-types-comparison` szabály ezt jogosan flagelné tévesen, ezért mindkét helyen
+`eslint-disable-next-line` áll, részletes indoklással a forráskódban.
+
+**A compare-and-set egyetlen forrásból (`canTransitionRunStatus`) vezeti le a `WHERE status IN
+(...)` feltételt.** A `transitionRun` belső segédfüggvény `allowedFromStatuses(to)` a hat
+`RunStatus` értéket végigszűri `canTransitionRunStatus(from, to)`-val, tehát a 7.1 táblázat
+átmeneti szabálya és a compare-and-set `UPDATE` sosem futhat szét egymástól (nincs két, kézzel
+karbantartott lista). A `RETURNING` záradék (`drizzle-kit`/`better-sqlite3` SQLite 3.35+
+támogatás) egy kérésben adja vissza a frissített sort, tehát a hívás nem igényel külön
+újraolvasást az `UPDATE` után.
+
+**`readSnapshot`-nak van egy `not_found` ága a hiányzó pillanatkép sorra**, ami a bekapcsolt
+`ON DELETE RESTRICT` (F-27) miatt rendes úton megnyitott kapcsolaton sosem fordulhat elő; a
+tesztje egy explicit `foreign_keys = OFF` pragmával nyitott kapcsolaton szimulálja a megsérült
+(dangling) állapotot. **Fontos mérési megjegyzés:** a `better-sqlite3` 13.0.3 saját mérésünk
+szerint **bekapcsolt** `foreign_keys` pragmával nyit alapból (nem az F-1 által hivatkozott, a
+puszta SQLite könyvtárra vonatkozó, kikapcsolt alapértelmezéssel) - a teszteknek ezért az "FK
+nélküli" ághoz **explicit ki kell kapcsolniuk** a pragmát, nem elég kihagyni a bekapcsolást.
+
+**Nincs exportált művelet, ami pillanatkép nélküli futást hozna létre.** A `startRun` az egyetlen
+függvény, ami `.insert(workflowRunTable)`-t hív ebben a fájlban, és a fájl az egyetlen hely a
+csomagban, ahol ez a hívás előfordul (a `workflow-repository.ts` csak `select`/`delete`-et végez
+a táblán, a `DELETE FROM graph_snapshot ...` söprésen kívül, ami nem érinti a `workflow_run`
+táblát).
 
 ## `Outcome` hibaosztály konvenció
 
