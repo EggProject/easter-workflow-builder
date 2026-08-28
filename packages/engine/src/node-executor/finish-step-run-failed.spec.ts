@@ -151,6 +151,31 @@ describe('finishStepRunFailed', () => {
     ]);
   });
 
+  it('resultSubtype és numTurns megadása esetén a markStepFailed hívásba is átadja (agent_step hibás result subtype-tal)', () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRunningStep(database);
+    const published: unknown[] = [];
+    const ports = portsOf(database, published);
+
+    const record = okOrThrow(
+      finishStepRunFailed(
+        {
+          runId,
+          stepRunId,
+          startedAtMs: 0,
+          errorKind: 'agent_result_not_success',
+          errorMessage: 'teszt hiba (agent_result_not_success).',
+          resultSubtype: 'error_max_turns',
+          numTurns: 8,
+        },
+        ports,
+      ),
+    );
+
+    expect(record.resultSubtype).toBe('error_max_turns');
+    expect(record.numTurns).toBe(8);
+  });
+
   it('a markStepFailed hibáját továbbadja, ha a sor időközben nem running állapotú', () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRunningStep(database);

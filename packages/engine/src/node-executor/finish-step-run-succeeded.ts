@@ -14,12 +14,22 @@ import type { NodeExecutorPorts } from './node-executor-ports.ts';
  * ellenőrzése sosem lép életbe erről a hívási útról (F-6, SPEC-003 7.2 - az
  * ellenőrzés az `agent_step`/`join` `ai_synthesis` módra vár, T-005-21).
  */
+/**
+ * A `resultSubtype` és a `numTurns` a `runAgentStep` (`agent-step` téma)
+ * `AgentStepExecution` értékéből jön, kizárólag az `agent_step` és a `join`
+ * `ai_synthesis` hívási úton (T-005-21): az SDK `result` üzenetéből olvasott
+ * két számadat, ugyanabban a záró tranzakcióban, mint a token összesítés
+ * (SPEC-004 5.2 8. pont, SPEC-003 4.10). A `db` `MarkStepSucceededInput`
+ * ugyanezt a két opcionális mezőt hordozza, ez a típus csak továbbadja.
+ */
 export interface FinishStepRunSucceededInput {
   readonly runId: string;
   readonly stepRunId: string;
   readonly startedAtMs: number;
   readonly output: unknown;
   readonly tokens?: StepRunTokenUsage;
+  readonly resultSubtype?: string;
+  readonly numTurns?: number;
 }
 
 /**
@@ -35,6 +45,8 @@ export function finishStepRunSucceeded(
   const succeeded = ports.database.stepRuns.markStepSucceeded(input.stepRunId, {
     output: input.output,
     ...(input.tokens !== undefined && { tokens: input.tokens }),
+    ...(input.resultSubtype !== undefined && { resultSubtype: input.resultSubtype }),
+    ...(input.numTurns !== undefined && { numTurns: input.numTurns }),
   });
   if (succeeded.kind === 'error') {
     return succeeded;

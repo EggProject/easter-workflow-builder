@@ -658,6 +658,57 @@ describe('createStepRunRepository', () => {
 
       sqlite.close();
     });
+
+    it('markStepSucceeded elmenti a resultSubtype és numTurns mezőt, ha a hívó megadja (SPEC-004 5.2 8. pont)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      const step = create(repository, 'run-1');
+      okOrThrow(repository.markStepRunning(step.id));
+
+      const succeeded = okOrThrow(repository.markStepSucceeded(step.id, { resultSubtype: 'success', numTurns: 4 }));
+      expect(succeeded.resultSubtype).toBe('success');
+      expect(succeeded.numTurns).toBe(4);
+
+      const reread = okOrThrow(repository.getStepRun(step.id));
+      expect(reread.resultSubtype).toBe('success');
+      expect(reread.numTurns).toBe(4);
+
+      sqlite.close();
+    });
+
+    it('markStepSucceeded resultSubtype/numTurns nélkül NULL-on hagyja a két oszlopot', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      const step = create(repository, 'run-1');
+      okOrThrow(repository.markStepRunning(step.id));
+
+      const succeeded = okOrThrow(repository.markStepSucceeded(step.id));
+      expect(succeeded.resultSubtype).toBeNull();
+      expect(succeeded.numTurns).toBeNull();
+
+      sqlite.close();
+    });
+
+    it('markStepFailed is elmenti a resultSubtype és numTurns mezőt (a lépés hibás result subtype-pal is zárhat)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      const step = create(repository, 'run-1');
+      okOrThrow(repository.markStepRunning(step.id));
+
+      const failed = okOrThrow(
+        repository.markStepFailed(step.id, 'agent_result_not_success', 'x', {
+          resultSubtype: 'error_max_turns',
+          numTurns: 12,
+        }),
+      );
+      expect(failed.resultSubtype).toBe('error_max_turns');
+      expect(failed.numTurns).toBe(12);
+
+      sqlite.close();
+    });
   });
 
   describe('attachSession', () => {

@@ -129,6 +129,23 @@ describe('finishStepRunSucceeded', () => {
     ]);
   });
 
+  it('resultSubtype és numTurns megadása esetén a markStepSucceeded hívásba is átadja (agent_step sikeres futtatás)', () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRunningStep(database);
+    const published: unknown[] = [];
+    const ports = portsOf(database, published);
+
+    const record = okOrThrow(
+      finishStepRunSucceeded(
+        { runId, stepRunId, startedAtMs: 0, output: { osszeg: 4 }, resultSubtype: 'success', numTurns: 3 },
+        ports,
+      ),
+    );
+
+    expect(record.resultSubtype).toBe('success');
+    expect(record.numTurns).toBe(3);
+  });
+
   it('a markStepSucceeded hibáját továbbadja, ha a sor időközben nem running állapotú', () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRunningStep(database);

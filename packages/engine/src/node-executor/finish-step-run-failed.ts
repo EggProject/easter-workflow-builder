@@ -4,6 +4,14 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
+/**
+ * A `resultSubtype` és a `numTurns` a `runAgentStep` (`agent-step` téma)
+ * `AgentStepExecution` értékéből jön: a lépés hibás `result` `subtype`-tal is
+ * elhasznált tokent és kört (SPEC-004 5.2 8. pont, `agent-step-execution.ts`
+ * doksija: "A `resultSubtype` ... a hibás ág üzenetében is szerepel"), ezért
+ * mindkét mező a token összesítéssel azonos tranzakcióban íródhat a hibás
+ * záráskor is.
+ */
 export interface FinishStepRunFailedInput {
   readonly runId: string;
   readonly stepRunId: string;
@@ -11,6 +19,8 @@ export interface FinishStepRunFailedInput {
   readonly errorKind: EngineErrorKind;
   readonly errorMessage: string;
   readonly tokens?: StepRunTokenUsage;
+  readonly resultSubtype?: string;
+  readonly numTurns?: number;
 }
 
 /**
@@ -23,6 +33,8 @@ export interface FinishStepRunFailedInput {
 export function finishStepRunFailed(input: FinishStepRunFailedInput, ports: NodeExecutorPorts): Outcome<StepRunRecord> {
   const failed = ports.database.stepRuns.markStepFailed(input.stepRunId, input.errorKind, input.errorMessage, {
     ...(input.tokens !== undefined && { tokens: input.tokens }),
+    ...(input.resultSubtype !== undefined && { resultSubtype: input.resultSubtype }),
+    ...(input.numTurns !== undefined && { numTurns: input.numTurns }),
   });
   if (failed.kind === 'error') {
     return failed;
