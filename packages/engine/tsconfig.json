@@ -1,4 +1,15 @@
 {
   "extends": "../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    // A csomag forrás szinten fogyasztja a `db` csomagot (a `db` `exports`
+    // mezője a `./src/index.ts`-re mutat, build lépés nélkül), tehát a `db`
+    // teljes forrásfája bekerül ebbe a programba is, azzal együtt, hogy a
+    // `db` a `drizzle-orm`-ot importálja. A `drizzle-orm@0.45.2` egyetlen
+    // csomagban szállítja az összes dialektus deklarációs fájlját, és ezek
+    // egymás között típushibásak `skipLibCheck` nélkül - ugyanaz a felsőáramú
+    // hiba, amit a `packages/db/tsconfig.json` már dokumentál
+    // (https://github.com/drizzle-team/drizzle-orm/issues/879, 4299, 4818).
+    "skipLibCheck": true
+  },
   "include": ["src/**/*.ts"]
 }

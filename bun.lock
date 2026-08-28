@@ -117,6 +117,13 @@
         "@easter-workflow-builder/core": "workspace:*",
         "@easter-workflow-builder/db": "workspace:*",
         "@easter-workflow-builder/logger": "workspace:*",
+        "@easter-workflow-builder/provider-capability": "workspace:*",
+        "@easter-workflow-builder/typeguards": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
       },
     },
     "packages/firecrawl-client": {
