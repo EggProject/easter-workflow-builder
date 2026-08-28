@@ -12,10 +12,12 @@ import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts'
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import { stepRunTable } from '../step-run/step-run.ts';
 import { runEventTable } from './run-event.ts';
+import type { RunEventKind } from './run-event-kind.ts';
 import {
   createRunEventRepository,
   type AppendEngineEventInput,
   type AppendSdkEventInput,
+  type EngineRunEventKind,
   type RunEventRepository,
 } from './run-event-repository.ts';
 
@@ -574,5 +576,95 @@ describe('createRunEventRepository', () => {
 
       sqlite.close();
     });
+  });
+
+  /**
+   * SPEC-003 15. szekció 58. kritérium, T-003-28 átvizsgálás: "Kikapcsolt
+   * állapotban ugyanaz a bemeneti sorozat **nulla** `sdk_stream_event` sort
+   * ír, a másik tizenegy `sdk` eredetű `kind` minden sorát megírja az
+   * `appendSdkEvent`, és mind a tizenhárom `engine` eredetű `kind` minden
+   * sorát megírja az `appendEngineEvent`."
+   *
+   * **A "tizenegy" szó szerint NEM teljesíthető: csak TÍZ tesztelhető.** A
+   * `run-event-kind.ts` 12 `sdk` eredetű értékéből a `sdk_stream_event`-en
+   * kívüli 11 közül a `sdk_context_usage`-ra a pinelt Agent SDK verzióban
+   * NINCS leképezés a `normalizeSdkMessage`-en át (lásd
+   * `normalize-sdk-message.ts` "NYITOTT PONT" bekezdése és
+   * `packages/db/CLAUDE.md`, T-003-20): nincs olyan nyers `type`/`subtype`,
+   * amiből ez a `kind` keletkezne. Ezt a tesztet ezért NEM egy kitalált nyers
+   * üzenettel kerüljük meg - a hiányzó tizenegyedik eset dokumentált tény,
+   * nem hézag a tesztben. A `sdk_stream_event` kikapcsolt állapotú `skipped`/
+   * nulla sor ága a fenti `appendSdkEvent` describe blokkban már fedett
+   * ("skipped: sdk_stream_event kikapcsolt persisted_stream_deltas mellett
+   * nem ír sort (58., 59. kritérium)"), itt nem ismételjük meg.
+   */
+  describe('a delta kapcsoló kikapcsolt állapotban minden nem-sdk_stream_event kind sorát megírja (58. kritérium)', () => {
+    const nonStreamSdkCases: readonly { readonly kind: RunEventKind; readonly message: unknown }[] = [
+      { kind: 'sdk_system', message: { type: 'system', subtype: 'init' } },
+      { kind: 'sdk_assistant', message: { type: 'assistant', message: { content: [] } } },
+      { kind: 'sdk_user', message: { type: 'user', message: { role: 'user', content: 'szia' } } },
+      { kind: 'sdk_result', message: { type: 'result', subtype: 'success' } },
+      { kind: 'sdk_hook_started', message: { type: 'system', subtype: 'hook_started' } },
+      { kind: 'sdk_hook_progress', message: { type: 'system', subtype: 'hook_progress' } },
+      { kind: 'sdk_hook_response', message: { type: 'system', subtype: 'hook_response' } },
+      { kind: 'sdk_informational', message: { type: 'system', subtype: 'informational' } },
+      { kind: 'sdk_commands_changed', message: { type: 'system', subtype: 'commands_changed' } },
+      { kind: 'sdk_rate_limit', message: { type: 'rate_limit_event', rate_limit_info: { status: 'allowed' } } },
+    ];
+
+    it('pontosan tíz nem-sdk_stream_event sdk eredetű kind tesztelhető ténylegesen (a sdk_context_usage kimarad)', () => {
+      expect(nonStreamSdkCases).toHaveLength(10);
+    });
+
+    it.each(nonStreamSdkCases)(
+      '$kind: appendSdkEvent kikapcsolt persisted_stream_deltas mellett is ír sort',
+      ({ kind, message }) => {
+        const { sqlite, database, repository } = openRepository();
+        seedRun(database, { workflowId: 'w1', runId: 'run-1', persistedStreamDeltas: false });
+
+        const outcome = okOrThrow(repository.appendSdkEvent(sdkInput('run-1', message)));
+        expect(outcome.status).toBe('written');
+
+        const rows = database.select().from(runEventTable).where(eq(runEventTable.runId, 'run-1')).all();
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.kind).toBe(kind);
+
+        sqlite.close();
+      },
+    );
+
+    const ALL_ENGINE_KINDS: readonly EngineRunEventKind[] = [
+      'run_started',
+      'run_finished',
+      'run_interrupted',
+      'step_started',
+      'step_finished',
+      'branch_taken',
+      'fan_out_expanded',
+      'join_resolved',
+      'loop_iteration_started',
+      'approval_requested',
+      'approval_decided',
+      'sub_workflow_started',
+      'sub_workflow_finished',
+    ];
+
+    it('mind a tizenhárom engine eredetű kind szerepel a listán', () => {
+      expect(ALL_ENGINE_KINDS).toHaveLength(13);
+    });
+
+    it.each(ALL_ENGINE_KINDS.map((kind) => ({ kind })))(
+      '$kind: appendEngineEvent kikapcsolt persisted_stream_deltas mellett is ír sort',
+      ({ kind }) => {
+        const { sqlite, database, repository } = openRepository();
+        seedRun(database, { workflowId: 'w1', runId: 'run-1', persistedStreamDeltas: false });
+
+        const outcome = okOrThrow(repository.appendEngineEvent(engineInput('run-1', { kind })));
+        const row = database.select().from(runEventTable).where(eq(runEventTable.id, outcome.eventId)).get();
+        expect(row?.kind).toBe(kind);
+
+        sqlite.close();
+      },
+    );
   });
 });

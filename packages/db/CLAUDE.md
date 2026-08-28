@@ -224,6 +224,23 @@ saját, most generált `id`, `depth` `0`, `workflowAncestry` a `[workflowId]` eg
 (SPEC-003 4.8 szekció). Ha megadja, a repository ebből vezeti le a gyerek futás mezőit: azonos
 `rootRunId`, `depth + 1`, `[...szülő lista, workflowId]`.
 
+**NYITOTT PONT: a `no_default_provider` hibaosztály (40. kritérium fele) elérhetetlen a `db`
+rétegben, ez SZÁNDÉKOSAN nincs javítva (T-003-28 átvizsgálás).** A `StartRunInput.providerId`
+kötelező, már feloldott `ProviderId` - a fenti bekezdés szerint ez a motor felelőssége, nem a
+`startRun`-é. A `startRun` emiatt sosem kerül abba a helyzetbe, hogy az `app_setting.
+default_provider_id`-ből kellene kitöltenie egy üres mezőt, tehát a 4.13 szekcióban leírt
+`no_default_provider` hibaág a mai kódban logikailag elérhetetlen, előidézhetetlen teszttel.
+
+- **Mi a viselkedés addig.** Ha a hívó (a motor, egy KÉSŐBBI specifikációban) nem tud
+  feloldani egy providert, a döntés az ő felelőssége marad: vagy maga olvassa ki az
+  `AppSettingRepository.readSettings()` `defaultProviderId` mezőjét és NULL esetén állítja
+  meg a folyamatot a hívó oldalán, vagy egy jövőbeli `startRun` bemeneti alak bővítés adja át
+  ezt a döntést a `db` rétegnek.
+- **Mi zárná le.** Egy architekturális döntés arról, hogy a `startRun` maga oldjon-e fel egy
+  hiányzó `providerId`-t az `app_setting` táblából, vagy ez a motor felelőssége marad - ez a
+  `StartRunInput` alakját érintené, tehát redesign, nem mechanikus javítás, ezért a T-003-28
+  ezt NEM hajtja végre magától, hanem user döntést igényel.
+
 **A pillanatkép beszúrás bájt-egyezése (45. kritérium), a kritikus tervezési döntés.** A
 `graph_snapshot.document` Drizzle oszlop `mode: 'json'`, tehát a típusos `insert(graphSnapshotTable)`
 íráskor `JSON.stringify`-t futtatna a kanonikus szövegből visszaparsolt objektumon
@@ -430,6 +447,18 @@ típusdefiníciója szerint viszont az `SDKContextUsage` **nem** `SDKMessage` á
 üzenetre `sdk_assistant` értéket ad, a `sdk_context_usage` érték pedig a `RunEventKind` unióban
 marad, de nem keletkezik. Kitalált leképezést nem adunk hozzá; ezt egy jövőbeli SDK verzió
 (vagy a 6.4 lista felülvizsgálata) zárja le.
+
+**Következmény az 58. kritériumra (T-003-28 átvizsgálás).** A SPEC-003 15. szekció 58.
+kritériuma szó szerint "a másik tizenegy `sdk` eredetű `kind`" kifejezést használja a
+`sdk_stream_event`-en kívüli sorokra. A fenti okból ebből csak TÍZ idézhető elő ténylegesen a
+`normalizeSdkMessage`-en át - a `sdk_context_usage` a tizenegyedik, ami nem termelhető ki
+kitalált nyers üzenettel, mert az meghamisítaná a bizonyítékot. A `run-event-repository.spec.ts`
+"a delta kapcsoló kikapcsolt állapotban minden nem-sdk_stream_event kind sorát megírja (58.
+kritérium)" `describe` blokkja ezt a tíz kind-ot egy `it.each` paraméterezett teszttel fedi
+(ugyanazokkal a nyers üzenet mintákkal, mint a `normalize-sdk-message.spec.ts`), plusz mind a
+13 `engine` eredetű kind-ot egy második `it.each`-csel - a hiányzó tizenegyedik esetet egy külön
+`it('pontosan tíz nem-sdk_stream_event sdk eredetű kind tesztelhető ténylegesen ...')` teszt
+dokumentálja, számként rögzítve, nem hallgatva el.
 
 **Minden normalizált mező nullable, hiányzó mező NULL-t ad** (6.2 szekció, 10. kritérium). Nincs
 `?? 0` és nincs `?? ''` alapérték, ami hiányzó adatot valós adatnak álcázna. Az **üres szöveg is
@@ -761,6 +790,31 @@ hanem a hibaosztály neve szó szerint, zárójelben szerepel a `message` szöve
 van zárva (database_closed)."), hogy a tesztek stabilan `.toContain(...)` tudjanak rá
 ellenőrizni, a hibaüzenet mégis emberi nyelvű maradjon. Ezt a mintát minden további téma
 követi.
+
+**A `foreign_key_violation` hibaosztály, a `transaction()` fallback ágán (T-003-28
+átvizsgálás, 40. kritérium).** A `duplicate_event`, az `invalid_max_concurrent_steps` és a
+`graph_snapshot` trigger (`SQLITE_CONSTRAINT_TRIGGER`) mind saját, specifikusabb repository
+szintű `catch` ágban dől el, MIELŐTT a hiba a `transaction()`-ig jutna - de az idegen kulcs
+sértésnek (`SQLITE_CONSTRAINT_FOREIGNKEY`) idáig nem volt saját fordítása, tehát a nyers
+`describeError(error)` `Error.message`-e ment tovább, nevesítés nélkül, megsértve a fenti
+konvenciót. A `sqlite-connection/describe-transaction-error.ts` `describeTransactionError`
+mechanikusan pótolja ezt: a `transaction()` (`open-database.ts`) fallback ágán, ha az elkapott
+hiba `SqliteDatabase.SqliteError` és a kódja `SQLITE_CONSTRAINT_FOREIGNKEY`, az üzenet
+kiegészül a `(foreign_key_violation)` jelöléssel; minden más hibakód (és minden más, a hívó
+saját `catch`-ában már lefordított eset) változatlanul a nyers `describeError`-t kapja - nincs
+ütközés a meglévő, specifikusabb fordításokkal. **Csak a Drizzle TÍPUSOS insert-builder
+közvetlen `SqliteError`-ját fedi** (a `workflow-repository.ts` `replaceGraph`-ja
+`.insert(...).run()` alakban ír, becsomagolás nélkül) - a `run-event-repository.ts`
+`insertSdkEventRow`-jának raw `sql` `INSERT ... SELECT`-je egy MÁSIK, `DrizzleError`-ba
+csomagolt idegen kulcs sértési utat termel (`run-event-repository.spec.ts` "egy váratlan
+adatbázis hiba (nem egyedi index sértés) továbbrepül" tesztje), amit ez a fordítás
+SZÁNDÉKOSAN nem fed le: a helyi `makeTransaction` másolat abban a spec fájlban változatlan
+maradt, mert a T-003-28 lezárása csak ehhez az egy, ténylegesen bizonyított kritériumhoz
+(`workflow-repository.spec.ts` "idegen kulcs sértés" tesztje) tartozó útvonalat kívánta
+mechanikusan javítani, redesign nélkül. A `describe-transaction-error.spec.ts` közvetlen,
+szintetikus (`SqliteDatabase.SqliteError`) bemenettel fedi mindhárom ágat (nem `SqliteError`,
+`SqliteError` más kóddal, `SqliteError` FK kóddal), a `run-event/extract-error-cause.spec.ts`
+mintáját követve.
 
 ## Függőségi irány
 

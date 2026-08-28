@@ -10,6 +10,7 @@ import { workflowTable } from '../workflow-graph/workflow.ts';
 import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
+import { createRunEventRepository, type RunEventRepository } from '../run-event/run-event-repository.ts';
 import { stepRunTable } from './step-run.ts';
 import {
   createStepRunRepository,
@@ -51,13 +52,20 @@ function openRepository(): {
   sqlite: SqliteDatabase.Database;
   database: BetterSQLite3Database;
   repository: StepRunRepository;
+  runEvents: RunEventRepository;
 } {
   const sqlite = new SqliteDatabase(':memory:');
   sqlite.pragma('foreign_keys = ON');
   const database = drizzle(sqlite);
   migrateDatabase(database, MIGRATIONS_FOLDER);
-  const repository = createStepRunRepository(database, makeTransaction(database));
-  return { sqlite, database, repository };
+  const transaction = makeTransaction(database);
+  const repository = createStepRunRepository(database, transaction);
+  // A 60. kritérium tesztje (lent, "a delta kapcsoló nem érinti a step_run
+  // token oszlopait") a `RunEventRepository`-t is igényli, hogy ténylegesen
+  // eltérő számú `run_event` sort tudjon írni a kapcsoló két állásában,
+  // ugyanazon a `database`/`transaction` páron, mint a `StepRunRepository`.
+  const runEvents = createRunEventRepository(database, transaction);
+  return { sqlite, database, repository, runEvents };
 }
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -85,9 +93,17 @@ function insertWorkflow(database: BetterSQLite3Database, id: string): void {
  * Beszúr egy `graph_snapshot` és egy rá hivatkozó `workflow_run` sort, és
  * visszaadja a futás azonosítóját. A `step_run` idegen kulcsa a
  * `workflow_run` táblára mutat (SPEC-003 4.10), ezért minden teszthez kell
- * egy létező futás.
+ * egy létező futás. Az `isPersistStreamDeltasEnabled` paraméter adja a 6.6
+ * szekció befagyasztott kapcsolóját (alapból kikapcsolva, a séma szintű
+ * alapértéknek megfelelően) - a 60. kritérium tesztje (lent) mindkét
+ * állásban hív erre egy-egy futást.
  */
-function insertRun(database: BetterSQLite3Database, workflowId: string, runId: string): void {
+function insertRun(
+  database: BetterSQLite3Database,
+  workflowId: string,
+  runId: string,
+  isPersistStreamDeltasEnabled = false,
+): void {
   const document = { seed: runId };
   const hash = computeSnapshotHash(`${runId}:${JSON.stringify(document)}`);
   database
@@ -106,7 +122,7 @@ function insertRun(database: BetterSQLite3Database, workflowId: string, runId: s
       depth: 0,
       workflowAncestry: [workflowId],
       graphSnapshotHash: hash,
-      persistedStreamDeltas: false,
+      persistedStreamDeltas: isPersistStreamDeltasEnabled,
       createdAtMs: new Date(0),
     })
     .run();
@@ -687,5 +703,106 @@ describe('createStepRunRepository', () => {
       expect(errorOrThrow(outcome)).toContain('not_found');
       sqlite.close();
     });
+  });
+});
+
+/**
+ * SPEC-003 15. szekció 60. kritérium, T-003-28 átvizsgálás: "...a `step_run`
+ * négy token oszlopa a kapcsoló mindkét állásában azonos értéket vesz fel."
+ * Ez a `describe('állapotváltók ...')` blokk token tesztjeitől (fent) abban
+ * tér el, hogy nem egy futáson belül nézi a token oszlopokat, hanem KÉT,
+ * eltérő `persisted_stream_deltas` állású futást hasonlít össze, ugyanazzal
+ * a token bemenettel - ez bizonyítja, hogy a kapcsoló, ami a `run_event`
+ * sorok SZÁMÁT befolyásolja (58., 59. kritérium), a `step_run` négy token
+ * oszlopára NINCS hatással, mert a `markStepSucceeded`/`markStepFailed` a
+ * hívó által átadott `tokens` bemenetből tölti őket, nem a `run_event`
+ * táblából származtatva (szemben az `aggregateRunTokens`-szel, ami a
+ * `run-event-repository.spec.ts`-ben már bizonyítottan kapcsoló-független).
+ */
+describe('a step_run négy token oszlopa a delta kapcsoló mindkét állásában azonos (60. kritérium)', () => {
+  it('ugyanaz a tokens bemenet ugyanazt a négy oszlopértéket adja vissza, függetlenül a beszúrt run_event sorok számától', () => {
+    const { sqlite, database, repository, runEvents } = openRepository();
+    insertWorkflow(database, 'w1');
+    insertRun(database, 'w1', 'run-off', false);
+    insertRun(database, 'w1', 'run-on', true);
+
+    const usage = { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 10, cache_creation_input_tokens: 5 };
+
+    /**
+     * Ugyanaz a bemeneti sorozat, mint a `run-event-repository.spec.ts`
+     * "a delta kapcsoló mindkét állásában azonos összeget ad" tesztjében:
+     * két `sdk_stream_event` sor is a sorozat része, hogy a két futás
+     * ténylegesen ELTÉRŐ számú `run_event` sort kapjon (58., 59. kritérium).
+     */
+    function feed(runId: string): void {
+      okOrThrow(
+        runEvents.appendSdkEvent({
+          runId,
+          stepRunId: null,
+          message: { type: 'system', subtype: 'init', session_id: 'ses-1' },
+        }),
+      );
+      okOrThrow(
+        runEvents.appendSdkEvent({
+          runId,
+          stepRunId: null,
+          message: { type: 'stream_event', event: { type: 'content_block_delta' } },
+        }),
+      );
+      okOrThrow(
+        runEvents.appendSdkEvent({
+          runId,
+          stepRunId: null,
+          message: { type: 'stream_event', event: { type: 'ping' } },
+        }),
+      );
+      okOrThrow(
+        runEvents.appendSdkEvent({
+          runId,
+          stepRunId: null,
+          message: { type: 'assistant', message: { content: [], usage } },
+        }),
+      );
+    }
+
+    feed('run-off');
+    feed('run-on');
+
+    const offEvents = okOrThrow(runEvents.readEventsSince('run-off', 0, 100));
+    const onEvents = okOrThrow(runEvents.readEventsSince('run-on', 0, 100));
+    // Bizonyíték, hogy a két futás ténylegesen eltérő számú run_event sort
+    // kapott: enélkül a lenti egyezés üresen igaz volna.
+    expect(offEvents).toHaveLength(2);
+    expect(onEvents).toHaveLength(4);
+
+    const tokens = { inputTokens: 321, outputTokens: 654, cacheReadInputTokens: 12, cacheCreationInputTokens: 3 };
+
+    const offStep = create(repository, 'run-off');
+    okOrThrow(repository.markStepRunning(offStep.id));
+    okOrThrow(repository.markStepSucceeded(offStep.id, { tokens }));
+
+    const onStep = create(repository, 'run-on');
+    okOrThrow(repository.markStepRunning(onStep.id));
+    okOrThrow(repository.markStepSucceeded(onStep.id, { tokens }));
+
+    const offRecord = okOrThrow(repository.getStepRun(offStep.id));
+    const onRecord = okOrThrow(repository.getStepRun(onStep.id));
+
+    const offTokenColumns = {
+      inputTokens: offRecord.inputTokens,
+      outputTokens: offRecord.outputTokens,
+      cacheReadInputTokens: offRecord.cacheReadInputTokens,
+      cacheCreationInputTokens: offRecord.cacheCreationInputTokens,
+    };
+    const onTokenColumns = {
+      inputTokens: onRecord.inputTokens,
+      outputTokens: onRecord.outputTokens,
+      cacheReadInputTokens: onRecord.cacheReadInputTokens,
+      cacheCreationInputTokens: onRecord.cacheCreationInputTokens,
+    };
+    expect(offTokenColumns).toStrictEqual(onTokenColumns);
+    expect(offTokenColumns).toStrictEqual(tokens);
+
+    sqlite.close();
   });
 });
