@@ -81,3 +81,17 @@ export type { AppSettingRepository, AppSettingsRecord } from './app-setting/app-
 // szándékosan nem exportáljuk, csak a típust, ugyanaz a minta, mint a
 // `WorkflowRepository`-nél (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
 export type { ProviderConcurrencyRepository } from './provider-concurrency/provider-concurrency-repository.ts';
+
+// human-approval: a HumanApprovalRepository publikus felülete (T-003-22). A
+// factory függvényt (`createHumanApprovalRepository`) szándékosan nem
+// exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
+// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció). Az `ApprovalDecision`
+// unió és az `isApprovalDecision` guard is itt kerül ki a barrelbe.
+export type {
+  HumanApprovalRepository,
+  RequestApprovalInput,
+  DecideApprovalInput,
+  HumanApprovalRecord,
+} from './human-approval/human-approval-repository.ts';
+export type { ApprovalDecision } from './human-approval/approval-decision.ts';
+export { isApprovalDecision } from './human-approval/is-approval-decision.ts';

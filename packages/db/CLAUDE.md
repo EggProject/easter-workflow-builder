@@ -21,6 +21,7 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 | `app-setting/`          | az `app_setting` tábla (SPEC-003 4.13 szekció): egysoros tábla, `CHECK (id = 1)` (F-15), a `persist_stream_deltas` oszlop séma szintű `.default(false)` alapértékkel (F-28, a 6. user döntés); a migráció egyetlen sort sem szúr be (41. kritérium). Az `AppSettingRepository`: `readSettings` (üres táblán `defaultProviderId: null`, `persistStreamDeltas: false`), `setDefaultProvider` és `setPersistStreamDeltas` (mindkettő `INSERT ... ON CONFLICT(id) DO UPDATE` upsert, a nem érintett oszlop a séma szintű alapértékét kapja beszúráskor, 56. kritérium, T-003-23)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `provider-concurrency/` | a `provider_concurrency_limit` tábla (SPEC-003 4.14 és 11. szekció): `provider_id` elsődleges kulcs, `CHECK (max_concurrent_steps > 0)` (F-15); a migráció üresen indul, sem a kódban, sem a migrációban nincs szállított párhuzamossági alapérték (41. kritérium). A `ProviderConcurrencyRepository`: `readLimit`, `readAllLimits`, `setLimit` (upsert, a `CHECK` megsértését a `better-sqlite3` `SQLITE_CONSTRAINT_CHECK` hibájának elkapásával `invalid_max_concurrent_steps` `Outcome` hibaágra fordítja, nem duplikálja a `> 0` szabályt TypeScript oldalon) és `clearLimit` (nem hiba, ha a sor nem is létezett, T-003-23)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `run-event/`            | a `run_event` tábla (SPEC-003 6.2 szekció): `id` `INTEGER PRIMARY KEY AUTOINCREMENT` (F-9, F-13, 9. kritérium, NEM sima `INTEGER PRIMARY KEY`), `run_id` idegen kulcs `ON DELETE CASCADE` a `workflow_run` táblára, opcionális `step_run_id` idegen kulcs `ON DELETE CASCADE` a `step_run` táblára (futás szintű eseménynél NULL), három index (`run_event_run_id_idx`, `run_event_step_run_id_idx`, `run_event_run_uuid_uq` **egyedi** a `(run_id, sdk_uuid)` páron, F-10: több NULL `sdk_uuid` sor is beszúrható ugyanahhoz a `run_id`-hez). A `kind` oszlopon **nincs** `CHECK` constraint (6.4 szekció); a huszonöt értékű `RunEventKind` uniót és az `isRunEventKind` guardot a `run-event-kind.ts` és az `is-run-event-kind.ts` adja, egyik sincs a barrelben (a `RunEventRepository` dönt az exportról, T-003-21). A nyers SDK üzenet normalizálását a `normalize-sdk-message.ts` (`normalizeSdkMessage`) és a hozzá tartozó `is-sdk-message-envelope.ts` boríték guard adja (T-003-20, lásd lent). A `RunEventRepository`: `appendSdkEvent` (a delta kapcsolót megkerülhetetlenül érvényesítő, egyetlen `INSERT ... SELECT` utasítás, `written`/`skipped` eredménnyel, `duplicate_event` hibaággal), `appendEngineEvent`, `readEventsSince` (kötelező `limit`), `readEventsForStep` és `aggregateRunTokens` (T-003-21); a `RunEventKind`/`isRunEventKind` innentől a barrelben is szerepel. |
+| `human-approval/`       | a `human_approval` tábla (SPEC-003 4.12 szekció): `run_id` idegen kulcs `ON DELETE CASCADE` a `workflow_run` táblára, `step_run_id` idegen kulcs `ON DELETE CASCADE` a `step_run` táblára, két index (`human_approval_step_uq` **egyedi** a `(step_run_id)` oszlopon, `human_approval_pending_idx` a `(decision, requested_at_ms)` páron, F-10: SQLite az indexben tárolja a NULL `decision` értéket is). Az `ApprovalDecision` unió (`'approved' \| 'rejected'`) és az `isApprovalDecision` guard a barrelben is szerepel. A `HumanApprovalRepository`: `requestApproval` (beszúrja a sort `decision: null` értékkel, ÉS ugyanabban a tranzakcióban `running -> waiting_approval` állapotba viszi a lépés futást a `StepRunRepository.markStepWaitingApproval` hívásával), `decideApproval` (compare-and-set `UPDATE ... WHERE step_run_id = ? AND decision IS NULL`, majd `markStepSucceeded`/`markStepRejected`, ugyanabban a tranzakcióban - ha az állapotváltás hibázik, a döntés írása is visszagördül), `getApprovalForStep` és `listPendingApprovals` (`WHERE decision IS NULL ORDER BY requested_at_ms`, a `human_approval_pending_idx` indexből kiszolgálva, T-003-22).                                                                                                                                                                                                                   |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -29,8 +30,8 @@ elhasalna egy `./src/**/*.ts` mintán, a hivatalos config doksi pedig nem dokume
 glob mintát erre a mezőre. Új tábla fájlt ezért a `drizzle.config.ts` listájába is fel kell
 venni.
 
-A további, a SPEC-003 8. szekciója szerinti téma mappák (`human-approval`, `run-recovery`) a
-végrehajtás további lépéseiben keletkeznek.
+A további, a SPEC-003 8. szekciója szerinti téma mappa (`run-recovery`) a végrehajtás további
+lépésében keletkezik.
 
 **Tábla séma tesztelése: `getTableConfig` kell a 100%-os function coverage-höz.** A
 `sqliteTable()` harmadik argumentuma (index lista) és a `.references(() => ...)` idegen kulcs
@@ -538,6 +539,78 @@ hasonló mintájával. Mivel a `normalizeSdkMessage` (T-003-20) `sdk_stream_even
 tölti a négy `usage` oszlopot, ez az összesítés a delta kapcsoló mindkét állásában azonos
 eredményt ad (60., 61. kritérium, tesztelve `run-event-repository.spec.ts`-ben, ugyanazzal a
 bemeneti sorozattal mindkét állásra).
+
+## A `HumanApprovalRepository` (T-003-22)
+
+A `human-approval-repository.ts` a `requestApproval`, `decideApproval`, `getApprovalForStep` és
+`listPendingApprovals` műveletet adja, `openDatabase` köti be a `DatabaseContext.approvals`
+mezőbe (`sqlite-connection/open-database.ts`). A barrel csak a `HumanApprovalRepository` típust
+és a bemeneti/kimeneti típusait exportálja, a `createHumanApprovalRepository` factory függvényt
+nem (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció). Az `ApprovalDecision` unió és az
+`isApprovalDecision` guard a `human-approval/approval-decision.ts` és
+`human-approval/is-approval-decision.ts` fájlban él, mindkettő a barrelben is szerepel.
+
+**A `stepRuns` a `createHumanApprovalRepository` HARMADIK paramétere, a már létrehozott
+`StepRunRepository` példány, nem a factory függvény.** A `requestApproval` a
+`markStepWaitingApproval`-t, a `decideApproval` a `markStepSucceeded`/`markStepRejected`-et
+hívja, ugyanabban a tranzakcióban, mint a saját `human_approval` sor módosítása (SPEC-003 9.2
+szekció). Ha a fájl a `createStepRunRepository` factory függvényt importálná és saját maga
+hozna létre egy második `StepRunRepository` példányt ugyanarra a `database`/`transaction`
+párra, az egy felesleges, második zárványt jelentene ugyanazon a táblán, második ok nélküli
+indirekcióval - ehelyett az `open-database.ts` adja át a már meglévő `stepRuns` mezőt, ott,
+ahol az MINDEN repository közül már létezik (`open-database.ts`, a `createHumanApprovalRepository`
+hívása a `stepRuns` létrehozása UTÁN áll). A fájl emiatt `import type`-tal hivatkozik a
+`StepRunRepository`-ra (`../step-run/step-run-repository.ts`), a `createStepRunRepository`
+futásidejű importja nélkül - nincs körkörös függés, mert a `step-run` téma egyetlen fájlja sem
+importál semmit a `human-approval` témából.
+
+**A tranzakció-beágyazás SAVEPOINT alapú, nem beágyazott `BEGIN`.** A `stepRuns.markStep*`
+függvények maguk is a megosztott `transaction` függvényt hívják meg (`createHumanApprovalRepository`
+második paramétere, ugyanaz a példány, mint amit a `stepRuns` kapott az `open-database.ts`-ben).
+Amikor a `decideApproval`/`requestApproval` saját `transaction()` hívásán BELÜLről meghívja ezt
+újra, a `better-sqlite3` `Database.prototype.transaction()` a `db.inTransaction` állapotot
+látva automatikusan `SAVEPOINT`/`RELEASE`/`ROLLBACK TO` hármast használ `BEGIN`/`COMMIT`/`ROLLBACK`
+helyett (forrásból ellenőrizve: `better-sqlite3/lib/methods/transaction.js`, `wrapTransaction`
+függvény, `if (db.inTransaction) { before = savepoint; ... }` ág). Ez a dokumentált, beépített
+nesting mechanizmus teszi lehetővé, hogy a `stepRuns.markStepSucceeded`/`markStepRejected`
+hibaága a teljes, KÜLSŐ tranzakciót (a `human_approval` sor módosításával együtt) visszagörgesse:
+a belső hívás `Outcome` hibaágat ad vissza (nem dob kivételt közvetlenül a hívó felé, mert a
+`transaction()` wrapper elkapja a `TransactionRollback`-ot és `Outcome`-má alakítja), a
+`decideApproval`/`requestApproval` ezt a hibaágat **továbbadja saját hibaágaként**, ami a SAJÁT
+`transaction()` hívásán belül `TransactionRollback`-ot dob, és ez már a KÜLSŐ (a `human_approval`
+`UPDATE`/`INSERT`-et is tartalmazó) `database.transaction()` hívást buktatja - így az egész
+művelet egyetlen atomi egység, futtatott teszttel igazolva (`human-approval-repository.spec.ts`,
+"ha a lépés állapotváltás hibázik, a human_approval.decision írása is visszagördül").
+
+**A `step_run_id` egyediségét a `human_approval_step_uq` NÉV szerint hivatkozható `uniqueIndex()`
+adja, nem a column builder `.unique()` metódusa.** A Drizzle 0.45.2 mindkettőt támogatja
+(`.unique(name?: string)` az oszlopépítőn, külön `config.uniqueConstraints` tömbbe kerülve; a
+`uniqueIndex()` a tábla extra configban, `config.indexes` tömbbe kerülve), de a SPEC-003 4.12
+szekció szó szerint "indexek" közé sorolja a `human_approval_step_uq`-t, és ugyanez a minta él
+már a `run_event_run_uuid_uq`-nál (`run-event.ts`) - a két mechanizmus együtt alkalmazva
+redundáns, egymástól független megszorítást hozna létre ugyanarra az oszlopra.
+
+**A `listPendingApprovals` SZÁNDÉKOSAN nem a `toHumanApprovalRecord`-on (a `decision` typeguard
+ellenőrzésén) át képezi le a sorokat.** A `decision !== null && !isApprovalDecision(decision)`
+feltétel a `WHERE decision IS NULL` szűrésű lekérdezésre alkalmazva egy típusilag garantáltan
+holt ágat vinne be - a `decision !== null` mindig hamis lenne, hiszen a `WHERE` feltétel ezt már
+kikényszerítette -, ami a SPEC-003 12.4 szekció 100 százalékos, kizárás nélküli lefedettségi
+küszöbét sértené. Ugyanaz az elv, mint a `run-event-repository.ts` `insertEngineEventRow`/
+`appendEngineEvent` szétválasztásánál (lásd fent, "Az `appendSdkEvent` és az `appendEngineEvent`
+SZÁNDÉKOSAN két külön SQL utasítás"). A `listPendingApprovals` ezért egy külön, hibaágat nem
+visszaadó `toPendingApprovalRecord` segédfüggvényt használ, ami a `decision` mezőt közvetlenül
+`null`-ra írja, a lekérdezés által garantált tény alapján, nem a nyers oszlopérték
+újraellenőrzésével. A `toHumanApprovalRecord` (a typeguarddal ellenőrző változat) a
+`decideApproval` (ahol a `decision` mindig a hívó által megadott, érvényes `ApprovalDecision`)
+és a `getApprovalForStep` (ahol a nyers oszlopérték korrupt is lehet, mert a `decision` oszlopon
+nincs DB szintű `CHECK`) hívási úton marad, és az `invalid_approval_decision` hibaág a
+`getApprovalForStep`-en át, egy közvetlenül beszúrt korrupt sorral tesztelt.
+
+**A `decideApproval` compare-and-set `UPDATE ... WHERE step_run_id = ? AND decision IS NULL`
+alakban fut**, a `RETURNING` záradékkal. Nulla módosított sor esetén egy külön `SELECT` dönti
+el, hogy a sor hiányzik-e (`not_found`) vagy már el van döntve (`already_decided`) - ez a
+diagnosztikai olvasás ugyanabban, a hívó számára láthatatlan tranzakcióban fut, tehát nem
+versenyhelyzet-érzékeny.
 
 ## `Outcome` hibaosztály konvenció
 

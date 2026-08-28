@@ -26,6 +26,7 @@ describe('migrateDatabase', () => {
       '__drizzle_migrations',
       'app_setting',
       'graph_snapshot',
+      'human_approval',
       'provider_concurrency_limit',
       // A `sqlite_sequence` a `run_event.id` AUTOINCREMENT oszlopa miatt
       // automatikusan létrejövő tábla (F-9, F-13, SPEC-003 15. szekció 5.
