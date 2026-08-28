@@ -25,6 +25,7 @@ export default defineConfig({
     './src/app-setting/app-setting.ts',
     './src/provider-concurrency/provider-concurrency.ts',
     './src/run-event/run-event.ts',
+    './src/human-approval/human-approval.ts',
   ],
   out: './drizzle',
 });

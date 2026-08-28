@@ -10,6 +10,7 @@ import { createStepRunRepository } from '../step-run/step-run-repository.ts';
 import { createAppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import { createProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
 import { createRunEventRepository } from '../run-event/run-event-repository.ts';
+import { createHumanApprovalRepository } from '../human-approval/human-approval-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -94,8 +95,17 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   const runs = createWorkflowRunRepository(database, transaction);
   const stepRuns = createStepRunRepository(database, transaction);
   const events = createRunEventRepository(database, transaction);
+  // A HumanApprovalRepository a StepRunRepository már létrehozott
+  // példányát kapja meg (nem a factory függvényt), hogy a
+  // markStepWaitingApproval/markStepSucceeded/markStepRejected hívások
+  // ugyanazt a database/transaction zárványt használják, mint a
+  // stepRuns mező (SPEC-003 9.2 szekció, `human-approval-repository.ts`).
+  const approvals = createHumanApprovalRepository(database, transaction, stepRuns);
   const settings = createAppSettingRepository(database, transaction);
   const concurrencyLimits = createProviderConcurrencyRepository(database, transaction);
 
-  return { kind: 'ok', value: { workflows, runs, stepRuns, events, settings, concurrencyLimits, transaction, close } };
+  return {
+    kind: 'ok',
+    value: { workflows, runs, stepRuns, events, approvals, settings, concurrencyLimits, transaction, close },
+  };
 }
