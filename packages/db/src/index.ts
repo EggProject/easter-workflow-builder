@@ -52,3 +52,15 @@ export type {
   AttachSessionInput,
   StepRunRecord,
 } from './step-run/step-run-repository.ts';
+
+// app-setting: az AppSettingRepository publikus felülete (T-003-23). A
+// factory függvényt (`createAppSettingRepository`) szándékosan nem
+// exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
+// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+export type { AppSettingRepository, AppSettingsRecord } from './app-setting/app-setting-repository.ts';
+
+// provider-concurrency: a ProviderConcurrencyRepository publikus felülete
+// (T-003-23). A factory függvényt (`createProviderConcurrencyRepository`)
+// szándékosan nem exportáljuk, csak a típust, ugyanaz a minta, mint a
+// `WorkflowRepository`-nél (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+export type { ProviderConcurrencyRepository } from './provider-concurrency/provider-concurrency-repository.ts';

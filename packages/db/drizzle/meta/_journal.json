@@ -36,6 +36,13 @@
       "when": 1787878540821,
       "tag": "0004_round_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787880474860,
+      "tag": "0005_condemned_madripoor",
+      "breakpoints": true
     }
   ]
 }
