@@ -63,3 +63,34 @@ export { validateScopeBalance } from './branch-scope/validate-scope-balance.ts';
 // provider-resolution: a háromszintű provider feloldás (SPEC-004 11.1,
 // PLAN-005 T-005-12).
 export { resolveEffectiveProvider } from './provider-resolution/resolve-effective-provider.ts';
+
+// capability-policy: a `Fact` három állapotának egységes kezelése, és a
+// SPEC-004 11.3 táblázat leírótól függő viselkedései, viselkedésenként egy
+// tiszta függvényben (SPEC-004 11.2, 11.3, PLAN-005 T-005-13).
+//
+// A táblázat tizenhat leírótól függő sorából tizennégy áll itt. A hiányzó
+// kettő, a kötelező env blokk (10. sor) és a tiltott env változók levétele
+// (11. sor) a `provider-environment` téma dolga (PLAN-005 T-005-14), mert
+// azok a `processEnvironment` porton át olvasnak, nem tiszta leíró döntések.
+// A táblázat 2. sora (kell-e a `Stop` hook) nem leíró mező, hanem a
+// stratégia választás következménye, ezért az `Options` összeállításához
+// tartozik (`agent-step` téma, T-005-19).
+export type { CapabilityFieldInclusion } from './capability-policy/capability-field-inclusion.ts';
+export type { ConnectionTestMode } from './capability-policy/connection-test-mode.ts';
+export type { StructuredOutputStrategyDecision } from './capability-policy/structured-output-strategy-decision.ts';
+export type { ModelIdentifierDecision } from './capability-policy/model-identifier-decision.ts';
+export type { DisallowedServerToolsDecision } from './capability-policy/disallowed-server-tools-decision.ts';
+export { resolveStructuredOutputStrategy } from './capability-policy/resolve-structured-output-strategy.ts';
+export { validateMaxTurnsFloor } from './capability-policy/validate-max-turns-floor.ts';
+export { validateForcedToolChoiceRisk } from './capability-policy/validate-forced-tool-choice-risk.ts';
+export { resolveModelWireIdentifier } from './capability-policy/resolve-model-wire-identifier.ts';
+export { requireModelSelection } from './capability-policy/require-model-selection.ts';
+export { validateModelId } from './capability-policy/validate-model-id.ts';
+export { resolveThinkingMode } from './capability-policy/resolve-thinking-mode.ts';
+export { resolveEffortInclusion } from './capability-policy/resolve-effort-inclusion.ts';
+export { resolveDisallowedServerTools } from './capability-policy/resolve-disallowed-server-tools.ts';
+export { shouldIncludePartialMessages } from './capability-policy/should-include-partial-messages.ts';
+export { resolveConcurrencySuggestion } from './capability-policy/resolve-concurrency-suggestion.ts';
+export { RATE_LIMIT_RETRY_POLICY } from './capability-policy/rate-limit-retry-policy.ts';
+export { resolveConnectionTestMode } from './capability-policy/resolve-connection-test-mode.ts';
+export { validateSdkVersionMatch } from './capability-policy/validate-sdk-version-match.ts';
