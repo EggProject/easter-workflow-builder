@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a nyolc nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a kilenc nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -74,6 +74,10 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         // témája ezzel dönti el a `malformed_node_config` ellenőrzést
         // (SPEC-004 4.7).
         'isNodeConfig',
+        // A kilencedik a T-005-25 óta: az `engine` csomag `run-supervisor`
+        // témája ebből tölti a pillanatkép dokumentum `version` mezőjét, a
+        // futás indításakor (SPEC-004 4.8 5. lépés).
+        'GRAPH_DOCUMENT_VERSION',
       ]),
     );
   });

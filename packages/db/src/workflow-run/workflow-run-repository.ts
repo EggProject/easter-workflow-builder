@@ -369,7 +369,18 @@ export function createWorkflowRunRepository(
         stepRunId: null,
         kind: 'run_started',
         occurredAtMs: now,
-        payload: { runId: row.id, workflowId: row.workflowId },
+        // A payload mezői a SPEC-004 13. szekció táblázatának `run_started`
+        // sorát követik (`workflowId`, `providerId`, `graphSnapshotHash`,
+        // `persistedStreamDeltas`), mert ugyanez az alak megy ki élőben a
+        // WebSocket nézetnek is (a motor `RunStartedPayload` típusa). A
+        // `runId` nem ismétlődik a payloadban: azt a `run_event.run_id`
+        // oszlop hordozza.
+        payload: {
+          workflowId: row.workflowId,
+          providerId: row.providerId,
+          graphSnapshotHash: row.graphSnapshotHash,
+          persistedStreamDeltas: row.persistedStreamDeltas,
+        },
       });
 
       return {

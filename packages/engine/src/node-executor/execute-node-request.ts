@@ -1,4 +1,4 @@
-import type { CreateStepRunInput, ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
+import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
 import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { SessionBearingInstance } from '../agent-step/session-bearing-instance.ts';
 import type { SessionSourceNodes } from '../agent-step/session-source-nodes.ts';
@@ -49,12 +49,11 @@ interface ExecuteNodeCommonFields {
  *
  * **Miért van egyáltalán diszkrimináns a `config.type` mellett.** Az
  * `error_handler` node az egyetlen, aminek a végrehajtásához a node
- * configján és a példány adatain kívül a **hibát adó másik lépés** három
- * adata is kell (`failedErrorKind`, `failedAttempt`, `retryStepRunInput`,
- * SPEC-004 8.2 bevezető). Ha ez a három mező a közös részben állna,
- * opcionális lenne, és a diszpécser `error_handler` ágának egy olyan
- * hiányzó-érték ágat kellene kezelnie, ami a hívási szerződés szerint sosem
- * fordul elő. A TypeScript viszont **nem szűkít beágyazott diszkriminánsra**
+ * configján és a példány adatain kívül a **hibát adó másik lépés** két adata
+ * is kell (`failedErrorKind`, `failedAttempt`, SPEC-004 8.2 bevezető). Ha ez
+ * a két mező a közös részben állna, opcionális lenne, és a diszpécser
+ * `error_handler` ágának egy olyan hiányzó-érték ágat kellene kezelnie, ami a
+ * hívási szerződés szerint sosem fordul elő. A TypeScript viszont **nem szűkít beágyazott diszkriminánsra**
  * (`request.config.type` a `request` unióját nem szűkíti, a fordító
  * ténylegesen `TS2339` hibát ad), ezért a diszkriminánsnak a legfelső szinten
  * kell állnia. Így a három mező típusszinten kötelező pontosan ott, ahol
@@ -75,5 +74,4 @@ export type ExecuteNodeRequest =
       readonly config: ErrorHandlerNodeConfig;
       readonly failedErrorKind: EngineErrorKind;
       readonly failedAttempt: number;
-      readonly retryStepRunInput: CreateStepRunInput;
     });

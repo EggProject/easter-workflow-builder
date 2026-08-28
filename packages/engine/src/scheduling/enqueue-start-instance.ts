@@ -1,4 +1,5 @@
 import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
+import { enqueueReadyInstance } from './enqueue-ready-instance.ts';
 import type { SchedulerState } from './scheduler-state.ts';
 
 /**
@@ -12,13 +13,13 @@ import type { SchedulerState } from './scheduler-state.ts';
  * a szabály rá nem alkalmazható. A `resolveInstanceReadiness` ezért bejövő él
  * nélküli példányra `waiting` állapotot ad, és a sorba kerülés kizárólag ezen
  * a függvényen át történik.
+ *
+ * A tényleges sorba állítást az `enqueueReadyInstance` végzi: ez a függvény
+ * csak a `start` node gyökér kontextusú példányát állítja elő, hogy a hívónak
+ * ne kelljen tudnia, hogy az üres verem a gyökér kontextus (4.3).
  */
 export function enqueueStartInstance(state: SchedulerState, startNodeId: string): SchedulerState {
   const instance: StepInstanceReference = { nodeId: startNodeId, branchContext: [] };
 
-  return {
-    ...state,
-    readyInstances: [...state.readyInstances, { instance, arrivalSequence: state.nextArrivalSequence }],
-    nextArrivalSequence: state.nextArrivalSequence + 1,
-  };
+  return enqueueReadyInstance(state, instance);
 }

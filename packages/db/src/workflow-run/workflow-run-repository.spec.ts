@@ -196,7 +196,12 @@ describe('createWorkflowRunRepository', () => {
       expect(events[0]?.kind).toBe('run_started');
       expect(events[0]?.origin).toBe('engine');
       expect(events[0]?.stepRunId).toBeNull();
-      expect(events[0]?.payload).toStrictEqual({ runId: run.id, workflowId: 'w1' });
+      expect(events[0]?.payload).toStrictEqual({
+        workflowId: 'w1',
+        providerId: 'minimax',
+        graphSnapshotHash: run.graphSnapshotHash,
+        persistedStreamDeltas: false,
+      });
 
       sqlite.close();
     });

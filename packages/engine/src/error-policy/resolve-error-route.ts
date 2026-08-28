@@ -4,15 +4,20 @@ import type { ErrorRoute } from './error-route.ts';
 
 /**
  * A menekülő él `branch_key` értéke (SPEC-004 4.2 táblázat fenntartott
- * kulcsai). Két, egymástól független szabály használja ugyanazt az alakot:
+ * kulcsai). Három, egymástól független szabály használja ugyanazt az alakot:
  *
  * - `on_error`: **bármely** node hibája után (8.1 1. pont).
  * - `exhausted`: kizárólag az `error_handler` node kimerült kísérletei után
  *   (8.2 2. pont). Az `error_handler` kimenő élei kizárólag ezt az ágat
  *   szolgálják (8.2 5. pont), tehát a sikeres újrapróbálkozás után a vezérlés
  *   **nem** ezeken az éleken megy tovább.
+ * - `rejected`: kizárólag az elutasított `human_approval` lépés után (5.8
+ *   utolsó pontja: "ha van `rejected` kimenő él, a vezérlés arra megy; ha
+ *   nincs, a 8.3 hibapolitika következik `approval_rejected` osztállyal").
+ *   Ez szó szerint ugyanaz a döntési fa, mint a másik kettőé, csak a keresett
+ *   kulcs más, ezért nem külön függvény (PLAN-005 T-005-25).
  */
-export type FailureEscapeKey = 'on_error' | 'exhausted';
+export type FailureEscapeKey = 'on_error' | 'exhausted' | 'rejected';
 
 export interface ResolveErrorRouteInput {
   readonly graph: ExecutableGraph;

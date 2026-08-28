@@ -50,12 +50,13 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'expression_evaluator_unavailable',
   'missing_provider_env',
   'unknown_concurrency_slot',
+  'run_execution_failed',
 ];
 
 describe('isEngineErrorKind', () => {
   it('mind a negyvennégy ágra igazat ad', () => {
     expect(allEngineErrorKinds.every((kind) => isEngineErrorKind(kind))).toBe(true);
-    expect(allEngineErrorKinds).toHaveLength(44);
+    expect(allEngineErrorKinds).toHaveLength(45);
   });
 
   it('hamisat ad ismeretlen szövegre', () => {

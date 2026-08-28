@@ -29,9 +29,11 @@ tölt majd ki. **A T-005-24 zárta le a `node-executor` témát és nyitotta meg
 témát**: az `error_handler` végrehajtója (8.2), a kimerítő diszpécser (`executeNode`), az
 `on_error` útvonal és a `fail_run`/`fail_branch` politika tiszta döntő függvényei (8.1, 8.3), a
 futás záró állapota (8.4), és a `backoffMs` lista hosszának futás indítási ellenőrzése
-(`insufficient_backoff_list`). Ma tizenöt téma áll készen. A spec 12. szekciójában felsorolt
-további három téma mappa (`run-supervisor`, `run-interrupt`, `startup-recovery`) a PLAN-005
-hátralévő fázisaiban készül.
+(`insufficient_backoff_list`). **A T-005-25 hozzátette a `run-supervisor` témát**: a futás
+indításának SPEC-004 4.8 szerinti teljes menete, a háttérben futó léptető hurok a terminális
+állapotig, a futás záró állapotának kiírása, és a `ChildWorkflowRunner` rekurzív implementációja.
+Ma tizenhat téma áll készen. A spec 12. szekciójában felsorolt további két téma mappa
+(`run-interrupt`, `startup-recovery`) a PLAN-005 hátralévő fázisaiban készül.
 
 ## Fájlok
 
@@ -52,6 +54,7 @@ hátralévő fázisaiban készül.
 | `agent-step/`           | az agent lépés életciklusa (SPEC-004 5.2), a session modell (6.3, 6.4) és a kimenő SDK `Options` összeállítása (PLAN-005 T-005-19). Négy csoport: a session forrás halmaz (`collectSessionSourceNodes`) és a `resolveForkSession` gráf bejárása; a futáskori session feloldás (`findNearestAncestorSession`, `resolveSessionBinding`); a leírótól függő döntések egy menetben (`validateAgentStepCapabilities`), az `Options` összeállítása (`buildAgentStepOptions`) a `Stop` hookkal (`buildStopHookMatcher`); és a teljes futtatás (`runAgentStep`) a `result` üzenet számadatainak kiolvasásával (`readResultTelemetry`). A tíz típusfájl **típus-only, nincs `.spec.ts`**. A `runAgentStep` `.spec.ts`-e valós `:memory:` adatbázis ellen fut, és az SDK üzeneteket a commitolt `agent-step-messages-fixture.json` fájlból olvassa. **A téma nem kér párhuzamossági helyet és nem vált `step_run` állapotot**, lásd "Szabályok"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `node-executor/`        | a diszpécser és a tíz végrehajtható node típus végrehajtója (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **T-005-20 az első felét adta**: az öt nem-agent típus (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott infrastruktúra - a hat portot összefogó `NodeExecutorPorts`, a `step_run`-hoz kötött, node típustól független adatokat hordozó `NodeExecutionInstance`, a `run-supervisor`-nak szánt `NodeExecutionOutcome`, az esemény írás+kiadás egyben (`emitEngineEvent`) és a közös nyitó/záró menet (`beginStepRun`, `finishStepRunSucceeded`, `finishStepRunFailed`). **A T-005-21 hozzáadta a második felet**: az `agent_step` (`execute-agent-step.ts`) és a `join` `ai_synthesis` (`execute-join-ai-synthesis.ts`) végrehajtóját, a köztük megosztott `agent-node-lifecycle.ts` belső menettel (a SPEC-004 5.2 teljes tíz pontja, a hely kérésével és felszabadításával, 7.2). **A T-005-22 hozzáadta a `human_approval` végrehajtóját** (`execute-human-approval.ts`, 5.8 szekció) és a döntésre várás regiszterét (`approval-wait-registry.ts`, `ApprovalWaitRegistry`/`createApprovalWaitRegistry`) - egyik sem kér párhuzamossági helyet (7.2). **A T-005-23 hozzáadta a `sub_workflow` végrehajtóját** (`execute-sub-workflow.ts`, 5.9 szekció), az ancestry alapú rekurzióvédelem tiszta függvényét (`detect-workflow-recursion.ts`) és a `ChildWorkflowRunner` port alakú, motoron BELÜLI függőséget (`child-workflow-runner.ts`, **típus-only, nincs `.spec.ts`**) - ez sem kér párhuzamossági helyet (7.2). **A T-005-24 zárta le a témát**: az `error_handler` végrehajtója (`execute-error-handler.ts`, 8.2 szekció), a `NodeExecutionOutcome` két új ága (`retry_scheduled`, `retry_exhausted`), a minden lehetséges függőséget összefogó `NodeExecutorDependencies` és a hozzá tartozó `ExecuteNodeRequest` (mindkettő **típus-only, nincs `.spec.ts`**), végül a kimerítő diszpécser (`execute-node.ts`), ami mind a tíz végrehajtható node típusra a saját `execute-*` függvényét hívja |
 | `error-policy/`         | a hibakezelés döntő függvényei (SPEC-004 8.1 ... 8.4, PLAN-005 T-005-24). A `resolveErrorRoute` a 8.1 hiba útját és a 8.3 politikát adja egyetlen `ErrorRoute` értékben (`handled` menekülő élekkel, `fail_run`, `fail_branch`); a `resolveRetryDecision` a 8.2 kísérlet vezérlését (`handledErrorKinds` szűrés, kísérletszám, `backoffMs` elem); a `resolveRunCompletion` a 8.4 záró állapotát (`succeeded`, vagy `failed` az ELSŐ kezeletlen hiba osztályával és az elhalt ágak számával). **Tiszta függvények**: a téma egyetlen sora sem érint adatbázist, nem hív portot, nem szakít meg futó lépést és nem ír `step_run` sort - csak kimondja a döntést. A négy típusfájl (`error-route`, `retry-decision`, `unhandled-error-record`, `run-completion`) **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `run-supervisor/`       | a futás életciklusa (SPEC-004 4.8, 4.4 ... 4.6, 8.4, PLAN-005 T-005-25). A `createRunSupervisor` az egyetlen belépési pont: `startRun` (a 4.8 menet hét lépése), háttérben futó léptető hurok (`advanceRun`), és a `ChildWorkflowRunner` két metódusa, **önmagára hivatkozva**. A 4.8 lépései külön, önmagukban futtatható függvények: `collectRunInputs` (1. lépés), `buildSnapshotDocument` (5. lépés), `buildNodePlans` + `validateProviderCapabilities` + `validateRunInput` egyetlen menetben (`prepareRun`, 3. és 4. lépés), plusz a gyerek futás kimenete (`collectTerminalOutput`, `buildChildResult`) és az aktív futások nyilvántartása (`ActiveRunRegistry`). A `run-supervisor.ts` és a `run-execution.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Függőségi irány
 
@@ -184,11 +187,12 @@ leíró alapú tíz ellenőrzést egyetlen menetben futtatja és a döntéseket 
 futtatás helye viszont **nem** a `validateRun`: annak a szignatúrája ma a pillanatkép dokumentum
 és a két provider azonosító, és a leíró kereséséhez a `providerDescriptorLookup` portot is meg
 kellene kapnia, amit a `run-supervisor` téma (T-005-25) amúgy is birtokol, mert az futtatja a
-SPEC-004 4.8 teljes menetét. A drótozás tehát oda tartozik: a `validateRun` után, minden
-`agent_step` és `ai_synthesis` módú node-ra egy `validateAgentStepCapabilities` hívás, plusz a
-`validateSdkVersionMatch` a telepített SDK verzióval (63. elfogadási kritérium). Addig a
-viselkedés: egy leíró szintű hiba (például ismeretlen `modelId`) nem a futás indítását, hanem az
-érintett lépést buktatja meg. Ez nyitott átvezetés, nem elfogadott végállapot.
+SPEC-004 4.8 teljes menetét. **A drótozás a T-005-25 óta megtörtént**, pontosan oda: a
+`validateRun` után, minden `agent_step` és `ai_synthesis` módú node-ra egy
+`validateAgentStepCapabilities` hívás, plusz a `validateSdkVersionMatch` a telepített SDK
+verzióval (63. elfogadási kritérium), a `validateProviderCapabilities` egyetlen menetében, a futás
+létrehozása előtt. Egy leíró szintű hiba (például ismeretlen `modelId`) innentől a futás
+indítását buktatja meg, nem az érintett lépést; a nyitott átvezetés lezárva.
 
 **Az `agent-step` téma határa és öt tervezési döntése.** A téma egyetlen agent lépés
 végrehajtásáról szól, és szándékosan **nem** ismer sem node típust, sem párhuzamossági helyet:
@@ -586,9 +590,9 @@ függőség, és a feloldása a `ChildWorkflowRunner` (`child-workflow-runner.ts
   (`isRunTerminal`) a `run-supervisor` birtokolja, nem a `node-executor` réteg. A végrehajtó ezért
   nem számol kimenetet, csak továbbadja azt, amit a port ad.
 
-**Emlékeztető, ami a T-005-25-re (a `run-supervisor` téma) vár.** A `ChildWorkflowRunner` valós
-implementációját ott kell megírni, **rekurzívan: a `run-supervisor` önmagát adja át**
-`ChildWorkflowRunner`-ként az `executeSubWorkflow` hívásnál. A két metódus dolga tételesen:
+**A `ChildWorkflowRunner` valós implementációja a T-005-25 óta megvan**, rekurzívan: a
+`run-supervisor` önmagát adja át `ChildWorkflowRunner`-ként az `executeSubWorkflow` hívásnál. A
+két metódus dolga tételesen:
 
 1. `startChildRun(request)`: a SPEC-004 4.8 menet **teljes** 1 ... 7. lépése a
    `request.targetWorkflowId` workflow-ra (`readGraph`, `readSettings`, node-onkénti provider
@@ -599,9 +603,8 @@ implementációját ott kell megírni, **rekurzívan: a `run-supervisor` önmag�
    gyerek workflow nem hoz létre `workflow_run` sort; a hibaág üzenete a szülő lépés
    `sub_workflow_failed` hibaüzenetébe kerül.
 2. `awaitChildRun(childRunId)`: a gyerek futás léptetése a terminális állapotig, majd a terminális
-   `WorkflowRunRecord` és a futás kimenete (`output`) visszaadása. A kimenet fogalmát itt kell
-   eldönteni és dokumentálni (a terminális node-ok kimenete), mert az `ExecutedStepInstance` lista
-   ott áll rendelkezésre.
+   `WorkflowRunRecord` és a futás kimenete (`output`) visszaadása. A kimenet fogalmát a
+   `collectTerminalOutput` dönti el, lásd a `run-supervisor` téma 3. tervezési döntését.
 
 A `run-supervisor` az `executeSubWorkflow` hívásakor a **saját** `ExecutableGraph`-ját és lefutott
 példány listáját adja át (`ExecuteSubWorkflowInput.graph`, `.executedInstances`), mert az
@@ -659,7 +662,7 @@ mindkét úton azonos.
   `ClockPort.sleep` szerződése kötelezően kér jelet, a futás megszakítása viszont a
   `run-interrupt` téma dolga (9. szekció, T-005-26). Megnevezett hiány, nem elfogadott végállapot.
 
-**Emlékeztető, ami a T-005-25-re (a `run-supervisor` téma) vár, a hibakezelés oldaláról.**
+**A hibakezelés oldaláról a T-005-25-re bízott három pont, lezárva.**
 
 1. **A `failed` kimenet után** a `resolveErrorRoute`-ot kell hívni a node configjának
    `onUnhandledError` mezőjével (a `null` szűkítése a hívóé, lásd fent) és `escapeKey: 'on_error'`
@@ -674,17 +677,145 @@ mindkét úton azonos.
    adni, és az eredményt a `markRunSucceeded`/`markRunFailed` hívásra, valamint a `run_finished`
    esemény payloadjára képezni. **Új futás állapot nem jön létre**: `partially_succeeded` nincs
    (44. elfogadási kritérium).
-3. **Nyitott átvezetés: a megismételt lépés `step_run` sorát ma az `error_handler` végrehajtója
-   hozza létre** (`retry_scheduled.retryStepRun`, a T-005-24 munkautasítása szerint, hogy a
-   "minden újrapróbálkozás új sor `attempt + 1` értékkel" kritérium ebben a lépésben, futtatott
-   teszttel igazolható legyen). A `run-supervisor` viszont a megismételt példányt a szokásos
-   `executeNode` úton futtatná, ami a `beginStepRun`-on át **még egy** sort hozna létre ugyanarra
-   a kísérletre. A T-005-25-nek ezt fel kell oldania, és a feloldás iránya nyitott kérdés, nem
-   eldöntött végállapot: vagy a végrehajtók közös nyitó menete kap egy "már létező sorral indulj"
-   utat, vagy a sor létrehozása kerül át a `run-supervisor`-ba, és az `error_handler` csak a
-   `nextAttempt` értéket adja vissza. A SPEC-004 8.2 4. pontja mindkét olvasatot megengedi ("a
-   hibát adó node új `step_run` sort **kap**", illetve "az `error_handler` ... ütemezett egy újabb
-   kísérletet"), tehát ez nem spec sértés, hanem eldöntendő szerkezeti kérdés.
+3. **A megismételt lépés `step_run` sorát a T-005-25 óta a `run-supervisor` írja**, a szokásos
+   `executeNode` úton; az `error_handler` végrehajtója csak a `nextAttempt` értéket adja vissza
+   (`retry_scheduled.nextAttempt`). A T-005-24 óta nyitva állt szerkezeti kérdés ezzel lezárult;
+   az indoklás a `run-supervisor` téma 2. tervezési döntésénél áll.
+
+**A `run-supervisor` téma (T-005-25) és a kilenc tervezési döntése.** A téma köti össze az összes
+korábbi témát egyetlen működő futás életciklussá, ezért itt a legtöbb a döntés, amit a SPEC-004
+nem mond ki tételesen.
+
+**1. A háttérfolyamat nyilvántartása: `ActiveRunRegistry` és `ActiveRunHandle`.** A `startRun` a
+4.8 menet 7. lépése után **azonnal** visszatér, mert a hívó (a HTTP réteg) nem várhat percekig; a
+léptetés innentől háttérben megy, és az előrehaladást az `eventPublisher` port közvetíti. A
+háttérfolyamathoz egyetlen fogódzó van, az `ActiveRunHandle`:
+
+| Mező                | Mit ad                                                                          |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `runId`             | a futás azonosítója                                                             |
+| `rootRunId`         | a futás fájának gyökere (SPEC-003 4.8), az al-workflow futásokkal közös         |
+| `workflowId`        | a futó workflow                                                                 |
+| `completion`        | `Promise<Outcome<RunCompletion>>`, a léptetés eredménye; **soha nem utasít el** |
+| `requestStop()`     | a hurok nem indít több lépést, és a záró állapotot **nem** ő írja               |
+| `isStopRequested()` | a jelzés olvasása                                                               |
+
+**Amit a T-005-26 (megszakítás) ebből használ.** A 9. szekció 2. pontja ("a szabályozó ebből a
+futásból többé nem enged induló lépést, és a sorban álló lépései kiesnek") pontosan a
+`requestStop()`; a 3. pontja ("minden élő agent lépéshez tartozó `AgentQuery` objektumon
+`interrupt()` a futás fáján") a `listActiveRuns()` `rootRunId` szerinti szűrésével kapja meg a fa
+tagjait. A `requestStop()` **szándékosan nem** ír záró állapotot: az 5. pont szerint a `db` oldal
+egyetlen tranzakcióban zár (futás `cancelled`, minden nem terminális lépés `cancelled`,
+`run_finished` esemény), tehát ha a hurok is írna, két, egymással versenyző állapotváltás
+keletkezne ugyanarra a sorra. **Ami hiányzik és a T-005-26-ra vár:** az élő `AgentQuery`
+objektumok nyilvántartása. Azok a `runAgentStep` belsejében élnek, ez a téma nem látja őket; a
+`requestStop()` ma csak azt garantálja, hogy ÚJ lépés nem indul, a futók a saját ütemükben
+fejeződnek be.
+
+**Amit a T-005-28 (`createEngine`, `shutdown`) ebből használ.** A 10.2 szabályos leállás ugyanaz a
+két lépés minden aktív futáson (`listActiveRuns()` -> `requestStop()`), majd a `completion`
+megvárása; a `decideApproval` motor művelet pedig ugyanazt az `approvalRegistry` példányt kapja,
+amit a `RunSupervisorDependencies` már megkövetel.
+
+**2. A retry duplikáció feloldása: a `step_run` sort a hívó írja.** A T-005-24 nyitva hagyott
+kérdése (`packages/engine/CLAUDE.md` korábbi "Nyitott átvezetés" pontja) **lezárva**, a második
+irányban: az `error_handler` végrehajtója **nem hoz létre** sort a megismételt lépéshez, csak a
+`nextAttempt` sorszámot adja vissza (`NodeExecutionOutcome.retry_scheduled`). A `run-supervisor`
+az `applyRetryScheduled` menetben a hibát adó **példányt** teszi vissza az érkezési sorba
+(`enqueueReadyInstance`), és a `retryAttempts` térképbe írja a következő `attempt` értéket; a sor
+így a szokásos `executeNode` úton, a közös `beginStepRun` menetben keletkezik. Két oka van ennek
+az iránynak: (a) a másik irány (a végrehajtók közös nyitó menete kapna "már létező sorral indulj"
+utat) mind a tíz `execute-*` fájlt és a `beginStepRun` szignatúráját érintette volna, (b) a
+`CreateStepRunInput` node típustól függő mezőit (`nodeType`, `modelId`, `sessionMode`,
+`structuredOutputStrategy`) a `run-supervisor` nem tudná kitalálni, a végrehajtó viszont igen. A
+SPEC-004 8.2 4. pontja passzív alakban fogalmaz ("a hibát adó node új `step_run` sort **kap**"),
+tehát egyik irányt sem zárja ki. Futtatott bizonyíték: a `create-run-supervisor.spec.ts`
+"az újrapróbálkozás pontosan EGY új step_run sort hoz létre attempt + 1 értékkel" tesztje.
+
+**3. A gyerek futás kimenete (`ChildWorkflowRunResult.output`).** A T-005-23 a fogalmat nyitva
+hagyta; a `collectTerminalOutput` dönti el: **terminális node az, aminek a gráfban nincs kimenő
+éle** (nem a `SchedulerState` dönti el, tehát a fogalom két különböző lefutás után is ugyanaz).
+Egyetlen terminális node esetén a kimenet **maga az az érték**, amit a node utolsó lefutott
+példánya adott - így a szülő kifejezései a szokásos `steps['al-workflow']` alakban érik el, felesleges
+közbenső szint nélkül. Több terminális node esetén rekord, node azonosító -> kimenet, mert egyetlen
+érték kiválasztása a több közül kitalált szabály lenne. Le nem futott terminális node nem kerül a
+rekordba (egyetlen terminális node esetén `undefined`), és ugyanannak a node-nak több lefutásából
+az **utolsó** marad - ugyanaz a "későbbi elem a frissebb lefutás" szabály, amit az
+`ExecutedStepInstance` lista és a `findVisibleStepInstance` döntetlen szabálya is használ.
+
+**4. A telepített SDK verzió a `RunSupervisorDependencies` mezője, nem import.** A
+`validateSdkVersionMatch` (11.3 táblázat 17. sora) és a pillanatkép dokumentum `sdkVersionPin`
+mezője (SPEC-003 5.1) is ezt kéri, a motor viszont nem függ az Agent SDK-tól (58. elfogadási
+kritérium), tehát nem kérdezheti le. Az érték egyetlen ellenőrzött forrása a
+`@easter-workflow-builder/agent` csomag `INSTALLED_AGENT_SDK_VERSION` konstansa, aminek az
+egyezését a csomag `package.json` pinjével egy regressziós teszt őrzi; a motor ezt paraméterként
+kapja, tehát a teszt mindkét ágat (egyező és eltérő verzió) közvetlenül elő tudja idézni.
+
+**5. A 11.2 provider validáció bedrótozása megtörtént.** A T-005-19 óta nyitott átvezetés lezárva:
+a `validateProviderCapabilities` a futás indításakor, a futás létrehozása ELŐTT végigfut minden
+`agent_step` és `ai_synthesis` módú `join` node-on, a node-jára feloldott provider leírójával, és
+két ellenőrzést futtat (`validateSdkVersionMatch`, majd a lépéshez kötött tíz sort egy menetben
+adó `validateAgentStepCapabilities`). A számított döntéseket **szándékosan eldobja**: azok a lépés
+végrehajtásakor, az `Options` összeállításával egy menetben születnek újra (`agent-node-lifecycle`),
+és mivel tiszta függvényről van szó, a kétszeri futtatás ugyanazt adja. Egy leíró szintű hiba
+(például ismeretlen `modelId`) innentől a **futás indítását** buktatja meg, nem az érintett lépést.
+
+**6. Az ideiglenes pillanatkép dokumentum: a `buildSnapshotDocument` kétszer fut.** A 4.8 sorrend
+kötött, de körkörös: a gráf validáció (3. lépés) a **dokumentumot** kapja bemenetként
+(`validateRun`), a node-onkénti provider feloldás viszont ugyanannak a validációnak a
+mellékterméke. A `validateRun` a dokumentum `effectiveProviderId` mezőjét nem olvassa (a saját
+doksija mondja ki), ezért előbb egy ideiglenes dokumentum épül, amiben minden node a **futás
+szintű** providert (workflow felülírás vagy globális alapértelmezés) kapja, majd a validáció után
+a végleges dokumentum a valódi térképpel. Az ideiglenes dokumentum sosem kerül adatbázisba: a
+`startRun` a másodikat kapja. Ebből következik, hogy a futás szintű feloldás **előre** fut, és
+egy hiányzó globális alapértelmezés (`no_default_provider`) már itt megbuktatja az indítást.
+
+**7. Tiszta összefűző függvények a nem elérhető ágak helyett.** Három helyen (`collectRunInputs`,
+`prepareRun`, `buildChildResult`) a `run-supervisor` **nem** ágaztat közvetlenül a
+részeredményekre, hanem egy tiszta függvénynek adja át őket. Az ok mindhárom helyen ugyanaz: a
+hibaágak éles futásban egyetlen közös okból (nem létező workflow, korrupt sor, belső
+ellentmondás) jönnének, tehát az elsőnél kilépve a többi **soha nem futna le**, és a 100
+százalékos, kizárás nélküli lefedettségi küszöb mellett pontosan az a fajta ág, amit tilos
+bevezetni. Így a hívási helyen egyetlen elágazás marad, aminek mindkét kimenete előfordul, a
+belső ágak pedig az összefűző függvény saját tesztjében, kézzel összerakott bemenettel érhetők el.
+Ugyanez az elv áll a `buildNodePlans` két hibaága mögött is.
+
+**8. Az `EngineErrorKind` új tagja: `run_execution_failed`.** A léptetés közben kétféle, nem lépés
+szintű hiba fordulhat elő: egy végrehajtó `Outcome` hibaága (adatbázis hiba, ami nem a lépés saját
+hibaága), és a futás állapotának belső ellentmondása - ma egyetlen ilyen van, egy `error_handler`
+példány, ami **nem** `on_error` élen vált futtathatóvá, tehát nincs hozzá hibakontextus (a 4.7
+validáció csak az `on_error` élek CÉLJÁT köti `error_handler` node-hoz, a fordítottját nem).
+Mindkét esetben a motor **nem talál ki** hibaosztályt és kísérletszámot: a futást `failed`
+állapotba viszi ezzel a megnevezett osztállyal, és a hívó az EREDETI üzenetet kapja vissza. Az
+`abortRun` a két írás eredményét szándékosan nem ágaztatja el: ha az adatbázis maga a hibaforrás,
+a lezárás sem sikerülhet, a bennragadt `running` futást pedig az indulási helyreállítás
+(T-005-27) viszi `interrupted` állapotba.
+
+**9. Három meglévő típus szűkült vagy bővült ebben a lépésben.** Mindhárom a hívó holt ágainak
+elkerülése miatt: a `FailureEscapeKey` felvette a `rejected` értéket (a `human_approval`
+elutasításának útja szó szerint ugyanaz a döntési fa, csak a menekülő él kulcsa más, 5.8 utolsó
+pontja); a `RunCompletion` **diszkriminált unió** lett, mert a lapos alakban a `markRunFailed`
+hívás előtt egy `?? ''` jellegű, sosem futó szűkítés kellett volna; a `scheduling` téma pedig
+kapott egy `enqueueReadyInstance` belépési pontot, mert a megismételt példány nem jelölésből válik
+futtathatóvá (az `enqueueStartInstance` ma ezt hívja, a `start` node gyökér kontextusú példányát
+előállítva).
+
+**A `run_started` esemény két útja.** A **sort** a `db` írja, a futás beszúrásával azonos
+tranzakcióban (SPEC-004 4.8 6. lépés, 13. szekció "a `startRun` tranzakciójában"), ezért a motor
+ezt az egy eseményt **nem** a `writeEngineEvent` úton adja ki, csak az `eventPublisher` porton -
+különben két `run_started` sor keletkezne ugyanarra a futásra. Hogy az élőben látott és az
+adatbázisból visszaolvasott alak egyezzen (ez az újracsatlakozás alapfeltétele, 5.2 6. pont), a
+`db` oldali payload ebben a lépésben a SPEC-004 13. szekció táblázatához igazodott: `workflowId`,
+`providerId`, `graphSnapshotHash`, `persistedStreamDeltas` - a `runId` nem ismétlődik benne, azt a
+`run_event.run_id` oszlop hordozza.
+
+**A `fail_run` "azonnalisága" ebben a lépésben.** A 8.3 táblázat szerint `fail_run` mellett "a
+motor megszakítja a többi futó lépést". A megszakítás (az SDK `interrupt()` hívása) a 9. szekció
+menete, ami a `run-interrupt` téma dolga (T-005-26), ezért ez a lépés a saját hatáskörében annyit
+tesz, hogy **új lépést nem indít**, és a már futókat megvárja. A futás záró állapota így is
+`failed`, és a `create-run-supervisor.spec.ts` "fail_run" tesztje futtatva igazolja, hogy a
+hibázó ág utáni node **nem kap `step_run` sort**, míg `fail_branch` mellett a testvér ág
+végigfut. Ez megnevezett hiány, nem elfogadott végállapot.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

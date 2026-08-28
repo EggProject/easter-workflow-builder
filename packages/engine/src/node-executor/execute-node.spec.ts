@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
-import type { AgentStepConfig, CreateStepRunInput, DatabaseContext, StepRunRecord } from '@easter-workflow-builder/db';
+import type { AgentStepConfig, DatabaseContext, StepRunRecord } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
 import type { Fact, ModelDescriptor, ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
 import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
@@ -286,22 +286,6 @@ function agentStepConfig(): AgentStepConfig {
   };
 }
 
-function retryStepRunInput(runId: string): CreateStepRunInput {
-  return {
-    runId,
-    nodeId: 'agent',
-    nodeType: 'agent_step',
-    parentStepRunId: null,
-    iteration: 0,
-    attempt: 1,
-    providerId: 'minimax',
-    modelId: null,
-    sessionMode: null,
-    structuredOutputStrategy: null,
-    subWorkflowRunId: null,
-  };
-}
-
 function plainRequest(runId: string, nodeId: string, config: PlainNodeConfig): ExecuteNodeRequest {
   return {
     kind: 'node',
@@ -495,14 +479,13 @@ describe('executeNode', () => {
       },
       failedErrorKind: 'provider_call_failed',
       failedAttempt: 1,
-      retryStepRunInput: retryStepRunInput(runId),
     };
 
     const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('retry_scheduled');
-    expect(outcome.kind === 'retry_scheduled' ? outcome.retryStepRun.attempt : -1).toBe(2);
-    expect(runStepRuns(database, runId).map((row) => row.nodeType)).toStrictEqual(['error_handler', 'agent_step']);
+    expect(outcome.kind === 'retry_scheduled' ? outcome.nextAttempt : -1).toBe(2);
+    expect(runStepRuns(database, runId).map((row) => row.nodeType)).toStrictEqual(['error_handler']);
   });
 
   it('a nem érintett függőségeket egyetlen ág sem hívja: a sub_workflow futtató érintetlen marad', async () => {

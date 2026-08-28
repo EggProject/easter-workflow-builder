@@ -45,12 +45,24 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
  *   `getStepRun`-nal olvassa vissza) és a döntést adja vissza.
  * - `retry_scheduled` -> az `error_handler` node végrehajtója ütemezett egy
  *   újabb kísérletet (SPEC-004 8.2 4. pont). A `stepRun` az `error_handler`
- *   **saját**, `succeeded` állapotban lezárt sora, a `retryStepRun` pedig a
- *   hibát adó node **új**, `pending` állapotú `step_run` sora `attempt + 1`
- *   értékkel. A vezérlés a **megismételt node** saját kimenő élein megy
+ *   **saját**, `succeeded` állapotban lezárt sora, a `nextAttempt` pedig az
+ *   az `attempt` sorszám, amivel a hibát adó node új `step_run` sort kap
+ *   (`attempt + 1`). A vezérlés a **megismételt node** saját kimenő élein megy
  *   tovább, NEM az `error_handler` élein (8.2 5. pont), tehát ebből az ágból
  *   a hívó nem épít `SchedulingEvent`-et az `error_handler` node-ra: a
  *   megismételt példányt kell futtatnia.
+ *
+ *   **A sort maga a végrehajtó NEM hozza létre** (a T-005-24 óta nyitva állt
+ *   szerkezeti kérdés lezárása, T-005-25). A SPEC-004 8.2 4. pontja passzív
+ *   alakban fogalmaz ("a hibát adó node új `step_run` sort **kap**"), tehát
+ *   nem köti ki, ki írja a sort. Ha az `error_handler` végrehajtója írná, a
+ *   `run-supervisor` a megismételt példányt a szokásos `executeNode` úton
+ *   futtatva a `beginStepRun`-on át **még egy** sort hozna létre ugyanarra a
+ *   kísérletre. A `nextAttempt` átadásával minden kísérlethez pontosan egy
+ *   sor tartozik, és az is ugyanazon a közös nyitó menten (`beginStepRun`)
+ *   keletkezik, mint minden más lépés sora - node típusonként helyes
+ *   `nodeType`, `modelId`, `sessionMode` és `structuredOutputStrategy`
+ *   mezővel, amiket a `run-supervisor` nem tudna kitalálni.
  * - `retry_exhausted` -> minden kísérlet elfogyott (8.2 2. pont). Az
  *   `error_handler` saját sora `failed` állapotban zárt
  *   `retry_attempts_exhausted` osztállyal, és a vezérlés az `exhausted` élre
@@ -75,7 +87,7 @@ export type NodeExecutionOutcome =
   | { readonly kind: 'fan_out_expanded'; readonly stepRun: StepRunRecord; readonly items: readonly unknown[] }
   | { readonly kind: 'loop_advanced'; readonly stepRun: StepRunRecord; readonly shouldContinue: boolean }
   | { readonly kind: 'approval_decided'; readonly stepRun: StepRunRecord; readonly decision: ApprovalDecision }
-  | { readonly kind: 'retry_scheduled'; readonly stepRun: StepRunRecord; readonly retryStepRun: StepRunRecord }
+  | { readonly kind: 'retry_scheduled'; readonly stepRun: StepRunRecord; readonly nextAttempt: number }
   | {
       readonly kind: 'retry_exhausted';
       readonly stepRun: StepRunRecord;

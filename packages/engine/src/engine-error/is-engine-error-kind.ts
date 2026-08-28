@@ -53,6 +53,7 @@ const ENGINE_ERROR_KIND_KEYS: Readonly<Record<EngineErrorKind, true>> = {
   expression_evaluator_unavailable: true,
   missing_provider_env: true,
   unknown_concurrency_slot: true,
+  run_execution_failed: true,
 };
 
 /**

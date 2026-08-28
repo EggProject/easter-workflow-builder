@@ -1,8 +1,9 @@
-// Barrel: csak nevesített újraexport. A csomag két témája: a `query-runner`
+// Barrel: csak nevesített újraexport. A csomag három témája: a `query-runner`
 // (a motorba befecskendezett futtató port típusai és a valódi Agent SDK
-// `query()` függvényét paraméterként fogadó adapter) és az `sdk-message-shape`
+// `query()` függvényét paraméterként fogadó adapter), az `sdk-message-shape`
 // (a `messages: AsyncIterable<unknown>` folyamból a motor által ténylegesen
-// kiolvasott mezők typeguardjai), SPEC-004 3.3.
+// kiolvasott mezők typeguardjai), SPEC-004 3.3, és az `sdk-version` (a
+// telepített SDK verzió egyetlen, gépileg őrzött forrása).
 
 // A port szerződése, amit a motor (L5) importál.
 export type { AgentQueryRequest } from './query-runner/agent-query-request.ts';
@@ -26,3 +27,7 @@ export { isSdkResultSubtype } from './sdk-message-shape/is-sdk-result-subtype.ts
 export type { SdkResultMessage } from './sdk-message-shape/sdk-result-message.ts';
 export { isSdkResultMessage } from './sdk-message-shape/is-sdk-result-message.ts';
 export { hasStructuredOutput } from './sdk-message-shape/has-structured-output.ts';
+
+// A telepített Agent SDK verzió, amit az összeállítás a motornak átad
+// (SPEC-004 11.3 táblázat 17. sora, SPEC-003 5.1 `sdkVersionPin`).
+export { INSTALLED_AGENT_SDK_VERSION } from './sdk-version/installed-agent-sdk-version.ts';

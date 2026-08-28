@@ -18,6 +18,7 @@ fordítási idejű ellenőrzés őrzi.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `query-runner/`      | a futtató port három típusa (`AgentQueryRequest`, `AgentQuery`, `AgentQueryRunner`), az SDK függvény port-kompatibilis alakja, a `createAgentQueryRunner` adapter, és a fordítási idejű őr, ami az SDK illeszkedését ellenőrzi                                                       |
 | `sdk-message-shape/` | a `messages: AsyncIterable<unknown>` folyamból a motor által ténylegesen kiolvasott három dolog typeguardja: a `system` `init` üzenet `session_id`-je, a `result` üzenet öt lehetséges `subtype` értéke, és a `structured_output` mező jelenléte (SPEC-004 3.3, 2. szekció F-3 tény) |
+| `sdk-version/`       | a telepített Agent SDK verzió egyetlen forrása (`INSTALLED_AGENT_SDK_VERSION`), amit az összeállítás a motornak átad; a `package.json` pinjével való egyezését regressziós teszt őrzi                                                                                                |
 
 A `query-runner/` hat típus-only fájljához nincs `.spec.ts` (SPEC-002 6.3 pont); az egyetlen
 futásidejű sort tartalmazó fájl a `create-agent-query-runner.ts`, aminek a `.spec.ts` párja
@@ -27,6 +28,12 @@ Az `sdk-message-shape/` három típus-only fájlja (`sdk-system-init-message.ts`
 `sdk-result-subtype.ts`, `sdk-result-message.ts`) mellé nem tartozik `.spec.ts` (SPEC-002 6.3
 pont); a másik négy fájl futtatható sort tartalmaz (három typeguard és a `hasStructuredOutput`
 segédfüggvény), mindegyik a `.spec.ts` párjával együtt.
+
+Az `sdk-version/` egyetlen fájlja egy konstans, a `.spec.ts` párja pedig **regressziós teszt**: a
+konstans értékét a csomag `package.json` fájljában pinelt SDK verzióhoz méri, tehát egy frissítés,
+ami a konstanst elfelejti átvezetni, a `bun run test` kapun bukik. Az érték futásidejű kiolvasása a
+`node_modules` alól nem járható: az SDK `exports` térképe nem teszi közzé a saját `package.json`
+fájlját (mérés: a csomag `exports` mezője hat bejegyzést sorol, `./package.json` nincs köztük).
 
 ## Függőségi irány
 
