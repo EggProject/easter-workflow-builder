@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { canonicalizeSnapshotDocument } from './canonicalize-snapshot-document.ts';
 import { computeSnapshotHash } from './compute-snapshot-hash.ts';
-import { readGraphSnapshot } from './read-graph-snapshot.ts';
+import { readGraphSnapshot } from '../snapshot-document/read-graph-snapshot.ts';
 
 /**
  * A commitolt 1. verziójú fixture dokumentum és a hozzá tartozó lenyomat
