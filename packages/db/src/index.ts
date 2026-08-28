@@ -27,3 +27,14 @@ export type {
   DeletionSummary,
   DeleteWorkflowInput,
 } from './workflow-graph/workflow-repository.ts';
+
+// workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
+// factory függvényt (`createWorkflowRunRepository`) szándékosan nem
+// exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
+// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+export type {
+  WorkflowRunRepository,
+  StartRunInput,
+  StartRunParentContext,
+  WorkflowRunRecord,
+} from './workflow-run/workflow-run-repository.ts';

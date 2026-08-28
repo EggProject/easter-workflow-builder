@@ -5,6 +5,7 @@ import { ensureDatabaseDirectory } from '../database-file/ensure-database-direct
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { createWorkflowRepository } from '../workflow-graph/workflow-repository.ts';
+import { createWorkflowRunRepository } from '../workflow-run/workflow-run-repository.ts';
 import type { DatabaseContext } from './database-context.ts';
 
 const DATABASE_CLOSED_MESSAGE =
@@ -86,6 +87,7 @@ export function openDatabase(filePath: string): Outcome<DatabaseContext> {
   }
 
   const workflows = createWorkflowRepository(database, transaction);
+  const runs = createWorkflowRunRepository(database, transaction);
 
-  return { kind: 'ok', value: { workflows, transaction, close } };
+  return { kind: 'ok', value: { workflows, runs, transaction, close } };
 }
