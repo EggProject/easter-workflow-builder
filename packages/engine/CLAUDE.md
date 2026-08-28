@@ -6,11 +6,11 @@ DAG ütemező, node végrehajtók, hibakezelés és a párhuzamossági szabályo
 motor (SPEC-004). A csomag **egy tárgykörű**, ezért a téma mappák közvetlenül a `src/` alatt
 állnak, egy szint mélyen, tárgykör mappa nélkül (SPEC-004 12. szekció).
 
-Ez az első lépés a motorban (T-005-8, PLAN-005 F3 fázis eleje): a kilenc befecskendezett port
-típusa és a motor hibaosztályainak zárt szótára. Ez a két téma minden hátralévő motor kódnak a
-belépési felülete, ezért erre épül a PLAN-005 összes további lépése. A tényleges ütemező, a node
-végrehajtók és a spec 12. szekciójában felsorolt tizenhat további téma mappa a PLAN-005 hátralévő
-lépéseiben készül.
+A csomag a PLAN-005 F3 fázisában épül fel, lépésenként egy-egy téma mappával. Ma négy téma áll
+készen: a kilenc befecskendezett port típusa és a motor hibaosztályainak szótára (T-005-8), a
+motor eseményei (T-005-9), és a végrehajtható gráf szerkezete a gráf alak ellenőrzéseivel
+(T-005-10). A tényleges ütemező, a node végrehajtók és a spec 12. szekciójában felsorolt további
+téma mappák a PLAN-005 hátralévő lépéseiben készülnek.
 
 ## Fájlok
 
@@ -19,6 +19,7 @@ lépéseiben készül.
 | `engine-port/`  | a kilenc befecskendezett port típusa és az összefogó `EngineDependencies` (SPEC-004 3.2, 3.3). **Típus-only, nincs `.spec.ts`** (SPEC-002 6.3 pont)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `engine-error/` | a motor hibaosztályainak `EngineErrorKind` uniója (nyitott, később bővülhet), az `isEngineErrorKind` guard és a `formatEngineErrorMessage` hibaüzenet formázó (F-24 konvenció), mindkettő saját `.spec.ts` párral                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `engine-event/` | a 13, motor eredetű `run_event` `kind` payload alakja (egy fájl egy payload típus), az összefogó `EngineEvent` diszkriminált unió és a `writeEngineEvent` motor esemény író, ami a `database.events.appendEngineEvent`-et hívja, `occurredAtMs`-t a `clock` portból számítva (SPEC-004 13. szekció, PLAN-005 T-005-9). A `StepStartedPayload` ma csak az öt kötelező mezőt hordozza; a SPEC-004 11.3 táblázat jelölő mezőit a `capability-policy` téma (T-005-13) veszi fel egy KÉSŐBBI lépésben. Az `EngineEvent['kind']` unió pontosan 13 tagú tesztje és a `writeEngineEvent` `.spec.ts`-e valós `:memory:` adatbázis ellen fut |
+| `run-graph/`    | a pillanatkép átindexelése `ExecutableGraph` alakra (`buildExecutableGraph`), a visszaél keresés (`findLoopBackEdges`), a kör keresés a visszaélek elhagyása után (`detectGraphCycle`), a `loop` node alakjának két ellenőrzése (`validateLoopBackEdgeBody`, `validateLoopBranchEdges`) és az elérhetőség számítás (`computeReachableNodeIds`), a SPEC-004 4.1 és 4.6 szekciója szerint (PLAN-005 T-005-10). Tiszta függvények, a téma egyetlen sora sem érint adatbázist. Az `executable-graph.ts` **típus-only, nincs `.spec.ts`**                                                                                               |
 
 ## Függőségi irány
 
@@ -58,6 +59,13 @@ hibaosztályt vehetnek fel, ha a spec további részének átfésülése során 
 természetes növekedés, nem hiba. Egy bővítéskor az `isEngineErrorKind` guard
 `ENGINE_ERROR_KIND_KEYS` rekordja és a hozzá tartozó `.spec.ts` teszt listája is kötelezően bővül,
 mert a `Record<EngineErrorKind, true>` annotáció ezt fordítási hibával kikényszeríti.
+
+**A `run-graph` téma határa.** A téma a gráf **alakjáról** dönt, a futásról nem, és csak a
+SPEC-004 4.6 szekció négy lépését végzi el. Ami tudatosan kimarad: a `dangling_edge` és az
+`unreachable_node` hibaág (a `run-validation` téma dolga, T-005-15; ide a `computeReachableNodeIds`
+nyers halmaza tartozik), a hatókör verem és a fan-out/join párosítás (`branch-scope` téma,
+T-005-11), és a node config vizsgálata (a `SnapshotNode.config` `unknown` marad, a node típusa a
+típusos `type` mezőből jön).
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

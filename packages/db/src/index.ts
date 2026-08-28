@@ -31,6 +31,16 @@ export type {
 // csomag `EngineEvent` payload típusai miatt).
 export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 
+// graph-snapshot: a pillanatkép dokumentum alakja. A `readGraphSnapshot`-ot és
+// a lenyomat számítót szándékosan nem exportáljuk, csak a dokumentum típusait:
+// az `engine` csomag `run-graph` témája ezekből építi az `ExecutableGraph`
+// értéket (T-005-10, SPEC-004 4.1).
+export type {
+  GraphSnapshotDocument,
+  SnapshotNode,
+  SnapshotEdge,
+} from './graph-snapshot/snapshot-document/graph-snapshot-document.ts';
+
 // workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
 // factory függvényt (`createWorkflowRunRepository`) szándékosan nem
 // exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
