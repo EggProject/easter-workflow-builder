@@ -27,6 +27,11 @@ describe('migrateDatabase', () => {
       'app_setting',
       'graph_snapshot',
       'provider_concurrency_limit',
+      // A `sqlite_sequence` a `run_event.id` AUTOINCREMENT oszlopa miatt
+      // automatikusan létrejövő tábla (F-9, F-13, SPEC-003 15. szekció 5.
+      // kritérium), nem a saját sémánk része.
+      'run_event',
+      'sqlite_sequence',
       'step_run',
       'workflow',
       'workflow_edge',
