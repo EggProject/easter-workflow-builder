@@ -148,6 +148,7 @@ export interface StepRunRepository {
   markStepCancelled(stepRunId: string): Outcome<StepRunRecord>;
   markStepInterrupted(stepRunId: string): Outcome<StepRunRecord>;
   attachSession(stepRunId: string, input: AttachSessionInput): Outcome<StepRunRecord>;
+  attachSubWorkflowRun(stepRunId: string, subWorkflowRunId: string): Outcome<StepRunRecord>;
 }
 
 const ALL_STEP_RUN_STATUSES: readonly StepRunStatus[] = [
@@ -536,6 +537,38 @@ export function createStepRunRepository(
     });
   }
 
+  /**
+   * Nem állapotváltás (SPEC-003 4.10 szekció, `sub_workflow_run_id` oszlop),
+   * ugyanaz a minta, mint az `attachSession`-nél: sima `UPDATE ... WHERE id = ?`,
+   * compare-and-set `status IN (...)` feltétel nélkül.
+   *
+   * **Miért kell külön művelet, és miért nem a `createStepRun` tölti ki.** A
+   * `sub_workflow` végrehajtó (SPEC-004 5.9) a lépés sorát a gyerek futás
+   * indítása **előtt** hozza létre (5. szekció "Közös szabályok": a lépés
+   * indulásakor `createStepRun`, `markStepRunning`, `step_started` esemény),
+   * mert a rekurzióvédelem hibaága is egy `failed` állapotban lezárt lépés
+   * sort igényel, és mert a `sub_workflow_started` esemény lépés szintű,
+   * tehát létező `step_run_id` kell hozzá. A gyerek futás azonosítója viszont
+   * csak a `startRun` lefutása után ismert, tehát az oszlop értéke
+   * szükségszerűen utólag íródik.
+   */
+  function attachSubWorkflowRun(stepRunId: string, subWorkflowRunId: string): Outcome<StepRunRecord> {
+    return transaction(() => {
+      const row = database
+        .update(stepRunTable)
+        .set({ subWorkflowRunId })
+        .where(eq(stepRunTable.id, stepRunId))
+        .returning()
+        .get();
+      // Ugyanaz a Drizzle tipizálási pontatlanság, mint a `transitionStep`-ben.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, sonarjs/different-types-comparison -- lásd a transitionStep indoklását
+      if (row === undefined) {
+        return { kind: 'error', message: notFoundMessage(stepRunId) };
+      }
+      return toStepRunRecord(row);
+    });
+  }
+
   return {
     createStepRun,
     listStepRuns,
@@ -548,5 +581,6 @@ export function createStepRunRepository(
     markStepCancelled,
     markStepInterrupted,
     attachSession,
+    attachSubWorkflowRun,
   };
 }
