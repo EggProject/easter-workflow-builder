@@ -15,6 +15,14 @@ export const minimaxServerTools: Fact<readonly ServerToolDescriptor[]> = {
           { kind: 'measurement', id: 'M-25' },
         ],
       },
+      clientToolName: {
+        state: 'known',
+        value: 'WebSearch',
+        evidence: [
+          { kind: 'measurement', id: 'M-17' },
+          { kind: 'measurement', id: 'M-25' },
+        ],
+      },
     },
   ],
   evidence: [
