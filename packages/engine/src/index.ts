@@ -137,3 +137,28 @@ export type { ExecutedStepInstance } from './run-context/executed-step-instance.
 export type { BuildRunContextInput } from './run-context/build-run-context.ts';
 export { buildRunContext } from './run-context/build-run-context.ts';
 export { resolveStepReference } from './run-context/resolve-step-reference.ts';
+
+// scheduling: a DAG ütemező tiszta, memóriában élő állapotgépe: a `live` és
+// `dead` jelölések nyilvántartása élenként és ág kontextusonként, a
+// futtathatóság eldöntése, a halott ág továbbterjesztése, a `fan_out`
+// kibontás és a `loop` iterációszám vezetése, és az érkezési sorszám
+// (SPEC-004 4.4, 4.5, 4.6, 7.1, PLAN-005 T-005-17). A téma egyetlen sora sem
+// érint adatbázist és nem hív portot.
+export type { EdgeMark } from './scheduling/edge-mark.ts';
+export type { InstanceReadiness } from './scheduling/instance-readiness.ts';
+export type { FanOutExpansion } from './scheduling/fan-out-expansion.ts';
+export type { ReadyInstance } from './scheduling/ready-instance.ts';
+export type { RunTopology } from './scheduling/run-topology.ts';
+export type { SchedulerState } from './scheduling/scheduler-state.ts';
+export type { SchedulingEvent } from './scheduling/scheduling-event.ts';
+export { createSchedulerState } from './scheduling/create-scheduler-state.ts';
+export { enqueueStartInstance } from './scheduling/enqueue-start-instance.ts';
+export { advanceScheduler } from './scheduling/advance-scheduler.ts';
+export { resolveInstanceReadiness } from './scheduling/resolve-instance-readiness.ts';
+export { takeNextReadyInstance } from './scheduling/take-next-ready-instance.ts';
+export { isRunTerminal } from './scheduling/is-run-terminal.ts';
+export { resolveLoopIteration } from './scheduling/resolve-loop-iteration.ts';
+export { resolveFanOutItem } from './scheduling/resolve-fan-out-item.ts';
+export { collectJoinInputs } from './scheduling/collect-join-inputs.ts';
+export { buildFanOutItemContext } from './scheduling/build-fan-out-item-context.ts';
+export { buildScopedKey } from './scheduling/build-scoped-key.ts';
