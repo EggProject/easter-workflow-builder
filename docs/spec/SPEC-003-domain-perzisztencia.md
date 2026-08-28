@@ -6,7 +6,7 @@
 | Dátum    | 2026-08-27                                                                                                                                                                                                                                                                                                                                                                           |
 | Előzmény | [`SPEC-002-csomag-architektura.md`](SPEC-002-csomag-architektura.md) 6. szekció (mappa konvenció), 4. szekció (rétegzés)                                                                                                                                                                                                                                                             |
 | Bemenet  | [`../research/2026-08-26-agent-sdk-minimax.md`](../research/2026-08-26-agent-sdk-minimax.md), [`../research/2026-08-26-spec000-kiertekeles.md`](../research/2026-08-26-spec000-kiertekeles.md), [`../research/2026-08-26-toolchain.md`](../research/2026-08-26-toolchain.md), [`../research/2026-08-27-tarolo-motor-ertekeles.md`](../research/2026-08-27-tarolo-motor-ertekeles.md) |
-| Kimenet  | 10 tábla a `@easter-workflow-builder/db` csomagban, 12 téma mappa, tartalom szerint címzett és verziózott gráf pillanatkép, két állapotgép, repository réteg                                                                                                                                                                                                                         |
+| Kimenet  | 10 tábla a `@easter-workflow-builder/db` csomagban, 12 mappa a `src/` alatt (kilenc téma, három tárgykör tíz témával, a PLAN-004 szerint pontosítva), tartalom szerint címzett és verziózott gráf pillanatkép, két állapotgép, repository réteg                                                                                                                                      |
 | Terv     | [`../plan/PLAN-003-domain-perzisztencia.md`](../plan/PLAN-003-domain-perzisztencia.md)                                                                                                                                                                                                                                                                                               |
 
 ---
@@ -857,7 +857,7 @@ A repository nem ad általános `updateStatus(id, status)` metódust. Nevesítet
 
 ## 8. A `packages/db` csomag belső szerkezete
 
-A csomag **egy tárgykörű**, tehát a SPEC-002 6.1 pont 8. szabálya szerint a téma mappák közvetlenül a `src/` alatt állnak, egy szint mélyen. Kétszintű tagolás tilos: a SPEC-002 kimondja, hogy pontosan két kétszintű csomag van a repóban, a `core` és a `provider-capability`.
+A csomag **egy tárgykörű**, tehát a SPEC-002 6.1 pont 8. szabálya szerint a téma mappák alapesetben közvetlenül a `src/` alatt állnak, egy szint mélyen. **Pontosítás, a PLAN-004 végrehajtása után.** A SPEC-002 6.1 pont 8. szabálya a kétszintű tagolásnak egy második okát is megengedi: ha egy tárgykörön belül egyetlen téma mappa maga több, önállóan megnevezhető fogalmat hordoz, kizárólag az érintett téma mappa bomlik `src/<tárgykör>/<téma>/` alakra. A `packages/db` csomagban három téma mappa esett ez alá (`workflow-graph`, `graph-snapshot`, `run-event`), a fájlszintű leképezést és az indoklást a [`../plan/PLAN-004-csomag-belso-szerkezet.md`](../plan/PLAN-004-csomag-belso-szerkezet.md) 4. szekciója adja. A másik kilenc téma mappa lapos maradt.
 
 ```
 packages/db/
@@ -872,17 +872,27 @@ packages/db/
     sqlite-connection/
     migration/
     workflow-graph/
+      workflow/
+      node-type/
+      node-config/
+      agent-step-config/
     graph-snapshot/
+      stored-snapshot/
+      snapshot-document/
+      snapshot-hash/
     workflow-run/
     step-run/
     run-event/
+      event-record/
+      event-kind/
+      sdk-message/
     human-approval/
     app-setting/
     provider-concurrency/
     run-recovery/
 ```
 
-Tizenkét téma mappa. Témánként:
+Kilenc téma mappa és három tárgykör mappa, a tárgykörök alatt összesen tíz témával. Témánként (illetve tárgykörönként):
 
 | Téma                   | Mi kerül bele                                                                                                                                                                                      |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -898,6 +908,8 @@ Tizenkét téma mappa. Témánként:
 | `app-setting`          | `app_setting` tábla és a hozzá tartozó repository                                                                                                                                                  |
 | `provider-concurrency` | `provider_concurrency_limit` tábla és a hozzá tartozó repository                                                                                                                                   |
 | `run-recovery`         | az indulási helyreállítás (7.4), ami a `workflow_run` és a `step_run` táblát együtt érinti, ezért egyik témába sem tartozik                                                                        |
+
+A táblázat a `workflow-graph`, a `graph-snapshot` és a `run-event` sorát a tárgykör szintjén írja le; a tíz téma szerinti finom bontást a PLAN-004 4. szekciója és a `packages/db/CLAUDE.md` `## Fájlok` táblázata adja.
 
 **Miért nem `schema/` és `repositories/` mappa.** Az technikai réteg szerinti tagolás lenne, amit a SPEC-002 6.5 pontja tilt. A tábla, a hozzá tartozó unió, a typeguardjai és a repositoryja ugyanarról a domain fogalomról szól, tehát egy témába tartozik.
 
@@ -1125,8 +1137,8 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ## 15. Elfogadási kritériumok
 
-1. A `packages/db/src` alatt pontosan 12 téma mappa áll, a 8. szekció listája szerint, plusz az `index.ts` barrel. Egyetlen fájl sem áll közvetlenül a `src/` alatt a barrelen kívül, és egyetlen téma mappában sincs további alkönyvtár.
-2. A `packages/db` csomagban `CLAUDE.md` kizárólag a csomag gyökerében van, és a `## Fájlok` táblázata mind a 12 téma mappát felsorolja, felelősség leírással. A `bun run docs:check` nulla kilépési kóddal fut.
+1. A `packages/db/src` alatt pontosan 12 mappa áll közvetlenül, a 8. szekció listája szerint, plusz az `index.ts` barrel; egyetlen fájl sem áll közvetlenül a `src/` alatt a barrelen kívül. Kilenc a 12 közül téma mappa, fájlokkal közvetlenül alatta, alkönyvtár nélkül. Három (`workflow-graph`, `graph-snapshot`, `run-event`) tárgykör mappa, a PLAN-004 4. szekciója szerinti, összesen tíz téma alkönyvtárral; egyik témán belül sincs további alkönyvtár, tehát a mappaszerkezet a SPEC-002 6.1 pont 8. szabálya szerint mindenhol legfeljebb kétszintű.
+2. A `packages/db` csomagban `CLAUDE.md` kizárólag a csomag gyökerében van, és a `## Fájlok` táblázata mind a tizenkilenc témát felsorolja (kilenc önálló mappaként, tíz a három tárgykör alatt), felelősség leírással. A `bun run docs:check` nulla kilépési kóddal fut.
 3. A `packages/db/src/index.ts` csak nevesített újraexportot tartalmaz, `export *` nélkül, és az `IS_DB_PLACEHOLDER` konstans megszűnt.
 4. A barrel **nem** exportál Drizzle tábla objektumot, `drizzle()` példányt, `BetterSQLite3Database` típust vagy `better-sqlite3` szimbólumot. Ezt egy `.spec.ts` mechanikusan igazolja a barrel exportált kulcsainak listáján.
 5. A séma pontosan 10 saját táblát definiál: `workflow`, `workflow_node`, `workflow_edge`, `workflow_run`, `graph_snapshot`, `step_run`, `run_event`, `human_approval`, `app_setting`, `provider_concurrency_limit`. A migrált adatbázis `sqlite_master` tartalma ezt igazolja, a `__drizzle_migrations` táblával, valamint a `run_event.id` `AUTOINCREMENT` oszlopa miatt automatikusan létrejövő `sqlite_sequence` táblával együtt (https://sqlite.org/autoinc.html, https://www.sqlite.org/fileformat2.html 2.6.3 szekció); más táblát a séma nem tartalmazhat.

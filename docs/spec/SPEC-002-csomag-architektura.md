@@ -685,10 +685,10 @@ Szabályok:
 5. A fájlnevek változatlanok maradnak: egy fájl egy exportált egység, ahogy eddig is. A téma konvenció a mappákról szól, nem a fájlok felbontásáról.
 6. Egyetlen fájl sem állhat közvetlenül a `src/` alatt, az `index.ts` barrel kivételével.
 7. Nincs téma mappán belüli `index.ts`. A csomagnak egyetlen belépési pontja van.
-8. **A `src/` alatti mappaszerkezet alapesetben egy szint mély, és kétszintű ott, ahol a csomag több tárgykört fog össze.** A tárgykör a témánál egy szinttel tágabb fogalom: az a terület, ami korábban önálló csomag volt, vagy önálló csomag lehetne. Ha egy csomagban egyetlen tárgykör van, a téma mappák közvetlenül a `src/` alatt állnak (ez az eset a `minimax-client`, a `firecrawl-client`, a `mcp-tool-kit`, a három `tool-*` és a `provider-registry` csomagban). Ha több, akkor minden tárgykör kap egy `src/<tárgykör>/` mappát, és a téma mappái az alatt állnak. Kettőnél mélyebb szerkezet tilos.
+8. **A `src/` alatti mappaszerkezet alapesetben egy szint mély, és kétszintű két okból lehet.** A tárgykör a témánál egy szinttel tágabb fogalom: az a terület, ami korábban önálló csomag volt, vagy önálló csomag lehetne. Az első ok: a csomag több tárgykört fog össze. Ha egy csomagban egyetlen tárgykör van, a téma mappák közvetlenül a `src/` alatt állnak (ez az eset a `minimax-client`, a `firecrawl-client`, a `mcp-tool-kit`, a három `tool-*` és a `provider-registry` csomagban). Ha több, akkor minden ilyen tárgykör kap egy `src/<tárgykör>/` mappát, és a téma mappái az alatt állnak. A második ok: egy tárgykörön belül egyetlen téma mappa maga több, önállóan megnevezhető fogalmat hordoz, és ez a fájlnevekből nem derül ki (a bontási próbát a PLAN-004 3. szekciója rögzíti). Ilyenkor kizárólag az érintett téma mappa bomlik `src/<tárgykör>/<téma>/` alakra, a csomag többi téma mappája lapos marad a `src/` alatt közvetlenül: ez a **vegyes alak**, és megengedett. Kettőnél mélyebb szerkezet mindkét esetben tilos.
 9. **Ha egy tárgykörnek egyetlen témája van, és a kettő neve megegyezik, a mappaszint nem duplázódik.** A `provider-capability/src/agent-tool-id/agent-tool-id.ts` az egyetlen ilyen eset a repóban; az `agent-tool-id/agent-tool-id/` alak tilos, mert nulla információt hordoz.
 
-A 8. szabály alá eső két csomag, tételesen:
+A 8. szabály alá eső három csomag, tételesen:
 
 ```
 packages/core/src/
@@ -706,9 +706,22 @@ packages/provider-capability/src/
   evidence/fact/
   evidence-sources/measurement-document/
   agent-tool-id/
+
+packages/db/src/
+  database-file/          sqlite-connection/      migration/
+  workflow-run/           step-run/               human-approval/
+  app-setting/            provider-concurrency/    run-recovery/
+  workflow-graph/
+    workflow/            node-type/          node-config/          agent-step-config/
+  graph-snapshot/
+    stored-snapshot/     snapshot-document/  snapshot-hash/
+  run-event/
+    event-record/        event-kind/         sdk-message/
 ```
 
 A `provider-capability` a vegyes eset: hat téma mappája közvetlenül a `src/` alatt áll (ez a csomag saját tárgyköre, a képességleíró típusok), és három beolvadt tárgykör mappája mellettük. Ez megengedett, mert a saját tárgykörnek nincs külön neve: az maga a csomag.
+
+A `db` a második ok, kizárólagosan: a csomag egy tárgykörű marad (SPEC-003 8. szekció), nem fog össze több, korábban önálló tárgykört. Három téma mappája (`workflow-graph`, `graph-snapshot`, `run-event`) önmaga több, önállóan megnevezhető fogalmat hordozott, ezért tárgykör mappává vált, a témái alá kerültek. A másik kilenc téma mappa lapos maradt a `src/` alatt. A fájlszintű leképezést és a döntés indoklását a [`../plan/PLAN-004-csomag-belso-szerkezet.md`](../plan/PLAN-004-csomag-belso-szerkezet.md) 4. szekciója adja.
 
 **A `packages/typeguards` jelenlegi szerkezete helyes és marad.** Ott azért áll 17 mappa 17 guardhoz, mert **egy adott typeguard típus maga egy téma**: az `is-string` téma az, hogy mi számít stringnek. Ugyanezt mutatja az `is-function/` mappa, amiben két fájl áll (`is-function.ts` és `is-function-return-any.ts`) a két saját spec fájljával: egy téma, több fájl. Ez a szerkezet nem sablon a többi csomagra, mert máshol a téma nem esik egybe egyetlen fájllal.
 
@@ -748,7 +761,7 @@ A `config` tiltása a **puszta** névre vonatkozik. A `minimax-config/` és a `f
 
 **Fő szabály.** A csoportosítás legfeljebb kétszintű: `src/<téma>/` egy tárgykörű csomagban, `src/<tárgykör>/<téma>/` több tárgykörűben (6.1 pont 8. szabálya). Harmadik szint nincs. Ha egy csomagban a tárgykörök fölé is csoportosítani kellene, az azt jelenti, hogy a csomag két csomag, és a szétbontást kell mérlegelni.
 
-A 19 termékcsomagból 17 egy tárgykörű, tehát lapos, `src/<téma>/` szintű. Kettő kétszintű, a `core` és a `provider-capability`, mert a user döntése szerint több, korábban önálló tárgykört fognak össze.
+A 19 termékcsomagból 16 egy tárgykörű, tehát lapos, `src/<téma>/` szintű. Három kétszintű: a `core` és a `provider-capability`, mert a user döntése szerint több, korábban önálló tárgykört fognak össze, és a `db`, mert három téma mappája (`workflow-graph`, `graph-snapshot`, `run-event`) önmaga több fogalmat hordozott, és a 6.1 pont 8. szabályának második oka szerint tárgykör mappává vált ([`../plan/PLAN-004-csomag-belso-szerkezet.md`](../plan/PLAN-004-csomag-belso-szerkezet.md)).
 
 ### 6.6 A csomag publikus felülete
 
@@ -893,7 +906,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 
 8. A keletkezett téma mappák halmaza névre és tartalomra pontosan megegyezik az 5. szekció táblázataiban felsorolt 45 téma mappával: nincs olyan téma mappa, ami az 5. szekcióban nem szerepel, nincs olyan felsorolt téma, aminek a mappája hiányzik, és egyetlen mappa tartalma sem tér el a felsorolttól. Az összevonás a téma mappák nevét és tartalmát nem változtatta meg, csak egy tárgykör mappát fűzött eléjük a 6.1 pont 8. szabálya szerint. Egyetlen téma mappa sem tartalmaz egyetlen fájlt pusztán azért, mert az a fájl máshova nem fért be; az 5. szekció minden egy fájlos témát külön megindokol (`agent-tool-id`, `descriptor`).
 9. Egyetlen csomagban sincs `types/`, `utils/`, `helpers/`, `lib/`, `common/`, `shared/`, `internal/` vagy `config/` nevű alkönyvtár, a 6.8 pont szerinti `tools/wire-probe` kivételével. A tiltás a puszta nevekre vonatkozik: a `minimax-config/` és a `firecrawl-config/` téma mappa a 6.5 pont szerint megengedett.
-10. A `packages/*` és az `apps/*` csomagokban a `src/` alatti mappaszerkezet legfeljebb kétszintű, és egyetlen téma mappában sincs további alkönyvtár. Kétszintű pontosan két csomag, a `core` és a `provider-capability`, a 6.1 pont 8. szabálya szerinti tárgykör tagolással; a maradék 17 termékcsomag lapos. Duplikált mappaszint (`<x>/<x>/`) sehol nincs, a 6.1 pont 9. szabálya szerint. A `tooling/*` csomagokra ugyanez érvényes, a `tools/wire-probe` a 6.8 pont szerint kivétel.
+10. A `packages/*` és az `apps/*` csomagokban a `src/` alatti mappaszerkezet legfeljebb kétszintű, és egyetlen téma mappában sincs további alkönyvtár. Kétszintű pontosan három csomag: a `core` és a `provider-capability`, a 6.1 pont 8. szabálya szerinti első ok (tárgykör-összevonás) miatt, és a `db`, ugyanennek a szabálynak a második oka miatt, ahol egy egyébként egy tárgykörű csomag három téma mappája (`workflow-graph`, `graph-snapshot`, `run-event`) vált tárgykör mappává, mert önmaga több fogalmat hordozott (PLAN-004 4. szekció); a maradék 16 termékcsomag lapos. Duplikált mappaszint (`<x>/<x>/`) sehol nincs, a 6.1 pont 9. szabálya szerint. A `tooling/*` csomagokra ugyanez érvényes, a `tools/wire-probe` a 6.8 pont szerint kivétel.
 11. Minden csomag `src/index.ts` fájlja csak nevesített újraexportot tartalmaz. `export *` egyetlen barrelben sem szerepel.
 12. Minden `packages/*` alatti könyvtárcsomag `package.json` `exports` mezője a `./src/index.ts` fájlra mutat. Az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagnak nincs `exports` mezője, és nem is kap: ezeket egyetlen másik csomag sem importálja csomagnév szerint, ez a migráció előtti állapot, és nem változik.
 13. A függőségi gráf aciklikus, és minden él szigorúan csökkenő rétegszám felé mutat, a 4. szekció "Rétegbesorolás, mind a 25 csomagra" táblázata szerint. Az eszköz csomagok (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`) kizárólag `devDependencies` helyen jelenhetnek meg. Ezt az `import-x/no-cycle` szabály, a `package.json` `dependencies` mezők, és a `bun run check:graph` együtt igazolja. **Teljesül.** A korábban itt jelzett `engine` (L4) -> `agent` (L4) eltérést a user döntése zárta le (2026-08-27, 4. szekció): az `engine` L5 rétegre, a rá épülő `server` L6 rétegre került, a `bun run check:graph` nulla eltérést ad.
