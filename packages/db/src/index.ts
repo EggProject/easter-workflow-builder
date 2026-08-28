@@ -39,6 +39,13 @@ export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 // keresztül szűkít, tehát az ágakat névvel egyetlen szignatúra sem említi.
 export type { NodeConfig, ScriptNodeConfig, JoinScriptNodeConfig } from './workflow-graph/node-config/node-config.ts';
 export { isNodeConfig } from './workflow-graph/node-config/is-node-config.ts';
+// Az agent lépés beállításai (T-005-19, SPEC-004 5.2 4. pont): az `engine`
+// csomag `agent-step` témája ebből állítja össze a kimenő SDK `Options`
+// objektumot, és az `ai_synthesis` módú `join` ugyanezt az alakot hordozza a
+// `settings` alobjektumában (SPEC-003 4.3). A típus többi, itt nem exportált
+// segédalakját (`PresetSystemPrompt`, `SandboxConfig`, ...) a motor indexelt
+// hozzáféréssel éri el, tehát azok nem duplikálódnak a barrelben.
+export type { AgentStepConfig } from './workflow-graph/agent-step-config/agent-step-config.ts';
 
 // graph-snapshot: a pillanatkép dokumentum alakja. A `readGraphSnapshot`-ot és
 // a lenyomat számítót szándékosan nem exportáljuk, csak a dokumentum típusait:

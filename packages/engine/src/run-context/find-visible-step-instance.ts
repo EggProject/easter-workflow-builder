@@ -1,5 +1,5 @@
 import type { BranchContext, BranchScope } from '../branch-scope/branch-scope.ts';
-import type { ExecutedStepInstance } from './executed-step-instance.ts';
+import type { StepInstanceReference } from './step-instance-reference.ts';
 
 // Egy hatókör bejegyzés összehasonlítható alakja. **Mind a három mező benne
 // van**, a `stepRunId` is: lásd a `findVisibleStepInstance` doksijának "Mit
@@ -60,15 +60,25 @@ function isContextPrefix(candidate: BranchContext, current: BranchContext): bool
  * mélységet enged node-onként (`validateScopeBalance`), de ez a függvény a
  * kapott listáról dönt, nem a gráf invariánsáról, ezért a sorrendet a
  * `.spec.ts` mindkét irányban rögzíti.
+ *
+ * **Miért generikus a példány típusa.** A feloldási szabály kizárólag a
+ * `StepInstanceReference` két mezőjén (`nodeId`, `branchContext`) dolgozik, a
+ * példányhoz kötött hasznos adaton nem. Két hívó két különböző sorral dolgozik
+ * ugyanezen a szabályon: a `run-context` téma az `ExecutedStepInstance`
+ * kimenetével, az `agent-step` téma pedig a session azonosítót hordozó
+ * `SessionBearingInstance` sorral (SPEC-004 6.3, "A folytatandó session
+ * feloldása"). A típusparaméter ezért nem előre gyártott rugalmasság: nélküle
+ * az ág kontextus előtag szabálya két helyen állna, két, egymástól
+ * elcsúszható másolatban.
  */
-export function findVisibleStepInstance(
-  executedInstances: readonly ExecutedStepInstance[],
+export function findVisibleStepInstance<TInstance extends StepInstanceReference>(
+  instances: readonly TInstance[],
   nodeId: string,
   branchContext: BranchContext,
-): ExecutedStepInstance | undefined {
-  let visible: ExecutedStepInstance | undefined;
+): TInstance | undefined {
+  let visible: TInstance | undefined;
 
-  for (const candidate of executedInstances) {
+  for (const candidate of instances) {
     if (candidate.nodeId !== nodeId || !isContextPrefix(candidate.branchContext, branchContext)) {
       continue;
     }

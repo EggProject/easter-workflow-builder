@@ -171,3 +171,35 @@ export { buildScopedKey } from './scheduling/build-scoped-key.ts';
 export type { ConcurrencyGate } from './concurrency-gate/concurrency-gate.ts';
 export type { ConcurrencyLimitLookup } from './concurrency-gate/concurrency-limit-lookup.ts';
 export { createConcurrencyGate } from './concurrency-gate/create-concurrency-gate.ts';
+
+// agent-step: az agent lépés életciklusa (SPEC-004 5.2), a session modell
+// (6.3, 6.4), a kimenő SDK `Options` összeállítása (11.3 táblázat) és a
+// strukturált kimenet utóellenőrzése (PLAN-005 T-005-19). A téma nem kér
+// párhuzamossági helyet és nem vált `step_run` állapotot, lásd
+// `packages/engine/CLAUDE.md`.
+export type { SessionBearingInstance } from './agent-step/session-bearing-instance.ts';
+export type { SessionSourceNodes } from './agent-step/session-source-nodes.ts';
+export type { SessionBinding } from './agent-step/session-binding.ts';
+export type { StopHookMatcher } from './agent-step/stop-hook-matcher.ts';
+export type { AgentStepOptions } from './agent-step/agent-step-options.ts';
+export type { AgentStepCapabilityDecisions } from './agent-step/agent-step-capability-decisions.ts';
+export type { AgentStepOutcome } from './agent-step/agent-step-outcome.ts';
+export type { AgentStepExecution } from './agent-step/agent-step-execution.ts';
+export type { AgentStepRequest } from './agent-step/agent-step-request.ts';
+export type { AgentStreamMessage } from './agent-step/agent-stream-message.ts';
+export type { ResultTelemetry } from './agent-step/result-telemetry.ts';
+export { collectSessionSourceNodes } from './agent-step/collect-session-source-nodes.ts';
+export { resolveForkSession } from './agent-step/resolve-fork-session.ts';
+export { findNearestAncestorSession } from './agent-step/find-nearest-ancestor-session.ts';
+export type { ResolveSessionBindingInput } from './agent-step/resolve-session-binding.ts';
+export { resolveSessionBinding } from './agent-step/resolve-session-binding.ts';
+export type {
+  AgentStepCapabilityOutcome,
+  AgentStepDescriptorFields,
+} from './agent-step/validate-agent-step-capabilities.ts';
+export { validateAgentStepCapabilities } from './agent-step/validate-agent-step-capabilities.ts';
+export { buildStopHookMatcher } from './agent-step/build-stop-hook-matcher.ts';
+export type { BuildAgentStepOptionsInput } from './agent-step/build-agent-step-options.ts';
+export { buildAgentStepOptions } from './agent-step/build-agent-step-options.ts';
+export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';
+export { runAgentStep } from './agent-step/run-agent-step.ts';
