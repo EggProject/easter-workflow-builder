@@ -16,7 +16,10 @@ hatot egyetlen `validateRun` menetbe fogja (T-005-15), és a futás kontextus ö
 `steps` hivatkozás feloldásával (T-005-16). Az **F4 fázis** ehhez hozzátette a DAG ütemező
 állapotgépét (`scheduling`, T-005-17) és a párhuzamossági szabályozót (`concurrency-gate`,
 T-005-18). Az **F5 fázis** első lépése az agent lépés életciklusát adta (`agent-step`, T-005-19),
-tehát ma tizenhárom téma áll készen. A node végrehajtók és a spec 12. szekciójában felsorolt
+a második lépése a `node-executor` téma **első felét** (T-005-20): az öt nem-agent node típus
+végrehajtóját (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott
+infrastruktúrát. Ma tizennégy téma áll készen. A `node-executor` téma **második fele**
+(`agent_step`, `join` `ai_synthesis`, a kimerítő diszpécser) és a spec 12. szekciójában felsorolt
 további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 
 ## Fájlok
@@ -36,6 +39,7 @@ további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 | `scheduling/`           | a DAG ütemező tiszta, memóriában élő állapotgépe (SPEC-004 4.4, 4.5, 4.6, 7.1, PLAN-005 T-005-17). A `SchedulerState` hét nyilvántartása fogja össze az élenkénti `live` és `dead` jelöléseket, a `fan_out` kibontásokat, a `loop` lefutásszámokat, az érkezési sorban álló és a futó példányokat. Az egyetlen léptető az `advanceScheduler`, ami három esemény fajtát ismer (`node_completed`, `fan_out_expanded`, `loop_advanced`); a bootstrap az `enqueueStartInstance`, a sor ürítése a `takeNextReadyInstance`, a terminális állapot az `isRunTerminal`. A négy olvasó (`resolveInstanceReadiness`, `resolveLoopIteration`, `resolveFanOutItem`, `collectJoinInputs`) a végrehajtó rétegnek ad választ. Adatbázist nem érint, portot nem hív: a determinizmus a hívások sorrendjéből jön, nem az órából. A hét típusfájl (`edge-mark`, `instance-readiness`, `fan-out-expansion`, `ready-instance`, `run-topology`, `scheduler-state`, `scheduling-event`) **típus-only, nincs `.spec.ts`**                                                                            |
 | `concurrency-gate/`     | a providerenkénti, minden futásra közös, szigorúan érkezési sorrendű párhuzamossági szabályozó (SPEC-004 7.1 ... 7.3, PLAN-005 T-005-18). A `createConcurrencyGate` egyetlen paramétere a `ConcurrencyLimitLookup`, tehát a téma egyetlen sora sem érint adatbázist, és nincs benne párhuzamossági szám. A hely kérése (`requestSlot`) és felszabadítása (`releaseSlot`) a felület, plusz két számláló olvasó a diagnosztikának. A `concurrency-gate.ts` és a `concurrency-limit-lookup.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `agent-step/`           | az agent lépés életciklusa (SPEC-004 5.2), a session modell (6.3, 6.4) és a kimenő SDK `Options` összeállítása (PLAN-005 T-005-19). Négy csoport: a session forrás halmaz (`collectSessionSourceNodes`) és a `resolveForkSession` gráf bejárása; a futáskori session feloldás (`findNearestAncestorSession`, `resolveSessionBinding`); a leírótól függő döntések egy menetben (`validateAgentStepCapabilities`), az `Options` összeállítása (`buildAgentStepOptions`) a `Stop` hookkal (`buildStopHookMatcher`); és a teljes futtatás (`runAgentStep`) a `result` üzenet számadatainak kiolvasásával (`readResultTelemetry`). A tíz típusfájl **típus-only, nincs `.spec.ts`**. A `runAgentStep` `.spec.ts`-e valós `:memory:` adatbázis ellen fut, és az SDK üzeneteket a commitolt `agent-step-messages-fixture.json` fájlból olvassa. **A téma nem kér párhuzamossági helyet és nem vált `step_run` állapotot**, lásd "Szabályok"                                                                                                                                         |
+| `node-executor/`        | a diszpécser és a tíz végrehajtható node típus végrehajtója (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **T-005-20 csak az első felét adja**: az öt nem-agent típus (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott infrastruktúra - a hat portot összefogó `NodeExecutorPorts`, a `step_run`-hoz kötött, node típustól független adatokat hordozó `NodeExecutionInstance`, a `run-supervisor`-nak szánt `NodeExecutionOutcome`, az esemény írás+kiadás egyben (`emitEngineEvent`) és a közös nyitó/záró menet (`beginStepRun`, `finishStepRunSucceeded`, `finishStepRunFailed`). A diszpécsert **nem** ez a lépés írja meg, lásd "Szabályok"                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## Függőségi irány
 
@@ -339,6 +343,81 @@ viselkedését írja le, a felületét nem, ezért a négy döntés indoklása i
   értesítés kell, amit tiszta függvény nem tud kiadni. A közös sort a `Map` beszúrási sorrendje
   adja, ezért itt nincs külön érkezési sorszám mező: a kiszolgálás providerenként a legrégebbi
   várakozót viszi, tehát egy telített provider soha nem tartja fel a szabadat.
+
+**A `node-executor` téma T-005-20-ban NEM kap kimerítő diszpécsert.** A SPEC-004 12. szekció a
+témát "a diszpécser és a tíz végrehajtható node típus végrehajtója" néven nevezi meg, de a
+diszpécser `switch(config.type)` szerkezetének a `switch-exhaustiveness-check` szabály miatt
+kimerítőnek kell lennie az `ExecutableNodeConfig` unión, aminek az `agent_step` és a `join`
+`ai_synthesis` ága T-005-20 idején még nincs megvalósítva (azok T-005-21 tárgya). Egy most
+megírt diszpécser vagy hiányos `switch` lenne (lint hiba), vagy egy kód nélküli, csak jelző
+placeholder ágat kellene tartalmazzon (rossz gyakorlat, `.claude/CLAUDE.md` 1. szekció "Nincs
+hibakezelés lehetetlen esetre" elve fordítva: itt egy MEGLÉVŐ esetre nem lenne kezelés). A
+döntés ezért: **T-005-20 csak az öt egyedi `execute-*` függvényt írja meg**, mindegyiket
+önmagában exportálva és tesztelve; a végső, kimerítő diszpécsert (`execute-node.ts` vagy hasonló
+néven) **a T-005-21 végrehajtója rakja össze**, amikor már mind a hét ág (`start`, `branch`,
+`fan_out`, `loop`, `join` mindhárom módja, `agent_step`) készen áll.
+
+**A közös `NodeExecutorPorts`/`NodeExecutionInstance`/`NodeExecutionOutcome` hármas.** Mind az öt
+(és a T-005-21-ben még kettő) végrehajtó ugyanazt a hat portot kapja (`database`, `clock`,
+`idGenerator`, `eventPublisher`, `expressionEvaluator`, `templateRenderer`) és ugyanazokat a
+`step_run`-hoz kötött szerkezeti adatokat (`runId`, `instance`, `parentStepRunId`, `iteration`,
+`attempt`, `providerId`) - ezt fogja össze a `NodeExecutorPorts`, illetve a
+`NodeExecutionInstance`, hogy a paraméterlista ne duplikálódjon fájlonként
+(`node-executor-ports.ts`, `node-executor-instance.ts`, mindkettő típus-only). A
+`NodeExecutionInstance.iteration` mező **kétféleképp** töltendő ki a hívó által: az öt közül
+négynél a 4.3 szekció általános szabálya szerint (a legfelső `loop` hatókör bejegyzés száma), a
+`loop` node saját sorára viszont a 4.6 1. pontja szerint (a példány addigi lefutásainak száma,
+`resolveLoopIteration`-ből) - ez a téma nem dönti el, melyik jelentés érvényes, csak felhasználja
+a kapott értéket (lásd `execute-loop.ts` doksiját).
+
+A `NodeExecutionOutcome` (`node-executor-outcome.ts`) a `run-supervisor`-nak szánt kimenet: **nem**
+maga a `SchedulingEvent`, mert a node-executor réteg szándékosan nem kapja meg a teljes
+`ExecutableGraph`-ot (a `branch` node kimenő éleinek `branch_key` listáját paraméterként kapja,
+nem a gráfból olvassa - lásd `execute-branch.ts` doksiját). A `succeeded` ág
+`selectedBranchKey: string | null` mezője a döntés: `null` = "minden `on_error`-tól különböző
+kimenő él `live`" (a `start`, a `join` `merge` módja - a legtöbb típusnál ez az eset, SPEC-004 4.4 4. pont), nem `null` = a `branch` node ténylegesen választott kulcsa. A `fan_out_expanded` és a
+`loop_advanced` ág közvetlenül megfelel a `scheduling` téma `SchedulingEvent` ugyanilyen nevű
+ágainak. A `failed` ág **nem** dönt `on_error`/`fail_run`/`fail_branch` kérdésben - az a jövőbeli
+`error-policy` téma (T-005-24) dolga, ez a téma csak a `step_run` `failed` lezárását és a
+hibaosztályt adja vissza (SPEC-004 5. szekció "Közös szabályok").
+
+**A közös nyitó/záró menet.** A `beginStepRun` (`createStepRun` + `markStepRunning` +
+`step_started` esemény) és a `finishStepRunSucceeded`/`finishStepRunFailed` (záró `markStep*` +
+`step_finished` esemény) egy-egy megosztott függvény, hogy az öt `execute-*` fájl ne ismételje meg
+a SPEC-004 5. szekció "Közös szabályok minden végrehajtóra" pontját. Az `emitEngineEvent` a motor
+esemény kiadásának egyetlen útja: előbb `writeEngineEvent` a `db` felé, utána
+`eventPublisher.publish` az élő nézetnek, ugyanabban a sorrendben, mint az 5.2 6. pont az SDK
+üzeneteknél (újracsatlakozáskor a kliens az adatbázisból pótol). Több hibaágú végrehajtóban
+(`branch`, `fan_out`, `loop`) egyetlen `failBranch`/`failFanOut`/`failLoop` helyi segédfüggvény
+zárja le mindegyik saját hibaosztályt, hogy a `finishStepRunFailed` esetleges DB hibája ne
+duplikálódjon annyi, egyenként tesztelendő ágba, ahány hibaosztálya van a végrehajtónak.
+
+**A node kimenet (`step_run.output`) öt döntése, mert a SPEC-004 5. szekció táblázata csak a
+`start` és a `join` `merge` sorára nevez meg konkrét kimenetet:**
+
+| Típus          | Kimenet                              | Indok                                                                                   |
+| -------------- | ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `start`        | a futás bemenete                     | SPEC-004 5. szekció 1. sora, szó szerint                                                |
+| `branch`       | `null`                               | vezérlést hordoz, adatot nem; a spec nem nevez meg kimenetet erre a sorra               |
+| `fan_out`      | a kiértékelt elemlista               | ez a kibontás tényleges eredménye, nem csak vezérlési döntés, ezért érdemes megőrizni   |
+| `loop`         | `null`                               | ugyanaz az indok, mint a `branch`-nél; a döntés a `shouldContinue` mezőben van, nem itt |
+| `join` `merge` | a bemenetek listája, elem sorrendben | SPEC-004 5.6 szekció, szó szerint                                                       |
+
+**A `fan_out` `branchLabelTemplate` renderelt szövege eldobódik.** A séma egyik táblája sem
+tárolja (sem a `FanOutExpandedPayload`, ami csak `itemCount`-ot hordoz, sem a `step_run`), ezért az
+`execute-fan-out.ts` a renderelést kizárólag **validációként** használja: minden elemre sikerül-e
+a renderelés, `template_render_failed`-et adva, ha bármelyik elhasal. Ez a SPEC-004 5. szekció 4. sorának expliciten megengedett olvasata ("döntsd el és dokumentáld, mire használod az
+eredményt, ha a séma nem tárolja").
+
+**A `step_run.result_subtype` és `num_turns` mező írási útja nyitva marad.** A `db` csomag
+`StepRunRepository.MarkStepSucceededInput`/`MarkStepFailedInput` típusa a séma már létező
+`result_subtype` és `num_turns` oszlopát nem exponálja írásra (csak a négy token oszlopot és -
+sikeres esetnél - az `output`-ot). Ez a T-005-20 öt node típusát **nem** érinti: egyiknek sincs
+`resultSubtype`/`numTurns` adata, csak az `agent_step`-nek (SPEC-004 5.2 8. pont). A bővítés ezért
+nem történt meg itt; a T-005-21 végrehajtójának kell eldöntenie, hogy a `runAgentStep` már kiszámolt
+`AgentStepExecution.resultSubtype`/`.numTurns` értékét hogyan vezeti be a záró `markStepSucceeded`/
+`markStepFailed` hívásba - vagy a `db` repository input típusainak bővítésével (nem sémaváltoztatás,
+az oszlopok már léteznek), vagy más úton.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

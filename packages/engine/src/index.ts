@@ -203,3 +203,33 @@ export type { BuildAgentStepOptionsInput } from './agent-step/build-agent-step-o
 export { buildAgentStepOptions } from './agent-step/build-agent-step-options.ts';
 export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';
 export { runAgentStep } from './agent-step/run-agent-step.ts';
+
+// node-executor: a diszpécser és a tíz végrehajtható node típus végrehajtója
+// (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **Ez a lépés
+// (T-005-20) csak az első felét adja**: az öt nem-agent típus végrehajtóját
+// (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a közös, megosztott
+// infrastruktúrát. A kimerítő `switch`-es diszpécsert **nem** ez a lépés írja
+// meg, mert az `agent_step` és a `join` `ai_synthesis` ág még hiányzik
+// (T-005-21) - egy most megírt diszpécser vagy nem lenne kimerítő (lint hiba),
+// vagy kódot nélkülöző placeholder ágat tartalmazna (rossz gyakorlat). A
+// diszpécsert a T-005-21 végrehajtója rakja össze, amikor mind a hét ág kész.
+export type { NodeExecutorPorts } from './node-executor/node-executor-ports.ts';
+export type { NodeExecutionInstance } from './node-executor/node-executor-instance.ts';
+export type { NodeExecutionOutcome } from './node-executor/node-executor-outcome.ts';
+export { emitEngineEvent } from './node-executor/emit-engine-event.ts';
+export type { BeganStepRun } from './node-executor/begin-step-run.ts';
+export { beginStepRun } from './node-executor/begin-step-run.ts';
+export type { FinishStepRunSucceededInput } from './node-executor/finish-step-run-succeeded.ts';
+export { finishStepRunSucceeded } from './node-executor/finish-step-run-succeeded.ts';
+export type { FinishStepRunFailedInput } from './node-executor/finish-step-run-failed.ts';
+export { finishStepRunFailed } from './node-executor/finish-step-run-failed.ts';
+export type { ExecuteStartInput } from './node-executor/execute-start.ts';
+export { executeStart } from './node-executor/execute-start.ts';
+export type { ExecuteBranchInput } from './node-executor/execute-branch.ts';
+export { executeBranch } from './node-executor/execute-branch.ts';
+export type { ExecuteFanOutInput } from './node-executor/execute-fan-out.ts';
+export { executeFanOut } from './node-executor/execute-fan-out.ts';
+export type { ExecuteLoopInput } from './node-executor/execute-loop.ts';
+export { executeLoop } from './node-executor/execute-loop.ts';
+export type { ExecuteJoinMergeInput } from './node-executor/execute-join-merge.ts';
+export { executeJoinMerge } from './node-executor/execute-join-merge.ts';
