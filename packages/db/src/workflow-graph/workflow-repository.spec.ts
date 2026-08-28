@@ -19,6 +19,7 @@ import {
   type WorkflowRunRecord,
   type WorkflowRunRepository,
 } from '../workflow-run/workflow-run-repository.ts';
+import { createRunEventRepository, type RunEventRepository } from '../run-event/run-event-repository.ts';
 import {
   createWorkflowRepository,
   type WorkflowEdgeInput,
@@ -60,6 +61,7 @@ function openRepository(): {
   database: BetterSQLite3Database;
   repository: WorkflowRepository;
   runs: WorkflowRunRepository;
+  events: RunEventRepository;
 } {
   const sqlite = new SqliteDatabase(':memory:');
   sqlite.pragma('foreign_keys = ON');
@@ -68,7 +70,8 @@ function openRepository(): {
   const transaction = makeTransaction(database);
   const repository = createWorkflowRepository(database, transaction);
   const runs = createWorkflowRunRepository(database, transaction);
-  return { sqlite, database, repository, runs };
+  const events = createRunEventRepository(database, transaction);
+  return { sqlite, database, repository, runs, events };
 }
 
 /**
@@ -466,8 +469,32 @@ describe('createWorkflowRepository', () => {
       const workflow = okOrThrow(repository.createWorkflow({ name: 'W', description: null, providerId: null }));
       startRun(runs, workflow.id, 'sole');
 
+      // eventCount: 1, mert a `startRun` ugyanabban a tranzakcióban egy
+      // `run_started` motor eseményt is ír (T-003-21).
       const summary = okOrThrow(repository.summarizeDeletion(workflow.id));
-      expect(summary).toStrictEqual({ runCount: 1, eventCount: 0, snapshotCount: 1 });
+      expect(summary).toStrictEqual({ runCount: 1, eventCount: 1, snapshotCount: 1 });
+
+      sqlite.close();
+    });
+
+    it('az eventCount a ténylegesen törlődő run_event sorok darabszáma, nem nulla (T-003-27)', () => {
+      const { sqlite, repository, runs, events } = openRepository();
+      const workflowA = okOrThrow(repository.createWorkflow({ name: 'A', description: null, providerId: null }));
+      const workflowB = okOrThrow(repository.createWorkflow({ name: 'B', description: null, providerId: null }));
+
+      // A workflow-a futása: a `startRun` `run_started` eseménye mellé még
+      // két motor esemény, tehát összesen három sor tartozik hozzá.
+      const runA = startRun(runs, workflowA.id, 'a');
+      okOrThrow(events.appendEngineEvent({ runId: runA.id, stepRunId: null, kind: 'step_started', payload: {} }));
+      okOrThrow(events.appendEngineEvent({ runId: runA.id, stepRunId: null, kind: 'step_finished', payload: {} }));
+
+      // A workflow-b futása érintetlen marad, tehát az eseményei NEM
+      // számítanak bele a workflow-a törlési összegzésébe.
+      const runB = startRun(runs, workflowB.id, 'b');
+      okOrThrow(events.appendEngineEvent({ runId: runB.id, stepRunId: null, kind: 'run_finished', payload: {} }));
+
+      const summary = okOrThrow(repository.summarizeDeletion(workflowA.id));
+      expect(summary).toStrictEqual({ runCount: 1, eventCount: 3, snapshotCount: 1 });
 
       sqlite.close();
     });
@@ -504,6 +531,10 @@ describe('createWorkflowRepository', () => {
         // hivatkozik rá) = 1. A megosztott (R2/R3) snapshot NEM árva, mert
         // R3 túlél, tehát nem számít bele.
         expect(summary.snapshotCount).toBe(1);
+        // eventCount: R1 és R2 `run_started` eseménye = 2. R3-é nem, mert R3
+        // túléli a törlést - tehát az `eventCount` ugyanarra a kaszkáddal
+        // bővített halmazra számol, mint a `runCount` (T-003-27).
+        expect(summary.eventCount).toBe(2);
 
         sqlite.close();
       },

@@ -12,7 +12,7 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 | Mappa                   | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `database-file/`        | az adatbázis fájl helyének feloldása: `EASTER_DB_FILE` env változó neve, fejlesztői alapértelmezés, könyvtár létrehozása (SPEC-003 10.1 szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `sqlite-connection/`    | `openDatabase`, a `DatabaseContext` felület mind a nyolc repository mezővel (`workflows`, `runs`, `stepRuns`, `events`, `approvals`, `settings`, `concurrencyLimits`, `recovery`), a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `sqlite-connection/`    | `openDatabase`, a `DatabaseContext` felület mind a nyolc repository mezővel (`workflows`, `runs`, `stepRuns`, `events`, `approvals`, `settings`, `concurrencyLimits`, `recovery`), a pragma sorrend, a migráció bekötése (SPEC-003 10.2 szekció), a tranzakció és a zárás; plusz a `barrel-exports.spec.ts`, a barrel exportlistájának gépi ellenőrzése (T-003-27, lásd lent)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `migration/`            | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `workflow-graph/`       | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `graph-snapshot/`       | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla (`hash` elsődleges kulcs, `graph_snapshot_version_idx` index, nincs idegen kulcsa) és a `graph_snapshot_no_update` `BEFORE UPDATE` trigger, ami minden módosítási kísérletet `SQLITE_CONSTRAINT_TRIGGER` hibával buktat meg (SPEC-003 4.9 és 5.5 szekció, T-003-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -111,10 +111,19 @@ provider azonosítója maradt bent), `invalid_provider_id` hibaágat ad. Ugyanez
   futás törlése a saját al-workflow futásait is elviszi, azok workflow-jától függetlenül). A
   `snapshotCount` azon `graph_snapshot` sorok száma, amikre a törlés után **egyetlen** megmaradó
   `workflow_run` sor sem hivatkozna (tehát árvává válnának); egy megosztott sor, amire egy
-  túlélő, más workflow-hoz tartozó futás is mutat, nem számít bele. Az `eventCount` NYITOTT PONT
-  marad: a `run_event` tábla azóta (T-003-19/T-003-21) létrejött, de a `summarizeDeletion` a
-  törlődő esemény darabszámot ténylegesen nem számolja, a mező kényszerűen `0` értéket ad;
-  jelölve magyar "NYITOTT PONT" komment a `summarizeDeletion` függvényben, `workflow-repository.ts`.
+  túlélő, más workflow-hoz tartozó futás is mutat, nem számít bele. **Az `eventCount` a T-003-27
+  óta szintén pontos darabszám** (a korábbi, kényszerű `0` és a hozzá tartozó "NYITOTT PONT"
+  komment megszűnt): `SELECT COUNT(*) FROM run_event WHERE run_id IN (deletedRunIds)`, Drizzle
+  `count()` aggregáttal. Kaszkád-számítás itt nem kell, ellentétben a `snapshotCount`-tal: a
+  `run_event.run_id` idegen kulcs `ON DELETE CASCADE` a `workflow_run` táblára, a `run_event` a
+  futás gyereke (nem a szülője), és egy sort nem oszthat meg két futás, mert a `run_id`
+  egyértékű. A `step_run_id` szerinti második út sem hoz be új sort, mert a `step_run` maga is
+  `ON DELETE CASCADE` a `workflow_run` táblára. Üres `deletedRunIds` halmazra a Drizzle
+  `inArray` `false` feltételt generál (`drizzle-orm@0.45.2`,
+  `sql/expressions/conditions.js`, forrásból ellenőrizve), tehát nincs szükség külön ágra, és a
+  `GROUP BY` nélküli aggregát SQLite-ban ilyenkor is pontosan egy sort ad - ugyanaz az eset,
+  mint a `RunEventRepository.aggregateRunTokens`-nél, tehát itt sincs `undefined` ellenőrzés és
+  `eslint-disable`.
 - `deleteWorkflow`: a `workflow` sor törlése (és vele a kaszkád) után, ugyanabban a
   tranzakcióban lefut az árva pillanatkép söprés, szó szerint a 4.15 szekció SQL-jével:
   `DELETE FROM graph_snapshot WHERE hash NOT IN (SELECT graph_snapshot_hash FROM workflow_run)`,
@@ -680,6 +689,68 @@ lefut a helyreállítás" - a `packages/db` egy adatbázis csomag, nem tudja, mi
 kapcsolatot". A `packages/db` csak a képességet adja
 (`DatabaseContext.recovery.recoverInterruptedRuns()`), a tényleges hívás az `apps/server`
 felelőssége lesz, egy KÉSŐBBI specifikációban.
+
+## Az adverzariális átvizsgálás megállapításai (T-003-27)
+
+**A barrel exportlistája gépi ellenőrzést kapott.** A SPEC-003 4. kritériuma nem csak a
+zártságot követeli meg, hanem azt is, hogy "ezt egy `.spec.ts` mechanikusan igazolja a barrel
+exportált kulcsainak listáján" - ilyen fájl eddig nem létezett. A
+`sqlite-connection/barrel-exports.spec.ts` pótolja: (1) a futásidejű névtér kulcsai pontosan a
+hét exportált ÉRTÉK (`ENV_EASTER_DB_FILE`, `resolveDatabaseFilePath`, `defaultDatabaseFilePath`,
+`ensureDatabaseDirectory`, `openDatabase`, `isRunEventKind`, `isApprovalDecision`), (2) a barrel
+forrásszövegéből kiolvasott `export { ... } from '...'` utasítások minden modul útvonala `./`
+kezdetű (tehát külső csomag szimbóluma nem szivároghat ki), és (3) egyetlen exportált név sem
+végződik `Table`-re, és nem `drizzle`/`BetterSQLite3Database`/`SqliteDatabase`/`Database`. A
+harmadik teszt épség ellenőrzést is végez: a forrásszövegből kiolvasott névlistának tartalmaznia
+kell mind a hét futásidejű nevet, tehát a minta bizonyítottan a valódi export utasításokra
+illeszkedik, nem üresen fut le. A teszt nem üres voltát mérés igazolja: egy ideiglenesen
+hozzáadott `export { workflowTable } from './workflow-graph/workflow.ts';` sorra a három
+tesztből kettő megbukik.
+
+**Miért nem `src/index.spec.ts` a helye.** A SPEC-003 1. kritériuma tiltja, hogy a barrelen
+kívül bármilyen fájl közvetlenül a `src/` alatt álljon. A `sqlite-connection` az a téma, ami a
+tiltott szimbólumokat ténylegesen tartja (a `drizzle()` példány és a `better-sqlite3` handle az
+`open-database.ts` lezárásában, SPEC-003 9.1), tehát a zártságot ott kell bizonyítani.
+Implementációs pár nélküli `.spec.ts`-nek van előzménye a csomagban
+(`graph-snapshot/graph-snapshot-immutability.spec.ts`).
+
+**Az `as const` NEM type assertion, és nem sérti a 32. kritériumot.** A `packages/db/src` alatt a
+termékkódban két `as` előfordulás van, mindkettő `status: 'pending' as const`
+(`workflow-run-repository.ts`, `step-run-repository.ts`). A `@typescript-eslint/consistent-type-assertions`
+szabály `assertionStyle: 'never'` beállítással (`tooling/eslint-config/src/eslint-preset/base.ts`)
+a const assertiont explicit kiveszi: `if (isConst(node.typeAnnotation) && messageId === 'never')
+{ return; }` (`@typescript-eslint/eslint-plugin@8.68.0`,
+`dist/rules/consistent-type-assertions.js`, telepített forrásból ellenőrizve). A `satisfies` itt
+nem helyettesíti: saját méréssel igazolva, hogy `{ status: 'pending' satisfies RunStatus }` a
+mutálható objektum literál mezőjében `string`-gé szélesedik, és a `RunStatus` mezőre nem
+értékelhető. Type assertion (`as SomeType`) sem a termékkódban, sem a tesztekben nincs.
+
+**NYITOTT PONT: az `isGraphSnapshotHash` guard nem létezik.** A SPEC-003 9.4 szekció tíz elemű,
+kimerítő guard listájából kilenc megvan (`isNodeType`, `isNodeConfig`, `isAgentStepConfig`,
+`isRunStatus`, `isStepRunStatus`, `isRunEventKind`, `isApprovalDecision`, `isProviderId`,
+`isGraphSnapshotDocumentV1`), a tizedik, az `isGraphSnapshotHash` (64 karakteres kisbetűs
+hexadecimális szöveg, F-24) sehol nem áll a `packages/db/src` alatt.
+
+- **Mi a viselkedés addig.** A lenyomat sosem hívói bemenet: kizárólag a `computeSnapshotHash`
+  állítja elő a kanonikus szövegből (`graph-snapshot/compute-snapshot-hash.ts`), és a
+  `startRun` ugyanabban a tranzakcióban írja a `graph_snapshot.hash` és a
+  `workflow_run.graph_snapshot_hash` oszlopba. Egyetlen exportált művelet bemenete sem fogad
+  lenyomat szöveget (`StartRunInput`-ban nincs ilyen mező, a `readSnapshot` `runId`-t kap),
+  tehát ma nincs olyan határ, ahol a guard bármit elkapna.
+- **Mi zárná le.** Egy döntés arról, hogy a `WorkflowRunRecord.graphSnapshotHash` nyers `string`
+  helyett kapjon-e szűkített `GraphSnapshotHash` típust, és a `toWorkflowRunRecord` olvasáskor
+  ezzel a guarddal szűkítsen-e, ugyanúgy, ahogy az `isProviderId` teszi a `provider_id`
+  oszlopon. Enélkül a guard használat nélküli, spekulatív kód lenne (a gyökér `CLAUDE.md`
+  "Simplicity First" szabálya), ezért a T-003-27 nem vezeti be magától.
+
+**A `vitest.config.ts` `coverage.exclude` listáján van egy `packages/db` specifikus bejegyzés,
+de az NEM SPEC-003 eredetű, és semmire nem illeszkedik.** A `'packages/db/**/migrations/**'` sor
+a SPEC-001 idejéből származik (`4e7fe05`, "feat(ci): Vitest és Playwright infrastruktúra"), és a
+generált SQL migrációk mappája ma `packages/db/drizzle/`, nem `migrations/`, tehát a minta nulla
+fájlra illeszkedik. A 39. kritérium ("a `coverage.exclude` listája egyetlen sorral sem bővült")
+ettől függetlenül teljesül. Nyitva hagyott, szándékosan nem javított pont: a sor törlése
+SPEC-001 örökség, nem tartozik a `packages/db` hatókörébe, és a lefedettségre bizonyíthatóan
+nincs hatása.
 
 ## `Outcome` hibaosztály konvenció
 
