@@ -16,6 +16,7 @@ a végrehajtás alatt folyamatosan bővül, ahogy egy-egy téma mappa elkészül
 | `migration/`         | a migrációs mappa útvonala (`MIGRATIONS_FOLDER`) és a `migrate()` hívás `Outcome` hibaágra burkolása; nem barrel export, `openDatabase` belső részlete                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `workflow-graph/`    | `workflow`, `workflow_node`, `workflow_edge` tábla (SPEC-003 4.1, 4.2, 4.7 szekció); a `NodeType` unió, a node config unió, az `AgentStepConfig` és a typeguardjaik (T-003-11); a `WorkflowRepository` (T-003-12)                                                                                                                                                                                                                                                                                                                                                |
 | `graph-snapshot/`    | a pillanatkép dokumentum típusa és verzió uniója, a `GRAPH_DOCUMENT_VERSION`, az RFC 8785 kanonizáló, a `sha256` lenyomat képzés, a `resolveSnapshotReuse` döntő függvény, a verziódiszpécser `readGraphSnapshot` és a typeguardok (SPEC-003 5. szekció, T-003-14); a `graph_snapshot` tábla (`hash` elsődleges kulcs, `graph_snapshot_version_idx` index, nincs idegen kulcsa) és a `graph_snapshot_no_update` `BEFORE UPDATE` trigger, ami minden módosítási kísérletet `SQLITE_CONSTRAINT_TRIGGER` hibával buktat meg (SPEC-003 4.9 és 5.5 szekció, T-003-15) |
+| `workflow-run/`      | a `workflow_run` tábla (SPEC-003 4.8 szekció): önhivatkozó `root_run_id` (`ON DELETE CASCADE`) és `restarted_from_run_id` (`ON DELETE SET NULL`) idegen kulcs, `graph_snapshot_hash` idegen kulcs `ON DELETE RESTRICT` viselkedéssel a `graph_snapshot` táblára (F-27, F-28, 51. kritérium), négy index; a `RunStatus` hat állapota és a `canTransitionRunStatus` átmeneti szabály függvény, kimerítő `switch` szerkezettel (SPEC-003 7.1 és 7.3 szekció, T-003-13); a `WorkflowRunRepository` a következő lépésé (T-003-16)                                     |
 
 A `drizzle.config.ts` a csomag gyökerén áll, a `drizzle/` mappa a generált, gitbe commitolt SQL
 migrációkat és a hozzájuk tartozó snapshotot tartalmazza. A `schema` mező explicit fájllista,
@@ -24,9 +25,9 @@ elhasalna egy `./src/**/*.ts` mintán, a hivatalos config doksi pedig nem dokume
 glob mintát erre a mezőre. Új tábla fájlt ezért a `drizzle.config.ts` listájába is fel kell
 venni.
 
-A további, a SPEC-003 8. szekciója szerinti téma mappák (`workflow-run`, `step-run`,
-`run-event`, `human-approval`, `app-setting`, `provider-concurrency`, `run-recovery`) a
-végrehajtás további lépéseiben keletkeznek.
+A további, a SPEC-003 8. szekciója szerinti téma mappák (`step-run`, `run-event`,
+`human-approval`, `app-setting`, `provider-concurrency`, `run-recovery`) a végrehajtás további
+lépéseiben keletkeznek.
 
 **Tábla séma tesztelése: `getTableConfig` kell a 100%-os function coverage-höz.** A
 `sqliteTable()` harmadik argumentuma (index lista) és a `.references(() => ...)` idegen kulcs
