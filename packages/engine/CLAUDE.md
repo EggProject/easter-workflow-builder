@@ -18,9 +18,10 @@ hatot egyetlen `validateRun` menetbe fogja (T-005-15), és a futás kontextus ö
 T-005-18). Az **F5 fázis** első lépése az agent lépés életciklusát adta (`agent-step`, T-005-19),
 a második lépése a `node-executor` téma **első felét** (T-005-20): az öt nem-agent node típus
 végrehajtóját (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott
-infrastruktúrát. Ma tizennégy téma áll készen. A `node-executor` téma **második fele**
-(`agent_step`, `join` `ai_synthesis`, a kimerítő diszpécser) és a spec 12. szekciójában felsorolt
-további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
+infrastruktúrát. **A T-005-21 ehhez hozzátette a `node-executor` téma második felét**: az
+`agent_step` és a `join` `ai_synthesis` végrehajtóját, a párhuzamossági hely kérésével és
+felszabadításával. Ma tizennégy téma áll készen. A kimerítő diszpécser és a spec 12. szekciójában
+felsorolt további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 
 ## Fájlok
 
@@ -39,7 +40,7 @@ további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 | `scheduling/`           | a DAG ütemező tiszta, memóriában élő állapotgépe (SPEC-004 4.4, 4.5, 4.6, 7.1, PLAN-005 T-005-17). A `SchedulerState` hét nyilvántartása fogja össze az élenkénti `live` és `dead` jelöléseket, a `fan_out` kibontásokat, a `loop` lefutásszámokat, az érkezési sorban álló és a futó példányokat. Az egyetlen léptető az `advanceScheduler`, ami három esemény fajtát ismer (`node_completed`, `fan_out_expanded`, `loop_advanced`); a bootstrap az `enqueueStartInstance`, a sor ürítése a `takeNextReadyInstance`, a terminális állapot az `isRunTerminal`. A négy olvasó (`resolveInstanceReadiness`, `resolveLoopIteration`, `resolveFanOutItem`, `collectJoinInputs`) a végrehajtó rétegnek ad választ. Adatbázist nem érint, portot nem hív: a determinizmus a hívások sorrendjéből jön, nem az órából. A hét típusfájl (`edge-mark`, `instance-readiness`, `fan-out-expansion`, `ready-instance`, `run-topology`, `scheduler-state`, `scheduling-event`) **típus-only, nincs `.spec.ts`**                                                                            |
 | `concurrency-gate/`     | a providerenkénti, minden futásra közös, szigorúan érkezési sorrendű párhuzamossági szabályozó (SPEC-004 7.1 ... 7.3, PLAN-005 T-005-18). A `createConcurrencyGate` egyetlen paramétere a `ConcurrencyLimitLookup`, tehát a téma egyetlen sora sem érint adatbázist, és nincs benne párhuzamossági szám. A hely kérése (`requestSlot`) és felszabadítása (`releaseSlot`) a felület, plusz két számláló olvasó a diagnosztikának. A `concurrency-gate.ts` és a `concurrency-limit-lookup.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `agent-step/`           | az agent lépés életciklusa (SPEC-004 5.2), a session modell (6.3, 6.4) és a kimenő SDK `Options` összeállítása (PLAN-005 T-005-19). Négy csoport: a session forrás halmaz (`collectSessionSourceNodes`) és a `resolveForkSession` gráf bejárása; a futáskori session feloldás (`findNearestAncestorSession`, `resolveSessionBinding`); a leírótól függő döntések egy menetben (`validateAgentStepCapabilities`), az `Options` összeállítása (`buildAgentStepOptions`) a `Stop` hookkal (`buildStopHookMatcher`); és a teljes futtatás (`runAgentStep`) a `result` üzenet számadatainak kiolvasásával (`readResultTelemetry`). A tíz típusfájl **típus-only, nincs `.spec.ts`**. A `runAgentStep` `.spec.ts`-e valós `:memory:` adatbázis ellen fut, és az SDK üzeneteket a commitolt `agent-step-messages-fixture.json` fájlból olvassa. **A téma nem kér párhuzamossági helyet és nem vált `step_run` állapotot**, lásd "Szabályok"                                                                                                                                         |
-| `node-executor/`        | a diszpécser és a tíz végrehajtható node típus végrehajtója (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **T-005-20 csak az első felét adja**: az öt nem-agent típus (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott infrastruktúra - a hat portot összefogó `NodeExecutorPorts`, a `step_run`-hoz kötött, node típustól független adatokat hordozó `NodeExecutionInstance`, a `run-supervisor`-nak szánt `NodeExecutionOutcome`, az esemény írás+kiadás egyben (`emitEngineEvent`) és a közös nyitó/záró menet (`beginStepRun`, `finishStepRunSucceeded`, `finishStepRunFailed`). A diszpécsert **nem** ez a lépés írja meg, lásd "Szabályok"                                                                                                                                                                                                                                                                                                                                                                                       |
+| `node-executor/`        | a diszpécser és a tíz végrehajtható node típus végrehajtója (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **T-005-20 az első felét adta**: az öt nem-agent típus (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott infrastruktúra - a hat portot összefogó `NodeExecutorPorts`, a `step_run`-hoz kötött, node típustól független adatokat hordozó `NodeExecutionInstance`, a `run-supervisor`-nak szánt `NodeExecutionOutcome`, az esemény írás+kiadás egyben (`emitEngineEvent`) és a közös nyitó/záró menet (`beginStepRun`, `finishStepRunSucceeded`, `finishStepRunFailed`). **A T-005-21 hozzáadta a második felet**: az `agent_step` (`execute-agent-step.ts`) és a `join` `ai_synthesis` (`execute-join-ai-synthesis.ts`) végrehajtóját, a köztük megosztott `agent-node-lifecycle.ts` belső menettel (a SPEC-004 5.2 teljes tíz pontja, a hely kérésével és felszabadításával, 7.2). A diszpécsert **még mindig nem** ez a lépés írja meg, lásd "Szabályok"                                                                     |
 
 ## Függőségi irány
 
@@ -344,18 +345,34 @@ viselkedését írja le, a felületét nem, ezért a négy döntés indoklása i
   adja, ezért itt nincs külön érkezési sorszám mező: a kiszolgálás providerenként a legrégebbi
   várakozót viszi, tehát egy telített provider soha nem tartja fel a szabadat.
 
-**A `node-executor` téma T-005-20-ban NEM kap kimerítő diszpécsert.** A SPEC-004 12. szekció a
+**A `node-executor` téma T-005-21-ben SEM kap kimerítő diszpécsert.** A SPEC-004 12. szekció a
 témát "a diszpécser és a tíz végrehajtható node típus végrehajtója" néven nevezi meg, de a
 diszpécser `switch(config.type)` szerkezetének a `switch-exhaustiveness-check` szabály miatt
-kimerítőnek kell lennie az `ExecutableNodeConfig` unión, aminek az `agent_step` és a `join`
-`ai_synthesis` ága T-005-20 idején még nincs megvalósítva (azok T-005-21 tárgya). Egy most
-megírt diszpécser vagy hiányos `switch` lenne (lint hiba), vagy egy kód nélküli, csak jelző
-placeholder ágat kellene tartalmazzon (rossz gyakorlat, `.claude/CLAUDE.md` 1. szekció "Nincs
-hibakezelés lehetetlen esetre" elve fordítva: itt egy MEGLÉVŐ esetre nem lenne kezelés). A
-döntés ezért: **T-005-20 csak az öt egyedi `execute-*` függvényt írja meg**, mindegyiket
-önmagában exportálva és tesztelve; a végső, kimerítő diszpécsert (`execute-node.ts` vagy hasonló
-néven) **a T-005-21 végrehajtója rakja össze**, amikor már mind a hét ág (`start`, `branch`,
-`fan_out`, `loop`, `join` mindhárom módja, `agent_step`) készen áll.
+kimerítőnek kell lennie az `ExecutableNodeConfig` unión, aminek a `human_approval` (T-005-22) és a
+`sub_workflow` (T-005-23) ága T-005-21 idején még nincs megvalósítva. Egy most megírt diszpécser
+vagy hiányos `switch` lenne (lint hiba), vagy egy kód nélküli, csak jelző placeholder ágat kellene
+tartalmazzon (rossz gyakorlat, `.claude/CLAUDE.md` 1. szekció "Nincs hibakezelés lehetetlen esetre"
+elve fordítva: itt egy MEGLÉVŐ esetre nem lenne kezelés). A döntés ezért: **T-005-20 az öt
+nem-agent, T-005-21 az `agent_step` és a `join` `ai_synthesis` egyedi `execute-*` függvényét írja
+meg**, mindegyiket önmagában exportálva és tesztelve; a végső, kimerítő diszpécsert
+(`execute-node.ts` vagy hasonló néven) **a T-005-24 (error-policy) végrehajtójának kell
+összeraknia**, miután mind a kilenc ág (`start`, `branch`, `fan_out`, `loop`, `join` mindhárom
+módja, `agent_step`, `human_approval`, `sub_workflow`) készen áll.
+
+**A T-005-21 megoldása: az `agent_step` és a `join` `ai_synthesis` a `beginStepRun`-t NEM
+használja.** A `beginStepRun` (lásd lent) a `createStepRun`, a `markStepRunning` és a
+`step_started` esemény hármasát egyetlen, oszthatatlan lépésben futtatja - ez a T-005-20 öt
+node típusának megfelel, mert egyiknél sincs közbeékelt lépés a kettő között. Az `agent_step`
+életciklusa viszont a SPEC-004 5.2 1. pontja szerint **kötött sorrendet** ír elő: `createStepRun`
+(`pending`) → **hely kérése a szabályozótól** → csak ezután `markStepRunning` → `step_started`. A
+hely kérése tehát a `createStepRun` és a `markStepRunning` közé ékelődik, amit a `beginStepRun`
+összevont felülete nem enged meg. Az `agent-node-lifecycle.ts` ezért **közvetlenül** hívja a
+`ports.database.stepRuns.createStepRun`/`markStepRunning` primitíveket (ugyanazokat, amiket a
+`beginStepRun` belsőleg is hív) és az `emitEngineEvent` segédet, a hely kérésével a kettő között -
+ez nem a közös nyitó menet **újraírása**, csak más sorrendű összerakása, mert a végrehajtott
+adatbázis-hívások és az esemény írás útja változatlan (`.claude/CLAUDE.md` 5. szekció "Csak azt
+írod át, amit muszáj"). A `beginStepRun` fájl maga **változatlan** marad, mert a többi öt
+végrehajtó a régi, összevont sorrendet helyesen használja.
 
 **A közös `NodeExecutorPorts`/`NodeExecutionInstance`/`NodeExecutionOutcome` hármas.** Mind az öt
 (és a T-005-21-ben még kettő) végrehajtó ugyanazt a hat portot kapja (`database`, `clock`,
@@ -409,15 +426,51 @@ tárolja (sem a `FanOutExpandedPayload`, ami csak `itemCount`-ot hordoz, sem a `
 a renderelés, `template_render_failed`-et adva, ha bármelyik elhasal. Ez a SPEC-004 5. szekció 4. sorának expliciten megengedett olvasata ("döntsd el és dokumentáld, mire használod az
 eredményt, ha a séma nem tárolja").
 
-**A `step_run.result_subtype` és `num_turns` mező írási útja nyitva marad.** A `db` csomag
-`StepRunRepository.MarkStepSucceededInput`/`MarkStepFailedInput` típusa a séma már létező
-`result_subtype` és `num_turns` oszlopát nem exponálja írásra (csak a négy token oszlopot és -
-sikeres esetnél - az `output`-ot). Ez a T-005-20 öt node típusát **nem** érinti: egyiknek sincs
-`resultSubtype`/`numTurns` adata, csak az `agent_step`-nek (SPEC-004 5.2 8. pont). A bővítés ezért
-nem történt meg itt; a T-005-21 végrehajtójának kell eldöntenie, hogy a `runAgentStep` már kiszámolt
-`AgentStepExecution.resultSubtype`/`.numTurns` értékét hogyan vezeti be a záró `markStepSucceeded`/
-`markStepFailed` hívásba - vagy a `db` repository input típusainak bővítésével (nem sémaváltoztatás,
-az oszlopok már léteznek), vagy más úton.
+**A `step_run.result_subtype` és `num_turns` mező írási útja lezárva (T-005-21).** A `db` csomag
+`StepRunRepository.MarkStepSucceededInput`/`MarkStepFailedInput` típusa **bővült** egy opcionális
+`resultSubtype?: string` és `numTurns?: number` mezővel (nem sémaváltoztatás, a `result_subtype` és
+a `num_turns` oszlop már létezett, csak a repository TypeScript felülete nem engedte írni őket,
+lásd `packages/db/CLAUDE.md`). A `node-executor` téma `finishStepRunSucceeded`/
+`finishStepRunFailed` segédje ugyanezt a két opcionális mezőt kapta, és a `agent-node-lifecycle.ts`
+tölti ki a `runAgentStep` `AgentStepExecution.resultSubtype`/`.numTurns` értékéből, ugyanazzal a
+feltételes szétterítés mintával, mint a token összesítésnél (`...(execution.tokens !== undefined &&
+{ tokens: execution.tokens })`). A T-005-20 öt node típusát ez nem érinti: egyiknek sincs
+`resultSubtype`/`numTurns` adata, a mező mindkét záró segédnél opcionális maradt.
+
+**A T-005-21 négy további tervezési döntése.**
+
+- **A `ports` paraméter típusa `EngineDependencies`, nem egy új, `NodeExecutorPorts`-ból
+  származtatott bővítés.** Az `agent-node-lifecycle.ts` a `runAgentStep`-et hívja, ami a teljes
+  kilenc portot várja (`EngineDependencies`). Egy `NodeExecutorPorts & { agentQueryRunner,
+processEnvironment }` alakú bővítés a `runAgentStep` hívásához úgyis fel kellene vegye a
+  kilencedik, `providerDescriptorLookup` mezőt is - ez a téma viszont nem keres leírót (a hívó,
+  a jövőbeli `run-supervisor`, már feloldva adja át), tehát egy ilyen bővítés szó szerint ugyanazt
+  a kilenc mezőt írná le, mint az `EngineDependencies`, csak új néven. A meglévő típus
+  újrahasználata a "Minimum kód" elv szerint helyesebb egy szerkezetileg azonos duplikátumnál.
+- **A hely felszabadítása sima `try/finally`-ban áll, `return`-nel a `finally` ágban.** A projekt
+  ESLint szabálykészlete nem tartalmaz `js.configs.recommended`-et (csak `typescript-eslint`,
+  `unicorn`, `import-x`, `sonarjs` recommended preseteket, lásd `tooling/eslint-config`
+  `base.ts`), tehát a `no-unsafe-finally` szabály **nincs bekötve**. Egy `Promise.prototype
+.finally()` callback-alapú, `let`-tel áthidalt változat TypeScript-hibát adna (`This comparison
+appears to be unintentional`), mert a fordító a zárt függvényen belüli újraértékadást nem
+  követi a narrowing-nál - a sima `try/finally` ezt elkerüli, és pontosan azt fejezi ki, amit a
+  SPEC-004 5.2 10. pontja kér: a hely **minden** ágon felszabadul, a `runAgentStep` saját
+  `Outcome` hibaágán is.
+- **A `CreateStepRunInput.modelId`/`.sessionMode`/`.structuredOutputStrategy` mező a `config`-ból
+  jön, nem a `validateAgentStepCapabilities` döntéseiből.** A `step_run` sor létrehozása (`pending`
+  állapotban) megelőzi a leírótól függő döntések számítását a kódban, és a `config.modelId`
+  (`string | null`) mindig elérhető, akkor is, ha a döntés kudarcot vall (pl. `unknown_model_id`) -
+  a `decisions.model.outgoingModel` viszont csak sikeres döntés esetén létezik, és az a **kimenő,
+  kliens** azonosító, nem szükségszerűen ugyanaz, mint a config wire azonosítója (11.3 táblázat 5.
+  sora). A `step_run.model_id` oszlop a config szintű, stabil azonosítót tükrözi.
+- **A `join_resolved` esemény a záráskor MINDIG íródik, sikeres és hibás lezáráskor egyaránt.** A
+  SPEC-004 5. szekció táblázata "`join_resolved` esemény"-t ír a `join` sorára, feltétel nélkül; az
+  esemény a join **vezérlési szemantikáját** jelzi (hány ág futott be, milyen módban), nem az agent
+  lépés saját sikerét. Az `execute-join-ai-synthesis.ts` ezért a `step_finished` esemény **mellett**
+  mindig kiadja, amíg a `runAgentNodeLifecycle` maga `Outcome`-szinten sikeresen visszatér (a
+  `runAgentStep` saját, adatbázis hibát jelentő `Outcome` hibaága esetén nincs érvényes `stepRun`,
+  amire hivatkozni lehetne, ezért ott a `join_resolved` sem íródik, ugyanúgy, ahogy a `step_finished`
+  sem).
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).

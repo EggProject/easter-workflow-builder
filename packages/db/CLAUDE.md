@@ -340,6 +340,18 @@ compare-and-set `WHERE status IN (...)` feltételen bukik el, `illegal_status_tr
 hibaággal, az `UPDATE` nulla sort módosít, és a token oszlopok érintetlenek maradnak - nincs
 külön védelem erre, a terminális állapot ténye önmagában elég.
 
+**A `resultSubtype`/`numTurns` mező (PLAN-005 T-005-21).** A `result_subtype` és a `num_turns`
+oszlop a séma szintjén már a `StepRunRecord`-ban is szerepelt (T-003-18), de a
+`MarkStepSucceededInput`/`MarkStepFailedInput` nem exponálta írásra - a `packages/engine`
+`node-executor` téma T-005-20 idejéig nem is volt hívó, aminek szüksége lett volna rá (a `db`
+csomag CLAUDE.md korábbi állapota ezt nyitott kérdésként hagyta). A T-005-21 mindkét bemeneti
+típust bővítette egy opcionális `resultSubtype?: string` és `numTurns?: number` mezővel,
+ugyanazzal a `resultTelemetryColumns` segédfüggvénnyel, mint a `tokenColumns` mintája: hiányzó
+mező esetén üres `UPDATE` fragmens, megadott mező esetén a megfelelő oszlop. A két mező
+**egymástól függetlenül** opcionális (nem pár), mert a `runAgentStep` `numTurns` nélkül is adhat
+`resultSubtype`-ot (a `result` üzenet mindkettőt egyszerre hordozza a gyakorlatban, de a típus
+ezt nem kényszeríti ki, ugyanúgy, mint a `tokens` mezőnél).
+
 **A bemeneti típusok nullázhatósági konvenciója eltér a `WorkflowRunRepository`-étől.** A
 `CreateStepRunInput` `parentStepRunId`, `modelId`, `sessionMode`, `structuredOutputStrategy` és
 `subWorkflowRunId` mezője **kötelezően kitöltött, nullázható** (`T | null`), a

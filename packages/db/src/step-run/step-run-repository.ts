@@ -67,14 +67,25 @@ export interface StepRunTokenUsage {
  * függően engedett, hogy a lépés vár-e strukturált kimenetet: lásd a
  * `markStepSucceeded` függvény dokumentációját (SPEC-003 7.2, M-34
  * következménye).
+ *
+ * A `resultSubtype` és a `numTurns` a `result_subtype`/`num_turns` oszlopot
+ * tölti (SPEC-004 5.2 8. pont: az SDK `result` üzenetéből olvasott két
+ * számadat, a token összesítéssel azonos tranzakcióban). Mindkettő opcionális,
+ * mert az öt korábbi node típus (`start`, `branch`, `fan_out`, `loop`, `join`
+ * `merge` módja) nem agent lépés, tehát nincs `result` üzenete
+ * (`packages/engine` `node-executor` téma, T-005-21).
  */
 export interface MarkStepSucceededInput {
   readonly output?: unknown;
   readonly tokens?: StepRunTokenUsage;
+  readonly resultSubtype?: string;
+  readonly numTurns?: number;
 }
 
 export interface MarkStepFailedInput {
   readonly tokens?: StepRunTokenUsage;
+  readonly resultSubtype?: string;
+  readonly numTurns?: number;
 }
 
 /**
@@ -186,6 +197,23 @@ function tokenColumns(tokens: StepRunTokenUsage | undefined): Partial<typeof ste
     outputTokens: tokens.outputTokens,
     cacheReadInputTokens: tokens.cacheReadInputTokens,
     cacheCreationInputTokens: tokens.cacheCreationInputTokens,
+  };
+}
+
+/**
+ * A `result_subtype` és a `num_turns` oszlopot alakítja `UPDATE` mezővé,
+ * ugyanazzal a "hiányzó mező -> üres objektum" elvvel, mint a `tokenColumns`.
+ * A két mező egymástól függetlenül opcionális, mert a `result` üzenet hiánya
+ * (a folyam üzenet nélkül szakadt meg) `numTurns`-t sem ad, de a `subtype`-ot
+ * ilyenkor a hívó explicit hibaosztályból, nem az üzenetből képezi.
+ */
+function resultTelemetryColumns(
+  resultSubtype: string | undefined,
+  turnCount: number | undefined,
+): Partial<typeof stepRunTable.$inferInsert> {
+  return {
+    ...(resultSubtype !== undefined && { resultSubtype }),
+    ...(turnCount !== undefined && { numTurns: turnCount }),
   };
 }
 
@@ -426,6 +454,7 @@ export function createStepRunRepository(
           finishedAtMs: new Date(),
           ...(input.output !== undefined && { output: input.output }),
           ...tokenColumns(input.tokens),
+          ...resultTelemetryColumns(input.resultSubtype, input.numTurns),
         })
         .where(and(eq(stepRunTable.id, stepRunId), inArray(stepRunTable.status, allowedStatuses)))
         .returning()
@@ -450,6 +479,7 @@ export function createStepRunRepository(
       errorKind,
       errorMessage,
       ...tokenColumns(input.tokens),
+      ...resultTelemetryColumns(input.resultSubtype, input.numTurns),
     });
   }
 

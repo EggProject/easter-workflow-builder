@@ -205,14 +205,20 @@ export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';
 export { runAgentStep } from './agent-step/run-agent-step.ts';
 
 // node-executor: a diszpécser és a tíz végrehajtható node típus végrehajtója
-// (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **Ez a lépés
-// (T-005-20) csak az első felét adja**: az öt nem-agent típus végrehajtóját
-// (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a közös, megosztott
-// infrastruktúrát. A kimerítő `switch`-es diszpécsert **nem** ez a lépés írja
-// meg, mert az `agent_step` és a `join` `ai_synthesis` ág még hiányzik
-// (T-005-21) - egy most megírt diszpécser vagy nem lenne kimerítő (lint hiba),
-// vagy kódot nélkülöző placeholder ágat tartalmazna (rossz gyakorlat). A
-// diszpécsert a T-005-21 végrehajtója rakja össze, amikor mind a hét ág kész.
+// (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). A T-005-20 az öt
+// nem-agent típus végrehajtóját adta (`start`, `branch`, `fan_out`, `loop`,
+// `join` `merge`) a közös, megosztott infrastruktúrával. **A T-005-21 ehhez
+// hozzátette az `agent_step` és a `join` `ai_synthesis` végrehajtóját**, a
+// közös `agent-node-lifecycle.ts` menettel és a hely kérésével/
+// felszabadításával (7. szekció) - ez a téma belső segéde, nincs a barrelben.
+// A kimerítő `switch`-es diszpécsert **még mindig nem** ez a lépés írja meg:
+// a `human_approval` (T-005-22) és a `sub_workflow` (T-005-23) végrehajtója
+// hiányzik, és egy most megírt diszpécser vagy nem lenne kimerítő (lint hiba),
+// vagy kódot nélkülöző placeholder ágat tartalmazna (rossz gyakorlat,
+// `.claude/CLAUDE.md` 5. szekció "nincs hibakezelés lehetetlen esetre" elve
+// fordítva). **A diszpécsert a T-005-24 (error-policy) végrehajtójának kell
+// összeraknia**, miután mind a kilenc ág (a `join` három módjával együtt)
+// elkészült.
 export type { NodeExecutorPorts } from './node-executor/node-executor-ports.ts';
 export type { NodeExecutionInstance } from './node-executor/node-executor-instance.ts';
 export type { NodeExecutionOutcome } from './node-executor/node-executor-outcome.ts';
@@ -233,3 +239,7 @@ export type { ExecuteLoopInput } from './node-executor/execute-loop.ts';
 export { executeLoop } from './node-executor/execute-loop.ts';
 export type { ExecuteJoinMergeInput } from './node-executor/execute-join-merge.ts';
 export { executeJoinMerge } from './node-executor/execute-join-merge.ts';
+export type { ExecuteAgentStepInput } from './node-executor/execute-agent-step.ts';
+export { executeAgentStep } from './node-executor/execute-agent-step.ts';
+export type { ExecuteJoinAiSynthesisInput } from './node-executor/execute-join-ai-synthesis.ts';
+export { executeJoinAiSynthesis } from './node-executor/execute-join-ai-synthesis.ts';
