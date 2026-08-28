@@ -27,6 +27,8 @@ A `bun run test:e2e` nyolcadik kapu, de ez a migráció az `apps/web` csomagot n
 
 **Ez a lista a "zöld" definíciója minden lépés elfogadási kritériumában.** Ahol egy lépés elfogadási kritériuma azt mondja, hogy "mind a hét kapu zöld", ott ezt a hét parancsot kell érteni.
 
+**Történeti állapot.** Ez a felsorolás a SPEC-002 végrehajtásakor érvényes kapukészletet rögzíti; a `check:graph` ekkor még nem volt kapu (az F7 fázisban került be), a `check:db-drift` pedig csak a SPEC-003-mal jött létre. A jelenlegi, mérvadó kapulista a `.claude/CLAUDE.md` 8. szekciója, ma kilenc parancs.
+
 **Commit lépésenként.** Minden lépés önálló, zöld commit. Kézi fájltörlés és újralétrehozás helyett `git mv`, hogy a git az átnevezést átnevezésként lássa, és a `check:casing` kapu ne bukjon el egy indexben maradt régi betűzésen.
 
 **Pusholni a végrehajtó agent nem tud.** Minden fázis végén szólni kell a usernek, hogy pusholjon, és megadni a branch nevét.
@@ -414,7 +416,7 @@ A user a 26 csomagos állapotra két kifogást emelt (SPEC-002 1. szekció, 4. �
 ## Definition of Done
 
 1. A SPEC-002 minden elfogadási kritériuma teljesül, mindegyikhez tartozik most futtatott parancs kimenete vagy konkrét fájl és sor hivatkozás. A 13. kritérium `engine` -> `agent` éle, ami korábban a spec 4. szekciójában nyitva jelölt, a userre váró besorolási ellentmondás volt, a user döntésével (2026-08-27) lezárult: az `engine` L5, a `server` L6 rétegre került, a `bun run check:graph` nulla eltérést ad.
-2. Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e`.
+2. Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e` (a SPEC-002 végrehajtásakor érvényes kapukészlet; a mai, mérvadó kapulista a `.claude/CLAUDE.md` 8. szekciója, kilenc parancs).
 3. A workspace 25 csomagból áll (19 `packages`, 2 `apps`, 3 `tooling`, 1 `tools`), mindegyik neve `@easter-workflow-builder/` prefixszel kezdődik, és mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. `src/index.ts` és `exports` mező minden `packages/*` alatti könyvtárcsomagban van; az `apps/server`, az `apps/web`, a `tooling/scripts`, a `tooling/tsconfig` és a `tools/wire-probe` csomagban ez a migráció előtti állapotnak megfelelően nem kötelező, a SPEC-002 12. kritériuma szerint.
 4. A `packages/agent-tools` és a `packages/providers` könyvtár nem létezik, és nincs helyettük átirányító barrel csomag.
 5. A lefedettség mind a négy metrikán 100 százalék, és a `vitest.config.ts` `coverage.exclude` listája a migráció eleje óta egyetlen sorral sem bővült.

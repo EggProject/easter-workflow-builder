@@ -75,8 +75,8 @@ jobs:
           # A `check:db-drift` (`tooling/scripts/db-drift.sh`) azt orzi, hogy
           # a `packages/db` sema es a commitolt `packages/db/drizzle`
           # migraciok szinkronban vannak-e (SPEC-003 10.3 szekcio "Drift
-          # ellenorzes" bekezdese, 15. szekcio 36. kriterium). NEM resze a
-          # nyolc kotelezo minosegi kapunak, kilencedik, kulon ellenorzes.
+          # ellenorzes" bekezdese, 15. szekcio 36. kriterium). Tagja a kilenc
+          # minosegi kapunak (.claude/CLAUDE.md 8. szekcio).
           - name: db-drift
             script: check:db-drift
     steps:

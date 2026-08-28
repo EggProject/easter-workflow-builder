@@ -828,7 +828,11 @@ A mérőeszköz marad a helyén, mert nem termékkód. A workspace-be illesztés
 
 ## 14. `CLAUDE.md` fájlok
 
-A `CLAUDE.md` projekt szabály szerint minden mappában vezetni kell egy `CLAUDE.md` fájlt.
+A projekt szabálya - gyökér `CLAUDE.md` 7. szekció, szó szerint: "CLAUDE.md kizárólag a
+csomag gyökerében kell, arról hogy miről szól a csomag; alkönyvtárakba nem kell" - a `CLAUDE.md`
+kötelezettségét a repo gyökerére és minden workspace csomag gyökerére korlátozza. Alkönyvtárban
+(téma vagy tárgykör mappában) nem kell. Ezt a SPEC-002 6.7 szekció és a
+`tooling/scripts/claude-md.sh` érvényesíti.
 
 ### Kötelező tartalom
 
@@ -843,15 +847,15 @@ A `CLAUDE.md` projekt szabály szerint minden mappában vezetni kell egy `CLAUDE
 
 ### Hol kell
 
-| Szint                                                  | Példa                                       | Kell                                          |
-| ------------------------------------------------------ | ------------------------------------------- | --------------------------------------------- |
-| Gyökér                                                 | `CLAUDE.md`                                 | van, marad                                    |
-| Alkalmazás                                             | `apps/server/CLAUDE.md`                     | igen                                          |
-| Csomag                                                 | `packages/core/CLAUDE.md`                   | igen                                          |
-| Csomag alkönyvtár                                      | `packages/providers/src/evidence/CLAUDE.md` | igen, ha a könyvtárnak önálló felelőssége van |
-| Eszköz                                                 | `tooling/eslint-config/CLAUDE.md`           | igen                                          |
-| Mérőeszköz                                             | `tools/wire-probe/CLAUDE.md`                | van, frissítendő a workspace illesztés után   |
-| Generált könyvtár (`dist`, `coverage`, `node_modules`) | nem                                         | nem                                           |
+| Szint                                                  | Példa                                        | Kell                                                          |
+| ------------------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------- |
+| Gyökér                                                 | `CLAUDE.md`                                  | van, marad                                                    |
+| Alkalmazás                                             | `apps/server/CLAUDE.md`                      | igen                                                          |
+| Csomag                                                 | `packages/core/CLAUDE.md`                    | igen                                                          |
+| Csomag alkönyvtár (téma vagy tárgykör mappa)           | `packages/provider-capability/src/evidence/` | nem, a felelősséget a csomag gyökér `CLAUDE.md`-je írja le    |
+| Eszköz                                                 | `tooling/eslint-config/CLAUDE.md`            | igen                                                          |
+| Mérőeszköz                                             | `tools/wire-probe/CLAUDE.md`                 | igen, csak a csomag gyökerében, a 6.8 pont (SPEC-002) szerint |
+| Generált könyvtár (`dist`, `coverage`, `node_modules`) | nem                                          | nem                                                           |
 
 ### Amit tilos beleírni
 
@@ -861,7 +865,7 @@ A `CLAUDE.md` projekt szabály szerint minden mappában vezetni kell egy `CLAUDE
 
 ### Karbantartási szabály
 
-Ha egy mappa fájlkészlete változik, a `CLAUDE.md` `## Fájlok` táblázata ugyanabban a commitban változik. Ezt a végrehajtás során egy ellenőrző script fogja meg, ami minden nem generált könyvtárra megnézi, hogy létezik-e `CLAUDE.md`, és hogy a `## Fájlok` táblázatban felsorolt nevek megegyeznek-e a könyvtár tartalmával.
+Ha egy csomag téma mappáinak készlete változik, a csomag gyökér `CLAUDE.md` `## Fájlok` táblázata ugyanabban a commitban változik. A `tooling/scripts/claude-md.sh` ezt a repo gyökerére és minden workspace csomag gyökerére nézve, kizárólag **létezés** szerint kényszeríti ki (`[[ -f "$dir/CLAUDE.md" ]]`, a `git ls-files '*/package.json'` alapján képzett listán); a `## Fájlok` táblázat tartalmi frissessége code review kérdése, gépi ellenőrzés nincs rá. Javaslat, nem eldöntött kérdés: egy tartalmi ellenőrzés megírása mérlegelhető, ha valaha megéri a ráfordítást.
 
 ## 15. Ellenőrizendő pontok, állás
 
@@ -985,7 +989,7 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 36. Létezik a `references/measurement-document.ts`, ami minden a leírókban hivatkozott `MeasurementId` értéket feloldható `docs/` horgonyra képez le, és nincs feloldatlan azonosító.
 37. A `tools/wire-probe` a workspace tagja: szerepel a gyökér `workspaces` glob alatt, a `tsconfig.json`-ja a `tooling/tsconfig/node.json` fájlt terjeszti ki, van `typecheck` és `lint` scriptje, és nincs saját `bun.lock` fájlja.
 38. A `tools/wire-probe` `typecheck` és `lint` taskja a Turborepo gráfban nulla kilépési kóddal fut, és a mérőeszköz forrása nem igényelt `any` vagy `as` bevezetést a szigorítás miatt.
-39. Minden nem generált könyvtárban van `CLAUDE.md`, a 14. szekció kötelező szekcióival, és egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel.
+39. A repo gyökerében és minden workspace csomag gyökerében van `CLAUDE.md`, a 14. szekció kötelező szekcióival, alkönyvtárban (téma vagy tárgykör mappában) nincs, és egyik sem tartalmaz olyan verziószámot, ami a research fájlban is szerepel.
 40. A `CLAUDE.md` teljességet ellenőrző script létezik, és a teljes repón nulla kilépési kóddal fut.
 41. A 15. szekció mind a 19 `V-*` pontja rendezett: vagy dokumentált forrásra hivatkozó döntéssel lezárva, vagy saját, most futtatott mérésre hivatkozva lezárva, vagy - V-14 és V-19 esetén - explicit, indokolt nyitva-jelöléssel, ami a végrehajtási környezet igazolt korlátjára hivatkozik. Feltételezéssel (mérés vagy dokumentáció nélkül) lezárt pont nincs.
 42. A D-1 döntés lezárva: a user döntése alapján nincsenek TypeScript projekt referenciák a csomagok között, a build sorrendet kizárólag a `turbo.json` `dependsOn` mezője adja.

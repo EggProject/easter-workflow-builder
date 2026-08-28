@@ -116,8 +116,8 @@ helyen sosem jelenhet meg.
   `apps/web/package.json`-ben maradnak.
 - A `check-dependency-graph.sh` ugyanazért nem turbo taskon keresztül fut, mint a
   `casing.sh`: a szabálya a teljes repóra vonatkozik, nem csomagonként. A gyökér
-  `package.json` `check:graph` scriptje hívja - ez **nem** tagja a hét kötelező
-  minőségi kapunak (PLAN-002), önálló, kiegészítő ellenőrzés. A réteg-hozzárendelés a
+  `package.json` `check:graph` scriptje hívja - tagja a kilenc minőségi kapunak
+  (`.claude/CLAUDE.md` 8. szekció). A réteg-hozzárendelés a
   `src/dependency-graph/package-layer.ts`-ben statikus térkép: ha a `read-workspace-
 packages.ts` egy olyan csomagot talál, ami nincs benne, a `find-dependency-graph-
 violations.ts` "hiányzó réteg-hozzárendelés" hibát ad - így egy új csomag felvétele
@@ -142,9 +142,8 @@ violations.ts` "hiányzó réteg-hozzárendelés" hibát ad - így egy új csoma
   ELŐTT `git checkout` + `git clean -fd` paranccsal visszaállítja a `drizzle/` mappát, hogy
   a repo munkakönyvtára ne maradjon piszkosan. Ugyanúgy szétválasztja a két kimeneti
   csatornát, mint az `e2e-coverage.sh`: stdout kizárólag az összegzés, minden diagnosztika
-  a stderr-en. A gyökér `package.json` `check:db-drift` scriptje hívja; **nem** tagja a
-  nyolc kötelező minőségi kapunak, kilencedik, kiegészítő ellenőrzés, a `check:graph`
-  mintájára.
+  a stderr-en. A gyökér `package.json` `check:db-drift` scriptje hívja; tagja a kilenc
+  minőségi kapunak (`.claude/CLAUDE.md` 8. szekció), a `check:graph` mintájára.
 
 ## Kapcsolódó dokumentumok
 

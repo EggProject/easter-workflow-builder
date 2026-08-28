@@ -8,7 +8,8 @@ tétel mindkét dokumentumba illene, csak egy helyen áll.
 
 Minden szabály mellett ott a forrása. Ha egy szabály itt és a forrásdokumentumban is szerepel, a
 forrásdokumentum az erősebb, és az eltérést itt kell javítani. A `docs/plan/PLAN-*.md` fájlok
-tartalma ide **nem** kerül: azok végrehajtási tervek, nem szabályok. Nyitva maradt ellentmondás a 13. szekcióban. Karbantartás: az utolsó szekció.
+tartalma ide **nem** kerül: azok végrehajtási tervek, nem szabályok. Nyitott ellentmondás esetén a
+menetet a 13. szekció írja le. Karbantartás: az utolsó szekció.
 
 Rövidítések a forrásokban: `SPEC-00n` plusz szekciószám a `docs/spec/` alatti spec, `research` a
 `docs/research/` alatti mért tény, "gyökér CLAUDE.md" a repo gyökerének fájlja (szekciószámmal az
@@ -34,7 +35,7 @@ Forrás: gyökér `CLAUDE.md`.
 | `docs/spec/SPEC-<n>-*.md` a specifikáció, `docs/plan/PLAN-<n>-*.md` a végrehajtási terv. A plan linkeli a specet, Todo lépésekre bontva, függőségekkel és elfogadási kritériumokkal.        | gyökér `CLAUDE.md`    |
 | `docs/research/` a verifikált kutatási tények tárolója, forrás URL-lel. Új tényt ide vezess.                                                                                                | gyökér `CLAUDE.md`    |
 | Feature branchben dolgozunk, a `main` védett. Branch minta: `feat/spec-<n>-<rövid-név>`. Zárás PR-rel.                                                                                      | gyökér `CLAUDE.md`    |
-| Minden lépés önálló, zöld commit: a nyolc kapu előbb fut le (8. szekció).                                                                                                                   | gyökér `CLAUDE.md` 7. |
+| Minden lépés önálló, zöld commit: a kilenc kapu előbb fut le (8. szekció).                                                                                                                  | gyökér `CLAUDE.md` 7. |
 | **Pusholni nem tudsz.** A futtatókörnyezet izolált Linux sandbox, nincs SSH kulcs, nincs `gh`. Minden commit sorozat után szólni kell a usernek, hogy pusholjon, és megadni a branch nevét. | gyökér `CLAUDE.md`    |
 | Fájlt átnevezni `git mv` paranccsal kell, nem kézi törléssel és újralétrehozással, különben a git indexben a régi betűzés marad (11. szekció).                                              | SPEC-002 10.          |
 
@@ -218,14 +219,19 @@ réteg-hozzárendelés hibát ad (SPEC-002 4.).
 minden workspace csomag gyökerében (minden könyvtárban, ami saját `package.json` fájlt tartalmaz).
 Sem téma mappa, sem tárgykör mappa, sem a `drizzle/` mappa nem kap sajátot. A `bun run docs:check`
 pontosan ezt ellenőrzi `git ls-files '*/package.json'` alapján (gyökér `CLAUDE.md` 7., SPEC-002
-6.7, `claude-md.sh` fejléc). **A SPEC-001 14./39. pontjával fennálló ellentmondás nyitott, lásd a 13. szekció 1. pontja.**
+6.7, SPEC-001 14., `claude-md.sh` fejléc). A SPEC-001 14. szekció "Hol kell" táblázata és a 39.
+elfogadási kritériuma ezt a szabályt tükrözi.
 
 A csomag szintű `CLAUDE.md` kötelező szekciói: `# <útvonal>`, `## Mi ez a mappa`, `## Fájlok`,
 `## Függőségi irány`, `## Szabályok`, `## Kapcsolódó dokumentumok`. A `## Fájlok` táblázata a
 **téma mappákat** sorolja fel, nem az egyes fájlokat. Tilos beleírni: a gyökér szabályok szó
 szerinti ismétlését, verziószámot, ami a toolchain research fájlban is szerepel, és mérési
 narratívát. Ha egy mappa fájlkészlete változik, a `## Fájlok` táblázat **ugyanabban a commitban**
-változik (SPEC-001 14., SPEC-002 6.7). **A tartalmi egyezés gépi kikényszerítése nyitott, lásd a 13. szekció 3. pontja.**
+változik (SPEC-001 14., SPEC-002 6.7). A `bun run docs:check` ezt kizárólag **létezés** szerint
+ellenőrzi, a táblázat tartalmi frissessége code review kérdése, gépi kikényszerítés nincs rá
+(SPEC-001 14. "Karbantartási szabály"). **Javaslat, nem eldöntött kérdés:** egy tartalmi
+ellenőrző script megírása mérlegelhető, ha valaha megéri a ráfordítást; ez nem döntés, csak
+felvetés.
 
 ---
 
@@ -271,28 +277,30 @@ Playwright, ESLint flat config (gyökér `CLAUDE.md`).
 
 ## 8. Minőségi kapuk
 
-**Minden lépés végén mind a nyolc parancs nulla kilépési kóddal fut, és a lépés csak ezután
-commitolható.** Forrás: SPEC-003 15. szekció 44. kritérium. **A "nyolcadik kapu" elnevezés a
-PLAN-002-ben mást jelöl, lásd a 13. szekció 2. pontja.**
+**Ez a szekció a kapuk listájának mérvadó, egyetlen forrása. Minden más dokumentum, ami a
+kapuk számát vagy listáját említi, ide mutat.** Minden lépés végén mind a kilenc parancs nulla
+kilépési kóddal fut, és a lépés csak ezután commitolható. Forrás: gyökér `package.json`
+scriptjei, `.github/workflows/ci.yml` `gate` mátrix, SPEC-003 15. szekció 44. kritérium.
 
-| Parancs                | Mit őriz                                                    |
-| ---------------------- | ----------------------------------------------------------- |
-| `bun run format:check` | Prettier formázás                                           |
-| `bun run typecheck`    | típushelyesség a teljes workspace-en                        |
-| `bun run lint`         | `any`, `as`, `private`, kör, deklarálatlan függőség tilalma |
-| `bun run test`         | Vitest, 100 százalék lefedettség mind a négy metrikán       |
-| `bun run build`        | build task                                                  |
-| `bun run docs:check`   | `CLAUDE.md` minden kötelező helyen                          |
-| `bun run check:casing` | a git index betűzése egyezik a relatív importokéval         |
-| `bun run check:graph`  | aciklikus gráf, szigorúan csökkenő rétegszám                |
+| Parancs                  | Mit őriz                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `bun run format:check`   | Prettier formázás                                                                        |
+| `bun run typecheck`      | típushelyesség a teljes workspace-en                                                     |
+| `bun run lint`           | `any`, `as`, `private`, kör, deklarálatlan függőség tilalma                              |
+| `bun run test`           | Vitest, 100 százalék lefedettség mind a négy metrikán                                    |
+| `bun run build`          | build task                                                                               |
+| `bun run docs:check`     | `CLAUDE.md` minden kötelező helyen                                                       |
+| `bun run check:casing`   | a git index betűzése egyezik a relatív importokéval                                      |
+| `bun run check:graph`    | aciklikus gráf, szigorúan csökkenő rétegszám                                             |
+| `bun run check:db-drift` | a `packages/db` séma és a commitolt `packages/db/drizzle` migrációk szinkronban vannak-e |
 
-Kiegészítő, a nyolcon kívüli ellenőrzések:
+A `test` és a `build` a CI-ben önálló jobként fut, a többi hét a `gate` mátrix egy-egy lába;
+mind a kilenc egyenrangú kapu, egyik sem "kiegészítő" a másikhoz képest (`tooling/scripts`
+CLAUDE.md, SPEC-003 10.3).
 
-- `bun run check:db-drift`: a `packages/db` séma és a commitolt `packages/db/drizzle` migrációk
-  szinkronban vannak-e. Kilencedik, önálló ellenőrzés, nem tagja a nyolcnak (`tooling/scripts`
-  CLAUDE.md, SPEC-003 10.3).
-- `bun run test:e2e` és `bun run coverage:e2e:report`: Playwright és az e2e lefedettségi riport.
-  A nyolcadik kapu jelentésére lásd a 13. szekció 2. nyitott ellentmondását.
+**A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak.** A
+Playwright futtatás és az e2e lefedettségi riport a CI-ban külön `e2e` jobban fut, a `build`
+jobra várva; nem szerepel sem a gyökér kilenc kapu parancsai között, sem a `gate` mátrixban.
 
 **Vitest projektek.** A gyökér `vitest.config.ts` `test.projects` mezője fogja össze a
 `packages/*` és `apps/*` csomagokat; `apps/web` és `packages/ui` saját `vitest.config.ts`-e adja a
@@ -526,37 +534,32 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ---
 
-## 13. Nyitott ellentmondások
+## 13. Ellentmondás esetén
 
-Ezeket nem mi döntjük el: a userrel kell tisztázni. Amíg nyitva vannak, ez a szekció mondja meg,
-mi az érvényes viselkedés, és mi zárná le a kérdést. Lezárás után a döntés átvezetendő minden
-érintett forrásdokumentumba és ez a bejegyzés törlendő.
+**Jelenleg nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
+a "nyolcadik kapu" elnevezés, a SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`, a
+kétszintű csomagok száma) egyike sem valódi nyitott kérdés volt: mindegyik már eldöntött állapotot
+írt le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
+átvezetés megtörtént (SPEC-001 14. szekció és 39. kritérium, SPEC-003 44. kritérium, PLAN-002 és
+PLAN-003 kapu-listája, `tooling/scripts/CLAUDE.md`, `.github/workflows/ci.yml`), a tételek
+törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-ben és e szabálykönyv 6.
+szekciójában is "három" (`core`, `provider-capability`, `db`).
 
-**1. `CLAUDE.md` elhelyezés.** A SPEC-001 14. szekció "Hol kell" táblázata és a 39. elfogadási
-kritérium minden nem generált könyvtárban kötelezővé teszi (a "Csomag alkönyvtár" sor: "igen, ha a
-könyvtárnak önálló felelőssége van"). A SPEC-002 6.7 és a `tooling/scripts/claude-md.sh` viszont
-kizárólag a csomag gyökerében követeli meg, alkönyvtárban nem. Mi a viselkedés addig: a nyolc kapu
-tagja a `bun run docs:check`, ami a SPEC-002 6.7 / `claude-md.sh` szabályát futtatja, tehát a
-gyakorlatban ez érvényesül. Mi zárná le: user döntés, hogy a SPEC-001 14./39. pontja módosuljon a
-SPEC-002 6.7-re, vagy fordítva.
+Ez a szekció ezért nem egy lista, hanem egy eljárás: mi a teendő, ha egy jövőbeli munkamenet
+tényleges, felhasználói döntést igénylő ellentmondást talál két forrásdokumentum között.
 
-**2. A "nyolcadik kapu" jelentése.** A PLAN-002 szerint a `bun run test:e2e` a nyolcadik kapu
-("Mind a nyolc kapu zöld: a hét fázisonkénti kapu, plusz a `bun run test:e2e`"). A PLAN-003 és a
-SPEC-003 15. szekció 44. elfogadási kritériuma viszont a nyolc parancsot tételesen felsorolja:
-`format:check`, `typecheck`, `lint`, `test`, `build`, `docs:check`, `check:casing`,
-`check:graph` - ebben a `test:e2e` nem szerepel, a `check:graph` viszont igen. Mi a viselkedés
-addig: e szabálykönyv 8. szekciója a SPEC-003 44. kritériumát követi, a `test:e2e`-t és a
-`coverage:e2e:report`-ot a nyolcon kívüli, kiegészítő ellenőrzésként kezeli. Mi zárná le: user
-döntés vagy egy spec módosítás, ami véglegesen rögzíti a nyolc kapu tagjait.
-
-**3. SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`.** A SPEC-001 14. szekció egy
-ellenőrző scriptet ígér, ami minden nem generált könyvtárra megnézi, hogy létezik-e `CLAUDE.md`,
-**és** hogy a `## Fájlok` táblázatban felsorolt nevek megegyeznek-e a könyvtár tartalmával. A
-ténylegesen megírt `tooling/scripts/claude-md.sh` kizárólag a fájl létezését ellenőrzi
-(`[[ -f "$dir/CLAUDE.md" ]]`), tartalmi egyezést nem. Mi a viselkedés addig: a `## Fájlok`
-táblázat naprakészsége code review kérdése, gépi kikényszerítés nincs rá. Mi zárná le: user döntés,
-hogy megéri-e megírni a tartalmi ellenőrzést, vagy a SPEC-001 14. ígéretét kell a tényleges,
-csak-létezést-néző hatókörre pontosítani.
+1. **Nem döntjük el csendben.** Ha az egyik forrás egyértelműen elavult (a döntés megvan, csak
+   nincs átvezetve), az nem ide tartozik: azt a talált helyen kell kijavítani, a döntéshez igazítva.
+   Ide csak az kerül, amit tényleg a usernek kell eldöntenie.
+2. **Új, számozott tétel kerül ebbe a szekcióba**, amíg nyitva van: melyik két forrás mond mást,
+   mi a tényleges eltérés, mi az érvényes viselkedés addig, és mi zárná le a kérdést.
+3. **A usert az askuserquestion tool-lal kell megkérdezni**, összetett kérdést kisebb, érthető
+   részekre bontva (gyökér `CLAUDE.md` 7.).
+4. **Lezárás után a döntést át kell vezetni minden érintett forrásdokumentumba**, majd a tételt
+   törölni kell erről a listáról.
+5. **Javaslat nem ellentmondás.** Egy felvetés, amit nem kell eldönteni, de érdemes megemlíteni
+   (pl. "megérné-e megírni X ellenőrzést") nem ebbe a szekcióba kerül, hanem oda, ahol felmerül,
+   "Javaslat, nem döntés" jelöléssel, hogy ne torlódjon fel megválaszolatlan kérdésként.
 
 ---
 
@@ -574,8 +577,9 @@ csak-létezést-néző hatókörre pontosítani.
 - **Forrás nélkül nincs szabály.** Minden bejegyzés mellé a forrás megnevezése kell (spec szekció,
   research fájl, csomag `CLAUDE.md`, vagy saját, most futtatott mérés). Ha csak sejtés, nem kerül
   ide.
-- **Ellentmondás esetén.** Nem döntjük el csendben. Az ellentmondást a userrel kell tisztázni, és a
-  lezárás után mindkét helyen át kell vezetni; addig a 13. szekcióban nyitott kérdésként áll.
+- **Ellentmondás esetén.** Nem döntjük el csendben. A 13. szekció írja le a menetet: addig, amíg
+  nyitva áll, ott kap egy számozott tételt, lezárás után minden érintett forrásdokumentumba át kell
+  vezetni, és a tételt onnan törölni kell.
 - **Az ellenőrzés.** A `bun run docs:check` ezt a fájlt nem kényszeríti ki és nem is tiltja: a
   `git ls-files '*/package.json'` alapján dolgozik, a `.claude/` könyvtárban pedig nincs
   `package.json`. A `bun run format:check` viszont **fedi**, mert a `.prettierignore` nem zárja ki,

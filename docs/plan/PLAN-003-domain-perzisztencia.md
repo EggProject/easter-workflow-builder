@@ -41,6 +41,8 @@ A `main` védett, közvetlen push tiltott, a zárás PR-rel történik. Az `npm`
 
 Ebből következik a lépések bontásának alapszabálya: **egy lépés soha nem hagy hátra futásidejű sort a hozzá tartozó `.spec.ts` fájl nélkül.** A tábla, a hozzá tartozó unió, a typeguardjai, a repositoryja és a tesztjei ugyanabban a lépésben keletkeznek. A `coverage.exclude` lista egyetlen sorral sem bővülhet.
 
+**Történeti állapot.** Ez a nyolcas lista a terv indulásakor érvényes kapukészlet: a `bun run check:db-drift` ezen a végrehajtáson belül, a T-003-25 lépésben jön létre. A jelenlegi, mérvadó kapulista a `.claude/CLAUDE.md` 8. szekciója, ma kilenc parancs.
+
 ## 3. Modell hozzárendelés
 
 | Modell   | Mikor                                                                                                                         |
