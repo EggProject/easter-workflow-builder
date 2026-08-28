@@ -1,4 +1,4 @@
-import type { StepRunRecord } from '@easter-workflow-builder/db';
+import type { ApprovalDecision, StepRunRecord } from '@easter-workflow-builder/db';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 
 /**
@@ -30,6 +30,19 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
  *   items }`. A `stepRun.id` adja a `stepRunId`-t.
  * - `loop_advanced` -> `{ kind: 'loop_advanced', instance, stepRunId,
  *   shouldContinue }`. A `stepRun.id` adja a `stepRunId`-t.
+ * - `approval_decided` -> a `human_approval` node döntés utáni lezárása
+ *   (SPEC-004 5.8, PLAN-005 T-005-22). A `decision` mező közvetlenül a
+ *   `db` `ApprovalDecision` uniója (`'approved' | 'rejected'`), és a hívó
+ *   (jövőbeli `run-supervisor`, T-005-25) ebből építi a `SchedulingEvent`-et:
+ *   `approved` esetén ugyanaz a `node_completed` jelleg, mint egy `branch`
+ *   node kiválasztott ágánál (a `branch_key` szó szerint `'approved'`, 4.2
+ *   táblázat), `rejected` esetén pedig a hívónak kell eldöntenie, van-e
+ *   kimenő `rejected` `branch_key` él - ha nincs, a 8.3 hibapolitika lép
+ *   életbe (`error-policy` téma, T-005-24). **A node-executor réteg ezt a
+ *   döntést itt sem hozza meg** (ugyanaz az elv, mint a `failed` ágnál):
+ *   csak a `stepRun` rekordot (a `db` `decideApproval` már elvégezte a
+ *   `waiting_approval -> succeeded`/`rejected` átmenetet, ezt a végrehajtó
+ *   `getStepRun`-nal olvassa vissza) és a döntést adja vissza.
  * - `failed` -> a hívó dönt (8.1, 8.3 szekció, `error-policy` téma,
  *   T-005-24): van-e `on_error` él, és ha nincs, `fail_run` vagy
  *   `fail_branch` a node config `onUnhandledError` mezője szerint. A
@@ -46,6 +59,7 @@ export type NodeExecutionOutcome =
   | { readonly kind: 'succeeded'; readonly stepRun: StepRunRecord; readonly selectedBranchKey: string | null }
   | { readonly kind: 'fan_out_expanded'; readonly stepRun: StepRunRecord; readonly items: readonly unknown[] }
   | { readonly kind: 'loop_advanced'; readonly stepRun: StepRunRecord; readonly shouldContinue: boolean }
+  | { readonly kind: 'approval_decided'; readonly stepRun: StepRunRecord; readonly decision: ApprovalDecision }
   | {
       readonly kind: 'failed';
       readonly stepRun: StepRunRecord;

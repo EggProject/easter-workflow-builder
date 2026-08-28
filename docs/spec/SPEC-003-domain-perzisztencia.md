@@ -825,6 +825,7 @@ Terminális: `succeeded`, `failed`, `cancelled`, `interrupted`. Terminális áll
 | `running`          | `interrupted`      | indulási helyreállítás                                                 |
 | `waiting_approval` | `succeeded`        | a felhasználó jóváhagyta                                               |
 | `waiting_approval` | `rejected`         | a felhasználó elutasította                                             |
+| `waiting_approval` | `failed`           | a jóváhagyás időkorlátja lejárt, `approval_timed_out` (SPEC-004 5.8)   |
 | `waiting_approval` | `cancelled`        | megszakítás várakozás közben                                           |
 | `waiting_approval` | `interrupted`      | indulási helyreállítás                                                 |
 
