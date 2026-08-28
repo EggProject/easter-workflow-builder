@@ -94,3 +94,10 @@ export { resolveConcurrencySuggestion } from './capability-policy/resolve-concur
 export { RATE_LIMIT_RETRY_POLICY } from './capability-policy/rate-limit-retry-policy.ts';
 export { resolveConnectionTestMode } from './capability-policy/resolve-connection-test-mode.ts';
 export { validateSdkVersionMatch } from './capability-policy/validate-sdk-version-match.ts';
+
+// provider-environment: a SPEC-004 11.3 táblázat 10. és 11. sora, a
+// `requiredEnv` és a `disallowedEnv` feldolgozása a `processEnvironment`
+// porton át, a lépés kimenő `Options.env` blokkjának összeállítása
+// (PLAN-005 T-005-14).
+export { buildProviderEnvironmentBlock } from './provider-environment/build-provider-environment-block.ts';
+export { resolveRequiredEnvironmentValue } from './provider-environment/resolve-required-environment-value.ts';
