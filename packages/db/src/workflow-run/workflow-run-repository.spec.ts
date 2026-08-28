@@ -227,6 +227,31 @@ describe('createWorkflowRunRepository', () => {
       sqlite.close();
     });
 
+    it('újraindításnál változatlan gráf a meglévő graph_snapshot sort használja, megváltozott gráf újat szúr be (27. kritérium)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+
+      const original = start(repository, 'w1', 'V1');
+
+      // Változatlan gráf: új futás sor, ugyanaz a lenyomat, NINCS új
+      // graph_snapshot sor (7.4 szekció: "ez nem kivétel, hanem ugyanaz a
+      // szabály", 50. kritérium).
+      const restartedUnchanged = start(repository, 'w1', 'V1', { restartedFromRunId: original.id });
+      expect(restartedUnchanged.id).not.toBe(original.id);
+      expect(restartedUnchanged.restartedFromRunId).toBe(original.id);
+      expect(restartedUnchanged.graphSnapshotHash).toBe(original.graphSnapshotHash);
+      expect(database.select().from(graphSnapshotTable).all()).toHaveLength(1);
+
+      // Megváltozott gráf: a dokumentum más, tehát más a lenyomat, és új sor
+      // keletkezik.
+      const restartedChanged = start(repository, 'w1', 'V2', { restartedFromRunId: original.id });
+      expect(restartedChanged.graphSnapshotHash).not.toBe(original.graphSnapshotHash);
+      expect(restartedChanged.restartedFromRunId).toBe(original.id);
+      expect(database.select().from(graphSnapshotTable).all()).toHaveLength(2);
+
+      sqlite.close();
+    });
+
     it('a globális persist_stream_deltas beállítást fagyasztja be indításkor; a későbbi átállítás a már elindult futást nem érinti (38., 57. kritérium)', () => {
       const { sqlite, database, repository } = openRepository();
       insertWorkflow(database, 'w1');

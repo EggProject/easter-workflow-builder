@@ -20,6 +20,7 @@ import {
   type WorkflowRunRepository,
 } from '../workflow-run/workflow-run-repository.ts';
 import { createRunEventRepository, type RunEventRepository } from '../run-event/run-event-repository.ts';
+import { createAppSettingRepository, type AppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import {
   createWorkflowRepository,
   type WorkflowEdgeInput,
@@ -62,6 +63,7 @@ function openRepository(): {
   repository: WorkflowRepository;
   runs: WorkflowRunRepository;
   events: RunEventRepository;
+  settings: AppSettingRepository;
 } {
   const sqlite = new SqliteDatabase(':memory:');
   sqlite.pragma('foreign_keys = ON');
@@ -71,7 +73,8 @@ function openRepository(): {
   const repository = createWorkflowRepository(database, transaction);
   const runs = createWorkflowRunRepository(database, transaction);
   const events = createRunEventRepository(database, transaction);
-  return { sqlite, database, repository, runs, events };
+  const settings = createAppSettingRepository(database, transaction);
+  return { sqlite, database, repository, runs, events, settings };
 }
 
 /**
@@ -441,6 +444,65 @@ describe('createWorkflowRepository', () => {
 
       const message = errorOrThrow(repository.readGraph(workflow.id));
       expect(message).toContain('corrupt_node_config');
+
+      sqlite.close();
+    });
+  });
+
+  describe('a futáskori pillanatkép sérthetetlensége az élő gráf átírása után (20. kritérium)', () => {
+    it('a readSnapshot a futáskori gráfot adja vissza a workflow átírása, a node-jai törlése és a globális alapértelmezett provider átállítása után is', () => {
+      const { sqlite, database, repository, runs, settings } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Eredeti', description: null, providerId: null }));
+      const { nodes, edges } = twoNodesOneEdge();
+      okOrThrow(repository.replaceGraph(workflow.id, nodes, edges));
+
+      // A motor által összeállított, futáskori dokumentum: a `startRun` ezt
+      // fagyasztja be (SPEC-003 5.1), az `effectiveProviderId` a háromszintű
+      // feloldás eredménye.
+      const capturedDocument: GraphSnapshotDocument = {
+        version: GRAPH_DOCUMENT_VERSION,
+        sdkVersionPin: '0.0.0-test',
+        workflow: { id: workflow.id, name: 'Eredeti', description: null },
+        nodes: [
+          {
+            id: 'node-a',
+            type: 'start',
+            label: 'A',
+            position: { x: 0, y: 0 },
+            config: startConfig,
+            effectiveProviderId: 'minimax',
+          },
+        ],
+        edges: [],
+      };
+      const run = okOrThrow(
+        runs.startRun({
+          workflowId: workflow.id,
+          input: {},
+          providerId: 'minimax',
+          graphSnapshotDocument: capturedDocument,
+        }),
+      );
+
+      // A futás után az élő workflow-t átírjuk: új név, más provider, és a
+      // gráf node-jait töröljük.
+      okOrThrow(
+        repository.updateWorkflow(workflow.id, {
+          name: 'Átírt',
+          description: 'másik leírás',
+          providerId: 'claude-subscription',
+        }),
+      );
+      okOrThrow(repository.replaceGraph(workflow.id, [], []));
+      okOrThrow(settings.setDefaultProvider('claude-subscription'));
+
+      // Az élő gráf tényleg üres lett, tehát a teszt nem üres.
+      expect(okOrThrow(repository.readGraph(workflow.id))).toStrictEqual({ nodes: [], edges: [] });
+      expect(database.select().from(workflowNodeTable).all()).toStrictEqual([]);
+
+      // A pillanatkép viszont változatlan: a futáskori nevet, a futáskori
+      // node-ot és a befagyasztott providert adja vissza.
+      expect(okOrThrow(runs.readSnapshot(run.id))).toStrictEqual(capturedDocument);
 
       sqlite.close();
     });
