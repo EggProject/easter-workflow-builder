@@ -5,7 +5,7 @@
    Drizzle/SQLite írási utat úgy, hogy NULL legyen belőle. */
 import { isInt, isNonEmptyString, isRecord } from '@easter-workflow-builder/typeguards';
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { RunEventKind } from './run-event-kind.ts';
+import type { RunEventKind } from '../event-kind/run-event-kind.ts';
 import type { SdkMessageEnvelope } from './is-sdk-message-envelope.ts';
 import { isSdkMessageEnvelope } from './is-sdk-message-envelope.ts';
 

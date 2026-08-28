@@ -11,7 +11,7 @@ import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
 import type { GraphSnapshotDocument } from '../graph-snapshot/graph-snapshot-document.ts';
 import { isStringArray } from '../workflow-graph/is-string-array.ts';
 import { appSettingTable, APP_SETTING_ROW_ID } from '../app-setting/app-setting.ts';
-import { insertEngineEventRow } from '../run-event/insert-engine-event-row.ts';
+import { insertEngineEventRow } from '../run-event/event-record/insert-engine-event-row.ts';
 import { workflowRunTable } from './workflow-run.ts';
 import { canTransitionRunStatus } from './can-transition-run-status.ts';
 import { isRunStatus } from './is-run-status.ts';
@@ -344,7 +344,7 @@ export function createWorkflowRunRepository(
       // A `run_started` esemény írása, ugyanabban a tranzakcióban, mint a
       // fenti futás sor (SPEC-003 6.6 szekció, T-003-21 zárja le a T-003-16
       // "NYITOTT PONT" kommentjét). Az `insertEngineEventRow`
-      // (`run-event/insert-engine-event-row.ts`) PLAIN, tranzakció nélküli
+      // (`run-event/event-record/insert-engine-event-row.ts`) PLAIN, tranzakció nélküli
       // segédfüggvény - nem nyit saját `database.transaction()`-t, ezért itt,
       // a `startRun` saját tranzakciós kontextusában közvetlenül hívható,
       // beágyazott tranzakció nélkül. Ugyanezt a függvényt használja a

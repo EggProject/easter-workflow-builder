@@ -4,13 +4,13 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { isOkOutcome } from '@easter-workflow-builder/core';
-import { migrateDatabase } from '../migration/migrate-database.ts';
-import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
-import { graphSnapshotTable } from '../graph-snapshot/graph-snapshot.ts';
-import { computeSnapshotHash } from '../graph-snapshot/compute-snapshot-hash.ts';
-import { workflowRunTable } from '../workflow-run/workflow-run.ts';
-import { stepRunTable } from '../step-run/step-run.ts';
+import { migrateDatabase } from '../../migration/migrate-database.ts';
+import { MIGRATIONS_FOLDER } from '../../migration/migrations-folder.ts';
+import { workflowTable } from '../../workflow-graph/workflow.ts';
+import { graphSnapshotTable } from '../../graph-snapshot/graph-snapshot.ts';
+import { computeSnapshotHash } from '../../graph-snapshot/compute-snapshot-hash.ts';
+import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
+import { stepRunTable } from '../../step-run/step-run.ts';
 import { runEventTable } from './run-event.ts';
 import { insertEngineEventRow } from './insert-engine-event-row.ts';
 

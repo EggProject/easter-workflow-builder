@@ -4,7 +4,7 @@ import type { WorkflowRunRepository } from '../workflow-run/workflow-run-reposit
 import type { StepRunRepository } from '../step-run/step-run-repository.ts';
 import type { AppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import type { ProviderConcurrencyRepository } from '../provider-concurrency/provider-concurrency-repository.ts';
-import type { RunEventRepository } from '../run-event/run-event-repository.ts';
+import type { RunEventRepository } from '../run-event/event-record/run-event-repository.ts';
 import type { HumanApprovalRepository } from '../human-approval/human-approval-repository.ts';
 import type { RunRecovery } from '../run-recovery/run-recovery.ts';
 

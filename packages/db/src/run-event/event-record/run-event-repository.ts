@@ -3,10 +3,10 @@ import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { runEventTable } from './run-event.ts';
-import { isRunEventKind } from './is-run-event-kind.ts';
-import type { RunEventKind } from './run-event-kind.ts';
-import { normalizeSdkMessage } from './normalize-sdk-message.ts';
-import type { NormalizedSdkMessage } from './normalize-sdk-message.ts';
+import { isRunEventKind } from '../event-kind/is-run-event-kind.ts';
+import type { RunEventKind } from '../event-kind/run-event-kind.ts';
+import { normalizeSdkMessage } from '../sdk-message/normalize-sdk-message.ts';
+import type { NormalizedSdkMessage } from '../sdk-message/normalize-sdk-message.ts';
 import { insertEngineEventRow } from './insert-engine-event-row.ts';
 import { extractErrorCause } from './extract-error-cause.ts';
 

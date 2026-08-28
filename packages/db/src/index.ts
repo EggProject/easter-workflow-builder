@@ -66,9 +66,9 @@ export type {
   AppendEngineEventInput,
   RunEventRecord,
   RunEventTokenAggregate,
-} from './run-event/run-event-repository.ts';
-export type { RunEventKind } from './run-event/run-event-kind.ts';
-export { isRunEventKind } from './run-event/is-run-event-kind.ts';
+} from './run-event/event-record/run-event-repository.ts';
+export type { RunEventKind } from './run-event/event-kind/run-event-kind.ts';
+export { isRunEventKind } from './run-event/event-kind/is-run-event-kind.ts';
 
 // app-setting: az AppSettingRepository publikus felülete (T-003-23). A
 // factory függvényt (`createAppSettingRepository`) szándékosan nem

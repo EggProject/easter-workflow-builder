@@ -471,6 +471,10 @@ miatt ehhez **kilencedikként a `bun run check:db-drift`** is minden fázis vég
 | F5    | A 4.4 két külön eldöntendő javaslata, **csak ha a user jóváhagyta**: `barrel-exports.spec.ts` saját mappába, `isStringArray` a `typeguards` csomagba            | F4, user | 3            | `sonnet` | ugyanaz, plusz a `typeguards` barrel és `CLAUDE.md` bővült, és a `db` három importja csomagnév szerintire váltott   |
 | F6    | Zárás: `packages/db/CLAUDE.md` `## Fájlok` táblájának végső átolvasása, a terv és a valóság összevetése fájlonként                                              | F5       | 0            | `opus`   | mind a 107 `db` fájl elszámolt, egyetlen fájl sem maradt leképezés nélkül, mind a kilenc kapu zöld                  |
 
+**Végrehajtás állapota.** F1: kész (a SPEC-002, a SPEC-003 és a `.claude/CLAUDE.md` átvezetve).
+F2: kész (`run-event/` -> `event-record/`, `event-kind/`, `sdk-message/`, 15 fájl, mind a
+kilenc kapu zöld, 912 teszt, 100% lefedettség).
+
 **Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha
 egy lépés hibás. A SPEC-002 átvezetése azért előzi meg a mozgatást, mert a spec a szerződés:

@@ -20,7 +20,7 @@ import {
   type WorkflowRunRecord,
   type WorkflowRunRepository,
 } from '../workflow-run/workflow-run-repository.ts';
-import { createRunEventRepository, type RunEventRepository } from '../run-event/run-event-repository.ts';
+import { createRunEventRepository, type RunEventRepository } from '../run-event/event-record/run-event-repository.ts';
 import { createAppSettingRepository, type AppSettingRepository } from '../app-setting/app-setting-repository.ts';
 import {
   createWorkflowRepository,
