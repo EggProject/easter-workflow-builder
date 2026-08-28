@@ -11,7 +11,7 @@ import type { EngineHookId } from './engine-hook-id.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
 import type { StorableMcpServer } from './storable-mcp-server.ts';
-import { isStringArray } from './is-string-array.ts';
+import { isStringArray } from '../node-config/is-string-array.ts';
 
 // A zárt értékkészletek kulcsonként. A `Record<Unió, true>` annotáció miatt a
 // fordító hibát ad, ha az unió bővül, de a lista nem.

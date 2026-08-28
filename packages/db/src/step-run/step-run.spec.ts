@@ -7,7 +7,7 @@ import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
+import { workflowTable } from '../workflow-graph/workflow/workflow.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import { stepRunTable } from './step-run.ts';
 

@@ -1,8 +1,8 @@
 import { isBoolean, isInt, isRecord, isString } from '@easter-workflow-builder/typeguards';
 import type { BranchOption, NodeConfig, StartInputField } from './node-config.ts';
 import type { ScriptConfig } from './script-config.ts';
-import { isAgentStepConfig } from './is-agent-step-config.ts';
-import { isNodeType } from './is-node-type.ts';
+import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
+import { isNodeType } from '../node-type/is-node-type.ts';
 import { isStringArray } from './is-string-array.ts';
 
 type UnknownRecord = Readonly<Record<string, unknown>>;

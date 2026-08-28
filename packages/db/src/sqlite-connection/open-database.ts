@@ -5,7 +5,7 @@ import { describeTransactionError } from './describe-transaction-error.ts';
 import { ensureDatabaseDirectory } from '../database-file/ensure-database-directory.ts';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
-import { createWorkflowRepository } from '../workflow-graph/workflow-repository.ts';
+import { createWorkflowRepository } from '../workflow-graph/workflow/workflow-repository.ts';
 import { createWorkflowRunRepository } from '../workflow-run/workflow-run-repository.ts';
 import { createStepRunRepository } from '../step-run/step-run-repository.ts';
 import { createAppSettingRepository } from '../app-setting/app-setting-repository.ts';

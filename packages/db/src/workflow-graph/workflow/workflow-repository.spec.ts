@@ -4,27 +4,30 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
-import { describeTransactionError } from '../sqlite-connection/describe-transaction-error.ts';
-import { migrateDatabase } from '../migration/migrate-database.ts';
-import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
+import { describeTransactionError } from '../../sqlite-connection/describe-transaction-error.ts';
+import { migrateDatabase } from '../../migration/migrate-database.ts';
+import { MIGRATIONS_FOLDER } from '../../migration/migrations-folder.ts';
 import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
-import type { NodeConfig } from './node-config.ts';
-import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
+import type { NodeConfig } from '../node-config/node-config.ts';
+import { graphSnapshotTable } from '../../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import {
   GRAPH_DOCUMENT_VERSION,
   type GraphSnapshotDocument,
-} from '../graph-snapshot/snapshot-document/graph-snapshot-document.ts';
-import { workflowRunTable } from '../workflow-run/workflow-run.ts';
+} from '../../graph-snapshot/snapshot-document/graph-snapshot-document.ts';
+import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
 import {
   createWorkflowRunRepository,
   type StartRunInput,
   type WorkflowRunRecord,
   type WorkflowRunRepository,
-} from '../workflow-run/workflow-run-repository.ts';
-import { createRunEventRepository, type RunEventRepository } from '../run-event/event-record/run-event-repository.ts';
-import { createAppSettingRepository, type AppSettingRepository } from '../app-setting/app-setting-repository.ts';
+} from '../../workflow-run/workflow-run-repository.ts';
+import {
+  createRunEventRepository,
+  type RunEventRepository,
+} from '../../run-event/event-record/run-event-repository.ts';
+import { createAppSettingRepository, type AppSettingRepository } from '../../app-setting/app-setting-repository.ts';
 import {
   createWorkflowRepository,
   type WorkflowEdgeInput,

@@ -3,8 +3,8 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm';
 import { getTableConfig, type ForeignKey } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
-import { migrateDatabase } from '../migration/migrate-database.ts';
-import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
+import { migrateDatabase } from '../../migration/migrate-database.ts';
+import { MIGRATIONS_FOLDER } from '../../migration/migrations-folder.ts';
 import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';

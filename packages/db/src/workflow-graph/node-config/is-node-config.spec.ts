@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a node config nullázható mezői a tárolt JSON-ban `null` értéket hordoznak (SPEC-003 4.3); az `undefined` nem éli túl a JSON oszlopot, tehát a `null` itt adat, nem helyőrző */
 import { describe, expect, it } from 'vitest';
-import type { AgentStepConfig } from './agent-step-config.ts';
+import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import type { NodeConfig } from './node-config.ts';
 import { isNodeConfig } from './is-node-config.ts';
 

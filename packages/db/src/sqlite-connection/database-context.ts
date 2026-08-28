@@ -1,5 +1,5 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { WorkflowRepository } from '../workflow-graph/workflow-repository.ts';
+import type { WorkflowRepository } from '../workflow-graph/workflow/workflow-repository.ts';
 import type { WorkflowRunRepository } from '../workflow-run/workflow-run-repository.ts';
 import type { StepRunRepository } from '../step-run/step-run-repository.ts';
 import type { AppSettingRepository } from '../app-setting/app-setting-repository.ts';

@@ -6,7 +6,7 @@ import { describeError, type Outcome } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
 import { migrateDatabase } from '../migration/migrate-database.ts';
 import { MIGRATIONS_FOLDER } from '../migration/migrations-folder.ts';
-import { workflowTable } from '../workflow-graph/workflow.ts';
+import { workflowTable } from '../workflow-graph/workflow/workflow.ts';
 import { graphSnapshotTable } from '../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-snapshot-hash.ts';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
