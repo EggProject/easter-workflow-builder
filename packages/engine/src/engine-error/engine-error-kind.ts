@@ -70,4 +70,6 @@ export type EngineErrorKind =
   // 15. O-1: a kifejezés port hiánya
   | 'expression_evaluator_unavailable'
   // PLAN-005 T-005-14: a `provider-environment` téma, hiányzó kötelező env változó
-  | 'missing_provider_env';
+  | 'missing_provider_env'
+  // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása
+  | 'unknown_concurrency_slot';

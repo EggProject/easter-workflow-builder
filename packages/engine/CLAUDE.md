@@ -13,10 +13,10 @@ ellenőrzéseivel (T-005-10), az ág hatókör verem a kiegyensúlyozottság ell
 háromszintű provider feloldás (T-005-12), a leírótól függő viselkedések (T-005-13), a
 kötelező/tiltott env változók feldolgozása (T-005-14), a futás indítási validációja, ami az előző
 hatot egyetlen `validateRun` menetbe fogja (T-005-15), és a futás kontextus összeállítása a
-`steps` hivatkozás feloldásával (T-005-16). Az **F4 fázis első lépése** ehhez hozzátette a DAG
-ütemező állapotgépét (`scheduling`, T-005-17), tehát ma tizenegy téma áll készen. A párhuzamossági
-szabályozó, a node végrehajtók és a spec 12. szekciójában felsorolt további téma mappák a PLAN-005
-hátralévő fázisaiban készülnek.
+`steps` hivatkozás feloldásával (T-005-16). Az **F4 fázis** ehhez hozzátette a DAG ütemező
+állapotgépét (`scheduling`, T-005-17) és a párhuzamossági szabályozót (`concurrency-gate`,
+T-005-18), tehát ma tizenkét téma áll készen. A node végrehajtók és a spec 12. szekciójában
+felsorolt további téma mappák a PLAN-005 hátralévő fázisaiban készülnek.
 
 ## Fájlok
 
@@ -33,6 +33,7 @@ hátralévő fázisaiban készülnek.
 | `run-context/`          | a `RunContext` összeállítása (`buildRunContext`) és a `steps` hivatkozás feloldása ős példányokra, a SPEC-004 6.1 és 6.2 szekciója szerint (PLAN-005 T-005-16). A feloldás két segéddel dolgozik: a `collectAncestorNodeIds` a gráfbeli ős halmazt adja a bejövő él térképen visszafelé haladva, a `findVisibleStepInstance` az ág kontextus előtag feltételt és a legbelső példány kiválasztását. Az egyetlen node hivatkozást feloldó, `unresolvable_step_reference` hibát adó `resolveStepReference` külön exportált függvény, mert azt a `sub_workflow` `inputMapping` feloldása hívja majd (5.9 2. pont, T-005-23). Tiszta függvények, adatbázis nélkül. A `run-context.ts`, a `step-instance-ref.ts` és az `executed-step-instance.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                     |
 | `provider-environment/` | a SPEC-004 11.3 táblázat 10. és 11. sora: a `buildProviderEnvironmentBlock` a lépés kimenő `Options.env` blokkját állítja össze a `requiredEnv[]` és a `disallowedEnv[]` leíró mezőből, a `processEnvironment` porton át (PLAN-005 T-005-14). A `resolveRequiredEnvironmentValue` egyetlen `requiredEnv` bejegyzést old fel: `literal` forrásnál a leíró `literalValue` mezőjét, `process_env_passthrough` forrásnál a port olvasott értékét adja, hiányzó változóra `missing_provider_env` hibával, kizárólag a névvel. A `disallowedEnv[]` neve a feloldás **előtt** kizár, hogy egy tiltott, de hiányzó változó se okozzon hibát. Tiszta függvény, adatbázis és esemény nélkül: sem üzenetben, sem eseményben nem ad vissza env **értéket**, csak nevet (17. szekció 33. és 64. kritérium)                                                                                                                                                                                                     |
 | `scheduling/`           | a DAG ütemező tiszta, memóriában élő állapotgépe (SPEC-004 4.4, 4.5, 4.6, 7.1, PLAN-005 T-005-17). A `SchedulerState` hét nyilvántartása fogja össze az élenkénti `live` és `dead` jelöléseket, a `fan_out` kibontásokat, a `loop` lefutásszámokat, az érkezési sorban álló és a futó példányokat. Az egyetlen léptető az `advanceScheduler`, ami három esemény fajtát ismer (`node_completed`, `fan_out_expanded`, `loop_advanced`); a bootstrap az `enqueueStartInstance`, a sor ürítése a `takeNextReadyInstance`, a terminális állapot az `isRunTerminal`. A négy olvasó (`resolveInstanceReadiness`, `resolveLoopIteration`, `resolveFanOutItem`, `collectJoinInputs`) a végrehajtó rétegnek ad választ. Adatbázist nem érint, portot nem hív: a determinizmus a hívások sorrendjéből jön, nem az órából. A hét típusfájl (`edge-mark`, `instance-readiness`, `fan-out-expansion`, `ready-instance`, `run-topology`, `scheduler-state`, `scheduling-event`) **típus-only, nincs `.spec.ts`** |
+| `concurrency-gate/`     | a providerenkénti, minden futásra közös, szigorúan érkezési sorrendű párhuzamossági szabályozó (SPEC-004 7.1 ... 7.3, PLAN-005 T-005-18). A `createConcurrencyGate` egyetlen paramétere a `ConcurrencyLimitLookup`, tehát a téma egyetlen sora sem érint adatbázist, és nincs benne párhuzamossági szám. A hely kérése (`requestSlot`) és felszabadítása (`releaseSlot`) a felület, plusz két számláló olvasó a diagnosztikának. A `concurrency-gate.ts` és a `concurrency-limit-lookup.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## Függőségi irány
 
@@ -251,6 +252,38 @@ meg). A `RunContext.item` mező értéke ezzel szemben az ütemező `fanOutItems
 és nem azonosító, hanem kizárólag a futtathatóvá válások **sorrendje**, ami magukból a hívásokból
 adódik. Ezért a `SchedulerState` belső számlálója adja, nem a `clock` vagy az `idGenerator` port; a 36. elfogadási kritérium ("nincs `Date.now()`, `Math.random()` a motorban") így is teljesül, és a
 determinizmus a 14.2 szekció értelmében megmarad.
+
+**A `concurrency-gate` téma négy tervezési döntése.** A SPEC-004 7. szekciója a szabályozó
+viselkedését írja le, a felületét nem, ezért a négy döntés indoklása itt áll:
+
+- **A kiosztás szinkron visszahívás, nem `Promise`.** A `requestSlot` az `onGranted` függvényt vagy
+  azonnal, még a saját visszatérése előtt hívja meg, vagy később, egy `releaseSlot` hívás
+  belsejéből, szintén szinkron módon. Így a téma tesztje egyetlen időzítőt, mikrotask ürítést és
+  valós időt sem használ, tehát a 14.2 szekció determinizmus követelménye a felület alakjából
+  következik, nem a teszt fegyelméből. A hívó oldalán ez egyetlen sor áthidalás egy `await`
+  pontig, és a `Promise` az `agent-step` réteg fogalma marad. Egy `Promise<void>` alakú felület
+  ugyanezt csak mikrotask ürítéssel engedné megfigyelni, ami törékenyebb és az ütemezésre bízná a
+  sorrendet.
+- **A korlát lekérdezés függvény, nem a létrehozáskor átvett térkép.** A SPEC-003 11. szekciója
+  szerint a beállított érték "azonnal érvénybe lép", a motor viszont egyetlen `createEngine`
+  híváskor jön létre: egy befagyasztott térkép a korlát változását szerverújraindításig
+  visszatartaná. Ebből következik, hogy a szabályozó minden döntés előtt újra kérdez, tehát egy
+  futás közben **csökkentett** korlát mellett a felszabaduló hely nem feltétlenül megy tovább;
+  erre külön teszteset áll. A lekérdezés **nem tizedik port** (a lista zárt, SPEC-004 3.2), hanem a
+  `createConcurrencyGate` paramétere, amit a hívó a már meglévő `database` portból állít elő.
+- **Ismeretlen azonosító felszabadítása hibaág (`unknown_concurrency_slot`), nem csendes
+  visszatérés.** A kétszeres felszabadítás pontosan így néz ki, és az következménye az lenne, hogy
+  a szabályozó a korlát fölé enged egy lépést, csendben. A hívási minta (`requestSlot`, majd
+  minden ágon egyszeri `releaseSlot`) mellett ez a hibaág valódi programhibát jelez, nem szokásos
+  útvonalat. Ami **nem** hiba: a még sorban álló, helyet nem kapott kérés felszabadítása, mert az a
+  megszakítás útja (9. szekció 2. pont, "a sorban álló lépései kiesnek"); ilyenkor a bejegyzés
+  kiesik a sorból, és a visszahívása soha nem fut le.
+- **Állapotot tartó lezárás, nem tiszta reducer, mint a `scheduling` témában.** Az ütemező
+  állapotát egyetlen futás léptetése birtokolja, a szabályozó viszont **minden futás által osztott
+  egyetlen objektum**, és a felszabaduló helyet egy másik futás várakozójának kell átadnia; ehhez
+  értesítés kell, amit tiszta függvény nem tud kiadni. A közös sort a `Map` beszúrási sorrendje
+  adja, ezért itt nincs külön érkezési sorszám mező: a kiszolgálás providerenként a legrégebbi
+  várakozót viszi, tehát egy telített provider soha nem tartja fel a szabadat.
 
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).
