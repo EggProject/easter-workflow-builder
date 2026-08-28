@@ -151,10 +151,12 @@ SPEC-002 4.).
 **Mappaszerkezet.**
 
 - A csoportosítás alapja a **téma**, a domain fogalom, nem a fájlok száma és nem technikai réteg.
-- A `src/` alatt alapesetben egy szint mély (`src/<téma>/`), és kétszintű ott, ahol a csomag több
-  tárgykört fog össze (`src/<tárgykör>/<téma>/`). Ilyen ma pontosan kettő van: a `core` és a
-  `provider-capability`. **Harmadik szint tilos.** (A `db` csomag harmadikként való felvétele
-  nyitott, lásd a 13. szekció 4. pontja.)
+- A `src/` alatt alapesetben egy szint mély (`src/<téma>/`), és kétszintű két okból lehet
+  (`src/<tárgykör>/<téma>/`): a csomag több tárgykört fog össze, vagy egy tárgykörön belül
+  egyetlen téma mappa maga több, önállóan megnevezhető fogalmat hordoz. Ilyen ma pontosan három
+  van: a `core` és a `provider-capability` (első ok), valamint a `db`, ahol a `workflow-graph`,
+  a `graph-snapshot` és a `run-event` téma mappa vált tárgykör mappává (második ok, PLAN-004).
+  **Harmadik szint tilos.**
 - Az `index.ts` barrelen kívül egyetlen fájl sem állhat közvetlenül a `src/` alatt. Téma mappán
   belül nincs `index.ts`.
 - Ha egy tárgykörnek egyetlen témája van és a nevük megegyezik, a mappaszint nem duplázódik
@@ -555,14 +557,6 @@ ténylegesen megírt `tooling/scripts/claude-md.sh` kizárólag a fájl létezé
 táblázat naprakészsége code review kérdése, gépi kikényszerítés nincs rá. Mi zárná le: user döntés,
 hogy megéri-e megírni a tartalmi ellenőrzést, vagy a SPEC-001 14. ígéretét kell a tényleges,
 csak-létezést-néző hatókörre pontosítani.
-
-**4. A `db` csomag mint harmadik kétszintű csomag.** A gyökér `CLAUDE.md` és e szabálykönyv 6.
-szekciója szerint kétszintű csomagból "ma pontosan kettő van: a `core` és a `provider-capability`".
-A PLAN-004 (3. és a hivatkozott szekciói) a `packages/db` csomagot harmadik kétszintű csomagként
-javasolja felvenni, a SPEC-002 6.1/6.5/10. kritérium és a gyökér `CLAUDE.md` egy mondatos
-átvezetésével együtt. Mi a viselkedés addig: a PLAN-004 még nincs végrehajtva, tehát a jelenlegi,
-"pontosan kettő" állapot marad érvényes. Mi zárná le: a PLAN-004 végrehajtása vagy elvetése user
-döntéssel.
 
 ---
 
