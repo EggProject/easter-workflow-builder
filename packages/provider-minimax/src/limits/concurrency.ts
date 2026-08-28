@@ -20,4 +20,12 @@ export const minimaxConcurrency: ConcurrencyCapability = {
     value: 4,
     evidence: [{ kind: 'measurement', id: 'M-31' }],
   },
+  measuredMaxConcurrentSteps: {
+    state: 'known',
+    value: 20,
+    evidence: [
+      { kind: 'measurement', id: 'M-39' },
+      { kind: 'research', section: '2026-08-28-parhuzamossagi-korlat.md 2.2 szekció' },
+    ],
+  },
 };

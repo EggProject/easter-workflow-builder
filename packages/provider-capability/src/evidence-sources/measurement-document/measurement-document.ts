@@ -9,6 +9,7 @@ export interface MeasurementDocumentAnchor {
 }
 
 const MEASUREMENT_JOURNAL = 'docs/research/2026-08-26-spec000-meresi-jegyzokonyv.md';
+const CONCURRENCY_MEASUREMENT = 'docs/research/2026-08-28-parhuzamossagi-korlat.md';
 
 /**
  * `MeasurementId` -> docs horgony leképezés. Csak a leírókban ténylegesen
@@ -77,4 +78,5 @@ export const measurementDocument: Readonly<Partial<Record<MeasurementId, Measure
     file: MEASUREMENT_JOURNAL,
     heading: 'M-36 Rate limit header leltár (M-26 - M-35 kör, passzív)',
   },
+  'M-39': { file: CONCURRENCY_MEASUREMENT, heading: '2.2 Konkurrencia ramp (M-39)' },
 };
