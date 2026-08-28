@@ -68,6 +68,11 @@ export type {
   SnapshotNode,
   SnapshotEdge,
 } from './graph-snapshot/snapshot-document/graph-snapshot-document.ts';
+// A ma írt dokumentumok verziószáma (SPEC-003 16. kritérium): a pillanatkép
+// dokumentumot az `engine` csomag `run-supervisor` témája állítja össze a
+// futás indításakor (SPEC-004 4.8 5. lépés), tehát a `version` mezőt nem
+// beégetett számként, hanem ebből a konstansból tölti.
+export { GRAPH_DOCUMENT_VERSION } from './graph-snapshot/snapshot-document/graph-snapshot-document.ts';
 
 // workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
 // factory függvényt (`createWorkflowRunRepository`) szándékosan nem

@@ -130,7 +130,6 @@ function inputOf(runId: string, handlerCase: HandlerCase): ExecuteErrorHandlerIn
     config,
     failedErrorKind: 'provider_call_failed',
     failedAttempt: handlerCase.failedAttempt ?? 1,
-    retryStepRunInput: retryInput(runId),
   };
 }
 
@@ -152,7 +151,7 @@ function cancelRunningStep(database: DatabaseContext, runId: string): void {
 }
 
 describe('executeErrorHandler', () => {
-  it('üres handledErrorKinds mindent kezel: új step_run sor attempt + 1 értékkel, az eredeti failed marad', async () => {
+  it('üres handledErrorKinds mindent kezel: a következő kísérlet sorszáma attempt + 1, az eredeti sor failed marad', async () => {
     const database = openMemoryDatabase();
     const { runId } = seedRun(database);
     const failedStepRunId = seedFailedStepRun(database, runId);
@@ -164,10 +163,11 @@ describe('executeErrorHandler', () => {
     );
 
     expect(outcome.kind).toBe('retry_scheduled');
-    expect(outcome.kind === 'retry_scheduled' ? outcome.retryStepRun.attempt : -1).toBe(2);
-    expect(outcome.kind === 'retry_scheduled' ? outcome.retryStepRun.nodeId : '').toBe('agent');
-    expect(outcome.kind === 'retry_scheduled' ? outcome.retryStepRun.status : '').toBe('pending');
+    expect(outcome.kind === 'retry_scheduled' ? outcome.nextAttempt : -1).toBe(2);
     expect(outcome.kind === 'retry_scheduled' ? outcome.stepRun.status : '').toBe('succeeded');
+    // A megismételt lépés sorát NEM ez a végrehajtó írja (T-005-25): a
+    // futásban csak a hibát adó lépés eredeti sora és a kezelő saját sora áll.
+    expect(okOrThrow(database.stepRuns.listStepRuns(runId))).toHaveLength(2);
     expect(okOrThrow(database.stepRuns.getStepRun(failedStepRunId)).status).toBe('failed');
   });
 
@@ -243,20 +243,6 @@ describe('executeErrorHandler', () => {
       inputOf('nincs-ilyen-futas', { maxAttempts: 3, backoffMs: [100, 200] }),
       ports,
     );
-
-    expect(outcome.kind).toBe('error');
-  });
-
-  it('az új kísérlet sorának létrehozási hibáját továbbadja', async () => {
-    const database = openMemoryDatabase();
-    const { runId } = seedRun(database);
-    const ports = portsOf(database, [], fakeClock([]));
-    const input: ExecuteErrorHandlerInput = {
-      ...inputOf(runId, { maxAttempts: 3, backoffMs: [100, 200] }),
-      retryStepRunInput: { ...retryInput(runId), runId: 'nincs-ilyen-futas' },
-    };
-
-    const outcome = await executeErrorHandler(input, ports);
 
     expect(outcome.kind).toBe('error');
   });

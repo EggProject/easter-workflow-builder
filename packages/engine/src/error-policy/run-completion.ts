@@ -19,9 +19,27 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
  * mindig 1, mert a futás az első kezeletlen hibánál leáll; `fail_branch`
  * mellett annyi, ahány ág elhalt.
  */
-export interface RunCompletion {
-  readonly status: Extract<RunStatus, 'succeeded' | 'failed'>;
-  readonly errorKind: EngineErrorKind | null;
-  readonly errorMessage: string | null;
-  readonly failedBranchCount: number;
-}
+/**
+ * **Miért diszkriminált unió, és nem négy, egymástól független mező.** A
+ * `status` és a két hiba mező kitöltöttsége együtt mozog: `succeeded`
+ * állapotban mindkettő `null`, `failed` állapotban mindkettő kitöltött. Egy
+ * lapos alakban a hívónak (`run-supervisor`, T-005-25) a `markRunFailed(runId,
+ * errorKind: string, errorMessage: string)` hívás előtt egy `?? ''` jellegű
+ * szűkítést kellene írnia, aminek az egyik ága sosem futna le - a 100
+ * százalékos, kizárás nélküli lefedettségi küszöb mellett pontosan az a fajta
+ * ág, amit tilos bevezetni (`.claude/CLAUDE.md` 5. szekció). Az unió a
+ * szűkítést a `status` mezőre bízza, tehát a hívónak nem keletkezik holt ága.
+ */
+export type RunCompletion =
+  | {
+      readonly status: Extract<RunStatus, 'succeeded'>;
+      readonly errorKind: null;
+      readonly errorMessage: null;
+      readonly failedBranchCount: number;
+    }
+  | {
+      readonly status: Extract<RunStatus, 'failed'>;
+      readonly errorKind: EngineErrorKind;
+      readonly errorMessage: string;
+      readonly failedBranchCount: number;
+    };

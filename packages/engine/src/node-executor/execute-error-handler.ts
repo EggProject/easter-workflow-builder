@@ -1,4 +1,4 @@
-import type { CreateStepRunInput, ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
+import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
@@ -28,25 +28,20 @@ import type { NodeExecutorPorts } from './node-executor-ports.ts';
  * - `failedAttempt`: az az `attempt` sorszám, amin a lépés elbukott. Ebből
  *   jön a kísérletszám ellenőrzés és a `backoffMs[attempt - 1]` index (8.2 2.
  *   és 3. pont).
- * - `retryStepRunInput`: a hibát adó lépés `CreateStepRunInput`-ja
- *   **változatlanul**, ahogy az eredeti kísérletnél is ment. A végrehajtó
- *   ebből építi az új kísérlet sorát, az `attempt` mezőt `nextAttempt`-re
- *   felülírva; minden más mező (`nodeId`, `nodeType`, `parentStepRunId`,
- *   `iteration`, `providerId`, `modelId`, `sessionMode`,
- *   `structuredOutputStrategy`) azonos marad, ahogy a 8.2 4. pontja előírja
- *   ("azonos `node_id`, `parent_step_run_id` és ág kontextus mellett").
- *   **Miért a kész bemenet és nem a `StepRunRecord`**: a `StepRunRecord`
- *   `nodeType`, `sessionMode` és `structuredOutputStrategy` mezője `string`
- *   típusú (a tárolt alak), a `CreateStepRunInput` viszont szűkített uniót
- *   vár; a visszaalakítás három typeguardot és három olyan hibaágat
- *   igényelne, ami a repository felületén át sosem fordulhat elő.
+ *
+ * **A megismételt lépés `step_run` sorát ez a végrehajtó NEM hozza létre**
+ * (T-005-25 lezárta a T-005-24 óta nyitva állt szerkezeti kérdést): a
+ * `retry_scheduled` kimenet csak a `nextAttempt` sorszámot adja vissza, a
+ * sort a `run-supervisor` írja, amikor a megismételt példányt a szokásos
+ * `executeNode` úton futtatja. Enélkül két sor keletkezne ugyanarra a
+ * kísérletre: egy itt, egy a `beginStepRun` közös nyitó menetében. Lásd a
+ * `node-executor-outcome.ts` `retry_scheduled` ágának doksiját.
  */
 export interface ExecuteErrorHandlerInput {
   readonly instance: NodeExecutionInstance;
   readonly config: ErrorHandlerNodeConfig;
   readonly failedErrorKind: EngineErrorKind;
   readonly failedAttempt: number;
-  readonly retryStepRunInput: CreateStepRunInput;
 }
 
 interface HandlerFailure {
@@ -105,11 +100,12 @@ function describeHandlerFailure(
  * 2 ... 3. A döntés a `error-policy` téma tiszta függvényéből
  *    (`resolveRetryDecision`): `handledErrorKinds` szűrés, majd a
  *    kísérletszám, majd a `backoffMs` elem kiolvasása.
- * 4. **Várakozás a `clock` porton**, `backoffMs[attempt - 1]` ideig, majd az
- *    új kísérlet `step_run` sora `attempt + 1` értékkel. Az **eredeti sor
- *    `failed` állapotban marad**, ezt a végrehajtó nem írja át (8.1
- *    zárómondata). A kezelő saját lépése `succeeded` állapotban zár, mert a
- *    feladatát elvégezte: ütemezett egy újabb kísérletet.
+ * 4. **Várakozás a `clock` porton**, `backoffMs[attempt - 1]` ideig, majd a
+ *    `nextAttempt` sorszám visszaadása; az új kísérlet `step_run` sorát a
+ *    hívó írja, amikor a megismételt példányt futtatja (lásd fent). Az
+ *    **eredeti sor `failed` állapotban marad**, ezt a végrehajtó nem írja át
+ *    (8.1 zárómondata). A kezelő saját lépése `succeeded` állapotban zár,
+ *    mert a feladatát elvégezte: ütemezett egy újabb kísérletet.
  * 5. A vezérlés a **megismételt node** saját kimenő élein megy tovább, nem az
  *    `error_handler` élein; a kezelő kimenő élei kizárólag az `exhausted`
  *    ágat szolgálják. Ezt a `NodeExecutionOutcome` két új ága
@@ -163,21 +159,16 @@ export async function executeErrorHandler(
   if (decision.kind === 'retry') {
     await ports.clock.sleep(decision.backoffMs, new AbortController().signal);
 
-    const created = ports.database.stepRuns.createStepRun({
-      ...input.retryStepRunInput,
-      attempt: decision.nextAttempt,
-    });
-    if (created.kind === 'error') {
-      return created;
-    }
-
     /* eslint-disable-next-line unicorn/no-null -- az `error_handler` node kimenete szándékosan `null`, ugyanazzal az indokkal, mint a `branch` és a `loop` node-nál: vezérlést hordoz, adatot nem */
     const finished = finishStepRunSucceeded({ runId, stepRunId, startedAtMs, output: null }, ports);
     if (finished.kind === 'error') {
       return finished;
     }
 
-    return { kind: 'ok', value: { kind: 'retry_scheduled', stepRun: finished.value, retryStepRun: created.value } };
+    return {
+      kind: 'ok',
+      value: { kind: 'retry_scheduled', stepRun: finished.value, nextAttempt: decision.nextAttempt },
+    };
   }
 
   const failure = describeHandlerFailure(decision, input);

@@ -97,7 +97,6 @@ export function executeNode(
         config: request.config,
         failedErrorKind: request.failedErrorKind,
         failedAttempt: request.failedAttempt,
-        retryStepRunInput: request.retryStepRunInput,
       },
       ports,
     );

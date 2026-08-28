@@ -50,6 +50,7 @@ const allEngineErrorKinds: readonly EngineErrorKind[] = [
   'expression_evaluator_unavailable',
   'missing_provider_env',
   'unknown_concurrency_slot',
+  'run_execution_failed',
 ];
 
 describe('formatEngineErrorMessage', () => {

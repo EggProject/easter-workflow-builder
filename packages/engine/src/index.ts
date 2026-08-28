@@ -159,6 +159,7 @@ export { createSchedulerState } from './scheduling/create-scheduler-state.ts';
 export { enqueueStartInstance } from './scheduling/enqueue-start-instance.ts';
 export { advanceScheduler } from './scheduling/advance-scheduler.ts';
 export { resolveInstanceReadiness } from './scheduling/resolve-instance-readiness.ts';
+export { enqueueReadyInstance } from './scheduling/enqueue-ready-instance.ts';
 export { takeNextReadyInstance } from './scheduling/take-next-ready-instance.ts';
 export { isRunTerminal } from './scheduling/is-run-terminal.ts';
 export { resolveLoopIteration } from './scheduling/resolve-loop-iteration.ts';
@@ -292,3 +293,32 @@ export { resolveRetryDecision } from './error-policy/resolve-retry-decision.ts';
 export type { UnhandledErrorRecord } from './error-policy/unhandled-error-record.ts';
 export type { RunCompletion } from './error-policy/run-completion.ts';
 export { resolveRunCompletion } from './error-policy/resolve-run-completion.ts';
+
+// run-supervisor: a futás életciklusa (SPEC-004 4.8, 4.4 ... 4.6, 8.4,
+// PLAN-005 T-005-25). A `createRunSupervisor` az egyetlen belépési pont: a
+// 4.8 menetét futtatja, háttérben lépteti a futást a terminális állapotig, és
+// ÖNMAGÁT adja át `ChildWorkflowRunner`-ként a `sub_workflow` végrehajtónak.
+// A 4.8 egyes lépései külön, önmagukban tesztelhető függvények, ezért a
+// barrelben is szerepelnek.
+export type {
+  StartRunRequest,
+  StartedRun,
+  RunSupervisor,
+  RunSupervisorDependencies,
+} from './run-supervisor/run-supervisor.ts';
+export type { NodePlan, PendingFailure, RunExecution } from './run-supervisor/run-execution.ts';
+export type { ActiveRunHandle, ActiveRunRegistry } from './run-supervisor/active-run-registry.ts';
+export { createActiveRunRegistry } from './run-supervisor/active-run-registry.ts';
+export type { BuildSnapshotDocumentInput } from './run-supervisor/build-snapshot-document.ts';
+export { buildSnapshotDocument } from './run-supervisor/build-snapshot-document.ts';
+export { buildNodePlans } from './run-supervisor/build-node-plans.ts';
+export { validateRunInput } from './run-supervisor/validate-run-input.ts';
+export { validateProviderCapabilities } from './run-supervisor/validate-provider-capabilities.ts';
+export type { RunInputs } from './run-supervisor/collect-run-inputs.ts';
+export { collectRunInputs } from './run-supervisor/collect-run-inputs.ts';
+export type { PrepareRunInput } from './run-supervisor/prepare-run.ts';
+export { prepareRun } from './run-supervisor/prepare-run.ts';
+export { buildChildResult } from './run-supervisor/build-child-result.ts';
+export { collectTerminalOutput } from './run-supervisor/collect-terminal-output.ts';
+export { advanceRun } from './run-supervisor/advance-run.ts';
+export { createRunSupervisor } from './run-supervisor/create-run-supervisor.ts';

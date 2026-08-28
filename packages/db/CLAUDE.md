@@ -574,6 +574,15 @@ nem vizsgálja az eredményt, részletes indoklással a forráskódban. Az `inse
 `RunEventRepository.appendEngineEvent` ismeretlen `runId`-s tesztjében (`run-event-
 repository.spec.ts`) fedett, valódi, előidézhető úton.
 
+**A `run_started` payload a SPEC-004 13. szekció szerződését követi** (`workflowId`,
+`providerId`, `graphSnapshotHash`, `persistedStreamDeltas`), nem a futás azonosítóját ismétli meg:
+azt a `run_event.run_id` oszlop hordozza. Az ok a motor oldaláról jön: a **sort** ez a repository
+írja (a futás beszúrásával azonos tranzakcióban), az **élő** WebSocket nézetnek viszont a motor
+adja ki ugyanezt az eseményt az `eventPublisher` porton, `writeEngineEvent` nélkül - két
+`run_started` sor különben ugyanarra a futásra keletkezne. Ha a két alak eltérne, egy
+újracsatlakozó kliens az adatbázisból más payloadot pótolna, mint amit élőben látott
+(SPEC-004 5.2 6. pont elve). Forrás: `packages/engine` `run-supervisor` téma, PLAN-005 T-005-25.
+
 **Az `EngineRunEventKind` a 13 `engine` eredetű `kind` értéket TypeScript szinten szűkíti, nem
 futásidejű guarddal.** A tizenkét `sdk` eredetű `RunEventKind` érték mindegyike `sdk_` előtaggal
 kezdődik (`run-event-kind.ts`), a tizenhárom `engine` eredetű egyike sem - a
