@@ -20,3 +20,22 @@ export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
 export type { EngineErrorKind } from './engine-error/engine-error-kind.ts';
 export { isEngineErrorKind } from './engine-error/is-engine-error-kind.ts';
 export { formatEngineErrorMessage } from './engine-error/format-engine-error-message.ts';
+
+// engine-event: a 13, motor eredetű `run_event` `kind` payload alakja, az
+// összefogó `EngineEvent` diszkriminált unió és a motor esemény író
+// (SPEC-004 13. szekció, PLAN-005 T-005-9).
+export type { RunStartedPayload } from './engine-event/run-started-payload.ts';
+export type { RunFinishedPayload } from './engine-event/run-finished-payload.ts';
+export type { RunInterruptedPayload } from './engine-event/run-interrupted-payload.ts';
+export type { StepStartedPayload } from './engine-event/step-started-payload.ts';
+export type { StepFinishedPayload } from './engine-event/step-finished-payload.ts';
+export type { BranchTakenPayload } from './engine-event/branch-taken-payload.ts';
+export type { FanOutExpandedPayload } from './engine-event/fan-out-expanded-payload.ts';
+export type { JoinResolvedPayload } from './engine-event/join-resolved-payload.ts';
+export type { LoopIterationStartedPayload } from './engine-event/loop-iteration-started-payload.ts';
+export type { ApprovalRequestedPayload } from './engine-event/approval-requested-payload.ts';
+export type { ApprovalDecidedPayload } from './engine-event/approval-decided-payload.ts';
+export type { SubWorkflowStartedPayload } from './engine-event/sub-workflow-started-payload.ts';
+export type { SubWorkflowFinishedPayload } from './engine-event/sub-workflow-finished-payload.ts';
+export type { EngineEvent } from './engine-event/engine-event.ts';
+export { writeEngineEvent } from './engine-event/write-engine-event.ts';

@@ -27,17 +27,23 @@ export type {
   DeletionSummary,
   DeleteWorkflowInput,
 } from './workflow-graph/workflow/workflow-repository.ts';
+// A `NodeType` innentől a barrelben is szerepel (T-005-9, az `engine`
+// csomag `EngineEvent` payload típusai miatt).
+export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 
 // workflow-run: a WorkflowRunRepository publikus felülete (T-003-16). A
 // factory függvényt (`createWorkflowRunRepository`) szándékosan nem
 // exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
-// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció).
+// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció). A `RunStatus` innentől a
+// barrelben is szerepel (T-005-9, az `engine` csomag `EngineEvent` payload
+// típusai miatt).
 export type {
   WorkflowRunRepository,
   StartRunInput,
   StartRunParentContext,
   WorkflowRunRecord,
 } from './workflow-run/workflow-run-repository.ts';
+export type { RunStatus } from './workflow-run/run-status.ts';
 
 // step-run: a StepRunRepository publikus felülete (T-003-18). A factory
 // függvényt (`createStepRunRepository`) szándékosan nem exportáljuk, csak a
@@ -52,6 +58,9 @@ export type {
   AttachSessionInput,
   StepRunRecord,
 } from './step-run/step-run-repository.ts';
+// A `StepRunStatus` innentől a barrelben is szerepel (T-005-9, az `engine`
+// csomag `EngineEvent` payload típusai miatt).
+export type { StepRunStatus } from './step-run/step-run-status.ts';
 
 // run-event: a RunEventRepository publikus felülete (T-003-21). A factory
 // függvényt (`createRunEventRepository`) szándékosan nem exportáljuk, csak a
