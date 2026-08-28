@@ -479,6 +479,11 @@ F3: kész (`graph-snapshot/` -> `stored-snapshot/`, `snapshot-document/`, `snaps
 F4: kész (`workflow-graph/` -> `workflow/`, `node-type/`, `node-config/`, `agent-step-config/`,
 24 fájl, az `is-string-array.ts` egyelőre a `node-config/` alatt, a 4.5 szekció szerinti
 fallback helyen, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
+F5: részlegesen kész, csak a 4.5 szekció szerinti javaslat: `isStringArray` átkerült a
+`packages/typeguards/src/is-string-array/` alá, a három hívó csomagnév szerint importál.
+A 4.4 szekció első javaslata (`barrel-exports.spec.ts` külön mappába) NEM hajtódott végre:
+a user jóváhagyása nem terjedt ki rá explicit módon, a plan 4.4 szekciója ezt "user külön
+döntését igénylő" tételként jelöli. Mind a kilenc kapu zöld, 912 teszt, 100% lefedettség.
 
 **Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha
