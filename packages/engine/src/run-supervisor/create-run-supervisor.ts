@@ -165,6 +165,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       providerId: prepared.snapshot.fallbackProviderId,
       graphSnapshotDocument: buildSnapshotDocument(prepared.snapshot),
       ...(request.parent !== undefined && { parent: request.parent }),
+      ...(request.restartedFromRunId !== undefined && { restartedFromRunId: request.restartedFromRunId }),
     };
 
     const started = ports.database.runs.startRun(startRunInput);

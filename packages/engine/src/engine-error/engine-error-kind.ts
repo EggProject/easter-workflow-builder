@@ -73,6 +73,14 @@ export type EngineErrorKind =
   | 'missing_provider_env'
   // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása
   | 'unknown_concurrency_slot'
+  // 9. szekció zárómondat, PLAN-005 T-005-27: a `restartRun` művelet - az
+  // eredeti futás `input` mezője a `db` rétegben `unknown` (nem `Record`), a
+  // `StartRunRequest.input` viszont `Readonly<Record<string, unknown>>`-ot
+  // vár. Ez NEM csak korrupt adatra fordul elő: a `WorkflowRunRepository.startRun`
+  // bemeneti típusa (`StartRunInput.input: unknown`) sem kényszeríti ki a
+  // rekord alakot a `db` rétegben, tehát a motor felett álló, más hívó is
+  // adhatott korábban nem rekord bemenetet (lásd `run-supervisor/restart-run.ts`).
+  | 'malformed_restart_source_input'
   // 4.4, 4.8: a futás léptetése közben történt, NEM lépés szintű hiba
   // (PLAN-005 T-005-25). Két forrása van, és mindkettő megállítja a futást:
   // egy végrehajtó `Outcome` hibaága (adatbázis hiba, ami nem a lépés saját

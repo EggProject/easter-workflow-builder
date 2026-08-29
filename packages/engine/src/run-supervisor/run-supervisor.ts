@@ -19,11 +19,18 @@ import type { ActiveRunHandle } from './active-run-registry.ts';
  *   `rootRunId`/`depth`/`workflowAncestry` hármasa, változatlanul (5.9 3. pont).
  *   Gyökér futásnál hiányzik, és a `db` `startRun` vezeti le a gyökér
  *   értékeket (SPEC-003 4.8).
+ * - `restartedFromRunId`: a `restartRun` motor művelet (`restart-run.ts`,
+ *   PLAN-005 T-005-27) tölti ki az EREDETI futás azonosítójával, amikor egy
+ *   korábbi futást indít újra a workflow **aktuális** állapotára (SPEC-004 9.
+ *   szekció zárómondata, SPEC-003 27. kritérium). A `db` `startRun`
+ *   változatlanul a `StartRunInput.restartedFromRunId` mezőbe írja, ami a
+ *   `workflow_run.restarted_from_run_id` FK oszlopra képződik le.
  */
 export interface StartRunRequest {
   readonly workflowId: string;
   readonly input: Readonly<Record<string, unknown>>;
   readonly parent?: StartRunParentContext;
+  readonly restartedFromRunId?: string;
 }
 
 /**
