@@ -31,6 +31,11 @@
         "@easter-workflow-builder/protocol": "workspace:*",
         "@easter-workflow-builder/provider-registry": "workspace:*",
       },
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
     },
     "apps/web": {
       "name": "@easter-workflow-builder/web",
