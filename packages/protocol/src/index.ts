@@ -69,3 +69,14 @@ export type { StepRunRecord } from './run/step-run-record.ts';
 export { StepRunRecordSchema } from './run/step-run-record.ts';
 export type { InterruptSummaryResponse } from './run/interrupt-summary.ts';
 export { InterruptSummaryResponseSchema } from './run/interrupt-summary.ts';
+
+// transcript: az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a
+// kurzoros lekérdezés kérése és a lapja.
+export type { RunEventKind, RunEventOrigin } from './transcript/run-event-kind.ts';
+export { RunEventKindSchema, RunEventOriginSchema } from './transcript/run-event-kind.ts';
+export type { RunEventRecord } from './transcript/run-event-record.ts';
+export { RunEventRecordSchema } from './transcript/run-event-record.ts';
+export type { ReadRunEventsQuery } from './transcript/read-run-events-query.ts';
+export { ReadRunEventsQuerySchema } from './transcript/read-run-events-query.ts';
+export type { TranscriptPage } from './transcript/transcript-page.ts';
+export { TranscriptPageSchema } from './transcript/transcript-page.ts';
