@@ -15,6 +15,7 @@ készülnek.
 | `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra          |
 | `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz      |
 | `src/run/`            | a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a listázás, a megszakítás, az újraindítás és a pillanatkép alakja |
+| `src/transcript/`     | az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a kurzoros lekérdezés kérése és a lapja                              |
 | `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                          |
 
 ## Függőségi irány
