@@ -9,17 +9,18 @@ készülnek.
 
 ## Fájlok
 
-| Mappa/fájl            | Tartalom                                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/http-route/`     | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény                |
-| `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra          |
-| `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz      |
-| `src/run/`            | a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a listázás, a megszakítás, az újraindítás és a pillanatkép alakja |
-| `src/transcript/`     | az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a kurzoros lekérdezés kérése és a lapja                              |
-| `src/approval/`       | a döntés felsorolás, a várakozó jóváhagyás rekordja, és a döntés kérés alakja                                                               |
-| `src/provider/`       | a provider összefoglaló alakja és a kapcsolat teszt válasza                                                                                 |
-| `src/settings/`       | a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát nézete a beállított értékkel és a mért javaslattal                |
-| `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                          |
+| Mappa/fájl            | Tartalom                                                                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/http-route/`     | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény                              |
+| `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra                        |
+| `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz                    |
+| `src/run/`            | a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a listázás, a megszakítás, az újraindítás és a pillanatkép alakja               |
+| `src/transcript/`     | az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a kurzoros lekérdezés kérése és a lapja                                            |
+| `src/approval/`       | a döntés felsorolás, a várakozó jóváhagyás rekordja, és a döntés kérés alakja                                                                             |
+| `src/provider/`       | a provider összefoglaló alakja és a kapcsolat teszt válasza                                                                                               |
+| `src/settings/`       | a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát nézete a beállított értékkel és a mért javaslattal                              |
+| `src/event-stream/`   | a stream azonosító és URL építés, a feliratkozás kérés és állapot, az öt keret sémája diszkriminált unióban, a keret kódoló és dekódoló, a kurzor szabály |
+| `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                                        |
 
 ## Függőségi irány
 
