@@ -173,8 +173,8 @@ function cancelRunningStep(database: DatabaseContext, runId: string): void {
 function registryDecidingImmediately(database: DatabaseContext, decision: ApprovalDecision): ApprovalWaitRegistry {
   const real = createApprovalWaitRegistry();
   return {
-    waitForDecision: (stepRunId) => {
-      const pending = real.waitForDecision(stepRunId);
+    waitForDecision: (runId, stepRunId) => {
+      const pending = real.waitForDecision(runId, stepRunId);
       queueMicrotask(() => {
         okOrThrow(database.approvals.decideApproval({ stepRunId, decision }));
         real.notifyDecided(stepRunId, decision);
@@ -187,6 +187,37 @@ function registryDecidingImmediately(database: DatabaseContext, decision: Approv
     cancelWait: (stepRunId) => {
       real.cancelWait(stepRunId);
     },
+    cancelWaitingForRunIds: (runIds) => {
+      real.cancelWaitingForRunIds(runIds);
+    },
+  };
+}
+
+/**
+ * Egy `createApprovalWaitRegistry`-t burkol, ami a regisztráció megtörténte
+ * UTÁN, egy mikrotaszkban lefuttatja, amit éles futásban a `run-interrupt` téma
+ * `stopAndAwaitRunTree` menete tenne: a várakozó futására meghívja a
+ * `cancelWaitingForRunIds`-t (T-005-31, AC-51).
+ */
+function registryInterruptingImmediately(): ApprovalWaitRegistry {
+  const real = createApprovalWaitRegistry();
+  return {
+    waitForDecision: (runId, stepRunId) => {
+      const pending = real.waitForDecision(runId, stepRunId);
+      queueMicrotask(() => {
+        real.cancelWaitingForRunIds(new Set([runId]));
+      });
+      return pending;
+    },
+    notifyDecided: (stepRunId, decision) => {
+      real.notifyDecided(stepRunId, decision);
+    },
+    cancelWait: (stepRunId) => {
+      real.cancelWait(stepRunId);
+    },
+    cancelWaitingForRunIds: (runIds) => {
+      real.cancelWaitingForRunIds(runIds);
+    },
   };
 }
 
@@ -197,13 +228,16 @@ function registryDecidingImmediately(database: DatabaseContext, decision: Approv
 function registryTrackingCancelWait(calls: string[]): ApprovalWaitRegistry {
   const real = createApprovalWaitRegistry();
   return {
-    waitForDecision: (stepRunId) => real.waitForDecision(stepRunId),
+    waitForDecision: (runId, stepRunId) => real.waitForDecision(runId, stepRunId),
     notifyDecided: (stepRunId, decision) => {
       real.notifyDecided(stepRunId, decision);
     },
     cancelWait: (stepRunId) => {
       calls.push(stepRunId);
       real.cancelWait(stepRunId);
+    },
+    cancelWaitingForRunIds: (runIds) => {
+      real.cancelWaitingForRunIds(runIds);
     },
   };
 }
@@ -307,6 +341,52 @@ describe('executeHumanApproval', () => {
       database.approvals.getApprovalForStep(outcome.kind === 'failed' ? outcome.stepRun.id : 'nincs-step-run-id'),
     );
     expect(approval.decision).toBeNull();
+  });
+
+  it('REGRESSZIÓ (AC-51): korlátlan várakozás megszakítása interrupted kimenettel zár, a lépés sorát érintetlenül hagyva', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const ports = portsOf(database, published, okRender);
+    const registry = registryInterruptingImmediately();
+
+    const outcome = okOrThrow(await executeHumanApproval(inputOf(runId), ports, registry));
+
+    expect(outcome.kind).toBe('interrupted');
+    // A lépés sora `waiting_approval` állapotban MARAD: a lezárása a
+    // megszakítást kérő fél tranzakciójáé (`approval-wait-signal.ts`).
+    const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
+    expect(rows.map((row) => row.status)).toStrictEqual(['waiting_approval']);
+    // Sem `step_finished`, sem `approval_decided` esemény nem íródik.
+    expect(findStepFinishedFields(published)).toBeUndefined();
+    expect(findApprovalDecidedDecision(published)).toBeUndefined();
+  });
+
+  it('időkorlátos várakozás megszakítása: a sleep megszakad (controller.abort), és interrupted a kimenet', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const aborted = { value: false };
+    const clock = fakeClock(
+      (_ms, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              aborted.value = true;
+              reject(new Error('megszakítva'));
+            },
+            { once: true },
+          );
+        }),
+    );
+    const ports = portsOf(database, published, okRender, clock);
+    const registry = registryInterruptingImmediately();
+
+    const outcome = okOrThrow(await executeHumanApproval(inputOf(runId, 60_000), ports, registry));
+
+    expect(outcome.kind).toBe('interrupted');
+    expect(aborted.value).toBe(true);
   });
 
   it('a bodyTemplate renderelésének hibáját template_render_failed osztállyal zárja', async () => {

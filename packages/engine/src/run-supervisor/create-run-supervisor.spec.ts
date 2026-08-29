@@ -26,7 +26,9 @@ import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts'
 import type { ExpressionEvaluatorPort } from '../engine-port/expression-evaluator-port.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
+import { interruptRun } from '../run-interrupt/interrupt-run.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
 import { createRunSupervisor } from './create-run-supervisor.ts';
 import type { RunSupervisor } from './run-supervisor.ts';
@@ -72,12 +74,46 @@ function messageIterable(messages: readonly unknown[]): AsyncIterable<unknown> {
 }
 
 /**
+ * A HOSSZAN FUTÓ agent lépés promptja: az üzenetfolyama a MEGSZAKÍTÁSIG vár, és
+ * csak az `interrupt()` lefutása után adja ki a `sikeres` sorozatot. Ez a
+ * legkisebb hamis, amivel egy ténylegesen futó testvér lépés modellezhető VALÓS
+ * IDŐ NÉLKÜL (SPEC-004 14.2), és egyben a 9. szekció 4. pontját is mutatja: a
+ * megszakítás után beérkezett üzenetek nem vesznek el.
+ */
+const INTERRUPTIBLE_PROMPT = 'MEGSZAKITHATO';
+
+/**
+ * Az `INTERRUPTIBLE_PROMPT` üzenetfolyama: minden `next()` megvárja a `gate`
+ * Promise-t, amit az `interrupt()` old fel.
+ */
+function gatedMessageIterable(gate: Promise<void>, messages: readonly unknown[]): AsyncIterable<unknown> {
+  return {
+    [Symbol.asyncIterator]: () => {
+      let index = 0;
+      return {
+        next: async (): Promise<IteratorResult<unknown>> => {
+          await gate;
+          const value = messages[index];
+          index += 1;
+          return value === undefined ? { done: true, value: undefined } : { done: false, value };
+        },
+      };
+    },
+  };
+}
+
+/**
  * A prompt sablon egyben a fixture sorozat neve: a hamis sablon renderelő a
  * sablont változatlanul adja vissza, tehát a teszt gráfban a `promptTemplate`
  * mező dönti el, hogy a lépés sikeres-e. Az `ELOSZOR-HIBA` prompt az
- * újrapróbálkozás tesztje: az ELSŐ hívásra hibás, utána sikeres válasz.
+ * újrapróbálkozás tesztje: az ELSŐ hívásra hibás, utána sikeres válasz; az
+ * `INTERRUPTIBLE_PROMPT` a hosszan futó lépés, lásd ott.
+ *
+ * A `interruptedPrompts` tömb minden `interrupt()` hívást feljegyez, a hívó
+ * lépés promptjával - ebből látja a teszt, MELYIK lépést szakította meg a
+ * motor.
  */
-function fakeRunner(): AgentQueryRunner {
+function fakeRunner(interruptedPrompts: string[]): AgentQueryRunner {
   const callCounts = new Map<string, number>();
   let callIndex = 0;
   return {
@@ -89,6 +125,10 @@ function fakeRunner(): AgentQueryRunner {
       if (request.prompt === 'ELOSZOR-HIBA') {
         name = seen === 0 ? 'hibasSubtype' : 'sikeres';
       }
+      const isInterruptible = request.prompt === INTERRUPTIBLE_PROMPT;
+      if (isInterruptible) {
+        name = 'sikeres';
+      }
       // A commitolt fixture `uuid` értékei sorozatonként rögzítettek, a
       // `run_event` tábla viszont futásonként egyedi `sdk_uuid` értéket vár
       // (SPEC-003 6.5 idempotencia). Ugyanaz a sorozat több lépésben is
@@ -96,9 +136,17 @@ function fakeRunner(): AgentQueryRunner {
       const messages = fixtureMessages(name).map((message) =>
         isFixtureRoot(message) ? { ...message, uuid: `${String(message['uuid'])}-${String(callIndex)}` } : message,
       );
+      const { promise: gate, resolve: openGate } = Promise.withResolvers<undefined>();
       return {
         kind: 'ok',
-        value: { messages: messageIterable(messages), interrupt: () => Promise.resolve() },
+        value: {
+          messages: isInterruptible ? gatedMessageIterable(gate, messages) : messageIterable(messages),
+          interrupt: () => {
+            interruptedPrompts.push(request.prompt);
+            openGate(undefined);
+            return Promise.resolve();
+          },
+        },
       };
     },
   };
@@ -240,6 +288,8 @@ interface Harness {
   readonly published: unknown[];
   readonly sleepCalls: SleepCall[];
   readonly approvalRegistry: ApprovalWaitRegistry;
+  readonly agentQueryRegistry: AgentQueryRegistry;
+  readonly interruptedPrompts: string[];
 }
 
 interface HarnessOptions {
@@ -253,6 +303,8 @@ function openHarness(options: HarnessOptions = {}): Harness {
   const published: unknown[] = [];
   const sleepCalls: SleepCall[] = [];
   const approvalRegistry = createApprovalWaitRegistry();
+  const agentQueryRegistry = createAgentQueryRegistry();
+  const interruptedPrompts: string[] = [];
   const publisher: EventPublisherPort = {
     publish: (event) => {
       published.push(event);
@@ -262,7 +314,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
   let nextId = 0;
   const ports: EngineDependencies = {
     database,
-    agentQueryRunner: fakeRunner(),
+    agentQueryRunner: fakeRunner(interruptedPrompts),
     providerDescriptorLookup: options.descriptorLookup ?? descriptorOf,
     expressionEvaluator: fakeEvaluator(),
     templateRenderer: {
@@ -283,13 +335,13 @@ function openHarness(options: HarnessOptions = {}): Harness {
     ports,
     concurrencyGate: createConcurrencyGate(() => null),
     approvalRegistry,
-    agentQueryRegistry: createAgentQueryRegistry(),
+    agentQueryRegistry,
     installedAgentSdkVersion: INSTALLED,
   });
   if (options.withoutDefaultProvider !== true) {
     okOrThrow(database.settings.setDefaultProvider('minimax'));
   }
-  return { database, supervisor, published, sleepCalls, approvalRegistry };
+  return { database, supervisor, published, sleepCalls, approvalRegistry, agentQueryRegistry, interruptedPrompts };
 }
 
 function agentStepConfig(promptTemplate: string): AgentStepConfig {
@@ -686,6 +738,37 @@ describe('createRunSupervisor', () => {
       expect(nodeIds).not.toContain('ok2');
     });
 
+    it('REGRESSZIÓ (AC-43): fail_run a MÁR FUTÓ testvér lépést is megszakítja, és a futás failed (nem cancelled) állapotban zár', async () => {
+      const harness = openHarness();
+      // A `hosszu` ág a `start` node-tól indul, a hibázó ág egy lépéssel
+      // később ér a `br` node-hoz: mire a `fail_run` politika életbe lép, a
+      // hosszan futó lépés `AgentQuery`-je BIZTOSAN a regiszterben van.
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-megszakit',
+        [
+          startNode('start'),
+          agentNode('hosszu', INTERRUPTIBLE_PROMPT),
+          agentNode('elokeszit', 'sikeres'),
+          branchNode('br', 'HIBA', ['a']),
+        ],
+        [edgeOf('e1', 'start', 'hosszu'), edgeOf('e2', 'start', 'elokeszit'), edgeOf('e3', 'elokeszit', 'br')],
+      );
+
+      const runId = await runToEnd(harness, workflowId);
+
+      // A hosszan futó testvér lépésen ténylegesen lefutott az SDK
+      // `interrupt()` hívása (SPEC-004 8.3 táblázat `fail_run` sora).
+      expect(harness.interruptedPrompts).toStrictEqual([INTERRUPTIBLE_PROMPT]);
+      const run = okOrThrow(harness.database.runs.getRun(runId));
+      // A záró állapot a `fail_run` politikáé, NEM a felhasználói megszakításé.
+      expect(run.status).toBe('failed');
+      expect(run.errorKind).toBe('expression_evaluation_failed');
+      // A megszakítás után beérkezett üzenetek nem vesztek el: a lépés lezárult.
+      const rows = stepRunsOf(harness.database, runId);
+      expect(rows.filter((row) => row.nodeId === 'hosszu' && row.status === 'succeeded')).toHaveLength(1);
+    });
+
     it('fail_branch: a testvér ág végigfut, a futás mégis failed állapotban zár, az ELSŐ hiba osztályával', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
@@ -806,6 +889,38 @@ describe('createRunSupervisor', () => {
       const rows = stepRunsOf(harness.database, runId);
       expect(rows.filter((row) => row.nodeId === 'utana' && row.status === 'succeeded')).toHaveLength(1);
       expect(statusOf(harness.database, runId)).toBe('succeeded');
+    });
+
+    it('REGRESSZIÓ (AC-51): korlátlan várakozású jóváhagyáson álló futás megszakítható, és cancelled állapotban zár', async () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'jovahagyas-megszakitas',
+        [startNode('start'), approvalNode('jov', null), agentNode('utana', 'sikeres')],
+        [edgeOf('e1', 'start', 'jov'), edgeOf('e2', 'jov', 'utana', 'approved')],
+      );
+
+      const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
+      const stepRunId = await waitForPendingApproval(harness.database);
+
+      // A megszakítás a VALÓS belépési ponton megy be, és VÉGET IS ÉR: a
+      // `stopAndAwaitRunTree` a `completion` Promise-ra vár, amit a korábbi
+      // kódban semmi nem oldott volna fel (nincs `AgentQuery`, nincs
+      // időkorlát). Ha a teszt itt beragadna, a Vitest időkorláton bukna.
+      const summary = okOrThrow(
+        await interruptRun(started.run.id, {
+          database: harness.database,
+          runSupervisor: harness.supervisor,
+          agentQueryRegistry: harness.agentQueryRegistry,
+          approvalRegistry: harness.approvalRegistry,
+        }),
+      );
+
+      expect(summary.cancelledRunIds).toStrictEqual([started.run.id]);
+      expect(statusOf(harness.database, started.run.id)).toBe('cancelled');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(stepRunId)).status).toBe('cancelled');
+      // A jóváhagyás utáni lépés sosem indult el.
+      expect(stepRunsOf(harness.database, started.run.id).map((row) => row.nodeId)).toStrictEqual(['start', 'jov']);
     });
 
     it('elutasítás rejected él nélkül: a 8.3 politika dönt, approval_rejected osztállyal', async () => {

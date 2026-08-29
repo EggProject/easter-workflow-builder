@@ -9,6 +9,7 @@ import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
 type HumanApprovalNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'human_approval' }>;
@@ -35,15 +36,17 @@ export interface ExecuteHumanApprovalInput {
 }
 
 /**
- * Az időkorlát verseny egyetlen belső eredménye: vagy döntés érkezett, vagy
- * lejárt az időkorlát. A `timed_out` ág a lejárt `timeoutMs` értéket is
- * hordozza (nem `config.timeoutMs`-t, ami `number | null`), hogy a hívó
- * (`executeHumanApproval`) a hibaüzenetben `null`-ellenőrzés nélkül,
- * típusbiztosan hivatkozhasson rá - ez az érték csak a `raceApprovalDecision`
- * `timeoutMs !== null` ágán belül keletkezik, ahol a szűkítés már megtörtént.
+ * Az időkorlát verseny egyetlen belső eredménye: döntés érkezett, kívülről
+ * megszakították a várakozást, vagy lejárt az időkorlát. A `timed_out` ág a
+ * lejárt `timeoutMs` értéket is hordozza (nem `config.timeoutMs`-t, ami
+ * `number | null`), hogy a hívó (`executeHumanApproval`) a hibaüzenetben
+ * `null`-ellenőrzés nélkül, típusbiztosan hivatkozhasson rá - ez az érték csak
+ * a `raceApprovalDecision` `timeoutMs !== null` ágán belül keletkezik, ahol a
+ * szűkítés már megtörtént.
  */
 type ApprovalWaitResult =
   | { readonly kind: 'decided'; readonly decision: ApprovalDecision }
+  | { readonly kind: 'interrupted' }
   | { readonly kind: 'timed_out'; readonly timeoutMs: number };
 
 /**
@@ -53,32 +56,36 @@ type ApprovalWaitResult =
  * **`timeoutMs === null`: nincs `sleep` hívás, korlátlan várakozás** (SPEC-004
  * 5.8 1. pont, 24. elfogadási kritérium: "a motorban nincs szállított
  * időkorlát szám"). Ilyenkor a függvény közvetlenül a döntésre váró
- * `Promise`-t adja vissza, `AbortController` és `Promise.race` nélkül.
+ * `Promise`-t adja vissza, `AbortController` és `Promise.race` nélkül. Ez az
+ * ág a T-005-31 óta sem vár ÖRÖKRE: a `waitForDecision` `interrupted`
+ * jelzéssel is feloldódhat, amit a megszakítás vagy a szabályos leállás
+ * (`ApprovalWaitRegistry.cancelWaitingForRunIds`) küld.
  *
  * **`timeoutMs !== null`: a vesztes ágat meg kell szakítani.** Ha a döntés
- * nyer, a `sleep`-et a `controller.abort()` állítja le; a `sleep` esetleges
- * emiatti elutasítását a belső `try/catch` szándékosan nyeli el, mert ez az
- * ág csak akkor fut le, ha MI hívtuk az `abort()`-ot (a döntés már megnyerte
- * a versenyt), tehát az értéke úgysem kerül felhasználásra - ez a minta
- * függetlenít attól, hogy egy jövőbeli valós `ClockPort.sleep` megszakításkor
- * elutasít-e vagy egyszerűen feloldódik, mindkét esetben helyesen viselkedik,
- * unhandled rejection nélkül. Ha a `sleep` nyer, a `registry.cancelWait(...)`
- * törli a döntésre váró bejegyzést, hogy az ne maradjon örökre a
- * regiszterben egy sosem beérkező (vagy már elkésett) döntésre várva.
+ * vagy a megszakítás nyer, a `sleep`-et a `controller.abort()` állítja le; a
+ * `sleep` esetleges emiatti elutasítását a belső `try/catch` szándékosan
+ * nyeli el, mert ez az ág csak akkor fut le, ha MI hívtuk az `abort()`-ot,
+ * tehát az értéke úgysem kerül felhasználásra - ez a minta függetlenít attól,
+ * hogy egy jövőbeli valós `ClockPort.sleep` megszakításkor elutasít-e vagy
+ * egyszerűen feloldódik, mindkét esetben helyesen viselkedik, unhandled
+ * rejection nélkül. Ha a `sleep` nyer, a `registry.cancelWait(...)` törli a
+ * döntésre váró bejegyzést, hogy az ne maradjon örökre a regiszterben egy
+ * sosem beérkező (vagy már elkésett) döntésre várva.
  */
 async function raceApprovalDecision(
+  runId: string,
   stepRunId: string,
   timeoutMs: number | null,
   ports: NodeExecutorPorts,
   registry: ApprovalWaitRegistry,
 ): Promise<ApprovalWaitResult> {
-  const decisionPromise: Promise<ApprovalWaitResult> = (async (): Promise<ApprovalWaitResult> => {
-    const decision = await registry.waitForDecision(stepRunId);
-    return { kind: 'decided', decision };
+  const signalPromise: Promise<ApprovalWaitResult> = (async (): Promise<ApprovalWaitResult> => {
+    const signal = await registry.waitForDecision(runId, stepRunId);
+    return signal.kind === 'decided' ? { kind: 'decided', decision: signal.decision } : { kind: 'interrupted' };
   })();
 
   if (timeoutMs === null) {
-    return decisionPromise;
+    return signalPromise;
   }
 
   const controller = new AbortController();
@@ -92,11 +99,11 @@ async function raceApprovalDecision(
     return { kind: 'timed_out' as const, timeoutMs };
   })();
 
-  const result = await Promise.race([decisionPromise, timeoutPromise]);
-  if (result.kind === 'decided') {
-    controller.abort();
-  } else {
+  const result = await Promise.race([signalPromise, timeoutPromise]);
+  if (result.kind === 'timed_out') {
     registry.cancelWait(stepRunId);
+  } else {
+    controller.abort();
   }
   return result;
 }
@@ -138,12 +145,19 @@ function failApproval(
  *    `clock` portból számítva (nem a repository saját, `new Date()` alapú
  *    időbélyegéből, ugyanaz a determinizmus elv, mint minden más eseménynél).
  * 5. Várakozás a `raceApprovalDecision` szerint.
- * 6. **Lejáratkor**: `finishStepRunFailed` `approval_timed_out` osztállyal - a
+ * 6. **Megszakításkor** (T-005-31, SPEC-004 9. szekció, 10.2 szekció): a
+ *    végrehajtó AZONNAL visszatér az `interrupted` kimenettel, `step_run`
+ *    állapotváltás és esemény írás NÉLKÜL. A lépés sorát a megszakítást kérő
+ *    fél zárja le, a futás sorával egyetlen tranzakcióban - és a két hívó két
+ *    KÜLÖNBÖZŐ záró állapotot ír (`cancelled` a felhasználói megszakításnál,
+ *    `interrupted` a szabályos leállásnál), amit ez a végrehajtó nem tudna
+ *    eldönteni (`approval-wait-signal.ts`).
+ * 7. **Lejáratkor**: `finishStepRunFailed` `approval_timed_out` osztállyal - a
  *    `human_approval.decision` oszlop NULL marad, mert a `db.approvals
  *    .decideApproval(...)` sosem hívódott (`human-approval-repository.ts`
  *    `toPendingApprovalRecord` doksija ugyanezt az invariánst őrzi a lekérdező
  *    oldalon).
- * 7. **Döntés érkezésekor**: a `db.approvals.decideApproval(...)` (KÜLSŐ hívó,
+ * 8. **Döntés érkezésekor**: a `db.approvals.decideApproval(...)` (KÜLSŐ hívó,
  *    a `createEngine` `decideApproval` motor művelete, T-005-28) már elvégezte
  *    a `step_run` állapotváltást, mielőtt a regiszteren át értesítést küldött
  *    volna - ezért ez a végrehajtó `getStepRun`-nal olvassa vissza az
@@ -172,7 +186,7 @@ export async function executeHumanApproval(
   input: ExecuteHumanApprovalInput,
   ports: NodeExecutorPorts,
   registry: ApprovalWaitRegistry,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const { instance, config, runContext } = input;
   const nodeId = instance.instance.nodeId;
   const { runId } = instance;
@@ -237,7 +251,15 @@ export async function executeHumanApproval(
     return requestEmitted;
   }
 
-  const raced = await raceApprovalDecision(stepRunId, config.timeoutMs, ports, registry);
+  const raced = await raceApprovalDecision(runId, stepRunId, config.timeoutMs, ports, registry);
+
+  // A várakozást a megszakítás vagy a szabályos leállás zárta le: a végrehajtó
+  // egyetlen állapotváltást és egyetlen eseményt sem ír, a lépés sorát a
+  // megszakítást kérő fél zárja le a futás sorával EGYETLEN tranzakcióban
+  // (`approval-wait-signal.ts` doksija).
+  if (raced.kind === 'interrupted') {
+    return { kind: 'ok', value: { kind: 'interrupted' } };
+  }
 
   if (raced.kind === 'timed_out') {
     const errorMessage = formatEngineErrorMessage(

@@ -1,5 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
+import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
@@ -13,11 +14,17 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  * A `createEngine` (T-005-28) a saját, teljes `RunSupervisor` példányát adja
  * majd ide, adapter nélkül, mert az triviálisan illeszkedik erre a
  * szűkebb felületre.
+ *
+ * Az `approvalRegistry` a T-005-31 óta kötelező mező: a `stopAndAwaitRunTree`
+ * ezen zárja le a fa várakozó `human_approval` lépéseit, ami nélkül egy
+ * korlátlan várakozású jóváhagyáson álló futás megszakítása sosem fejeződne
+ * be (AC-51, lásd `stop-and-await-run-tree.ts` 2. pontját).
  */
 export interface InterruptRunDependencies {
   readonly database: DatabaseContext;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
+  readonly approvalRegistry: ApprovalWaitRegistry;
 }
 
 /**
@@ -92,7 +99,7 @@ export async function interruptRun(
   const rootRunId = target.value.rootRunId;
 
   const treeHandles = dependencies.runSupervisor.listActiveRuns().filter((handle) => handle.rootRunId === rootRunId);
-  await stopAndAwaitRunTree(treeHandles, dependencies.agentQueryRegistry);
+  await stopAndAwaitRunTree(treeHandles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
 
   const cancelled = dependencies.database.recovery.cancelRunTree(rootRunId);
   if (cancelled.kind === 'error') {

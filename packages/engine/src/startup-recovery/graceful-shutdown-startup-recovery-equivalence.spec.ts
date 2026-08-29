@@ -4,6 +4,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { DatabaseContext, GraphSnapshotDocument } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
 import { isRecord } from '@easter-workflow-builder/typeguards';
+import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { shutdownActiveRuns } from '../run-interrupt/shutdown-active-runs.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
@@ -116,6 +117,7 @@ describe('a szabályos leállás és a durva leállás utáni indulási helyreá
         database: viaGracefulShutdown.database,
         runSupervisor: noActiveRuns,
         agentQueryRegistry: createAgentQueryRegistry(),
+        approvalRegistry: createApprovalWaitRegistry(),
       }),
     );
 

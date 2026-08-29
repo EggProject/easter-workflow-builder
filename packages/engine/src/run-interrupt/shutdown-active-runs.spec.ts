@@ -15,6 +15,7 @@ import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import { createAgentQueryRegistry } from './agent-query-registry.ts';
 import { shutdownActiveRuns } from './shutdown-active-runs.ts';
 import type { ShutdownActiveRunsDependencies } from './shutdown-active-runs.ts';
+import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -108,7 +109,7 @@ function dependenciesOf(
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
 ): ShutdownActiveRunsDependencies {
   const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
-  return { database, runSupervisor, agentQueryRegistry };
+  return { database, runSupervisor, agentQueryRegistry, approvalRegistry: createApprovalWaitRegistry() };
 }
 
 describe('shutdownActiveRuns', () => {
