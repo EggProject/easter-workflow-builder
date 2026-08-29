@@ -9,13 +9,15 @@ tétel mindkét dokumentumba illene, csak egy helyen áll.
 Minden szabály mellett ott a forrása. Ha egy szabály itt és a forrásdokumentumban is szerepel, a
 forrásdokumentum az erősebb, és az eltérést itt kell javítani. A `docs/plan/PLAN-*.md` fájlok
 tartalma ide **nem** kerül: azok végrehajtási tervek, nem szabályok. Nyitott ellentmondás esetén a
-menetet a 13. szekció írja le. Karbantartás: az utolsó szekció.
+menetet a 14. szekció írja le. Karbantartás: az utolsó szekció.
 
 Rövidítések a forrásokban: `SPEC-00n` plusz szekciószám a `docs/spec/` alatti spec, `research` a
 `docs/research/` alatti mért tény, "gyökér CLAUDE.md" a repo gyökerének fájlja (szekciószámmal az
 1-7. szekcióra hivatkozik; szám nélkül olyan projekt-specifikus döntésre, ami korábban a gyökér
 `CLAUDE.md` "Project-Specific Guidelines" szekciójában állt, onnan mára ide konszolidálva),
-"csomag CLAUDE.md" az adott csomag gyökerének fájlja.
+"csomag CLAUDE.md" az adott csomag gyökerének fájlja. Nyitott, méréssel eldöntendő technikai
+kérdésre a 4. szekció 2. pontjának jelölési konvenciója vonatkozik (nyitva jelölés, "mi a
+viselkedés addig", "mi zárná le"), függetlenül attól, melyik szekcióban merül fel.
 
 ---
 
@@ -37,7 +39,7 @@ Forrás: gyökér `CLAUDE.md`.
 | Feature branchben dolgozunk, a `main` védett. Branch minta: `feat/spec-<n>-<rövid-név>`. Zárás PR-rel.                                                                                      | gyökér `CLAUDE.md`    |
 | Minden lépés önálló, zöld commit: a kilenc kapu előbb fut le (8. szekció).                                                                                                                  | gyökér `CLAUDE.md` 7. |
 | **Pusholni nem tudsz.** A futtatókörnyezet izolált Linux sandbox, nincs SSH kulcs, nincs `gh`. Minden commit sorozat után szólni kell a usernek, hogy pusholjon, és megadni a branch nevét. | gyökér `CLAUDE.md`    |
-| Fájlt átnevezni `git mv` paranccsal kell, nem kézi törléssel és újralétrehozással, különben a git indexben a régi betűzés marad (11. szekció).                                              | SPEC-002 10.          |
+| Fájlt átnevezni `git mv` paranccsal kell, nem kézi törléssel és újralétrehozással, különben a git indexben a régi betűzés marad (12. szekció).                                              | SPEC-002 10.          |
 
 A Todo lista, a commit kötelezettsége, az askuserquestion tool és a "mindig azt kell csinálni,
 amit a user kér" szabály szó szerint a gyökér `CLAUDE.md` 7. szekciójában áll, itt nem ismételjük.
@@ -275,7 +277,7 @@ Playwright, ESLint flat config (gyökér `CLAUDE.md`).
   sandboxára vonatkozik, nem a CI futtatókörnyezetére (SPEC-001 15., V-19).
 - **`npm` és `npx` nem használható**, csak `bun run` és `bun x` (`bunx`). A
   `devEngines.packageManager` deklaráció után az `npx` megtagadja a futást; ez egy valós CI hibát
-  okozott, lásd 11. szekció.
+  okozott, lásd 12. szekció.
 - Eltávolított vagy deprecated TypeScript opció (`baseUrl`, `moduleResolution: node`,
   `target: es5`, ...) egyetlen configba sem kerülhet, és `"ignoreDeprecations"` kapcsolót sem
   használunk (SPEC-001 6.).
@@ -415,7 +417,88 @@ a **commitolt** migrációkkal épül fel. Mockolt adatbázis nincs (SPEC-003 12
 
 ---
 
-## 11. Buktatók, amiket már megtapasztaltunk
+## 11. Frontend és e2e tesztelés
+
+Eddig nem volt önálló szekció a frontend felületi elvárásokra és a Playwright e2e tesztek
+írási szabályaira, ez pótolja azt.
+
+**Playwright locator és várakozás szabályok.** Forrás:
+`docs/research/2026-08-29-playwright-teszt-szabalyok.md`, a teljes, 15 tételes "Alkalmazható
+szabálylista" ott áll részletesen, itt csak a lényeg.
+
+- **Locator sorrend**, a hivatalos Quick Guide dokumentált sorrendje szerint: `getByRole`
+  elsőként, utána `getByLabel` (form mezőn), `getByPlaceholder`, `getByAltText`, `getByTitle`,
+  `getByText` (csak nem interaktív elemen), végül `getByTestId`. CSS és XPath szelektor csak
+  akkor, ha egyik sem alkalmazható (research 2. szekció, <https://playwright.dev/docs/locators>).
+- **Tilos a `page.waitForTimeout()` és a kézi `setTimeout`/`sleep`.** Ezt maga a hivatalos
+  Playwright dokumentáció mondja ki, szó szerint: "Note that `page.waitForTimeout()` should
+  only be used for debugging. Tests using the timer in production are going to be flaky. Use
+  signals such as network events, selectors becoming visible and others instead."
+  (<https://playwright.dev/docs/api/class-page#page-wait-for-timeout>, research 5. szekció).
+  Helyette web-first assertion, `locator.waitFor({ state })`, `page.waitForResponse()` vagy
+  `expect.poll`/`toPass` (research 7. szekció).
+- **`toBeDetached` néven nincs önálló assertion.** A "nincs csatolva a DOM-hoz" állítást a
+  hivatalos API kizárólag `toBeAttached({ attached: false })` alakban tudja kifejezni.
+  `toBeAttached()` csak a DOM-hoz csatoltságot ellenőrzi, láthatóságtól függetlenül;
+  `toBeVisible()` ennél szigorúbb, csatoltság ÉS láthatóság együtt kell hozzá. A kettő nem
+  felcserélhető (research 6. szekció, <https://playwright.dev/docs/api/class-locatorassertions>).
+- **A timeout tilalom határa.** A kézi, idő alapú várakozás tilalma (`waitForTimeout`,
+  `setTimeout`, `sleep`) maradéktalanul megvalósítható kizárólag állapot alapú eszközökkel. Ez
+  **nem** jelenti a Playwright beépített assertion timeoutjának (alapból 5000 ms) vagy a test
+  timeoutnak (alapból 30000 ms) a nullázását vagy kikapcsolását: erre a hivatalos doksi nem ad
+  dokumentált megoldást, és nem is ajánlja. Ezeket a beépített felső korlátokat nem szabad
+  nullázni vagy eltávolítani (research 8. szekció, NEM MEGERŐSÍTETT pont az
+  `expect.timeout`/`test.timeout` nullázására).
+
+**E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
+test-nel").
+
+- Az e2e tesztben minden külső hívás mockolva legyen, ugyanúgy, mint egy unit tesztben: a
+  REST hívások `page.route()`-tal adott, garantált válasszal mennek, valós backend szervert a
+  teszt nem szólíthat meg.
+
+**Nyitott kérdés: SSE mockolás.** Forrás:
+`docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekció.
+
+A fenti "minden mockolva legyen" szabály az SSE csatornára (`GET /events`, `EventSource`)
+jelenleg **nem zárható le**: a Playwright hivatalos doksijának nincs SSE/`EventSource`
+mockolási útmutatója (a `docs/src/mock.md` guide HTTP mockolást, HAR visszajátszást és
+WebSocket mockolást dokumentál, `EventSource`-t nem). Van egy közösségi, megerősítetlen
+kimenetelű GitHub issue (`microsoft/playwright` #15353) a `page.route` + `text/event-stream`
+korlátairól, ahol a bejelentő szerint a `Content-Type` `null`-ként érkezett az `EventSource`
+oldalán; a lezárás oka nem ellenőrizhető.
+
+- **Nyitva marad, amíg nincs**: saját méréssel igazolt válasz arra, hogy a
+  `page.route`/`route.fulfill({ contentType: 'text/event-stream' })` minta megbízhatóan
+  mockolja-e az SSE-t a projekt pinelt Playwright verziója ellen.
+- **Lehetséges utak** (mérés dönt közöttük, nem feltételezés): (a) transzport szintű mockolás
+  `page.route`-tal, ha a mérés igazolja, hogy működik; (b) valós vagy célra írt könnyű teszt
+  szerver a `GET /events` végponton, a DOM végállapotára várva web-first assertion-nel, ekkor
+  az SSE csatorna kivétel a "minden mockolva legyen" szabály alól, amit a frontend specben
+  explicit ki kell mondani.
+- **Mi a viselkedés addig**: a frontend spec megírása előtt méréssel el kell dönteni, melyik
+  út valósul meg; addig egyik utat sem szabad kódba írni feltételezésből.
+- **Mi zárná le**: saját, dokumentált mérés a `page.route` + `text/event-stream` viselkedéséről
+  a projekt pinelt Playwright verziója ellen, `docs/research/` alá vezetve.
+
+**Frontend felületi elvárások.** Forrás: felhasználó kérése.
+
+- **Várakozás jelzése.** Minden felületi ponton, ahol a usernek várnia kell (async művelet,
+  workflow futás, agent lépés, API hívás), látható jelzés kell, ami mutatja, hogy várakozás
+  van folyamatban: loading spinner, progress bar, skeleton állapot vagy explicit státusz
+  szöveg. Nem maradhat felületi állapot, ahol egy érzékelhető késleltetésű várakozás jelzés
+  nélkül fut le.
+- **Teljes böngésző szélesség és reszponzivitás.** A frontend layout a teljes böngésző
+  szélességet használja, nem egy keskeny, középre igazított oszlopot. Ez megerősíti és
+  kiterjeszti azt, amit a felhasználó eredeti specifikációja már kimondott: az
+  `eggproject-design` skill topnav shell-jét kell használni, és a content terület a teljes
+  rendelkezésre álló területet "faltól falig" tölti ki. A kiterjesztés: a layoutnak minden
+  támogatott viewport méreten reszponzívnak kell lennie, nem csak egyetlen, fix asztali
+  szélességen.
+
+---
+
+## 12. Buktatók, amiket már megtapasztaltunk
 
 Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami visszatérés esetén elkapja.
 
@@ -532,7 +615,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ---
 
-## 12. Hol keresd a részleteket
+## 13. Hol keresd a részleteket
 
 | Téma                                                                | Forrás                                                                         |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -546,11 +629,12 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | rögzített verziók és a mögöttük álló okok                           | `docs/research/2026-08-26-toolchain.md`                                        |
 | tároló motor kiértékelés, méretmérések                              | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
 | SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
+| Playwright e2e teszt szabályok, SSE mockolás nyitott kérdése        | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
 ---
 
-## 13. Ellentmondás esetén
+## 14. Ellentmondás esetén
 
 **Jelenleg nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
 a "nyolcadik kapu" elnevezés, a SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`, a
@@ -579,7 +663,7 @@ tényleges, felhasználói döntést igénylő ellentmondást talál két forrá
 
 ---
 
-## 14. A szabálykönyv karbantartása
+## 15. A szabálykönyv karbantartása
 
 - **Mikor kerül bele új szabály.** Amikor egy döntés a projekt egészére vagy egy visszatérő
   munkamenetre vonatkozik: user döntés, lezárt nyitott kérdés, mérésből származó megkötés, vagy egy
@@ -593,7 +677,7 @@ tényleges, felhasználói döntést igénylő ellentmondást talál két forrá
 - **Forrás nélkül nincs szabály.** Minden bejegyzés mellé a forrás megnevezése kell (spec szekció,
   research fájl, csomag `CLAUDE.md`, vagy saját, most futtatott mérés). Ha csak sejtés, nem kerül
   ide.
-- **Ellentmondás esetén.** Nem döntjük el csendben. A 13. szekció írja le a menetet: addig, amíg
+- **Ellentmondás esetén.** Nem döntjük el csendben. A 14. szekció írja le a menetet: addig, amíg
   nyitva áll, ott kap egy számozott tételt, lezárás után minden érintett forrásdokumentumba át kell
   vezetni, és a tételt onnan törölni kell.
 - **Az ellenőrzés.** A `bun run docs:check` ezt a fájlt nem kényszeríti ki és nem is tiltja: a
