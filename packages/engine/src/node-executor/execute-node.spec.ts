@@ -10,6 +10,7 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { createApprovalWaitRegistry, type ApprovalWaitRegistry } from './approval-wait-registry.ts';
 import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
 import { executeNode } from './execute-node.ts';
@@ -168,6 +169,7 @@ function dependenciesOf(
     concurrencyGate: openGate(),
     approvalRegistry: options.approvalRegistry ?? createApprovalWaitRegistry(),
     childWorkflowRunner: notCalledRunner,
+    agentQueryRegistry: createAgentQueryRegistry(),
   };
 }
 

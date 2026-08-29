@@ -1,4 +1,4 @@
-import { and, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
@@ -32,14 +32,37 @@ export interface RecoverInterruptedRunsResult {
   readonly recoveredRunCount: number;
 }
 
+export interface CancelRunTreeResult {
+  readonly cancelledRunIds: readonly string[];
+}
+
 /**
- * Az indulási helyreállítás felülete (SPEC-003 7.4 szekció, "Szerver
- * leállás" bekezdés). **Nincs saját tábla ehhez a témához**: a
- * `workflow_run` és a `step_run` táblát EGYÜTT érinti, ezért egyik témába
- * sem tartozik (8. szekció, "a `run-recovery`" sor).
+ * Az indulási helyreállítás ÉS a felhasználói megszakítás közös felülete
+ * (SPEC-003 7.4 szekció "Szerver leállás" bekezdés, SPEC-004 9. szekció).
+ * **Nincs saját tábla ehhez a témához**: mindkét művelet a `workflow_run` és
+ * a `step_run` táblát EGYÜTT érinti, ezért egyik táblás témába sem tartozik
+ * (8. szekció, "a `run-recovery`" sor). A `recoverInterruptedRuns` a szerver
+ * indulásakor fut, a `cancelRunTree` a `packages/engine` `run-interrupt`
+ * témájának `interruptRun` művelete hívja, a felhasználó explicit
+ * megszakítási kérésére (SPEC-004 9. szekció 5. pont).
  */
 export interface RunRecovery {
   recoverInterruptedRuns(): Outcome<RecoverInterruptedRunsResult>;
+
+  /**
+   * Egy futás fája (a `rootRunId` és minden alá tartozó, azonos gyökerű
+   * al-workflow futás) megszakítása: minden nem terminális (`pending`/
+   * `running`) futás `cancelled` állapotba megy, a hozzájuk tartozó minden
+   * nem terminális lépés futás szintén, és futásonként EGY `run_finished`
+   * motor esemény íródik `status: 'cancelled'` payloaddal, egyetlen
+   * tranzakcióban (SPEC-004 9. szekció 5. pont, 13. szekció táblázat). A
+   * `root_run_id` oszlop szerinti szűrés (a `workflow_run_root_idx` index)
+   * miatt a hívónak nem kell összegyűjtenie a fa futásainak azonosítóját: már
+   * TERMINÁLIS futás és lépés érintetlen marad, tehát a metódus akkor is
+   * biztonságosan hívható, ha a fának időközben egy része magától befejeződött
+   * (`cancelledRunIds` üres lista, ha nincs mit megszakítani).
+   */
+  cancelRunTree(rootRunId: string): Outcome<CancelRunTreeResult>;
 }
 
 /**
@@ -137,5 +160,72 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
     });
   }
 
-  return { recoverInterruptedRuns };
+  /**
+   * `cancelRunTree`, a felhasználói megszakítás (`interruptRun`, `engine`
+   * `run-interrupt` téma) DB oldali zárása (SPEC-004 9. szekció 5. pont).
+   * Ugyanaz a tömeges `UPDATE ... WHERE status IN (...) RETURNING id` minta,
+   * mint a `recoverInterruptedRuns`-ban, két eltéréssel: a szűrés a
+   * `root_run_id` oszlopra szűkít (a `workflow_run_root_idx` index, egyetlen
+   * futás fájára, nem a teljes adatbázisra), és a célállapot `cancelled`,
+   * `run_finished` eseménnyel `interrupted`/`run_interrupted` helyett - a
+   * kettő a `workflow_run.status` oszlopban különbözteti meg a felhasználói
+   * döntést (`cancelled`) a rendszer döntésétől (`interrupted`, SPEC-004 10.2
+   * szekció "Miért `interrupted` és nem `cancelled`").
+   *
+   * A `run_finished` payload alakja szó szerint a `packages/engine`
+   * `RunFinishedPayload` mezőit követi (`status`, `errorKind`, `errorMessage`,
+   * `failedBranchCount`), hogy az élő és a visszaolvasott esemény egyezzen
+   * (ugyanaz az elv, mint a `workflow-run-repository.ts` `run_started`
+   * payloadjánál): a `db` csomag nem importálhatja az `engine` típusát
+   * (fordított rétegirány lenne), ezért a mezőnevek itt szó szerint,
+   * duplikálva állnak.
+   */
+  function cancelRunTree(rootRunId: string): Outcome<CancelRunTreeResult> {
+    return transaction(() => {
+      const now = new Date();
+
+      const cancelledRuns = database
+        .update(workflowRunTable)
+        .set({ status: 'cancelled', finishedAtMs: now })
+        .where(
+          and(eq(workflowRunTable.rootRunId, rootRunId), inArray(workflowRunTable.status, NON_TERMINAL_RUN_STATUSES)),
+        )
+        .returning({ id: workflowRunTable.id })
+        .all();
+
+      if (cancelledRuns.length === 0) {
+        return { kind: 'ok', value: { cancelledRunIds: [] } };
+      }
+
+      const runIds = cancelledRuns.map((row) => row.id);
+
+      database
+        .update(stepRunTable)
+        .set({ status: 'cancelled', finishedAtMs: now })
+        .where(and(inArray(stepRunTable.runId, runIds), inArray(stepRunTable.status, NON_TERMINAL_STEP_RUN_STATUSES)))
+        .run();
+
+      for (const runId of runIds) {
+        insertEngineEventRow(database, {
+          runId,
+          // eslint-disable-next-line unicorn/no-null -- futás szintű esemény: a run_event.step_run_id valódi NULL értéke, nem helyőrző (SPEC-003 6.2 szekció)
+          stepRunId: null,
+          kind: 'run_finished',
+          occurredAtMs: now,
+          payload: {
+            status: 'cancelled',
+            // eslint-disable-next-line unicorn/no-null -- a `RunFinishedPayload.errorKind`/`errorMessage` `T | null` mezője: a felhasználói megszakítás nem hibaosztály, a `null` a "nincs hiba" valódi tárolt értéke (SPEC-004 13. szekció táblázat)
+            errorKind: null,
+            // eslint-disable-next-line unicorn/no-null -- lásd a fenti indoklást
+            errorMessage: null,
+            failedBranchCount: 0,
+          },
+        });
+      }
+
+      return { kind: 'ok', value: { cancelledRunIds: runIds } };
+    });
+  }
+
+  return { recoverInterruptedRuns, cancelRunTree };
 }

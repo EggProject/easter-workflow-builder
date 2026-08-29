@@ -1,5 +1,6 @@
 import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ApprovalWaitRegistry } from './approval-wait-registry.ts';
 import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
 
@@ -33,10 +34,17 @@ import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
  *   (5.9), amit a `run-supervisor` (T-005-25) **önmagára hivatkozva** tölt
  *   ki - ez oldja fel a `node-executor` és a `run-supervisor` közti kört
  *   (`child-workflow-runner.ts`).
+ * - `agentQueryRegistry`: az élő `AgentQuery` objektumok nyilvántartása
+ *   (9. szekció 3. pont, PLAN-005 T-005-26), szintén egyetlen, megosztott
+ *   példány (`createAgentQueryRegistry`), amit a `run-interrupt` téma
+ *   `interruptRun` művelete kérdez le. Csak az `agent_step` és a `join`
+ *   `ai_synthesis` ág adja tovább, ugyanaz a szűkítés, mint a
+ *   `concurrencyGate`-nél.
  */
 export interface NodeExecutorDependencies {
   readonly ports: EngineDependencies;
   readonly concurrencyGate: ConcurrencyGate;
   readonly approvalRegistry: ApprovalWaitRegistry;
   readonly childWorkflowRunner: ChildWorkflowRunner;
+  readonly agentQueryRegistry: AgentQueryRegistry;
 }

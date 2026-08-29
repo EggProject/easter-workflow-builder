@@ -14,6 +14,7 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import type { StepStartedPayload } from '../engine-event/step-started-payload.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
@@ -122,6 +123,7 @@ async function runAfterSlotGranted(
   input: AgentNodeLifecycleInput,
   stepRunId: string,
   ports: EngineDependencies,
+  agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<NodeExecutionOutcome>> {
   const { instance, nodeType, config, descriptor, runContext, graph, sessionSourceNodes, sessionInstances } = input;
   const nodeId = instance.instance.nodeId;
@@ -185,7 +187,7 @@ async function runAfterSlotGranted(
     sessionInstances,
   };
 
-  const executed = await runAgentStep(request, ports);
+  const executed = await runAgentStep(request, ports, agentQueryRegistry);
   if (executed.kind === 'error') {
     return executed;
   }
@@ -239,11 +241,18 @@ async function runAfterSlotGranted(
  * `packages/engine/CLAUDE.md`), az a végeredmény: a lépés saját kimenetele
  * ilyenkor eldobódik, mert egy hibás szabályozó állapot súlyosabb, mint egy
  * egyébként lezárt lépés eredménye.
+ *
+ * **Az `agentQueryRegistry` paramétert változatlanul továbbadja a
+ * `runAgentStep`-nek** (SPEC-004 9. szekció 3. pont, PLAN-005 T-005-26): ez a
+ * réteg maga nem regisztrál semmit, csak a hely kérésének/felszabadításának
+ * felelőse marad, a regisztráció ott történik, ahol az élő `AgentQuery`
+ * objektum ténylegesen keletkezik (`agent-step/run-agent-step.ts`).
  */
 export async function runAgentNodeLifecycle(
   input: AgentNodeLifecycleInput,
   ports: EngineDependencies,
   gate: ConcurrencyGate,
+  agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<NodeExecutionOutcome>> {
   const { instance, nodeType, config } = input;
   const nodeId = instance.instance.nodeId;
@@ -274,7 +283,7 @@ export async function runAgentNodeLifecycle(
   });
 
   try {
-    return await runAfterSlotGranted(input, stepRunId, ports);
+    return await runAfterSlotGranted(input, stepRunId, ports, agentQueryRegistry);
   } finally {
     const released = gate.releaseSlot(stepRunId);
     if (released.kind === 'error') {

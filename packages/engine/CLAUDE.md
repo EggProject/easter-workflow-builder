@@ -32,8 +32,13 @@ futás záró állapota (8.4), és a `backoffMs` lista hosszának futás indít�
 (`insufficient_backoff_list`). **A T-005-25 hozzátette a `run-supervisor` témát**: a futás
 indításának SPEC-004 4.8 szerinti teljes menete, a háttérben futó léptető hurok a terminális
 állapotig, a futás záró állapotának kiírása, és a `ChildWorkflowRunner` rekurzív implementációja.
-Ma tizenhat téma áll készen. A spec 12. szekciójában felsorolt további két téma mappa
-(`run-interrupt`, `startup-recovery`) a PLAN-005 hátralévő fázisaiban készül.
+**A T-005-26 hozzátette a `run-interrupt` témát**: a felhasználói megszakítás teljes menete (SPEC-004 9. szekció) - az élő `AgentQuery` objektumok nyilvántartása (`agent-query-registry.ts`), a
+`requestStop()`/`interrupt()`/`completion` várakozás közös menete (`stop-and-await-run-tree.ts`) és
+az `interruptRun` belépési pont, ami a `run-supervisor` aktív kézikönyveit a `rootRunId` szerint
+szűkíti, majd a `packages/db` `run-recovery` témájának új `cancelRunTree` primitívjével egyetlen
+tranzakcióban zár. Ma tizenhét téma áll készen. A spec 12. szekciójában felsorolt utolsó téma mappa
+(`startup-recovery`) a PLAN-005 hátralévő fázisában (T-005-27) készül; a T-005-28 a `createEngine`
+összeállítást és a `shutdown()` metódust adja, ami erre a témára is épít.
 
 ## Fájlok
 
@@ -55,6 +60,7 @@ Ma tizenhat téma áll készen. A spec 12. szekciójában felsorolt további ké
 | `node-executor/`        | a diszpécser és a tíz végrehajtható node típus végrehajtója (SPEC-004 5. szekció, PLAN-005 T-005-20 ... T-005-24). **T-005-20 az első felét adta**: az öt nem-agent típus (`start`, `branch`, `fan_out`, `loop`, `join` `merge`) és a köztük megosztott infrastruktúra - a hat portot összefogó `NodeExecutorPorts`, a `step_run`-hoz kötött, node típustól független adatokat hordozó `NodeExecutionInstance`, a `run-supervisor`-nak szánt `NodeExecutionOutcome`, az esemény írás+kiadás egyben (`emitEngineEvent`) és a közös nyitó/záró menet (`beginStepRun`, `finishStepRunSucceeded`, `finishStepRunFailed`). **A T-005-21 hozzáadta a második felet**: az `agent_step` (`execute-agent-step.ts`) és a `join` `ai_synthesis` (`execute-join-ai-synthesis.ts`) végrehajtóját, a köztük megosztott `agent-node-lifecycle.ts` belső menettel (a SPEC-004 5.2 teljes tíz pontja, a hely kérésével és felszabadításával, 7.2). **A T-005-22 hozzáadta a `human_approval` végrehajtóját** (`execute-human-approval.ts`, 5.8 szekció) és a döntésre várás regiszterét (`approval-wait-registry.ts`, `ApprovalWaitRegistry`/`createApprovalWaitRegistry`) - egyik sem kér párhuzamossági helyet (7.2). **A T-005-23 hozzáadta a `sub_workflow` végrehajtóját** (`execute-sub-workflow.ts`, 5.9 szekció), az ancestry alapú rekurzióvédelem tiszta függvényét (`detect-workflow-recursion.ts`) és a `ChildWorkflowRunner` port alakú, motoron BELÜLI függőséget (`child-workflow-runner.ts`, **típus-only, nincs `.spec.ts`**) - ez sem kér párhuzamossági helyet (7.2). **A T-005-24 zárta le a témát**: az `error_handler` végrehajtója (`execute-error-handler.ts`, 8.2 szekció), a `NodeExecutionOutcome` két új ága (`retry_scheduled`, `retry_exhausted`), a minden lehetséges függőséget összefogó `NodeExecutorDependencies` és a hozzá tartozó `ExecuteNodeRequest` (mindkettő **típus-only, nincs `.spec.ts`**), végül a kimerítő diszpécser (`execute-node.ts`), ami mind a tíz végrehajtható node típusra a saját `execute-*` függvényét hívja |
 | `error-policy/`         | a hibakezelés döntő függvényei (SPEC-004 8.1 ... 8.4, PLAN-005 T-005-24). A `resolveErrorRoute` a 8.1 hiba útját és a 8.3 politikát adja egyetlen `ErrorRoute` értékben (`handled` menekülő élekkel, `fail_run`, `fail_branch`); a `resolveRetryDecision` a 8.2 kísérlet vezérlését (`handledErrorKinds` szűrés, kísérletszám, `backoffMs` elem); a `resolveRunCompletion` a 8.4 záró állapotát (`succeeded`, vagy `failed` az ELSŐ kezeletlen hiba osztályával és az elhalt ágak számával). **Tiszta függvények**: a téma egyetlen sora sem érint adatbázist, nem hív portot, nem szakít meg futó lépést és nem ír `step_run` sort - csak kimondja a döntést. A négy típusfájl (`error-route`, `retry-decision`, `unhandled-error-record`, `run-completion`) **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `run-supervisor/`       | a futás életciklusa (SPEC-004 4.8, 4.4 ... 4.6, 8.4, PLAN-005 T-005-25). A `createRunSupervisor` az egyetlen belépési pont: `startRun` (a 4.8 menet hét lépése), háttérben futó léptető hurok (`advanceRun`), és a `ChildWorkflowRunner` két metódusa, **önmagára hivatkozva**. A 4.8 lépései külön, önmagukban futtatható függvények: `collectRunInputs` (1. lépés), `buildSnapshotDocument` (5. lépés), `buildNodePlans` + `validateProviderCapabilities` + `validateRunInput` egyetlen menetben (`prepareRun`, 3. és 4. lépés), plusz a gyerek futás kimenete (`collectTerminalOutput`, `buildChildResult`) és az aktív futások nyilvántartása (`ActiveRunRegistry`). A `run-supervisor.ts` és a `run-execution.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `run-interrupt/`        | a felhasználói megszakítás teljes menete (SPEC-004 9. szekció, PLAN-005 T-005-26). Az `AgentQueryRegistry` (`agent-query-registry.ts`) egy élő, `stepRunId` kulcsú `Map`: a `register`/`unregister` a `runAgentStep` (`agent-step` téma) `finally` ágán fut, a `listForRunIds` a megszakítandó fa `AgentQuery` objektumait adja. A `stopAndAwaitRunTree` a közös menet: `requestStop()` minden kézikönyvön, `interrupt()` minden érintett élő `AgentQuery`-n, majd az összes `completion` megvárása. Az `interruptRun` a belépési pont: a cél `runId`-ból olvassa ki a `rootRunId`-t, a `run-supervisor` `listActiveRuns()` listáját erre szűkíti, lefuttatja a `stopAndAwaitRunTree` menetet, majd a `database.recovery.cancelRunTree(rootRunId)` egyetlen tranzakcióban zár. Mindhárom fájl kap `.spec.ts`-t, valós `:memory:` adatbázissal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Függőségi irány
 
@@ -700,17 +706,17 @@ háttérfolyamathoz egyetlen fogódzó van, az `ActiveRunHandle`:
 | `requestStop()`     | a hurok nem indít több lépést, és a záró állapotot **nem** ő írja               |
 | `isStopRequested()` | a jelzés olvasása                                                               |
 
-**Amit a T-005-26 (megszakítás) ebből használ.** A 9. szekció 2. pontja ("a szabályozó ebből a
-futásból többé nem enged induló lépést, és a sorban álló lépései kiesnek") pontosan a
+**Amit a T-005-26 (megszakítás) ebből használ, lezárva.** A 9. szekció 2. pontja ("a szabályozó
+ebből a futásból többé nem enged induló lépést, és a sorban álló lépései kiesnek") pontosan a
 `requestStop()`; a 3. pontja ("minden élő agent lépéshez tartozó `AgentQuery` objektumon
 `interrupt()` a futás fáján") a `listActiveRuns()` `rootRunId` szerinti szűrésével kapja meg a fa
-tagjait. A `requestStop()` **szándékosan nem** ír záró állapotot: az 5. pont szerint a `db` oldal
-egyetlen tranzakcióban zár (futás `cancelled`, minden nem terminális lépés `cancelled`,
-`run_finished` esemény), tehát ha a hurok is írna, két, egymással versenyző állapotváltás
-keletkezne ugyanarra a sorra. **Ami hiányzik és a T-005-26-ra vár:** az élő `AgentQuery`
-objektumok nyilvántartása. Azok a `runAgentStep` belsejében élnek, ez a téma nem látja őket; a
-`requestStop()` ma csak azt garantálja, hogy ÚJ lépés nem indul, a futók a saját ütemükben
-fejeződnek be.
+tagjait, majd az `agent-query-registry.ts` (`run-interrupt` téma) `listForRunIds`-jével az azokhoz
+tartozó élő `AgentQuery` objektumokat. A `requestStop()` **szándékosan nem** ír záró állapotot: az 5. pont szerint a `db` oldal egyetlen tranzakcióban zár (futás `cancelled`, minden nem terminális
+lépés `cancelled`, `run_finished` esemény), tehát ha a hurok is írna, két, egymással versenyző
+állapotváltás keletkezne ugyanarra a sorra. Az élő `AgentQuery` objektumok nyilvántartása
+(korábban itt nyitott pont) a `run-interrupt` téma `AgentQueryRegistry`-je: a `runAgentStep`
+(`agent-step` téma) regisztrálja `agentQueryRunner.run(...)` sikere után, azonnal, és `finally`
+ágon iratkozik le minden kilépési úton, lásd a `run-interrupt/` sor és "Szabályok" lent.
 
 **Amit a T-005-28 (`createEngine`, `shutdown`) ebből használ.** A 10.2 szabályos leállás ugyanaz a
 két lépés minden aktív futáson (`listActiveRuns()` -> `requestStop()`), majd a `completion`
@@ -826,6 +832,33 @@ Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `a
 programjába is. A `drizzle-orm@0.45.2` egymás között típushibás dialektus deklarációi enélkül a
 `typecheck` kapun buknának; ugyanaz a felsőáramú hiba, amit a `packages/db/tsconfig.json` már
 dokumentál (11. szekció, gyökér `.claude/CLAUDE.md`).
+
+**A `run-interrupt` téma (T-005-26) négy tervezési döntése.**
+
+- **A `pending -> cancelled` átmenetnek nincs külön kódág.** A SPEC-004 9. szekció "Megszakítás
+  indulás előtt" bekezdése szerint egy sosem futott `pending` futásnak nincs mit megszakítani SDK
+  oldalon, de ezt a `cancelRunTree` `WHERE status IN ('pending', 'running')` feltétele önmagában
+  lefedi: egy `pending` futásnak nincs aktív kézikönyve, tehát a `listActiveRuns()` szűrése üres
+  listát ad rá, a `stopAndAwaitRunTree` azonnal visszatér, és a DB zárás önmagában viszi
+  `cancelled`-be a sort. Egy külön "ha pending" ág itt sosem futna le ténylegesen eltérő módon, a
+  100 százalékos, kizárás nélküli lefedettségi küszöb (`.claude/CLAUDE.md` 5. szekció) miatt nem is
+  íródott meg.
+- **A `Query.close()` metódust ez a téma sosem hívja** (O-2 nyitott kérdés, SPEC-004 9. szekció "A
+  `Query.close()` metódust nem hívjuk" bekezdése). A folyam lezárását kizárólag a `runAgentStep`
+  stream-kiürítő ciklusának természetes kimerülése végzi; a `stopAndAwaitRunTree` kizárólag
+  `interrupt()`-et hív az `AgentQuery`-n.
+- **A `packages/db` `run-recovery` témája bővült, nem új témával.** A `cancelRunTree(rootRunId)` a
+  `recoverInterruptedRuns` tömeges `UPDATE ... WHERE status IN (...)` mintáját követi,
+  `root_run_id` szerint szűkítve (a `workflow_run_root_idx` index), egyetlen tranzakcióban: a fa
+  minden nem terminális futása és lépése `cancelled`, futásonként egy `run_finished` esemény. Séma
+  változás nem történt, ez repository felület bővítés (`packages/db/CLAUDE.md` `run-recovery` sor).
+- **Ismert, ebben a témában szándékosan lefedetlen két él.** (1) Egy `human_approval` lépésnek
+  nincs `AgentQuery`-je, tehát erre a mechanizmusra nem szakítható meg - a döntésre várás
+  `ApprovalWaitRegistry` témája (`node-executor`) más eszköz. (2) Egy `concurrency-gate`
+  párhuzamossági helyre váró, még el sem indult lépés `interrupt()`-je nem old fel várakozó
+  Promise-t, mert a gate sorból való eltávolítás ma nem jelez a várakozónak; ez korlátlan
+  (`null`) párhuzamossági korláttal nem exponálódik, tehát a meglévő teszt eszköztárral nem
+  reprodukálható. Mindkettő megnevezett hiány, nem elfogadott végállapot.
 
 ## Kapcsolódó dokumentumok
 

@@ -6,6 +6,7 @@ import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
@@ -59,6 +60,7 @@ export async function executeJoinAiSynthesis(
   input: ExecuteJoinAiSynthesisInput,
   ports: EngineDependencies,
   gate: ConcurrencyGate,
+  agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<NodeExecutionOutcome>> {
   const outcome = await runAgentNodeLifecycle(
     {
@@ -73,6 +75,7 @@ export async function executeJoinAiSynthesis(
     },
     ports,
     gate,
+    agentQueryRegistry,
   );
   if (outcome.kind === 'error') {
     return outcome;

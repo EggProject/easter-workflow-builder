@@ -26,6 +26,7 @@ import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts'
 import type { ExpressionEvaluatorPort } from '../engine-port/expression-evaluator-port.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
 import { createRunSupervisor } from './create-run-supervisor.ts';
 import type { RunSupervisor } from './run-supervisor.ts';
@@ -282,6 +283,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
     ports,
     concurrencyGate: createConcurrencyGate(() => null),
     approvalRegistry,
+    agentQueryRegistry: createAgentQueryRegistry(),
     installedAgentSdkVersion: INSTALLED,
   });
   if (options.withoutDefaultProvider !== true) {

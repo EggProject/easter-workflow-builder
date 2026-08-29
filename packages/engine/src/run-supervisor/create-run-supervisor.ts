@@ -79,6 +79,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     concurrencyGate: dependencies.concurrencyGate,
     approvalRegistry: dependencies.approvalRegistry,
     childWorkflowRunner: { startChildRun, awaitChildRun },
+    agentQueryRegistry: dependencies.agentQueryRegistry,
   };
 
   /**

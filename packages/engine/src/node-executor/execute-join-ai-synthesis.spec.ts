@@ -18,6 +18,7 @@ import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { executeJoinAiSynthesis } from './execute-join-ai-synthesis.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
@@ -330,6 +331,7 @@ describe('executeJoinAiSynthesis', () => {
         },
         dependencies,
         gate,
+        createAgentQueryRegistry(),
       ),
     );
 
@@ -368,6 +370,7 @@ describe('executeJoinAiSynthesis', () => {
         },
         dependencies,
         gate,
+        createAgentQueryRegistry(),
       ),
     );
 
@@ -397,6 +400,7 @@ describe('executeJoinAiSynthesis', () => {
       },
       dependencies,
       gate,
+      createAgentQueryRegistry(),
     );
 
     expect(outcome.kind).toBe('error');
@@ -435,6 +439,7 @@ describe('executeJoinAiSynthesis', () => {
       },
       dependencies,
       gate,
+      createAgentQueryRegistry(),
     );
 
     expect(outcome.kind).toBe('error');

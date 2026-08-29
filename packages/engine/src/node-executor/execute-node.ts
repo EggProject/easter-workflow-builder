@@ -54,6 +54,7 @@ function executeJoinNode(
         },
         dependencies.ports,
         dependencies.concurrencyGate,
+        dependencies.agentQueryRegistry,
       );
     }
   }
@@ -135,6 +136,7 @@ export function executeNode(
         },
         ports,
         dependencies.concurrencyGate,
+        dependencies.agentQueryRegistry,
       );
     }
     case 'human_approval': {
