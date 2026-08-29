@@ -66,7 +66,24 @@ function outgoingEdgesOf(topology: RunTopology, nodeId: string): readonly Snapsh
 
 // A futtathatóvá vált példány a sor végére kerül, és megkapja a következő
 // érkezési sorszámot (SPEC-004 7.1).
+//
+// **A sorba állítás idempotens: egy példány egyszerre legfeljebb egyszer állhat
+// a sorban.** Egy menet több úton is eljuthat ugyanahhoz a példányhoz - a
+// `settleTouched` a jelölésenként érintett célokat járja be, a halott ág
+// terjesztése (`settleInstance` `dead` ága) pedig saját, beágyazott menetben
+// újra kiértékelheti ugyanazt a példányt. Egy `branch` node halott és élő ága
+// ugyanabba a lentebbi node-ba visszatalálkozva pontosan így viselkedik, és a
+// duplikálás **az élek pillanatképbeli sorrendjétől** függött: halott él elöl a
+// példány kétszer került a sorba, élő él elöl egyszer. Kétszeri sorba állásból
+// két `step_run` sor keletkezne ugyanarra a példányra, és a `run-supervisor`
+// `inFlight` térképe (példány kulcs -> `Promise`) az egyik futó lépés
+// eredményét el is veszítené. A sorrendfüggés a 4.4 2. pontjával is
+// ellentmondott: a futtathatóság a jelöléseken áll, nem az élek felsorolásán.
 function enqueue(draft: SchedulerDraft, instance: StepInstanceReference): void {
+  const instanceKey = instanceKeyOf(instance);
+  if (draft.readyInstances.some((ready) => instanceKeyOf(ready.instance) === instanceKey)) {
+    return;
+  }
   draft.readyInstances.push({ instance, arrivalSequence: draft.nextArrivalSequence });
   draft.nextArrivalSequence += 1;
 }
