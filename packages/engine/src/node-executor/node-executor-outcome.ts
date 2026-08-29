@@ -80,7 +80,9 @@ import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
  * Minden ág hordozza a lezárt `stepRun` rekordot (`StepRunRecord`), mert az
  * mind a négy esetben létezik: a `begin-step-run.ts` már létrehozta és
  * `running` állapotba vitte, a végrehajtó pedig valamelyik záró
- * `markStep*`-tel lezárta.
+ * `markStep*`-tel lezárta. **Ez az invariáns a T-005-31 óta is érvényes**: a
+ * külső megszakítás miatt lezáratlanul maradó lépés NEM ennek az uniónak az
+ * ága, hanem a `NodeExecutionResult` külön ága (`node-executor-result.ts`).
  */
 export type NodeExecutionOutcome =
   | { readonly kind: 'succeeded'; readonly stepRun: StepRunRecord; readonly selectedBranchKey: string | null }

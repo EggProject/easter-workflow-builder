@@ -12,6 +12,7 @@ import { executeSubWorkflow } from './execute-sub-workflow.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import type { ExecuteNodeRequest } from './execute-node-request.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorDependencies } from './node-executor-dependencies.ts';
 
 type JoinNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'join' }>;
@@ -88,7 +89,7 @@ function executeJoinNode(
 export function executeNode(
   request: ExecuteNodeRequest,
   dependencies: NodeExecutorDependencies,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const { ports } = dependencies;
 
   if (request.kind === 'error_handler') {

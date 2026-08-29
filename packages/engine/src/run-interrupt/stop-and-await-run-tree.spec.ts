@@ -3,6 +3,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import type { AgentQuery } from '@easter-workflow-builder/agent';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
+import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import { createAgentQueryRegistry } from './agent-query-registry.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
 
@@ -53,7 +54,7 @@ describe('stopAndAwaitRunTree', () => {
     first.resolve();
     second.resolve();
 
-    await stopAndAwaitRunTree([first.handle, second.handle], registry);
+    await stopAndAwaitRunTree([first.handle, second.handle], registry, createApprovalWaitRegistry());
 
     expect(first.handle.isStopRequested()).toBe(true);
     expect(second.handle.isStopRequested()).toBe(true);
@@ -68,7 +69,7 @@ describe('stopAndAwaitRunTree', () => {
     const { handle, resolve } = controlledHandle('run-1', 'root-1');
     resolve();
 
-    await stopAndAwaitRunTree([handle], registry);
+    await stopAndAwaitRunTree([handle], registry, createApprovalWaitRegistry());
 
     expect(interruptInTree).toHaveBeenCalledTimes(1);
     expect(interruptOutsideTree).not.toHaveBeenCalled();
@@ -81,7 +82,7 @@ describe('stopAndAwaitRunTree', () => {
 
     let hasSettled = false;
     const call = (async (): Promise<void> => {
-      await stopAndAwaitRunTree([first.handle, second.handle], registry);
+      await stopAndAwaitRunTree([first.handle, second.handle], registry, createApprovalWaitRegistry());
       hasSettled = true;
     })();
 
@@ -99,12 +100,43 @@ describe('stopAndAwaitRunTree', () => {
     expect(hasSettled).toBe(true);
   });
 
+  it('REGRESSZIÓ (AC-51): a kapott futások VÁRAKOZÓ human_approval lépéseit is lezárja, mielőtt a completion-re várna', async () => {
+    const registry = createAgentQueryRegistry();
+    const approvalRegistry = createApprovalWaitRegistry();
+    const inTree = approvalRegistry.waitForDecision('run-1', 'step-1');
+    const outsideTree = approvalRegistry.waitForDecision('run-other', 'step-other');
+    // A `completion` szándékosan CSAK akkor teljesül, ha a várakozó jóváhagyás
+    // már feloldódott: pontosan ez a valós lánc (a `human_approval`
+    // végrehajtója a döntésre vár, tehát a léptető hurok addig nem lép ki).
+    const { promise: completion, resolve } = Promise.withResolvers<Outcome<RunCompletion>>();
+    const handle: ActiveRunHandle = {
+      runId: 'run-1',
+      rootRunId: 'root-1',
+      workflowId: 'wf',
+      completion,
+      requestStop: () => {
+        // ebben a tesztben nincs szerepe: a lezárást a jóváhagyás feloldása vezérli
+      },
+      isStopRequested: () => false,
+    };
+    void inTree.then(() => {
+      resolve(SUCCEEDED);
+    });
+
+    await stopAndAwaitRunTree([handle], registry, approvalRegistry);
+
+    await expect(inTree).resolves.toStrictEqual({ kind: 'interrupted' });
+    // A fán kívüli futás várakozója érintetlen: a döntése változatlanul megjön.
+    approvalRegistry.notifyDecided('step-other', 'approved');
+    await expect(outsideTree).resolves.toStrictEqual({ kind: 'decided', decision: 'approved' });
+  });
+
   it('üres kézikönyv listára azonnal visszatér, nem hív interrupt-ot', async () => {
     const registry = createAgentQueryRegistry();
     const interruptSpy = vi.fn(() => Promise.resolve());
     registry.register('run-x', 'step-x', fakeQuery(interruptSpy));
 
-    await stopAndAwaitRunTree([], registry);
+    await stopAndAwaitRunTree([], registry, createApprovalWaitRegistry());
 
     expect(interruptSpy).not.toHaveBeenCalled();
   });

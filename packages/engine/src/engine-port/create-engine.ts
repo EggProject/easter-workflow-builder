@@ -118,7 +118,12 @@ export function createEngine(dependencies: EngineDependencies): Engine {
   }
 
   function interruptRun(runId: string): Promise<Outcome<InterruptSummary>> {
-    return interruptRunTree(runId, { database: dependencies.database, runSupervisor, agentQueryRegistry });
+    return interruptRunTree(runId, {
+      database: dependencies.database,
+      runSupervisor,
+      agentQueryRegistry,
+      approvalRegistry,
+    });
   }
 
   /**
@@ -207,6 +212,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
       database: dependencies.database,
       runSupervisor,
       agentQueryRegistry,
+      approvalRegistry,
     });
     if (recovered.kind === 'error') {
       return recovered;

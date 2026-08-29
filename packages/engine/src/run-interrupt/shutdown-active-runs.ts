@@ -1,6 +1,7 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RecoverInterruptedRunsResult } from '@easter-workflow-builder/db';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
+import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
@@ -17,6 +18,7 @@ export interface ShutdownActiveRunsDependencies {
   readonly database: DatabaseContext;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
+  readonly approvalRegistry: ApprovalWaitRegistry;
 }
 
 /**
@@ -58,6 +60,6 @@ export async function shutdownActiveRuns(
   dependencies: ShutdownActiveRunsDependencies,
 ): Promise<Outcome<RecoverInterruptedRunsResult>> {
   const handles = dependencies.runSupervisor.listActiveRuns();
-  await stopAndAwaitRunTree(handles, dependencies.agentQueryRegistry);
+  await stopAndAwaitRunTree(handles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
   return dependencies.database.recovery.recoverInterruptedRuns('graceful_shutdown');
 }

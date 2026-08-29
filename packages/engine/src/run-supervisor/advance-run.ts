@@ -12,9 +12,11 @@ import { executeNode } from '../node-executor/execute-node.ts';
 import type { ExecuteNodeRequest } from '../node-executor/execute-node-request.ts';
 import type { NodeExecutionInstance } from '../node-executor/node-executor-instance.ts';
 import type { NodeExecutionOutcome } from '../node-executor/node-executor-outcome.ts';
+import type { NodeExecutionResult } from '../node-executor/node-executor-result.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { buildRunContext } from '../run-context/build-run-context.ts';
 import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
+import { interruptLiveAgentQueries } from '../run-interrupt/interrupt-live-agent-queries.ts';
 import { advanceScheduler } from '../scheduling/advance-scheduler.ts';
 import { buildScopedKey } from '../scheduling/build-scoped-key.ts';
 import { collectJoinInputs } from '../scheduling/collect-join-inputs.ts';
@@ -33,7 +35,7 @@ const NO_LIVE_EDGE_IDS: ReadonlySet<string> = new Set();
 interface CompletedExecution {
   readonly instance: StepInstanceReference;
   readonly plan: NodePlan;
-  readonly outcome: Outcome<NodeExecutionOutcome>;
+  readonly outcome: Outcome<NodeExecutionResult>;
 }
 
 const OK: Outcome<void> = { kind: 'ok', value: undefined };
@@ -316,6 +318,16 @@ function applyCompletion(execution: RunExecution, completed: CompletedExecution)
     return outcome;
   }
   const value = outcome.value;
+
+  // Külső megszakítás miatt véget ért lépés: nincs lezárt `step_run` sor,
+  // tehát nincs mit felvenni a lefutott példányok közé, és nincs mit
+  // jelölni a gráfon sem - a lépés és a futás sorát a megszakítást kérő fél
+  // zárja le, egyetlen tranzakcióban (`node-executor-result.ts`
+  // `interrupted` ága, SPEC-004 9. szekció 5. pont).
+  if (value.kind === 'interrupted') {
+    return OK;
+  }
+
   recordExecuted(execution, instance, value.stepRun);
 
   // A hiba útja lezárult: ha ez a példány egy hibakontextust fogyasztó
@@ -525,19 +537,37 @@ function startReadyInstances(
  * példány, minden futtathatót elindít, majd megvárja, hogy **legalább egy**
  * befejeződjön, és az eredményét beépíti a futás állapotába.
  *
- * **`fail_run` és külső leállítás után nem indul új lépés**, a már futók
- * viszont befejeződnek. A futó lépések tényleges megszakítása (az SDK
- * `interrupt()` hívása) a `run-interrupt` téma dolga (9. szekció, T-005-26):
- * ez a téma a saját hatáskörében annyit tesz, hogy a futásból nem enged több
- * lépést indulni - ez a 9. szekció 2. pontja, a 3. pont marad a T-005-26-nak.
+ * **`fail_run` és külső leállítás után nem indul új lépés**, és a `fail_run`
+ * a MÁR futó testvér lépéseket is megszakítja (8.3 táblázat: "a motor
+ * megszakítja a többi futó lépést"). A megszakítás elemi lépése ugyanaz a
+ * primitíva, amit a külső megszakítás is használ
+ * (`run-interrupt/interrupt-live-agent-queries.ts`), és pontosan egyszer fut
+ * le futásonként - erre való a `hasInterruptedSiblings` jelző, mert a
+ * `fail_run` után új lépés már nem indul, tehát új megszakítandó `AgentQuery`
+ * sem keletkezik.
+ *
+ * **A DB oldali zárás NEM változik a megszakítással.** A `fail_run` továbbra
+ * is a `finishRun` menetén, `resolveRunCompletion` + `markRunFailed` úton zár
+ * (8.4), nem a `run-interrupt` téma `cancelRunTree` primitívjén: az
+ * `interrupt()` itt csak a folyamatban lévő provider hívásokat állítja le,
+ * nem tesz felhasználói megszakítást a futásból.
+ *
+ * **A külső leállítás (`stopRequested`) NEM indít innen megszakítást**: azt a
+ * `stopAndAwaitRunTree` már elvégezte, mielőtt a `completion` Promise-ra várni
+ * kezdett volna (9. szekció 2 ... 4. pont).
  */
 async function runSchedulingLoop(
   execution: RunExecution,
   dependencies: NodeExecutorDependencies,
 ): Promise<Outcome<void>> {
   const inFlight = new Map<string, Promise<CompletedExecution>>();
+  let hasInterruptedSiblings = false;
 
   for (;;) {
+    if (!hasInterruptedSiblings && execution.failRunRequested) {
+      hasInterruptedSiblings = true;
+      await interruptLiveAgentQueries(new Set([execution.runId]), dependencies.agentQueryRegistry);
+    }
     if (!execution.failRunRequested && !execution.stopRequested) {
       const started = startReadyInstances(execution, dependencies, inFlight);
       if (started.kind === 'error') {

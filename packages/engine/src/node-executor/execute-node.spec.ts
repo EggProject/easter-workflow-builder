@@ -14,6 +14,8 @@ import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.
 import { createApprovalWaitRegistry, type ApprovalWaitRegistry } from './approval-wait-registry.ts';
 import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
 import { executeNode } from './execute-node.ts';
+import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { ExecuteNodeRequest } from './execute-node-request.ts';
 import type { NodeExecutorDependencies } from './node-executor-dependencies.ts';
 
@@ -28,6 +30,21 @@ function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
     throw new Error(`váratlan hibaág: ${outcome.message}`);
   }
   return outcome.value;
+}
+
+/**
+ * A diszpécser eredményéből a LEZÁRULT node kimenet. A `NodeExecutionResult`
+ * `interrupted` ága (`node-executor-result.ts`) kizárólag a `human_approval`
+ * node külső megszakításakor áll elő, amit az `execute-human-approval.spec.ts`
+ * és a `create-run-supervisor.spec.ts` fed; ez a fájl a diszpécser
+ * ÁGVÁLASZTÁSÁT vizsgálja, ezért itt a megszakítás váratlan kimenet.
+ */
+function settledOrThrow(outcome: Outcome<NodeExecutionResult>): NodeExecutionOutcome {
+  const value = okOrThrow(outcome);
+  if (value.kind === 'interrupted') {
+    throw new Error('váratlan interrupted kimenet');
+  }
+  return value;
 }
 
 const notCalled = (): never => {
@@ -140,8 +157,8 @@ function openGate(): ConcurrencyGate {
 function registryDecidingImmediately(database: DatabaseContext): ApprovalWaitRegistry {
   const real = createApprovalWaitRegistry();
   return {
-    waitForDecision: (stepRunId) => {
-      const pending = real.waitForDecision(stepRunId);
+    waitForDecision: (runId, stepRunId) => {
+      const pending = real.waitForDecision(runId, stepRunId);
       queueMicrotask(() => {
         okOrThrow(database.approvals.decideApproval({ stepRunId, decision: 'approved' }));
         real.notifyDecided(stepRunId, 'approved');
@@ -153,6 +170,9 @@ function registryDecidingImmediately(database: DatabaseContext): ApprovalWaitReg
     },
     cancelWait: (stepRunId) => {
       real.cancelWait(stepRunId);
+    },
+    cancelWaitingForRunIds: (runIds) => {
+      real.cancelWaitingForRunIds(runIds);
     },
   };
 }
@@ -322,7 +342,7 @@ describe('executeNode', () => {
     const { runId } = seedRun(database);
     const request = plainRequest(runId, 'start', { type: 'start', inputFields: [], onUnhandledError: 'fail_run' });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('succeeded');
     expect(outcome.stepRun.nodeType).toBe('start');
@@ -340,7 +360,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('succeeded');
     expect(outcome.kind === 'succeeded' ? outcome.selectedBranchKey : null).toBe('igen');
@@ -357,7 +377,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('fan_out_expanded');
     expect(outcome.kind === 'fan_out_expanded' ? outcome.items : []).toStrictEqual([1, 2]);
@@ -374,7 +394,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('loop_advanced');
     expect(outcome.kind === 'loop_advanced' ? outcome.shouldContinue : false).toBe(true);
@@ -391,7 +411,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('succeeded');
     expect(outcome.stepRun.output).toStrictEqual(['elso', 'masodik']);
@@ -409,7 +429,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, published)));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, published)));
 
     expect(outcome.stepRun.nodeType).toBe('join');
     expect(published).toContainEqual(
@@ -422,7 +442,7 @@ describe('executeNode', () => {
     const { runId } = seedRun(database);
     const request = plainRequest(runId, 'agent', { type: 'agent_step', ...agentStepConfig(), onUnhandledError: null });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('provider_call_failed');
@@ -441,7 +461,7 @@ describe('executeNode', () => {
     });
     const dependencies = dependenciesOf(database, [], { approvalRegistry: registryDecidingImmediately(database) });
 
-    const outcome = okOrThrow(await executeNode(request, dependencies));
+    const outcome = settledOrThrow(await executeNode(request, dependencies));
 
     expect(outcome.kind).toBe('approval_decided');
     expect(outcome.kind === 'approval_decided' ? outcome.decision : '').toBe('approved');
@@ -458,7 +478,7 @@ describe('executeNode', () => {
       onUnhandledError: 'fail_run',
     });
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('workflow_recursion_detected');
@@ -483,7 +503,7 @@ describe('executeNode', () => {
       failedAttempt: 1,
     };
 
-    const outcome = okOrThrow(await executeNode(request, dependenciesOf(database, [])));
+    const outcome = settledOrThrow(await executeNode(request, dependenciesOf(database, [])));
 
     expect(outcome.kind).toBe('retry_scheduled');
     expect(outcome.kind === 'retry_scheduled' ? outcome.nextAttempt : -1).toBe(2);

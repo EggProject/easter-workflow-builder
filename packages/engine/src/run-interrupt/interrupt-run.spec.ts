@@ -9,6 +9,7 @@ import type {
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
 import type { AgentQuery } from '@easter-workflow-builder/agent';
+import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
@@ -153,7 +154,7 @@ function dependenciesOf(
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
 ): InterruptRunDependencies {
   const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
-  return { database, runSupervisor, agentQueryRegistry };
+  return { database, runSupervisor, agentQueryRegistry, approvalRegistry: createApprovalWaitRegistry() };
 }
 
 describe('interruptRun', () => {
