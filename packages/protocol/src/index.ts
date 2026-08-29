@@ -69,6 +69,8 @@ export type { StepRunRecord } from './run/step-run-record.ts';
 export { StepRunRecordSchema } from './run/step-run-record.ts';
 export type { InterruptSummaryResponse } from './run/interrupt-summary.ts';
 export { InterruptSummaryResponseSchema } from './run/interrupt-summary.ts';
+export type { RunInterruptedReason } from './run/run-interrupted-reason.ts';
+export { RunInterruptedReasonSchema } from './run/run-interrupted-reason.ts';
 
 // transcript: az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a
 // kurzoros lekérdezés kérése és a lapja.
@@ -102,7 +104,33 @@ export { ConcurrencyLimitViewSchema, SetConcurrencyLimitRequestSchema } from './
 
 // event-stream: a stream azonosító és URL építés, a feliratkozás kérés és állapot, az
 // öt keret sémája diszkriminált unióban, a keret kódoló és dekódoló, a kurzor szabály.
-export type { SubscriptionRequest, SubscriptionState } from './event-stream/stream-subscription.ts';
-export { SubscriptionRequestSchema, SubscriptionStateSchema } from './event-stream/stream-subscription.ts';
+export type {
+  RunSubscriptionEntry,
+  SubscriptionRequest,
+  SubscriptionState,
+} from './event-stream/stream-subscription.ts';
+export {
+  RunSubscriptionEntrySchema,
+  SubscriptionRequestSchema,
+  SubscriptionStateSchema,
+} from './event-stream/stream-subscription.ts';
 export { buildStreamUrl } from './event-stream/build-stream-url.ts';
 export { resolveReplayCursor } from './event-stream/resolve-replay-cursor.ts';
+export type {
+  ProtocolErrorFrame,
+  ReplayCompleteFrame,
+  RunEventFrame,
+  RunEventTransientFrame,
+  StreamFrame,
+  StreamReadyFrame,
+} from './event-stream/stream-frame.ts';
+export {
+  ProtocolErrorFrameSchema,
+  ReplayCompleteFrameSchema,
+  RunEventFrameSchema,
+  RunEventTransientFrameSchema,
+  StreamFrameSchema,
+  StreamReadyFrameSchema,
+} from './event-stream/stream-frame.ts';
+export { encodeStreamFrame } from './event-stream/encode-stream-frame.ts';
+export { decodeStreamFrame } from './event-stream/decode-stream-frame.ts';
