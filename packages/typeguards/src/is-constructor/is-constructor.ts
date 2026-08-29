@@ -1,6 +1,6 @@
-import { isFunction } from '../is-function/is-function';
-import type { Constructor } from './constructor';
-import { isNil } from '../is-nil/is-nil';
+import { isFunction } from '../is-function/is-function.ts';
+import type { Constructor } from './constructor.ts';
+import { isNil } from '../is-nil/is-nil.ts';
 
 /**
  * Type guard that checks if a value is a class constructor.

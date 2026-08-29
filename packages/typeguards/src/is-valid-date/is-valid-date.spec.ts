@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidDate } from './is-valid-date';
+import { isValidDate } from './is-valid-date.ts';
 import {
   TIMESTAMP_UNIX_EPOCH,
   TIMESTAMP_EPOCH,
@@ -9,7 +9,7 @@ import {
   DATE_YEAR_2023,
   DATE_MONTH_APRIL,
   DATE_DAY_15,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 describe('isValidDate function', () => {
   it('should return true for valid Date objects', () => {

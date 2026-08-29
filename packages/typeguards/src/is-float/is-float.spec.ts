@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFloat } from './is-float';
+import { isFloat } from './is-float.ts';
 import {
   POSITIVE_INT_ZERO,
   POSITIVE_INT_SMALL,
@@ -11,7 +11,7 @@ import {
   NEGATIVE_INT_SMALL,
   NEGATIVE_FLOAT_SMALL,
   NEGATIVE_FLOAT_LARGE,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 describe('isFloat', () => {
   it('should return true for positive floating-point numbers', () => {

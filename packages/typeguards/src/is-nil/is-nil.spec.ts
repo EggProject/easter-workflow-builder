@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isNil } from './is-nil';
+import { isNil } from './is-nil.ts';
 import {
   POSITIVE_INT_ZERO,
   POSITIVE_INT_SMALL,
   NEGATIVE_INT_ONE,
   POSITIVE_FLOAT_TYPICAL,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 function getTestStringValue(): string | undefined {
   return 'test';

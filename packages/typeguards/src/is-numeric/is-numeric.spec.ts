@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isNumeric } from './is-numeric';
+import { isNumeric } from './is-numeric.ts';
 import {
   POSITIVE_INT_ZERO,
   POSITIVE_INT_MEDIUM,
@@ -7,7 +7,7 @@ import {
   POSITIVE_FLOAT_LARGE,
   MAGIC_NUMBER_123,
   TEST_STRING_NUMERIC,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 describe('isNumeric - valid numeric strings', () => {
   describe('integers', () => {

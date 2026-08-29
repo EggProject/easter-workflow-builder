@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isFunctionReturnAny } from './is-function-return-any';
-import { MAGIC_NUMBER_123 } from '../test-constants/test-constants';
+import { isFunctionReturnAny } from './is-function-return-any.ts';
+import { MAGIC_NUMBER_123 } from '../test-constants/test-constants.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a tesztelt guard kifejezetten az `any` visszatérésű függvényeket vizsgálja
 function returnsAnything(): any {

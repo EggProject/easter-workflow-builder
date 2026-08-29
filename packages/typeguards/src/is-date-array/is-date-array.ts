@@ -1,4 +1,4 @@
-import { isInt } from '../is-int/is-int';
+import { isInt } from '../is-int/is-int.ts';
 
 /**
  * Type guard that checks if a value is an array of Date objects.

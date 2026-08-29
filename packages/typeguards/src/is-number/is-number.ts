@@ -1,5 +1,5 @@
-import { isFloat } from '../is-float/is-float';
-import { isInt } from '../is-int/is-int';
+import { isFloat } from '../is-float/is-float.ts';
+import { isInt } from '../is-int/is-int.ts';
 
 /**
  * Type guard that checks if a value is a valid number (either integer or float).

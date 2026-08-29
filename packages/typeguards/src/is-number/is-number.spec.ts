@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isNumber } from './is-number';
+import { isNumber } from './is-number.ts';
 import {
   POSITIVE_INT_ZERO,
   POSITIVE_INT_ONE,
@@ -13,7 +13,7 @@ import {
   POSITIVE_FLOAT_LARGE,
   NEGATIVE_FLOAT_MEDIUM,
   NEGATIVE_FLOAT_LARGE,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 describe('isNumber', () => {
   describe('integers', () => {
