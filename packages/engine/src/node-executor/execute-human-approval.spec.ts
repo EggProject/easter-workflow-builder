@@ -134,6 +134,23 @@ function findApprovalDecidedDecision(published: readonly unknown[]): unknown {
   return event['payload']['decision'];
 }
 
+/**
+ * Ugyanaz a minta, mint a `findApprovalDecidedDecision`: a `step_finished`
+ * esemény payloadjának `status`/`errorKind`/`tokens` mezőit adja vissza, hogy
+ * a teszt a `durationMs` (nem determinisztikus mennyiségű `clock.nowMs()`
+ * hívástól függő) mező nélkül tudjon egzakt módon ellenőrizni.
+ */
+function findStepFinishedFields(
+  published: readonly unknown[],
+): { readonly status: unknown; readonly errorKind: unknown; readonly tokens: unknown } | undefined {
+  const event = published.find((candidate) => isRecord(candidate) && candidate['kind'] === 'step_finished');
+  if (!isRecord(event) || !isRecord(event['payload'])) {
+    return undefined;
+  }
+  const payload = event['payload'];
+  return { status: payload['status'], errorKind: payload['errorKind'], tokens: payload['tokens'] };
+}
+
 function cancelRunningStep(database: DatabaseContext, runId: string): void {
   const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
   const running = rows.find((row) => row.status === 'running');
@@ -206,6 +223,9 @@ describe('executeHumanApproval', () => {
     expect(outcome.kind === 'approval_decided' ? outcome.stepRun.status : 'nincs-allapot').toBe('succeeded');
     expect(published).toContainEqual(expect.objectContaining({ kind: 'approval_requested' }));
     expect(findApprovalDecidedDecision(published)).toBe('approved');
+    // A döntés-érkezés útvonalon a `step_finished` esemény is íródik (T-005-28
+    // zárta le a korábban nyitott átvezetést, lásd `execute-human-approval.ts`).
+    expect(findStepFinishedFields(published)).toStrictEqual({ status: 'succeeded', errorKind: null, tokens: null });
   });
 
   it('elutasítás - a hívóra van bízva, hogy van-e kimenő rejected él: a kimenet ekkor is helyesen "rejected"-et jelez', async () => {
@@ -220,6 +240,7 @@ describe('executeHumanApproval', () => {
     expect(outcome.kind).toBe('approval_decided');
     expect(outcome.kind === 'approval_decided' ? outcome.decision : 'nincs-dontes').toBe('rejected');
     expect(outcome.kind === 'approval_decided' ? outcome.stepRun.status : 'nincs-allapot').toBe('rejected');
+    expect(findStepFinishedFields(published)).toStrictEqual({ status: 'rejected', errorKind: null, tokens: null });
   });
 
   it('elutasítás - akkor is helyesen jelez, ha a gráfban egyébként NINCS kimenő rejected él (az élválasztást a hívó végzi)', async () => {
@@ -387,7 +408,11 @@ describe('executeHumanApproval', () => {
     expect(outcome.kind).toBe('error');
   });
 
-  it('az approval_decided esemény írásának hibáját továbbadja', async () => {
+  it('a step_finished esemény írásának hibáját továbbadja, a döntés-érkezés útvonalon', async () => {
+    // A negyedik appendEngineEvent hívás a `step_finished` (1: step_started,
+    // 2: approval_requested, 3: step_finished ÚJ, T-005-28), tehát ez a
+    // teszt a 3. hívást buktatja meg - lásd `execute-human-approval.ts`
+    // "A `step_finished` esemény a döntés-érkezés útvonalon" doksiját.
     const database = openMemoryDatabase();
     const { runId } = seedRun(database);
     const published: unknown[] = [];
@@ -399,6 +424,34 @@ describe('executeHumanApproval', () => {
         appendEngineEvent: (input) => {
           appendCount += 1;
           if (appendCount === 3) {
+            database.close();
+          }
+          return database.events.appendEngineEvent(input);
+        },
+      },
+    };
+    const ports = portsOf(racyDatabase, published, okRender);
+    const registry = registryDecidingImmediately(database, 'approved');
+
+    const outcome = await executeHumanApproval(inputOf(runId), ports, registry);
+
+    expect(outcome.kind).toBe('error');
+  });
+
+  it('az approval_decided esemény írásának hibáját továbbadja', async () => {
+    // A negyedik appendEngineEvent hívás az `approval_decided` (1: step_started,
+    // 2: approval_requested, 3: step_finished, 4: approval_decided).
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    let appendCount = 0;
+    const racyDatabase: DatabaseContext = {
+      ...database,
+      events: {
+        ...database.events,
+        appendEngineEvent: (input) => {
+          appendCount += 1;
+          if (appendCount === 4) {
             database.close();
           }
           return database.events.appendEngineEvent(input);

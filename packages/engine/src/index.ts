@@ -13,6 +13,19 @@ export type { ClockPort } from './engine-port/clock-port.ts';
 export type { IdGeneratorPort } from './engine-port/id-generator-port.ts';
 export type { ProcessEnvironmentPort } from './engine-port/process-environment-port.ts';
 export type { EngineDependencies } from './engine-port/engine-dependencies.ts';
+// A motor teljes felülete és a `createEngine` összeállítás (SPEC-004 3.1
+// szekció, PLAN-005 T-005-28): az `Engine` interfész, a négy eredmény típus
+// (`ApprovalDecisionInput`, `ConcurrencySuggestion`, `ConnectionTestResult`,
+// `ShutdownSummary`, `InterruptSummary`) és a `createEngine(dependencies)`
+// factory, ami a kilenc portból felépíti a motoron belüli, megosztott
+// állapotokat és visszaadja a hét metódusú felületet.
+export type { Engine } from './engine-port/engine.ts';
+export type { ApprovalDecisionInput } from './engine-port/approval-decision-input.ts';
+export type { ConcurrencySuggestion } from './engine-port/concurrency-suggestion.ts';
+export type { ConnectionTestResult } from './engine-port/connection-test-result.ts';
+export type { InterruptSummary } from './engine-port/interrupt-summary.ts';
+export type { ShutdownSummary } from './engine-port/shutdown-summary.ts';
+export { createEngine } from './engine-port/create-engine.ts';
 
 // engine-error: a motor hibaosztályainak zárt szótára, a guardja és a
 // hibaüzenet formázója (SPEC-004 4.2, 4.5, 4.6, 4.7, 4.8, 5., 6.2, 6.3, 8.2,
