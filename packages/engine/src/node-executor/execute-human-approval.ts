@@ -144,18 +144,29 @@ function failApproval(
  *    `toPendingApprovalRecord` doksija ugyanezt az invariánst őrzi a lekérdező
  *    oldalon).
  * 7. **Döntés érkezésekor**: a `db.approvals.decideApproval(...)` (KÜLSŐ hívó,
- *    T-005-28, MOST NEM ennek a végrehajtónak a felelőssége) már elvégezte a
- *    `step_run` állapotváltást, mielőtt a regiszteren át értesítést küldött
+ *    a `createEngine` `decideApproval` motor művelete, T-005-28) már elvégezte
+ *    a `step_run` állapotváltást, mielőtt a regiszteren át értesítést küldött
  *    volna - ezért ez a végrehajtó `getStepRun`-nal olvassa vissza az
- *    időközben lezárt sort, `approval_decided` eseményt ír
- *    (`waitedMs = decidedAtMs - requestedAtMs`), és az `approval_decided`
- *    `NodeExecutionOutcome` ágán adja vissza a döntést.
+ *    időközben lezárt sort, egy `step_finished` eseményt ír (lásd lent), majd
+ *    `approval_decided` eseményt (`waitedMs = decidedAtMs - requestedAtMs`),
+ *    és az `approval_decided` `NodeExecutionOutcome` ágán adja vissza a
+ *    döntést.
  *
- * **Emlékeztető, dokumentálva a `packages/engine/CLAUDE.md`-ben is:** a
- * `decideApproval` motor művelet (T-005-28) felelőssége, hogy a `db.approvals
- * .decideApproval(...)` sikere UTÁN meghívja a `registry.notifyDecided(...)`-t
- * - enélkül egy timeoutMs nélküli (korlátlan) `human_approval` lépés örökre
- * várna.
+ * **A `step_finished` esemény a döntés-érkezés útvonalon (T-005-28 óta
+ * lezárva).** A SPEC-004 5. szekció "Közös szabályok" pontja minden lépés
+ * zárásához `step_finished` eseményt ír elő, de ezen az úton a tényleges
+ * állapotváltás (`markStepSucceeded`/`markStepRejected`) a `db.approvals
+ * .decideApproval(...)` belseje, nem ez a végrehajtó, tehát a szokásos
+ * `finishStepRunSucceeded`/`finishStepRunFailed` segéd nem hívható újra (a
+ * sor már terminális, egy második állapotváltás `illegal_status_transition`
+ * hibát adna). A végrehajtó ezért **közvetlenül** `emitEngineEvent`-tel írja
+ * az eseményt, a már visszaolvasott `stepRunAfterDecision.value.status`
+ * mezővel; az `errorKind` és a `tokens` mindig `null`, mert sem a
+ * `markStepSucceeded`, sem a `markStepRejected` hívás nem ír `error_kind`
+ * vagy token oszlopot (`human-approval-repository.ts`). A `durationMs` a
+ * `beginStepRun` által rögzített `startedAtMs`-hez képest, a `clock` portból,
+ * ugyanazzal a számítással, mint a `finishStepRunSucceeded`/
+ * `finishStepRunFailed` segédben.
  */
 export async function executeHumanApproval(
   input: ExecuteHumanApprovalInput,
@@ -242,6 +253,27 @@ export async function executeHumanApproval(
   }
 
   const decidedAtMs = ports.clock.nowMs();
+
+  /* eslint-disable unicorn/no-null -- a `StepFinishedPayload.errorKind`/`.tokens` mezője a döntés-érkezés útvonalon mindig a tárolt alak valódi hiány értéke: sem a `markStepSucceeded`, sem a `markStepRejected` hívás nem ír `error_kind` vagy token oszlopot (SPEC-004 5.8 utolsó pontja, `human-approval-repository.ts`) */
+  const stepFinishedEmitted = emitEngineEvent(
+    {
+      kind: 'step_finished',
+      runId,
+      stepRunId,
+      payload: {
+        status: stepRunAfterDecision.value.status,
+        errorKind: null,
+        durationMs: decidedAtMs - startedAtMs,
+        tokens: null,
+      },
+    },
+    ports,
+  );
+  /* eslint-enable unicorn/no-null */
+  if (stepFinishedEmitted.kind === 'error') {
+    return stepFinishedEmitted;
+  }
+
   const decidedEmitted = emitEngineEvent(
     {
       kind: 'approval_decided',

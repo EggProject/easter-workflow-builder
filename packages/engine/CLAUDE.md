@@ -22,7 +22,7 @@ infrastruktúrát. **A T-005-21 ehhez hozzátette a `node-executor` téma másod
 `agent_step` és a `join` `ai_synthesis` végrehajtóját, a párhuzamossági hely kérésével és
 felszabadításával. **A T-005-22 hozzátette a `human_approval` végrehajtóját**, a korlátlan és a
 korlátos várakozással (5.8), plusz a döntésre várás `ApprovalWaitRegistry`-jét, ami a
-`decideApproval` motor művelet (T-005-28, még nem létezik) felé nyitott felület. **A T-005-23
+`decideApproval` motor művelet (T-005-28, `engine-port/create-engine.ts`) felé nyitott felület. **A T-005-23
 hozzátette a `sub_workflow` végrehajtóját**, az ancestry alapú rekurzióvédelemmel és a
 `ChildWorkflowRunner` port alakú, motoron belüli függőséggel, amit a `run-supervisor` (T-005-25)
 tölt majd ki. **A T-005-24 zárta le a `node-executor` témát és nyitotta meg az `error-policy`
@@ -45,16 +45,21 @@ futásra lefuttatja - nem `rootRunId` szerint szűkítve, mint az `interruptRun`
 zárta a spec 12. szekciójában felsorolt utolsó téma mappát, a `startup-recovery`-t: a
 `runStartupRecovery` a `RunRecovery.recoverInterruptedRuns('startup_recovery')` hívást burkolja
 (SPEC-004 10.1 szekció), plusz a `restartRun` motor műveletet a `run-supervisor` témába illesztette
-(`restart-run.ts`, 9. szekció zárómondata) - lásd mindkettő részleteit lent. Ma tizennyolc téma áll
-készen, a PLAN-005 F3-F7 fázisa szerinti teljes lista; a T-005-28 a `createEngine` összeállítást és
-a `shutdown()`/`decideApproval()` metódust adja, ami a `shutdownActiveRuns`-ra és az
-`ApprovalWaitRegistry`-re épít.
+(`restart-run.ts`, 9. szekció zárómondata) - lásd mindkettő részleteit lent. **A T-005-28 zárta le a
+PLAN-005 F3-F7 fázisát**: a `createEngine` összeállítás (`engine-port/create-engine.ts`), ami a
+belső, megosztott állapotot (`ConcurrencyGate`, `ApprovalWaitRegistry`, `AgentQueryRegistry`,
+`RunSupervisor`, mindegyik pontosan egyszer példányosítva) a hét `Engine` metódus mögé zárja: a
+`decideApproval` a `shutdownActiveRuns`-ra és az `ApprovalWaitRegistry`-re, a `shutdown` a
+`shutdownActiveRuns`-ra, az `interruptRun`/`restartRun` a T-005-26/T-005-27 kész primitívjeire épül
+adapter nélkül, a `suggestedConcurrencyLimit`/`testProviderConnection` pedig a `capability-policy`
+téma T-005-13-as döntő függvényeit hívja. Ma tizennyolc téma áll készen, a PLAN-005 F3-F7 fázisa
+szerinti teljes, lezárt lista.
 
 ## Fájlok
 
 | Mappa                   | Felelősség                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `engine-port/`          | a kilenc befecskendezett port típusa és az összefogó `EngineDependencies` (SPEC-004 3.2, 3.3). **Típus-only, nincs `.spec.ts`** (SPEC-002 6.3 pont)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `engine-port/`          | a kilenc befecskendezett port típusa és az összefogó `EngineDependencies` (SPEC-004 3.2, 3.3), **plusz a T-005-28 óta a motor kifelé mutatott felülete**: a `Engine` interfész (SPEC-004 3.1, hét metódus), a `createEngine(dependencies): Engine` összeállító függvény és az öt kis eredmény típus (`ApprovalDecisionInput`, `ConcurrencySuggestion`, `ConnectionTestResult`, `InterruptSummary`, `ShutdownSummary`). A kilenc port típusfájl **típus-only, nincs `.spec.ts`** (SPEC-002 6.3 pont); a `create-engine.ts` viszont valós `:memory:` adatbázis ellen futó, végponttól végpontig tesztelt implementáció, saját `.spec.ts`-sel, lásd "Szabályok"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `engine-error/`         | a motor hibaosztályainak `EngineErrorKind` uniója (nyitott, később bővülhet), az `isEngineErrorKind` guard és a `formatEngineErrorMessage` hibaüzenet formázó (F-24 konvenció), mindkettő saját `.spec.ts` párral                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `engine-event/`         | a 13, motor eredetű `run_event` `kind` payload alakja (egy fájl egy payload típus), az összefogó `EngineEvent` diszkriminált unió és a `writeEngineEvent` motor esemény író, ami a `database.events.appendEngineEvent`-et hívja, `occurredAtMs`-t a `clock` portból számítva (SPEC-004 13. szekció, PLAN-005 T-005-9). A `StepStartedPayload` az öt kötelező mező mellett a SPEC-004 11.3 táblázat három opcionális jelölő mezőjét is hordozza (`strategyUnproven`, `modelIdentifierUnproven`, `serverToolAvailabilityUnproven`), amiket a `capability-policy` téma `unknown` ágai töltenek (T-005-13). Az `EngineEvent['kind']` unió pontosan 13 tagú tesztje és a `writeEngineEvent` `.spec.ts`-e valós `:memory:` adatbázis ellen fut                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `run-graph/`            | a pillanatkép átindexelése `ExecutableGraph` alakra (`buildExecutableGraph`), a visszaél keresés (`findLoopBackEdges`), a kör keresés a visszaélek elhagyása után (`detectGraphCycle`), a `loop` node alakjának két ellenőrzése (`validateLoopBackEdgeBody`, `validateLoopBranchEdges`) és az elérhetőség számítás (`computeReachableNodeIds`), a SPEC-004 4.1 és 4.6 szekciója szerint (PLAN-005 T-005-10). Tiszta függvények, a téma egyetlen sora sem érint adatbázist. Az `executable-graph.ts` **típus-only, nincs `.spec.ts`**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -562,21 +567,22 @@ void` pár szándékosan **más** mintát követ, mint a `ConcurrencyGate.reques
   (jövőbeli `run-supervisor`, T-005-25) bízva - ugyanaz az elv, mint a `failed` ág `on_error`/
   `fail_run`/`fail_branch` döntésénél.
 
-**Emlékeztető, ami a T-005-28-ra (a `decideApproval` motor művelet, a `createEngine` összeállítása)
-vár.** A `db.approvals.decideApproval(...)` hívás és a hozzá tartozó `notifyDecided` hívás **ebben
-a lépésben még nem létezik** - az `execute-human-approval.spec.ts` a jövőbeli hívó helyett egy
-teszt-only wrappert épít (`registryDecidingImmediately`), ami a `waitForDecision` regisztráció után
-egy mikrotaszkban azonnal meghívja a `notifyDecided`-et. Éles futásban a `decideApproval` motor
-művelet felelőssége, hogy a `db.approvals.decideApproval(...)` **sikere UTÁN** hívja meg a
-`registry.notifyDecided(stepRunId, decision)`-t, ugyanazon a regiszter példányon, amit a
-`node-executor` réteg a `waitForDecision`-höz használt - enélkül egy `timeoutMs: null` (korlátlan)
-`human_approval` lépés örökre várna. Ugyanígy nyitva marad a `step_finished` esemény írása a
-döntés-érkezés útvonalon: a SPEC-004 5. szekció "Közös szabályok" pontja minden lépés zárásához
-`step_finished` eseményt ír elő, de a `human_approval` döntés-érkezés esetén a tényleges
-állapotváltás (`markStepSucceeded`/`markStepRejected`) a `db.approvals.decideApproval(...)` belseje,
-nem ez a végrehajtó - a SPEC-004 5.8 utolsó pontja csak az `approval_decided` esemény írását nevezi
-meg erre az útvonalra. Ez a `step_finished` esemény írásának útja ezért a T-005-28 nyitott
-átvezetése, nem elfogadott végállapot.
+**A T-005-28-ra váró átvezetés lezárva.** A `db.approvals.decideApproval(...)` hívás és a hozzá
+tartozó `notifyDecided` hívás a `createEngine` `decideApproval` motor műveletében él
+(`engine-port/create-engine.ts`): a `database.approvals.decideApproval(input)` sikere UTÁN hívja
+meg a `approvalRegistry.notifyDecided(input.stepRunId, input.decision)`-t, ugyanazon a
+`ApprovalWaitRegistry` példányon, amit a `RunSupervisorDependencies` már megkapott, tehát amin a
+`node-executor` réteg a `waitForDecision`-t is hívta - enélkül egy `timeoutMs: null` (korlátlan)
+`human_approval` lépés örökre várna. Az `execute-human-approval.spec.ts` teszt-only wrappere
+(`registryDecidingImmediately`) ezt a valódi hívót helyettesíti egységteszt szinten; a
+`create-engine.spec.ts` végponttól végpontig futó tesztje a TÉNYLEGES `decideApproval` motor
+művelettel bizonyítja ugyanezt. **A `step_finished` esemény írása a döntés-érkezés útvonalon szintén
+lezárva** (`execute-human-approval.ts`, "Döntés érkezésekor" pont): mivel a tényleges állapotváltás
+(`markStepSucceeded`/`markStepRejected`) a `db.approvals.decideApproval(...)` belseje, nem ez a
+végrehajtó, a lépés **közvetlenül** `emitEngineEvent`-tel írja az eseményt, a már visszaolvasott
+`stepRunAfterDecision.value.status` mezővel, `errorKind`/`tokens` mindig `null`-lal (a
+`markStepSucceeded`/`markStepRejected` egyike sem ír ilyen oszlopot). A `create-engine.spec.ts`
+`decideApproval` tesztje mindkét eseményt (`step_finished`, majd `approval_decided`) ellenőrzi.
 
 **A `sub_workflow` végrehajtó és a `ChildWorkflowRunner` szerződés (T-005-23).** A SPEC-004 5.9
 szekció leírja az al-workflow hívás **viselkedését**, de nem azt, hogyan tud egy `node-executor`
@@ -729,10 +735,15 @@ lépés `cancelled`, `run_finished` esemény), tehát ha a hurok is írna, két,
 (`agent-step` téma) regisztrálja `agentQueryRunner.run(...)` sikere után, azonnal, és `finally`
 ágon iratkozik le minden kilépési úton, lásd a `run-interrupt/` sor és "Szabályok" lent.
 
-**Amit a T-005-28 (`createEngine`, `shutdown`) ebből használ.** A 10.2 szabályos leállás ugyanaz a
-két lépés minden aktív futáson (`listActiveRuns()` -> `requestStop()`), majd a `completion`
-megvárása; a `decideApproval` motor művelet pedig ugyanazt az `approvalRegistry` példányt kapja,
-amit a `RunSupervisorDependencies` már megkövetel.
+**Amit a T-005-28 (`createEngine`, `shutdown`) ebből használ, lezárva.** A `createEngine.shutdown()`
+a `shutdownActiveRuns`-t hívja a saját `database`/`runSupervisor`/`agentQueryRegistry` példányaival,
+és a visszaadott `RecoverInterruptedRunsResult.recoveredRunCount` mezőt a `ShutdownSummary`
+`interruptedRunCount` nevére illeszti (a nevek eltérnek, mert a leállás szemantikája szerint a
+futások `interrupted` állapotba kerülnek, nem "helyreállnak", lásd "10.2 Szabályos leállás"
+fentebb). Az `interruptRun` és a `restartRun` motor művelet ugyanígy, adapter nélkül hívja a T-005-26/
+T-005-27-ben kész `interruptRun`/`restartRun` függvényt. A `decideApproval` motor művelet pedig
+ugyanazt az `approvalRegistry` példányt kapja, amit a `RunSupervisorDependencies` már megkövetel -
+lásd a `node-executor` szekció "A T-005-28-ra váró átvezetés lezárva" bekezdését.
 
 **2. A retry duplikáció feloldása: a `step_run` sort a hívó írja.** A T-005-24 nyitva hagyott
 kérdése (`packages/engine/CLAUDE.md` korábbi "Nyitott átvezetés" pontja) **lezárva**, a második
@@ -914,9 +925,54 @@ dokumentál (11. szekció, gyökér `.claude/CLAUDE.md`).
   a két réteg között (nem korrupt adatra írt, sosem futó ág), ezért kapott önálló hibaosztályt az
   `isRecord` typeguard hamis ágán.
 
+**A `createEngine` összeállítás öt tervezési döntése (T-005-28).**
+
+- **Az `Engine` interfész, a `createEngine` és az öt eredmény típus az `engine-port/` mappában
+  áll, nem új téma mappában.** A SPEC-004 12. szekció táblázata pontosan tizennyolc téma mappát
+  sorol fel, tehát egy tizenkilencedik felvétele eltérne a spectől. Az `engine-port` már a
+  `createEngine` **bemenetét** (`EngineDependencies`) hordozza; a `Engine` a **kimenete**, a
+  `createEngine` a kettőt összekötő függvény - ugyanabba a mappába valók, mert egyetlen fogalmat
+  írnak le két oldalról, nem két különböző fogalmat (6. szekció "A bontási kritérium" 4. pontja: a
+  csoportnak nincs önálló domain neve a `engine-port`-tól elkülönítve).
+- **A belső, megosztott állapot (`ConcurrencyGate`, `ApprovalWaitRegistry`, `AgentQueryRegistry`,
+  `RunSupervisor`) mindegyike pontosan egyszer példányosul a `createEngine` törzsében**, zárásban
+  élő állapotként, ugyanaz a minta, mint a `createConcurrencyGate`/`createApprovalWaitRegistry`/
+  `createRunSupervisor` saját belső állapota: két `createEngine` hívás (két teszt) nem látja
+  egymás futásait, egyetlen híváson belül viszont mind a hét `Engine` metódus ugyanazt a négy
+  példányt osztja.
+- **A `testProviderConnection` mindkét módja (`sdk_model_list`, `minimal_query`) ugyanazt a
+  minimális `query()` hívást futtatja.** A `resolveConnectionTestMode` a leíróból jövő
+  `modelsEndpoint.calledBySdk` alapján dönt a `mode` KIMENETI mezőről (SPEC-004 11.3 táblázat 16.
+  sora), de a befecskendezett `agentQueryRunner` port (3.3 szekció) nem hordoz külön
+  "modell lista" metódust - az `AgentQuery` alakja `{ messages, interrupt() }`, ennyi. A `mode` így
+  ma tisztán DIAGNOSZTIKAI jelölő a hívó felé ("milyen úton próbálkozott volna a motor"), a
+  tényleges hálózati hívás mindkét ágon azonos. Ez **szándékos egyszerűsítés, nem kitalált
+  viselkedés**: a spec nem ír elő tényleges modell lista lekérdezést a portlista zárt (3.2) volta
+  miatt, tehát egy külön SDK hívás bedrótozása találgatás lenne.
+- **A `ConcurrencyLimitLookup` hibaágát a `createEngine` "nincs korlát" (`null`) állapotra
+  fordítja.** A `ConcurrencyLimitLookup` típusnak (`concurrency-gate/concurrency-limit-lookup.ts`)
+  nincs hibacsatornája, csak `number | null` a visszatérése; ha a
+  `database.concurrencyLimits.readLimit(providerId)` hibaágat ad, a gate szándékosan
+  korlátlanként kezeli a providert, hogy egy olvasási hiba ne fagyassza le csendben az összes
+  lépést - egy valódi adatbázis hiba amúgy is hangosan felszínre kerülne a sok más DB hívás
+  valamelyikén ugyanabban a kérésben. Futtatott bizonyíték: a `create-engine.spec.ts` "a
+  párhuzamossági korlát lekérdezésének hibaága" tesztje, ahol egy mindig hibázó `readLimit`
+  mellett a lépés végig lefut.
+- **Az `interruptRun`/`shutdown` végpontig futó tesztjei szándékosan `agent_step`-et használnak,
+  nem `human_approval`-t.** A `run-interrupt` téma "Ismert, ebben a témában szándékosan lefedetlen
+  két él" bekezdése fentebb már kimondja: egy `human_approval` lépésnek nincs `AgentQuery`-je,
+  tehát az `interrupt()` mechanizmus nem éri el, és `timeoutMs: null` mellett a
+  `raceApprovalDecision` promise-a a `requestStop()` jelzésre sem oldódik fel - ez a
+  `runSchedulingLoop` "a már futók befejeződnek" szabályának (fent, `run-supervisor` szekció)
+  együttes következménye a `human_approval` várakozással, MEGNEVEZETT, nem e lépésben eldöntendő
+  hiány. A `create-engine.spec.ts` ezért egy vezérelhető (`controlledMessageIterable`) agent
+  üzenetfolyamot használ: a step `running` állapotba kerüléséig vár, majd az `interrupt()`/
+  `shutdown()` hívás felszabadítja a folyamot, ugyanaz a minta, mint a
+  `run-agent-step.spec.ts` "a query a hívás UTÁN AZONNAL regisztrálódik" tesztje.
+
 ## Kapcsolódó dokumentumok
 
-- [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 3.2, 3.3 és 12. szekció
+- [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 3.1, 3.2, 3.3 és 12. szekció
 - [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 11.2 és 11.3 szekció
 - [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 5.2, 6.3 és 6.4 szekció
 - [`../../docs/research/2026-08-26-agent-sdk-minimax.md`](../../docs/research/2026-08-26-agent-sdk-minimax.md), 1. szekció (az `Options` mezői, a `Stop` hook és a `HookCallbackMatcher` alakja)
