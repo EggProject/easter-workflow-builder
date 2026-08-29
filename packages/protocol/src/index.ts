@@ -80,3 +80,15 @@ export type { ReadRunEventsQuery } from './transcript/read-run-events-query.ts';
 export { ReadRunEventsQuerySchema } from './transcript/read-run-events-query.ts';
 export type { TranscriptPage } from './transcript/transcript-page.ts';
 export { TranscriptPageSchema } from './transcript/transcript-page.ts';
+
+// approval: a döntés felsorolás, a várakozó jóváhagyás rekordja, és a döntés kérés alakja.
+export type { ApprovalDecision } from './approval/approval-decision.ts';
+export { ApprovalDecisionSchema } from './approval/approval-decision.ts';
+export type { ApprovalDecisionRequest, PendingApproval } from './approval/pending-approval.ts';
+export { ApprovalDecisionRequestSchema, PendingApprovalSchema } from './approval/pending-approval.ts';
+
+// provider: a provider összefoglaló alakja és a kapcsolat teszt válasza.
+export type { ProviderSummary } from './provider/provider-summary.ts';
+export { ProviderSummarySchema } from './provider/provider-summary.ts';
+export type { ConnectionTestMode, ConnectionTestResponse } from './provider/connection-test-response.ts';
+export { ConnectionTestModeSchema, ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
