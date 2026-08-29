@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@easter-workflow-builder/core": "workspace:*",
+    "@easter-workflow-builder/typeguards": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
