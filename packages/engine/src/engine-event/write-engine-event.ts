@@ -8,7 +8,7 @@ import type { EngineEvent } from './engine-event.ts';
  * `kind` és `payload` mezőjét közvetlenül továbbadja a
  * `DatabaseContext.events.appendEngineEvent`-nek. Az `occurredAtMs` mezőt a
  * `clock` portból számítja (SPEC-004 14.2 determinizmus tábla: a motorban
- * nincs `Date.now()`). A `new Date(clock.nowMs())` konverzió itt megengedett,
+ * nincs natív rendszeróra hívás). A `new Date(clock.nowMs())` konverzió itt megengedett,
  * mert a `clock.nowMs()` a determinisztikus forrás, csak az
  * `AppendEngineEventInput.occurredAtMs: Date` mező típusa miatt kell
  * `Date`-be csomagolni.
