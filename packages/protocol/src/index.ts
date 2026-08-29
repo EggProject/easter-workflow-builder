@@ -92,3 +92,10 @@ export type { ProviderSummary } from './provider/provider-summary.ts';
 export { ProviderSummarySchema } from './provider/provider-summary.ts';
 export type { ConnectionTestMode, ConnectionTestResponse } from './provider/connection-test-response.ts';
 export { ConnectionTestModeSchema, ConnectionTestResponseSchema } from './provider/connection-test-response.ts';
+
+// settings: a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát
+// nézete a beállított értékkel és a mért javaslattal.
+export type { SettingsRecord, UpdateSettingsRequest } from './settings/settings-record.ts';
+export { SettingsRecordSchema, UpdateSettingsRequestSchema } from './settings/settings-record.ts';
+export type { ConcurrencyLimitView, SetConcurrencyLimitRequest } from './settings/concurrency-limit-view.ts';
+export { ConcurrencyLimitViewSchema, SetConcurrencyLimitRequestSchema } from './settings/concurrency-limit-view.ts';
