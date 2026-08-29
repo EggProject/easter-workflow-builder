@@ -10,7 +10,7 @@ import type { NodeExecutorPorts } from './node-executor-ports.ts';
  * `finishStepRunSucceeded`/`finishStepRunFailed` hívásnak, hogy a
  * `step_finished` esemény `durationMs` mezője kiszámolható legyen a `clock`
  * porton keresztül (SPEC-004 14.2 determinizmus tábla: a motorban nincs
- * `Date.now()`).
+ * natív rendszeróra hívás).
  */
 export interface BeganStepRun {
   readonly stepRun: StepRunRecord;
