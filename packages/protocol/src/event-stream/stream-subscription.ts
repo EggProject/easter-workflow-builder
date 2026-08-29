@@ -7,11 +7,13 @@ import { z } from 'zod';
  * indult"), a `replayLimit` a pótlás lapmérete, a kérés **kötelező** mezője,
  * alapérték nélkül (F-19, 24. kritérium).
  */
-const RunSubscriptionEntrySchema = z.strictObject({
+export const RunSubscriptionEntrySchema = z.strictObject({
   runId: z.string(),
   fromEventId: z.number().int().nonnegative(),
   replayLimit: z.number().int().positive(),
 });
+
+export type RunSubscriptionEntry = z.infer<typeof RunSubscriptionEntrySchema>;
 
 /**
  * `PUT /api/streams/{streamId}/subscriptions` kérés törzse (SPEC-005 4.2 F
