@@ -4,7 +4,19 @@ import process from 'node:process';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import { createServerLogger, type DestinationStream } from '@easter-workflow-builder/logger';
+import { createEngine } from '@easter-workflow-builder/engine';
+import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
 import type { ServerConfig } from '../server-config/server-config.ts';
+import { buildProviderDescriptorLookup } from '../engine-assembly/build-provider-descriptor-lookup.ts';
+import { createRejectingExpressionEvaluator } from '../engine-assembly/create-rejecting-expression-evaluator.ts';
+import { createRejectingTemplateRenderer } from '../engine-assembly/create-rejecting-template-renderer.ts';
+import { createRealEventPublisher } from '../engine-assembly/create-real-event-publisher.ts';
+import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
+import { createProcessEnvironmentReader } from '../engine-assembly/create-process-environment-reader.ts';
+import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
+import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
+import { createHttpServer } from '../http-server/create-http-server.ts';
 import { continueStartupWithDatabase } from './continue-startup-with-database.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -117,6 +129,66 @@ describe('continueStartupWithDatabase', () => {
 
     await new Promise<void>((resolve) => {
       occupier.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /**
+   * SPEC-006 13. szekció 46. elfogadási kritériuma: "a szerver ténylegesen
+   * elindul és kiszolgál egy kérést, valós `:memory:` adatbázissal,
+   * befecskendezett `agentQueryRunner` porttal, `port: 0` értékkel". Ez a
+   * `continueStartupWithDatabase`-en KÍVÜL épít mindent, mert az a
+   * függvény maga hívja a `buildEngineDependencies`-t, ami mindig a valódi
+   * `buildAgentQueryRunner()`-t adja - befecskendezett fake portra ezen a
+   * ponton nincs mód. A teszt ezért a `continue-startup-with-database.ts`
+   * 5-7. lépését (motor, HTTP szerver, figyelés) manuálisan, de a valós
+   * `engine-assembly` építőelemekkel ismétli meg, kizárólag az
+   * `agentQueryRunner` portot cserélve fake-re - ugyanaz a minta, mint a
+   * `packages/engine` `create-engine.spec.ts` teszt harnessa.
+   */
+  it('a szerver valóban elindul és kiszolgál egy kérést, injektált agentQueryRunner porttal, valós :memory: adatbázissal, port: 0 értékkel (46. elfogadási kritérium)', async () => {
+    const database = openMemoryDatabase();
+    const clock = createSystemClock();
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const fakeAgentQueryRunner: AgentQueryRunner = {
+      run: () => {
+        throw new Error('nem várt hívás: ez a próba nem indít agent lépést');
+      },
+    };
+    const engine = createEngine({
+      database,
+      agentQueryRunner: fakeAgentQueryRunner,
+      providerDescriptorLookup: buildProviderDescriptorLookup(),
+      expressionEvaluator: createRejectingExpressionEvaluator(),
+      templateRenderer: createRejectingTemplateRenderer(),
+      eventPublisher: createRealEventPublisher(streamRegistry, clock),
+      clock,
+      idGenerator: createRandomUuidIdGenerator(),
+      processEnvironment: createProcessEnvironmentReader(),
+    });
+
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('a teszt szerver nem kapott portot');
+    }
+
+    const response = await fetch(`http://127.0.0.1:${String(address.port)}/api/workflows?limit=10`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toStrictEqual([]);
+
+    await new Promise<void>((resolve) => {
+      server.close(() => {
         resolve();
       });
     });
