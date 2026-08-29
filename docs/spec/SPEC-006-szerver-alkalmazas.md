@@ -5,7 +5,7 @@
 | Státusz  | tervezet                                                                                                                                                                                                                                                                                                                                                                                         |
 | Dátum    | 2026-08-29                                                                                                                                                                                                                                                                                                                                                                                       |
 | Előzmény | [`SPEC-005-api-protokoll.md`](SPEC-005-api-protokoll.md) (a REST és SSE kontraktus), [`SPEC-004-vegrehajto-motor.md`](SPEC-004-vegrehajto-motor.md) (a motor felülete, a kilenc port, az indulási helyreállítás), [`SPEC-003-domain-perzisztencia.md`](SPEC-003-domain-perzisztencia.md) (a kapcsolat nyitás, a migrációk), [`SPEC-002-csomag-architektura.md`](SPEC-002-csomag-architektura.md) |
-| Kimenet  | az `apps/server` alkalmazás tizennégy új téma mappája, és a `packages/logger` csomag három téma mappája                                                                                                                                                                                                                                                                                          |
+| Kimenet  | az `apps/server` alkalmazás tizenöt új téma mappája, és a `packages/logger` csomag három téma mappája                                                                                                                                                                                                                                                                                            |
 | Terv     | [`../plan/PLAN-007-szerver-alkalmazas.md`](../plan/PLAN-007-szerver-alkalmazas.md)                                                                                                                                                                                                                                                                                                               |
 
 ---
@@ -522,6 +522,7 @@ apps/server/
     shutdown-sequence/
     http-server/
     route-dispatch/
+    route-registry/
     error-mapping/
     workflow-endpoint/
     run-endpoint/
@@ -541,6 +542,7 @@ apps/server/
 | `shutdown-sequence`     | a 8.1 hét lépése, és a két jelkezelő felvétele                                                                                                                       |
 | `http-server`           | a `node:http` szerver létrehozása, a `127.0.0.1` bind, a kérés törzs olvasás, a JSON válasz kiírás, és a CORS fejlécek                                               |
 | `route-dispatch`        | a `ROUTE_TABLE` alapú illesztő, a paraméter kinyerés, a `404` és a `405` ág, és a `RouteId` alapú kezelő kiválasztás                                                 |
+| `route-registry`        | a `Record<RouteId, RouteHandler>` kimerítő összeállítása, mind a 26 azonosító valódi kezelőre kötve                                                                  |
 | `error-mapping`         | a SPEC-005 8.3 táblázat: az `Outcome` üzenetéből a hibaosztály név kiolvasása és `ProtocolErrorCode` értékre képzése                                                 |
 | `workflow-endpoint`     | a SPEC-005 4.2 A táblázat nyolc végpontjának kezelője                                                                                                                |
 | `run-endpoint`          | a B táblázat nyolc végpontjának kezelője                                                                                                                             |
@@ -553,7 +555,7 @@ apps/server/
 
 **A `main.ts` a `src/` alatt áll, az `index.ts` barrelen kívül.** Ez a SPEC-002 6. szekció "az `index.ts` barrelen kívül egyetlen fájl sem állhat közvetlenül a `src/` alatt" szabályának kivétele, és **ugyanaz a kivétel, amit a spec már nevesít az `apps/web/src/main.ts` fájlra** (SPEC-002 6.8). A `main.ts` tartalma egyetlen hívás: a `startup-sequence` belépési függvényének indítása. **A lefedettségi kizárás listája nem bővül vele:** a `main.ts` egyetlen elágazást sem tartalmaz, tehát a lefedettsége teszt nélkül is teljes lehet, feltéve, hogy egyetlen sora sem hoz be feltételt.
 
-**Miért ez a tizennégy téma, és miért nincs második szint.** A PLAN-004 3. szekció mindhárom feltétele teljesül: mindegyiknek felismerhető domain neve van; egyetlen fájl sem tartozik egyszerre kettőbe; és az import irány egyirányú (a végpont témák az `error-mapping` témára hivatkoznak, fordítva nem; a `stream-connection` a `stream-registry` témára, fordítva nem; a `startup-sequence` mindenre, rá semmi). A végpont témák szándékosan a SPEC-005 4.2 táblázatának betűs csoportjait követik, tehát a kettő egymás mellett olvasható. Mélyebb bontás viszont nem indokolt: a téma mappákon belül a fájlnevek már megnevezik a végpontot, tehát a második feltétel egy szinttel lejjebb nem teljesül.
+**Miért ez a tizenöt téma, és miért nincs második szint.** A PLAN-004 3. szekció mindhárom feltétele teljesül: mindegyiknek felismerhető domain neve van; egyetlen fájl sem tartozik egyszerre kettőbe; és az import irány egyirányú (a végpont témák az `error-mapping` témára hivatkoznak, fordítva nem; a `stream-connection` a `stream-registry` témára, fordítva nem; a `startup-sequence` mindenre, rá semmi). A végpont témák szándékosan a SPEC-005 4.2 táblázatának betűs csoportjait követik, tehát a kettő egymás mellett olvasható. Mélyebb bontás viszont nem indokolt: a téma mappákon belül a fájlnevek már megnevezik a végpontot, tehát a második feltétel egy szinttel lejjebb nem teljesül.
 
 **Amit szándékosan nem csináltunk:** nincs `routes/`, `handlers/`, `middleware/`, `types/`, `utils/`, `config/` vagy `common/` mappa. Az utóbbi négy a SPEC-002 tiltott név listáján áll; az első három technikai réteg, nem domain fogalom.
 
@@ -676,10 +678,10 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### A csomagok és a határok
 
-1. Az `apps/server/src` alatt pontosan a 9.1 listája szerinti tizenöt téma mappa áll közvetlenül, egy szint mélyen, plusz az `index.ts` barrel és a `main.ts` belépési pont; egyetlen téma mappában sincs alkönyvtár.
+1. Az `apps/server/src` alatt pontosan a 9.1 listája szerinti tizenhat téma mappa áll közvetlenül, egy szint mélyen, plusz az `index.ts` barrel és a `main.ts` belépési pont; egyetlen téma mappában sincs alkönyvtár.
 2. Az `apps/server/CLAUDE.md` a csomag gyökerében áll, sehol máshol, és a `## Fájlok` táblázata minden témát felsorol felelősség leírással. A `packages/logger/CLAUDE.md` ugyanígy, a három témájával. A `bun run docs:check` nulla kilépési kóddal fut.
 3. Az `apps/server/src/index.ts` és a `packages/logger/src/index.ts` csak nevesített újraexportot tartalmaz, `export *` nélkül, és az `IS_SERVER_PLACEHOLDER` és az `IS_LOGGER_PLACEHOLDER` konstans megszűnt.
-4. Az `apps/server/package.json` `dependencies` mezője **változatlan**, tehát a hét meglévő workspace csomag; a `devDependencies` sem bővült. A `packages/logger/package.json` `dependencies` mezője pontosan `pino` és `pino-roll`, a `docs/research/2026-08-26-toolchain.md` fájlban rögzített verziókkal, és a `logger` továbbra sem függ workspace csomagtól.
+4. Az `apps/server/package.json` `dependencies` mezője kilenc workspace csomagot tartalmaz, mindegyik ténylegesen importálva az `apps/server/src` alatt: `agent` (a valós Agent SDK `query()` függvényt bekötő `createAgentQueryRunner`), `core` (az `Outcome` alaptípus és az `EnvironmentReader` port), `db` (`openDatabase`, `DatabaseContext`, a repository típusok), `engine` (`createEngine`, `runStartupRecovery`, az `Engine` és `IdGeneratorPort` típusok), `logger` (`createServerLogger`, `buildLogRotationOptions`), `protocol` (a `ROUTE_TABLE`, a séma típusok és a `zodErrorToProtocolErrorBody`/`encodeStreamFrame` függvények), `provider-capability` (`ProviderCapabilityDescriptor`, `isProviderId`), `provider-registry` (a `providerRegistry` példány) és `typeguards` (`isRecord`, `isString` a publikált esemény alakjának szűkítésére); a `devDependencies` sem bővült. A `packages/logger/package.json` `dependencies` mezője pontosan `pino` és `pino-roll`, a `docs/research/2026-08-26-toolchain.md` fájlban rögzített verziókkal, és a `logger` továbbra sem függ workspace csomagtól.
 5. A `bun run check:graph` nulla kilépési kóddal fut, a `server` L6 és a `logger` L0 besorolásával.
 
 ### Localhost és titok
