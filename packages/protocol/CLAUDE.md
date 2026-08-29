@@ -9,10 +9,11 @@ készülnek.
 
 ## Fájlok
 
-| Mappa/fájl        | Tartalom                                                                                                                     |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `src/http-route/` | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény |
-| `src/index.ts`    | barrel, csak nevesített újraexport                                                                                           |
+| Mappa/fájl            | Tartalom                                                                                                                           |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/http-route/`     | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény       |
+| `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra |
+| `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                 |
 
 ## Függőségi irány
 
