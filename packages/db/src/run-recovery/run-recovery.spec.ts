@@ -139,7 +139,7 @@ describe('createRunRecovery', () => {
       insertStep(database, 'run-running', 'step-2', 'running');
       insertStep(database, 'run-running', 'step-3', 'waiting_approval');
 
-      const result = okOrThrow(repository.recoverInterruptedRuns());
+      const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(2);
 
       const runPending = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'run-pending')).get();
@@ -170,8 +170,22 @@ describe('createRunRecovery', () => {
         expect(event.origin).toBe('engine');
         expect(event.kind).toBe('run_interrupted');
         expect(event.stepRunId).toBeNull();
-        expect(event.payload).toStrictEqual({ runId: event.runId });
+        expect(event.payload).toStrictEqual({ reason: 'startup_recovery' });
       }
+
+      sqlite.close();
+    });
+
+    it('a reason paramétert változatlanul, szó szerint írja a payload-ba (graceful_shutdown eset)', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-running', 'running');
+
+      okOrThrow(repository.recoverInterruptedRuns('graceful_shutdown'));
+
+      const events = database.select().from(runEventTable).all();
+      expect(events).toHaveLength(1);
+      expect(events[0]?.payload).toStrictEqual({ reason: 'graceful_shutdown' });
 
       sqlite.close();
     });
@@ -194,7 +208,7 @@ describe('createRunRecovery', () => {
         .run();
       database.update(stepRunTable).set({ finishedAtMs: sentinel }).where(eq(stepRunTable.id, 'step-done')).run();
 
-      const result = okOrThrow(repository.recoverInterruptedRuns());
+      const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(0);
 
       const run = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'run-done')).get();
@@ -214,7 +228,7 @@ describe('createRunRecovery', () => {
     it('nulla pending/running futás esetén recoveredRunCount 0, és nem ír eseményt', () => {
       const { sqlite, database, repository } = openRepository();
 
-      const result = okOrThrow(repository.recoverInterruptedRuns());
+      const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(0);
 
       const events = database.select().from(runEventTable).all();
@@ -230,7 +244,7 @@ describe('createRunRecovery', () => {
       insertStep(database, 'run-mixed', 'step-running', 'running');
       insertStep(database, 'run-mixed', 'step-succeeded', 'succeeded');
 
-      okOrThrow(repository.recoverInterruptedRuns());
+      okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
 
       const runningStep = database.select().from(stepRunTable).where(eq(stepRunTable.id, 'step-running')).get();
       expect(runningStep?.status).toBe('interrupted');

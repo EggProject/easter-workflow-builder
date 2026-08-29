@@ -37,17 +37,44 @@ export interface CancelRunTreeResult {
 }
 
 /**
+ * A `run_interrupted` esemény payloadjának oka (SPEC-004 13. szekció
+ * táblázat, `run_interrupted` sor; a `packages/engine` `RunInterruptedPayload`
+ * típusa, `run-interrupted-payload.ts`, szó szerint ugyanezt az uniót
+ * ismétli). A `db` réteg nem importálhatja az `engine` típusát (fordított
+ * rétegirány lenne), ezért a két literál itt, duplikálva áll - ugyanaz a
+ * minta, mint a `cancelRunTree` `run_finished` payloadjának mezőnevei
+ * (lásd ott).
+ */
+export type RunInterruptedReason = 'startup_recovery' | 'graceful_shutdown';
+
+/**
  * Az indulási helyreállítás ÉS a felhasználói megszakítás közös felülete
- * (SPEC-003 7.4 szekció "Szerver leállás" bekezdés, SPEC-004 9. szekció).
- * **Nincs saját tábla ehhez a témához**: mindkét művelet a `workflow_run` és
- * a `step_run` táblát EGYÜTT érinti, ezért egyik táblás témába sem tartozik
- * (8. szekció, "a `run-recovery`" sor). A `recoverInterruptedRuns` a szerver
- * indulásakor fut, a `cancelRunTree` a `packages/engine` `run-interrupt`
- * témájának `interruptRun` művelete hívja, a felhasználó explicit
+ * (SPEC-003 7.4 szekció "Szerver leállás" bekezdés, SPEC-004 9. és 10.
+ * szekció). **Nincs saját tábla ehhez a témához**: mindkét művelet a
+ * `workflow_run` és a `step_run` táblát EGYÜTT érinti, ezért egyik táblás
+ * témába sem tartozik (8. szekció, "a `run-recovery`" sor). A
+ * `recoverInterruptedRuns` a `packages/engine` `startup-recovery` témájának
+ * (indulási helyreállítás, `reason: 'startup_recovery'`) ÉS a `run-interrupt`
+ * témájának (szabályos leállás, `reason: 'graceful_shutdown'`) is a közös
+ * hívási útja - a `cancelRunTree` ettől külön, a felhasználó explicit
  * megszakítási kérésére (SPEC-004 9. szekció 5. pont).
  */
 export interface RunRecovery {
-  recoverInterruptedRuns(): Outcome<RecoverInterruptedRunsResult>;
+  /**
+   * Minden `pending`/`running` futás és nem terminális lépésük `interrupted`
+   * állapotba viszi, futásonként egy `run_interrupted` eseménnyel, a kapott
+   * `reason` értékkel a payloadban (SPEC-004 13. szekció táblázat).
+   *
+   * **Egyetlen függvény, két hívó, nem külön ág** (SPEC-004 10.2 szekció "A
+   * szabályos és a durva leállás ugyanoda érkezik ... nem kell külön ágat
+   * karbantartani. Ez szándékos."): a szerver indulási helyreállítása
+   * (10.1 szekció) és a szabályos leállás (10.2 szekció) UGYANAZT az SQL
+   * menetet futtatja, a `reason` paraméter kizárólag a beírt esemény
+   * payloadjában különbözteti meg a két esetet - a `workflow_run`/`step_run`
+   * végállapot (mindkettőnél `interrupted`) és a hatókör (mindkettőnél
+   * MINDEN `pending`/`running` sor, nem egyetlen futás fája) azonos.
+   */
+  recoverInterruptedRuns(reason: RunInterruptedReason): Outcome<RecoverInterruptedRunsResult>;
 
   /**
    * Egy futás fája (a `rootRunId` és minden alá tartozó, azonos gyökerű
@@ -67,11 +94,14 @@ export interface RunRecovery {
 
 /**
  * `recoverInterruptedRuns` a szerver indulási helyreállítása (SPEC-003 7.4
- * szekció, PLAN-003 T-003-24). A hívó (egy KÉSŐBBI specifikációban az
- * `apps/server`) a saját indulásakor, minden hálózati kapcsolat fogadása
- * ELŐTT hívja meg; a `packages/db` csomag maga NEM hívja automatikusan (a
- * `db` réteg nem tudja, mikor "fogad hálózati kapcsolatot" - ez rögzített
- * tervezési döntés, nem hiányzó funkció).
+ * szekció, PLAN-003 T-003-24) ÉS a szabályos leállás (SPEC-004 10.2 szekció,
+ * PLAN-005 T-005-27) közös hívási útja, a `reason` paraméterrel
+ * megkülönböztetve. A hívó (a `packages/engine` `startup-recovery` témája
+ * indulási helyreállításnál, a `run-interrupt` témája szabályos leállásnál) a
+ * saját indulásakor/leállásakor hívja meg; a `packages/db` csomag maga NEM
+ * hívja automatikusan (a `db` réteg nem tudja, mikor "fogad hálózati
+ * kapcsolatot", illetve mikor kap `SIGTERM`-et - ez rögzített tervezési
+ * döntés, nem hiányzó funkció).
  *
  * **Tömeges `UPDATE ... WHERE status IN (...)`, nem egyenkénti
  * `markRunInterrupted`/`markStepInterrupted` hívás iterálása** (SPEC-003 7.4
@@ -98,7 +128,7 @@ export interface RunRecovery {
  * (lásd fent), nem szabad szövegre.
  */
 export function createRunRecovery(database: BetterSQLite3Database, transaction: TransactionFunction): RunRecovery {
-  function recoverInterruptedRuns(): Outcome<RecoverInterruptedRunsResult> {
+  function recoverInterruptedRuns(reason: RunInterruptedReason): Outcome<RecoverInterruptedRunsResult> {
     return transaction(() => {
       const now = new Date();
 
@@ -135,10 +165,16 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
 
       // 3. Futásonként EGY `run_interrupted` motor esemény (SPEC-003 7.4
       // szekció szó szerint: "futásonként egy `run_interrupted` motor
-      // esemény íródik", `origin: 'engine'`, `stepRunId: null`). Az
-      // `insertEngineEventRow` (`run-event/event-record/insert-engine-event-row.ts`)
-      // PLAIN, tranzakció nélküli segédfüggvény, ugyanúgy hívható itt, mint
-      // a `workflow-run-repository.ts` `startRun`-jában a `run_started`
+      // esemény íródik", `origin: 'engine'`, `stepRunId: null`). A payload
+      // alakja szó szerint a `packages/engine` `RunInterruptedPayload`
+      // mezőjét követi (`reason`), hogy az élő és a visszaolvasott esemény
+      // egyezzen (ugyanaz az elv, mint a `workflow-run-repository.ts`
+      // `run_started` payloadjánál és a `cancelRunTree` `run_finished`
+      // payloadjánál): a `runId` nem ismétlődik a payloadban, azt a
+      // `run_event.run_id` oszlop hordozza. Az `insertEngineEventRow`
+      // (`run-event/event-record/insert-engine-event-row.ts`) PLAIN,
+      // tranzakció nélküli segédfüggvény, ugyanúgy hívható itt, mint a
+      // `workflow-run-repository.ts` `startRun`-jában a `run_started`
       // eseménynél. A visszaadott `Outcome`-ot ugyanazon okból nem
       // ágaztatjuk el, mint ott: a `not_found` hibaág logikailag kizárt,
       // mert a `runId` az imént, UGYANEBBEN a tranzakcióban lett kiolvasva
@@ -152,7 +188,7 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
           stepRunId: null,
           kind: 'run_interrupted',
           occurredAtMs: now,
-          payload: { runId },
+          payload: { reason },
         });
       }
 

@@ -149,8 +149,15 @@ export type { ApprovalDecision } from './human-approval/approval-decision.ts';
 export { isApprovalDecision } from './human-approval/is-approval-decision.ts';
 
 // run-recovery: a RunRecovery publikus felülete (T-003-24, a `cancelRunTree`
-// a T-005-26 óta). A factory függvényt (`createRunRecovery`) szándékosan nem
-// exportáljuk, csak a típust, ugyanaz a minta, mint a `WorkflowRepository`-nél
-// (SPEC-002 6.6 5. szabálya, SPEC-003 9.3 szekció). Ez a `packages/db/src`
-// alatti 12., egyben utolsó téma mappa (SPEC-003 8. szekció).
-export type { RunRecovery, RecoverInterruptedRunsResult, CancelRunTreeResult } from './run-recovery/run-recovery.ts';
+// a T-005-26 óta, a `recoverInterruptedRuns` `reason` paramétere és a
+// `RunInterruptedReason` típus a T-005-27 óta). A factory függvényt
+// (`createRunRecovery`) szándékosan nem exportáljuk, csak a típust, ugyanaz a
+// minta, mint a `WorkflowRepository`-nél (SPEC-002 6.6 5. szabálya, SPEC-003
+// 9.3 szekció). Ez a `packages/db/src` alatti 12., egyben utolsó téma mappa
+// (SPEC-003 8. szekció).
+export type {
+  RunRecovery,
+  RecoverInterruptedRunsResult,
+  CancelRunTreeResult,
+  RunInterruptedReason,
+} from './run-recovery/run-recovery.ts';

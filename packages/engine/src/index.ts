@@ -322,18 +322,39 @@ export { buildChildResult } from './run-supervisor/build-child-result.ts';
 export { collectTerminalOutput } from './run-supervisor/collect-terminal-output.ts';
 export { advanceRun } from './run-supervisor/advance-run.ts';
 export { createRunSupervisor } from './run-supervisor/create-run-supervisor.ts';
+// A `restartRun` motor művelet (SPEC-004 3.1 `Engine` felület, 9. szekció
+// zárómondata, SPEC-003 27. kritérium, PLAN-005 T-005-27): a `startRun`
+// menetét hívja ÚJRA az eredeti futás workflowId-jével és input-jával, a
+// `restartedFromRunId` mezővel kiegészítve - a workflow AKTUÁLIS gráfját a
+// `startRun` amúgy is mindig frissen olvassa.
+export type { RestartRunDependencies } from './run-supervisor/restart-run.ts';
+export { restartRun } from './run-supervisor/restart-run.ts';
 
 // run-interrupt: a felhasználói megszakítás ÉS a szabályos leállás közös
-// menete (SPEC-004 9. szekció, PLAN-005 T-005-26). Az `AgentQueryRegistry` az
-// élő `AgentQuery` objektumok nyilvántartása, amit az `agent-step` téma tölt
-// (a `agentQueryRunner.run(...)` hívás után azonnal), és amit az
-// `interruptRun` kérdez le a futás fája alapján. A `stopAndAwaitRunTree` a
-// megszakítás 2 ... 4. pontjának (`requestStop`, `interrupt`, a `completion`
-// megvárása) közös, a jövőbeli `shutdown` (T-005-28) által is újrahasznált
-// menete; a DB oldali zárás témánként eltér (`interruptRun` a `cancelRunTree`
+// menete (SPEC-004 9. és 10.2 szekció, PLAN-005 T-005-26, T-005-27). Az
+// `AgentQueryRegistry` az élő `AgentQuery` objektumok nyilvántartása, amit az
+// `agent-step` téma tölt (a `agentQueryRunner.run(...)` hívás után azonnal),
+// és amit az `interruptRun` és a `shutdownActiveRuns` is kérdez le. A
+// `stopAndAwaitRunTree` a megszakítás 2 ... 4. pontjának (`requestStop`,
+// `interrupt`, a `completion` megvárása) közös, mindkét belépési pont által
+// újrahasznált menete; a DB oldali zárás témánként eltér (`interruptRun` a
+// `cancelRunTree`, `shutdownActiveRuns` a `recoverInterruptedRuns`
 // primitívvel).
 export type { AgentQueryRegistry } from './run-interrupt/agent-query-registry.ts';
 export { createAgentQueryRegistry } from './run-interrupt/agent-query-registry.ts';
 export { stopAndAwaitRunTree } from './run-interrupt/stop-and-await-run-tree.ts';
 export type { InterruptRunDependencies, InterruptRunResult } from './run-interrupt/interrupt-run.ts';
 export { interruptRun } from './run-interrupt/interrupt-run.ts';
+// A szabályos leállás (SPEC-004 10.2 szekció, PLAN-005 T-005-27): a
+// `shutdownActiveRuns` a `stopAndAwaitRunTree`-t MINDEN aktív futásra
+// lefuttatja, majd a `db` `recoverInterruptedRuns('graceful_shutdown')`
+// hívásával zár - lásd a `startup-recovery` témát is, ami ugyanezt a `db`
+// függvényt hívja `'startup_recovery'` értékkel.
+export type { ShutdownActiveRunsDependencies } from './run-interrupt/shutdown-active-runs.ts';
+export { shutdownActiveRuns } from './run-interrupt/shutdown-active-runs.ts';
+
+// startup-recovery: a `RunRecovery.recoverInterruptedRuns()` (MÁR KÉSZ `db`
+// réteg) VÉKONY burkolása a motor oldalán (SPEC-004 10.1 szekció, PLAN-005
+// T-005-27, AC-53). Ez a `packages/engine/src` alatti 18., egyben utolsó
+// téma mappa (SPEC-004 12. szekció).
+export { runStartupRecovery } from './startup-recovery/run-startup-recovery.ts';
