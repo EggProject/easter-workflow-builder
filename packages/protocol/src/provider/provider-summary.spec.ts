@@ -12,7 +12,7 @@ describe('ProviderSummarySchema', () => {
     expect(outcome.success).toBe(true);
   });
 
-  it('elutasítja, ha env változó ÉRTÉKET próbálnak vinni egy nem deklarált mezőn (29. kritérium)', () => {
+  it('elutasítja, ha env változó ÉRTÉKET próbálnak vinni egy nem deklarált mezőn (9. kritérium)', () => {
     const outcome = ProviderSummarySchema.safeParse({
       id: 'minimax',
       displayName: 'MiniMax',
