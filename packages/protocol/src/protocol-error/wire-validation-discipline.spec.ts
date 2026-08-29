@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 // A csomag SRC gyökere (nem csak a protocol-error témáé): a séma írás négy
 // szabálya (SPEC-005 7.3) és a titok kiszivárgás tilalma (8.4) csomagszintű
-// garancia (13. szekció 4., 5., 8., 16. kritérium), nem csak a
+// garancia (13. szekció 7., 14., 32. kritérium), nem csak a
 // protocol-error témáé - ez a fájl azért él itt, mert a `.safeParse()`
 // kizárólagossága és a `.default()`/`.transform()` tilalom a Zod hiba
 // fordítás témájához (`zod-error-to-protocol-error-body.ts`) és a titok
@@ -52,7 +52,7 @@ describe('a packages/protocol-ban nincs Authorization fejléc, süti vagy token 
   }
 });
 
-describe('a packages/protocol kizárólag .safeParse(-t hív, .parse(-t soha (SPEC-005 7.4, 13. szekció 20. kritérium)', () => {
+describe('a packages/protocol kizárólag .safeParse(-t hív, .parse(-t soha (SPEC-005 7.4, 13. szekció 32. kritérium)', () => {
   const files = listSourceFiles(SRC_DIR);
 
   for (const file of files) {
@@ -67,7 +67,7 @@ describe('a packages/protocol kizárólag .safeParse(-t hív, .parse(-t soha (SP
   }
 });
 
-describe('a packages/protocol egyetlen sémájában sincs .default() vagy .transform() (SPEC-005 7.3 2. szabály, 13. szekció 21. kritérium)', () => {
+describe('a packages/protocol egyetlen sémájában sincs .default() vagy .transform() (SPEC-005 7.3 2. szabály, 13. szekció 14. kritérium)', () => {
   const files = listSourceFiles(SRC_DIR);
 
   const forbiddenSchemaMethods: readonly string[] = ['.default(', '.transform('];

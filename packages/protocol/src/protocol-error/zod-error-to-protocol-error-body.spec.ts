@@ -14,7 +14,7 @@ describe('zodErrorToProtocolErrorBody', () => {
     }
   });
 
-  it('soha nem tartalmazza a kapott, titkot hordozó értéket (28. kritérium)', () => {
+  it('soha nem tartalmazza a kapott, titkot hordozó értéket (16. kritérium)', () => {
     const schema = z.strictObject({ apiKey: z.number() });
     const outcome = schema.safeParse({ apiKey: 'sk-super-secret-value' });
     expect(outcome.success).toBe(false);
