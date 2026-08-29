@@ -16,6 +16,8 @@ készülnek.
 | `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz      |
 | `src/run/`            | a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a listázás, a megszakítás, az újraindítás és a pillanatkép alakja |
 | `src/transcript/`     | az esemény origin és kind felsorolás, a run_event drótszintű rekordja, a kurzoros lekérdezés kérése és a lapja                              |
+| `src/approval/`       | a döntés felsorolás, a várakozó jóváhagyás rekordja, és a döntés kérés alakja                                                               |
+| `src/provider/`       | a provider összefoglaló alakja és a kapcsolat teszt válasza                                                                                 |
 | `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                          |
 
 ## Függőségi irány
