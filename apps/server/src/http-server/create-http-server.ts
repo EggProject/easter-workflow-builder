@@ -1,21 +1,35 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { httpStatusForErrorCode, type ProtocolErrorBody, type RouteId } from '@easter-workflow-builder/protocol';
+import {
+  STREAM_PATH,
+  httpStatusForErrorCode,
+  type ProtocolErrorBody,
+  type RouteId,
+} from '@easter-workflow-builder/protocol';
 import { matchRoute } from '../route-dispatch/match-route.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 import { mapOutcomeMessageToErrorCode } from '../error-mapping/map-outcome-message-to-error-code.ts';
+import {
+  handleStreamConnection,
+  type StreamConnectionDependencies,
+} from '../stream-connection/handle-stream-connection.ts';
 import { normalizeIncomingRequest } from './normalize-incoming-request.ts';
 import { readJsonRequestBody } from './read-json-request-body.ts';
 import { resolveCorsHeaders } from './resolve-cors-headers.ts';
+import { wrapResponseAsStreamSink } from './wrap-response-as-stream-sink.ts';
 
 /**
  * A `node:http` szerver összeállításának bemenete (SPEC-006 `http-server`
  * téma). A `handlers` a `ROUTE_TABLE` mind a 26 azonosítójára kötelezően
  * kitöltött rekord: egy hiányzó bejegyzés fordítási hibát ad (SPEC-006 12.
- * elfogadási kritérium), nem futásidejű "nincs kezelő" ágat.
+ * elfogadási kritérium), nem futásidejű "nincs kezelő" ágat. A
+ * `streamDependencies` a `STREAM_PATH` (`GET /events`) kiszolgálásához kell
+ * - az a `ROUTE_TABLE`-ön kívül áll (SPEC-005 5.2 szekció), ezért külön ág
+ * vezeti, a `matchRoute` elé.
  */
 export interface HttpServerOptions {
   readonly handlers: Readonly<Record<RouteId, RouteHandler>>;
   readonly devOrigin: string | undefined;
+  readonly streamDependencies: StreamConnectionDependencies;
 }
 
 function writeJson(
@@ -68,6 +82,50 @@ async function serveMatchedRoute(
   writeJson(response, result.value.status, result.value.body, corsHeaders);
 }
 
+/**
+ * A `Last-Event-ID` fejléc kiolvasása (SPEC-006 6.3). A Node
+ * `IncomingMessage.headers` egy ismétlődő fejlécre tömböt is adhat; a
+ * szabvány szerint a kliens egyetlen `Last-Event-ID` fejlécet küld, tehát a
+ * tömb esetét az első elem választja, hogy a hívó oldalon (`create-http-server.ts`)
+ * ne kelljen elágazni ezen.
+ */
+function readLastEventIdHeader(headerValue: string | readonly string[] | undefined): string | undefined {
+  if (headerValue === undefined) {
+    return undefined;
+  }
+  // A `typeof` ellenőrzés azért kell az `Array.isArray` helyett, mert annak
+  // `arg is any[]` típusőre nem szűkíti ki a `readonly string[]` ágat a
+  // negált oldalon (a `readonly string[]` nem részhalmaza az `any[]`-nek).
+  return typeof headerValue === 'string' ? headerValue : headerValue[0];
+}
+
+/**
+ * A `GET /events` kiszolgálása (SPEC-005 5.2, 5.5, 5.6). A státusz mindig
+ * `200`, a `Content-Type` mindig `text/event-stream` karakterkódolás
+ * nélkül, a `flushHeaders()` az első keret (`stream_ready`) előtt fut
+ * (SPEC-006 23. elfogadási kritérium). Tömörítés nincs (F-11).
+ */
+function serveStreamConnection(
+  request: IncomingMessage,
+  response: ServerResponse,
+  query: URLSearchParams,
+  corsHeaders: Readonly<Record<string, string>>,
+  streamDependencies: StreamConnectionDependencies,
+): void {
+  response.writeHead(200, {
+    ...corsHeaders,
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+  });
+  response.flushHeaders();
+
+  const streamId = query.get('streamId') ?? '';
+  const lastEventIdHeader = readLastEventIdHeader(request.headers['last-event-id']);
+  const sink = wrapResponseAsStreamSink(response);
+  const connection = handleStreamConnection(streamId, lastEventIdHeader, sink, streamDependencies);
+  response.on('close', connection.handleClientClosed);
+}
+
 async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -76,6 +134,12 @@ async function handleRequest(
   try {
     const normalized = normalizeIncomingRequest(request.url, request.method);
     const corsHeaders = resolveCorsHeaders(normalized.pathname, options.devOrigin);
+
+    if (normalized.pathname === STREAM_PATH && normalized.method === 'GET') {
+      serveStreamConnection(request, response, normalized.searchParams, corsHeaders, options.streamDependencies);
+      return;
+    }
+
     const matchResult = matchRoute(normalized.method, normalized.pathname);
 
     if (matchResult.kind === 'not_found') {

@@ -11,13 +11,16 @@ const TRAILING_ERROR_CLASS_PATTERN = /\(([a-z0-9_]+)\)\.?\s*$/;
 /**
  * A `conflict` kódra képződő hibaosztályok (SPEC-005 8.3 táblázat 2. és 4.
  * sora): az erőforrás létezik, csak az állapota vagy egy egyidejű írás
- * akadályozza a műveletet.
+ * akadályozza a műveletet. Az `already_decided` a `decideApproval` C
+ * táblázat 18. sorának saját hibaága (`packages/db`
+ * `human-approval-repository.ts`): a jóváhagyás már el van döntve.
  */
 const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
   'illegal_status_transition',
   'foreign_key_violation',
   'duplicate_event',
   'graph_snapshot_hash_collision',
+  'already_decided',
 ]);
 
 /**

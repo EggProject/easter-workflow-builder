@@ -7,6 +7,7 @@ import {
   ENV_LOG_ROTATION_SIZE,
   ENV_SERVER_PORT,
   ENV_STREAM_DEV_ORIGIN,
+  ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
 } from './environment-variable-name.ts';
 
 /**
@@ -24,6 +25,7 @@ export interface ServerConfig {
   readonly logRotationSize: string;
   readonly logRotationFrequency: number | string;
   readonly logRetainedFileCount: number;
+  readonly streamKeepAliveIntervalMs: number;
 }
 
 function missingVariableMessage(name: string): string {
@@ -104,6 +106,11 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
     return logRetainedFileCount;
   }
 
+  const streamKeepAliveIntervalMs = readPositiveInteger(environment, ENV_STREAM_KEEP_ALIVE_INTERVAL_MS);
+  if (streamKeepAliveIntervalMs.kind === 'error') {
+    return streamKeepAliveIntervalMs;
+  }
+
   const developmentOrigin = environment[ENV_STREAM_DEV_ORIGIN];
   const logLevel = environment[ENV_LOG_LEVEL];
 
@@ -115,6 +122,7 @@ export function readServerConfig(environment: EnvironmentReader): Outcome<Server
       logRotationSize: logRotationSize.value,
       logRotationFrequency: logRotationFrequency.value,
       logRetainedFileCount: logRetainedFileCount.value,
+      streamKeepAliveIntervalMs: streamKeepAliveIntervalMs.value,
       ...(developmentOrigin !== undefined &&
         developmentOrigin.trim().length > 0 && { devOrigin: developmentOrigin.trim() }),
       ...(logLevel !== undefined && logLevel.trim().length > 0 && { logLevel: logLevel.trim() }),

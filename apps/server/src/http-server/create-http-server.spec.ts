@@ -1,9 +1,32 @@
 import { describe, expect, it, afterEach } from 'vitest';
+import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
+import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import type { RouteId } from '@easter-workflow-builder/protocol';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
+import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
+import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
+import type { StreamConnectionDependencies } from '../stream-connection/handle-stream-connection.ts';
 import { createHttpServer, type HttpServerOptions } from './create-http-server.ts';
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
+
+function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
+  if (!isOkOutcome(outcome)) {
+    throw new Error(`váratlan hibaág: ${outcome.message}`);
+  }
+  return outcome.value;
+}
+
+function buildStreamDependencies(): StreamConnectionDependencies {
+  const database: DatabaseContext = okOrThrow(openDatabase(':memory:'));
+  return {
+    database,
+    registry: createStreamRegistry(createRandomUuidIdGenerator()),
+    clock: createSystemClock(),
+    keepAliveIntervalMs: 60_000,
+  };
+}
 
 /**
  * A `ROUTE_TABLE` mind a 26 kulcsára egy alapértelmezett, felülírható
@@ -43,6 +66,17 @@ function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Recor
   return { ...base, ...overrides };
 }
 
+function buildOptions(
+  overrides: Partial<Record<RouteId, RouteHandler>>,
+  developmentOrigin: string | undefined,
+): HttpServerOptions {
+  return {
+    handlers: buildHandlers(overrides),
+    devOrigin: developmentOrigin,
+    streamDependencies: buildStreamDependencies(),
+  };
+}
+
 async function startTestServer(options: HttpServerOptions): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = createHttpServer(options);
   await new Promise<void>((resolve) => {
@@ -56,6 +90,10 @@ async function startTestServer(options: HttpServerOptions): Promise<{ baseUrl: s
     baseUrl: `http://127.0.0.1:${String(address.port)}`,
     close: () =>
       new Promise<void>((resolve) => {
+        // A stream végpont szándékosan tartósan nyitott kapcsolatot hagyhat hátra
+        // (SPEC-006 6. szekció): a teszt zárása ezért a valódi leállás mintáját
+        // követi (SPEC-006 8.1 4. lépés), különben a `close()` visszahívás sosem futna le.
+        server.closeAllConnections();
         server.close(() => {
           resolve();
         });
@@ -75,12 +113,12 @@ describe('createHttpServer', () => {
   });
 
   it('ismert útvonalon a kezelő válaszát adja vissza', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({
-        listWorkflows: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: [{ id: '1' }] } }),
-      }),
-      devOrigin: undefined,
-    });
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        { listWorkflows: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: [{ id: '1' }] } }) },
+        undefined,
+      ),
+    );
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows?limit=10`);
@@ -90,15 +128,17 @@ describe('createHttpServer', () => {
 
   it('a kezelő megkapja az útvonal paramétert, a query stringet és a JSON törzset', async () => {
     let seen: RouteHandlerContext | undefined;
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({
-        updateWorkflow: (context) => {
-          seen = context;
-          return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        {
+          updateWorkflow: (context) => {
+            seen = context;
+            return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
+          },
         },
-      }),
-      devOrigin: undefined,
-    });
+        undefined,
+      ),
+    );
     closeServer = close;
 
     await fetch(`${baseUrl}/api/workflows/wf-1?verbose=1`, {
@@ -113,7 +153,7 @@ describe('createHttpServer', () => {
   });
 
   it('ismeretlen útvonalra 404-et ad, not_found kóddal', async () => {
-    const { baseUrl, close } = await startTestServer({ handlers: buildHandlers({}), devOrigin: undefined });
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined));
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/nincs-ilyen`);
@@ -122,7 +162,7 @@ describe('createHttpServer', () => {
   });
 
   it('ismert útvonalon rossz metódusra 405-öt ad, Allow fejléccel', async () => {
-    const { baseUrl, close } = await startTestServer({ handlers: buildHandlers({}), devOrigin: undefined });
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined));
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows`, { method: 'DELETE' });
@@ -132,7 +172,7 @@ describe('createHttpServer', () => {
   });
 
   it('rosszul formázott JSON törzsre 400-at ad, invalid_request kóddal, a nyers törzs visszhangzása nélkül', async () => {
-    const { baseUrl, close } = await startTestServer({ handlers: buildHandlers({}), devOrigin: undefined });
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined));
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows`, {
@@ -147,12 +187,15 @@ describe('createHttpServer', () => {
   });
 
   it('a kezelő Outcome hibaágát a mapOutcomeMessageToErrorCode szerinti státuszra képezi', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({
-        getWorkflow: () => Promise.resolve({ kind: 'error', message: 'A(z) "x" workflow nem található (not_found).' }),
-      }),
-      devOrigin: undefined,
-    });
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        {
+          getWorkflow: () =>
+            Promise.resolve({ kind: 'error', message: 'A(z) "x" workflow nem található (not_found).' }),
+        },
+        undefined,
+      ),
+    );
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows/x`);
@@ -164,12 +207,12 @@ describe('createHttpServer', () => {
   });
 
   it('204 státusznál nincs válasz törzs', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({
-        clearConcurrencyLimit: () => Promise.resolve({ kind: 'ok', value: { status: 204, body: undefined } }),
-      }),
-      devOrigin: undefined,
-    });
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        { clearConcurrencyLimit: () => Promise.resolve({ kind: 'ok', value: { status: 204, body: undefined } }) },
+        undefined,
+      ),
+    );
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/settings/concurrency-limits/minimax`, { method: 'DELETE' });
@@ -177,23 +220,36 @@ describe('createHttpServer', () => {
     expect(await response.text()).toBe('');
   });
 
-  it('a stream útvonalon konfigurált fejlesztői origin esetén CORS fejlécet küld', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({}),
-      devOrigin: 'http://localhost:5173',
-    });
+  it('a stream útvonalon konfigurált fejlesztői origin esetén CORS fejlécet küld, 200 státusszal és text/event-stream típussal', async () => {
+    const { baseUrl, close } = await startTestServer(buildOptions({}, 'http://localhost:5173'));
     closeServer = close;
 
-    const response = await fetch(`${baseUrl}/events`);
+    const response = await fetch(`${baseUrl}/events?streamId=s1`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
     expect(response.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+    await response.body?.cancel();
+  });
+
+  it('a stream első kerete mindig stream_ready, ismeretlen streamId esetén is', async () => {
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/events?streamId=ismeretlen`);
+    const reader = response.body?.getReader();
+    if (reader === undefined) {
+      throw new Error('a stream válasz nem olvasható');
+    }
+    const { value } = await reader.read();
+    const chunk = new TextDecoder().decode(value);
+    expect(chunk).toContain('event: stream_ready');
+    expect(chunk).toContain('"streamId":"ismeretlen"');
+    await reader.cancel();
   });
 
   it('nem stream útvonalon konfigurált origin mellett sem küld CORS fejlécet', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({}),
-      devOrigin: 'http://localhost:5173',
-    });
+    const { baseUrl, close } = await startTestServer(buildOptions({}, 'http://localhost:5173'));
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows`);
@@ -201,14 +257,16 @@ describe('createHttpServer', () => {
   });
 
   it('a kezelőben eldobott kivételre 500-at ad, a hiba részletei nélkül', async () => {
-    const { baseUrl, close } = await startTestServer({
-      handlers: buildHandlers({
-        listWorkflows: () => {
-          throw new Error('titkos verem nyomkövetési részlet');
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        {
+          listWorkflows: () => {
+            throw new Error('titkos verem nyomkövetési részlet');
+          },
         },
-      }),
-      devOrigin: undefined,
-    });
+        undefined,
+      ),
+    );
     closeServer = close;
 
     const response = await fetch(`${baseUrl}/api/workflows`);

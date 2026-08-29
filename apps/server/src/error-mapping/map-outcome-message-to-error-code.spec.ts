@@ -6,12 +6,15 @@ describe('mapOutcomeMessageToErrorCode', () => {
     expect(mapOutcomeMessageToErrorCode('A(z) "abc" workflow nem található (not_found).')).toBe('not_found');
   });
 
-  it.each(['illegal_status_transition', 'foreign_key_violation', 'duplicate_event', 'graph_snapshot_hash_collision'])(
-    'a(z) %s hibaosztályt conflict kódra képezi',
-    (errorClass) => {
-      expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
-    },
-  );
+  it.each([
+    'illegal_status_transition',
+    'foreign_key_violation',
+    'duplicate_event',
+    'graph_snapshot_hash_collision',
+    'already_decided',
+  ])('a(z) %s hibaosztályt conflict kódra képezi', (errorClass) => {
+    expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
+  });
 
   it.each([
     'no_default_provider',

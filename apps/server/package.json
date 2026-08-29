@@ -17,6 +17,7 @@
     "@easter-workflow-builder/protocol": "workspace:*",
     "@easter-workflow-builder/provider-capability": "workspace:*",
     "@easter-workflow-builder/provider-registry": "workspace:*",
+    "@easter-workflow-builder/typeguards": "workspace:*",
     "pino": "10.3.1",
     "pino-roll": "4.0.0"
   },

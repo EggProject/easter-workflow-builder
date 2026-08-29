@@ -9,6 +9,7 @@ import {
   ENV_LOG_ROTATION_SIZE,
   ENV_SERVER_PORT,
   ENV_STREAM_DEV_ORIGIN,
+  ENV_STREAM_KEEP_ALIVE_INTERVAL_MS,
 } from './environment-variable-name.ts';
 
 const VALID_ENVIRONMENT: EnvironmentReader = {
@@ -17,6 +18,7 @@ const VALID_ENVIRONMENT: EnvironmentReader = {
   [ENV_LOG_ROTATION_SIZE]: '10m',
   [ENV_LOG_ROTATION_FREQUENCY]: 'daily',
   [ENV_LOG_RETAINED_FILE_COUNT]: '5',
+  [ENV_STREAM_KEEP_ALIVE_INTERVAL_MS]: '15000',
 };
 
 /**
@@ -40,6 +42,7 @@ describe('readServerConfig', () => {
         logRotationSize: '10m',
         logRotationFrequency: 'daily',
         logRetainedFileCount: 5,
+        streamKeepAliveIntervalMs: 15_000,
       },
     });
   });
@@ -95,6 +98,17 @@ describe('readServerConfig', () => {
 
   it('nem egész megőrzött fájlszámra hibát ad', () => {
     const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_LOG_RETAINED_FILE_COUNT]: '1.5' });
+    expect(outcome.kind).toBe('error');
+  });
+
+  it('a hiányzó életben tartó gyakoriságra hibát ad, a nevet megnevezve', () => {
+    const outcome = readServerConfig(withoutKey(VALID_ENVIRONMENT, ENV_STREAM_KEEP_ALIVE_INTERVAL_MS));
+    expect(outcome.kind).toBe('error');
+    expect(outcome.kind === 'error' && outcome.message).toContain(ENV_STREAM_KEEP_ALIVE_INTERVAL_MS);
+  });
+
+  it('nem egész életben tartó gyakoriságra hibát ad', () => {
+    const outcome = readServerConfig({ ...VALID_ENVIRONMENT, [ENV_STREAM_KEEP_ALIVE_INTERVAL_MS]: '1.5' });
     expect(outcome.kind).toBe('error');
   });
 

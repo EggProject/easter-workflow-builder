@@ -24,3 +24,11 @@ export const ENV_STREAM_DEV_ORIGIN = 'EASTER_STREAM_DEV_ORIGIN';
  * literál.
  */
 export const ENV_LOG_LEVEL = 'EASTER_LOG_LEVEL';
+
+/**
+ * Az SSE életben tartó jelzés gyakorisága, milliszekundumban (SPEC-006 6.6,
+ * 12. szekció O-3). Kötelező, alapérték nélkül: a Node négy dokumentált
+ * időkorlátja közül egyik sem erre a célra való (M-13, M-14), tehát nincs
+ * dokumentált forrásból származó szám, amire hivatkozhatnánk.
+ */
+export const ENV_STREAM_KEEP_ALIVE_INTERVAL_MS = 'EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS';

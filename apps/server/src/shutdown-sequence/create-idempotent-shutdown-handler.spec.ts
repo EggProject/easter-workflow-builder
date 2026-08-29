@@ -7,6 +7,9 @@ import { createServerLogger, type DestinationStream } from '@easter-workflow-bui
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
+import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
+import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createIdempotentShutdownHandler } from './create-idempotent-shutdown-handler.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -39,12 +42,18 @@ function listen(server: Server): Promise<void> {
 describe('createIdempotentShutdownHandler', () => {
   it('a második hívás ugyanazt a Promise-t adja, mint az első, nem indít újabb leállást', async () => {
     const database = openMemoryDatabase();
-    const engine = createEngine(buildEngineDependencies(database));
-    const server = createHttpServer({ handlers: buildRouteHandlers(database), devOrigin: undefined });
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const clock = createSystemClock();
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+    });
     await listen(server);
     const logger = createServerLogger({ secretValues: [] }, noopSink());
 
-    const shutdown = createIdempotentShutdownHandler({ server, engine, database, logger });
+    const shutdown = createIdempotentShutdownHandler({ server, engine, database, logger, streamRegistry });
 
     const first = shutdown();
     const second = shutdown();

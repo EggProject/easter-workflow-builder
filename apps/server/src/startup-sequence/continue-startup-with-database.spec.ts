@@ -37,6 +37,7 @@ function baseConfig(port: number): ServerConfig {
     logRotationSize: '10M',
     logRotationFrequency: 'daily',
     logRetainedFileCount: 5,
+    streamKeepAliveIntervalMs: 15_000,
   };
 }
 

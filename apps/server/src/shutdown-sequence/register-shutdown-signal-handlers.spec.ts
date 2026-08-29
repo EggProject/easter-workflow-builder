@@ -8,6 +8,9 @@ import { createServerLogger, type DestinationStream } from '@easter-workflow-bui
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
+import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
+import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { registerShutdownSignalHandlers } from './register-shutdown-signal-handlers.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -62,12 +65,59 @@ describe('registerShutdownSignalHandlers', () => {
 
   it('SIGINT jelre lefuttatja a leállási sorrendet és beállítja a process.exitCode-ot', async () => {
     const database = openMemoryDatabase();
-    const engine = createEngine(buildEngineDependencies(database));
-    const server = createHttpServer({ handlers: buildRouteHandlers(database), devOrigin: undefined });
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const clock = createSystemClock();
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+    });
     await listen(server);
     const logger = createServerLogger({ secretValues: [] }, noopSink());
 
-    registerShutdownSignalHandlers({ server, engine, database, logger });
+    registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
+    process.emit('SIGINT', 'SIGINT');
+    await waitForExitCode();
+
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('SIGTERM jelre ugyanúgy lefuttatja a leállási sorrendet', async () => {
+    const database = openMemoryDatabase();
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const clock = createSystemClock();
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+    });
+    await listen(server);
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
+
+    registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
+    process.emit('SIGTERM', 'SIGTERM');
+    await waitForExitCode();
+
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('egy második jel a már futó leállást nem indítja újra', async () => {
+    const database = openMemoryDatabase();
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const clock = createSystemClock();
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+    });
+    await listen(server);
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
+
+    registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
+    process.emit('SIGINT', 'SIGINT');
     process.emit('SIGINT', 'SIGINT');
     await waitForExitCode();
 

@@ -49,6 +49,7 @@ function baseEnvironment(port: number, logDirectory: string): EnvironmentReader 
     EASTER_LOG_ROTATION_SIZE: '10M',
     EASTER_LOG_ROTATION_FREQUENCY: 'daily',
     EASTER_LOG_RETAINED_FILE_COUNT: '5',
+    EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS: '15000',
     EASTER_DB_FILE: ':memory:',
   };
 }

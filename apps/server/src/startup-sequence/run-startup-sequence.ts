@@ -4,6 +4,7 @@ import type { EnvironmentReader } from '@easter-workflow-builder/core';
 import { openDatabase, resolveDatabaseFilePath } from '@easter-workflow-builder/db';
 import { buildLogRotationOptions, createServerLogger, type ServerLogger } from '@easter-workflow-builder/logger';
 import { readServerConfig, type ServerConfig } from '../server-config/server-config.ts';
+import { describeServerConfigForLog } from '../server-config/describe-server-config-for-log.ts';
 import { collectSecretEnvironmentValues } from './collect-secret-environment-values.ts';
 import { continueStartupWithDatabase } from './continue-startup-with-database.ts';
 
@@ -58,6 +59,7 @@ export async function runStartupSequence(environment: EnvironmentReader, repoRoo
 
   // 2. logger
   const logger = buildLogger(config.value, environment);
+  logger.info(describeServerConfigForLog(config.value), 'A szerver konfigurációja betöltve.');
 
   // 3. adatbázis
   const databaseFilePath = resolveDatabaseFilePath(environment, repoRootDirectory);

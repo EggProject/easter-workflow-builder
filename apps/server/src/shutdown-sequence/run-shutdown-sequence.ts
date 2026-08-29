@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import type { DatabaseContext } from '@easter-workflow-builder/db';
 import type { Engine } from '@easter-workflow-builder/engine';
 import type { ServerLogger } from '@easter-workflow-builder/logger';
+import type { StreamRegistry } from '../stream-registry/create-stream-registry.ts';
 
 /**
  * A szabályos leállás bemenete: a leállítandó erőforrások (SPEC-006 8.1).
@@ -11,6 +12,7 @@ export interface ShutdownDependencies {
   readonly engine: Engine;
   readonly database: DatabaseContext;
   readonly logger: ServerLogger;
+  readonly streamRegistry: StreamRegistry;
 }
 
 function closeHttpServer(server: Server): Promise<void> {
@@ -23,12 +25,12 @@ function closeHttpServer(server: Server): Promise<void> {
 
 /**
  * A szabályos leállás 2 ... 6. lépése (SPEC-006 8.1, 8.2). A `server.close()`
- * után nem jön be új kapcsolat, a `closeAllConnections()` a fennmaradt
- * kapcsolatokat zárja, majd a motor és az adatbázis zár, ebben a sorrendben.
- * A 3. lépés ("minden SSE nyelő lezárása") ebben a verzióban nem létezik: a
- * stream réteg (`stream-registry`/`stream-connection`) nem készült el - ez
- * dokumentált, nyitott hiány (lásd a záró jelentés hiánylistáját), a lépés
- * emiatt kimarad, nem hamisan sikeresre írt.
+ * után nem jön be új kapcsolat; a 3. lépés minden nyitott SSE nyelőt lezár
+ * (`streamRegistry.closeAllConnections()`, SPEC-006 8.2 3. lépés) - ez
+ * `engine.shutdown()` ELŐTT fut, mert a stream kapcsolatok sosem járnak le
+ * maguktól, és a `server.close()` visszahívása nélkülük soha nem futna le. A
+ * `closeAllConnections()` a fennmaradt (idle) kapcsolatokat zárja, majd a
+ * motor és az adatbázis zár, ebben a sorrendben.
  *
  * A visszatérési érték a kilépési kód (SPEC-006 8.2 7. lépés): `0`, ha minden
  * lépés sikerült, `1`, ha az `engine.shutdown()` hibaágat adott. A
@@ -36,10 +38,11 @@ function closeHttpServer(server: Server): Promise<void> {
  * dolga, ez a függvény nem nyúl a globális `process` objektumhoz.
  */
 export async function runShutdownSequence(dependencies: ShutdownDependencies): Promise<number> {
-  const { server, engine, database, logger } = dependencies;
+  const { server, engine, database, logger, streamRegistry } = dependencies;
 
   logger.info('A szerver leállása elkezdődött.');
   await closeHttpServer(server);
+  streamRegistry.closeAllConnections();
   server.closeAllConnections();
 
   const shutdownResult = await engine.shutdown();
