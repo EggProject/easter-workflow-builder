@@ -9,6 +9,12 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@easter-workflow-builder/core": "workspace:*"
+    "@easter-workflow-builder/core": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
