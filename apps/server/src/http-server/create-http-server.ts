@@ -3,6 +3,7 @@ import { httpStatusForErrorCode, type ProtocolErrorBody, type RouteId } from '@e
 import { matchRoute } from '../route-dispatch/match-route.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 import { mapOutcomeMessageToErrorCode } from '../error-mapping/map-outcome-message-to-error-code.ts';
+import { normalizeIncomingRequest } from './normalize-incoming-request.ts';
 import { readJsonRequestBody } from './read-json-request-body.ts';
 import { resolveCorsHeaders } from './resolve-cors-headers.ts';
 
@@ -73,9 +74,9 @@ async function handleRequest(
   options: HttpServerOptions,
 ): Promise<void> {
   try {
-    const url = new URL(request.url ?? '/', 'http://localhost');
-    const corsHeaders = resolveCorsHeaders(url.pathname, options.devOrigin);
-    const matchResult = matchRoute(request.method ?? '', url.pathname);
+    const normalized = normalizeIncomingRequest(request.url, request.method);
+    const corsHeaders = resolveCorsHeaders(normalized.pathname, options.devOrigin);
+    const matchResult = matchRoute(normalized.method, normalized.pathname);
 
     if (matchResult.kind === 'not_found') {
       request.resume();
@@ -99,7 +100,7 @@ async function handleRequest(
       response,
       matchResult.match.routeId,
       matchResult.match.parameters,
-      url.searchParams,
+      normalized.searchParams,
       corsHeaders,
       options.handlers,
     );
