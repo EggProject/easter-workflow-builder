@@ -9,12 +9,13 @@ készülnek.
 
 ## Fájlok
 
-| Mappa/fájl            | Tartalom                                                                                                                               |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/http-route/`     | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény           |
-| `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra     |
-| `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz |
-| `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                     |
+| Mappa/fájl            | Tartalom                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/http-route/`     | az `API_BASE_PATH` és a `STREAM_PATH` konstans, a 26 végpont útvonal sablonja, és a paraméter behelyettesítő tiszta függvény                |
+| `src/protocol-error/` | a `ProtocolErrorCode` szótár, a `ProtocolErrorBody` séma, a HTTP státusz leképezés, és a Zod hiba lista fordítása a boríték alakra          |
+| `src/workflow/`       | a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás, a módosítás, a teljes gráf csere és a törlés kérés/válasz      |
+| `src/run/`            | a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a listázás, a megszakítás, az újraindítás és a pillanatkép alakja |
+| `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                          |
 
 ## Függőségi irány
 

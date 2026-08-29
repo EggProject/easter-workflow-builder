@@ -54,3 +54,18 @@ export {
 } from './workflow/workflow-graph-document.ts';
 export type { DeletionSummary, DeleteWorkflowRequest } from './workflow/delete-workflow-request.ts';
 export { DeletionSummarySchema, DeleteWorkflowRequestSchema } from './workflow/delete-workflow-request.ts';
+
+// run: a futás és a lépés futás állapot felsorolása, a futás rekord, az indítás, a
+// listázás, a megszakítás, az újraindítás és a pillanatkép alakja.
+export type { RunStatus, StepRunStatus } from './run/run-status.ts';
+export { RunStatusSchema, StepRunStatusSchema } from './run/run-status.ts';
+export type { ListRunsQuery, RunDetail, RunSummary } from './run/run-record.ts';
+export { ListRunsQuerySchema, RunDetailSchema, RunSummarySchema } from './run/run-record.ts';
+export type { RestartRunRequest, StartedRunResponse, StartRunRequest } from './run/start-run-request.ts';
+export { RestartRunRequestSchema, StartedRunResponseSchema, StartRunRequestSchema } from './run/start-run-request.ts';
+export type { RunSnapshotResponse, SnapshotEdge, SnapshotNode } from './run/run-snapshot.ts';
+export { RunSnapshotResponseSchema, SnapshotEdgeSchema, SnapshotNodeSchema } from './run/run-snapshot.ts';
+export type { StepRunRecord } from './run/step-run-record.ts';
+export { StepRunRecordSchema } from './run/step-run-record.ts';
+export type { InterruptSummaryResponse } from './run/interrupt-summary.ts';
+export { InterruptSummaryResponseSchema } from './run/interrupt-summary.ts';
