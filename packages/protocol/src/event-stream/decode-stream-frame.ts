@@ -5,9 +5,9 @@ import { StreamFrameSchema, type StreamFrame } from './stream-frame.ts';
  * A bejövő SSE keret dekódolása (SPEC-005 7.4 szekció "kliens, bejövő SSE
  * keret" sora: "a keret szöveges folyamból dekódolt `unknown`"). A bemenet a
  * `data:` sor tartalmának `JSON.parse` eredménye - a szöveges SSE keretezést
- * (az `event:`/`id:`/`data:` sorok szétválasztását) a böngésző `EventSource`
- * API-ja végzi, ezt a csomag nem ismétli meg (10.1 szekció: a csomag nem
- * ismer `EventSource`-t). Ami itt validálódik, az a `data:` sor már
+ * (az `event:`/`id:`/`data:` sorok szétválasztását) a böngésző natív SSE
+ * kliense végzi, ezt a csomag nem ismétli meg (10.1 szekció: a csomag nem
+ * ismer böngésző API-t). Ami itt validálódik, az a `data:` sor már
  * feloldott JSON értéke a `StreamFrameSchema` ellen.
  *
  * Négy érvénytelen bemenet esetén ad hibaágat (SPEC-005 10.2 táblázat

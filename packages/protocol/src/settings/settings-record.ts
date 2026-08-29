@@ -18,7 +18,7 @@ export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 /**
  * `PUT /api/settings` kérés törzse: mindkét mező elhagyható (SPEC-005 4.2 E
  * táblázat 22. sora). Ez **részleges frissítés**, nem alapértelmezés: a
- * séma ezt `optional()` mezővel fejezi ki, nem `.default()` értékkel - egy
+ * séma ezt `optional()` mezővel fejezi ki, nem szállított alapértékkel - egy
  * elhagyott mező érintetlenül hagyja a tárolt beállítást.
  */
 export const UpdateSettingsRequestSchema = z.strictObject({

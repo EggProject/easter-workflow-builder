@@ -50,7 +50,7 @@ export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
 /**
  * `PATCH /api/workflows/{workflowId}` kérés törzse: minden mező elhagyható
  * (SPEC-005 4.2 A táblázat 4. sora). Az `optional()` a részleges frissítést
- * fejezi ki, nem `.default()` értéket: egy elhagyott mező érintetlenül
+ * fejezi ki, nem szállított alapértéket: egy elhagyott mező érintetlenül
  * hagyja a tárolt értéket (ugyanaz az elv, mint az `UpdateSettingsRequest`).
  */
 export const UpdateWorkflowRequestSchema = z.strictObject({
