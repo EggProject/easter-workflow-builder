@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `SnapshotEdge`, a `SnapshotWorkflow.description`, a `CreateStepRunInput` és az `AgentStepConfig` nullázható mezői a tárolt alakban `null` értéket hordoznak (SPEC-003 4.3, 4.4, 5.1, 9.2), nem helyőrző `undefined`-et */
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AgentQueryRequest, AgentQueryRunner } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type {
@@ -17,6 +17,7 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { ProcessEnvironmentPort } from '../engine-port/process-environment-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepRequest } from './agent-step-request.ts';
@@ -164,6 +165,37 @@ function messageIterable(messages: readonly unknown[]): AsyncIterable<unknown> {
   };
 }
 
+/**
+ * Lassú, kézzel vezérelt üzenetfolyam: az `init` üzenet után a generátor a
+ * `release()` hívásig felfüggesztve marad, tehát a teszt szimulálni tudja,
+ * hogy a lépés MÉG FUT, amikor a megszakítás megérkezik (SPEC-004 9. szekció
+ * 4. pont). A `release()` UTÁN érkező `result` üzenet igazolja, hogy a
+ * megszakítás utáni esemény is beíródik.
+ */
+function controlledMessageIterable(): { readonly messages: AsyncIterable<unknown>; readonly release: () => void } {
+  const { promise: gate, resolve: releaseGate } = Promise.withResolvers<undefined>();
+
+  async function* generate(): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: 'session-lassu', uuid: 'lassu-1' };
+    await gate;
+    yield {
+      type: 'result',
+      subtype: 'success',
+      session_id: 'session-lassu',
+      uuid: 'lassu-2',
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  return {
+    messages: generate(),
+    release: () => {
+      releaseGate(undefined);
+    },
+  };
+}
+
 interface CapturedRequest {
   request: AgentQueryRequest | undefined;
 }
@@ -191,6 +223,11 @@ const notCalled = (): never => {
 // Az alapértelmezett kiadó nyelő: a legtöbb teszt nem a kimenő eseményeket
 // vizsgálja, de a port hívása így is megtörténik.
 const discardedEvents: unknown[] = [];
+
+// Az alapértelmezett regiszter: a legtöbb teszt csak a lépés eredményét
+// vizsgálja, a regisztráció/leiratkozás bekötését az "a query azonnal
+// regisztrálódik..." teszt ellenőrzi, a saját, dedikált példányán.
+const agentQueryRegistry = createAgentQueryRegistry();
 
 interface DependencyParts {
   readonly database: DatabaseContext;
@@ -274,7 +311,7 @@ describe('runAgentStep', () => {
       },
     });
 
-    const execution = okOrThrow(await runAgentStep(request, dependencies));
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
     expect(execution.outcome).toStrictEqual({ status: 'succeeded', output: { osszeg: 4 } });
     expect(execution.resultSubtype).toBe('success');
@@ -321,7 +358,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
     });
 
-    const execution = okOrThrow(await runAgentStep(request, dependencies));
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
     const options = captured.request?.options ?? {};
 
     expect(execution.outcome.status).toBe('succeeded');
@@ -345,7 +382,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
     });
 
-    const execution = okOrThrow(await runAgentStep(request, dependencies));
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution).kind).toBe('no_resumable_session');
     expect(captured.request).toBeUndefined();
@@ -367,7 +404,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('strukturaltKimenetNelkul'), newCapture()),
     });
 
-    const execution = okOrThrow(await runAgentStep(request, dependencies));
+    const execution = okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution).kind).toBe('missing_structured_output');
     expect(execution.tokens?.inputTokens).toBe(1);
@@ -383,7 +420,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('strukturaltKimenetNelkul'), newCapture()),
     });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
 
     expect(execution.outcome).toStrictEqual({ status: 'succeeded', output: undefined });
     // Az alapértelmezett kiadó nyelő is megkapta az üzeneteket: a kiadás
@@ -401,7 +438,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('hibasSubtype'), newCapture()),
     });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution)).toStrictEqual({
       kind: 'agent_result_not_success',
@@ -421,7 +458,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('resultNelkul'), newCapture()),
     });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution).kind).toBe('provider_call_failed');
     expect(execution.resultSubtype).toBeUndefined();
@@ -455,7 +492,7 @@ describe('runAgentStep', () => {
     };
     const dependencies = dependenciesOf({ database, agentQueryRunner: runner });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
     const events = okOrThrow(database.events.readEventsForStep(stepRunId, 10));
 
     expect(failedOutcomeOf(execution).kind).toBe('provider_call_failed');
@@ -474,7 +511,7 @@ describe('runAgentStep', () => {
       templateRenderer: { render: () => ({ kind: 'error', message: 'ismeretlen sablon mező' }), compile: notCalled },
     });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution)).toStrictEqual({
       kind: 'template_render_failed',
@@ -509,7 +546,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
 
-    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies)));
+    const failure = failedOutcomeOf(okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry)));
 
     expect(failure.kind).toBe('missing_provider_env');
     expect(failure.message).toContain('PROVIDER_KULCS');
@@ -525,7 +562,7 @@ describe('runAgentStep', () => {
       agentQueryRunner: { run: () => ({ kind: 'error', message: 'a futtatás nem indult' }) },
     });
 
-    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies));
+    const execution = okOrThrow(await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry));
 
     expect(failedOutcomeOf(execution)).toStrictEqual({
       kind: 'provider_call_failed',
@@ -543,7 +580,11 @@ describe('runAgentStep', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), newCapture()),
     });
 
-    const outcome = await runAgentStep(requestOf({ runId: 'nincs-ilyen-futas', stepRunId }), dependencies);
+    const outcome = await runAgentStep(
+      requestOf({ runId: 'nincs-ilyen-futas', stepRunId }),
+      dependencies,
+      agentQueryRegistry,
+    );
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('not_found');
@@ -567,8 +608,58 @@ describe('runAgentStep', () => {
       },
     });
 
-    const outcome = await runAgentStep(requestOf({ runId, stepRunId }), dependencies);
+    const outcome = await runAgentStep(requestOf({ runId, stepRunId }), dependencies, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
+  });
+
+  it('a query a hívás UTÁN AZONNAL regisztrálódik, a lépés zárásakor leiratkozik, és a megszakítás előtti ÉS utáni esemény is beíródik', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const registry = createAgentQueryRegistry();
+    const controlled = controlledMessageIterable();
+    const interruptSpy = vi.fn(() => {
+      controlled.release();
+      return Promise.resolve();
+    });
+    const runner: AgentQueryRunner = {
+      run: () => ({ kind: 'ok', value: { messages: controlled.messages, interrupt: interruptSpy } }),
+    };
+    const dependencies = dependenciesOf({ database, agentQueryRunner: runner });
+
+    const executionPromise = runAgentStep(requestOf({ runId, stepRunId }), dependencies, registry);
+
+    // Azonnal, mikrotaszk-várakozás nélkül: a regisztráció a `run()` sikeres
+    // visszatérése után, még a folyam olvasása előtt megtörténik.
+    expect(registry.listForRunIds(new Set([runId]))).toHaveLength(1);
+
+    // Megvárjuk, amíg a folyam feldolgozza a megszakítás ELŐTTI (init)
+    // üzenetet - a generátor ezután a `release()` hívásig felfüggesztve marad.
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      if (okOrThrow(database.events.readEventsForStep(stepRunId, 10)).length === 1) {
+        break;
+      }
+      await Promise.resolve();
+    }
+    expect(okOrThrow(database.events.readEventsForStep(stepRunId, 10))).toHaveLength(1);
+
+    const [liveQuery] = registry.listForRunIds(new Set([runId]));
+    if (liveQuery === undefined) {
+      throw new Error('nincs élő query a regiszterben');
+    }
+    await liveQuery.interrupt();
+
+    const execution = okOrThrow(await executionPromise);
+
+    expect(interruptSpy).toHaveBeenCalledTimes(1);
+    expect(execution.outcome.status).toBe('succeeded');
+    // A lépés zárásakor leiratkozott.
+    expect(registry.listForRunIds(new Set([runId]))).toHaveLength(0);
+
+    // A megszakítás ELŐTT (init) ÉS UTÁN (result) érkezett esemény is beíródott.
+    const events = okOrThrow(database.events.readEventsForStep(stepRunId, 10));
+    expect(events).toHaveLength(2);
+
+    database.close();
   });
 });

@@ -4,6 +4,7 @@ import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ChildWorkflowRunner } from '../node-executor/child-workflow-runner.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ActiveRunHandle } from './active-run-registry.ts';
 
 /**
@@ -51,6 +52,11 @@ export interface StartedRun {
  * - `approvalRegistry`: egyetlen, minden futásra közös regiszter (5.8). A
  *   `decideApproval` motor művelet (T-005-28) ugyanezen a példányon hívja a
  *   `notifyDecided`-et.
+ * - `agentQueryRegistry`: az élő `AgentQuery` objektumok nyilvántartása
+ *   (9. szekció 3. pont, PLAN-005 T-005-26), szintén egyetlen, megosztott
+ *   példány (`createAgentQueryRegistry`); az `interruptRun` (`run-interrupt`
+ *   téma) ugyanezt a példányt kapja meg, hogy a futás fáján élő lépéseket
+ *   megtalálja.
  * - `installedAgentSdkVersion`: a **telepített** Agent SDK verziója. Két
  *   helyre kell: a `validateSdkVersionMatch` ellenőrzéshez (11.3 táblázat 17. sora) és a pillanatkép dokumentum `sdkVersionPin` mezőjéhez (SPEC-003 5.1).
  *   **Miért paraméter és nem import.** A motor nem függ az Agent SDK-tól
@@ -64,6 +70,7 @@ export interface RunSupervisorDependencies {
   readonly ports: EngineDependencies;
   readonly concurrencyGate: ConcurrencyGate;
   readonly approvalRegistry: ApprovalWaitRegistry;
+  readonly agentQueryRegistry: AgentQueryRegistry;
   readonly installedAgentSdkVersion: string;
 }
 

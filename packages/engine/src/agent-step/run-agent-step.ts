@@ -7,6 +7,7 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { buildProviderEnvironmentBlock } from '../provider-environment/build-provider-environment-block.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepOutcome } from './agent-step-outcome.ts';
 import type { AgentStepRequest } from './agent-step-request.ts';
@@ -222,10 +223,21 @@ async function consumeStream(
  * hiányzó strukturált kimenet) a **sikeres** ágon, az `AgentStepExecution`
  * `outcome` mezőjében érkeznek, a hibaosztály nevével együtt, mert azok mellé
  * a token adatok is kimehetnek.
+ *
+ * **Az `agentQueryRegistry` bekötése** (SPEC-004 9. szekció 3. pont, PLAN-005
+ * T-005-26): amint az `agentQueryRunner.run(...)` hívás sikeres `AgentQuery`-t
+ * ad, a függvény AZONNAL regisztrálja a `run-interrupt` téma regiszterébe -
+ * ez az egyetlen hely, ahol az élő `AgentQuery` objektum ténylegesen
+ * keletkezik. A leiratkozás `finally` ágban, az üzenetfolyam feldolgozásának
+ * (`consumeStream`) MINDEN kimenetén lefut: sikeres zárás, a lépés saját
+ * hibája, vagy a folyam olvasása közben dobott hiba esetén is. A
+ * `agentQueryRunner.run(...)` hibaágán (a `query.kind === 'error'` esetben)
+ * NINCS regisztráció, hiszen ott sosem keletkezik `AgentQuery`.
  */
 export async function runAgentStep(
   request: AgentStepRequest,
   dependencies: EngineDependencies,
+  agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<AgentStepExecution>> {
   const prompt = dependencies.templateRenderer.render(request.config.promptTemplate, request.runContext);
   if (prompt.kind === 'error') {
@@ -271,5 +283,10 @@ export async function runAgentStep(
     );
   }
 
-  return consumeStream(request, dependencies, query.value, toSessionAttachment(sessionBinding.value));
+  agentQueryRegistry.register(request.runId, request.stepRunId, query.value);
+  try {
+    return await consumeStream(request, dependencies, query.value, toSessionAttachment(sessionBinding.value));
+  } finally {
+    agentQueryRegistry.unregister(request.stepRunId);
+  }
 }

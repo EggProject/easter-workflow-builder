@@ -19,6 +19,7 @@ import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-ga
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { runAgentNodeLifecycle, type AgentNodeLifecycleInput } from './agent-node-lifecycle.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 
@@ -101,6 +102,13 @@ function neverCalledRunner(captured: { called: boolean }): AgentQueryRunner {
 const notCalled = (): never => {
   throw new Error('ebben a tesztben nem hívott port');
 };
+
+// A regiszter szerepe ebben a fájlban pusztán instrumentális: a lépés
+// életciklusa (`runAgentNodeLifecycle`) megköveteli, de ez a téma nem a
+// regiszter viselkedését teszteli (lásd `run-interrupt/agent-query-registry.spec.ts`
+// és `agent-step/run-agent-step.spec.ts`), ezért egyetlen, minden teszt által
+// megosztott példány elég.
+const agentQueryRegistry = createAgentQueryRegistry();
 
 function knownFact<TValue>(value: TValue): Fact<TValue> {
   return { state: 'known', value, evidence: [{ kind: 'measurement', id: 'M-01' }] };
@@ -375,7 +383,9 @@ describe('runAgentNodeLifecycle', () => {
       },
     });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(inputOf(runId), dependencies, observingGate));
+    const outcome = okOrThrow(
+      await runAgentNodeLifecycle(inputOf(runId), dependencies, observingGate, agentQueryRegistry),
+    );
 
     expect(outcome.kind).toBe('succeeded');
     expect(stepRunIdAtGrant).toBe(outcome.stepRun.id);
@@ -416,7 +426,7 @@ describe('runAgentNodeLifecycle', () => {
     const models = [model('modell-1', unknownFact())];
     const input = inputOf(runId, { descriptor: descriptor({ models }) });
 
-    await runAgentNodeLifecycle(input, dependencies, gate);
+    await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);
 
     const startedEvent = published.find(
       (event): event is { payload: Record<string, unknown> } =>
@@ -461,7 +471,7 @@ describe('runAgentNodeLifecycle', () => {
       }),
     });
 
-    await runAgentNodeLifecycle(input, dependencies, gate);
+    await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);
 
     const startedEvent = published.find(
       (event): event is { payload: Record<string, unknown> } =>
@@ -492,7 +502,7 @@ describe('runAgentNodeLifecycle', () => {
       config: agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
     });
 
-    await runAgentNodeLifecycle(input, dependencies, gate);
+    await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);
 
     const startedEvent = published.find(
       (event): event is { payload: Record<string, unknown> } =>
@@ -518,7 +528,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('hibasSubtype'), { request: undefined }),
     });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(inputOf(runId), dependencies, gate));
+    const outcome = okOrThrow(await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('agent_result_not_success');
@@ -538,7 +548,7 @@ describe('runAgentNodeLifecycle', () => {
     const dependencies = dependenciesOf({ database, agentQueryRunner: neverCalledRunner(runnerCalled) });
     const input = inputOf(runId, { config: agentStepConfig({ modelId: 'ismeretlen' }) });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(input, dependencies, gate));
+    const outcome = okOrThrow(await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('unknown_model_id');
@@ -558,7 +568,7 @@ describe('runAgentNodeLifecycle', () => {
     });
     const input = inputOf('nincs-ilyen-futas');
 
-    const outcome = await runAgentNodeLifecycle(input, dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(calls).toStrictEqual([]);
@@ -575,7 +585,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('unknown_concurrency_slot');
@@ -605,7 +615,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, racyGate);
+    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, racyGate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('illegal_status_transition');
@@ -633,7 +643,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
   });
@@ -661,7 +671,7 @@ describe('runAgentNodeLifecycle', () => {
     });
     const input = inputOf(runId, { config: agentStepConfig({ modelId: 'ismeretlen' }) });
 
-    const outcome = await runAgentNodeLifecycle(input, dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('illegal_status_transition');
@@ -689,7 +699,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('illegal_status_transition');
@@ -713,7 +723,7 @@ describe('runAgentNodeLifecycle', () => {
       },
     });
 
-    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate);
+    const outcome = await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
 
     expect(outcome.kind).toBe('error');
     expect(calls.some((call) => call.startsWith('release:'))).toBe(true);
@@ -730,7 +740,7 @@ describe('runAgentNodeLifecycle', () => {
     });
 
     expect(gate.occupiedSlotCount('minimax')).toBe(0);
-    await runAgentNodeLifecycle(inputOf(runId), dependencies, gate);
+    await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
     expect(gate.occupiedSlotCount('minimax')).toBe(0);
     expect(gate.waitingRequestCount('minimax')).toBe(0);
 
@@ -746,7 +756,9 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(inputOf(runId, { nodeType: 'join' }), dependencies, gate));
+    const outcome = okOrThrow(
+      await runAgentNodeLifecycle(inputOf(runId, { nodeType: 'join' }), dependencies, gate, agentQueryRegistry),
+    );
 
     expect(outcome.stepRun.nodeType).toBe('join');
 

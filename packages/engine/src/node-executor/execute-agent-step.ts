@@ -6,6 +6,7 @@ import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import type { RunContext } from '../run-context/run-context.ts';
+import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
@@ -45,6 +46,7 @@ export function executeAgentStep(
   input: ExecuteAgentStepInput,
   ports: EngineDependencies,
   gate: ConcurrencyGate,
+  agentQueryRegistry: AgentQueryRegistry,
 ): Promise<Outcome<NodeExecutionOutcome>> {
   return runAgentNodeLifecycle(
     {
@@ -59,5 +61,6 @@ export function executeAgentStep(
     },
     ports,
     gate,
+    agentQueryRegistry,
   );
 }

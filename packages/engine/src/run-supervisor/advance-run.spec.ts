@@ -22,6 +22,7 @@ import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
+import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
@@ -245,6 +246,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     concurrencyGate: createConcurrencyGate(() => null),
     approvalRegistry: createApprovalWaitRegistry(),
     childWorkflowRunner: { startChildRun: notCalled, awaitChildRun: notCalled },
+    agentQueryRegistry: createAgentQueryRegistry(),
   };
 
   const scheduler =
