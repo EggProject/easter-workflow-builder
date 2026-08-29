@@ -1,13 +1,10 @@
 // Barrel: csak nevesített újraexport (SPEC-002 6.6 6. szabálya). A csomag téma mappánként
 // bővül, ahogy a SPEC-005 végrehajtási lépései elkészülnek.
 
-// Ideiglenes, eldobható séma (T-006-2, PLAN-006): kizárólag azt igazolja, hogy a Zod
-// együtt tud élni a kilenc minőségi kapuval, mielőtt bármilyen domain tartalom íródna. A
-// következő lépés (T-006-3) törli, és a valódi téma mappák váltják fel.
-import { z } from 'zod';
-
-const PlaceholderSchema = z.strictObject({ placeholder: z.string() });
-
-export function isPlaceholder(value: unknown): boolean {
-  return PlaceholderSchema.safeParse(value).success;
-}
+// http-route: az API_BASE_PATH és a STREAM_PATH konstans, a 26 végpont útvonal sablonja,
+// és a paraméter behelyettesítő tiszta függvény.
+export { API_BASE_PATH } from './http-route/api-base-path.ts';
+export { STREAM_PATH } from './http-route/stream-path.ts';
+export type { HttpMethod, RouteDefinition, RouteId } from './http-route/route-table.ts';
+export { ROUTE_TABLE } from './http-route/route-table.ts';
+export { buildRoutePath } from './http-route/build-route-path.ts';
