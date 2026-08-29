@@ -5,30 +5,31 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 
 ## Rögzített verziók
 
-| Csomag                           | Verzió         | Forrás / megjegyzés                            |
-| -------------------------------- | -------------- | ---------------------------------------------- |
-| `@anthropic-ai/claude-agent-sdk` | 0.3.245        | **pinelve**, lásd lent                         |
-| TypeScript                       | **6.0.3**      | fix, nem frissítjük 7-re                       |
-| Bun                              | 1.4.0          | csak csomagkezelő és workspace                 |
-| Node.js                          | 26.7.0         | runtime, `.nvmrc` = v26.0.0                    |
-| Turborepo                        | 2.10.12        | `tasks` séma, nem `pipeline`                   |
-| React                            | 19.2.8         | nincs React 20                                 |
-| Vite                             | 8.2.2          | Rolldown alapú                                 |
-| `@xyflow/react`                  | 12.11.5        | MIT, React 19 kompatibilis                     |
-| Vitest                           | 4.1.11         | v8 coverage provider                           |
-| `@playwright/test`               | 1.62.1         |                                                |
-| ESLint                           | 10.9.1         | csak flat config, `.eslintrc` megszűnt         |
-| `typescript-eslint`              | 8.68.0         | peer: `typescript >=4.8.4 <6.1.0`              |
-| `eslint-plugin-unicorn`          | 73.0.0         | peer: `eslint >=10.4`                          |
-| `eslint-plugin-import-x`         | 4.17.1         | az `eslint-plugin-import` karbantartott forkja |
-| `eslint-plugin-sonarjs`          | 4.2.0          | **LGPL-3.0-only**, dev függőség                |
-| Prettier                         | 3.9.6          | nincs 4.0                                      |
-| Drizzle ORM                      | 0.45.2         | még 0.x                                        |
-| `better-sqlite3`                 | 13.0.3         | natív modul                                    |
-| `drizzle-kit`                    | 0.31.10        | npm `latest`, T-003-2, lásd lent               |
-| `@types/better-sqlite3`          | 9.6.0          | npm `latest`, T-003-2, lásd lent               |
-| `ws`                             | 8.21.3         |                                                |
-| `pino` / `pino-roll`             | 10.3.1 / 4.0.0 | log rotation                                   |
+| Csomag                           | Verzió                     | Forrás / megjegyzés                                   |
+| -------------------------------- | -------------------------- | ----------------------------------------------------- |
+| `@anthropic-ai/claude-agent-sdk` | 0.3.245                    | **pinelve**, lásd lent                                |
+| TypeScript                       | **6.0.3**                  | fix, nem frissítjük 7-re                              |
+| Bun                              | 1.4.0                      | csak csomagkezelő és workspace                        |
+| Node.js                          | 26.7.0                     | runtime, `.nvmrc` = v26.0.0                           |
+| Turborepo                        | 2.10.12                    | `tasks` séma, nem `pipeline`                          |
+| React                            | 19.2.8                     | nincs React 20                                        |
+| Vite                             | 8.2.2                      | Rolldown alapú                                        |
+| `@xyflow/react`                  | 12.11.5                    | MIT, React 19 kompatibilis                            |
+| Vitest                           | 4.1.11                     | v8 coverage provider                                  |
+| `@playwright/test`               | 1.62.1                     |                                                       |
+| ESLint                           | 10.9.1                     | csak flat config, `.eslintrc` megszűnt                |
+| `typescript-eslint`              | 8.68.0                     | peer: `typescript >=4.8.4 <6.1.0`                     |
+| `eslint-plugin-unicorn`          | 73.0.0                     | peer: `eslint >=10.4`                                 |
+| `eslint-plugin-import-x`         | 4.17.1                     | az `eslint-plugin-import` karbantartott forkja        |
+| `eslint-plugin-sonarjs`          | 4.2.0                      | **LGPL-3.0-only**, dev függőség                       |
+| Prettier                         | 3.9.6                      | nincs 4.0                                             |
+| Drizzle ORM                      | 0.45.2                     | még 0.x                                               |
+| `better-sqlite3`                 | 13.0.3                     | natív modul                                           |
+| `drizzle-kit`                    | 0.31.10                    | npm `latest`, T-003-2, lásd lent                      |
+| `@types/better-sqlite3`          | 9.6.0                      | npm `latest`, T-003-2, lásd lent                      |
+| `ws`                             | 8.21.3                     |                                                       |
+| `pino` / `pino-roll`             | 10.3.1 / 4.0.0             | log rotation                                          |
+| `zod`                            | `^4.0.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -45,6 +46,23 @@ Mindkét lekérdezés ugyanazt a verziót adta a két forrásból, tippelés nem
 `better-sqlite3@13.0.3` és `@types/better-sqlite3@9.6.0` választását nem befolyásolja, mert
 ezek a `drizzle-kit` CLI belső build függőségei, nem futásidejű peer követelmény a
 felhasználó felé.
+
+## `zod` verzió, 2026-08-29 (T-006, SPEC-005)
+
+Élő npm registry lekérdezés, két független forrással:
+
+| Csomag | Verzió (npm `latest`) | Forrás 1                                          | Forrás 2                                                |
+| ------ | --------------------- | ------------------------------------------------- | ------------------------------------------------------- |
+| `zod`  | `4.5.2`               | https://registry.npmjs.org/zod/latest (`version`) | https://unpkg.com/zod/package.json (302 -> `zod@4.5.2`) |
+
+A `packages/protocol/package.json` a `zod` csomagot `^4.0.0` range-en deklarálja, ami a
+workspace fában **már meglévő** kényszer: az `@anthropic-ai/claude-agent-sdk` `peerDependencies`
+mezője `zod: "^4.0.0"`, a `@modelcontextprotocol/sdk` `zod: "^3.25 || ^4.0"`, az
+`@anthropic-ai/sdk` `zod: "^3.25.0 || ^4.0.0"` értéket követeli. A `^4.0.0` tehát nem új
+verziódöntés, hanem a fában már meglévő négy hely közös metszete (SPEC-005 3.4, 6.). A
+telepített, `bun.lock`-ban rögzített tényleges verzió `4.4.3` (a `^4.0.0` range-nek megfelel), nem
+a legfrissebb `4.5.2`, mert a projekt a lockfile-ban rögzített verziót használja, és a frissítés
+külön, forrásolt lépés (SPEC-005 6. táblázat, "A `zod` verzió frissül..." sor).
 
 ## Miért TypeScript 6.0.3 és nem 7
 
