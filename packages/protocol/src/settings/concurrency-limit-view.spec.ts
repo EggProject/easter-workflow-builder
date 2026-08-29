@@ -38,4 +38,8 @@ describe('SetConcurrencyLimitRequestSchema', () => {
   it('elutasítja a nullát', () => {
     expect(SetConcurrencyLimitRequestSchema.safeParse({ maxConcurrentSteps: 0 }).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(SetConcurrencyLimitRequestSchema.safeParse({ maxConcurrentSteps: 4, extra: 1 }).success).toBe(false);
+  });
 });

@@ -42,4 +42,8 @@ describe('ApprovalDecisionRequestSchema', () => {
   it('elutasítja a hiányzó decision mezőt', () => {
     expect(ApprovalDecisionRequestSchema.safeParse({}).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(ApprovalDecisionRequestSchema.safeParse({ decision: 'approved', extra: 1 }).success).toBe(false);
+  });
 });
