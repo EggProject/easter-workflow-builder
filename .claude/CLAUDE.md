@@ -104,6 +104,15 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   guard, kebab-case fájlnév, mindkét ágra és a típusszűkítésre kötelező unit teszt.
 - Domain specifikus guard a **saját csomagjában**, a témája mappájában marad.
 - Minden guard `value is T` alakú és `unknown` bemenetet fogad (SPEC-003 9.4).
+- **Kimondott, hatókörben szűkített kivétel: a `packages/protocol` csomag.** Minden drótszintű
+  alak Zod sémából származik (`.safeParse()` a futásidejű ellenőrzés, `z.infer` a típus), nem
+  kézzel írt typeguardból. A `typeguards` csomag emiatt nem szűnik meg és nem csökken a szerepe:
+  a `protocol` is használhat belőle guardot ott, ahol a kérdés nem drótszintű alak. Négy kötött
+  séma írási szabály tartozik hozzá: minden bejövő objektum `z.strictObject` (ismeretlen kulcs
+  elutasítva), nincs `.default()` és nincs `.transform()` a protokoll sémáiban, minden kimenő
+  alak `.readonly()`, az uniók `z.discriminatedUnion`. A `.parse()` tiltott, csak `.safeParse()`
+  fut, és minden validáló függvény `Outcome<T>` alakban ad választ, hogy a dobó kivétel ne törje
+  meg a projekt `Outcome` konvencióját (SPEC-005 7.2, 7.3, 7.4).
 
 **Fájlok és tesztek**
 
