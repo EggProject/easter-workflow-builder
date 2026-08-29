@@ -162,6 +162,40 @@ describe('advanceScheduler', () => {
     expect(executed).toStrictEqual(['start', 'b', 'x', 'z', 'vege']);
   });
 
+  // Regresszió (T-005-30). A `branch` halott ága (`b -> z`) és élő ága
+  // (`b -> y`) ugyanabba a node-ba (`y`) talál vissza, és a HALOTT él áll elöl
+  // az él listában. A jelölések a menet elején mind kiíródnak, ezért a halott
+  // `z` példány terjesztése a beágyazott menetben már futtathatónak látja az
+  // `y` példányt és sorba állítja, majd a külső menet ugyanazt a példányt még
+  // egyszer kiértékeli - `y` kétszer került a sorba, tehát kétszer futott le. A
+  // `step_run` sor a példány azonosságához kötött (SPEC-004 4.3), és a
+  // futtathatóság a jelöléseken áll, nem az élek pillanatképbeli sorrendjén
+  // (4.4 2. pont), tehát ez sorrendtől független kell legyen.
+  it('a halott ág terjesztése akkor sem futtatja kétszer a visszatalálkozó node-ot, ha a halott él áll elöl', () => {
+    const topology = topologyOf(
+      [
+        node('start', 'start'),
+        node('b', 'branch'),
+        node('y', 'agent_step'),
+        node('z', 'agent_step'),
+        node('vege', 'agent_step'),
+      ],
+      [
+        edge('e1', 'start', 'b'),
+        edge('e2', 'b', 'z', 'jobb'),
+        edge('e3', 'b', 'y', 'bal'),
+        edge('e4', 'z', 'y'),
+        edge('e5', 'y', 'vege'),
+      ],
+    );
+
+    const { executed } = playRun(topology, (instance) =>
+      instance.nodeId === 'b' ? completeWithBranchKey(topology, instance, 'bal') : completeAll(topology, instance),
+    );
+
+    expect(executed).toStrictEqual(['start', 'b', 'y', 'vege']);
+  });
+
   it('N elemű fan_out N példányt ad, és a join egyszer fut a külső kontextusban', () => {
     const topology = topologyOf(
       [
