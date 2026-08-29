@@ -13,6 +13,10 @@ describe('StartRunRequestSchema', () => {
   it('elutasítja, ha az input hiányzik', () => {
     expect(StartRunRequestSchema.safeParse({}).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(StartRunRequestSchema.safeParse({ input: {}, extra: 1 }).success).toBe(false);
+  });
 });
 
 describe('StartedRunResponseSchema', () => {
@@ -28,5 +32,9 @@ describe('RestartRunRequestSchema', () => {
 
   it('elfogadja a megadott inputot is', () => {
     expect(RestartRunRequestSchema.safeParse({ input: { name: 'Ada' } }).success).toBe(true);
+  });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(RestartRunRequestSchema.safeParse({ extra: 1 }).success).toBe(false);
   });
 });

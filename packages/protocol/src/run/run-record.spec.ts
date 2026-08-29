@@ -65,4 +65,8 @@ describe('ListRunsQuerySchema', () => {
   it('elutasítja a hiányzó limitet', () => {
     expect(ListRunsQuerySchema.safeParse({ workflowId: 'wf-1' }).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(ListRunsQuerySchema.safeParse({ limit: 10, extra: 1 }).success).toBe(false);
+  });
 });

@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `stepRunId`/`throughEventId`/`runId` mezők valódi SQL NULL-t hordozó, nullable drótszintű mezők, nem helyőrző `undefined` (SPEC-003 6.2, SPEC-005 5.4 táblázat) */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { ProtocolErrorBody } from '../protocol-error/protocol-error-body.ts';
 import {
   ProtocolErrorFrameSchema,
   ReplayCompleteFrameSchema,
@@ -7,6 +8,7 @@ import {
   RunEventTransientFrameSchema,
   StreamFrameSchema,
   StreamReadyFrameSchema,
+  type ProtocolErrorFrame,
 } from './stream-frame.ts';
 
 const validRunEventRecord = {
@@ -159,6 +161,10 @@ describe('ProtocolErrorFrameSchema', () => {
       runId: 'run-1',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('a code és message mezője pontosan a ProtocolErrorBody alakját hordozza, két külön hiba alak nélkül (38. kritérium)', () => {
+    expectTypeOf<Pick<ProtocolErrorFrame, 'code' | 'message'>>().toEqualTypeOf<ProtocolErrorBody>();
   });
 });
 

@@ -17,6 +17,10 @@ describe('DeleteWorkflowRequestSchema', () => {
   it('elutasítja a hiányzó törzset, undefined bemenetként (13. kritérium, 3/3 eset)', () => {
     expect(DeleteWorkflowRequestSchema.safeParse(undefined).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(DeleteWorkflowRequestSchema.safeParse({ acknowledgeIrreversible: true, extra: 1 }).success).toBe(false);
+  });
 });
 
 describe('DeletionSummarySchema', () => {

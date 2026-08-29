@@ -35,6 +35,10 @@ describe('WorkflowNodeInputSchema', () => {
   it('elutasítja az érvénytelen node típust', () => {
     expect(WorkflowNodeInputSchema.safeParse({ ...VALID_NODE, type: 'unknown' }).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(WorkflowNodeInputSchema.safeParse({ ...VALID_NODE, extra: 1 }).success).toBe(false);
+  });
 });
 
 describe('WorkflowNodeSchema', () => {
@@ -47,6 +51,10 @@ describe('WorkflowNodeSchema', () => {
 describe('WorkflowEdgeInputSchema és WorkflowEdgeSchema', () => {
   it('elfogadja az érvényes él bemenetet', () => {
     expect(WorkflowEdgeInputSchema.safeParse(VALID_EDGE).success).toBe(true);
+  });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(WorkflowEdgeInputSchema.safeParse({ ...VALID_EDGE, extra: 1 }).success).toBe(false);
   });
 
   it('elfogadja az időbélyeggel kiegészített él rekordot', () => {
@@ -72,5 +80,9 @@ describe('ReplaceGraphRequestSchema', () => {
 
   it('elfogadja az üres listákat is (teljes csere, nulla elem)', () => {
     expect(ReplaceGraphRequestSchema.safeParse({ nodes: [], edges: [] }).success).toBe(true);
+  });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(ReplaceGraphRequestSchema.safeParse({ nodes: [], edges: [], extra: 1 }).success).toBe(false);
   });
 });

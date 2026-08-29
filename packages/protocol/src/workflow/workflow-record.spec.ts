@@ -80,4 +80,8 @@ describe('ListWorkflowsQuerySchema', () => {
   it('elutasítja a nem pozitív limitet', () => {
     expect(ListWorkflowsQuerySchema.safeParse({ limit: 0 }).success).toBe(false);
   });
+
+  it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
+    expect(ListWorkflowsQuerySchema.safeParse({ limit: 20, extra: 1 }).success).toBe(false);
+  });
 });
