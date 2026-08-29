@@ -56,4 +56,28 @@ describe('createClearConcurrencyLimitHandler', () => {
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
+
+  it('hiányzó providerId útvonal paraméterre not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createClearConcurrencyLimitHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+    expect(result.kind === 'error' && result.message).toContain('(not_found)');
+  });
+
+  it('a repository hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createClearConcurrencyLimitHandler(database);
+
+    const result = await handler({
+      parameters: { providerId: 'minimax' },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
+
+    expect(result.kind).toBe('error');
+  });
 });

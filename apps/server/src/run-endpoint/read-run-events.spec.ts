@@ -129,12 +129,46 @@ describe('createReadRunEventsHandler', () => {
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
 
+  it('hiányzó runId útvonal paraméterre üres stringgel keres, not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createReadRunEventsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams({ afterEventId: '0', limit: '10' }),
+      body: undefined,
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
   it('érvénytelen query paraméterre invalid_request hibát ad', async () => {
     const database = openMemoryDatabase();
     const runId = createTestRun(database);
     const handler = createReadRunEventsHandler(database);
 
     const result = await handler({ parameters: { runId }, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('az események olvasásának hibaágát változatlanul továbbadja, miután a futás létezik', async () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    const databaseWithFailingEvents: DatabaseContext = {
+      ...database,
+      events: {
+        ...database.events,
+        readEventsSince: () => ({ kind: 'error', message: 'szimulált olvasási hiba (internal).' }),
+      },
+    };
+    const handler = createReadRunEventsHandler(databaseWithFailingEvents);
+
+    const result = await handler({
+      parameters: { runId },
+      query: new URLSearchParams({ afterEventId: '1', limit: '10' }),
+      body: undefined,
+    });
 
     expect(result.kind).toBe('error');
   });

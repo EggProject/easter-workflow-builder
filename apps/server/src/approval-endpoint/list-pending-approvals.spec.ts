@@ -92,4 +92,14 @@ describe('createListPendingApprovalsHandler', () => {
 
     expect(result).toStrictEqual({ kind: 'ok', value: { status: 200, body: [] } });
   });
+
+  it('a repository hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createListPendingApprovalsHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
 });

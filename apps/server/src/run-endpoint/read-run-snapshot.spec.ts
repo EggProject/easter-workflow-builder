@@ -83,4 +83,13 @@ describe('createReadRunSnapshotHandler', () => {
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
+
+  it('hiányzó runId útvonal paraméterre üres stringgel keres, not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createReadRunSnapshotHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
 });

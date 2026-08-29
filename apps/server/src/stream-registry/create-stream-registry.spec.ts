@@ -106,6 +106,15 @@ describe('createStreamRegistry', () => {
     expect(isS2Notified).toBe(false);
   });
 
+  it('notifyRunChanged olyan streamId-re feliratkozott futásra jelez, amelyhez nincs nyitott kapcsolat (nem dob hibát)', () => {
+    const registry = createStreamRegistry(createRandomUuidIdGenerator());
+    registry.replaceSubscriptions('s1', [{ runId: 'run-1', fromEventId: 0, replayLimit: 10 }]);
+
+    expect(() => {
+      registry.notifyRunChanged({ runId: 'run-1', transientFrame: undefined });
+    }).not.toThrow();
+  });
+
   it('notifyRunChanged olyan runId-ra, amire senki nem iratkozott fel, nem hív semmit', () => {
     const registry = createStreamRegistry(createRandomUuidIdGenerator());
     registry.replaceSubscriptions('s1', [{ runId: 'run-1', fromEventId: 0, replayLimit: 10 }]);

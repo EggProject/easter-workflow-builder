@@ -61,6 +61,16 @@ describe('createTestProviderConnectionHandler', () => {
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
 
+  it('hiányzó providerId útvonal paraméterre not_found hibát ad', async () => {
+    const engine = buildFakeEngine({});
+    const handler = createTestProviderConnectionHandler(engine);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+    expect(result.kind === 'error' && result.message).toContain('(not_found)');
+  });
+
   it('a motor hibaágát változatlanul továbbadja', async () => {
     const engine = buildFakeEngine({
       testProviderConnection: () => Promise.resolve({ kind: 'error', message: 'hiba (internal).' }),

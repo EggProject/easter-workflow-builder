@@ -89,4 +89,29 @@ describe('createGetRunHandler', () => {
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
+
+  it('hiányzó runId útvonal paraméterre üres stringgel keres, not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createGetRunHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('elindult és befejezett futásra a startedAtMs/finishedAtMs mezőket egésszé alakítva adja (nem null ág)', async () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    okOrThrow(database.runs.markRunRunning(runId));
+    okOrThrow(database.runs.markRunSucceeded(runId));
+    const handler = createGetRunHandler(database);
+
+    const result = await handler({ parameters: { runId }, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('ok');
+    const body = result.kind === 'ok' ? result.value.body : undefined;
+    expect(isRecord(body) && typeof body['startedAtMs'] === 'number' && typeof body['finishedAtMs'] === 'number').toBe(
+      true,
+    );
+  });
 });

@@ -41,4 +41,14 @@ describe('createReadSettingsHandler', () => {
       persistStreamDeltas: false,
     });
   });
+
+  it('a repository hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createReadSettingsHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
 });

@@ -64,6 +64,16 @@ describe('createSetConcurrencyLimitHandler', () => {
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
 
+  it('hiányzó providerId útvonal paraméterre not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createSetConcurrencyLimitHandler(database, buildFakeEngine());
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { maxConcurrentSteps: 5 } });
+
+    expect(result.kind).toBe('error');
+    expect(result.kind === 'error' && result.message).toContain('(not_found)');
+  });
+
   it('érvénytelen kérés törzsre invalid_request hibát ad', async () => {
     const database = openMemoryDatabase();
     const handler = createSetConcurrencyLimitHandler(database, buildFakeEngine());
@@ -73,14 +83,21 @@ describe('createSetConcurrencyLimitHandler', () => {
     expect(result.kind).toBe('error');
   });
 
-  it('a repository hibaágát változatlanul továbbadja', async () => {
+  it('a repository hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    // A `maxConcurrentSteps: 0` NEM ide tartozik: a `SetConcurrencyLimitRequestSchema`
+    // (`z.number().int().positive()`) ezt már a Zod validáción elutasítja
+    // (invalid_request), a `database.concurrencyLimits.setLimit` DB szintű
+    // `CHECK (max_concurrent_steps > 0)` hibaága emiatt a nyilvános API-n át
+    // sosem érhető el 0-val - a repository hibaágat ezért lezárt adatbázis
+    // kapcsolattal váltjuk ki, érvényes, pozitív bemenettel.
     const database = openMemoryDatabase();
+    database.close();
     const handler = createSetConcurrencyLimitHandler(database, buildFakeEngine());
 
     const result = await handler({
       parameters: { providerId: 'minimax' },
       query: new URLSearchParams(),
-      body: { maxConcurrentSteps: 0 },
+      body: { maxConcurrentSteps: 5 },
     });
 
     expect(result.kind).toBe('error');

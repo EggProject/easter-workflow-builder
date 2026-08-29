@@ -66,4 +66,42 @@ describe('createUpdateSettingsHandler', () => {
 
     expect(result.kind).toBe('error');
   });
+
+  it('a setDefaultProvider hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { defaultProviderId: 'minimax' },
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('a setPersistStreamDeltas hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { persistStreamDeltas: true },
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('a záró readSettings hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createUpdateSettingsHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: {} });
+
+    expect(result.kind).toBe('error');
+  });
 });

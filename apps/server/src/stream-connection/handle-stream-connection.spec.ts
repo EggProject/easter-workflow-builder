@@ -4,7 +4,11 @@ import type { ClockPort } from '@easter-workflow-builder/engine';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
-import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
+import {
+  createStreamRegistry,
+  type StreamConnectionListener,
+  type StreamRegistry,
+} from '../stream-registry/create-stream-registry.ts';
 import { handleStreamConnection, type StreamConnectionDependencies } from './handle-stream-connection.ts';
 import type { StreamSink } from './stream-sink.ts';
 
@@ -128,6 +132,10 @@ function buildControllableClock(): {
       resolver?.();
     },
   };
+}
+
+function noopUnregister(): void {
+  // szándékosan üres: a fakeRegistry openConnection leiratkozó függvénye ebben a tesztben nem hívódik
 }
 
 function flushMicrotasks(): Promise<void> {
@@ -258,6 +266,23 @@ describe('handleStreamConnection', () => {
     expect(live).toHaveLength(1);
   });
 
+  it('élő jelzésre is lapozva megy a lecsapolás, amíg a lap tele jön vissza', () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    const dependencies = buildDependencies(database, buildControllableClock().clock);
+    dependencies.registry.replaceSubscriptions('s1', [{ runId, fromEventId: 1, replayLimit: 2 }]);
+    const { sink, chunks } = buildFakeSink();
+
+    handleStreamConnection('s1', undefined, sink, dependencies);
+    for (let index = 0; index < 5; index += 1) {
+      appendEvent(database, runId);
+    }
+    dependencies.registry.notifyRunChanged({ runId, transientFrame: undefined });
+
+    const live = chunks.filter((chunk) => chunk.includes('"delivery":"live"'));
+    expect(live).toHaveLength(5);
+  });
+
   it('üres lecsapolásra, ha van transientFrame jelölt, azt küldi ki', () => {
     const database = openMemoryDatabase();
     const runId = createTestRun(database);
@@ -385,5 +410,109 @@ describe('handleStreamConnection', () => {
     dependencies.registry.closeAllConnections();
 
     expect(isClosed()).toBe(true);
+  });
+
+  it('a pótlás olvasási hibájára replay_complete-tel zár, throughEventId null értékkel (a replayRun hiba ága)', () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    appendEvent(database, runId);
+    const databaseWithFailingReplay: DatabaseContext = {
+      ...database,
+      events: {
+        ...database.events,
+        readEventsSince: () => ({ kind: 'error', message: 'szimulált olvasási hiba (internal).' }),
+      },
+    };
+    const dependencies = buildDependencies(databaseWithFailingReplay, buildControllableClock().clock);
+    dependencies.registry.replaceSubscriptions('s1', [{ runId, fromEventId: 1, replayLimit: 10 }]);
+    const { sink, chunks } = buildFakeSink();
+
+    handleStreamConnection('s1', undefined, sink, dependencies);
+
+    expect(chunks.some((chunk) => chunk.includes('"delivery":"replayed"'))).toBe(false);
+    const complete = chunks.find((chunk) => chunk.includes('event: replay_complete'));
+    expect(complete).toContain('"throughEventId":null');
+  });
+
+  it('már követett futásra a feliratkozás ismételt cseréje nem pótol újra (a handleReplaced tracked.has ága)', () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    appendEvent(database, runId);
+    const dependencies = buildDependencies(database, buildControllableClock().clock);
+    dependencies.registry.replaceSubscriptions('s1', [{ runId, fromEventId: 1, replayLimit: 10 }]);
+    const { sink, chunks } = buildFakeSink();
+
+    handleStreamConnection('s1', undefined, sink, dependencies);
+    const replayedAfterFirst = chunks.filter((chunk) => chunk.includes('"delivery":"replayed"')).length;
+
+    dependencies.registry.replaceSubscriptions('s1', [{ runId, fromEventId: 1, replayLimit: 10 }]);
+    const replayedAfterSecond = chunks.filter((chunk) => chunk.includes('"delivery":"replayed"')).length;
+
+    expect(replayedAfterFirst).toBe(1);
+    expect(replayedAfterSecond).toBe(1);
+  });
+
+  it('élő jelzés nem figyelt futásra a kapcsolat szintjén is figyelmen kívül marad (a handleSignal state === undefined védő ága)', () => {
+    const database = openMemoryDatabase();
+    let capturedListener: StreamConnectionListener | undefined;
+    const fakeRegistry: StreamRegistry = {
+      serverInstanceId: 'fixed-id',
+      getSubscriptions: () => [],
+      replaceSubscriptions: () => {
+        // szándékosan üres: ez a teszt nem a registry replaceSubscriptions útját fedi
+      },
+      openConnection: (_streamId, listener) => {
+        capturedListener = listener;
+        return noopUnregister;
+      },
+      notifyRunChanged: () => {
+        // szándékosan üres: ez a teszt közvetlenül a listener.onSignal-t hívja, mert a
+        // valós createStreamRegistry sosem hív onSignal-t nem figyelt futásra - ez a
+        // védő ág a StreamRegistry interfész szerződését, nem egyetlen implementációt védi
+      },
+      closeAllConnections: () => {
+        // szándékosan üres
+      },
+    };
+    const { sink, chunks } = buildFakeSink();
+
+    handleStreamConnection('s1', undefined, sink, {
+      database,
+      registry: fakeRegistry,
+      clock: buildControllableClock().clock,
+      keepAliveIntervalMs: 30_000,
+    });
+    const before = chunks.length;
+    capturedListener?.onSignal({ runId: 'nem-kovetett-run', transientFrame: undefined });
+
+    expect(chunks).toHaveLength(before);
+  });
+
+  it('élő jelzés közbeni olvasási hibára a lecsapolás megszakad, a nyelő nem kap töredék adatot (a handleSignal hiba ága)', () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    let callCount = 0;
+    const databaseWithLaterFailure: DatabaseContext = {
+      ...database,
+      events: {
+        ...database.events,
+        readEventsSince: () => {
+          callCount += 1;
+          return callCount === 1
+            ? { kind: 'ok', value: [] }
+            : { kind: 'error', message: 'szimulált olvasási hiba (internal).' };
+        },
+      },
+    };
+    const dependencies = buildDependencies(databaseWithLaterFailure, buildControllableClock().clock);
+    dependencies.registry.replaceSubscriptions('s1', [{ runId, fromEventId: 0, replayLimit: 10 }]);
+    const { sink, chunks } = buildFakeSink();
+
+    handleStreamConnection('s1', undefined, sink, dependencies);
+    const before = chunks.length;
+    dependencies.registry.notifyRunChanged({ runId, transientFrame: undefined });
+
+    expect(chunks).toHaveLength(before);
+    expect(callCount).toBe(2);
   });
 });

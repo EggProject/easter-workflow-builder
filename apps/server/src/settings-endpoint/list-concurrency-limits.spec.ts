@@ -46,4 +46,28 @@ describe('createListConcurrencyLimitsHandler', () => {
       { providerId: 'minimax', configuredMaxConcurrentSteps: 5 },
     ]);
   });
+
+  it('a claude-subscription-re is ad nézetet, ha csak az van beállítva (a másik providerId ?? null ága)', async () => {
+    const database = openMemoryDatabase();
+    okOrThrow(database.concurrencyLimits.setLimit('claude-subscription', 3));
+    const handler = createListConcurrencyLimitsHandler(database, buildFakeEngine());
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('ok');
+    expect(result.kind === 'ok' && result.value.body).toMatchObject([
+      { providerId: 'claude-subscription', configuredMaxConcurrentSteps: 3 },
+      { providerId: 'minimax', configuredMaxConcurrentSteps: null },
+    ]);
+  });
+
+  it('a repository hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createListConcurrencyLimitsHandler(database, buildFakeEngine());
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
 });

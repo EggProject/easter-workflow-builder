@@ -93,4 +93,20 @@ describe('createStartRunHandler', () => {
 
     expect(result.kind).toBe('error');
   });
+
+  it('hiányzó workflowId útvonal paraméterre üres stringgel hívja a motort', async () => {
+    let seenRequest: unknown;
+    const engine = buildFakeEngine({
+      startRun: (request) => {
+        seenRequest = request;
+        return Promise.resolve({ kind: 'error', message: 'A(z) "" workflow nem található (not_found).' });
+      },
+    });
+    const handler = createStartRunHandler(engine);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { input: {} } });
+
+    expect(seenRequest).toStrictEqual({ workflowId: '', input: {} });
+    expect(result.kind).toBe('error');
+  });
 });

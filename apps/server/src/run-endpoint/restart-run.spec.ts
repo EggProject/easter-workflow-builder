@@ -92,4 +92,20 @@ describe('createRestartRunHandler', () => {
 
     expect(result.kind).toBe('error');
   });
+
+  it('hiányzó runId útvonal paraméterre üres stringgel hívja a motort', async () => {
+    let seenRunId: string | undefined;
+    const engine = buildFakeEngine({
+      restartRun: (runId) => {
+        seenRunId = runId;
+        return Promise.resolve({ kind: 'error', message: 'A(z) "" futás nem található (not_found).' });
+      },
+    });
+    const handler = createRestartRunHandler(engine);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: {} });
+
+    expect(seenRunId).toBe('');
+    expect(result.kind).toBe('error');
+  });
 });

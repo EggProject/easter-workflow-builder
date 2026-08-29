@@ -83,13 +83,20 @@ async function serveMatchedRoute(
 }
 
 /**
- * A `Last-Event-ID` fejléc kiolvasása (SPEC-006 6.3). A Node
- * `IncomingMessage.headers` egy ismétlődő fejlécre tömböt is adhat; a
- * szabvány szerint a kliens egyetlen `Last-Event-ID` fejlécet küld, tehát a
- * tömb esetét az első elem választja, hogy a hívó oldalon (`create-http-server.ts`)
- * ne kelljen elágazni ezen.
+ * A `Last-Event-ID` fejléc kiolvasása (SPEC-006 6.3). Az `IncomingHttpHeaders`
+ * index szignatúrája minden fejlécnévre `string | string[] | undefined`
+ * típust ad, mert ez a `set-cookie` fejlécre valódi tömböt eredményez; a
+ * `last-event-id` viszont nincs a Node dokumentált "első előfordulást tartja
+ * meg" listáján, tehát az ismétlődő példányokat a Node saját HTTP elemzője
+ * `", "` elválasztóval EGYETLEN stringgé fűzi össze, mielőtt ez a függvény
+ * egyáltalán látná (mérve: két `Last-Event-ID` fejléccel küldött nyers kérésre
+ * a szerver oldali `request.headers['last-event-id']` értéke `"5, 9"`, nem
+ * tömb). A tömb ág emiatt valódi Node HTTP kéréssel nem érhető el; a
+ * függvény saját, exportált egysége viszont a deklarált típusa szerint
+ * mindkét alakot helyesen kezeli, ezért közvetlen unit teszttel fedett
+ * (`create-http-server.spec.ts`), nem a teljes HTTP kérésen át.
  */
-function readLastEventIdHeader(headerValue: string | readonly string[] | undefined): string | undefined {
+export function readLastEventIdHeader(headerValue: string | readonly string[] | undefined): string | undefined {
   if (headerValue === undefined) {
     return undefined;
   }

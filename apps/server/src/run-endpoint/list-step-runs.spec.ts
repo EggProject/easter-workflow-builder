@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createListStepRunsHandler } from './list-step-runs.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -94,5 +95,64 @@ describe('createListStepRunsHandler', () => {
 
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
+  });
+
+  it('hiányzó runId útvonal paraméterre üres stringgel keres, not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createListStepRunsHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('elindult és befejezett lépésre a startedAtMs/finishedAtMs mezőket egésszé alakítva adja (nem null ág)', async () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    const step = okOrThrow(
+      database.stepRuns.createStepRun({
+        runId,
+        nodeId: 'start-1',
+        nodeType: 'start',
+        parentStepRunId: null,
+        providerId: 'claude-subscription',
+        modelId: null,
+        sessionMode: null,
+        structuredOutputStrategy: null,
+        subWorkflowRunId: null,
+      }),
+    );
+    okOrThrow(database.stepRuns.markStepRunning(step.id));
+    okOrThrow(database.stepRuns.markStepSucceeded(step.id));
+    const handler = createListStepRunsHandler(database);
+
+    const result = await handler({ parameters: { runId }, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('ok');
+    const body = result.kind === 'ok' ? result.value.body : undefined;
+    expect(
+      Array.isArray(body) &&
+        body.length === 1 &&
+        isRecord(body[0]) &&
+        typeof body[0]['startedAtMs'] === 'number' &&
+        typeof body[0]['finishedAtMs'] === 'number',
+    ).toBe(true);
+  });
+
+  it('a listStepRuns hibaágát változatlanul továbbadja, miután a futás létezik', async () => {
+    const database = openMemoryDatabase();
+    const runId = createTestRun(database);
+    const databaseWithFailingList: DatabaseContext = {
+      ...database,
+      stepRuns: {
+        ...database.stepRuns,
+        listStepRuns: () => ({ kind: 'error', message: 'szimulált olvasási hiba (internal).' }),
+      },
+    };
+    const handler = createListStepRunsHandler(databaseWithFailingList);
+
+    const result = await handler({ parameters: { runId }, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind).toBe('error');
   });
 });

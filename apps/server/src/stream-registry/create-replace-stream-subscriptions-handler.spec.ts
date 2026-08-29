@@ -104,4 +104,14 @@ describe('createReplaceStreamSubscriptionsHandler', () => {
 
     expect(result.kind).toBe('error');
   });
+
+  it('hiányzó streamId útvonal paraméterre üres stringgel cserél', async () => {
+    const database = openMemoryDatabase();
+    const registry = createStreamRegistry(createRandomUuidIdGenerator());
+    const handler = createReplaceStreamSubscriptionsHandler(database, registry);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { runs: [] } });
+
+    expect(result).toStrictEqual({ kind: 'ok', value: { status: 200, body: { streamId: '', subscriptions: [] } } });
+  });
 });

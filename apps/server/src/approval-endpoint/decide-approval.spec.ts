@@ -166,4 +166,52 @@ describe('createDecideApprovalHandler', () => {
 
     expect(result.kind).toBe('error');
   });
+
+  it('hiányzó approvalId útvonal paraméterre üres stringgel keres, not_found hibát ad', async () => {
+    const database = openMemoryDatabase();
+    const handler = createDecideApprovalHandler(database, buildFakeEngine(database));
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { decision: 'approved' } });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('a listPendingApprovals hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+    const database = openMemoryDatabase();
+    database.close();
+    const handler = createDecideApprovalHandler(database, buildFakeEngine(database));
+
+    const result = await handler({
+      parameters: { approvalId: 'x' },
+      query: new URLSearchParams(),
+      body: { decision: 'approved' },
+    });
+
+    expect(result.kind).toBe('error');
+  });
+
+  it('a döntés utáni getApprovalForStep hibaágát változatlanul továbbadja', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = createTestRunAndWaitingStep(database);
+    const approval = okOrThrow(
+      database.approvals.requestApproval({ runId, stepRunId, title: 'Cím', body: 'Törzs', payload: {} }),
+    );
+    const engine = buildFakeEngine(database);
+    const databaseWithFailingReadback: DatabaseContext = {
+      ...database,
+      approvals: {
+        ...database.approvals,
+        getApprovalForStep: () => ({ kind: 'error', message: 'szimulált olvasási hiba (internal).' }),
+      },
+    };
+    const handler = createDecideApprovalHandler(databaseWithFailingReadback, engine);
+
+    const result = await handler({
+      parameters: { approvalId: approval.id },
+      query: new URLSearchParams(),
+      body: { decision: 'approved' },
+    });
+
+    expect(result.kind).toBe('error');
+  });
 });

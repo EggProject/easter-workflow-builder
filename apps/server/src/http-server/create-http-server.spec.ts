@@ -7,7 +7,7 @@ import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uu
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import type { StreamConnectionDependencies } from '../stream-connection/handle-stream-connection.ts';
-import { createHttpServer, type HttpServerOptions } from './create-http-server.ts';
+import { createHttpServer, readLastEventIdHeader, type HttpServerOptions } from './create-http-server.ts';
 
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
 
@@ -248,6 +248,21 @@ describe('createHttpServer', () => {
     await reader.cancel();
   });
 
+  it('a stream útvonalon hiányzó streamId query paraméterre üres stringgel nyit kapcsolatot', async () => {
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/events`);
+    const reader = response.body?.getReader();
+    if (reader === undefined) {
+      throw new Error('a stream válasz nem olvasható');
+    }
+    const { value } = await reader.read();
+    const chunk = new TextDecoder().decode(value);
+    expect(chunk).toContain('"streamId":""');
+    await reader.cancel();
+  });
+
   it('nem stream útvonalon konfigurált origin mellett sem küld CORS fejlécet', async () => {
     const { baseUrl, close } = await startTestServer(buildOptions({}, 'http://localhost:5173'));
     closeServer = close;
@@ -273,5 +288,19 @@ describe('createHttpServer', () => {
     expect(response.status).toBe(500);
     const payload: unknown = await response.json();
     expect(payload).toStrictEqual({ code: 'internal', message: 'Váratlan szerver hiba történt (internal).' });
+  });
+});
+
+describe('readLastEventIdHeader', () => {
+  it('sima string fejléc értéket változatlanul ad vissza', () => {
+    expect(readLastEventIdHeader('42')).toBe('42');
+  });
+
+  it('tömb alakú fejléc esetén az első elemet adja (az IncomingHttpHeaders index szignatúrája szerint elvben lehetséges alak)', () => {
+    expect(readLastEventIdHeader(['5', '9'])).toBe('5');
+  });
+
+  it('hiányzó fejlécre undefined-et ad', () => {
+    expect(readLastEventIdHeader(undefined)).toBeUndefined();
   });
 });
