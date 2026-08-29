@@ -99,3 +99,10 @@ export type { SettingsRecord, UpdateSettingsRequest } from './settings/settings-
 export { SettingsRecordSchema, UpdateSettingsRequestSchema } from './settings/settings-record.ts';
 export type { ConcurrencyLimitView, SetConcurrencyLimitRequest } from './settings/concurrency-limit-view.ts';
 export { ConcurrencyLimitViewSchema, SetConcurrencyLimitRequestSchema } from './settings/concurrency-limit-view.ts';
+
+// event-stream: a stream azonosító és URL építés, a feliratkozás kérés és állapot, az
+// öt keret sémája diszkriminált unióban, a keret kódoló és dekódoló, a kurzor szabály.
+export type { SubscriptionRequest, SubscriptionState } from './event-stream/stream-subscription.ts';
+export { SubscriptionRequestSchema, SubscriptionStateSchema } from './event-stream/stream-subscription.ts';
+export { buildStreamUrl } from './event-stream/build-stream-url.ts';
+export { resolveReplayCursor } from './event-stream/resolve-replay-cursor.ts';
