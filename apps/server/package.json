@@ -15,5 +15,10 @@
     "@easter-workflow-builder/logger": "workspace:*",
     "@easter-workflow-builder/protocol": "workspace:*",
     "@easter-workflow-builder/provider-registry": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
