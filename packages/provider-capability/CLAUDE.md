@@ -47,6 +47,14 @@ miatt, az `@easter-workflow-builder/agent-tool-bundle`.
 `evidence` listával, vagy `unknown` indoklással és a blokkoló mérési esettel. Ezt az
 `evidence/fact/` téma `Fact<T>` típusa kényszeríti ki.
 
+**Az `EnvironmentRequirement` a `source` mezőn diszkriminált unió.** A `literalValue` kizárólag a
+`literal` ágon létezik, és ott **kötelező**; a `process_env_passthrough` ág nem is ismeri a mezőt.
+Korábban egyetlen, opcionális `literalValue` mezős interfész állt itt, és emiatt a fogyasztó
+oldalon (`packages/engine` `resolveRequiredEnvironmentValue`) csendes üres string ág keletkezett a
+hiányzó literál értékre - olyan ág, ami a leírók tényleges alakján sosem futott, tehát a
+`.claude/CLAUDE.md` 5. szekciója szerint tilos. A javítás iránya ezért a típus szűkítése volt, nem
+egy futásidejű hibaág.
+
 Kódolási elvárások: nincs `any` (helyette `unknown` és typeguard), nincs `as` típuskényszerítés
 (helyette `satisfies` vagy explicit típusannotáció).
 

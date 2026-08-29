@@ -181,6 +181,94 @@ const RETRY_DOCUMENT: GraphSnapshotDocument = {
   ],
 };
 
+// A `br` node kifejezése: ELŐSZÖR hibát ad, utána az `a` ágat választja - ez a
+// "sikeres újrapróbálkozás" a kifejezés kiértékelő szintjén.
+const FLAKY_EXPRESSION = 'ELSORE_HIBA';
+const STABLE_EXPRESSION = 'MINDIG_A';
+const EMPTY_ITEMS_EXPRESSION = 'URES_LISTA';
+
+// Egyetlen `a` ágú `branch` node a `retryDocument` gráfjához. A config literál
+// itt, a hívás helyén áll, mert egy meglévő `NodeConfig` konstans kiterjesztése
+// (`{ ...FAILING_BRANCH, expression }`) a diszkriminált unió minden ágának
+// mezőit összeolvasztaná, és a `NodeConfig` paraméterre nem lenne értékadható.
+function branchNode(id: string, expression: string): SnapshotNode {
+  return node(id, {
+    type: 'branch',
+    expression,
+    branches: [{ key: 'a', label: 'a' }],
+    defaultBranchKey: null,
+    onUnhandledError: 'fail_run',
+  });
+}
+
+// A `retryDocument` gráfjához való kifejezés kiértékelő. Állapotot tart, mert a
+// `FLAKY_EXPRESSION` viselkedése hívásonként változik.
+function flakyEvaluator(): (expression: string) => Outcome<unknown> {
+  let flakyCalls = 0;
+  return (expression) => {
+    if (expression === EMPTY_ITEMS_EXPRESSION) {
+      return { kind: 'ok', value: [] };
+    }
+    if (expression === STABLE_EXPRESSION) {
+      return { kind: 'ok', value: 'a' };
+    }
+    flakyCalls += 1;
+    return flakyCalls === 1
+      ? { kind: 'error', message: `a(z) ${expression} kifejezés kiértékelése elhasalt` }
+      : { kind: 'ok', value: 'a' };
+  };
+}
+
+/**
+ * REGRESSZIÓS gráf a sikeres újrapróbálkozás utáni kettős lefutáshoz. A `le`
+ * node-nak KÉT bejövő éle van: az egyik a hibára futó, majd újrapróbált `br`
+ * node felől, a másik a hibátlan `ok` node felől. A `br` első lefutása
+ * `on_error` élen a kezelőhöz megy; ha a `br -> le` él ekkor `dead` jelölést
+ * kapna, a `le` a 4.4 2. pontja szerint (egyetlen `live` jelölés elég) azonnal
+ * futtathatóvá válna, lefutna, majd a sikeres újrapróbálkozás után MÁSODSZOR
+ * is, azonos `attempt` értékkel.
+ *
+ * A `le` node `fan_out`, a párja `jn` pedig üres listás `join` `merge`: ez a
+ * legkisebb node páros, ami hibátlanul lefut és terminális lehet, mert a
+ * `branch` node terminálisan mindig `branch_no_matching_edge` hibát adna
+ * (`execute-branch.ts`), az `agent_step` pedig SDK futtatót igényelne.
+ */
+function retryDocument(handler: NodeConfig): GraphSnapshotDocument {
+  return {
+    version: 1,
+    sdkVersionPin: INSTALLED,
+    workflow: { id: 'wf', name: 'teszt', description: null },
+    nodes: [
+      node('start', START),
+      branchNode('br', FLAKY_EXPRESSION),
+      branchNode('ok', STABLE_EXPRESSION),
+      node('eh', handler),
+      node('le', {
+        type: 'fan_out',
+        itemsExpression: EMPTY_ITEMS_EXPRESSION,
+        branchLabelTemplate: '{{item}}',
+        onUnhandledError: 'fail_run',
+      }),
+      node('jn', { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' }),
+    ],
+    edges: [
+      edge('e1', 'start', 'br'),
+      edge('e2', 'start', 'ok'),
+      { id: 'e3', sourceNodeId: 'br', targetNodeId: 'le', sourceHandle: null, targetHandle: null, branchKey: 'a' },
+      { id: 'e4', sourceNodeId: 'ok', targetNodeId: 'le', sourceHandle: null, targetHandle: null, branchKey: 'a' },
+      {
+        id: 'e5',
+        sourceNodeId: 'br',
+        targetNodeId: 'eh',
+        sourceHandle: null,
+        targetHandle: null,
+        branchKey: 'on_error',
+      },
+      edge('e6', 'le', 'jn'),
+    ],
+  };
+}
+
 interface Fixture {
   readonly database: DatabaseContext;
   readonly execution: RunExecution;
@@ -194,6 +282,7 @@ interface FixtureOptions {
   readonly enqueueStart?: boolean;
   readonly onNowMs?: () => void;
   readonly onSleep?: () => void;
+  readonly evaluate?: (expression: string) => Outcome<unknown>;
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -231,7 +320,9 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     agentQueryRunner: runner,
     providerDescriptorLookup: descriptorOf,
     expressionEvaluator: {
-      evaluate: (expression) => ({ kind: 'error', message: `a(z) ${expression} kifejezés kiértékelése elhasalt` }),
+      evaluate:
+        options.evaluate ??
+        ((expression) => ({ kind: 'error', message: `a(z) ${expression} kifejezés kiértékelése elhasalt` })),
       compile: notCalled,
     },
     templateRenderer: { render: notCalled, compile: notCalled },
@@ -332,6 +423,59 @@ describe('advanceRun', () => {
     const outcome = await advanceRun(fixture.execution, fixture.dependencies);
 
     expect(outcome.kind).toBe('error');
+  });
+
+  it('REGRESSZIÓ: sikeres újrapróbálkozás után a több bejövő élű leszármazott EGYSZER fut le', async () => {
+    const fixture = openFixture({
+      document: retryDocument({
+        type: 'error_handler',
+        maxAttempts: 3,
+        backoffMs: [1, 1],
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_run',
+      }),
+      evaluate: flakyEvaluator(),
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    const steps = okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId));
+    const downstream = steps.filter((step) => step.nodeId === 'le');
+    expect(completion.status).toBe('succeeded');
+    // A `br` kétszer futott: az első kísérlet `failed`, a második `succeeded`.
+    expect(steps.filter((step) => step.nodeId === 'br').map((step) => [step.attempt, step.status])).toStrictEqual([
+      [1, 'failed'],
+      [2, 'succeeded'],
+    ]);
+    // A leszármazott viszont PONTOSAN egyszer, a megismételt példány sikeres
+    // eredménye szerint - a hibás lefutás jelölése sosem érte el.
+    expect(downstream.map((step) => step.status)).toStrictEqual(['succeeded']);
+    expect(steps.filter((step) => step.nodeId === 'jn')).toHaveLength(1);
+  });
+
+  it('REGRESSZIÓ: kimerült kísérletek után az elhalasztott dead jelölés kikerül, a leszármazott nem ragad be', async () => {
+    const fixture = openFixture({
+      document: retryDocument({
+        type: 'error_handler',
+        maxAttempts: 1,
+        backoffMs: [],
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_branch',
+      }),
+      evaluate: flakyEvaluator(),
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    const steps = okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId));
+    expect(completion.status).toBe('failed');
+    expect(completion.errorKind).toBe('retry_attempts_exhausted');
+    // A `br` egyetlen kísérletet kapott, a kezelő kimerítette a kísérleteket,
+    // és a `br -> le` él ekkor kapta meg a halasztott `dead` jelölést: a `le`
+    // az `ok` felőli `live` jelöléssel futtathatóvá vált (4.4 2. pont).
+    expect(steps.filter((step) => step.nodeId === 'br')).toHaveLength(1);
+    expect(steps.filter((step) => step.nodeId === 'le')).toHaveLength(1);
+    expect(steps.filter((step) => step.nodeId === 'jn')).toHaveLength(1);
   });
 
   it('a run_finished esemény írásának hibáját továbbadja', async () => {

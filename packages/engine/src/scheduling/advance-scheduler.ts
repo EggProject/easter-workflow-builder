@@ -40,6 +40,12 @@ interface MarkBatch {
 // 3. pont), ezért a halott ág terjedése ezzel az üres halmazzal megy.
 const NO_LIVE_EDGE_IDS: ReadonlySet<string> = new Set();
 
+// Sikeres, halott vagy véglegesen elbukott példánynál minden kimenő él kap
+// jelölést, tehát nincs kihagyandó él. Az egyetlen esemény, ami élt hagy ki, a
+// `deferred_marks_settled`: ott a kihagyott él a halasztás alatt már `live`
+// jelölést kapott, és azt felülírni nem szabad.
+const NO_SKIPPED_EDGE_IDS: ReadonlySet<string> = new Set();
+
 function toDraft(state: SchedulerState): SchedulerDraft {
   return {
     edgeMarks: new Map(state.edgeMarks),
@@ -176,8 +182,9 @@ function recordExpansion(batch: MarkBatch, instance: StepInstanceReference, expa
 }
 
 // Egy lefutott vagy halott példány kimenő éleinek jelölése (SPEC-004 4.4
-// 3., 4. és 5. pont): a `liveEdgeIds` halmazban álló élek `live`, a többi
-// `dead` jelölést kap.
+// 3. és 4. pont): a `liveEdgeIds` halmazban álló élek `live`, a többi `dead`
+// jelölést kap. A `skippedEdgeIds` élekre semmilyen jelölés nem kerül, mert
+// azokat egy korábbi esemény már véglegesen megjelölte (`failure_settled`).
 //
 // **Meg nem nyílt hatókörbe nem kerül jelölés.** A hatókört nyitó élek
 // (`isScopeOpeningEdge`) kimaradnak, mert a törzs példányai csak a hatókörön belül
@@ -188,11 +195,16 @@ function recordExpansion(batch: MarkBatch, instance: StepInstanceReference, expa
 // kiegyensúlyozottsága garantálja, hogy a törzs node-jai kizárólag a hatókörön
 // belülről kapnak jelölést (4.5), a `join` pedig a kibontás bejegyzésből tudja
 // meg, hogy halott.
-function applyOutgoingMarks(batch: MarkBatch, instance: StepInstanceReference, liveEdgeIds: ReadonlySet<string>): void {
+function applyOutgoingMarks(
+  batch: MarkBatch,
+  instance: StepInstanceReference,
+  liveEdgeIds: ReadonlySet<string>,
+  skippedEdgeIds: ReadonlySet<string>,
+): void {
   const nodeType = batch.topology.graph.nodesById.get(instance.nodeId)?.type;
 
   for (const edge of outgoingEdgesOf(batch.topology, instance.nodeId)) {
-    if (isScopeOpeningEdge(nodeType, edge)) {
+    if (isScopeOpeningEdge(nodeType, edge) || skippedEdgeIds.has(edge.id)) {
       continue;
     }
     const context = markContextOnEdge(batch, instance.branchContext, edge);
@@ -201,6 +213,24 @@ function applyOutgoingMarks(batch: MarkBatch, instance: StepInstanceReference, l
 
   if (nodeType === 'fan_out') {
     recordExpansion(batch, instance, { kind: 'dead' });
+  }
+}
+
+// Egy lezárult, de **nem végleges sorsú** példány kimenő éleinek jelölése:
+// kizárólag a `liveEdgeIds` élek kapnak `live` jelölést, a többi kimenő él
+// jelöletlen marad (`scheduling-event.ts` "Miért kell a halasztás").
+//
+// A `live` jelölést kapó élek sosem nyitnak hatókört, ezért itt nincs
+// `isScopeOpeningEdge` szűrés: a halasztás két hívási helye a hibára futott
+// példány `on_error` éle (ami `fan_out` node-nál is kimarad a hatókör
+// nyitásból) és az újabb kísérletet ütemező `error_handler`, aminek egyetlen
+// éle sem nyit hatókört. `fan_out` node kibontás bejegyzése sem születik meg:
+// a párosított `join` addig vár, amíg a példány sorsa véglegessé nem válik.
+function applyDeferredMarks(batch: MarkBatch, instance: StepInstanceReference, liveEdgeIds: ReadonlySet<string>): void {
+  for (const edge of outgoingEdgesOf(batch.topology, instance.nodeId)) {
+    if (liveEdgeIds.has(edge.id)) {
+      placeMark(batch, edge, markContextOnEdge(batch, instance.branchContext, edge), 'live');
+    }
   }
 }
 
@@ -220,7 +250,7 @@ function settleInstance(draft: SchedulerDraft, topology: RunTopology, instance: 
   }
 
   const deadBatch: MarkBatch = { draft, topology, touched: [] };
-  applyOutgoingMarks(deadBatch, instance, NO_LIVE_EDGE_IDS);
+  applyOutgoingMarks(deadBatch, instance, NO_LIVE_EDGE_IDS, NO_SKIPPED_EDGE_IDS);
   settleTouched(deadBatch);
 }
 
@@ -345,7 +375,15 @@ export function advanceScheduler(state: SchedulerState, topology: RunTopology, e
 
   switch (event.kind) {
     case 'node_completed': {
-      applyOutgoingMarks(batch, event.instance, event.liveEdgeIds);
+      applyOutgoingMarks(batch, event.instance, event.liveEdgeIds, NO_SKIPPED_EDGE_IDS);
+      break;
+    }
+    case 'outgoing_marks_deferred': {
+      applyDeferredMarks(batch, event.instance, event.liveEdgeIds);
+      break;
+    }
+    case 'deferred_marks_settled': {
+      applyOutgoingMarks(batch, event.instance, NO_LIVE_EDGE_IDS, event.keptEdgeIds);
       break;
     }
     case 'fan_out_expanded': {
