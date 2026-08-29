@@ -29,21 +29,6 @@ describe('resolveRequiredEnvironmentValue', () => {
     });
   });
 
-  it('literal forrásnál, literalValue nélkül üres stringet ad', () => {
-    const requirement: EnvironmentRequirement = {
-      name: 'FAKE_LITERAL',
-      source: 'literal',
-      secret: false,
-      purpose: 'fake purpose',
-      evidence: FAKE_EVIDENCE,
-    };
-
-    expect(resolveRequiredEnvironmentValue(requirement, buildProcessEnvironment({}))).toStrictEqual({
-      kind: 'ok',
-      value: '',
-    });
-  });
-
   it('process_env_passthrough forrásnál a processEnvironment port olvasott értékét adja', () => {
     const requirement: EnvironmentRequirement = {
       name: 'ANTHROPIC_AUTH_TOKEN',

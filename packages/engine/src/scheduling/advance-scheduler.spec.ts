@@ -10,6 +10,7 @@ import type { RunTopology } from './run-topology.ts';
 import type { SchedulerState } from './scheduler-state.ts';
 import type { SchedulingEvent } from './scheduling-event.ts';
 import { advanceScheduler } from './advance-scheduler.ts';
+import { buildScopedKey } from './build-scoped-key.ts';
 import { collectJoinInputs } from './collect-join-inputs.ts';
 import { createSchedulerState } from './create-scheduler-state.ts';
 import { enqueueStartInstance } from './enqueue-start-instance.ts';
@@ -111,6 +112,56 @@ function playRun(
 }
 
 const ROOT: BranchContext = [];
+
+function rootInstance(nodeId: string): StepInstanceReference {
+  return { nodeId, branchContext: ROOT };
+}
+
+// REGRESSZIÓS gráf a halasztott jelöléshez: a `le` node-nak KÉT bejövő éle van,
+// az egyik a hibára futó `br` node felől. Amíg a `br` hibája újrapróbálkozás
+// alatt áll, a `br -> le` élre nem kerülhet `dead` jelölés, mert a 4.4 2. pontja
+// szerint egyetlen `live` jelölés (itt az `ok -> le` él) már futtathatóvá tenné
+// a `le` példányt - az pedig lefutna, majd a sikeres újrapróbálkozás után
+// MÁSODSZOR is (`scheduling-event.ts` "Miért kell a halasztás").
+function deferralTopology(): RunTopology {
+  return topologyOf(
+    [
+      node('start', 'start'),
+      node('br', 'branch'),
+      node('ok', 'branch'),
+      node('eh', 'error_handler'),
+      node('le', 'agent_step'),
+    ],
+    [
+      edge('e1', 'start', 'br'),
+      edge('e2', 'start', 'ok'),
+      edge('e3', 'br', 'le', 'a'),
+      edge('e4', 'ok', 'le', 'a'),
+      edge('e5', 'br', 'eh', 'on_error'),
+    ],
+  );
+}
+
+function onErrorEdgeIds(topology: RunTopology): ReadonlySet<string> {
+  return edgeIdsWhere(topology, 'br', (branchKey) => branchKey === 'on_error');
+}
+
+// Az az állapot, amiben a `start` és az `ok` lefutott, a `br` pedig kezelt
+// hibával zárt: az `on_error` éle `live`, a `br -> le` éle jelöletlen.
+function stateAfterHandledFailure(topology: RunTopology): SchedulerState {
+  let state = enqueueStartInstance(createSchedulerState(), 'start');
+  state = advanceScheduler(state, topology, completeAll(topology, rootInstance('start')));
+  state = advanceScheduler(state, topology, completeWithBranchKey(topology, rootInstance('ok'), 'a'));
+  return advanceScheduler(state, topology, {
+    kind: 'outgoing_marks_deferred',
+    instance: rootInstance('br'),
+    liveEdgeIds: onErrorEdgeIds(topology),
+  });
+}
+
+function readyNodeIds(state: SchedulerState): readonly string[] {
+  return state.readyInstances.map((ready) => ready.instance.nodeId);
+}
 
 describe('advanceScheduler', () => {
   it('lineáris láncon minden node egyszer fut le, és a futás terminális lesz', () => {
@@ -540,5 +591,31 @@ describe('advanceScheduler', () => {
     });
 
     expect(executed).toStrictEqual(['start', 'lo', 'li@l0', 'other@l0', 'ib@l0/l0', 'lo', 'li@l0', 'vege', 'lifin@l0']);
+  });
+
+  it('outgoing_marks_deferred esetén a jelöletlen élen álló leszármazott vár, akkor is, ha másik éle live', () => {
+    const topology = deferralTopology();
+
+    const state = stateAfterHandledFailure(topology);
+
+    expect(state.edgeMarks.get(buildScopedKey('e5', ROOT))).toBe('live');
+    expect(state.edgeMarks.get(buildScopedKey('e3', ROOT))).toBeUndefined();
+    expect(readyNodeIds(state)).toStrictEqual(['start', 'br', 'ok', 'eh']);
+  });
+
+  it('deferred_marks_settled a menekülő élt kihagyva jelöl dead-et, és felszabadítja a várakozó leszármazottat', () => {
+    const topology = deferralTopology();
+
+    const state = advanceScheduler(stateAfterHandledFailure(topology), topology, {
+      kind: 'deferred_marks_settled',
+      instance: rootInstance('br'),
+      keptEdgeIds: onErrorEdgeIds(topology),
+    });
+
+    expect(state.edgeMarks.get(buildScopedKey('e3', ROOT))).toBe('dead');
+    // A menekülő él jelölése változatlan: a felülírása visszamenőleg tenné
+    // halottá a már elindult kezelőt, és a kezelőt újra sorba is állítaná.
+    expect(state.edgeMarks.get(buildScopedKey('e5', ROOT))).toBe('live');
+    expect(readyNodeIds(state)).toStrictEqual(['start', 'br', 'ok', 'eh', 'le']);
   });
 });

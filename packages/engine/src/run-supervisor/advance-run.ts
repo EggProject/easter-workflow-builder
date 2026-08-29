@@ -122,6 +122,31 @@ function completeNode(
   });
 }
 
+/**
+ * Egy lezárult, de **nem végleges sorsú** példány jelölése: csak a
+ * `liveEdgeIds` élek kapnak `live` jelölést, a többi vár (`scheduling-event.ts`
+ * "Miért kell a halasztás"). Két hívási helye van, mindkettő az
+ * újrapróbálkozás menetében (8.2):
+ *
+ * - a hibára futott példány, aminek van `on_error` éle: a kezelő még
+ *   ütemezhet újabb kísérletet, és akkor a megismételt lefutás jelöl
+ *   (8.2 5. pont);
+ * - az `error_handler`, ami újabb kísérletet ütemezett: a saját `exhausted`
+ *   éle csak akkor dől el, amikor a kezelő utoljára fut le, ezért az üres
+ *   `liveEdgeIds` halmazzal EGYETLEN éle sem kap jelölést - `dead` sem.
+ */
+function deferOutgoingMarks(
+  execution: RunExecution,
+  instance: StepInstanceReference,
+  liveEdgeIds: ReadonlySet<string>,
+): void {
+  execution.scheduler = advanceScheduler(execution.scheduler, execution.topology, {
+    kind: 'outgoing_marks_deferred',
+    instance,
+    liveEdgeIds,
+  });
+}
+
 // A lefutott példány felvétele a nyilvántartásokba. **Hibás lefutás is
 // bekerül**: a `steps` rekord (6.2) és a `join` bemenetek (5.6) a példány
 // legutolsó lefutását nézik, és a retry pontosan azt jelenti, hogy ugyanannak
@@ -148,6 +173,14 @@ function recordExecuted(execution: RunExecution, instance: StepInstanceReference
  * hiba adatait, mert a kezelő végrehajtása azokat kéri (8.2 bevezető). Az
  * `exhausted` és a `rejected` menekülő él célja nem `error_handler` node,
  * tehát ott nincs mit eltárolni.
+ *
+ * **Az `on_error` út az `outgoing_marks_deferred` eseménnyel megy, nem a
+ * `node_completed` eseménnyel**: a nem menekülő élek jelölése elhalasztódik,
+ * amíg a kezelő el nem dönti, indul-e újabb kísérlet (8.2 5. pont, lásd a
+ * `scheduling-event.ts` "Miért kell a halasztás" bekezdését és a
+ * `settleDeferredFailure` függvényt). A másik két menekülő kulcs
+ * (`exhausted`, `rejected`) után nincs újrapróbálkozás, tehát ott a jelölés
+ * azonnal végleges.
  */
 function applyFailureRoute(
   execution: RunExecution,
@@ -166,6 +199,8 @@ function applyFailureRoute(
   if (route.kind === 'handled') {
     if (escapeKey === 'on_error') {
       rememberPendingFailure(execution, instance, route.liveEdgeIds, failure);
+      deferOutgoingMarks(execution, instance, route.liveEdgeIds);
+      return;
     }
     completeNode(execution, instance, route.liveEdgeIds);
     return;
@@ -195,15 +230,59 @@ function rememberPendingFailure(
         errorKind: failure.errorKind,
         errorMessage: failure.errorMessage,
         attempt: failure.attempt,
+        escapeEdgeIds: liveEdgeIds,
       });
     }
   }
 }
 
 /**
+ * A hibára futott példányon elhalasztott `dead` jelölések véglegesítése
+ * (SPEC-004 4.4 5. pont).
+ *
+ * A hívás feltétele: a hibakontextust fogyasztó példány - az `on_error` él
+ * célján álló `error_handler` (`validateErrorHandlerEdges`) - **nem**
+ * `retry_scheduled` eredménnyel zárt, tehát a hibára futott példány már nem
+ * fog újra lefutni. Ilyenkor a kimenő élei `dead` jelölést kapnak, a menekülő
+ * élt kihagyva, mert az az `outgoing_marks_deferred` eseményen már `live`
+ * jelölést kapott, és a felülírása visszamenőleg halottá tenné a lefutott
+ * kezelőt.
+ *
+ * A jelölés nélkül a hibás ág nem terjedne tovább: egy több bejövő élű
+ * leszármazott, aminek egy másik ága `live`, a 4.4 2. pontja szerint
+ * futtatható, ezért a halasztás nem maradhat örökre nyitva.
+ */
+function settleDeferredFailure(execution: RunExecution, instance: StepInstanceReference): void {
+  const instanceKey = instanceKeyOf(instance);
+  const failure = execution.pendingFailures.get(instanceKey);
+  if (failure === undefined) {
+    return;
+  }
+  execution.pendingFailures.delete(instanceKey);
+  execution.scheduler = advanceScheduler(execution.scheduler, execution.topology, {
+    kind: 'deferred_marks_settled',
+    instance: failure.failedInstance,
+    keptEdgeIds: failure.escapeEdgeIds,
+  });
+}
+
+/**
  * Egy sikeres `error_handler` lefutás következménye (SPEC-004 8.2 4. és 5. pont): a hibát adó példány újra sorba áll, `attempt + 1` értékkel, és a
  * vezérlés a **megismételt node** saját kimenő élein megy tovább, nem a
- * kezelőén - a kezelő minden kimenő éle `dead` jelölést kap.
+ * kezelőén.
+ *
+ * **A kezelő kimenő élei ilyenkor jelöletlenek maradnak**, nem `dead`
+ * jelölést kapnak. A kezelő ugyanis még lefuthat mégegyszer: ha a megismételt
+ * lépés ismét hibázik, az `on_error` éle újra `live` jelölést kap, és a
+ * következő lefutás akár az `exhausted` ágra is mehet (8.2 2. pont). Egy
+ * korai `dead` jelölés az `exhausted` élen ugyanazt a hibát okozná, mint a
+ * hibára futott példány korai jelölése: egy több bejövő élű leszármazott
+ * kétszer futna le (`scheduling-event.ts` "Miért kell a halasztás").
+ *
+ * A halasztás nem marad örökre nyitva: sikeres újrapróbálkozás után a
+ * megismételt példány `on_error` éle `dead` jelölést kap, ettől a kezelő
+ * példány halottá válik, és a halott ág terjesztése jelöli meg a kezelő
+ * kimenő éleit (`advance-scheduler.ts` `settleInstance`).
  */
 function applyRetryScheduled(
   execution: RunExecution,
@@ -218,7 +297,7 @@ function applyRetryScheduled(
   execution.pendingFailures.delete(handlerKey);
   execution.retryAttempts.set(instanceKeyOf(failure.failedInstance), nextAttempt);
   execution.scheduler = enqueueReadyInstance(execution.scheduler, failure.failedInstance);
-  completeNode(execution, instance, NO_LIVE_EDGE_IDS);
+  deferOutgoingMarks(execution, instance, NO_LIVE_EDGE_IDS);
   return OK;
 }
 
@@ -238,6 +317,13 @@ function applyCompletion(execution: RunExecution, completed: CompletedExecution)
   }
   const value = outcome.value;
   recordExecuted(execution, instance, value.stepRun);
+
+  // A hiba útja lezárult: ha ez a példány egy hibakontextust fogyasztó
+  // `error_handler`, és NEM újabb kísérletet ütemezett, a hibára futott
+  // példány elhalasztott jelölései véglegesíthetők (8.2 5. pont).
+  if (value.kind !== 'retry_scheduled') {
+    settleDeferredFailure(execution, instance);
+  }
 
   switch (value.kind) {
     case 'succeeded': {

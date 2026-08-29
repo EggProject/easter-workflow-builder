@@ -46,12 +46,20 @@ export interface NodePlan {
  * A `failedInstance` azért kell, mert egy sikeres újrapróbálkozás után a
  * vezérlés a **megismételt node** saját kimenő élein megy tovább (8.2 5. pont),
  * tehát a kezelő lefutása után ezt a példányt kell újra sorba állítani.
+ *
+ * Az `escapeEdgeIds` a hibára futott példány `on_error` élei: azok, amik a
+ * hiba pillanatában `live` jelölést kaptak. A többi kimenő él jelölése ekkor
+ * **elhalasztódik** (`failure_escaped`), és ha a hiba útja újrapróbálkozás
+ * nélkül zárul, ez a halmaz mondja meg, mely éleket kell kihagyni a záró
+ * `dead` jelölésből (`failure_settled`, `advance-run.ts`
+ * `settleDeferredFailure`).
  */
 export interface PendingFailure {
   readonly failedInstance: StepInstanceReference;
   readonly errorKind: EngineErrorKind;
   readonly errorMessage: string;
   readonly attempt: number;
+  readonly escapeEdgeIds: ReadonlySet<string>;
 }
 
 /**
