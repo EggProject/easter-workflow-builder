@@ -45,7 +45,11 @@ describe('createDeleteWorkflowHandler', () => {
     );
 
     const handler = createDeleteWorkflowHandler(database);
-    const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
 
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(invalid_request)');
@@ -76,7 +80,11 @@ describe('createDeleteWorkflowHandler', () => {
 
   it('hiányzó workflowId paraméterre is not_found hibát ad, nem dob kivételt', async () => {
     const handler = createDeleteWorkflowHandler(openMemoryDatabase());
-    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: { acknowledgeIrreversible: true } });
+    const result = await handler({
+      parameters: {},
+      query: new URLSearchParams(),
+      body: { acknowledgeIrreversible: true },
+    });
     expect(result.kind).toBe('error');
   });
 

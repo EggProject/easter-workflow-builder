@@ -1,4 +1,8 @@
-import { ReplaceGraphRequestSchema, zodErrorToProtocolErrorBody, type ReplaceGraphRequest } from '@easter-workflow-builder/protocol';
+import {
+  ReplaceGraphRequestSchema,
+  zodErrorToProtocolErrorBody,
+  type ReplaceGraphRequest,
+} from '@easter-workflow-builder/protocol';
 import { isNodeConfig, type DatabaseContext, type WorkflowNodeInput } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RouteHandler, RouteHandlerResult } from '../route-dispatch/route-handler.ts';

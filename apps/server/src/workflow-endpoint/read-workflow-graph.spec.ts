@@ -23,14 +23,22 @@ describe('createReadWorkflowGraphHandler', () => {
     );
 
     const handler = createReadWorkflowGraphHandler(database);
-    const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
 
     expect(result).toStrictEqual({ kind: 'ok', value: { status: 200, body: { nodes: [], edges: [] } } });
   });
 
   it('ismeretlen workflowId-ra not_found hibát ad', async () => {
     const handler = createReadWorkflowGraphHandler(openMemoryDatabase());
-    const result = await handler({ parameters: { workflowId: 'nincs-ilyen' }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: 'nincs-ilyen' },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
@@ -65,7 +73,11 @@ describe('createReadWorkflowGraphHandler', () => {
     };
 
     const handler = createReadWorkflowGraphHandler(racyDatabase);
-    const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
 
     expect(result.kind).toBe('error');
   });

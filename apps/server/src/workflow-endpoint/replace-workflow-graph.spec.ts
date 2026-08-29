@@ -1,7 +1,12 @@
 /* eslint-disable unicorn/no-null -- a WorkflowRecord/CreateWorkflowInput/WorkflowEdgeInput több mezője valódi `T | null`, a tesztfixtúrák ezt a tárolt null értéket adják, nem helyőrzőt (SPEC-003 4.3) */
 import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
-import { openDatabase, type DatabaseContext, type WorkflowEdgeInput, type WorkflowNodeInput } from '@easter-workflow-builder/db';
+import {
+  openDatabase,
+  type DatabaseContext,
+  type WorkflowEdgeInput,
+  type WorkflowNodeInput,
+} from '@easter-workflow-builder/db';
 import { createReplaceWorkflowGraphHandler } from './replace-workflow-graph.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -45,7 +50,11 @@ describe('createReplaceWorkflowGraphHandler', () => {
 
   it('sémának nem megfelelő törzsre invalid_request hibát ad', async () => {
     const handler = createReplaceWorkflowGraphHandler(openMemoryDatabase());
-    const result = await handler({ parameters: { workflowId: 'akármi' }, query: new URLSearchParams(), body: { nodes: [] } });
+    const result = await handler({
+      parameters: { workflowId: 'akármi' },
+      query: new URLSearchParams(),
+      body: { nodes: [] },
+    });
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(invalid_request)');
   });
@@ -124,7 +133,11 @@ describe('createReplaceWorkflowGraphHandler', () => {
       ...database,
       workflows: {
         ...database.workflows,
-        replaceGraph: (workflowId: string, nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => {
+        replaceGraph: (
+          workflowId: string,
+          nodes: readonly WorkflowNodeInput[],
+          edges: readonly WorkflowEdgeInput[],
+        ) => {
           const result = database.workflows.replaceGraph(workflowId, nodes, edges);
           if (result.kind === 'ok') {
             database.close();

@@ -23,7 +23,11 @@ describe('createGetWorkflowHandler', () => {
     );
 
     const handler = createGetWorkflowHandler(database);
-    const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
 
     expect(result).toStrictEqual({
       kind: 'ok',
@@ -43,7 +47,11 @@ describe('createGetWorkflowHandler', () => {
 
   it('ismeretlen workflowId-ra not_found hibaosztályú hibát ad', async () => {
     const handler = createGetWorkflowHandler(openMemoryDatabase());
-    const result = await handler({ parameters: { workflowId: 'nincs-ilyen' }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: 'nincs-ilyen' },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });

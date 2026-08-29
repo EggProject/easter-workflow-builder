@@ -6,14 +6,12 @@ describe('mapOutcomeMessageToErrorCode', () => {
     expect(mapOutcomeMessageToErrorCode('A(z) "abc" workflow nem található (not_found).')).toBe('not_found');
   });
 
-  it.each([
-    'illegal_status_transition',
-    'foreign_key_violation',
-    'duplicate_event',
-    'graph_snapshot_hash_collision',
-  ])('a(z) %s hibaosztályt conflict kódra képezi', (errorClass) => {
-    expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
-  });
+  it.each(['illegal_status_transition', 'foreign_key_violation', 'duplicate_event', 'graph_snapshot_hash_collision'])(
+    'a(z) %s hibaosztályt conflict kódra képezi',
+    (errorClass) => {
+      expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
+    },
+  );
 
   it.each([
     'no_default_provider',
@@ -50,9 +48,9 @@ describe('mapOutcomeMessageToErrorCode', () => {
     // A "not_found" szó itt szabad szövegben áll, nem a záró zárójelben; a
     // felismerés csak a záró zárójelre horgonyoz, tehát a valódi, be nem
     // sorolt záró hibaosztály (`egyeb_hiba`) dönt, nem a szövegbeli szó.
-    expect(mapOutcomeMessageToErrorCode('a not_found eset itt szabad szövegben áll, más okból bukott (egyeb_hiba).')).toBe(
-      'internal',
-    );
+    expect(
+      mapOutcomeMessageToErrorCode('a not_found eset itt szabad szövegben áll, más okból bukott (egyeb_hiba).'),
+    ).toBe('internal');
   });
 
   it('az üzenet eleji "A(z)" zárójel nem zavarja meg a felismerést', () => {

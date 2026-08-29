@@ -149,8 +149,7 @@ describe('createHttpServer', () => {
   it('a kezelő Outcome hibaágát a mapOutcomeMessageToErrorCode szerinti státuszra képezi', async () => {
     const { baseUrl, close } = await startTestServer({
       handlers: buildHandlers({
-        getWorkflow: () =>
-          Promise.resolve({ kind: 'error', message: 'A(z) "x" workflow nem található (not_found).' }),
+        getWorkflow: () => Promise.resolve({ kind: 'error', message: 'A(z) "x" workflow nem található (not_found).' }),
       }),
       devOrigin: undefined,
     });

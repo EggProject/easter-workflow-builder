@@ -23,7 +23,11 @@ describe('createSummarizeWorkflowDeletionHandler', () => {
     );
 
     const handler = createSummarizeWorkflowDeletionHandler(database);
-    const result = await handler({ parameters: { workflowId: created.id }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: created.id },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
 
     expect(result).toStrictEqual({
       kind: 'ok',
@@ -34,7 +38,11 @@ describe('createSummarizeWorkflowDeletionHandler', () => {
 
   it('ismeretlen workflowId-ra not_found hibát ad', async () => {
     const handler = createSummarizeWorkflowDeletionHandler(openMemoryDatabase());
-    const result = await handler({ parameters: { workflowId: 'nincs-ilyen' }, query: new URLSearchParams(), body: undefined });
+    const result = await handler({
+      parameters: { workflowId: 'nincs-ilyen' },
+      query: new URLSearchParams(),
+      body: undefined,
+    });
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
