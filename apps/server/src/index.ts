@@ -1,3 +1,1 @@
-// Placeholder export, hogy a csomag lefordulhasson. A tenyleges tartalmat
-// egy kesobbi specifikacio adja.
-export const IS_SERVER_PLACEHOLDER = true;
+export { runStartupSequence } from './startup-sequence/run-startup-sequence.ts';
