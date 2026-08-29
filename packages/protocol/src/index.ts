@@ -17,3 +17,40 @@ export type { ProtocolErrorBody } from './protocol-error/protocol-error-body.ts'
 export { ProtocolErrorBodySchema } from './protocol-error/protocol-error-body.ts';
 export { httpStatusForErrorCode } from './protocol-error/http-status-for-error-code.ts';
 export { zodErrorToProtocolErrorBody } from './protocol-error/zod-error-to-protocol-error-body.ts';
+
+// workflow: a node típus felsorolás, a workflow rekord, a gráf dokumentum, a létrehozás,
+// a módosítás, a teljes gráf csere és a törlés kérés és válasz alakja.
+export type { NodeType } from './workflow/node-type.ts';
+export { NodeTypeSchema } from './workflow/node-type.ts';
+export type {
+  CreateWorkflowRequest,
+  ListWorkflowsQuery,
+  UpdateWorkflowRequest,
+  WorkflowDetail,
+  WorkflowSummary,
+} from './workflow/workflow-record.ts';
+export {
+  CreateWorkflowRequestSchema,
+  ListWorkflowsQuerySchema,
+  UpdateWorkflowRequestSchema,
+  WorkflowDetailSchema,
+  WorkflowSummarySchema,
+} from './workflow/workflow-record.ts';
+export type {
+  ReplaceGraphRequest,
+  WorkflowEdge,
+  WorkflowEdgeInput,
+  WorkflowGraphDocument,
+  WorkflowNode,
+  WorkflowNodeInput,
+} from './workflow/workflow-graph-document.ts';
+export {
+  ReplaceGraphRequestSchema,
+  WorkflowEdgeInputSchema,
+  WorkflowEdgeSchema,
+  WorkflowGraphDocumentSchema,
+  WorkflowNodeInputSchema,
+  WorkflowNodeSchema,
+} from './workflow/workflow-graph-document.ts';
+export type { DeletionSummary, DeleteWorkflowRequest } from './workflow/delete-workflow-request.ts';
+export { DeletionSummarySchema, DeleteWorkflowRequestSchema } from './workflow/delete-workflow-request.ts';
