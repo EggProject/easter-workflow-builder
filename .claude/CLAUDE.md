@@ -457,29 +457,39 @@ test-nel").
   REST hívások `page.route()`-tal adott, garantált válasszal mennek, valós backend szervert a
   teszt nem szólíthat meg.
 
-**Nyitott kérdés: SSE mockolás.** Forrás:
-`docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekció.
+**SSE mockolás: lezárva, hibrid úton.** Forrás:
+`docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
+`docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekciójának nyitott kérdését
+saját, dokumentált méréssel lezárta (10 lefuttatott Playwright teszt a pinelt
+`@playwright/test@1.62.1` és chromium ellen). A korábbi nyitva jelölés ezzel törölve; a
+döntést a `docs/spec/SPEC-007-frontend-alkalmazas.md` 13.4 szekciója valósítja meg.
 
-A fenti "minden mockolva legyen" szabály az SSE csatornára (`GET /events`, `EventSource`)
-jelenleg **nem zárható le**: a Playwright hivatalos doksijának nincs SSE/`EventSource`
-mockolási útmutatója (a `docs/src/mock.md` guide HTTP mockolást, HAR visszajátszást és
-WebSocket mockolást dokumentál, `EventSource`-t nem). Van egy közösségi, megerősítetlen
-kimenetelű GitHub issue (`microsoft/playwright` #15353) a `page.route` + `text/event-stream`
-korlátairól, ahol a bejelentő szerint a `Content-Type` `null`-ként érkezett az `EventSource`
-oldalán; a lezárás oka nem ellenőrizhető.
+A "minden mockolva legyen" szabály az SSE csatornán (`GET /events`, `EventSource`) **az
+alapeset**, egyetlen, mérten körülhatárolt kivétellel.
 
-- **Nyitva marad, amíg nincs**: saját méréssel igazolt válasz arra, hogy a
-  `page.route`/`route.fulfill({ contentType: 'text/event-stream' })` minta megbízhatóan
-  mockolja-e az SSE-t a projekt pinelt Playwright verziója ellen.
-- **Lehetséges utak** (mérés dönt közöttük, nem feltételezés): (a) transzport szintű mockolás
-  `page.route`-tal, ha a mérés igazolja, hogy működik; (b) valós vagy célra írt könnyű teszt
-  szerver a `GET /events` végponton, a DOM végállapotára várva web-first assertion-nel, ekkor
-  az SSE csatorna kivétel a "minden mockolva legyen" szabály alól, amit a frontend specben
-  explicit ki kell mondani.
-- **Mi a viselkedés addig**: a frontend spec megírása előtt méréssel el kell dönteni, melyik
-  út valósul meg; addig egyik utat sem szabad kódba írni feltételezésből.
-- **Mi zárná le**: saját, dokumentált mérés a `page.route` + `text/event-stream` viselkedéséről
-  a projekt pinelt Playwright verziója ellen, `docs/research/` alá vezetve.
+- **`page.route()` + `route.fulfill({ contentType: 'text/event-stream' })` a HASZNÁLANDÓ út**
+  minden olyan teszthez, ami egyetlen, lezárt SSE válaszon belüli viselkedést ellenőriz: a
+  kapcsolat megnyitása, a `data:` keretek feldolgozása és a rájuk következő DOM frissülés, az
+  `id:` mező hatása az adott üzenet `lastEventId` mezőjére, az `event:` mezős nevesített
+  keretek, és a `Content-Type` beállítás. Mind mérten működik, és a hivatkozott
+  `microsoft/playwright` #15353 issue `Content-Type: null` állítása a pinelt verzió ellen
+  **nem reprodukálható**.
+- **`page.route()` NEM használható két, mérten bizonyított esetben**: a **`Last-Event-ID`
+  alapú újracsatlakozás** fejléc szintű ellenőrzésére, mert a második kapcsolat kérés
+  fejlécei a route rétegen nem tartalmazzák a fejlécet (holott a böngésző azt egy valódi
+  szerver felé a kontroll mérés szerint bizonyítottan elküldi); és **egy már megnyitott,
+  folyamatban lévő mockolt kapcsolatba menet közben beszúrt új keret** szimulálására, mert a
+  `route.fulfill()` egyszeri, lezárt aktus ("Route is already handled!"), és a `Route` típusa
+  sem enged streamelést.
+- **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
+  végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
+  működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
+  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
+- **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
+  hivatkozva. A SPEC-007 13.4 ezt megteszi.
+- **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
+  `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
+  a mérést meg kell ismételni azokra a motorokra is.
 
 **Frontend felületi elvárások.** Forrás: felhasználó kérése.
 
@@ -629,14 +639,28 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | rögzített verziók és a mögöttük álló okok                           | `docs/research/2026-08-26-toolchain.md`                                        |
 | tároló motor kiértékelés, méretmérések                              | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
 | SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
-| Playwright e2e teszt szabályok, SSE mockolás nyitott kérdése        | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
+| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
 ---
 
 ## 14. Ellentmondás esetén
 
-**Jelenleg nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
+**1. tétel, nyitva: a `.spec.tsx` fájlok és a `coverage.exclude` lista.** A 8. szekció kimondja,
+hogy a `vitest.config.ts` `coverage.exclude` listája **nem bővíthető**. A React komponens tesztek
+viszont JSX-et tartalmaznak, tehát `.spec.tsx` a nevük, és a lista ma csak `**/*.spec.ts`
+bejegyzést tartalmaz, miközben a `coverage.include` a `.tsx` fájlokat is felveszi. **A tényleges
+eltérés**: a tiltás szövege abszolút, a szándéka viszont a 8. szekció saját megfogalmazása
+szerint a **termékkód** kizárások megakadályozása. Egy `**/*.spec.tsx` sor nem termékkód kizárás,
+hanem a már meglévő teszt fájl bejegyzés pontos analógja egy másik kiterjesztésre. **Mi az
+érvényes viselkedés addig**: a lista nem bővül, és a komponens tesztek `.spec.ts` fájlok, JSX
+nélkül, `createElement` hívásokkal. **Mi zárná le**: user döntés a két út között, a
+`docs/spec/SPEC-007-frontend-alkalmazas.md` O-1 nyitott kérdése szerint; lezárás után a 8.
+szekció szövegét pontosítani kell, és ezt a tételt törölni.
+
+**Ezen az egy tételen kívül nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
 a "nyolcadik kapu" elnevezés, a SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`, a
 kétszintű csomagok száma) egyike sem valódi nyitott kérdés volt: mindegyik már eldöntött állapotot
 írt le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
