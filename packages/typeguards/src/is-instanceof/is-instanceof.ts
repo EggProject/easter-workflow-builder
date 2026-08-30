@@ -1,4 +1,4 @@
-import type { Constructor } from '../is-constructor/constructor';
+import type { Constructor } from '../is-constructor/constructor.ts';
 
 /**
  * Type guard that checks if a value is an instance of a specific class or constructor.

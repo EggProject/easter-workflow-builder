@@ -8,6 +8,7 @@ export { STREAM_PATH } from './http-route/stream-path.ts';
 export type { HttpMethod, RouteDefinition, RouteId } from './http-route/route-table.ts';
 export { ROUTE_TABLE } from './http-route/route-table.ts';
 export { buildRoutePath } from './http-route/build-route-path.ts';
+export { isRouteId } from './http-route/is-route-id.ts';
 
 // protocol-error: a ProtocolErrorCode szótár, a ProtocolErrorBody séma, a HTTP státusz
 // leképezés, és a Zod hiba lista fordítása a boríték alakra.

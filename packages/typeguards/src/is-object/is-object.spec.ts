@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isObject } from './is-object';
-import { POSITIVE_INT_ZERO, POSITIVE_INT_SMALL, POSITIVE_FLOAT_TYPICAL } from '../test-constants/test-constants';
+import { isObject } from './is-object.ts';
+import { POSITIVE_INT_ZERO, POSITIVE_INT_SMALL, POSITIVE_FLOAT_TYPICAL } from '../test-constants/test-constants.ts';
 
 describe('isObject', () => {
   describe('plain objects', () => {

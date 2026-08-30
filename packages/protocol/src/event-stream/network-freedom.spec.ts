@@ -65,13 +65,17 @@ describe('a packages/protocol nem nyit hálózatot (SPEC-005 10.1, 13. szekció 
     });
   }
 
-  it('a package.json dependencies mezője pontosan a core és a zod csomagot listázza, HTTP könyvtárat nem', () => {
+  it('a package.json dependencies mezője pontosan a core, a typeguards és a zod csomagot listázza, HTTP könyvtárat nem', () => {
     const packageJsonText = readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8');
     const parsed: unknown = JSON.parse(packageJsonText);
     if (!isObject(parsed) || !('dependencies' in parsed) || !isObject(parsed.dependencies)) {
       throw new Error('a package.json nem tartalmaz objektum dependencies mezőt');
     }
-    expect(Object.keys(parsed.dependencies)).toStrictEqual(['@easter-workflow-builder/core', 'zod']);
+    expect(Object.keys(parsed.dependencies)).toStrictEqual([
+      '@easter-workflow-builder/core',
+      '@easter-workflow-builder/typeguards',
+      'zod',
+    ]);
   });
 });
 

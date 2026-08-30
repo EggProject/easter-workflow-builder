@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isInt } from './is-int';
+import { isInt } from './is-int.ts';
 import {
   POSITIVE_INT_ZERO,
   POSITIVE_INT_ONE,
@@ -12,7 +12,7 @@ import {
   POSITIVE_FLOAT_MEDIUM,
   NEGATIVE_FLOAT_MEDIUM,
   POSITIVE_FLOAT_LARGE,
-} from '../test-constants/test-constants';
+} from '../test-constants/test-constants.ts';
 
 describe('isInt', () => {
   it('should return true for positive integers', () => {

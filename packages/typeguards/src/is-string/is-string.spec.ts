@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isString } from './is-string';
-import { POSITIVE_INT_ZERO, POSITIVE_FLOAT_TYPICAL, MAGIC_NUMBER_123 } from '../test-constants/test-constants';
+import { isString } from './is-string.ts';
+import { POSITIVE_INT_ZERO, POSITIVE_FLOAT_TYPICAL, MAGIC_NUMBER_123 } from '../test-constants/test-constants.ts';
 
 describe('isString', () => {
   it('should return true for regular strings', () => {

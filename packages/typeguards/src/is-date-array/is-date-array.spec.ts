@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isDateArray } from './is-date-array';
-import { ARRAY_LENGTH_SMALL, ARRAY_LENGTH_MEDIUM } from '../test-constants/test-constants';
+import { isDateArray } from './is-date-array.ts';
+import { ARRAY_LENGTH_SMALL, ARRAY_LENGTH_MEDIUM } from '../test-constants/test-constants.ts';
 
 describe('isDateArray', () => {
   it('should return true for valid Date array', () => {

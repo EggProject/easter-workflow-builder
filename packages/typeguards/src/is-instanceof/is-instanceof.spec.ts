@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isInstanceof } from './is-instanceof';
-import { POSITIVE_INT_SMALL, ARRAY_LENGTH_SINGLE, POSITIVE_INT_MEDIUM } from '../test-constants/test-constants';
+import { isInstanceof } from './is-instanceof.ts';
+import { POSITIVE_INT_SMALL, ARRAY_LENGTH_SINGLE, POSITIVE_INT_MEDIUM } from '../test-constants/test-constants.ts';
 
 class CustomClass {
   value = 'test';

@@ -26,6 +26,8 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `src/casing/`                     | téma mappa: a `casing.sh` mögötti tényleges ellenőrzés (`check-casing.ts`) és a rá épülő `.spec.ts` regressziós teszt                                                                                                                                                                             |
 | `src/dependency-graph/`           | téma mappa: a `check-dependency-graph.sh` mögötti réteg-hozzárendelés (`package-layer.ts`), a `package.json`-ok beolvasása (`read-workspace-packages.ts`), a tiszta ellenőrző logika (`find-dependency-graph-violations.ts`, `.spec.ts`-sel) és a CLI belépési pont (`check-dependency-graph.ts`) |
 | `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                                                                                                        |
+| `src/relative-import-extension/`  | téma mappa, megvalósítás fájl nélkül: a `packages/*/src` és az `apps/*/src` alatt minden relatív import kiterjesztéssel áll (SPEC-006 M-5, M-6, M-7, PLAN-007 T-007-3); a `casing` téma `findRelativeImportSpecifiers` függvényét hívja újra                                                      |
+| `src/no-preserve-symlinks/`       | téma mappa, megvalósítás fájl nélkül: az `apps/server/src` és az `apps/server/package.json` scriptjei nem tartalmazzák a `--preserve-symlinks` kapcsolót (SPEC-006 3.6, M-4, PLAN-007 T-007-3)                                                                                                    |
 
 ## Függőségi irány
 

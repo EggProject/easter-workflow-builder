@@ -1,4 +1,16 @@
 {
   "extends": "../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    // A pino@10.3.1 tranzitív függősége, a thread-stream@4.2.0 sajat
+    // index.d.ts fájlja a `worker_threads.TransferListItem` típusra
+    // hivatkozik (https://github.com/pinojs/thread-stream/blob/main/index.d.ts,
+    // az `emit('message', ...)` túlterhelés), a telepített
+    // `@types/node@26.3.0` viszont nem exportálja ezt a típust (saját mérés:
+    // `grep -n TransferListItem node_modules/@types/node/worker_threads.d.ts`
+    // nulla találatot ad) - dokumentált, felsőáramú típusütközés, nem a mi
+    // kódunk hibája, ugyanaz a minta, mint a `packages/db` `drizzle-orm`
+    // esetében. Csak ebben a csomagban kell, mert csak ez függ a `pino`-tól.
+    "skipLibCheck": true
+  },
   "include": ["src/**/*.ts"]
 }

@@ -1,4 +1,4 @@
-import { isString } from '../is-string/is-string';
+import { isString } from '../is-string/is-string.ts';
 
 /**
  * Type guard that checks if a value is a numeric string.
