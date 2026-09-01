@@ -9,15 +9,15 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 
 ## Fájlok
 
-| Téma                               | Tartalom                                                                                                                                                                                                                                       |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `design-token`                     | a token barrel (`colors-and-type.css`) és 11 token CSS fájl, bájtra azonosan az `eggproject-design` skillből átemelve (SPEC-007 4.2), plusz a bájtazonosságot őrző regressziós teszt                                                           |
-| `self-hosted-font`                 | a `fonts.css` és 20 `.woff2` fájl (Roboto + JetBrains Mono, latin plusz latin-ext), bájtra azonosan átemelve, plusz a bájtazonosságot őrző regressziós teszt                                                                                   |
-| `topnav-shell`                     | a `topnav-shell.css` (az átemelt `.app-pagehead`/`.app-content`/`.app-tn` blokk, a "faltól falig" override és a --ep-screen-md alatti lenyíló navigáció reszponzív szabálya), az `AppShellFrame` domain mentes React komponens és mindkét spec |
-| `media-query-breakpoint-invariant` | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt, ami minden CSS média lekérdezés `min-width`/`max-width` literálját a `design-token/breakpoints.css` `--ep-screen-*` tokenjeihez méri                                 |
+| Téma                               | Tartalom                                                                                                                                                                                                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design-token`                     | a token barrel (`colors-and-type.css`) és 11 token CSS fájl, bájtra azonosan az `eggproject-design` skillből átemelve (SPEC-007 4.2), plusz a bájtazonosságot őrző regressziós teszt                                                                        |
+| `self-hosted-font`                 | a `fonts.css` és 20 `.woff2` fájl (Roboto + JetBrains Mono, latin plusz latin-ext), bájtra azonosan átemelve, plusz a bájtazonosságot őrző regressziós teszt                                                                                                |
+| `topnav-shell`                     | a `topnav-shell.css` (az átemelt `.app-pagehead`/`.app-content`/`.app-tn` blokk, a "faltól falig" override és a --ep-screen-md alatti lenyíló navigáció reszponzív szabálya), az `AppShellFrame` domain mentes React komponens és mindkét spec              |
+| `media-query-breakpoint-invariant` | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt, ami minden CSS média lekérdezés `min-width`/`max-width` literálját a `design-token/breakpoints.css` `--ep-screen-*` tokenjeihez méri                                              |
+| `theme-mode`                       | a háromállapotú (`light`/`dark`/`system`) téma mód: a `ThemeMode` típus és típusőr, a `useThemeMode` hook (DOM `data-theme` és `localStorage['eggTheme']` szinkronban tartása, `matchMedia` figyelés kizárólag `system` módban) és a `ThemeModeToggle` gomb |
 
-A további témák (`theme-mode`, és a 12 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek
-fel, F1 és F2 fázisban.
+A további témák (a 12 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2 fázisban.
 
 ## Függőségi irány
 
