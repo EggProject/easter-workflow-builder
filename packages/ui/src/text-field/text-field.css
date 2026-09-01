@@ -1,0 +1,92 @@
+/* ============================================================
+   EggProject — Text field (Input)
+   Forrás: eggproject-design-components/components/input/input.css,
+   bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. A fájl minden szabálya az
+   Input komponenshez tartozik, ezért szűkítés nem kellett.
+   Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+/* ============ Input field ============
+   .field          — wrapper (label + input + optional error)
+   .field__label   — uppercase overline label
+   .input          — the actual input (also works on a styled div for previews)
+   .input--focused — visual focus state
+   .input--error   — error state
+   .field__error     — error message below input
+   .input-with-icon — wrap an input with a leading icon
+============================================ */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label {
+  font: 500 12px var(--ep-font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ep-fg-muted);
+}
+
+.input {
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-control-border);
+  border-radius: var(--ep-radius-md);
+  padding: 11px 14px;
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+  transition:
+    border-color var(--ep-dur-base) var(--ep-ease-out),
+    box-shadow var(--ep-dur-base) var(--ep-ease-out);
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+}
+.input:read-only {
+  background: var(--ep-bg-sunken);
+  color: var(--ep-fg);
+  border-color: var(--ep-fg-subtle);
+  opacity: 1;
+  cursor: text;
+}
+.input:where(:not(:disabled)):hover { border-color: var(--ep-fg); }
+.input:focus,
+.input--focused {
+  border-color: var(--ep-accent);
+  box-shadow: var(--ep-shadow-focus);
+}
+.input--error { border-color: var(--ep-danger); }
+.input::placeholder { color: var(--ep-fg-placeholder); }
+
+.input:disabled {
+  background: var(--ep-bg-sunken);
+  color: var(--ep-fg-subtle);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Browser autofill — keep themed text + caret; defer the UA background paint via a
+   near-infinite background-color transition. No box-shadow set, so the focus ring survives. */
+.input:autofill,
+.input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ep-fg);
+  caret-color: var(--ep-fg);
+  transition: background-color 600000s 0s;
+}
+
+/* Compact size — for dense contexts like data-table filter rows. Mirrors .select--sm. */
+.input--sm { padding: 7px 11px; font-size: 13px; }
+
+.input-with-icon { position: relative; }
+.input-with-icon svg {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  color: var(--ep-fg-subtle);
+  pointer-events: none;
+}
+.input-with-icon .input { padding-left: 40px; }
+
+.field__error { font: var(--ep-text-meta); color: var(--ep-danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}

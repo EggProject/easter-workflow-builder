@@ -1,0 +1,141 @@
+/* ============================================================
+   EggProject — Form control (Checkbox)
+   Forrás: eggproject-design-components/components/form-controls/form-controls.css,
+   kizárólag a megosztott .ctrl váz és a Checkbox szabályai, bájtra
+   azonosan. Kihagyva a forrás @import sora (a design-token tokenek
+   globálisan töltődnek), valamint a Radio (.ctrl__radio, .radio-group),
+   a Switch (.ctrl__switch*) és a kártya alakú választó (.ctrl-card*)
+   szakasz: azok a forrás önálló komponensei, és a SPEC-007 6.1 szerint a
+   felület egyedül a törlés megerősítő jelölőnégyzetét használja, tehát
+   nem tagjai a tizenkét komponens listájának.
+   A forced-colors és a reduced-motion blokk emiatt csak a checkbox
+   szelektorait viszi tovább; a blokkok fölötti magyarázó kommentek
+   szövege változatlan marad, bár prózában megemlítik a radiót, a
+   switchet és a kártyát is.
+   A React komponens az `indeterminate` DOM tulajdonságot nem állítja és
+   `hint` propot sem ismer (a hatókörben egyikre sincs eset), a hozzájuk
+   tartozó CSS szabályok (.ctrl__input:indeterminate, .ctrl__hint) viszont
+   a checkbox saját szabályai, ezért bájtra azonosan átkerülnek.
+   Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+/* ============ Form controls — Checkbox · Radio · Switch ============
+   Each control is a <label class="ctrl"> wrapping a native input
+   (visually hidden) + a styled .ctrl__box / .ctrl__radio / .ctrl__switch
+   + an optional .ctrl__label text + .ctrl__hint.
+============================================ */
+.ctrl {
+  display: inline-flex; align-items: flex-start; gap: 10px;
+  font: var(--ep-text-small);
+  color: var(--ep-fg);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.4;
+}
+.ctrl[disabled],
+.ctrl.is-disabled { cursor: not-allowed; opacity: 0.5; }
+.ctrl__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px; height: 1px;
+  pointer-events: none;
+}
+.ctrl__text {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.ctrl__label { font: 500 14px var(--ep-font-sans); color: var(--ep-fg); }
+.ctrl__hint  { font: 400 13px/1.45 var(--ep-font-sans); color: var(--ep-fg-muted); }
+
+/* ============ Checkbox ============ */
+.ctrl__box {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  background: var(--ep-bg-elevated);
+  border: 1.5px solid var(--ep-control-border);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background-color var(--ep-dur-fast) var(--ep-ease-out),
+              border-color var(--ep-dur-fast) var(--ep-ease-out),
+              box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+  margin-top: 1px;
+}
+.ctrl__box svg {
+  width: 12px; height: 12px;
+  color: var(--ep-accent-on);
+  opacity: 0;
+  transition: opacity var(--ep-dur-fast) var(--ep-ease-out);
+}
+.ctrl__input:checked + .ctrl__box {
+  background: var(--ep-accent);
+  border-color: var(--ep-accent);
+}
+.ctrl__input:checked + .ctrl__box svg { opacity: 1; }
+.ctrl__input:indeterminate + .ctrl__box {
+  background: var(--ep-accent);
+  border-color: var(--ep-accent);
+}
+.ctrl__input:indeterminate + .ctrl__box::after {
+  content: '';
+  width: 8px; height: 2px;
+  background: var(--ep-accent-on);
+  border-radius: 1px;
+}
+.ctrl__input:focus-visible + .ctrl__box { box-shadow: var(--ep-shadow-focus); }
+.ctrl:hover .ctrl__input:not(:checked):not(:disabled) + .ctrl__box { border-color: var(--ep-fg); }
+
+/* ============ Forced colors (Windows High Contrast etc.) ============
+   Custom-painted controls can't lean on design tokens here, so map every
+   state onto explicit system colors. forced-color-adjust:none is applied
+   ONLY to the custom visuals (never the native input, never the card — it
+   inherits and would stop the card's label/hint text from adapting); the
+   visuals' ::after / svg children inherit it and get explicit colors below. */
+@media (forced-colors: active) {
+  /* Idle: recognizable shape — Canvas fill, CanvasText border + glyph. */
+  .ctrl__box {
+    forced-color-adjust: none;
+    background: Canvas;
+    border: 1.5px solid CanvasText;
+  }
+  .ctrl__box svg { color: CanvasText; }
+
+  /* Checked / indeterminate: Highlight surface, HighlightText glyph. */
+  .ctrl__input:checked + .ctrl__box,
+  .ctrl__input:indeterminate + .ctrl__box {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .ctrl__input:checked + .ctrl__box svg { color: HighlightText; }
+  .ctrl__input:indeterminate + .ctrl__box::after { background: HighlightText; }
+
+  /* Focus: box-shadow rings drop out in forced colors — use a real outline.
+     :focus-visible still gates it, so mouse clicks keep the normal model. */
+  .ctrl__input:focus-visible + .ctrl__box {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Disabled: GrayText; reset wrapper opacity so GrayText isn't dimmed further.
+     Placed after checked so checked+disabled reads as a grayed (not Highlight) state. */
+  .ctrl[disabled],
+  .ctrl.is-disabled { opacity: 1; }
+  .ctrl__input:disabled + .ctrl__box {
+    background: Canvas;
+    border-color: GrayText;
+  }
+  .ctrl__input:disabled + .ctrl__box svg { color: GrayText; }
+  .ctrl__input:disabled + .ctrl__box::after { background: GrayText; }
+}
+
+/* ============ Reduced motion ============
+   Make every choice-control transition instant. Final states (checked bg/border,
+   radio-dot scale(1), switch-thumb translateX, focus ring, disabled) all still
+   apply — only the animation is removed. No transforms are reset, so end positions
+   hold. Beyond the transform/colour/shadow transitions, two extra user-perceivable
+   ones are folded in (documented): .ctrl__box svg (checkmark opacity fade) and
+   .ctrl__switch (track background crossfade). */
+@media (prefers-reduced-motion: reduce) {
+  .ctrl__box,
+  .ctrl__box svg {
+    transition: none;
+  }
+}

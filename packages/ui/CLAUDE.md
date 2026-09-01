@@ -23,8 +23,11 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 | `skeleton`                         | a `.skel` betöltés-jelző, nyolc alakkal; `shape="text"` és `lines` esetén rekurzívan rajzolt sor-stack; a forrás `SkeletonList` komponense nincs átemelve                                                                                                   |
 | `loading-indicator`                | a `.progress` determinisztikus sávjelző (`ProgressBar`); a forrás indeterminált/logó-spinner/demo blokkjai nincsenek átemelve, mert nem tagjai a tizenkét komponens listájának                                                                              |
 | `toast`                            | a `.toast-viewport`/`.toast` értesítés család: `Toast` primitív kártya, `ToastViewport` (hat pozíció) és a `useToasts` push/dismiss hook, befecskendezett időzítő porttal; a forrás `ManagedToast` hover/fókusz-szüneteltetése nincs átemelve               |
+| `text-field`                       | a `.field`/`.input` szöveges mező (`TextField`): címke, hibaüzenet, vezető ikon, és a hívó `aria-describedby` értékét megőrző ARIA hivatkozás lista                                                                                                         |
+| `select-field`                     | a `.select` választó (`SelectField`) **natív `<select>` alakban**, letiltott és betöltő állapottal; a forrás egyedi listbox változata (button trigger plusz `.menu` panel) nincs átemelve, mert a hatókörön kívüli Menu komponens CSS-ét igényelné          |
+| `form-control`                     | a `.ctrl` jelölőnégyzet (`Checkbox`); a forrás Radio, RadioGroup és Switch exportja nincs átemelve, mert a felület egyedül a törlés megerősítő jelölőnégyzetét használja                                                                                    |
 
-A további témák (a fennmaradó 6 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2
+A további témák (a fennmaradó 3 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2
 fázisban.
 
 ## Függőségi irány
