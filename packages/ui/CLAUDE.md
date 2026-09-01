@@ -15,6 +15,7 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 | `self-hosted-font`                 | a `fonts.css` és 20 `.woff2` fájl (Roboto + JetBrains Mono, latin plusz latin-ext), bájtra azonosan átemelve, plusz a bájtazonosságot őrző regressziós teszt                                                                                                                                                         |
 | `topnav-shell`                     | a `topnav-shell.css` (az átemelt `.app-pagehead`/`.app-content`/`.app-tn` blokk, a "faltól falig" override és a --ep-screen-md alatti lenyíló navigáció reszponzív szabálya), az `AppShellFrame` domain mentes React komponens és mindkét spec                                                                       |
 | `media-query-breakpoint-invariant` | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt, ami minden CSS média lekérdezés `min-width`/`max-width` literálját a `design-token/breakpoints.css` `--ep-screen-*` tokenjeihez méri                                                                                                       |
+| `component-boundary-invariant`     | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt a csomag határaira, ami a default `React` importot, a workspace importot, a `ResizeObserver`/`IntersectionObserver` hivatkozást és a barrel `export *` alakját tiltja                                                                       |
 | `theme-mode`                       | a háromállapotú (`light`/`dark`/`system`) téma mód: a `ThemeMode` típus és típusőr, a `useThemeMode` hook (DOM `data-theme` és `localStorage['eggTheme']` szinkronban tartása, `matchMedia` figyelés kizárólag `system` módban) és a `ThemeModeToggle` gomb                                                          |
 | `class-name-list`                  | `joinClassNames`: feltételes CSS osztálynév lista összefűzése, minden komponens téma újrahasznosítja                                                                                                                                                                                                                 |
 | `aria-token-list`                  | `joinAriaTokenList`: ARIA id-hivatkozás lista (`aria-describedby`, `aria-labelledby`) összefűzése duplikátum nélkül, hogy a komponens belső azonosítója a hívóé mellé kerüljön, ne a helyére                                                                                                                         |
@@ -50,6 +51,14 @@ meg, a `design-token` és a `topnav-shell` provenienciáját ez a `CLAUDE.md` é
 `docs/research/2026-09-01-spec007-f0-meresek.md` dokumentálja. A `.prettierignore` kizárja a
 `design-token` és a `self-hosted-font` mappát, plusz a `topnav-shell.css` és a komponens CSS
 fájlokat, fájlonként (SPEC-007 4.5).
+
+**Nyitott pont az F3 fázisnak (nem döntés, felvetés):** a `design-token/colors-and-type.css`
+token barrelt ma egyetlen fájl sem importálja, és a `package.json` `exports` mezője kizárólag a
+`src/index.ts` barrelre mutat, tehát az `apps/web` mély importtal sem éri el. Három út
+mérlegelhető, mindegyik az F3 hatókörében: mellékhatás import a barrelben, önálló `exports`
+bejegyzés a CSS-re, vagy a token import az `AppShellFrame` mellé. A jelen lépés egyiket sem
+választja, mert a SPEC-007 16. szekció 5. kritériuma szerint a barrel **csak nevesített
+újraexportot** tartalmazhat, és az alkalmazás összeszerelése az F3 fázis feladata.
 
 ## Kapcsolódó dokumentumok
 
