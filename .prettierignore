@@ -26,3 +26,4 @@ packages/ui/src/select-field/select-field.css
 packages/ui/src/form-control/form-control.css
 packages/ui/src/modal/modal.css
 packages/ui/src/tab/tab.css
+packages/ui/src/data-table/data-table.css
