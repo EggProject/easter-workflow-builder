@@ -1,0 +1,98 @@
+/* ============================================================
+   EggProject — Topnav shell (szűkített átemelés)
+   Forrás: eggproject-design-app-common/_shell.css, a .app-tn,
+   az .app-pagehead és az .app-content szabályok, szabályonként
+   bájtra azonosan. Az öt shell közül (sidebar, topnav, marketing,
+   docs, focus) kizárólag a topnav kerül át, mert a projekt csak
+   ezt használja (SPEC-007 4.2). Átemelés dátuma: 2026-09-01.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+
+   Az egyetlen, ehhez a fájlhoz KÜLÖN, a fájl végén álló blokk
+   adja a "faltól falig" felülírást (SPEC-007 5.2): a
+   --ep-layout-max-app token értékét a .app-tn scope-jában a
+   --ep-layout-max-full sentinelre állítja. Az alább átemelt
+   szabályok egyetlen bájtja sem módosult ehhez képest.
+   ============================================================ */
+
+/* === Page header inside main ============================== */
+.app-pagehead {
+  padding: 32px 40px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.app-pagehead__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.app-pagehead__title {
+  font: 400 36px/1.1 var(--ep-font-display);
+  letter-spacing: -0.02em;
+  color: var(--ep-fg);
+}
+.app-pagehead__title em { font-weight: 700; }
+.app-pagehead__lead {
+  font: 400 15px/1.55 var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+  max-width: 60ch;
+}
+.app-pagehead__actions { display: flex; gap: 10px; align-items: center; }
+
+.app-content {
+  padding: 8px 40px 80px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* === 2 · Top-nav app shell ================================= */
+.app-tn {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  background: var(--ep-bg-sunken);
+}
+.app-tn__bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 20px;
+  height: 60px; padding: 0 28px;
+  background: var(--ep-bg-elevated);
+  border-bottom: 1px solid var(--ep-divider);
+}
+.app-tn__brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; text-decoration: none; color: var(--ep-fg); }
+.app-tn__brand img { width: 24px; height: 24px; }
+.app-tn__brand b {
+  font: 600 17px var(--ep-font-sans);
+  letter-spacing: -0.02em;
+  display: inline-flex; align-items: baseline; gap: 4px;
+}
+.app-tn__brand b::after {
+  content: ""; width: 4px; height: 4px;
+  background: var(--ep-blue-600); border-radius: 50%;
+  display: inline-block; margin-bottom: 2px;
+}
+.app-tn__navigation { display: flex; gap: 2px; }
+.app-tn__navigation a {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--ep-radius-md);
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+  text-decoration: none;
+  transition: background var(--ep-dur-fast) var(--ep-ease-out),
+              color var(--ep-dur-fast) var(--ep-ease-out);
+}
+.app-tn__navigation a svg { width: 16px; height: 16px; flex-shrink: 0; }
+.app-tn__navigation a:hover { color: var(--ep-fg); background: var(--ep-bg-hover); }
+.app-tn__navigation a.is-on { background: var(--ep-accent); color: var(--ep-fg-on-blue); }
+.app-tn__navigation a .pill {
+  font: 500 11px var(--ep-font-mono);
+  background: var(--ep-bg-sunken); color: var(--ep-fg-subtle);
+  padding: 1px 6px; border-radius: 999px;
+}
+.app-tn__navigation a.is-on .pill { background: rgba(255,255,255,0.12); color: var(--ep-paper-100); }
+.app-tn__actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.app-tn__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app-tn__inner { width: 100%; max-width: var(--ep-layout-max-app, 1240px); margin: 0 auto; }
+
+/* ============================================================
+   Faltól falig override (SPEC-007 5.2). ÚJ, önálló blokk — a
+   fenti, átemelt .app-tn szabály egyetlen bájtja sem változott.
+   A --ep-layout-max-full sentinel (design-token/breakpoints.css)
+   a design system saját, erre a célra szánt tokenje: `none`.
+   ============================================================ */
+.app-tn {
+  --ep-layout-max-app: var(--ep-layout-max-full);
+}

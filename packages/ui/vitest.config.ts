@@ -18,5 +18,10 @@ export default defineProject({
   test: {
     name: 'ui',
     environment: 'happy-dom',
+    // Ket, sajat meressel feltart hiba javitasa - lasd a fajl sajat
+    // fejleckommentjet (docs/research/2026-09-01-spec007-f0-meresek.md,
+    // T-008-4): a React 19 act() kornyezet jelzese, es a Vitest happy-dom
+    // projekt-kornyezetben nem mukodo globalThis.localStorage javitasa.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

@@ -14,8 +14,10 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "happy-dom": "20.11.6",
     "vitest": "catalog:"
   }
 }

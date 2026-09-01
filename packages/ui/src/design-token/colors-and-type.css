@@ -1,0 +1,36 @@
+/* ============================================================
+   EggProject — Colors & Type  (barrel)
+   Premium-modern development brand. Gold primary action,
+   sapphire second voice, paper-cream (light) / warm-graphite (dark).
+
+   This file is a THIN @import barrel — the canonical public entry
+   point that every other skill links cross-skill. All token
+   definitions, the .ep-* type classes and the .ep-theme-toggle now
+   live in the modules under ./tokens/. NO tokens are defined inline
+   here; do not add any. Edit the modules instead.
+
+   Cascade order (load order is significant):
+     fonts → colors → typography → spacing → breakpoints → radius →
+     elevation → motion → theme-light → theme-dark → theme-auto →
+     theme-toggle
+   ============================================================ */
+
+/* --- Webfonts: self-hosted Roboto + JetBrains Mono (.woff2) — NO CDN --- */
+@import url('../self-hosted-font/fonts.css');
+
+/* --- Design-token primitives --- */
+@import url('./colors.css');
+@import url('./typography.css');
+@import url('./spacing.css');
+@import url('./breakpoints.css');
+@import url('./radius.css');
+@import url('./elevation.css');
+@import url('./motion.css');
+
+/* --- Theme scopes (light default, dark opt-in, auto follows OS) --- */
+@import url('./theme-light.css');
+@import url('./theme-dark.css');
+@import url('./theme-auto.css');
+
+/* --- Canonical theme toggle component --- */
+@import url('./theme-toggle.css');
