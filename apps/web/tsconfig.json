@@ -1,4 +1,15 @@
 {
   "extends": "../../tooling/tsconfig/react.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    // A react.json alapertelmezese ures types tomb (bongeszo csomag, nincs
+    // szuksege Node globalisokra). A `core` csomagot viszont FORRAS szinten
+    // fogyasztjuk (`exports` a `./src/index.ts`-re mutat, nincs build lepes,
+    // .claude/CLAUDE.md 7. "Forras fogyasztas"), tehat a `core` teljes
+    // forrasfaja bekerul ennek a csomagnak a TypeScript programjaba is - az
+    // `image-source` targykor `node:buffer` importjaval egyutt. Node tipusok
+    // nelkul ez TS2591 hibat ad. Ugyanaz a mintazat, mint a `db`-tol fuggo
+    // csomagok `skipLibCheck` kapcsoloja (.claude/CLAUDE.md 12.).
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
