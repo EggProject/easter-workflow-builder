@@ -18,3 +18,6 @@ packages/ui/src/topnav-shell/topnav-shell.css
 packages/ui/src/button/button.css
 packages/ui/src/badge/badge.css
 packages/ui/src/card/card.css
+packages/ui/src/skeleton/skeleton.css
+packages/ui/src/loading-indicator/loading-indicator.css
+packages/ui/src/toast/toast.css

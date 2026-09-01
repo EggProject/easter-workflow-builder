@@ -1,0 +1,175 @@
+/* ============================================================
+   EggProject — Toast
+   Forrás: eggproject-design-components/components/toast/toast.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-01.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Toast ============
+   .toast-viewport — fixed container, bottom-right; stacks toasts
+   .toast — single toast card; variant + dot + body + actions
+============================================ */
+.toast-viewport {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  display: flex; flex-direction: column-reverse;
+  gap: 10px;
+  z-index: 1100;
+  max-width: 380px;
+  pointer-events: none;
+}
+.toast-viewport--tl { top: 24px; left: 24px; bottom: auto; right: auto; flex-direction: column; }
+.toast-viewport--tc { top: 24px; left: 50%; transform: translateX(-50%); bottom: auto; right: auto; flex-direction: column; }
+.toast-viewport--bc { left: 50%; transform: translateX(-50%); right: auto; }
+.toast-viewport--tr { top: 24px; right: 24px; bottom: auto; left: auto; flex-direction: column; }
+.toast-viewport--bl { bottom: 24px; left: 24px; top: auto; right: auto; }
+
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 14px 14px 16px;
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border-subtle);
+  border-radius: var(--ep-radius-md);
+  box-shadow: var(--ep-shadow-lg);
+  min-width: 280px;
+  max-width: 380px;
+  animation: toast-in var(--ep-dur-base) var(--ep-ease-out);
+}
+.toast.is-out { animation: toast-out 220ms var(--ep-ease-out) forwards; }
+
+.toast__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ep-accent);
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+.toast--success .toast__dot { background: var(--ep-success); }
+.toast--warning .toast__dot { background: var(--ep-warning-fg); }
+.toast--danger  .toast__dot { background: var(--ep-danger);  }
+.toast--info    .toast__dot { background: var(--ep-accent); }
+
+.toast__body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.toast__title {
+  font: 600 14px/1.35 var(--ep-font-sans);
+  color: var(--ep-fg);
+}
+.toast__message {
+  font: 400 13px/1.45 var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+}
+.toast__meta {
+  font: var(--ep-text-meta);
+  font-family: var(--ep-font-mono);
+  color: var(--ep-fg-subtle);
+  margin-top: 4px;
+}
+
+.toast__actions { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.toast__action {
+  font: 500 12px var(--ep-font-sans);
+  color: var(--ep-accent);
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  border-radius: var(--ep-radius-sm);
+  cursor: pointer;
+  margin-left: -8px;
+}
+.toast__action:hover { background: var(--ep-accent-bg); }
+
+.toast__close {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--ep-radius-sm);
+  color: var(--ep-fg-subtle);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+.toast__close:hover { background: var(--ep-bg-hover); color: var(--ep-fg); }
+.toast__close svg { width: 14px; height: 14px; }
+
+/* Keyboard focus — system focus token, instant (not transitioned), no layout shift */
+.toast__action:focus-visible,
+.toast__close:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+
+/* ---- Dark variant — on slate / portal surfaces ---- */
+.toast--ink {
+  background: var(--ep-ink-900);
+  border-color: transparent;
+  box-shadow: var(--ep-shadow-xl);
+}
+.toast--ink .toast__title { color: var(--ep-paper-50); }
+.toast--ink .toast__message   { color: var(--ep-slate-300); }
+.toast--ink .toast__meta  { color: var(--ep-slate-400); }
+.toast--ink .toast__action { color: var(--ep-blue-300); }
+.toast--ink .toast__action:hover { background: rgba(255,255,255,0.08); }
+.toast--ink .toast__close { color: var(--ep-slate-300); }
+.toast--ink .toast__close:hover { background: rgba(255,255,255,0.08); color: var(--ep-paper-50); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(8px); }
+}
+
+/* ---- Forced colors — system colors only; real borders replace shadow separation ---- */
+@media (forced-colors: active) {
+  .toast,
+  .toast--ink {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  /* Variant shows as a colored dot in normal mode; keep it perceivable here.
+     The hue distinction is lost (acceptable) — the title/message text carries meaning. */
+  .toast__dot,
+  .toast--success .toast__dot,
+  .toast--warning .toast__dot,
+  .toast--danger  .toast__dot,
+  .toast--info    .toast__dot { background: CanvasText; }
+
+  .toast__title,
+  .toast--ink .toast__title,
+  .toast__message,
+  .toast--ink .toast__message { color: CanvasText; }
+  .toast__meta,
+  .toast--ink .toast__meta { color: GrayText; }
+
+  .toast__action,
+  .toast__close,
+  .toast--ink .toast__action,
+  .toast--ink .toast__close {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .toast__action:hover,
+  .toast__close:hover,
+  .toast--ink .toast__action:hover,
+  .toast--ink .toast__close:hover { background: Highlight; color: HighlightText; }
+
+  .toast__action:focus-visible,
+  .toast__close:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* ---- Reduced motion — drop the entrance animation; timing/dismiss/focus unaffected ---- */
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}

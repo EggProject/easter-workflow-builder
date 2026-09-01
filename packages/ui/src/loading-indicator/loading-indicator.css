@@ -1,0 +1,95 @@
+/* ============================================================
+   EggProject — Loading indicator (ProgressBar)
+   Forrás: eggproject-design-components/components/loading/loading.css,
+   kizárólag a determinisztikus ProgressBar szabályai. A forrás fájl
+   ugyanitt ProgressIndeterminate-et (.progress-bar__indeterminate,
+   .progress-bar__value--dots, @keyframes pb-dot/pb-indet), LogoSpinner-t
+   (.spin*) és egy demo oldalt (.demo*, .files*) is tartalmaz - egyik sem
+   tagja a SPEC-007 12.1 tizenkét komponens listájának, ezért ez a
+   szűkített átemelés kihagyja őket. A megmaradó szabályok bájtra
+   azonosak a forrással, KIVÉVE a lenn jelzett két, kombinált
+   szelektorlistájú szabályt: azoknál a nem érintett szelektorok
+   (.spin*, .progress-bar__indeterminate, .progress-bar__value--dots)
+   kikerültek a listából, a megmaradó deklaráció-blokk szövege
+   változatlan. Átemelés dátuma: 2026-09-01. Licencállítás nincs
+   (SPEC-007 4.4, M-34).
+   ============================================================ */
+.progress-bar { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+.progress-bar__header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px;
+}
+.progress-bar__label {
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg);
+}
+.progress-bar__value {
+  font: 500 12px var(--ep-font-mono);
+  color: var(--ep-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Track + fill */
+.progress-bar__track {
+  position: relative;
+  width: 100%;
+  background: var(--ep-bg-pressed);
+  border-radius: var(--ep-radius-pill);
+  overflow: hidden;
+}
+.progress-bar--sm .progress-bar__track { height: 4px; }
+.progress-bar--md .progress-bar__track { height: 8px; }
+.progress-bar--lg .progress-bar__track { height: 12px; }
+
+.progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ep-accent-hover), var(--ep-blue-500));
+  border-radius: var(--ep-radius-pill);
+  position: relative;
+  overflow: hidden;
+  transition: width 240ms var(--ep-ease-out);
+  min-width: 0;
+}
+
+/* Subtle shimmer overlay — slides across the fill continuously */
+.progress-bar__shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.0) 30%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.0) 70%,
+    transparent 100%
+  );
+  animation: pb-shimmer 1.6s linear infinite;
+}
+@keyframes pb-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%);  }
+}
+
+/* Kombinált szelektorlistából szűkítve (lásd fejléc) — a deklaráció-blokk
+   szövege változatlan a forráshoz képest. */
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar__shimmer { animation: none !important; }
+  /* The determinate fill's width tween is cosmetic — snap it instead of easing. */
+  .progress-bar__fill { transition: none; }
+}
+
+/* ============================================================
+   Forced colors (Windows High Contrast): the fill relies on a gradient
+   background, which is stripped in forced-colors — pin it to a system colour so
+   the filled portion stays distinct from the track. System colours only; no
+   token/hex/rgb/hsl; no forced-color-adjust. Live emulation not run —
+   source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .progress-bar { color: CanvasText; }
+  .progress-bar__label { color: CanvasText; }
+  .progress-bar__value { color: CanvasText; }
+  .progress-bar__track { background: Canvas; border: 1px solid CanvasText; }
+  .progress-bar__fill { background: Highlight; }
+  .progress-bar__shimmer { background: none; }
+}

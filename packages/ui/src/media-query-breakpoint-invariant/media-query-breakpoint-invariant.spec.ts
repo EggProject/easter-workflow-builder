@@ -21,6 +21,11 @@ const SOURCE_TREE_CSS_PATTERN = /^(?:packages\/ui|apps\/web)\/src\/.*\.css$/;
 
 const BREAKPOINT_TOKEN_PATTERN = /--ep-screen-[a-z0-9]+:\s*(\d+)px/g;
 const MEDIA_QUERY_LITERAL_PATTERN = /(?:min-width|max-width):\s*(\d+)px/g;
+// Csak az `@media` előírás fejlécét (a kulcsszó és a nyitó "{" közötti
+// feltétel-listát) nézzük: a `.toast-viewport { max-width: 380px; }`-hoz
+// hasonló, sima komponens-méretezési tulajdonság nem media query töréspont,
+// tehát nem tartozik a token-kényszer alá.
+const MEDIA_QUERY_PRELUDE_PATTERN = /@media([^{]*)\{/g;
 
 interface InvalidBreakpointLiteral {
   readonly file: string;
@@ -50,9 +55,12 @@ function readAllowedBreakpointPixelValues(root: string): ReadonlySet<number> {
   return values;
 }
 
-function findInvalidBreakpointLiterals(cssContent: string, allowedPixelValues: ReadonlySet<number>): readonly number[] {
+function collectInvalidPixelValuesFromPrelude(
+  prelude: string,
+  allowedPixelValues: ReadonlySet<number>,
+): readonly number[] {
   const invalid: number[] = [];
-  for (const match of cssContent.matchAll(MEDIA_QUERY_LITERAL_PATTERN)) {
+  for (const match of prelude.matchAll(MEDIA_QUERY_LITERAL_PATTERN)) {
     const rawValue = match[1];
     if (rawValue === undefined) {
       continue;
@@ -61,6 +69,18 @@ function findInvalidBreakpointLiterals(cssContent: string, allowedPixelValues: R
     if (!allowedPixelValues.has(pixelValue)) {
       invalid.push(pixelValue);
     }
+  }
+  return invalid;
+}
+
+function findInvalidBreakpointLiterals(cssContent: string, allowedPixelValues: ReadonlySet<number>): readonly number[] {
+  const invalid: number[] = [];
+  for (const preludeMatch of cssContent.matchAll(MEDIA_QUERY_PRELUDE_PATTERN)) {
+    const prelude = preludeMatch[1];
+    if (prelude === undefined) {
+      continue;
+    }
+    invalid.push(...collectInvalidPixelValuesFromPrelude(prelude, allowedPixelValues));
   }
   return invalid;
 }
