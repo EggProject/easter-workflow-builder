@@ -321,9 +321,14 @@ scriptje, de a `no-shadowed-path-import.spec.ts` regressziós tesztje mégis lef
 fel, függetlenül attól, van-e a csomagnak `test` scriptje (gyökér `CLAUDE.md`).
 
 **Lefedettség.** 100 százalék mind a négy metrikán, kizárás nélkül. A `vitest.config.ts`
-`coverage.exclude` listája nem bővíthető. Csomag-specifikus kizárás ma nincs; az egyetlen
-ideiglenes kizárás az `apps/web/src/main.ts`, ami a valódi UI belépési pont megérkezésekor
-törlendő (gyökér `CLAUDE.md`, SPEC-002 9., SPEC-003 12.4).
+`coverage.exclude` listája **termékkód** kizárásra nem bővíthető: ez a tiltás célja, nem a
+szó szerinti "egyetlen sor sem kerülhet rá" olvasat. Csomag-specifikus **termékkód** kizárás ma
+nincs; az egyetlen ideiglenes ilyen kizárás az `apps/web/src/main.ts`, ami a valódi UI belépési
+pont megérkezésekor törlendő (gyökér `CLAUDE.md`, SPEC-002 9., SPEC-003 12.4). **Egy teszt fájl
+bejegyzés nem termékkód kizárás**, ezért a lista egyetlen `**/*.spec.tsx` sorral bővült, a már
+meglévő `**/*.spec.ts` bejegyzés pontos analógjaként egy másik kiterjesztésre: a `packages/ui`
+és az `apps/web` React komponens tesztjei `.spec.tsx` fájlok, valódi JSX-szel (user döntés,
+SPEC-007 O-1, 2026-09-01). Más sor a listán nem bővíthető.
 
 **Token takarékos wrapper kötelezettség.** Minden zajos parancshoz (lint, teszt, prettier, build,
 mérés) kötelező bash wrapper a `tooling/scripts` alatt, ami csak összegzést és a hibákat írja ki.
@@ -648,22 +653,19 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**1. tétel, nyitva: a `.spec.tsx` fájlok és a `coverage.exclude` lista.** A 8. szekció kimondja,
-hogy a `vitest.config.ts` `coverage.exclude` listája **nem bővíthető**. A React komponens tesztek
-viszont JSX-et tartalmaznak, tehát `.spec.tsx` a nevük, és a lista ma csak `**/*.spec.ts`
-bejegyzést tartalmaz, miközben a `coverage.include` a `.tsx` fájlokat is felveszi. **A tényleges
-eltérés**: a tiltás szövege abszolút, a szándéka viszont a 8. szekció saját megfogalmazása
-szerint a **termékkód** kizárások megakadályozása. Egy `**/*.spec.tsx` sor nem termékkód kizárás,
-hanem a már meglévő teszt fájl bejegyzés pontos analógja egy másik kiterjesztésre. **Mi az
-érvényes viselkedés addig**: a lista nem bővül, és a komponens tesztek `.spec.ts` fájlok, JSX
-nélkül, `createElement` hívásokkal. **Mi zárná le**: user döntés a két út között, a
-`docs/spec/SPEC-007-frontend-alkalmazas.md` O-1 nyitott kérdése szerint; lezárás után a 8.
-szekció szövegét pontosítani kell, és ezt a tételt törölni.
+**Nincs nyitott ellentmondás.** A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
+`coverage.exclude` lista, a `CLAUDE.md` elhelyezés, a "nyolcadik kapu" elnevezés, a SPEC-001 14.
+"Karbantartási szabály" kontra `claude-md.sh`, a kétszintű csomagok száma) mindegyike lezárult.
 
-**Ezen az egy tételen kívül nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
-a "nyolcadik kapu" elnevezés, a SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`, a
-kétszintű csomagok száma) egyike sem valódi nyitott kérdés volt: mindegyik már eldöntött állapotot
-írt le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
+A `.spec.tsx` tétel lezárása: a user 2026-09-01-én a `.spec.tsx` út mellett döntött (SPEC-007
+O-1). A `vitest.config.ts` `coverage.exclude` listája egyetlen `**/*.spec.tsx` sorral bővült, a
+már meglévő `**/*.spec.ts` bejegyzés analógjaként; a `packages/ui` és az `apps/web` React
+komponens tesztjei `.spec.tsx` fájlok, valódi JSX-szel. A 8. szekció szövege ennek megfelelően
+pontosítva: a "nem bővíthető" tiltás a **termékkód** kizárásokra vonatkozik, egy teszt fájl
+bejegyzésre nem.
+
+A másik négy tétel egyike sem volt valódi nyitott kérdés: mindegyik már eldöntött állapotot írt
+le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
 átvezetés megtörtént (SPEC-001 14. szekció és 39. kritérium, SPEC-003 44. kritérium, PLAN-002 és
 PLAN-003 kapu-listája, `tooling/scripts/CLAUDE.md`, `.github/workflows/ci.yml`), a tételek
 törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-ben és e szabálykönyv 6.

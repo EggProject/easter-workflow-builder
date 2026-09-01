@@ -107,6 +107,25 @@ Forrás: https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/
 - E2E coverage: `vite-plugin-istanbul` instrumentálás + `window.__coverage__` mentés
   Playwrightból. A Playwrightnak nincs beépített coverage funkciója.
 
+## React és táblamotor verziók, 2026-09-01 (T-008-6, PLAN-008 F0)
+
+Élő npm registry lekérdezés, két független forrással mindegyikre (a `react` már korábban
+rögzítve, `19.2.8`, változatlan).
+
+| Csomag                  | Verzió    | Forrás 1                                                  | Forrás 2                                                                 |
+| ----------------------- | --------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `react-dom`             | `19.2.8`  | `https://registry.npmjs.org/react-dom/latest` (`version`) | `https://unpkg.com/react-dom/package.json` (301 -> `react-dom@19.2.8`)   |
+| `@types/react`          | `19.2.18` | `https://registry.npmjs.org/@types/react/latest`          | `https://unpkg.com/@types/react/package.json` (301 -> `@19.2.18`)        |
+| `@types/react-dom`      | `19.2.5`  | `https://registry.npmjs.org/@types/react-dom/latest`      | `https://unpkg.com/@types/react-dom/package.json` (301 -> `@19.2.5`)     |
+| `@tanstack/react-table` | `9.2.4`   | `https://registry.npmjs.org/@tanstack/react-table/latest` | `https://unpkg.com/@tanstack/react-table/package.json` (301 -> `@9.2.4`) |
+
+A `@tanstack/react-table` `9.2.4` a döntés a `data-table` téma motorjára (SPEC-007 O-2, lásd
+`docs/research/2026-09-01-spec007-f0-meresek.md`): a mérés szerint mindkét verzió (`8.21.3` és
+`9.2.4`) ténylegesen renderel React 19.2.8 alatt, de a `9.2.4` az npm `latest`, stabil kiadás
+(`prerelease: false`), a `8.21.3` pedig csak a régi, deprecated `useLegacyTable` kompatibilitási
+rétegen át lenne portolható — a projekt szabálya szerint új kódot nem építünk deprecated API-ra,
+ezért a `9.2.4` natív (`useTable` + `tableFeatures`) API-ja a választás.
+
 ## GitHub Actions verziók
 
 | Action                      | Verzió |

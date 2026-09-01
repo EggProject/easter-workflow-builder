@@ -114,6 +114,12 @@ export default defineConfig({
         // maga a teszt
         '**/*.test.ts',
         '**/*.spec.ts',
+        // React komponens tesztek, valodi JSX-szel - a mar meglevo **/*.spec.ts
+        // bejegyzes pontos analogja egy masik kiterjesztesre. NEM termekkod
+        // kizaras: a .claude/CLAUDE.md 8. szekcioja szerint a "nem bovitheto"
+        // tiltas kizarolag a termekkod kizarasokra vonatkozik. User dontes,
+        // SPEC-007 O-1, 2026-09-01 (docs/spec/SPEC-007-frontend-alkalmazas.md).
+        '**/*.spec.tsx',
         '**/e2e/**',
 
         // IDEIGLENES kizaras: az `apps/web/src/main.ts` a Playwright e2e
