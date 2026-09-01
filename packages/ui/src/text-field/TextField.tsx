@@ -1,4 +1,5 @@
 import { useId, type InputHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { joinAriaTokenList } from '../aria-token-list/join-aria-token-list.ts';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import './text-field.css';
 
@@ -20,21 +21,6 @@ export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElemen
    * `<label>` elemre kerül.
    */
   readonly inputClassName?: string;
-}
-
-/**
- * A hívó saját `aria-describedby` értéke és a komponens hibaüzenet
- * azonosítója egyetlen, szóközzel elválasztott ARIA id-hivatkozás listává:
- * duplikátum nélkül, üres lista helyett `undefined`. A forrás `Input.jsx`
- * ugyanezt teszi; a felület számára ez azért fontos, mert a hibaüzenet
- * hozzáadása nem törölheti a hívó saját leíró hivatkozását.
- */
-function joinAriaDescribedBy(consumerValue: string | undefined, errorId: string | undefined): string | undefined {
-  const tokens = `${consumerValue ?? ''} ${errorId ?? ''}`
-    .trim()
-    .split(/\s+/)
-    .filter((token) => token.length > 0);
-  return tokens.length === 0 ? undefined : [...new Set(tokens)].join(' ');
 }
 
 /**
@@ -68,7 +54,7 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
       {...rest}
       id={resolvedId}
       aria-invalid={hasError ? 'true' : ariaInvalid}
-      aria-describedby={joinAriaDescribedBy(ariaDescribedBy, hasError ? errorId : undefined)}
+      aria-describedby={joinAriaTokenList(ariaDescribedBy, hasError ? errorId : undefined)}
     />
   );
 

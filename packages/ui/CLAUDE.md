@@ -17,6 +17,7 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 | `media-query-breakpoint-invariant` | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt, ami minden CSS média lekérdezés `min-width`/`max-width` literálját a `design-token/breakpoints.css` `--ep-screen-*` tokenjeihez méri                                              |
 | `theme-mode`                       | a háromállapotú (`light`/`dark`/`system`) téma mód: a `ThemeMode` típus és típusőr, a `useThemeMode` hook (DOM `data-theme` és `localStorage['eggTheme']` szinkronban tartása, `matchMedia` figyelés kizárólag `system` módban) és a `ThemeModeToggle` gomb |
 | `class-name-list`                  | `joinClassNames`: feltételes CSS osztálynév lista összefűzése, minden komponens téma újrahasznosítja                                                                                                                                                        |
+| `aria-token-list`                  | `joinAriaTokenList`: ARIA id-hivatkozás lista (`aria-describedby`, `aria-labelledby`) összefűzése duplikátum nélkül, hogy a komponens belső azonosítója a hívóé mellé kerüljön, ne a helyére                                                                |
 | `button`                           | a `.btn` gomb, öt variánssal (`primary`/`secondary`/`ghost`/`ink`/`danger`) és három mérettel (`sm`/`md`/`lg`)                                                                                                                                              |
 | `badge`                            | a `.badge` jelvény, hét variánssal; a forrás `Chip` komponense nincs átemelve, mert nem tagja a tizenkét komponens listájának                                                                                                                               |
 | `card`                             | a `.card` felület, `feature` (sötét, invertált) variánssal, opcionális fejléc/ikon/meta sorral                                                                                                                                                              |
@@ -26,8 +27,10 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 | `text-field`                       | a `.field`/`.input` szöveges mező (`TextField`): címke, hibaüzenet, vezető ikon, és a hívó `aria-describedby` értékét megőrző ARIA hivatkozás lista                                                                                                         |
 | `select-field`                     | a `.select` választó (`SelectField`) **natív `<select>` alakban**, letiltott és betöltő állapottal; a forrás egyedi listbox változata (button trigger plusz `.menu` panel) nincs átemelve, mert a hatókörön kívüli Menu komponens CSS-ét igényelné          |
 | `form-control`                     | a `.ctrl` jelölőnégyzet (`Checkbox`); a forrás Radio, RadioGroup és Switch exportja nincs átemelve, mert a felület egyedül a törlés megerősítő jelölőnégyzetét használja                                                                                    |
+| `modal`                            | a `.modal-overlay`/`.modal` modális (`Modal`): `role="dialog"`, `aria-modal`, cím és alcím ARIA hivatkozással, bezárás gombbal, `Escape` billentyűvel és háttérkattintással; a forrás megosztott dialógus verme és fókusz csapdája nincs átemelve           |
+| `tab`                              | a `.tabs` aláhúzott fülsor (`Tabs`): `tablist`/`tab`/`tabpanel` szemantika, kontrollált és nem kontrollált mód, roving tabindex; a forrás `Segmented` és `Pills` exportja nincs átemelve                                                                    |
 
-A további témák (a fennmaradó 3 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2
+A további témák (a fennmaradó 1 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2
 fázisban.
 
 ## Függőségi irány
