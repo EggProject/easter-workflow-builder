@@ -15,3 +15,6 @@ tools/wire-probe/.proxy.log
 packages/ui/src/design-token
 packages/ui/src/self-hosted-font
 packages/ui/src/topnav-shell/topnav-shell.css
+packages/ui/src/button/button.css
+packages/ui/src/badge/badge.css
+packages/ui/src/card/card.css

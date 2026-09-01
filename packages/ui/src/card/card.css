@@ -1,0 +1,91 @@
+/* ============================================================
+   EggProject — Card
+   Forrás: eggproject-design-components/components/card/card.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-01.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Card ============
+   Default surface; use `.card--feature` for the dark/inverted variant.
+============================================ */
+.card {
+  background: var(--ep-bg-elevated);
+  border-radius: var(--ep-radius-lg);
+  border: 1px solid var(--ep-border-subtle);
+  padding: 18px;
+  box-shadow: var(--ep-shadow-sm);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card__header { display: flex; align-items: center; gap: 10px; }
+.card__icn {
+  width: 32px; height: 32px;
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-accent-bg);
+  color: var(--ep-accent);
+  display: flex; align-items: center; justify-content: center;
+  font: italic 700 16px var(--ep-font-display);
+}
+.card h3 { font: 600 16px var(--ep-font-sans); color: var(--ep-fg); }
+.card p  { font: var(--ep-text-small); color: var(--ep-fg-muted); }
+.card__meta {
+  display: flex; justify-content: space-between; align-items: center;
+  font: var(--ep-text-meta); font-family: var(--ep-font-mono);
+  color: var(--ep-fg-subtle);
+  margin-top: 4px;
+}
+
+/* Feature (dark) variant — hero, testimonials, CTAs */
+.card--feature { background: var(--ep-ink-900); color: var(--ep-paper-100); border: none; }
+.card--feature h3 {
+  color: var(--ep-paper-50);
+  font: 400 22px var(--ep-font-display);
+  letter-spacing: -0.01em;
+}
+.card--feature h3 em { color: var(--ep-blue-400); font-weight: 700; }
+.card--feature p { color: var(--ep-slate-300); }
+.card--feature .card__icn { background: rgba(255, 255, 255, 0.08); color: var(--ep-blue-300); }
+.card--feature .card__meta { color: var(--ep-slate-400); }
+
+/* ============================================================
+   Forced colors (Windows High Contrast): the token surface, the subtle token
+   border and the shadow-based elevation are all flattened — and .card--feature
+   carries `border: none`, so in HCM the feature card would lose its outline and
+   the inverted surface would collapse into the page. Pin every card to system
+   colours and give it a real 1px system border so it stays a distinct surface;
+   the feature card gets that border explicitly to replace its `border: none`.
+   The .card__icn mark (decorative, aria-hidden in the JSX — string initial or
+   SVG) drops its tinted token / hardcoded rgba background for a system-coloured
+   disc with a real border so it stays visible on both surfaces; it never carries
+   a per-tone meaning here. Text stays legible: h3/p → CanvasText, meta → GrayText.
+   .card__header is a pure layout flex wrapper — it needs no colour rule; its
+   children carry visibility. System colours only; no token/hex/rgb/hsl; no
+   forced-color-adjust; no motion introduced. Live emulation not run —
+   source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .card {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  .card--feature {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  .card h3,
+  .card--feature h3 { color: CanvasText; }
+  .card p,
+  .card--feature p { color: CanvasText; }
+  .card__meta,
+  .card--feature .card__meta { color: GrayText; }
+  .card__icn,
+  .card--feature .card__icn {
+    background: ButtonFace;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+}

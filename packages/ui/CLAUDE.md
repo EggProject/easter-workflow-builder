@@ -16,8 +16,13 @@ komponensek kerülnek át, amiket az `apps/web` ténylegesen használ.
 | `topnav-shell`                     | a `topnav-shell.css` (az átemelt `.app-pagehead`/`.app-content`/`.app-tn` blokk, a "faltól falig" override és a --ep-screen-md alatti lenyíló navigáció reszponzív szabálya), az `AppShellFrame` domain mentes React komponens és mindkét spec              |
 | `media-query-breakpoint-invariant` | megvalósítás fájl nélküli téma (SPEC-002 6.2 5. pont): regressziós teszt, ami minden CSS média lekérdezés `min-width`/`max-width` literálját a `design-token/breakpoints.css` `--ep-screen-*` tokenjeihez méri                                              |
 | `theme-mode`                       | a háromállapotú (`light`/`dark`/`system`) téma mód: a `ThemeMode` típus és típusőr, a `useThemeMode` hook (DOM `data-theme` és `localStorage['eggTheme']` szinkronban tartása, `matchMedia` figyelés kizárólag `system` módban) és a `ThemeModeToggle` gomb |
+| `class-name-list`                  | `joinClassNames`: feltételes CSS osztálynév lista összefűzése, minden komponens téma újrahasznosítja                                                                                                                                                        |
+| `button`                           | a `.btn` gomb, öt variánssal (`primary`/`secondary`/`ghost`/`ink`/`danger`) és három mérettel (`sm`/`md`/`lg`)                                                                                                                                              |
+| `badge`                            | a `.badge` jelvény, hét variánssal; a forrás `Chip` komponense nincs átemelve, mert nem tagja a tizenkét komponens listájának                                                                                                                               |
+| `card`                             | a `.card` felület, `feature` (sötét, invertált) variánssal, opcionális fejléc/ikon/meta sorral                                                                                                                                                              |
 
-A további témák (a 12 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2 fázisban.
+A további témák (a fennmaradó 9 komponens téma) a SPEC-007 12.1 szekciója szerint épülnek fel F2
+fázisban.
 
 ## Függőségi irány
 
