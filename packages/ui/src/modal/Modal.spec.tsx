@@ -9,6 +9,19 @@ function pressKey(key: string): void {
   });
 }
 
+// A Tab kezelés a dialógus elem `onKeyDown` propján megy (React szintetikus
+// esemény delegálás), nem `document`-re kötött natív figyelőn - a natív
+// eseményt ezért a ténylegesen fókuszált elemen kell kiváltani, hogy a React
+// gyökér konténerig felbuborékoljon.
+function pressTab(options: { readonly shiftKey?: boolean } = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, ...options });
+  const target = document.activeElement ?? document;
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
+}
+
 describe('Modal', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -32,6 +45,30 @@ describe('Modal', () => {
       throw new Error('a modális nem található a kirajzolt fán');
     }
     return dialog;
+  }
+
+  // A dialógus DOM sorrendje a Modal.tsx felépítése szerint: `children` (a
+  // `.modal__body`) MEGELŐZI a `footer`-t. Három fókuszálható elemmel
+  // (input, "Mégse", "Törlés") tehát az input az ELSŐ, a "Mégse" a KÖZTES,
+  // a "Törlés" az UTOLSÓ - a köztes teszteknek ezért a "Mégse" gombra kell
+  // fókuszálniuk, nem az inputra.
+  function renderThreeFocusableElementModal(): void {
+    act(() => {
+      root.render(
+        <Modal
+          open
+          title="Cím"
+          footer={
+            <>
+              <button type="button">Mégse</button>
+              <button type="button">Törlés</button>
+            </>
+          }
+        >
+          <input type="text" />
+        </Modal>,
+      );
+    });
   }
 
   it('zárt állapotban semmit nem rajzol ki', () => {
@@ -301,5 +338,162 @@ describe('Modal', () => {
     });
     pressKey('Escape');
     expect(closeCount).toBe(0);
+  });
+
+  // A fókusz csapda és a fókusz visszaállítás unit lefedettsége. A valós
+  // böngésző fókusz mozgás Playwright e2e teszttel is igazolt (SPEC-007
+  // T-008-14 kiegészítés), itt a happy-dom által hűen adott `.focus()` és
+  // `document.activeElement` viselkedésre épülő ágak lefedettsége a cél.
+  describe('fókusz csapda és fókusz visszaállítás', () => {
+    it('megnyitáskor a dialóguson belüli első fókuszálható elemre kerül a fókusz', () => {
+      act(() => {
+        root.render(
+          <Modal open title="Cím" footer={<button type="button">Mégse</button>}>
+            <input type="text" />
+          </Modal>,
+        );
+      });
+      expect(document.activeElement).toBe(container.querySelector('input'));
+    });
+
+    it('fókuszálható gyerek nélkül a dialógusra magára kerül a fókusz', () => {
+      act(() => {
+        root.render(<Modal open title="Cím" />);
+      });
+      expect(document.activeElement).toBe(renderedDialog());
+    });
+
+    it('bezáráskor a fókusz visszatér a megnyitó elemre', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+
+      act(() => {
+        root.render(
+          <Modal open title="Cím">
+            <input type="text" />
+          </Modal>,
+        );
+      });
+      expect(document.activeElement).not.toBe(trigger);
+
+      act(() => {
+        root.render(<Modal open={false} title="Cím" />);
+      });
+      expect(document.activeElement).toBe(trigger);
+      trigger.remove();
+    });
+
+    it('nem HTMLElement korábbi fókusz esetén bezáráskor nem dob hibát és nem próbál fókuszálni', () => {
+      const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      Object.defineProperty(document, 'activeElement', { value: svgElement, configurable: true });
+
+      try {
+        act(() => {
+          root.render(
+            <Modal open title="Cím">
+              <input type="text" />
+            </Modal>,
+          );
+        });
+      } finally {
+        // Csak az imént, az `document` PÉLDÁNYON felvett saját tulajdonságot
+        // távolítja el - ezután a `Document.prototype` eredeti accessora
+        // (amit happy-dom ad) érvényesül újra a többi tesztre.
+        Reflect.deleteProperty(document, 'activeElement');
+      }
+
+      expect(() => {
+        act(() => {
+          root.render(<Modal open={false} title="Cím" />);
+        });
+      }).not.toThrow();
+    });
+
+    it('utolsó elemen Tab a legelsőre ugrik, és megelőzi az alapértelmezett viselkedést', () => {
+      act(() => {
+        root.render(
+          <Modal open title="Cím" footer={<button type="button">Mégse</button>}>
+            <input type="text" />
+          </Modal>,
+        );
+      });
+      const input = container.querySelector<HTMLInputElement>('input');
+      const cancelButton = container.querySelector<HTMLButtonElement>(':scope .modal__footer button');
+      act(() => {
+        cancelButton?.focus();
+      });
+      const event = pressTab();
+      expect(document.activeElement).toBe(input);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('első elemen Shift+Tab a legutolsóra ugrik', () => {
+      act(() => {
+        root.render(
+          <Modal open title="Cím" footer={<button type="button">Mégse</button>}>
+            <input type="text" />
+          </Modal>,
+        );
+      });
+      const cancelButton = container.querySelector<HTMLButtonElement>(':scope .modal__footer button');
+      const event = pressTab({ shiftKey: true });
+      expect(document.activeElement).toBe(cancelButton);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('köztes elemen a Tab nem változtat fókuszt és nem előzi meg az alapértelmezettet', () => {
+      renderThreeFocusableElementModal();
+      const middleButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Mégse');
+      act(() => {
+        middleButton?.focus();
+      });
+      const event = pressTab();
+      expect(document.activeElement).toBe(middleButton);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('köztes elemen a Shift+Tab sem változtat fókuszt', () => {
+      renderThreeFocusableElementModal();
+      const middleButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Mégse');
+      act(() => {
+        middleButton?.focus();
+      });
+      const event = pressTab({ shiftKey: true });
+      expect(document.activeElement).toBe(middleButton);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('a dialóguson belül más billentyű (nem Tab) nem indít fókusz mozgást', () => {
+      renderThreeFocusableElementModal();
+      const input = container.querySelector<HTMLInputElement>('input');
+      act(() => {
+        input?.focus();
+      });
+      const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true });
+      act(() => {
+        input?.dispatchEvent(event);
+      });
+      expect(document.activeElement).toBe(input);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('fókuszálható elem nélkül a Tab a dialógusra fókuszál és megelőzi az alapértelmezettet', () => {
+      act(() => {
+        root.render(<Modal open title="Cím" />);
+      });
+      const event = pressTab();
+      expect(document.activeElement).toBe(renderedDialog());
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('zárt modális nem figyeli a Tab billentyűt', () => {
+      act(() => {
+        root.render(<Modal open={false} title="Cím" />);
+      });
+      const event = pressTab();
+      expect(event.defaultPrevented).toBe(false);
+    });
   });
 });

@@ -1,9 +1,42 @@
-import { useEffect, useId, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { joinAriaTokenList } from '../aria-token-list/join-aria-token-list.ts';
 import './modal.css';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ModalIconVariant = 'info' | 'success' | 'warning' | 'danger';
+
+/**
+ * A dialóguson belüli, billentyűvel elérhető elemek, DOM sorrendben (a
+ * fókusz csapda és a kezdő fókusz erre épül). A `[tabindex]:not([tabindex="-1"])`
+ * a dialógus saját, `tabIndex={-1}` gyökerét kizárja.
+ */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function queryFocusableElements(dialogElement: HTMLElement): readonly HTMLElement[] {
+  return [...dialogElement.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+}
+
+/**
+ * Csak akkor hív fókuszt, ha az elem ténylegesen `HTMLElement` (a
+ * `document.activeElement` típusa `Element | null`, és egy SVG eredetű
+ * fókusz `SVGElement` lenne, aminek nincs a `.focus()` metódusa a projekt
+ * TypeScript szigorával kompatibilis módon elérhető). Ez az ág valódi,
+ * mindkét oldala tesztelt (lásd a `.spec.tsx` fájlt).
+ */
+function focusIfHtmlElement(element: Element | null): void {
+  if (element instanceof HTMLElement) {
+    element.focus();
+  }
+}
 
 export interface ModalProperties {
   readonly open: boolean;
@@ -38,15 +71,26 @@ export interface ModalProperties {
  * `aria-labelledby` hivatkozással kötődik, tehát az e2e teszt
  * `getByRole('dialog')` locatorral éri el (SPEC-007 13.5 2. pont).
  *
- * DOKUMENTÁLT RÉSZHALMAZ. A forrás `Modal.jsx` egy `window` szintű,
- * megosztott dialógus kezelőt (nyitott modálisok verme, görgetés zár,
- * `inert` alapú háttér izoláció, z-index rétegzés), egy `Tab` fókusz
- * csapdát és a fókusz visszaállítását is tartalmazza. Ezek nincsenek
- * átemelve, mert `getComputedStyle`, `getClientRects`, `inert` és
- * `requestAnimationFrame` viselkedésre épülnek, amiket a pinelt happy-dom
- * nem hűen ad vissza: a rájuk írt unit teszt hamis zöldet adna, ugyanaz az
- * érv, mint a `ResizeObserver` tilalmánál (SPEC-007 13.2, M-24, O-8).
- * A jelen spec három modálisa (létrehozás, átnevezés, törlés) sosem nyílik
+ * FÓKUSZ CSAPDA ÉS FÓKUSZ VISSZAÁLLÍTÁS (PLAN-008 F3-F7 kiegészítés a
+ * T-008-14 lezárása után, valós böngészőben mérhető viselkedés, Playwright
+ * e2e teszttel is fedve): nyitáskor a dialóguson belüli első fókuszálható
+ * elemre kerül a fókusz (üresen a dialógusra magára), a `Tab` a dialóguson
+ * belül körbeér, és záráskor a fókusz visszatér a megnyitó elemre. A
+ * csatolás egy stabil `ref` callbacken megy, nem `useRef` plusz effektben
+ * olvasott `.current`-en: a callback MINDIG a tényleges csatolt elemmel
+ * (nyitáskor) vagy `null`-lal (záráskor/unmountkor) hívódik, tehát a
+ * `HTMLDivElement | null` szűkítés mindkét ága minden nyitás-zárás cikluson
+ * ténylegesen lefut - nincs típusilag garantáltan sosem futó ág
+ * (`.claude/CLAUDE.md` 5. szekció).
+ *
+ * DOKUMENTÁLT RÉSZHALMAZ, a fentieken túl. A forrás `Modal.jsx` egy `window`
+ * szintű, megosztott dialógus kezelőt (nyitott modálisok verme, görgetés
+ * zár, `inert` alapú háttér izoláció, z-index rétegzés) is tartalmaz. Ez
+ * NINCS átemelve, mert `getComputedStyle`, `getClientRects`, `inert` és
+ * `requestAnimationFrame` viselkedésre épül, amit a pinelt happy-dom nem
+ * hűen ad vissza: a rá írt unit teszt hamis zöldet adna, ugyanaz az érv,
+ * mint a `ResizeObserver` tilalmánál (SPEC-007 13.2, M-24, O-8). A jelen
+ * spec három modálisa (létrehozás, átnevezés, törlés) sosem nyílik
  * egymásra, tehát a vermet ma semmi nem használná.
  */
 export function Modal(properties: Readonly<ModalProperties>): ReactElement | undefined {
@@ -88,9 +132,48 @@ export function Modal(properties: Readonly<ModalProperties>): ReactElement | und
     };
   }, [open, onClose]);
 
+  const previouslyFocusedElementReference = useRef<Element | null>(null);
+
+  const attachDialogElement = useCallback((dialogElement: HTMLDivElement | null): void => {
+    if (dialogElement === null) {
+      focusIfHtmlElement(previouslyFocusedElementReference.current);
+      return;
+    }
+    previouslyFocusedElementReference.current = document.activeElement;
+    const first = queryFocusableElements(dialogElement)[0];
+    (first ?? dialogElement).focus();
+  }, []);
+
   if (!open) {
     return undefined;
   }
+
+  const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Tab') {
+      return;
+    }
+    const dialogElement = event.currentTarget;
+    const focusable = queryFocusableElements(dialogElement);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (first === undefined || last === undefined) {
+      event.preventDefault();
+      dialogElement.focus();
+      return;
+    }
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (active === first) {
+        event.preventDefault();
+        last.focus();
+      }
+      return;
+    }
+    if (active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   return (
     <div
@@ -103,6 +186,7 @@ export function Modal(properties: Readonly<ModalProperties>): ReactElement | und
       }}
     >
       <div
+        ref={attachDialogElement}
         tabIndex={-1}
         className={`modal modal--${size}`}
         role="dialog"
@@ -110,6 +194,7 @@ export function Modal(properties: Readonly<ModalProperties>): ReactElement | und
         aria-labelledby={ariaLabelledBy ?? (title === undefined ? undefined : titleId)}
         aria-label={ariaLabel}
         aria-describedby={joinAriaTokenList(ariaDescribedBy, subtitle === undefined ? undefined : descriptionId)}
+        onKeyDown={handleDialogKeyDown}
       >
         <div className="modal__header">
           {icon !== undefined && (
