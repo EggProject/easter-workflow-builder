@@ -86,4 +86,28 @@ describe('AppShellFrame', () => {
 
     expect(container.querySelector('.app-pagehead__actions')?.textContent).toBe('Új');
   });
+
+  it('az isNavigationMenuOpen hianyaban a data-navigation-open attributum "false"', () => {
+    act(() => {
+      root.render(
+        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Cím">
+          <p>Lista</p>
+        </AppShellFrame>,
+      );
+    });
+
+    expect(container.querySelector<HTMLElement>('.app-tn')?.dataset['navigationOpen']).toBe('false');
+  });
+
+  it('az isNavigationMenuOpen true erteken a data-navigation-open attributum "true"', () => {
+    act(() => {
+      root.render(
+        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Cím" isNavigationMenuOpen>
+          <p>Lista</p>
+        </AppShellFrame>,
+      );
+    });
+
+    expect(container.querySelector<HTMLElement>('.app-tn')?.dataset['navigationOpen']).toBe('true');
+  });
 });

@@ -96,3 +96,39 @@
 .app-tn {
   --ep-layout-max-app: var(--ep-layout-max-full);
 }
+
+/* ============================================================
+   Reszponzív: navigáció lenyíló menübe (SPEC-007 5.3, M-26, M-29).
+   ÚJ, a forrásban nem létező szabály: az M-28 mérés szerint a
+   forrás _shell.css három media querye egyike sem érinti a
+   .app-tn bart, tehát ezt saját kézzel kellett megépíteni,
+   kizárólag a design-token/breakpoints.css --ep-screen-md
+   tokenjének értékével (768px).
+
+   A panel NYITOTTSÁGA NEM CSS állapot (SPEC-007 M-29 indoklása):
+   a láthatóságát a hívó a .app-tn gyökér elem
+   data-navigation-open attribútumával vezérli (lásd
+   AppShellFrame isNavigationMenuOpen prop). Alapértelmezésben
+   (data-navigation-open="false") a panel zárt. Az attribútum
+   tényleges állapotváltása app szintű felelősség (SPEC-007
+   T-008-23, ezen munkamenet hatókörén kívül) — ez a szabály
+   kizárólag a panel VIZUÁLIS alakját adja.
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-tn__navigation {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    z-index: 9;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+    background: var(--ep-bg-elevated);
+    border-bottom: 1px solid var(--ep-divider);
+    display: none;
+  }
+  .app-tn[data-navigation-open='true'] .app-tn__navigation {
+    display: flex;
+  }
+}

@@ -14,13 +14,20 @@ export interface AppShellFrameProperties {
   readonly pageTitle: ReactNode;
   readonly pageActions?: ReactNode;
   readonly children: ReactNode;
+  /**
+   * A --ep-screen-md alatt lenyíló menüvé váló navigáció nyitottsága
+   * (SPEC-007 5.3). A komponens az állapotot nem tárolja, csak a
+   * topnav-shell.css data-navigation-open szelektorába vezeti át; a
+   * tényleges nyitás/zárás a hívó (app szintű) felelőssége.
+   */
+  readonly isNavigationMenuOpen?: boolean;
 }
 
 export function AppShellFrame(properties: AppShellFrameProperties): ReactElement {
-  const { brand, navigation, actions, pageTitle, pageActions, children } = properties;
+  const { brand, navigation, actions, pageTitle, pageActions, children, isNavigationMenuOpen } = properties;
 
   return (
-    <div className="app-tn">
+    <div className="app-tn" data-navigation-open={isNavigationMenuOpen ?? false}>
       <div className="app-tn__bar">
         <div className="app-tn__brand">{brand}</div>
         <nav className="app-tn__navigation">{navigation}</nav>
