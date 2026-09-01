@@ -360,7 +360,7 @@ Minden komponens téma mappa pontosan három fájlt tartalmaz:
 | `<név>.css`      | a forrás CSS fájl, **bájtra azonosan**, plusz egy fejléc komment a származással                   |
 | `<Név>.spec.tsx` | a komponens unit tesztje, `createRoot` és `act` felett, happy-dom környezetben, valódi JSX-szel   |
 
-**`.spec.tsx`, valódi JSX-szel — az O-1 lezárva.** A `vitest.config.ts` `coverage.exclude`
+**`.spec.tsx`, valódi JSX-szel: az O-1 lezárva.** A `vitest.config.ts` `coverage.exclude`
 listája a `**/*.spec.ts` bejegyzést tartalmazta, `**/*.spec.tsx` bejegyzést nem (M-45), a
 `coverage.include` viszont a `.tsx` fájlokat is felveszi. A user az O-1 kérdést a `.spec.tsx` út
 felé zárta le: a kizárási lista **egyetlen** `**/*.spec.tsx` sorral bővül, a már meglévő
