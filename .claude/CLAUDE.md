@@ -176,8 +176,9 @@ SPEC-002 4.).
 - **Tiltott mappanevek:** `types/`, `interfaces/`, `models/`, `utils/`, `helpers/`, `lib/`,
   `common/`, `shared/`, `internal/`, `private/`, `config/`. A tiltás a puszta névre vonatkozik: a
   `minimax-config/` és a `firecrawl-config/` helyes, mert megnevezi a szolgáltatást.
-- Két kivétel a hatókör alól: `apps/web/src/main.ts` és a `tools/wire-probe` csomag
-  (SPEC-002 6.8).
+- Két kivétel a hatókör alól: `apps/web/src/vite-env.d.ts` és a `tools/wire-probe` csomag
+  (SPEC-002 6.8). Az előbbi a korábbi `apps/web/src/main.ts` kivétel helyére lépett, miután a
+  valódi UI belépési pont felállt (SPEC-007 12.2, T-008-30).
 
 **A bontási kritérium.** Darabszám küszöb nincs, mert nincs rá forrásunk. A darabszám csak azt
 jelzi, hol érdemes lefuttatni a próbát. Forrás: PLAN-004 3. szekció.
@@ -323,8 +324,9 @@ fel, függetlenül attól, van-e a csomagnak `test` scriptje (gyökér `CLAUDE.m
 **Lefedettség.** 100 százalék mind a négy metrikán, kizárás nélkül. A `vitest.config.ts`
 `coverage.exclude` listája **termékkód** kizárásra nem bővíthető: ez a tiltás célja, nem a
 szó szerinti "egyetlen sor sem kerülhet rá" olvasat. Csomag-specifikus **termékkód** kizárás ma
-nincs; az egyetlen ideiglenes ilyen kizárás az `apps/web/src/main.ts`, ami a valódi UI belépési
-pont megérkezésekor törlendő (gyökér `CLAUDE.md`, SPEC-002 9., SPEC-003 12.4). **Egy teszt fájl
+nincs; a korábbi, ideiglenes `apps/web/src/main.ts` kizárás a valódi UI belépési pont
+megérkezésekor (SPEC-007 12.2, T-008-30) törölve lett a listáról (gyökér `CLAUDE.md`, SPEC-002
+9., SPEC-003 12.4). **Egy teszt fájl
 bejegyzés nem termékkód kizárás**, ezért a lista egyetlen `**/*.spec.tsx` sorral bővült, a már
 meglévő `**/*.spec.ts` bejegyzés pontos analógjaként egy másik kiterjesztésre: a `packages/ui`
 és az `apps/web` React komponens tesztjei `.spec.tsx` fájlok, valódi JSX-szel (user döntés,

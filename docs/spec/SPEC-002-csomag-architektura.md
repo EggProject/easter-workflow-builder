@@ -789,13 +789,15 @@ A gyökér `CLAUDE.md` szabálya - "CLAUDE.md kizárólag a csomag gyökerében 
 
 A csomag szintű `CLAUDE.md` a SPEC-001 14. szekció mind a hat kötelező szekcióját tartalmazza, és a `## Fájlok` táblázata a **téma mappákat** sorolja fel (kétszintű csomagban a tárgykörrel együtt, `<tárgykör>/<téma>/` alakban), mappánként egy-két mondatos felelősség leírással, nem az egyes fájlokat. Az 5. szekció csomagonkénti táblázatai adják a téma -> fájl leképezést, ez a forrás, nem a `CLAUDE.md`.
 
-### 6.8 Két kivétel a hatókör alól
+### 6.8 Egy kivétel a hatókör alól
 
-#### `apps/web/src/main.ts`
-
-Ez a fájl a Vite belépési pontja, és a helyét három, egymástól független dolog rögzíti: az `apps/web/index.html` `<script src="/src/main.ts">` hivatkozása, a `vitest.config.ts` `coverage.exclude` listájának `apps/web/src/main.ts` sora, és az e2e nyc riport, ami erre a fájlútra jelent lefedettséget. Egy téma mappába vitel (`src/<téma>/main.ts`) mindhármat elrontaná, nulla haszonért, ráadásul a SPEC-002 22. elfogadási kritériuma tiltja a `coverage.exclude` lista módosítását.
-
-A fájl ezért a `src/` tetején marad. Amikor egy későbbi specifikáció a valódi UI belépési pontot felállítja, akkor kell újra megvizsgálni, a `coverage.exclude` sor megszüntetésével együtt (SPEC-001 9. szekció, "SZIGORITANI KELL").
+**LEZÁRVA (SPEC-007 12.2, T-008-30).** A korábbi `apps/web/src/main.ts` kivétel megszűnt: a
+valódi UI belépési pont felállt, a fájl az `app-mount` téma mappába költözött (`main.tsx`,
+egy import és egy hívás), a `vitest.config.ts` `coverage.exclude` listájáról az
+`apps/web/src/main.ts` sor törölve, és a `bun run test` ezután is nulla kilépési kóddal fut, 100
+százalékos lefedettséggel mind a négy metrikán. A helyére lépő, ma is érvényes kivétel az
+`apps/web/src/vite-env.d.ts`: típus only fájl, ami a `src/` tetején áll, `import.meta.env`
+típusbővítésként, a Vite dokumentált mintája szerint (SPEC-007 M-11).
 
 #### `tools/wire-probe`
 
@@ -870,7 +872,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 ## 9. Coverage
 
 1. A 100 százalékos küszöb minden új csomagra vonatkozik, **kizárás nélkül**. A `vitest.config.ts` `coverage.exclude` listája egyetlen új sorral sem bővülhet.
-2. Az `apps/web/src/main.ts` ideiglenes kizárása változatlanul marad, mert nem ennek a specnek a hatóköre.
+2. Az `apps/web/src/main.ts` korábbi ideiglenes kizárása megszűnt (SPEC-007 12.2, T-008-30): a `vitest.config.ts` `coverage.exclude` listájáról a sor törölve, a valódi UI belépési pont a küszöb alá esik.
 3. A típus-only fájlok nulla utasítással szerepelnek a riportban, tehát nem igényelnek sem tesztet, sem kizárást.
 4. A `**/index.ts` kizárás miatt a barrel fájlok nem számítanak. Ez a 6.6 pont 4. szabályának az oka: a barrelben nem lehet lefedetlenül maradó elágazás.
 5. Az ÚJ `scrape-page.ts` fájl (5.11) és a három `*-tool-dependencies.ts` típus-only fájl (5.14, 5.15, 5.16) sem kap kizárást. A `scrape-page` mindkét ágát (sikeres hívás, hibás hívás) a saját `.spec.ts` fedi, befecskendezett `fetch` függvénnyel, élő hálózat nélkül.
@@ -901,7 +903,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 
    ```
    find packages apps tooling -path '*/src/*' -maxdepth 3 -type f -name '*.ts' \
-     -not -name 'index.ts' -not -path 'apps/web/src/main.ts' -not -path '*/node_modules/*'
+     -not -name 'index.ts' -not -path 'apps/web/src/vite-env.d.ts' -not -path '*/node_modules/*'
    ```
 
 8. A keletkezett téma mappák halmaza névre és tartalomra pontosan megegyezik az 5. szekció táblázataiban felsorolt 45 téma mappával: nincs olyan téma mappa, ami az 5. szekcióban nem szerepel, nincs olyan felsorolt téma, aminek a mappája hiányzik, és egyetlen mappa tartalma sem tér el a felsorolttól. Az összevonás a téma mappák nevét és tartalmát nem változtatta meg, csak egy tárgykör mappát fűzött eléjük a 6.1 pont 8. szabálya szerint. Egyetlen téma mappa sem tartalmaz egyetlen fájlt pusztán azért, mert az a fájl máshova nem fért be; az 5. szekció minden egy fájlos témát külön megindokol (`agent-tool-id`, `descriptor`).

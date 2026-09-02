@@ -9,32 +9,35 @@ A `@vitejs/plugin-react` csomag **sehol nem szerepel**: a Vite a `.tsx` fájloka
 automatikus JSX runtime-mal fordítja (SPEC-007 M-1, M-2, M-3, saját méréssel igazolva,
 `docs/research/2026-09-01-spec007-f0-meresek.md`).
 
-Az alkalmazás **épülőben van**: a SPEC-007 12.2 tizenkét téma mappájából eddig a
-`frontend-config`, a `client-route`, a `history-navigation`, a `protocol-error-message`, a
-`request-state`, a `rest-client`, a `stream-client` és a `workflow-list` áll, a többit a PLAN-008
-F5 fázisa adja. A `src/main.ts` és az `index.html` még a Playwright e2e infrastruktúra vázát
-szolgálja, amit a T-008-18 lépés cserél le a valódi belépési pontra.
+A SPEC-007 12.2 tizenkét téma mappája mind megvan: `app-mount`, `app-shell`, `client-route`,
+`frontend-config`, `history-navigation`, `not-found-route`, `protocol-error-message`,
+`request-state`, `rest-client`, `run-history`, `stream-client`, `workflow-list`. A valódi belépési
+pont a `src/app-mount/main.tsx`, amit az `index.html` modul scriptje tölt be; a `src/main.ts`
+ideiglenes e2e-váz megszűnt.
 
 ## Fájlok
 
-| Téma / fájl                   | Tartalom                                                                                                                                 |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`                | barrel, csak nevesített újraexport                                                                                                       |
-| `src/vite-env.d.ts`           | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                         |
-| `src/frontend-config/`        | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja           |
-| `src/client-route/`           | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                     |
-| `src/history-navigation/`     | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)         |
-| `src/protocol-error-message/` | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                            |
-| `src/request-state/`          | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)               |
-| `src/rest-client/`            | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció) |
-| `src/stream-client/`          | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)      |
-| `src/workflow-list/`          | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                  |
-| `src/main.ts`                 | ideiglenes böngésző belépési pont, kizárólag az e2e vázhoz; a T-008-18 lépés cseréli le                                                  |
-| `index.html`                  | a Vite dev/build belépési HTML-je                                                                                                        |
-| `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                  |
-| `vitest.config.ts`            | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                       |
-| `playwright.config.ts`        | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                    |
-| `e2e/`                        | Playwright tesztek és a coverage fixture                                                                                                 |
+| Téma / fájl                   | Tartalom                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                | barrel, csak nevesített újraexport                                                                                                                            |
+| `src/vite-env.d.ts`           | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                                              |
+| `src/app-mount/`              | a valódi böngésző belépési pont: `main.tsx` (egy import, egy hívás) és `mount-app.tsx`, ami a `#root` hiányát és a hibás konfigurációt kezeli (SPEC-007 12.2) |
+| `src/app-shell/`              | a topnav összeállítása: brand, navigáció, lenyíló menü, stream státusz kijelző (SPEC-007 12.2)                                                                |
+| `src/frontend-config/`        | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja                                |
+| `src/client-route/`           | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                                          |
+| `src/history-navigation/`     | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)                              |
+| `src/not-found-route/`        | az ismeretlen útvonal képernyője (SPEC-007 12.2)                                                                                                              |
+| `src/protocol-error-message/` | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                                                 |
+| `src/request-state/`          | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)                                    |
+| `src/rest-client/`            | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció)                      |
+| `src/run-history/`            | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                       |
+| `src/stream-client/`          | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                           |
+| `src/workflow-list/`          | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                       |
+| `index.html`                  | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat                                                                                        |
+| `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                       |
+| `vitest.config.ts`            | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                            |
+| `playwright.config.ts`        | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                         |
+| `e2e/`                        | Playwright tesztek és a coverage fixture                                                                                                                      |
 
 ## Függőségi irány
 
@@ -74,4 +77,4 @@ nem `window`-n.
 - [`../../docs/spec/SPEC-007-frontend-alkalmazas.md`](../../docs/spec/SPEC-007-frontend-alkalmazas.md)
 - [`../../docs/plan/PLAN-008-frontend-alkalmazas.md`](../../docs/plan/PLAN-008-frontend-alkalmazas.md)
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 3. és 10. szekció
-- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció (a `src/main.ts` kivétel a 6.8 pontban)
+- [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció (a `src/vite-env.d.ts` kivétel a 6.8 pontban)
