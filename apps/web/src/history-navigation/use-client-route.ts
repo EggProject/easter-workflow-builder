@@ -9,6 +9,11 @@ export interface UseClientRouteResult {
    */
   readonly routeId: ClientRouteId | undefined;
   /**
+   * A jelenlegi query string, a kérdőjellel együtt vagy üres sztring
+   * (SPEC-007 10.2, a `run-history` `?workflowId=` szűrője).
+   */
+  readonly search: string;
+  /**
    * Navigáció a megadott útvonalra: `pushState` hívás, majd az állapot
    * azonnali frissítése, mert a `pushState` nem vált ki `popstate`
    * eseményt (SPEC-007 M-12).
@@ -23,10 +28,12 @@ export interface UseClientRouteResult {
  */
 export function useClientRoute(port: HistoryLocationPort): UseClientRouteResult {
   const [pathname, setPathname] = useState<string>(port.pathname);
+  const [search, setSearch] = useState<string>(port.search);
 
   useEffect(() => {
     return port.addPopStateListener(() => {
       setPathname(port.pathname());
+      setSearch(port.search());
     });
   }, [port]);
 
@@ -35,9 +42,13 @@ export function useClientRoute(port: HistoryLocationPort): UseClientRouteResult 
       const path = CLIENT_ROUTE_TABLE[routeId].template;
       port.pushState(path);
       setPathname(path);
+      // A CLIENT_ROUTE_TABLE sablonjai nem tartalmaznak query stringet, tehát
+      // a navigáció után a valódi böngésző URL-nek megfelelően a keresés is
+      // üresre vált (SPEC-007 7.2).
+      setSearch('');
     },
     [port],
   );
 
-  return { routeId: matchClientRoute(pathname), navigate };
+  return { routeId: matchClientRoute(pathname), search, navigate };
 }

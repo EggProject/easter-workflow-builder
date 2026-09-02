@@ -10,6 +10,7 @@ import type { HistoryLocationPort } from './history-location-port.ts';
  */
 export const browserHistoryLocationPort: HistoryLocationPort = {
   pathname: () => globalThis.location.pathname,
+  search: () => globalThis.location.search,
   pushState: (path) => {
     // eslint-disable-next-line unicorn/no-null -- a DOM `History#pushState` `state` paramétere kötelező, az alkalmazás nem tárol saját állapotot, a szerializálhatatlan `undefined` helyett `null`-t ír elő a specifikáció.
     globalThis.history.pushState(null, '', path);

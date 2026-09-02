@@ -13,6 +13,12 @@ describe('browserHistoryLocationPort', () => {
     expect(browserHistoryLocationPort.pathname()).toBe('/runs');
   });
 
+  it('a search a globalThis.location.search értékét adja', () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/runs?workflowId=workflow-1');
+    expect(browserHistoryLocationPort.search()).toBe('?workflowId=workflow-1');
+  });
+
   it('a pushState új bejegyzést ír a böngésző előzményekbe', () => {
     browserHistoryLocationPort.pushState('/runs');
     expect(globalThis.location.pathname).toBe('/runs');

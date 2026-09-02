@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { HistoryLocationPort } from './history-location-port.ts';
 import { useClientRoute, type UseClientRouteResult } from './use-client-route.ts';
 
-function createFakePort(initialPathname: string): HistoryLocationPort & { readonly emitPopState: () => void } {
+interface FakePort extends HistoryLocationPort {
+  readonly emitPopState: () => void;
+  readonly setSearchForTest: (nextSearch: string) => void;
+}
+
+function createFakePort(initialPathname: string, initialSearch = ''): FakePort {
   let pathname = initialPathname;
+  let search = initialSearch;
   const listeners = new Set<() => void>();
   return {
     pathname: () => pathname,
+    search: () => search,
     pushState: (path) => {
       pathname = path;
     },
@@ -22,6 +29,9 @@ function createFakePort(initialPathname: string): HistoryLocationPort & { readon
       for (const listener of listeners) {
         listener();
       }
+    },
+    setSearchForTest: (nextSearch) => {
+      search = nextSearch;
     },
   };
 }
@@ -80,6 +90,20 @@ describe('useClientRoute', () => {
     expect(latest?.routeId).toBe('runHistory');
   });
 
+  it('a kezdeti search-öt adja, és navigate után üresre vált', () => {
+    const port = createFakePort('/runs', '?workflowId=workflow-1');
+    act(() => {
+      root.render(<HookHarness port={port} />);
+    });
+    expect(latest?.search).toBe('?workflowId=workflow-1');
+
+    act(() => {
+      latest?.navigate('workflowList');
+    });
+
+    expect(latest?.search).toBe('');
+  });
+
   it('popstate eseményre a location.pathname alapján újraszámol', () => {
     const port = createFakePort('/');
     act(() => {
@@ -92,6 +116,21 @@ describe('useClientRoute', () => {
     });
 
     expect(latest?.routeId).toBe('runHistory');
+  });
+
+  it('popstate eseményre a search is a location.search alapján újraszámol', () => {
+    const port = createFakePort('/runs');
+    act(() => {
+      root.render(<HookHarness port={port} />);
+    });
+    expect(latest?.search).toBe('');
+
+    act(() => {
+      port.setSearchForTest('?workflowId=workflow-2');
+      port.emitPopState();
+    });
+
+    expect(latest?.search).toBe('?workflowId=workflow-2');
   });
 
   it('leszereléskor leiratkozik a popstate eseményről', () => {

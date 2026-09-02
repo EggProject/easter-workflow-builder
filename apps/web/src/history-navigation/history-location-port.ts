@@ -10,6 +10,12 @@ export interface HistoryLocationPort {
    */
   readonly pathname: () => string;
   /**
+   * A jelenlegi query string, a kérdőjellel együtt vagy üres sztring
+   * (`location.search`). A `run-history` téma a `?workflowId=` szűrőt ebből
+   * olvassa (SPEC-007 10.2).
+   */
+  readonly search: () => string;
+  /**
    * Új bejegyzés a böngésző előzményekbe. A `pushState` NEM vált ki
    * `popstate` eseményt (SPEC-007 M-12), ezért a hívó felelőssége az
    * állapot frissítése.
