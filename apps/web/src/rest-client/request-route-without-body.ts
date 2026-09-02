@@ -15,7 +15,8 @@ export interface RequestRouteWithoutBodyInput<TValue> {
 
 /**
  * Törzs nélküli hívás a `ROUTE_TABLE` egy bejegyzésére (SPEC-007 8.1),
- * `GET` és `DELETE` végpontokhoz.
+ * `GET` és `DELETE` végpontokhoz, plusz az "üres törzs" dokumentált `POST`
+ * végpontokhoz (pl. `interruptRun`, SPEC-005 4.2 B táblázat 15. sora).
  */
 export function requestRouteWithoutBody<TValue>(
   input: Readonly<RequestRouteWithoutBodyInput<TValue>>,
