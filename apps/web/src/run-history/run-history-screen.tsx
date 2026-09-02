@@ -53,7 +53,9 @@ const RELOAD_TRIGGERING_FRAME_EVENTS: ReadonlySet<StreamFrame['event']> = new Se
 ]);
 
 function formatTimestamp(ms: number | null): string {
-  return ms === null ? '—' : new Date(ms).toLocaleString('hu-HU');
+  // Nagykötőjel (en dash), NEM gondolatjel (em dash) - a gyökér CLAUDE.md 6.
+  // szekciója a gondolatjelet kivétel nélkül tiltja.
+  return ms === null ? '–' : new Date(ms).toLocaleString('hu-HU');
 }
 
 function readWorkflowIdFilter(search: string): string | undefined {
@@ -168,11 +170,11 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
       });
       setPendingActionRunId(undefined);
       if (outcome.kind === 'ok') {
-        pushToast({ variant: 'success', title: 'Futás megszakítva', message: run.id, duration: 5000 });
+        pushToast({ variant: 'success', title: 'Futás megszakítva', message: run.id });
         void loadRuns();
         return;
       }
-      pushToast({ variant: 'danger', title: 'A megszakítás sikertelen', message: outcome.message, duration: 8000 });
+      pushToast({ variant: 'danger', title: 'A megszakítás sikertelen', message: outcome.message });
     })();
   }
 
@@ -189,11 +191,11 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
       });
       setPendingActionRunId(undefined);
       if (outcome.kind === 'ok') {
-        pushToast({ variant: 'success', title: 'Futás újraindítva', message: run.id, duration: 5000 });
+        pushToast({ variant: 'success', title: 'Futás újraindítva', message: run.id });
         void loadRuns();
         return;
       }
-      pushToast({ variant: 'danger', title: 'Az újraindítás sikertelen', message: outcome.message, duration: 8000 });
+      pushToast({ variant: 'danger', title: 'Az újraindítás sikertelen', message: outcome.message });
     })();
   }
 

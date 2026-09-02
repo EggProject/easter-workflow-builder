@@ -86,11 +86,11 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
       });
       setStartingRunWorkflowId(undefined);
       if (outcome.kind === 'ok') {
-        pushToast({ variant: 'success', title: 'Futás elindítva', message: workflow.name, duration: 5000 });
+        pushToast({ variant: 'success', title: 'Futás elindítva', message: workflow.name });
         navigate('runHistory');
         return;
       }
-      pushToast({ variant: 'danger', title: 'A futás indítása sikertelen', message: outcome.message, duration: 8000 });
+      pushToast({ variant: 'danger', title: 'A futás indítása sikertelen', message: outcome.message });
     })();
   }
 

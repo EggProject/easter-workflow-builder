@@ -789,7 +789,7 @@ A gyökér `CLAUDE.md` szabálya - "CLAUDE.md kizárólag a csomag gyökerében 
 
 A csomag szintű `CLAUDE.md` a SPEC-001 14. szekció mind a hat kötelező szekcióját tartalmazza, és a `## Fájlok` táblázata a **téma mappákat** sorolja fel (kétszintű csomagban a tárgykörrel együtt, `<tárgykör>/<téma>/` alakban), mappánként egy-két mondatos felelősség leírással, nem az egyes fájlokat. Az 5. szekció csomagonkénti táblázatai adják a téma -> fájl leképezést, ez a forrás, nem a `CLAUDE.md`.
 
-### 6.8 Egy kivétel a hatókör alól
+### 6.8 Két kivétel a hatókör alól
 
 **LEZÁRVA (SPEC-007 12.2, T-008-30).** A korábbi `apps/web/src/main.ts` kivétel megszűnt: a
 valódi UI belépési pont felállt, a fájl az `app-mount` téma mappába költözött (`main.tsx`,

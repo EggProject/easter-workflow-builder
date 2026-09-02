@@ -101,6 +101,14 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(configSource).not.toMatch(/\?\?\s*\d/);
     const offenders = PRODUCT_FILES.filter((file) => /localhost|:4173|:4174|:5173|:3000|:8080/.test(file.content));
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
+    // Kitalált idő szám (pl. toast `duration: 5000`) - a `use-toasts.ts`
+    // csak a hívó által átadott `duration` VÁLTOZÓT olvassa, számliterált
+    // sosem ír; termékkódban `pushToast`/`setTimeout` mellett numerikus
+    // literál nem állhat, mert nincs rá dokumentált forrás.
+    const timeoutOffenders = PRODUCT_FILES.filter((file) =>
+      /(?:duration|setTimeout|setInterval)\s*[:(]\s*\d/.test(file.content),
+    );
+    expect(timeoutOffenders.map((file) => file.relativePath)).toEqual([]);
   });
 
   it('(9) nincs @xyflow/react import és nincs SPEC-008/SPEC-009 hatókörű fájl', () => {

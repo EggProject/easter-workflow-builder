@@ -15,36 +15,38 @@ A SPEC-007 12.2 tizenkét téma mappája mind megvan: `app-mount`, `app-shell`, 
 pont a `src/app-mount/main.tsx`, amit az `index.html` modul scriptje tölt be; a `src/main.ts`
 ideiglenes e2e-váz megszűnt.
 
-A tizenkettőn felül egy tizenharmadik, megvalósítás nélküli, greppel ellenőrizhető invariáns téma
-mappa is van: `greppable-invariants` (T-008-31). Ez a `packages/ui`-ban már bevett minta
-(`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
-`media-query-breakpoint-invariant`) analógja: nem a SPEC-007 12.2 UI témái közé tartozik, hanem a
-SPEC-002 6.2 5. pontja szerinti konfigurációs invariáns saját mappában.
+A tizenkettőn felül két további, megvalósítás nélküli, greppel ellenőrizhető invariáns téma mappa
+is van: `greppable-invariants` (T-008-31, tizenharmadik) és `vite-istanbul-include-invariant`
+(T-008-18, tizennegyedik). Ezek a `packages/ui`-ban már bevett minta (`aria-token-list`,
+`class-name-list`, `component-boundary-invariant`, `media-query-breakpoint-invariant`) analógjai:
+egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. pontja szerinti
+konfigurációs invariáns saját mappában.
 
 ## Fájlok
 
-| Téma / fájl                   | Tartalom                                                                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`                | barrel, csak nevesített újraexport                                                                                                                            |
-| `src/vite-env.d.ts`           | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                                              |
-| `src/app-mount/`              | a valódi böngésző belépési pont: `main.tsx` (egy import, egy hívás) és `mount-app.tsx`, ami a `#root` hiányát és a hibás konfigurációt kezeli (SPEC-007 12.2) |
-| `src/app-shell/`              | a topnav összeállítása: brand, navigáció, lenyíló menü, stream státusz kijelző (SPEC-007 12.2)                                                                |
-| `src/frontend-config/`        | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja                                |
-| `src/client-route/`           | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                                          |
-| `src/history-navigation/`     | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)                              |
-| `src/not-found-route/`        | az ismeretlen útvonal képernyője (SPEC-007 12.2)                                                                                                              |
-| `src/protocol-error-message/` | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                                                 |
-| `src/request-state/`          | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)                                    |
-| `src/rest-client/`            | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció)                      |
-| `src/run-history/`            | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                       |
-| `src/stream-client/`          | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                           |
-| `src/workflow-list/`          | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                       |
-| `src/greppable-invariants/`   | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                        |
-| `index.html`                  | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat                                                                                        |
-| `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                       |
-| `vitest.config.ts`            | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                            |
-| `playwright.config.ts`        | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                         |
-| `e2e/`                        | Playwright tesztek, a coverage fixture és a közös REST/SSE mockolási segédfüggvények (T-008-27..29)                                                           |
+| Téma / fájl                            | Tartalom                                                                                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                         | barrel, csak nevesített újraexport                                                                                                                            |
+| `src/vite-env.d.ts`                    | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                                              |
+| `src/app-mount/`                       | a valódi böngésző belépési pont: `main.tsx` (egy import, egy hívás) és `mount-app.tsx`, ami a `#root` hiányát és a hibás konfigurációt kezeli (SPEC-007 12.2) |
+| `src/app-shell/`                       | a topnav összeállítása: brand, navigáció, lenyíló menü, stream státusz kijelző (SPEC-007 12.2)                                                                |
+| `src/frontend-config/`                 | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja                                |
+| `src/client-route/`                    | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                                          |
+| `src/history-navigation/`              | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)                              |
+| `src/not-found-route/`                 | az ismeretlen útvonal képernyője (SPEC-007 12.2)                                                                                                              |
+| `src/protocol-error-message/`          | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                                                 |
+| `src/request-state/`                   | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)                                    |
+| `src/rest-client/`                     | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció)                      |
+| `src/run-history/`                     | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                       |
+| `src/stream-client/`                   | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                           |
+| `src/workflow-list/`                   | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                       |
+| `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                        |
+| `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18) |
+| `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                             |
+| `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                       |
+| `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                            |
+| `playwright.config.ts`                 | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                         |
+| `e2e/`                                 | Playwright tesztek, a coverage fixture és a közös REST/SSE mockolási segédfüggvények (T-008-27..29)                                                           |
 
 ## Függőségi irány
 
