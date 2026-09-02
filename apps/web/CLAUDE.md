@@ -15,6 +15,12 @@ A SPEC-007 12.2 tizenkét téma mappája mind megvan: `app-mount`, `app-shell`, 
 pont a `src/app-mount/main.tsx`, amit az `index.html` modul scriptje tölt be; a `src/main.ts`
 ideiglenes e2e-váz megszűnt.
 
+A tizenkettőn felül egy tizenharmadik, megvalósítás nélküli, greppel ellenőrizhető invariáns téma
+mappa is van: `greppable-invariants` (T-008-31). Ez a `packages/ui`-ban már bevett minta
+(`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
+`media-query-breakpoint-invariant`) analógja: nem a SPEC-007 12.2 UI témái közé tartozik, hanem a
+SPEC-002 6.2 5. pontja szerinti konfigurációs invariáns saját mappában.
+
 ## Fájlok
 
 | Téma / fájl                   | Tartalom                                                                                                                                                      |
@@ -33,11 +39,12 @@ ideiglenes e2e-váz megszűnt.
 | `src/run-history/`            | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                       |
 | `src/stream-client/`          | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                           |
 | `src/workflow-list/`          | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                       |
+| `src/greppable-invariants/`   | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                        |
 | `index.html`                  | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat                                                                                        |
 | `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                       |
 | `vitest.config.ts`            | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                            |
 | `playwright.config.ts`        | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                         |
-| `e2e/`                        | Playwright tesztek és a coverage fixture                                                                                                                      |
+| `e2e/`                        | Playwright tesztek, a coverage fixture és a közös REST/SSE mockolási segédfüggvények (T-008-27..29)                                                           |
 
 ## Függőségi irány
 
