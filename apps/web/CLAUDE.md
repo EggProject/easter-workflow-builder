@@ -9,24 +9,30 @@ A `@vitejs/plugin-react` csomag **sehol nem szerepel**: a Vite a `.tsx` fájloka
 automatikus JSX runtime-mal fordítja (SPEC-007 M-1, M-2, M-3, saját méréssel igazolva,
 `docs/research/2026-09-01-spec007-f0-meresek.md`).
 
-Az alkalmazás **épülőben van**: a SPEC-007 12.2 tizenkét téma mappájából eddig a `frontend-config`
-áll, a többit a PLAN-008 F3 ... F5 fázisai adják. A `src/main.ts` és az `index.html` még a
-Playwright e2e infrastruktúra vázát szolgálja, amit a T-008-18 lépés cserél le a valódi
-belépési pontra.
+Az alkalmazás **épülőben van**: a SPEC-007 12.2 tizenkét téma mappájából eddig a
+`frontend-config`, a `client-route`, a `history-navigation`, a `protocol-error-message`, a
+`request-state` és a `rest-client` áll, a többit a PLAN-008 F4 ... F5 fázisai adják. A
+`src/main.ts` és az `index.html` még a Playwright e2e infrastruktúra vázát szolgálja, amit a
+T-008-18 lépés cserél le a valódi belépési pontra.
 
 ## Fájlok
 
-| Téma / fájl            | Tartalom                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `src/index.ts`         | barrel, csak nevesített újraexport                                                                                             |
-| `src/vite-env.d.ts`    | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)               |
-| `src/frontend-config/` | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja |
-| `src/main.ts`          | ideiglenes böngésző belépési pont, kizárólag az e2e vázhoz; a T-008-18 lépés cseréli le                                        |
-| `index.html`           | a Vite dev/build belépési HTML-je                                                                                              |
-| `vite.config.ts`       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                        |
-| `vitest.config.ts`     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                             |
-| `playwright.config.ts` | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                          |
-| `e2e/`                 | Playwright tesztek és a coverage fixture                                                                                       |
+| Téma / fájl                   | Tartalom                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                | barrel, csak nevesített újraexport                                                                                                       |
+| `src/vite-env.d.ts`           | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                         |
+| `src/frontend-config/`        | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja           |
+| `src/client-route/`           | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                     |
+| `src/history-navigation/`     | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)         |
+| `src/protocol-error-message/` | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                            |
+| `src/request-state/`          | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)               |
+| `src/rest-client/`            | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció) |
+| `src/main.ts`                 | ideiglenes böngésző belépési pont, kizárólag az e2e vázhoz; a T-008-18 lépés cseréli le                                                  |
+| `index.html`                  | a Vite dev/build belépési HTML-je                                                                                                        |
+| `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                  |
+| `vitest.config.ts`            | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                       |
+| `playwright.config.ts`        | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                    |
+| `e2e/`                        | Playwright tesztek és a coverage fixture                                                                                                 |
 
 ## Függőségi irány
 
