@@ -166,3 +166,65 @@
     display: inline-flex;
   }
 }
+
+/* ============================================================
+   Mobil vízszintes túllógás javítása (SPEC-007 5.3). ÚJ, a
+   forrásban nem létező szabály.
+
+   A MÉRT HIBA. A `.app-tn__bar` nem törő flex sor, aminek mindkét
+   gyereke a saját tartalmi szélességén marad: a brand (hamburger
+   plusz a 17px/600 márkanév) 229px, az akciók (stream státusz
+   szöveg plusz téma váltó) 142px. 468px viewport szélesség alatt a
+   kettő nem fér el, a bar tartalma kilóg jobbra, és mivel a
+   `.app-tn` blokk szintű, a túllógás a dokumentumra terjed: 320px-en
+   a `documentElement.scrollWidth` 427 volt a 320-as `clientWidth`
+   mellett (+107px), és a téma váltó gomb teljesen a képernyőn kívülre
+   került. Mérés: 2026-09-02, chromium, `apps/web` preview build.
+
+   A JAVÍTÁS IRÁNYA. Az akciók sáv nem zsugorodik (`flex: 0 0 auto`),
+   tehát a státusz szöveg és a téma váltó gomb mindig teljes egészében
+   a viewporton belül marad; a nyomást a márkanév veszi fel, ami
+   ellipszissel rövidül. A hamburger gomb szintén nem zsugorodik, hogy
+   a lenyíló navigáció elérhető maradjon.
+
+   A `display: block` felülírás a márkanéven azért kell, mert a
+   `text-overflow: ellipsis` nem hat egy `inline-flex` konténer
+   névtelen szöveg-flexelemére; a `::after` márkapont a levágott
+   szöveggel együtt tűnik el, ami a szándékolt viselkedés.
+
+   A töréspont a `design-token/breakpoints.css` --ep-screen-md
+   tokenjének értéke (768px), ugyanaz, amit a lenyíló navigáció
+   használ; a tényleges törés 468px körül kezdődik, arra a
+   szélességre viszont nincs token, ezért a fölötte álló, "tablet"
+   jelentésű tokennél lépünk be. A media-query-breakpoint-invariant
+   regressziós teszt őrzi, hogy ki ne találjunk másik számot.
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-tn__brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .app-tn__brand b {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .app-tn__nav-toggle {
+    flex: 0 0 auto;
+  }
+  .app-tn__actions {
+    flex: 0 0 auto;
+  }
+  /* A 40px-es oldalsó belső margó egy 320px-es kijelzőn a szélesség
+     negyedét elveszi. A `--ep-layout-gutter` (24px) a design system
+     saját, erre a célra szánt "horizontal page padding" tokenje;
+     mérés szerint ezzel fér el 375px-en a művelet gomb sor két
+     sorban három helyett. A függőleges értékek változatlanok. */
+  .app-pagehead,
+  .app-content {
+    padding-left: var(--ep-layout-gutter);
+    padding-right: var(--ep-layout-gutter);
+  }
+}

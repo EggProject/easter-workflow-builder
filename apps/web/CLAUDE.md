@@ -45,6 +45,7 @@ konfigurációs invariáns saját mappában.
 | `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                             |
 | `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                       |
 | `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                            |
+| `vitest.setup.ts`                      | a React 19 `act()` környezet jelzése és a happy-dom projekt-környezetben hiányzó `globalThis.localStorage` pótlása (a `packages/ui` azonos fájljának párja)   |
 | `playwright.config.ts`                 | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                         |
 | `e2e/`                                 | Playwright tesztek, a coverage fixture és a közös REST/SSE mockolási segédfüggvények (T-008-27..29)                                                           |
 

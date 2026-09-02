@@ -41,6 +41,13 @@ export interface DataTableColumn<TRow> {
    */
   readonly secondary?: boolean;
   /**
+   * Harmadlagos oszlop: a `--ep-screen-md` (768px) töréspont alatt is
+   * elrejtőzik, tehát a másodlagosnál szűkebb tartományban látszik. A
+   * mobil szélességen a maradék oszlopok így elférnek anélkül, hogy a
+   * tartalom kifutna a viewportból (SPEC-007 5.3).
+   */
+  readonly tertiary?: boolean;
+  /**
    * Rendezhető-e az oszlop. Alapértelmezésben igen; a művelet oszlopon
    * érdemes kikapcsolni.
    */
@@ -86,6 +93,7 @@ function headerClassName<TRow>(column: DataTableColumn<TRow>, canSort: boolean, 
     'data-table__cell--header',
     ALIGN_CLASS_NAME[column.align ?? 'left'],
     column.secondary === true && 'data-table__cell--secondary',
+    column.tertiary === true && 'data-table__cell--tertiary',
     canSort && 'is-sortable',
     isSorted && 'is-sorted',
   );
@@ -97,6 +105,7 @@ function bodyCellClassName<TRow>(column: DataTableColumn<TRow>): string {
     ALIGN_CLASS_NAME[column.align ?? 'left'],
     column.mono === true && 'data-table__cell--mono',
     column.secondary === true && 'data-table__cell--secondary',
+    column.tertiary === true && 'data-table__cell--tertiary',
   );
 }
 

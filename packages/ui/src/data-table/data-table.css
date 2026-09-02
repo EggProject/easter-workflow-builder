@@ -147,3 +147,44 @@
     display: none;
   }
 }
+
+/* ============================================================
+   Mobil cella tördelés (SPEC-007 5.3). ÚJ, a forrásban nem létező
+   szabály, a fenti blokk mobil párja.
+
+   A MÉRT HIBA. A `.data-table__cell` `min-width: 0` mellett `flex: 1 1 0`
+   alapon osztozik a helyen, tehát a cella a tartalma alá zsugorodik, a
+   tartalom pedig kifut a cellából. A művelet oszlop három gombja
+   (Átnevezés, Törlés, Indítás) együtt ~213px, ami 600px viewport
+   szélesség alatt már nem fér a cellába: 375px-en a Törlés és az
+   Indítás gomb jobb széle 390 és 457 volt a 375-ös viewporton, tehát
+   mindkettő a képernyőn kívülre került. Mérés: 2026-09-02, chromium.
+
+   A JAVÍTÁS. Két lépés, mindkettő mérten szükséges (abláció,
+   ugyanaz a mérés):
+   1. `--ep-screen-md` alatt a cella tartalma törhet, tehát a
+      gombok egymás alá kerülnek a cellán belül. Ez az egyetlen
+      lépés, ami a gombokat ténylegesen a viewportba hozza: a
+      harmadlagos oszlop rejtése önmagában 414px-ig nem elég.
+   2. A harmadlagos oszlopok (`--tertiary`) elrejtése, hogy a
+      maradék oszlopok több helyet kapjanak: enélkül a sor 375px-en
+      116px magas (három gomb sor), vele 80px (kettő).
+
+   A sor `min-height: 56px` értéke változatlan; a sor magassága a
+   tördelt tartalommal magától nő.
+
+   A töréspont a `design-token/breakpoints.css` --ep-screen-md
+   tokenjének értéke (768px); a `--ep-space-2` a spacing.css 4px-es
+   skálájának tokenje.
+   ============================================================ */
+@media (max-width: 768px) {
+  .data-table__cell {
+    flex-wrap: wrap;
+    row-gap: var(--ep-space-2);
+    padding-top: var(--ep-space-2);
+    padding-bottom: var(--ep-space-2);
+  }
+  .data-table__cell--tertiary {
+    display: none;
+  }
+}

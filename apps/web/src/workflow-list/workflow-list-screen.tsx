@@ -102,7 +102,15 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
     { id: 'name', header: 'Név', value: (row) => row.name },
     { id: 'description', header: 'Leírás', value: (row) => row.description ?? '', secondary: true },
     { id: 'providerId', header: 'Provider', value: (row) => row.providerId ?? 'nincs megadva', secondary: true },
-    { id: 'createdAtMs', header: 'Létrehozva', value: (row) => formatTimestamp(row.createdAtMs), mono: true },
+    {
+      id: 'createdAtMs',
+      header: 'Létrehozva',
+      value: (row) => formatTimestamp(row.createdAtMs),
+      mono: true,
+      // Mobil szélességen a monospace időbélyeg három sorba törne, és
+      // elvenné a helyet a művelet gomboktól (SPEC-007 5.3).
+      tertiary: true,
+    },
     {
       id: 'actions',
       header: 'Műveletek',

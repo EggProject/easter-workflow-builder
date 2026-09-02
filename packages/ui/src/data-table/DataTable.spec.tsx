@@ -111,6 +111,13 @@ describe('DataTable', () => {
     expect(headerCells()[2]?.className).toContain('data-table__cell--secondary');
   });
 
+  it('a harmadlagos jelölés a fejléc és a törzs cellájára is kikerül', () => {
+    renderDemoTable([{ id: 'name', header: 'Név', value: (row) => row.name, tertiary: true }]);
+    expect(headerCells()[0]?.className).toContain('data-table__cell--tertiary');
+    const cell = container.querySelector(':scope .data-table__row [role="cell"]');
+    expect(cell?.className).toBe('data-table__cell data-table__cell--tertiary');
+  });
+
   it('a középre igazított oszlop a saját osztályát kapja', () => {
     renderDemoTable([{ id: 'name', header: 'Név', value: (row) => row.name, align: 'center' }]);
     const cell = container.querySelector(':scope .data-table__row [role="cell"]');

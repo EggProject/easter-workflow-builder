@@ -24,6 +24,10 @@
     // `packages/db`-től függő csomagok `skipLibCheck` kapcsolója
     // (.claude/CLAUDE.md 12. szekció), csak itt a hiányzó ambiens deklaráció a
     // probléma, nem egy típushibás lib.
-    "../../packages/ui/src/design-token/css-module.d.ts"
+    "../../packages/ui/src/design-token/css-module.d.ts",
+    // A setup fájl a `src/` alatti mintán kívül él, tehát külön kell
+    // felvenni, hogy a `tsc` és az ESLint `projectService` is lássa - szó
+    // szerint ugyanaz, ahogy a `packages/ui/tsconfig.json` teszi.
+    "vitest.setup.ts"
   ]
 }

@@ -200,7 +200,16 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
   }
 
   const columns: readonly DataTableColumn<RunSummary>[] = [
-    { id: 'id', header: 'Azonosító', value: (row) => row.id, mono: true },
+    {
+      id: 'id',
+      header: 'Azonosító',
+      value: (row) => row.id,
+      mono: true,
+      // Mobil szélességen a futás azonosító elveszi a helyet a workflow
+      // névtől, az állapottól és a művelet gombtól; mérés szerint nélküle
+      // fér el a "Megszakítás" gomb 320px-en (SPEC-007 5.3).
+      tertiary: true,
+    },
     {
       id: 'workflowName',
       header: 'Workflow',
