@@ -11,9 +11,9 @@ automatikus JSX runtime-mal fordítja (SPEC-007 M-1, M-2, M-3, saját méréssel
 
 Az alkalmazás **épülőben van**: a SPEC-007 12.2 tizenkét téma mappájából eddig a
 `frontend-config`, a `client-route`, a `history-navigation`, a `protocol-error-message`, a
-`request-state`, a `rest-client` és a `stream-client` áll, a többit a PLAN-008 F5 fázisa adja. A
-`src/main.ts` és az `index.html` még a Playwright e2e infrastruktúra vázát szolgálja, amit a
-T-008-18 lépés cserél le a valódi belépési pontra.
+`request-state`, a `rest-client`, a `stream-client` és a `workflow-list` áll, a többit a PLAN-008
+F5 fázisa adja. A `src/main.ts` és az `index.html` még a Playwright e2e infrastruktúra vázát
+szolgálja, amit a T-008-18 lépés cserél le a valódi belépési pontra.
 
 ## Fájlok
 
@@ -28,6 +28,7 @@ T-008-18 lépés cserél le a valódi belépési pontra.
 | `src/request-state/`          | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)               |
 | `src/rest-client/`            | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció) |
 | `src/stream-client/`          | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)      |
+| `src/workflow-list/`          | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                  |
 | `src/main.ts`                 | ideiglenes böngésző belépési pont, kizárólag az e2e vázhoz; a T-008-18 lépés cseréli le                                                  |
 | `index.html`                  | a Vite dev/build belépési HTML-je                                                                                                        |
 | `vite.config.ts`              | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                  |

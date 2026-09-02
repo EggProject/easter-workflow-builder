@@ -11,5 +11,19 @@
     // csomagok `skipLibCheck` kapcsoloja (.claude/CLAUDE.md 12.).
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    // Az `ui` csomag forrás szintű fogyasztása (`exports` a `./src/index.ts`-re
+    // mutat, nincs build lépés, .claude/CLAUDE.md 7. "Forrás fogyasztás") az UI
+    // komponensek `import './x.css'` oldalhatás importjait is behozza ennek a
+    // csomagnak a TypeScript programjába. Az ehhez tartozó ambiens
+    // `declare module '*.css'` deklaráció (`packages/ui/src/design-token/css-module.d.ts`)
+    // önmagában nem `import`-olt fájl, tehát a program csak akkor látja, ha
+    // explicit szerepel az `include` listán - ugyanaz a mintázat, mint a
+    // `packages/db`-től függő csomagok `skipLibCheck` kapcsolója
+    // (.claude/CLAUDE.md 12. szekció), csak itt a hiányzó ambiens deklaráció a
+    // probléma, nem egy típushibás lib.
+    "../../packages/ui/src/design-token/css-module.d.ts"
+  ]
 }
