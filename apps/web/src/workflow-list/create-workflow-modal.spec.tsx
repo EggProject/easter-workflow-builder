@@ -30,6 +30,20 @@ const oneProviderFetchFunction: FetchFunction = () =>
     Response.json([{ id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] }]),
   );
 
+/**
+ * Két provider: az egyik kötelező env változó NEVET hordoz, a másik egyet
+ * sem. A séma értéket nem is tud vinni (`ProviderSummarySchema`
+ * `z.strictObject`), tehát a felület sem tud értéket kiírni (SPEC-007 16.
+ * szekció 49. kritérium).
+ */
+const twoProvidersFetchFunction: FetchFunction = () =>
+  Promise.resolve(
+    Response.json([
+      { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
+      { id: 'minimax', displayName: 'MiniMax', models: ['MiniMax-M3'], requiredEnvNames: ['MINIMAX_API_KEY'] },
+    ]),
+  );
+
 const failingCreateFetchFunction: FetchFunction = (input) => {
   if (input.includes('/providers')) {
     return Promise.resolve(Response.json([]));
@@ -101,6 +115,74 @@ describe('CreateWorkflowModal', () => {
 
     const select = container.querySelector('select');
     expect(select?.querySelectorAll('option')).toHaveLength(2);
+  });
+
+  it('provider választás nélkül nem ír ki env változó nevet', async () => {
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={twoProvidersFetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).not.toContain('Szükséges környezeti változók');
+    expect(container.textContent).not.toContain('nem kell környezeti változó');
+  });
+
+  it('a kiválasztott provider kötelező env változóinak NEVÉT jeleníti meg', async () => {
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={twoProvidersFetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const select = container.querySelector('select');
+    if (select === null) {
+      throw new Error('a teszt nem talált <select> elemet');
+    }
+    act(() => {
+      typeInto(select, 'minimax');
+    });
+
+    expect(container.textContent).toContain('Szükséges környezeti változók: MINIMAX_API_KEY');
+  });
+
+  it('env változót nem igénylő providerre ezt mondja ki, nem hagyja üresen', async () => {
+    await act(async () => {
+      root.render(
+        <CreateWorkflowModal
+          open
+          onClose={noop}
+          onCreated={noop}
+          apiOrigin={API_ORIGIN}
+          fetchFunction={twoProvidersFetchFunction}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const select = container.querySelector('select');
+    if (select === null) {
+      throw new Error('a teszt nem talált <select> elemet');
+    }
+    act(() => {
+      typeInto(select, 'claude-subscription');
+    });
+
+    expect(container.textContent).toContain('Ehhez a providerhez nem kell környezeti változó.');
   });
 
   it('sikeres létrehozásra meghívja az onCreated és az onClose callbacket', async () => {

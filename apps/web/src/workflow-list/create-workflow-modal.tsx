@@ -1,5 +1,10 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
-import { ProviderSummarySchema, WorkflowSummarySchema, type WorkflowSummary } from '@easter-workflow-builder/protocol';
+import {
+  ProviderSummarySchema,
+  WorkflowSummarySchema,
+  type ProviderSummary,
+  type WorkflowSummary,
+} from '@easter-workflow-builder/protocol';
 import { Button, Modal, SelectField, TextField } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
 import { arraySchema } from '../rest-client/array-schema.ts';
@@ -28,7 +33,7 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
   const [description, setDescription] = useState('');
   const [providerId, setProviderId] = useState('');
 
-  const providersState = useRequestState<readonly { readonly id: string; readonly displayName: string }[]>();
+  const providersState = useRequestState<readonly ProviderSummary[]>();
   const submitState = useRequestState<WorkflowSummary>();
 
   useEffect(() => {
@@ -75,10 +80,9 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
 
   const isSubmitting = submitState.state.status === 'pending';
   const isProvidersLoading = providersState.state.status === 'pending';
-  const providerOptions =
-    providersState.state.status === 'success'
-      ? providersState.state.value.map((provider) => ({ value: provider.id, label: provider.displayName }))
-      : [];
+  const loadedProviders = providersState.state.status === 'success' ? providersState.state.value : [];
+  const providerOptions = loadedProviders.map((provider) => ({ value: provider.id, label: provider.displayName }));
+  const selectedProvider = loadedProviders.find((provider) => provider.id === providerId);
 
   return (
     <Modal
@@ -124,6 +128,18 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
             setProviderId(event.target.value);
           }}
         />
+        {selectedProvider !== undefined && (
+          // A `ProviderSummary` env változó NEVET hordoz, értéket soha
+          // (SPEC-005 4.2 D, `.claude/CLAUDE.md` 9.), és a felület is
+          // kizárólag a nevet írja ki (SPEC-007 10.1, 16. szekció 49.
+          // kritérium): a felhasználó így látja, melyik változót kell
+          // beállítania a szerver környezetében.
+          <p>
+            {selectedProvider.requiredEnvNames.length === 0
+              ? 'Ehhez a providerhez nem kell környezeti változó.'
+              : `Szükséges környezeti változók: ${selectedProvider.requiredEnvNames.join(', ')}`}
+          </p>
+        )}
         {submitState.state.status === 'failure' && <p role="alert">{submitState.state.message}</p>}
       </form>
     </Modal>
