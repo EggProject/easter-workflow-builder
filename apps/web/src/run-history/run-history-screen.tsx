@@ -43,6 +43,12 @@ export interface RunHistoryScreenProperties {
    */
   readonly streamId: string;
   readonly lastFrame: StreamFrame | undefined;
+  /**
+   * Hányszor váltott a szerver példány azonosítója (`stream_ready` keret,
+   * SPEC-007 9.2). Minden változása szerver újraindulást jelent, amire a
+   * képernyő újratölti az adatát (16. szekció 44. kritérium).
+   */
+  readonly serverRestartCount: number;
 }
 
 const NON_CLOSED_STATUSES: ReadonlySet<RunStatus> = new Set(['pending', 'running']);
@@ -68,7 +74,8 @@ function readWorkflowIdFilter(search: string): string | undefined {
  * komponensben, mert mindegyik ugyanazt a listaadatot forgatja.
  */
 export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties>): ReactElement {
-  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction, search, streamId, lastFrame } = properties;
+  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction, search, streamId, lastFrame, serverRestartCount } =
+    properties;
   const workflowIdFilter = readWorkflowIdFilter(search);
 
   const [activeTabId, setActiveTabId] = useState<string>(workflowIdFilter === undefined ? 'all' : 'workflow');
@@ -103,8 +110,13 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
   }, [runsRequest.run, listLimit, fetchFunction, apiOrigin, isWorkflowScoped, workflowIdFilter]);
 
   useEffect(() => {
+    // A `serverRestartCount` szándékosan dependency, holott a törzs nem
+    // olvassa: a szerver újraindulása (a `stream_ready` keret megváltozott
+    // `serverInstanceId` mezője) ugyanazt az újratöltést váltja ki, mint a
+    // csatolás (SPEC-007 9.2, 16. szekció 44. kritérium). Elágazás nélkül,
+    // hogy ne keletkezzen sosem futó ág.
     void loadRuns();
-  }, [loadRuns]);
+  }, [loadRuns, serverRestartCount]);
 
   useEffect(() => {
     if (lastFrame === undefined) {

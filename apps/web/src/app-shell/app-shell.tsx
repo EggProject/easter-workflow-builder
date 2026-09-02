@@ -63,6 +63,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     navigate,
     streamId: streamConnection.streamId,
     lastFrame: streamConnection.lastFrame,
+    serverRestartCount: streamConnection.serverRestartCount,
   });
 
   return (
@@ -139,14 +140,24 @@ interface RouteContentDependencies {
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
   readonly streamId: string;
   readonly lastFrame: ReturnType<typeof useStreamConnection>['lastFrame'];
+  readonly serverRestartCount: number;
 }
 
 function renderRouteContent(
   routeId: ReturnType<typeof useClientRoute>['routeId'],
   dependencies: Readonly<RouteContentDependencies>,
 ): ReactElement {
-  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction, search, navigate, streamId, lastFrame } =
-    dependencies;
+  const {
+    apiOrigin,
+    listLimit,
+    streamReplayLimit,
+    fetchFunction,
+    search,
+    navigate,
+    streamId,
+    lastFrame,
+    serverRestartCount,
+  } = dependencies;
 
   switch (routeId) {
     case 'workflowList': {
@@ -156,6 +167,7 @@ function renderRouteContent(
           listLimit={listLimit}
           fetchFunction={fetchFunction}
           navigate={navigate}
+          serverRestartCount={serverRestartCount}
         />
       );
     }
@@ -169,6 +181,7 @@ function renderRouteContent(
           search={search}
           streamId={streamId}
           lastFrame={lastFrame}
+          serverRestartCount={serverRestartCount}
         />
       );
     }

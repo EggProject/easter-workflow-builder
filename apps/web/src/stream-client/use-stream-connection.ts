@@ -15,6 +15,26 @@ export interface StreamConnectionState {
   readonly phase: StreamConnectionPhase;
   readonly lastFrame: StreamFrame | undefined;
   readonly serverInstanceId: string | undefined;
+  /**
+   * Hányszor váltott a szerver példány azonosítója egy MÁSIK ismert értékre
+   * (SPEC-007 9.2, 16. szekció 44. kritérium). Az első `stream_ready` keret
+   * még nem növeli, mert akkor nem volt korábbi érték, amitől eltérhetne;
+   * minden további eltérés szerver újraindulást jelent, és a képernyők erre
+   * töltik újra az adatukat (SPEC-005 5.2).
+   */
+  readonly serverRestartCount: number;
+}
+
+/**
+ * A `stream_ready` keret két, egymástól elválaszthatatlan következménye:
+ * melyik szerver példánnyal beszélünk, és hányszor váltott az. Egyetlen
+ * állapotban áll, mert a számláló kizárólag az azonosító változásából
+ * számítható, és két külön `useState` hívás esetén az egyik frissítése a
+ * másikéból, egy másik frissítő törzsében történne.
+ */
+interface ServerInstanceState {
+  readonly serverInstanceId: string | undefined;
+  readonly restartCount: number;
 }
 
 export interface UseStreamConnectionInput {
@@ -67,7 +87,10 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
   const [streamId] = useState<string>(streamIdGenerator);
   const [readyState, setReadyState] = useState<number>(0);
   const [hasConnectedOnce, setHasConnectedOnce] = useState<boolean>(false);
-  const [serverInstanceId, setServerInstanceId] = useState<string | undefined>(undefined);
+  const [serverInstance, setServerInstance] = useState<ServerInstanceState>({
+    serverInstanceId: undefined,
+    restartCount: 0,
+  });
   const [pendingReplayRunIds, setPendingReplayRunIds] = useState<ReadonlySet<string>>(new Set());
   const [lastFrame, setLastFrame] = useState<StreamFrame | undefined>(undefined);
 
@@ -97,27 +120,49 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
       setReadyState(source.readyState);
       setLastFrame(frame);
 
-      if (frame.event === 'stream_ready') {
-        setServerInstanceId(frame.serverInstanceId);
-        setPendingReplayRunIds((previous) => {
-          const next = new Set(previous);
-          for (const entry of frame.subscriptions) {
-            next.add(entry.runId);
-          }
-          return next;
-        });
-        return;
-      }
-
-      if (frame.event === 'replay_complete') {
-        setPendingReplayRunIds((previous) => {
-          if (!previous.has(frame.runId)) {
-            return previous;
-          }
-          const next = new Set(previous);
-          next.delete(frame.runId);
-          return next;
-        });
+      // Kimerítő `switch` a keret `event` mezőjén, mind az öt ággal
+      // (SPEC-007 9.2, 16. szekció 42. kritérium): a
+      // `switch-exhaustiveness-check` szabály miatt egy hatodik keret típus
+      // felvétele a `protocol` csomagban itt fordítási hibát ad.
+      switch (frame.event) {
+        case 'stream_ready': {
+          setServerInstance((previous) => {
+            if (previous.serverInstanceId === frame.serverInstanceId) {
+              return previous;
+            }
+            return {
+              serverInstanceId: frame.serverInstanceId,
+              restartCount: previous.serverInstanceId === undefined ? previous.restartCount : previous.restartCount + 1,
+            };
+          });
+          setPendingReplayRunIds((previous) => {
+            const next = new Set(previous);
+            for (const entry of frame.subscriptions) {
+              next.add(entry.runId);
+            }
+            return next;
+          });
+          break;
+        }
+        case 'replay_complete': {
+          setPendingReplayRunIds((previous) => {
+            if (!previous.has(frame.runId)) {
+              return previous;
+            }
+            const next = new Set(previous);
+            next.delete(frame.runId);
+            return next;
+          });
+          break;
+        }
+        case 'run_event':
+        case 'run_event_transient':
+        case 'protocol_error': {
+          // Erre a három keretre a fenti `setLastFrame` az egyetlen teendő:
+          // a képernyők a `lastFrame` mezőből dolgoznak, a `protocol_error`
+          // pedig szándékosan NEM zárja le a kapcsolatot (SPEC-007 9.2).
+          break;
+        }
       }
     }
 
@@ -137,6 +182,7 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
     streamId,
     phase: computePhase(readyState, hasConnectedOnce, pendingReplayRunIds.size),
     lastFrame,
-    serverInstanceId,
+    serverInstanceId: serverInstance.serverInstanceId,
+    serverRestartCount: serverInstance.restartCount,
   };
 }

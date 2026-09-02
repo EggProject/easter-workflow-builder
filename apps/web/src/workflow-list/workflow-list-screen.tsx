@@ -28,6 +28,12 @@ export interface WorkflowListScreenProperties {
   readonly listLimit: number;
   readonly fetchFunction: FetchFunction;
   readonly navigate: (routeId: ClientRouteId) => void;
+  /**
+   * Hányszor váltott a szerver példány azonosítója (`stream_ready` keret,
+   * SPEC-007 9.2). Minden változása szerver újraindulást jelent, amire a
+   * képernyő újratölti az adatát (16. szekció 44. kritérium).
+   */
+  readonly serverRestartCount: number;
 }
 
 function formatTimestamp(ms: number): string {
@@ -40,7 +46,7 @@ function formatTimestamp(ms: number): string {
  * `ProgressBar`-ral jelez (11. szekció 2. és 3. async pont).
  */
 export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProperties>): ReactElement {
-  const { apiOrigin, listLimit, fetchFunction, navigate } = properties;
+  const { apiOrigin, listLimit, fetchFunction, navigate, serverRestartCount } = properties;
 
   const workflowsRequest = useRequestState<readonly WorkflowSummary[]>();
   const [lastWorkflows, setLastWorkflows] = useState<readonly WorkflowSummary[] | undefined>(undefined);
@@ -67,11 +73,13 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
   }, [workflowsRequest.run, listLimit, fetchFunction, apiOrigin]);
 
   useEffect(() => {
-    // Csak az első csatoláskor fut: a képernyő élettartama alatt egyszer
-    // kell automatikusan induljon, a további hívásokat a felhasználói
-    // művelet (létrehozás, átnevezés, törlés, indítás) váltja ki.
+    // Csatoláskor fut, és minden szerver újraindulásra újra: a további
+    // hívásokat a felhasználói művelet (létrehozás, átnevezés, törlés,
+    // indítás) váltja ki. A `serverRestartCount` szándékosan dependency,
+    // holott a törzs nem olvassa (SPEC-007 9.2, 16. szekció 44.
+    // kritérium); elágazás nélkül, hogy ne keletkezzen sosem futó ág.
     void loadWorkflows();
-  }, [loadWorkflows]);
+  }, [loadWorkflows, serverRestartCount]);
 
   function handleStartRun(workflow: WorkflowSummary): void {
     setStartingRunWorkflowId(workflow.id);

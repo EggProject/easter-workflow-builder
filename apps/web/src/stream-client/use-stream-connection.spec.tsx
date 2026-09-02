@@ -146,6 +146,43 @@ describe('useStreamConnection', () => {
     });
   });
 
+  /**
+   * A `serverRestartCount` három ága (SPEC-007 9.2, 16. szekció 44.
+   * kritérium): az ELSŐ ismert azonosító nem újraindulás, az UGYANAZ
+   * megismételve sem, és kizárólag egy MÁSIK azonosító növeli a számlálót.
+   */
+  function dispatchStreamReady(source: FakeEventSource, serverInstanceId: string): void {
+    act(() => {
+      source.dispatch(
+        'stream_ready',
+        frameData({ event: 'stream_ready', streamId: 'stream-1', serverInstanceId, subscriptions: [] }),
+      );
+    });
+  }
+
+  it('a serverRestartCount kezdetben nulla, és az első stream_ready keret nem növeli', () => {
+    const source = render();
+    expect(latest?.serverRestartCount).toBe(0);
+    dispatchStreamReady(source, 'srv-1');
+    expect(latest?.serverInstanceId).toBe('srv-1');
+    expect(latest?.serverRestartCount).toBe(0);
+  });
+
+  it('ugyanazt a serverInstanceId-t ismételve a serverRestartCount nem változik', () => {
+    const source = render();
+    dispatchStreamReady(source, 'srv-1');
+    dispatchStreamReady(source, 'srv-1');
+    expect(latest?.serverRestartCount).toBe(0);
+  });
+
+  it('eltérő serverInstanceId esetén a serverRestartCount nő: a szerver újraindult', () => {
+    const source = render();
+    dispatchStreamReady(source, 'srv-1');
+    dispatchStreamReady(source, 'srv-2');
+    expect(latest?.serverInstanceId).toBe('srv-2');
+    expect(latest?.serverRestartCount).toBe(1);
+  });
+
   it('stream_ready keretre nem üres subscriptions esetén replaying fázisba lép', () => {
     const source = render();
     act(() => {

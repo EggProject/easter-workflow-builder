@@ -100,7 +100,7 @@ describe('RunHistoryScreen', () => {
     container.remove();
   });
 
-  function render(fetchFunction: FetchFunction, search = '', lastFrame?: StreamFrame): void {
+  function render(fetchFunction: FetchFunction, search = '', lastFrame?: StreamFrame, serverRestartCount = 0): void {
     act(() => {
       root.render(
         <RunHistoryScreen
@@ -111,6 +111,7 @@ describe('RunHistoryScreen', () => {
           search={search}
           streamId="stream-1"
           lastFrame={lastFrame}
+          serverRestartCount={serverRestartCount}
         />,
       );
     });
@@ -347,6 +348,7 @@ describe('RunHistoryScreen', () => {
           search=""
           streamId="stream-1"
           lastFrame={{ event: 'replay_complete', runId: 'run-1', throughEventId: null }}
+          serverRestartCount={0}
         />,
       );
     });
@@ -380,6 +382,7 @@ describe('RunHistoryScreen', () => {
           search=""
           streamId="stream-1"
           lastFrame={{ event: 'stream_ready', streamId: 'stream-1', serverInstanceId: 'server-1', subscriptions: [] }}
+          serverRestartCount={0}
         />,
       );
     });
@@ -389,6 +392,27 @@ describe('RunHistoryScreen', () => {
     });
 
     expect(log.runsCallCount).toBe(callCountBeforeFrame);
+  });
+
+  it('a serverRestartCount növekedésére újratölti a listát (szerver újraindulás)', async () => {
+    const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
+    const fetchFunction = createFetchFunction([RUN_PENDING], log);
+    render(fetchFunction);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const callCountBeforeRestart = log.runsCallCount;
+
+    render(fetchFunction, '', undefined, 1);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(log.runsCallCount).toBeGreaterThan(callCountBeforeRestart);
   });
 
   it('az "Állapot" fejlécre kattintás felirat szerint rendez', async () => {

@@ -90,13 +90,46 @@ describe('WorkflowListScreen', () => {
     container.remove();
   });
 
-  function render(fetchFunction: FetchFunction, navigate: (routeId: ClientRouteId) => void = noop): void {
+  function render(
+    fetchFunction: FetchFunction,
+    navigate: (routeId: ClientRouteId) => void = noop,
+    serverRestartCount = 0,
+  ): void {
     act(() => {
       root.render(
-        <WorkflowListScreen apiOrigin={API_ORIGIN} listLimit={25} fetchFunction={fetchFunction} navigate={navigate} />,
+        <WorkflowListScreen
+          apiOrigin={API_ORIGIN}
+          listLimit={25}
+          fetchFunction={fetchFunction}
+          navigate={navigate}
+          serverRestartCount={serverRestartCount}
+        />,
       );
     });
   }
+
+  it('a serverRestartCount növekedésére újratölti a listát (szerver újraindulás)', async () => {
+    let listCallCount = 0;
+    const countingFetchFunction: FetchFunction = () => {
+      listCallCount += 1;
+      return Promise.resolve(jsonResponse([WORKFLOW_ROW]));
+    };
+    render(countingFetchFunction);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const callCountBeforeRestart = listCallCount;
+
+    render(countingFetchFunction, noop, 1);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(listCallCount).toBeGreaterThan(callCountBeforeRestart);
+  });
 
   it('első betöltéskor Skeleton jelzést mutat, majd a betöltött sorokat rajzolja', async () => {
     render(oneWorkflowFetchFunction);
