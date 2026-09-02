@@ -132,3 +132,37 @@
     display: flex;
   }
 }
+
+/* ============================================================
+   A lenyíló navigációt nyitó gomb (SPEC-007 5.3, T-008-23). ÚJ,
+   a forrásban nem létező szabály, a fenti blokk párja: a gomb
+   kizárólag --ep-screen-md (768px) alatt látszik, mert fölötte a
+   navigáció már a barban van, a gombra nincs szükség. Az
+   `isNavigationMenuOpen` tényleges állapotváltása (kattintás,
+   útvonalváltáskori zárás) az app-shell téma felelőssége; ez a
+   szabály kizárólag a gomb vizuális alakját adja.
+   ============================================================ */
+.app-tn__nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ep-fg);
+  border-radius: var(--ep-radius-md);
+  cursor: pointer;
+}
+.app-tn__nav-toggle:hover {
+  background: var(--ep-bg-hover);
+}
+.app-tn__nav-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 768px) {
+  .app-tn__nav-toggle {
+    display: inline-flex;
+  }
+}
