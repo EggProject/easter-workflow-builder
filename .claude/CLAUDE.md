@@ -414,6 +414,15 @@ törlési út, és a bemenete kötelezően tartalmazza az `acknowledgeIrreversib
 pillanatkép nem kaszkádon megy: a futások törlése után, ugyanabban a tranzakcióban árva söprés
 viszi el. A felületnek megerősítést kell kérnie, megnevezve, mi vész el (SPEC-003 4.15, 9.2).
 
+**Amit a "megnevezve, mi vész el" konkrétan jelent.** A megnevezés forrása a `DeletionSummary`
+alakja, ami a `packages/db` repository rétegében dől el, onnan tükrözi a `packages/protocol`
+`DeletionSummarySchema`, és a felület azt jeleníti meg: `runCount`, `eventCount`,
+`snapshotCount`. A fenti bekezdés kaszkád-felsorolása (lépés futás, jóváhagyás) azt írja le, mi
+**törlődik**, nem azt, mi **számlálódik**: a lépés futások és a jóváhagyások a futással együtt,
+kaszkádban tűnnek el, tehát a futás darabszáma fedi őket. Ez a pont korábban a SPEC-007 48.
+kritériumában négy mezős felsorolásként állt, ami nem egyezett a sémával; a spec 2026-09-02-án a
+séma szerint javítva (SPEC-007 10.1, 48. kritérium).
+
 **Migrációk.** `drizzle-kit generate`, a generált SQL és a snapshot gitbe kerül; a `migrate()` az
 `openDatabase` része, a hálózati kapcsolatok fogadása előtt. **A `drizzle-kit push` tiltott.**
 Kézzel írt SQL a `--custom` üres migrációba kerül. Fejlesztés és éles ugyanazon az úton megy
@@ -655,7 +664,18 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Nincs nyitott ellentmondás.** A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
+**Egy nyitott tétel áll.**
+
+**1. A fejlesztői REST hívás originje és a szerver CORS engedélyének hatóköre.**
+
+| Mező                      | Tartalom                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Melyik két forrás         | SPEC-006 5.7 (és 691. sor 8. kritériuma) kontra SPEC-007 O-4                                                                                                                                                                                                                                                                                                                      |
+| Mi az eltérés             | A SPEC-006 szerint a CORS engedély **kizárólag** a `STREAM_PATH` útvonalra vonatkozik, mert a REST hívás a Vite dev proxyn át, azonos originről érkezne (SPEC-005 5.8). A SPEC-007 viszont a REST hívást is a kötelező `VITE_API_ORIGIN` konfigurációra küldi, proxy nélkül. Ha a két origin fejlesztéskor eltér, a REST hívást a böngésző CORS okból eldobja                     |
+| Mi az érvényes viselkedés | Proxy szabály **nem íródik meg**, mert a `server.proxy` `target` mezője konkrét portot követel, amire nincs forrás (SPEC-006 O-1, SPEC-007 O-4), és tippelni tilos (4. szekció). A jelen kódban minden kliens hívás a `VITE_API_ORIGIN` értékre megy. Éles használatban a kérdés nem merül fel: a szerver szolgálja ki a felépített felületet, tehát azonos origin, és nincs CORS |
+| Mi zárná le               | A SPEC-006 O-1 termékdöntése a szerver portjáról és a dev szerver portjáról. Utána két út közül kell választani: a dev REST hívás proxyn megy (a SPEC-006 CORS engedélye változatlan marad), vagy közvetlenül (akkor a SPEC-006 5.7 hatóköre az `/api` előtagra is kiterjesztendő). A választást a usernek kell meghoznia, az askuserquestion tool-lal                            |
+
+A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
 `coverage.exclude` lista, a `CLAUDE.md` elhelyezés, a "nyolcadik kapu" elnevezés, a SPEC-001 14.
 "Karbantartási szabály" kontra `claude-md.sh`, a kétszintű csomagok száma) mindegyike lezárult.
 
@@ -673,8 +693,9 @@ PLAN-003 kapu-listája, `tooling/scripts/CLAUDE.md`, `.github/workflows/ci.yml`)
 törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-ben és e szabálykönyv 6.
 szekciójában is "három" (`core`, `provider-capability`, `db`).
 
-Ez a szekció ezért nem egy lista, hanem egy eljárás: mi a teendő, ha egy jövőbeli munkamenet
-tényleges, felhasználói döntést igénylő ellentmondást talál két forrásdokumentum között.
+A szekció alábbi része az eljárás: mi a teendő, ha egy munkamenet tényleges, felhasználói döntést
+igénylő ellentmondást talál két forrásdokumentum között. A fenti 1. tétel pontosan ezt az
+eljárást követi.
 
 1. **Nem döntjük el csendben.** Ha az egyik forrás egyértelműen elavult (a döntés megvan, csak
    nincs átvezetve), az nem ide tartozik: azt a talált helyen kell kijavítani, a döntéshez igazítva.
