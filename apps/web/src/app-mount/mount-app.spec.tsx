@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountApp } from './mount-app.tsx';
 
 class FakeEventSource {
@@ -17,6 +17,26 @@ class FakeEventSource {
 describe('mountApp', () => {
   // eslint-disable-next-line unicorn/no-unnecessary-global-this -- a bare `EventSource` azonosító ReferenceError-t dobna, mert happy-dom-ban nem létező globális (M-24); a `globalThis.` biztonságos, sosem dobó tulajdonság-elérés.
   const originalEventSource = globalThis.EventSource;
+  const originalFetch = globalThis.fetch;
+
+  /**
+   * A `mountApp` a VALÓDI `browserFetchFunction` portot adja tovább, ami a
+   * globális `fetch`-et hívja, és a létrehozott React gyökeret nem is adja
+   * vissza, tehát a teszt nem tudja leszerelni. A hálózati stub ezért a
+   * teljes fájlra szól (`beforeEach` plusz `afterAll`), nem tesztenként: egy
+   * `afterEach`-ben visszaállított `fetch` mellett a késve lefutó effekt már
+   * a valódi hálózatot szólította meg, tényleges DNS feloldással
+   * (`ENOTFOUND api.example.test`), nemdeterminisztikusan. Unit teszt
+   * hálózatot nem szólíthat meg: minden port befecskendezett (SPEC-007
+   * 13.1).
+   */
+  beforeEach(() => {
+    Object.assign(globalThis, { fetch: () => Promise.resolve(Response.json([])) });
+  });
+
+  afterAll(() => {
+    Object.assign(globalThis, { fetch: originalFetch });
+  });
 
   afterEach(() => {
     document.body.replaceChildren();
