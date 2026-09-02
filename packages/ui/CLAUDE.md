@@ -52,13 +52,19 @@ meg, a `design-token` és a `topnav-shell` provenienciáját ez a `CLAUDE.md` é
 `design-token` és a `self-hosted-font` mappát, plusz a `topnav-shell.css` és a komponens CSS
 fájlokat, fájlonként (SPEC-007 4.5).
 
-**Nyitott pont az F3 fázisnak (nem döntés, felvetés):** a `design-token/colors-and-type.css`
-token barrelt ma egyetlen fájl sem importálja, és a `package.json` `exports` mezője kizárólag a
-`src/index.ts` barrelre mutat, tehát az `apps/web` mély importtal sem éri el. Három út
-mérlegelhető, mindegyik az F3 hatókörében: mellékhatás import a barrelben, önálló `exports`
-bejegyzés a CSS-re, vagy a token import az `AppShellFrame` mellé. A jelen lépés egyiket sem
-választja, mert a SPEC-007 16. szekció 5. kritériuma szerint a barrel **csak nevesített
-újraexportot** tartalmazhat, és az alkalmazás összeszerelése az F3 fázis feladata.
+**Az F3 fázis nyitott pontja lezárva.** A `design-token/colors-and-type.css` token barrelt
+korábban egyetlen fájl sem importálta: a komponens CSS-ek csak HASZNÁLTÁK a `--ep-*` változókat
+(pl. `background:var(--ep-bg-sunken)`), a DEFINÍCIÓ (`:root`, `[data-theme="dark"]`) soha nem
+jutott be a `vite build` kimenetébe, tehát az egész design system (szín, betűtípus, sötét téma)
+inaktív volt minden képernyőn, hiba nélkül - a build + preview + Playwright screenshot vizuális
+ellenőrzés fedte fel (F3 lezárása, gyökér `CLAUDE.md`). A három korábban mérlegelt út közül a
+harmadikat választottuk: az `AppShellFrame.tsx` (a legkülső, minden alkalmazás-összeszerelésben
+garantáltan jelen lévő komponens) importálja a barrelt, ugyanolyan mellékhatás-import mintával,
+mint minden más komponens a saját CSS-ét. A barrel mellékhatás import útja kizárva marad (SPEC-007 16. szekció 5. kritériuma: a barrel csak nevesített újraexportot tartalmazhat), az önálló
+`exports` bejegyzés útja is kizárva marad (a repo-szintű "`exports` a `src/index.ts`-re mutat"
+konvenciót törné). Regresszió: `topnav-shell/AppShellFrame.spec.tsx` (forrás-szintű import
+ellenőrzés) és `apps/web/e2e/design-tokens.spec.ts` (valódi böngésző + valódi build ellen igazolja
+a `--ep-bg` és a kizárólag sötét `--ep-tint` tényleges feloldását).
 
 ## Kapcsolódó dokumentumok
 
