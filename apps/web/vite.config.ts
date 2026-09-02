@@ -1,10 +1,6 @@
-// Minimalis Vite 8 dev/build config az e2e infrastruktura vazahoz
-// (SPEC-001 10. szekcio). Az apps/web MEG NEM a tenyleges React
-// alkalmazas - az egy kesobbi specifikacio targya (SPEC-001 1. szekcio,
-// "Amit NEM dont el": "Nem tervez UI-t"). Ez a fajl csak annyit szolgal,
-// hogy a Playwright `webServer`-nek legyen mit inditania, es a
-// `vite-plugin-istanbul` instrumentalast valodi build/serve folyamaton
-// lehessen kiprobalni.
+// Vite 8 dev/build config a valodi React 19 alkalmazashoz (SPEC-007). Ez a
+// fajl adja a Playwright `webServer`-nek inditando build/serve folyamatot,
+// es a `vite-plugin-istanbul` instrumentalast az e2e lefedettseghez.
 //
 // A `vite-plugin-istanbul` Vite 8 (Rolldown) kompatibilitasa a SPEC-001
 // szerint "nem igazolt" volt - EMPIRIKUSAN ELLENORIZVE ebben a feladatban,
@@ -23,7 +19,12 @@ import istanbul from 'vite-plugin-istanbul';
 export default defineConfig({
   plugins: [
     istanbul({
-      include: 'src/*',
+      // A `src/*` mintázat csak a `src/` közvetlen fájljait fedte volna,
+      // a téma mappák alá süllyesztett komponenseket nem (SPEC-002 6.
+      // mappaszerkezet): a `src/**/*` az egész forrásfát fedi, a
+      // regressziót a `vite-istanbul-include-invariant` téma őrzi
+      // (T-008-18).
+      include: 'src/**/*',
       exclude: ['node_modules', 'e2e/**'],
       // A dev szerver es a normal production build alapertelmezesben NEM
       // instrumentalt - csak akkor, ha a VITE_COVERAGE=true env valtozo

@@ -121,17 +121,6 @@ export default defineConfig({
         // SPEC-007 O-1, 2026-09-01 (docs/spec/SPEC-007-frontend-alkalmazas.md).
         '**/*.spec.tsx',
         '**/e2e/**',
-
-        // IDEIGLENES kizaras: az `apps/web/src/main.ts` a Playwright e2e
-        // infrastruktura vazahoz keszult minimalis bongeszo belepesi pont
-        // (lasd a fajl sajat megjegyzeset), NEM a tenyleges alkalmazas -
-        // azt egy kesobbi specifikacio adja. Egyetlen elagazast tartalmaz
-        // (nullellenorzes a `#root` elemre), aminek 100%-os Vitest unit
-        // lefedettsege csak ugy lenne elerheto, ha erre a triviális
-        // helyorzore irnank egy tesztet, amit a feladat kifejezetten nem
-        // ker. SZIGORITANI KELL: amint a valodi UI belepesi pont felvaltja
-        // ezt a fajlt, ez a sor torlendo.
-        'apps/web/src/main.ts',
       ],
 
       // A dokumentalt, egykapcsolos alak mind a negy metrikan 100
