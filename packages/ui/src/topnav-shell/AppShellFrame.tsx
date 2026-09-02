@@ -1,4 +1,12 @@
 import type { ReactElement, ReactNode } from 'react';
+// A `--ep-*` design-token változókat DEFINIÁLÓ barrel: minden komponens CSS
+// csak HASZNÁLJA ezeket (pl. topnav-shell.css: `background:var(--ep-bg-sunken)`),
+// de a definíciót (`:root`, `[data-theme="dark"]`) semmi más nem importálja
+// (packages/ui CLAUDE.md "Nyitott pont" - most lezárva). Az `AppShellFrame` a
+// legkülső, minden alkalmazás-összeszerelésben garantáltan jelen lévő
+// komponens, ezért itt, a `src/index.ts` barrel helyett (SPEC-007 16.
+// szekció 5. kritérium: a barrel kizárólag nevesített újraexportot tartalmazhat).
+import '../design-token/colors-and-type.css';
 import './topnav-shell.css';
 
 /**

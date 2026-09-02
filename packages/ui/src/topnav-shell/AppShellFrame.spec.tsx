@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -109,5 +112,11 @@ describe('AppShellFrame', () => {
     });
 
     expect(container.querySelector<HTMLElement>('.app-tn')?.dataset['navigationOpen']).toBe('true');
+  });
+
+  it('a design-token barrelt importálja, hogy a --ep-* tokenek DEFINIÁLVA legyenek, ne csak használva (regresszió: korábban egyetlen fájl sem importálta, a --ep-bg és társai üresen maradtak minden valódi build kimenetében)', () => {
+    const directory = path.dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(path.join(directory, 'AppShellFrame.tsx'), 'utf8');
+    expect(source).toContain("import '../design-token/colors-and-type.css';");
   });
 });
