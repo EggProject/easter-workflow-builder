@@ -55,6 +55,16 @@ function findButtonByText(scope: ParentNode, text: string): HTMLButtonElement {
   return button;
 }
 
+function findButtonByLabel(scope: ParentNode, label: string): HTMLButtonElement {
+  const button = [...scope.querySelectorAll('button')].find(
+    (candidate) => candidate.getAttribute('aria-label') === label,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" aria-label gombot`);
+  }
+  return button;
+}
+
 interface RouteCallLog {
   runsCallCount: number;
   subscriptionBodies: string[];
@@ -198,6 +208,28 @@ describe('RunHistoryScreen', () => {
     expect(lastRunsUrl).not.toContain('workflowId');
   });
 
+  it('a művelet gomb ikon gomb: nincs látható szövege, de van hozzáférhető neve, és a folyamatban lévő állapotban letiltott és aria-busy', async () => {
+    const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
+    render(createFetchFunction([RUN_PENDING], log));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const interruptButton = findButtonByLabel(container, 'Megszakítás – run-1');
+    expect(interruptButton.textContent).toBe('');
+    expect(interruptButton.querySelector('svg')).not.toBeNull();
+    expect(interruptButton.disabled).toBe(false);
+
+    act(() => {
+      interruptButton.click();
+    });
+    // Kattintás után, a válasz megérkezéséig a gomb letiltott és aria-busy -
+    // ez adja a várakozás jelzését, mert a gombnak nincs szöveges tartalma.
+    expect(interruptButton.disabled).toBe(true);
+    expect(interruptButton.getAttribute('aria-busy')).toBe('true');
+  });
+
   it('a "Megszakítás" gomb pending/running futásra jelenik meg, sikeres kattintásra Toast-ot ad', async () => {
     const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
     render(createFetchFunction([RUN_PENDING], log));
@@ -208,7 +240,7 @@ describe('RunHistoryScreen', () => {
     });
 
     await act(async () => {
-      findButtonByText(container, 'Megszakítás').click();
+      findButtonByLabel(container, 'Megszakítás – run-1').click();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -232,7 +264,7 @@ describe('RunHistoryScreen', () => {
     });
 
     await act(async () => {
-      findButtonByText(container, 'Megszakítás').click();
+      findButtonByLabel(container, 'Megszakítás – run-1').click();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -250,7 +282,7 @@ describe('RunHistoryScreen', () => {
     });
 
     await act(async () => {
-      findButtonByText(container, 'Újraindítás').click();
+      findButtonByLabel(container, 'Újraindítás – run-2').click();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -274,7 +306,7 @@ describe('RunHistoryScreen', () => {
     });
 
     await act(async () => {
-      findButtonByText(container, 'Újraindítás').click();
+      findButtonByLabel(container, 'Újraindítás – run-2').click();
       await Promise.resolve();
       await Promise.resolve();
     });

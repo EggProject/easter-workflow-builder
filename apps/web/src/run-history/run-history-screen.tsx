@@ -12,6 +12,7 @@ import {
 } from '@easter-workflow-builder/protocol';
 import {
   Badge,
+  Button,
   DataTable,
   ProgressBar,
   Skeleton,
@@ -26,6 +27,47 @@ import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { describeRunStatusBadge } from './run-status-badge.ts';
+
+/**
+ * `Square` (megszakítás) és `RotateCcw` (újraindítás) ikon a soronkénti
+ * egyetlen művelet gombjához. A geometria a projekt által vendorolt lucide
+ * 0.525.0 készlet valódi útvonal-adata (24x24 viewBox), a repóban már
+ * meglévő ikon-konvenció (1.75px stroke, kerekített vonal) szerint kézzel
+ * beágyazva - ugyanaz a módszer, mint a hamburger és a bezárás ikon
+ * (`app-shell.tsx`, `Modal.tsx`), nem külön ikon csomag.
+ */
+function InterruptIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+    </svg>
+  );
+}
+
+function RestartIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
 
 export interface RunHistoryScreenProperties {
   readonly apiOrigin: string;
@@ -262,25 +304,35 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
         // hatot): a ternary emiatt kimerítő, harmadik ág nélkül.
         const isInterruptible = row.status === 'pending' || row.status === 'running';
         return isInterruptible ? (
-          <button
+          <Button
             type="button"
+            icon
+            size="sm"
+            variant="secondary"
+            isLoading={isBusy}
             disabled={isBusy}
+            aria-label={`Megszakítás – ${row.id}`}
             onClick={() => {
               handleInterrupt(row);
             }}
           >
-            {isBusy ? 'Megszakítás...' : 'Megszakítás'}
-          </button>
+            <InterruptIcon />
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
+            icon
+            size="sm"
+            variant="secondary"
+            isLoading={isBusy}
             disabled={isBusy}
+            aria-label={`Újraindítás – ${row.id}`}
             onClick={() => {
               handleRestart(row);
             }}
           >
-            {isBusy ? 'Újraindítás...' : 'Újraindítás'}
-          </button>
+            <RestartIcon />
+          </Button>
         );
       },
     },
