@@ -138,6 +138,31 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('Az oldal nem található');
   });
 
+  it('a topnav bal oldalán a márkajel logó jelenik meg, dekoratív (üres alt) képként', async () => {
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const brand = container.querySelector('.app-tn__brand');
+    if (brand === null) {
+      throw new Error('a teszt nem talált .app-tn__brand elemet');
+    }
+    const logo = brand.querySelector('img');
+    if (logo === null) {
+      throw new Error('a teszt nem talált logó img elemet');
+    }
+    expect(logo.getAttribute('alt')).toBe('');
+    expect(logo.getAttribute('src')).toBeTruthy();
+    // A logó a márkanév ELŐTT áll a DOM-ban, a design system saját topnav
+    // mintáját követve (eggproject-design-app-common/skeletons/shell-topnav.html).
+    const brandChildren = [...brand.children];
+    const logoIndex = brandChildren.indexOf(logo);
+    const nameIndex = brandChildren.findIndex((child) => child.tagName === 'B');
+    expect(logoIndex).toBeGreaterThanOrEqual(0);
+    expect(logoIndex).toBeLessThan(nameIndex);
+  });
+
   it('a navigáció gombra kattintva a célútvonal linkje "is-on" osztályt kap, a másik nem', async () => {
     render();
     await act(async () => {

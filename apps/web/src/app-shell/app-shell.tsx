@@ -1,5 +1,5 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
-import { AppShellFrame, ThemeModeToggle } from '@easter-workflow-builder/ui';
+import { AppShellFrame, logoMarkUrl, ThemeModeToggle } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
@@ -92,6 +92,10 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          {/* A design system saját topnav minta követése (eggproject-design-app-common/
+              skeletons/shell-topnav.html): a márkajel `<img>` a szöveges márkanév ELŐTT,
+              a `.app-tn__brand img` szabály (topnav-shell.css) adja a 24x24px méretet. */}
+          <img src={logoMarkUrl} alt="" />
           <b>easter-workflow-builder</b>
         </>
       }
