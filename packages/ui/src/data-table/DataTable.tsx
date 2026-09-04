@@ -16,6 +16,15 @@ export interface DataTableColumn<TRow> {
   readonly id: string;
   readonly header: string;
   /**
+   * A fejléc szövege vizuálisan rejtett, de a hozzáférhetőségi fában
+   * megmarad: ugyanaz a W3C WAI C7 technika, mint a topnav márkanevén
+   * (`topnav-shell.css`), nem `display: none`, mert az kivenné az elemet a
+   * hozzáférhetőségi fából. A `role="columnheader"` accessible name-je a
+   * szöveges tartalomból származik, ezért egy oszlopnak képernyőolvasó
+   * számára ettől függetlenül is neve marad.
+   */
+  readonly hiddenHeader?: boolean;
+  /**
    * A cella szöveges értéke. Ez adja a rendezés alapját is, tehát a
    * rendezés a megjelenített szöveg szerint megy, nem külön kulcs szerint.
    */
@@ -30,6 +39,13 @@ export interface DataTableColumn<TRow> {
    * egyenlően osztozik a többi rugalmas oszloppal.
    */
   readonly width?: number;
+  /**
+   * Az oszlop a tartalmához igazodik (`flex: 0 0 auto`, fix pixel szélesség
+   * nélkül): nem vesz részt a többi oszlop egyenlő flex elosztásában. A
+   * művelet oszlophoz készült, ahol az oszlopnak csak a benne álló gombhoz
+   * kell igazodnia, kitalált pixel szám nélkül.
+   */
+  readonly fitContent?: boolean;
   /**
    * Monospace cella (azonosító, időbélyeg).
    */
@@ -110,7 +126,29 @@ function bodyCellClassName<TRow>(column: DataTableColumn<TRow>): string {
 }
 
 function cellStyle<TRow>(column: DataTableColumn<TRow>): CSSProperties {
-  return column.width === undefined ? { flex: '1 1 0' } : { flex: '0 0 auto', width: column.width };
+  if (column.width !== undefined) {
+    return { flex: '0 0 auto', width: column.width };
+  }
+  if (column.fitContent === true) {
+    return { flex: '0 0 auto' };
+  }
+  return { flex: '1 1 0' };
+}
+
+/**
+ * A fejléc cella stílusa. A `.data-table__cell` vízszintes paddingje
+ * (`padding: 0 10px`) mindig ad szélességet, függőleges paddingje viszont
+ * nincs: `hiddenHeader` esetén a felirat kikerül a normál elrendezésből
+ * (`position: absolute`), tehát a cellának saját tartalom nélkül nulla
+ * lenne a magassága - Playwright szerint "not visible", egérrel pedig
+ * rákattinthatatlan. Az `alignSelf: 'stretch'` a `.data-table__header`
+ * sor fix magasságát (`height: 40px`) adja a cellának; a felirat
+ * pozícióját nem változtatja, mert a cella saját, középre igazító flow-ja
+ * (`.data-table__cell { align-items: center }`) attól függetlenül működik.
+ */
+function headerCellStyle<TRow>(column: DataTableColumn<TRow>): CSSProperties {
+  const style = cellStyle(column);
+  return column.hiddenHeader === true ? { ...style, alignSelf: 'stretch' } : style;
 }
 
 function ariaSortValue(sortDirection: 'asc' | 'desc' | false | undefined): 'ascending' | 'descending' | 'none' {
@@ -179,7 +217,7 @@ export function DataTable<TRow extends RowData>(properties: Readonly<DataTablePr
                   aria-sort={canSort ? ariaSortValue(sortDirection) : undefined}
                   tabIndex={canSort ? 0 : undefined}
                   className={headerClassName(column, canSort, sortDirection === 'asc' || sortDirection === 'desc')}
-                  style={cellStyle(column)}
+                  style={headerCellStyle(column)}
                   onClick={() => {
                     tableColumn?.toggleSorting();
                   }}
@@ -191,7 +229,14 @@ export function DataTable<TRow extends RowData>(properties: Readonly<DataTablePr
                     tableColumn?.toggleSorting();
                   }}
                 >
-                  <span className="data-table__label">{column.header}</span>
+                  <span
+                    className={joinClassNames(
+                      'data-table__label',
+                      column.hiddenHeader === true && 'data-table__label--visually-hidden',
+                    )}
+                  >
+                    {column.header}
+                  </span>
                 </div>
               );
             })}

@@ -295,6 +295,8 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
     {
       id: 'actions',
       header: 'Műveletek',
+      hiddenHeader: true,
+      fitContent: true,
       sortable: false,
       value: () => '',
       cell: (row) => {

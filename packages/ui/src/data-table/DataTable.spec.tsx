@@ -138,6 +138,62 @@ describe('DataTable', () => {
     expect(firstRowCells[1]?.style.flexBasis).toBe('0px');
   });
 
+  it('fitContent esetén a cella a tartalmához igazodik, sem fixen, sem egyenlő elosztásban', () => {
+    renderDemoTable([
+      { id: 'name', header: 'Név', value: (row) => row.name },
+      { id: 'actions', header: 'Műveletek', value: () => '', fitContent: true },
+    ]);
+    const [, actionsHeader] = headerCells();
+    const actionsBodyCell = container.querySelector<HTMLDivElement>(':scope .data-table__row [role="cell"]:last-child');
+    for (const cell of [actionsHeader, actionsBodyCell]) {
+      expect(cell?.style.flexGrow).toBe('0');
+      expect(cell?.style.flexShrink).toBe('0');
+      expect(cell?.style.width).toBe('');
+    }
+  });
+
+  it('hiddenHeader esetén a felirat vizuálisan rejtett osztályt kap, de a szövege megmarad', () => {
+    renderDemoTable([
+      { id: 'name', header: 'Név', value: (row) => row.name },
+      { id: 'actions', header: 'Műveletek', value: () => '', hiddenHeader: true },
+    ]);
+    const [nameHeader, actionsHeader] = headerCells();
+    const nameLabel = nameHeader?.querySelector('.data-table__label');
+    const actionsLabel = actionsHeader?.querySelector('.data-table__label');
+
+    // A nem rejtett fejléc felirata nem kapja meg a rejtő osztályt.
+    expect(nameLabel?.className).toBe('data-table__label');
+    // A rejtett fejléc felirata megkapja, DE a szövege és a columnheader
+    // accessible name-je (a role szerinti keresés) ettől függetlenül elérhető
+    // marad - a rejtés vizuális, nem a hozzáférhetőségi fából való eltávolítás.
+    expect(actionsLabel?.className).toBe('data-table__label data-table__label--visually-hidden');
+    expect(actionsHeader?.textContent).toBe('Műveletek');
+    // A columnheader role accessible name-je a szöveges tartalomból származik,
+    // tehát a `getByRole`-lal kereső e2e tesztek a rejtés után is megtalálják.
+    expect(actionsHeader?.getAttribute('role')).toBe('columnheader');
+  });
+
+  it('hiddenHeader esetén a fejléc cella align-self: stretch stílust kap, hogy ne nullázódjon a magassága', () => {
+    renderDemoTable([
+      { id: 'name', header: 'Név', value: (row) => row.name },
+      { id: 'actions', header: 'Műveletek', value: () => '', hiddenHeader: true },
+    ]);
+    const [nameHeader, actionsHeader] = headerCells();
+
+    // A nem rejtett fejléc cellája nem kapja meg a nyújtó stílust: a felirata
+    // a normál elrendezésben marad, tehát a cellának amúgy is van magassága.
+    expect(nameHeader?.style.alignSelf).toBe('');
+    // A rejtett fejléc felirata `position: absolute`-ra kerül (lásd a CSS
+    // `data-table__label--visually-hidden` szabályát), a cellának emiatt
+    // saját tartalom nélkül nulla lenne a magassága - ez adja vissza a sor
+    // teljes, fix magasságát (`.data-table__header { height: 40px }`).
+    expect(actionsHeader?.style.alignSelf).toBe('stretch');
+    // A törzs cellára ez nem vonatkozik: annak mindig van valódi tartalma
+    // (szöveg vagy egyedi kirajzolás), tehát sosem nullázódna a magassága.
+    const actionsBodyCell = container.querySelector<HTMLDivElement>(':scope .data-table__row [role="cell"]:last-child');
+    expect(actionsBodyCell?.style.alignSelf).toBe('');
+  });
+
   it('egyedi cella kirajzolás felülírja a szöveges értéket', () => {
     renderDemoTable([
       {

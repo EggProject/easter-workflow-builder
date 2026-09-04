@@ -386,6 +386,81 @@ test('a --ep-screen-sm fölött a márkanév szövege teljes szélességben lát
   expect(await renderedWidth(brandText)).toBeGreaterThan(1);
 });
 
+// ============================================================
+// REGRESSZIÓ: a "Műveletek" oszlop fejléce és szélessége (2026-09-05).
+//
+// A FELHASZNÁLÓI KÉRÉS. A táblázatok "Műveletek" oszlopában a fejléc szövege
+// ne látszódjon, és az oszlop csak annyi helyet foglaljon, amennyi a benne
+// álló gombhoz kell - ne az egyenlő flex elosztás szerinti, sokszorosan
+// nagyobb szélességet.
+//
+// A MEGOLDÁS a `DataTable` komponens általános képessége (`DataTableColumn`
+// `hiddenHeader` és `fitContent` mezője, packages/ui/src/data-table/), nem
+// az `apps/web` oldalra összedrótozva. A fejléc elrejtése ugyanaz a W3C WAI
+// C7 technika, mint a topnav márkanevén (lásd fentebb): a szöveg vizuálisan
+// 1x1 pixelre klippelt, de a hozzáférhetőségi fából nem távolítja el, mert
+// `display: none` helyett megy. Az oszlop szélessége `flex: 0 0 auto`,
+// kitalált pixel szám nélkül.
+// ============================================================
+
+test('a Műveletek oszlop fejléce mindkét táblán vizuálisan rejtett, és a szélessége a gombhoz igazodik', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.goto('/');
+  const workflowTable = page.getByRole('table', { name: 'Workflow-k' });
+  await expect(workflowTable).toBeVisible();
+
+  const workflowLabel = workflowTable.getByText('Műveletek', { exact: true });
+  // Vizuálisan rejtett: a W3C WAI C7 technika 1x1 pixeles dobozt ad.
+  expect(await renderedWidth(workflowLabel)).toBeLessThanOrEqual(1);
+  // Hozzáférhetőségi fában viszont jelen van: sem `display: none`, sem
+  // `visibility: hidden`. A computed `display` "block", nem a span alapértelmezett
+  // "inline"-ja, mert a szülő `.data-table__cell--header` `display: flex`, és a
+  // CSS Display spec szerint egy flex item mindig blockified.
+  expect(await accessibilityTreeRemovingStyles(workflowLabel)).toEqual({ display: 'block', visibility: 'visible' });
+  // A columnheader accessible name-je a szöveges tartalomból marad, tehát a
+  // `getByRole`-lal kereső korábbi tesztek (workflow-list.spec.ts) is
+  // megtalálják a rejtés után is.
+  await expect(workflowTable.getByRole('columnheader', { name: 'Műveletek' })).toBeVisible();
+
+  const workflowRow = workflowTable.getByRole('row', { name: /Alfa workflow/ });
+  const workflowTrigger = workflowRow.getByRole('button', { name: /^Műveletek/ });
+  const workflowActionsBox = await workflowRow.getByRole('cell').last().boundingBox();
+  const workflowTriggerBox = await workflowTrigger.boundingBox();
+  const workflowNameBox = await workflowRow.getByRole('cell').first().boundingBox();
+  if (workflowActionsBox === null || workflowTriggerBox === null || workflowNameBox === null) {
+    throw new Error('hiányzó befoglaló doboz a workflow táblán');
+  }
+  // A cella szélessége a gomb szélessége plusz a `.data-table__cell` 10-10px
+  // vízszintes padding-je, kis tolerenciával - NEM az egyenlő elosztás
+  // szerinti, a Név oszlopéhoz mérhető szélesség.
+  expect(workflowActionsBox.width).toBeLessThanOrEqual(workflowTriggerBox.width + 24);
+  expect(workflowActionsBox.width).toBeLessThan(workflowNameBox.width / 2);
+
+  await page.goto('/runs');
+  const runsTable = page.getByRole('table', { name: 'Futások' });
+  await expect(runsTable).toBeVisible();
+
+  const runsLabel = runsTable.getByText('Műveletek', { exact: true });
+  expect(await renderedWidth(runsLabel)).toBeLessThanOrEqual(1);
+  // A "block" ugyanaz a flex item blockification, mint fentebb a workflow táblán.
+  expect(await accessibilityTreeRemovingStyles(runsLabel)).toEqual({ display: 'block', visibility: 'visible' });
+  await expect(runsTable.getByRole('columnheader', { name: 'Műveletek' })).toBeVisible();
+
+  const runsRow = runsTable.getByRole('row', { name: /r-01H8XYZABCDEF0123456789/ });
+  const runsTrigger = runsRow.getByRole('button', { name: /^Megszakítás/ });
+  const runsActionsBox = await runsRow.getByRole('cell').last().boundingBox();
+  const runsTriggerBox = await runsTrigger.boundingBox();
+  const runsWorkflowNameBox = await runsRow.getByRole('cell').nth(1).boundingBox();
+  if (runsActionsBox === null || runsTriggerBox === null || runsWorkflowNameBox === null) {
+    throw new Error('hiányzó befoglaló doboz a futás előzmények táblán');
+  }
+  expect(runsActionsBox.width).toBeLessThanOrEqual(runsTriggerBox.width + 24);
+  expect(runsActionsBox.width).toBeLessThan(runsWorkflowNameBox.width / 2);
+});
+
 test.describe('valódi mobil eszköz emuláció', () => {
   // A `devices['Pixel 7']` `defaultBrowserType` mezőjét nem lehet tovább
   // adni: a Playwright ezt csak a config `projects` szintjén fogadja el, egy

@@ -151,6 +151,8 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
     {
       id: 'actions',
       header: 'Műveletek',
+      hiddenHeader: true,
+      fitContent: true,
       sortable: false,
       value: () => '',
       cell: (row) => (

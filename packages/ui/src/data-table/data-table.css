@@ -188,3 +188,25 @@
     display: none;
   }
 }
+
+/* ============================================================
+   Vizuálisan rejtett fejléc felirat (a felhasználó kérése: a művelet
+   oszlop fejléce ne látszódjon). ÚJ, a forrásban nem létező szabály,
+   viewporttól függetlenül mindig aktív.
+
+   A deklaráció-készlet szó szerint a W3C WAI C7 technika
+   (https://www.w3.org/WAI/WCAG21/Techniques/css/C7), ugyanaz, amit a
+   `topnav-shell.css` a márkanév szűk nézetbeli elrejtésére használ:
+   `display: none` helyett, mert az MDN szerint az kivenné az elemet a
+   hozzáférhetőségi fából, egy oszlopnak viszont képernyőolvasó számára
+   továbbra is kell neve.
+   ============================================================ */
+.data-table__label--visually-hidden {
+  clip-path: inset(100%);
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}

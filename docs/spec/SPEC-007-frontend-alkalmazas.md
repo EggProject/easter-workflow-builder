@@ -1074,6 +1074,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 60. A 15. szekció mind a kilenc nyitott kérdése vagy a user válaszával lezárva és minden érintett forrásdokumentumba átvezetve, vagy nyitottként áll a "mi a viselkedés addig" és a "mi zárná le" mezővel. Tippeléssel lezárt pont nincs.
 61. A jelen dokumentumban nincs gondolatjel: a hosszú kötőjel karakterre futtatott keresés nulla találatot ad.
 62. A `bun run format:check`, `typecheck`, `lint`, `test`, `build`, `docs:check`, `check:casing`, `check:graph` és `check:db-drift`, mind a kilenc parancs nulla kilépési kóddal fut a teljes workspace-en. A kapuk mérvadó listája a `.claude/CLAUDE.md` 8. szekciója.
+63. A `DataTableColumn` két, kizárólag a felhasználói kérés által indokolt kapacitást hordoz. A `hiddenHeader` a fejléc feliratát a W3C WAI C7 technikával (`.data-table__label--visually-hidden`) vizuálisan elrejti, a hozzáférhetőségi fából nem távolítja el: a `role="columnheader"` accessible name-je a szöveges tartalomból marad, `display: none` nem szerepel. A `fitContent` az oszlopot a tartalmához igazítja (`flex: 0 0 auto`, kitalált pixel szélesség nélkül) az egyenlő flex elosztás helyett. Mindkét képernyő "Műveletek" oszlopa mindkét mezőt használja. Regressziós teszt igazolja mindkét ágat (`packages/ui/src/data-table/DataTable.spec.tsx`), és az `apps/web/e2e/responsive.spec.ts` a vízszintes túllógás hiányát minden támogatott viewport szélességen.
 
 ## 17. Kapcsolódó dokumentumok
 
