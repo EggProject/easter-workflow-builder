@@ -61,6 +61,28 @@ function findButtonByText(scope: ParentNode, text: string): HTMLButtonElement {
   return button;
 }
 
+function findButtonByLabel(scope: ParentNode, label: string): HTMLButtonElement {
+  const button = [...scope.querySelectorAll('button')].find(
+    (candidate) => candidate.getAttribute('aria-label') === label,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" aria-label gombot`);
+  }
+  return button;
+}
+
+/**
+ * A sor műveletek hárompontos triggerét nyitja meg egy adott workflow
+ * névre, hogy a benne álló `MenuItem` gombok (Átnevezés/Törlés/Indítás)
+ * elérhetőek legyenek - ugyanaz a két lépés, amit egy valódi felhasználó
+ * tenne (trigger megnyitása, utána a kívánt művelet kiválasztása).
+ */
+function openActionsMenu(scope: ParentNode, workflowName: string): void {
+  act(() => {
+    findButtonByLabel(scope, `Műveletek – ${workflowName}`).click();
+  });
+}
+
 function findDialog(container: HTMLElement): HTMLElement {
   const dialog = container.querySelector('[role="dialog"]');
   if (!(dialog instanceof HTMLElement)) {
@@ -170,14 +192,38 @@ describe('WorkflowListScreen', () => {
     expect(container.textContent).toContain('Még nincs workflow.');
   });
 
+  it('a sor műveletek hárompontos ikon gombja: nincs látható szövege, hozzáférhető neve van, és a lenyíló menü mindhárom műveletet tartalmazza', async () => {
+    render(oneWorkflowFetchFunction);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const trigger = findButtonByLabel(container, 'Műveletek – Alfa');
+    expect(trigger.textContent).toBe('');
+    expect(trigger.querySelector('svg')).not.toBeNull();
+    expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    openActionsMenu(container, 'Alfa');
+    // A menü panel 2026-09-04 óta `createPortal`-lal a `document.body`-ba
+    // kerül (packages/ui/src/menu/Menu.tsx), tehát nem a `container`
+    // leszármazottja.
+    const menu = document.body.querySelector('[role="menu"]');
+    expect(menu).not.toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const itemLabels = [...(menu?.querySelectorAll('[role="menuitem"]') ?? [])].map((item) => item.textContent);
+    expect(itemLabels).toEqual(['Átnevezés', 'Törlés', 'Indítás']);
+  });
+
   it('az "Átnevezés" gomb megnyitja az átnevező modálist a sor adataival', async () => {
     render(oneWorkflowFetchFunction);
     await act(async () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Átnevezés').click();
+      findButtonByText(document.body, 'Átnevezés').click();
     });
 
     expect(container.textContent).toContain('Workflow átnevezése');
@@ -189,8 +235,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Törlés').click();
+      findButtonByText(document.body, 'Törlés').click();
     });
 
     expect(container.textContent).toContain('Workflow törlése');
@@ -219,8 +266,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     await act(async () => {
-      findButtonByText(container, 'Indítás').click();
+      findButtonByText(document.body, 'Indítás').click();
       await Promise.resolve();
     });
 
@@ -238,8 +286,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     await act(async () => {
-      findButtonByText(container, 'Indítás').click();
+      findButtonByText(document.body, 'Indítás').click();
       await Promise.resolve();
     });
 
@@ -316,8 +365,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Átnevezés').click();
+      findButtonByText(document.body, 'Átnevezés').click();
     });
     const dialog = findDialog(container);
 
@@ -343,8 +393,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Átnevezés').click();
+      findButtonByText(document.body, 'Átnevezés').click();
     });
 
     const dialog = findDialog(container);
@@ -403,8 +454,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Törlés').click();
+      findButtonByText(document.body, 'Törlés').click();
     });
     await act(async () => {
       await Promise.resolve();
@@ -452,8 +504,9 @@ describe('WorkflowListScreen', () => {
       await Promise.resolve();
     });
 
+    openActionsMenu(container, 'Alfa');
     act(() => {
-      findButtonByText(container, 'Törlés').click();
+      findButtonByText(document.body, 'Törlés').click();
     });
     await act(async () => {
       await Promise.resolve();

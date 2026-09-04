@@ -7,6 +7,8 @@ import {
 import {
   Button,
   DataTable,
+  Menu,
+  MenuItem,
   ProgressBar,
   Skeleton,
   ToastViewport,
@@ -22,6 +24,33 @@ import { useRequestState } from '../request-state/use-request-state.ts';
 import { CreateWorkflowModal } from './create-workflow-modal.tsx';
 import { DeleteWorkflowModal } from './delete-workflow-modal.tsx';
 import { RenameWorkflowModal } from './rename-workflow-modal.tsx';
+import './workflow-list-screen.css';
+
+/**
+ * Hárompontos (`MoreVertical`) ikon a sor műveletek menü triggeréhez. A
+ * kör-pontok geometriája a projekt által vendorolt lucide 0.525.0
+ * `MoreVertical` ikonjának valódi útvonal-adata (24x24 viewBox), a repóban
+ * már meglévő ikon-konvenció (1.75px stroke, kerekített vonal) szerint
+ * kézzel beágyazva - ugyanaz a módszer, mint a hamburger és a bezárás ikon
+ * (`app-shell.tsx`, `Modal.tsx`), nem külön ikon csomag.
+ */
+function MoreVerticalIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </svg>
+  );
+}
 
 export interface WorkflowListScreenProperties {
   readonly apiOrigin: string;
@@ -125,45 +154,52 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
       sortable: false,
       value: () => '',
       cell: (row) => (
-        <>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
+        <Menu
+          align="right"
+          trigger={(triggerProperties) => (
+            <Button
+              {...triggerProperties}
+              type="button"
+              size="sm"
+              variant="secondary"
+              icon
+              aria-label={`Műveletek – ${row.name}`}
+            >
+              <MoreVerticalIcon />
+            </Button>
+          )}
+        >
+          <MenuItem
+            onSelect={() => {
               setWorkflowToRename(row);
             }}
           >
             Átnevezés
-          </Button>{' '}
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
+          </MenuItem>
+          <MenuItem
+            danger
+            onSelect={() => {
               setWorkflowToDelete(row);
             }}
           >
             Törlés
-          </Button>{' '}
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
+          </MenuItem>
+          <MenuItem
+            disabled={startingRunWorkflowId === row.id}
+            onSelect={() => {
               handleStartRun(row);
             }}
-            disabled={startingRunWorkflowId === row.id}
           >
             {startingRunWorkflowId === row.id ? 'Indítás...' : 'Indítás'}
-          </Button>
-        </>
+          </MenuItem>
+        </Menu>
       ),
     },
   ];
 
   return (
     <div>
-      <div>
+      <div className="workflow-list__toolbar">
         <Button
           type="button"
           onClick={() => {

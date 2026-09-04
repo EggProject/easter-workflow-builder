@@ -1,0 +1,8 @@
+/* A "Új workflow" gomb a lista fölött jobbra igazítva jelenik meg
+   (felhasználói kérés). A `.data-table` fölötti eszköztár sor egyetlen
+   eleme ma ez a gomb, de a szabály flexbox alapú, hogy egy jövőbeli
+   második eszköztár elem esetén se kelljen újraírni. */
+.workflow-list__toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
