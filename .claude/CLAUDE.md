@@ -176,8 +176,9 @@ SPEC-002 4.).
 - **Tiltott mappanevek:** `types/`, `interfaces/`, `models/`, `utils/`, `helpers/`, `lib/`,
   `common/`, `shared/`, `internal/`, `private/`, `config/`. A tiltás a puszta névre vonatkozik: a
   `minimax-config/` és a `firecrawl-config/` helyes, mert megnevezi a szolgáltatást.
-- Két kivétel a hatókör alól: `apps/web/src/main.ts` és a `tools/wire-probe` csomag
-  (SPEC-002 6.8).
+- Két kivétel a hatókör alól: `apps/web/src/vite-env.d.ts` és a `tools/wire-probe` csomag
+  (SPEC-002 6.8). Az előbbi a korábbi `apps/web/src/main.ts` kivétel helyére lépett, miután a
+  valódi UI belépési pont felállt (SPEC-007 12.2, T-008-30).
 
 **A bontási kritérium.** Darabszám küszöb nincs, mert nincs rá forrásunk. A darabszám csak azt
 jelzi, hol érdemes lefuttatni a próbát. Forrás: PLAN-004 3. szekció.
@@ -309,9 +310,35 @@ A `test` és a `build` a CI-ben önálló jobként fut, a többi hét a `gate` m
 mind a kilenc egyenrangú kapu, egyik sem "kiegészítő" a másikhoz képest (`tooling/scripts`
 CLAUDE.md, SPEC-003 10.3).
 
-**A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak.** A
-Playwright futtatás és az e2e lefedettségi riport a CI-ban külön `e2e` jobban fut, a `build`
-jobra várva; nem szerepel sem a gyökér kilenc kapu parancsai között, sem a `gate` mátrixban.
+**A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak, de
+2026-09-05 óta KIKÉNYSZERÍTETT KÜSZÖBŰ CI KAPU.** A Playwright futtatás és az e2e lefedettségi
+riport a CI-ban külön `e2e` jobban fut, a `build` jobra várva; nem szerepel sem a gyökér kilenc
+kapu parancsai között, sem a `gate` mátrixban.
+
+**Miért nem a tizedik kapu, és mi teszi mégis kapuvá.** A kilenc kapu a **lokális, commit előtti**
+készlet: mindegyik parancs futtatható build és böngésző nélkül, másodpercek alatt. Az e2e ezzel
+szemben Chromium telepítést és teljes frontend buildet igényel (a fejlesztői sandboxban ráadásul
+csak a 12. szekcióban leírt `LD_LIBRARY_PATH` kerülővel indul el), ezért marad külön kategória, a
+CI saját `e2e` jobjában. Ami kapuvá teszi: a `bun run coverage:e2e:report` a küszöb alatt **nem
+nulla kilépési kódot** ad, ettől az `e2e` job elbukik, az `e2e` job pedig szerepel az összesítő
+`ci` job `needs` listájában (`[gate, test, build, e2e]`), ami a repository ruleset egyetlen
+kötelező státuszcsekkje. A lánc mind a három szeme mérve, illetve dokumentált forrásból igazolva:
+`docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 6. szekció.
+
+**A küszöb értéke mért szám, ratchet.** A kikényszerítés helye az `apps/web/package.json`
+`coverage:e2e:report` scriptjének `--check-coverage` kapcsolója, mind a négy metrikára. A számokat
+ide nem írjuk (egy frissítés egy helyen történjen), a származtatás, a nem fedett részek tételes
+listája és a "nulla fájl kizárás" döntés a research fájlban áll. A küszöb pontosan a mért érték,
+felfelé kerekítés nélkül: a lefedettség nőhet, csökkenni észrevétlenül nem tud. Az `nyc`
+összehasonlítása szigorúan kisebb (`coverage < threshold`), tehát a küszöbbel egyenlő érték
+átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a `ci` job `needs` listája)
+az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+
+**Az e2e küszöb nem 100 százalék, és ez felhasználói döntés.** A unit lefedettség változatlanul
+100 százalék, kizárás nélkül. Az e2e küszöb alatta van, mert marad néhány, e2e-vel elvileg sem
+elérhető sor (build időben rögzülő `VITE_*` konfiguráció hibaágai, React `useEffect` cleanup, ami
+csak leszereléskor fut, és egy olyan hibaág, amit nem lehet felhasználói úton előidézni). Ezek
+tételesen, fájlonként indokolva a research fájlban állnak, és mind unit teszttel fedett.
 
 **Vitest projektek.** A gyökér `vitest.config.ts` `test.projects` mezője fogja össze a
 `packages/*` és `apps/*` csomagokat; `apps/web` és `packages/ui` saját `vitest.config.ts`-e adja a
@@ -321,9 +348,15 @@ scriptje, de a `no-shadowed-path-import.spec.ts` regressziós tesztje mégis lef
 fel, függetlenül attól, van-e a csomagnak `test` scriptje (gyökér `CLAUDE.md`).
 
 **Lefedettség.** 100 százalék mind a négy metrikán, kizárás nélkül. A `vitest.config.ts`
-`coverage.exclude` listája nem bővíthető. Csomag-specifikus kizárás ma nincs; az egyetlen
-ideiglenes kizárás az `apps/web/src/main.ts`, ami a valódi UI belépési pont megérkezésekor
-törlendő (gyökér `CLAUDE.md`, SPEC-002 9., SPEC-003 12.4).
+`coverage.exclude` listája **termékkód** kizárásra nem bővíthető: ez a tiltás célja, nem a
+szó szerinti "egyetlen sor sem kerülhet rá" olvasat. Csomag-specifikus **termékkód** kizárás ma
+nincs; a korábbi, ideiglenes `apps/web/src/main.ts` kizárás a valódi UI belépési pont
+megérkezésekor (SPEC-007 12.2, T-008-30) törölve lett a listáról (gyökér `CLAUDE.md`, SPEC-002
+9., SPEC-003 12.4). **Egy teszt fájl
+bejegyzés nem termékkód kizárás**, ezért a lista egyetlen `**/*.spec.tsx` sorral bővült, a már
+meglévő `**/*.spec.ts` bejegyzés pontos analógjaként egy másik kiterjesztésre: a `packages/ui`
+és az `apps/web` React komponens tesztjei `.spec.tsx` fájlok, valódi JSX-szel (user döntés,
+SPEC-007 O-1, 2026-09-01). Más sor a listán nem bővíthető.
 
 **Token takarékos wrapper kötelezettség.** Minden zajos parancshoz (lint, teszt, prettier, build,
 mérés) kötelező bash wrapper a `tooling/scripts` alatt, ami csak összegzést és a hibákat írja ki.
@@ -407,6 +440,15 @@ törlési út, és a bemenete kötelezően tartalmazza az `acknowledgeIrreversib
 pillanatkép nem kaszkádon megy: a futások törlése után, ugyanabban a tranzakcióban árva söprés
 viszi el. A felületnek megerősítést kell kérnie, megnevezve, mi vész el (SPEC-003 4.15, 9.2).
 
+**Amit a "megnevezve, mi vész el" konkrétan jelent.** A megnevezés forrása a `DeletionSummary`
+alakja, ami a `packages/db` repository rétegében dől el, onnan tükrözi a `packages/protocol`
+`DeletionSummarySchema`, és a felület azt jeleníti meg: `runCount`, `eventCount`,
+`snapshotCount`. A fenti bekezdés kaszkád-felsorolása (lépés futás, jóváhagyás) azt írja le, mi
+**törlődik**, nem azt, mi **számlálódik**: a lépés futások és a jóváhagyások a futással együtt,
+kaszkádban tűnnek el, tehát a futás darabszáma fedi őket. Ez a pont korábban a SPEC-007 48.
+kritériumában négy mezős felsorolásként állt, ami nem egyezett a sémával; a spec 2026-09-02-án a
+séma szerint javítva (SPEC-007 10.1, 48. kritérium).
+
 **Migrációk.** `drizzle-kit generate`, a generált SQL és a snapshot gitbe kerül; a `migrate()` az
 `openDatabase` része, a hálózati kapcsolatok fogadása előtt. **A `drizzle-kit push` tiltott.**
 Kézzel írt SQL a `--custom` üres migrációba kerül. Fejlesztés és éles ugyanazon az úton megy
@@ -457,29 +499,44 @@ test-nel").
   REST hívások `page.route()`-tal adott, garantált válasszal mennek, valós backend szervert a
   teszt nem szólíthat meg.
 
-**Nyitott kérdés: SSE mockolás.** Forrás:
-`docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekció.
+**SSE mockolás: lezárva, hibrid úton.** Forrás:
+`docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
+`docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekciójának nyitott kérdését
+saját, dokumentált méréssel lezárta (10 lefuttatott Playwright teszt a pinelt
+`@playwright/test@1.62.1` és chromium ellen). A korábbi nyitva jelölés ezzel törölve; a
+döntést a `docs/spec/SPEC-007-frontend-alkalmazas.md` 13.4 szekciója valósítja meg.
 
-A fenti "minden mockolva legyen" szabály az SSE csatornára (`GET /events`, `EventSource`)
-jelenleg **nem zárható le**: a Playwright hivatalos doksijának nincs SSE/`EventSource`
-mockolási útmutatója (a `docs/src/mock.md` guide HTTP mockolást, HAR visszajátszást és
-WebSocket mockolást dokumentál, `EventSource`-t nem). Van egy közösségi, megerősítetlen
-kimenetelű GitHub issue (`microsoft/playwright` #15353) a `page.route` + `text/event-stream`
-korlátairól, ahol a bejelentő szerint a `Content-Type` `null`-ként érkezett az `EventSource`
-oldalán; a lezárás oka nem ellenőrizhető.
+A "minden mockolva legyen" szabály az SSE csatornán (`GET /events`, `EventSource`) **az
+alapeset**, egyetlen, mérten körülhatárolt kivétellel.
 
-- **Nyitva marad, amíg nincs**: saját méréssel igazolt válasz arra, hogy a
-  `page.route`/`route.fulfill({ contentType: 'text/event-stream' })` minta megbízhatóan
-  mockolja-e az SSE-t a projekt pinelt Playwright verziója ellen.
-- **Lehetséges utak** (mérés dönt közöttük, nem feltételezés): (a) transzport szintű mockolás
-  `page.route`-tal, ha a mérés igazolja, hogy működik; (b) valós vagy célra írt könnyű teszt
-  szerver a `GET /events` végponton, a DOM végállapotára várva web-first assertion-nel, ekkor
-  az SSE csatorna kivétel a "minden mockolva legyen" szabály alól, amit a frontend specben
-  explicit ki kell mondani.
-- **Mi a viselkedés addig**: a frontend spec megírása előtt méréssel el kell dönteni, melyik
-  út valósul meg; addig egyik utat sem szabad kódba írni feltételezésből.
-- **Mi zárná le**: saját, dokumentált mérés a `page.route` + `text/event-stream` viselkedéséről
-  a projekt pinelt Playwright verziója ellen, `docs/research/` alá vezetve.
+- **`page.route()` + `route.fulfill({ contentType: 'text/event-stream' })` a HASZNÁLANDÓ út**
+  minden olyan teszthez, ami egyetlen, lezárt SSE válaszon belüli viselkedést ellenőriz: a
+  kapcsolat megnyitása, a `data:` keretek feldolgozása és a rájuk következő DOM frissülés, az
+  `id:` mező hatása az adott üzenet `lastEventId` mezőjére, az `event:` mezős nevesített
+  keretek, és a `Content-Type` beállítás. Mind mérten működik, és a hivatkozott
+  `microsoft/playwright` #15353 issue `Content-Type: null` állítása a pinelt verzió ellen
+  **nem reprodukálható**.
+- **`page.route()` NEM használható három, mérten bizonyított esetben**: a **`Last-Event-ID`
+  alapú újracsatlakozás** fejléc szintű ellenőrzésére, mert a második kapcsolat kérés
+  fejlécei a route rétegen nem tartalmazzák a fejlécet (holott a böngésző azt egy valódi
+  szerver felé a kontroll mérés szerint bizonyítottan elküldi); **egy már megnyitott,
+  folyamatban lévő mockolt kapcsolatba menet közben beszúrt új keret** szimulálására, mert a
+  `route.fulfill()` egyszeri, lezárt aktus ("Route is already handled!"), és a `Route` típusa
+  sem enged streamelést; és **bármely állítás, aminek a kapcsolat nyitva maradása az
+  előfeltétele** (2026-09-05-i mérés,
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 4. szekció): a `route.fulfill()`
+  lezárt válasz, tehát az `EventSource` a keretek után azonnal `error`-t kap, a `readyState`
+  kiesik `OPEN`-ből, és a `replaying`/`live` fázis csak egy meg nem figyelhető pillanatra
+  áll fenn.
+- **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
+  végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
+  működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
+  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
+- **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
+  hivatkozva. A SPEC-007 13.4 ezt megteszi.
+- **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
+  `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
+  a mérést meg kell ismételni azokra a motorokra is.
 
 **Frontend felületi elvárások.** Forrás: felhasználó kérése.
 
@@ -629,24 +686,48 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | rögzített verziók és a mögöttük álló okok                           | `docs/research/2026-08-26-toolchain.md`                                        |
 | tároló motor kiértékelés, méretmérések                              | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
 | SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
-| Playwright e2e teszt szabályok, SSE mockolás nyitott kérdése        | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
+| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
+| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
 ---
 
 ## 14. Ellentmondás esetén
 
-**Jelenleg nincs nyitott ellentmondás.** A korábban itt állt négy tétel (`CLAUDE.md` elhelyezés,
-a "nyolcadik kapu" elnevezés, a SPEC-001 14. "Karbantartási szabály" kontra `claude-md.sh`, a
-kétszintű csomagok száma) egyike sem valódi nyitott kérdés volt: mindegyik már eldöntött állapotot
-írt le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
+**Egy nyitott tétel áll.**
+
+**1. A fejlesztői REST hívás originje és a szerver CORS engedélyének hatóköre.**
+
+| Mező                      | Tartalom                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Melyik két forrás         | SPEC-006 5.7 (és 691. sor 8. kritériuma) kontra SPEC-007 O-4                                                                                                                                                                                                                                                                                                                      |
+| Mi az eltérés             | A SPEC-006 szerint a CORS engedély **kizárólag** a `STREAM_PATH` útvonalra vonatkozik, mert a REST hívás a Vite dev proxyn át, azonos originről érkezne (SPEC-005 5.8). A SPEC-007 viszont a REST hívást is a kötelező `VITE_API_ORIGIN` konfigurációra küldi, proxy nélkül. Ha a két origin fejlesztéskor eltér, a REST hívást a böngésző CORS okból eldobja                     |
+| Mi az érvényes viselkedés | Proxy szabály **nem íródik meg**, mert a `server.proxy` `target` mezője konkrét portot követel, amire nincs forrás (SPEC-006 O-1, SPEC-007 O-4), és tippelni tilos (4. szekció). A jelen kódban minden kliens hívás a `VITE_API_ORIGIN` értékre megy. Éles használatban a kérdés nem merül fel: a szerver szolgálja ki a felépített felületet, tehát azonos origin, és nincs CORS |
+| Mi zárná le               | A SPEC-006 O-1 termékdöntése a szerver portjáról és a dev szerver portjáról. Utána két út közül kell választani: a dev REST hívás proxyn megy (a SPEC-006 CORS engedélye változatlan marad), vagy közvetlenül (akkor a SPEC-006 5.7 hatóköre az `/api` előtagra is kiterjesztendő). A választást a usernek kell meghoznia, az askuserquestion tool-lal                            |
+
+A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
+`coverage.exclude` lista, a `CLAUDE.md` elhelyezés, a "nyolcadik kapu" elnevezés, a SPEC-001 14.
+"Karbantartási szabály" kontra `claude-md.sh`, a kétszintű csomagok száma) mindegyike lezárult.
+
+A `.spec.tsx` tétel lezárása: a user 2026-09-01-én a `.spec.tsx` út mellett döntött (SPEC-007
+O-1). A `vitest.config.ts` `coverage.exclude` listája egyetlen `**/*.spec.tsx` sorral bővült, a
+már meglévő `**/*.spec.ts` bejegyzés analógjaként; a `packages/ui` és az `apps/web` React
+komponens tesztjei `.spec.tsx` fájlok, valódi JSX-szel. A 8. szekció szövege ennek megfelelően
+pontosítva: a "nem bővíthető" tiltás a **termékkód** kizárásokra vonatkozik, egy teszt fájl
+bejegyzésre nem.
+
+A másik négy tétel egyike sem volt valódi nyitott kérdés: mindegyik már eldöntött állapotot írt
+le, csak a régi forrásdokumentum (SPEC-001, PLAN-002) nem lett átvezetve a döntéshez. Az
 átvezetés megtörtént (SPEC-001 14. szekció és 39. kritérium, SPEC-003 44. kritérium, PLAN-002 és
 PLAN-003 kapu-listája, `tooling/scripts/CLAUDE.md`, `.github/workflows/ci.yml`), a tételek
 törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-ben és e szabálykönyv 6.
 szekciójában is "három" (`core`, `provider-capability`, `db`).
 
-Ez a szekció ezért nem egy lista, hanem egy eljárás: mi a teendő, ha egy jövőbeli munkamenet
-tényleges, felhasználói döntést igénylő ellentmondást talál két forrásdokumentum között.
+A szekció alábbi része az eljárás: mi a teendő, ha egy munkamenet tényleges, felhasználói döntést
+igénylő ellentmondást talál két forrásdokumentum között. A fenti 1. tétel pontosan ezt az
+eljárást követi.
 
 1. **Nem döntjük el csendben.** Ha az egyik forrás egyértelműen elavult (a döntés megvan, csak
    nincs átvezetve), az nem ide tartozik: azt a talált helyen kell kijavítani, a döntéshez igazítva.

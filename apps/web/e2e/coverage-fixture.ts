@@ -10,8 +10,11 @@
 // dokumentalt "Combining reports from multiple runs" mintat kovet, csak a
 // `nyc --silent` helyett a Playwright fixture irja a raw JSON fajlokat.
 //
-// Az e2e coverage-re NINCS kuszob (SPEC-001 10. szekcio, elfogadasi
-// kriterium 24. pont: "E2E kuszob nem kerul bevezetesre").
+// Az e2e coverage-nek 2026-09-05 ota VAN kuszobe, mind a negy metrikan
+// (SPEC-001 10. szekcio, 24. elfogadasi kriterium). A kuszob szamait a
+// `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` meresi jegyzoknyve
+// szarmaztatja, a kikenyszerites helye az `apps/web/package.json`
+// `coverage:e2e:report` scriptjenek `--check-coverage` kapcsoloja.
 import { test as base } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';

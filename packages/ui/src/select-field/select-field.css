@@ -1,0 +1,106 @@
+/* ============================================================
+   EggProject — Select field (Select)
+   Forrás: eggproject-design-components/components/select/select.css,
+   kizárólag a .select* szabályok, bájtra azonosan. Kihagyva a forrás két
+   @import sora (a design-token tokenek globálisan töltődnek; a
+   ../menu/menu.css pedig a Menu komponensé, ami NEM tagja a SPEC-007 12.1
+   tizenkét komponens listájának), és a teljes Combobox szakasz
+   (.combo, .combo__input, .combo__caret, .combo__panel, .combo__empty) -
+   a Combobox önálló forrás komponens, szintén nem tagja a listának.
+   A forced-colors blokk emiatt csak a .select:focus-visible szelektort
+   viszi tovább, a .combo__input:focus szelektor nélkül; a blokk fölötti
+   magyarázó komment szövege változatlan marad, bár prózában megemlíti a
+   combo inputot is.
+   MELYIK VÁLTOZAT ÉPÜL: a forrás Select.jsx egyedi listbox (button
+   trigger + .menu panel), ami a Menu komponens CSS-ét igényelné. Helyette
+   a natív <select> retrofit épül meg, amit maga a forrás CSS nevez meg és
+   támogat ("Native <select> shares the .select shell", select.select
+   szabály). A button trigger szabályai (.select__value, .select__caret,
+   .select__icon, .select--open, .select__panel) így ma nem aktívak, de
+   bájtra azonosan átkerülnek, mert ugyanennek a komponensnek a részei.
+   Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+/* ============ Select ============
+   .select         — visual trigger (looks like .input but with chevron)
+   .select--open   — visual state when menu shows
+   The dropdown panel uses .menu — same as Menu component.
+============================================ */
+.select {
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-control-border);
+  border-radius: var(--ep-radius-md);
+  padding: 10px 14px;
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+  cursor: pointer;
+  transition:
+    border-color var(--ep-dur-fast) var(--ep-ease-out),
+    box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+  outline: none;
+  min-width: 200px;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+}
+/* The button trigger (React Select) lays out the value + caret; the native <select> retrofit
+   on static pages uses the platform control, so flex/gap stay button-only. */
+button.select { display: inline-flex; align-items: center; gap: 10px; }
+/* Native <select> shares the .select shell but keeps the platform dropdown indicator —
+   no appearance:none, no custom caret. box-sizing keeps width:100% inside the field grid. */
+select.select { box-sizing: border-box; max-width: 100%; }
+.select:where(:not(:disabled)):hover { border-color: var(--ep-fg); }
+.select:focus-visible,
+.select--open { border-color: var(--ep-accent); box-shadow: var(--ep-shadow-focus); }
+
+.select:disabled {
+  background: var(--ep-bg-sunken);
+  color: var(--ep-fg-subtle);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.select__icon {
+  width: 16px; height: 16px;
+  color: var(--ep-fg-muted);
+  flex-shrink: 0;
+}
+.select__value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select__value--placeholder { color: var(--ep-fg-placeholder); }
+.select__caret {
+  width: 14px; height: 14px;
+  color: var(--ep-fg-subtle);
+  flex-shrink: 0;
+  transition: transform var(--ep-dur-fast) var(--ep-ease-out);
+}
+.select--open .select__caret { transform: rotate(180deg); }
+
+.select--sm { padding: 7px 10px; font-size: 13px; min-width: 140px; }
+
+.select__panel {
+  margin-top: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .select,
+  .select__caret {
+    transition: none;
+  }
+}
+
+/* Forced-colors drops box-shadow, so the token focus ring vanishes; restore a real system
+   outline for the button trigger, the native <select> (both match .select) and the combo input.
+   Positive offset — none of these controls sits in an overflow-clipping ancestor. */
+@media (forced-colors: active) {
+  .select:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}

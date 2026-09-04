@@ -15,6 +15,7 @@ const config: Linter.Config[] = [
     ignores: [
       '**/dist/**',
       '**/coverage/**',
+      '**/coverage-e2e/**',
       '**/.turbo/**',
       'tools/wire-probe/artifacts/**',
       'tools/wire-probe/node_modules/**',

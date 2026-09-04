@@ -1,0 +1,268 @@
+/* ============================================================
+   EggProject — Button
+   Forrás: eggproject-design-components/components/button/button.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-01.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Button ============
+   Variants: primary · secondary · ghost · ink · danger
+   Sizes:    sm · md (default) · lg
+============================================ */
+.btn {
+  font: 500 14px/1 var(--ep-font-sans);
+  padding: 11px 18px;
+  border-radius: var(--ep-radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--ep-dur-base) var(--ep-ease-out),
+              border-color var(--ep-dur-base) var(--ep-ease-out),
+              color var(--ep-dur-base) var(--ep-ease-out),
+              box-shadow var(--ep-dur-base) var(--ep-ease-out),
+              transform var(--ep-dur-base) var(--ep-ease-out);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  letter-spacing: 0;
+  position: relative;
+}
+
+.btn--primary {
+  background: var(--ep-accent);
+  color: var(--ep-accent-on);
+  box-shadow: var(--ep-shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.30);
+}
+.btn--primary:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover { background: var(--ep-accent-hover); }
+
+/* Pressed / toggle — persistent on-state via aria-pressed="true".
+   Recessed fill + a top inset shadow as the non-colour depth cue; NO
+   transform, so a latched button never shifts. Theme-stable: accent-press,
+   accent-on and accent are identical in light, dark and auto. NOT guarded
+   against disabled — a disabled pressed button keeps its on-state under the
+   existing opacity:0.5. The inset replaces the raised idle shadow. */
+.btn--primary[aria-pressed="true"] {
+  background: var(--ep-accent-press);
+  color: var(--ep-accent-on);
+  border-color: var(--ep-accent);
+  box-shadow: inset 0 2px 4px rgba(10, 18, 48, 0.30);
+}
+/* Pressed + hover — outrank the idle primary hover (0,6,0 > 0,5,0) so
+   hovering a latched button keeps the pressed fill + inset, never reverting
+   to the idle hover. Guarded against the three disabled forms. */
+.btn--primary[aria-pressed="true"]:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
+  background: var(--ep-accent-press);
+}
+/* Pressed + focus — focus ring AND inset in ONE box-shadow list so neither
+   overrides the other (0,3,0 wins over .btn:focus-visible 0,2,0). The native
+   outline stays inherited from .btn as the forced-colors fallback. */
+.btn--primary[aria-pressed="true"]:focus-visible {
+  box-shadow: var(--ep-shadow-focus), inset 0 2px 4px rgba(10, 18, 48, 0.30);
+}
+
+.btn--secondary {
+  background: var(--ep-bg-elevated);
+  color: var(--ep-fg);
+  border-color: var(--ep-border);
+}
+.btn--secondary:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover { border-color: var(--ep-fg); }
+
+/* Pressed / toggle — stays NEUTRAL (no gold fill). The purpose-built
+   --ep-bg-pressed state-layer + the --ep-control-border interactive edge
+   carry the state in light AND dark (control-border ≥3:1 vs the page in both;
+   border-strong would fail 1.4.11 in dark). Top inset = depth cue (primarily
+   a light-theme read; dark depth comes from the state-layer + brighter edge).
+   NO transform. NOT guarded against disabled — a disabled pressed button keeps
+   its on-state under the existing opacity:0.5. Text stays --ep-fg (≥11:1). */
+.btn--secondary[aria-pressed="true"] {
+  background: var(--ep-bg-pressed);
+  border-color: var(--ep-control-border);
+  box-shadow: inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+/* Pressed + hover — outrank the idle secondary hover (0,6,0 > 0,5,0) so the
+   idle hover's --ep-fg border can't override the pressed edge; hold the fill
+   + inset (inherited from the base rule). */
+.btn--secondary[aria-pressed="true"]:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
+  border-color: var(--ep-control-border);
+}
+/* Pressed + focus — focus ring AND inset in ONE box-shadow list (0,3,0 wins
+   over .btn:focus-visible 0,2,0). Native outline stays as the forced-colors fallback. */
+.btn--secondary[aria-pressed="true"]:focus-visible {
+  box-shadow: var(--ep-shadow-focus), inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+
+.btn--ghost { background: transparent; color: var(--ep-accent-fg); }
+.btn--ghost:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover { background: var(--ep-accent-bg); }
+
+/* Pressed / toggle — stays ACCENT (gold), distinct from BOTH the ghost hover
+   (which fills the same --ep-accent-bg but has no border + no inset) and the
+   neutral secondary pressed (which uses --ep-bg-pressed + slate edge). The
+   --ep-accent-fg border is the state edge: it meets 1.4.11 (~5.2:1 light /
+   ~12.5:1 dark vs the page), unlike --ep-accent which would fail (~1.9:1).
+   Top inset = depth cue (mainly a light read; dark depth = the accent-fg edge).
+   NO transform. NOT guarded against disabled — keeps its on-state under opacity:0.5. */
+.btn--ghost[aria-pressed="true"] {
+  background: var(--ep-accent-bg);
+  border-color: var(--ep-accent-fg);
+  box-shadow: inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+/* Pressed + hover — outrank the idle ghost hover (0,6,0 > 0,5,0): hold the
+   fill + the accent-fg border + inset so the pressed look never collapses into
+   the borderless idle hover. */
+.btn--ghost[aria-pressed="true"]:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
+  background: var(--ep-accent-bg);
+  border-color: var(--ep-accent-fg);
+}
+/* Pressed + focus — focus ring AND inset in ONE box-shadow list (0,3,0 wins
+   over .btn:focus-visible 0,2,0). Native outline stays as the forced-colors fallback. */
+.btn--ghost[aria-pressed="true"]:focus-visible {
+  box-shadow: var(--ep-shadow-focus), inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+
+.btn--ink { background: var(--ep-ink-900); color: var(--ep-paper-100); }
+.btn--ink:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover { background: var(--ep-ink-950); }
+/* Ink edge needs a visible border on graphite (dark + auto-dark). */
+[data-theme="dark"] .btn--ink { border-color: var(--ep-control-border); }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .btn--ink { border-color: var(--ep-control-border); }
+}
+
+/* Pressed / toggle — stays solid/dark/premium ink. The surface goes to the
+   darkest ink (recess) and the border BRIGHTENS to cream: this is the one
+   token that reads as a state change in BOTH themes (light: transparent →
+   cream; dark: control-border → cream, ~5.8× brighter). MUST sit AFTER the
+   dark/auto ink border rules above — equal specificity (0,2,0), so source
+   order alone keeps the cream border from being reset to --ep-control-border.
+   The rgba(0,0,0,.45) inset is a deliberate ink-surface depth shadow (the only
+   direction that recesses on a near-black fill); NOT a generic black. NO
+   transform. NOT guarded against disabled — keeps its on-state under opacity:0.5. */
+.btn--ink[aria-pressed="true"] {
+  background: var(--ep-ink-950);
+  border-color: var(--ep-paper-100);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+/* Pressed + hover — outrank the idle ink hover (0,6,0 > 0,5,0): hold the
+   ink-950 fill + the cream border + inset so it never collapses into the
+   borderless idle hover. */
+.btn--ink[aria-pressed="true"]:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
+  background: var(--ep-ink-950);
+  border-color: var(--ep-paper-100);
+}
+/* Pressed + focus — focus ring AND inset in ONE box-shadow list (0,3,0 wins
+   over .btn:focus-visible 0,2,0). Native outline stays as the forced-colors fallback. */
+.btn--ink[aria-pressed="true"]:focus-visible {
+  box-shadow: var(--ep-shadow-focus), inset 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.btn--danger { background: transparent; color: var(--ep-danger); border-color: var(--ep-danger); }
+/* Hover fills with --ep-danger-bg; the text flips to --ep-fg because --ep-danger
+   on --ep-danger-bg is only ~4.05:1 in light (WCAG 1.4.3 fail). Border stays
+   --ep-danger (cascade). Idle text is unchanged. */
+.btn--danger:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover { background: var(--ep-danger-bg); color: var(--ep-fg); }
+
+/* Pressed / toggle — stays clearly DANGER. The danger-bg fill + the danger
+   border + an INSET danger ring (the inset 0 0 0 1px that thickens the edge to
+   ~2px) carry the destructive meaning AND the on-state in BOTH themes: the ring
+   is theme-stable (--ep-danger always contrasts its own fill — dark red on the
+   pale light fill, light rose on the dark fill), which is what separates pressed
+   from the normal danger hover, where the dark depth inset alone is invisible.
+   Text is --ep-fg (NOT --ep-danger): danger text on danger-bg is only ~4.05:1 in
+   light (WCAG 1.4.3 fail, same as the existing hover); --ep-fg restores ≥AA while
+   the hue is carried by the fill + border + ring. NO transform. NOT guarded
+   against disabled — keeps its on-state under the existing opacity:0.5. */
+.btn--danger[aria-pressed="true"] {
+  background: var(--ep-danger-bg);
+  color: var(--ep-fg);
+  border-color: var(--ep-danger);
+  box-shadow: inset 0 0 0 1px var(--ep-danger), inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+/* Pressed + hover — outrank the idle danger hover (0,6,0 > 0,5,0) so the text
+   stays --ep-fg and never collapses into the idle hover's --ep-danger text; hold
+   the fill + danger ring + inset. Guarded against the three disabled forms. */
+.btn--danger[aria-pressed="true"]:not(:disabled):not([disabled]):not([aria-disabled="true"]):hover {
+  background: var(--ep-danger-bg);
+  color: var(--ep-fg);
+  border-color: var(--ep-danger);
+  box-shadow: inset 0 0 0 1px var(--ep-danger), inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+/* Pressed + focus — focus ring AND the danger ring + inset in ONE box-shadow
+   list (0,3,0 wins over .btn:focus-visible 0,2,0). Native outline stays as the
+   forced-colors fallback. */
+.btn--danger[aria-pressed="true"]:focus-visible {
+  box-shadow: var(--ep-shadow-focus), inset 0 0 0 1px var(--ep-danger), inset 0 2px 4px rgba(10, 18, 48, 0.28);
+}
+
+/* Focus ring — the native outline is kept as a forced-colors fallback. */
+.btn:focus-visible { box-shadow: var(--ep-shadow-focus); }
+
+/* Press — 1px depth cue on every enabled variant. */
+.btn:not(:disabled):not([disabled]):not([aria-disabled="true"]):active { transform: translateY(1px); }
+
+/* Disabled — visual only; stays focusable (no pointer-events lock). */
+.btn:disabled,
+.btn[disabled],
+.btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+
+/* Loading — busy state. Carries aria-disabled for interaction semantics but
+   must NOT inherit the disabled 0.5 dim; the three-dot loader marks it instead.
+   (Equal specificity to the disabled rule above, so source order wins.) */
+.btn.is-loading { opacity: 1; cursor: progress; }
+.btn__loader { display: none; }
+.btn.is-loading .btn__content { opacity: 0; }   /* keep size + accessible name, hide ink */
+.btn.is-loading .btn__loader {
+  display: flex;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+}
+.btn__loader span {
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 50%;
+  background: currentColor;   /* inherits each variant's text colour */
+  animation: btn-dot 1.2s ease-in-out infinite;
+}
+.btn__loader span:nth-child(2) { animation-delay: 0.15s; }
+.btn__loader span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes btn-dot {
+  0%, 60%, 100% { opacity: 0.35; transform: scale(1); }
+  30%           { opacity: 1;    transform: scale(1.25); }
+}
+
+/* Reduced motion — keep the 1px press, drop the animation; the loader stays
+   visible as three solid dots so loading is still recognisable. */
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn__loader span { animation: none; opacity: 1; }
+}
+
+.btn--sm { padding: 7px 12px; font-size: 12px; }
+.btn--lg { padding: 14px 22px; font-size: 16px; border-radius: var(--ep-radius-lg); }
+
+.btn svg { width: 14px; height: 14px; }
+
+/* ── Icon-only — square geometry, composes with any colour variant + size.
+   Geometry + icon size only; never touches colours or states. Placed AFTER
+   the size rules so padding:0 and the explicit sizes win over the sm/lg
+   padding shorthand regardless of authoring order. Explicit logical sizes
+   (no aspect-ratio) + border-box keep the box an exact square incl. border. */
+.btn--icon {
+  box-sizing: border-box;
+  justify-content: center;
+  padding: 0;
+  inline-size: 38px;
+  block-size: 38px;
+  min-inline-size: 38px;
+  flex-shrink: 0;
+}
+.btn--icon.btn--sm { inline-size: 28px; block-size: 28px; min-inline-size: 28px; }
+.btn--icon.btn--lg { inline-size: 46px; block-size: 46px; min-inline-size: 46px; }
+
+.btn--icon svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn--icon.btn--sm svg { width: 14px; height: 14px; }
+.btn--icon.btn--lg svg { width: 18px; height: 18px; }

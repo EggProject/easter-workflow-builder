@@ -1,4 +1,39 @@
 {
   "extends": "../../tooling/tsconfig/react.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    // A react.json alapertelmezese ures types tomb (bongeszo csomag, nincs
+    // szuksege Node globalisokra). A `core` csomagot viszont FORRAS szinten
+    // fogyasztjuk (`exports` a `./src/index.ts`-re mutat, nincs build lepes,
+    // .claude/CLAUDE.md 7. "Forras fogyasztas"), tehat a `core` teljes
+    // forrasfaja bekerul ennek a csomagnak a TypeScript programjaba is - az
+    // `image-source` targykor `node:buffer` importjaval egyutt. Node tipusok
+    // nelkul ez TS2591 hibat ad. Ugyanaz a mintazat, mint a `db`-tol fuggo
+    // csomagok `skipLibCheck` kapcsoloja (.claude/CLAUDE.md 12.).
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    // Az `ui` csomag forrás szintű fogyasztása (`exports` a `./src/index.ts`-re
+    // mutat, nincs build lépés, .claude/CLAUDE.md 7. "Forrás fogyasztás") az UI
+    // komponensek `import './x.css'` oldalhatás importjait is behozza ennek a
+    // csomagnak a TypeScript programjába. Az ehhez tartozó ambiens
+    // `declare module '*.css'` deklaráció (`packages/ui/src/design-token/css-module.d.ts`)
+    // önmagában nem `import`-olt fájl, tehát a program csak akkor látja, ha
+    // explicit szerepel az `include` listán - ugyanaz a mintázat, mint a
+    // `packages/db`-től függő csomagok `skipLibCheck` kapcsolója
+    // (.claude/CLAUDE.md 12. szekció), csak itt a hiányzó ambiens deklaráció a
+    // probléma, nem egy típushibás lib.
+    "../../packages/ui/src/design-token/css-module.d.ts",
+    // A logó SVG URL import (`brand-mark/logo-mark-url.ts`) ugyanabba a
+    // kategóriába esik, mint a fenti CSS ambiens deklaráció: az `ui`
+    // forrás szintű fogyasztása ezt a fájlt is behozza a program
+    // import gráfjába, de az ambiens `declare module '*.svg'` fájlt
+    // magát semmi nem importálja, tehát explicit fel kell venni.
+    "../../packages/ui/src/brand-mark/svg-module.d.ts",
+    // A setup fájl a `src/` alatti mintán kívül él, tehát külön kell
+    // felvenni, hogy a `tsc` és az ESLint `projectService` is lássa - szó
+    // szerint ugyanaz, ahogy a `packages/ui/tsconfig.json` teszi.
+    "vitest.setup.ts"
+  ]
 }

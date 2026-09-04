@@ -1,0 +1,275 @@
+/* ============================================================
+   EggProject — Topnav shell (szűkített átemelés)
+   Forrás: eggproject-design-app-common/_shell.css, a .app-tn,
+   az .app-pagehead és az .app-content szabályok, szabályonként
+   bájtra azonosan. Az öt shell közül (sidebar, topnav, marketing,
+   docs, focus) kizárólag a topnav kerül át, mert a projekt csak
+   ezt használja (SPEC-007 4.2). Átemelés dátuma: 2026-09-01.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+
+   Az egyetlen, ehhez a fájlhoz KÜLÖN, a fájl végén álló blokk
+   adja a "faltól falig" felülírást (SPEC-007 5.2): a
+   --ep-layout-max-app token értékét a .app-tn scope-jában a
+   --ep-layout-max-full sentinelre állítja. Az alább átemelt
+   szabályok egyetlen bájtja sem módosult ehhez képest.
+   ============================================================ */
+
+/* === Page header inside main ============================== */
+.app-pagehead {
+  padding: 32px 40px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.app-pagehead__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.app-pagehead__title {
+  font: 400 36px/1.1 var(--ep-font-display);
+  letter-spacing: -0.02em;
+  color: var(--ep-fg);
+}
+.app-pagehead__title em { font-weight: 700; }
+.app-pagehead__lead {
+  font: 400 15px/1.55 var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+  max-width: 60ch;
+}
+.app-pagehead__actions { display: flex; gap: 10px; align-items: center; }
+
+.app-content {
+  padding: 8px 40px 80px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* === 2 · Top-nav app shell ================================= */
+.app-tn {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  background: var(--ep-bg-sunken);
+}
+.app-tn__bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 20px;
+  height: 60px; padding: 0 28px;
+  background: var(--ep-bg-elevated);
+  border-bottom: 1px solid var(--ep-divider);
+}
+.app-tn__brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; text-decoration: none; color: var(--ep-fg); }
+.app-tn__brand img { width: 24px; height: 24px; }
+.app-tn__brand b {
+  font: 600 17px var(--ep-font-sans);
+  letter-spacing: -0.02em;
+  display: inline-flex; align-items: baseline; gap: 4px;
+}
+.app-tn__brand b::after {
+  content: ""; width: 4px; height: 4px;
+  background: var(--ep-blue-600); border-radius: 50%;
+  display: inline-block; margin-bottom: 2px;
+}
+.app-tn__navigation { display: flex; gap: 2px; }
+.app-tn__navigation a {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--ep-radius-md);
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+  text-decoration: none;
+  transition: background var(--ep-dur-fast) var(--ep-ease-out),
+              color var(--ep-dur-fast) var(--ep-ease-out);
+}
+.app-tn__navigation a svg { width: 16px; height: 16px; flex-shrink: 0; }
+.app-tn__navigation a:hover { color: var(--ep-fg); background: var(--ep-bg-hover); }
+.app-tn__navigation a.is-on { background: var(--ep-accent); color: var(--ep-fg-on-blue); }
+.app-tn__navigation a .pill {
+  font: 500 11px var(--ep-font-mono);
+  background: var(--ep-bg-sunken); color: var(--ep-fg-subtle);
+  padding: 1px 6px; border-radius: 999px;
+}
+.app-tn__navigation a.is-on .pill { background: rgba(255,255,255,0.12); color: var(--ep-paper-100); }
+.app-tn__actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.app-tn__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app-tn__inner { width: 100%; max-width: var(--ep-layout-max-app, 1240px); margin: 0 auto; }
+
+/* ============================================================
+   Faltól falig override (SPEC-007 5.2). ÚJ, önálló blokk — a
+   fenti, átemelt .app-tn szabály egyetlen bájtja sem változott.
+   A --ep-layout-max-full sentinel (design-token/breakpoints.css)
+   a design system saját, erre a célra szánt tokenje: `none`.
+   ============================================================ */
+.app-tn {
+  --ep-layout-max-app: var(--ep-layout-max-full);
+}
+
+/* ============================================================
+   Reszponzív: navigáció lenyíló menübe (SPEC-007 5.3, M-26, M-29).
+   ÚJ, a forrásban nem létező szabály: az M-28 mérés szerint a
+   forrás _shell.css három media querye egyike sem érinti a
+   .app-tn bart, tehát ezt saját kézzel kellett megépíteni,
+   kizárólag a design-token/breakpoints.css --ep-screen-md
+   tokenjének értékével (768px).
+
+   A panel NYITOTTSÁGA NEM CSS állapot (SPEC-007 M-29 indoklása):
+   a láthatóságát a hívó a .app-tn gyökér elem
+   data-navigation-open attribútumával vezérli (lásd
+   AppShellFrame isNavigationMenuOpen prop). Alapértelmezésben
+   (data-navigation-open="false") a panel zárt. Az attribútum
+   tényleges állapotváltása app szintű felelősség (SPEC-007
+   T-008-23, ezen munkamenet hatókörén kívül) — ez a szabály
+   kizárólag a panel VIZUÁLIS alakját adja.
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-tn__navigation {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    z-index: 9;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+    background: var(--ep-bg-elevated);
+    border-bottom: 1px solid var(--ep-divider);
+    display: none;
+  }
+  .app-tn[data-navigation-open='true'] .app-tn__navigation {
+    display: flex;
+  }
+}
+
+/* ============================================================
+   A lenyíló navigációt nyitó gomb (SPEC-007 5.3, T-008-23). ÚJ,
+   a forrásban nem létező szabály, a fenti blokk párja: a gomb
+   kizárólag --ep-screen-md (768px) alatt látszik, mert fölötte a
+   navigáció már a barban van, a gombra nincs szükség. Az
+   `isNavigationMenuOpen` tényleges állapotváltása (kattintás,
+   útvonalváltáskori zárás) az app-shell téma felelőssége; ez a
+   szabály kizárólag a gomb vizuális alakját adja.
+   ============================================================ */
+.app-tn__nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ep-fg);
+  border-radius: var(--ep-radius-md);
+  cursor: pointer;
+}
+.app-tn__nav-toggle:hover {
+  background: var(--ep-bg-hover);
+}
+.app-tn__nav-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 768px) {
+  .app-tn__nav-toggle {
+    display: inline-flex;
+  }
+}
+
+/* ============================================================
+   Mobil vízszintes túllógás javítása (SPEC-007 5.3). ÚJ, a
+   forrásban nem létező szabály.
+
+   A MÉRT HIBA. A `.app-tn__bar` nem törő flex sor, aminek mindkét
+   gyereke a saját tartalmi szélességén marad: a brand (hamburger
+   plusz a 17px/600 márkanév) 229px, az akciók (stream státusz
+   szöveg plusz téma váltó) 142px. 468px viewport szélesség alatt a
+   kettő nem fér el, a bar tartalma kilóg jobbra, és mivel a
+   `.app-tn` blokk szintű, a túllógás a dokumentumra terjed: 320px-en
+   a `documentElement.scrollWidth` 427 volt a 320-as `clientWidth`
+   mellett (+107px), és a téma váltó gomb teljesen a képernyőn kívülre
+   került. Mérés: 2026-09-02, chromium, `apps/web` preview build.
+
+   A JAVÍTÁS IRÁNYA. Az akciók sáv nem zsugorodik (`flex: 0 0 auto`),
+   tehát a státusz szöveg és a téma váltó gomb mindig teljes egészében
+   a viewporton belül marad; a nyomást a márkanév veszi fel, ami
+   ellipszissel rövidül. A hamburger gomb szintén nem zsugorodik, hogy
+   a lenyíló navigáció elérhető maradjon.
+
+   A `display: block` felülírás a márkanéven azért kell, mert a
+   `text-overflow: ellipsis` nem hat egy `inline-flex` konténer
+   névtelen szöveg-flexelemére; a `::after` márkapont a levágott
+   szöveggel együtt tűnik el, ami a szándékolt viselkedés.
+
+   A töréspont a `design-token/breakpoints.css` --ep-screen-md
+   tokenjének értéke (768px), ugyanaz, amit a lenyíló navigáció
+   használ; a tényleges törés 468px körül kezdődik, arra a
+   szélességre viszont nincs token, ezért a fölötte álló, "tablet"
+   jelentésű tokennél lépünk be. A media-query-breakpoint-invariant
+   regressziós teszt őrzi, hogy ki ne találjunk másik számot.
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-tn__brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .app-tn__brand b {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .app-tn__nav-toggle {
+    flex: 0 0 auto;
+  }
+  .app-tn__actions {
+    flex: 0 0 auto;
+  }
+  /* A 40px-es oldalsó belső margó egy 320px-es kijelzőn a szélesség
+     negyedét elveszi. A `--ep-layout-gutter` (24px) a design system
+     saját, erre a célra szánt "horizontal page padding" tokenje;
+     mérés szerint ezzel fér el 375px-en a művelet gomb sor két
+     sorban három helyett. A függőleges értékek változatlanok. */
+  .app-pagehead,
+  .app-content {
+    padding-left: var(--ep-layout-gutter);
+    padding-right: var(--ep-layout-gutter);
+  }
+}
+
+/* ============================================================
+   A márkanév SZÖVEGE szűk nézetben (felhasználói kérés,
+   2026-09-05). ÚJ, a forrásban nem létező szabály, a fenti
+   ellipszises rövidítés kiegészítése.
+
+   A MÉRT HIBA. A fenti, --ep-screen-md alatti `text-overflow:
+   ellipsis` 320px-en egyetlen "e" betűre csonkolta a márkanevet:
+   a felhasználó a logó mellett egy értelmetlen betűt látott.
+   Saját mérés (2026-09-05, chromium, apps/web preview build,
+   `<b>.scrollWidth > <b>.clientWidth`): a szöveg 320, 360, 375,
+   390, 414 és 480px szélességen csonkolt, 540, 600, 640, 700 és
+   768px szélességen viszont már nem. A csonkolási határ tehát
+   480 és 540px között van.
+
+   A JAVÍTÁS. A márkajel `<img>` 2026-09-04 óta a márkanév előtt
+   áll, és önmagában hordozza az identitást, ezért szűk nézetben a
+   szöveg teljesen eltűnhet. `display: none`-nal NEM: az MDN szerint
+   az "will remove it from the accessibility tree", a márkanév
+   viszont a lap identitása, tehát képernyőolvasónak elérhetőnek
+   kell maradnia. A használt deklaráció lista a W3C WAI C7 technika
+   `.visually-hidden` szabálykészlete, szó szerint
+   (https://www.w3.org/WAI/WCAG21/Techniques/css/C7), ami a mai
+   `clip-path`-ot és a régi, deprecated `clip` fallbacket is hozza.
+   A `::after` márkapont a szöveggel együtt tűnik el, mert annak
+   pszeudo-eleme.
+
+   A TÖRÉSPONT. A mért csonkolási határra (480 ... 540px) nincs
+   design system token: a breakpoints.css legszűkebb tokenje a
+   --ep-screen-sm (640px), és ez a legkisebb olyan token, ami a
+   teljes mért csonkolási tartományt lefedi. Kitalált számot a
+   media-query-breakpoint-invariant regressziós teszt amúgy sem
+   engedne.
+   ============================================================ */
+@media (max-width: 640px) {
+  .app-tn__brand b {
+    clip-path: inset(100%);
+    clip: rect(1px, 1px, 1px, 1px);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}

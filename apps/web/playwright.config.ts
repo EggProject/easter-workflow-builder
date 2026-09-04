@@ -1,10 +1,20 @@
-// Playwright 1.62.1 alap konfiguracio (SPEC-001 10. szekcio). Az
-// `apps/web` meg nem a tenyleges alkalmazas (lasd vite.config.ts
-// megjegyzese) - ez a konfiguracio es a `e2e/smoke.spec.ts` a Playwright
-// vazat igazolja, valodi UI nelkul.
+// Playwright 1.62.1 konfiguracio (SPEC-001 10. szekcio). A `webServer.env`
+// haromnak a VITE_ elotagu kotelezo felulet konfiguraciot allitja be
+// buildidoben (SPEC-007 O-4, O-6): enelkul a `readFrontendConfig` hibaagat
+// adna, es minden e2e teszt a "Hianyzo kotelezo konfiguracio" hibakepernyot
+// latna a valodi UI helyett.
+//
+// A VITE_API_ORIGIN egy FIX, buildidoben rogzitett origin
+// (http://localhost:4174), amit a legtobb teszt `page.route()`-tal fog el -
+// nem kell, hogy ott tenylegesen fusson barmi. A `docs/research/
+// 2026-08-30-sse-mockolas-meres.md` szerinti EGYETLEN kivetel (Last-Event-ID
+// ujracsatlakozas es kozbeni keret beszuras) sajat, celra irt `node:http`
+// teszt szervere UGYANERRE a 4174-es portra kotodik, hogy a buildidoben
+// rogzitett origin valodi halozati hivast kapjon `page.route()` nelkul.
 import { defineConfig, devices } from '@playwright/test';
+import { API_ORIGIN, PREVIEW_ORIGIN } from './e2e/api-origin.ts';
 
-const PREVIEW_PORT = 4173;
+const PREVIEW_PORT = Number(new URL(PREVIEW_ORIGIN).port);
 
 export default defineConfig({
   testDir: './e2e',
@@ -27,7 +37,7 @@ export default defineConfig({
   ...(Boolean(process.env['CI']) && { workers: 1 }),
   reporter: 'list',
   use: {
-    baseURL: `http://localhost:${String(PREVIEW_PORT)}`,
+    baseURL: PREVIEW_ORIGIN,
     trace: 'on-first-retry',
   },
   projects: [
@@ -44,11 +54,14 @@ export default defineConfig({
     // env valtozo itt, kozvetlenul a build parancs elott aktivalja az
     // instrumentalast, hogy a `dist/` amit a `vite preview` kiszolgal,
     // tenylegesen tartalmazza a window.__coverage__ inicializalast.
-    command: 'vite build && vite preview --port 4173 --strictPort',
+    command: `vite build && vite preview --port ${String(PREVIEW_PORT)} --strictPort`,
     port: PREVIEW_PORT,
     reuseExistingServer: !process.env['CI'],
     env: {
       VITE_COVERAGE: 'true',
+      VITE_API_ORIGIN: API_ORIGIN,
+      VITE_LIST_LIMIT: '50',
+      VITE_STREAM_REPLAY_LIMIT: '100',
     },
   },
 });

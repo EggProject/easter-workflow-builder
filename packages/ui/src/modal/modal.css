@@ -1,0 +1,171 @@
+/* ============================================================
+   EggProject — Modal
+   Forrás: eggproject-design-components/components/modal/modal.css,
+   bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. A fájl minden szabálya a Modal
+   és a ModalFooter komponenshez tartozik, ezért szűkítés nem kellett.
+   Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+/* ============ Modal ============
+   Structure:
+     .modal-overlay > .modal[ .modal--<size> ]
+       > .modal__header ( .modal__eyebrow + .modal__title + .modal__close )
+       > .modal__body
+       > .modal__footer
+   Sizes: sm (380) · md (520, default) · lg (720) · xl (920)
+============================================ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10, 18, 48, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+  z-index: 1000;
+  animation: modal-overlay-in var(--ep-dur-base) var(--ep-ease-out);
+}
+
+.modal {
+  background: var(--ep-bg-elevated);
+  border-radius: var(--ep-radius-xl);
+  box-shadow: var(--ep-shadow-xl);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 64px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: modal-in var(--ep-dur-base) var(--ep-ease-out);
+}
+.modal--sm { max-width: 380px; }
+.modal--lg { max-width: 720px; }
+.modal--xl { max-width: 920px; }
+
+.modal__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px 28px 0;
+}
+.modal__header-text { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.modal__eyebrow {
+  font: var(--ep-text-overline);
+  letter-spacing: var(--ep-track-overline);
+  text-transform: uppercase;
+  color: var(--ep-fg-subtle);
+}
+.modal__title {
+  font: 400 28px/1.15 var(--ep-font-display);
+  letter-spacing: var(--ep-track-tight);
+  color: var(--ep-fg);
+}
+.modal__title em { font-weight: 700; }
+.modal__subtitle {
+  font: var(--ep-text-body);
+  color: var(--ep-fg-muted);
+  margin-top: 2px;
+}
+.modal__close {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--ep-radius-md);
+  background: transparent;
+  border: 0;
+  color: var(--ep-fg-muted);
+  cursor: pointer;
+  transition: color var(--ep-dur-fast) var(--ep-ease-out),
+              background-color var(--ep-dur-fast) var(--ep-ease-out),
+              box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+  flex-shrink: 0;
+}
+.modal__close:hover { background: var(--ep-bg-hover); color: var(--ep-fg); }
+/* Keyboard focus only: design-system gold ring, no layout shift. Outline removed only
+   because the box-shadow ring replaces it; the ring survives hover (no box-shadow there). */
+.modal__close:focus-visible { outline: none; box-shadow: var(--ep-shadow-focus); }
+.modal__close svg { width: 16px; height: 16px; }
+
+.modal__body {
+  padding: 18px 28px 4px;
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+  overflow-y: auto;
+  flex: 1;
+}
+.modal__body > * + * { margin-top: 14px; }
+
+.modal__footer {
+  display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+  padding: 20px 28px 24px;
+  margin-top: 16px;
+}
+.modal__footer--split { justify-content: space-between; }
+.modal__footer-left { display: flex; align-items: center; gap: 10px; }
+
+/* Iconified header — leading status indicator */
+.modal__icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  background: var(--ep-accent-bg);
+  color: var(--ep-accent);
+}
+.modal__icon--success { background: var(--ep-success-bg); color: var(--ep-success); }
+.modal__icon--warning { background: var(--ep-warning-bg); color: var(--ep-warning-fg); }
+.modal__icon--danger  { background: var(--ep-danger-bg);  color: var(--ep-danger);  }
+.modal__icon svg { width: 18px; height: 18px; }
+
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ============ Reduced motion ============
+   Drop the backdrop fade, the panel scale/translate entrance, and the close-button
+   transitions. The keyframe end states equal the natural rendered state, so the modal
+   still appears fully formed and instantly — nothing waits on animation, so the focus
+   manager needs no timing coordination and the focus ring shows at once. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal { animation: none; }
+  .modal__close { transition: none; }
+}
+
+/* ============ Forced colors (Windows High Contrast etc.) ============
+   Shadows and rgba tints drop out here, so map panel, backdrop, text and close button
+   onto explicit system colors and give the panel a real border for separation. System
+   colors are honoured without forced-color-adjust, so none is used (no global override). */
+@media (forced-colors: active) {
+  /* Backdrop: solid system fill, no blur — the panel stays primary via its border. */
+  .modal-overlay {
+    background: Canvas;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Panel: Canvas fill + CanvasText hairline. border-box (global reset) → no layout shift. */
+  .modal {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .modal__title,
+  .modal__body { color: CanvasText; }
+  .modal__eyebrow,
+  .modal__subtitle { color: GrayText; }
+  /* Close button: recognizable shape; system outline replaces the box-shadow focus ring. */
+  .modal__close {
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+  .modal__close:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .modal__close:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

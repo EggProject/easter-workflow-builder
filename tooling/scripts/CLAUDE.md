@@ -116,6 +116,16 @@ helyen sosem jelenhet meg.
   kommentbe kerülő táblázatot olvashatatlanná tenné, a `--silent` pedig a bun
   `$ <parancs>` visszhangját némítja el. Az `nyc` kapcsolói így egyetlen helyen, az
   `apps/web/package.json`-ben maradnak.
+- **Az `e2e-coverage.sh` 2026-09-05 óta kikényszerített küszöbű kaput burkol, nem puszta
+  riportot.** Az `nyc` a `--check-coverage` kapcsoló mellett `process.exitCode = 1` értéket
+  állít, ha bármelyik metrika a küszöb alatt van, és a hibát `console.error`-ral, tehát
+  **stderr-re** írja - pontosan abba a csatornába, amit ez a wrapper amúgy is a hibáknak
+  tart fenn. A wrapper ilyenkor a stdoutra semmit nem ír, a napló végét a stderr-re teszi,
+  és a kilépési kódot továbbadja. A küszöb számai nem itt, hanem az `apps/web/package.json`
+  scriptjében állnak; a származtatásuk a
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` fájlban. A kapu jellegét (a
+  `--check-coverage` megléte és az `e2e` job a `ci` job `needs` listájában) az
+  `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
 - A `check-dependency-graph.sh` ugyanazért nem turbo taskon keresztül fut, mint a
   `casing.sh`: a szabálya a teljes repóra vonatkozik, nem csomagonként. A gyökér
   `package.json` `check:graph` scriptje hívja - tagja a kilenc minőségi kapunak

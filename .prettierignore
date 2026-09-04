@@ -7,3 +7,24 @@ test-results
 bun.lock
 tools/wire-probe/artifacts
 tools/wire-probe/.proxy.log
+
+# Vendorolt, valtozatlanul atemelt eggproject-design fajlok (SPEC-007 4.5):
+# a bajtazonossag a garancia, a Prettier ne formazza at oket. A komponens
+# CSS fajlok fajlonkent kerulnek fel, mert a temamappaban a .tsx fajlt a
+# Prettier-nek formazni KELL.
+packages/ui/src/design-token
+packages/ui/src/self-hosted-font
+packages/ui/src/topnav-shell/topnav-shell.css
+packages/ui/src/button/button.css
+packages/ui/src/badge/badge.css
+packages/ui/src/card/card.css
+packages/ui/src/skeleton/skeleton.css
+packages/ui/src/loading-indicator/loading-indicator.css
+packages/ui/src/toast/toast.css
+packages/ui/src/text-field/text-field.css
+packages/ui/src/select-field/select-field.css
+packages/ui/src/form-control/form-control.css
+packages/ui/src/modal/modal.css
+packages/ui/src/tab/tab.css
+packages/ui/src/data-table/data-table.css
+packages/ui/src/menu/menu.css

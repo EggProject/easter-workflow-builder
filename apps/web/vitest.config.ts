@@ -17,5 +17,11 @@ export default defineProject({
     name: 'web',
     environment: 'happy-dom',
     exclude: [...configDefaults.exclude, 'e2e/**'],
+    // Ugyanaz az indok, mint a packages/ui projektnel: a React 19 act()
+    // kornyezet jelzese, es a Vitest happy-dom projekt-kornyezeteben nem
+    // mukodo globalThis.localStorage javitasa. Az app-shell a packages/ui
+    // ThemeModeToggle komponenset rajzolja, ami localStorage-t olvas, es a
+    // Vitest projekt configok semmit nem oroklenek egymastol.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

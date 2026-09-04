@@ -1,4 +1,12 @@
 {
   "extends": "../../tooling/tsconfig/react.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    // A react.json alapertelmezese ures types tomb (bongeszo csomag, nincs
+    // szuksege Node globalisokra a termekkodban). A bajtazonossagi
+    // regresszios tesztek viszont `node:fs`/`node:crypto` hivassal olvassak
+    // a sajat masolatukat (SPEC-007 4.2), ezert a Node tipusok itt,
+    // csomag szinten kellenek.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }
