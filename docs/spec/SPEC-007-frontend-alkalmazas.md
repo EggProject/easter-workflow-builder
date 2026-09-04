@@ -301,12 +301,32 @@ A `.app-tn__bar` magassága `60px`, `position: sticky`, `top: 0` (M-28), és ezt
 
 **A használt töréspontok, és miért pont azok.** A token kommentek nevezik meg a jelentésüket (M-26), tehát a választás a design system saját szótárából jön, nem találgatásból.
 
-| Töréspont                   | Mi történik alatta                                                                                                                                                                                                                                                                                                                                                                        | Miért ez a token                                     |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `--ep-screen-md` (`768px`)  | a `.app-tn__navigation` kikerül a barból egy lenyíló menübe, amit a brand melletti gomb nyit; a márkanév zsugorodik és ellipszissel rövidül, míg az akciók sáv (stream státusz, téma váltó) nem zsugorodik; az oldal vízszintes belső margója `--ep-layout-gutter`-re szűkül; a data table harmadlagos oszlopai elrejtőznek, és a cella tartalma törhet, hogy a művelet gombok elférjenek | a token kommentje szerint ez a **tablet** határa     |
-| `--ep-screen-lg` (`1024px`) | a data table másodlagos oszlopai (leírás, létrehozás ideje) elrejtőznek, az azonosító és az állapot marad                                                                                                                                                                                                                                                                                 | a token kommentje szerint ez a **kis laptop** határa |
+| Töréspont                   | Mi történik alatta                                                                                                                                                                                                                                                                                                                                                                        | Miért ez a token                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `--ep-screen-md` (`768px`)  | a `.app-tn__navigation` kikerül a barból egy lenyíló menübe, amit a brand melletti gomb nyit; a márkanév zsugorodik és ellipszissel rövidül, míg az akciók sáv (stream státusz, téma váltó) nem zsugorodik; az oldal vízszintes belső margója `--ep-layout-gutter`-re szűkül; a data table harmadlagos oszlopai elrejtőznek, és a cella tartalma törhet, hogy a művelet gombok elférjenek | a token kommentje szerint ez a **tablet** határa       |
+| `--ep-screen-sm` (`640px`)  | a márkanév **szövege** teljesen eltűnik (a logó marad), de kizárólag vizuálisan: a W3C WAI C7 `.visually-hidden` deklaráció listájával, nem `display: none`-nal, tehát a hozzáférhetőségi fában jelen marad                                                                                                                                                                               | a token kommentje szerint ez a **nagy telefon** határa |
+| `--ep-screen-lg` (`1024px`) | a data table másodlagos oszlopai (leírás, létrehozás ideje) elrejtőznek, az azonosító és az állapot marad                                                                                                                                                                                                                                                                                 | a token kommentje szerint ez a **kis laptop** határa   |
 
 **A mobil túllógás mért indoklása (2026-09-02).** A fenti `--ep-screen-md` sor második fele nem tervezésből, hanem mérésből jött: a `.app-tn__bar` nem törő flex sorában a brand (229px) és az akciók (142px) 468px viewport szélesség alatt nem fértek el, a bar tartalma kilógott, és a `.app-tn` blokk szintűsége miatt a túllógás a dokumentumra terjedt (320px-en `scrollWidth` 427 a 320-as `clientWidth` mellett), a téma váltó gomb pedig a képernyőn kívülre került. A tábla `flex: 1 1 0` cellái ezzel egyidejűleg a tartalmuk alá zsugorodtak, és a művelet gombok kifutottak a viewportból. Az abláció szerint a cella tördelése az egyetlen lépés, ami a gombokat ténylegesen a viewportba hozza; a harmadlagos oszlop rejtése önmagában 414px-ig nem elég, de a tördelt sorok magasságát 116px-ről 80px-re viszi le. A tényleges törés 468px körül kezdődik, arra a szélességre viszont **nincs token**, ezért a fölötte álló `--ep-screen-md` tokennél lépünk be; kitalált töréspontot nem vezetünk be.
+
+**A márkanév csonkolásának mért indoklása (2026-09-05).** A fenti `--ep-screen-md` sor
+ellipszises rövidítése egy szűk nézetben rosszabb állapotot hozott létre, mint a rejtés: 320px-en
+a márkanév egyetlen "e" betűre csonkolt, a felhasználó tehát a logó mellett egy értelmetlen betűt
+látott. Saját mérés (chromium, `apps/web` preview build, `<b>.scrollWidth > <b>.clientWidth`): a
+szöveg 320, 360, 375, 390, 414 és 480px szélességen csonkolt, 540, 600, 640, 700 és 768px
+szélességen viszont már nem, tehát a csonkolási határ 480 és 540px között van. Erre a szélességre
+**nincs token**, a `breakpoints.css` legszűkebb tokenje a `--ep-screen-sm` (640px), és ez a
+legkisebb olyan token, ami a teljes mért csonkolási tartományt lefedi - ezért ott lépünk be. A
+logó (`.app-tn__brand img`) 2026-09-04 óta a márkanév előtt áll és önmagában hordozza az
+identitást, ezért a szöveg eltűnhet; `display: none` viszont tilos, mert az MDN szerint az
+"will remove it from the accessibility tree", a márkanév pedig a lap identitása. A használt
+deklaráció lista a W3C WAI C7 technika szó szerinti szabálykészlete
+(<https://www.w3.org/WAI/WCAG21/Techniques/css/C7>). A regressziót az `apps/web/e2e/responsive.spec.ts`
+két tesztje őrzi: a szűk nézetben a `boundingBox()` szélessége legfeljebb 1px, a computed `display`
+és `visibility` viszont nem `none`/`hidden`, a logó látszik, és a topnav nem lóg túl; a token
+fölött egy pixellel a szöveg teljes szélességben látszik. A `toBeVisible()` erre **nem** alkalmas:
+a Playwright dokumentált definíciója szerint egy nem üres befoglaló dobozú, `visibility: hidden`
+nélküli elem "visible", tehát egy 1x1 pixeles, klippelt elem is átmenne rajta.
 
 **A korábban mért kivétel 2026-09-04 óta NEM áll fenn.** A futás előzmények tábláján a
 legkeskenyebb eszközön (`iPhone SE`, 320px) a "Megszakítás" feliratú szöveges gomb 91px-es

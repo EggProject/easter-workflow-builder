@@ -228,3 +228,48 @@
     padding-right: var(--ep-layout-gutter);
   }
 }
+
+/* ============================================================
+   A márkanév SZÖVEGE szűk nézetben (felhasználói kérés,
+   2026-09-05). ÚJ, a forrásban nem létező szabály, a fenti
+   ellipszises rövidítés kiegészítése.
+
+   A MÉRT HIBA. A fenti, --ep-screen-md alatti `text-overflow:
+   ellipsis` 320px-en egyetlen "e" betűre csonkolta a márkanevet:
+   a felhasználó a logó mellett egy értelmetlen betűt látott.
+   Saját mérés (2026-09-05, chromium, apps/web preview build,
+   `<b>.scrollWidth > <b>.clientWidth`): a szöveg 320, 360, 375,
+   390, 414 és 480px szélességen csonkolt, 540, 600, 640, 700 és
+   768px szélességen viszont már nem. A csonkolási határ tehát
+   480 és 540px között van.
+
+   A JAVÍTÁS. A márkajel `<img>` 2026-09-04 óta a márkanév előtt
+   áll, és önmagában hordozza az identitást, ezért szűk nézetben a
+   szöveg teljesen eltűnhet. `display: none`-nal NEM: az MDN szerint
+   az "will remove it from the accessibility tree", a márkanév
+   viszont a lap identitása, tehát képernyőolvasónak elérhetőnek
+   kell maradnia. A használt deklaráció lista a W3C WAI C7 technika
+   `.visually-hidden` szabálykészlete, szó szerint
+   (https://www.w3.org/WAI/WCAG21/Techniques/css/C7), ami a mai
+   `clip-path`-ot és a régi, deprecated `clip` fallbacket is hozza.
+   A `::after` márkapont a szöveggel együtt tűnik el, mert annak
+   pszeudo-eleme.
+
+   A TÖRÉSPONT. A mért csonkolási határra (480 ... 540px) nincs
+   design system token: a breakpoints.css legszűkebb tokenje a
+   --ep-screen-sm (640px), és ez a legkisebb olyan token, ami a
+   teljes mért csonkolási tartományt lefedi. Kitalált számot a
+   media-query-breakpoint-invariant regressziós teszt amúgy sem
+   engedne.
+   ============================================================ */
+@media (max-width: 640px) {
+  .app-tn__brand b {
+    clip-path: inset(100%);
+    clip: rect(1px, 1px, 1px, 1px);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+}

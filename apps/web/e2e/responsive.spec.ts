@@ -286,6 +286,106 @@ test('a lenyíló navigáció nyitott állapotban sem okoz vízszintes túllóg�
   await expect.poll(async () => horizontalOverflow(page)).toBe(0);
 });
 
+// ============================================================
+// REGRESSZIÓ: a márkanév csonkolása szűk nézetben (2026-09-05).
+//
+// A MÉRT HIBA. A `.app-tn__brand b` ellipszises rövidítése 320px-en
+// egyetlen "e" betűre csonkolta a márkanevet, ami rosszabb, mint ha nem
+// is látszana: a felhasználó a logó mellett egy értelmetlen betűt látott.
+// A javítás a --ep-screen-sm token alatt teljesen elrejti a SZÖVEGET (a
+// logó marad), de kizárólag vizuálisan: a W3C WAI C7 technika szerint,
+// nem `display: none`-nal, mert az az MDN szerint a hozzáférhetőségi
+// fából is kivenné, a márkanév pedig a lap identitása.
+// ============================================================
+
+const SMALL_SCREEN_TOKEN_PATTERN = /--ep-screen-sm:\s*(\d+)px/;
+
+/**
+ * A `--ep-screen-sm` token értéke a design system `breakpoints.css`
+ * fájljából olvasva, nem beírva: eddig a szélességig rejtett a topnav
+ * márkanév szövege (`topnav-shell.css`).
+ */
+function smallScreenBreakpointWidth(): number {
+  const content = readFileSync(BREAKPOINTS_CSS_PATH, 'utf8');
+  const match = SMALL_SCREEN_TOKEN_PATTERN.exec(content);
+  if (match?.[1] === undefined) {
+    throw new Error('A --ep-screen-sm token nem található a breakpoints.css fájlban.');
+  }
+  return Number(match[1]);
+}
+
+/**
+ * A `toBeVisible()` erre a kérdésre NEM alkalmas: a Playwright dokumentált
+ * definíciója szerint "element is considered visible when it has non-empty
+ * bounding box and does not have `visibility:hidden` computed style"
+ * (https://playwright.dev/docs/actionability#visible), tehát egy 1x1
+ * pixeles, klippelt elem is "visible". A tényleges kérdés a doboz mérete,
+ * ezt pedig a dokumentált `locator.boundingBox()` adja meg.
+ */
+async function renderedWidth(locator: ReturnType<Page['getByText']>): Promise<number> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error('A keresett elemnek nincs befoglaló doboza.');
+  }
+  return box.width;
+}
+
+/**
+ * Az MDN szerint pontosan két CSS érték veszi ki az elemet a
+ * hozzáférhetőségi fából: a `display: none` és a `visibility: hidden`
+ * ("will remove it from the accessibility tree"). A rejtésnek egyiket sem
+ * szabad használnia.
+ */
+async function accessibilityTreeRemovingStyles(
+  locator: ReturnType<Page['getByText']>,
+): Promise<{ display: string; visibility: string }> {
+  return locator.evaluate((element) => {
+    const style = globalThis.getComputedStyle(element);
+    return { display: style.display, visibility: style.visibility };
+  });
+}
+
+test('a márkanév szövege szűk nézetben vizuálisan rejtett, a logó viszont látszik', async ({ page }) => {
+  const narrowWidth = SUPPORTED_VIEWPORT_WIDTHS[0];
+  expect(narrowWidth).toBeDefined();
+  expect(narrowWidth ?? 0).toBeLessThan(smallScreenBreakpointWidth());
+
+  await page.setViewportSize({ width: narrowWidth ?? 0, height: VIEWPORT_HEIGHT });
+  await page.goto('/');
+  await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
+
+  const brandText = page.getByText('easter-workflow-builder', { exact: true });
+
+  // A szöveg NINCS csonkolva egy értelmetlen betűre: a teljes márkanév
+  // ott áll a DOM-ban, csak vizuálisan rejtve.
+  await expect(brandText).toHaveText('easter-workflow-builder');
+  // Vizuálisan rejtett: a W3C WAI C7 technika 1x1 pixeles dobozt ad.
+  expect(await renderedWidth(brandText)).toBeLessThanOrEqual(1);
+  // Hozzáférhetőségi fában viszont jelen van: sem `display: none`,
+  // sem `visibility: hidden`.
+  expect(await accessibilityTreeRemovingStyles(brandText)).toEqual({ display: 'block', visibility: 'visible' });
+
+  // A logó marad, és az hordozza az identitást. A márkajel szándékosan
+  // dekoratív (`alt=""`, tehát a role fából kivett kép), ezért ez az
+  // egyetlen hely, ahol nem alkalmazható semmilyen szemantikus locator,
+  // és CSS szelektor kell (a szabálykönyv 11. szekciója szerinti
+  // "csak akkor, ha egyik sem alkalmazható" eset).
+  await expect(page.locator('.app-tn__brand img')).toBeVisible();
+
+  // És a topnav továbbra sem lóg túl.
+  await expect.poll(async () => horizontalOverflow(page)).toBe(0);
+});
+
+test('a --ep-screen-sm fölött a márkanév szövege teljes szélességben látszik', async ({ page }) => {
+  await page.setViewportSize({ width: smallScreenBreakpointWidth() + 1, height: VIEWPORT_HEIGHT });
+  await page.goto('/');
+  await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
+
+  const brandText = page.getByText('easter-workflow-builder', { exact: true });
+  await expect(brandText).toBeVisible();
+  expect(await renderedWidth(brandText)).toBeGreaterThan(1);
+});
+
 test.describe('valódi mobil eszköz emuláció', () => {
   // A `devices['Pixel 7']` `defaultBrowserType` mezőjét nem lehet tovább
   // adni: a Playwright ezt csak a config `projects` szintjén fogadja el, egy
