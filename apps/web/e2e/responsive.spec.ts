@@ -216,7 +216,14 @@ test('a futás előzmények egyetlen támogatott viewport szélességen sem lóg
   }
 });
 
-test('a téma váltó és a workflow művelet gombjai minden szélességen a viewporton belül vannak', async ({ page }) => {
+// A táblázat sor műveletek 2026-09-04 óta egyetlen hárompontos ikon gomb
+// mögötti lebegő menübe kerültek (felhasználói kérés), a korábbi három
+// önálló szöveges gomb helyett. A teszt ezért a triggert ÉS a megnyitott
+// menü mindhárom elemét ellenőrzi a viewportban, nem törölve a korábbi
+// állítást, hanem átfogalmazva rá.
+test('a téma váltó és a workflow sor műveletek menüje minden szélességen a viewporton belül vannak', async ({
+  page,
+}) => {
   for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
     // A `test.step` a viewport szélességet a hibaüzenetbe emeli: a
     // `toBeInViewport` maga csak arányt jelent, azt nem, melyik
@@ -230,13 +237,30 @@ test('a téma váltó és a workflow művelet gombjai minden szélességen a vie
       // az érintkezést, és a köztes, `overflow` konténerek okozta vágást is
       // elkapja - pontosan ez bukott el a hibás állapotban.
       await expect(page.getByRole('button', { name: /^Téma:/ })).toBeInViewport({ ratio: 1 });
+
+      const trigger = page.getByRole('button', { name: /^Műveletek/ });
+      await expect(trigger).toBeInViewport({ ratio: 1 });
+      await trigger.click();
       for (const label of ['Átnevezés', 'Törlés', 'Indítás']) {
-        await expect(page.getByRole('button', { name: label })).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('menuitem', { name: label })).toBeInViewport({ ratio: 1 });
       }
+      // Zárás billentyűzettel, hogy a következő iteráció (`page.goto`)
+      // előtt ne maradjon nyitott menü - bár az új navigáció úgyis
+      // eltünteti, ez explicit dokumentálja az Escape zárás elvárását.
+      await page.keyboard.press('Escape');
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     });
   }
 });
 
+// A KORÁBBI MÉRT KIVÉTEL (320px-en a "Megszakítás" szöveges gomb 91px
+// tartalmi szélessége 13px-cel meghaladta a cellára jutó helyet, ezért a
+// tábla saját `overflow-x: auto` konténerén belül görgetve volt csak
+// elérhető) 2026-09-04 óta NEM ÁLL FENN: a gomb ikon gombbá vált
+// (`.btn--icon`, 28px szélesség `sm` méretben), ami jelentősen a korábbi
+// 91px alatt van. A teszt ezért a szigorú, görgetés nélküli
+// `toBeInViewport` állítást használja, a korábbi `scrollIntoViewIfNeeded`
+// kerülőút nélkül - lásd SPEC-007 5.3 a lezárt mérésért.
 test('a futás előzmények téma váltója és művelet gombja minden szélességen elérhető', async ({ page }) => {
   for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
     await test.step(`viewport szélesség: ${String(width)}px`, async () => {
@@ -245,22 +269,7 @@ test('a futás előzmények téma váltója és művelet gombja minden széless�
       await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
 
       await expect(page.getByRole('button', { name: /^Téma:/ })).toBeInViewport({ ratio: 1 });
-
-      // MÉRT KIVÉTEL, ezért itt `scrollIntoViewIfNeeded` áll a szigorú,
-      // görgetés nélküli állítás helyett. A futás előzmények tábláján a
-      // legkeskenyebb eszközön (iPhone SE, 320px) három oszlop marad
-      // (Workflow, Állapot, Műveletek), és a "Megszakítás" felirat egyetlen,
-      // nem törhető szó: 2026-09-02-i mérés szerint a gomb 91px-es
-      // tartalmi szélessége 13px-cel meghaladja a cellára jutó helyet, és
-      // ezen a szélességen sem cella-, sem sor-belső margó elvételével nem
-      // szüntethető meg, csak egy negyedik oszlop-szinttel. A gomb ezért a
-      // tábla SAJÁT `overflow-x: auto` konténerén belül görgetve érhető el -
-      // pontosan az a viselkedés, amit a szabálykönyv 11. szekciója a széles
-      // tartalomra előír. Az OLDAL törzse ettől függetlenül nem görget
-      // vízszintesen, azt a fenti két teszt szigorúan állítja.
-      const interruptButton = page.getByRole('button', { name: 'Megszakítás' });
-      await interruptButton.scrollIntoViewIfNeeded();
-      await expect(interruptButton).toBeInViewport({ ratio: 1 });
+      await expect(page.getByRole('button', { name: /^Megszakítás/ })).toBeInViewport({ ratio: 1 });
     });
   }
 });

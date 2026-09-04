@@ -109,7 +109,12 @@ test('workflow átnevezése a soronkénti modálison keresztül', async ({ page 
 
   await page.goto('/');
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Átnevezés' }).click();
+  // A sor műveletek 2026-09-04 óta egy hárompontos triggerből nyíló, portálon
+  // (`document.body`) át renderelt menü mögé kerültek (felhasználói kérés),
+  // ezért a menüelem NEM a sor leszármazottja - a triggert kell előbb
+  // megnyitni, a menüitemet pedig a `page` szintjén kell megcélozni.
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
   const nameField = dialog.getByLabel('Név');
@@ -130,7 +135,10 @@ test('workflow törlése: az összegzés és a jelölőnégyzet nélkül a gomb 
 
   await page.goto('/');
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Törlés' }).click();
+  // Lásd a fenti "Átnevezés" tesztnél lévő megjegyzést: a menü portálon
+  // (`document.body`) át nyílik, nem a sor leszármazottjaként.
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Törlés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow törlése' });
   await expect(dialog.getByText('3 futást')).toBeVisible();
@@ -166,7 +174,10 @@ test('workflow törlése: a megerősítés után a DELETE törzse acknowledgeIrr
 
   await page.goto('/');
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Törlés' }).click();
+  // Lásd a fenti "Átnevezés" tesztnél lévő megjegyzést: a menü portálon
+  // (`document.body`) át nyílik, nem a sor leszármazottjaként.
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Törlés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow törlése' });
   await dialog.getByText('Tudomásul veszem, hogy a törlés nem vonható vissza').click();
@@ -188,7 +199,10 @@ test('futás indítása a Futás előzmények útvonalra navigál', async ({ pag
 
   await page.goto('/');
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Indítás' }).click();
+  // Lásd a fenti "Átnevezés" tesztnél lévő megjegyzést: a menü portálon
+  // (`document.body`) át nyílik, nem a sor leszármazottjaként.
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
   await expect(page.getByRole('heading', { name: 'Futás előzmények' })).toBeVisible();
 });

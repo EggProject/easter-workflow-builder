@@ -29,7 +29,10 @@ test.beforeEach(async ({ page }) => {
 
 test('nyitáskor az első fókuszálható elemre (a bezárás gombra) kerül a fókusz', async ({ page }) => {
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Átnevezés' }).click();
+  // A sor műveletek 2026-09-04 óta egy hárompontos triggerből nyíló, portálon
+  // (`document.body`) át renderelt menü mögé kerültek (felhasználói kérés).
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
   await expect(dialog.getByRole('button', { name: 'Bezárás' })).toBeFocused();
@@ -37,7 +40,8 @@ test('nyitáskor az első fókuszálható elemre (a bezárás gombra) kerül a f
 
 test('Shift+Tab az első elemről az utolsóra ugrik, Tab az utolsóról vissza az elsőre', async ({ page }) => {
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  await row.getByRole('button', { name: 'Átnevezés' }).click();
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
   const closeButton = dialog.getByRole('button', { name: 'Bezárás' });
@@ -59,8 +63,15 @@ test('Shift+Tab az első elemről az utolsóra ugrik, Tab az utolsóról vissza 
 
 test('Escape bezárja a dialógust, és a fókusz visszatér a megnyitó gombra', async ({ page }) => {
   const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
-  const triggerButton = row.getByRole('button', { name: 'Átnevezés' });
+  // A "megnyitó gomb" itt a hárompontos trigger: az "Átnevezés" menüitem a
+  // kiválasztáskor bezárja a menüt (ekkor a Menu saját fókusz-visszaállítása
+  // a triggerre kerül), és csak EZUTÁN nyílik meg a modális - a Modal a
+  // MOUNT pillanatában rögzíti a `document.activeElement`-et
+  // (packages/ui/src/modal/Modal.tsx), ami emiatt a trigger, nem a
+  // (már bezárt menüből eltűnt) menüitem.
+  const triggerButton = row.getByRole('button', { name: /^Műveletek/ });
   await triggerButton.click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
   await expect(dialog).toBeVisible();
