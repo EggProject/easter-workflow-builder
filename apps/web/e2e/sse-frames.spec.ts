@@ -207,6 +207,117 @@ test('a stream_ready keret NEM váltja ki a lista újratöltését', async ({ pa
   expect(listRunsCallCount).toBe(1);
 });
 
+/**
+ * Egy `stream_ready` keret a megadott szerver példány azonosítóval és
+ * feliratkozás listával. A `subscriptions` alakja azonos a `PUT` válaszával
+ * (`stream-subscription.ts`).
+ */
+function streamReadyFrame(serverInstanceId: string, replayingRunIds: readonly string[]): StreamFrame {
+  return {
+    event: 'stream_ready',
+    streamId: 'e2e-stream',
+    serverInstanceId,
+    subscriptions: replayingRunIds.map((runId) => ({ runId, fromEventId: 0, replayLimit: 100 })),
+  };
+}
+
+test('érvénytelen JSON törzsű keret figyelmen kívül marad, a kapcsolat tovább él', async ({ page }) => {
+  // A `handleFrame` a `JSON.parse` köré tett try/catch-csel némán eldobja a
+  // sérült keretet. A rá következő, ép `stream_ready` viszont feldolgozódik,
+  // tehát a hibás keret nem rontja el a kapcsolatot.
+  let listRunsCallCount = 0;
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => {
+      listRunsCallCount += 1;
+      await route.fulfill(jsonBody([RUN_PENDING]));
+    }),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: `event: run_event\ndata: ez nem json\n\n${encodeStreamFrame(streamReadyFrame('s-1', []))}`,
+    });
+  });
+
+  await page.goto('/runs');
+
+  await expect(page.getByRole('table', { name: 'Futások' }).getByRole('row', { name: /r-1/ })).toBeVisible();
+  // A sérült `run_event` keret NEM váltott ki újratöltést: egyetlen hívás
+  // volt, a csatoláskori.
+  expect(listRunsCallCount).toBe(1);
+});
+
+test('ismeretlen alakú keret figyelmen kívül marad, a kapcsolat tovább él', async ({ page }) => {
+  // A törzs érvényes JSON, de a `StreamFrameSchema` diszkriminált uniója
+  // egyetlen ágra sem illeszkedik: a `decodeStreamFrame` hibaágat ad, és a
+  // `handleFrame` visszatér.
+  let listRunsCallCount = 0;
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => {
+      listRunsCallCount += 1;
+      await route.fulfill(jsonBody([RUN_PENDING]));
+    }),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: `event: run_event\ndata: {"event":"nincs_ilyen_keret"}\n\n${encodeStreamFrame(streamReadyFrame('s-1', []))}`,
+    });
+  });
+
+  await page.goto('/runs');
+
+  await expect(page.getByRole('table', { name: 'Futások' }).getByRole('row', { name: /r-1/ })).toBeVisible();
+  expect(listRunsCallCount).toBe(1);
+});
+
+test('ugyanaz a serverInstanceId kétszer NEM számít szerver újraindulásnak', async ({ page }) => {
+  // A `setServerInstance` frissítője azonos azonosítóra változatlanul adja
+  // vissza az előző állapotot, tehát a `serverRestartCount` nem nő, és a
+  // képernyő nem tölt újra (SPEC-007 16. szekció 44. kritérium ellenpárja).
+  let listRunsCallCount = 0;
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => {
+      listRunsCallCount += 1;
+      await route.fulfill(jsonBody([RUN_PENDING]));
+    }),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: [streamReadyFrame('s-1', []), streamReadyFrame('s-1', [])]
+        .map((frame) => encodeStreamFrame(frame))
+        .join(''),
+    });
+  });
+
+  await page.goto('/runs');
+
+  await expect(page.getByRole('table', { name: 'Futások' }).getByRole('row', { name: /r-1/ })).toBeVisible();
+  expect(listRunsCallCount).toBe(1);
+});
+
+// A `replaying` fázis (feliratkozásos `stream_ready` plusz `replay_complete`)
+// MÉRTEN nem figyelhető meg `page.route()` mockon: a `route.fulfill()` lezárt
+// válasz, tehát az `EventSource` a keretek után azonnal `error`-t kap, kiesik
+// `OPEN`-ből, és a `computePhase` a `reconnecting` ágra fut. Ezek a tesztek
+// ezért a valódi teszt szerveren futnak, lásd `sse-real-server.spec.ts`.
+
 test('protocol_error keret nem szakítja meg a kapcsolatot, a lista tovább használható marad', async ({ page }) => {
   await setup(page, [[RUN_PENDING]]);
   const frames: readonly StreamFrame[] = [

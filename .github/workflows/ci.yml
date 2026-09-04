@@ -234,8 +234,15 @@ jobs:
       # A `window.__coverage__` nyers adatat az apps/web/e2e/coverage-fixture.ts
       # menti tesztenkent az `apps/web/e2e/.nyc_output` ala; ezt fesuli ossze a
       # gyoker `coverage:e2e:report` scriptje, azaz a
-      # `tooling/scripts/e2e-coverage.sh` token takarekos wrapper (nyc). Kuszob
-      # nincs (SPEC-001 10. szekcio, 24. elfogadasi kriterium), csak riport.
+      # `tooling/scripts/e2e-coverage.sh` token takarekos wrapper (nyc).
+      #
+      # EZ KIKENYSZERITETT KUSZOB, nem csak riport (2026-09-05, felhasznaloi
+      # dontes). Az `apps/web/package.json` scriptje `--check-coverage`
+      # kapcsoloval fut, mind a negy metrikara a MERT ertekkel
+      # (`docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`). Kuszob alatt a
+      # wrapper nem nulla kilepesi kodot ad, az alabbi `if !` ag elbuktatja a
+      # lepest, a lepes az `e2e` jobot, az `e2e` job pedig - mert szerepel az
+      # osszesito `ci` job `needs` listajaban - a `ci` jobot is.
       #
       # Az nyc `text` reportere nem ad gepi olvashato osszegzot (nincs
       # json-summary), ezert a szoveges tablazat kerul kodblokkban a job
@@ -271,7 +278,7 @@ jobs:
             cat "$RUNNER_TEMP/e2e-coverage.txt"
             echo '```'
             echo ''
-            echo 'Erre a riportra nincs kuszob (SPEC-001 10. szekcio), csak riport.'
+            echo 'Kikenyszeritett kuszob mind a negy metrikan (SPEC-001 10. szekcio): kuszob alatt ez a job, es vele a `ci` job is elbukik.'
             # A visszapipa itt markdown kodjeloles, nem parancs-behelyettesites,
             # ezert kell egyes idezojel es ezert nem alkalmazando az SC2016.
             # shellcheck disable=SC2016

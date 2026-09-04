@@ -119,14 +119,15 @@ Minden sor **saját mérés** a telepített skill fájlokon, 2026-08-30, a `~/.c
 
 A teljes mérési jegyzőkönyv: [`../research/2026-08-30-sse-mockolas-meres.md`](../research/2026-08-30-sse-mockolas-meres.md). Ez a mérés zárja le a `.claude/CLAUDE.md` 11. szekciójának nyitott kérdését. A mérés a pinelt `@playwright/test@1.62.1` és chromium ellen futott.
 
-| #    | Tény                                                                                                                                                                                                                                                              |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M-38 | A `page.route()` **elfogja** az `EventSource` kérését, az `onopen` tüzel a mockolt válaszra, több `data:` keret sorrendben megérkezik, az `id:` mező eljut a kliens `lastEventId` mezőjéig egy kapcsolaton belül, és az `event:` mezős nevesített esemény működik |
-| M-39 | A `Content-Type: text/event-stream` a mockolt válaszon **nem** `null`: az oldalon belüli `fetch` pontosan ezt az értéket olvassa vissza, és az `EventSource` sikeresen megnyílik, ami a szabvány szerint hibás típusnál lehetetlen lenne                          |
-| M-40 | Újracsatlakozáskor a második `page.route()` hívás megtörténik, de a kérés fejléclistája **nem tartalmazza** a `last-event-id` kulcsot, sem a `Route` API három metódusán, sem a `page.on('request')` csatornán                                                    |
-| M-41 | **Kontroll mérés valódi `node:http` szerver ellen**, ugyanazzal a kliens kóddal: a második kérés fejléceiben a `last-event-id: 1` érték **jelen van**. A böngésző tehát helyesen küldi, csak a `page.route()` réteg nem teszi láthatóvá                           |
-| M-42 | A `route.fulfill()` **egyszeri**: a második hívás `"Route is already handled!"` hibát dob, és a `playwright-core@1.62.1` típusdefiníciója szerint a `body` mező típusa `string \| Buffer`, tehát nincs streamelési API                                            |
-| M-43 | A könnyű `node:http` teszt szerver plusz web-first assertion út **működik**: a demonstrációs teszt egyetlen `expect(locator).toHaveText()` állítással, `waitForTimeout` nélkül zöld, és a `Last-Event-ID` alapú újracsatlakozás forgatókönyvét hitelesen fedi     |
+| #    | Tény                                                                                                                                                                                                                                                                                                                         |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M-38 | A `page.route()` **elfogja** az `EventSource` kérését, az `onopen` tüzel a mockolt válaszra, több `data:` keret sorrendben megérkezik, az `id:` mező eljut a kliens `lastEventId` mezőjéig egy kapcsolaton belül, és az `event:` mezős nevesített esemény működik                                                            |
+| M-39 | A `Content-Type: text/event-stream` a mockolt válaszon **nem** `null`: az oldalon belüli `fetch` pontosan ezt az értéket olvassa vissza, és az `EventSource` sikeresen megnyílik, ami a szabvány szerint hibás típusnál lehetetlen lenne                                                                                     |
+| M-40 | Újracsatlakozáskor a második `page.route()` hívás megtörténik, de a kérés fejléclistája **nem tartalmazza** a `last-event-id` kulcsot, sem a `Route` API három metódusán, sem a `page.on('request')` csatornán                                                                                                               |
+| M-41 | **Kontroll mérés valódi `node:http` szerver ellen**, ugyanazzal a kliens kóddal: a második kérés fejléceiben a `last-event-id: 1` érték **jelen van**. A böngésző tehát helyesen küldi, csak a `page.route()` réteg nem teszi láthatóvá                                                                                      |
+| M-42 | A `route.fulfill()` **egyszeri**: a második hívás `"Route is already handled!"` hibát dob, és a `playwright-core@1.62.1` típusdefiníciója szerint a `body` mező típusa `string \| Buffer`, tehát nincs streamelési API                                                                                                       |
+| M-43 | A könnyű `node:http` teszt szerver plusz web-first assertion út **működik**: a demonstrációs teszt egyetlen `expect(locator).toHaveText()` állítással, `waitForTimeout` nélkül zöld, és a `Last-Event-ID` alapú újracsatlakozás forgatókönyvét hitelesen fedi                                                                |
+| M-44 | A `page.route()` mockon **nem figyelhető meg** semmi, aminek a kapcsolat nyitva maradása az előfeltétele: a `route.fulfill()` lezárt válasz után az `EventSource` azonnal `error`-t kap, a `readyState` kiesik `OPEN`-ből, és a `replaying` fázis csak egy meg nem figyelhető pillanatra áll fenn (2026-09-05-i saját mérés) |
 
 ### 2.7 A repó jelenlegi állapota
 
@@ -145,7 +146,7 @@ Saját mérés a repón, 2026-08-30.
 
 - **Az M-1 ... M-3 együtt nem jelenti azt, hogy a `@vitejs/plugin-react` felesleges.** Csak azt jelenti, hogy a **fordításhoz** nem kell. A Fast Refresh a plugin dolga, és annak elmaradása fejlesztői kényelmi kérdés, nem helyességi. Ez a különbség dönti el a 7.1 döntést és az O-3 nyitott kérdést.
 - **Az M-37-ből nem következik, hogy a TanStack tábla alkalmatlan React 19 alatt.** Abból csak az következik, hogy nevesített állítás nincs, tehát a projekt szabálya szerint mérni kell, mielőtt bármit állítanánk (O-2).
-- **Az M-40-ből nem következik, hogy a `page.route()` mockolás használhatatlan.** Az M-38 és az M-39 szerint az esetek nagy részére működik; pontosan két, mérten körülhatárolt esetre nem (13.4).
+- **Az M-40-ből nem következik, hogy a `page.route()` mockolás használhatatlan.** Az M-38 és az M-39 szerint az esetek nagy részére működik; pontosan három, mérten körülhatárolt esetre nem (13.4, az M-44 a harmadik).
 - **Az M-24-ből nem következik, hogy az SSE kliens nem tesztelhető.** Abból az következik, hogy az `EventSource` létrehozása **befecskendezett gyáron** kell menjen, ugyanúgy, ahogy a szerver oldalon az idő és a nyelő port (9.1).
 - **Az M-26-ból nem következik, hogy a design system reszponzív.** Abból az következik, hogy a **tokenek** megvannak, a media queryket viszont nekünk kell megírni, és kizárólag a token értékeivel (5.3).
 
@@ -919,18 +920,23 @@ dolognak a neve, amit őriz.
 
 **Az SSE oldal: hibrid, mérés alapján.** A `docs/research/2026-08-30-sse-mockolas-meres.md` mérése ezt egyértelműen eldöntötte:
 
-| Amit tesztelünk                                             | Hogyan                               | Forrás        |
-| ----------------------------------------------------------- | ------------------------------------ | ------------- |
-| a kapcsolat megnyílása, a `stream_ready` keret feldolgozása | `page.route()` mock                  | M-38, M-39    |
-| több `data:` keret sorrendben, a DOM frissülése rájuk       | `page.route()` mock                  | M-38          |
-| a nevesített `event:` keretek (mind az öt típus)            | `page.route()` mock                  | M-38          |
-| az `id:` mező hatása egy kapcsolaton belül                  | `page.route()` mock                  | M-38          |
-| **a `Last-Event-ID` alapú újracsatlakozás**                 | **könnyű `node:http` teszt szerver** | M-40 ... M-43 |
-| **menet közben, élő kapcsolatba beszúrt keret**             | **könnyű `node:http` teszt szerver** | M-42          |
+| Amit tesztelünk                                               | Hogyan                               | Forrás        |
+| ------------------------------------------------------------- | ------------------------------------ | ------------- |
+| a kapcsolat megnyílása, a `stream_ready` keret feldolgozása   | `page.route()` mock                  | M-38, M-39    |
+| több `data:` keret sorrendben, a DOM frissülése rájuk         | `page.route()` mock                  | M-38          |
+| a nevesített `event:` keretek (mind az öt típus)              | `page.route()` mock                  | M-38          |
+| az `id:` mező hatása egy kapcsolaton belül                    | `page.route()` mock                  | M-38          |
+| **a `Last-Event-ID` alapú újracsatlakozás**                   | **könnyű `node:http` teszt szerver** | M-40 ... M-43 |
+| **menet közben, élő kapcsolatba beszúrt keret**               | **könnyű `node:http` teszt szerver** | M-42          |
+| **a `replaying` és a `live` fázis** (nyitva maradó kapcsolat) | **könnyű `node:http` teszt szerver** | M-44          |
 
 **A kivétel kimondása, indoklással.** A "minden mockolva legyen" szabály alól a `Last-Event-ID` alapú újracsatlakozás tesztje **kivétel**, mert ez a viselkedés `page.route()`-tal **mérten nem figyelhető meg**: a második kapcsolat kérés fejlécei a route rétegen nem tartalmazzák a `Last-Event-ID` fejlécet (M-40), holott a böngésző azt egy valódi szerver felé bizonyítottan elküldi (M-41). A `route.fulfill()` ráadásul egyszeri, lezárt aktus (M-42), tehát egy már megnyitott kapcsolatba nem tolható be újabb keret. A célra írt `node:http` szerver útja **mérten működik**, web-first assertionnel, `waitForTimeout` nélkül (M-43).
 
-**A teszt szerver nem a termék szervere.** Egy minimális, a teszt fájl mellett élő `node:http` kiszolgáló, ami kizárólag a `GET /events` végpontot ismeri, és a kapott `Last-Event-ID` fejléc értékéből épít determinisztikus választ. Adatbázist nem nyit, motort nem indít, és a REST hívások továbbra is `page.route()` mockon mennek.
+**M-44, a harmadik kivétel (2026-09-05-i saját mérés).** Bármely állítás, aminek a kapcsolat **nyitva maradása** az előfeltétele, szintén nem figyelhető meg `page.route()` mockon: a `route.fulfill()` lezárt HTTP válasz, tehát az `EventSource` a keretek feldolgozása után azonnal `error` eseményt kap, a `readyState` kiesik `OPEN`-ből, és a `computePhase` a `reconnecting` ágra fut. A `replaying` fázis ("előzmények betöltése" felirat) így csak egy meg nem figyelhető pillanatra áll fenn: két erre írt teszt `element(s) not found` hibával, 5000 ms assertion timeout után bukott el mockon, és elsőre zölden futott le a kapcsolatot nyitva hagyó teszt szerveren. Forrás: [`../research/2026-09-05-e2e-lefedettsegi-kuszob.md`](../research/2026-09-05-e2e-lefedettsegi-kuszob.md) 4. szekció.
+
+**A teszt szerver nem a termék szervere.** Egy minimális, a teszt fájl mellett élő `node:http` kiszolgáló, ami kizárólag a `GET /events` végpontot ismeri, és a kapott `Last-Event-ID` fejléc értékéből, illetve a teszt által megadott keretsorból épít determinisztikus választ. Adatbázist nem nyit, motort nem indít, és a REST hívások továbbra is `page.route()` mockon mennek.
+
+**Mind a három kivétel EGYETLEN spec fájlban áll: `e2e/sse-real-server.spec.ts`** (2026-09-05-ig `sse-reconnect.spec.ts`). Ez nem stílus kérdése: a teszt szerver a build időben rögzített `VITE_API_ORIGIN` portjára kötődik, amit egyszerre csak egy teszt tarthat, a `fullyParallel` beállítás viszont a fájlon belül is párhuzamosítana - ezért a fájl a dokumentált `test.describe.configure({ mode: 'serial' })` beállítást kapja, és ezért nem szabad második, szervert indító spec fájlt nyitni. A `server.close()` mellé `server.closeAllConnections()` is kell, különben a nyitva hagyott SSE kapcsolat életben tartja a szervert, és a következő teszt `EADDRINUSE` hibával bukna.
 
 ### 13.5 A Playwright szabályok
 
@@ -1057,8 +1063,8 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### Tesztelés és kapuk
 
-52. Az `apps/web/e2e` alatt minden REST hívás `page.route()` mockon megy; valós backend szervert egyetlen teszt sem szólít meg, a 13.4 szerinti, kimondott `sse-reconnect` kivételt leszámítva. A `VITE_API_ORIGIN` értéke **egyetlen** helyen, az `e2e/api-origin.ts` konstansában áll, amit a `playwright.config.ts` és minden mock segédfüggvény onnan importál, tehát a kettő nem szakadhat el egymástól; ez a konstans **nem** REST hívás célpontja, hanem a `page.route()` minta forrása. Spec fájlban `http://localhost:` literál nem állhat.
-53. Az SSE e2e tesztek a 13.4 táblázat szerint bomlanak: a `page.route()` mock az alapeset, és kizárólag a `Last-Event-ID` alapú újracsatlakozás plusz a menet közbeni keret beszúrás megy a könnyű `node:http` teszt szerveren. A kivétel indoklása a specben áll, a mérési fájlra hivatkozva.
+52. Az `apps/web/e2e` alatt minden REST hívás `page.route()` mockon megy; valós backend szervert egyetlen teszt sem szólít meg, a 13.4 szerinti, kimondott `sse-real-server` kivételt leszámítva. A `VITE_API_ORIGIN` értéke **egyetlen** helyen, az `e2e/api-origin.ts` konstansában áll, amit a `playwright.config.ts` és minden mock segédfüggvény onnan importál, tehát a kettő nem szakadhat el egymástól; ez a konstans **nem** REST hívás célpontja, hanem a `page.route()` minta forrása. Spec fájlban `http://localhost:` literál nem állhat.
+53. Az SSE e2e tesztek a 13.4 táblázat szerint bomlanak: a `page.route()` mock az alapeset, és kizárólag a `Last-Event-ID` alapú újracsatlakozás, a menet közbeni keret beszúrás, valamint a nyitva maradó kapcsolatot igénylő fázis állítások (M-44) mennek a könnyű `node:http` teszt szerveren. Mind a három egyetlen spec fájlban, `e2e/sse-real-server.spec.ts` alatt áll, `mode: 'serial'` beállítással, mert a teszt szerver portja egyszerre csak egy tesztnél lehet. A kivétel indoklása a specben áll, a mérési fájlokra hivatkozva.
 54. Az `apps/web/e2e` alatt egyetlen `page.waitForTimeout(`, `setTimeout(` és `sleep(` hívás sincs; minden várakozás web-first assertion vagy `page.waitForResponse()`. Greppel ellenőrizhető teszt igazolja.
 55. Minden `apps/web/e2e/*.spec.ts` fájl a `./coverage-fixture.ts` fájlból importálja a `test` és az `expect` párost. Greppel ellenőrizhető teszt igazolja.
 56. A komponens tesztek a `createRoot` (`react-dom/client`) és az `act` (`react`) API-t használják, `@testing-library/*` csomag nélkül; a `package.json` fájlokban nincs ilyen függőség (M-5, M-7, 13.2).

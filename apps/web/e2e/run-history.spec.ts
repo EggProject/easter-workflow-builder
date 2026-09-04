@@ -142,6 +142,72 @@ test('a lezárt futás sora az Újraindítás gombot mutatja, nem a Megszakítá
   await expect(page.getByText('Futás újraindítva')).toBeVisible();
 });
 
+test('az újraindítás hibájára toast jelenik meg', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => route.fulfill(jsonBody([RUN_SUCCEEDED]))),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+    mockRoute('restartRun', async (route) =>
+      route.fulfill(jsonBody({ code: 'conflict', message: 'A futás nem indítható újra.' }, 409)),
+    ),
+  ]);
+
+  await page.goto('/runs');
+  const row = page.getByRole('table', { name: 'Futások' }).getByRole('row', { name: /r-succeeded/ });
+  await row.getByRole('button', { name: 'Újraindítás' }).click();
+
+  await expect(page.getByText('Az újraindítás sikertelen')).toBeVisible();
+  await expect(page.getByText('A futás nem indítható újra.')).toBeVisible();
+});
+
+test('a futás lista betöltési hibájára riasztás jelenik meg', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) =>
+      route.fulfill(jsonBody({ code: 'internal', message: 'A futásokat nem sikerült lekérni.' }, 500)),
+    ),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+  ]);
+
+  await page.goto('/runs');
+
+  await expect(page.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.: A futásokat nem sikerült lekérni.');
+});
+
+test('az Állapot fejlécre kattintva a tábla az állapot felirata szerint rendez', async ({ page }) => {
+  // Az oszlop `cell` függvénnyel rajzol, tehát a `value` (a rendezés
+  // kulcsa) kizárólag a rendezés bekapcsolásakor hívódik meg.
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => route.fulfill(jsonBody([RUN_PENDING, RUN_SUCCEEDED]))),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/runs');
+  const table = page.getByRole('table', { name: 'Futások' });
+  const statusHeader = table.getByRole('columnheader', { name: 'Állapot' });
+
+  await statusHeader.click();
+
+  await expect(statusHeader).toHaveAttribute('aria-sort', 'ascending');
+  // A nulladik sor a fejléc sor, az első az első adatsor. A magyar
+  // feliratok szerinti növekvő sorrend: "sikeres" < "várakozik".
+  await expect(table.getByRole('row').nth(1)).toContainText('sikeres');
+
+  // A "Műveletek" oszlop `sortable: false`, ezért nincs `aria-sort`
+  // attribútuma, és kattintás után sem kap egyet. A tábla mind a két sort
+  // tovább mutatja: a rendezés kulcsa minden sorra üres sztring.
+  const actionsHeader = table.getByRole('columnheader', { name: 'Műveletek' });
+  await expect(actionsHeader).not.toHaveAttribute('aria-sort');
+  await actionsHeader.click();
+  await expect(actionsHeader).not.toHaveAttribute('aria-sort');
+  await expect(table.getByRole('row', { name: /r-pending/ })).toBeVisible();
+  await expect(table.getByRole('row', { name: /r-succeeded/ })).toBeVisible();
+});
+
 test('a nem lezárt futásokra a subscriptions PUT törzse fromEventId 0-val megy', async ({ page }) => {
   const subscriptionBodies: unknown[] = [];
   await installApiMocks(page, [

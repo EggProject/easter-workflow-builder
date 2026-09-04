@@ -178,6 +178,15 @@ ki, hogy a 2.1-2.8 mérések véletlenül a valódi szerverre futottak volna rá
    - **Egy már megnyitott, folyamatban lévő mockolt kapcsolatba menet közben beszúrt,
      új keret szimulálására** (2.7): a `route.fulfill()` egyszeri, lezárt aktus, a
      `Route` osztály típusa sem, a mért futásidejű viselkedés sem enged további írást.
+   - **UTÓLAGOS KIEGÉSZÍTÉS (2026-09-05, `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 4. szekció): egy HARMADIK eset is van.** Bármely állítás, aminek a kapcsolat NYITVA
+     maradása az előfeltétele, `page.route()` mockon nem figyelhető meg: a
+     `route.fulfill()` lezárt HTTP válasz, tehát az `EventSource` a keretek feldolgozása
+     után azonnal `error` eseményt kap, a `readyState` kiesik `OPEN`-ből, és a
+     `use-stream-connection.ts` `computePhase` függvénye a `reconnecting` ágra fut. A
+     `replaying` fázis ("előzmények betöltése" felirat) így csak egy meg nem figyelhető
+     pillanatra áll fenn: két erre írt teszt `element(s) not found` hibával, 5000 ms
+     assertion timeout után bukott el `page.route()` mockon, és elsőre zölden futott le a
+     kapcsolatot nyitva hagyó `node:http` teszt szerveren.
 3. **A 2. pont alá eső tesztekhez** (elsősorban: a `Last-Event-ID`-alapú
    újracsatlakozás forgatókönyve, és bármi, ami valódi, menet közbeni streamelt
    push-t igényel) **egy célra írt, könnyű `node:http` teszt szerver** az út — ez

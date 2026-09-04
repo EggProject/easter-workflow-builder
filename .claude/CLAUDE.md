@@ -310,9 +310,35 @@ A `test` és a `build` a CI-ben önálló jobként fut, a többi hét a `gate` m
 mind a kilenc egyenrangú kapu, egyik sem "kiegészítő" a másikhoz képest (`tooling/scripts`
 CLAUDE.md, SPEC-003 10.3).
 
-**A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak.** A
-Playwright futtatás és az e2e lefedettségi riport a CI-ban külön `e2e` jobban fut, a `build`
-jobra várva; nem szerepel sem a gyökér kilenc kapu parancsai között, sem a `gate` mátrixban.
+**A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak, de
+2026-09-05 óta KIKÉNYSZERÍTETT KÜSZÖBŰ CI KAPU.** A Playwright futtatás és az e2e lefedettségi
+riport a CI-ban külön `e2e` jobban fut, a `build` jobra várva; nem szerepel sem a gyökér kilenc
+kapu parancsai között, sem a `gate` mátrixban.
+
+**Miért nem a tizedik kapu, és mi teszi mégis kapuvá.** A kilenc kapu a **lokális, commit előtti**
+készlet: mindegyik parancs futtatható build és böngésző nélkül, másodpercek alatt. Az e2e ezzel
+szemben Chromium telepítést és teljes frontend buildet igényel (a fejlesztői sandboxban ráadásul
+csak a 12. szekcióban leírt `LD_LIBRARY_PATH` kerülővel indul el), ezért marad külön kategória, a
+CI saját `e2e` jobjában. Ami kapuvá teszi: a `bun run coverage:e2e:report` a küszöb alatt **nem
+nulla kilépési kódot** ad, ettől az `e2e` job elbukik, az `e2e` job pedig szerepel az összesítő
+`ci` job `needs` listájában (`[gate, test, build, e2e]`), ami a repository ruleset egyetlen
+kötelező státuszcsekkje. A lánc mind a három szeme mérve, illetve dokumentált forrásból igazolva:
+`docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 6. szekció.
+
+**A küszöb értéke mért szám, ratchet.** A kikényszerítés helye az `apps/web/package.json`
+`coverage:e2e:report` scriptjének `--check-coverage` kapcsolója, mind a négy metrikára. A számokat
+ide nem írjuk (egy frissítés egy helyen történjen), a származtatás, a nem fedett részek tételes
+listája és a "nulla fájl kizárás" döntés a research fájlban áll. A küszöb pontosan a mért érték,
+felfelé kerekítés nélkül: a lefedettség nőhet, csökkenni észrevétlenül nem tud. Az `nyc`
+összehasonlítása szigorúan kisebb (`coverage < threshold`), tehát a küszöbbel egyenlő érték
+átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a `ci` job `needs` listája)
+az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+
+**Az e2e küszöb nem 100 százalék, és ez felhasználói döntés.** A unit lefedettség változatlanul
+100 százalék, kizárás nélkül. Az e2e küszöb alatta van, mert marad néhány, e2e-vel elvileg sem
+elérhető sor (build időben rögzülő `VITE_*` konfiguráció hibaágai, React `useEffect` cleanup, ami
+csak leszereléskor fut, és egy olyan hibaág, amit nem lehet felhasználói úton előidézni). Ezek
+tételesen, fájlonként indokolva a research fájlban állnak, és mind unit teszttel fedett.
 
 **Vitest projektek.** A gyökér `vitest.config.ts` `test.projects` mezője fogja össze a
 `packages/*` és `apps/*` csomagokat; `apps/web` és `packages/ui` saját `vitest.config.ts`-e adja a
@@ -490,13 +516,18 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   keretek, és a `Content-Type` beállítás. Mind mérten működik, és a hivatkozott
   `microsoft/playwright` #15353 issue `Content-Type: null` állítása a pinelt verzió ellen
   **nem reprodukálható**.
-- **`page.route()` NEM használható két, mérten bizonyított esetben**: a **`Last-Event-ID`
+- **`page.route()` NEM használható három, mérten bizonyított esetben**: a **`Last-Event-ID`
   alapú újracsatlakozás** fejléc szintű ellenőrzésére, mert a második kapcsolat kérés
   fejlécei a route rétegen nem tartalmazzák a fejlécet (holott a böngésző azt egy valódi
-  szerver felé a kontroll mérés szerint bizonyítottan elküldi); és **egy már megnyitott,
+  szerver felé a kontroll mérés szerint bizonyítottan elküldi); **egy már megnyitott,
   folyamatban lévő mockolt kapcsolatba menet közben beszúrt új keret** szimulálására, mert a
   `route.fulfill()` egyszeri, lezárt aktus ("Route is already handled!"), és a `Route` típusa
-  sem enged streamelést.
+  sem enged streamelést; és **bármely állítás, aminek a kapcsolat nyitva maradása az
+  előfeltétele** (2026-09-05-i mérés,
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 4. szekció): a `route.fulfill()`
+  lezárt válasz, tehát az `EventSource` a keretek után azonnal `error`-t kap, a `readyState`
+  kiesik `OPEN`-ből, és a `replaying`/`live` fázis csak egy meg nem figyelhető pillanatra
+  áll fenn.
 - **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
   végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
   működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
@@ -657,6 +688,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
 | Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
 | az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
+| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 

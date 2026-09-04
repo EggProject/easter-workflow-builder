@@ -97,6 +97,81 @@ test('új workflow létrehozása a modálison keresztül', async ({ page }) => {
     .toEqual({ name: 'Gamma workflow', description: null, providerId: 'claude-subscription' });
 });
 
+test('kitöltött leírással és provider nélkül a létrehozás törzse a leírást és null providerId-t küld', async ({
+  page,
+}) => {
+  const created: { body: unknown } = { body: undefined };
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('createWorkflow', async (route) => {
+      created.body = route.request().postDataJSON();
+      await route.fulfill(jsonBody({ ...ALFA, id: 'w-delta', name: 'Delta workflow' }));
+    }),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  await dialog.getByLabel('Név').fill('Delta workflow');
+  await dialog.getByLabel('Leírás').fill('A delta leírása');
+  await dialog.getByRole('button', { name: 'Létrehozás' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect
+    .poll(() => created.body)
+    .toEqual({ name: 'Delta workflow', description: 'A delta leírása', providerId: null });
+});
+
+test('a kiválasztott provider szükséges környezeti változóit a modális kiírja', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) =>
+      route.fulfill(
+        jsonBody([
+          {
+            id: 'minimax',
+            displayName: 'MiniMax',
+            models: [],
+            requiredEnvNames: ['MINIMAX_API_KEY', 'ANTHROPIC_BASE_URL'],
+          },
+        ]),
+      ),
+    ),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  await dialog.getByRole('combobox', { name: 'Provider' }).selectOption('minimax');
+
+  // Kizárólag a változó NEVE jelenik meg, az értéke soha
+  // (SPEC-007 16. szekció 49. kritérium).
+  await expect(dialog.getByText('Szükséges környezeti változók: MINIMAX_API_KEY, ANTHROPIC_BASE_URL')).toBeVisible();
+});
+
+test('a létrehozás hibájára a modálison belül riasztás jelenik meg, a modális nyitva marad', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('listProviders', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('createWorkflow', async (route) =>
+      route.fulfill(jsonBody({ code: 'conflict', message: 'Ilyen nevű workflow már van.' }, 409)),
+    ),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Új workflow' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Új workflow' });
+  await dialog.getByLabel('Név').fill('Ütköző név');
+  await dialog.getByRole('button', { name: 'Létrehozás' }).click();
+
+  await expect(dialog.getByRole('alert')).toContainText('Ilyen nevű workflow már van.');
+  await expect(dialog).toBeVisible();
+});
+
 test('workflow átnevezése a soronkénti modálison keresztül', async ({ page }) => {
   const updated: { body: unknown } = { body: undefined };
   await installApiMocks(page, [
@@ -123,6 +198,139 @@ test('workflow átnevezése a soronkénti modálison keresztül', async ({ page 
 
   await expect(dialog).toBeHidden();
   await expect.poll(() => updated.body).toMatchObject({ name: 'Alfa módosítva' });
+});
+
+test('leírás nélküli workflow átnevezésekor a leírás mező üresen indul és kitölthető', async ({ page }) => {
+  const updated: { body: unknown } = { body: undefined };
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([BETA]))),
+    mockRoute('updateWorkflow', async (route) => {
+      updated.body = route.request().postDataJSON();
+      await route.fulfill(jsonBody({ ...BETA, description: 'Most már van leírás' }));
+    }),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Béta workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
+  // A `null` leírás üres sztringre képződik le (`workflow.description ?? ''`).
+  await expect(dialog.getByLabel('Leírás')).toHaveValue('');
+  await dialog.getByLabel('Leírás').fill('Most már van leírás');
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => updated.body).toEqual({ name: 'Béta workflow', description: 'Most már van leírás' });
+});
+
+test('a leírás mező kiürítésével az átnevezés törzse null leírást küld', async ({ page }) => {
+  const updated: { body: unknown } = { body: undefined };
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('updateWorkflow', async (route) => {
+      updated.body = route.request().postDataJSON();
+      await route.fulfill(jsonBody({ ...ALFA, description: null }));
+    }),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
+  await dialog.getByLabel('Leírás').fill('');
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => updated.body).toEqual({ name: 'Alfa workflow', description: null });
+});
+
+test('a workflow tábla a Név oszlop szerint rendez, a Műveletek oszlop szerint nem', async ({ page }) => {
+  await installApiMocks(page, [mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([BETA, ALFA])))]);
+
+  await page.goto('/');
+  const table = page.getByRole('table', { name: 'Workflow-k' });
+  const nameHeader = table.getByRole('columnheader', { name: 'Név' });
+
+  await nameHeader.click();
+  await expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
+  // A nulladik sor a fejléc sor; növekvő sorrendben az "Alfa" előzi a "Béta"-t.
+  await expect(table.getByRole('row').nth(1)).toContainText('Alfa workflow');
+
+  // A "Műveletek" oszlop `sortable: false`, ezért nincs `aria-sort`
+  // attribútuma, és kattintás után sem kap egyet; a tábla mind a két sort
+  // tovább mutatja, mert a rendezés kulcsa minden sorra üres sztring.
+  const actionsHeader = table.getByRole('columnheader', { name: 'Műveletek' });
+  await expect(actionsHeader).not.toHaveAttribute('aria-sort');
+  await actionsHeader.click();
+  await expect(actionsHeader).not.toHaveAttribute('aria-sort');
+  await expect(table.getByRole('row', { name: /Alfa workflow/ })).toBeVisible();
+  await expect(table.getByRole('row', { name: /Béta workflow/ })).toBeVisible();
+});
+
+test('az átnevezés hibájára a modálison belül riasztás jelenik meg', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('updateWorkflow', async (route) =>
+      route.fulfill(jsonBody({ code: 'not_found', message: 'Időközben törölték.' }, 404)),
+    ),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Átnevezés' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+
+  await expect(dialog.getByRole('alert')).toContainText('Időközben törölték.');
+});
+
+test('a törlési összegzés hibájára riasztás jelenik meg, és a törlés gomb tiltott marad', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('summarizeWorkflowDeletion', async (route) =>
+      route.fulfill(jsonBody({ code: 'internal', message: 'Nem sikerült összeszámolni.' }, 500)),
+    ),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Törlés' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workflow törlése' });
+  await expect(dialog.getByRole('alert')).toContainText('Nem sikerült összeszámolni.');
+  // Összegzés nélkül nincs mit megerősíteni, tehát a gomb tiltott marad.
+  await expect(dialog.getByRole('button', { name: 'Törlés' })).toBeDisabled();
+});
+
+test('a törlés hibájára a modálison belül riasztás jelenik meg', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('summarizeWorkflowDeletion', async (route) =>
+      route.fulfill(jsonBody({ runCount: 1, eventCount: 2, snapshotCount: 3 })),
+    ),
+    mockRoute('deleteWorkflow', async (route) =>
+      route.fulfill(jsonBody({ code: 'conflict', message: 'Fut még egy futás.' }, 409)),
+    ),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Törlés' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workflow törlése' });
+  await dialog.getByText('Tudomásul veszem, hogy a törlés nem vonható vissza').click();
+  await dialog.getByRole('button', { name: 'Törlés' }).click();
+
+  await expect(dialog.getByRole('alert')).toContainText('Fut még egy futás.');
+  await expect(dialog).toBeVisible();
 });
 
 test('workflow törlése: az összegzés és a jelölőnégyzet nélkül a gomb tiltott', async ({ page }) => {
@@ -205,4 +413,21 @@ test('futás indítása a Futás előzmények útvonalra navigál', async ({ pag
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
   await expect(page.getByRole('heading', { name: 'Futás előzmények' })).toBeVisible();
+});
+
+test('a futás indítás hibájára toast jelenik meg, és a lista marad a helyén', async ({ page }) => {
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
+    mockRoute('startRun', async (route) =>
+      route.fulfill(jsonBody({ code: 'unprocessable', message: 'Nincs gráf a workflow-hoz.' }, 422)),
+    ),
+  ]);
+
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Indítás' }).click();
+
+  await expect(page.getByText('A futás indítása sikertelen')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Workflow-k' })).toBeVisible();
 });

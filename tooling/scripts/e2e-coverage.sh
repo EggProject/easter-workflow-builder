@@ -29,6 +29,21 @@
 # `coverage:e2e:report` scriptjeben allnak - ez a wrapper azt hivja, nem
 # masolja le oket.
 #
+# ========================== EZ KIKENYSZERITETT KAPU ==========================
+#
+# 2026-09-05 ota ez a parancs nem csak riportal: a `--check-coverage` plusz a
+# negy metrika kuszob (`--statements`, `--branches`, `--functions`, `--lines`)
+# miatt a kuszob alatt NEM NULLA kilepesi koddal all le, es azt tovabbadja.
+# Az `nyc` a hibauzenetet `console.error`-ral, tehat STDERR-re irja, es
+# `process.exitCode = 1` erteket allit; az osszehasonlitas szigoruan kisebb
+# (`coverage < threshold`), tehat a kuszobbel EGYENLO ertek atmegy.
+#
+# A kuszob szamai MERT ertekek, nem talalgatas: a szarmaztatas, a nem fedett
+# reszek tetelesen es a kizarasi dontes a
+# `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` fajlban all. A kuszob
+# ratchet: csak a mert ertekre allitjuk, felfele kerekites nelkul, tehat a
+# lefedettseg eszrevetlenul nem csokkenhet.
+#
 # =============================================================================
 set -euo pipefail
 
@@ -73,7 +88,11 @@ duration=$((end_ts - start_ts))
 echo "e2e-coverage | ${duration}s" >&2
 
 if [[ "$exit_code" -ne 0 ]]; then
-  echo "a nyc riport nem keszult el, a nyers kimenet vege:" >&2
+  # Ket oka lehet: a riport nem keszult el, vagy elkeszult, de a lefedettseg
+  # a kuszob ALATT van (`ERROR: Coverage for ... does not meet global
+  # threshold`). Mindketto ugyanezen az agon jon ki, es a lenti tail a nyc
+  # sajat, beszedes hibasorait is tartalmazza.
+  echo "a nyc riport nem keszult el vagy a lefedettseg a kuszob alatt van, a nyers kimenet vege:" >&2
   tail -n "$WRAPPER_TAIL_LINES" "$full_log" >&2
   echo "teljes kimenet: ${full_log}" >&2
   exit "$exit_code"
