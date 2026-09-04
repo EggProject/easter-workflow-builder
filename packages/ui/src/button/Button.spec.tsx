@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Button, type ButtonSize, type ButtonVariant } from './Button.tsx';
@@ -80,5 +80,57 @@ describe('Button', () => {
     });
     expect(renderedButton().getAttribute('type')).toBe('submit');
     expect(renderedButton().disabled).toBe(true);
+  });
+
+  it('icon esetén a "btn--icon" módosítót adja, aria-busy nélkül', () => {
+    act(() => {
+      root.render(
+        <Button icon aria-label="Műveletek">
+          x
+        </Button>,
+      );
+    });
+    expect(renderedButton().className).toBe('btn btn--primary btn--icon');
+    expect(renderedButton().getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('isLoading esetén a "is-loading" módosítót, aria-busy jelzést és loader jelzőt ad, a tartalmat megőrizve', () => {
+    act(() => {
+      root.render(<Button isLoading>Mentés</Button>);
+    });
+    const button = renderedButton();
+    expect(button.className).toBe('btn btn--primary is-loading');
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(button.querySelector('.btn__content')?.textContent).toBe('Mentés');
+    expect(button.querySelectorAll(':scope .btn__loader > span')).toHaveLength(3);
+  });
+
+  it('isLoading nélkül nincs .btn__content és .btn__loader burkoló, a children közvetlenül jelenik meg', () => {
+    act(() => {
+      root.render(<Button>Mentés</Button>);
+    });
+    const button = renderedButton();
+    expect(button.querySelector('.btn__content')).toBeNull();
+    expect(button.querySelector('.btn__loader')).toBeNull();
+    expect(button.textContent).toBe('Mentés');
+  });
+
+  it('icon és isLoading együtt is megadható', () => {
+    act(() => {
+      root.render(
+        <Button icon isLoading aria-label="Mentés">
+          <svg aria-hidden="true" />
+        </Button>,
+      );
+    });
+    expect(renderedButton().className).toBe('btn btn--primary btn--icon is-loading');
+  });
+
+  it('a ref prop a natív button elemre mutat (React 19 ref-as-prop)', () => {
+    const reference = createRef<HTMLButtonElement>();
+    act(() => {
+      root.render(<Button ref={reference}>x</Button>);
+    });
+    expect(reference.current).toBe(renderedButton());
   });
 });

@@ -7,6 +7,9 @@
 export { joinAriaTokenList } from './aria-token-list/join-aria-token-list.ts';
 export { joinClassNames } from './class-name-list/join-class-names.ts';
 
+// Márkajelzés (topnav logó).
+export { logoMarkUrl } from './brand-mark/logo-mark-url.ts';
+
 // Elrendezés és téma.
 export { AppShellFrame, type AppShellFrameProperties } from './topnav-shell/AppShellFrame.tsx';
 export { isThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODE_VALUES, type ThemeMode } from './theme-mode/theme-mode.ts';
@@ -25,6 +28,8 @@ export {
 } from './data-table/DataTable.tsx';
 export { Checkbox, type CheckboxProperties } from './form-control/Checkbox.tsx';
 export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from './loading-indicator/ProgressBar.tsx';
+export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';
+export { MenuItem, type MenuItemProperties } from './menu/MenuItem.tsx';
 export { Modal, type ModalIconVariant, type ModalProperties, type ModalSize } from './modal/Modal.tsx';
 export {
   SelectField,

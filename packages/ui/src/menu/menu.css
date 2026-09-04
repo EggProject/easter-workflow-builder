@@ -1,0 +1,124 @@
+/* ============================================================
+   EggProject — Menu (lebegő művelet menü)
+   Forrás: eggproject-design-components/components/menu/menu.css, a
+   `.menu`, a `.menu__item` (és állapotai), a `.menu__text`, valamint a
+   `.menu-anchor` trigger-konténer szabályai, szabályonként bájtra
+   azonosan a forrásból.
+
+   MIÉRT SZŰKÍTETT. A forrás Menu.jsx `MenuLabel`, `MenuDivider`,
+   `MenuGroup`, jelölhető (`checked`) elem, billentyű-gyorsparancs felirat
+   és ikon-vezetésű elem támogatást is ad; ebből a jelen felhasználási
+   eset (táblázat sor műveletek, 2-3 egyszerű szöveges elem soronként)
+   egyiket sem igényli (lásd Menu.tsx dokumentációja). Kihagyva ezért:
+   - a forrás @import sora (a design-token tokenek globálisan töltődnek),
+   - .menu--wide (nincs szélesebb variáns az egyszerű szöveges elemekhez),
+   - .menu__group, ".menu__group + .menu__group", .menu__label (nincs
+     csoportosítás),
+   - .menu__icon és a ".menu__item--danger .menu__icon" módosítója
+     (nincs ikon-vezetésű elem),
+   - .menu__shortcut (nincs billentyű-gyorsparancs felirat),
+   - .menu__divider (nincs elválasztó),
+   - .menu__check (nincs jelölhető elem),
+   valamint ezek forced-colors megfelelői a fájl végén.
+
+   Átemelés dátuma: 2026-09-04. Licencállítás nincs (SPEC-007 4.4, M-34
+   mintájára).
+
+   A `.menu` POZÍCIÓJA ELTÉR A FORRÁSTÓL (2026-09-04, mért hiba javítása,
+   lásd a `Menu.tsx` fejléc dokumentációját): a forrás `.menu-anchor > .menu`
+   relatív/absolút pozícionálása helyett a panel `position: fixed`, a
+   `Menu.tsx` a trigger `getBoundingClientRect()`-jéből számítja ki a
+   `top`/`left`/`right` inline stílust, és a panel `createPortal`-lal a
+   `document.body`-ba kerül - mert a táblázat sor műveletek triggere a
+   `DataTable` saját, görgethető törzsében ül (`data-table.css`
+   `.data-table-scroll { overflow: auto; }`), ami a relatív pozícionálású
+   panelt ténylegesen levágta.
+   ============================================================ */
+.menu {
+  position: fixed;
+  z-index: 600;
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border-subtle);
+  border-radius: var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow-lg);
+  padding: 6px;
+  min-width: 220px;
+  font: var(--ep-text-small);
+  color: var(--ep-fg);
+  display: flex; flex-direction: column;
+}
+
+.menu__item {
+  display: flex; align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--ep-radius-sm);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg);
+  text-align: left;
+  width: 100%;
+  transition: background var(--ep-dur-fast) var(--ep-ease-out);
+}
+.menu__item:hover,
+.menu__item.is-active { background: var(--ep-bg-hover); }
+.menu__item:focus-visible { outline: none; background: var(--ep-accent-bg); box-shadow: var(--ep-shadow-focus); }
+.menu__item--danger { color: var(--ep-danger); }
+.menu__item--danger:hover { background: var(--ep-danger-bg); }
+.menu__item[disabled],
+.menu__item.is-disabled { color: var(--ep-fg-faint); cursor: not-allowed; }
+.menu__item[disabled]:hover,
+.menu__item.is-disabled:hover { background: transparent; }
+
+.menu__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============ MenuTrigger — pre-styled button container ============ */
+.menu-anchor { display: inline-block; }
+/* Closed panel is fully removed from layout + the a11y tree.
+   The [hidden] selector outranks .menu { display: flex } so it actually hides. */
+.menu[hidden] { display: none; }
+/* Entrance only — closing hides instantly via [hidden]; the end state is the panel's
+   natural state, so no transform/opacity is left applied after the animation. The
+   panel is no longer a `.menu-anchor` child (portal, see header comment), so the
+   selector keys off the panel's own [hidden] toggle instead of a parent `.is-open`. */
+.menu:not([hidden]) {
+  animation: menu-in var(--ep-dur-fast) var(--ep-ease-out);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Reduced motion: drop the panel entrance movement; end state shows instantly.
+        Closing is already instant via [hidden]; item hover color transition is non-motion and stays. ---- */
+@media (prefers-reduced-motion: reduce) {
+  .menu:not([hidden]) { animation: none; }
+}
+
+/* ---- Forced colors (Windows High Contrast): map to system colors. Box-shadow rings are
+        dropped by the UA here, so keyboard focus gets a real Highlight outline instead. ---- */
+@media (forced-colors: active) {
+  .menu {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;          /* real border carries panel separation when shadows are dropped */
+  }
+  .menu__item { color: CanvasText; background: transparent; }
+  .menu__item:hover,
+  .menu__item.is-active,
+  .menu__item:focus-visible {
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;          /* not shadow-based; ≥2px */
+    outline-offset: -2px;                  /* inside the item → no clipping, no layout shift */
+  }
+  .menu__item[disabled],
+  .menu__item.is-disabled {                /* placed last → wins over the hover rule on equal specificity */
+    color: GrayText;
+    background: transparent;
+    outline: none;
+  }
+}
