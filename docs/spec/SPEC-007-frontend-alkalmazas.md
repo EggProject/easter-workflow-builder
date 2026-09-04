@@ -5,7 +5,7 @@
 | Státusz  | tervezet                                                                                                                                                                                                                                                                               |
 | Dátum    | 2026-08-30                                                                                                                                                                                                                                                                             |
 | Előzmény | [`SPEC-006-szerver-alkalmazas.md`](SPEC-006-szerver-alkalmazas.md) (a szerver, amivel a felület beszél), [`SPEC-005-api-protokoll.md`](SPEC-005-api-protokoll.md) (a REST és SSE kontraktus), [`SPEC-002-csomag-architektura.md`](SPEC-002-csomag-architektura.md) (a mappa konvenció) |
-| Kimenet  | a `packages/ui` csomag húsz téma mappája, és az `apps/web` alkalmazás tizennégy téma mappája (12.1, 12.2)                                                                                                                                                                              |
+| Kimenet  | a `packages/ui` csomag huszonkét téma mappája, és az `apps/web` alkalmazás tizennégy téma mappája (12.1, 12.2)                                                                                                                                                                         |
 | Terv     | [`../plan/PLAN-008-frontend-alkalmazas.md`](../plan/PLAN-008-frontend-alkalmazas.md)                                                                                                                                                                                                   |
 
 ---
@@ -308,7 +308,17 @@ A `.app-tn__bar` magassága `60px`, `position: sticky`, `top: 0` (M-28), és ezt
 
 **A mobil túllógás mért indoklása (2026-09-02).** A fenti `--ep-screen-md` sor második fele nem tervezésből, hanem mérésből jött: a `.app-tn__bar` nem törő flex sorában a brand (229px) és az akciók (142px) 468px viewport szélesség alatt nem fértek el, a bar tartalma kilógott, és a `.app-tn` blokk szintűsége miatt a túllógás a dokumentumra terjedt (320px-en `scrollWidth` 427 a 320-as `clientWidth` mellett), a téma váltó gomb pedig a képernyőn kívülre került. A tábla `flex: 1 1 0` cellái ezzel egyidejűleg a tartalmuk alá zsugorodtak, és a művelet gombok kifutottak a viewportból. Az abláció szerint a cella tördelése az egyetlen lépés, ami a gombokat ténylegesen a viewportba hozza; a harmadlagos oszlop rejtése önmagában 414px-ig nem elég, de a tördelt sorok magasságát 116px-ről 80px-re viszi le. A tényleges törés 468px körül kezdődik, arra a szélességre viszont **nincs token**, ezért a fölötte álló `--ep-screen-md` tokennél lépünk be; kitalált töréspontot nem vezetünk be.
 
-**Egy mért, megmaradó kivétel.** A futás előzmények tábláján a legkeskenyebb eszközön (`iPhone SE`, 320px) három oszlop marad (Workflow, Állapot, Műveletek), és a "Megszakítás" felirat egyetlen, nem törhető szó: a gomb 91px-es tartalmi szélessége 13px-cel meghaladja a cellára jutó helyet, és ez ezen a szélességen sem cella-, sem sor-belső margó elvételével nem szüntethető meg, csak egy negyedik oszlop-szinttel, amit nem vezetünk be. A gomb ezért a tábla **saját** `overflow-x: auto` konténerén belül görgetve érhető el - pontosan az a viselkedés, amit a széles tartalomra elő van írva. Az oldal törzse ettől függetlenül egyetlen mért szélességen sem görget vízszintesen.
+**A korábban mért kivétel 2026-09-04 óta NEM áll fenn.** A futás előzmények tábláján a
+legkeskenyebb eszközön (`iPhone SE`, 320px) a "Megszakítás" feliratú szöveges gomb 91px-es
+tartalmi szélessége korábban 13px-cel meghaladta a cellára jutó helyet, ezért a tábla **saját**
+`overflow-x: auto` konténerén belül görgetve volt csak elérhető. A táblázat sor műveletek
+2026-09-04 óta ikon gombbá váltak (felhasználói kérés: egy művelet esetén ikon gomb, lásd
+5.3-nál a `menu` téma leírását a több műveletes esetre) - a "Megszakítás" ikon gomb `.btn--icon`
+mérete (`sm` méretben 28px szélesség) jelentősen a korábbi 91px alatt van, tehát a kivétel
+megszűnt. Az `apps/web/e2e/responsive.spec.ts` ezt a szigorú, görgetés nélküli
+`toBeInViewport({ ratio: 1 })` állítással igazolja, a korábbi `scrollIntoViewIfNeeded` kerülőút
+nélkül, minden mért szélességen (13.4 szekció). Az oldal törzse egyetlen mért szélességen sem
+görget vízszintesen.
 
 **Több töréspontot nem használunk.** A jelen spec két képernyője nem indokol többet, és egy nem használt media query spekulatív kód lenne. A `sm`, `xl`, `2xl`, `3xl` és `4xl` token átkerül a repóba (a fájl változatlanul), de a projekt CSS-e nem hivatkozik rájuk.
 
@@ -671,6 +681,7 @@ packages/ui/
     index.ts                   barrel, csak nevesitett ujraexport
     design-token/
     self-hosted-font/
+    brand-mark/
     topnav-shell/
     theme-mode/
     class-name-list/
@@ -681,6 +692,7 @@ packages/ui/
     badge/
     card/
     modal/
+    menu/
     tab/
     toast/
     loading-indicator/
@@ -695,9 +707,10 @@ packages/ui/
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `design-token`      | a token barrel és a 11 token CSS fájl, bájtra azonosan (4.2)                                                                |
 | `self-hosted-font`  | a `fonts.css` és a 20 `.woff2` fájl                                                                                         |
+| `brand-mark`        | a topnav logó `logo-mark.svg`-je, bájtra azonosan, plusz a `logoMarkUrl` Vite URL import (lásd a 2026-09-04-i bővítés lent) |
 | `topnav-shell`      | a shell CSS szűkített, bájtra azonos átemelése, és az `AppShellFrame` komponens, ami a bar és a content vázát adja          |
 | `theme-mode`        | a három módú téma állapot, a `data-theme` írása, a `localStorage` olvasás és írás, a `matchMedia` figyelés, és a váltó gomb |
-| a 12 komponens téma | fejenként a `.tsx`, a `.css` és a `.spec.tsx` fájl (6.2), egyetlen kimondott kivétellel: a `toast` (lásd lent)              |
+| a 13 komponens téma | fejenként a `.tsx`, a `.css` és a `.spec.tsx` fájl (6.2), két kimondott kivétellel: a `toast` és a `menu` (lásd lent)       |
 
 **A négy további téma mappa, ami a végrehajtás során keletkezett.** A 12.1 eredeti listája
 tizenhat témát nevezett meg; a tényleges csomag húsz téma mappából áll. A négy különbség nem
@@ -718,8 +731,66 @@ kerül, mindegyik saját `.spec.tsx` párral: a `Toast` primitív kártya, a `To
 pozíciójú konténer, a `useToasts` pedig a push és dismiss állapot hook, befecskendezett időzítő
 porttal. Három megvalósítás plusz három teszt plusz egy közös `toast.css` az a hét fájl. A
 szabály tehát nem "három fájl", hanem "exportált egységenként egy megvalósítás és egy
-`.spec.tsx` fájl, plusz a téma egyetlen `.css` fájlja"; a maradék tizenegy komponens téma ennek
-a szabálynak a `n = 1` esete.
+`.spec.tsx` fájl, plusz a téma egyetlen `.css` fájlja"; a maradék tíz komponens téma ennek a
+szabálynak a `n = 1` esete.
+
+**A `menu` téma tizenegy fájl, ugyanezen okból, plusz három belső segédmodul.** A `Menu` és a
+`MenuItem` két külön exportált egység, tehát fejenként megvalósítás plusz `.spec.tsx` (négy
+fájl), plusz a közös `menu.css`. A hatodik és hetedik fájl (`menu-close-context.ts` és a saját
+`.spec.ts` párja) NEM exportált nyilvános egység - a barrelben nem szerepel -, hanem a `Menu` és
+a `MenuItem` közötti belső huzalozás (a kiválasztás utáni panel-bezárás és fókusz-visszaállítás
+kérése), amit egy React Context hordoz. A nyolcadik és kilencedik fájl (`read-panel-element.ts`
+és a saját `.spec.ts` párja) szintén nem exportált nyilvános egység: a panel DOM elemének
+olvasását emeli ki, mert a `panelReference.current` típusa `HTMLDivElement | null`, de a
+gyakorlatban a `Menu.tsx` egyetlen hívási pontján sem lehet `null` (a panel mindig renderelve
+van, csak `hidden` attribútummal rejtve) - egy `if (panel === null) return;` ág a hívási helyen
+soha nem futó, tesztelhetetlen branch lenne, ami a SPEC-003 12.4 szekció 100 százalékos
+lefedettségi küszöbét sértené. A kiemelt függvény a `null` ágat dobással jelzi, szintetikus
+bemenettel közvetlenül tesztelhető - ugyanaz a minta, mint a `packages/db`
+`run-event/event-record/extract-error-cause.ts`-e (`.claude/CLAUDE.md` 12. szekció). A tizedik és
+tizenegyedik fájl (`compute-panel-position.ts` és a saját `.spec.ts` párja) a panel `position:
+fixed` koordinátáit számító, tiszta függvényt emeli ki: a `Menu` `createPortal`-lal a
+`document.body`-ba renderel (lásd lent), és a kiszámított `top`/`left` értéket mindig a
+viewporton belülre szorítja - ez a mérten, valódi hibaként felmerült eset (`align="right"` esetén
+a nyers jobbra igazítás keskeny viewporton a panelt a bal szélen túlra tolta) miatt tiszta
+függvényben áll, mert a happy-dom teszt környezet `getBoundingClientRect()`-je mindig nulla
+téglalapot ad, ami a szorítás ágát élő DOM-on keresztül tesztelhetetlenné tenné. A
+`.claude/CLAUDE.md` "egy fájlba egy dolog" szabálya mindhárom belső segédmodulra vonatkozik,
+ezért egyik sincs a `Menu.tsx`-ben.
+
+**A `menu` panel portálja, 2026-09-04 óta (a forrástól eltérve).** A panel `createPortal`-lal a
+`document.body`-ba renderelődik, NEM a trigger DOM-beli szülőjének gyermekeként, ahogy a forrás
+teszi. Az eltérés oka mért, valódi hiba: a táblázat sor műveletek triggere a `DataTable` saját,
+görgethető törzsében ül (`data-table.css` `.data-table-scroll { overflow: auto; }`), ami a forrás
+relatív pozícionálású panelét ténylegesen levágta - az `apps/web/e2e/responsive.spec.ts` 320px
+szélességen ezt elő is idézte (`toBeInViewport({ ratio: 1 })` ~0.61 arányra bukott a menü
+elemein). A hivatalos React dokumentáció pontosan erre az esetre ajánlja a portált ("you can use
+a portal to create a modal dialog that floats above the rest of the page, even if the component
+... is inside a container with `overflow: hidden`", react.dev/reference/react-dom/createPortal),
+és a kontextus, valamint az eseménybuborékolás a React fa szerint működik tovább, a DOM fától
+függetlenül - ugyanez a hivatalos oldal. A portál miatt a "kívülre kattintás"/"fókusz kilépett a
+menüből" döntésnek (`isInsideMenu`, `Menu.tsx`) a triggert körülölelő `anchor` ÉS a portált panel
+elemet is meg kell vizsgálnia, mert a kettő a DOM-ban külön ágon áll.
+
+**Két új téma mappa a 2026-09-04-i felületi kiegészítésben, tényleges hatókör bővítésként.** A
+fenti négy témával szemben (amik a SPEC-002 szabályainak strukturális következményei, nem új
+funkciók) a `menu` és a `brand-mark` egy user kérés (táblázat sor műveletek lebegő menübe
+rendezése, plusz a topnav logó) tényleges, új hatókörű bővítése. A `menu` a design system
+`Menu`/`MenuItem` komponens párjának dokumentált részhalmaza (lásd feljebb és `Menu.tsx`); a
+`Popover` komponens NEM került átemelésre, mert nincs menü szemantikája (nincs `role="menu"`,
+nincs nyíl navigáció, a fókusz nyitáskor a triggeren marad) - a user kifejezett kérése szerint
+"nyilakkal navigálás" és "Escape zárás, fókusz-visszaállítás" kellett, ez a `Menu` kontraktusa,
+nem a `Popover`-é. A `brand-mark` a `design-token`/`self-hosted-font` mintáját követi (bájtra
+azonos átemelés, byte-identity regressziós teszt), a `logo-mark.svg`-vel; a `logo-wordmark.svg`
+és a `logo-mark-inverse.svg` NEM került át. A `logo-wordmark.svg`-re azért nincs szükség, mert a
+topnav shell saját, `eggproject-design-app-common/skeletons/shell-topnav.html` kanonikus mintája
+a mark ikont plusz külön szöveges márkanevet (`<b>` elem) használja, nem a wordmark SVG-t - ezt
+a mintát követi az `AppShell` is, a meglévő `<b>easter-workflow-builder</b>` szöveg mellé téve a
+logót. A `logo-mark-inverse.svg`-re azért nincs szükség, mert a kanonikus minta ugyanezt az
+egy SVG-t (`logo-mark.svg`) használja témától függetlenül, szín szerinti váltás nélkül; ezt a
+döntést a design system saját példája hozta meg, nem ez a munkamenet - a mark saját színei
+(kék/arany/krém gyűrűk, sötét tintaszín nélkül) nem támaszkodnak világos hátérre úgy, ahogy a
+wordmark sötét szövege tenné.
 
 **Egy szint mély, tárgykör mappa nélkül.** A csomag egy tárgykörű: minden téma a design system átemeléséről szól. A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül, mert a fájlnevek már megnevezik a csoportot (a `Button.tsx` mellett álló `button.css` nem lehet másé), tehát a második feltétel egy szinttel lejjebb elbukik. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 
@@ -894,7 +965,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### A csomagok és a határok
 
-1. A `packages/ui/src` alatt pontosan a 12.1 listája szerinti **húsz** téma mappa áll közvetlenül, egy szint mélyen, plusz az `index.ts` barrel; egyetlen téma mappában sincs alkönyvtár. A húszból négy (`class-name-list`, `aria-token-list`, `media-query-breakpoint-invariant`, `component-boundary-invariant`) a végrehajtás során keletkezett, a 12.1 táblázatában megnevezett felelősséggel és indokkal.
+1. A `packages/ui/src` alatt pontosan a 12.1 listája szerinti **huszonkét** téma mappa áll közvetlenül, egy szint mélyen, plusz az `index.ts` barrel; egyetlen téma mappában sincs alkönyvtár. A huszonkettőből négy (`class-name-list`, `aria-token-list`, `media-query-breakpoint-invariant`, `component-boundary-invariant`) a végrehajtás során keletkezett, a 12.1 táblázatában megnevezett felelősséggel és indokkal; kettő (`menu`, `brand-mark`) a 2026-09-04-i felületi kiegészítés tényleges hatókör bővítése, ugyanott dokumentálva.
 2. Az `apps/web/src` alatt pontosan a 12.2 listája szerinti **tizennégy** téma mappa áll közvetlenül, egy szint mélyen, plusz az `index.ts` barrel és a `vite-env.d.ts` típus only fájl; egyetlen téma mappában sincs alkönyvtár. A tizennégyből kettő (`greppable-invariants`, `vite-istanbul-include-invariant`) a SPEC-002 6.2 5. pontja szerinti, megvalósítás nélküli invariáns téma.
 3. Az `apps/web/src` alatt **nincs** olyan fájl, ami a SPEC-008 vagy a SPEC-009 hatókörébe tartozik: nincs `@xyflow/react` import, nincs transcript panel, nincs beállítás képernyő. Greppel ellenőrizhető teszt igazolja.
 4. Mindkét csomag `CLAUDE.md` fájlja a csomag gyökerében áll, sehol máshol, és a `## Fájlok` táblázata minden témát felsorol felelősség leírással; a típus only `vite-env.d.ts` fájl külön meg van jelölve. A `bun run docs:check` nulla kilépési kóddal fut.
@@ -927,7 +998,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 22. Egyetlen `.tsx` fájlban sincs `import React from 'react'` default import; a JSX az automatikus runtime-on megy (M-2, M-3). Greppel ellenőrizhető teszt igazolja.
 23. Egyetlen komponens sem importál a `@easter-workflow-builder/protocol` csomagból, és egyetlen komponens propja sem hordoz domain fogalmat. Greppel ellenőrizhető teszt igazolja.
 24. Egyetlen komponens sem hivatkozik a `ResizeObserver` és az `IntersectionObserver` API-ra. Greppel ellenőrizhető teszt igazolja (M-24, O-8).
-25. Mind a tizenkét komponens téma mappa **exportált egységenként** egy `.tsx` megvalósítást és egy `.spec.tsx` tesztet tartalmaz, plusz a téma egyetlen `.css` fájlját; a `.spec.tsx` valódi JSX-szel, az O-1 lezárása szerint. Tizenegy témában ez pontosan három fájl. A `toast` téma három egységet exportál (`Toast`, `ToastViewport`, `useToasts`), tehát hét fájl: a `.claude/CLAUDE.md` 5. szekció "egy fájlba egy dolog" szabálya erősebb, mint a fájlszám (12.1).
+25. Mind a tizenhárom komponens téma mappa **exportált egységenként** egy `.tsx` megvalósítást és egy `.spec.tsx` tesztet tartalmaz, plusz a téma egyetlen `.css` fájlját; a `.spec.tsx` valódi JSX-szel, az O-1 lezárása szerint. Tíz témában ez pontosan három fájl. A `toast` téma három egységet exportál (`Toast`, `ToastViewport`, `useToasts`), tehát hét fájl. A `menu` téma két egységet exportál (`Menu`, `MenuItem`), négy fájl plusz a közös `menu.css`, plusz egy belső, nem exportált segédmodul (`menu-close-context.ts`) a saját `.spec.ts` párjával, szintén hét fájl összesen. Mindkét esetben a `.claude/CLAUDE.md` 5. szekció "egy fájlba egy dolog" szabálya erősebb, mint a fájlszám (12.1).
 26. A `Modal` `role="dialog"` értékkel és `aria-labelledby` hivatkozással, a `ProgressBar` `role="progressbar"` értékkel, a téma váltó gomb `aria-label` felirattal rajzol ki, tehát az e2e tesztek `getByRole` locatort tudnak használni.
 
 ### Az alkalmazás váz
