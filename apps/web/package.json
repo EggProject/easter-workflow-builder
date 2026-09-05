@@ -16,6 +16,7 @@
     "@dagrejs/dagre": "catalog:",
     "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/protocol": "workspace:*",
+    "@easter-workflow-builder/typeguards": "workspace:*",
     "@easter-workflow-builder/ui": "workspace:*",
     "@xyflow/react": "catalog:",
     "react": "catalog:",

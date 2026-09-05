@@ -26,11 +26,21 @@ konfigurációs invariáns saját mappában.
 
 **A SPEC-008 F3 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel.** Eddig elkészült
 témák: `graph-node-catalog` (T-009-14, tizenhetedik), `graph-node-card` (T-009-15,
-tizennyolcadik) és `graph-editor` (T-009-16, tizenkilencedik). A SPEC-008 11.2 szekciója tíz új
-témát ír elő összesen (a maradék hét a PLAN-009 hátralévő lépéseiben érkezik); a végleges
-"huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a jelen tényleges darabszám (tizenkettő
-SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat) közötti eltérés a PLAN-009 T-009-32
-(F8) zárásának hatóköre, nem ezé a lépésé.
+tizennyolcadik), `graph-editor` (T-009-16, tizenkilencedik) és `node-inspector` (T-009-18,
+huszadik). A SPEC-008 11.2 szekciója tíz új témát ír elő összesen (a maradék hat a PLAN-009
+hátralévő lépéseiben érkezik); a végleges "huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a
+jelen tényleges darabszám (tizenkettő SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat)
+közötti eltérés a PLAN-009 T-009-32 (F8) zárásának hatóköre, nem ezé a lépésé.
+
+**A `node-inspector` téma a kiválasztott node `config` mezőjét szerkeszti** a `protocol`
+`node-config` sémája felett, típusonként külön mezőcsoporttal (SPEC-008 5.1, 5.2, AC16). A
+mezőnkénti hiba a `NodeConfigSchema.safeParse` eredményéből, útvonal szerint jelenik meg. A
+`SandboxConfig` és a `structuredOutput.schema` dokumentálatlan, `unknown` alakú mezői nyers JSON
+szerkesztőn mennek, nem bespoke mezőkön (a `packages/protocol` saját doksija szerint "tippelni
+tilos"). A téma **nem importál `zod`-ot közvetlenül**: a mezőnkénti hibalista a
+`fieldErrorsFromZodError` segédfüggvényen át, egy strukturális `ZodErrorLike` típussal megy, mert
+a drótszintű validálás kizárólag a `packages/protocol` felelőssége (`greppable-invariants`
+teszt (2)).
 
 **A `graph-editor` téma a T-009-17 óta a betöltést, a mentést és a mentetlen jelzőt is hordozza**
 (`GraphEditorScreen`), a `GraphEditorCanvas` mellett - a SPEC-008 11.2 táblázata ezt a témát
@@ -63,6 +73,7 @@ szabálya 0-ra oldódna, azaz láthatatlan lenne.
 | `src/graph-node-catalog/`              | a tíz csomópont típus megjelenítési és handle táblája, `Record<NodeType, ...>` alakban, plusz a kártya méret konstans (T-009-19-től) (SPEC-008 5.1, 5.7)                                                                                                        |
 | `src/graph-node-card/`                 | a vászon egyetlen egyedi node komponense, a `Handle` elemekkel és a `StepRunStatus` jelvény leképezéssel (SPEC-008 5.1, 5.5, AC21)                                                                                                                              |
 | `src/graph-editor/`                    | a vezérelt `GraphEditorCanvas` (`@xyflow/react` felett), a `GraphEditorScreen` (betöltés, mentés, mentetlen jelző, mentés előtti séma ellenőrzés), a node/él leképezés és az `isValidGraphConnection` szerkezeti szabálypár (SPEC-008 5.4, 5.5, AC8-AC13, AC15) |
+| `src/node-inspector/`                  | a kiválasztott node `config` mezőjét szerkesztő panel, típusonkénti mezőcsoporttal és a `protocol` séma feletti mezőnkénti hibalistával (SPEC-008 5.1, 5.2, AC16, AC17, AC60)                                                                                   |
 | `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                                                                                                          |
 | `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                                                                   |
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                                                                  |

@@ -1,5 +1,7 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import {
+  SettingsRecordSchema,
+  WorkflowDetailSchema,
   WorkflowGraphDocumentSchema,
   type WorkflowEdgeInput,
   type WorkflowGraphDocument,
@@ -7,6 +9,8 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { Button, Skeleton, ToastViewport, useToasts } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
+import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -34,12 +38,12 @@ function readWorkflowId(search: string): string | undefined {
 
 /**
  * A gráf szerkesztő képernyő: betöltés, mentés, mentetlen jelző és a mentés
- * előtti séma ellenőrzés (SPEC-008 5.5, T-009-17, AC12, AC13, AC15). A vászon
- * (`GraphEditorCanvas`) minden változást visszaad, ebből épül a jelenlegi
- * állapot; a mentetlen jelző ezt hasonlítja a betöltött alaphoz
- * (`isGraphDirty`). A mentés csak akkor indul, ha a `validateGraphForSave`
- * `ok` értéket ad - hibás alak esetén a felület a hibás mező útvonalát
- * mutatja, kérés nélkül.
+ * előtti séma ellenőrzés (SPEC-008 5.5, T-009-17, AC12, AC13, AC15), plusz a
+ * csomópont beállítás panel (`node-inspector`, T-009-18, AC16, AC17). A
+ * vászon (`GraphEditorCanvas`) teljesen vezérelt: a `currentNodes`/
+ * `currentEdges` innen jön, és a node-inspector szerkesztése (`config`
+ * mezőn át) UGYANEZT az állapotot módosítja, ami a vászonra is azonnal
+ * visszahat (M-55).
  */
 export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
   const { apiOrigin, fetchFunction, search } = properties;
@@ -47,11 +51,18 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
 
   const graphState = useRequestState<WorkflowGraphDocument>();
   const saveState = useRequestState<WorkflowGraphDocument>();
+  // A workflow rekord (a lépés szintű `providerId` felülírás örökölt
+  // értékéhez, AC17) és a globális beállítás (`defaultProviderId`) - mindkét
+  // végpont a SPEC-005 4.2 táblázatában él, a node-inspector panel enélkül
+  // nem tudná megnevezni, MELYIK providert örökli a lépés.
+  const workflowState = useRequestState<{ readonly providerId: string | null }>();
+  const settingsState = useRequestState<{ readonly defaultProviderId: string | null }>();
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   const [baseline, setBaseline] = useState<WorkflowGraphDocument | undefined>(undefined);
   const [currentNodes, setCurrentNodes] = useState<readonly WorkflowNodeInput[]>([]);
   const [currentEdges, setCurrentEdges] = useState<readonly WorkflowEdgeInput[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [validationMessage, setValidationMessage] = useState<string | undefined>(undefined);
   // Külön jelző, nem a `graphState.state.status === 'success'` közvetlenül:
   // a `graphState.state` sikeresre váltása és a `currentNodes`/`currentEdges`
@@ -76,12 +87,30 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
         apiOrigin,
       }),
     );
-    // A `graphState.run` szándékosan nincs a dependency listán: a
-    // `useRequestState` saját `useCallback`-je stabil, de a hívó oldali
-    // `graphState` objektum maga nem az; a betöltésnek a `workflowId`, az
-    // `apiOrigin` és a `fetchFunction` tényleges változására kell
-    // újrafutnia, nem minden renderen. A projekt ESLint konfigurációja nem
-    // tartalmazza a `react-hooks/exhaustive-deps` szabályt.
+    void workflowState.run(() =>
+      requestRouteWithoutBody({
+        routeId: 'getWorkflow',
+        parameters: { workflowId },
+        responseSchema: WorkflowDetailSchema,
+        fetchFunction,
+        apiOrigin,
+      }),
+    );
+    void settingsState.run(() =>
+      requestRouteWithoutBody({
+        routeId: 'readSettings',
+        responseSchema: SettingsRecordSchema,
+        fetchFunction,
+        apiOrigin,
+      }),
+    );
+    // A `graphState.run`/`workflowState.run`/`settingsState.run` szándékosan
+    // nincs a dependency listán: a `useRequestState` saját `useCallback`-je
+    // stabil, de a hívó oldali objektum maga nem az; a betöltésnek a
+    // `workflowId`, az `apiOrigin` és a `fetchFunction` tényleges
+    // változására kell újrafutnia, nem minden renderen. A projekt ESLint
+    // konfigurációja nem tartalmazza a `react-hooks/exhaustive-deps`
+    // szabályt.
   }, [workflowId, apiOrigin, fetchFunction]);
 
   useEffect(() => {
@@ -109,6 +138,10 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     },
     [],
   );
+
+  const handleUpdateNode = useCallback((updatedNode: WorkflowNodeInput): void => {
+    setCurrentNodes((current) => current.map((node) => (node.id === updatedNode.id ? updatedNode : node)));
+  }, []);
 
   // A korai visszatérés minden hook UTÁN, de a lenti `handleSave` ELŐTT áll:
   // a `workflowId` innentől `string` (nem `string | undefined`), mert a
@@ -158,6 +191,14 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   const isLoading = !isHydrated;
   const isSaving = saveState.state.status === 'pending';
   const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
+  const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
+  const workflowProviderId =
+    // eslint-disable-next-line unicorn/no-null -- a `describeInheritedProvider` a drótszintű `string | null` alakot várja.
+    workflowState.state.status === 'success' ? workflowState.state.value.providerId : null;
+  const defaultProviderId =
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    settingsState.state.status === 'success' ? settingsState.state.value.defaultProviderId : null;
+  const inheritedProviderDescription = describeInheritedProvider(workflowProviderId, defaultProviderId);
 
   return (
     <div className="graph-editor-screen">
@@ -172,20 +213,26 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       {isLoading ? (
         <Skeleton shape="text" lines={4} />
       ) : (
-        <div className="graph-editor-screen__canvas">
-          <GraphEditorCanvas
-            initialNodes={currentNodes}
-            initialEdges={currentEdges}
-            onGraphChange={handleGraphChange}
-            selectedNodeId={undefined}
-            onSelectNode={() => {
-              // A csomópont beállítás panel (`node-inspector`, T-009-18) a
-              // fogyasztója; addig a kiválasztás nyugtázása nélkül is
-              // helyesen működik a vászon (a `GraphEditorCanvas` a
-              // `selectedNodeId` prop hiányában is renderel, csak a
-              // vizuális kiemelés marad el).
-            }}
-          />
+        <div className="graph-editor-screen__body">
+          <div className="graph-editor-screen__canvas">
+            <GraphEditorCanvas
+              nodes={currentNodes}
+              edges={currentEdges}
+              onGraphChange={handleGraphChange}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={setSelectedNodeId}
+            />
+          </div>
+          {selectedNode !== undefined && (
+            <NodeInspector
+              node={selectedNode}
+              onChange={handleUpdateNode}
+              onClose={() => {
+                setSelectedNodeId(undefined);
+              }}
+              inheritedProviderDescription={inheritedProviderDescription}
+            />
+          )}
         </div>
       )}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />

@@ -111,8 +111,8 @@ describe('GraphEditorCanvas', () => {
     act(() => {
       root.render(
         <GraphEditorCanvas
-          initialNodes={nodes}
-          initialEdges={edges}
+          nodes={nodes}
+          edges={edges}
           onGraphChange={onGraphChange}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
@@ -121,11 +121,28 @@ describe('GraphEditorCanvas', () => {
     });
   }
 
-  it('felmountoláskor az induló gráfot változtatás nélkül visszaadja az onGraphChange-nek', () => {
+  it('a kapott node-okat és éleket megjeleníti, onGraphChange hívás nélkül (vezérelt komponens)', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
-    expect(onGraphChange).toHaveBeenCalledTimes(1);
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+    expect(onGraphChange).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-id="n1"]')).not.toBeNull();
+    expect(container.querySelector('[data-id="n2"]')).not.toBeNull();
+  });
+
+  it('a nodes prop külső (pl. node-inspector általi) módosítására a vászon a felmountolt állapotban is frissül', () => {
+    // A `START_NODE.label` szándékosan eltér a `GRAPH_NODE_CATALOG` `start`
+    // bejegyzésének saját, mindig kirajzolt "Indítás" típuscímkéjétől
+    // (`GraphNodeCard.tsx` `graph-node-card__type`), különben az átnevezés
+    // előtti/utáni szöveg nem volna megkülönböztethető a típuscímkétől.
+    const originalLabelStartNode: WorkflowNodeInput = { ...START_NODE, label: 'Kezdőpont' };
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([originalLabelStartNode], [], onGraphChange, vi.fn());
+    expect(container.textContent).toContain('Kezdőpont');
+
+    const renamedStartNode: WorkflowNodeInput = { ...originalLabelStartNode, label: 'Átnevezve' };
+    renderCanvas([renamedStartNode], [], onGraphChange, vi.fn());
+    expect(container.textContent).toContain('Átnevezve');
+    expect(container.textContent).not.toContain('Kezdőpont');
   });
 
   it('a nodeTypes referenciája azonos marad két render között (M-56, AC8)', () => {
@@ -191,6 +208,15 @@ describe('GraphEditorCanvas', () => {
       lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'remove' }]);
     });
     expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], []);
+  });
+
+  it('az onEdgesChange egy megmaradó élt a flowEdgeToWorkflowEdge-en át ad vissza (AC9)', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'select', selected: true }]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
   });
 
   it('az onConnect az addEdge-en át felveszi az új élt, a branchKey a sourceHandle-ből származik (AC10)', () => {

@@ -1,0 +1,59 @@
+.node-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--ep-bg-elevated);
+  border-left: 1px solid var(--ep-control-border);
+}
+
+.node-inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.node-inspector__reason {
+  font: var(--ep-text-meta);
+  color: var(--ep-fg-muted);
+}
+
+.node-inspector fieldset,
+.agent-definition-entry-fields fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--ep-control-border);
+  border-radius: var(--ep-radius-md);
+  padding: 12px;
+}
+
+.node-inspector legend,
+.agent-definition-entry-fields legend {
+  font: 500 12px var(--ep-font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ep-fg-muted);
+  padding: 0 4px;
+}
+
+.agents-field-editor__entry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-inspector__errors {
+  color: var(--ep-danger);
+  font: var(--ep-text-meta);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.node-inspector__list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

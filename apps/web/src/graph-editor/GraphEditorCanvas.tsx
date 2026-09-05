@@ -11,7 +11,7 @@ import {
   type EdgeChange,
   type NodeChange,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
@@ -29,8 +29,17 @@ import './graph-editor.css';
 const NODE_TYPES = { workflowNode: GraphNodeCard };
 
 export interface GraphEditorCanvasProperties {
-  readonly initialNodes: readonly WorkflowNodeInput[];
-  readonly initialEdges: readonly WorkflowEdgeInput[];
+  /**
+   * A gráf teljes állapota, a szülő (`graph-editor-screen`, T-009-17) tartja
+   * karban - a vászon teljesen vezérelt (React Flow "Controlled Flow"
+   * mintája): sem belső `nodes`/`edges` állapotot, sem "csak induláskor"
+   * feldolgozott propot nem tart. Ez azért szükséges, mert a node beállítás
+   * panel (`node-inspector`, T-009-18) is EZT az állapotot módosítja (a
+   * `config` mezőn át), és a módosításnak a már felmountolt vásznon is meg
+   * kell jelennie - amit egy "csak induláskor olvasott" prop nem tenne meg.
+   */
+  readonly nodes: readonly WorkflowNodeInput[];
+  readonly edges: readonly WorkflowEdgeInput[];
   /**
    * Minden node/él változás után hívódik, a domain alakra visszaalakítva
    * (SPEC-008 5.5: a mentetlen jelző és a mentés ebből az állapotból épül,
@@ -47,61 +56,70 @@ export interface GraphEditorCanvasProperties {
 }
 
 /**
- * A vezérelt vászon (SPEC-008 5.5, M-55): a `nodes` és az `edges` a
- * képernyő állapota, a változások az `applyNodeChanges` és az
- * `applyEdgeChanges` függvényen mennek át (AC9). Az `onConnect` az
- * `addEdge` segédfüggvényt hívja (M-58); a `branchKey` mezőt a
- * `flowEdgeToWorkflowEdge` tölti ki a `sourceHandle` értékéből, az
- * `onGraphChange` kimenetén (AC10). Az `isValidConnection` a katalógus és a
- * meglévő élek adatából dönt, gráf szemantika nélkül (AC11, SPEC-008 5.4).
+ * A vezérelt vászon (SPEC-008 5.5, M-55): a `nodes` és az `edges` a szülő
+ * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
+ * mintáját követi - nincs belső állapot duplikáció, minden változás
+ * (`applyNodeChanges`, `applyEdgeChanges`, AC9) egy lépésben, közvetlenül az
+ * `onGraphChange`-en át jut vissza a szülőhöz. Az `onConnect` az `addEdge`
+ * segédfüggvényt hívja (M-58); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
+ * tölti ki a `sourceHandle` értékéből (AC10). Az `isValidConnection` a
+ * katalógus és a meglévő élek adatából dönt, gráf szemantika nélkül (AC11,
+ * SPEC-008 5.4).
  */
 export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperties>): ReactElement {
-  const { initialNodes, initialEdges, onGraphChange, selectedNodeId, onSelectNode } = properties;
+  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode } = properties;
 
-  const [nodes, setNodes] = useState<GraphNodeCardFlowNode[]>(() =>
-    initialNodes.map((node) => workflowNodeToFlowNode(node)),
+  const flowNodes = useMemo(() => nodes.map((node) => workflowNodeToFlowNode(node)), [nodes]);
+  const flowEdges = useMemo(() => edges.map((edge) => workflowEdgeToFlowEdge(edge)), [edges]);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange<GraphNodeCardFlowNode>[]) => {
+      const nextFlowNodes = applyNodeChanges(changes, flowNodes);
+      onGraphChange(
+        nextFlowNodes.map((node) => flowNodeToWorkflowNode(node)),
+        edges,
+      );
+    },
+    [flowNodes, edges, onGraphChange],
   );
-  const [edges, setEdges] = useState<Edge[]>(() => initialEdges.map((edge) => workflowEdgeToFlowEdge(edge)));
 
-  // Az `onGraphChange` szándékosan nincs a dependency listán: a hívó
-  // (`graph-editor-screen`, T-009-17) minden renderen új függvényt adhat,
-  // ami végtelen ciklust okozna; a `nodes`/`edges` állapot a valódi kiváltó.
-  // A projekt ESLint konfigurációja nem tartalmazza a `react-hooks/exhaustive-deps`
-  // szabályt, tehát nincs mit letiltani - ez a megjegyzés csak a szándékos kihagyást dokumentálja.
-  useEffect(() => {
-    onGraphChange(
-      nodes.map((node) => flowNodeToWorkflowNode(node)),
-      edges.map((edge) => flowEdgeToWorkflowEdge(edge)),
-    );
-  }, [nodes, edges]);
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      const nextFlowEdges = applyEdgeChanges(changes, flowEdges);
+      onGraphChange(
+        nodes,
+        nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
+      );
+    },
+    [flowEdges, nodes, onGraphChange],
+  );
 
-  const onNodesChange = useCallback((changes: NodeChange<GraphNodeCardFlowNode>[]) => {
-    setNodes((current) => applyNodeChanges(changes, current));
-  }, []);
-
-  const onEdgesChange = useCallback((changes: EdgeChange<Edge>[]) => {
-    setEdges((current) => applyEdgeChanges(changes, current));
-  }, []);
-
-  const onConnect = useCallback((connection: Connection) => {
-    setEdges((current) => addEdge(connection, current));
-  }, []);
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      const nextFlowEdges = addEdge(connection, flowEdges);
+      onGraphChange(
+        nodes,
+        nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
+      );
+    },
+    [flowEdges, nodes, onGraphChange],
+  );
 
   const isValidConnection = useCallback(
-    (connectionOrEdge: Edge | Connection) => isValidGraphConnection(connectionOrEdge, nodes, edges),
-    [nodes, edges],
+    (connectionOrEdge: Edge | Connection) => isValidGraphConnection(connectionOrEdge, flowNodes, flowEdges),
+    [flowNodes, flowEdges],
   );
 
   const displayedNodes = useMemo(
-    () => nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId })),
-    [nodes, selectedNodeId],
+    () => flowNodes.map((node) => ({ ...node, selected: node.id === selectedNodeId })),
+    [flowNodes, selectedNodeId],
   );
 
   return (
     <div className="graph-editor-canvas">
       <ReactFlow
         nodes={displayedNodes}
-        edges={edges}
+        edges={flowEdges}
         nodeTypes={NODE_TYPES}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

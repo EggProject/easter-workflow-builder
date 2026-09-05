@@ -24,6 +24,19 @@
   gap: 12px;
 }
 
+.graph-editor-screen__body {
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+}
+
 .graph-editor-screen__canvas {
+  height: 70vh;
+  flex: 1;
+  min-width: 0;
+}
+
+.graph-editor-screen__body .node-inspector {
+  flex: 0 0 340px;
   height: 70vh;
 }
