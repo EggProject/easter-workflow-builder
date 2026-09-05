@@ -16,7 +16,33 @@ declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 
+/**
+ * A globális `fetch` lezárása: unit teszt nem szólíthat meg hálózatot.
+ *
+ * A `mountApp` a valódi `browserFetchFunction` portot adja tovább, és a
+ * létrehozott React gyökeret nem adja vissza, tehát az a teszt, ami a
+ * belépési pontot futtatja, nem tudja leszerelni. Stub nélkül a képernyő
+ * effektje ténylegesen a hálózatra ment, és a késve, a fájl lefutása UTÁN
+ * megérkező DNS hiba React állapotfrissítést váltott ki már leszerelt
+ * happy-dom környezetben - a CI-ban `ReferenceError: window is not defined`
+ * alakú, a futást megbuktató kezeletlen hiba (PR #11, run 33933773721),
+ * helyben zöld, mert ott a DNS hiba a teszten belül megérkezett.
+ *
+ * A lezárás determinisztikussá teszi ezt a hibaosztályt: a hívás azonnal,
+ * még a mikrotask sorban elutasít, tehát a teszt lefutása után nincs
+ * függőben lévő hálózati művelet. Az a teszt, aminek tényleges válaszra van
+ * szüksége, továbbra is szabadon felülírja (`Object.assign(globalThis, {
+ * fetch })`), ezért `writable: true` - a másik két tulajdonságot senki nem
+ * írja felül, azoknál nem kell.
+ */
+function forbiddenFetch(): Promise<never> {
+  return Promise.reject(
+    new Error('Unit teszt nem szólíthat meg hálózatot: cseréld le a globalThis.fetch függvényt a tesztben.'),
+  );
+}
+
 Object.defineProperties(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: { value: true, configurable: true },
   localStorage: { value: new Storage(), configurable: true },
+  fetch: { value: forbiddenFetch, configurable: true, writable: true },
 });
