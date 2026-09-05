@@ -757,6 +757,36 @@ test.describe('error_handler node', () => {
     await expect(reopened.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)')).toHaveValue('50\n150');
     await expect(reopened.getByLabel('Kezelt hibafajták (soronként egy)')).toHaveValue('timeout\nrate_limit');
   });
+
+  test('nem numerikus backoffMs sor a NodeConfigSchema szerint érvénytelen állapotot hoz létre, a panel mezőnkénti hibalistát mutat', async ({
+    page,
+  }) => {
+    // A `backoffMs` textarea (number-list-field-value.ts) NEM natív
+    // `type="number"` input, tehát a böngésző nem szűri ki a nem numerikus
+    // sort: a `fromNumberListFieldValue` a `Number('abc')` NaN eredményét
+    // válogatás nélkül a tömbbe teszi. A `NodeConfigSchema.safeParse` a
+    // `z.number()` miatt a NaN-t elutasítja (mérve: `z.number().safeParse(NaN)`
+    // `invalid_type` hibát ad), tehát ez a `node-inspector` saját
+    // `role="alert"` hibalistáját (`fieldErrorsFromZodError`) TÉNYLEGESEN
+    // felhasználói úton eléri - az előző jelentés "elérhetetlen" állítása erre
+    // a mezőre nem igaz.
+    const panel = await openNode(page, 'n-error');
+    await expect(panel.getByRole('alert')).toBeAttached({ attached: false });
+
+    await panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)').fill('50\nabc\n150');
+
+    const alert = panel.getByRole('alert');
+    await expect(alert).toBeVisible();
+    // A pontos zod üzenetszöveg NEM stabil ellenőrzési pont: a `VITE_COVERAGE`
+    // instrumentált buildben az Istanbul által eltolt `/* @__PURE__ */`
+    // annotáció miatt a Rolldown a zod alapértelmezett locale regisztrációját
+    // tree-shake-eli (a `webServer` build log ugyanerre a jelenségre figyelmeztet
+    // több fájlban, INVALID_ANNOTATION), ezért a mért, ténylegesen megjelenő
+    // szöveg a rövidebb "Invalid input" - ez a mezőnkénti hibalista MEGJELENÉSÉT
+    // és az útvonal (`backoffMs.1`) megnevezését igazolja, ami a lényegi állítás.
+    await expect(alert).toContainText('backoffMs.1');
+    await expect(alert).toContainText('Invalid input');
+  });
 });
 
 test.describe('sub_workflow node', () => {

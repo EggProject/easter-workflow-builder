@@ -171,3 +171,38 @@ csendben kivenni.
   öt, tesztelhetetlen maradékot tartalmazó fájlt azonnal megbuktatná, és fájlonként külön küszöböt
   kellene hozzá kitalálni, amire nincs forrásunk. A globális küszöb ratchet jellege enélkül is
   megvan.
+
+---
+
+## 8. SPEC-008 utólagos kiegészítés (2026-09-06): három új, tételesen igazolt elérhetetlen ág
+
+A gráf szerkesztő (SPEC-008) node-inspector és graph-node-card témái négy korábban hiányzó,
+ténylegesen e2e-elérhető branch-et kaptak új Playwright teszttel (`node-inspector.spec.ts`
+"nem numerikus backoffMs sor..." teszt, `rest-error-paths.spec.ts` "nem 2xx válaszra, ha a törzs
+NEM érvényes JSON..." teszt, `sse-frames.spec.ts` "eltérő serverInstanceId..." teszt,
+`client-route-navigation.spec.ts` "/run" útvonal teszt). Eközben egy korábbi jelentés két
+állítását saját méréssel kellett ellenőrizni; az egyik hamisnak bizonyult, a másik igaznak. A
+maradék, tételesen e2e-vel elvileg sem elérhető ágak az alábbi hárommal bővülnek (a fenti 2.2
+táblázat öt tétele mellé, azokat nem érintve):
+
+| Fájl                                   | Nem fedett ág                               | Miért nem érhető el e2e-vel                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graph-node-card/GraphNodeCard.tsx`    | 74. és 82. sor (`status !== undefined` ág)  | A `data.status` mezőt ma egyetlen hívó sem állítja be (`GraphEditorScreen`/`GraphEditorCanvas` grep-elve: nincs `status:` mező a node adatban) - az élő futás nézet drótba kötése a PLAN-009 F4 ... F6 fázisának tárgya. **Előző jelentés állítása: IGAZ, saját méréssel megerősítve.**                                                                                                                                                                                                                                                                                                                                               |
+| `node-inspector/NodeInspector.tsx`     | 123. sor (`path === '' ? '(gyökér)' : ...`) | Gyökér szintű (üres útvonalú) zod hiba csak akkor keletkezik, ha a `config` maga nem objektum, vagy egy `z.strictObject` felesleges kulcsot kap - mindkettőt már a `readWorkflowGraph` válaszát ellenőrző `WorkflowGraphDocumentSchema` (ugyanaz a `NodeConfigSchema`) kiszűri, mielőtt a node elérné a `NodeInspector`-t; a mezőszerkesztők pedig kizárólag `{...config, mező: érték}` szórással módosítanak, sosem cserélik le a teljes `config`-ot. Saját méréssel igazolva (`NodeConfigSchema.safeParse(null\|42\|"x"\|[])` és extra kulcsos objektum, mindkettő `path: []`-t ad, de egyik sem jut túl a wire-szintű validáción). |
+| `rest-client/perform-route-request.ts` | 70. sor (`buildRoutePath` hibaág)           | A már dokumentált 2.2 táblázat tétele, a mai gráf szerkesztő útvonalakkal (`workflowId`/`runId` query paraméter) is változatlanul érvényes: minden hívó betöltött rekordból veszi az azonosítót.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+**Az előző jelentés MÁSIK állítása (a `role="alert"` mezőnkénti hibalista, `NodeInspector.tsx`
+119-127. sor és `field-errors-from-zod-error.ts`) HAMISNAK bizonyult.** Az `error_handler` node
+`backoffMs` mezője (`number-list-field-value.ts`) egy `<textarea>`, NEM natív `type="number"`
+input, tehát a böngésző nem szűri ki a nem numerikus sort: a `fromNumberListFieldValue` a
+`Number('abc')` NaN eredményét válogatás nélkül a tömbbe teszi, a `NodeConfigSchema.safeParse`
+pedig a `z.number()` miatt elutasítja (saját méréssel igazolva:
+`z.number().safeParse(NaN)` `invalid_type` hibát ad). Ez a felhasználói úton TÉNYLEGESEN
+kiváltható, új Playwright teszt fedi (`node-inspector.spec.ts`), mindkét érintett fájl e2e
+branch/statement/function/line lefedettsége ezután 100 százalék.
+
+**Mért állapot ezután (teljes `apps/web/e2e` újrafuttatás, 116 teszt):** statements 97.24,
+branches **95.05**, functions 98, lines 97.12 - mind a négy metrika a jelenlegi, VÁLTOZATLANUL
+hagyott küszöb fölött. A küszöb emelését (ratchet) a koordinátor dönti el: a mérés időpontjában
+egy másik, párhuzamos munkamenet a `graph-editor/` témát élőben szerkesztette, tehát ez a szám a
+véglegesnél instabilabb alapot ad egy visszavonhatatlan küszöbemeléshez.

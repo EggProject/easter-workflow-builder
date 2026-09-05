@@ -78,3 +78,13 @@ test('a böngésző vissza gombja (popstate) visszaállítja az előző útvonal
   await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/');
 });
+
+test('a "/run" útvonalon a futás nézet helyőrzője jelenik meg, "Futás nézet" topnav címmel', async ({ page }) => {
+  // A `runView` ág (SPEC-008 T-009-20 ... T-009-27 helyőrzője) a
+  // `renderRouteContent` switch ötödik ága; a `ROUTE_PAGE_TITLE['runView']`
+  // pedig a topnav `<h1>` címét adja.
+  await page.goto('/run');
+
+  await expect(page.getByRole('heading', { name: 'Futás nézet' })).toBeVisible();
+  await expect(page.getByText('Futás nézet (folyamatban).')).toBeVisible();
+});
