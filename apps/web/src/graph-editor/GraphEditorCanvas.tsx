@@ -9,8 +9,10 @@ import {
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeSelectionChange,
   type NodeChange,
   type NodeDimensionChange,
+  type NodeSelectionChange,
 } from '@xyflow/react';
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
@@ -18,6 +20,7 @@ import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-d
 import { GRAPH_NODE_CARD_HEIGHT, GRAPH_NODE_CARD_WIDTH } from '../graph-node-catalog/graph-node-catalog.ts';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
+import { isNodeDeselected, mergeEdgeSelection, type SelectedEdgeIds } from './graph-selection.ts';
 import { isValidGraphConnection } from './is-valid-connection.ts';
 import { mergeMeasuredNodeSizes, withMeasuredNodeSize, type MeasuredNodeSizes } from './measured-node-sizes.ts';
 import '@xyflow/react/dist/style.css';
@@ -63,9 +66,10 @@ export interface GraphEditorCanvasProperties {
  * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
  * mintáját követi - a GRÁF állapotát nem duplikálja, minden gráf változás
  * (`applyNodeChanges`, `applyEdgeChanges`, AC9) egy lépésben, közvetlenül az
- * `onGraphChange`-en át jut vissza a szülőhöz. Az egyetlen saját állapot a
- * mért csomópont méret, ami nem gráf adat és nem is mentődik
- * (`measured-node-sizes.ts`). Az `onConnect` az `addEdge`
+ * `onGraphChange`-en át jut vissza a szülőhöz. Két saját állapota van, és
+ * egyik sem gráf adat, tehát egyik sem mentődik: a mért csomópont méret
+ * (`measured-node-sizes.ts`) és a kiválasztott élek halmaza
+ * (`graph-selection.ts`). Az `onConnect` az `addEdge`
  * segédfüggvényt hívja (M-58); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
  * tölti ki a `sourceHandle` értékéből (AC10). Az `isValidConnection` a
  * katalógus és a meglévő élek adatából dönt, gráf szemantika nélkül (AC11,
@@ -80,6 +84,12 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
   // le, mi történik enélkül (tartósan rejtett csomópont, nulla él, végtelen
   // `ResizeObserver` hurok, saját méréssel igazolva).
   const [measuredNodeSizes, setMeasuredNodeSizes] = useState<MeasuredNodeSizes>({});
+  // A kiválasztott élek szintén a vászon nézeti állapota, ugyanabból az okból:
+  // a `WorkflowEdgeInput` nem hordoz `selected` mezőt, tehát a vezérelt
+  // oda-vissza leképezésen elveszne. A `graph-selection.ts` doksija írja le,
+  // mi történik enélkül (kattintásra sem kiválasztható, tehát Backspace-szel
+  // sem törölhető él, saját méréssel igazolva).
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<SelectedEdgeIds>(() => new Set());
 
   const flowNodes = useMemo(
     () => nodes.map((node) => withMeasuredNodeSize(workflowNodeToFlowNode(node), measuredNodeSizes[node.id])),
@@ -89,19 +99,26 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
 
   const onNodesChange = useCallback(
     (changes: NodeChange<GraphNodeCardFlowNode>[]) => {
-      // A `dimensions` változás mérési eredmény, nem gráf szerkesztés: a mért
-      // méret térképbe megy, a domain állapotot nem piszkolja be.
+      // A `dimensions` változás mérési eredmény, a `select` változás
+      // kiválasztás: egyik sem gráf szerkesztés, tehát a domain állapotot
+      // egyik sem piszkolja be.
       const dimensionChanges: NodeDimensionChange[] = [];
+      const selectionChanges: NodeSelectionChange[] = [];
       const graphChanges: NodeChange<GraphNodeCardFlowNode>[] = [];
       for (const change of changes) {
         if (change.type === 'dimensions') {
           dimensionChanges.push(change);
+        } else if (change.type === 'select') {
+          selectionChanges.push(change);
         } else {
           graphChanges.push(change);
         }
       }
       if (dimensionChanges.length > 0) {
         setMeasuredNodeSizes((previous) => mergeMeasuredNodeSizes(previous, dimensionChanges));
+      }
+      if (isNodeDeselected(selectionChanges, selectedNodeId)) {
+        onSelectNode(undefined);
       }
       if (graphChanges.length > 0) {
         const nextFlowNodes = applyNodeChanges(graphChanges, flowNodes);
@@ -111,16 +128,33 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
         );
       }
     },
-    [flowNodes, edges, onGraphChange],
+    [flowNodes, edges, onGraphChange, selectedNodeId, onSelectNode],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<Edge>[]) => {
-      const nextFlowEdges = applyEdgeChanges(changes, flowEdges);
-      onGraphChange(
-        nodes,
-        nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
-      );
+      // Ugyanaz a szétválasztás, mint a csomópontoknál: a `select` változás
+      // kiválasztás, nem gráf szerkesztés, tehát a saját nézeti állapotba
+      // megy, nem a domain alakba (ahol a `selected` mező úgyis elveszne).
+      const selectionChanges: EdgeSelectionChange[] = [];
+      const graphChanges: EdgeChange<Edge>[] = [];
+      for (const change of changes) {
+        if (change.type === 'select') {
+          selectionChanges.push(change);
+        } else {
+          graphChanges.push(change);
+        }
+      }
+      if (selectionChanges.length > 0) {
+        setSelectedEdgeIds((previous) => mergeEdgeSelection(previous, selectionChanges));
+      }
+      if (graphChanges.length > 0) {
+        const nextFlowEdges = applyEdgeChanges(graphChanges, flowEdges);
+        onGraphChange(
+          nodes,
+          nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
+        );
+      }
     },
     [flowEdges, nodes, onGraphChange],
   );
@@ -145,6 +179,10 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
     () => flowNodes.map((node) => ({ ...node, selected: node.id === selectedNodeId })),
     [flowNodes, selectedNodeId],
   );
+  const displayedEdges = useMemo(
+    () => flowEdges.map((edge) => ({ ...edge, selected: selectedEdgeIds.has(edge.id) })),
+    [flowEdges, selectedEdgeIds],
+  );
 
   return (
     <div className="graph-editor-canvas">
@@ -157,7 +195,7 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
       <style>{`:root { --graph-node-card-width: ${String(GRAPH_NODE_CARD_WIDTH)}px; --graph-node-card-height: ${String(GRAPH_NODE_CARD_HEIGHT)}px; }`}</style>
       <ReactFlow
         nodes={displayedNodes}
-        edges={flowEdges}
+        edges={displayedEdges}
         nodeTypes={NODE_TYPES}
         /* A betöltött gráf beleillik a vászonba, ahelyett hogy az
            alapértelmezett `{ x: 0, y: 0, zoom: 1 }` nézetben a jobb szélen

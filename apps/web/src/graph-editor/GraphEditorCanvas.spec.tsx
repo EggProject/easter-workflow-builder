@@ -80,6 +80,15 @@ const EDGE: WorkflowEdgeInput = {
   branchKey: null,
 };
 
+const SECOND_EDGE: WorkflowEdgeInput = {
+  id: 'e2',
+  sourceNodeId: 'n2',
+  targetNodeId: 'n1',
+  sourceHandle: null,
+  targetHandle: null,
+  branchKey: null,
+};
+
 type OnGraphChange = (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => void;
 type OnSelectNode = (nodeId: string | undefined) => void;
 
@@ -254,11 +263,74 @@ describe('GraphEditorCanvas', () => {
 
   it('az onEdgesChange egy megmaradó élt a flowEdgeToWorkflowEdge-en át ad vissza (AC9)', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onEdgesChange?.([{ id: 'e2', type: 'remove' }]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+  });
+
+  // REGRESSZIÓ (2026-09-06): az él kiválasztása NÉZETI állapot. Ha a domain
+  // állapotba menne vissza, a `selected` mező a `WorkflowEdgeInput`
+  // leképezésen elveszne, az él sosem kapna `selected` osztályt, és a
+  // `deleteKeyCode` alapértelmezése (Backspace) sem tudna mit törölni
+  // (lásd `graph-selection.ts`).
+  it('az onEdgesChange a select változást NEM adja vissza a domain állapotba', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
     act(() => {
       lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'select', selected: true }]);
     });
+    expect(onGraphChange).not.toHaveBeenCalled();
+  });
+
+  it('az onEdgesChange a kiválasztást a <ReactFlow> edges propjára írja vissza', () => {
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], vi.fn(), vi.fn());
+    act(() => {
+      lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'select', selected: true }]);
+    });
+    expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e1')?.selected).toBe(true);
+    expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e2')?.selected).toBe(false);
+
+    act(() => {
+      lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'select', selected: false }]);
+    });
+    expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e1')?.selected).toBe(false);
+  });
+
+  it('vegyes él változás listánál a select a nézeti, a remove a domain állapotba kerül', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onEdgesChange?.([
+        { id: 'e1', type: 'select', selected: true },
+        { id: 'e2', type: 'remove' },
+      ]);
+    });
     expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+    expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e1')?.selected).toBe(true);
+  });
+
+  // REGRESSZIÓ (2026-09-06): élre kattintva a React Flow `select: false`
+  // változást küld minden kiválasztott csomópontra (`addSelectedEdges`). Ha
+  // ezt elnyeljük, a csomópont kiválasztva marad, és a Backspace a
+  // kiválasztott élen kívül a csomópontot is törli.
+  it('a csomópont kiválasztás megszűnését jelző select változás az onSelectNode-ra jut', () => {
+    const onSelectNode = vi.fn<OnSelectNode>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], vi.fn(), onSelectNode, 'n1');
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([{ id: 'n1', type: 'select', selected: false }]);
+    });
+    expect(onSelectNode).toHaveBeenCalledWith(undefined);
+  });
+
+  it('a csomópont select változása NEM kerül a domain állapotba', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn(), 'n1');
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([{ id: 'n2', type: 'select', selected: true }]);
+    });
+    expect(onGraphChange).not.toHaveBeenCalled();
   });
 
   it('az onConnect az addEdge-en át felveszi az új élt, a branchKey a sourceHandle-ből származik (AC10)', () => {
