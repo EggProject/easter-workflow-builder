@@ -9,6 +9,7 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { Button, Skeleton, ToastViewport, useToasts } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
@@ -143,6 +144,14 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     setCurrentNodes((current) => current.map((node) => (node.id === updatedNode.id ? updatedNode : node)));
   }, []);
 
+  // Az automatikus elrendezés (`graph-auto-layout`, T-009-19, SPEC-008 5.7)
+  // szinkron fut, jelzés nélkül, és NEM ment: csak a `currentNodes` állapotot
+  // írja át, amitől a mentetlen jelző (`isDirty`) a meglévő
+  // `isGraphDirty`-n át magától igazra vált - nincs hozzá külön jelző.
+  const handleAutoLayout = useCallback((): void => {
+    setCurrentNodes((current) => layoutGraph(current, currentEdges));
+  }, [currentEdges]);
+
   // A korai visszatérés minden hook UTÁN, de a lenti `handleSave` ELŐTT áll:
   // a `workflowId` innentől `string` (nem `string | undefined`), mert a
   // TypeScript a `const` kötés szűkítését a szövegben utána következő
@@ -205,6 +214,9 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       <div className="graph-editor-screen__toolbar">
         <Button type="button" onClick={handleSave} disabled={isSaving || isLoading}>
           {isSaving ? 'Mentés...' : 'Mentés'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={handleAutoLayout} disabled={isLoading}>
+          Elrendezés
         </Button>
         {isDirty && <span role="status">Mentetlen változtatások</span>}
         {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}

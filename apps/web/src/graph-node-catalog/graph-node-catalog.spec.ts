@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- a névtelen kimenő handle azonosítója a dróton ténylegesen `null`, nem helyőrző `undefined` (SPEC-008 5.1, M-88) */
 import { NodeTypeSchema } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
-import { GRAPH_NODE_CATALOG } from './graph-node-catalog.ts';
+import { GRAPH_NODE_CARD_HEIGHT, GRAPH_NODE_CARD_WIDTH, GRAPH_NODE_CATALOG } from './graph-node-catalog.ts';
 
 describe('GRAPH_NODE_CATALOG', () => {
   it('mind a tíz NodeType értékre tartalmaz bejegyzést', () => {
@@ -68,5 +68,12 @@ describe('GRAPH_NODE_CATALOG', () => {
     for (const nodeType of NodeTypeSchema.options) {
       expect(GRAPH_NODE_CATALOG[nodeType].label.length).toBeGreaterThan(0);
     }
+  });
+
+  it('a kártya méret konstans pozitív egész pixel érték mindkét dimenzióban (T-009-19, M-94)', () => {
+    expect(Number.isSafeInteger(GRAPH_NODE_CARD_WIDTH)).toBe(true);
+    expect(GRAPH_NODE_CARD_WIDTH).toBeGreaterThan(0);
+    expect(Number.isSafeInteger(GRAPH_NODE_CARD_HEIGHT)).toBe(true);
+    expect(GRAPH_NODE_CARD_HEIGHT).toBeGreaterThan(0);
   });
 });

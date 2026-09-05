@@ -41,6 +41,23 @@ const SINGLE_UNNAMED_OUTPUT: GraphNodeOutputHandles = {
  * ("Property 'script' is missing"), majd a bejegyzés visszaállítása után
  * újra zöld lett.
  */
+/**
+ * A gráf csomópont kártya (`graph-node-card` téma) mért méretének alsó
+ * korlátja pixelben (SPEC-008 5.7, AC62, T-009-19). Két fogyasztója van: a
+ * kártya CSS-e egy custom propertyn át (`GraphEditorCanvas` injektálja), és a
+ * `graph-auto-layout` téma dagre hívása közvetlenül - **ez a kódbázis
+ * egyetlen helye, ahol ez a két szám literálként szerepel**. Nincs rá
+ * dokumentált külső forrás, mert ez a mi saját kártyánk mérete, nem a dagre
+ * könyvtáré: a szám a `docs/research/2026-09-05-grafszerkeszto-es-transcript.md`
+ * 7. szekció saját méréséből jön, valós Chromiumban, a SPEC-007 5.3
+ * módszerével. A `.graph-node-card` CSS-e `min-width`/`min-height`-ként
+ * olvassa, nem fix `width`/`height`-ként, mert az egyedi node címke
+ * (`workflowNode.label`) tetszőlegesen hosszú lehet - lásd a research fájl
+ * "Mit NEM zár le ez a mérés" bekezdését.
+ */
+export const GRAPH_NODE_CARD_WIDTH = 358;
+export const GRAPH_NODE_CARD_HEIGHT = 106;
+
 export const GRAPH_NODE_CATALOG = {
   start: { label: 'Indítás', hasInputHandle: false, outputHandles: SINGLE_UNNAMED_OUTPUT },
   agent_step: { label: 'Agent lépés', hasInputHandle: true, outputHandles: SINGLE_UNNAMED_OUTPUT },

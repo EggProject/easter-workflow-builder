@@ -26,11 +26,23 @@ konfigurációs invariáns saját mappában.
 
 **A SPEC-008 F3 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel.** Eddig elkészült
 témák: `graph-node-catalog` (T-009-14, tizenhetedik), `graph-node-card` (T-009-15,
-tizennyolcadik), `graph-editor` (T-009-16, tizenkilencedik) és `node-inspector` (T-009-18,
-huszadik). A SPEC-008 11.2 szekciója tíz új témát ír elő összesen (a maradék hat a PLAN-009
-hátralévő lépéseiben érkezik); a végleges "huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a
-jelen tényleges darabszám (tizenkettő SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat)
-közötti eltérés a PLAN-009 T-009-32 (F8) zárásának hatóköre, nem ezé a lépésé.
+tizennyolcadik), `graph-editor` (T-009-16, tizenkilencedik), `node-inspector` (T-009-18,
+huszadik) és `graph-auto-layout` (T-009-19, huszonegyedik). A SPEC-008 11.2 szekciója tíz új
+témát ír elő összesen (a maradék öt a PLAN-009 hátralévő lépéseiben érkezik); a végleges
+"huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a jelen tényleges darabszám (tizenkettő
+SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat) közötti eltérés a PLAN-009 T-009-32
+(F8) zárásának hatóköre, nem ezé a lépésé.
+
+**A `graph-auto-layout` téma a `@dagrejs/dagre@3.1.1` hívást tiszta függvénybe zárja**
+(`layoutGraph`, SPEC-008 5.7, AC61, AC62): a bemenete és a kimenete is a domain szintű
+`WorkflowNodeInput`/`WorkflowEdgeInput` alak, nincs `@xyflow/react` import és DOM hivatkozás.
+Az egyetlen felülírt dagre opció a `rankdir` (`LR`); a csomópont méret a `graph-node-catalog`
+egyetlen mért konstansa (`GRAPH_NODE_CARD_WIDTH`/`GRAPH_NODE_CARD_HEIGHT`, T-009-19, M-94,
+`docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció), amit a
+`graph-node-card.css` egy `GraphEditorCanvas` által injektált custom propertyn át
+`min-width`/`min-height`-ként is olvas - egyetlen forrás, két fogyasztó, szám duplikáció
+nélkül. A `GraphEditorScreen` toolbarjának "Elrendezés" gombja hívja, szinkron, mentés
+nélkül.
 
 **A `node-inspector` téma a kiválasztott node `config` mezőjét szerkeszti** a `protocol`
 `node-config` sémája felett, típusonként külön mezőcsoporttal (SPEC-008 5.1, 5.2, AC16). A
@@ -74,6 +86,7 @@ szabálya 0-ra oldódna, azaz láthatatlan lenne.
 | `src/graph-node-card/`                 | a vászon egyetlen egyedi node komponense, a `Handle` elemekkel és a `StepRunStatus` jelvény leképezéssel (SPEC-008 5.1, 5.5, AC21)                                                                                                                              |
 | `src/graph-editor/`                    | a vezérelt `GraphEditorCanvas` (`@xyflow/react` felett), a `GraphEditorScreen` (betöltés, mentés, mentetlen jelző, mentés előtti séma ellenőrzés), a node/él leképezés és az `isValidGraphConnection` szerkezeti szabálypár (SPEC-008 5.4, 5.5, AC8-AC13, AC15) |
 | `src/node-inspector/`                  | a kiválasztott node `config` mezőjét szerkesztő panel, típusonkénti mezőcsoporttal és a `protocol` séma feletti mezőnkénti hibalistával (SPEC-008 5.1, 5.2, AC16, AC17, AC60)                                                                                   |
+| `src/graph-auto-layout/`               | a `@dagrejs/dagre` hívás tiszta függvényként (`layoutGraph`), egyetlen felülírt opcióval (`rankdir`) és a `graph-node-catalog` kártya méret konstansával (SPEC-008 5.7, AC61, AC62)                                                                             |
 | `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                                                                                                          |
 | `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                                                                   |
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                                                                  |

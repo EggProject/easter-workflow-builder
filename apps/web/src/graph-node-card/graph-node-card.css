@@ -1,11 +1,19 @@
-/* A gráf szerkesztő egyedi node kártyája (SPEC-008 5.1, 5.5). A méretét
-   T-009-19 rögzíti, egyetlen mért konstansból, custom propertyn át
-   (SPEC-008 5.7) - addig a tartalom szabja meg a kártya méretét. */
+/* A gráf szerkesztő egyedi node kártyája (SPEC-008 5.1, 5.5). A mérete a
+   `--graph-node-card-width`/`--graph-node-card-height` custom propertyn át
+   jön, amit a `GraphEditorCanvas` a `graph-node-catalog` téma egyetlen mért
+   konstansából (T-009-19, SPEC-008 5.7, AC62) injektál `<style>` elemként.
+   Szándékosan `min-width`/`min-height`, nem fix `width`/`height`: az egyedi
+   node címke (`workflowNode.label`) tetszőlegesen hosszú lehet, és a kártya
+   ekkor a mértnél nagyobbra nő, ahelyett hogy a tartalom levágódna (lásd a
+   `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció
+   "Mit NEM zár le ez a mérés" bekezdését). */
 .graph-node-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 12px 16px;
+  min-width: var(--graph-node-card-width);
+  min-height: var(--graph-node-card-height);
   border-radius: var(--ep-radius-md);
   border: 1px solid var(--ep-border-subtle);
   background: var(--ep-bg-elevated);

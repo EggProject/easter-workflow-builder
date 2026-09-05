@@ -443,6 +443,83 @@ Mentions" alatt említi, nem jelöltként.
 
 ---
 
+## 7. A csomópont kártya mérete (M-94 lezárása), 2026-09-05
+
+**Módszer.** Valós, headless Chromiumon (a repóban már telepített `chromium-1234`
+binárison, a 12. szekció "Playwright rootless konténerben" kerülőútjával:
+`LD_LIBRARY_PATH` a kicsomagolt `libxdamage1` könyvtárára), a `playwright-core@1.62.1`
+csomaggal, a SPEC-007 5.3 módszerét követve. A méréshez az `apps/web` **valódi production
+build**-je futott (`vite build` + `vite preview`), nem szintetikus/esbuild oldal: a
+`GraphEditorCanvas` és a `GraphNodeCard` komponens változatlan formában, a valós `.css`
+kaszkáddal (design tokenek, önhosztolt Roboto webfont) rendereli mind a tíz csomópont
+típust, `AppShellFrame`-be ágyazva (ugyanaz a szerkezet, mint a valódi alkalmazásban). A
+mérés a `apps/web/src/app-mount/main.tsx` fájl egy IDEIGLENES, kizárólag a mérés idejére
+becserélt tartalmával készült; a fájl a mérés után változatlan formában visszaállt (`git
+checkout`), a repóban emiatt nincs commitolt nyoma.
+
+**A tíz típus tartalma.** Minden node saját katalógus típusú fejléccel (`GRAPH_NODE_CATALOG`
+felirat) és egy 30-50 karakteres, reprezentatív magyar egyedi címkével (`workflowNode.label`)
+rendelkezett, a `script` típus emellett a fixen megjelenő figyelmeztető sorral is
+(`graph-node-card__warning`). Az egyedi címke szövege értelemszerűen tetszőleges hosszúságú
+lehet éles használatban - erről lásd a "Mit NEM zár le ez a mérés" bekezdést.
+
+**Az eredmény: a kártya mérete a viewport szélességétől függ.** A `.graph-node-card` egyetlen
+`width`/`height` CSS szabályt sem visel (tartalom szerint méreteződik), és a React Flow
+node wrapper (`.react-flow__node`) abszolút pozícionált, explicit szélesség nélkül - ezért a
+tartalmazó blokk (a `.react-flow__pane`, ami a rendelkezésre álló vászon szélességét kapja)
+"shrink-to-fit" módon szabja meg a kártya tényleges szélességét. Keskeny vászonszélességen a
+szöveg (a típus fejléc és az egyedi címke) sortörik, ami **kisebb szélességet, de nagyobb
+magasságot** ad; széles vászonszélességen a szöveg egy sorban fér el, ami **nagyobb
+szélességet, de kisebb magasságot** ad. Ez pontosan a PLAN-009 6. szekciójának saját kockázat
+bejegyzése ("a kártya mérete viewportonként változik"), most méréssel megerősítve.
+
+Mért érték mind a tíz típusra, két vászonszélességen (`900px` magas viewport, a
+`SPEC-007 5.3` legszűkebb támogatott sávja, `320px`, és egy széles referencia, `1024px`):
+
+| Típus            | 320px szélesség (w×h) | 1024px szélesség (w×h) |
+| ---------------- | --------------------- | ---------------------- |
+| `start`          | 320×87                | 340×66                 |
+| `agent_step`     | 320×87                | **358×66**             |
+| `branch`         | 218×66                | 218×66                 |
+| `fan_out`        | 320×87                | 329×66                 |
+| `join`           | 318×66                | 318×66                 |
+| `loop`           | 261×66                | 261×66                 |
+| `human_approval` | 285×66                | 285×66                 |
+| `error_handler`  | 243×66                | 243×66                 |
+| `sub_workflow`   | 269×66                | 269×66                 |
+| `script`         | 320×**106**           | 330×85                 |
+
+A mérés nyers kimenete (a `card.offsetWidth`/`card.offsetHeight` érték, ami a CSS
+transzformációtól - React Flow zoom/pan - független, tényleges layout doboz méret, tehát
+ugyanabban a koordinátarendszerben áll, mint a dagre bemenete és a node `positionX`/
+`positionY` mezője) a fenti táblázatba lett átvezetve; külön fájlba nem került, mert a
+teljes munkamenet nem hagyott repóban nyomot (fenti bekezdés).
+
+**A konstans: a két szélsőérték maximuma.** `GRAPH_NODE_CARD_WIDTH = 358` (az `agent_step`
+1024px szélességen mért értéke) és `GRAPH_NODE_CARD_HEIGHT = 106` (a `script` 320px
+szélességen mért értéke, három sornyi tartalom: típus fejléc, kétsoros egyedi címke,
+figyelmeztető sor). A két szám **különböző mérésből** származik, ami helyes: a cél nem egy
+adott node tényleges mérete, hanem egy olyan alsó korlát mindkét dimenzióra, ami a mért
+tartomány egyetlen pontján sem lépődik túl.
+
+**Mit NEM zár le ez a mérés.** Az egyedi címke (`workflowNode.label`) éles használatban
+tetszőlegesen hosszú lehet - erre nincs és nem is lehet véges felső korlát méréssel
+igazolni. Emiatt a `graph-node-card.css` a mért konstanst **`min-width`/`min-height`**
+formában alkalmazza, nem fix `width`/`height`-ként: a kártya normál esetben pontosan ekkora,
+egy szokatlanul hosszú egyedi címke esetén ennél nagyobbra nőhet (a tartalom nem vágódik le),
+cserébe egy ilyen szélsőséges esetben a dagre elrendezés (ami a rögzített konstanssal
+számol) elvileg átfedést engedhetne. Ez tudatos, dokumentált kompromisszum: a `.claude/
+CLAUDE.md` 2. szekciója szerint nincs hibakezelés lehetetlen (itt: véges korláttal nem
+jellemezhető) esetre, és a levágás/ellipszis bevezetése olyan felületi viselkedés lenne, amit
+sem a SPEC-008, sem a user nem kért. A mérés emellett nem vizsgálta a `node-inspector` panel
+egyidejűleg nyitott állapotát (SPEC-008 5.2, T-009-18), ami a vászon rendelkezésre álló
+szélességét tovább szűkítené 320px alá - ez a mérés a `GraphEditorScreen` "csak vászon"
+állapotára szorítkozik, mert az automatikus elrendezés gombja nem köti ki, hogy a panel
+zárva legyen, de a ténylegesen legszűkebb, panellal együtt mért eset ezen felül nyitott
+kérdés marad, NEM MEGERŐSÍTETT.
+
+---
+
 ## Amit ez a felderítés NEM dönt el
 
 - **Melyik virtualizációs csomagot választja a projekt** (`react-window` vagy
@@ -452,5 +529,7 @@ Mentions" alatt említi, nem jelöltként.
   hogy still auto-scrollozzon") - nincs rá forrás, NEM MEGERŐSÍTETT.
 - **Melyik töréspontnál vált a SPEC-008 osztott nézete fülekre** - ez tervezési döntés,
   a rendelkezésre álló hét token közül.
-- **A gráf csomópont kártya tényleges mérete**, amit a dagre bemenetként vár (6.3) - erre
-  nincs külső forrás, a PLAN-009 saját mérése adja.
+- **A gráf csomópont kártya tényleges mérete** (6.3) a 7. szekció saját mérésével lezárva:
+  `GRAPH_NODE_CARD_WIDTH = 358`, `GRAPH_NODE_CARD_HEIGHT = 106`. Nyitva marad viszont a
+  `node-inspector` panel egyidejűleg nyitott állapotával szűkített vászonszélesség hatása -
+  ezt a mérés nem vizsgálta, NEM MEGERŐSÍTETT.

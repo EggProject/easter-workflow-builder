@@ -168,4 +168,13 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(viteConfigSource).not.toMatch(/localhost|:4173|:4174|:5173|:3000|:3001|:8080/);
     expect(viteConfigSource).not.toMatch(/\btimeout\s*:/);
   });
+
+  it('(14) nincs felülírt dagre nodesep/ranksep/edgesep/marginx/marginy opció (SPEC-008 5.7, M-93, AC61)', () => {
+    const forbiddenOptionNames = ['nodesep', 'ranksep', 'edgesep', 'marginx', 'marginy'];
+    const offenders = PRODUCT_FILES.filter((file) => {
+      const codeOnly = stripCommentLines(file.content);
+      return forbiddenOptionNames.some((optionName) => codeOnly.includes(optionName));
+    });
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
 });

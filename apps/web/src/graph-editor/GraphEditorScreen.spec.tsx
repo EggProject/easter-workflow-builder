@@ -293,6 +293,35 @@ describe('GraphEditorScreen', () => {
     expect(container.textContent).not.toContain('Mentetlen változtatások');
   });
 
+  it('az Elrendezés gomb átírja a node pozíciókat, mentetlen jelzőt ad, és nem ment (T-009-19)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+    const initialPositions = lastCanvasProperties().nodes.map((node) => ({
+      id: node.id,
+      positionX: node.positionX,
+      positionY: node.positionY,
+    }));
+
+    const layoutButton = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Elrendezés',
+    );
+    if (layoutButton === undefined) {
+      throw new Error('a teszt nem talált "Elrendezés" gombot');
+    }
+    act(() => {
+      layoutButton.click();
+    });
+
+    const layoutedPositions = lastCanvasProperties().nodes.map((node) => ({
+      id: node.id,
+      positionX: node.positionX,
+      positionY: node.positionY,
+    }));
+    expect(layoutedPositions).not.toEqual(initialPositions);
+    expect(container.textContent).toContain('Mentetlen változtatások');
+    expect(log.putBodies).toHaveLength(0);
+  });
+
   it('hibás gráfra (NaN a maxIterations mezőn) a Mentés nem indít kérést, és megnevezi a hibás mezőt (AC12)', async () => {
     const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
     await renderScreen('?workflowId=wf-1', createFetchFunction(log));
