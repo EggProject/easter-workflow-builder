@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 class FakeEventSource {
   readyState = 0;
@@ -16,6 +16,32 @@ class FakeEventSource {
 describe('main belépési pont', () => {
   // eslint-disable-next-line unicorn/no-unnecessary-global-this -- a bare `EventSource` azonosító ReferenceError-t dobna, mert happy-dom-ban nem létező globális (M-24); a `globalThis.` biztonságos, sosem dobó tulajdonság-elérés.
   const originalEventSource = globalThis.EventSource;
+  const originalFetch = globalThis.fetch;
+
+  /**
+   * Szó szerint ugyanaz a hálózati stub, amit a `mount-app.spec.tsx`
+   * fejléce indokol, és ugyanabból az okból: a `main.tsx` importálása a
+   * `mountApp`-ot hívja, ami a VALÓDI `browserFetchFunction` portot adja
+   * tovább, tehát a globális `fetch`-et. Stub nélkül a
+   * `WorkflowListScreen` effektje ténylegesen a hálózatot szólította meg
+   * (`ENOTFOUND api.example.test`), és a késve, a fájl lefutása UTÁN
+   * megérkező elutasítás React állapotfrissítést váltott ki már
+   * leszerelt happy-dom környezetben. Ez a CI-ban `ReferenceError: window
+   * is not defined` alakban bukott el (PR #11, run 33933773721), helyben
+   * viszont zöld volt, mert itt a DNS hiba a teszten belül megérkezett -
+   * a különbség kizárólag a DNS válaszidő, tehát a hiba nem
+   * determinisztikus. A visszaállítás `afterAll`-ban van, nem
+   * `afterEach`-ben: a `mountApp` a React gyökeret nem adja vissza, tehát
+   * a teszt nem tudja leszerelni, és egy korábban visszaállított `fetch`
+   * mellett a késve lefutó effekt megint a valódi hálózatra menne.
+   */
+  beforeEach(() => {
+    Object.assign(globalThis, { fetch: () => Promise.resolve(Response.json([])) });
+  });
+
+  afterAll(() => {
+    Object.assign(globalThis, { fetch: originalFetch });
+  });
 
   afterEach(() => {
     document.body.replaceChildren();

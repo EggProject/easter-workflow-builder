@@ -87,9 +87,19 @@
   animation: menu-in var(--ep-dur-fast) var(--ep-ease-out);
 }
 
+/* Csak `transform`, `opacity` NÉLKÜL (2026-09-05, felhasználói kérés javítása,
+   mérve: docs/research/2026-09-05-menu-atlatszatlansag.md): a forrás
+   `eggproject-design-components/components/menu/menu.css` `menu-in`
+   kulcskockája `opacity: 0 -> 1`-et is animál, ami a panel HÁTTERÉT (már
+   önmagában átlátszatlan `--ep-bg-elevated` token) a nyitási animáció teljes
+   `--ep-dur-fast` (140ms) ideje alatt ténylegesen áttetszővé teszi - a mögötte
+   álló táblázat sor átüt rajta. A forrásban ez szándékos belépő fade, de a
+   felhasználó kérése ennél erősebb: a panel SOHA, egyetlen pillanatra sem
+   lehet áttetsző. A `transform` csúszó belépés megmarad, csak az `opacity`
+   esik ki. */
 @keyframes menu-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(-4px); }
+  to   { transform: translateY(0); }
 }
 
 /* ---- Reduced motion: drop the panel entrance movement; end state shows instantly.
