@@ -14,7 +14,9 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | Turborepo                        | 2.10.12                    | `tasks` séma, nem `pipeline`                          |
 | React                            | 19.2.8                     | nincs React 20                                        |
 | Vite                             | 8.2.2                      | Rolldown alapú                                        |
-| `@xyflow/react`                  | 12.11.5                    | MIT, React 19 kompatibilis                            |
+| `@xyflow/react`                  | 12.11.6                    | MIT, React 19 kompatibilis                            |
+| `react-window`                   | 2.3.1                      | MIT, React 18/19 kompatibilis, `List`/`Grid` API      |
+| `@dagrejs/dagre`                 | 3.1.1                      | MIT, nincs peer dependency                            |
 | Vitest                           | 4.1.11                     | v8 coverage provider                                  |
 | `@playwright/test`               | 1.62.1                     |                                                       |
 | ESLint                           | 10.9.1                     | csak flat config, `.eslintrc` megszűnt                |
@@ -143,6 +145,21 @@ futásidejű függősége a `@dagrejs/graphlib@4.0.5`, a típusdefiníciót maga
 az eredeti `dagre` csomag helyett: az utóbbi utolsó kiadása `0.8.5`, `2019-12-03`, míg a
 fork `3.1.1` kiadása `2026-08-08`, és a hivatalos React Flow layouting oldal is a
 `dagrejs` szervezet repójára és wikijére mutat.
+
+## `@xyflow/react`, `react-window` verzió pontosítás, 2026-09-05 (PLAN-009 T-009-2, T-009-4)
+
+A F0 blokkoló mérések megismételték az élő registry lekérdezést a ténylegesen rögzítendő
+verziókra (`docs/research/2026-09-05-plan009-f0-blokkolo-meresek.md` 1. és 3. szekció).
+
+| Csomag          | Verzió    | Forrás 1                                                               | Forrás 2                                                                                            |
+| --------------- | --------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@xyflow/react` | `12.11.6` | `https://registry.npmjs.org/@xyflow/react/latest` (`dist-tags.latest`) | `https://unpkg.com/@xyflow/react@12.11.6/package.json`, plusz a GitHub release `2026-09-01`         |
+| `react-window`  | `2.3.1`   | `https://registry.npmjs.org/react-window/latest` (`dist-tags.latest`)  | `https://unpkg.com/react-window@2.3.1/package.json`, plusz a GitHub tag lista (`2.3.1` legfrissebb) |
+
+A `2026-09-05-grafszerkeszto-es-transcript.md` kutatás még `@xyflow/react@12.11.5`-öt és
+`react-window@2.3.0`-t mért; a fenti két sor a ténylegesen a katalógusba és a
+`bun.lock`-ba kerülő verziót rögzíti. Egyik csomag `peerDependencies` mezője, licence és
+DOM/API alakja sem változott a mért patch verzióhoz képest.
 
 ## GitHub Actions verziók
 

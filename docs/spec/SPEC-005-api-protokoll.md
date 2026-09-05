@@ -320,6 +320,8 @@ A Vite dev proxy nem továbbítja rendesen az SSE kapcsolat lezárását, és a 
 1. **Fejlesztéskor az SSE végpont közvetlenül a backend originre megy, nem a proxyn át.** Az útvonal ezért nem az `/api` előtag alatt áll (4.1), tehát egy `/api` mintára írt proxy szabály soha nem kapja el, akkor sem, ha valaki később felveszi.
 2. **Ennek ára van, és kimondjuk: fejlesztéskor a stream kapcsolat más originről jön**, mert a Vite dev szerver és a backend külön porton áll. A stream végpontnak ezért fejlesztéskor CORS engedélyt kell adnia a dev originre; a `withCredentials` értéke hamis marad (3.5), tehát hitelesítő adat nem megy át. Éles használatban a szerver szolgálja ki a felépített felületet, tehát azonos origin, és nincs CORS. A dev origin konkrét értéke konfiguráció, nem a protokoll része, és számot nem adunk rá (11. szekció O-1).
 
+**Pontosítás, 2026-09-05 (PLAN-009 T-009-5, SPEC-008 O-2).** A fenti indoklás alapjául szolgáló hiba (`vitejs/vite` #12157, #13522) a `#13578` PR-ben javítva lett, és egy saját, valós `EventSource` méréssel a telepített `vite@8.2.2` dev proxyján át **sem a lezárás, sem a `Last-Event-ID` fejléc nem hibás** (`docs/research/2026-09-05-plan009-f0-blokkolo-meresek.md` 4. szekció). **A fenti 1-2. pont döntése ettől függetlenül változatlan marad**: a stream továbbra is közvetlenül a backend originre megy, mert ez már a beépített, szigorúbb út, és a váltás nem hozna hasznot (SPEC-008 3.1).
+
 ## 6. A delta kérdés
 
 **Ez a user 4. döntése.** A delták nem perzisztálódnak alapból, de élőben mennek; a szerver nem pufferel deltát.
