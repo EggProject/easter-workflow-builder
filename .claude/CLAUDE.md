@@ -696,16 +696,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Egy nyitott tétel áll.**
+**Nyitott tétel jelenleg nincs.**
 
-**1. A fejlesztői REST hívás originje és a szerver CORS engedélyének hatóköre.**
-
-| Mező                      | Tartalom                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Melyik két forrás         | SPEC-006 5.7 (és 691. sor 8. kritériuma) kontra SPEC-007 O-4                                                                                                                                                                                                                                                                                                                      |
-| Mi az eltérés             | A SPEC-006 szerint a CORS engedély **kizárólag** a `STREAM_PATH` útvonalra vonatkozik, mert a REST hívás a Vite dev proxyn át, azonos originről érkezne (SPEC-005 5.8). A SPEC-007 viszont a REST hívást is a kötelező `VITE_API_ORIGIN` konfigurációra küldi, proxy nélkül. Ha a két origin fejlesztéskor eltér, a REST hívást a böngésző CORS okból eldobja                     |
-| Mi az érvényes viselkedés | Proxy szabály **nem íródik meg**, mert a `server.proxy` `target` mezője konkrét portot követel, amire nincs forrás (SPEC-006 O-1, SPEC-007 O-4), és tippelni tilos (4. szekció). A jelen kódban minden kliens hívás a `VITE_API_ORIGIN` értékre megy. Éles használatban a kérdés nem merül fel: a szerver szolgálja ki a felépített felületet, tehát azonos origin, és nincs CORS |
-| Mi zárná le               | A SPEC-006 O-1 termékdöntése a szerver portjáról és a dev szerver portjáról. Utána két út közül kell választani: a dev REST hívás proxyn megy (a SPEC-006 CORS engedélye változatlan marad), vagy közvetlenül (akkor a SPEC-006 5.7 hatóköre az `/api` előtagra is kiterjesztendő). A választást a usernek kell meghoznia, az askuserquestion tool-lal                            |
+A korábban itt állt hatodik tétel (a fejlesztői REST hívás originje és a szerver CORS engedélyének
+hatóköre) 2026-09-05-én lezárult: a user termékdöntése szerint a **szerver portja `3001`**, a Vite
+dev szerver az alapértelmezett `5173` porton marad, és a dev REST hívás a Vite proxyn megy. Ezzel a
+SPEC-006 CORS engedélye változatlan marad (kizárólag a `STREAM_PATH` útvonalra), az SSE csatorna
+pedig továbbra is közvetlenül a backend originre kapcsolódik, a proxyt megkerülve. A döntés
+átvezetve a SPEC-006 O-1 és 5.7, a SPEC-007 O-4 tételébe, és a SPEC-008 3. szekciója írja le a
+teljes elrendezést.
 
 A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
 `coverage.exclude` lista, a `CLAUDE.md` elhelyezés, a "nyolcadik kapu" elnevezés, a SPEC-001 14.
@@ -726,8 +725,8 @@ törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-b
 szekciójában is "három" (`core`, `provider-capability`, `db`).
 
 A szekció alábbi része az eljárás: mi a teendő, ha egy munkamenet tényleges, felhasználói döntést
-igénylő ellentmondást talál két forrásdokumentum között. A fenti 1. tétel pontosan ezt az
-eljárást követi.
+igénylő ellentmondást talál két forrásdokumentum között. A fent lezárt tétel pontosan ezt az
+eljárást követte, az 1 ... 4. pont szerint.
 
 1. **Nem döntjük el csendben.** Ha az egyik forrás egyértelműen elavult (a döntés megvan, csak
    nincs átvezetve), az nem ide tartozik: azt a talált helyen kell kijavítani, a döntéshez igazítva.
