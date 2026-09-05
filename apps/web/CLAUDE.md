@@ -24,6 +24,13 @@ minta (`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
 egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. pontja szerinti
 konfigurációs invariáns saját mappában.
 
+**A SPEC-008 F3 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel.** Eddig elkészült
+témák: `graph-node-catalog` (T-009-14, tizenhetedik) és `graph-node-card` (T-009-15,
+tizennyolcadik). A SPEC-008 11.2 szekciója tíz új témát ír elő összesen (a maradék nyolc a
+PLAN-009 hátralévő lépéseiben érkezik); a végleges "huszonnégy téma" végösszeg (SPEC-008
+DoD 2.) és a jelen tényleges darabszám (tizenkettő SPEC-007 UI + négy invariáns + tíz SPEC-008
+= huszonhat) közötti eltérés a PLAN-009 T-009-32 (F8) zárásának hatóköre, nem ezé a lépésé.
+
 ## Fájlok
 
 | Téma / fájl                            | Tartalom                                                                                                                                                                                                      |
@@ -42,6 +49,8 @@ konfigurációs invariáns saját mappában.
 | `src/run-history/`                     | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                                                                       |
 | `src/stream-client/`                   | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                                                                           |
 | `src/workflow-list/`                   | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                                                                       |
+| `src/graph-node-catalog/`              | a tíz csomópont típus megjelenítési és handle táblája, `Record<NodeType, ...>` alakban, plusz a kártya méret konstans (T-009-19-től) (SPEC-008 5.1, 5.7)                                                      |
+| `src/graph-node-card/`                 | a vászon egyetlen egyedi node komponense, a `Handle` elemekkel és a `StepRunStatus` jelvény leképezéssel (SPEC-008 5.1, 5.5, AC21)                                                                            |
 | `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                                                        |
 | `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                 |
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                |
@@ -60,6 +69,15 @@ a `db`, az `engine`, az `agent` vagy a `server` csomagtól függenie. Ez megegye
 `package.json` tényleges tartalmával. A külső függőségek (`react`, `react-dom`) és a típusaik
 (`@types/react`, `@types/react-dom`) katalógus hivatkozással állnak, a verziók forrása a
 `docs/research/2026-08-26-toolchain.md`.
+
+**Három új külső függőség a SPEC-008 óta**: `@xyflow/react`, `react-window` és `@dagrejs/dagre`,
+mindhárom katalógus hivatkozással (SPEC-008 4.2). Egyik sem a `packages/ui` függősége: a vászon a
+workflow node típusait ismeri (domain fogalom), a virtualizált lista egyetlen fogyasztóval spekulatív
+absztrakció lenne, a dagre hívás pedig a csomópont kártya méretét és a saját éllistát ismeri
+(SPEC-008 4.1). A `@xyflow/react@12.11.6` saját `.d.ts` fájljai `exactOptionalPropertyTypes: true`
+mellett típushibásak egymás között (`InternalNode<NodeType>` és `NodeOrigin` illesztése, `TS2344`
+több belső fájlban), ezért az `apps/web/tsconfig.json` `skipLibCheck: true` kapcsolót kapott - ugyanaz
+a felsőáramú hiba kategória, mint a `drizzle-orm` a `packages/engine`-ben (`.claude/CLAUDE.md` 12.).
 
 ## Szabályok
 

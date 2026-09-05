@@ -1,0 +1,42 @@
+/* A gráf szerkesztő egyedi node kártyája (SPEC-008 5.1, 5.5). A méretét
+   T-009-19 rögzíti, egyetlen mért konstansból, custom propertyn át
+   (SPEC-008 5.7) - addig a tartalom szabja meg a kártya méretét. */
+.graph-node-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: var(--ep-radius-md);
+  border: 1px solid var(--ep-border-subtle);
+  background: var(--ep-bg-elevated);
+  color: var(--ep-fg);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+.graph-node-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.graph-node-card__type {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ep-fg-muted);
+}
+
+.graph-node-card__label {
+  margin: 0;
+  font: var(--ep-text-small);
+  font-weight: 500;
+  color: var(--ep-fg);
+}
+
+.graph-node-card__warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ep-danger);
+}
