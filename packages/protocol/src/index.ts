@@ -135,3 +135,80 @@ export {
 } from './event-stream/stream-frame.ts';
 export { encodeStreamFrame } from './event-stream/encode-stream-frame.ts';
 export { decodeStreamFrame } from './event-stream/decode-stream-frame.ts';
+
+// node-config: a workflow_node.config drótszintű alakja, node típusonként, a packages/db
+// NodeConfig uniójának szándékos mirror sémája (SPEC-005 7.7, .claude/CLAUDE.md 5. szekció).
+export type { ProviderId } from './node-config/provider-id.ts';
+export { ProviderIdSchema } from './node-config/provider-id.ts';
+export type { ThinkingMode } from './node-config/thinking-mode.ts';
+export { ThinkingModeSchema } from './node-config/thinking-mode.ts';
+export type { AgentToolId } from './node-config/agent-tool-id.ts';
+export { AgentToolIdSchema } from './node-config/agent-tool-id.ts';
+export type { StructuredOutputStrategyId } from './node-config/structured-output-strategy-id.ts';
+export { StructuredOutputStrategyIdSchema } from './node-config/structured-output-strategy-id.ts';
+export type { EngineHookId } from './node-config/engine-hook-id.ts';
+export { EngineHookIdSchema } from './node-config/engine-hook-id.ts';
+export type { SessionMode } from './node-config/session-mode.ts';
+export { SessionModeSchema } from './node-config/session-mode.ts';
+export type {
+  StorableHttpMcpServer,
+  StorableMcpServer,
+  StorableSseMcpServer,
+  StorableStdioMcpServer,
+} from './node-config/storable-mcp-server.ts';
+export {
+  StorableHttpMcpServerSchema,
+  StorableMcpServerSchema,
+  StorableSseMcpServerSchema,
+  StorableStdioMcpServerSchema,
+} from './node-config/storable-mcp-server.ts';
+export type { SandboxConfig } from './node-config/sandbox-config.ts';
+export { SandboxConfigSchema } from './node-config/sandbox-config.ts';
+export type { ScriptConfig } from './node-config/script-config.ts';
+export { ScriptConfigSchema } from './node-config/script-config.ts';
+export type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './node-config/agent-step-config.ts';
+export {
+  AgentStepConfigSchema,
+  PresetSystemPromptSchema,
+  StructuredOutputConfigSchema,
+} from './node-config/agent-step-config.ts';
+export type {
+  AgentStepNodeConfig,
+  BranchNodeConfig,
+  BranchOption,
+  ErrorHandlerNodeConfig,
+  FanOutNodeConfig,
+  HumanApprovalNodeConfig,
+  JoinAiSynthesisNodeConfig,
+  JoinMergeNodeConfig,
+  JoinMergeSettings,
+  JoinNodeConfig,
+  JoinScriptNodeConfig,
+  LoopNodeConfig,
+  NodeConfig,
+  ScriptNodeConfig,
+  StartInputField,
+  StartNodeConfig,
+  SubWorkflowNodeConfig,
+  UnhandledErrorPolicy,
+} from './node-config/node-config.ts';
+export {
+  AgentStepNodeConfigSchema,
+  BranchNodeConfigSchema,
+  BranchOptionSchema,
+  ErrorHandlerNodeConfigSchema,
+  FanOutNodeConfigSchema,
+  HumanApprovalNodeConfigSchema,
+  JoinAiSynthesisNodeConfigSchema,
+  JoinMergeNodeConfigSchema,
+  JoinMergeSettingsSchema,
+  JoinNodeConfigSchema,
+  JoinScriptNodeConfigSchema,
+  LoopNodeConfigSchema,
+  NodeConfigSchema,
+  ScriptNodeConfigSchema,
+  StartInputFieldSchema,
+  StartNodeConfigSchema,
+  SubWorkflowNodeConfigSchema,
+  UnhandledErrorPolicySchema,
+} from './node-config/node-config.ts';

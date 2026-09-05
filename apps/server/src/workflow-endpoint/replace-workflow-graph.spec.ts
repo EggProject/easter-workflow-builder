@@ -71,6 +71,12 @@ describe('createReplaceWorkflowGraphHandler', () => {
   });
 
   it('érvénytelen node config-ra malformed_node_config hibát ad', async () => {
+    // A `NodeConfigSchema` a `loop.maxIterations` mezőt csak `number`-ként ellenőrzi
+    // (a Zod séma nem hordozza a "pozitív egész" finomítást, mert az a TypeScript
+    // típusszintű egyenlőségét nem érintené), a `db` `isNodeConfig` guardja viszont
+    // igen (`isPositiveInteger`). Ez a rés az egyetlen mód, amivel a Zod séma
+    // rétegen átjutó, de az `isNodeConfig` mély ellenőrzésén elbukó értéket lehet
+    // előállítani, tehát ez a teszt kifejezetten ezt a rést célozza.
     const database = openMemoryDatabase();
     const created = okOrThrow(
       database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
@@ -81,7 +87,16 @@ describe('createReplaceWorkflowGraphHandler', () => {
       parameters: { workflowId: created.id },
       query: new URLSearchParams(),
       body: {
-        nodes: [{ id: 'n1', type: 'start', label: 'Start', positionX: 0, positionY: 0, config: { type: 'start' } }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'loop',
+            label: 'Ismétlés',
+            positionX: 0,
+            positionY: 0,
+            config: { type: 'loop', maxIterations: -1, continueExpression: 'true', onUnhandledError: null },
+          },
+        ],
         edges: [],
       },
     });
