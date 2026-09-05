@@ -47,7 +47,7 @@ konfigurációs invariáns saját mappában.
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)  |
 | `src/unit-test-network-isolation/`     | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vitest.setup.ts` `fetch` lezárását őrzi (unit teszt nem szólíthat meg hálózatot)                                      |
 | `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                                               |
-| `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                                         |
+| `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`), plusz a `/api` fejlesztői proxy szabály (SPEC-008 3.)                                  |
 | `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                                              |
 | `vitest.setup.ts`                      | a React 19 `act()` környezet jelzése, a happy-dom projekt-környezetben hiányzó `globalThis.localStorage` pótlása (a `packages/ui` azonos fájljának párja) és a `fetch` lezárása |
 | `playwright.config.ts`                 | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                                           |
@@ -72,6 +72,25 @@ a `src/` alatt közvetlenül kizárólag az `index.ts` barrel és a `vite-env.d.
 időkorlát szám a `src/` alatt: mindegyik kötelező `VITE_` előtagú környezeti változó,
 alapérték nélkül (SPEC-007 O-4, O-5, O-6, 16. szekció 45. kritérium). A hiányzó változóról szóló
 hibaüzenet a változó **nevét** nevezi meg, az értékét soha.
+
+**A fejlesztői elrendezés, két origin (SPEC-008 3. szekció, a user termékdöntése 2026-09-05).**
+A szerver portja `3001`, a Vite dev szerver az alapértelmezett `5173` portján marad. Ebből
+következik, hogy a `frontend-config` két külön originnel dolgozik:
+
+| Csatorna          | Env változó          | Fejlesztéskor                                           | Élesben          |
+| ----------------- | -------------------- | ------------------------------------------------------- | ---------------- |
+| REST (`/api/...`) | `VITE_API_ORIGIN`    | a Vite dev szerver saját originje - **proxyn megy**     | a szerver origin |
+| SSE (`/events`)   | `VITE_STREAM_ORIGIN` | közvetlenül a backend originre, **a proxyt megkerülve** | a szerver origin |
+
+A `vite.config.ts` `server.proxy` mezője pontosan egy szabályt tartalmaz, a kulcsa a
+`protocol` csomag `API_BASE_PATH` értéke (`/api`), a `target` pedig a `loadEnv` mechanizmuson
+át a `VITE_STREAM_ORIGIN` értékét olvassa - **nem új env változó**, hanem a kliens config már
+meglévő mezőjének újrahasznosítása, mert fejlesztéskor az már a tényleges backend originre
+mutat. Az SSE csatorna azért kerüli meg a proxyt, mert a `docs/research/
+2026-09-05-plan009-f0-blokkolo-meresek.md` 4. szekciója szerint ez a szigorúbb, már beépített
+út, és a mérés (a lezárás és a `Last-Event-ID` fejléc helyesen működik a proxyn át is) nem ad
+okot a váltásra. A `timeout` mezőt a proxy szabály **nem állítja be** (M-79, nincs rá két
+független forrás).
 
 A `tsc --noEmit` (a `typecheck` script) a `src/**/*.ts` és a `src/**/*.tsx` fát fedi. Az `e2e/`
 saját `tsconfig.json`-nal rendelkezik (Node környezet, `tooling/tsconfig/node.json` alap), mert
@@ -100,10 +119,13 @@ már leszerelt happy-dom környezetben váltott ki React állapotfrissítést: a
 `src/unit-test-network-isolation/` regressziós tesztje őrzi.
 
 Az `e2e/sse-real-server.spec.ts` az **egyetlen** spec fájl, ami valódi hálózati szervert indít, és
-ez nem bővíthető második fájlra: a szerver a build időben rögzített `VITE_API_ORIGIN` portjára
+ez nem bővíthető második fájlra: a szerver a build időben rögzített `VITE_STREAM_ORIGIN` portjára
 kötődik, amit egyszerre csak egy teszt tarthat, ezért a fájl `test.describe.configure({ mode:
 'serial' })` beállítást kap, és a `server.close()` mellett `server.closeAllConnections()` hívást
-is (különben a nyitva hagyott SSE kapcsolat `EADDRINUSE` hibát okoz a következő tesztnél).
+is (különben a nyitva hagyott SSE kapcsolat `EADDRINUSE` hibát okoz a következő tesztnél). Az
+`e2e/api-origin.ts` `API_ORIGIN` és `STREAM_ORIGIN` konstansa (SPEC-008 3.3) szándékosan azonos
+értékű: a `page.route()` mindkét csatornát ugyanazon az originen fogja el, a kettő külön neve a
+REST és az SSE mock segédfüggvények szemantikai pontossága miatt kell, nem eltérő port miatt.
 
 Az `e2e/coverage-fixture.ts` `declare global { var __coverage__: unknown }` ambiens
 deklarációja szükséges, mert a `page.evaluate()` callback a böngészőben fut, és a

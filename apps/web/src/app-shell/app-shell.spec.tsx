@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppShell } from './app-shell.tsx';
 
 const API_ORIGIN = 'https://api.example.test';
+const STREAM_ORIGIN = 'https://stream.example.test';
 
 const catchAllFetchFunction: FetchFunction = () => Promise.resolve(Response.json([]));
 
@@ -83,7 +84,13 @@ describe('AppShell', () => {
   function render(): void {
     act(() => {
       root.render(
-        <AppShell apiOrigin={API_ORIGIN} listLimit={25} streamReplayLimit={50} fetchFunction={catchAllFetchFunction} />,
+        <AppShell
+          apiOrigin={API_ORIGIN}
+          streamOrigin={STREAM_ORIGIN}
+          listLimit={25}
+          streamReplayLimit={50}
+          fetchFunction={catchAllFetchFunction}
+        />,
       );
     });
   }

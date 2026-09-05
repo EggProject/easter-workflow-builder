@@ -1,18 +1,19 @@
 // Playwright 1.62.1 konfiguracio (SPEC-001 10. szekcio). A `webServer.env`
-// haromnak a VITE_ elotagu kotelezo felulet konfiguraciot allitja be
-// buildidoben (SPEC-007 O-4, O-6): enelkul a `readFrontendConfig` hibaagat
-// adna, es minden e2e teszt a "Hianyzo kotelezo konfiguracio" hibakepernyot
-// latna a valodi UI helyett.
+// negynek a VITE_ elotagu kotelezo felulet konfiguraciot allitja be
+// buildidoben (SPEC-007 O-4, O-6, SPEC-008 3.3): enelkul a
+// `readFrontendConfig` hibaagat adna, es minden e2e teszt a "Hianyzo
+// kotelezo konfiguracio" hibakepernyot latna a valodi UI helyett.
 //
-// A VITE_API_ORIGIN egy FIX, buildidoben rogzitett origin
-// (http://localhost:4174), amit a legtobb teszt `page.route()`-tal fog el -
-// nem kell, hogy ott tenylegesen fusson barmi. A `docs/research/
-// 2026-08-30-sse-mockolas-meres.md` szerinti EGYETLEN kivetel (Last-Event-ID
-// ujracsatlakozas es kozbeni keret beszuras) sajat, celra irt `node:http`
-// teszt szervere UGYANERRE a 4174-es portra kotodik, hogy a buildidoben
-// rogzitett origin valodi halozati hivast kapjon `page.route()` nelkul.
+// A VITE_API_ORIGIN es a VITE_STREAM_ORIGIN egy-egy FIX, buildidoben
+// rogzitett origin (http://localhost:4174, lasd e2e/api-origin.ts), amit a
+// legtobb teszt `page.route()`-tal fog el - nem kell, hogy ott tenylegesen
+// fusson barmi. A `docs/research/2026-08-30-sse-mockolas-meres.md` szerinti
+// EGYETLEN kivetel (Last-Event-ID ujracsatlakozas es kozbeni keret beszuras)
+// sajat, celra irt `node:http` teszt szervere UGYANERRE a 4174-es portra
+// kotodik, hogy a buildidoben rogzitett origin valodi halozati hivast
+// kapjon `page.route()` nelkul.
 import { defineConfig, devices } from '@playwright/test';
-import { API_ORIGIN, PREVIEW_ORIGIN } from './e2e/api-origin.ts';
+import { API_ORIGIN, PREVIEW_ORIGIN, STREAM_ORIGIN } from './e2e/api-origin.ts';
 
 const PREVIEW_PORT = Number(new URL(PREVIEW_ORIGIN).port);
 
@@ -60,6 +61,7 @@ export default defineConfig({
     env: {
       VITE_COVERAGE: 'true',
       VITE_API_ORIGIN: API_ORIGIN,
+      VITE_STREAM_ORIGIN: STREAM_ORIGIN,
       VITE_LIST_LIMIT: '50',
       VITE_STREAM_REPLAY_LIMIT: '100',
     },

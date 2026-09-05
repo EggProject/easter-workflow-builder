@@ -70,9 +70,9 @@ describe('useStreamConnection', () => {
     return source;
   }
 
-  function HookHarness({ apiOrigin }: { readonly apiOrigin: string }): null {
+  function HookHarness({ streamOrigin }: { readonly streamOrigin: string }): null {
     latest = useStreamConnection({
-      apiOrigin,
+      streamOrigin,
       eventSourceFactory: testEventSourceFactory,
       streamIdGenerator: testStreamIdGenerator,
     });
@@ -94,9 +94,9 @@ describe('useStreamConnection', () => {
     container.remove();
   });
 
-  function render(apiOrigin = 'https://api.example.test'): FakeEventSource {
+  function render(streamOrigin = 'https://api.example.test'): FakeEventSource {
     act(() => {
-      root.render(<HookHarness apiOrigin={apiOrigin} />);
+      root.render(<HookHarness streamOrigin={streamOrigin} />);
     });
     if (createdSource === undefined) {
       throw new Error('a teszt forrás nem jött létre');
@@ -112,7 +112,7 @@ describe('useStreamConnection', () => {
     expect(latest?.serverInstanceId).toBeUndefined();
   });
 
-  it('a streamId a buildStreamUrl-en át kerül az URL-be, az apiOrigin előtaggal', () => {
+  it('a streamId a buildStreamUrl-en át kerül az URL-be, a streamOrigin előtaggal', () => {
     const source = render('https://api.example.test');
     expect(source.capturedUrl).toBe('https://api.example.test/events?streamId=stream-1');
   });

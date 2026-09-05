@@ -151,4 +151,10 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       expect(readFileSync(packageJsonPath, 'utf8')).not.toContain('@testing-library');
     }
   });
+
+  it('(13) a vite.config.ts nem tartalmaz port számot, origin literált és timeout mezőt a proxy szabályban (SPEC-008 3.3, M-79)', () => {
+    const viteConfigSource = readFileSync(path.join(WEB_SRC, '..', 'vite.config.ts'), 'utf8');
+    expect(viteConfigSource).not.toMatch(/localhost|:4173|:4174|:5173|:3000|:3001|:8080/);
+    expect(viteConfigSource).not.toMatch(/\btimeout\s*:/);
+  });
 });

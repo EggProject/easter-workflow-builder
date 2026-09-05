@@ -16,7 +16,7 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { API_ORIGIN } from './api-origin.ts';
+import { STREAM_ORIGIN } from './api-origin.ts';
 
 const WORKFLOW: WorkflowSummary = {
   id: 'w-alfa',
@@ -93,7 +93,7 @@ test('a kapcsolat sikeres megnyitása után a "kapcsolódás" felirat nem látha
   // megbízhatóan ellenőrizhető VÉGÁLLAPOTOT igazolja: a valódi böngésző +
   // mockolt SSE válasz párosa ténylegesen `open`-ig jut.
   await setup(page, [[RUN_PENDING]]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -114,7 +114,7 @@ test('a kapcsolat sikeres megnyitása után a "kapcsolódás" felirat nem látha
 
 test('a Content-Type fejléc pontosan text/event-stream', async ({ page }) => {
   await setup(page, [[RUN_PENDING]]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -160,7 +160,7 @@ test('több data: keret sorrendben dolgozódik fel: run_event, run_event_transie
     },
     { event: 'replay_complete', runId: 'r-1', throughEventId: 1 },
   ];
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -186,7 +186,7 @@ test('a stream_ready keret NEM váltja ki a lista újratöltését', async ({ pa
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
   ]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -236,7 +236,7 @@ test('érvénytelen JSON törzsű keret figyelmen kívül marad, a kapcsolat tov
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
   ]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -267,7 +267,7 @@ test('ismeretlen alakú keret figyelmen kívül marad, a kapcsolat tovább él',
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
   ]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -296,7 +296,7 @@ test('ugyanaz a serverInstanceId kétszer NEM számít szerver újraindulásnak'
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
   ]);
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -324,7 +324,7 @@ test('protocol_error keret nem szakítja meg a kapcsolatot, a lista tovább hasz
     { event: 'stream_ready', streamId: 'e2e-stream', serverInstanceId: 's-1', subscriptions: [] },
     { event: 'protocol_error', code: 'invalid_request', message: 'teszt hiba', runId: null },
   ];
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/event-stream',

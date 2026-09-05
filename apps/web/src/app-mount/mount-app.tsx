@@ -25,6 +25,7 @@ export function mountApp(): void {
   createRoot(root).render(
     <AppShell
       apiOrigin={config.value.apiOrigin}
+      streamOrigin={config.value.streamOrigin}
       listLimit={config.value.listLimit}
       streamReplayLimit={config.value.streamReplayLimit}
       fetchFunction={browserFetchFunction}

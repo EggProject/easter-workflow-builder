@@ -12,6 +12,7 @@ import { WorkflowListScreen } from '../workflow-list/workflow-list-screen.tsx';
 
 export interface AppShellProperties {
   readonly apiOrigin: string;
+  readonly streamOrigin: string;
   readonly listLimit: number;
   readonly streamReplayLimit: number;
   readonly fetchFunction: FetchFunction;
@@ -38,11 +39,11 @@ const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string
  * tovább, ami az egyetlen SSE fogyasztó (SPEC-007 10.2).
  */
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
-  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
+  const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
 
   const { routeId, search, navigate } = useClientRoute(browserHistoryLocationPort);
   const streamConnection = useStreamConnection({
-    apiOrigin,
+    streamOrigin,
     eventSourceFactory: browserEventSourceFactory,
     streamIdGenerator: browserStreamIdGenerator,
   });
