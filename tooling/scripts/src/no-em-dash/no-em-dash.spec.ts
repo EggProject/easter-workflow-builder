@@ -16,7 +16,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const EM_DASH = '—';
+// Unicode escape, NEM literál karakter: egy literál em dash a saját
+// forrásfájlt is megbuktatná a lenti keresésben (PLAN-009 T-009-1 alap
+// mérése találta, a legutóbbi commit önmagát buktatta).
+const EM_DASH = '\u{2014}';
 
 const CHECKED_EXTENSIONS = ['.md', '.ts', '.tsx', '.css'];
 
