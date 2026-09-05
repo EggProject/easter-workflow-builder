@@ -31,6 +31,9 @@ export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from '.
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';
 export { MenuItem, type MenuItemProperties } from './menu/MenuItem.tsx';
 export { Modal, type ModalIconVariant, type ModalProperties, type ModalSize } from './modal/Modal.tsx';
+export { Resizable, type ResizableProperties } from './resizable/Resizable.tsx';
+export { ResizableHandle, type ResizableHandleProperties } from './resizable/ResizableHandle.tsx';
+export { ResizablePanel, type ResizablePanelProperties } from './resizable/ResizablePanel.tsx';
 export {
   SelectField,
   type SelectFieldOption,
