@@ -92,7 +92,14 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
   });
 
   it('(7) nincs ResizeObserver és IntersectionObserver hivatkozás', () => {
-    const offenders = PRODUCT_FILES.filter((file) => /ResizeObserver|IntersectionObserver/.test(file.content));
+    // A doksi sorok kiszűrve, ugyanazzal a `stripCommentLines` segédfüggvénnyel
+    // és ugyanabból az okból, mint a (4) és a (14) ellenőrzésnél: a szabály a
+    // tényleges API HIVATKOZÁST tiltja, nem azt a magyarázó mondatot, ami
+    // leírja, miért nem használunk saját megfigyelőt (`graph-editor` téma,
+    // 2026-09-05).
+    const offenders = PRODUCT_FILES.filter((file) =>
+      /ResizeObserver|IntersectionObserver/.test(stripCommentLines(file.content)),
+    );
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 

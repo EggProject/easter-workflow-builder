@@ -201,6 +201,48 @@ describe('GraphEditorCanvas', () => {
     expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE], [EDGE]);
   });
 
+  // REGRESSZIÓ (2026-09-05): a `dimensions` változás mérési eredmény, nem gráf
+  // szerkesztés. Ha a domain állapotba menne vissza, a `measured` mező a
+  // `WorkflowNodeInput` leképezésen elveszne, a React Flow `adoptUserNodes`
+  // pedig minden körben újramérésre kényszerülne - a csomópont tartósan
+  // `visibility: hidden` maradna, él nem rajzolódna, és a `ResizeObserver`
+  // hurok sosem konvergálna (lásd `measured-node-sizes.ts`).
+  it('az onNodesChange a dimensions változást NEM adja vissza a domain állapotba', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n1', type: 'dimensions', dimensions: { width: 358, height: 106 } },
+      ]);
+    });
+    expect(onGraphChange).not.toHaveBeenCalled();
+  });
+
+  it('az onNodesChange a mért méretet a <ReactFlow> nodes propjára írja vissza', () => {
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], vi.fn(), vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n1', type: 'dimensions', dimensions: { width: 358, height: 106 } },
+      ]);
+    });
+    const measuredNode = lastCapturedProperties().nodes?.find((node) => node.id === 'n1');
+    expect(measuredNode?.measured).toEqual({ width: 358, height: 106 });
+    const unmeasuredNode = lastCapturedProperties().nodes?.find((node) => node.id === 'n2');
+    expect(unmeasuredNode?.measured).toBeUndefined();
+  });
+
+  it('vegyes változás listánál a nem dimensions ág a domain állapotba kerül', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n1', type: 'dimensions', dimensions: { width: 358, height: 106 } },
+        { id: 'n2', type: 'remove' },
+      ]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE], [EDGE]);
+  });
+
   it('az onEdgesChange az applyEdgeChanges-en át törli az élt az állapotból (AC9)', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());

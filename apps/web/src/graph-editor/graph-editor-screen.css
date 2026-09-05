@@ -1,42 +1,66 @@
 /* A gráf szerkesztő képernyő elrendezése (SPEC-008 5.5, T-009-17).
 
-   A vászon magassága IDEIGLENESEN `vh` alapú, nem az `.app-content`
-   magasságából számított: az `.app-content` (packages/ui/src/topnav-shell/
-   topnav-shell.css) ma nem ad definit magasságot a gyerekeinek (csak
-   `display: flex; flex-direction: column` van rajta, `flex: 1` vagy explicit
-   `height` nélkül), ezért egy `height: 100%` a vásznon 0-ra oldódna fel.
-   A viewport-relatív méret ETTŐL FÜGGETLEN, definit magasságot ad, tehát a
-   vászon minden viewport méreten látható marad. A végleges, `.app-content`
-   magasságából számított megoldás a T-009-22 tárgya (SPEC-008 F4,
-   `apps/web/CLAUDE.md`: "A `.app-content` magassága a viewport és a `60px`
-   bar magasságából számít, kitalált szám nélkül") - ez a szabály erre a
-   témára még nem vonatkozik, mert a `run-view` osztott elrendezése még nem
-   létezik. */
+   A vászon magassága NEM `vh` alapú többé: a képernyő az `.app-content`
+   maradék magasságát tölti ki (`flex: 1`), az `.app-content` pedig a topnav
+   shell új, a fájl végén álló blokkja szerint maga is `flex: 1`
+   (packages/ui/src/topnav-shell/topnav-shell.css). Így a vászon a
+   rendelkezésre álló területet tölti ki, és belül pásztáz és nagyít -
+   a korábbi `70vh` mellett a csomópont rács túlnyúlt a viewporton, és az
+   OLDAL görgött, nem a vászon.
+
+   A `min-height: 0` minden szinten kötelező: enélkül a flex elem
+   alapértelmezett `min-height: auto` értéke a tartalom magasságára feszítené
+   a dobozt, és a belső `overflow` (a vászon pásztázása, a beállítás panel
+   görgetése) sosem lépne életbe. */
 .graph-editor-screen {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .graph-editor-screen__toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .graph-editor-screen__body {
   display: flex;
   gap: 12px;
+  flex: 1;
   min-height: 0;
 }
 
 .graph-editor-screen__canvas {
-  height: 70vh;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .graph-editor-screen__body .node-inspector {
   flex: 0 0 340px;
-  height: 70vh;
+  min-height: 0;
+}
+
+/* Szűk nézetben a vászon és a beállítás panel EGYMÁS ALÁ kerül, egyenlő
+   arányban osztozva a magasságon: a panel 340px-es, nem zsugorodó sávja
+   egy 320px-es kijelzőn önmagában szélesebb lenne a viewportnál, tehát a
+   sor elrendezés vízszintes túllógást okozna (a szabálykönyv 11. szekciója
+   ezt egyetlen viewport méreten sem engedi). A töréspont a design system
+   --ep-screen-md tokenjének értéke (768px), ugyanaz, amit a topnav lenyíló
+   navigációja használ; kitalált szám nincs, az arány egyenlő osztás. */
+@media (max-width: 768px) {
+  .graph-editor-screen__body {
+    flex-direction: column;
+  }
+
+  .graph-editor-screen__canvas,
+  .graph-editor-screen__body .node-inspector {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+  }
 }

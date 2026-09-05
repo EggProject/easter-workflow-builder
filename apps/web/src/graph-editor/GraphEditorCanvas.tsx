@@ -10,14 +10,16 @@ import {
   type Edge,
   type EdgeChange,
   type NodeChange,
+  type NodeDimensionChange,
 } from '@xyflow/react';
-import { useCallback, useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
 import { GRAPH_NODE_CARD_HEIGHT, GRAPH_NODE_CARD_WIDTH } from '../graph-node-catalog/graph-node-catalog.ts';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
 import { isValidGraphConnection } from './is-valid-connection.ts';
+import { mergeMeasuredNodeSizes, withMeasuredNodeSize, type MeasuredNodeSizes } from './measured-node-sizes.ts';
 import '@xyflow/react/dist/style.css';
 import './graph-editor.css';
 
@@ -59,9 +61,11 @@ export interface GraphEditorCanvasProperties {
 /**
  * A vezérelt vászon (SPEC-008 5.5, M-55): a `nodes` és az `edges` a szülő
  * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
- * mintáját követi - nincs belső állapot duplikáció, minden változás
+ * mintáját követi - a GRÁF állapotát nem duplikálja, minden gráf változás
  * (`applyNodeChanges`, `applyEdgeChanges`, AC9) egy lépésben, közvetlenül az
- * `onGraphChange`-en át jut vissza a szülőhöz. Az `onConnect` az `addEdge`
+ * `onGraphChange`-en át jut vissza a szülőhöz. Az egyetlen saját állapot a
+ * mért csomópont méret, ami nem gráf adat és nem is mentődik
+ * (`measured-node-sizes.ts`). Az `onConnect` az `addEdge`
  * segédfüggvényt hívja (M-58); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
  * tölti ki a `sourceHandle` értékéből (AC10). Az `isValidConnection` a
  * katalógus és a meglévő élek adatából dönt, gráf szemantika nélkül (AC11,
@@ -70,16 +74,42 @@ export interface GraphEditorCanvasProperties {
 export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperties>): ReactElement {
   const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode } = properties;
 
-  const flowNodes = useMemo(() => nodes.map((node) => workflowNodeToFlowNode(node)), [nodes]);
+  // A React Flow által mért csomópont méret a vászon SAJÁT nézeti állapota,
+  // nem domain adat: a `WorkflowNodeInput` nem hordozza, tehát a vezérelt
+  // oda-vissza leképezésen elveszne. A `measured-node-sizes.ts` doksija írja
+  // le, mi történik enélkül (tartósan rejtett csomópont, nulla él, végtelen
+  // `ResizeObserver` hurok, saját méréssel igazolva).
+  const [measuredNodeSizes, setMeasuredNodeSizes] = useState<MeasuredNodeSizes>({});
+
+  const flowNodes = useMemo(
+    () => nodes.map((node) => withMeasuredNodeSize(workflowNodeToFlowNode(node), measuredNodeSizes[node.id])),
+    [nodes, measuredNodeSizes],
+  );
   const flowEdges = useMemo(() => edges.map((edge) => workflowEdgeToFlowEdge(edge)), [edges]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<GraphNodeCardFlowNode>[]) => {
-      const nextFlowNodes = applyNodeChanges(changes, flowNodes);
-      onGraphChange(
-        nextFlowNodes.map((node) => flowNodeToWorkflowNode(node)),
-        edges,
-      );
+      // A `dimensions` változás mérési eredmény, nem gráf szerkesztés: a mért
+      // méret térképbe megy, a domain állapotot nem piszkolja be.
+      const dimensionChanges: NodeDimensionChange[] = [];
+      const graphChanges: NodeChange<GraphNodeCardFlowNode>[] = [];
+      for (const change of changes) {
+        if (change.type === 'dimensions') {
+          dimensionChanges.push(change);
+        } else {
+          graphChanges.push(change);
+        }
+      }
+      if (dimensionChanges.length > 0) {
+        setMeasuredNodeSizes((previous) => mergeMeasuredNodeSizes(previous, dimensionChanges));
+      }
+      if (graphChanges.length > 0) {
+        const nextFlowNodes = applyNodeChanges(graphChanges, flowNodes);
+        onGraphChange(
+          nextFlowNodes.map((node) => flowNodeToWorkflowNode(node)),
+          edges,
+        );
+      }
     },
     [flowNodes, edges, onGraphChange],
   );

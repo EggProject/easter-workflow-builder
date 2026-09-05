@@ -98,6 +98,59 @@
 }
 
 /* ============================================================
+   A tartalom terület függőleges kitöltése (2026-09-05). ÚJ, önálló
+   blokk — a fenti, átemelt szabályok egyetlen bájtja sem változott.
+
+   A MÉRT HIBA. Az `.app-tn__main` már `flex: 1`, de a benne álló
+   `.app-tn__inner` és `.app-content` nem adta tovább ezt a magasságot:
+   egy `height: 100%` a gyerekükön 0-ra oldódott fel. Emiatt a gráf
+   szerkesztő vászna kénytelen volt viewport-relatív (`70vh`) magasságot
+   használni, ami valós böngészőben a csomópont rácsot a viewporton
+   túlnyújtotta, és az OLDALT görgette a vászon pásztázása helyett.
+
+   A JAVÍTÁS. A shell magassága HATÁROZOTT (`height: 100vh`), nem csak
+   alsó korlát: az átemelt `min-height: 100vh` mellett egy magas
+   gyerek (a szerkesztő beállítás panelje 2265px-re mérve) az egész
+   láncot megnyújtotta volna, és a `flex: 1` semmit nem korlátozna, mert
+   egy határozatlan magasságú flex konténerben nincs mit elosztani. A
+   határozott magasság mellett a görgetés helye az `.app-content` lesz
+   (`overflow: auto`), tehát a hosszú listák ugyanúgy görgethetők, csak
+   a tartalom területén belül, a dokumentum törzse helyett. A
+   `min-height: 0` azért kell, mert egy flex elem alapértelmezett
+   `min-height: auto` értéke a tartalom magasságára feszítené a dobozt,
+   és a belső `overflow` sosem lépne életbe.
+   ============================================================ */
+.app-tn {
+  height: 100vh;
+}
+.app-tn__main {
+  min-height: 0;
+}
+.app-tn__inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* A böngésző alapértelmezett 8px-es `body` margója nélkül a shell nem
+   ér el a fal széléig, és a `min-height: 100vh` mellé 16px függőleges
+   túllógást (állandó oldalgörgetést) ad. A forrás `_shell.css` ezt a
+   saját, alapozó `* { box-sizing: border-box; margin: 0; padding: 0; }`
+   szabályával oldja meg, ami NEM került át (SPEC-007 4.2 szűkített
+   átemelés) - a teljes univerzális reset minden komponens térközét
+   átírná, ami ennek a hibának a javításához nem kell. Ezért csak a
+   `body` margója nullázódik, ugyanarra az értékre, amit a forrás is ad. */
+body {
+  margin: 0;
+}
+
+/* ============================================================
    Reszponzív: navigáció lenyíló menübe (SPEC-007 5.3, M-26, M-29).
    ÚJ, a forrásban nem létező szabály: az M-28 mérés szerint a
    forrás _shell.css három media querye egyike sem érinti a

@@ -13,7 +13,13 @@
 // --ep-screen-md media query pedig sosem illeszkedett volna) a fájl végén
 // egy `devices['Pixel 7']` preseten futó, valódi mobil emulációs teszt
 // fedi le, nem csak a `setViewportSize`-os asztali szimuláció.
-import type { RunSummary, WorkflowSummary } from '@easter-workflow-builder/protocol';
+import type {
+  RunSummary,
+  SettingsRecord,
+  WorkflowDetail,
+  WorkflowGraphDocument,
+  WorkflowSummary,
+} from '@easter-workflow-builder/protocol';
 import { devices, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -45,7 +51,40 @@ const RUNNING_RUN: RunSummary = {
   errorKind: null,
   errorMessage: null,
 };
+// A gráf szerkesztő képernyő fixture-jei (2026-09-05): a vászon a beállítás
+// panellel együtt egy nem törő flex sor, ami szűk kijelzőn vízszintes
+// túllógást okozott volna, ezért a `--ep-screen-md` alatt egymás alá kerül.
+// Ezt a lenti, minden támogatott szélességen futó teszt őrzi.
+const EDITOR_GRAPH: WorkflowGraphDocument = {
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Ügyfél kérés fogadása',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'start', inputFields: [], onUnhandledError: null },
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    },
+  ],
+  edges: [],
+};
+
+const EDITOR_WORKFLOW: WorkflowDetail = {
+  id: 'w-alfa',
+  name: 'Alfa workflow',
+  description: 'leírás',
+  providerId: 'claude-subscription',
+  createdAtMs: 1,
+  updatedAtMs: 1,
+};
+
+const EDITOR_SETTINGS: SettingsRecord = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+
 /* eslint-enable unicorn/no-null */
+
+const EDITOR_URL = '/editor?workflowId=w-alfa';
 
 test.beforeEach(async ({ page }) => {
   await mockIdleStream(page);
@@ -55,6 +94,9 @@ test.beforeEach(async ({ page }) => {
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(EDITOR_GRAPH))),
+    mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(EDITOR_WORKFLOW))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(EDITOR_SETTINGS))),
   ]);
 });
 
@@ -214,6 +256,35 @@ test('a futás előzmények egyetlen támogatott viewport szélességen sem lóg
       .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
       .toBe(0);
   }
+});
+
+test('a gráf szerkesztő egyetlen támogatott viewport szélességen sem lóg túl vízszintesen', async ({ page }) => {
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(EDITOR_URL);
+      // A csomópont LÁTHATÓSÁGÁRA vár, nem csak a csatoltságára: a
+      // `visibility: hidden` regresszió (lásd graph-editor.spec.ts) minden
+      // szélességen elbuktatná ezt a tesztet is.
+      await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+      await expect
+        .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
+        .toBe(0);
+    });
+  }
+});
+
+test('a gráf szerkesztő a megnyitott beállítás panellel sem lóg túl a legszűkebb kijelzőn', async ({ page }) => {
+  const narrowWidth = SUPPORTED_VIEWPORT_WIDTHS[0];
+  expect(narrowWidth).toBeDefined();
+
+  await page.setViewportSize({ width: narrowWidth ?? 0, height: VIEWPORT_HEIGHT });
+  await page.goto(EDITOR_URL);
+  await page.getByTestId('rf__node-n1').click();
+  await expect(page.getByRole('button', { name: 'Bezárás' })).toBeVisible();
+
+  await expect.poll(async () => horizontalOverflow(page)).toBe(0);
 });
 
 // A táblázat sor műveletek 2026-09-04 óta egyetlen hárompontos ikon gomb
