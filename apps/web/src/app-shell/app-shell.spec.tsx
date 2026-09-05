@@ -134,7 +134,7 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('Futás előzmények');
   });
 
-  it('a "/editor" útvonalon a szerkesztő helyőrzőjét rajzolja, "Szerkesztő" fejléccel', async () => {
+  it('a "/editor" útvonalon "Szerkesztő" fejléccel a GraphEditorScreen tartalmát rajzolja', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/editor');
     render();
@@ -142,7 +142,9 @@ describe('AppShell', () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain('Szerkesztő (folyamatban).');
+    // Nincs `?workflowId=` a query stringben, tehát a `GraphEditorScreen`
+    // a hiányzó azonosító üzenetét mutatja, kérés nélkül (SPEC-008 5.3).
+    expect(container.textContent).toContain('Nincs megadva szerkesztendő workflow');
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
   });
 

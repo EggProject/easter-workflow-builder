@@ -1,0 +1,29 @@
+/* A gráf szerkesztő képernyő elrendezése (SPEC-008 5.5, T-009-17).
+
+   A vászon magassága IDEIGLENESEN `vh` alapú, nem az `.app-content`
+   magasságából számított: az `.app-content` (packages/ui/src/topnav-shell/
+   topnav-shell.css) ma nem ad definit magasságot a gyerekeinek (csak
+   `display: flex; flex-direction: column` van rajta, `flex: 1` vagy explicit
+   `height` nélkül), ezért egy `height: 100%` a vásznon 0-ra oldódna fel.
+   A viewport-relatív méret ETTŐL FÜGGETLEN, definit magasságot ad, tehát a
+   vászon minden viewport méreten látható marad. A végleges, `.app-content`
+   magasságából számított megoldás a T-009-22 tárgya (SPEC-008 F4,
+   `apps/web/CLAUDE.md`: "A `.app-content` magassága a viewport és a `60px`
+   bar magasságából számít, kitalált szám nélkül") - ez a szabály erre a
+   témára még nem vonatkozik, mert a `run-view` osztott elrendezése még nem
+   létezik. */
+.graph-editor-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.graph-editor-screen__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.graph-editor-screen__canvas {
+  height: 70vh;
+}

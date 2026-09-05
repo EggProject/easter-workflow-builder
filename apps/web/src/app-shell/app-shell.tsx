@@ -2,6 +2,7 @@ import type { FetchFunction } from '@easter-workflow-builder/core';
 import { AppShellFrame, logoMarkUrl, ThemeModeToggle } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import type { ClientRouteId } from '../client-route/client-route-table.ts';
+import { GraphEditorScreen } from '../graph-editor/GraphEditorScreen.tsx';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
@@ -204,11 +205,7 @@ function renderRouteContent(
       );
     }
     case 'graphEditor': {
-      // A tényleges szerkesztő a T-009-13 ... T-009-19 lépések tárgya
-      // (SPEC-008 F3 fázis); ez a helyőrző csak az útvonaltábla bővítését
-      // (T-009-12) zárja le exhaustive-en, hogy a switch fordítási hiba
-      // nélkül fedje az új ClientRouteId ágat.
-      return <p>Szerkesztő (folyamatban).</p>;
+      return <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} />;
     }
     case 'runView': {
       // A tényleges futás nézet a T-009-20 ... T-009-27 lépések tárgya
