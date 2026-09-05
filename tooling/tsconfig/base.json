@@ -3,6 +3,14 @@
     // A TypeScript 6.0.3 alapertelmezeseit (strict, module: esnext, types: [],
     // rootDir a tsconfig konyvtara stb.) itt nem ismeteljuk meg, csak azokat az
     // opciokat allitjuk, amik elternek az alapertelmezestol.
+    // A cel a legfrissebb nyelvi szint, mert soha nem emittalunk .js-t
+    // (noEmit), es a futtatokornyezet Node 26, illetve a mai bongeszok.
+    // A `lib` ebbol szarmazik (lib.esnext.full.d.ts), tehat a szabvanyos,
+    // ES2026-os `Uint8Array.prototype.toBase64()` metodus deklaracioja is
+    // elerheto - erre a `packages/core` base64 kodolasanak van szuksege, ami
+    // 2026-09-05 ota nem a `node:buffer` modult hasznalja (a barrel a
+    // bongeszobe is bekerul, lasd resolve-image-data-url.ts).
+    "target": "esnext",
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,

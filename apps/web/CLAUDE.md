@@ -17,8 +17,9 @@ ideiglenes e2e-váz megszűnt.
 
 A tizenkettőn felül négy további, megvalósítás nélküli invariáns téma mappa is van:
 `greppable-invariants` (T-008-31, tizenharmadik), `vite-istanbul-include-invariant` (T-008-18,
-tizennegyedik), `e2e-coverage-threshold` (tizenötödik, 2026-09-05) és
-`unit-test-network-isolation` (tizenhatodik, 2026-09-05). Ezek a `packages/ui`-ban már bevett
+tizennegyedik), `e2e-coverage-threshold` (tizenötödik, 2026-09-05),
+`unit-test-network-isolation` (tizenhatodik, 2026-09-05) és `browser-safe-imports`
+(tizenhetedik, 2026-09-05). Ezek a `packages/ui`-ban már bevett
 minta (`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
 `media-query-breakpoint-invariant`) analógjai:
 egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. pontja szerinti
@@ -91,6 +92,7 @@ szabálya 0-ra oldódna, azaz láthatatlan lenne.
 | `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                                                                   |
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                                                                  |
 | `src/unit-test-network-isolation/`     | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vitest.setup.ts` `fetch` lezárását őrzi (unit teszt nem szólíthat meg hálózatot)                                                                                                                      |
+| `src/browser-safe-imports/`            | megvalósítás fájl nélküli téma: regressziós teszt, ami az `apps/web` futásidejű workspace zárt halmazát Node beépített modul (`node:*`) importtól védi                                                                                                          |
 | `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                                                                                                                               |
 | `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`), plusz a `/api` fejlesztői proxy szabály (SPEC-008 3.)                                                                                                                  |
 | `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                                                                                                                              |
