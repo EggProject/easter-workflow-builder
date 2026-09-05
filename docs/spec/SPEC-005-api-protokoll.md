@@ -415,6 +415,24 @@ A `protocol` L1, tehát a `db` (L2) enumjait nem importálhatja (F-23). Ezért a
 
 A típusszintű ág az erősebb, mert az teljes: egy `db` oldali új érték, amit a protokoll nem ismer, ugyanúgy fordítási hibát ad, mint egy protokoll oldali kitalált érték.
 
+### 7.7 A `WorkflowNodeInput.config` mező: a SPEC-008 felülírja a jelen spec döntését
+
+**Kimondjuk: ez egy visszavont döntés, nem egy pontosítás.** A jelen spec eredeti döntése az volt, hogy a node beállítása a dróton `z.unknown()` marad, és a mély ellenőrzést a szerver végzi a `db` `isNodeConfig` guardjával (a `workflow-graph-document.ts` `NODE_CONFIG_SCHEMA` konstansának doc kommentje ezt az indoklást hordozza: a tíz ágú `NodeConfig` a `db` domain típusa, amit a `protocol` L1 rétegként nem importálhat (F-23), és egy kézzel másolt duplikátum egy második, elcsúszásra képes forrás lenne).
+
+**A user döntése alapján a SPEC-008 5.3 szekciója ezt felülírja**: a `protocol` csomag kap egy `node-config` téma mappát, benne a tíz ág Zod sémájával, és a `WorkflowNodeInput.config` erre a sémára hivatkozik. A jelen szekció rögzíti, mi indokolja a változtatást, hogy a döntés ne csendben boruljon.
+
+**Az indok, három pontban.**
+
+1. **A fogyasztó oldalon nincs más út.** A gráf szerkesztő az `apps/web` csomagban él, ami a `db` csomagtól nem függhet (`apps/web/CLAUDE.md` függőségi irány). A `z.unknown()` alak mellett a szerkesztő űrlapjának nincs típusa, amire épülhetne, tehát a felület nyers JSON szerkesztőre szorulna: nincs típusbiztonság és nincs mezőnkénti hibajelzés. A user termékdöntése ezt elutasította.
+2. **A "második, elcsúszásra képes forrás" ellenérv a 7.6 szekcióval már meg van válaszolva.** A `protocol` ma **hat** drótszintű felsorolást deklarál a `db` uniójának szándékos duplikátumaként, és mindegyikhez gépi sodródás védelem tartozik az `apps/server` csomagban. A `node-config` ugyanezt a mintát követi, nem egy újat: ugyanaz a hely (`apps/server`, az egyetlen csomag, ahol a két oldal egyszerre látszik), ugyanaz a két ág (típusszintű kétirányú kölcsönös értékadhatóság, plusz futásidejű ág). A duplikáció tehát **nem védtelen marad, hanem védetté válik**, ami az eredeti döntés valódi célja volt.
+3. **A futásidejű ág itt erősebb, mint a hat felsorolásnál.** A `db` exportál futásidejű guardot a node configra (`isNodeConfig`), tehát a védelem nem szorul kizárólag a típusszintű ágra: a protokoll sémán átment érték mind a tíz ágra átmegy a `db` guardján is, és a guard által elutasított alakot a séma is elutasítja.
+
+**Ami NEM változik.** A séma írás négy szabálya (7.3) az új témára is érvényes, tehát minden bejövő objektum `z.strictObject`, nincs `.default()` és nincs `.transform()`, a kimenő alakok `.readonly()`, az uniók `z.discriminatedUnion`, és `.parse()` sehol nem fut. A szerver továbbra is átadja a validált értéket a `db` felé, tehát az `isNodeConfig` guard hívása nem szűnik meg: a Zod a dróton érkező alakot dönti el, a guard a domain invariánsát (7.2 utolsó bekezdése változatlanul érvényes).
+
+**Az `agents` mező kimondottan kivétel.** Az `AgentStepConfig.agents` a `db` oldalon `Readonly<Record<string, unknown>>`, dokumentált indokkal (a mezőlista SDK verzióhoz kötött). A protokoll sémája **ugyanezt az alakot veszi át**, nem szűkíti, mert egy szűkítés a sodródás védelmet azonnal megbuktatná. Az `agents` szerkesztő űrlapja ezért nem a protokoll sémájából, hanem az `apps/web` saját mezőtáblájából épül (SPEC-008 5.2).
+
+**Ahol ez a spec érinti a szerkezetét.** A `packages/protocol/src` alatt a jelen spec zárásakor **kilenc** téma mappa állt (9. szekció); a SPEC-008 5.3 végrehajtása után **tíz**, a `node-config` téma felvételével. A csomag `CLAUDE.md` `## Fájlok` táblázata ugyanabban a commitban bővül, amiben a mappa létrejön.
+
 ## 8. Hibakezelés
 
 ### 8.1 Egyetlen hiba alak, REST-en és SSE-n
@@ -484,6 +502,8 @@ packages/protocol/
     settings/
     event-stream/
 ```
+
+**A tizedik téma a SPEC-008 döntésével érkezik.** A fenti kilenc a jelen spec zárásakor érvényes állapot; a `node-config` téma mappa a SPEC-008 5.3 végrehajtásakor jön létre, a 7.7 szekció szerint. A bontási kritérium (PLAN-004 3. szekció) rá is teljesül: önálló domain neve van, egyetlen fájlja sem tartozik egyszerre a `workflow` témába, és az import irány egyirányú (`workflow` hivatkozik a `node-config` sémára, fordítva nem, mert az ágak a saját `z.literal` diszkriminátorukat hordozzák, nem a `NodeTypeSchema` értéket).
 
 | Téma             | Mi kerül bele                                                                                                                                             |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -569,8 +589,8 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### A csomag és a határok
 
-1. A `packages/protocol/src` alatt pontosan kilenc téma mappa áll közvetlenül, a 9. szekció listája szerint, plusz az `index.ts` barrel; egyetlen fájl sem áll közvetlenül a `src/` alatt a barrelen kívül, és egyetlen téma mappában sincs alkönyvtár.
-2. A `packages/protocol/CLAUDE.md` a csomag gyökerében áll, sehol máshol, és a `## Fájlok` táblázata mind a kilenc témát felsorolja felelősség leírással. A `bun run docs:check` nulla kilépési kóddal fut.
+1. A `packages/protocol/src` alatt pontosan kilenc téma mappa áll közvetlenül, a 9. szekció listája szerint, plusz az `index.ts` barrel; egyetlen fájl sem áll közvetlenül a `src/` alatt a barrelen kívül, és egyetlen téma mappában sincs alkönyvtár. **A SPEC-008 5.3 végrehajtása után a várt szám tíz**, a `node-config` téma felvételével (7.7).
+2. A `packages/protocol/CLAUDE.md` a csomag gyökerében áll, sehol máshol, és a `## Fájlok` táblázata mind a kilenc témát felsorolja felelősség leírással, a `node-config` téma megérkezése után mind a tizet. A `bun run docs:check` nulla kilépési kóddal fut.
 3. A `packages/protocol/src/index.ts` csak nevesített újraexportot tartalmaz, `export *` nélkül, és az `IS_PROTOCOL_PLACEHOLDER` konstans megszűnt.
 4. A `packages/protocol/package.json` `dependencies` mezője pontosan `@easter-workflow-builder/core` és `zod`; a `zod` range-e szó szerint az, amit a fában már meglévő négy csomag és az Agent SDK peer mezője használ, tehát új verziószám nem került a repóba. A `bun run check:graph` nulla kilépési kóddal fut, és a `protocol` L1 marad.
 5. A `packages/protocol/package.json` nem listáz HTTP könyvtárat, és a `packages/protocol/src` alatt nincs `node:http`, `fetch`, `EventSource` és `WebSocket` szöveg. Greppel ellenőrizhető teszt igazolja.

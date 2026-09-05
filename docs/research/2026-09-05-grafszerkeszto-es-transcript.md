@@ -285,6 +285,164 @@ is tette.
 
 ---
 
+## 5. Az SDK `agents` mezőjének tényleges alakja, 2026-09-05 (SPEC-008 O-4)
+
+A SPEC-008 O-4 tétele a user döntése szerint **mérésre vár, nem tippelésre**: ha van
+dokumentált séma, arra épül a node panel űrlapja; ha nincs, a mező csak olvasható marad.
+A mérés a **pinelt** SDK verzió ellen futott, két független forrással.
+
+**A pinelt verzió: `0.3.245`.** Pontos egyezés, nem range, mind a hét fogyasztó csomagban
+(`bun.lock`, `packages/agent/package.json`, `apps/server/package.json`,
+`tools/wire-probe/package.json`), és a `2026-08-26-toolchain.md` ugyanezt rögzíti.
+
+**Forrás 1, a telepített csomag típusdefiníciója, saját olvasás.**
+`tools/wire-probe/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts`:
+
+- 1414. sor, az `Options` típusban: `agents?: Record<string, AgentDefinition>;`
+- 38 ... 99. sor, az `AgentDefinition` típus **tizenhat** mezővel, kettő kötelező
+  (`description`, `prompt`). A típus doc kommentje: "Definition for a custom subagent that
+  can be invoked via the Agent tool."
+- **Futásidejű validáció nincs**: sem az `sdk.mjs`, sem a `bridge.mjs` nem tartalmaz Zod
+  sémát erre a típusra.
+
+**Forrás 2, a hivatalos dokumentáció, saját olvasás.**
+`https://docs.claude.com/en/docs/agent-sdk/subagents`, "AgentDefinition configuration"
+táblázat: **tizenhárom** mező, `Field`, `Type`, `Required`, `Description` oszlopokkal. A
+`https://docs.claude.com/en/api/agent-sdk/typescript` oldal `Options` táblázata az
+`agents` sort ugyanezzel a típussal adja: `Record<string, AgentDefinition>`, alapérték
+`undefined`, leírás "Programmatically define subagents".
+
+**A két forrás által egybehangzóan fedett tizenhárom mező:**
+
+| Mező              | Típus                                                       | Kötelező |
+| ----------------- | ----------------------------------------------------------- | -------- |
+| `description`     | `string`                                                    | igen     |
+| `prompt`          | `string`                                                    | igen     |
+| `tools`           | `string[]`                                                  | nem      |
+| `disallowedTools` | `string[]`                                                  | nem      |
+| `model`           | `string`                                                    | nem      |
+| `skills`          | `string[]`                                                  | nem      |
+| `memory`          | `'user' \| 'project' \| 'local'`                            | nem      |
+| `mcpServers`      | `(string \| object)[]`                                      | nem      |
+| `initialPrompt`   | `string`                                                    | nem      |
+| `maxTurns`        | `number`                                                    | nem      |
+| `background`      | `boolean`                                                   | nem      |
+| `effort`          | `'low' \| 'medium' \| 'high' \| 'xhigh' \| 'max' \| number` | nem      |
+| `permissionMode`  | `PermissionMode`                                            | nem      |
+
+**Három mező NEM MEGERŐSÍTETT, mert nincs mögötte két független forrás.** A telepített
+`.d.ts` tartalmazza, a `subagents` doksi táblázata viszont nem sorolja fel:
+`criticalSystemReminder_EXPERIMENTAL` (a neve maga jelzi a kísérleti állapotot),
+`observer` és `observerMessage`.
+
+**Verdikt: van dokumentált, stabil séma**, tizenhárom mezőre, két független forrással.
+A SPEC-008 O-4 tétele ezzel lezárható a "van séma" ágon, a nem megerősített három mező
+kizárásával.
+
+**A mai projektbeli állapot**, saját olvasás:
+`packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts` 72. sora
+`readonly agents: Readonly<Record<string, unknown>>;`, a 44 ... 47. sorok kommentjének
+indoklásával, hogy az `AgentDefinition` mezőlistája SDK verzióhoz kötött. A
+`packages/engine/src/agent-step/build-agent-step-options.ts` 103. sora a mezőt
+típusszűkítés nélkül adja tovább.
+
+## 6. Automatikus gráf elrendezés, 2026-09-05 (SPEC-008 O-6)
+
+A SPEC-008 O-6 tételét a user lezárta: **legyen automatikus elrendezés**, egy gombbal. A
+feltétele dokumentált elrendező könyvtár, két független forrással, és dokumentált forrásból
+vagy saját mérésből vett távolságok.
+
+### 6.1 Mit nevez meg a hivatalos React Flow dokumentáció
+
+`https://reactflow.dev/learn/layouting/layouting`, saját olvasás. A "Layouting nodes"
+szekció négy külső könyvtárat sorol fel táblázatban (`Dagre`, `D3-Hierarchy`, `D3-Force`,
+`ELK`), és a bevezető mondat szerint a felsorolás a legegyszerűbbtől a legösszetettebbig
+halad, ahol "dagre is largely a drop-in solution and elkjs is a full-blown highly
+configurable layouting engine".
+
+A dagre szekció ajánlása szó szerint: "If you need to organize your flows into a tree, we
+highly recommend dagre." A szekció a repo linkjét
+(`https://github.com/dagrejs/dagre`) és a konfigurációs doksi linkjét
+(`https://github.com/dagrejs/dagre/wiki#configuring-the-layout`) is megadja. Az oldalsó
+navigáció külön példaoldalt sorol fel mindkét fő jelöltre: "Layout: Dagre Tree", "Elkjs
+Tree".
+
+A másik két jelöltet a doksi maga zárja ki a mi esetünkre: a `d3-hierarchy` "expects your
+graphs to have a single root node, so it won't work in all cases", és "assigns the same
+width and height to all nodes", ami a tíz eltérő csomópont típusnál hibás; a `d3-force`
+iteratív, fizikai szimuláció, aminek a doksi szerint "computing the force layout every
+render forever is going to incur a big performance hit". Az `elkjs` doksi hivatkozása
+mellett az oldal maga írja: "Docs: https://eclipse.dev/elk/reference.html (good luck!)".
+
+### 6.2 Élő npm registry lekérdezés, saját mérés
+
+Minden sor `curl https://registry.npmjs.org/<csomag>/latest` lekérdezésből, a publikálási
+dátumok a teljes csomagdokumentum `time` mezőjéből.
+
+| Csomag            | `version` | `license`                     | `peerDependencies`  | típusok               |
+| ----------------- | --------- | ----------------------------- | ------------------- | --------------------- |
+| `@dagrejs/dagre`  | `3.1.1`   | `MIT`                         | **nincs a mezőben** | beépített `.d.ts`     |
+| `dagre` (eredeti) | `0.8.5`   | `MIT`                         | **nincs a mezőben** | nincs, `@types/dagre` |
+| `elkjs`           | `0.12.0`  | `EPL-2.0 OR GPL-3.0-or-later` | **nincs a mezőben** | beépített             |
+| `d3-hierarchy`    | `3.1.2`   | `ISC`                         | **nincs a mezőben** | nincs, `@types/...`   |
+
+**A `dagre` kontra `@dagrejs/dagre` kérdés adattal eldöntve.** A `dagre@0.8.5` publikálási
+ideje `2019-12-03T17:04:44.979Z`, a csomagdokumentum `modified` mezője `2022-06-14`. A
+`@dagrejs/dagre@3.1.1` publikálási ideje `2026-08-08T15:10:12.165Z`. A hivatkozott
+hivatalos React Flow doksi maga is a `dagrejs` szervezet repójára és wikijére mutat.
+
+**A választás: `@dagrejs/dagre@3.1.1`.** Két független forrás: a hivatalos React Flow
+layouting oldal ajánlása fa alakú gráfra, és a saját, most futtatott registry lekérdezés,
+ami szerint az eredeti csomag hat éve nem kapott kiadást, a `dagrejs` fork viszont egy
+hónapon belül igen.
+
+**Licenc, saját olvasás a publikált fájlon.** `https://unpkg.com/@dagrejs/dagre@3.1.1/LICENSE`
+első sora: `Copyright (c) 2012-2014 Chris Pettitt`, a szöveg MIT, a registry `license`
+mezője ugyanezt mondja. Egyetlen futásidejű függősége a `@dagrejs/graphlib@4.0.5`.
+
+**React 19 verdikt: nincs mit ütköztetni.** A csomag `peerDependencies` mezője a registry
+válaszban és a publikált `package.json` fájlban is hiányzik, tehát nem deklarál React peer
+range-et; tiszta gráfszámító könyvtár, ami koordinátákat ad vissza, és a React Flow réteg
+fogyasztja őket. Ez erősebb bizonyíték, mint egy kompatibilitási táblázat, mert nincs olyan
+range, amin kívül eshetnénk.
+
+### 6.3 A dokumentált alapértelmezett távolságok
+
+**Forrás 1, a hivatalos wiki** (`https://github.com/dagrejs/dagre/wiki#configuring-the-layout`,
+amire a React Flow doksi is mutat): `rankdir` `TB`, `nodesep` `50`, `edgesep` `10`,
+`ranksep` `50`, `marginx` `0`, `marginy` `0`.
+
+**Forrás 2, a publikált csomag forráskódja, saját olvasás.**
+`https://unpkg.com/@dagrejs/dagre@3.1.1/dist/dagre.cjs`, a gráf alapértelmezés objektuma
+szó szerint:
+
+```
+{ranksep:50, edgesep:20, nodesep:50, rankdir:"TB", rankalign:"center"}
+```
+
+a margókra pedig a `translateGraph` lépés `marginx||0` és `marginy||0` alakot használ.
+
+**Az `edgesep` értékén a két forrás eltér**: a wiki `10`, a ténylegesen publikált `3.1.1`
+kódja `20`. Ezt nem tippeljük el: az `edgesep` a **párhuzamos élek** egymás közti
+távolsága, amit a spec nem állít be, tehát a csomag saját, telepített alapértéke marad
+érvényben. A `nodesep`, a `ranksep`, a `rankdir` és a két margó viszont **mindkét forrásban
+azonos**, tehát ezekre van két független forrásunk.
+
+**Amire NINCS forrás: a csomópont kártya mérete.** A dagre bemenete csomópontonként egy
+`width` és egy `height` érték, amit a hívónak kell megadnia. Ez nem a könyvtár
+alapértelmezése, hanem a mi saját kártyánk mérete, tehát dokumentált külső forrás nem
+létezik rá. A SPEC-008 ezért nem ad rá számot: a PLAN-009 egy külön lépése méri le a
+ténylegesen kirajzolt kártyát valós chromiumban, a SPEC-007 5.3 módszerével, és a mért
+érték kerül egyetlen konstansként a kódba.
+
+**Amit ez a szekció NEM állít**: nem mértük a `@dagrejs/dagre` tényleges futását a projekt
+felállásában, mert a csomag még nincs telepítve; a telepítés utáni első elrendezés maga a
+PLAN-009 lépésének elfogadási kritériuma. Nem vizsgáltuk a `d3-flextree`, az
+`entitree-flex` és a `Cola.js` csomagot, mert a hivatalos doksi ezeket csak "Honourable
+Mentions" alatt említi, nem jelöltként.
+
+---
+
 ## Amit ez a felderítés NEM dönt el
 
 - **Melyik virtualizációs csomagot választja a projekt** (`react-window` vagy
@@ -294,3 +452,5 @@ is tette.
   hogy still auto-scrollozzon") - nincs rá forrás, NEM MEGERŐSÍTETT.
 - **Melyik töréspontnál vált a SPEC-008 osztott nézete fülekre** - ez tervezési döntés,
   a rendelkezésre álló hét token közül.
+- **A gráf csomópont kártya tényleges mérete**, amit a dagre bemenetként vár (6.3) - erre
+  nincs külső forrás, a PLAN-009 saját mérése adja.

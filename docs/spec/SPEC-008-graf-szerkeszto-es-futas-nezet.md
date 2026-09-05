@@ -5,7 +5,7 @@
 | Státusz  | tervezet                                                                                                                                                                                                                                                                    |
 | Dátum    | 2026-09-05                                                                                                                                                                                                                                                                  |
 | Előzmény | [`SPEC-007-frontend-alkalmazas.md`](SPEC-007-frontend-alkalmazas.md) (a felület váza, amire épül), [`SPEC-005-api-protokoll.md`](SPEC-005-api-protokoll.md) (a fogyasztott szerződés), [`SPEC-004-vegrehajto-motor.md`](SPEC-004-vegrehajto-motor.md) (a futás állapotgépe) |
-| Kimenet  | a `packages/ui` csomag egy új téma mappája és az `apps/web` alkalmazás kilenc új téma mappája (11.1, 11.2)                                                                                                                                                                  |
+| Kimenet  | a `packages/ui` csomag egy, az `apps/web` alkalmazás tíz és a `packages/protocol` csomag egy új téma mappája (11.1, 11.2, 11.3)                                                                                                                                             |
 | Mérés    | [`../research/2026-09-05-grafszerkeszto-es-transcript.md`](../research/2026-09-05-grafszerkeszto-es-transcript.md)                                                                                                                                                          |
 | Terv     | [`../plan/PLAN-009-graf-szerkeszto-es-futas-nezet.md`](../plan/PLAN-009-graf-szerkeszto-es-futas-nezet.md)                                                                                                                                                                  |
 
@@ -16,7 +16,9 @@
 ### Amit eldönt
 
 - A vizuális gráf szerkesztőt: az `@xyflow/react` vászon vezérelt módban, a tíz csomópont típus megjelenítése, az élek kötése, a mentés és a betöltés.
-- A lépés szintű beállítások felületét: hol és hogyan jelenik meg az `AgentStepConfig` huszonegy mezője, és melyik marad a SPEC-009 hatókörében.
+- **A csomópont `config` mezőjének drótszintű alakját**: a `protocol` csomag `node-config` téma mappáját a tíz ág Zod sémájával, a sodródás védelmével együtt, ami a SPEC-005 egy kimondott döntését felülírja (5.3, SPEC-005 7.7).
+- **Az automatikus elrendezést**: egy gomb, ami a gráfot a `@dagrejs/dagre` könyvtárral rendezi el, dokumentált alapértelmezett távolságokkal (5.7).
+- A lépés szintű beállítások felületét: hol és hogyan jelenik meg az `AgentStepConfig` huszonegy mezője, **beleértve az `agents` mező űrlapját a mért, dokumentált `AgentDefinition` alakra**, és melyik mező marad a SPEC-009 hatókörében.
 - A mentés előtti validáció határvonalát: mit ellenőriz a kliens, és mit hagy a szerverre, indoklással.
 - A szerkesztő és a futáshoz tartozó gráf pillanatkép viszonyát.
 - Az élő futás nézetet: az osztott elrendezést húzható elválasztóval, a futás állapotának megjelenítését a rajzon, a párhuzamos ágakat, a hibát és a megszakítást.
@@ -31,19 +33,22 @@
 ### Amit NEM dönt el
 
 - **Nem építi meg a beállítás felületet.** A beállítások képernyő, a skill feltöltés és az MCP szerver konfiguráció a **SPEC-009** hatóköre. A `GET`/`PUT /api/settings`, a párhuzamossági korlát négy végpontja és a provider kapcsolat teszt kezelője a jelen specben **nem** kap felületet.
-- **Nem szerkeszthető a jelen specben a `skills`, az `mcpServers` és az `agents` mező.** Az első kettő a SPEC-009 hatóköre; a harmadikra a `db` csomag típusa `Readonly<Record<string, unknown>>`, tehát nincs séma, amiből űrlapot lehetne építeni, és tippelni tilos (5.2, O-4).
+- **Nem szerkeszthető a jelen specben a `skills` és az `mcpServers` mező.** Mindkettő a SPEC-009 hatóköre. Az `agents` mező ezzel szemben **szerkeszthetővé válik**, mert a mérés dokumentált, két független forrással fedett alakot talált (M-90, 5.2); a mérésben nem megerősített három `AgentDefinition` mező viszont változatlanul olvasható marad.
 - **Nem futtat gráf szemantikai validációt a kliensen.** A körkeresés, a `loop` visszaél szabályai, a `fan_out` hatókör kiegyensúlyozottsága és a kezeletlen hiba politika a motor validációja (SPEC-004 4., 6. szekció); a kliens ezt nem másolja le (5.4).
 - **Nem vezet be új futásindítási vagy megszakítási szemantikát.** A `POST /runs`, a `POST /interrupt` és a `POST /restart` a SPEC-005 4.2 B táblázata szerint hívódik, változatlanul.
 - **Nem módosítja a `packages/db`, az `engine` és az `apps/server` viselkedését**, a 3. szekció szerinti port és CORS átvezetést leszámítva, ami a szerveren egyetlen sort sem változtat, csak a spec szövegét pontosítja.
 - **Nem vezet be új hitelesítést.** A szerver a `127.0.0.1` címre köt (SPEC-006 3.5).
-- **Nem ad számot ott, ahol nincs forrás.** A transcript sor magassága, a fan out ágak automatikus elrendezésének távolságai, a `retry` érték és az e2e küszöb új értéke mind mérésből vagy nyitott kérdésből jön, nem becslésből (14. szekció).
+- **Nem ad számot ott, ahol nincs forrás.** A transcript sor magassága, a `retry` érték és az e2e küszöb új értéke mind mérésből vagy nyitott kérdésből jön, nem becslésből (14. szekció). Az automatikus elrendezés távolságai **két független forrásból** jönnek (M-93), a csomópont kártya mérete pedig a PLAN-009 saját méréséből (5.7).
 
-### A user két döntése, amiket ez a spec megvalósít
+### A user öt döntése, amiket ez a spec megvalósít
 
 | #   | Döntés                                                                                                                                                          | Hol valósul meg                                  |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | 1   | A szerver portja `3001`, a Vite dev szerver az alapértelmezett porton marad, tehát a dev proxy megépíthető, és a dev REST hívás proxyn megy                     | 3. szekció, és a 15. szekció 1 ... 6. kritériuma |
 | 2   | Az élő futás nézet osztott, húzható elválasztóval; szűk nézetben egymás alá kerül, a legszűkebben fülekre vált, kizárólag a design system töréspont tokenjeivel | 6.1 és 10. szekció, és a 15. szekció 30 ... 34.  |
+| 3   | A `protocol` csomag kap egy `node-config` témát a tíz ág Zod sémájával, tehát a szerkesztő űrlapja típusbiztos, mezőnkénti hibajelzéssel (O-1 lezárva)          | 5.3, SPEC-005 7.7, és a 15. szekció 58 ... 59.   |
+| 4   | Az `agents` mező alakját előbb megmérjük az SDK forrásából és a hivatalos doksiból; a mérés dokumentált alakot talált, tehát az űrlap megépül (O-4 lezárva)     | 5.2, M-90, és a 15. szekció 60.                  |
+| 5   | Legyen automatikus elrendezés, egy gombbal, dokumentált könyvtárral és dokumentált távolságokkal (O-6 lezárva)                                                  | 5.7, M-91 ... M-93, és a 15. szekció 61 ... 62.  |
 
 ## 2. Megerősített tények, forrással
 
@@ -116,13 +121,28 @@ A 2.1 sorai a [`../research/2026-09-05-grafszerkeszto-es-transcript.md`](../rese
 | M-88 | A `RunStatus` hat, a `StepRunStatus` nyolc értéket vesz fel; a fenntartott `branchKey` értékek a `continue`, `exit`, `approved`, `rejected`, `exhausted` és `on_error`                                                                                                                                     | SPEC-003 7.1, 7.2, SPEC-004 4.2                             |
 | M-89 | Az `InterruptSummaryResponse` mezői: `rootRunId` és `cancelledRunIds`, tehát a megszakítás válasza megnevezi az al-workflow futásokat is                                                                                                                                                                   | `packages/protocol/src/run/interrupt-summary.ts`            |
 
-### 2.6 Amit ezekből NEM következtetünk
+### 2.6 Az SDK `agents` mezője és az elrendező könyvtár
+
+A 2.6 sorai a [`../research/2026-09-05-grafszerkeszto-es-transcript.md`](../research/2026-09-05-grafszerkeszto-es-transcript.md) 5. és 6. szekciójának mérésén és a hivatkozott hivatalos dokumentáción állnak.
+
+| #    | Tény                                                                                                                                                                                                                                                                                                                                                                                                                             | Forrás                                                                                                                                                                                                                                                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M-90 | A pinelt `@anthropic-ai/claude-agent-sdk@0.3.245` `Options` típusában az `agents` mező alakja `Record<string, AgentDefinition>`, és az `AgentDefinition` **tizenhat** mezőt hordoz, kettő kötelező (`description`, `prompt`). Ebből **tizenhármat két független forrás is fed**; a `criticalSystemReminder_EXPERIMENTAL`, az `observer` és az `observerMessage` **NEM MEGERŐSÍTETT**, mert csak a telepített `.d.ts` sorolja fel | saját olvasás a telepített `sdk.d.ts` fájlon (1414. és 38 ... 99. sor), plusz a [subagents doksi](https://docs.claude.com/en/docs/agent-sdk/subagents) "AgentDefinition configuration" táblázata, plusz a [TypeScript referencia](https://docs.claude.com/en/api/agent-sdk/typescript) `Options` táblázatának `agents` sora |
+| M-91 | A hivatalos React Flow layouting oldal négy külső könyvtárat sorol fel (`Dagre`, `D3-Hierarchy`, `D3-Force`, `ELK`), és fa alakú gráfra nevesítve ajánlja az elsőt: _"If you need to organize your flows into a tree, we highly recommend dagre."_ A `d3-hierarchy` esetére maga zárja ki a mi felállásunkat: _"assigns the same width and height to all nodes"_, ami tíz eltérő csomópont típusnál hibás                        | [React Flow, Layouting](https://reactflow.dev/learn/layouting/layouting)                                                                                                                                                                                                                                                    |
+| M-92 | **Élő registry lekérdezés, 2026-09-05.** A `@dagrejs/dagre` `latest` értéke `3.1.1`, licence `MIT`, `peerDependencies` mezője **nincs**, egyetlen futásidejű függősége a `@dagrejs/graphlib@4.0.5`, és a típusdefiníciót maga szállítja. Az eredeti `dagre` csomag utolsó kiadása `0.8.5`, `2019-12-03`, a fork `3.1.1` kiadása `2026-08-08`                                                                                     | `registry.npmjs.org/@dagrejs/dagre`, `registry.npmjs.org/dagre`, plusz `unpkg.com/@dagrejs/dagre@3.1.1/package.json` és a publikált `LICENSE` fájl                                                                                                                                                                          |
+| M-93 | A dagre dokumentált alapértelmezései közül a `nodesep` (`50`), a `ranksep` (`50`), a `rankdir` (`TB`), a `marginx` (`0`) és a `marginy` (`0`) **két független forrásban azonos**. Az `edgesep` értékén a két forrás eltér (wiki `10`, a publikált `3.1.1` kód `20`), ezért azt a spec nem állítja be, hanem a csomag saját alapértékén hagyja                                                                                    | [dagre wiki, Configuring the layout](https://github.com/dagrejs/dagre/wiki#configuring-the-layout), plusz saját olvasás a `unpkg.com/@dagrejs/dagre@3.1.1/dist/dagre.cjs` fájlon                                                                                                                                            |
+| M-94 | A dagre bemenete csomópontonként egy `width` és egy `height` érték, amit a **hívónak** kell megadnia; erre a könyvtár nem ad alapértelmezést, és külső dokumentált forrás sem létezik, mert a kártya a mi saját elemünk. **NEM MEGERŐSÍTETT szám**, a PLAN-009 saját mérése adja                                                                                                                                                 | research 6.3 szekció, kimondottan forrás nélküli pontként                                                                                                                                                                                                                                                                   |
+
+### 2.7 Amit ezekből NEM következtetünk
 
 - **Az M-53-ból nem következik, hogy a gráf szerkesztő nem tesztelhető unit szinten.** Abból az következik, hogy az **élrajzolás** nem tesztelhető happy-dom alatt. A saját kódunk (az állapot, a `nodeTypes` tábla, a validáció, a szerializálás) tiszta függvény és React állapot, tehát száz százalékig unit tesztelhető (12.2).
 - **Az M-57 és az M-53 együtt nem ad kész megoldást.** A doksi óv a `width`/`height` beállításától, a mérés viszont pont azzal tette láthatóvá a node-ot. A feloldás egy blokkoló mérés a PLAN-009 F0 fázisában (O-3), nem egy találgatás.
 - **Az M-61-ből nem következik, hogy azonnal `12.11.6`-ra kell váltani.** Abból az következik, hogy a `docs/research/2026-08-26-toolchain.md` `12.11.5` bejegyzése egy patch-csel elavult, és a rögzítés előtt a mérést a ténylegesen rögzített verzión kell megismételni (PLAN-009 F0).
 - **Az M-80-ból nem következik, hogy az SSE mehet a proxyn át.** Abból az következik, hogy a SPEC-005 5.8 indoklása részben elavult. A döntés (az SSE megkerüli a proxyt) marad, mert a telepített `vite@8.2.2` proxyján át **nincs saját mérésünk**, a megkerülés pedig szigorúan a biztonságosabb út (O-2).
 - **Az M-74-ből nem következik, hogy a meglévő `resizable` komponens hibás.** Abból az következik, hogy az `Enter` billentyű a forrásban hiányzik, a hivatkozott elsődleges forrás pedig nem jelöli opcionálisnak, tehát az átemeléskor pótolni kell (6.1).
+- **Az M-90-ből nem következik, hogy a `db` csomag `agents` típusát szűkíteni kell.** A `Readonly<Record<string, unknown>>` alak indoklása (a mezőlista SDK verzióhoz kötött) érvényben marad, és a `protocol` sémája is ezt az alakot veszi át, különben a sodródás védelem megbukna. Az űrlap egy **felületi mezőtáblából** épül, nem a tárolt típus szűkítéséből (5.2).
+- **Az M-93-ból nem következik, hogy a spec bármelyik dagre opciót beállítja.** Abból az következik, hogy amit nem állítunk be, arról tudjuk, mi lesz a viselkedés, és két forrásból tudjuk. A spec egyetlen dagre opciót sem ír felül; a `rankdir` iránya a felület saját, kimondott választása (5.7).
+- **Az M-94-ből nem következik, hogy az automatikus elrendezés mért node geometriától függene.** A kártya mérete egyetlen, statikus konstans, amit a CSS és a dagre hívás egyaránt olvas; futásidejű mérés (`measured.width`, `getBoundingClientRect()`) sehol nem szerepel, tehát a 12.2 szabály sértetlen marad.
 
 ## 3. A port döntés és az átvezetései
 
@@ -172,28 +192,34 @@ A 2.1 sorai a [`../research/2026-09-05-grafszerkeszto-es-transcript.md`](../rese
 
 ### 4.1 A határvonal
 
-| Kérdés                                     | Ki dönti el   | Miért nem a másik                                                                        |
-| ------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------- |
-| hogyan néz ki egy húzható elválasztó       | `packages/ui` | domain fogalom nélküli, a design system átemelése (M-72)                                 |
-| hogyan néz ki egy `agent_step` csomópont   | `apps/web`    | a csomópont típus domain fogalom, a `packages/ui` domain mentes (SPEC-007 3.1)           |
-| melyik `run_event.kind` hogyan jelenik meg | `apps/web`    | ugyanaz                                                                                  |
-| mi a drótszintű alak                       | `protocol`    | egyetlen forrás, Zod sémából (SPEC-005 3.1)                                              |
-| mi a gráf szemantikai szabálya             | `engine`      | a motor validációja, amit a kliens nem másol le (5.4)                                    |
-| melyik útvonal melyik képernyőt jelenti    | `apps/web`    | kliens oldali fogalom                                                                    |
-| virtualizált lista, ami az aljára tapad    | `apps/web`    | egyetlen fogyasztója a transcript, tehát a `packages/ui` szintre emelés spekulatív lenne |
+| Kérdés                                      | Ki dönti el   | Miért nem a másik                                                                        |
+| ------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------- |
+| hogyan néz ki egy húzható elválasztó        | `packages/ui` | domain fogalom nélküli, a design system átemelése (M-72)                                 |
+| hogyan néz ki egy `agent_step` csomópont    | `apps/web`    | a csomópont típus domain fogalom, a `packages/ui` domain mentes (SPEC-007 3.1)           |
+| melyik `run_event.kind` hogyan jelenik meg  | `apps/web`    | ugyanaz                                                                                  |
+| mi a drótszintű alak                        | `protocol`    | egyetlen forrás, Zod sémából (SPEC-005 3.1)                                              |
+| mi a gráf szemantikai szabálya              | `engine`      | a motor validációja, amit a kliens nem másol le (5.4)                                    |
+| melyik útvonal melyik képernyőt jelenti     | `apps/web`    | kliens oldali fogalom                                                                    |
+| virtualizált lista, ami az aljára tapad     | `apps/web`    | egyetlen fogyasztója a transcript, tehát a `packages/ui` szintre emelés spekulatív lenne |
+| mi a node `config` drótszintű alakja        | `protocol`    | ugyanaz, mint a többi drótszintű alaknál: egyetlen forrás, Zod sémából (5.3)             |
+| melyik `AgentDefinition` mező szerkeszthető | `apps/web`    | felületi döntés a mért, dokumentált alak felett; a tárolt típust nem szűkíti (5.2)       |
+| hogyan rendezi el a gráfot egy gomb         | `apps/web`    | a dagre hívás a csomópont kártya méretét és a saját éllistát ismeri (5.7)                |
 
-**Az `@xyflow/react` és a `react-window` az `apps/web` függősége, nem a `packages/ui` csomagé.** Az előbbi mert a vászon a workflow csomópont típusait ismeri, tehát domain fogalmat hordoz; az utóbbi mert egyetlen helyen használjuk, és a `.claude/CLAUDE.md` 5. szekció tiltja a spekulatív absztrakciót egyszer használt kódra.
+**Az `@xyflow/react`, a `react-window` és a `@dagrejs/dagre` az `apps/web` függősége, nem a `packages/ui` csomagé.** Az első mert a vászon a workflow csomópont típusait ismeri, tehát domain fogalmat hordoz; a második mert egyetlen helyen használjuk, és a `.claude/CLAUDE.md` 5. szekció tiltja a spekulatív absztrakciót egyszer használt kódra; a harmadik mert a hívása a csomópont kártya méretét és a gráf éllistáját is ismeri, tehát ugyanabba a domain körbe esik, mint a vászon.
+
+**A `packages/protocol` csomag viszont bővül**, a `node-config` téma mappával (5.3). Ez a csomag `dependencies` mezőjét nem érinti: a `zod` már ma is ott áll, új külső csomag nem kell hozzá.
 
 ### 4.2 Függőségi irány
 
 A réteg besorolás **nem változik**: `ui` L2, `web` L5, és a `package-layer.ts` térképet nem kell bővíteni, mert új workspace csomag nem keletkezik.
 
-| Csomag        | `dependencies` a spec után                                                                         | Változás                                      |
-| ------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `packages/ui` | `@tanstack/react-table`, `react`, `react-dom`                                                      | nincs, a `resizable` téma nem hoz új csomagot |
-| `apps/web`    | a három workspace bejegyzés, `react`, `react-dom`, plusz **`@xyflow/react`** és **`react-window`** | két új külső csomag, katalógus hivatkozással  |
+| Csomag              | `dependencies` a spec után                                                                                               | Változás                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `packages/protocol` | `zod`                                                                                                                    | nincs, a `node-config` téma nem hoz új csomagot |
+| `packages/ui`       | `@tanstack/react-table`, `react`, `react-dom`                                                                            | nincs, a `resizable` téma nem hoz új csomagot   |
+| `apps/web`          | a három workspace bejegyzés, `react`, `react-dom`, plusz **`@xyflow/react`**, **`react-window`** és **`@dagrejs/dagre`** | három új külső csomag, katalógus hivatkozással  |
 
-Mindkét új verzió a `docs/research/2026-08-26-toolchain.md` fájlba kerül, két független forrással (M-61, M-67), és a gyökér `package.json` `catalog` mezőjén át hivatkozódik.
+Mind a három új verzió a `docs/research/2026-08-26-toolchain.md` fájlba kerül, két független forrással (M-61, M-67, M-92), és a gyökér `package.json` `catalog` mezőjén át hivatkozódik.
 
 ## 5. A gráf szerkesztő
 
@@ -230,33 +256,71 @@ A csomópont kiválasztásakor egy oldalsó panel nyílik, ami a kiválasztott t
 | futási korlátok       | `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `permissionMode`, `enabledEngineHooks`                       | szám mező és `SelectField`, a zárt listákból              |
 | eszközök és környezet | `allowedTools`, `disallowedTools`, `agentTools`, `cwd`, `additionalDirectories`, `sandbox`, `structuredOutput` | lista szerkesztő és jelölőnégyzet                         |
 
-**Három mező szándékosan nem szerkeszthető a jelen specben**, és a panel ezt ki is mondja, nem hagyja üresen a helyet:
+**Két mező szándékosan nem szerkeszthető a jelen specben**, és a panel ezt ki is mondja, nem hagyja üresen a helyet:
 
-| Mező         | Miért                                                                                                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `skills`     | a skill feltöltés a SPEC-009 hatóköre; a panel a jelenlegi értéket olvashatóan mutatja                                                                                                                  |
-| `mcpServers` | az MCP konfiguráció a SPEC-009 hatóköre; ugyanaz                                                                                                                                                        |
-| `agents`     | a `db` típusa `Readonly<Record<string, unknown>>`, tehát nincs séma, amiből űrlapot lehetne építeni, és tippelni tilos (`.claude/CLAUDE.md` 4.). A panel a kulcsok listáját mutatja, szerkesztés nélkül |
+| Mező         | Miért                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `skills`     | a skill feltöltés a SPEC-009 hatóköre; a panel a jelenlegi értéket olvashatóan mutatja |
+| `mcpServers` | az MCP konfiguráció a SPEC-009 hatóköre; ugyanaz                                       |
+
+#### Az `agents` mező űrlapja, a mérés eredménye szerint
+
+**A user 4. döntése: előbb mérünk, aztán döntünk.** A mérés a **pinelt** `@anthropic-ai/claude-agent-sdk@0.3.245` telepített típusdefiníciójából és a hivatalos dokumentációból dolgozott, két független forrással (M-90). **Az eredmény: van dokumentált, stabil alak**, tehát a spec megépíti az űrlapot, nem hagyja olvashatónak.
+
+A mező alakja `Record<string, AgentDefinition>`, tehát a panel egy **kulcsonkénti listát** rajzol: minden bejegyzés az agent neve plusz egy összecsukható űrlap. A bejegyzés felvehető, átnevezhető és törölhető.
+
+**Az űrlap pontosan a tizenhárom, két forrással fedett mezőt szerkeszti.** A mezőlista egy `apps/web` oldali, `as const satisfies` alakú tábla a `node-inspector` témában, aminek minden sora megnevezi a mező nevét, az értékfajtáját és a kötelezőségét; a forrása a research 5. szekciója, és a sorok mellett ott a hivatkozás.
+
+| Csoport            | Mezők                                                         | Vezérlő                                   |
+| ------------------ | ------------------------------------------------------------- | ----------------------------------------- |
+| kötelező           | `description`, `prompt`                                       | többsoros szövegmező, üresen nem menthető |
+| modell és korlátok | `model`, `maxTurns`, `effort`, `permissionMode`, `background` | szövegmező, szám mező, `SelectField`      |
+| eszközök           | `tools`, `disallowedTools`                                    | lista szerkesztő                          |
+| környezet          | `memory`, `initialPrompt`                                     | `SelectField` a zárt listából, szövegmező |
+| SPEC-009 hatókör   | `skills`, `mcpServers`                                        | olvasható, nem szerkeszthető              |
+
+Az utolsó két sor ugyanazt a határvonalat követi, mint a lépés szintjén: a skill és az MCP konfiguráció a SPEC-009 hatóköre, tehát az agent definícióján belül sem szerkeszthető, csak olvasható.
+
+**Három mező kimondottan nem szerkeszthető, mert NEM MEGERŐSÍTETT** (M-90): a `criticalSystemReminder_EXPERIMENTAL`, az `observer` és az `observerMessage` csak a telepített `.d.ts` fájlban szerepel, hivatalos doksi nem fedi. A panel ezeket olvashatóan mutatja, és megnevezi az okot.
+
+**A szerkesztés soha nem dob el ismeretlen kulcsot.** A mentés a szerkesztett tizenhárom mezőt **ráolvasztja** a tárolt objektumra, nem lecseréli azt. Ebből következik, hogy egy jövőbeli SDK verzió új mezője, vagy a fenti három nem megerősített mező, változatlanul átmegy a mentésen. Ez nem kényelmi döntés: a tárolt alak `Record<string, unknown>`, tehát egy lecserélő mentés csendes adatvesztés lenne.
+
+**A `db` és a `protocol` típusa emiatt nem szűkül.** A `db` `Readonly<Record<string, unknown>>` alakja marad, dokumentált indokkal (a mezőlista SDK verzióhoz kötött), és a `protocol` `node-config` sémája is ugyanezt az alakot veszi át, különben a sodródás védelem (5.3) megbukna. **Az űrlap tehát felületi réteg egy `unknown` érték felett, nem egy második típusforrás.**
 
 **A provider választás három szintje** a `.claude/CLAUDE.md` 9. szekciója szerint áll: a globális alapértelmezés a SPEC-009 beállítás képernyőjén, a workflow szintű felülírás a workflow létrehozó modálisban (SPEC-007 10.1), a **lépés szintű felülírás pedig ebben a panelben**, a `providerId` mezőn. A "nincs felülírás" állapotot a `null` érték jelenti, és a panel megnevezi, melyik providert örökli ilyenkor a lépés. A kapcsolat teszt gomb a SPEC-009 hatóköre, ide nem kerül.
 
-### 5.3 A `config` mező drótszintű alakja, és a belőle következő nyitott kérdés
+### 5.3 A `config` mező drótszintű alakja: a `protocol` `node-config` téma
 
-**A `WorkflowNodeInput.config` a dróton `z.unknown()`** (M-83), kimondott indoklással: a tíz ágú `NodeConfig` a `db` domain típusa, amit a `protocol` L1 rétegként nem importálhat, és a SPEC-005 egy kézzel másolt duplikátumot elcsúszásra képes második forrásnak minősített. Az `apps/web` viszont a `db` csomagtól **nem függhet** (`apps/web/CLAUDE.md` függőségi irány), tehát a szerkesztő űrlapjának ma nincs olyan típusa, amire épülhetne.
+**A kiindulás.** A `WorkflowNodeInput.config` eddig a dróton `z.unknown()` volt (M-83), kimondott indoklással: a tíz ágú `NodeConfig` a `db` domain típusa, amit a `protocol` L1 rétegként nem importálhat, és a SPEC-005 egy kézzel másolt duplikátumot elcsúszásra képes második forrásnak minősített. Az `apps/web` viszont a `db` csomagtól **nem függhet** (`apps/web/CLAUDE.md` függőségi irány), tehát a szerkesztő űrlapjának nem volt típusa, amire épülhetett volna.
 
-**Ez a jelen spec legfontosabb nyitott kérdése (O-1), és nem dönthető el tippeléssel.** Három út létezik, mindegyiknek van ára:
+**A user 3. döntése ezt lezárja: a `protocol` csomag kap egy `node-config` téma mappát**, benne a tíz ág Zod sémájával. Ebből következik, hogy a szerkesztő űrlapja **típusbiztos, mezőnkénti hibajelzéssel**, és hogy a lépés szintű beállítások ténylegesen szerkeszthetők (5.2).
 
-| Út                                                                     | Ára                                                                                                                                                                              |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a `protocol` csomag kap egy `node-config` témát a tíz ág Zod sémájával | módosítja a SPEC-005 egy kimondott döntését; viszont pontosan az a minta, amit a `protocol` már ma hatszor követ (hat duplikált felsorolás, sodródás regressziós teszttel védve) |
-| az `apps/web` saját, nem drótszintű űrlap típusokat kap                | a sodródás védelem helye bizonytalan: az `apps/server` a `web` csomagtól nem függ, tehát a meglévő T-006-12 minta nem alkalmazható változtatás nélkül                            |
-| a panel nyers JSON szerkesztő marad                                    | nincs típusbiztonság és nincs mezőnkénti hibajelzés, tehát a felület lényegében nem szerkesztő                                                                                   |
+**Ez a SPEC-005 egy kimondott döntésének felülírása, és nem csendben történik.** A SPEC-005 kapott egy új, 7.7 szekciót, ami megnevezi a visszavont döntést, a három indokot és azt, ami nem változik. A jelen szekció ezt nem ismétli meg, csak a felületre néző következményeket rögzíti.
 
-**A viselkedés a döntésig:** a jelen spec az első utat **javasolja**, de nem hajtja végre; a PLAN-009 F0 fázisa a kérdést az askuserquestion tool-lal a user elé viszi, és a válasz nélkül a szerkesztő node panelje kizárólag a `label` és a pozíció szerkesztésére nyílik meg. **Amíg nincs válasz, a `config` szerkesztő nem íródik meg.**
+**A séma írás négy szabálya az új témára is érvényes** (SPEC-005 7.3): minden bejövő objektum `z.strictObject`, nincs `.default()` és nincs `.transform()`, a kimenő alakok `.readonly()`, a tíz ág `z.discriminatedUnion` a `type` mezőn, és `.parse()` sehol nem fut, csak `.safeParse()`.
+
+**Két alak kimondottan nem szűkül**, mert a `db` oldalon sem szűkített, és egy szűkítés a sodródás védelmet azonnal megbuktatná:
+
+| Mező                           | Alak a `db` oldalon                 | Alak a sémában                          |
+| ------------------------------ | ----------------------------------- | --------------------------------------- |
+| `AgentStepConfig.agents`       | `Readonly<Record<string, unknown>>` | `z.record(z.string(), z.unknown())`     |
+| `JoinMergeNodeConfig.settings` | `Readonly<Record<string, unknown>>` | ugyanaz, a `db` saját indoklása szerint |
+
+#### A sodródás védelem, pontosan a meglévő hat minta szerint
+
+A `protocol` ma **hat** drótszintű felsorolást deklarál a `db` uniójának szándékos duplikátumaként, és mindegyikhez ugyanaz a gépi védelem tartozik, az `apps/server/src/enum-drift-protection/` téma mappában (SPEC-005 7.6, PLAN-006 T-006-12). **A `node-config` ugyanezt a mintát követi, nem egy újat.** A minta öt eleme, ahogy a meglévő fájl megvalósítja:
+
+1. **A hely az `apps/server`**, mert az az egyetlen csomag, ahol a `protocol` és a `db` egyszerre látszik.
+2. **Megvalósítás nélküli regressziós teszt**: a mappában nincs futásidejű forrásfájl, csak a `.spec.ts`, és a mappa neve az, amit őriz. A lefedettségi mérleget ezért nem érinti.
+3. **A típusszintű ág az erős védelem**: `expectTypeOf<ProtocolNodeConfig>().toEqualTypeOf<DatabaseNodeConfig>()`, ami futásidőben nem csinál semmit, kizárólag a `bun run typecheck` kapu dönt róla. A védelem tehát nem attól függ, hogy a teszt lefut-e, hanem attól, hogy a fájl lefordul-e.
+4. **A futásidejű ág ott fut, ahol a `db` guardot exportál.** A `node-config` esetében exportál (`isNodeConfig`), tehát ez az ág itt **erősebb, mint a hat felsorolásnál**: mind a tíz ágra egy reprezentatív érték átmegy a séma `safeParse` hívásán, és ugyanaz az érték átmegy a `db` `isNodeConfig` guardján is.
+5. **A bizonyíték a szándékos elrontás.** A meglévő fájl doc kommentje rögzíti, hogy a védelmet manuálisan is igazolták: egy szándékosan hibás érték `TS2344` hibával megbuktatta a `typecheck` kaput. A `node-config` védelmének ugyanígy futtatott próbával kell igazolnia magát.
+
+**Ha a típusszintű egyenlőség nem áll elő** (a `readonly` tömbök és a rekord alakok szerkezeti eltérése miatt), a lépés **nem zárható le egy gyengébb ellenőrzéssel**: az eltérést a séma oldalán kell megszüntetni, vagy a különbséget kimondva, a bukó próbával együtt kell dokumentálni. Ez a `.claude/CLAUDE.md` 4. szekció "nem ellenőrzött jelölés" szabálya, nem egy új kivétel.
 
 ### 5.4 Mit validál a kliens, és mit nem
 
-**A kliens kizárólag azt ellenőrzi, amit a protokoll séma maga megkövetel.** A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut a felépített dokumentumon, és hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás. Ezen felül két, tisztán szerkesztői ellenőrzés fut, mert mindkettő a szerkesztő saját állapotáról szól, nem a gráf szemantikájáról:
+**A kliens kizárólag azt ellenőrzi, amit a protokoll séma maga megkövetel.** A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut a felépített dokumentumon, és hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás. **Az 5.3 döntés után ez a `config` mezőre is kiterjed**, mert a séma a tíz ág diszkriminált uniója, tehát az `error.issues[].path` a config mezőútvonalát is megadja. Ettől nem lesz több a kliens oldali szabály: a séma **alakot** ellenőriz, nem gráf szemantikát, és a séma forrása változatlanul egyetlen csomag. Ezen felül két, tisztán szerkesztői ellenőrzés fut, mert mindkettő a szerkesztő saját állapotáról szól, nem a gráf szemantikájáról:
 
 1. **Van-e mentetlen változás**, és ha van, az elnavigálás megerősítést kér.
 2. **Van-e olyan él, aminek a forrása vagy a célja már törölt csomópont**, mert azt a szerkesztő saját törlési művelete okozná, és a `PUT` idegen kulcs hibát adna.
@@ -286,6 +350,44 @@ A vászon a hivatalos vezérelt alakot használja (M-55): a `nodes` és az `edge
 1. **A futás nézet gráfja csak olvasható.** A `nodesDraggable`, a `nodesConnectable` és az `elementsSelectable` prop hamis; a felhasználó nagyíthat és pásztázhat, de nem szerkeszthet.
 2. **A szerkesztő nem tud "visszaállni egy futás állapotára".** A pillanatkép alakja szűkebb, mint az élő gráfé (nincs `createdAtMs`, van viszont `effectiveProviderId`), tehát egy visszatöltő funkció adatvesztéssel járna. Ilyen funkciót a jelen spec nem épít.
 3. **A futás nézet megnevezi, hogy a rajz a futás pillanatképe**, nem a workflow mai állapota, és a fejlécében megjeleníti a `sdkVersionPin` értéket. A felhasználónak tudnia kell, hogy egy régi futás rajza eltérhet attól, amit a szerkesztőben lát.
+
+### 5.7 Az automatikus elrendezés
+
+**A user 5. döntése: legyen egy gomb, ami szépen elrendezi a gráfot.** Ez az O-6 tétel lezárása, és a feltétele teljesült: a könyvtár dokumentált és két független forrással igazolt, a távolságok pedig dokumentált forrásból jönnek.
+
+#### A könyvtár és a választás indoka
+
+**A választás a `@dagrejs/dagre@3.1.1`**, `MIT` licenccel. Két független forrás támasztja alá:
+
+1. **A hivatalos React Flow layouting oldal** négy jelöltet sorol fel, és fa alakú gráfra nevesítve ezt ajánlja (M-91). Ugyanez az oldal zárja ki a másik két egyszerű jelöltet a mi esetünkre: a `d3-hierarchy` egyetlen gyökeret vár és minden csomópontnak azonos méretet ad, ami tíz eltérő típusnál hibás; a `d3-force` iteratív fizikai szimuláció, ami minden renderben újraszámolna.
+2. **Saját, most futtatott élő registry lekérdezés** (M-92), ami szerint az eredeti `dagre` csomag utolsó kiadása 2019-es, a `dagrejs` fork viszont 2026-08-08-i. A React Flow doksi által megadott repo és wiki link maga is a `dagrejs` szervezetre mutat.
+
+**React 19 verdikt: nincs mit ütköztetni.** A csomag `peerDependencies` mezője sem a registry válaszban, sem a publikált `package.json` fájlban nem létezik (M-92), tehát nem deklarál React peer range-et. Ez erősebb bizonyíték, mint egy kompatibilitási táblázat, mert nincs olyan range, amin kívül eshetnénk: a könyvtár koordinátákat számol, React importja nincs. A típusdefiníciót maga szállítja, tehát `@types/dagre` nem kell.
+
+#### A távolságok, és mi az, amire nincs forrás
+
+**Amit nem állítunk be, arról tudjuk, mi lesz, és két forrásból tudjuk** (M-93): a `nodesep` `50`, a `ranksep` `50`, a `marginx` és a `marginy` `0`. A spec **egyetlen dagre opciót sem ír felül**, egyetlen kivétellel: a `rankdir` értéke `LR`, mert a workflow gráf balról jobbra olvasandó, és ez a felület saját, kimondott iránydöntése, nem egy távolság szám. Az `edgesep` értékén a két forrás eltér (M-93), ezért azt kimondottan nem állítjuk be, hanem a telepített csomag saját alapértékén hagyjuk.
+
+**Amire nincs forrás: a csomópont kártya mérete** (M-94). A dagre bemenete csomópontonként egy `width` és egy `height`, amit a hívónak kell megadnia, és ez a mi saját kártyánk mérete, nem a könyvtár alapértelmezése. A spec ezért **nem ad rá számot**. A `.claude/CLAUDE.md` 4. szekciója szerinti kezelés:
+
+| Kérdés                | Válasz                                                                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| mi a viselkedés addig | a gomb nem íródik meg; a csomópont pozícióját a felhasználó adja, ahogy eddig                                                                                                         |
+| mi zárja le           | a PLAN-009 egy külön lépésének saját mérése: a ténylegesen kirajzolt kártya mérete valós chromiumban, a SPEC-007 5.3 módszerével, és a mért érték kerül a kódba egyetlen konstansként |
+
+**A konstans egyetlen helyen áll**, a `graph-node-catalog` témában, és **két fogyasztója van**: a kártya CSS-e egy custom propertyn át, és a dagre hívás közvetlenül. Ebből következik, hogy a rajzolt méret és az elrendezéshez használt méret **nem tud elcsúszni**, és hogy a 12.2 szabály sértetlen marad: futásidejű geometria mérés (`measured.width`, `getBoundingClientRect()`) sehol nem szerepel.
+
+#### Mit csinál a gomb, és mit nem
+
+| Amit csinál                                                                                                        | Amit nem csinál                                                                            |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| a jelenlegi node és él listából dagre gráfot épít, minden csomópontra ugyanazzal a kártya mérettel                 | nem ment: a mentés továbbra is külön, kimondott felhasználói művelet                       |
+| a kapott középpont koordinátákat bal felső sarok koordinátává alakítja, és beírja a `positionX`/`positionY` mezőbe | nem fut automatikusan betöltéskor, változtatáskor vagy mentéskor                           |
+| a változtatást piszkos állapotnak jelöli, tehát a felhasználó vissza tudja vonni, ha nem menti el                  | nem érinti a futás nézet gráfját (5.6), mert az a pillanatképet mutatja, és csak olvasható |
+
+**Az elrendezés tiszta függvény, és nem importál `@xyflow/react` szimbólumot.** A bemenete a `WorkflowNodeInput` és a `WorkflowEdgeInput` lista, plusz a kártya méret konstans; a kimenete azonosítónként egy `positionX`/`positionY` pár. A vászon típusaira azért nem hivatkozik, mert a pozíció a mi drótszintű alakunk mezője, nem a React Flow rajzoló állapota; ebből következik, hogy a 29. kritérium (`@xyflow/react` import kizárólag három témában) érintetlen marad. DOM hivatkozás nincs benne. Ebből következik, hogy happy-dom alatt közvetlenül, szintetikus bemenettel tesztelhető, tehát a 100 százalékos lefedettség nem szorul e2e tesztre (12.2 mintája).
+
+**Az `N = 0` és az `N = 1` eset nem hibaág.** Üres gráfon és egyetlen csomópont esetén a függvény ugyanazt az utat futja: a dagre gráfot felépíti, elrendezi, és a kapott pozíciókat visszaírja. Külön ág nem íródik rá, mert a `.claude/CLAUDE.md` 5. szekció tiltja a lehetetlen esetre írt hibakezelést, és a kimerítő lefedettség tiltja a sosem futó ágat.
 
 ## 6. Az élő futás nézet
 
@@ -461,7 +563,7 @@ A `human_approval` csomópont a motorban `waiting_approval` állapotba viszi a l
 | 14  | a függő jóváhagyások lekérése                           | `ProgressBar` a jóváhagyás sávban                                            | a sáv helye már látszik                              |
 | 15  | a jóváhagyási döntés elküldése                          | mindkét gomb letiltva, spinner a megnyomotton                                | a dupla küldés kizárása, és látszik, melyiket nyomta |
 
-**Ami szándékosan nem async pont:** az elválasztó húzása és a vászon pásztázása. Mindkettő szinkron, helyi művelet, tehát jelzés nélkül fut, és ezt kimondjuk, hogy a 15. szekció 35. kritériuma egyértelmű legyen.
+**Ami szándékosan nem async pont:** az elválasztó húzása, a vászon pásztázása és az automatikus elrendezés gombja. Mind a három szinkron, helyi művelet, tehát jelzés nélkül fut, és ezt kimondjuk, hogy a 15. szekció 35. kritériuma egyértelmű legyen. Az elrendezés azért szinkron, mert a dagre hívás tiszta függvény a helyi node és él listán (5.7), tehát nincs hálózat és nincs várakozás.
 
 ## 10. A reszponzív terv
 
@@ -497,14 +599,16 @@ packages/ui/src/
 
 A csomag ezzel **huszonhárom** téma mappából áll. A fájlszám a SPEC-007 25. kritériumának szabálya szerint alakul: exportált egységenként egy megvalósítás és egy `.spec.tsx`, plusz a téma egyetlen `.css` fájlja. A `packages/ui` `dependencies` mezője **nem bővül**.
 
-### 11.2 `apps/web`, kilenc új téma
+### 11.2 `apps/web`, tíz új téma
 
 ```
 apps/web/src/
-  graph-node-catalog/        a tiz csomopont tipus megjelenitesi es handle tablaja
+  graph-node-catalog/        a tiz csomopont tipus megjelenitesi es handle tablaja,
+                             plusz a kartya meret konstans (5.7)
   graph-editor/              a vezerelt vaszon, a mentes es a betoltes, a piszkos allapot
   graph-node-card/           az egyetlen egyedi node komponens, a Handle elemekkel
-  node-inspector/            a csomopont beallitas panel
+  graph-auto-layout/         a dagre hivas tiszta fuggvenykent es az elrendezes gomb
+  node-inspector/            a csomopont beallitas panel es az agents mezotabla
   run-view/                  az osztott futas nezet osszeallitasa es a reszponziv savok
   run-graph/                 a pillanatkepbol epulo, csak olvashato graf, elo dekoracioval
   transcript-panel/          a virtualizalt lista, az automatikus gorgetes es a delta jeloles
@@ -512,19 +616,20 @@ apps/web/src/
   approval-prompt/           a jovahagyas panel es a ket dontes
 ```
 
-| Téma                 | Felelősség                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `graph-node-catalog` | tiszta adat: típusonként a magyar címke, a bemenő és kimenő handle-ök, és hogy melyik config mező szerkeszthető. Három téma használja (`graph-node-card`, `node-inspector`, `run-graph`), tehát egyikük mappájába sem tartozik |
-| `graph-editor`       | a `ReactFlow` vezérelt bekötése, a modul szintű `nodeTypes`, az `onConnect` és az `isValidConnection`, a `PUT` mentés                                                                                                          |
-| `graph-node-card`    | az egyetlen egyedi node komponens, ami a katalógusból rajzol; itt állnak a `Handle` elemek                                                                                                                                     |
-| `node-inspector`     | a kiválasztott csomópont beállításai, csoportonként; az O-1 lezárásáig csak a `label` és a pozíció                                                                                                                             |
-| `run-view`           | a `Resizable` és a `Tabs` közötti váltás, a fejléc, a vezérlő gombok és a morzsasor                                                                                                                                            |
-| `run-graph`          | a pillanatkép és a `StepRunRecord` lista összefésülése, és az élő SSE frissítés bekötése                                                                                                                                       |
-| `transcript-panel`   | a `react-window` `List` bekötése, az `onRowsRendered` predikátum, a `scrollToRow`, és a delta figyelmeztetés                                                                                                                   |
-| `run-event-row`      | a huszonöt `kind` kimerítő `switch` leképezése egy sorra, plusz a nyers payload kinyitása                                                                                                                                      |
-| `approval-prompt`    | a függő jóváhagyás megjelenítése és a két döntés elküldése                                                                                                                                                                     |
+| Téma                 | Felelősség                                                                                                                                                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graph-node-catalog` | tiszta adat: típusonként a magyar címke, a bemenő és kimenő handle-ök, és hogy melyik config mező szerkeszthető, plusz a kártya méret konstans. Négy téma használja (`graph-node-card`, `graph-auto-layout`, `node-inspector`, `run-graph`), tehát egyikük mappájába sem tartozik |
+| `graph-editor`       | a `ReactFlow` vezérelt bekötése, a modul szintű `nodeTypes`, az `onConnect` és az `isValidConnection`, a `PUT` mentés                                                                                                                                                             |
+| `graph-node-card`    | az egyetlen egyedi node komponens, ami a katalógusból rajzol; itt állnak a `Handle` elemek                                                                                                                                                                                        |
+| `graph-auto-layout`  | a `@dagrejs/dagre` hívás tiszta függvényként a node és él listán, plusz az elrendezés gomb (5.7). Egyetlen fogyasztója a `graph-editor`, de önálló domain fogalom és a `graph-editor` témán kívül nincs `@dagrejs/dagre` import                                                   |
+| `node-inspector`     | a kiválasztott csomópont beállításai, csoportonként, a `node-config` séma felett; itt áll az `agents` mezőtábla is (5.2)                                                                                                                                                          |
+| `run-view`           | a `Resizable` és a `Tabs` közötti váltás, a fejléc, a vezérlő gombok és a morzsasor                                                                                                                                                                                               |
+| `run-graph`          | a pillanatkép és a `StepRunRecord` lista összefésülése, és az élő SSE frissítés bekötése                                                                                                                                                                                          |
+| `transcript-panel`   | a `react-window` `List` bekötése, az `onRowsRendered` predikátum, a `scrollToRow`, és a delta figyelmeztetés                                                                                                                                                                      |
+| `run-event-row`      | a huszonöt `kind` kimerítő `switch` leképezése egy sorra, plusz a nyers payload kinyitása                                                                                                                                                                                         |
+| `approval-prompt`    | a függő jóváhagyás megjelenítése és a két döntés elküldése                                                                                                                                                                                                                        |
 
-Az alkalmazás ezzel **huszonhárom** téma mappából áll. **Három meglévő téma módosul**, és egyik módosítás sem hoz új mappát:
+Az alkalmazás ezzel **huszonnégy** téma mappából áll. **Négy meglévő téma módosul**, és egyik módosítás sem hoz új mappát:
 
 | Téma                   | Mi változik                                                                                                |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -535,27 +640,46 @@ Az alkalmazás ezzel **huszonhárom** téma mappából áll. **Három meglévő 
 
 **Egy szint mély, tárgykör mappa nélkül.** A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül: a fájlnevek már megnevezik a csoportot. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 
+### 11.3 `packages/protocol`, egy új téma
+
+```
+packages/protocol/src/
+  node-config/               a tiz ag Zod semaja, z.discriminatedUnion a type mezon
+```
+
+| Téma          | Mi kerül bele                                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node-config` | a `workflow_node.config` tíz ágának Zod sémája, a `db` `NodeConfig` uniójának szándékos duplikátumaként, és a belőle következtetett drótszintű típus (5.3, SPEC-005 7.7) |
+
+A csomag ezzel **tíz** téma mappából áll, egy szint mélyen, plusz az `index.ts` barrel. A bontási kritérium (PLAN-004 3. szekció) mindhárom feltétele teljesül: önálló domain neve van; egyetlen fájlja sem tartozik egyszerre a `workflow` témába; és az import irány egyirányú, mert a `workflow` téma hivatkozik a `node-config` sémára, fordítva nem. A visszairány azért nincs, mert az ágak a saját `z.literal` diszkriminátorukat hordozzák, nem a `workflow` téma `NodeTypeSchema` értékét.
+
+**A sodródás védelem nem ide kerül, hanem az `apps/server` csomagba**, a meglévő `enum-drift-protection` téma mappa mellé, mert az az egyetlen csomag, ahol a `protocol` és a `db` egyszerre látszik (5.3). Az `apps/server` így egy új, megvalósítás nélküli regressziós teszt mappát kap, aminek a neve az, amit őriz.
+
 ## 12. Tesztelés
 
 ### 12.1 A határvonal unit és e2e között
 
-| Amit igazolni akarunk                                            | Hol     | Miért ott                                                                |
-| ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| a node katalógus tábla teljessége mind a tíz típusra             | unit    | tiszta adat, kimerítő `switch`                                           |
-| az `onConnect` a helyes `branchKey` értéket állítja be           | unit    | tiszta függvény a `Connection` objektumon                                |
-| a `nodeTypes` hivatkozás két render között azonos                | unit    | modul szintű `const`, identitás összehasonlítással ellenőrizhető         |
-| a mentetlen jelző a szerkesztett és a betöltött különbségéből    | unit    | tiszta összehasonlítás                                                   |
-| a `ReplaceGraphRequestSchema` `safeParse` hibaútja               | unit    | a séma a `protocol` csomagból jön, a bemenet szintetikus                 |
-| a huszonöt `kind` mindegyikének sor alakja                       | unit    | szintetikus `RunEventRecord`, nincs hálózat                              |
-| az automatikus görgetés predikátuma                              | unit    | az `onRowsRendered` callback szintetikusan hívható (M-70)                |
-| a delta figyelmeztetés megjelenése                               | unit    | a `RunDetail.persistedStreamDeltas` mező szintetikus                     |
-| a node kártya kirajzolt osztály és ARIA listája                  | unit    | explicit méret mellett a node szerkezete tesztelhető (M-53)              |
-| **hogy egy él ténylegesen ki van rajzolva**                      | **e2e** | happy-dom alatt semmilyen körülmények között nem rajzolódik (M-53, M-54) |
-| **hogy a vászon pásztázása és nagyítása működik**                | **e2e** | valós layout és egérműveletek kellenek                                   |
-| **hogy az elválasztó húzása arányt változtat**                   | **e2e** | valós pointer esemény és valós méret                                     |
-| **hogy a transcript virtualizált, tehát a DOM sor szám állandó** | **e2e** | valós layout nélkül nincs látható ablak                                  |
-| **hogy a három reszponzív sáv a helyes elrendezést adja**        | **e2e** | a viewport méret böngésző szintű fogalom                                 |
-| **hogy egy SSE keret hatására a csomópont állapota frissül**     | **e2e** | a stream, a React fa és a DOM együtt                                     |
+| Amit igazolni akarunk                                            | Hol     | Miért ott                                                                         |
+| ---------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------- |
+| a node katalógus tábla teljessége mind a tíz típusra             | unit    | tiszta adat, kimerítő `switch`                                                    |
+| az `onConnect` a helyes `branchKey` értéket állítja be           | unit    | tiszta függvény a `Connection` objektumon                                         |
+| a `nodeTypes` hivatkozás két render között azonos                | unit    | modul szintű `const`, identitás összehasonlítással ellenőrizhető                  |
+| a mentetlen jelző a szerkesztett és a betöltött különbségéből    | unit    | tiszta összehasonlítás                                                            |
+| a `ReplaceGraphRequestSchema` `safeParse` hibaútja               | unit    | a séma a `protocol` csomagból jön, a bemenet szintetikus                          |
+| a `node-config` séma mind a tíz ága, elfogadva és elutasítva     | unit    | tiszta séma, szintetikus bemenettel, a `protocol` csomagban                       |
+| a `node-config` és a `db` `NodeConfig` sodródás védelme          | unit    | típusszintű ág a `typecheck` kapun, futásidejű ág az `isNodeConfig` guardon (5.3) |
+| az automatikus elrendezés kiszámolt pozíciói                     | unit    | tiszta függvény, DOM hivatkozás nélkül, szintetikus gráffal (5.7)                 |
+| az `agents` mezőtábla és a ráolvasztó mentés                     | unit    | tiszta adat és tiszta objektum összefésülés (5.2)                                 |
+| a huszonöt `kind` mindegyikének sor alakja                       | unit    | szintetikus `RunEventRecord`, nincs hálózat                                       |
+| az automatikus görgetés predikátuma                              | unit    | az `onRowsRendered` callback szintetikusan hívható (M-70)                         |
+| a delta figyelmeztetés megjelenése                               | unit    | a `RunDetail.persistedStreamDeltas` mező szintetikus                              |
+| a node kártya kirajzolt osztály és ARIA listája                  | unit    | explicit méret mellett a node szerkezete tesztelhető (M-53)                       |
+| **hogy egy él ténylegesen ki van rajzolva**                      | **e2e** | happy-dom alatt semmilyen körülmények között nem rajzolódik (M-53, M-54)          |
+| **hogy a vászon pásztázása és nagyítása működik**                | **e2e** | valós layout és egérműveletek kellenek                                            |
+| **hogy az elválasztó húzása arányt változtat**                   | **e2e** | valós pointer esemény és valós méret                                              |
+| **hogy a transcript virtualizált, tehát a DOM sor szám állandó** | **e2e** | valós layout nélkül nincs látható ablak                                           |
+| **hogy a három reszponzív sáv a helyes elrendezést adja**        | **e2e** | a viewport méret böngésző szintű fogalom                                          |
+| **hogy egy SSE keret hatására a csomópont állapota frissül**     | **e2e** | a stream, a React fa és a DOM együtt                                              |
 
 ### 12.2 Az élek e2e kényszere, és miért nem sérti a 100 százalékot
 
@@ -599,35 +723,50 @@ Az alkalmazás ezzel **huszonhárom** téma mappából áll. **Három meglévő 
 
 ## 13. Kockázatok
 
-| Kockázat                                                                   | Hatás                                                                | Védelem                                                                                                |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| A `nodeTypes` objektum a render függvényen belül keletkezik                | a vászon minden szülő rendernél újraépül, a szerkesztés akadozik     | modul szintű `const`, plusz identitás regressziós teszt (M-56, 5.5)                                    |
-| Valaki lemásolja a gráf szemantikai validációt a kliensre                  | két forrás keletkezik, ami elcsúszhat, és nem tesztelhető ágakat hoz | az 5.4 szabály, plusz greppes kritérium a `graph_cycle_detected` és társai mintára                     |
-| Egy ág mért node geometriától függ                                         | happy-dom alatt sosem fut le, a 100 százalékos küszöb elérhetetlen   | a 12.2 szabály, plusz a `menu` téma tiszta függvény mintája                                            |
-| A transcript sorai nem virtualizáltak, csak látszólag                      | a mért 40 ms-os akadás minden új eseménynél visszatér                | e2e teszt, ami a DOM sor számot méri nagy listán, és állandó értéket vár (M-66)                        |
-| Az átmeneti delta sorok mozgatják az `afterEventId` kurzort                | a lapozás perzisztált sorokat ugrana át, csendben                    | a 7.5 3. szabály, plusz unit teszt a kurzor mozgatására                                                |
-| Egy `react-window` 1.x tutorial alapján íródik a kód                       | nem fordul le, vagy rosszul fordul le                                | a M-69 tény kimondása a specben, plusz a mért, 2.x API-ra írt PLAN-009 lépés                           |
-| A `getByTestId` a kivételen kívül is elterjed az e2e tesztekben            | a locator sorrend szabálya elveszti az értelmét                      | a 12.3 greppes invariáns: `getByTestId` kizárólag `rf__` előtagú értékkel                              |
-| Az átemelt `resizable.css` a Prettier miatt megváltozik                    | a bájtazonosság elvész                                               | a `.prettierignore` bővítése, plusz bájtszintű összehasonlító teszt (SPEC-007 4.5 mintája)             |
-| Egy media queryhez olyan töréspont kellene, ami nincs a tokenek között     | a layout elcsúszik a design systemtől                                | a meglévő `media-query-breakpoint-invariant` regressziós teszt, ami az új CSS fájlokra is fut          |
-| A dev proxy bevezetése után az SSE is a proxyn menne                       | a SPEC-005 5.8 döntése sérül, és egy nem mért kockázatot vállalnánk  | a `streamOrigin` külön konfiguráció (3.3), plusz greppes kritérium, hogy a proxy szabály kulcsa `/api` |
-| Az `O-1` lezárása nélkül íródik meg a `config` szerkesztő                  | a `db` domain típus duplikátuma keletkezne, ellenőrzés nélkül        | az 5.3 kimondott addigi viselkedés: a panel csak a `label` és a pozíció szerkesztésére nyílik          |
-| A `@xyflow/react` a `12.11.5` helyett más verzióval kerül be, mérés nélkül | a mért DOM alak és a locator kivétel alapja elvész                   | a PLAN-009 F0 lépése: a rögzített verzión meg kell ismételni a research 1. szekció mérését (M-61)      |
+| Kockázat                                                                   | Hatás                                                                     | Védelem                                                                                                                                |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| A `nodeTypes` objektum a render függvényen belül keletkezik                | a vászon minden szülő rendernél újraépül, a szerkesztés akadozik          | modul szintű `const`, plusz identitás regressziós teszt (M-56, 5.5)                                                                    |
+| Valaki lemásolja a gráf szemantikai validációt a kliensre                  | két forrás keletkezik, ami elcsúszhat, és nem tesztelhető ágakat hoz      | az 5.4 szabály, plusz greppes kritérium a `graph_cycle_detected` és társai mintára                                                     |
+| Egy ág mért node geometriától függ                                         | happy-dom alatt sosem fut le, a 100 százalékos küszöb elérhetetlen        | a 12.2 szabály, plusz a `menu` téma tiszta függvény mintája                                                                            |
+| A transcript sorai nem virtualizáltak, csak látszólag                      | a mért 40 ms-os akadás minden új eseménynél visszatér                     | e2e teszt, ami a DOM sor számot méri nagy listán, és állandó értéket vár (M-66)                                                        |
+| Az átmeneti delta sorok mozgatják az `afterEventId` kurzort                | a lapozás perzisztált sorokat ugrana át, csendben                         | a 7.5 3. szabály, plusz unit teszt a kurzor mozgatására                                                                                |
+| Egy `react-window` 1.x tutorial alapján íródik a kód                       | nem fordul le, vagy rosszul fordul le                                     | a M-69 tény kimondása a specben, plusz a mért, 2.x API-ra írt PLAN-009 lépés                                                           |
+| A `getByTestId` a kivételen kívül is elterjed az e2e tesztekben            | a locator sorrend szabálya elveszti az értelmét                           | a 12.3 greppes invariáns: `getByTestId` kizárólag `rf__` előtagú értékkel                                                              |
+| Az átemelt `resizable.css` a Prettier miatt megváltozik                    | a bájtazonosság elvész                                                    | a `.prettierignore` bővítése, plusz bájtszintű összehasonlító teszt (SPEC-007 4.5 mintája)                                             |
+| Egy media queryhez olyan töréspont kellene, ami nincs a tokenek között     | a layout elcsúszik a design systemtől                                     | a meglévő `media-query-breakpoint-invariant` regressziós teszt, ami az új CSS fájlokra is fut                                          |
+| A dev proxy bevezetése után az SSE is a proxyn menne                       | a SPEC-005 5.8 döntése sérül, és egy nem mért kockázatot vállalnánk       | a `streamOrigin` külön konfiguráció (3.3), plusz greppes kritérium, hogy a proxy szabály kulcsa `/api`                                 |
+| A `node-config` séma elcsúszik a `db` `NodeConfig` uniójától               | a felület olyan alakot fogadna el, amit a szerver elutasít, vagy fordítva | a hat meglévő felsorolás mintája szerinti kétirányú sodródás védelem az `apps/server` csomagban, típusszintű és futásidejű ággal (5.3) |
+| A `node-config` séma szűkíti az `agents` vagy a `settings` rekord alakját  | a sodródás védelem azonnal megbukik a `typecheck` kapun                   | az 5.3 kimondott szabálya: a két rekord alak a `db` oldali alakot veszi át, szűkítés nélkül                                            |
+| Az `agents` űrlap mentése eldob egy ismeretlen kulcsot                     | csendes adatvesztés egy `Record<string, unknown>` mezőben                 | az 5.2 ráolvasztó mentés szabálya, plusz unit teszt egy nem megerősített mezőt hordozó bejegyzésre                                     |
+| Az automatikus elrendezés kitalált távolságokkal dolgozik                  | forrás nélküli szám kerül a kódba                                         | az 5.7: a dagre opciókat nem írjuk felül (M-93), a kártya méret pedig a PLAN-009 saját mérése (M-94)                                   |
+| Az elrendezés a `measured.width` értékből venné a kártya méretet           | happy-dom alatt sosem futna le, a 100 százalékos küszöb elérhetetlen      | az 5.7 egyetlen konstansa, plusz a 12.2 greppes invariáns, ami a `graph-auto-layout` témára is fut                                     |
+| A `@xyflow/react` a `12.11.5` helyett más verzióval kerül be, mérés nélkül | a mért DOM alak és a locator kivétel alapja elvész                        | a PLAN-009 F0 lépése: a rögzített verzión meg kell ismételni a research 1. szekció mérését (M-61)                                      |
 
 ## 14. Nyitott kérdések, amikre nincs forrás
 
+### 14.1 A lezárt tételek
+
+**Három tétel lezárult, és a döntés minden érintett forrásdokumentumba át van vezetve.** Az azonosítók nem számozódnak újra, hogy a hivatkozások ne csússzanak el; a maradék öt tétel a 14.2 táblázatban áll.
+
+| #   | Mi zárta le                                                                                                                                  | Hova lett átvezetve                                                                                                                                                          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O-1 | **user döntés**: a `protocol` csomag kap egy `node-config` témát a tíz ág Zod sémájával                                                      | jelen spec 5.3, 11.3, a 15. szekció 58 ... 59. kritériuma; **SPEC-005 új 7.7 szekció** (a visszavont döntés kimondva, indokolva), SPEC-005 9. szekció és 1 ... 2. kritériuma |
+| O-4 | **saját mérés**, a pinelt SDK telepített `sdk.d.ts` fájlján és két hivatalos doksi oldalon (M-90); az eredmény: van dokumentált, stabil alak | jelen spec 5.2, a 15. szekció 60. kritériuma; research 5. szekció                                                                                                            |
+| O-6 | **user döntés** plusz két független forrás a könyvtárra (M-91, M-92) és a távolságokra (M-93)                                                | jelen spec 5.7, 11.2, a 15. szekció 61 ... 62. kritériuma; research 6. szekció; `docs/research/2026-08-26-toolchain.md` új bejegyzés                                         |
+
+**Egy szám maradt nyitva a lezárt O-6 tételen belül, és ezt kimondjuk:** a csomópont kártya mérete (M-94). Erre nincs külső dokumentált forrás, mert a kártya a mi saját elemünk; a PLAN-009 egy külön lépésének saját mérése adja, addig az elrendezés gomb nem íródik meg (5.7).
+
+### 14.2 A nyitva maradt öt tétel
+
 Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig, és mi zárná le.
 
-| #   | Kérdés                                                                                 | Addig                                                                                                                                                                                                                                                                                                                                    | Mi zárná le                                                                                                                                                  |
-| --- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| O-1 | Hol áll a csomópont `config` típusa, amire a szerkesztő űrlapja épül                   | a node panel **kizárólag a `label` és a pozíció** szerkesztésére nyílik meg; a `config` szerkesztő nem íródik meg. A dróton a mező `z.unknown()` (M-83), az `apps/web` pedig a `db` csomagtól nem függhet, tehát ma nincs típus, amire építeni lehetne (5.3)                                                                             | user döntés a három út közül; a spec az elsőt (`protocol` csomag `node-config` téma, a hat meglévő duplikált felsorolás sodródás védett mintájára) javasolja |
-| O-2 | Mehet-e az SSE a Vite dev proxyn át a telepített `vite@8.2.2` verzióval                | **nem megy**: a stream közvetlenül a `streamOrigin` értékre kapcsolódik, a proxyt megkerülve, a SPEC-005 5.8 döntése szerint. A döntés indoklása viszont **részben elavult**: a hivatkozott hiba javítva lett a `vitejs/vite` #13578 PR-ben, és a `timeout: 0` workaroundot maintainer forrás nem támasztja alá (M-80)                   | saját mérés: egy `EventSource` kapcsolat a telepített `vite@8.2.2` dev proxyján át, a lezárás és a `Last-Event-ID` viselkedés megfigyelésével                |
-| O-3 | Hogyan tehető a React Flow csomópont láthatóvá happy-dom alatt, a doksival összhangban | a **termékkód** sosem állít `width` vagy `height` mezőt node objektumon, hanem `style` és `className` propot használ, a doksi szerint (M-57). A **teszt fixture** kérdése nyitva: a research a `width`/`height` mezővel mért sikert (M-53), a doksi viszont az `initialWidth`/`initialHeight` mezőt adja a kezdeti render előtti méretre | blokkoló mérés a PLAN-009 F0 fázisában: az `initialWidth`/`initialHeight` ugyanúgy láthatóvá teszi-e a node-ot happy-dom alatt, mint a `width`/`height`      |
-| O-4 | Az `agents` mező szerkesztése                                                          | nem szerkeszthető; a panel a kulcsok listáját mutatja. A `db` típusa `Readonly<Record<string, unknown>>`, tehát nincs séma, amiből űrlapot lehetne építeni (5.2)                                                                                                                                                                         | az SDK dokumentált alakja az `agents` mezőre, vagy user döntés egy szűkített, saját alakról                                                                  |
-| O-5 | A `react-window@2.3.0` `rowHeight` propja elfogad-e soronként eltérő magasságot        | a spec két kimenetet előre rögzít (7.3): változó magasság esetén a sor a tartalomból számít, egyébként fix magasság, és a hosszú tartalom a soron belül görgethető dobozban áll                                                                                                                                                          | blokkoló mérés a PLAN-009 F0 fázisában, a publikált csomag ellen, valós böngészőben                                                                          |
-| O-6 | A `fan_out` és a `loop` csomópontok automatikus elrendezésének távolságai              | **nincs automatikus elrendezés**: a csomópont pozícióját a felhasználó adja, és a `positionX`/`positionY` mező tárolja. Egy elrendező algoritmus távolság konstansokat igényelne, amikre nincs forrás                                                                                                                                    | user igény egy automatikus elrendezésre, plusz egy dokumentált elrendező könyvtár, két független forrással                                                   |
-| O-7 | A `--ep-screen-md` és a `--ep-screen-lg` váltási pont a futás nézetben a helyes-e      | a 10. szekció három sávja érvényes; a szabály (csak token érték lehet literál) kikényszerített, a **választás** a hét token közül tervezési döntés                                                                                                                                                                                       | a PLAN-009 reszponzív mérése, a SPEC-007 5.3 módszerével; ha a törés máshol van, a fölötte álló tokennél lépünk be                                           |
-| O-8 | Az e2e lefedettségi küszöb új értéke                                                   | a mai, mért érték marad érvényben, és egyik metrikán sem csökkenhet (12.5)                                                                                                                                                                                                                                                               | a PLAN-009 záró lépésének újramérése, a research fájlba vezetve                                                                                              |
+| #   | Kérdés                                                                                 | Addig                                                                                                                                                                                                                                                                                                                                    | Mi zárná le                                                                                                                                             |
+| --- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O-2 | Mehet-e az SSE a Vite dev proxyn át a telepített `vite@8.2.2` verzióval                | **nem megy**: a stream közvetlenül a `streamOrigin` értékre kapcsolódik, a proxyt megkerülve, a SPEC-005 5.8 döntése szerint. A döntés indoklása viszont **részben elavult**: a hivatkozott hiba javítva lett a `vitejs/vite` #13578 PR-ben, és a `timeout: 0` workaroundot maintainer forrás nem támasztja alá (M-80)                   | saját mérés: egy `EventSource` kapcsolat a telepített `vite@8.2.2` dev proxyján át, a lezárás és a `Last-Event-ID` viselkedés megfigyelésével           |
+| O-3 | Hogyan tehető a React Flow csomópont láthatóvá happy-dom alatt, a doksival összhangban | a **termékkód** sosem állít `width` vagy `height` mezőt node objektumon, hanem `style` és `className` propot használ, a doksi szerint (M-57). A **teszt fixture** kérdése nyitva: a research a `width`/`height` mezővel mért sikert (M-53), a doksi viszont az `initialWidth`/`initialHeight` mezőt adja a kezdeti render előtti méretre | blokkoló mérés a PLAN-009 F0 fázisában: az `initialWidth`/`initialHeight` ugyanúgy láthatóvá teszi-e a node-ot happy-dom alatt, mint a `width`/`height` |
+| O-5 | A `react-window@2.3.0` `rowHeight` propja elfogad-e soronként eltérő magasságot        | a spec két kimenetet előre rögzít (7.3): változó magasság esetén a sor a tartalomból számít, egyébként fix magasság, és a hosszú tartalom a soron belül görgethető dobozban áll                                                                                                                                                          | blokkoló mérés a PLAN-009 F0 fázisában, a publikált csomag ellen, valós böngészőben                                                                     |
+| O-7 | A `--ep-screen-md` és a `--ep-screen-lg` váltási pont a futás nézetben a helyes-e      | a 10. szekció három sávja érvényes; a szabály (csak token érték lehet literál) kikényszerített, a **választás** a hét token közül tervezési döntés                                                                                                                                                                                       | a PLAN-009 reszponzív mérése, a SPEC-007 5.3 módszerével; ha a törés máshol van, a fölötte álló tokennél lépünk be                                      |
+| O-8 | Az e2e lefedettségi küszöb új értéke                                                   | a mai, mért érték marad érvényben, és egyik metrikán sem csökkenhet (12.5)                                                                                                                                                                                                                                                               | a PLAN-009 záró lépésének újramérése, a research fájlba vezetve                                                                                         |
 
 ## 15. Elfogadási kritériumok
 
@@ -651,7 +790,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 13. A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut; hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás, és **nem küld kérést**.
 14. A `script` csomópont felvehető, de a szerkesztő a kártyán és a futtatás tiltásakor megnevezi, hogy a motor `unimplemented_node_type` hibával elutasítaná (M-87).
 15. A mentetlen jelző a betöltött és a szerkesztett dokumentum összehasonlításából származik; egy visszavont változtatás után a jelző eltűnik. Futtatott teszt igazolja.
-16. A node beállítás panel az O-1 lezárásáig kizárólag a `label` és a pozíció szerkesztésére nyílik; a `skills`, az `mcpServers` és az `agents` mező olvasható, de nem szerkeszthető, és a panel ezt ki is mondja (5.2).
+16. A node beállítás panel a `protocol` `node-config` sémája felett szerkeszt, mezőnkénti hibajelzéssel; a `skills` és az `mcpServers` mező olvasható, de nem szerkeszthető, és a panel ezt ki is mondja (5.2).
 17. A lépés szintű `providerId` felülírás a panelen szerkeszthető, és a `null` érték mellett a panel megnevezi, melyik providert örökli a lépés.
 18. A `CLIENT_ROUTE_TABLE` pontosan négy bejegyzést tartalmaz, mind a négy fix útvonal; az illesztő **továbbra sem** tartalmaz paraméteres szegmens ágat (SPEC-007 34. kritériuma).
 
@@ -693,18 +832,26 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 ### Tesztelés és kapuk
 
 45. Az `apps/web/e2e` alatt a `getByTestId` hívás **kizárólag `rf__` előtagú értékkel** áll; minden más locator a kötött sorrend szerinti. Greppes teszt igazolja (12.3).
-46. Az `apps/web/src` alatt egyetlen ág sem függ mért node geometriától: nincs `measured.width`, `measured.height` és `getBoundingClientRect()` hivatkozás a `graph-editor`, a `graph-node-card` és a `run-graph` témában. Greppes teszt igazolja (12.2).
+46. Az `apps/web/src` alatt egyetlen ág sem függ mért node geometriától: nincs `measured.width`, `measured.height` és `getBoundingClientRect()` hivatkozás a `graph-editor`, a `graph-node-card`, a `graph-auto-layout` és a `run-graph` témában. Greppes teszt igazolja (12.2, 5.7).
 47. Az élek kirajzolására vonatkozó minden állítás **e2e tesztben** áll, unit tesztben egy sem; az él állapotra vonatkozó állítások (tömb tartalom, `branchKey`) viszont unit tesztek. A két halmaz elkülönülését a PLAN-009 zárása tételesen igazolja.
 48. Az `apps/web/e2e` alatt továbbra sincs `page.waitForTimeout(`, `setTimeout(` és `sleep(` hívás; minden új e2e teszt is web-first assertionre vagy `page.waitForResponse()` hívásra épül. Greppes teszt igazolja.
 49. Minden új e2e spec fájl a `./coverage-fixture.ts` fájlból importálja a `test` és az `expect` párost, és minden REST hívás `page.route()` mockon megy; valós backend szervert egyetlen új teszt sem szólít meg, a SPEC-007 13.4 szerinti, kimondott `sse-real-server` kivételt leszámítva.
 50. A `bun run test` nulla kilépési kóddal fut, és a lefedettség mind a négy metrikán **100 százalék**; a `vitest.config.ts` `coverage.exclude` listája **nem bővült**.
 51. A `bun run coverage:e2e:report` nulla kilépési kóddal fut, a küszöb az újramért, tényleges értékre áll, és egyik metrikán sem alacsonyabb a mai értéknél; a származtatás a `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` fájlba vezetve (12.5).
-52. A `docs/research/2026-08-26-toolchain.md` tartalmazza a `react-window` és a `@xyflow/react` bejegyzést, mindkettőt **két független forrással**, és a `@xyflow/react` sor a ténylegesen rögzített, telepített verziót nevezi meg (M-61, M-67).
-53. A `packages/ui/src` alatt **huszonhárom** téma mappa áll, az `apps/web/src` alatt szintén **huszonhárom**, plusz a barrel és a `vite-env.d.ts`; egyetlen téma mappában sincs alkönyvtár. Mindkét `CLAUDE.md` `## Fájlok` táblázata minden témát felsorol, és a `bun run docs:check` zöld.
+52. A `docs/research/2026-08-26-toolchain.md` tartalmazza a `react-window`, a `@xyflow/react` és a `@dagrejs/dagre` bejegyzést, mindhármat **két független forrással**, és a `@xyflow/react` sor a ténylegesen rögzített, telepített verziót nevezi meg (M-61, M-67, M-92).
+53. A `packages/ui/src` alatt **huszonhárom**, az `apps/web/src` alatt **huszonnégy**, a `packages/protocol/src` alatt **tíz** téma mappa áll, plusz a barrel és az `apps/web` `vite-env.d.ts` fájlja; egyetlen téma mappában sincs alkönyvtár. Mind a három `CLAUDE.md` `## Fájlok` táblázata minden témát felsorol, és a `bun run docs:check` zöld.
 54. Az `apps/web/src` alatt **nincs** olyan fájl, ami a SPEC-009 hatókörébe tartozik: nincs beállítás képernyő, nincs skill feltöltés, nincs MCP konfiguráció. Greppes teszt igazolja, és a `greppable-invariants` téma korábbi, SPEC-008 hatókört tiltó sora törölve.
-55. A 14. szekció mind a nyolc nyitott kérdése vagy a user válaszával, illetve méréssel lezárva és minden érintett forrásdokumentumba átvezetve, vagy nyitottként áll a "mi a viselkedés addig" és a "mi zárná le" mezővel. Tippeléssel lezárt pont nincs.
+55. A 14. szekció három lezárt tétele (O-1, O-4, O-6) minden érintett forrásdokumentumba át van vezetve, és a maradék öt (O-2, O-3, O-5, O-7, O-8) vagy a user válaszával, illetve méréssel lezárva és átvezetve, vagy nyitottként áll a "mi a viselkedés addig" és a "mi zárná le" mezővel. Tippeléssel lezárt pont nincs.
 56. A jelen dokumentumban nincs gondolatjel: a hosszú kötőjel karakterre futtatott keresés nulla találatot ad.
 57. A `bun run format:check`, `typecheck`, `lint`, `test`, `build`, `docs:check`, `check:casing`, `check:graph` és `check:db-drift`, mind a kilenc parancs nulla kilépési kóddal fut a teljes workspace-en. A kapuk mérvadó listája a `.claude/CLAUDE.md` 8. szekciója.
+
+### A lezárt O-1, O-4 és O-6 döntések
+
+58. A `packages/protocol/src/node-config` téma a `workflow_node.config` mind a tíz ágát Zod sémával fedi, `z.discriminatedUnion` alakban a `type` mezőn, és a `WorkflowNodeInput.config` erre a sémára hivatkozik, nem `z.unknown()` értékre. A négy séma írási szabály (SPEC-005 7.3) sértetlen: `z.strictObject`, nincs `.default()` és `.transform()`, a kimenő alakok `.readonly()`, `.parse()` sehol nem fut. Az `AgentStepConfig.agents` és a `JoinMergeNodeConfig.settings` alakja **nem szűkül** a `db` oldali `Record<string, unknown>` alakhoz képest (5.3).
+59. Az `apps/server` csomag új, megvalósítás nélküli regressziós teszt mappát kap, aminek a neve az, amit őriz, és ami a meglévő `enum-drift-protection` téma öt elemű mintáját követi: típusszintű kétirányú kölcsönös értékadhatóság a `protocol` és a `db` `NodeConfig` alakja között, plusz futásidejű ág mind a tíz ágra a `db` `isNodeConfig` guardján. A védelmet **szándékosan elrontott értékkel futtatott próba** igazolja, ami a `bun run typecheck` kaput megbuktatja (5.3).
+60. Az `agents` mező űrlapja a mérésben két független forrással fedett **tizenhárom** `AgentDefinition` mezőt szerkeszti, a `skills` és az `mcpServers` kivételével, ami a SPEC-009 hatóköre; a nem megerősített `criticalSystemReminder_EXPERIMENTAL`, `observer` és `observerMessage` mező olvasható, és a panel megnevezi az okot. A mentés **ráolvaszt**, nem cserél: futtatott teszt igazolja, hogy egy ismeretlen kulcsot hordozó bejegyzés a szerkesztés után is megőrzi azt (5.2, M-90).
+61. A gráf szerkesztő elrendezés gombja a `@dagrejs/dagre@3.1.1` könyvtárral számol, tiszta függvényben, `@xyflow/react` import és DOM hivatkozás nélkül; a `rankdir` az egyetlen felülírt opció (`LR`), és a `nodesep`, a `ranksep`, az `edgesep`, a `marginx` és a `marginy` egyetlen sorban sem szerepel a kódban. Greppes teszt igazolja mind az ötöt (5.7, M-93).
+62. A csomópont kártya mérete **egyetlen konstans** a `graph-node-catalog` témában, amit a kártya CSS-e és a dagre hívás egyaránt olvas; az értéke a PLAN-009 saját méréséből származik, és a mérés a research fájlba van vezetve. Az `apps/web/src` alatt nincs második kártya méret szám; greppes teszt igazolja (5.7, M-94).
 
 ## 16. Kapcsolódó dokumentumok
 

@@ -115,6 +115,17 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   alak `.readonly()`, az uniók `z.discriminatedUnion`. A `.parse()` tiltott, csak `.safeParse()`
   fut, és minden validáló függvény `Outcome<T>` alakban ad választ, hogy a dobó kivétel ne törje
   meg a projekt `Outcome` konvencióját (SPEC-005 7.2, 7.3, 7.4).
+- **A `protocol` a `db` domain uniót is duplikálhatja, ha gépi sodródás védelem tartozik hozzá.**
+  A hat drótszintű felsorolás mellé a `node-config` téma is így kerül be: a tíz ág Zod sémája a
+  `db` `NodeConfig` uniójának szándékos duplikátuma, mert az `apps/web` a `db` csomagtól nem
+  függhet, tehát enélkül a szerkesztő űrlapjának nincs típusa. A védelem helye kötött, az
+  `apps/server` csomag (az egyetlen, ahol a két oldal egyszerre látszik), a formája pedig a
+  meglévő `enum-drift-protection` téma mintája: megvalósítás nélküli regressziós teszt,
+  típusszintű kétirányú kölcsönös értékadhatóság a `typecheck` kapun, plusz futásidejű ág ott,
+  ahol a `db` guardot exportál. **Ami a `db` oldalon `Record<string, unknown>`, azt a séma sem
+  szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
+  megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
+  SPEC-008 5.3, user döntés 2026-09-05).
 
 **Fájlok és tesztek**
 

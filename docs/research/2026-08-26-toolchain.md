@@ -126,6 +126,24 @@ A `@tanstack/react-table` `9.2.4` a döntés a `data-table` téma motorjára (SP
 rétegen át lenne portolható — a projekt szabálya szerint új kódot nem építünk deprecated API-ra,
 ezért a `9.2.4` natív (`useTable` + `tableFeatures`) API-ja a választás.
 
+## Gráf elrendező könyvtár verzió, 2026-09-05 (SPEC-008 O-6)
+
+Élő npm registry lekérdezés, két független forrással. A választás indoklása, a licenc
+olvasás, a React 19 verdikt és a dokumentált alapértelmezett távolságok a
+`docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 6. szekciójában állnak.
+
+| Csomag           | Verzió  | Forrás 1                                           | Forrás 2                                              |
+| ---------------- | ------- | -------------------------------------------------- | ----------------------------------------------------- |
+| `@dagrejs/dagre` | `3.1.1` | `https://registry.npmjs.org/@dagrejs/dagre/latest` | `https://unpkg.com/@dagrejs/dagre@3.1.1/package.json` |
+
+A csomag licence `MIT`, `peerDependencies` mezője nincs (tehát React peer range-et nem
+deklarál, és a projekt `react@19.2.8` verziójával nincs mit ütköztetni), egyetlen
+futásidejű függősége a `@dagrejs/graphlib@4.0.5`, a típusdefiníciót maga szállítja
+(`./dist/types/index.d.ts`), tehát `@types/dagre` nem kell. A `dagrejs` fork a választás
+az eredeti `dagre` csomag helyett: az utóbbi utolsó kiadása `0.8.5`, `2019-12-03`, míg a
+fork `3.1.1` kiadása `2026-08-08`, és a hivatalos React Flow layouting oldal is a
+`dagrejs` szervezet repójára és wikijére mutat.
+
 ## GitHub Actions verziók
 
 | Action                      | Verzió |
