@@ -123,7 +123,7 @@ A `@tanstack/react-table` `9.2.4` a döntés a `data-table` téma motorjára (SP
 `docs/research/2026-09-01-spec007-f0-meresek.md`): a mérés szerint mindkét verzió (`8.21.3` és
 `9.2.4`) ténylegesen renderel React 19.2.8 alatt, de a `9.2.4` az npm `latest`, stabil kiadás
 (`prerelease: false`), a `8.21.3` pedig csak a régi, deprecated `useLegacyTable` kompatibilitási
-rétegen át lenne portolható — a projekt szabálya szerint új kódot nem építünk deprecated API-ra,
+rétegen át lenne portolható. A projekt szabálya szerint új kódot nem építünk deprecated API-ra,
 ezért a `9.2.4` natív (`useTable` + `tableFeatures`) API-ja a választás.
 
 ## Gráf elrendező könyvtár verzió, 2026-09-05 (SPEC-008 O-6)
