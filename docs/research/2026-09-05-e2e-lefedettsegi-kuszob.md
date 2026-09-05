@@ -206,3 +206,111 @@ branches **95.05**, functions 98, lines 97.12 - mind a négy metrika a jelenlegi
 hagyott küszöb fölött. A küszöb emelését (ratchet) a koordinátor dönti el: a mérés időpontjában
 egy másik, párhuzamos munkamenet a `graph-editor/` témát élőben szerkesztette, tehát ez a szám a
 véglegesnél instabilabb alapot ad egy visszavonhatatlan küszöbemeléshez.
+
+---
+
+## 9. Végleges konszolidációs mérés (2026-09-06): öt párhuzamos ág egyesítése utáni küszöb
+
+Az öt párhuzamos munkamenet lezárult, minden módosítás egyetlen commit sorozatban áll a
+`feat/spec-008-grafszerkeszto` ágon. Ez a mérés a végleges állapoton fut: tiszta
+`apps/web/e2e/.nyc_output`, `bun run test:e2e` (117 Playwright teszt, mind zöld), majd
+`nyc report --reporter=json-summary` a pontos `pct` értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző (7. szekció, instabil alapon) |
+| ---------- | --------------- | --------- | ----------------------------------- |
+| statements | 890 / 909       | **97.9**  | 97.24                               |
+| branches   | 367 / 384       | **95.57** | 95.05                               |
+| functions  | 347 / 351       | **98.86** | 98                                  |
+| lines      | 852 / 871       | **97.81** | 97.12                               |
+
+**A küszöb ez a négy szám, felfelé kerekítés nélkül** (`apps/web/package.json`
+`coverage:e2e:report` scriptje). Az igazolás: a mért értékkel a kapu exit 0, egy 0.01-dal
+megemelt `--statements 97.91` kapcsolóval (a `package.json`-t nem érintve, külön `nyc report`
+hívással) a kapu `ERROR: Coverage for statements (97.9%) does not meet global threshold
+(97.91%)` üzenettel exit 1-et ad - tehát a mechanizmus ténylegesen kikényszerít.
+
+### 9.1 A koordinátori jelentés ellenőrzése a valósággal szemben
+
+A feladatot kiadó jelentés öt fedetlen helyet sorolt fel. A tényleges `nyc`
+`coverage-final.json` (`statementMap`/`branchMap` szerint, nem a szöveges "Uncovered Line #s"
+oszlopból) ezt **három ponton egészíti ki**: a jelentés hiányos volt, nem téves.
+
+| Fájl                                                             | A jelentésben szerepelt? | Tényleges fedetlen sor/ág                                                                       |
+| ---------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `app-mount/mount-app.tsx`                                        | igen                     | 16, 21-22. sor (változatlan, lásd 2.2)                                                          |
+| `frontend-config/read-frontend-config.ts`                        | igen                     | 23, 29, 37, 41, 62, 67, 72, 77. sor (a sorszámok a 2.2 tábla óta eltolódtak, az ok azonos)      |
+| `rest-client/perform-route-request.ts`                           | igen                     | 70. sor (változatlan, lásd 2.2 és 8. szekció)                                                   |
+| `stream-client/use-stream-connection.ts`                         | igen (182. sorral)       | 182. sor - a jelentésben megadott sorszám pontosan egyezik a méréssel                           |
+| `graph-node-card/GraphNodeCard.tsx` + `step-run-status-badge.ts` | igen                     | 74. és 82. sor (`cond-expr`/`binary-expr`), `step-run-status-badge.ts` 30. sor - egyezik        |
+| `node-inspector/NodeInspector.tsx`                               | igen                     | 123. sor (`cond-expr`) - egyezik                                                                |
+| `history-navigation/browser-history-location-port.ts`            | **NEM szerepelt**        | 21. sor - ez a 2.2 tábla RÉGI, már dokumentált tétele, a jelentés csak kihagyta a felsorolásból |
+| `graph-editor/GraphEditorScreen.tsx`                             | **NEM szerepelt, ÚJ**    | 177-178. sor, plusz a 222. sor JSX feltétel igaz ága                                            |
+| `graph-editor/is-valid-connection.ts`                            | **NEM szerepelt, ÚJ**    | 36. sor (`return false`)                                                                        |
+| `graph-editor/validate-graph-for-save.ts`                        | **NEM szerepelt, ÚJ**    | 23. sor (`return { kind: 'error', ... }`)                                                       |
+
+A `browser-history-location-port.ts` tétel nem új hiba, csak a koordinátori jelentés nem sorolta
+fel újra (a 2.2 táblában már 2026-08-30 óta dokumentált `useEffect` cleanup ág). A három valóban
+ÚJ tétel (`GraphEditorScreen.tsx`, `is-valid-connection.ts`, `validate-graph-for-save.ts`) mind a
+`graph-editor-validation.spec.ts` fájl saját fejléc kommentjében (2-16. sor) már meg volt
+indokolva, csak nem lett átvezetve ebbe a research fájlba.
+
+### 9.2 A három új tétel indoklása és unit teszt fedettsége
+
+**`graph-editor/validate-graph-for-save.ts` 23. sor és `GraphEditorScreen.tsx` 177-178. sor,
+plusz a 222. sor JSX feltétel igaz ága - egy gyökérok.** A `validateGraphForSave` hiba ágát
+(`ReplaceGraphRequestSchema` elutasítás) a `graph-editor-validation.spec.ts` fejléce (2-16. sor)
+szerint szándékosan nem próbálja valódi felhasználói úton előidézni: a `node-config` sémák
+egyikében sincs `regex`/`min`/`max`/`positive` korlátozás (saját grep-pel igazolva), az egyetlen
+elméleti forrás (egy `NaN` a `maxIterations` számmezőn) pedig a natív `<input type="number">`
+böngésző szintű bemenet-tisztítása miatt sosem jut el a React állapotig. Emiatt a
+`GraphEditorScreen.handleSave` `validated.kind === 'error'` ága (177-178. sor,
+`setValidationMessage` + korai `return`) és az ebből következő `validationMessage !== undefined`
+JSX feltétel igaz ága (222. sor, a `<p role="alert">` kiírása) is együtt marad fedetlen: a kettő
+ugyanannak az állapotnak a beállítása, illetve a beállított állapot megjelenítése. Unit teszttel
+fedve: `validate-graph-for-save.spec.ts` ("hibás node mezőre (NaN egy number mezőn...) error
+Outcome-ot ad...") és `GraphEditorScreen.spec.tsx` ("hibás gráfra (NaN a maxIterations mezőn) a
+Mentés nem indít kérést, és megnevezi a hibás mezőt (AC12)" - ez utóbbi a `container.textContent`
+tartalmazza a `maxIterations` szót, tehát a 222. sor JSX ágát is lefuttatja).
+
+**`graph-editor/is-valid-connection.ts` 36. sor.** Az `isValidGraphConnection` a `return false`
+ágat kizárólag akkor adja, ha a cél node katalógus bejegyzése `hasInputHandle: false` (jelenleg
+kizárólag a `start` típus). A `GraphNodeCard.tsx` viszont `hasInputHandle && <Handle
+type="target" .../>` mintával **egyáltalán nem rajzol** bemenő handle DOM elemet ilyen node-ra
+(saját olvasással igazolva, `GraphNodeCard.tsx` 79. sor). A React Flow kapcsolat-húzás
+(`onConnect`/`isValidConnection`) csak akkor tüzel, ha az egér egy létező handle DOM elem fölött
+enged fel - `start` node esetén ilyen elem nincs a lapon, tehát a húzás React Flow szinten akad
+el, mielőtt az `isValidGraphConnection` egyáltalán meghívódna. Ezt maga az e2e teszt
+(`graph-editor-validation.spec.ts`, "a bemenő handle nélküli (start) csomópontra irányuló húzás
+nem hoz létre élt" teszt, 255-257. sor kommentje: "ide nincs mire csatlakozni") is dokumentálja:
+az a teszt a hiányzó élt igazolja, nem magát a `return false` ágat futtatja le. Unit teszttel
+fedve: `is-valid-connection.spec.ts` ("elutasítja a start csomópontra kötést, mert nincs bemenő
+handle-je").
+
+### 9.3 Igazolás, hogy minden fedetlen e2e sor unit teszttel fedett
+
+A unit lefedettség (`bun run test`) 100 százalék, kizárás nélkül, minden metrikán - ez a 8.
+szekció négy kapuja közül a `test` kapu, ami ebben a munkamenetben zöld. Az egyenkénti
+megfeleltetés:
+
+| Fedetlen e2e hely                                        | Unit teszt                                                                                         |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `app-mount/mount-app.tsx`                                | a fájl saját `.spec.tsx`-e (VITE_ hiba ágak, build idejű config mock)                              |
+| `frontend-config/read-frontend-config.ts`                | `read-frontend-config.spec.ts`                                                                     |
+| `graph-editor/GraphEditorScreen.tsx` 177-178, 222        | `GraphEditorScreen.spec.tsx` ("hibás gráfra (NaN a maxIterations mezőn)... (AC12)")                |
+| `graph-editor/is-valid-connection.ts` 36                 | `is-valid-connection.spec.ts` ("elutasítja a start csomópontra kötést...")                         |
+| `graph-editor/validate-graph-for-save.ts` 23             | `validate-graph-for-save.spec.ts` ("hibás node mezőre (NaN egy number mezőn...)")                  |
+| `graph-node-card/GraphNodeCard.tsx` 74, 82               | `GraphNodeCard.spec.tsx` (`it.each(StepRunStatusSchema.options)` a "%s" StepRunStatus badge teszt) |
+| `graph-node-card/step-run-status-badge.ts` 30            | `step-run-status-badge.spec.ts`                                                                    |
+| `history-navigation/browser-history-location-port.ts` 21 | a fájl saját `.spec.ts`-e (`popstate` feliratkozás lebontás)                                       |
+| `node-inspector/NodeInspector.tsx` 123                   | a fájl saját `.spec.tsx`-e (gyökér szintű zod hiba ág, direkt hívással)                            |
+| `rest-client/perform-route-request.ts` 70                | `perform-route-request.spec.ts` (`buildRoutePath` hiányzó paraméter ág)                            |
+| `stream-client/use-stream-connection.ts` 182             | a fájl saját `.spec.ts`-e (`EventSource` bezárás `useEffect` cleanup)                              |
+
+### 9.4 A `GraphNodeCard.tsx`/`step-run-status-badge.ts` kizárás jövője
+
+A `data.status` mezőt ma egyetlen hívó sem állítja be (`GraphEditorScreen`/`GraphEditorCanvas`
+grep-elve nincs `status:` mező a node adat összeállításánál). Az élő futás nézet (a lépés
+állapotának valós idejű, WebSocket/SSE eredetű megjelenítése a vásznon) a PLAN-009 F4 ... F6
+fázisának tárgya. **Amint ez megvalósul, ez a kizárás megszűnik**: az élő futás nézet e2e tesztje
+szükségszerűen beállít egy `status` értéket, és attól kezdve `GraphNodeCard.tsx` 74/82. sora és a
+`step-run-status-badge.ts` teljes fájlja e2e-vel is 100 százalékban fedett lesz.
