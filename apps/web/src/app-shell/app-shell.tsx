@@ -1,6 +1,7 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { AppShellFrame, logoMarkUrl, ThemeModeToggle } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ReactElement } from 'react';
+import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
@@ -29,6 +30,18 @@ const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string
   connecting: 'kapcsolódás',
   replaying: 'előzmények betöltése',
   reconnecting: 'újracsatlakozás',
+};
+
+/**
+ * A topnav fejléc címe útvonalanként (SPEC-008 T-009-12). A `workflowList`
+ * és az ismeretlen (`undefined`) útvonal nincs felsorolva - mindkettő a
+ * meglévő, változatlan `'Workflow-k'` alapértékre esik vissza, ugyanúgy,
+ * mint a bővítés előtti kétágú feltétel esetén.
+ */
+const ROUTE_PAGE_TITLE: Readonly<Partial<Record<ClientRouteId, string>>> = {
+  runHistory: 'Futás előzmények',
+  graphEditor: 'Szerkesztő',
+  runView: 'Futás nézet',
 };
 
 /**
@@ -70,7 +83,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
   return (
     <AppShellFrame
       isNavigationMenuOpen={isNavigationMenuOpen}
-      pageTitle={routeId === 'runHistory' ? 'Futás előzmények' : 'Workflow-k'}
+      pageTitle={routeId === undefined ? 'Workflow-k' : (ROUTE_PAGE_TITLE[routeId] ?? 'Workflow-k')}
       brand={
         <>
           <button
@@ -189,6 +202,18 @@ function renderRouteContent(
           serverRestartCount={serverRestartCount}
         />
       );
+    }
+    case 'graphEditor': {
+      // A tényleges szerkesztő a T-009-13 ... T-009-19 lépések tárgya
+      // (SPEC-008 F3 fázis); ez a helyőrző csak az útvonaltábla bővítését
+      // (T-009-12) zárja le exhaustive-en, hogy a switch fordítási hiba
+      // nélkül fedje az új ClientRouteId ágat.
+      return <p>Szerkesztő (folyamatban).</p>;
+    }
+    case 'runView': {
+      // A tényleges futás nézet a T-009-20 ... T-009-27 lépések tárgya
+      // (SPEC-008 F4 ... F6 fázis), ugyanazon okból helyőrző.
+      return <p>Futás nézet (folyamatban).</p>;
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

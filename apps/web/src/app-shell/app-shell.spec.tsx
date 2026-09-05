@@ -134,6 +134,30 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('Futás előzmények');
   });
 
+  it('a "/editor" útvonalon a szerkesztő helyőrzőjét rajzolja, "Szerkesztő" fejléccel', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Szerkesztő (folyamatban).');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
+  });
+
+  it('a "/run" útvonalon a futás nézet helyőrzőjét rajzolja, "Futás nézet" fejléccel', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/run');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Futás nézet (folyamatban).');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Futás nézet');
+  });
+
   it('ismeretlen útvonalon a "nem található" képernyőt rajzolja', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/nincs-ilyen');

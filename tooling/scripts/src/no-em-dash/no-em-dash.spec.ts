@@ -45,6 +45,7 @@ const VENDORED_FILES = new Set([
   'packages/ui/src/tab/tab.css',
   'packages/ui/src/data-table/data-table.css',
   'packages/ui/src/menu/menu.css',
+  'packages/ui/src/resizable/resizable.css',
 ]);
 
 function repoRoot(): string {
