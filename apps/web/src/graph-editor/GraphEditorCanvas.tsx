@@ -159,6 +159,14 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
         nodes={displayedNodes}
         edges={flowEdges}
         nodeTypes={NODE_TYPES}
+        /* A betöltött gráf beleillik a vászonba, ahelyett hogy az
+           alapértelmezett `{ x: 0, y: 0, zoom: 1 }` nézetben a jobb szélen
+           levágódna. A prop dokumentált jelentése: "When `true`, the flow
+           will be zoomed and panned to fit all the nodes initially provided"
+           (`@xyflow/react` `component-props.d.ts`). Kitalált nagyítási szám
+           nincs: a `defaultViewport` és a `minZoom`/`maxZoom` a könyvtár
+           alapértelmezésén marad. */
+        fitView
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
