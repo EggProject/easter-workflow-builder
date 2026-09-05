@@ -25,11 +25,18 @@ egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. po
 konfigurációs invariáns saját mappában.
 
 **A SPEC-008 F3 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel.** Eddig elkészült
-témák: `graph-node-catalog` (T-009-14, tizenhetedik) és `graph-node-card` (T-009-15,
-tizennyolcadik). A SPEC-008 11.2 szekciója tíz új témát ír elő összesen (a maradék nyolc a
-PLAN-009 hátralévő lépéseiben érkezik); a végleges "huszonnégy téma" végösszeg (SPEC-008
-DoD 2.) és a jelen tényleges darabszám (tizenkettő SPEC-007 UI + négy invariáns + tíz SPEC-008
-= huszonhat) közötti eltérés a PLAN-009 T-009-32 (F8) zárásának hatóköre, nem ezé a lépésé.
+témák: `graph-node-catalog` (T-009-14, tizenhetedik), `graph-node-card` (T-009-15,
+tizennyolcadik) és `graph-editor` (T-009-16, tizenkilencedik). A SPEC-008 11.2 szekciója tíz új
+témát ír elő összesen (a maradék hét a PLAN-009 hátralévő lépéseiben érkezik); a végleges
+"huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a jelen tényleges darabszám (tizenkettő
+SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat) közötti eltérés a PLAN-009 T-009-32
+(F8) zárásának hatóköre, nem ezé a lépésé.
+
+**A `graph-editor` téma egyelőre csak a vászon komponenst tartalmazza** (`GraphEditorCanvas`),
+adatbetöltés és mentés nélkül - a `app-shell.tsx` `'graphEditor'` ága szándékosan megtartja a
+helyőrzőjét: a valódi bekötés a T-009-17 tárgya, amikor a `GraphEditorScreen` (adatbetöltéssel,
+`apiOrigin`/`fetchFunction`/route paraméterrel, a többi képernyő mintáját követve) elkészül. Ezt
+egy köztes, azonnal cserélendő bekötés helyett közvetlenül T-009-17-ben végezzük el.
 
 ## Fájlok
 
@@ -51,6 +58,7 @@ DoD 2.) és a jelen tényleges darabszám (tizenkettő SPEC-007 UI + négy invar
 | `src/workflow-list/`                   | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                                                                       |
 | `src/graph-node-catalog/`              | a tíz csomópont típus megjelenítési és handle táblája, `Record<NodeType, ...>` alakban, plusz a kártya méret konstans (T-009-19-től) (SPEC-008 5.1, 5.7)                                                      |
 | `src/graph-node-card/`                 | a vászon egyetlen egyedi node komponense, a `Handle` elemekkel és a `StepRunStatus` jelvény leképezéssel (SPEC-008 5.1, 5.5, AC21)                                                                            |
+| `src/graph-editor/`                    | a vezérelt `GraphEditorCanvas` (`@xyflow/react` felett), a node/él leképezés a domain és a vászon alak között, és az `isValidGraphConnection` szerkezeti szabálypár (SPEC-008 5.4, 5.5, AC8-AC11)             |
 | `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                                                        |
 | `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                 |
 | `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                |
