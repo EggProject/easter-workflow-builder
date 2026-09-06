@@ -378,3 +378,30 @@ A mérés időpontjában a `feat/spec-008-grafszerkeszto` ágon egy párhuzamos 
 tehát a KETTŐ EGYÜTTES állapotát méri. Ha a párhuzamos munkamenet később még fedetlen kódot
 tesz hozzá, a kapu az ő oldalán bukik, és a lefedettséget nekik kell visszahozniuk a küszöbre;
 a küszöb leszállítása ilyenkor is tiltott.
+
+---
+
+## 11. Konszolidációs újramérés (2026-09-06): a két párhuzamos ág egyesítése és a vászon-rés javítása után
+
+A 10.3 pontban jelzett nyitott kérdés lezárva: a morzsamenü munkamenet és a node inspector
+munkamenet is lezárult, plusz megtörtént a gráf szerkesztő vászon alatti üres sáv javítása
+(`.app-content:has(> .graph-editor-screen)`, `packages/ui/src/topnav-shell/topnav-shell.css`)
+és egy hozzá tartozó új e2e teszt (`apps/web/e2e/graph-editor.spec.ts`, a rés mérése
+700/900/1200px viewport magasságon).
+
+**A mérés menete:** törölt `apps/web/e2e/.nyc_output`, `bun run test:e2e` (128 Playwright
+teszt, mind zöld), majd `nyc report --reporter=json-summary` a pontos `pct` értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (10. szekció) |
+| ---------- | --------------- | --------- | -------------------------- |
+| statements | 936 / 955       | **98.01** | 98.01                      |
+| branches   | 372 / 388       | **95.87** | 95.87                      |
+| functions  | 356 / 360       | **98.88** | 98.88                      |
+| lines      | 897 / 916       | **97.92** | 97.92                      |
+
+**A szám nem változott.** A CSS javítás (topnav-shell.css) és a tooling-szintű keresztszennyeződés
+javítás (no-em-dash.spec.ts) egyike sem `apps/web/src` instrumentált forrás, az új e2e teszt pedig
+meglévő, már fedett kódutakon mér, tehát sem a számláló, sem a nevező nem mozdult. A
+`apps/web/package.json` `coverage:e2e:report` küszöbe (98.01/95.87/98.88/97.92) ezzel a végleges,
+konszolidált állapoton igazolt, nem csak a részállapoton - a 10.3 pont nyitott kérdése ezzel
+lezárva.
