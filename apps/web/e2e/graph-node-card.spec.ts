@@ -446,6 +446,13 @@ test('kattintásra a csomópont React Flow "selected" osztályt kap, a vászon �
   // háttér rétege, a könyvtár saját, dokumentálatlan, de stabil DOM
   // kimenete) kattintására törli a kiválasztást - a `fitView` paddingja miatt
   // a bal felső sarok üresen marad mindkét node-tól.
-  await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+  //
+  // A kattintási pont NEM a sarok legszéle: a vászon a `Resizable` osztott
+  // elrendezés paneljében ül, aminek a design system szerinti lekerekített
+  // sarka (`--ep-radius-xl`) levágja a doboz sarkát, tehát az ív KÜLSŐ
+  // oldalán már a szülő doboz kapja a mutató eseményeket (mérve: "intercepts
+  // pointer events"). A 40px-es eltolás az ív mögé esik, és a `fitView`
+  // paddingja miatt továbbra is üres terület.
+  await page.locator('.react-flow__pane').click({ position: { x: 40, y: 40 } });
   await expect(nodeLocator(page, 'sel-1')).not.toHaveClass(/\bselected\b/);
 });

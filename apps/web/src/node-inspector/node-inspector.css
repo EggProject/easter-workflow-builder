@@ -141,7 +141,15 @@
       gridre vált, aminek a harmadik sora legalább egy sornyi magas, akkor
       is, ha nincs hiba. Így a hibaüzenet megjelenése nem tolja el a panel
       többi mezőjét (a layout nem ugrik). A `.field` alap `gap` értéke a
-      design systemé marad. */
+      design systemé marad.
+
+      A fenntartott magasság a `--ep-space-5` token (20px), NEM a nála
+      kisebb `--ep-space-4` (16px): a hibaüzenet a `--ep-text-meta` tokent
+      viseli, ami `500 12px/1.4`, tehát a tényleges sormagassága 16,8px.
+      16px-es fenntartott sorral a mérés 0,8px elmozdulást mutatott a
+      szomszédos mezőn (`apps/web/e2e/node-inspector.spec.ts`, "a
+      hibaüzenet megjelenése nem tolja el a szomszédos mezőt"); a
+      következő skálalépcső ezt nullára viszi. */
 .node-inspector .input {
   min-width: 0;
   max-width: 100%;
@@ -152,9 +160,22 @@
 }
 
 .node-inspector .field {
-  display: grid;
-  grid-template-rows: auto auto minmax(var(--ep-space-4), auto);
   min-width: 0;
+}
+
+/* A fenntartott hibaüzenet sor KIZÁRÓLAG a valódi mezőkre vonatkozik. A
+   `TextField`, a `SelectField` és a `TextAreaField` `<label class="field">`
+   elemet ad, tehát a címke szerinti szűkítés pontosan ezeket fogja meg. A
+   panelben `<div class="field">` alakban álló dobozok NEM mezők: vagy több
+   mezőt fognak össze (`SystemPromptField`, `SandboxField`,
+   `StructuredOutputField`), vagy csak olvasható értéket mutatnak
+   (`Skillek`, `MCP szerverek`, `Futásidő`) - egyiknek sincs hibaüzenete,
+   tehát fenntartott hely sem kell nekik. Enélkül a csoportosító dobozok
+   üres, fenntartott sora mérten 32px felesleges rést nyitott a mezők
+   között. */
+.node-inspector label.field {
+  display: grid;
+  grid-template-rows: auto auto minmax(var(--ep-space-5), auto);
 }
 
 /* Az örökölt provider megnevezése és a "SPEC-009 hatóköre" indoklások. */

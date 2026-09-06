@@ -267,6 +267,16 @@ async function openNode(page: Page, nodeId: string): Promise<Locator> {
   return panel;
 }
 
+/**
+ * Egy elem mért szélessége, hiányzó doboz esetén nulla. Külön függvény, mert
+ * a `unicorn/no-await-expression-member` nem engedi a `(await
+ * locator.boundingBox())?.width` alakot.
+ */
+async function widthOf(locator: Locator): Promise<number> {
+  const box = await locator.boundingBox();
+  return box === null ? 0 : box.width;
+}
+
 async function closePanel(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Bezárás' }).click();
   await expect(inspectorPanel(page)).toBeAttached({ attached: false });
@@ -280,6 +290,132 @@ test.describe('a panel fejléce és a bezárás', () => {
     await expect(panel.getByText('Indítás')).toBeVisible();
     await expect(panel.getByText('n-start')).toBeVisible();
     await closePanel(page);
+  });
+});
+
+test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () => {
+  test('a panel a vászon jobb szélére dokkolt, húzható elválasztóval, és a vászon mellette szűkül', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const canvas = page.locator('.graph-editor-canvas');
+
+    const canvasWidthBefore = await widthOf(canvas);
+    expect(canvasWidthBefore).toBeGreaterThan(0);
+
+    const panel = await openNode(page, 'n-agent');
+
+    // Az elválasztó a W3C WAI Window Splitter minta szerinti `separator`
+    // szerepű elem (packages/ui `resizable` téma), tehát valódi, húzható
+    // elválasztó, nem díszítés.
+    const separator = page.getByRole('separator', { name: 'A beállítás panel szélessége' });
+    await expect(separator).toBeVisible();
+
+    const canvasBox = await canvas.boundingBox();
+    const panelBox = await panel.boundingBox();
+    const separatorBox = await separator.boundingBox();
+    if (canvasBox === null || panelBox === null || separatorBox === null) {
+      throw new Error('a teszt nem tudta megmérni a vászon, a panel vagy az elválasztó dobozát');
+    }
+
+    // Dokkolt, nem lebegő: az elválasztó a vászon UTÁN, a panel az
+    // elválasztó UTÁN kezdődik, tehát a három terület nem fedi egymást.
+    expect(separatorBox.x).toBeGreaterThanOrEqual(canvasBox.x + canvasBox.width - 1);
+    expect(panelBox.x).toBeGreaterThanOrEqual(separatorBox.x + separatorBox.width - 1);
+    // A vászon mellette SZŰKÜLT, nem takarva lett.
+    expect(canvasBox.width).toBeLessThan(canvasWidthBefore);
+
+    // A billentyűzetes átméretezés (nyilak) ténylegesen szélesíti a sávot.
+    const panelWidthBefore = panelBox.width;
+    await separator.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect.poll(async () => widthOf(panel)).toBeGreaterThan(panelWidthBefore);
+
+    // Bezárás után a vászon visszakapja a teljes szélességet.
+    await closePanel(page);
+    await expect.poll(async () => widthOf(canvas)).toBe(canvasWidthBefore);
+  });
+
+  test('a szakaszcímek fieldset nélkül is megnevezett mezőcsoportot adnak', async ({ page }) => {
+    const panel = await openNode(page, 'n-agent');
+    // A `fieldset`/`legend` pár helyére `role="group"` plusz
+    // `aria-labelledby` lépett (W3C WAI ARIA17), ami a hozzáférhetőségi
+    // faban UGYANAZT a szerepet és nevet adja.
+    for (const title of ['prompt és provider', 'futási korlátok', 'eszközök és környezet']) {
+      await expect(panel.getByRole('group', { name: title, exact: true })).toBeVisible();
+    }
+    // A régi megvalósítás nyoma sehol nem maradt.
+    await expect(panel.locator('fieldset')).toHaveCount(0);
+  });
+
+  test('egyetlen mező sem lóg ki a panelből', async ({ page }) => {
+    const panel = await openNode(page, 'n-agent');
+    await expect(panel.getByRole('textbox', { name: 'Prompt sablon' })).toBeVisible();
+
+    const overflowing = await page.evaluate(() => {
+      const element = globalThis.document.querySelector('.node-inspector__body');
+      if (element === null) {
+        throw new Error('a teszt nem talált .node-inspector__body elemet');
+      }
+      const panelRight = element.getBoundingClientRect().right;
+      return [...element.querySelectorAll('.input, .select')]
+        .filter((control) => control.getBoundingClientRect().right > panelRight + 1)
+        .map((control) => control.className);
+    });
+    expect(overflowing).toEqual([]);
+  });
+
+  test('a hibaüzenet a HIBÁS MEZŐ ALATT jelenik meg, aria-invalid és aria-describedby kötéssel', async ({ page }) => {
+    const panel = await openNode(page, 'n-error');
+    const backoffField = panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)');
+    await expect(backoffField).not.toHaveAttribute('aria-invalid', 'true');
+
+    await backoffField.fill('50\nabc\n150');
+
+    await expect(backoffField).toHaveAttribute('aria-invalid', 'true');
+    const describedBy = await backoffField.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    const message = panel.locator(`#${String(describedBy)}`);
+    await expect(message).toBeVisible();
+    await expect(message).toHaveClass(/field__error/);
+
+    // A hibaüzenet a mező ALATT áll, nem fölötte és nem mellette.
+    const fieldBox = await backoffField.boundingBox();
+    const messageBox = await message.boundingBox();
+    if (fieldBox === null || messageBox === null) {
+      throw new Error('a teszt nem tudta megmérni a mező vagy a hibaüzenet dobozát');
+    }
+    expect(messageBox.y).toBeGreaterThanOrEqual(fieldBox.y + fieldBox.height - 1);
+  });
+
+  test('a hibaüzenet megjelenése nem tolja el a szomszédos mezőt', async ({ page }) => {
+    const panel = await openNode(page, 'n-error');
+    const backoffField = panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)');
+    const nextField = panel.getByLabel('Kezelt hibafajták (soronként egy)');
+
+    async function gapBetweenFields(): Promise<number> {
+      const backoffBox = await backoffField.boundingBox();
+      const nextBox = await nextField.boundingBox();
+      if (backoffBox === null || nextBox === null) {
+        throw new Error('a teszt nem tudta megmérni a két mező dobozát');
+      }
+      return nextBox.y - (backoffBox.y + backoffBox.height);
+    }
+
+    const gapBefore = await gapBetweenFields();
+    await backoffField.fill('50\nabc\n150');
+    await expect(backoffField).toHaveAttribute('aria-invalid', 'true');
+
+    // A hibaüzenet helye MINDIG fenn van tartva (a `.field` harmadik,
+    // legalább egy sornyi grid sora), tehát a hibás mező és a következő
+    // mező KÖZÖTTI távolság nem változik: a hibaüzenet a már meglévő
+    // helyre írja ki magát, nem told el semmit.
+    //
+    // A panel tetején megjelenő, `role="alert"` összesítő ettől független:
+    // az egy ÚJ tartalmi blokk, aminek szükségszerűen helyet kell kapnia,
+    // ezért a mérés a két mező RELATÍV távolságát nézi, nem az abszolút
+    // helyüket.
+    expect(await gapBetweenFields()).toBe(gapBefore);
   });
 });
 
@@ -534,7 +670,12 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
     await expect(kutatoGroup.getByLabel('Leírás')).toBeVisible();
 
-    await kutatoGroup.getByLabel('Modell').fill('claude-sonnet-4');
+    // PONTOS egyezés: a bejegyzés `modell és korlátok` szakasza
+    // `role="group"` plusz `aria-labelledby` alakban áll (a `fieldset`
+    // és a `legend` helyett, lásd `InspectorSection.tsx`), tehát a
+    // szakasznak IS van hozzáférhető neve, ami részsztringként
+    // tartalmazza a `Modell` szót.
+    await kutatoGroup.getByLabel('Modell', { exact: true }).fill('claude-sonnet-4');
     await kutatoGroup.getByLabel('Max. körök száma').fill('4');
     await kutatoGroup.getByLabel('Effort (szint neve vagy szám)').fill('medium');
     await kutatoGroup.getByLabel('Jogosultsági mód').fill('plan');
@@ -558,7 +699,7 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
       .getByRole('group', { name: 'agents', exact: true })
       .getByRole('group', { name: 'kutato', exact: true });
     await reopenedKutato.getByRole('button', { name: 'Kibontás' }).click();
-    await expect(reopenedKutato.getByLabel('Modell')).toHaveValue('claude-sonnet-4');
+    await expect(reopenedKutato.getByLabel('Modell', { exact: true })).toHaveValue('claude-sonnet-4');
     await expect(reopenedKutato.getByLabel('Max. körök száma')).toHaveValue('4');
     await expect(reopenedKutato.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
     await expect(reopenedKutato.getByRole('combobox', { name: 'Memória hatóköre' })).toHaveValue('project');

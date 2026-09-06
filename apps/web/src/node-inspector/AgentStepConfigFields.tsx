@@ -27,6 +27,15 @@ export interface AgentStepConfigFieldsProperties {
   readonly config: AgentStepConfig;
   readonly onChange: (nextConfig: AgentStepConfig) => void;
   /**
+   * A szerkesztett alak útvonal előtagja a node `config` gyökeréhez képest,
+   * a mezőnkénti hibakereséshez. Az `agent_step` node-on üres sztring (az
+   * `AgentStepConfig` MAGA a config), a `join` node `ai_synthesis` módjában
+   * `settings.`, mert ott ugyanez az alak a `settings` mező alatt áll.
+   * Kötelező prop, alapérték nélkül: egy alapérték olyan elágazást hozna,
+   * amit csak az egyik hívó futtatna.
+   */
+  readonly fieldPathPrefix: string;
+  /**
    * A `providerId` `null` értéke esetén megjelenő szöveg, ami megnevezi,
    * melyik providert örökli a lépés (AC17) - a `describe-inherited-
    * provider.ts` adja, a `NodeInspector` konténerben lekérdezett workflow és
@@ -68,21 +77,21 @@ function MultiCheckboxSelector<TOption extends string>(
  * `AgentsFieldEditor` saját, kulcsonkénti szerkesztőjén megy.
  */
 export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFieldsProperties>): ReactElement {
-  const { config, onChange, inheritedProviderDescription } = properties;
-  const promptTemplateError = useFieldError('promptTemplate');
-  const systemPromptError = useFieldError('systemPrompt');
-  const providerIdError = useFieldError('providerId');
-  const modelIdError = useFieldError('modelId');
-  const sessionModeError = useFieldError('sessionMode');
-  const maxTurnsError = useFieldError('maxTurns');
-  const maxBudgetUsdError = useFieldError('maxBudgetUsd');
-  const effortError = useFieldError('effort');
-  const thinkingError = useFieldError('thinking');
-  const permissionModeError = useFieldError('permissionMode');
-  const allowedToolsError = useFieldError('allowedTools');
-  const disallowedToolsError = useFieldError('disallowedTools');
-  const cwdError = useFieldError('cwd');
-  const additionalDirectoriesError = useFieldError('additionalDirectories');
+  const { config, onChange, inheritedProviderDescription, fieldPathPrefix } = properties;
+  const promptTemplateError = useFieldError(`${fieldPathPrefix}promptTemplate`);
+  const systemPromptError = useFieldError(`${fieldPathPrefix}systemPrompt`);
+  const providerIdError = useFieldError(`${fieldPathPrefix}providerId`);
+  const modelIdError = useFieldError(`${fieldPathPrefix}modelId`);
+  const sessionModeError = useFieldError(`${fieldPathPrefix}sessionMode`);
+  const maxTurnsError = useFieldError(`${fieldPathPrefix}maxTurns`);
+  const maxBudgetUsdError = useFieldError(`${fieldPathPrefix}maxBudgetUsd`);
+  const effortError = useFieldError(`${fieldPathPrefix}effort`);
+  const thinkingError = useFieldError(`${fieldPathPrefix}thinking`);
+  const permissionModeError = useFieldError(`${fieldPathPrefix}permissionMode`);
+  const allowedToolsError = useFieldError(`${fieldPathPrefix}allowedTools`);
+  const disallowedToolsError = useFieldError(`${fieldPathPrefix}disallowedTools`);
+  const cwdError = useFieldError(`${fieldPathPrefix}cwd`);
+  const additionalDirectoriesError = useFieldError(`${fieldPathPrefix}additionalDirectories`);
 
   function setField<TKey extends keyof AgentStepConfig>(key: TKey, fieldValue: AgentStepConfig[TKey]): void {
     onChange({ ...config, [key]: fieldValue });

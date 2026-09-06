@@ -4,7 +4,6 @@ import type { ChangeEvent, ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
 import { InspectorSection } from './InspectorSection.tsx';
 import { JsonTextAreaField } from './JsonTextAreaField.tsx';
-import { ScopedFieldErrors } from './ScopedFieldErrors.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
@@ -143,15 +142,14 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
   return (
     <InspectorSection title="összefésülés">
       {modeSelect}
-      <ScopedFieldErrors prefix="settings">
-        <AgentStepConfigFields
-          config={config.settings}
-          onChange={(nextSettings) => {
-            onChange({ ...config, settings: nextSettings });
-          }}
-          inheritedProviderDescription={inheritedProviderDescription}
-        />
-      </ScopedFieldErrors>
+      <AgentStepConfigFields
+        fieldPathPrefix="settings."
+        config={config.settings}
+        onChange={(nextSettings) => {
+          onChange({ ...config, settings: nextSettings });
+        }}
+        inheritedProviderDescription={inheritedProviderDescription}
+      />
     </InspectorSection>
   );
 }

@@ -49,6 +49,7 @@ function renderConfigFields(
       return (
         <AgentStepConfigFields
           config={config}
+          fieldPathPrefix=""
           inheritedProviderDescription={inheritedProviderDescription}
           onChange={(nextSettings) => {
             onConfigChange({ ...nextSettings, type: 'agent_step', onUnhandledError: config.onUnhandledError });

@@ -46,7 +46,7 @@ describe('AgentsFieldEditor', () => {
     act(() => {
       root.render(<AgentsFieldEditor value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />);
     });
-    expect(container.querySelector('legend')?.textContent).toBe('kutato');
+    expect(container.querySelector('.inspector-section__title')?.textContent).toBe('kutato');
     expect(container.querySelector('[aria-expanded="false"]')).not.toBeNull();
     expect(container.querySelector('.agent-definition-entry-fields')).toBeNull();
   });

@@ -44,6 +44,17 @@ describe('useFieldError', () => {
     expect(container.textContent).toBe('kötelező mező');
   });
 
+  it('a mező alatti útvonal hibáját is felszedi (soronkénti lista mező)', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['backoffMs.1', 'Invalid input']])}>
+          <ErrorProbe path="backoffMs" />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    expect(container.textContent).toBe('Invalid input');
+  });
+
   it('ismeretlen útvonalra undefined értéket ad, akkor is, ha a térképben van másik hiba', () => {
     act(() => {
       root.render(

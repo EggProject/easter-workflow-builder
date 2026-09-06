@@ -1,6 +1,7 @@
 import { Button, TextField } from '@easter-workflow-builder/ui';
 import { useState, type ChangeEvent, type ReactElement } from 'react';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
+import { InspectorSection } from './InspectorSection.tsx';
 
 export interface AgentsFieldEditorProperties {
   /**
@@ -83,8 +84,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
         const isExpanded = expandedKeys.has(key);
         const renameDraft = renameDrafts[key] ?? key;
         return (
-          <fieldset key={key}>
-            <legend>{key}</legend>
+          <InspectorSection key={key} title={key}>
             <div className="agents-field-editor__entry-header">
               <Button
                 type="button"
@@ -137,7 +137,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
                 }}
               />
             )}
-          </fieldset>
+          </InspectorSection>
         );
       })}
       <div className="agents-field-editor__add">

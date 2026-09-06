@@ -235,22 +235,29 @@ test('a beállítás panel önállóan görget, és nem vágódik le a viewport 
   await expect(page.getByRole('button', { name: 'Bezárás' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Prompt sablon' })).toBeVisible();
 
+  // A GÖRGETÉS a panel törzsén van, nem a panel gyökerén: a fejléc (a
+  // katalógus címke, a node azonosító és a Bezárás gomb) a görgethető
+  // területen KÍVÜL áll, tehát görgetés közben is látszik.
   const panel = await page.evaluate(() => {
-    const element = globalThis.document.querySelector('.node-inspector');
-    if (element === null) {
-      throw new Error('a teszt nem talált .node-inspector elemet');
+    const root = globalThis.document.querySelector('.node-inspector');
+    const body = globalThis.document.querySelector('.node-inspector__body');
+    if (root === null || body === null) {
+      throw new Error('a teszt nem talált .node-inspector es .node-inspector__body elemet');
     }
-    const rect = element.getBoundingClientRect();
     return {
-      overflowY: globalThis.getComputedStyle(element).overflowY,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-      bottom: rect.bottom,
+      overflowY: globalThis.getComputedStyle(body).overflowY,
+      rootOverflowY: globalThis.getComputedStyle(root).overflowY,
+      scrollHeight: body.scrollHeight,
+      clientHeight: body.clientHeight,
+      bottom: root.getBoundingClientRect().bottom,
       viewportHeight: globalThis.document.documentElement.clientHeight,
     };
   });
 
   expect(panel.overflowY).toBe('auto');
+  // A panel gyökere NEM görget: enélkül két, egymásba ágyazott görgősáv
+  // keletkezne, és a fejléc is elgörögne.
+  expect(panel.rootOverflowY).toBe('visible');
   // Van mit görgetni, és a panel alja a viewporton belül van: nem lóg le,
   // tehát a görgetése ténylegesen elérhető.
   expect(panel.scrollHeight).toBeGreaterThan(panel.clientHeight);
@@ -258,9 +265,9 @@ test('a beállítás panel önállóan görget, és nem vágódik le a viewport 
 
   // És a görgetés valóban a panelen belül történik.
   const scrolled = await page.evaluate(() => {
-    const element = globalThis.document.querySelector('.node-inspector');
+    const element = globalThis.document.querySelector('.node-inspector__body');
     if (element === null) {
-      throw new Error('a teszt nem talált .node-inspector elemet');
+      throw new Error('a teszt nem talált .node-inspector__body elemet');
     }
     element.scrollTop = 200;
     return element.scrollTop;

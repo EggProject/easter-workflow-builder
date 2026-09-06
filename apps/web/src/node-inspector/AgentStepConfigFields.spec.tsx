@@ -85,7 +85,12 @@ describe('AgentStepConfigFields', () => {
   function render(config: AgentStepConfig, onChange: (next: AgentStepConfig) => void, description = 'nincs'): void {
     act(() => {
       root.render(
-        <AgentStepConfigFields config={config} onChange={onChange} inheritedProviderDescription={description} />,
+        <AgentStepConfigFields
+          fieldPathPrefix=""
+          config={config}
+          onChange={onChange}
+          inheritedProviderDescription={description}
+        />,
       );
     });
   }
@@ -406,7 +411,12 @@ describe('AgentStepConfigFields', () => {
             ])
           }
         >
-          <AgentStepConfigFields config={BASE_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+          <AgentStepConfigFields
+            fieldPathPrefix=""
+            config={BASE_CONFIG}
+            onChange={vi.fn()}
+            inheritedProviderDescription="nincs"
+          />
         </FieldErrorsContext.Provider>,
       );
     });
