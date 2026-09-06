@@ -267,11 +267,33 @@ flowchart TD
     BAR --> NAV["app-tn__navigation, ket utvonal"]
     BAR --> ACT["app-tn__actions, temavalto es stream allapot"]
     MAIN --> INNER["app-tn__inner, faltol falig"]
-    INNER --> HEAD["app-pagehead, cim es muveletek"]
+    INNER --> HEAD["app-pagehead, morzsamenu es muveletek"]
     INNER --> CONTENT["app-content, a kepernyo"]
 ```
 
 A `.app-tn__bar` magassága `60px`, `position: sticky`, `top: 0` (M-28), és ezt nem írjuk felül. A `.app-tn__navigation` két bejegyzést tart: a workflow listát és a futás előzményeket; a SPEC-008 és a SPEC-009 ide vesz fel továbbiakat.
+
+**A nagy oldalcím lecserélve morzsamenüre (2026-09-06, felhasználói kérés).** A `HEAD`
+csomópont korábban egy `<h1 class="app-pagehead__title">` címet hordozott, ami a felhasználó
+mérése szerint feleslegesen sok függőleges helyet foglalt: a 36px-es betűméret és az átemelt
+`.app-pagehead` 32px felső / 20px alsó belső margója együtt kb. 140px magas sávot adott, egyetlen
+soros szöveghez. A csere: a `packages/ui` `Breadcrumb` komponense (a design system kész
+`breadcrumb` komponensének átemelt alakja, `packages/ui` CLAUDE.md) a `.app-pagehead__top`
+zónában, a WAI-ARIA APG Breadcrumb Pattern szerint (`<nav aria-label>` plusz `<ol>`/`<li>` lista,
+`aria-current="page"` az aktuális elemen,
+<https://www.w3.org/WAI/ARIA/apg/patterns/breadcrumb/>). Az `AppShellFrame` `pageTitle` propja
+megszűnt, helyette `breadcrumb: ReactNode`. Az `apps/web` mind a négy útvonalon (`workflowList`,
+`runHistory`, `graphEditor`, `runView`) és az ismeretlen útvonalon is morzsamenüt rajzol: a
+gyökér (`workflowList`) egyetlen, ős nélküli elem, minden más útvonalon a "Workflow-k" az első,
+kattintható ős. A névforrás a `client-route-table.ts` `label` mezője, nem duplikált lista.
+
+**Mért nyereség.** Egy izolált, a valódi átemelt CSS-t és design tokeneket használó Playwright
+méréssel (chromium, 2026-09-06): a `.app-pagehead` teljes magassága a régi H1 mellett 139.8px, az
+új morzsamenü mellett 47px - **92.8px** különbség, amivel a `.app-content` (a tényleges tartalom)
+ugyanennyivel feljebb kezdődik. A `.app-pagehead` felső/alsó belső margója egy ÚJ, a byte-azonos
+blokk UTÁN álló szabállyal `--ep-space-3`-ra (12px) csökkent a design system spacing skálájából
+(`topnav-shell.css`); az átemelt `.app-pagehead`/`.app-pagehead__title` szabály egyetlen bájtja
+sem módosult, mert a `topnav-shell-byte-identity.spec.ts` ezt kényszeríti ki.
 
 ### 5.2 A "faltól falig" követelmény
 
