@@ -59,7 +59,10 @@ test('a topnav "Workflow-k" linkje a futás előzményekről visszavisz a listá
   await page.goto('/runs');
   await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Workflow-k' }).click();
+  // A morzsamenü "Workflow-k" őse óta (2026-09-06) KÉT "Workflow-k" feliratú
+  // link is a lapon van; a topnav linkje a `.app-tn__navigation` konténerre
+  // szűkítve egyértelmű, a morzsamenü linkjét a `breadcrumb.spec.ts` fedi.
+  await page.locator('.app-tn__navigation').getByRole('link', { name: 'Workflow-k' }).click();
 
   await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/');
@@ -79,12 +82,13 @@ test('a böngésző vissza gombja (popstate) visszaállítja az előző útvonal
   expect(new URL(page.url()).pathname).toBe('/');
 });
 
-test('a "/run" útvonalon a futás nézet helyőrzője jelenik meg, "Futás nézet" topnav címmel', async ({ page }) => {
+test('a "/run" útvonalon a futás nézet helyőrzője jelenik meg, "Futás nézet" morzsamenüvel', async ({ page }) => {
   // A `runView` ág (SPEC-008 T-009-20 ... T-009-27 helyőrzője) a
-  // `renderRouteContent` switch ötödik ága; a `ROUTE_PAGE_TITLE['runView']`
-  // pedig a topnav `<h1>` címét adja.
+  // `renderRouteContent` switch ötödik ága; a `resolveBreadcrumbCurrent`
+  // pedig a topnav alatti morzsamenü aktuális elemét adja (2026-09-06, a
+  // nagy oldalcím felváltása).
   await page.goto('/run');
 
-  await expect(page.getByRole('heading', { name: 'Futás nézet' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Futás nézet')).toBeVisible();
   await expect(page.getByText('Futás nézet (folyamatban).')).toBeVisible();
 });

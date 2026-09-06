@@ -38,7 +38,7 @@ test('betölti és megjeleníti a workflow listát', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Workflow-k' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Workflow-k')).toBeVisible();
   const table = page.getByRole('table', { name: 'Workflow-k' });
   await expect(table.getByRole('row', { name: /Alfa workflow/ })).toBeVisible();
   await expect(table.getByRole('row', { name: /Béta workflow/ })).toBeVisible();
@@ -412,7 +412,7 @@ test('futás indítása a Futás előzmények útvonalra navigál', async ({ pag
   await row.getByRole('button', { name: /^Műveletek/ }).click();
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Futás előzmények' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Futás előzmények')).toBeVisible();
 });
 
 test('a futás indítás hibájára toast jelenik meg, és a lista marad a helyén', async ({ page }) => {
@@ -429,5 +429,5 @@ test('a futás indítás hibájára toast jelenik meg, és a lista marad a hely�
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
   await expect(page.getByText('A futás indítása sikertelen')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Workflow-k' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Workflow-k')).toBeVisible();
 });

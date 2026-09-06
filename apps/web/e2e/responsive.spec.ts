@@ -130,7 +130,7 @@ test('768px alatt a navigációra kattintva bezárul a lenyíló menü', async (
   await page.getByRole('button', { name: 'Navigáció megnyitása' }).click();
   await page.getByRole('link', { name: 'Futás előzmények' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Futás előzmények' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Futás előzmények')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Futás előzmények' })).toBeHidden();
 });
 
