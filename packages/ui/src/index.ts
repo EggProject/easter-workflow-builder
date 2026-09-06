@@ -18,6 +18,7 @@ export { useThemeMode, type UseThemeModeResult } from './theme-mode/use-theme-mo
 
 // Komponensek.
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
+export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
 export { Card, type CardProperties } from './card/Card.tsx';
 export {
