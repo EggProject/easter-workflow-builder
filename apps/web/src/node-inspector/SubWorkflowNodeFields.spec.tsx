@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SubWorkflowNodeFields } from './SubWorkflowNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -59,5 +60,23 @@ describe('SubWorkflowNodeFields', () => {
       typeInto(mappingTextarea, 'c=d\ne=f');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ inputMapping: { c: 'd', e: 'f' } }));
+  });
+
+  it('a `targetWorkflowId` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['targetWorkflowId', 'Kötelező']])}>
+          <SubWorkflowNodeFields config={CONFIG} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const targetInput = container.querySelector('input');
+    if (targetInput === null) {
+      throw new Error('a teszt nem találta a targetWorkflowId mezőt');
+    }
+    expect(targetInput.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(targetInput.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező');
   });
 });

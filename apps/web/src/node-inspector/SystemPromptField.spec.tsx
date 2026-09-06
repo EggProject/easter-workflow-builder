@@ -13,16 +13,20 @@ function typeInto(element: HTMLSelectElement | HTMLTextAreaElement, value: strin
 }
 
 function modeSelect(container: HTMLElement): HTMLSelectElement {
-  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Rendszer prompt módja"]');
-  if (select === null) {
+  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
+    (candidate) => candidate.closest('label')?.textContent.includes('Rendszer prompt módja') === true,
+  );
+  if (select === undefined) {
     throw new Error('a teszt nem talált mód választó select elemet');
   }
   return select;
 }
 
 function excludeSelect(container: HTMLElement): HTMLSelectElement {
-  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Dinamikus szekciók kizárása"]');
-  if (select === null) {
+  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
+    (candidate) => candidate.closest('label')?.textContent.includes('Dinamikus szekciók kizárása') === true,
+  );
+  if (select === undefined) {
     throw new Error('a teszt nem talált exclude select elemet');
   }
   return select;

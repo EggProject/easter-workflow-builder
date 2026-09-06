@@ -1,8 +1,10 @@
 import type { HumanApprovalNodeConfig } from '@easter-workflow-builder/protocol';
 import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
+import { useFieldError } from './use-field-error.ts';
 
 export interface HumanApprovalNodeFieldsProperties {
   readonly config: HumanApprovalNodeConfig;
@@ -17,13 +19,16 @@ export interface HumanApprovalNodeFieldsProperties {
  */
 export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const titleError = useFieldError('title');
+  const bodyTemplateError = useFieldError('bodyTemplate');
+  const timeoutMsError = useFieldError('timeoutMs');
 
   return (
-    <fieldset>
-      <legend>emberi jóváhagyás</legend>
+    <InspectorSection title="emberi jóváhagyás">
       <TextField
         label="Cím"
         value={config.title}
+        error={titleError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           onChange({ ...config, title: event.target.value });
         }}
@@ -31,6 +36,7 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
       <TextAreaField
         label="Törzs sablon (bodyTemplate)"
         value={config.bodyTemplate}
+        error={bodyTemplateError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, bodyTemplate: event.target.value });
         }}
@@ -39,10 +45,11 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
         type="number"
         label="Időkorlát ms-ben (üres = korlátlan)"
         value={toNumberFieldValue(config.timeoutMs)}
+        error={timeoutMsError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           onChange({ ...config, timeoutMs: fromNumberFieldValue(event.target.value) });
         }}
       />
-    </fieldset>
+    </InspectorSection>
   );
 }

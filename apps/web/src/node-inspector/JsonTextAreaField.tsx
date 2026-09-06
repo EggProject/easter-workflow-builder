@@ -35,13 +35,5 @@ export function JsonTextAreaField(properties: Readonly<JsonTextAreaFieldProperti
     }
   }
 
-  return (
-    <TextAreaField
-      label={label}
-      value={text}
-      onChange={handleChange}
-      rows={6}
-      {...(parseError === undefined ? {} : { error: parseError })}
-    />
-  );
+  return <TextAreaField label={label} value={text} onChange={handleChange} rows={6} error={parseError} />;
 }

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HumanApprovalNodeFields } from './HumanApprovalNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -69,5 +70,23 @@ describe('HumanApprovalNodeFields', () => {
       typeInto(timeoutInput, '');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ timeoutMs: null }));
+  });
+
+  it('a `title` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['title', 'Kötelező']])}>
+          <HumanApprovalNodeFields config={CONFIG} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const titleInput = container.querySelector('input');
+    if (titleInput === null) {
+      throw new Error('a teszt nem találta a cím mezőt');
+    }
+    expect(titleInput.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(titleInput.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező');
   });
 });

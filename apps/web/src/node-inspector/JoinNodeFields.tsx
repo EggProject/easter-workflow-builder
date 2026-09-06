@@ -2,8 +2,11 @@ import { JoinMergeSettingsSchema, type AgentStepConfig, type JoinNodeConfig } fr
 import { SelectField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
+import { InspectorSection } from './InspectorSection.tsx';
 import { JsonTextAreaField } from './JsonTextAreaField.tsx';
+import { ScopedFieldErrors } from './ScopedFieldErrors.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
+import { useFieldError } from './use-field-error.ts';
 
 export interface JoinNodeFieldsProperties {
   readonly config: JoinNodeConfig;
@@ -74,6 +77,8 @@ const MODE_OPTIONS = [
  */
 export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription } = properties;
+  const modeError = useFieldError('mode');
+  const sourceError = useFieldError('settings.source');
 
   function handleModeChange(event: ChangeEvent<HTMLSelectElement>): void {
     const { onUnhandledError } = config;
@@ -93,7 +98,8 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
 
   const modeSelect = (
     <SelectField
-      aria-label="Összefésülés módja"
+      label="Összefésülés módja"
+      error={modeError}
       options={MODE_OPTIONS}
       value={config.mode}
       onChange={handleModeChange}
@@ -102,8 +108,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
 
   if (config.mode === 'merge') {
     return (
-      <fieldset>
-        <legend>összefésülés</legend>
+      <InspectorSection title="összefésülés">
         {modeSelect}
         <JsonTextAreaField
           label="Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)"
@@ -115,37 +120,38 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
             }
           }}
         />
-      </fieldset>
+      </InspectorSection>
     );
   }
 
   if (config.mode === 'script') {
     return (
-      <fieldset>
-        <legend>összefésülés</legend>
+      <InspectorSection title="összefésülés">
         {modeSelect}
         <TextAreaField
           label="Forrás (source)"
           value={config.settings.source}
+          error={sourceError}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             onChange({ ...config, settings: { ...config.settings, source: event.target.value } });
           }}
         />
-      </fieldset>
+      </InspectorSection>
     );
   }
 
   return (
-    <fieldset>
-      <legend>összefésülés</legend>
+    <InspectorSection title="összefésülés">
       {modeSelect}
-      <AgentStepConfigFields
-        config={config.settings}
-        onChange={(nextSettings) => {
-          onChange({ ...config, settings: nextSettings });
-        }}
-        inheritedProviderDescription={inheritedProviderDescription}
-      />
-    </fieldset>
+      <ScopedFieldErrors prefix="settings">
+        <AgentStepConfigFields
+          config={config.settings}
+          onChange={(nextSettings) => {
+            onChange({ ...config, settings: nextSettings });
+          }}
+          inheritedProviderDescription={inheritedProviderDescription}
+        />
+      </ScopedFieldErrors>
+    </InspectorSection>
   );
 }

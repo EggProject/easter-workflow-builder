@@ -9,6 +9,7 @@ import {
 import { Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
+import { InspectorSection } from './InspectorSection.tsx';
 import { SandboxField } from './SandboxField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
 import { SystemPromptField } from './SystemPromptField.tsx';
@@ -17,6 +18,7 @@ import { describeUnknownValue } from './describe-unknown-value.ts';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
 import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
+import { useFieldError } from './use-field-error.ts';
 import './node-inspector.css';
 
 const SPEC_009_SCOPE_REASON = 'a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható';
@@ -35,16 +37,15 @@ export interface AgentStepConfigFieldsProperties {
 
 function MultiCheckboxSelector<TOption extends string>(
   properties: Readonly<{
-    legend: string;
+    title: string;
     options: readonly TOption[];
     selected: readonly TOption[];
     onToggle: (option: TOption, isChecked: boolean) => void;
   }>,
 ): ReactElement {
-  const { legend, options, selected, onToggle } = properties;
+  const { title, options, selected, onToggle } = properties;
   return (
-    <fieldset>
-      <legend>{legend}</legend>
+    <InspectorSection title={title}>
       {options.map((option) => (
         <Checkbox
           key={option}
@@ -55,7 +56,7 @@ function MultiCheckboxSelector<TOption extends string>(
           }}
         />
       ))}
-    </fieldset>
+    </InspectorSection>
   );
 }
 
@@ -68,6 +69,20 @@ function MultiCheckboxSelector<TOption extends string>(
  */
 export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription } = properties;
+  const promptTemplateError = useFieldError('promptTemplate');
+  const systemPromptError = useFieldError('systemPrompt');
+  const providerIdError = useFieldError('providerId');
+  const modelIdError = useFieldError('modelId');
+  const sessionModeError = useFieldError('sessionMode');
+  const maxTurnsError = useFieldError('maxTurns');
+  const maxBudgetUsdError = useFieldError('maxBudgetUsd');
+  const effortError = useFieldError('effort');
+  const thinkingError = useFieldError('thinking');
+  const permissionModeError = useFieldError('permissionMode');
+  const allowedToolsError = useFieldError('allowedTools');
+  const disallowedToolsError = useFieldError('disallowedTools');
+  const cwdError = useFieldError('cwd');
+  const additionalDirectoriesError = useFieldError('additionalDirectories');
 
   function setField<TKey extends keyof AgentStepConfig>(key: TKey, fieldValue: AgentStepConfig[TKey]): void {
     onChange({ ...config, [key]: fieldValue });
@@ -75,23 +90,25 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
 
   return (
     <div className="agent-step-config-fields">
-      <fieldset>
-        <legend>prompt és provider</legend>
+      <InspectorSection title="prompt és provider">
         <TextAreaField
           label="Prompt sablon"
           value={config.promptTemplate}
+          error={promptTemplateError}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setField('promptTemplate', event.target.value);
           }}
         />
         <SystemPromptField
           value={config.systemPrompt}
+          error={systemPromptError}
           onChange={(nextValue) => {
             setField('systemPrompt', nextValue);
           }}
         />
         <SelectField
-          aria-label="Provider felülírás"
+          label="Provider felülírás"
+          error={providerIdError}
           options={[
             { value: '', label: 'nincs felülírás (öröklés)' },
             ...ProviderIdSchema.options.map((option) => ({ value: option, label: option })),
@@ -115,12 +132,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextField
           label="Modell azonosító"
           value={toTextFieldValue(config.modelId)}
+          error={modelIdError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('modelId', fromTextFieldValue(event.target.value));
           }}
         />
         <SelectField
-          aria-label="Session mód"
+          label="Session mód"
+          error={sessionModeError}
           options={SessionModeSchema.options.map((option) => ({ value: option, label: option }))}
           value={config.sessionMode}
           onChange={(event: ChangeEvent<HTMLSelectElement>) => {
@@ -130,14 +149,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
             }
           }}
         />
-      </fieldset>
+      </InspectorSection>
 
-      <fieldset>
-        <legend>futási korlátok</legend>
+      <InspectorSection title="futási korlátok">
         <TextField
           type="number"
           label="Max. körök száma"
           value={toNumberFieldValue(config.maxTurns)}
+          error={maxTurnsError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('maxTurns', fromNumberFieldValue(event.target.value));
           }}
@@ -146,6 +165,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           type="number"
           label="Max. büdzsé (USD)"
           value={toNumberFieldValue(config.maxBudgetUsd)}
+          error={maxBudgetUsdError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('maxBudgetUsd', fromNumberFieldValue(event.target.value));
           }}
@@ -153,12 +173,14 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextField
           label="Effort"
           value={toTextFieldValue(config.effort)}
+          error={effortError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('effort', fromTextFieldValue(event.target.value));
           }}
         />
         <SelectField
-          aria-label="Thinking mód"
+          label="Thinking mód"
+          error={thinkingError}
           options={[
             { value: '', label: 'nincs megadva' },
             ...ThinkingModeSchema.options.map((option) => ({ value: option, label: option })),
@@ -178,12 +200,13 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextField
           label="Jogosultsági mód"
           value={toTextFieldValue(config.permissionMode)}
+          error={permissionModeError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('permissionMode', fromTextFieldValue(event.target.value));
           }}
         />
         <MultiCheckboxSelector
-          legend="Bekapcsolt motor hookok"
+          title="Bekapcsolt motor hookok"
           options={EngineHookIdSchema.options}
           selected={config.enabledEngineHooks}
           onToggle={(option, isChecked) => {
@@ -196,13 +219,13 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
             );
           }}
         />
-      </fieldset>
+      </InspectorSection>
 
-      <fieldset>
-        <legend>eszközök és környezet</legend>
+      <InspectorSection title="eszközök és környezet">
         <TextAreaField
           label="Engedélyezett eszközök"
           value={toStringListFieldValue(config.allowedTools)}
+          error={allowedToolsError}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setField('allowedTools', fromStringListFieldValue(event.target.value));
           }}
@@ -210,12 +233,13 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextAreaField
           label="Tiltott eszközök"
           value={toStringListFieldValue(config.disallowedTools)}
+          error={disallowedToolsError}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setField('disallowedTools', fromStringListFieldValue(event.target.value));
           }}
         />
         <MultiCheckboxSelector
-          legend="Beépített agent eszközök"
+          title="Beépített agent eszközök"
           options={AgentToolIdSchema.options}
           selected={config.agentTools}
           onToggle={(option, isChecked) => {
@@ -228,6 +252,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextField
           label="Munkakönyvtár (cwd)"
           value={toTextFieldValue(config.cwd)}
+          error={cwdError}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField('cwd', fromTextFieldValue(event.target.value));
           }}
@@ -235,6 +260,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <TextAreaField
           label="További engedélyezett könyvtárak"
           value={toStringListFieldValue(config.additionalDirectories)}
+          error={additionalDirectoriesError}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setField('additionalDirectories', fromStringListFieldValue(event.target.value));
           }}
@@ -251,10 +277,9 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
             setField('structuredOutput', nextValue);
           }}
         />
-      </fieldset>
+      </InspectorSection>
 
-      <fieldset>
-        <legend>SPEC-009 hatóköre</legend>
+      <InspectorSection title="SPEC-009 hatóköre">
         <div className="field">
           <span className="field__label">Skillek</span>
           <p>{describeUnknownValue(config.skills)}</p>
@@ -265,17 +290,16 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           <p>{describeUnknownValue(config.mcpServers)}</p>
           <p className="node-inspector__reason">{SPEC_009_SCOPE_REASON}</p>
         </div>
-      </fieldset>
+      </InspectorSection>
 
-      <fieldset>
-        <legend>agents</legend>
+      <InspectorSection title="agents">
         <AgentsFieldEditor
           value={config.agents}
           onChange={(nextValue) => {
             setField('agents', nextValue);
           }}
         />
-      </fieldset>
+      </InspectorSection>
     </div>
   );
 }

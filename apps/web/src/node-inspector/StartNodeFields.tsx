@@ -1,6 +1,8 @@
 import type { StartInputField, StartNodeConfig } from '@easter-workflow-builder/protocol';
 import { Button, Checkbox, TextField } from '@easter-workflow-builder/ui';
-import type { ChangeEvent, ReactElement } from 'react';
+import { useContext, type ChangeEvent, type ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 export interface StartNodeFieldsProperties {
   readonly config: StartNodeConfig;
@@ -16,6 +18,7 @@ const EMPTY_INPUT_FIELD: StartInputField = { name: '', label: '', valueKind: 'st
  */
 export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const fieldErrors = useContext(FieldErrorsContext);
 
   function setInputFields(nextInputFields: readonly StartInputField[]): void {
     onChange({ ...config, inputFields: nextInputFields });
@@ -28,13 +31,13 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
   }
 
   return (
-    <fieldset>
-      <legend>bemeneti mezők</legend>
+    <InspectorSection title="bemeneti mezők">
       {config.inputFields.map((field, index) => (
         <div key={index} className="node-inspector__list-row">
           <TextField
             label="Név"
             value={field.name}
+            error={fieldErrors.get(`inputFields.${String(index)}.name`)}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               updateField(index, { name: event.target.value });
             }}
@@ -42,6 +45,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
           <TextField
             label="Címke"
             value={field.label}
+            error={fieldErrors.get(`inputFields.${String(index)}.label`)}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               updateField(index, { label: event.target.value });
             }}
@@ -49,6 +53,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
           <TextField
             label="Érték típusa"
             value={field.valueKind}
+            error={fieldErrors.get(`inputFields.${String(index)}.valueKind`)}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               updateField(index, { valueKind: event.target.value });
             }}
@@ -80,6 +85,6 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
       >
         Bemeneti mező hozzáadása
       </Button>
-    </fieldset>
+    </InspectorSection>
   );
 }

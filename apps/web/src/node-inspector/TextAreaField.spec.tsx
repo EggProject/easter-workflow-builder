@@ -40,6 +40,34 @@ describe('TextAreaField', () => {
     expect(container.querySelector('.field__error')?.textContent).toBe('kötelező mező');
   });
 
+  it('hiba esetén aria-invalid és aria-describedby köti a mezőt az üzenethez', () => {
+    act(() => {
+      root.render(<TextAreaField label="Prompt" value="" error="kötelező mező" onChange={vi.fn()} />);
+    });
+    const textarea = container.querySelector('textarea');
+    const errorElement = container.querySelector('.field__error');
+    expect(textarea?.getAttribute('aria-invalid')).toBe('true');
+    expect(errorElement?.id).toBeTruthy();
+    expect(textarea?.getAttribute('aria-describedby')).toBe(errorElement?.id);
+  });
+
+  it('hiba nélkül nem tesz ki aria-invalid attribútumot, és megőrzi a hívóét', () => {
+    act(() => {
+      root.render(<TextAreaField label="Prompt" value="" aria-invalid="true" onChange={vi.fn()} />);
+    });
+    expect(container.querySelector('textarea')?.getAttribute('aria-invalid')).toBe('true');
+    expect(container.querySelector('textarea')?.getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('hiba esetén a hívó saját aria-describedby értéke megmarad a hiba azonosítója mellett', () => {
+    act(() => {
+      root.render(
+        <TextAreaField id="prompt" label="Prompt" value="" aria-describedby="sugo" error="hiba" onChange={vi.fn()} />,
+      );
+    });
+    expect(container.querySelector('textarea')?.getAttribute('aria-describedby')).toBe('sugo prompt-error');
+  });
+
   it('a szerkesztésre az onChange a beírt értékkel hívódik', () => {
     const onChange = vi.fn();
     act(() => {

@@ -1,6 +1,7 @@
 import { Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
 import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
 import {
   UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS,
@@ -101,7 +102,7 @@ function renderFieldControl(
     case 'select': {
       return (
         <SelectField
-          aria-label={field.label}
+          label={field.label}
           options={control.options.map((option) => ({ value: option, label: option }))}
           placeholder="nincs megadva"
           value={isString(rawValue) ? rawValue : ''}
@@ -147,22 +148,20 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
   return (
     <div className="agent-definition-entry-fields">
       {FIELD_GROUPS.map((group) => (
-        <fieldset key={group}>
-          <legend>{group}</legend>
+        <InspectorSection key={group} title={group}>
           {AGENT_DEFINITION_FIELD_TABLE.filter((field) => field.group === group).map((field) => (
             <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
           ))}
-        </fieldset>
+        </InspectorSection>
       ))}
-      <fieldset>
-        <legend>nem megerősített mezők</legend>
+      <InspectorSection title="nem megerősített mezők">
         <p className="node-inspector__reason">{UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON}</p>
         {UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS.map((key) => (
           <p key={key}>
             <b>{key}</b>: {describeUnknownValue(record[key])}
           </p>
         ))}
-      </fieldset>
+      </InspectorSection>
     </div>
   );
 }

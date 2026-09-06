@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StartNodeFields } from './StartNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
@@ -156,5 +157,27 @@ describe('StartNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ inputFields: [{ name: 'b', label: 'B', valueKind: 'string', required: false }] }),
     );
+  });
+
+  it('az `inputFields.0.name` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    const config: StartNodeConfig = {
+      ...EMPTY_CONFIG,
+      inputFields: [{ name: 'a', label: 'A', valueKind: 'string', required: false }],
+    };
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['inputFields.0.name', 'Kötelező mező']])}>
+          <StartNodeFields config={config} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const [nameInput] = [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')];
+    if (nameInput === undefined) {
+      throw new Error('a teszt nem találta a név mezőt');
+    }
+    expect(nameInput.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(nameInput.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező mező');
   });
 });

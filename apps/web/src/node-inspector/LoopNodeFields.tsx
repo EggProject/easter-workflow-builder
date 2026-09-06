@@ -1,7 +1,9 @@
 import type { LoopNodeConfig } from '@easter-workflow-builder/protocol';
 import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
+import { useFieldError } from './use-field-error.ts';
 
 export interface LoopNodeFieldsProperties {
   readonly config: LoopNodeConfig;
@@ -20,14 +22,16 @@ export interface LoopNodeFieldsProperties {
  */
 export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const maxIterationsError = useFieldError('maxIterations');
+  const continueExpressionError = useFieldError('continueExpression');
 
   return (
-    <fieldset>
-      <legend>ciklus</legend>
+    <InspectorSection title="ciklus">
       <TextField
         type="number"
         label="Max. iterációk száma"
         value={String(config.maxIterations)}
+        error={maxIterationsError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           onChange({ ...config, maxIterations: Number(event.target.value) });
         }}
@@ -35,10 +39,11 @@ export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): 
       <TextAreaField
         label="Folytatás feltétel (continueExpression)"
         value={config.continueExpression}
+        error={continueExpressionError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, continueExpression: event.target.value });
         }}
       />
-    </fieldset>
+    </InspectorSection>
   );
 }

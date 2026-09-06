@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoopNodeFields } from './LoopNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 type OnChange = (nextConfig: LoopNodeConfig) => void;
 
@@ -74,5 +75,23 @@ describe('LoopNodeFields', () => {
       throw new Error('a teszt nem talált onChange hívást');
     }
     expect(lastCall[0].maxIterations).toBe(0);
+  });
+
+  it('a `maxIterations` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['maxIterations', 'Kötelező']])}>
+          <LoopNodeFields config={CONFIG} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const maxIterationsInput = container.querySelector('input');
+    if (maxIterationsInput === null) {
+      throw new Error('a teszt nem találta a maxIterations mezőt');
+    }
+    expect(maxIterationsInput.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(maxIterationsInput.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező');
   });
 });

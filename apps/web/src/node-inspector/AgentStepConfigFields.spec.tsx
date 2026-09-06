@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): void {
   let prototype: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -21,9 +22,11 @@ function typeInto(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaEl
 }
 
 function selectByLabel(container: HTMLElement, label: string): HTMLSelectElement {
-  const select = container.querySelector<HTMLSelectElement>(`select[aria-label="${CSS.escape(label)}"]`);
-  if (select === null) {
-    throw new Error(`a teszt nem talált "${label}" aria-label select elemet`);
+  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
+    (candidate) => candidate.closest('label')?.textContent.includes(label) === true,
+  );
+  if (select === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select elemet`);
   }
   return select;
 }
@@ -276,7 +279,9 @@ describe('AgentStepConfigFields', () => {
     const onChange = vi.fn();
     render(BASE_CONFIG, onChange);
     const textInputs = [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')];
-    const cwdInput = textInputs.find((input) => input.closest('fieldset')?.textContent.includes('Munkakönyvtár'));
+    const cwdInput = textInputs.find(
+      (input) => input.closest('[role="group"]')?.textContent.includes('Munkakönyvtár') === true,
+    );
     if (cwdInput === undefined) {
       throw new Error('a teszt nem talált cwd mezőt');
     }
@@ -361,7 +366,7 @@ describe('AgentStepConfigFields', () => {
     // értékétől, különben a lenti `.find` az azonos szövegű `promptTemplate` textarea-t
     // találná meg elsőként (DOM sorrend szerint az korábban rendereltik).
     render({ ...BASE_CONFIG, systemPrompt: 'rendszer sablon' }, onChange);
-    expect(container.querySelector('select[aria-label="Rendszer prompt módja"]')).not.toBeNull();
+    expect(selectByLabel(container, 'Rendszer prompt módja')).toBeDefined();
     const systemPromptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
       (textarea) => textarea.value === 'rendszer sablon',
     );
@@ -387,5 +392,48 @@ describe('AgentStepConfigFields', () => {
       typeInto(promptTextarea, 'új sablon');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ promptTemplate: 'új sablon' }));
+  });
+
+  it('a `promptTemplate`, a `systemPrompt` és a `providerId` mezőnkénti hibája megjelenik a mezők alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider
+          value={
+            new Map([
+              ['promptTemplate', 'Kötelező mező'],
+              ['systemPrompt', 'Érvénytelen alak'],
+              ['providerId', 'Ismeretlen provider'],
+            ])
+          }
+        >
+          <AgentStepConfigFields config={BASE_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const promptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
+      (textarea) => textarea.value === 'sablon',
+    );
+    if (promptTextarea === undefined) {
+      throw new Error('a teszt nem találta a prompt sablon mezőt');
+    }
+    expect(promptTextarea.getAttribute('aria-invalid')).toBe('true');
+    const promptErrorElement = [...container.querySelectorAll('.field__error')].find(
+      (element) => element.id === promptTextarea.getAttribute('aria-describedby'),
+    );
+    expect(promptErrorElement?.textContent).toBe('Kötelező mező');
+
+    const systemPromptModeSelect = selectByLabel(container, 'Rendszer prompt módja');
+    expect(systemPromptModeSelect.getAttribute('aria-invalid')).toBe('true');
+    const systemPromptErrorElement = [...container.querySelectorAll('.field__error')].find(
+      (element) => element.id === systemPromptModeSelect.getAttribute('aria-describedby'),
+    );
+    expect(systemPromptErrorElement?.textContent).toBe('Érvénytelen alak');
+
+    const providerSelect = selectByLabel(container, 'Provider felülírás');
+    expect(providerSelect.getAttribute('aria-invalid')).toBe('true');
+    const providerErrorElement = [...container.querySelectorAll('.field__error')].find(
+      (element) => element.id === providerSelect.getAttribute('aria-describedby'),
+    );
+    expect(providerErrorElement?.textContent).toBe('Ismeretlen provider');
   });
 });

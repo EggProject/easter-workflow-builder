@@ -1,9 +1,11 @@
 import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/protocol';
 import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
 import { fromNumberListFieldValue, toNumberListFieldValue } from './number-list-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
+import { useFieldError } from './use-field-error.ts';
 
 export interface ErrorHandlerNodeFieldsProperties {
   readonly config: ErrorHandlerNodeConfig;
@@ -17,14 +19,17 @@ export interface ErrorHandlerNodeFieldsProperties {
  */
 export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const maxAttemptsError = useFieldError('maxAttempts');
+  const backoffMsError = useFieldError('backoffMs');
+  const handledErrorKindsError = useFieldError('handledErrorKinds');
 
   return (
-    <fieldset>
-      <legend>hibakezelő</legend>
+    <InspectorSection title="hibakezelő">
       <TextField
         type="number"
         label="Max. próbálkozások száma"
         value={String(config.maxAttempts)}
+        error={maxAttemptsError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           onChange({ ...config, maxAttempts: Number(event.target.value) });
         }}
@@ -32,6 +37,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
       <TextAreaField
         label="Várakozás próbálkozásonként, ms (soronként egy szám)"
         value={toNumberListFieldValue(config.backoffMs)}
+        error={backoffMsError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, backoffMs: fromNumberListFieldValue(event.target.value) });
         }}
@@ -39,10 +45,11 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
       <TextAreaField
         label="Kezelt hibafajták (soronként egy)"
         value={toStringListFieldValue(config.handledErrorKinds)}
+        error={handledErrorKindsError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, handledErrorKinds: fromStringListFieldValue(event.target.value) });
         }}
       />
-    </fieldset>
+    </InspectorSection>
   );
 }

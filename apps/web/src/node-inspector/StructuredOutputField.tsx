@@ -36,7 +36,7 @@ export function StructuredOutputField(properties: Readonly<StructuredOutputField
       {isEnabled && (
         <>
           <SelectField
-            aria-label="Strukturált kimenet stratégiája"
+            label="Strukturált kimenet stratégiája"
             options={StructuredOutputStrategyIdSchema.options.map((option) => ({ value: option, label: option }))}
             value={value.strategy}
             onChange={(event: ChangeEvent<HTMLSelectElement>) => {

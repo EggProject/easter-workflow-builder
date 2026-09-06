@@ -12,6 +12,7 @@ import { LoopNodeFields } from './LoopNodeFields.tsx';
 import { ScriptNodeFields } from './ScriptNodeFields.tsx';
 import { StartNodeFields } from './StartNodeFields.tsx';
 import { SubWorkflowNodeFields } from './SubWorkflowNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 import { fieldErrorsFromZodError } from './field-errors-from-zod-error.ts';
 import './node-inspector.css';
 
@@ -27,6 +28,13 @@ export interface NodeInspectorProperties {
    */
   readonly inheritedProviderDescription: string;
 }
+
+/**
+ * Érvényes `config` esetén ez a térkép megy le a kontextuson. Modul szintű
+ * konstans, hogy a hivatkozás két render között azonos maradjon, tehát a
+ * `FieldErrorsContext` fogyasztói ne renderelődjenek újra feleslegesen.
+ */
+const NO_FIELD_ERRORS: ReadonlyMap<string, string> = new Map<string, string>();
 
 function renderConfigFields(
   config: NodeConfig,
@@ -91,41 +99,58 @@ function renderConfigFields(
  * fejléc címkéje a `node.type` katalógus bejegyzéséből jön, a mezők viszont
  * a ténylegesen tárolt `config.type`-ból, típusbiztosan).
  *
- * A mezőnkénti hiba egy összesített, útvonal szerinti listaként jelenik meg
- * a panel tetején (`fieldErrorsFromZodError`): minden bejegyzés megnevezi a
- * hibás mező útvonalát, nem csak egy kombinált mondatot ad.
+ * ELRENDEZÉS: a panel dokkolt sáv, nem lebegő doboz - a fogyasztó
+ * (`GraphEditorScreen`) egy `Resizable` osztott elrendezés jobb paneljébe
+ * teszi, tehát a vászon mellette szűkül, és a sáv szélessége húzható
+ * (SPEC-008 5.5). A panel `<aside>` elem, saját hozzáférhető névvel, tehát
+ * a képernyőolvasó kiegészítő területként (`complementary`) találja meg.
+ *
+ * A HIBAJELZÉS KÉT SZINTŰ, a WCAG "error summary" mintája szerint:
+ * a `role="alert"` összesítő a panel tetején megmondja, HÁNY hiba van és
+ * melyik útvonalakon, a mezőnkénti üzenet pedig a hibás mező ALATT áll,
+ * `aria-invalid` és `aria-describedby` kötéssel (a `TextField`, a
+ * `SelectField` és a `TextAreaField` `error` propja). A mezőkhöz a
+ * `FieldErrorsContext` viszi le a térképet, hogy a tíz típus szerinti
+ * komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
   const { node, onChange, onClose, inheritedProviderDescription } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   const parsedConfig = NodeConfigSchema.safeParse(node.config);
-  const fieldErrors = parsedConfig.success ? undefined : fieldErrorsFromZodError(parsedConfig.error);
+  const fieldErrors = parsedConfig.success ? NO_FIELD_ERRORS : fieldErrorsFromZodError(parsedConfig.error);
 
   function handleConfigChange(nextConfig: NodeConfig): void {
     onChange({ ...node, config: nextConfig });
   }
 
   return (
-    <div className="node-inspector">
+    <aside className="node-inspector" aria-label={`${catalogEntry.label} beállításai`}>
       <div className="node-inspector__header">
-        <div>
-          <p className="node-inspector__reason">{catalogEntry.label}</p>
-          <p>{node.id}</p>
+        <div className="node-inspector__identity">
+          <h2 className="node-inspector__title">{catalogEntry.label}</h2>
+          <p className="node-inspector__node-id">{node.id}</p>
         </div>
         <Button type="button" variant="secondary" size="sm" onClick={onClose}>
           Bezárás
         </Button>
       </div>
-      {fieldErrors !== undefined && fieldErrors.size > 0 && (
-        <ul role="alert" className="node-inspector__errors">
-          {Array.from(fieldErrors, ([path, message]) => (
-            <li key={path}>
-              <b>{path === '' ? '(gyökér)' : path}</b>: {message}
-            </li>
-          ))}
-        </ul>
-      )}
-      {renderConfigFields(node.config, handleConfigChange, inheritedProviderDescription)}
-    </div>
+      <div className="node-inspector__body">
+        {fieldErrors.size > 0 && (
+          <div role="alert" className="node-inspector__errors">
+            <p className="node-inspector__errors-title">Érvénytelen mezők: {fieldErrors.size}</p>
+            <ul className="node-inspector__error-list">
+              {Array.from(fieldErrors, ([path, message]) => (
+                <li key={path}>
+                  <b className="node-inspector__error-path">{path}</b> {message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <FieldErrorsContext.Provider value={fieldErrors}>
+          {renderConfigFields(node.config, handleConfigChange, inheritedProviderDescription)}
+        </FieldErrorsContext.Provider>
+      </div>
+    </aside>
   );
 }

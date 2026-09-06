@@ -1,6 +1,8 @@
 import type { ScriptNodeConfig } from '@easter-workflow-builder/protocol';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
+import { useFieldError } from './use-field-error.ts';
 
 export interface ScriptNodeFieldsProperties {
   readonly config: ScriptNodeConfig;
@@ -18,14 +20,15 @@ export interface ScriptNodeFieldsProperties {
  */
 export function ScriptNodeFields(properties: Readonly<ScriptNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const sourceError = useFieldError('source');
 
   return (
-    <fieldset>
-      <legend>szkript</legend>
+    <InspectorSection title="szkript">
       <p role="alert">A motor a futtatáskor `unimplemented_node_type` hibával elutasítja ezt a csomópontot.</p>
       <TextAreaField
         label="Forrás (source)"
         value={config.source}
+        error={sourceError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, source: event.target.value });
         }}
@@ -34,6 +37,6 @@ export function ScriptNodeFields(properties: Readonly<ScriptNodeFieldsProperties
         <span className="field__label">Futásidő (runtime)</span>
         <p>{config.runtime}</p>
       </div>
-    </fieldset>
+    </InspectorSection>
   );
 }

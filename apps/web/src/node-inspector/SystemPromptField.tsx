@@ -10,6 +10,12 @@ export type SystemPromptValue = string | PresetSystemPrompt | null;
 export interface SystemPromptFieldProperties {
   readonly value: SystemPromptValue;
   readonly onChange: (nextValue: SystemPromptValue) => void;
+  /**
+   * A `systemPrompt` mező szintjén jelentkező hibaüzenet (pl. érvénytelen
+   * unió alak) - a mód választón jelenik meg, mert az képviseli a mezőt
+   * mindhárom ágban (`.claude/CLAUDE.md` mezőnkénti hibajelzés).
+   */
+  readonly error?: string | undefined;
 }
 
 const MODE_OPTIONS = [
@@ -38,7 +44,7 @@ const DEFAULT_PRESET: PresetSystemPrompt = {
  * ugyanaz az ellenőrzés legyen, redundáns pár nélkül.
  */
 export function SystemPromptField(properties: Readonly<SystemPromptFieldProperties>): ReactElement {
-  const { value, onChange } = properties;
+  const { value, onChange, error } = properties;
 
   function handleModeChange(event: ChangeEvent<HTMLSelectElement>): void {
     const nextMode = event.target.value;
@@ -60,7 +66,8 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
     return (
       <div className="field">
         <SelectField
-          aria-label="Rendszer prompt módja"
+          label="Rendszer prompt módja"
+          error={error}
           options={MODE_OPTIONS}
           value="none"
           onChange={handleModeChange}
@@ -73,7 +80,8 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
     return (
       <div className="field">
         <SelectField
-          aria-label="Rendszer prompt módja"
+          label="Rendszer prompt módja"
+          error={error}
           options={MODE_OPTIONS}
           value="text"
           onChange={handleModeChange}
@@ -92,7 +100,8 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
   return (
     <div className="field">
       <SelectField
-        aria-label="Rendszer prompt módja"
+        label="Rendszer prompt módja"
+        error={error}
         options={MODE_OPTIONS}
         value="preset"
         onChange={handleModeChange}
@@ -105,7 +114,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
         }}
       />
       <SelectField
-        aria-label="Dinamikus szekciók kizárása"
+        label="Dinamikus szekciók kizárása"
         options={[
           { value: '', label: 'nincs megadva' },
           { value: 'true', label: 'igen' },

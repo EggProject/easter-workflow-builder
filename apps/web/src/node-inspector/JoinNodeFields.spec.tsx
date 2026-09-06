@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoinNodeFields } from './JoinNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLSelectElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLTextAreaElement.prototype;
@@ -159,7 +160,7 @@ describe('JoinNodeFields', () => {
         />,
       );
     });
-    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Összefésülés módja"]');
+    const select = container.querySelector<HTMLSelectElement>('select');
     if (select === null) {
       throw new Error('a teszt nem találta a mód legördülőt');
     }
@@ -198,7 +199,7 @@ describe('JoinNodeFields', () => {
     act(() => {
       root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />);
     });
-    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Összefésülés módja"]');
+    const select = container.querySelector<HTMLSelectElement>('select');
     if (select === null) {
       throw new Error('a teszt nem találta a mód legördülőt');
     }
@@ -206,5 +207,43 @@ describe('JoinNodeFields', () => {
       typeInto(select, 'nincs-ilyen-mod');
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('"script" módra a `settings.source` mezőnkénti hibája a forrás mező alatt jelenik meg', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['settings.source', 'Kötelező mező']])}>
+          <JoinNodeFields config={SCRIPT_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const textarea = container.querySelector('textarea');
+    if (textarea === null) {
+      throw new Error('a teszt nem találta a forrás textarea-t');
+    }
+    expect(textarea.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(textarea.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező mező');
+  });
+
+  it('"ai_synthesis" módra a `settings.promptTemplate` hiba a beágyazott AgentStepConfigFields `promptTemplate` mezője alatt jelenik meg (ScopedFieldErrors)', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['settings.promptTemplate', 'Kötelező mező']])}>
+          <JoinNodeFields config={AI_SYNTHESIS_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const promptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
+      (textarea) => textarea.value === 'foglald össze',
+    );
+    if (promptTextarea === undefined) {
+      throw new Error('a teszt nem találta a prompt sablon mezőt');
+    }
+    expect(promptTextarea.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(promptTextarea.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező mező');
   });
 });

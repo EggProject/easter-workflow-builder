@@ -182,8 +182,10 @@ describe('NodeInspector', () => {
         <NodeInspector node={node} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
       );
     });
-    const legends = [...container.querySelectorAll('legend')].map((element) => element.textContent);
-    expect(legends).toContain(legend);
+    const sectionTitles = [...container.querySelectorAll('.inspector-section__title')].map(
+      (element) => element.textContent,
+    );
+    expect(sectionTitles).toContain(legend);
   });
 
   it('a fejlécben megjeleníti a katalógus címkét és a node azonosítót', () => {
@@ -253,10 +255,21 @@ describe('NodeInspector', () => {
     expect(errorList?.textContent).toContain('maxIterations');
   });
 
-  it('gyökér szintű hibára (felesleges kulcs a config objektumon) "(gyökér)" címkével jeleníti meg az útvonalat', () => {
+  it('gyökér szintű hibára üres útvonal elemet ad, amit a CSS jelöl meg "(gyökér)" felirattal', () => {
     // A `z.strictObject` a felesleges kulcsot a TELJES objektum szintjén jelzi
-    // (nem egy adott mezőn), tehát a Zod issue `path`-ja üres tömb - ez a
-    // `NodeInspector` `path === '' ? '(gyökér)' : path` ágának "gyökér" esete.
+    // (nem egy adott mezőn), tehát a Zod issue `path`-ja üres tömb.
+    //
+    // A `NodeInspector` ezt SZÁNDÉKOSAN nem elágazással kezeli: az üres
+    // útvonalat a `.node-inspector__error-path:empty::before` CSS szabály
+    // jelöli meg "(gyökér)" felirattal. Az ok a `.claude/CLAUDE.md` 5.
+    // szekciója: a gyökér szintű hiba a FELÜLETEN elő sem állhat, mert a
+    // gráf betöltésekor a `WorkflowGraphDocumentSchema` ugyanezt a
+    // `NodeConfigSchema` sémát futtatja, tehát egy felesleges kulcsot
+    // hordozó config el sem jut a panelig; egy sosem futó JavaScript ágat
+    // pedig a szabálykönyv tilt. Ez a teszt így azt igazolja, hogy a
+    // gyökér szintű hiba MEGJELENIK a listában, és hogy az útvonal eleme
+    // üres, tehát a CSS szabály tényleg rá illeszkedik.
+    //
     // A TypeScript excess-property ellenőrzése csak FRISS objektum literálra fut
     // egy kontextuális típus helyén; egy közbülső változóba kötött literál már
     // szélesség szerinti (width) altípusként megy át a `NodeConfig` felé, tehát
@@ -276,7 +289,8 @@ describe('NodeInspector', () => {
     });
     const errorList = container.querySelector('.node-inspector__errors');
     expect(errorList).not.toBeNull();
-    expect(errorList?.textContent).toContain('(gyökér)');
+    const paths = [...container.querySelectorAll('.node-inspector__error-path')].map((element) => element.textContent);
+    expect(paths).toEqual(['']);
   });
 
   it('az `agent_step` node szerkesztése a type és az onUnhandledError mezőt megőrzi', () => {

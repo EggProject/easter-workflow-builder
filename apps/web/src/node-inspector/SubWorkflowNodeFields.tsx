@@ -1,8 +1,10 @@
 import type { SubWorkflowNodeConfig } from '@easter-workflow-builder/protocol';
 import { TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
+import { InspectorSection } from './InspectorSection.tsx';
 import { TextAreaField } from './TextAreaField.tsx';
 import { fromStringRecordFieldValue, toStringRecordFieldValue } from './string-record-field-value.ts';
+import { useFieldError } from './use-field-error.ts';
 
 export interface SubWorkflowNodeFieldsProperties {
   readonly config: SubWorkflowNodeConfig;
@@ -17,13 +19,15 @@ export interface SubWorkflowNodeFieldsProperties {
  */
 export function SubWorkflowNodeFields(properties: Readonly<SubWorkflowNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
+  const targetWorkflowIdError = useFieldError('targetWorkflowId');
+  const inputMappingError = useFieldError('inputMapping');
 
   return (
-    <fieldset>
-      <legend>al-workflow</legend>
+    <InspectorSection title="al-workflow">
       <TextField
         label="Célzott workflow azonosítója"
         value={config.targetWorkflowId}
+        error={targetWorkflowIdError}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           onChange({ ...config, targetWorkflowId: event.target.value });
         }}
@@ -31,10 +35,11 @@ export function SubWorkflowNodeFields(properties: Readonly<SubWorkflowNodeFields
       <TextAreaField
         label="Bemenet leképezés (soronként kulcs=érték)"
         value={toStringRecordFieldValue(config.inputMapping)}
+        error={inputMappingError}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           onChange({ ...config, inputMapping: fromStringRecordFieldValue(event.target.value) });
         }}
       />
-    </fieldset>
+    </InspectorSection>
   );
 }

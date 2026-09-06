@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BranchNodeFields } from './BranchNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -151,5 +152,23 @@ describe('BranchNodeFields', () => {
       typeInto(defaultInput, '');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ defaultBranchKey: null }));
+  });
+
+  it('az `expression` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['expression', 'Kötelező']])}>
+          <BranchNodeFields config={CONFIG} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const textarea = container.querySelector('textarea');
+    if (textarea === null) {
+      throw new Error('a teszt nem találta a feltétel mezőt');
+    }
+    expect(textarea.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(textarea.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező');
   });
 });

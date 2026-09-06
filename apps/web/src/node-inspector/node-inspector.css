@@ -1,59 +1,198 @@
+/* A csomópont beállítás panel: a vászon jobb szélére DOKKOLT sáv (SPEC-008
+   5.2, 5.5). Nem lebeg és nem takarja a vásznat - a `graph-editor-screen`
+   egy `Resizable` osztott elrendezés jobb paneljébe teszi, tehát a vászon
+   mellette szűkül, az elválasztó pedig a húzható `.resizable-handle`.
+
+   Minden térköz a design system `--ep-space-*` tokenjeiből jön, minden
+   tipográfia a `--ep-text-*` tokenekből; kitalált pixel érték nincs.
+
+   A panel SAJÁT hátteret kap (`--ep-bg-elevated`), a vászon a nála
+   mélyebb `--ep-bg-sunken` felületen ül (`graph-editor.css`), tehát a két
+   terület a húzható elválasztó nélkül is elkülönül. */
 .node-inspector {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  overflow-y: auto;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
   background: var(--ep-bg-elevated);
-  border-left: 1px solid var(--ep-control-border);
 }
 
+/* A fejléc a görgethető törzsön KÍVÜL áll, tehát görgetés közben is látszik,
+   `position: sticky` nélkül: a panel oszlop irányú flex, a fejléc a nem
+   zsugorodó első elem, a törzs kapja a maradékot. */
 .node-inspector__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ep-space-3);
+  padding: var(--ep-space-4) var(--ep-space-5);
+  border-bottom: 1px solid var(--ep-divider);
+  flex: 0 0 auto;
 }
 
+.node-inspector__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+  min-width: 0;
+}
+
+.node-inspector__title {
+  margin: 0;
+  font: var(--ep-text-h4);
+  color: var(--ep-fg);
+  overflow-wrap: anywhere;
+}
+
+.node-inspector__node-id {
+  margin: 0;
+  font: var(--ep-text-code);
+  color: var(--ep-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A panel ÖNÁLLÓAN görög, a viewporton belül maradva: a görgetés itt van, a
+   `.resizable-panel` így sosem kap második görgősávot. */
+.node-inspector__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-5);
+  padding: var(--ep-space-5);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ============ Összesítő hibablokk ============
+   A mezőnkénti hibaüzenet mellett MEGMARAD a panel tetején álló,
+   `role="alert"` összesítő (a WCAG "error summary" mintája): a mezőnkénti
+   üzenet megmondja, MIT kell javítani, az összesítő azt, hogy HÁNY hiba
+   van, és felsorolja azokat a mezőket is, amiknek nincs saját vezérlőjük a
+   panelen (pl. az `agents` bejegyzések nem megerősített mezői). */
+.node-inspector__errors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+  padding: var(--ep-space-3) var(--ep-space-4);
+  border: 1px solid var(--ep-danger);
+  border-radius: var(--ep-radius-md);
+  color: var(--ep-danger);
+}
+
+.node-inspector__errors-title {
+  margin: 0;
+  font: var(--ep-text-meta);
+}
+
+.node-inspector__error-list {
+  margin: 0;
+  padding-left: var(--ep-space-5);
+  font: var(--ep-text-meta);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+}
+
+/* Az útvonal a `config` gyökerétől számít. Az ÜRES útvonal magát a config
+   objektumot jelenti; ezt CSS jelöli meg, nem JavaScript elágazás, mert a
+   `z.strictObject` gyökér szintű hibája a felületen elő sem állhat (a
+   `WorkflowGraphDocumentSchema` ugyanezt a sémát futtatja a betöltéskor),
+   egy sosem futó ágat pedig a `.claude/CLAUDE.md` 5. szekciója tilt. */
+.node-inspector__error-path:empty::before {
+  content: '(gyökér)';
+}
+
+/* ============ Mezőcsoport (`InspectorSection`) ============
+   A `fieldset`/`legend` párt váltja ki, `role="group"` plusz
+   `aria-labelledby` szemantikával (lásd `InspectorSection.tsx`). A csoport
+   kártya alakú, a design system `settings.html` `.card` mintája szerint. */
+.inspector-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-4);
+  padding: var(--ep-space-4);
+  border: 1px solid var(--ep-border-subtle);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg);
+}
+
+.inspector-section__title {
+  margin: 0;
+  font: var(--ep-text-h4);
+  color: var(--ep-fg);
+}
+
+/* A csoporton belüli mezők közötti térköz. A mezőnek MINDIG van helye a
+   hibaüzenetének (lásd lentebb), tehát ez a rés tisztán a mezők közötti
+   levegő, nem a hibaüzeneté - a kettő nem csúszik egymásra. */
+.inspector-section__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-5);
+  min-width: 0;
+}
+
+/* ============ Mezők ============
+   1. A `.input` a `packages/ui` `text-field` témájából jön. A panelben a
+      `<textarea>` is ezt az osztályt viseli, aminek a natív, `cols`
+      alapú belső szélessége felülírandó, különben szűk panelben kilóg.
+   2. A HIBAÜZENET HELYE MINDIG FENN VAN TARTVA: a `.field` a panelben
+      gridre vált, aminek a harmadik sora legalább egy sornyi magas, akkor
+      is, ha nincs hiba. Így a hibaüzenet megjelenése nem tolja el a panel
+      többi mezőjét (a layout nem ugrik). A `.field` alap `gap` értéke a
+      design systemé marad. */
+.node-inspector .input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.node-inspector textarea.input {
+  resize: vertical;
+}
+
+.node-inspector .field {
+  display: grid;
+  grid-template-rows: auto auto minmax(var(--ep-space-4), auto);
+  min-width: 0;
+}
+
+/* Az örökölt provider megnevezése és a "SPEC-009 hatóköre" indoklások. */
 .node-inspector__reason {
+  margin: 0;
   font: var(--ep-text-meta);
   color: var(--ep-fg-muted);
 }
 
-.node-inspector fieldset,
-.agent-definition-entry-fields fieldset {
+/* Több mezőt egy sorba rendező lista sor (bemeneti mezők, ágak, agent
+   bejegyzések). Törhető, hogy szűk panelben se lógjon ki semmi, és a
+   gombja a mezők aljához igazodjon. */
+.node-inspector__list-row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border: 1px solid var(--ep-control-border);
-  border-radius: var(--ep-radius-md);
-  padding: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ep-space-3);
+  padding: var(--ep-space-3);
+  border: 1px solid var(--ep-divider);
+  border-radius: var(--ep-radius-sm);
+  min-width: 0;
 }
 
-.node-inspector legend,
-.agent-definition-entry-fields legend {
-  font: 500 12px var(--ep-font-sans);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ep-fg-muted);
-  padding: 0 4px;
+/* A lista sor mezői egyenlően osztoznak a soron, és 200px alatt új sorba
+   törnek. A 200px nem kitalált szám: a design system `.select` szabályának
+   `min-width: 200px` deklarációjával azonos (`packages/ui/src/select-field/
+   select-field.css`), tehát a natív választó és a szöveges mező ugyanazon a
+   ponton tör új sorba - enélkül a `.select` szélesebb maradna a sorban lévő
+   szöveges mezőknél, és kilógna. */
+.node-inspector__list-row > .field {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
 .agents-field-editor__entry-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.node-inspector__errors {
-  color: var(--ep-danger);
-  font: var(--ep-text-meta);
-  margin: 0;
-  padding-left: 18px;
-}
-
-.node-inspector__list-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ep-space-3);
+  min-width: 0;
 }

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorHandlerNodeFields } from './ErrorHandlerNodeFields.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -67,5 +68,23 @@ describe('ErrorHandlerNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ handledErrorKinds: ['timeout', 'network_error'] }),
     );
+  });
+
+  it('a `maxAttempts` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
+    act(() => {
+      root.render(
+        <FieldErrorsContext.Provider value={new Map([['maxAttempts', 'Kötelező']])}>
+          <ErrorHandlerNodeFields config={CONFIG} onChange={vi.fn()} />
+        </FieldErrorsContext.Provider>,
+      );
+    });
+    const maxAttemptsInput = container.querySelector('input');
+    if (maxAttemptsInput === null) {
+      throw new Error('a teszt nem találta a maxAttempts mezőt');
+    }
+    expect(maxAttemptsInput.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(maxAttemptsInput.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('Kötelező');
   });
 });
