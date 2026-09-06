@@ -192,6 +192,40 @@ test('a vászon a rendelkezésre álló területet tölti ki, és az oldal nem g
   expect(layout.canvasHeight).toBeGreaterThan((layout.viewportHeight - layout.canvasTop) / 2);
 });
 
+test('a vászon és a panel alsó éle a rendelkezésre álló terület aljához közel ér, több viewport magasságon (2026-09-06)', async ({
+  page,
+}) => {
+  // A MÉRT HIBA (editor-node-inspector.png). Az .app-content átemelt 80px
+  // alsó paddingje (--ep-space-20) a hosszú, görgetett listákra (workflow
+  // lista, futás előzmények) szánt légtér; a gráf szerkesztő viszont az
+  // .app-content TARTALOM dobozát tölti ki flex:1-gyel, tehát a 80px
+  // levonódott a vászon/panel rendelkezésre álló magasságából, és üres sáv
+  // maradt alattuk a viewport aljáig.
+  //
+  // A JAVÍTÁS (topnav-shell.css, `.app-content:has(> .graph-editor-screen)`)
+  // a paddinget a felső 8px-re (--ep-space-2) csökkenti erre a screen-re. A
+  // teszt ezt igazolja: a rés a token értéke köré esik, nem a régi 80px köré.
+  for (const viewportHeight of [700, 900, 1200]) {
+    await page.setViewportSize({ width: 1440, height: viewportHeight });
+    await page.goto(EDITOR_URL);
+    await expect(nodeLocator(page, 'n1')).toBeVisible();
+
+    const gap = await page.evaluate(() => {
+      const group = globalThis.document.querySelector('.resizable-group');
+      if (group === null) {
+        throw new Error('a teszt nem talalt .resizable-group elemet');
+      }
+      const bottom = group.getBoundingClientRect().bottom;
+      return globalThis.document.documentElement.clientHeight - bottom;
+    });
+
+    // --ep-space-2 (8px), kis tűréssel a szélkerekítésre. A régi, javítatlan
+    // állapot ~80px rést adott, ami ennél a felső korlátnál jóval nagyobb.
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(9);
+  }
+});
+
 test('a React Flow vezérlő gombjai a design system tokenjeire vannak témázva, sötét módban is', async ({ page }) => {
   await page.addInitScript(() => {
     globalThis.localStorage.setItem('eggTheme', 'dark');

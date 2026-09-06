@@ -599,6 +599,8 @@ A `human_approval` csomópont a motorban `waiting_approval` állapotba viszi a l
 
 **A vászon minden sávban a teljes rendelkezésre álló területet tölti ki**, a SPEC-007 5.2 "faltól falig" követelménye szerint; a `.app-content` magassága a viewport magasságából és a `60px` bar magasságából számítódik, mindkettő a design system saját értéke.
 
+**A gráf szerkesztőn az `.app-content` alsó paddingje 8px-re csökken (2026-09-06).** Az átemelt `.app-content` 80px alsó paddingje (`--ep-space-20`) a hosszú, görgetett listákra (workflow lista, futás előzmények) szánt légtér; a gráf szerkesztő viszont az `.app-content` tartalom dobozát tölti ki `flex: 1`-gyel, tehát a 80px levonódott a vászon és a dokkolt beállítás panel rendelkezésre álló magasságából, üres sávot hagyva alattuk a viewport aljáig. A `packages/ui/src/topnav-shell/topnav-shell.css` `.app-content:has(> .graph-editor-screen)` szabálya kizárólag erre a screen-re csökkenti a paddinget a felső 8px-re (`--ep-space-2`), mert egyedül a `GraphEditorScreen` gyökere ad megnevezett osztályt az `.app-content` közvetlen gyerekének. Regresszió: `apps/web/e2e/graph-editor.spec.ts`.
+
 ## 11. A csomagok belső szerkezete
 
 ### 11.1 `packages/ui`, egy új téma

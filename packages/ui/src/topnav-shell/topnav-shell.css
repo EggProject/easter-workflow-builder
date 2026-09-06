@@ -138,6 +138,41 @@
   overflow: auto;
 }
 
+/* ============================================================
+   A gráf szerkesztő alsó légtere (2026-09-06). ÚJ, önálló blokk - a
+   fenti, átemelt .app-content szabály (36-39. sor) egyetlen bájtja
+   sem változott.
+
+   A MÉRT HIBA. Az átemelt .app-content 80px alsó paddingje
+   (--ep-space-20) egy hosszú, GÖRGETETT lista (workflow lista, futás
+   előzmények) aljára szánt légtér. A gráf szerkesztő a fenti blokk
+   .app-content flex:1 szabályára épülve az .app-content TARTALOM
+   dobozát tölti ki (apps/web graph-editor-screen.css); mivel a padding
+   a tartalom doboz köré kerül, nem a flex-allokált külső méretbe
+   számít bele, a 80px levonódik a vászon és a dokkolt beállítás panel
+   rendelkezésre álló magasságából. Mérve (chromium, 1440x900,
+   editor-node-inspector.png): a vászon/panel alsó éle a viewport
+   aljától 80px-re végződött, üres sávot hagyva alatta.
+
+   A JAVÍTÁS. Kizárólag a gráf szerkesztő screen-re szűkítve: a
+   `:has(> .graph-editor-screen)` azért használható megkülönböztetésül,
+   mert EGYEDÜL ez a screen ad megnevezett osztályt az .app-content
+   közvetlen gyerekének (a workflow lista és a futás előzmények screen
+   gyökere osztály nélküli div, GraphEditorScreen.tsx). Az alsó padding
+   a felső paddinggel (--ep-space-2, 8px) egyező értékre csökken: token
+   skála tagja, nem kitalált szám, és szimmetrikus a már meglévő felső
+   8px-szel. A `:has()` a chromiumban Chrome 105 óta (2022) natívan
+   támogatott (https://developer.chrome.com/blog/has-m105/,
+   https://caniuse.com/css-has), a projekt e2e Playwright futtatása
+   kizárólag chromium ellen megy (apps/web/playwright.config.ts,
+   SPEC-007 13.4). Regresszió: apps/web/e2e/graph-editor.spec.ts, "a
+   vászon és a panel alsó éle a rendelkezésre álló terület aljához
+   közel ér" teszt.
+   ============================================================ */
+.app-content:has(> .graph-editor-screen) {
+  padding-bottom: var(--ep-space-2);
+}
+
 /* A böngésző alapértelmezett 8px-es `body` margója nélkül a shell nem
    ér el a fal széléig, és a `min-height: 100vh` mellé 16px függőleges
    túllógást (állandó oldalgörgetést) ad. A forrás `_shell.css` ezt a

@@ -65,6 +65,12 @@ határozott magasságot ad a gyerekeinek (`packages/ui` topnav shell), tehát a 
 maradék helyet tölti ki (`flex: 1`), belül pásztáz, és az OLDAL nem görget. A `70vh` mellett a
 csomópont rács túlnyúlt a viewporton, a beállítás panel alja pedig levágódott.
 
+**Az `.app-content` 80px alsó paddingje a szerkesztőn 8px-re csökken (2026-09-06)**, mert a
+tartalom doboz mérete a flex-allokált magasságból számít, nem afölé: a görgetett listákra szánt
+80px levonódott a vászon/panel rendelkezésre álló magasságából, üres sávot hagyva alattuk. A
+`topnav-shell.css` `.app-content:has(> .graph-editor-screen)` szabálya csökkenti a paddinget a
+felső 8px-re (`--ep-space-2`), regresszió `apps/web/e2e/graph-editor.spec.ts`-ben.
+
 **A vászon a React Flow mért csomópont méretét saját nézeti állapotban tartja**
 (`src/graph-editor/measured-node-sizes.ts`, SPEC-008 5.5). Nélküle a vezérelt oda-vissza
 leképezés minden körben elnyelte a `measured` mezőt: a csomópontok tartósan
