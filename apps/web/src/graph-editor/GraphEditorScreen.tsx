@@ -7,7 +7,16 @@ import {
   type WorkflowGraphDocument,
   type WorkflowNodeInput,
 } from '@easter-workflow-builder/protocol';
-import { Button, Skeleton, ToastViewport, useToasts } from '@easter-workflow-builder/ui';
+import {
+  Button,
+  Resizable,
+  ResizableHandle,
+  ResizablePanel,
+  Skeleton,
+  ToastViewport,
+  joinClassNames,
+  useToasts,
+} from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
@@ -232,27 +241,49 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       {isLoading ? (
         <Skeleton shape="text" lines={4} />
       ) : (
-        <div className="graph-editor-screen__body">
-          <div className="graph-editor-screen__canvas">
-            <GraphEditorCanvas
-              nodes={currentNodes}
-              edges={currentEdges}
-              onGraphChange={handleGraphChange}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
-              autoLayoutRevision={autoLayoutRevision}
-            />
-          </div>
-          {selectedNode !== undefined && (
-            <NodeInspector
-              node={selectedNode}
-              onChange={handleUpdateNode}
-              onClose={() => {
-                setSelectedNodeId(undefined);
-              }}
-              inheritedProviderDescription={inheritedProviderDescription}
-            />
+        <div
+          className={joinClassNames(
+            'graph-editor-screen__body',
+            selectedNode === undefined && 'graph-editor-screen__body--solo',
           )}
+        >
+          {/* A vászon és a beállítás panel egyetlen, HÚZHATÓ osztott
+              elrendezésben áll (SPEC-008 5.5): a panel dokkolt sáv a jobb
+              szélen, nem lebegő doboz, tehát a vászon mellette szűkül. A
+              vászon panelje MINDIG felmountolva marad, akkor is, amikor
+              nincs kiválasztott csomópont - enélkül a kiválasztás a React
+              Flow-t újramountolná, és a felhasználó pásztázása és nagyítása
+              elveszne. A "nincs kiválasztás" állapot elrendezését a
+              `--solo` módosító adja, CSS-ben. */}
+          <Resizable defaultSizes={[70, 30]}>
+            <ResizablePanel index={0}>
+              <div className="graph-editor-screen__canvas">
+                <GraphEditorCanvas
+                  nodes={currentNodes}
+                  edges={currentEdges}
+                  onGraphChange={handleGraphChange}
+                  selectedNodeId={selectedNodeId}
+                  onSelectNode={setSelectedNodeId}
+                  autoLayoutRevision={autoLayoutRevision}
+                />
+              </div>
+            </ResizablePanel>
+            {selectedNode !== undefined && (
+              <>
+                <ResizableHandle beforeIndex={0} aria-label="A beállítás panel szélessége" />
+                <ResizablePanel index={1}>
+                  <NodeInspector
+                    node={selectedNode}
+                    onChange={handleUpdateNode}
+                    onClose={() => {
+                      setSelectedNodeId(undefined);
+                    }}
+                    inheritedProviderDescription={inheritedProviderDescription}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </Resizable>
         </div>
       )}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
