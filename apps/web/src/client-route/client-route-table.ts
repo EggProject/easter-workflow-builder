@@ -7,13 +7,18 @@
  * előzmény füleinek mintájára), nem az útvonal sablonjából - paraméter
  * nélküli sablonra nem írható tesztelhető paraméteres ág (SPEC-007 7.2,
  * 13.3, SPEC-008 18. kritérium).
+ *
+ * A `label` az útvonal emberi olvasható neve (SPEC-007 5.1, 2026-09-06
+ * kiegészítés): az egyetlen forrása a topnav navigáció linkszövegének és a
+ * `AppShell` morzsamenüjének is, hogy ne keletkezzen második, duplikált
+ * névlista (`.claude/CLAUDE.md` 5. szekció).
  */
 export const CLIENT_ROUTE_TABLE = {
-  workflowList: { template: '/' },
-  runHistory: { template: '/runs' },
-  graphEditor: { template: '/editor' },
-  runView: { template: '/run' },
-} as const satisfies Readonly<Record<string, { readonly template: string }>>;
+  workflowList: { template: '/', label: 'Workflow-k' },
+  runHistory: { template: '/runs', label: 'Futás előzmények' },
+  graphEditor: { template: '/editor', label: 'Szerkesztő' },
+  runView: { template: '/run', label: 'Futás nézet' },
+} as const satisfies Readonly<Record<string, { readonly template: string; readonly label: string }>>;
 
 /**
  * A `CLIENT_ROUTE_TABLE` kulcsainak uniója: minden kliens útvonal azonosítója.
