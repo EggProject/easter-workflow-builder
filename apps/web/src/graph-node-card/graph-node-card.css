@@ -6,8 +6,21 @@
    node címke (`workflowNode.label`) tetszőlegesen hosszú lehet, és a kártya
    ekkor a mértnél nagyobbra nő, ahelyett hogy a tartalom levágódna (lásd a
    `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció
-   "Mit NEM zár le ez a mérés" bekezdését). */
+   "Mit NEM zár le ez a mérés" bekezdését).
+
+   A `box-sizing: border-box` NEM stílus ízlés, hanem a konstans jelentésének
+   helyreállítása, és egy mért hiba javítása (research 7. szekció "A mért
+   érték doboz modellje"). A mérés a kártya `offsetWidth`/`offsetHeight`
+   értékét vette fel, ami DEFINÍCIÓ SZERINT border-box méret (keret és
+   belső margó együtt). A böngésző alapértelmezett `content-box` modelljében
+   viszont a `min-width`/`min-height` a TARTALOM dobozra vonatkozik, tehát a
+   358x106-os konstansból 392x132-es kirajzolt kártya lett (mérve: 358 + 2*16
+   belső margó + 2*1 keret = 392, illetve 106 + 2*12 + 2*1 = 132), miközben a
+   dagre elrendezés ugyanezt a konstanst 358x106-ként kapta meg. A két szám
+   különbsége ült rá a csomópontok közti hézagra: a dokumentált 50 egységes
+   `ranksep`-ből 16, az 50 egységes `nodesep`-ből 24 maradt. */
 .graph-node-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 4px;

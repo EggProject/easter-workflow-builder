@@ -502,6 +502,50 @@ figyelmeztető sor). A két szám **különböző mérésből** származik, ami 
 adott node tényleges mérete, hanem egy olyan alsó korlát mindkét dimenzióra, ami a mért
 tartomány egyetlen pontján sem lépődik túl.
 
+### 7.1 A mért érték doboz modellje (2026-09-06, utólagos javítás)
+
+**Mit vett fel a fenti mérés valójában.** A `card.offsetWidth`/`card.offsetHeight` a HTML
+definíciója szerint **border-box** méret: a tartalom, a belső margó (`padding`) és a keret
+(`border`) együtt. A `358` és a `106` tehát a kártya TELJES kirajzolt doboza, nem a
+tartalomdoboza.
+
+**A hiba, ami ebből lett.** A `graph-node-card.css` ezt a két számot `min-width`/`min-height`
+alakban alkalmazta, a böngésző alapértelmezett `box-sizing: content-box` modelljében - ahol a
+`min-width`/`min-height` a TARTALOM dobozra vonatkozik. A `12px 16px` belső margó és az `1px`
+keret ezért hozzáadódott, és a ténylegesen kirajzolt kártya **`392x132`** lett, miközben a
+`graph-auto-layout` téma ugyanezt a csomópontot `358x106`-osnak adta át a dagre-nak.
+
+**A következmény, saját méréssel (2026-09-06, valós Chromium, `vite build` + `vite preview`,
+1440x900 viewport, hatcsomópontos gráf egy elágazással).** A dagre helyesen dolgozott: a
+rangok középpont-távolsága pontosan `358 + 50 = 408`, az azonos rangba eső csomópontoké
+pontosan `106 + 50 = 156` egység lett, tehát mindkét dokumentált alapérték (6.3 szekció)
+érvényben volt, és a középpont -> bal felső sarok eltolás korrekciója is helyes volt. A
+TÉNYLEGES hézag viszont a kirajzolt méretből adódik: `408 - 392 = 16` a rangok között és
+`156 - 132 = 24` az azonos rangon belül, az 50-50 helyett. Innen a felhasználó által jelzett
+kép: a párhuzamos csomópontok egymáshoz tapadtak, és az élek eltűntek közöttük.
+
+**A javítás.** `box-sizing: border-box` a `.graph-node-card` szabályban. Ezzel a kirajzolt
+kártya pontosan a MÉRT konstans (ugyanazzal a méréssel ellenőrizve: `358x106`), a hézagok
+pedig pontosan a dokumentált `50`-`50`. A konstans értéke NEM változott, mert nem az volt
+hibás, hanem a doboz modell, amiben alkalmaztuk. A `min-width`/`min-height` alak megmarad, a
+hosszú címke miatti növekedés lehetősége is (lásd a következő bekezdést).
+
+### 7.2 A nézet újraillesztése az automatikus elrendezés után (2026-09-06)
+
+**Ugyanabban a mérésben felvett második tény.** A React Flow vászon nagyítása (a
+`.react-flow__viewport` `transform: scale()` értéke) az "Elrendezés" kattintás előtt és után
+**pontosan ugyanaz a szám** volt (`0,554659`), holott az elrendezés eredményének befoglaló
+doboza jelentősen eltért a betöltött, kézi elrendezésétől. Ez megerősíti a `<ReactFlow>`
+`fitView` propjának dokumentált jelentését (`@xyflow/react` `component-props.d.ts`: "the flow
+will be zoomed and panned to fit all the nodes **initially** provided"): a prop kizárólag a
+kezdeti nézetre hat, egy későbbi pozíció átírás után nem illeszt újra. Emiatt csúszott az
+elrendezett gráf a vászon egy sarkába, nagy üres területtel maga körül.
+
+**A javítás és az ellenőrzése.** A `FitViewOnAutoLayout` komponens (a `<ReactFlow>`
+gyerekeként, `useReactFlow()` hookkal) az elrendezés számlálójának megváltozásakor
+`fitView()`-t hív. A javítás után ugyanaz a mérés a kattintás előtt `0,563239`, utána
+`0,622111` nagyítást adott, tehát a nézet ténylegesen újra illeszkedett.
+
 **Mit NEM zár le ez a mérés.** Az egyedi címke (`workflowNode.label`) éles használatban
 tetszőlegesen hosszú lehet - erre nincs és nem is lehet véges felső korlát méréssel
 igazolni. Emiatt a `graph-node-card.css` a mért konstanst **`min-width`/`min-height`**

@@ -65,6 +65,12 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   const [currentEdges, setCurrentEdges] = useState<readonly WorkflowEdgeInput[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [validationMessage, setValidationMessage] = useState<string | undefined>(undefined);
+  // Az automatikus elrendezések számlálója: a vászon ennek megváltozására
+  // illeszti újra a nézetet (`GraphEditorCanvas.autoLayoutRevision`). Azért
+  // külön számláló, és nem a `currentNodes` figyelése, mert a nézet
+  // újraillesztése KIZÁRÓLAG az elrendezés gomb hatása - egy kézi node
+  // húzáskor a nézet ugrálása hibás viselkedés lenne.
+  const [autoLayoutRevision, setAutoLayoutRevision] = useState(0);
   // Külön jelző, nem a `graphState.state.status === 'success'` közvetlenül:
   // a `graphState.state` sikeresre váltása és a `currentNodes`/`currentEdges`
   // TÉNYLEGES feltöltése két külön render (az állapotfrissítés csak a
@@ -150,6 +156,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   // `isGraphDirty`-n át magától igazra vált - nincs hozzá külön jelző.
   const handleAutoLayout = useCallback((): void => {
     setCurrentNodes((current) => layoutGraph(current, currentEdges));
+    setAutoLayoutRevision((revision) => revision + 1);
   }, [currentEdges]);
 
   // A korai visszatérés minden hook UTÁN, de a lenti `handleSave` ELŐTT áll:
@@ -233,6 +240,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
               onGraphChange={handleGraphChange}
               selectedNodeId={selectedNodeId}
               onSelectNode={setSelectedNodeId}
+              autoLayoutRevision={autoLayoutRevision}
             />
           </div>
           {selectedNode !== undefined && (

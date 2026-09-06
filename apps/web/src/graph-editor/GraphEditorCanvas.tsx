@@ -18,6 +18,7 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
 import { GRAPH_NODE_CARD_HEIGHT, GRAPH_NODE_CARD_WIDTH } from '../graph-node-catalog/graph-node-catalog.ts';
+import { FitViewOnAutoLayout } from './FitViewOnAutoLayout.tsx';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
 import { isNodeDeselected, mergeEdgeSelection, type SelectedEdgeIds } from './graph-selection.ts';
@@ -59,6 +60,18 @@ export interface GraphEditorCanvasProperties {
    */
   readonly selectedNodeId: string | undefined;
   readonly onSelectNode: (nodeId: string | undefined) => void;
+  /**
+   * Az automatikus elrendezések számlálója (`graph-editor-screen`): minden
+   * "Elrendezés" kattintás növeli eggyel. A vászon ennek a MEGVÁLTOZÁSÁRA
+   * illeszti újra a nézetet, mert a `fitView` prop dokumentált jelentése
+   * kizárólag a kezdeti nézetre szól ("the flow will be zoomed and panned to
+   * fit all the nodes INITIALLY provided") - egy későbbi, teljes pozíció
+   * átírás után a nézet a régi nagyításon és eltolásán maradna, tehát az új
+   * elrendezés a vászon egy tetszőleges sarkába csúszna, nagy üres területet
+   * hagyva maga körül (2026-09-06-i saját mérés: a `fitView` prop szerinti
+   * kezdeti nagyítás a kattintás után változatlan maradt).
+   */
+  readonly autoLayoutRevision: number;
 }
 
 /**
@@ -76,7 +89,7 @@ export interface GraphEditorCanvasProperties {
  * SPEC-008 5.4).
  */
 export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperties>): ReactElement {
-  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode } = properties;
+  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode, autoLayoutRevision } = properties;
 
   // A React Flow által mért csomópont méret a vászon SAJÁT nézeti állapota,
   // nem domain adat: a `WorkflowNodeInput` nem hordozza, tehát a vezérelt
@@ -218,6 +231,11 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
       >
         <Background />
         <Controls />
+        {/* A `<ReactFlow>` GYEREKEKÉNT áll, mert a `useReactFlow()` hook
+            kizárólag a React Flow saját context providere alatt hívható - az
+            pedig magán a `<ReactFlow>`-n belül épül fel, tehát EBBŐL a
+            komponensből (ami rendereli) nem érhető el. */}
+        <FitViewOnAutoLayout revision={autoLayoutRevision} />
       </ReactFlow>
     </div>
   );

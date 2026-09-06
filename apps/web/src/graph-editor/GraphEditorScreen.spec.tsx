@@ -308,9 +308,14 @@ describe('GraphEditorScreen', () => {
     if (layoutButton === undefined) {
       throw new Error('a teszt nem talált "Elrendezés" gombot');
     }
+    const revisionBeforeLayout = lastCanvasProperties().autoLayoutRevision;
     act(() => {
       layoutButton.click();
     });
+
+    // Az elrendezés számlálója eggyel nőtt: ebből tudja a vászon, hogy a
+    // nézetet újra a teljes gráfra kell illesztenie (`FitViewOnAutoLayout`).
+    expect(lastCanvasProperties().autoLayoutRevision).toBe(revisionBeforeLayout + 1);
 
     const layoutedPositions = lastCanvasProperties().nodes.map((node) => ({
       id: node.id,

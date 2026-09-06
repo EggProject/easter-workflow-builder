@@ -116,6 +116,7 @@ describe('GraphEditorCanvas', () => {
     onGraphChange: OnGraphChange,
     onSelectNode: OnSelectNode,
     selectedNodeId?: string,
+    autoLayoutRevision = 0,
   ): void {
     act(() => {
       root.render(
@@ -125,6 +126,7 @@ describe('GraphEditorCanvas', () => {
           onGraphChange={onGraphChange}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
+          autoLayoutRevision={autoLayoutRevision}
         />,
       );
     });
