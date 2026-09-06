@@ -30,7 +30,7 @@ describe('AppShellFrame', () => {
           brand={<span>Easter</span>}
           navigation={<a href="/">Workflow-k</a>}
           actions={<button type="button">Téma</button>}
-          pageTitle="Workflow lista"
+          breadcrumb={<span>Workflow lista</span>}
         >
           <p>Tartalom</p>
         </AppShellFrame>,
@@ -44,10 +44,10 @@ describe('AppShellFrame', () => {
     expect(container.querySelector('.app-tn__actions')?.textContent).toBe('Téma');
   });
 
-  it('a content vazat es az oldal cimet kirajzolja', () => {
+  it('a content vazat es a morzsamenüt kirajzolja, oldalcím (h1) nélkül', () => {
     act(() => {
       root.render(
-        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Futás előzmények">
+        <AppShellFrame brand="B" navigation="N" actions="A" breadcrumb={<span>Futás előzmények</span>}>
           <p>Lista</p>
         </AppShellFrame>,
       );
@@ -56,14 +56,15 @@ describe('AppShellFrame', () => {
     expect(container.querySelector('.app-tn__main')).not.toBeNull();
     expect(container.querySelector('.app-tn__inner')).not.toBeNull();
     expect(container.querySelector('.app-pagehead')).not.toBeNull();
-    expect(container.querySelector('.app-pagehead__title')?.textContent).toBe('Futás előzmények');
+    expect(container.querySelector('.app-pagehead__top')?.textContent).toBe('Futás előzmények');
+    expect(container.querySelector('h1')).toBeNull();
     expect(container.querySelector('.app-content')?.textContent).toBe('Lista');
   });
 
   it('a pageActions opcionalis: hianyaban nincs .app-pagehead__actions elem', () => {
     act(() => {
       root.render(
-        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Cím">
+        <AppShellFrame brand="B" navigation="N" actions="A" breadcrumb={<span>Cím</span>}>
           <p>Lista</p>
         </AppShellFrame>,
       );
@@ -79,7 +80,7 @@ describe('AppShellFrame', () => {
           brand="B"
           navigation="N"
           actions="A"
-          pageTitle="Cím"
+          breadcrumb={<span>Cím</span>}
           pageActions={<button type="button">Új</button>}
         >
           <p>Lista</p>
@@ -93,7 +94,7 @@ describe('AppShellFrame', () => {
   it('az isNavigationMenuOpen hianyaban a data-navigation-open attributum "false"', () => {
     act(() => {
       root.render(
-        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Cím">
+        <AppShellFrame brand="B" navigation="N" actions="A" breadcrumb={<span>Cím</span>}>
           <p>Lista</p>
         </AppShellFrame>,
       );
@@ -105,7 +106,7 @@ describe('AppShellFrame', () => {
   it('az isNavigationMenuOpen true erteken a data-navigation-open attributum "true"', () => {
     act(() => {
       root.render(
-        <AppShellFrame brand="B" navigation="N" actions="A" pageTitle="Cím" isNavigationMenuOpen>
+        <AppShellFrame brand="B" navigation="N" actions="A" breadcrumb={<span>Cím</span>} isNavigationMenuOpen>
           <p>Lista</p>
         </AppShellFrame>,
       );

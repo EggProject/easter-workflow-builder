@@ -151,6 +151,28 @@ body {
 }
 
 /* ============================================================
+   A page-head függőleges térközének csökkentése, mert a nagy H1 cím
+   megszűnt, helyette a menüsáv alatti kompakt morzsamenü áll
+   (felhasználói kérés, 2026-09-06). ÚJ, önálló blokk - a fenti, átemelt
+   .app-pagehead szabály egyetlen bájtja sem változott.
+
+   A MÉRT PROBLÉMA. Az átemelt .app-pagehead 32px felső és 20px alsó belső
+   margót ad, egy 36px betűméretű H1-hez tervezve (font: 400 36px/1.1).
+   A cím eltávolítása után (AppShellFrame.tsx) ez a térköz a nála jóval
+   alacsonyabb, 13px-es morzsamenü körül feleslegesen nagy marad.
+
+   A JAVÍTÁS. A design system saját spacing skálájának (design-token/
+   spacing.css) tokenjeire állítva: --ep-space-3 (12px) felül és alul - a
+   --ep-space-10 (40px) oldalsó margó VÁLTOZATLAN, mert az illeszkedik az
+   .app-content ugyanolyan 40px oldalsó térközéhez (nem kitalált szám,
+   mindkét érték a token skála tagja).
+   ============================================================ */
+.app-pagehead {
+  padding-top: var(--ep-space-3);
+  padding-bottom: var(--ep-space-3);
+}
+
+/* ============================================================
    Reszponzív: navigáció lenyíló menübe (SPEC-007 5.3, M-26, M-29).
    ÚJ, a forrásban nem létező szabály: az M-28 mérés szerint a
    forrás _shell.css három media querye egyike sem érinti a
