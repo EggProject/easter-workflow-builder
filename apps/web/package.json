@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 97.9 --branches 95.57 --functions 98.86 --lines 97.81"
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 98.01 --branches 95.87 --functions 98.88 --lines 97.92"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

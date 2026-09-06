@@ -248,7 +248,11 @@ A típusok zárt listája a `packages/db` `node-type` témájából jön (M-87),
 
 ### 5.2 A lépés szintű beállítások
 
-A csomópont kiválasztásakor egy oldalsó panel nyílik, ami a kiválasztott típus szerinti mezőket mutatja. Az `agent_step` és a `join` `ai_synthesis` módja a teljes `AgentStepConfig` alakot szerkeszti, három csoportban.
+A csomópont kiválasztásakor a vászon jobb szélén egy **dokkolt sáv** nyílik, ami a kiválasztott típus szerinti mezőket mutatja. **Nem lebegő doboz és nem takarja a vásznat**: a vászon és a panel egyetlen `Resizable` osztott elrendezésben áll (`packages/ui` `resizable` téma), tehát a vászon mellette szűkül, az elválasztó pedig a húzható, `role="separator"` szemantikájú `ResizableHandle` (10. szekció). A sáv saját hátteret visel (`--ep-bg-elevated`), a vászon a nála mélyebb `--ep-bg-sunken` felületen ül. A panel fejléce (a katalógus címke, a node azonosító és a Bezárás gomb) a görgethető területen KÍVÜL áll, tehát görgetés közben is látszik; a törzs önállóan görög, a viewporton belül maradva.
+
+**A mezőcsoportokat NEM `fieldset` és `legend` tagolja.** A `legend` a szegélybe rajzolódó, böngészőnként eltérően elhelyezett elem, aminek a doboz belső térközét és szélességét nem lehet megbízhatóan vezérelni; a design system maga sem ezzel tagolja a több szakaszos űrlapjait, hanem kártya alakú szakasszal, saját fejléccel (`eggproject-design-admin-app-examples/examples/settings.html`, `.card`/`.card__header`). A csoport a `fieldset`/`legend` párral **azonos** szemantikát kap: `role="group"` plusz `aria-labelledby`, ami a szakasz `<h3>` címére mutat. Ez a W3C WAI hivatalos, dokumentált alternatívája (WAI Forms Tutorial "Grouping Controls", <https://www.w3.org/WAI/tutorials/forms/grouping/>; WCAG 2.2 ARIA17 technika, <https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA17>); az ARIA17 egyetlen megkötése is teljesül, mert a panelen nincs rádiógomb, csak jelölőnégyzet és szöveges mező.
+
+**A hibajelzés két szintű**, a WCAG "error summary" mintája szerint. A panel tetején álló, `role="alert"` összesítő megmondja, hány hiba van és melyik útvonalakon; a mezőnkénti üzenet pedig a hibás mező **alatt** áll, `aria-invalid` és `aria-describedby` kötéssel. A hibaüzenet helye **mindig fenn van tartva** (a mező grid elrendezésének harmadik, legalább egy sornyi sora), tehát a megjelenése nem tolja el a panel többi mezőjét. A mezőkhöz egy React kontextus viszi le a hibatérképet, hogy a tíz típus szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal; a `join` `ai_synthesis` módja egy kötelező útvonal előtag propon át kapja meg, hogy a mezői a `settings` alatt állnak. Az `agent_step` és a `join` `ai_synthesis` módja a teljes `AgentStepConfig` alakot szerkeszti, három csoportban.
 
 | Csoport               | Mezők                                                                                                          | Vezérlő                                                   |
 | --------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -589,7 +593,9 @@ A `human_approval` csomópont a motorban `waiting_approval` állapotba viszi a l
 
 **A két váltási pont választása a rendelkezésre álló hét token közül, a token kommentjeik jelentése alapján történt, nem méréssel.** A `.claude/CLAUDE.md` 4. szekciója szerint ezt kimondjuk: a **szabály** (csak token érték lehet literál) forrásolt és kikényszerített, a **választás** a hét token közül tervezési döntés. A PLAN-009 ezt ugyanazzal a módszerrel erősíti meg, amivel a SPEC-007 5.3 mobil túllógását mérte (chromium, `apps/web` preview build, `scrollWidth` és `toBeInViewport` állítások); ha a mérés azt mutatja, hogy a tényleges törés máshol van, a **fölötte álló** tokennél lépünk be, pontosan úgy, ahogy a SPEC-007 5.3 tette, és kitalált töréspontot nem vezetünk be.
 
-**A gráf szerkesztő ugyanezt a három sávot használja**, azzal a különbséggel, hogy ott a második panel a node beállítás oldalsó panel, nem a transcript. `--ep-screen-md` alatt a panel `Modal` alakban nyílik, mert egy fül váltás a szerkesztésnél elveszítené a vászon kontextusát.
+**A gráf szerkesztő két sávot használ, nem hármat** (felhasználói döntés, 2026-09-06). A `--ep-screen-md` (768px) és fölötte a vászon és a node beállítás panel **vízszintes, húzható osztásban** áll: a panel dokkolt sáv a jobb szélen, a vászon mellette szűkül. A `--ep-screen-md` alatt a két panel egymás alá kerül, egyenlő osztásban, és a húzható elválasztó `display: none` értékkel a hozzáférhetőségi fából is kikerül, mert vízszintes osztás nélkül nincs mit húzni.
+
+**Ez a SPEC egy korábbi, meg nem valósult tervének kimondott felülírása.** A korábbi szöveg a futás nézet három sávját vetítette a szerkesztőre is, `--ep-screen-md` alatt `Modal` alakú panellel. A felhasználó döntése ehelyett egyetlen, következetes alakot kért: ugyanaz a `Resizable` komponens, ami a futás nézetben is áll, hogy a két képernyő egyformán viselkedjen. A `Modal` változat nem épül meg; a `--ep-screen-md` alatti egymás alá rendezés a `graph-editor-screen.css` egyetlen media queryjében áll, a `--ep-screen-md` token értékével.
 
 **A vászon minden sávban a teljes rendelkezésre álló területet tölti ki**, a SPEC-007 5.2 "faltól falig" követelménye szerint; a `.app-content` magassága a viewport magasságából és a `60px` bar magasságából számítódik, mindkettő a design system saját értéke.
 
@@ -803,8 +809,14 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 14. A `script` csomópont felvehető, de a szerkesztő a kártyán és a futtatás tiltásakor megnevezi, hogy a motor `unimplemented_node_type` hibával elutasítaná (M-87).
 15. A mentetlen jelző a betöltött és a szerkesztett dokumentum összehasonlításából származik; egy visszavont változtatás után a jelző eltűnik. Futtatott teszt igazolja.
 16. A node beállítás panel a `protocol` `node-config` sémája felett szerkeszt, mezőnkénti hibajelzéssel; a `skills` és az `mcpServers` mező olvasható, de nem szerkeszthető, és a panel ezt ki is mondja (5.2).
-17. A lépés szintű `providerId` felülírás a panelen szerkeszthető, és a `null` érték mellett a panel megnevezi, melyik providert örökli a lépés.
-18. A `CLIENT_ROUTE_TABLE` pontosan négy bejegyzést tartalmaz, mind a négy fix útvonal; az illesztő **továbbra sem** tartalmaz paraméteres szegmens ágat (SPEC-007 34. kritériuma).
+
+16a. A panel **dokkolt, húzható sáv** a vászon jobb szélén, nem lebegő doboz: futtatott e2e teszt méri, hogy a `role="separator"` elválasztó a vászon után, a panel az elválasztó után kezdődik, hogy a vászon a panel megnyitásakor ténylegesen szűkül, és hogy a billentyűzetes átméretezés szélesíti a sávot (5.2, 10.).
+
+16b. A panelen **nincs `fieldset` és `legend`**: a mezőcsoportok `role="group"` plusz `aria-labelledby` szemantikát viselnek, a `getByRole('group', { name })` lekérdezés mindegyiket megtalálja, és a fán egyetlen `fieldset` elem sincs. Futtatott e2e teszt igazolja mind a hármat (5.2).
+
+16c. A hibaüzenet a **hibás mező alatt** jelenik meg, `aria-invalid` és `aria-describedby` kötéssel, és a megjelenése nem tolja el a szomszédos mezőt (a fenntartott hely miatt). Futtatott e2e teszt méri mindkettőt (5.2).
+
+16d. Egyetlen mező sem lóg ki a panelből: futtatott e2e teszt méri, hogy a panel törzsében álló `.input` és `.select` elemek jobb széle egyike sem nyúlik túl a törzs jobb szélén (5.2). 17. A lépés szintű `providerId` felülírás a panelen szerkeszthető, és a `null` érték mellett a panel megnevezi, melyik providert örökli a lépés. 18. A `CLIENT_ROUTE_TABLE` pontosan négy bejegyzést tartalmaz, mind a négy fix útvonal; az illesztő **továbbra sem** tartalmaz paraméteres szegmens ágat (SPEC-007 34. kritériuma).
 
 ### Az élő futás nézet
 

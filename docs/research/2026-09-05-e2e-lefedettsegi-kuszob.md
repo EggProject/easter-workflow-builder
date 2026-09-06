@@ -314,3 +314,67 @@ grep-elve nincs `status:` mező a node adat összeállításánál). Az élő fu
 fázisának tárgya. **Amint ez megvalósul, ez a kizárás megszűnik**: az élő futás nézet e2e tesztje
 szükségszerűen beállít egy `status` értéket, és attól kezdve `GraphNodeCard.tsx` 74/82. sora és a
 `step-run-status-badge.ts` teljes fájlja e2e-vel is 100 százalékban fedett lesz.
+
+---
+
+## 10. Küszöb emelés (2026-09-06): a node inspector újratervezése után
+
+A node inspector beállítás panel újratervezése (dokkolt, húzható jobb oldali sáv, `fieldset`
+helyett `role="group"`, mezőnkénti hibajelzés) új e2e teszteket is hozott, és a lefedettség
+mind a négy metrikán NŐTT. A ratchet szabály szerint a küszöb a mért értékre emelkedik.
+
+**A mérés menete:** törölt `apps/web/e2e/.nyc_output` és `apps/web/coverage-e2e`, majd
+`bun x turbo run test:e2e --filter=@easter-workflow-builder/web --force` (127 Playwright teszt,
+mind zöld), végül `nyc report --reporter=json-summary` a pontos `pct` értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (9. szekció) |
+| ---------- | --------------- | --------- | ------------------------- |
+| statements | 936 / 955       | **98.01** | 97.9                      |
+| branches   | 372 / 388       | **95.87** | 95.57                     |
+| functions  | 356 / 360       | **98.88** | 98.86                     |
+| lines      | 897 / 916       | **97.92** | 97.81                     |
+
+**A `node-inspector` téma minden fájlja 100 százalék mind a négy metrikán.** Az `all files`
+maradék rése változatlanul a 2.2 és a 8. szekció tételes listája (`app-mount`,
+`frontend-config`, `graph-editor` három fájlja, `graph-node-card` két fájlja,
+`history-navigation`, `rest-client`, `stream-client`), plusz a `GraphEditorScreen.tsx` mentés
+előtti validáció hibaága, ami a `validate-graph-for-save.ts` fedetlen ágának a párja.
+
+### 10.1 A 9.3 táblázat egy sora TÖRLENDŐ: `node-inspector/NodeInspector.tsx` 123
+
+A korábbi mérés a `NodeInspector.tsx` `path === '' ? '(gyökér)' : path` ágát e2e-vel
+elérhetetlenként tartotta nyilván, unit teszttel fedve. **Ez az ág megszűnt.** Az újratervezés
+során kiderült, hogy az ág nem csak e2e-vel elérhetetlen, hanem a FELÜLETEN sem állhat elő: a
+gyökér szintű `z.strictObject` hibához egy felesleges kulcs kellene a `config` objektumon, a
+gráf betöltésekor viszont a `WorkflowGraphDocumentSchema` UGYANEZT a `NodeConfigSchema` sémát
+futtatja, tehát egy ilyen dokumentum el sem jut a panelig. A `.claude/CLAUDE.md` 5. szekciója
+az ilyen ágat tiltja, ezért a JavaScript elágazás helyére a
+`.node-inspector__error-path:empty::before` CSS szabály lépett: a jelölés megmarad, az ág
+eltűnt. A `NodeInspector.spec.tsx` továbbra is előállítja a gyökér szintű hibát, és azt
+ellenőrzi, hogy az útvonal eleme üres, tehát a CSS szabály illeszkedik rá.
+
+### 10.2 Két új segéd, amit a mérés alakított
+
+A tervezett `scope-field-errors.ts` és `ScopedFieldErrors.tsx` (a `join` `ai_synthesis` módja
+alatti `settings.` előtag levágása) **törölve lett**, mert a szűrés ága a felületről nem
+érhető el: az `AgentStepConfigSchema` egyetlen mezője sem tud séma szerint érvénytelen értéket
+felvenni felhasználói úton (`promptTemplate`, `modelId`, `effort`, `permissionMode`, `cwd`
+mind `z.string()`, a listák `z.array(z.string())`, a számok natív `type="number"` mezőn
+mennek, a `sandbox` és a `structuredOutput` szerkesztője pedig saját `safeParse` kapun
+engedi tovább az értéket). Helyette az `AgentStepConfigFields` kötelező `fieldPathPrefix`
+propot kapott (`''` az `agent_step` node-on, `'settings.'` a `join` `ai_synthesis` módjában):
+sztring összefűzés, elágazás nélkül, és ugyanazt oldja meg.
+
+A `find-field-error.ts` a `Map.get` gyorsút nélkül, egyetlen bejárással készült el. A gyorsút
+ága csak unit tesztből lett volna elérhető, mert a felületen ma **egyetlen** séma szerinti
+hibaútvonal reprodukálható: az `error_handler` node `backoffMs` mezőjének nem numerikus sora
+(`backoffMs.<index>`, tehát előtag egyezés, nem pontos egyezés). A térkép legfeljebb néhány
+elemű, tehát a gyorsút nem mért volna semmit.
+
+### 10.3 Ami NEM ELLENŐRZÖTT ebben a mérésben
+
+A mérés időpontjában a `feat/spec-008-grafszerkeszto` ágon egy párhuzamos munkamenet
+(morzsamenü bevezetése) is dolgozott, és a commitjai már az ágon álltak. A fenti négy szám
+tehát a KETTŐ EGYÜTTES állapotát méri. Ha a párhuzamos munkamenet később még fedetlen kódot
+tesz hozzá, a kapu az ő oldalán bukik, és a lefedettséget nekik kell visszahozniuk a küszöbre;
+a küszöb leszállítása ilyenkor is tiltott.
