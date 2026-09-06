@@ -7,11 +7,14 @@ export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElemen
   /**
    * A mező fölött álló, nagybetűs címke szövege.
    */
-  readonly label?: string;
+  readonly label?: string | undefined;
   /**
-   * Hibaüzenet: egyben hibás állapotba is állítja a mezőt.
+   * Hibaüzenet: egyben hibás állapotba is állítja a mezőt. Az `| undefined`
+   * kimondása szándékos az `exactOptionalPropertyTypes` mellett: a hívók egy
+   * `string | undefined` értékű keresés eredményét adják át közvetlenül
+   * (`error={fieldErrors.get(path)}`), objektum spread trükk nélkül.
    */
-  readonly error?: string;
+  readonly error?: string | undefined;
   /**
    * Vezető ikon; jelenlétében a mező `.input-with-icon` burkolót kap.
    */

@@ -18,6 +18,9 @@
    szabály). A button trigger szabályai (.select__value, .select__caret,
    .select__icon, .select--open, .select__panel) így ma nem aktívak, de
    bájtra azonosan átkerülnek, mert ugyanennek a komponensnek a részei.
+   HOZZÁADVA a forráshoz képest: egyetlen szabály, a `.select--error`
+   (lásd az indoklást a szabály fölött). A fájl minden más sora bájtra
+   azonos a forrással.
    Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
    ============================================================ */
 /* ============ Select ============
@@ -48,6 +51,14 @@ button.select { display: inline-flex; align-items: center; gap: 10px; }
 /* Native <select> shares the .select shell but keeps the platform dropdown indicator —
    no appearance:none, no custom caret. box-sizing keeps width:100% inside the field grid. */
 select.select { box-sizing: border-box; max-width: 100%; }
+/* EGYETLEN HOZZÁADOTT SZABÁLY, ami a forrásban nincs: a hibás állapot
+   szegélye. A forrás Select komponense nem ismer hibaüzenetet, a testvér
+   Input komponense viszont igen (`.input--error`), és a `SelectField` a
+   `TextField` mintáját veszi át (címke fölé, hibaüzenet alá, `aria-invalid`
+   és `aria-describedby` kötéssel). A szabály bájtra az `.input--error`
+   párja, hogy a két mező hibás állapota vizuálisan azonos legyen. */
+.select--error { border-color: var(--ep-danger); }
+
 .select:where(:not(:disabled)):hover { border-color: var(--ep-fg); }
 .select:focus-visible,
 .select--open { border-color: var(--ep-accent); box-shadow: var(--ep-shadow-focus); }

@@ -4,6 +4,9 @@
    bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
    csomag globálisan tölt be) kivételével. A fájl minden szabálya az
    Input komponenshez tartozik, ezért szűkítés nem kellett.
+   HOZZÁADVA a forráshoz képest: egyetlen deklaráció, a `.input`
+   `box-sizing: border-box` sora (az indoklás a deklaráció fölött áll).
+   A fájl minden más sora bájtra azonos a forrással.
    Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
    ============================================================ */
 /* ============ Input field ============
@@ -36,6 +39,17 @@
   outline: none;
   font-family: inherit;
   width: 100%;
+  /* HOZZÁADVA a forráshoz képest, MÉRT hiba javítása. A forrás `_shell.css`
+     univerzális `* { box-sizing: border-box; ... }` resete szándékosan NEM
+     került át (SPEC-007 4.2 szűkített átemelés, lásd a topnav-shell.css
+     `body` szabálya melletti indoklást), tehát az `.input` a böngésző
+     `content-box` alapértelmezésén maradt: a `width: 100%` mellé a
+     `padding: 11px 14px` és az 1px szegély MINDKÉT oldalon rájött, azaz a
+     mező pontosan 30px-szel túlnyúlt a szülőjén. A testvér `select.select`
+     szabály ugyanezt a kapcsolót ugyanezzel az indokkal már viseli
+     ("box-sizing keeps width:100% inside the field grid"), tehát ez a sor
+     az `.input` és a `.select` közötti eltérést szünteti meg. */
+  box-sizing: border-box;
 }
 .input:read-only {
   background: var(--ep-bg-sunken);

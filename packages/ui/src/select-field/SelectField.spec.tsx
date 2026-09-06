@@ -143,6 +143,55 @@ describe('SelectField', () => {
     expect(renderedSelect().className).toBe('select sajat');
   });
 
+  it('label nélkül és hiba nélkül csupasz select elemet ad, .field burkoló nélkül', () => {
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} />);
+    });
+    expect(container.querySelector('.field')).toBeNull();
+    expect(container.firstElementChild?.tagName).toBe('SELECT');
+  });
+
+  it('label megadásakor a .field burkolóba kerül, a címkével implicit összekötve', () => {
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} label="Provider" />);
+    });
+    const field = container.querySelector('label.field');
+    expect(field).not.toBeNull();
+    expect(field?.querySelector('.field__label')?.textContent).toBe('Provider');
+    expect(field?.querySelector('select')).not.toBeNull();
+    expect(container.querySelector('.field__error')).toBeNull();
+    expect(renderedSelect().getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('hiba esetén a mező alatt jelenik meg az üzenet, aria-describedby és aria-invalid kötéssel', () => {
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} label="Provider" error="Kötelező mező" />);
+    });
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.textContent).toBe('Kötelező mező');
+    expect(renderedSelect().className).toBe('select select--error');
+    expect(renderedSelect().getAttribute('aria-invalid')).toBe('true');
+    expect(renderedSelect().getAttribute('aria-describedby')).toBe(errorElement?.id);
+  });
+
+  it('hiba önmagában, label nélkül is a .field burkolót hozza', () => {
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} error="Érvénytelen" />);
+    });
+    expect(container.querySelector('label.field')).not.toBeNull();
+    expect(container.querySelector('.field__label')).toBeNull();
+    expect(container.querySelector('.field__error')?.textContent).toBe('Érvénytelen');
+  });
+
+  it('hiba esetén a hívó saját aria-describedby értéke megmarad a hiba azonosítója mellett', () => {
+    act(() => {
+      root.render(
+        <SelectField id="provider" options={PROVIDER_OPTIONS} aria-describedby="provider-sugo" error="Érvénytelen" />,
+      );
+    });
+    expect(renderedSelect().getAttribute('aria-describedby')).toBe('provider-sugo provider-error');
+  });
+
   it('a kiválasztott érték és a változás kezelő működik', () => {
     const seen: string[] = [];
     act(() => {
