@@ -139,11 +139,11 @@
 }
 
 /* ============================================================
-   A gráf szerkesztő alsó légtere (2026-09-06). ÚJ, önálló blokk - a
-   fenti, átemelt .app-content szabály (36-39. sor) egyetlen bájtja
-   sem változott.
+   A gráf szerkesztő FALTÓL FALIG tartalom területe (2026-09-06,
+   2026-09-09-én kiterjesztve). ÚJ, önálló blokk - a fenti, átemelt
+   .app-content szabály (36-39. sor) egyetlen bájtja sem változott.
 
-   A MÉRT HIBA. Az átemelt .app-content 80px alsó paddingje
+   A MÉRT HIBA (2026-09-06). Az átemelt .app-content 80px alsó paddingje
    (--ep-space-20) egy hosszú, GÖRGETETT lista (workflow lista, futás
    előzmények) aljára szánt légtér. A gráf szerkesztő a fenti blokk
    .app-content flex:1 szabályára épülve az .app-content TARTALOM
@@ -154,23 +154,30 @@
    editor-node-inspector.png): a vászon/panel alsó éle a viewport
    aljától 80px-re végződött, üres sávot hagyva alatta.
 
-   A JAVÍTÁS. Kizárólag a gráf szerkesztő screen-re szűkítve: a
+   A KITERJESZTÉS (2026-09-09, felhasználói kérés: "faltol falig, slim
+   designt csinaljunk"). Ugyanez az oldalsó 40px belső margóra is igaz:
+   a szerkesztő vászna nem egy hasáb az oldal közepén, hanem a teljes
+   területet elfoglaló munkafelület, az aljához tapadó akciósáv pedig
+   szintén a teljes szélességet kéri. Ezért a padding ezen az egy
+   screen-en TELJESEN nullázódik, nem csak alul csökken. Kitalált szám
+   így nincs is: a `0` az egyetlen érték.
+
+   A HATÓKÖR. Kizárólag a gráf szerkesztő screen-re szűkítve: a
    `:has(> .graph-editor-screen)` azért használható megkülönböztetésül,
    mert EGYEDÜL ez a screen ad megnevezett osztályt az .app-content
    közvetlen gyerekének (a workflow lista és a futás előzmények screen
-   gyökere osztály nélküli div, GraphEditorScreen.tsx). Az alsó padding
-   a felső paddinggel (--ep-space-2, 8px) egyező értékre csökken: token
-   skála tagja, nem kitalált szám, és szimmetrikus a már meglévő felső
-   8px-szel. A `:has()` a chromiumban Chrome 105 óta (2022) natívan
-   támogatott (https://developer.chrome.com/blog/has-m105/,
+   gyökere osztály nélküli div, GraphEditorScreen.tsx). A szabály
+   specificitása (0,2,0) magasabb, mint a --ep-screen-md alatti
+   reszponzív .app-content szabályé (0,1,0), tehát a nullázás szűk
+   nézetben is érvényes marad. A `:has()` a chromiumban Chrome 105 óta
+   (2022) natívan támogatott (https://developer.chrome.com/blog/has-m105/,
    https://caniuse.com/css-has), a projekt e2e Playwright futtatása
    kizárólag chromium ellen megy (apps/web/playwright.config.ts,
-   SPEC-007 13.4). Regresszió: apps/web/e2e/graph-editor.spec.ts, "a
-   vászon és a panel alsó éle a rendelkezésre álló terület aljához
-   közel ér" teszt.
+   SPEC-007 13.4). Regresszió: apps/web/e2e/graph-editor.spec.ts és
+   apps/web/e2e/graph-editor-layout.spec.ts.
    ============================================================ */
 .app-content:has(> .graph-editor-screen) {
-  padding-bottom: var(--ep-space-2);
+  padding: 0;
 }
 
 /* A böngésző alapértelmezett 8px-es `body` margója nélkül a shell nem

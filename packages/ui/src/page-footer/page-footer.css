@@ -1,0 +1,70 @@
+/* ============================================================
+   EggProject — Sticky page footer (SAJÁT KIEGÉSZÍTÉS)
+   ============================================================
+
+   EZ NEM ÁTEMELÉS. A design system egyetlen skilljében sincs
+   oldal szintű, a viewport aljához tapadó akciósáv; ezt a
+   2026-09-08-i audit tételesen kimondja
+   (docs/research/2026-09-08-design-system-audit.md 5.4 és 8.1).
+   Ami a forrásban van, és amiből ez a recept összeáll:
+
+     - .app-tn__bar (eggproject-design-app-common/_shell.css): a
+       felső, RAGADÓS sáv. Onnan jön a `position: sticky`, a
+       `z-index: 10`, a `background: var(--ep-bg-elevated)` és az
+       elválasztó szegély - itt `top` helyett `bottom`, és
+       `border-bottom` helyett `border-top`, mert a sáv az oldal
+       alján áll, nem a tetején.
+     - .modal__footer és .modal__footer--split
+       (eggproject-design-components/components/modal/modal.css): a
+       lábléc SZERKEZETE. Onnan jön a `display: flex`, az
+       `align-items: center` és a `--split` változat
+       `justify-content: space-between` értéke, ami a felhasználó
+       kérése szerint balra a státuszt, jobbra a gombokat teszi.
+
+   Kitalált szám egyetlen deklarációban sincs: minden térköz a
+   design-token/spacing.css skálájának tagja, minden szín és
+   betűkészlet a saját tokenjén megy. A forrás két receptjének
+   pixel literáljai (a .app-tn__bar 28px oldalsó és a
+   .modal__footer 20/28/24px belső margója) SZÁNDÉKOSAN nem
+   kerülnek át: azok a saját kontextusukhoz vannak szabva, és a
+   4px alapú skálán amúgy sincs 28px lépcső.
+   ============================================================ */
+
+.page-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ep-space-3);
+  padding: var(--ep-space-2) var(--ep-space-6);
+  background: var(--ep-bg-elevated);
+  border-top: 1px solid var(--ep-divider);
+}
+
+/* A státusz oldal zsugorodhat (hosszú hibaüzenet is állhat benne), a
+   gomb oldal nem: a gombsornak minden viewport szélességen teljes
+   egészében a képernyőn kell maradnia (a szabálykönyv 11. szekciója
+   szerinti vízszintes túllógás tilalom). */
+.page-footer__status {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+.page-footer__status > * {
+  margin: 0;
+  min-width: 0;
+}
+
+.page-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-space-3);
+  flex: 0 0 auto;
+}

@@ -230,6 +230,28 @@ describe('Resizable', () => {
     }).not.toThrow();
   });
 
+  it('az onSizesChange a kezdő renderen a kezdőértéket, majd minden változást jelent (2026-09-09)', () => {
+    const reported: (readonly number[])[] = [];
+    act(() => {
+      root.render(
+        <Resizable
+          defaultSizes={[40, 60]}
+          onSizesChange={(sizes) => {
+            reported.push(sizes);
+          }}
+        >
+          <ResizablePanel index={0} />
+          <ResizableHandle beforeIndex={0} />
+          <ResizablePanel index={1} />
+        </Resizable>,
+      );
+    });
+    expect(reported).toEqual([[40, 60]]);
+
+    pressKeyOn(handle(), 'ArrowRight');
+    expect(reported.at(-1)).toEqual([45, 55]);
+  });
+
   it('a panelek gyerek tartalma megjelenik', () => {
     renderTwoPane();
     const panels = [...container.querySelectorAll('.resizable-panel')];

@@ -20,6 +20,7 @@ export { useThemeMode, type UseThemeModeResult } from './theme-mode/use-theme-mo
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
 export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
+export { ButtonGroup, type ButtonGroupProperties } from './button-group/ButtonGroup.tsx';
 export { Card, type CardProperties } from './card/Card.tsx';
 export {
   DataTable,
@@ -32,6 +33,7 @@ export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from '.
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';
 export { MenuItem, type MenuItemProperties } from './menu/MenuItem.tsx';
 export { Modal, type ModalIconVariant, type ModalProperties, type ModalSize } from './modal/Modal.tsx';
+export { PageFooter, type PageFooterProperties } from './page-footer/PageFooter.tsx';
 export { Resizable, type ResizableProperties } from './resizable/Resizable.tsx';
 export { ResizableHandle, type ResizableHandleProperties } from './resizable/ResizableHandle.tsx';
 export { ResizablePanel, type ResizablePanelProperties } from './resizable/ResizablePanel.tsx';

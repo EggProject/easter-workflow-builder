@@ -15,6 +15,16 @@ export interface ResizableProperties {
    * darabszámából számolt volna).
    */
   readonly defaultSizes: readonly number[];
+  /**
+   * A panelméretek minden változásánál meghívódik, a kezdő renderen is.
+   * Kizárólag ÉRTESÍTÉS: a méretet továbbra is a komponens tartja, a hívó
+   * ebből legfeljebb perzisztálni tud (a gráf szerkesztő a
+   * `localStorage`-be írja, felhasználói kérés 2026-09-09). Vezérelt
+   * `sizes` prop szándékosan NINCS: az a komponens teljes állapotkezelését
+   * kifordítaná, holott egyetlen fogyasztónak sem kell kívülről beállítania
+   * a méretet a kezdőérték után.
+   */
+  readonly onSizesChange?: (sizes: readonly number[]) => void;
 }
 
 interface DragState {
@@ -68,7 +78,7 @@ function isCollapsed(sizePercent: number): boolean {
  * CLAUDE.md 5. szekció, "100 százalékos... küszöb").
  */
 export function Resizable(properties: Readonly<ResizableProperties>): ReactElement {
-  const { children, direction = 'horizontal', defaultSizes } = properties;
+  const { children, direction = 'horizontal', defaultSizes, onSizesChange } = properties;
   const isVertical = direction === 'vertical';
 
   const [sizes, setSizes] = useState<readonly number[]>(defaultSizes);
@@ -134,6 +144,15 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
       globalThis.removeEventListener('pointerup', handlePointerUp);
     };
   }, [dragState, isVertical]);
+
+  // Az értesítés hatásban megy, nem a `setSizes` hívási helyein: a méret
+  // három úton változhat (húzás, billentyű, összecsomagolás), és mindhárom
+  // frissítő függvény alakú, tehát az ÚJ méret a hívás helyén még nem
+  // ismert. A `sizes` állapotra kötött hatás mindhármat egyetlen ponton
+  // fogja el, a kezdő renderen pedig a kezdőértéket adja tovább.
+  useEffect(() => {
+    onSizesChange?.(sizes);
+  }, [sizes, onSizesChange]);
 
   const contextValue: ResizableContextValue = {
     sizes,
