@@ -42,8 +42,8 @@ describe('useFieldErrorVisibility', () => {
     return button;
   }
 
-  function isVisible(): string | null {
-    return renderedButton().getAttribute('data-visible');
+  function visibleFlag(): string | undefined {
+    return renderedButton().dataset['visible'];
   }
 
   function markTouched(): void {
@@ -56,16 +56,16 @@ describe('useFieldErrorVisibility', () => {
     act(() => {
       root.render(<Probe />);
     });
-    expect(isVisible()).toBe('false');
+    expect(visibleFlag()).toBe('false');
     markTouched();
-    expect(isVisible()).toBe('false');
+    expect(visibleFlag()).toBe('false');
   });
 
   it('érintetlen, de érvénytelen mezőn nem látható', () => {
     act(() => {
       root.render(<Probe error="Kötelező mező" />);
     });
-    expect(isVisible()).toBe('false');
+    expect(visibleFlag()).toBe('false');
   });
 
   it('érintett és érvénytelen mezőn látható', () => {
@@ -73,7 +73,7 @@ describe('useFieldErrorVisibility', () => {
       root.render(<Probe error="Kötelező mező" />);
     });
     markTouched();
-    expect(isVisible()).toBe('true');
+    expect(visibleFlag()).toBe('true');
   });
 
   it('megkísérelt beküldés után érintetlen mezőn is látható', () => {
@@ -84,7 +84,7 @@ describe('useFieldErrorVisibility', () => {
         </FieldErrorVisibilityContext.Provider>,
       );
     });
-    expect(isVisible()).toBe('true');
+    expect(visibleFlag()).toBe('true');
   });
 
   it('megkísérelt beküldés után is rejtve marad, ha nincs hiba', () => {
@@ -95,6 +95,6 @@ describe('useFieldErrorVisibility', () => {
         </FieldErrorVisibilityContext.Provider>,
       );
     });
-    expect(isVisible()).toBe('false');
+    expect(visibleFlag()).toBe('false');
   });
 });
