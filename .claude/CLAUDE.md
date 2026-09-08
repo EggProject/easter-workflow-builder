@@ -563,6 +563,34 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   rendelkezésre álló területet "faltól falig" tölti ki. A kiterjesztés: a layoutnak minden
   támogatott viewport méreten reszponzívnak kell lennie, nem csak egyetlen, fix asztali
   szélességen.
+- **Csak létező design system elem használható.** Ami a `eggproject-design*` skillekben nincs
+  meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
+  emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
+  a kész `.textarea` komponens jár, nem az egysoros `.input` osztály
+  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09).
+- **Tilos a card in card.** Kártya alakú dobozon (szegély plusz lekerekítés plusz saját
+  háttér) belül nem állhat második ilyen doboz, és nem lehet dupla belső térköz sem. Ami a
+  tagoláshoz kell: vagy összecsukható panel (`accordion`), vagy megnevezett, doboz nélküli
+  csoport. Kitalált, a design system `.card`-jától eltérő tokenkombinációjú "kártyaszerű"
+  osztály nem vezethető be (user kérés 2026-09-09).
+- **A gombok `sm` méretűek**, kivéve modálisban és popupban. A szöveg nélküli gomb ikon gomb
+  (`.btn--icon`), és **kötelező** hozzáférhető nevet adni neki (`aria-label`), különben a
+  `getByRole('button', { name })` locator sem találja, amire a projekt e2e tesztjei épülnek
+  (user kérés 2026-09-09).
+- **Az űrlap hibaüzenete kizárólag a mező alatt jelenik meg**, összesítő az űrlap tetején
+  nincs. A megjelenés szabálya: a mező **érintett és érvénytelen**, VAGY az űrlapot már
+  **legalább egyszer megpróbálták beküldeni** (és a beküldés hiba miatt nem sikerült) **és a
+  mező érvénytelen**. Ugyanez az érték dönt az `aria-invalid` kitételéről is, mert a WCAG 2.2
+  ARIA21 technika kimondja: "The aria-invalid attribute should not be set to 'true' before
+  input validation is performed"
+  (<https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21>). A mező és az üzenet összekötése
+  `aria-describedby`, a megjelenés eljuttatása a képernyőolvasóhoz `role="alert"`, mindkettő a
+  W3C WAI Forms Tutorial "User Notifications" lapja szerint
+  (<https://www.w3.org/WAI/tutorials/forms/notifications/>). **NEM MEGERŐSÍTETT**, és ezért nem
+  is állítjuk, hogy a WAI előírná az időzítést: a WCAG 3.3.1 Understanding lapja szerint "This
+  criterion does not mandate any particular way in which errors should be displayed"
+  (<https://www.w3.org/WAI/WCAG22/Understanding/error-identification>), tehát a fenti szabály
+  felhasználói termékdöntés (user kérés 2026-09-09).
 
 ---
 
