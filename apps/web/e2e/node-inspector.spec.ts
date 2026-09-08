@@ -1000,6 +1000,27 @@ test.describe('error_handler node', () => {
     await expect(alert).toContainText('Invalid input');
     await expect(backoffField).toHaveAttribute('aria-describedby', /-error$/);
   });
+
+  test('a mentés a séma ellenőrzésen elbukik, ha a panelen érvénytelen érték maradt', async ({ page }) => {
+    // A `graph-editor-validation.spec.ts` fejléc kommentje szerint a
+    // `validateGraphForSave` HIBA ága felhasználói úton elérhetetlen, mert a
+    // `node-config` sémákban nincs `regex`/`min`/`max` korlátozás, a natív
+    // `<input type="number">` pedig kitisztítja a nem numerikus bevitelt. Ez
+    // a `backoffMs` mezőre MÉRTEN NEM IGAZ: a mező textarea (soronként egy
+    // szám), tehát a böngésző nem szűr, a `Number('abc')` NaN-t ad, és a
+    // `z.number()` a NaN-t elutasítja. A mentés így ténylegesen elbukik a
+    // séma ellenőrzésen, hálózati hívás nélkül.
+    const panel = await openNode(page, 'n-error');
+    await panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)').fill('50\nabc\n150');
+
+    await page.getByRole('button', { name: 'Mentés', exact: true }).click();
+
+    // A lábléc `role="alert"` üzenete megnevezi a hibás mező ÚTVONALÁT is,
+    // a `zodErrorToProtocolErrorBody` jóvoltából.
+    const footerAlert = page.locator('.page-footer').getByRole('alert');
+    await expect(footerAlert).toBeVisible();
+    await expect(footerAlert).toContainText('backoffMs');
+  });
 });
 
 test.describe('sub_workflow node', () => {

@@ -405,3 +405,46 @@ meglévő, már fedett kódutakon mér, tehát sem a számláló, sem a nevező 
 `apps/web/package.json` `coverage:e2e:report` küszöbe (98.01/95.87/98.88/97.92) ezzel a végleges,
 konszolidált állapoton igazolt, nem csak a részállapoton - a 10.3 pont nyitott kérdése ezzel
 lezárva.
+
+---
+
+## 12. A node inspector belső újratervezése utáni ratchet (2026-09-09)
+
+**Kiváltó ok:** a `node-inspector` téma belső újratervezése (SPEC-008 5.2, felhasználói kérések
+2026-09-09): a hibaösszesítő megszűnt, a kártya alakú `InspectorSection` és a `node-inspector`
+saját `TextAreaField` fájlja törölve (a `packages/ui` `textarea` témája lépett a helyére), a
+mezők pedig összecsukható panelekbe kerültek.
+
+**A mérés menete:** törölt `apps/web/e2e/.nyc_output`, teljes `bun x playwright test` (136
+Playwright teszt, mind zöld), majd `nyc report --reporter=json-summary` a pontos `pct`
+értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (11. szekció) |
+| ---------- | --------------- | --------- | -------------------------- |
+| statements | 959 / 976       | **98.25** | 98.01                      |
+| branches   | 372 / 386       | **96.37** | 95.87                      |
+| functions  | 359 / 363       | **98.89** | 98.88                      |
+| lines      | 921 / 938       | **98.18** | 97.92                      |
+
+**Mind a négy metrika NŐTT, tehát a ratchet felfelé mozdul**; az `apps/web/package.json`
+`coverage:e2e:report` küszöbe a mért értékre áll (98.25/96.37/98.89/98.18).
+
+**Egy közbenső mérés kimondása, mert tanulságos.** Az újratervezés után, az utolsó új e2e teszt
+ELŐTT a mérés 97.95/95.59/98.89/97.86 volt, tehát HÁROM metrikán a küszöb ALATT - miközben a
+nem fedett sorok száma (20) egyáltalán nem változott. Az ok tisztán a nevező: az újratervezés
+több mint 150 sornyi, **száz százalékban fedett** kódot törölt (a saját `TextAreaField.tsx`, az
+`InspectorSection` kártya és a hibaösszesítő blokk), tehát a fedett rész zsugorodott, a
+változatlan, nem fedett sorok pedig nagyobb súlyt kaptak. **A ratchet ezt nem tudja
+megkülönböztetni egy valódi lefedettség romlástól**, ezért a szám nem lett leszállítva; helyette
+egy olyan, valódi hiányra mutató e2e teszt készült, ami a mentés séma ellenőrzésének HIBA ágát
+fedi le.
+
+**Egy korábbi állítás mérten megdőlt.** Az `apps/web/e2e/graph-editor-validation.spec.ts` fejléc
+kommentje szerint a `validateGraphForSave` hiba ága "felhasználói úton" nem idézhető elő, mert a
+`node-config` sémákban nincs `regex`/`min`/`max` korlátozás, a natív `<input type="number">`
+pedig kitisztítja a nem numerikus bevitelt. Ez az `error_handler` node `backoffMs` mezőjére
+**nem igaz**: az a mező textarea (soronként egy szám), tehát a böngésző nem szűr, a
+`Number('abc')` NaN-t ad, és a `z.number()` a NaN-t elutasítja. Az új e2e teszt
+(`apps/web/e2e/node-inspector.spec.ts`, "a mentés a séma ellenőrzésen elbukik...") ezt az utat
+járja végig, és ezzel fedi a `validate-graph-for-save.ts` hiba ágát és a `GraphEditorScreen`
+`setValidationMessage` ágát is.
