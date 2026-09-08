@@ -32,7 +32,7 @@ export function SandboxField(properties: Readonly<SandboxFieldProperties>): Reac
   const isEnabled = value !== null;
 
   return (
-    <div className="field">
+    <div className="node-inspector__group">
       <Checkbox
         label="Sandbox felülírás megadva"
         checked={isEnabled}

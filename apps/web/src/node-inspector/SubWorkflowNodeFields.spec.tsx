@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `SubWorkflowNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { SubWorkflowNodeConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -65,9 +66,11 @@ describe('SubWorkflowNodeFields', () => {
   it('a `targetWorkflowId` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['targetWorkflowId', 'Kötelező']])}>
-          <SubWorkflowNodeFields config={CONFIG} onChange={vi.fn()} />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['targetWorkflowId', 'Kötelező']])}>
+            <SubWorkflowNodeFields config={CONFIG} onChange={vi.fn()} />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const targetInput = container.querySelector('input');

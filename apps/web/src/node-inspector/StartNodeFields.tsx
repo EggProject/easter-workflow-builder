@@ -1,7 +1,6 @@
 import type { StartInputField, StartNodeConfig } from '@easter-workflow-builder/protocol';
 import { Button, Checkbox, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 
 export interface StartNodeFieldsProperties {
@@ -15,6 +14,10 @@ const EMPTY_INPUT_FIELD: StartInputField = { name: '', label: '', valueKind: 'st
  * A `start` node szerkesztett mezője: a bemeneti mezők listája (SPEC-008
  * 5.1, `name`/`label`/`valueKind`/`required`). Felvehető, szerkeszthető és
  * törölhető sor.
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. A node egyetlen fogalmat
+ * hordoz, a bemeneti mezők listáját, ami egyben a leggyakrabban szerkesztett
+ * tartalom is - egy panel mögé rejteni pontosan a fontosat rejtené el.
  */
 export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -31,7 +34,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
   }
 
   return (
-    <InspectorSection title="bemeneti mezők">
+    <>
       {config.inputFields.map((field, index) => (
         <div key={index} className="node-inspector__list-row">
           <TextField
@@ -79,12 +82,13 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
       ))}
       <Button
         type="button"
+        size="sm"
         onClick={() => {
           setInputFields([...config.inputFields, EMPTY_INPUT_FIELD]);
         }}
       >
         Bemeneti mező hozzáadása
       </Button>
-    </InspectorSection>
+    </>
   );
 }

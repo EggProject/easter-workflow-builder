@@ -1,8 +1,7 @@
 import type { PresetSystemPrompt } from '@easter-workflow-builder/protocol';
-import { SelectField } from '@easter-workflow-builder/ui';
+import { SelectField, TextAreaField } from '@easter-workflow-builder/ui';
 import { isString } from '@easter-workflow-builder/typeguards';
 import type { ChangeEvent, ReactElement } from 'react';
-import { TextAreaField } from './TextAreaField.tsx';
 import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-value.ts';
 
 export type SystemPromptValue = string | PresetSystemPrompt | null;
@@ -64,7 +63,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
 
   if (value === null) {
     return (
-      <div className="field">
+      <div className="node-inspector__group">
         <SelectField
           label="Rendszer prompt módja"
           error={error}
@@ -78,7 +77,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
 
   if (isString(value)) {
     return (
-      <div className="field">
+      <div className="node-inspector__group">
         <SelectField
           label="Rendszer prompt módja"
           error={error}
@@ -98,7 +97,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
   }
 
   return (
-    <div className="field">
+    <div className="node-inspector__group">
       <SelectField
         label="Rendszer prompt módja"
         error={error}

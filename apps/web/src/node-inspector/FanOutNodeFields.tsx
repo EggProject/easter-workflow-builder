@@ -1,7 +1,6 @@
 import type { FanOutNodeConfig } from '@easter-workflow-builder/protocol';
+import { TextAreaField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
 export interface FanOutNodeFieldsProperties {
@@ -12,6 +11,9 @@ export interface FanOutNodeFieldsProperties {
 /**
  * A `fan_out` node szerkesztett mezői: `itemsExpression`,
  * `branchLabelTemplate` (SPEC-008 5.1).
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. A node mindössze két mezőt
+ * hordoz, és mindkettő a szétosztás lényege.
  */
 export function FanOutNodeFields(properties: Readonly<FanOutNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -19,7 +21,7 @@ export function FanOutNodeFields(properties: Readonly<FanOutNodeFieldsProperties
   const branchLabelTemplateError = useFieldError('branchLabelTemplate');
 
   return (
-    <InspectorSection title="szétosztás">
+    <>
       <TextAreaField
         label="Elemek kifejezés (itemsExpression)"
         value={config.itemsExpression}
@@ -36,6 +38,6 @@ export function FanOutNodeFields(properties: Readonly<FanOutNodeFieldsProperties
           onChange({ ...config, branchLabelTemplate: event.target.value });
         }}
       />
-    </InspectorSection>
+    </>
   );
 }

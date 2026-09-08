@@ -1,10 +1,8 @@
 import { JoinMergeSettingsSchema, type AgentStepConfig, type JoinNodeConfig } from '@easter-workflow-builder/protocol';
-import { SelectField } from '@easter-workflow-builder/ui';
+import { SelectField, TextAreaField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
-import { InspectorSection } from './InspectorSection.tsx';
 import { JsonTextAreaField } from './JsonTextAreaField.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
 export interface JoinNodeFieldsProperties {
@@ -73,6 +71,12 @@ const MODE_OPTIONS = [
  * `script` mód a közös `ScriptConfig` alakot hordozza; az `ai_synthesis`
  * mód a teljes `AgentStepConfig`-ot, a `agent_step` node-dal AZONOS
  * `AgentStepConfigFields` komponensen át.
+ *
+ * CSOPORTOSÍTÁS: a mód választó és a módhoz tartozó egyetlen beállítás
+ * elöl áll, panel nélkül - a `merge` és a `script` módnak összesen két
+ * mezője van. Az `ai_synthesis` mód a saját panelezését az
+ * `AgentStepConfigFields`-től örökli, tehát a mód választó után ugyanaz a
+ * "elöl a prompt, panelben a felülírások" tagolás jelenik meg.
  */
 export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription } = properties;
@@ -107,7 +111,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
 
   if (config.mode === 'merge') {
     return (
-      <InspectorSection title="összefésülés">
+      <>
         {modeSelect}
         <JsonTextAreaField
           label="Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)"
@@ -119,13 +123,13 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
             }
           }}
         />
-      </InspectorSection>
+      </>
     );
   }
 
   if (config.mode === 'script') {
     return (
-      <InspectorSection title="összefésülés">
+      <>
         {modeSelect}
         <TextAreaField
           label="Forrás (source)"
@@ -135,12 +139,12 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
             onChange({ ...config, settings: { ...config.settings, source: event.target.value } });
           }}
         />
-      </InspectorSection>
+      </>
     );
   }
 
   return (
-    <InspectorSection title="összefésülés">
+    <>
       {modeSelect}
       <AgentStepConfigFields
         fieldPathPrefix="settings."
@@ -150,6 +154,6 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
         }}
         inheritedProviderDescription={inheritedProviderDescription}
       />
-    </InspectorSection>
+    </>
   );
 }

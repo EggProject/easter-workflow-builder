@@ -1,9 +1,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { InspectorSection } from './InspectorSection.tsx';
+import { InspectorFieldGroup } from './InspectorFieldGroup.tsx';
 
-describe('InspectorSection', () => {
+describe('InspectorFieldGroup', () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -23,9 +23,9 @@ describe('InspectorSection', () => {
   it('a csoport role="group" szerepet kap, a címére mutató aria-labelledby kötéssel', () => {
     act(() => {
       root.render(
-        <InspectorSection title="prompt és provider">
+        <InspectorFieldGroup title="Bekapcsolt motor hookok">
           <input aria-label="mező" />
-        </InspectorSection>,
+        </InspectorFieldGroup>,
       );
     });
     const group = container.querySelector('[role="group"]');
@@ -33,34 +33,37 @@ describe('InspectorSection', () => {
     const titleId = group?.getAttribute('aria-labelledby');
     expect(titleId).toBeTruthy();
     const title = titleId === null || titleId === undefined ? undefined : document.querySelector(`#${titleId}`);
-    expect(title?.textContent).toBe('prompt és provider');
+    expect(title?.textContent).toBe('Bekapcsolt motor hookok');
   });
 
-  it('a cím h3 elem, a panel h2 fejléce alatti szinten', () => {
+  it('NINCS kártya alakú doboz: a design system .field__label címkéje és egy tiszta elrendezés csoport', () => {
     act(() => {
-      root.render(<InspectorSection title="futási korlátok">{undefined}</InspectorSection>);
+      root.render(<InspectorFieldGroup title="eszközök">{undefined}</InspectorFieldGroup>);
     });
-    const title = container.querySelector('.inspector-section__title');
-    expect(title?.tagName).toBe('H3');
+    expect(container.querySelector('.inspector-section')).toBeNull();
+    expect(container.querySelector('.card')).toBeNull();
+    expect(container.querySelector('[role="group"]')?.className).toBe('node-inspector__group');
+    expect(container.querySelector('.field__label')?.tagName).toBe('SPAN');
   });
 
-  it('a gyerekeit a mezőket tartó dobozban rendereli', () => {
+  it('a gyerekeit közvetlenül a csoportba rendereli, közbeiktatott doboz nélkül', () => {
     act(() => {
       root.render(
-        <InspectorSection title="eszközök">
-          <span data-testid="gyerek">tartalom</span>
-        </InspectorSection>,
+        <InspectorFieldGroup title="eszközök">
+          <span>tartalom</span>
+        </InspectorFieldGroup>,
       );
     });
-    expect(container.querySelector('.inspector-section__fields')?.textContent).toBe('tartalom');
+    const group = container.querySelector('[role="group"]');
+    expect(group?.lastElementChild?.textContent).toBe('tartalom');
   });
 
-  it('két szakasz két KÜLÖNBÖZŐ azonosítót kap, tehát a nevük nem keveredik', () => {
+  it('két csoport két KÜLÖNBÖZŐ azonosítót kap, tehát a nevük nem keveredik', () => {
     act(() => {
       root.render(
         <>
-          <InspectorSection title="első">{undefined}</InspectorSection>
-          <InspectorSection title="második">{undefined}</InspectorSection>
+          <InspectorFieldGroup title="első">{undefined}</InspectorFieldGroup>
+          <InspectorFieldGroup title="második">{undefined}</InspectorFieldGroup>
         </>,
       );
     });

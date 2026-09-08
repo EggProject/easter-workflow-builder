@@ -1,5 +1,5 @@
 import { NodeConfigSchema, type NodeConfig, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
-import { Button } from '@easter-workflow-builder/ui';
+import { Button, FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
@@ -27,6 +27,15 @@ export interface NodeInspectorProperties {
    * globális beállítás alapján, ez a komponens csak továbbadja.
    */
   readonly inheritedProviderDescription: string;
+  /**
+   * Megkísérelték-e már beküldeni (menteni) a gráfot úgy, hogy a beküldés
+   * hiba miatt nem sikerült. Ilyenkor minden érvénytelen mező kiírja a
+   * hibáját, akkor is, ha a felhasználó hozzá sem nyúlt - enélkül csak az
+   * ÉRINTETT, érvénytelen mezők jeleznek. A tényt a beküldést ismerő
+   * fogyasztó (`GraphEditorScreen`) adja meg; alapértéke `false`, mert a
+   * panel önmagában nem tud a mentésről.
+   */
+  readonly isSaveAttempted?: boolean;
 }
 
 /**
@@ -104,18 +113,20 @@ function renderConfigFields(
  * (`GraphEditorScreen`) egy `Resizable` osztott elrendezés jobb paneljébe
  * teszi, tehát a vászon mellette szűkül, és a sáv szélessége húzható
  * (SPEC-008 5.5). A panel `<aside>` elem, saját hozzáférhető névvel, tehát
- * a képernyőolvasó kiegészítő területként (`complementary`) találja meg.
+ * a képernyőolvasó kiegészítő területként (`complementary`) találja meg. A
+ * fejléc bezáró gombja ikon gomb (`.btn--icon`), aminek a hozzáférhető
+ * nevét `aria-label` adja, mert nincs látható szövege.
  *
- * A HIBAJELZÉS KÉT SZINTŰ, a WCAG "error summary" mintája szerint:
- * a `role="alert"` összesítő a panel tetején megmondja, HÁNY hiba van és
- * melyik útvonalakon, a mezőnkénti üzenet pedig a hibás mező ALATT áll,
- * `aria-invalid` és `aria-describedby` kötéssel (a `TextField`, a
- * `SelectField` és a `TextAreaField` `error` propja). A mezőkhöz a
- * `FieldErrorsContext` viszi le a térképet, hogy a tíz típus szerinti
- * komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
+ * A HIBAJELZÉS EGY SZINTŰ: a hibaüzenet KIZÁRÓLAG a hibás mező ALATT áll,
+ * `aria-invalid` és `aria-describedby` kötéssel, és csak akkor, ha a mező
+ * ÉRINTETT és érvénytelen, VAGY ha a mentést már megkísérelték és a mező
+ * érvénytelen (`packages/ui` `field-error-visibility` téma). A panel
+ * tetején álló összesítő MEGSZŰNT (felhasználói kérés, 2026-09-09). A
+ * mezőkhöz a `FieldErrorsContext` viszi le a térképet, hogy a tíz típus
+ * szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
-  const { node, onChange, onClose, inheritedProviderDescription } = properties;
+  const { node, onChange, onClose, inheritedProviderDescription, isSaveAttempted = false } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   const parsedConfig = NodeConfigSchema.safeParse(node.config);
   const fieldErrors = parsedConfig.success ? NO_FIELD_ERRORS : fieldErrorsFromZodError(parsedConfig.error);
@@ -131,26 +142,18 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
           <h2 className="node-inspector__title">{catalogEntry.label}</h2>
           <p className="node-inspector__node-id">{node.id}</p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-          Bezárás
+        <Button type="button" variant="ghost" size="sm" icon aria-label="Bezárás" onClick={onClose}>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
         </Button>
       </div>
       <div className="node-inspector__body">
-        {fieldErrors.size > 0 && (
-          <div role="alert" className="node-inspector__errors">
-            <p className="node-inspector__errors-title">Érvénytelen mezők: {fieldErrors.size}</p>
-            <ul className="node-inspector__error-list">
-              {Array.from(fieldErrors, ([path, message]) => (
-                <li key={path}>
-                  <b className="node-inspector__error-path">{path}</b> {message}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <FieldErrorsContext.Provider value={fieldErrors}>
-          {renderConfigFields(node.config, handleConfigChange, inheritedProviderDescription)}
-        </FieldErrorsContext.Provider>
+        <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>
+          <FieldErrorsContext.Provider value={fieldErrors}>
+            {renderConfigFields(node.config, handleConfigChange, inheritedProviderDescription)}
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>
       </div>
     </aside>
   );

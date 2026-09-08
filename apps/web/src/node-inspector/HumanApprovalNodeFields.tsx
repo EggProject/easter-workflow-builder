@@ -1,8 +1,6 @@
 import type { HumanApprovalNodeConfig } from '@easter-workflow-builder/protocol';
-import { TextField } from '@easter-workflow-builder/ui';
+import { TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
 
@@ -16,6 +14,11 @@ export interface HumanApprovalNodeFieldsProperties {
  * `timeoutMs` (SPEC-008 5.1). A `timeoutMs` `null` értéke korlátlan
  * várakozást jelent (`packages/protocol/src/node-config/node-config.ts`
  * doksija).
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. A cím és a törzs sablon az,
+ * amit a jóváhagyó ténylegesen látni fog, tehát elöl a helye; a `timeoutMs`
+ * valóban ritkán állított korlát, de EGYETLEN mező, aminek a panelbe
+ * zárása több chrome-ot adna, mint amennyi helyet megspórol.
  */
 export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -24,7 +27,7 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
   const timeoutMsError = useFieldError('timeoutMs');
 
   return (
-    <InspectorSection title="emberi jóváhagyás">
+    <>
       <TextField
         label="Cím"
         value={config.title}
@@ -50,6 +53,6 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
           onChange({ ...config, timeoutMs: fromNumberFieldValue(event.target.value) });
         }}
       />
-    </InspectorSection>
+    </>
   );
 }

@@ -1,5 +1,5 @@
+import { TextAreaField } from '@easter-workflow-builder/ui';
 import { useState, type ChangeEvent, type ReactElement } from 'react';
-import { TextAreaField } from './TextAreaField.tsx';
 
 export interface JsonTextAreaFieldProperties {
   readonly label: string;

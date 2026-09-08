@@ -1,20 +1,34 @@
-import { Checkbox, SelectField, TextField } from '@easter-workflow-builder/ui';
+import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import type { ChangeEvent, ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import {
   UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS,
   UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON,
   AGENT_DEFINITION_FIELD_TABLE,
   type AgentDefinitionFieldDescriptor,
+  type AgentDefinitionFieldGroup,
 } from './agent-definition-field-table.ts';
 import { describeUnknownValue } from './describe-unknown-value.ts';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import './node-inspector.css';
 
-const FIELD_GROUPS = [...new Set(AGENT_DEFINITION_FIELD_TABLE.map((field) => field.group))];
+/**
+ * A tábla öt csoportja két szintre oszlik. ELÖL, panel nélkül a `kötelező`
+ * csoport áll (a leírás és a prompt: e kettő nélkül az agent bejegyzésnek
+ * nincs értelme, és mérten ez az a két mező, amit minden bejegyzésen ki
+ * kell tölteni). A többi négy csoport összecsukható panelbe kerül, mert
+ * mind opcionális felülírás vagy csak olvasható érték - a `modell és
+ * korlátok`, illetve az `eszközök`+`környezet` páros egy-egy panelt kap
+ * (utóbbi kettő ugyanannak a futtatási környezetnek a két oldala), a
+ * `SPEC-009 hatókör` pedig a nem megerősített mezőkkel együtt egyetlen,
+ * csak olvasható panelbe.
+ */
+const ACCORDION_PANELS: readonly { readonly title: string; readonly groups: readonly AgentDefinitionFieldGroup[] }[] = [
+  { title: 'Modell és korlátok', groups: ['modell és korlátok'] },
+  { title: 'Eszközök és környezet', groups: ['eszközök', 'környezet'] },
+  { title: 'Skillek és MCP szerverek (csak olvasható)', groups: ['SPEC-009 hatókör'] },
+];
 
 export interface AgentDefinitionEntryFieldsProperties {
   /**
@@ -132,6 +146,8 @@ function renderFieldControl(
  * tehát ezen a szinten nincs mezőnkénti Zod hibaüzenet sem - a felület
  * típusőrökkel olvassa ki a mért mezőket, hibás alak esetén az "üres"
  * alapértékre esik vissza, sosem omlik össze.
+ *
+ * CSOPORTOSÍTÁS: lásd az `ACCORDION_PANELS` konstans fölötti indoklást.
  */
 export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionEntryFieldsProperties>): ReactElement {
   const { value, onChange } = properties;
@@ -146,22 +162,31 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
   }
 
   return (
-    <div className="agent-definition-entry-fields">
-      {FIELD_GROUPS.map((group) => (
-        <InspectorSection key={group} title={group}>
-          {AGENT_DEFINITION_FIELD_TABLE.filter((field) => field.group === group).map((field) => (
-            <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
-          ))}
-        </InspectorSection>
+    <div className="node-inspector__group agent-definition-entry-fields">
+      {AGENT_DEFINITION_FIELD_TABLE.filter((field) => field.group === 'kötelező').map((field) => (
+        <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
       ))}
-      <InspectorSection title="nem megerősített mezők">
-        <p className="node-inspector__reason">{UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON}</p>
-        {UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS.map((key) => (
-          <p key={key}>
-            <b>{key}</b>: {describeUnknownValue(record[key])}
-          </p>
+      <Accordion>
+        {ACCORDION_PANELS.map((panel) => (
+          <AccordionItem key={panel.title} title={panel.title}>
+            <div className="node-inspector__group">
+              {AGENT_DEFINITION_FIELD_TABLE.filter((field) => panel.groups.includes(field.group)).map((field) => (
+                <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
+              ))}
+              {panel.groups.includes('SPEC-009 hatókör') && (
+                <>
+                  <p className="node-inspector__reason">{UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON}</p>
+                  {UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS.map((key) => (
+                    <p key={key}>
+                      <b>{key}</b>: {describeUnknownValue(record[key])}
+                    </p>
+                  ))}
+                </>
+              )}
+            </div>
+          </AccordionItem>
         ))}
-      </InspectorSection>
+      </Accordion>
     </div>
   );
 }

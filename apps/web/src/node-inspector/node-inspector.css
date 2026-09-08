@@ -6,6 +6,15 @@
    Minden térköz a design system `--ep-space-*` tokenjeiből jön, minden
    tipográfia a `--ep-text-*` tokenekből; kitalált pixel érték nincs.
 
+   NINCS CARD IN CARD. A panel egy kártya alakú `.resizable-group`
+   belsejében ül, ezért itt egyetlen szabály sem rajzol második kártyát:
+   nincs szegély plusz lekerekítés plusz saját háttér kombináció egyetlen
+   belső dobozon sem. A korábbi `.inspector-section` (kitalált, a design
+   system `.card`-jától eltérő tokenkombinációjú kártya) és a panel tetején
+   álló, szegélyezett hibaösszesítő emiatt megszűnt
+   (`docs/research/2026-09-08-design-system-audit.md` 6. szekció,
+   felhasználói kérés 2026-09-09).
+
    A panel SAJÁT hátteret kap (`--ep-bg-elevated`), a vászon a nála
    mélyebb `--ep-bg-sunken` felületen ül (`graph-editor.css`), tehát a két
    terület a húzható elválasztó nélkül is elkülönül. */
@@ -64,79 +73,33 @@
   overflow-y: auto;
 }
 
-/* ============ Összesítő hibablokk ============
-   A mezőnkénti hibaüzenet mellett MEGMARAD a panel tetején álló,
-   `role="alert"` összesítő (a WCAG "error summary" mintája): a mezőnkénti
-   üzenet megmondja, MIT kell javítani, az összesítő azt, hogy HÁNY hiba
-   van, és felsorolja azokat a mezőket is, amiknek nincs saját vezérlőjük a
-   panelen (pl. az `agents` bejegyzések nem megerősített mezői). */
-.node-inspector__errors {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ep-space-2);
-  padding: var(--ep-space-3) var(--ep-space-4);
-  border: 1px solid var(--ep-danger);
-  border-radius: var(--ep-radius-md);
-  color: var(--ep-danger);
-}
-
-.node-inspector__errors-title {
-  margin: 0;
-  font: var(--ep-text-meta);
-}
-
-.node-inspector__error-list {
-  margin: 0;
-  padding-left: var(--ep-space-5);
-  font: var(--ep-text-meta);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ep-space-1);
-}
-
-/* Az útvonal a `config` gyökerétől számít. Az ÜRES útvonal magát a config
-   objektumot jelenti; ezt CSS jelöli meg, nem JavaScript elágazás, mert a
-   `z.strictObject` gyökér szintű hibája a felületen elő sem állhat (a
-   `WorkflowGraphDocumentSchema` ugyanezt a sémát futtatja a betöltéskor),
-   egy sosem futó ágat pedig a `.claude/CLAUDE.md` 5. szekciója tilt. */
-.node-inspector__error-path:empty::before {
-  content: '(gyökér)';
-}
-
-/* ============ Mezőcsoport (`InspectorSection`) ============
-   A `fieldset`/`legend` párt váltja ki, `role="group"` plusz
-   `aria-labelledby` szemantikával (lásd `InspectorSection.tsx`). A csoport
-   kártya alakú, a design system `settings.html` `.card` mintája szerint. */
-.inspector-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ep-space-4);
-  padding: var(--ep-space-4);
-  border: 1px solid var(--ep-border-subtle);
-  border-radius: var(--ep-radius-md);
-  background: var(--ep-bg);
-}
-
-.inspector-section__title {
-  margin: 0;
-  font: var(--ep-text-h4);
-  color: var(--ep-fg);
-}
-
-/* A csoporton belüli mezők közötti térköz. A mezőnek MINDIG van helye a
-   hibaüzenetének (lásd lentebb), tehát ez a rés tisztán a mezők közötti
-   levegő, nem a hibaüzeneté - a kettő nem csúszik egymásra. */
-.inspector-section__fields {
+/* ============ Megnevezett mezőcsoport (`InspectorFieldGroup`) ============
+   TISZTA ELRENDEZÉS, kártya chrome nélkül: nincs szegély, nincs
+   lekerekítés, nincs saját háttér és nincs belső térköz, tehát nem tud
+   dupla eltartást vagy dobozt a dobozban adni. A csoport CÍMKÉJE a design
+   system saját `.field__label` osztálya (`text-field` téma), nem egy
+   kitalált szakaszcím osztály. */
+.node-inspector__group {
   display: flex;
   flex-direction: column;
   gap: var(--ep-space-5);
   min-width: 0;
 }
 
+/* Az összecsukható panelek (`packages/ui` `accordion` téma) törzse a
+   forrásból örökölt `padding: 0 4px 18px` értéket viszi. A benne álló
+   mezőcsoport a saját, `--ep-space-5` térközével dolgozik; itt csak azt
+   kell kimondani, hogy a törzs egy szűk sávban se engedjen kilógni semmit. */
+.node-inspector .accordion__body {
+  min-width: 0;
+}
+
 /* ============ Mezők ============
-   1. A `.input` a `packages/ui` `text-field` témájából jön. A panelben a
-      `<textarea>` is ezt az osztályt viseli, aminek a natív, `cols`
-      alapú belső szélessége felülírandó, különben szűk panelben kilóg.
+   1. A `.input` (`text-field` téma) és a `.textarea` (`textarea` téma) is
+      a design systemből jön. A `<textarea>` MA a saját `.textarea`
+      osztályát viseli, nem az egysoros `.input` osztályt, tehát a
+      korábban ide írt `resize: vertical` toldás megszűnt: a `resize` és a
+      `min-height` a komponens saját CSS-ében van.
    2. A HIBAÜZENET HELYE MINDIG FENN VAN TARTVA: a `.field` a panelben
       gridre vált, aminek a harmadik sora legalább egy sornyi magas, akkor
       is, ha nincs hiba. Így a hibaüzenet megjelenése nem tolja el a panel
@@ -150,13 +113,10 @@
       szomszédos mezőn (`apps/web/e2e/node-inspector.spec.ts`, "a
       hibaüzenet megjelenése nem tolja el a szomszédos mezőt"); a
       következő skálalépcső ezt nullára viszi. */
-.node-inspector .input {
+.node-inspector .input,
+.node-inspector .textarea {
   min-width: 0;
   max-width: 100%;
-}
-
-.node-inspector textarea.input {
-  resize: vertical;
 }
 
 .node-inspector .field {
@@ -187,15 +147,16 @@
 
 /* Több mezőt egy sorba rendező lista sor (bemeneti mezők, ágak, agent
    bejegyzések). Törhető, hogy szűk panelben se lógjon ki semmi, és a
-   gombja a mezők aljához igazodjon. */
+   gombja a mezők aljához igazodjon. Egyetlen elválasztó szegélyt visel,
+   háttér és lekerekítés nélkül: a sorok elhatárolása kell, nem egy újabb
+   kártya. */
 .node-inspector__list-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--ep-space-3);
-  padding: var(--ep-space-3);
-  border: 1px solid var(--ep-divider);
-  border-radius: var(--ep-radius-sm);
+  padding-bottom: var(--ep-space-3);
+  border-bottom: 1px solid var(--ep-divider);
   min-width: 0;
 }
 

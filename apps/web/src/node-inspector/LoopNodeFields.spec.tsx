@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `LoopNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { LoopNodeConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,9 +81,11 @@ describe('LoopNodeFields', () => {
   it('a `maxIterations` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['maxIterations', 'Kötelező']])}>
-          <LoopNodeFields config={CONFIG} onChange={vi.fn()} />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['maxIterations', 'Kötelező']])}>
+            <LoopNodeFields config={CONFIG} onChange={vi.fn()} />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const maxIterationsInput = container.querySelector('input');

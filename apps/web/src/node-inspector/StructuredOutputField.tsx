@@ -24,7 +24,7 @@ export function StructuredOutputField(properties: Readonly<StructuredOutputField
   const isEnabled = value !== null;
 
   return (
-    <div className="field">
+    <div className="node-inspector__group">
       <Checkbox
         label="Strukturált kimenet felülírás megadva"
         checked={isEnabled}

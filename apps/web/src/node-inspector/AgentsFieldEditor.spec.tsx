@@ -46,7 +46,11 @@ describe('AgentsFieldEditor', () => {
     act(() => {
       root.render(<AgentsFieldEditor value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />);
     });
-    expect(container.querySelector('.inspector-section__title')?.textContent).toBe('kutato');
+    // A bejegyzés megnevezett, DOBOZ NÉLKÜLI csoport (`InspectorFieldGroup`):
+    // a design system `.field__label` címkéje viszi az agent nevét, kártya
+    // alakú szakaszcím nincs.
+    expect(container.querySelector('.field__label')?.textContent).toBe('kutato');
+    expect(container.querySelector('.inspector-section')).toBeNull();
     expect(container.querySelector('[aria-expanded="false"]')).not.toBeNull();
     expect(container.querySelector('.agent-definition-entry-fields')).toBeNull();
   });

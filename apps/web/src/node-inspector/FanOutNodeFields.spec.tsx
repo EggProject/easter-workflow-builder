@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `FanOutNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { FanOutNodeConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,9 +60,11 @@ describe('FanOutNodeFields', () => {
   it('az `itemsExpression` mezőnkénti hibája megjelenik a mező alatt, aria kötéssel', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['itemsExpression', 'Kötelező']])}>
-          <FanOutNodeFields config={CONFIG} onChange={vi.fn()} />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['itemsExpression', 'Kötelező']])}>
+            <FanOutNodeFields config={CONFIG} onChange={vi.fn()} />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const textarea = container.querySelector('textarea');

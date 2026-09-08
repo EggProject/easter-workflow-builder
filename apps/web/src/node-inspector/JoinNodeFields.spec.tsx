@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a `JoinNodeConfig.onUnhandledError` a dróton ténylegesen `null` értéket hordoz (SPEC-005). */
 import type { JoinNodeConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -127,7 +128,10 @@ describe('JoinNodeFields', () => {
         <JoinNodeFields config={AI_SYNTHESIS_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />,
       );
     });
-    expect(container.querySelector('.agent-step-config-fields')).not.toBeNull();
+    // Az `AgentStepConfigFields` ma töredéket ad vissza (nincs saját burkoló
+    // doboza), tehát a jelenlétét a saját tartalmán mérjük: a prompt sablon
+    // elöl, a felülírások pedig összecsukható panelekben.
+    expect(container.querySelector('.accordion')).not.toBeNull();
     expect(container.textContent).toContain('foglald össze');
     const promptTextarea = [...container.querySelectorAll('textarea')].find(
       (textarea) => textarea.value === 'foglald össze',
@@ -212,9 +216,11 @@ describe('JoinNodeFields', () => {
   it('"script" módra a `settings.source` mezőnkénti hibája a forrás mező alatt jelenik meg', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['settings.source', 'Kötelező mező']])}>
-          <JoinNodeFields config={SCRIPT_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['settings.source', 'Kötelező mező']])}>
+            <JoinNodeFields config={SCRIPT_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const textarea = container.querySelector('textarea');
@@ -230,9 +236,11 @@ describe('JoinNodeFields', () => {
   it('"ai_synthesis" módra a `settings.promptTemplate` hiba a beágyazott AgentStepConfigFields `promptTemplate` mezője alatt jelenik meg (ScopedFieldErrors)', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['settings.promptTemplate', 'Kötelező mező']])}>
-          <JoinNodeFields config={AI_SYNTHESIS_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['settings.promptTemplate', 'Kötelező mező']])}>
+            <JoinNodeFields config={AI_SYNTHESIS_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const promptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(

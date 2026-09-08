@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a teszt a `node-config` séma nullázható mezőit vizsgálja (SPEC-005 protokoll alak). */
 import type { AgentStepConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -284,9 +285,7 @@ describe('AgentStepConfigFields', () => {
     const onChange = vi.fn();
     render(BASE_CONFIG, onChange);
     const textInputs = [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')];
-    const cwdInput = textInputs.find(
-      (input) => input.closest('[role="group"]')?.textContent.includes('Munkakönyvtár') === true,
-    );
+    const cwdInput = textInputs.find((input) => input.closest('label')?.textContent.includes('Munkakönyvtár') === true);
     if (cwdInput === undefined) {
       throw new Error('a teszt nem talált cwd mezőt');
     }
@@ -402,22 +401,24 @@ describe('AgentStepConfigFields', () => {
   it('a `promptTemplate`, a `systemPrompt` és a `providerId` mezőnkénti hibája megjelenik a mezők alatt, aria kötéssel', () => {
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider
-          value={
-            new Map([
-              ['promptTemplate', 'Kötelező mező'],
-              ['systemPrompt', 'Érvénytelen alak'],
-              ['providerId', 'Ismeretlen provider'],
-            ])
-          }
-        >
-          <AgentStepConfigFields
-            fieldPathPrefix=""
-            config={BASE_CONFIG}
-            onChange={vi.fn()}
-            inheritedProviderDescription="nincs"
-          />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider
+            value={
+              new Map([
+                ['promptTemplate', 'Kötelező mező'],
+                ['systemPrompt', 'Érvénytelen alak'],
+                ['providerId', 'Ismeretlen provider'],
+              ])
+            }
+          >
+            <AgentStepConfigFields
+              fieldPathPrefix=""
+              config={BASE_CONFIG}
+              onChange={vi.fn()}
+              inheritedProviderDescription="nincs"
+            />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const promptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(

@@ -1,7 +1,7 @@
 import { Button, TextField } from '@easter-workflow-builder/ui';
 import { useState, type ChangeEvent, type ReactElement } from 'react';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
-import { InspectorSection } from './InspectorSection.tsx';
+import { InspectorFieldGroup } from './InspectorFieldGroup.tsx';
 
 export interface AgentsFieldEditorProperties {
   /**
@@ -20,6 +20,14 @@ export interface AgentsFieldEditorProperties {
  * rekordot, sosem cserél (AC60) - a `handleEntryChange` maga is csak a
  * megadott kulcsot írja felül, a `AgentDefinitionEntryFields` pedig ugyanezt
  * teszi eggyel lejjebb, a bejegyzésen belül.
+ *
+ * MIÉRT NEM `AccordionItem` A BEJEGYZÉS KIBONTÁSA. Az `AccordionItem`
+ * fejléce EGY natív gomb, a bejegyzés fejléce viszont az átnevező mezővel
+ * és két további gombbal együtt áll - interaktív vezérlőt pedig nem lehet
+ * gombba ágyazni. A bejegyzés ezért marad a saját, `aria-expanded` jelzésű
+ * kibontó gombján. A szerkesztő MAGA egyébként már egy `AccordionItem`
+ * panelben ül (`AgentStepConfigFields` "Al-agentek"), tehát a ritkán
+ * szerkesztett tartalom elrejtése ott történik meg.
  */
 export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperties>): ReactElement {
   const { value, onChange } = properties;
@@ -84,7 +92,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
         const isExpanded = expandedKeys.has(key);
         const renameDraft = renameDrafts[key] ?? key;
         return (
-          <InspectorSection key={key} title={key}>
+          <InspectorFieldGroup key={key} title={key}>
             <div className="agents-field-editor__entry-header">
               <Button
                 type="button"
@@ -137,7 +145,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
                 }}
               />
             )}
-          </InspectorSection>
+          </InspectorFieldGroup>
         );
       })}
       <div className="agents-field-editor__add">
@@ -150,6 +158,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
         />
         <Button
           type="button"
+          size="sm"
           disabled={newAgentName.trim() === '' || Object.hasOwn(value, newAgentName.trim())}
           onClick={handleAdd}
         >

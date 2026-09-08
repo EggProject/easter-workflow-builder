@@ -1,28 +1,33 @@
 import { useId, type ReactElement, type ReactNode } from 'react';
+import './node-inspector.css';
 
-export interface InspectorSectionProperties {
+export interface InspectorFieldGroupProperties {
   /**
-   * A szakasz címe; egyben a mezőcsoport hozzáférhető neve.
+   * A csoport címe; egyben a mezőcsoport hozzáférhető neve.
    */
   readonly title: string;
   readonly children: ReactNode;
 }
 
 /**
- * A beállítás panel egy mezőcsoportja, saját címmel.
+ * A beállítás panel egy megnevezett mezőcsoportja, DOBOZ NÉLKÜL.
  *
- * MIÉRT NEM `fieldset` és `legend`: a `legend` a szegélybe rajzolódó,
- * böngészőnként eltérően elhelyezett elem, aminek a doboz belső térközét és
- * a szélességét nem lehet megbízhatóan vezérelni - a panel korábbi alakjában
- * pontosan ez okozta az egymásra csúszó mezőket és a szakaszcím
- * olvashatatlanságát. A design system maga sem `fieldset`-tel tagolja a
- * több szakaszos űrlapjait, hanem kártya alakú szakasszal, saját fejléccel
- * (`eggproject-design-admin-app-examples/examples/settings.html`,
- * `.card`/`.card__header`).
+ * MI VÁLTOZOTT, ÉS MIÉRT. A korábbi `InspectorSection` kártya alakú dobozt
+ * rajzolt (szegély, lekerekítés, saját háttér), ráadásul nem a design
+ * system `.card` osztályával, hanem egy attól eltérő tokenkombinációjú,
+ * kitalált `.inspector-section` osztállyal
+ * (`docs/research/2026-09-08-design-system-audit.md` 6. szekció). A panel
+ * viszont már eleve egy kártya alakú `.resizable-group` belsejében ül,
+ * tehát minden ilyen doboz card in card volt - amit a felhasználó
+ * kifejezetten tiltott -, és a doboz saját belső térköze a mezők közötti
+ * térközzel dupla eltartást adott. A csoport ezért ma **tisztán elrendezés**
+ * (egy flex oszlop token térközzel) plusz a design system saját
+ * `.field__label` címkéje, kártya chrome nélkül.
  *
- * A HOZZÁFÉRHETŐSÉG NEM SÉRÜL, mert a csoport a `fieldset`/`legend` PÁRRAL
- * AZONOS szemantikát kap: `role="group"` plusz `aria-labelledby`, ami a
- * szakasz címére mutat. Ez a W3C WAI hivatalos, dokumentált alternatívája:
+ * A HOZZÁFÉRHETŐSÉG NEM VÁLTOZOTT: a csoport továbbra is a `fieldset`/
+ * `legend` párral azonos szemantikát kap, `role="group"` plusz
+ * `aria-labelledby` alakban, ami a W3C WAI hivatalos, dokumentált
+ * alternatívája:
  *
  * - WAI Forms Tutorial, "Grouping Controls":
  *   <https://www.w3.org/WAI/tutorials/forms/grouping/> - "WAI-ARIA provides
@@ -31,33 +36,25 @@ export interface InspectorSectionProperties {
  *   attribute references the `id` for text that will serve as the label for
  *   the group. This technique provides additional styling possibilities."
  * - WCAG 2.2 technika ARIA17, "Using grouping roles to identify related form
- *   controls": <https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA17> - "This
- *   is a viable alternative for grouping form controls programmatically when
- *   the user interface's design makes it difficult to employ the
- *   `fieldset`/`legend` technique (H71)."
- * - MDN, ARIA `group` role:
- *   <https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/group_role>
+ *   controls": <https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA17>
  *
- * Az ARIA17 egyetlen megkötése is teljesül: rádiógomb csoportra
- * `role="radiogroup"` kellene, a panelen viszont nincs rádiógomb, csak
- * jelölőnégyzet és szöveges mező. A `role` a hozzáférhetőségi fában
- * ugyanazt a `group` szerepet adja, mint a `fieldset`, tehát a
- * `getByRole('group', { name })` lekérdezések változatlanul találnak.
- *
- * A cím `<h3>`, nem `<div>`: a panelt egy `<h2>` fejléc nyitja, tehát a
- * szakaszcímek a következő szinten állnak, és a képernyőolvasó fejléc
- * navigációja is végigjárja őket.
+ * A cím `<h3>` helyett `<span class="field__label">`: a több mezőt kitevő,
+ * ÖNÁLLÓ szakaszok ma `AccordionItem` panelek, és a fejlécük már natív
+ * `<h3>` (lásd `packages/ui` `accordion` téma), tehát a dokumentum fejléc
+ * vázát azok adják. Ez a csoport ennél kisebb egység (egy jelölőnégyzet
+ * lista, egy `agents` bejegyzés), aminek a panel többi, csak olvasható
+ * `.field` blokkjával azonos, halkabb címke illik.
  */
-export function InspectorSection(properties: Readonly<InspectorSectionProperties>): ReactElement {
+export function InspectorFieldGroup(properties: Readonly<InspectorFieldGroupProperties>): ReactElement {
   const { title, children } = properties;
   const titleId = useId();
 
   return (
-    <div className="inspector-section" role="group" aria-labelledby={titleId}>
-      <h3 className="inspector-section__title" id={titleId}>
+    <div className="node-inspector__group" role="group" aria-labelledby={titleId}>
+      <span className="field__label" id={titleId}>
         {title}
-      </h3>
-      <div className="inspector-section__fields">{children}</div>
+      </span>
+      {children}
     </div>
   );
 }

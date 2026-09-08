@@ -1,8 +1,6 @@
 import type { BranchNodeConfig, BranchOption } from '@easter-workflow-builder/protocol';
-import { Button, TextField } from '@easter-workflow-builder/ui';
+import { Button, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
@@ -17,6 +15,13 @@ const EMPTY_BRANCH: BranchOption = { key: '', label: '' };
 /**
  * A `branch` node szerkesztett mezői: `expression`, az ágak listája
  * (`branches[].key`/`label`) és a `defaultBranchKey` (SPEC-008 5.1).
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. Mindhárom mező magának az
+ * elágazásnak a szemantikája, tehát nincs olyan, ritkán szerkesztett
+ * csoport, amit érdemes lenne elrejteni. A `defaultBranchKey` valóban
+ * ritkábban állított tartalék, de EGYETLEN mező: egy külön panel fejléce
+ * több helyet és kattintást kérne, mint amennyit a mező elrejtése
+ * megspórol.
  */
 export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -35,7 +40,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
   }
 
   return (
-    <InspectorSection title="elágazás">
+    <>
       <TextAreaField
         label="Feltétel kifejezés"
         value={config.expression}
@@ -76,6 +81,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
       ))}
       <Button
         type="button"
+        size="sm"
         onClick={() => {
           setBranches([...config.branches, EMPTY_BRANCH]);
         }}
@@ -90,6 +96,6 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
           onChange({ ...config, defaultBranchKey: fromTextFieldValue(event.target.value) });
         }}
       />
-    </InspectorSection>
+    </>
   );
 }

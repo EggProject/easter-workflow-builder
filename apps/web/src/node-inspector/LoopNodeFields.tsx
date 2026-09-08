@@ -1,8 +1,6 @@
 import type { LoopNodeConfig } from '@easter-workflow-builder/protocol';
-import { TextField } from '@easter-workflow-builder/ui';
+import { TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
 export interface LoopNodeFieldsProperties {
@@ -19,6 +17,11 @@ export interface LoopNodeFieldsProperties {
  * viselkedés), a `Number('')` pedig `0`-t ad, nem `NaN`-t - a mentés előtti
  * `NodeConfigSchema.safeParse` ezért csak akkor jelez hibát, ha a hívó
  * oldalon valamilyen külön korlát (pl. minimum érték) is érvényben van.
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. A `maxIterations` látszólag
+ * "futási korlát", valójában viszont a ciklus egyetlen kötelező, alapérték
+ * nélküli mezője, tehát minden `loop` node-on ki kell tölteni - elrejteni
+ * pontosan a kötelezőt rejtené el.
  */
 export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -26,7 +29,7 @@ export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): 
   const continueExpressionError = useFieldError('continueExpression');
 
   return (
-    <InspectorSection title="ciklus">
+    <>
       <TextField
         type="number"
         label="Max. iterációk száma"
@@ -44,6 +47,6 @@ export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): 
           onChange({ ...config, continueExpression: event.target.value });
         }}
       />
-    </InspectorSection>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import type { StartNodeConfig } from '@easter-workflow-builder/protocol';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -166,9 +167,11 @@ describe('StartNodeFields', () => {
     };
     act(() => {
       root.render(
-        <FieldErrorsContext.Provider value={new Map([['inputFields.0.name', 'Kötelező mező']])}>
-          <StartNodeFields config={config} onChange={vi.fn()} />
-        </FieldErrorsContext.Provider>,
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['inputFields.0.name', 'Kötelező mező']])}>
+            <StartNodeFields config={config} onChange={vi.fn()} />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
       );
     });
     const [nameInput] = [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')];

@@ -1,8 +1,6 @@
 import type { ErrorHandlerNodeConfig } from '@easter-workflow-builder/protocol';
-import { TextField } from '@easter-workflow-builder/ui';
+import { TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
-import { InspectorSection } from './InspectorSection.tsx';
-import { TextAreaField } from './TextAreaField.tsx';
 import { fromNumberListFieldValue, toNumberListFieldValue } from './number-list-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
@@ -16,6 +14,10 @@ export interface ErrorHandlerNodeFieldsProperties {
  * A `error_handler` node szerkesztett mezői: `maxAttempts`, `backoffMs`,
  * `handledErrorKinds` (SPEC-008 5.1). A `maxAttempts` kötelező, szállított
  * alapérték nélkül, ugyanúgy, mint a `loop` `maxIterations` mezője.
+ *
+ * CSOPORTOSÍTÁS: nincs összecsukható panel. A három mező EGYÜTT maga az
+ * újrapróbálkozási szabály, vagyis a node teljes tartalma - itt nincs
+ * "haladó" réteg, amit el lehetne rejteni.
  */
 export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFieldsProperties>): ReactElement {
   const { config, onChange } = properties;
@@ -24,7 +26,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
   const handledErrorKindsError = useFieldError('handledErrorKinds');
 
   return (
-    <InspectorSection title="hibakezelő">
+    <>
       <TextField
         type="number"
         label="Max. próbálkozások száma"
@@ -50,6 +52,6 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
           onChange({ ...config, handledErrorKinds: fromStringListFieldValue(event.target.value) });
         }}
       />
-    </InspectorSection>
+    </>
   );
 }

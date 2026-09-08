@@ -64,6 +64,13 @@ describe('JsonTextAreaField', () => {
       typeInto(textarea, '{nem json');
     });
     expect(onChange).not.toHaveBeenCalled();
+    // A hibaüzenet csak ÉRINTETT mezőn látszik (`packages/ui`
+    // `field-error-visibility` téma), tehát a mező elhagyása kell hozzá.
+    expect(container.querySelector('.field__error')).toBeNull();
+    act(() => {
+      textarea.focus();
+      textarea.blur();
+    });
     expect(container.querySelector('.field__error')?.textContent).toContain('Érvénytelen JSON');
   });
 });
