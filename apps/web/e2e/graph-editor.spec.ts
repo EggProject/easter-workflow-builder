@@ -192,7 +192,7 @@ test('a vászon a rendelkezésre álló területet tölti ki, és az oldal nem g
   expect(layout.canvasHeight).toBeGreaterThan((layout.viewportHeight - layout.canvasTop) / 2);
 });
 
-test('a vászon és a panel alsó éle a rendelkezésre álló terület aljához közel ér, több viewport magasságon (2026-09-06)', async ({
+test('a vászon a lábléc tetejéig, a lábléc a viewport aljáig ér, több viewport magasságon (2026-09-06, 2026-09-09)', async ({
   page,
 }) => {
   // A MÉRT HIBA (editor-node-inspector.png). Az .app-content átemelt 80px
@@ -203,26 +203,35 @@ test('a vászon és a panel alsó éle a rendelkezésre álló terület aljához
   // maradt alattuk a viewport aljáig.
   //
   // A JAVÍTÁS (topnav-shell.css, `.app-content:has(> .graph-editor-screen)`)
-  // a paddinget a felső 8px-re (--ep-space-2) csökkenti erre a screen-re. A
-  // teszt ezt igazolja: a rés a token értéke köré esik, nem a régi 80px köré.
+  // 2026-09-09 óta a TELJES belső margót nullázza ezen a screen-en (faltól
+  // falig, felhasználói kérés), és a képernyő alján a `.page-footer`
+  // akciósáv áll. A teszt ezért két rést mér: a lábléc alja a viewport
+  // aljához ér (nulla rés), a vászon alja pedig a lábléc tetejéhez - üres
+  // sáv sehol nincs. A régi, javítatlan állapot ~80px rést adott.
   for (const viewportHeight of [700, 900, 1200]) {
     await page.setViewportSize({ width: 1440, height: viewportHeight });
     await page.goto(EDITOR_URL);
     await expect(nodeLocator(page, 'n1')).toBeVisible();
 
-    const gap = await page.evaluate(() => {
+    const geometry = await page.evaluate(() => {
       const group = globalThis.document.querySelector('.resizable-group');
-      if (group === null) {
-        throw new Error('a teszt nem talalt .resizable-group elemet');
+      const footer = globalThis.document.querySelector('.page-footer');
+      if (group === null || footer === null) {
+        throw new Error('a teszt nem talalt .resizable-group es .page-footer elemet');
       }
-      const bottom = group.getBoundingClientRect().bottom;
-      return globalThis.document.documentElement.clientHeight - bottom;
+      const footerRect = footer.getBoundingClientRect();
+      return {
+        gapUnderFooter: globalThis.document.documentElement.clientHeight - footerRect.bottom,
+        gapUnderGroup: footerRect.top - group.getBoundingClientRect().bottom,
+      };
     });
 
-    // --ep-space-2 (8px), kis tűréssel a szélkerekítésre. A régi, javítatlan
-    // állapot ~80px rést adott, ami ennél a felső korlátnál jóval nagyobb.
-    expect(gap).toBeGreaterThanOrEqual(0);
-    expect(gap).toBeLessThanOrEqual(9);
+    // Kis tűrés a szélkerekítésre; a régi, javítatlan állapot ~80px rést
+    // adott, ami ennél a felső korlátnál jóval nagyobb.
+    expect(geometry.gapUnderFooter).toBeGreaterThanOrEqual(0);
+    expect(geometry.gapUnderFooter).toBeLessThanOrEqual(1);
+    expect(geometry.gapUnderGroup).toBeGreaterThanOrEqual(0);
+    expect(geometry.gapUnderGroup).toBeLessThanOrEqual(1);
   }
 });
 
