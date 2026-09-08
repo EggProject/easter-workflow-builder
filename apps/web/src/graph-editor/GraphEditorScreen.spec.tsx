@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
+import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
 
 /**
  * A `GraphEditorCanvas` mockolva: ez a spec a `GraphEditorScreen` SAJÁT
@@ -175,6 +176,10 @@ describe('GraphEditorScreen', () => {
 
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
+    // A perzisztált elrendezés arány tesztek közötti átszivárgásának
+    // megelőzése: a `Resizable` a csatoláskor is jelent, tehát minden
+    // renderelés ír a kulcsra.
+    globalThis.localStorage.clear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -199,6 +204,79 @@ describe('GraphEditorScreen', () => {
   it('a betöltés sikertelenségére hibaüzenetet mutat', async () => {
     await renderScreen('?workflowId=wf-1', unreachableFetchFunction);
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+  });
+
+  it('kiválasztás nélkül NINCS jobb oldali panel és nincs elválasztó (2026-09-09)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+    expect(container.querySelector('.node-inspector')).toBeNull();
+    expect(container.querySelector('[role="separator"]')).toBeNull();
+    // A vászon panelje viszont fel van mountolva: a kiválasztás nem
+    // szerelheti újra a React Flow-t, mert azzal a pásztázás és a
+    // nagyítás elveszne.
+    expect(container.querySelectorAll('.resizable-panel')).toHaveLength(1);
+    expect(container.querySelector('.graph-editor-screen__body--solo')).not.toBeNull();
+  });
+
+  it('a lábléc balra a státuszt, jobbra a sm méretű split button gombcsoportot hordozza (2026-09-09)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+    const footer = container.querySelector('.page-footer');
+    if (footer === null) {
+      throw new Error('a teszt nem talált .page-footer elemet');
+    }
+    // A sáv a képernyő gyökerének KÖZVETLEN gyereke, tehát nem a
+    // görgethető törzsön belül ül.
+    expect(footer.parentElement?.className).toBe('graph-editor-screen');
+
+    const group = footer.querySelector(':scope .page-footer__actions .button-group');
+    if (group === null) {
+      throw new Error('a teszt nem talált gombcsoportot a láblécben');
+    }
+    expect(group.getAttribute('role')).toBe('group');
+    expect(group.getAttribute('aria-label')).toBe('Gráf műveletek');
+    const buttons = [...group.querySelectorAll('button')];
+    expect(buttons.map((button) => button.textContent)).toEqual(['Mentés', 'Elrendezés']);
+    // Minden szerkesztő gomb `sm` méretű (a modális és a popup a kivétel).
+    expect(buttons.every((button) => button.classList.contains('btn--sm'))).toBe(true);
+
+    // A státusz a MÁSIK sávban áll, nem a gombok mellett.
+    act(() => {
+      lastCanvasProperties().onGraphChange([{ ...START_NODE, positionX: 99 }, AGENT_NODE], []);
+    });
+    expect(footer.querySelector(':scope .page-footer__status [role="status"]')?.textContent).toBe(
+      'Mentetlen változtatások',
+    );
+  });
+
+  it('a felső eszköztár megszűnt: a képernyőn nincs .graph-editor-screen__toolbar (2026-09-09)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+    expect(container.querySelector('.graph-editor-screen__toolbar')).toBeNull();
+  });
+
+  it('az osztott elrendezés aránya a localStorage-ből töltődik vissza, és a változás oda mentődik (2026-09-09)', async () => {
+    globalThis.localStorage.setItem(GRAPH_EDITOR_LAYOUT_STORAGE_KEY, JSON.stringify([55, 45]));
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+    act(() => {
+      lastCanvasProperties().onSelectNode('n-1');
+    });
+    const panels = [...container.querySelectorAll<HTMLDivElement>('.resizable-panel')];
+    expect(panels.map((panel) => panel.style.flexBasis)).toEqual(['55%', '45%']);
+
+    // A billentyűzetes átméretezés az új arányt azonnal a kulcsra írja.
+    const separator = container.querySelector('[role="separator"]');
+    if (separator === null) {
+      throw new Error('a teszt nem talált elválasztót');
+    }
+    act(() => {
+      separator.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    });
+    expect(globalThis.localStorage.getItem(GRAPH_EDITOR_LAYOUT_STORAGE_KEY)).toBe('[60,40]');
   });
 
   it('node kiválasztására megjelenik a node-inspector, bezárásra eltűnik', async () => {

@@ -9,6 +9,8 @@ import {
 } from '@easter-workflow-builder/protocol';
 import {
   Button,
+  ButtonGroup,
+  PageFooter,
   Resizable,
   ResizableHandle,
   ResizablePanel,
@@ -26,6 +28,7 @@ import { requestRouteWithoutBody } from '../rest-client/request-route-without-bo
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
+import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
@@ -54,6 +57,14 @@ function readWorkflowId(search: string): string | undefined {
  * `currentEdges` innen jön, és a node-inspector szerkesztése (`config`
  * mezőn át) UGYANEZT az állapotot módosítja, ami a vászonra is azonnal
  * visszahat (M-55).
+ *
+ * Az elrendezés 2026-09-09 óta három ponton más (felhasználói kérés):
+ * a felső eszköztár megszűnt, helyette a képernyő aljához tapadó
+ * `PageFooter` áll (balra a státusz, jobbra egy `ButtonGroup` split
+ * button); a vászon köré vont kártya keret törlődött, tehát a
+ * munkafelület faltól falig ér; és az osztott elrendezés aránya a
+ * `localStorage`-be mentődik, majd a következő megnyitáskor visszatölt
+ * (`graph-editor-layout.ts`).
  */
 export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
   const { apiOrigin, fetchFunction, search } = properties;
@@ -88,6 +99,13 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   // `GraphEditorCanvas` belső állapota `useState` lusta kezdőértékkel épül
   // (csak csatoláskor fut le), a később érkező valódi adat már nem jutna be.
   const [isHydrated, setIsHydrated] = useState(false);
+  // A perzisztált osztott elrendezés arány EGYSZER, csatoláskor olvasódik
+  // be (lusta `useState` kezdőérték): a `Resizable` a `defaultSizes` propot
+  // szintén csak a saját kezdő állapotához használja, tehát a későbbi
+  // olvasások amúgy sem hatnának. Az írás a `storeLayoutSizes` modul
+  // szintű függvényén megy, aminek a hivatkozása stabil, tehát a
+  // `Resizable` értesítő hatása nem futhat körbe.
+  const [initialLayoutSizes] = useState<readonly number[]>(readStoredLayoutSizes);
 
   useEffect(() => {
     if (workflowId === undefined) {
@@ -227,19 +245,10 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
 
   return (
     <div className="graph-editor-screen">
-      <div className="graph-editor-screen__toolbar">
-        <Button type="button" onClick={handleSave} disabled={isSaving || isLoading}>
-          {isSaving ? 'Mentés...' : 'Mentés'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={handleAutoLayout} disabled={isLoading}>
-          Elrendezés
-        </Button>
-        {isDirty && <span role="status">Mentetlen változtatások</span>}
-        {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
-        {graphState.state.status === 'failure' && <p role="alert">{graphState.state.message}</p>}
-      </div>
       {isLoading ? (
-        <Skeleton shape="text" lines={4} />
+        <div className="graph-editor-screen__loading">
+          <Skeleton shape="text" lines={4} />
+        </div>
       ) : (
         <div
           className={joinClassNames(
@@ -255,7 +264,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
               Flow-t újramountolná, és a felhasználó pásztázása és nagyítása
               elveszne. A "nincs kiválasztás" állapot elrendezését a
               `--solo` módosító adja, CSS-ben. */}
-          <Resizable defaultSizes={[70, 30]}>
+          <Resizable defaultSizes={initialLayoutSizes} onSizesChange={storeLayoutSizes}>
             <ResizablePanel index={0}>
               <div className="graph-editor-screen__canvas">
                 <GraphEditorCanvas
@@ -286,6 +295,29 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
           </Resizable>
         </div>
       )}
+      {/* A státusz és a művelet gombok a képernyő aljához tapadó
+          akciósávban állnak (felhasználói kérés, 2026-09-09): balra a
+          státusz, jobbra egy összeragasztott gombcsoport, hogy a később
+          érkező további műveletek is ide kerülhessenek. A gombok `sm`
+          méretűek, mert ez nem modális és nem popup felület. */}
+      <PageFooter
+        status={
+          <>
+            {isDirty && <span role="status">Mentetlen változtatások</span>}
+            {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
+            {graphState.state.status === 'failure' && <p role="alert">{graphState.state.message}</p>}
+          </>
+        }
+      >
+        <ButtonGroup aria-label="Gráf műveletek">
+          <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
+            {isSaving ? 'Mentés...' : 'Mentés'}
+          </Button>
+          <Button type="button" size="sm" variant="secondary" onClick={handleAutoLayout} disabled={isLoading}>
+            Elrendezés
+          </Button>
+        </ButtonGroup>
+      </PageFooter>
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
