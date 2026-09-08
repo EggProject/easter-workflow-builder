@@ -278,8 +278,24 @@ async function widthOf(locator: Locator): Promise<number> {
 }
 
 async function closePanel(page: Page): Promise<void> {
+  // A gomb ikon gomb, tehát nincs látható szövege: a hozzáférhető nevét az
+  // `aria-label` adja, és a `getByRole` név szerinti keresés ezt találja meg.
   await page.getByRole('button', { name: 'Bezárás' }).click();
   await expect(inspectorPanel(page)).toBeAttached({ attached: false });
+}
+
+/**
+ * Egy összecsukható panel kinyitása a fejléc gombjára kattintva
+ * (`packages/ui` `accordion` téma). A ritkán szerkesztett mezők zárva
+ * indulnak, tehát az őket vizsgáló teszteknek előbb ki kell nyitniuk a
+ * panelt. A várakozás állapot alapú: a törzs `role="region"` eleme akkor
+ * válik láthatóvá, amikor a natív `hidden` lekerül róla.
+ */
+async function openAccordion(scope: Locator, title: string): Promise<Locator> {
+  await scope.getByRole('button', { name: title, exact: true }).click();
+  const region = scope.getByRole('region', { name: title, exact: true });
+  await expect(region).toBeVisible();
+  return region;
 }
 
 test.describe('a panel fejléce és a bezárás', () => {
@@ -336,21 +352,70 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
     await expect.poll(async () => widthOf(canvas)).toBe(canvasWidthBefore);
   });
 
-  test('a szakaszcímek fieldset nélkül is megnevezett mezőcsoportot adnak', async ({ page }) => {
+  test('a mezőcsoportok fieldset és kártya doboz nélkül is megnevezettek', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    // A `fieldset`/`legend` pár helyére `role="group"` plusz
-    // `aria-labelledby` lépett (W3C WAI ARIA17), ami a hozzáférhetőségi
-    // faban UGYANAZT a szerepet és nevet adja.
-    for (const title of ['prompt és provider', 'futási korlátok', 'eszközök és környezet']) {
-      await expect(panel.getByRole('group', { name: title, exact: true })).toBeVisible();
+    // A ritkán szerkesztett csoportok összecsukható panelek: a fejlécük
+    // natív gomb `aria-expanded` jelzéssel, a törzsük `role="region"` a
+    // fejlécre mutató névvel (`packages/ui` `accordion` téma).
+    for (const title of [
+      'Modell és futási korlátok',
+      'Eszközök és környezet',
+      'Al-agentek (agents)',
+      'Skillek és MCP szerverek (csak olvasható)',
+    ]) {
+      await expect(panel.getByRole('button', { name: title, exact: true })).toHaveAttribute('aria-expanded', 'false');
     }
-    // A régi megvalósítás nyoma sehol nem maradt.
+    // A `fieldset`/`legend` pár helyére `role="group"` plusz
+    // `aria-labelledby` lépett (W3C WAI ARIA17) ott, ahol nem panel, hanem
+    // egyszerű megnevezett csoport kell (jelölőnégyzet lista).
     await expect(panel.locator('fieldset')).toHaveCount(0);
+    // NINCS CARD IN CARD: a korábbi, kitalált kártya osztály eltűnt.
+    await expect(panel.locator('.inspector-section')).toHaveCount(0);
+    await expect(panel.locator('.card')).toHaveCount(0);
+  });
+
+  test('a panel TETEJÉN nincs hibaösszesítő, és érintetlen mezőn nincs hibaüzenet', async ({ page }) => {
+    const panel = await openNode(page, 'n-error');
+    // Séma szerint érvénytelen érték úgy, hogy a mezőhöz nem nyúlunk:
+    // a `backoffMs` NaN-t kap, tehát a `NodeConfigSchema` elutasítja.
+    await panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)').fill('50\nabc\n150');
+    // A hibaüzenet még NEM látszik, mert a mezőt nem hagytuk el.
+    await expect(panel.locator('.field__error')).toHaveCount(0);
+    // És a panel tetején sincs semmilyen összesítő.
+    await expect(panel.locator('.node-inspector__errors')).toHaveCount(0);
+    await expect(panel.getByText('Érvénytelen mezők')).toHaveCount(0);
+  });
+
+  test('a többsoros mezők a design system .textarea osztályát viselik, nem az egysoros .input osztályt', async ({
+    page,
+  }) => {
+    const panel = await openNode(page, 'n-agent');
+    const promptField = panel.getByRole('textbox', { name: 'Prompt sablon' });
+    await expect(promptField).toHaveClass(/(^|\s)textarea(\s|$)/);
+    await expect(promptField).not.toHaveClass(/(^|\s)input(\s|$)/);
+    // A panelen egyetlen `<textarea>` sem viseli az egysoros mező osztályát.
+    await expect(panel.locator('textarea.input')).toHaveCount(0);
+  });
+
+  test('az összecsukható panel billentyűzetről is nyitható és zárható', async ({ page }) => {
+    const panel = await openNode(page, 'n-agent');
+    const header = panel.getByRole('button', { name: 'Modell és futási korlátok', exact: true });
+    const region = panel.getByRole('region', { name: 'Modell és futási korlátok', exact: true });
+
+    await expect(region).toBeAttached({ attached: false });
+    await header.focus();
+    await page.keyboard.press('Enter');
+    await expect(region).toBeVisible();
+    await expect(header).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Space');
+    await expect(region).toBeAttached({ attached: false });
+    await expect(header).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('egyetlen mező sem lóg ki a panelből', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
     await expect(panel.getByRole('textbox', { name: 'Prompt sablon' })).toBeVisible();
+    await openAccordion(panel, 'Eszközök és környezet');
 
     const overflowing = await page.evaluate(() => {
       const element = globalThis.document.querySelector('.node-inspector__body');
@@ -358,7 +423,7 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
         throw new Error('a teszt nem talált .node-inspector__body elemet');
       }
       const panelRight = element.getBoundingClientRect().right;
-      return [...element.querySelectorAll('.input, .select')]
+      return [...element.querySelectorAll('.input, .select, .textarea')]
         .filter((control) => control.getBoundingClientRect().right > panelRight + 1)
         .map((control) => control.className);
     });
@@ -371,6 +436,8 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
     await expect(backoffField).not.toHaveAttribute('aria-invalid', 'true');
 
     await backoffField.fill('50\nabc\n150');
+    // A mező ELHAGYÁSA teszi láthatóvá a hibaüzenetet (érintett + érvénytelen).
+    await backoffField.blur();
 
     await expect(backoffField).toHaveAttribute('aria-invalid', 'true');
     const describedBy = await backoffField.getAttribute('aria-describedby');
@@ -404,17 +471,14 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
 
     const gapBefore = await gapBetweenFields();
     await backoffField.fill('50\nabc\n150');
+    await backoffField.blur();
     await expect(backoffField).toHaveAttribute('aria-invalid', 'true');
 
     // A hibaüzenet helye MINDIG fenn van tartva (a `.field` harmadik,
     // legalább egy sornyi grid sora), tehát a hibás mező és a következő
     // mező KÖZÖTTI távolság nem változik: a hibaüzenet a már meglévő
-    // helyre írja ki magát, nem told el semmit.
-    //
-    // A panel tetején megjelenő, `role="alert"` összesítő ettől független:
-    // az egy ÚJ tartalmi blokk, aminek szükségszerűen helyet kell kapnia,
-    // ezért a mérés a két mező RELATÍV távolságát nézi, nem az abszolút
-    // helyüket.
+    // helyre írja ki magát, nem told el semmit. Összesítő blokk ma nincs a
+    // panel tetején, tehát az abszolút hely sem mozdul.
     expect(await gapBetweenFields()).toBe(gapBefore);
   });
 });
@@ -510,10 +574,10 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     page,
   }) => {
     const panel = await openNode(page, 'n-agent');
-    await panel.getByLabel('Modell azonosító').fill('claude-opus-4');
-    await panel.getByRole('combobox', { name: 'Session mód' }).selectOption('continued');
+    const limits = await openAccordion(panel, 'Modell és futási korlátok');
+    await limits.getByLabel('Modell azonosító').fill('claude-opus-4');
+    await limits.getByRole('combobox', { name: 'Session mód' }).selectOption('continued');
 
-    const limits = panel.getByRole('group', { name: 'futási korlátok' });
     await limits.getByLabel('Max. körök száma').fill('12');
     await limits.getByLabel('Max. büdzsé (USD)').fill('2.5');
     await limits.getByLabel('Effort').fill('high');
@@ -536,9 +600,10 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
-    await expect(reopened.getByLabel('Modell azonosító')).toHaveValue('claude-opus-4');
-    await expect(reopened.getByRole('combobox', { name: 'Session mód' })).toHaveValue('continued');
-    const reopenedLimits = reopened.getByRole('group', { name: 'futási korlátok' });
+    // Az összecsukható panel újranyitáskor ZÁRVA indul (alapértelmezés).
+    const reopenedLimits = await openAccordion(reopened, 'Modell és futási korlátok');
+    await expect(reopenedLimits.getByLabel('Modell azonosító')).toHaveValue('claude-opus-4');
+    await expect(reopenedLimits.getByRole('combobox', { name: 'Session mód' })).toHaveValue('continued');
     await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('12');
     await expect(reopenedLimits.getByLabel('Max. büdzsé (USD)')).toHaveValue('2.5');
     await expect(reopenedLimits.getByLabel('Effort')).toHaveValue('high');
@@ -555,7 +620,7 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     page,
   }) => {
     const panel = await openNode(page, 'n-agent');
-    const group = panel.getByRole('group', { name: 'eszközök és környezet' });
+    const group = await openAccordion(panel, 'Eszközök és környezet');
     await group.getByLabel('Engedélyezett eszközök').fill('Read\nWrite');
     await group.getByLabel('Tiltott eszközök').fill('Bash');
 
@@ -600,7 +665,7 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
-    const reopenedGroup = reopened.getByRole('group', { name: 'eszközök és környezet' });
+    const reopenedGroup = await openAccordion(reopened, 'Eszközök és környezet');
     await expect(reopenedGroup.getByLabel('Engedélyezett eszközök')).toHaveValue('Read\nWrite');
     await expect(reopenedGroup.getByLabel('Tiltott eszközök')).toHaveValue('Bash');
     await expect(reopenedGroup.getByRole('checkbox', { name: 'web_search' })).toBeChecked();
@@ -631,7 +696,7 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
 test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mezők', () => {
   test('a skillek és az MCP szerverek mező olvashatóan, ok megnevezéssel jelenik meg', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    const group = panel.getByRole('group', { name: 'SPEC-009 hatóköre' });
+    const group = await openAccordion(panel, 'Skillek és MCP szerverek (csak olvasható)');
     // A `skills` mező `null`, a `describeUnknownValue` a JSON.stringify ágon
     // fut le (nem a `(nincs megadva)` ágon, mert `null !== undefined`).
     await expect(group.getByText('null', { exact: true })).toBeVisible();
@@ -645,7 +710,7 @@ test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mezők', (
 test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntryFields)', () => {
   test('a nem objektum alakú bejegyzés riasztást mutat, a szabályos bejegyzés mezői kitölthetők', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    const agentsGroup = panel.getByRole('group', { name: 'agents', exact: true });
+    const agentsGroup = await openAccordion(panel, 'Al-agentek (agents)');
 
     // A "legacy" bejegyzés egy sztring, nem objektum: kibontva riasztást ad.
     const legacyGroup = agentsGroup.getByRole('group', { name: 'legacy' });
@@ -659,10 +724,6 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
     await expect(kutatoGroup.getByLabel('Leírás')).toHaveValue('Kutat a weben.');
     await expect(kutatoGroup.getByLabel('Prompt')).toHaveValue('Kutass alaposan.');
-    // A többi mező hiányzik a bejegyzésből -> `describeUnknownValue(undefined)`.
-    await expect(kutatoGroup.getByText('(nincs megadva)').first()).toBeVisible();
-    // A `skills` mező sztring (`'all'`) -> a `describeUnknownValue` sztring ága.
-    await expect(kutatoGroup.getByText('all', { exact: true })).toBeVisible();
 
     // Össze- és kibontás: mindkét `toggleExpanded` ág lefut.
     await kutatoGroup.getByRole('button', { name: 'Összecsukás' }).click();
@@ -670,47 +731,51 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await kutatoGroup.getByRole('button', { name: 'Kibontás' }).click();
     await expect(kutatoGroup.getByLabel('Leírás')).toBeVisible();
 
-    // PONTOS egyezés: a bejegyzés `modell és korlátok` szakasza
-    // `role="group"` plusz `aria-labelledby` alakban áll (a `fieldset`
-    // és a `legend` helyett, lásd `InspectorSection.tsx`), tehát a
-    // szakasznak IS van hozzáférhető neve, ami részsztringként
-    // tartalmazza a `Modell` szót.
-    await kutatoGroup.getByLabel('Modell', { exact: true }).fill('claude-sonnet-4');
-    await kutatoGroup.getByLabel('Max. körök száma').fill('4');
-    await kutatoGroup.getByLabel('Effort (szint neve vagy szám)').fill('medium');
-    await kutatoGroup.getByLabel('Jogosultsági mód').fill('plan');
-    await kutatoGroup.getByText('Háttérben fut').click();
-    await expect(kutatoGroup.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
-    await kutatoGroup.getByLabel('Engedélyezett eszközök').fill('Read');
-    await kutatoGroup.getByLabel('Tiltott eszközök').fill('Bash');
-    await kutatoGroup.getByRole('combobox', { name: 'Memória hatóköre' }).selectOption('project');
-    await kutatoGroup.getByLabel('Kezdő üzenet').fill('Szia!');
+    // A bejegyzés ritkán szerkesztett mezői is összecsukható panelekben
+    // állnak (a kötelező leírás és prompt marad elöl).
+    const kutatoLimits = await openAccordion(kutatoGroup, 'Modell és korlátok');
+    await kutatoLimits.getByLabel('Modell', { exact: true }).fill('claude-sonnet-4');
+    await kutatoLimits.getByLabel('Max. körök száma').fill('4');
+    await kutatoLimits.getByLabel('Effort (szint neve vagy szám)').fill('medium');
+    await kutatoLimits.getByLabel('Jogosultsági mód').fill('plan');
+    await kutatoLimits.getByText('Háttérben fut').click();
+    await expect(kutatoLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
 
+    const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
+    await kutatoTools.getByLabel('Engedélyezett eszközök').fill('Read');
+    await kutatoTools.getByLabel('Tiltott eszközök').fill('Bash');
+    await kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }).selectOption('project');
+    await kutatoTools.getByLabel('Kezdő üzenet').fill('Szia!');
+
+    const kutatoReadOnly = await openAccordion(kutatoGroup, 'Skillek és MCP szerverek (csak olvasható)');
+    // A `skills` mező sztring (`'all'`) -> a `describeUnknownValue` sztring ága.
+    await expect(kutatoReadOnly.getByText('all', { exact: true })).toBeVisible();
     await expect(
-      kutatoGroup.getByText(
+      kutatoReadOnly.getByText(
         'nem megerősített mező: csak a telepített .d.ts fájlban szerepel, hivatalos dokumentáció nem fedi (M-90)',
       ),
     ).toBeVisible();
-    await expect(kutatoGroup.getByText('criticalSystemReminder_EXPERIMENTAL')).toBeVisible();
+    await expect(kutatoReadOnly.getByText('criticalSystemReminder_EXPERIMENTAL')).toBeVisible();
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
-    const reopenedKutato = reopened
-      .getByRole('group', { name: 'agents', exact: true })
-      .getByRole('group', { name: 'kutato', exact: true });
+    const reopenedAgentsGroup = await openAccordion(reopened, 'Al-agentek (agents)');
+    const reopenedKutato = reopenedAgentsGroup.getByRole('group', { name: 'kutato', exact: true });
     await reopenedKutato.getByRole('button', { name: 'Kibontás' }).click();
-    await expect(reopenedKutato.getByLabel('Modell', { exact: true })).toHaveValue('claude-sonnet-4');
-    await expect(reopenedKutato.getByLabel('Max. körök száma')).toHaveValue('4');
-    await expect(reopenedKutato.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
-    await expect(reopenedKutato.getByRole('combobox', { name: 'Memória hatóköre' })).toHaveValue('project');
-    await expect(reopenedKutato.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
+    const reopenedLimits = await openAccordion(reopenedKutato, 'Modell és korlátok');
+    await expect(reopenedLimits.getByLabel('Modell', { exact: true })).toHaveValue('claude-sonnet-4');
+    await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('4');
+    await expect(reopenedLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
+    const reopenedTools = await openAccordion(reopenedKutato, 'Eszközök és környezet');
+    await expect(reopenedTools.getByRole('combobox', { name: 'Memória hatóköre' })).toHaveValue('project');
+    await expect(reopenedTools.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
   });
 
   test('agent hozzáadása üres vagy ütköző névvel tiltott, érvényes névvel felvehető; átnevezés és törlés', async ({
     page,
   }) => {
     const panel = await openNode(page, 'n-agent');
-    const agentsGroup = panel.getByRole('group', { name: 'agents', exact: true });
+    const agentsGroup = await openAccordion(panel, 'Al-agentek (agents)');
 
     const agentAddButton = agentsGroup.getByRole('button', { name: 'Agent hozzáadása' });
     // Üres név: a gomb tiltott (üres kötelező mező védelem).
@@ -744,7 +809,7 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
-    const reopenedAgents = reopened.getByRole('group', { name: 'agents', exact: true });
+    const reopenedAgents = await openAccordion(reopened, 'Al-agentek (agents)');
     await expect(reopenedAgents.getByRole('group', { name: 'harmadik', exact: true })).toBeVisible();
     await expect(reopenedAgents.getByRole('group', { name: 'legacy' })).toBeAttached({ attached: false });
     await expect(reopenedAgents.getByRole('group', { name: 'kutato', exact: true })).toBeVisible();
@@ -808,8 +873,10 @@ test.describe('join node', () => {
     const jsonField = panel.getByLabel('Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)');
     await expect(jsonField).toHaveValue('{}');
 
-    // Szintaktikai JSON hiba: a szerkesztő saját hibaüzenete jelenik meg.
+    // Szintaktikai JSON hiba: a szerkesztő saját hibaüzenete jelenik meg,
+    // de csak a mező ELHAGYÁSA után (érintett + érvénytelen szabály).
     await jsonField.fill('{ez nem json');
+    await jsonField.blur();
     await expect(panel.getByText('Érvénytelen JSON - a változtatás egyelőre nem kerül mentésre.')).toBeVisible();
 
     // Szemantikailag érvénytelen (de szintaktikusan helyes) JSON: a
@@ -834,8 +901,10 @@ test.describe('join node', () => {
 
     await modeSelect.selectOption('ai_synthesis');
     await expect(panel.getByLabel('Prompt sablon')).toHaveValue('');
-    // Az `ai_synthesis` alapértelmezett `agents` mezője üres.
-    await expect(panel.getByText('Nincs felvett agent.')).toBeVisible();
+    // Az `ai_synthesis` alapértelmezett `agents` mezője üres - az al-agentek
+    // panel zárva indul, tehát ki kell nyitni hozzá.
+    const joinAgents = await openAccordion(panel, 'Al-agentek (agents)');
+    await expect(joinAgents.getByText('Nincs felvett agent.')).toBeVisible();
     await panel.getByLabel('Prompt sablon').fill('Szintetizáld az ágak kimenetét.');
 
     await modeSelect.selectOption('merge');
@@ -899,7 +968,7 @@ test.describe('error_handler node', () => {
     await expect(reopened.getByLabel('Kezelt hibafajták (soronként egy)')).toHaveValue('timeout\nrate_limit');
   });
 
-  test('nem numerikus backoffMs sor a NodeConfigSchema szerint érvénytelen állapotot hoz létre, a panel mezőnkénti hibalistát mutat', async ({
+  test('nem numerikus backoffMs sor a NodeConfigSchema szerint érvénytelen állapotot hoz létre, a hibaüzenet a mező alatt jelenik meg', async ({
     page,
   }) => {
     // A `backoffMs` textarea (number-list-field-value.ts) NEM natív
@@ -907,26 +976,29 @@ test.describe('error_handler node', () => {
     // sort: a `fromNumberListFieldValue` a `Number('abc')` NaN eredményét
     // válogatás nélkül a tömbbe teszi. A `NodeConfigSchema.safeParse` a
     // `z.number()` miatt a NaN-t elutasítja (mérve: `z.number().safeParse(NaN)`
-    // `invalid_type` hibát ad), tehát ez a `node-inspector` saját
-    // `role="alert"` hibalistáját (`fieldErrorsFromZodError`) TÉNYLEGESEN
-    // felhasználói úton eléri - az előző jelentés "elérhetetlen" állítása erre
-    // a mezőre nem igaz.
+    // `invalid_type` hibát ad), tehát ez a mezőnkénti hibajelzést
+    // (`fieldErrorsFromZodError`) TÉNYLEGESEN felhasználói úton eléri.
     const panel = await openNode(page, 'n-error');
     await expect(panel.getByRole('alert')).toBeAttached({ attached: false });
 
-    await panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)').fill('50\nabc\n150');
+    const backoffField = panel.getByLabel('Várakozás próbálkozásonként, ms (soronként egy szám)');
+    await backoffField.fill('50\nabc\n150');
+    await backoffField.blur();
 
+    // A hibaüzenet `role="alert"` szerepű, és a HIBÁS MEZŐ alatt áll, nem a
+    // panel tetején: a `backoffMs.1` útvonal a mező saját üzenetévé válik,
+    // mert a `findFieldError` az elem szintű útvonalat is a mezőhöz köti.
     const alert = panel.getByRole('alert');
     await expect(alert).toBeVisible();
+    await expect(alert).toHaveClass(/field__error/);
     // A pontos zod üzenetszöveg NEM stabil ellenőrzési pont: a `VITE_COVERAGE`
     // instrumentált buildben az Istanbul által eltolt `/* @__PURE__ */`
     // annotáció miatt a Rolldown a zod alapértelmezett locale regisztrációját
     // tree-shake-eli (a `webServer` build log ugyanerre a jelenségre figyelmeztet
     // több fájlban, INVALID_ANNOTATION), ezért a mért, ténylegesen megjelenő
-    // szöveg a rövidebb "Invalid input" - ez a mezőnkénti hibalista MEGJELENÉSÉT
-    // és az útvonal (`backoffMs.1`) megnevezését igazolja, ami a lényegi állítás.
-    await expect(alert).toContainText('backoffMs.1');
+    // szöveg a rövidebb "Invalid input".
     await expect(alert).toContainText('Invalid input');
+    await expect(backoffField).toHaveAttribute('aria-describedby', /-error$/);
   });
 });
 
