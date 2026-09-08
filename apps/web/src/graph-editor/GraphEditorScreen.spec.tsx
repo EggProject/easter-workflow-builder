@@ -288,8 +288,11 @@ describe('GraphEditorScreen', () => {
     expect(container.querySelector('.node-inspector')).not.toBeNull();
     expect(container.textContent).toContain('n-1');
 
-    const closeButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Bezárás');
-    if (closeButton === undefined) {
+    // A gomb hozzáférhető NEVE szerint keresünk, nem a szöveges tartalma
+    // szerint: a panel bezárás gombja ikon gomb (`.btn--icon`), tehát
+    // látható szövege nincs, a neve az `aria-label`-ből jön.
+    const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
+    if (closeButton === null) {
       throw new Error('a teszt nem talált Bezárás gombot');
     }
     act(() => {
