@@ -16,7 +16,19 @@ export { isThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODE_VALUES, type ThemeMode 
 export { ThemeModeToggle } from './theme-mode/ThemeModeToggle.tsx';
 export { useThemeMode, type UseThemeModeResult } from './theme-mode/use-theme-mode.ts';
 
+// Az űrlap mezők hibaüzenetének megjelenési szabálya (érintett vagy már
+// megkísérelt beküldés). A kontextust a beküldést ismerő űrlap adja meg; a
+// hook a `TextField`, a `SelectField` és a `TextAreaField` közös belső
+// használatán túl a saját mezőt író fogyasztóknak is elérhető.
+export { FieldErrorVisibilityContext } from './field-error-visibility/field-error-visibility-context.ts';
+export {
+  useFieldErrorVisibility,
+  type FieldErrorVisibility,
+} from './field-error-visibility/use-field-error-visibility.ts';
+
 // Komponensek.
+export { Accordion, type AccordionProperties } from './accordion/Accordion.tsx';
+export { AccordionItem, type AccordionItemProperties } from './accordion/AccordionItem.tsx';
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
 export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
@@ -45,6 +57,7 @@ export {
 } from './select-field/SelectField.tsx';
 export { Skeleton, type SkeletonProperties, type SkeletonShape } from './skeleton/Skeleton.tsx';
 export { Tabs, type TabItem, type TabsProperties } from './tab/Tabs.tsx';
+export { TextAreaField, type TextAreaFieldProperties } from './textarea/TextAreaField.tsx';
 export { TextField, type TextFieldProperties } from './text-field/TextField.tsx';
 export { Toast, type ToastAction, type ToastProperties, type ToastVariant } from './toast/Toast.tsx';
 export { ToastViewport, type ToastViewportProperties, type ToastViewportPosition } from './toast/ToastViewport.tsx';

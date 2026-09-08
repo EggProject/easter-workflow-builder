@@ -1,0 +1,141 @@
+/* ============================================================
+   EggProject — Accordion
+   Forrás: eggproject-design-components/components/accordion/accordion.css,
+   bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. A fájl minden szabálya az
+   Accordion komponenshez tartozik, ezért szűkítés nem kellett; a
+   `--bordered`/`--separated`/`--subtle` variáns propként nincs kivezetve
+   (lásd `Accordion.tsx`: az első kettő kártya alakú dobozt rajzol, ami a
+   panelen card in card lenne), de a szabályok bájtra átkerülnek, mert
+   ugyanennek a komponensnek a részei.
+   Átemelés dátuma: 2026-09-09. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Accordion ============
+   .accordion                — container (list of items)
+   .accordion--bordered      — single border around the whole list
+   .accordion__item          — one collapsible
+   .accordion__header          — header / clickable row
+   .accordion__title         — main label
+   .accordion__meta          — right-side meta (count, status etc)
+   .accordion__chevron          — chevron indicator
+   .accordion__body          — content panel
+   .accordion__item.is-open  — open state
+============================================ */
+.accordion { display: flex; flex-direction: column; }
+
+.accordion__item {
+  border-bottom: 1px solid var(--ep-divider);
+}
+.accordion__item:last-child { border-bottom: 0; }
+
+/* Heading wrapper: native <h3> so item titles join the document heading outline.
+   Only the inner button is interactive; reset the UA heading margin so the row keeps
+   its exact spacing (no new vertical gap between items). */
+.accordion__heading { margin: 0; }
+
+.accordion__header {
+  display: flex; align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ep-fg);
+  font: 600 16px/1.4 var(--ep-font-sans);
+  font-family: inherit;
+  transition: color var(--ep-dur-fast) var(--ep-ease-out);
+}
+.accordion__header:hover { color: var(--ep-accent); }
+.accordion__header:focus-visible { outline: none; color: var(--ep-accent); box-shadow: var(--ep-shadow-focus); }
+
+.accordion__icon {
+  width: 18px; height: 18px;
+  color: var(--ep-fg-muted);
+  flex-shrink: 0;
+}
+
+.accordion__title { flex: 1; }
+.accordion__meta {
+  font: 500 12px var(--ep-font-sans);
+  color: var(--ep-fg-subtle);
+}
+
+.accordion__chevron {
+  width: 16px; height: 16px;
+  color: var(--ep-fg-muted);
+  transition: transform var(--ep-dur-base) var(--ep-ease-out);
+  flex-shrink: 0;
+}
+.accordion__item.is-open .accordion__chevron { transform: rotate(180deg); }
+
+/* Closed panels are hidden purely by the JSX `hidden` attribute (UA [hidden]{display:none}):
+   no max-height cap and no layout-property animation, so an open panel takes its natural,
+   uncapped block height and grows freely with its content. */
+.accordion__body {
+  font: var(--ep-text-body);
+  color: var(--ep-fg-muted);
+  padding: 0 4px 18px;
+}
+.accordion__body > * + * { margin-top: 12px; }
+
+/* ---- Bordered (card-style) ---- */
+.accordion--bordered {
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border);
+  border-radius: var(--ep-radius-lg);
+  padding: 0 16px;
+}
+
+/* ---- Separated (each item is a card) ---- */
+.accordion--separated { gap: 8px; }
+.accordion--separated .accordion__item {
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border);
+  border-radius: var(--ep-radius-md);
+  padding: 0 16px;
+}
+.accordion--separated .accordion__header { padding: 14px 0; }
+.accordion--separated .accordion__body { padding: 0 0 14px; }
+
+/* ---- Subtle (header-only) ---- */
+.accordion--subtle .accordion__header { font: 500 14px var(--ep-font-sans); padding: 12px 4px; }
+.accordion--subtle .accordion__header:hover { background: var(--ep-bg-hover); }
+
+/* ============ Reduced motion ============
+   The only motion is the header colour fade and the chevron rotation; make both instant.
+   The chevron's rotated end-state (.is-open) is a static transform, so the open/closed
+   indication survives — only the transition between states is removed. */
+@media (prefers-reduced-motion: reduce) {
+  .accordion__header,
+  .accordion__chevron { transition: none; }
+}
+
+/* ============ Forced colors (Windows High Contrast etc.) ============
+   Token borders/colours and the box-shadow focus ring drop out here, so map text and
+   dividers onto explicit system colours and replace the shadow ring with a real outline.
+   System colours are honoured without forced-color-adjust, so none is used. */
+@media (forced-colors: active) {
+  /* Dividers / variant chrome → real CanvasText lines (subtle token borders flatten away). */
+  .accordion__item { border-bottom-color: CanvasText; }
+  .accordion--bordered,
+  .accordion--separated .accordion__item { border-color: CanvasText; }
+
+  /* Trigger + panel text stay readable; secondary meta drops to GrayText. */
+  .accordion__header,
+  .accordion__title,
+  .accordion__body { color: CanvasText; }
+  .accordion__meta { color: GrayText; }
+  /* Own chevron + icon container ride currentColor so they don't vanish. */
+  .accordion__icon,
+  .accordion__chevron { color: CanvasText; }
+
+  /* Keyboard focus: the box-shadow ring is invisible here — use a real system outline. */
+  .accordion__header:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}

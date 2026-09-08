@@ -1,6 +1,7 @@
-import { useId, type InputHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { useId, type FocusEvent, type InputHTMLAttributes, type ReactElement, type ReactNode } from 'react';
 import { joinAriaTokenList } from '../aria-token-list/join-aria-token-list.ts';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
+import { useFieldErrorVisibility } from '../field-error-visibility/use-field-error-visibility.ts';
 import './text-field.css';
 
 export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElement> {
@@ -12,7 +13,9 @@ export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElemen
    * Hibaüzenet: egyben hibás állapotba is állítja a mezőt. Az `| undefined`
    * kimondása szándékos az `exactOptionalPropertyTypes` mellett: a hívók egy
    * `string | undefined` értékű keresés eredményét adják át közvetlenül
-   * (`error={fieldErrors.get(path)}`), objektum spread trükk nélkül.
+   * (`error={fieldErrors.get(path)}`), objektum spread trükk nélkül. A
+   * MEGJELENÉS szabályát a `useFieldErrorVisibility` adja (érintett vagy már
+   * megkísérelt beküldés).
    */
   readonly error?: string | undefined;
   /**
@@ -32,6 +35,11 @@ export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElemen
  * összekötése a forrás mintáját követi: a `<label>` körbeveszi a mezőt
  * (implicit összekötés), és a mező azonosítója a hívóé vagy a `useId`
  * generálta érték.
+ *
+ * A HIBAÜZENET MEGJELENÉSE nem az `error` prop puszta meglétén múlik, hanem
+ * a `useFieldErrorVisibility` szabályán: érintett (`blur`) VAGY már
+ * megkísérelt űrlap beküldés. A hívó saját `onBlur` kezelője megmarad, a
+ * komponens csak elé fűzi az érintettség jelölését.
  */
 export function TextField(properties: Readonly<TextFieldProperties>): ReactElement {
   const {
@@ -41,6 +49,7 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
     inputClassName,
     className,
     id,
+    onBlur,
     'aria-describedby': ariaDescribedBy,
     'aria-invalid': ariaInvalid,
     ...rest
@@ -48,16 +57,22 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
 
   const automaticId = useId();
   const resolvedId = id ?? automaticId;
-  const hasError = error !== undefined;
+  const { isErrorVisible, markTouched } = useFieldErrorVisibility(error);
   const errorId = `${resolvedId}-error`;
+
+  function handleBlur(event: FocusEvent<HTMLInputElement>): void {
+    markTouched();
+    onBlur?.(event);
+  }
 
   const inputElement = (
     <input
-      className={joinClassNames('input', hasError && 'input--error', inputClassName)}
+      className={joinClassNames('input', isErrorVisible && 'input--error', inputClassName)}
       {...rest}
       id={resolvedId}
-      aria-invalid={hasError ? 'true' : ariaInvalid}
-      aria-describedby={joinAriaTokenList(ariaDescribedBy, hasError ? errorId : undefined)}
+      onBlur={handleBlur}
+      aria-invalid={isErrorVisible ? 'true' : ariaInvalid}
+      aria-describedby={joinAriaTokenList(ariaDescribedBy, isErrorVisible ? errorId : undefined)}
     />
   );
 
@@ -72,8 +87,8 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
           {inputElement}
         </span>
       )}
-      {hasError && (
-        <span className="field__error" id={errorId}>
+      {isErrorVisible && (
+        <span className="field__error" id={errorId} role="alert">
           {error}
         </span>
       )}

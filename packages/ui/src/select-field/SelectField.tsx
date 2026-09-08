@@ -1,6 +1,7 @@
-import { useId, type ReactElement, type SelectHTMLAttributes } from 'react';
+import { useId, type FocusEvent, type ReactElement, type SelectHTMLAttributes } from 'react';
 import { joinAriaTokenList } from '../aria-token-list/join-aria-token-list.ts';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
+import { useFieldErrorVisibility } from '../field-error-visibility/use-field-error-visibility.ts';
 // A `.field`, a `.field__label` és a `.field__error` osztály a `text-field`
 // téma CSS-éé; a `SelectField` a címkés/hibás alakjában ugyanezt a burkolót
 // használja, ezért a témát is be kell töltenie, hogy egy csak `SelectField`-et
@@ -46,7 +47,8 @@ export interface SelectFieldProperties extends Omit<SelectHTMLAttributes<HTMLSel
   /**
    * Hibaüzenet: egyben hibás állapotba is állítja a mezőt. A `TextField`
    * mintáját követi (`aria-invalid`, `aria-describedby`), hogy a két mező
-   * hibajelzése ugyanúgy viselkedjen.
+   * hibajelzése ugyanúgy viselkedjen; a MEGJELENÉS szabályát ugyanaz a
+   * `useFieldErrorVisibility` adja (érintett vagy már megkísérelt beküldés).
    */
   readonly error?: string | undefined;
 }
@@ -79,6 +81,7 @@ export function SelectField(properties: Readonly<SelectFieldProperties>): ReactE
     label,
     error,
     id,
+    onBlur,
     'aria-describedby': ariaDescribedBy,
     'aria-invalid': ariaInvalid,
     ...rest
@@ -87,19 +90,25 @@ export function SelectField(properties: Readonly<SelectFieldProperties>): ReactE
   const automaticId = useId();
   const resolvedId = id ?? automaticId;
   const isLoading = loading === true;
-  const hasError = error !== undefined;
+  const { isErrorVisible, markTouched } = useFieldErrorVisibility(error);
   const errorId = `${resolvedId}-error`;
   const visibleOptions = isLoading ? NO_OPTIONS : options;
   const placeholderLabel = isLoading ? loadingLabel : placeholder;
 
+  function handleBlur(event: FocusEvent<HTMLSelectElement>): void {
+    markTouched();
+    onBlur?.(event);
+  }
+
   const selectElement = (
     <select
-      className={joinClassNames('select', size === 'sm' && 'select--sm', hasError && 'select--error', className)}
+      className={joinClassNames('select', size === 'sm' && 'select--sm', isErrorVisible && 'select--error', className)}
       {...rest}
       id={resolvedId}
       disabled={isLoading || disabled === true}
-      aria-invalid={hasError ? 'true' : ariaInvalid}
-      aria-describedby={joinAriaTokenList(ariaDescribedBy, hasError ? errorId : undefined)}
+      onBlur={handleBlur}
+      aria-invalid={isErrorVisible ? 'true' : ariaInvalid}
+      aria-describedby={joinAriaTokenList(ariaDescribedBy, isErrorVisible ? errorId : undefined)}
     >
       {placeholderLabel !== undefined && <option value="">{placeholderLabel}</option>}
       {visibleOptions.map((option) => (
@@ -110,7 +119,7 @@ export function SelectField(properties: Readonly<SelectFieldProperties>): ReactE
     </select>
   );
 
-  if (label === undefined && !hasError) {
+  if (label === undefined && error === undefined) {
     return selectElement;
   }
 
@@ -118,8 +127,8 @@ export function SelectField(properties: Readonly<SelectFieldProperties>): ReactE
     <label className="field">
       {label !== undefined && <span className="field__label">{label}</span>}
       {selectElement}
-      {hasError && (
-        <span className="field__error" id={errorId}>
+      {isErrorVisible && (
+        <span className="field__error" id={errorId} role="alert">
           {error}
         </span>
       )}

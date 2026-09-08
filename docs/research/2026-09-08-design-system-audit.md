@@ -455,3 +455,65 @@ token vagy minta egyik skillben sem.
 - **A `.node-inspector textarea.input` minta** — az `.input` osztály többsoros mezőn való
   felhasználása geometriai toldozással (`resize: vertical`), miközben a design system saját,
   erre szánt `.textarea` osztálya kihasználatlan marad (4.4 szekció).
+
+---
+
+## 9. Az audit alapján elvégzett elrendezés átalakítás (2026-09-09)
+
+Ez a szekció az audit 5. és 8. pontjának **végrehajtását** rögzíti a gráf szerkesztő KERETÉRE
+és ELRENDEZÉSÉRE (a node inspector belseje külön munkamenet hatóköre). Forrás: felhasználói
+kérés, 2026-09-09 (szó szerint: "faltol falig, slim designt csinaljunk, es felesleges a kartya
+a szerkeszto kore", "a gomboknak a szerkeszto feluleten egy split button(button group tipus)
+kene lennie", "tilos a card in card design!", "ez a jobb oldali panel akkor jelenjen meg ha egy
+elemre kattintok", "legyen a layout ha lehet resizable ... localstorage -be le kell menteni").
+
+### 9.1 Amit a design systemből átemeltünk (létező elem)
+
+| Elem            | Hova került                     | Hatókör                                                                                                                                                                                                                                         |
+| --------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.button-group` | `packages/ui/src/button-group/` | a CSS bájtra azonos a forrással (a `@import` sor nélkül); a `ButtonGroup` React alak `role="group"` és kötelező `aria-label`; a függőleges variáns és az `is-active` szegmentált állapot nincs propként kivezetve, mert a felület nem használja |
+| `.btn--sm`      | `apps/web/src/graph-editor/`    | a "Mentés" és az "Elrendezés" gomb `size="sm"` lett, az audit 5.5 pontja szerint (a modális gombok `md` mérete a kimondott kivétel, változatlan)                                                                                                |
+
+### 9.2 Amit saját kiegészítésként építettünk (a design systemben NINCS)
+
+**`packages/ui/src/page-footer/`, a sticky page footer.** Az audit 5.4 és 8.1 pontja tételesen
+kimondja, hogy oldal szintű, a viewport aljához tapadó akciósáv a négy `eggproject-design*`
+skill egyikében sincs. A `page-footer.css` ezért **saját kiegészítés**, és ezt a fájl fejléc
+kommentje is kimondja. A recept két LÉTEZŐ forrásból áll össze, kizárólag design system
+tokenekkel, kitalált szám nélkül:
+
+| Amit átvesz                                                                                                                | Honnan                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `position: sticky`, `z-index: 10`, `background: var(--ep-bg-elevated)`, elválasztó szegély                                 | `.app-tn__bar` (`eggproject-design-app-common/_shell.css`), `bottom`/`border-top` irányba fordítva      |
+| `display: flex`, `align-items: center`, `justify-content: space-between`                                                   | `.modal__footer` és `.modal__footer--split` (`eggproject-design-components/components/modal/modal.css`) |
+| minden térköz (`--ep-space-2`, `--ep-space-3`, `--ep-space-6`), a `--ep-text-small` betűkészlet és az `--ep-fg-muted` szín | `eggproject-design/tokens/spacing.css`, `typography.css`, a téma színtokenek                            |
+
+A forrás két receptjének pixel literálja (a `.app-tn__bar` 28px oldalsó és a `.modal__footer`
+20/28/24px belső margója) **szándékosan nem** került át: azok a saját kontextusukhoz vannak
+szabva, és a 4px alapú skálán nincs is 28px lépcső.
+
+### 9.3 A card in card megszüntetése
+
+Az audit 6. szekciója szerint a legkülső kártya a `.resizable-group` volt (szegély, `--ep-radius-xl`
+lekerekítés, `--ep-bg-elevated` háttér). A design systemnek **nincs keret nélküli Resizable
+variánsa** (8.1 pont), a `resizable.css` pedig bájtazonossági regressziós teszt alatt áll
+(`packages/ui/src/resizable/resizable-byte-identity.spec.ts`), tehát új módosító osztály nem
+vehető fel bele az átemelés garanciájának elvesztése nélkül. A törlés ezért a **fogyasztó
+oldalán**, erre az egy képernyőre szűkítve áll (`apps/web/src/graph-editor/graph-editor-screen.css`),
+dokumentáló kommenttel. Regresszió: `apps/web/e2e/graph-editor-layout.spec.ts` "NINCS card in
+card" tesztje, ami számított stílusból méri, hogy a szegély, a lekerekítés és a saját háttér is
+eltűnt.
+
+A "faltól falig" másik fele az `.app-content` belső margója: a `topnav-shell.css`
+`.app-content:has(> .graph-editor-screen)` szabálya 2026-09-06 óta létezett (akkor csak az alsó
+80px csökkentésére), most a TELJES paddingot nullázza ezen az egy screen-en. Kitalált szám így
+nincs, az egyetlen érték a `0`.
+
+### 9.4 Nagy felbontás
+
+Az audit 7.1 pontjának megállapítását követjük: **4K-specifikus töréspontot nem vezettünk be**,
+mert a design system szándékosan nem ad ilyet. A szerkesztő a `--ep-layout-max-full` full-bleed
+szentinelre álló `.app-tn` láncot használja (`topnav-shell.css`, 2026-09-01 óta), tehát FHD-n,
+QHD-n és afölött is a teljes szélességet kapja, `max-width` sapka nélkül. Új media query nem
+került be; a meglévő `--ep-screen-md` (768px) sáv a `graph-editor-screen.css` egyetlen media
+queryje, változatlanul.

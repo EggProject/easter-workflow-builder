@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FieldErrorVisibilityContext } from '../field-error-visibility/field-error-visibility-context.ts';
 import { SelectField, type SelectFieldOption } from './SelectField.tsx';
 
 const PROVIDER_OPTIONS: readonly SelectFieldOption[] = [
@@ -35,6 +36,17 @@ describe('SelectField', () => {
 
   function renderedOptionLabels(): readonly string[] {
     return [...container.querySelectorAll('option')].map((option) => option.textContent);
+  }
+
+  /**
+   * A mező elhagyása: innentől "érintett", tehát a hibaüzenete láthatóvá
+   * válhat (`useFieldErrorVisibility`).
+   */
+  function blurSelect(): void {
+    act(() => {
+      renderedSelect().focus();
+      renderedSelect().blur();
+    });
   }
 
   it('alapértelmezésben a "select" osztályt viseli, és minden opciót kirajzol', () => {
@@ -163,32 +175,66 @@ describe('SelectField', () => {
     expect(renderedSelect().getAttribute('aria-invalid')).toBeNull();
   });
 
-  it('hiba esetén a mező alatt jelenik meg az üzenet, aria-describedby és aria-invalid kötéssel', () => {
+  it('érintetlen mezőn nincs hibaüzenet, akkor sem, ha az érték érvénytelen', () => {
     act(() => {
       root.render(<SelectField options={PROVIDER_OPTIONS} label="Provider" error="Kötelező mező" />);
     });
+    expect(container.querySelector('.field__error')).toBeNull();
+    expect(renderedSelect().className).toBe('select');
+    expect(renderedSelect().getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('érintés után a mező alatt jelenik meg az üzenet, aria-describedby és aria-invalid kötéssel', () => {
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} label="Provider" error="Kötelező mező" />);
+    });
+    blurSelect();
     const errorElement = container.querySelector('.field__error');
     expect(errorElement?.textContent).toBe('Kötelező mező');
+    expect(errorElement?.getAttribute('role')).toBe('alert');
     expect(renderedSelect().className).toBe('select select--error');
     expect(renderedSelect().getAttribute('aria-invalid')).toBe('true');
     expect(renderedSelect().getAttribute('aria-describedby')).toBe(errorElement?.id);
   });
 
-  it('hiba önmagában, label nélkül is a .field burkolót hozza', () => {
+  it('megkísérelt beküldés után érintetlen mezőn is látszik a hibaüzenet', () => {
+    act(() => {
+      root.render(
+        <FieldErrorVisibilityContext.Provider value>
+          <SelectField options={PROVIDER_OPTIONS} label="Provider" error="Kötelező mező" />
+        </FieldErrorVisibilityContext.Provider>,
+      );
+    });
+    expect(container.querySelector('.field__error')?.textContent).toBe('Kötelező mező');
+  });
+
+  it('a hívó saját onBlur kezelője megmarad az érintettség jelölése mellett', () => {
+    const onBlur = vi.fn();
+    act(() => {
+      root.render(<SelectField options={PROVIDER_OPTIONS} label="Provider" error="Hibás" onBlur={onBlur} />);
+    });
+    blurSelect();
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.field__error')).not.toBeNull();
+  });
+
+  it('hiba önmagában, label nélkül is a .field burkolót hozza (a hibaüzenet még rejtve)', () => {
     act(() => {
       root.render(<SelectField options={PROVIDER_OPTIONS} error="Érvénytelen" />);
     });
     expect(container.querySelector('label.field')).not.toBeNull();
     expect(container.querySelector('.field__label')).toBeNull();
+    blurSelect();
     expect(container.querySelector('.field__error')?.textContent).toBe('Érvénytelen');
   });
 
-  it('hiba esetén a hívó saját aria-describedby értéke megmarad a hiba azonosítója mellett', () => {
+  it('látható hiba esetén a hívó saját aria-describedby értéke megmarad a hiba azonosítója mellett', () => {
     act(() => {
       root.render(
         <SelectField id="provider" options={PROVIDER_OPTIONS} aria-describedby="provider-sugo" error="Érvénytelen" />,
       );
     });
+    blurSelect();
     expect(renderedSelect().getAttribute('aria-describedby')).toBe('provider-sugo provider-error');
   });
 
