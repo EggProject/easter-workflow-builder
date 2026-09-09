@@ -180,17 +180,52 @@
   padding: 0;
 }
 
-/* A böngésző alapértelmezett 8px-es `body` margója nélkül a shell nem
-   ér el a fal széléig, és a `min-height: 100vh` mellé 16px függőleges
-   túllógást (állandó oldalgörgetést) ad. A forrás `_shell.css` ezt a
-   saját, alapozó `* { box-sizing: border-box; margin: 0; padding: 0; }`
-   szabályával oldja meg, ami NEM került át (SPEC-007 4.2 szűkített
-   átemelés) - a teljes univerzális reset minden komponens térközét
-   átírná, ami ennek a hibának a javításához nem kell. Ezért csak a
-   `body` margója nullázódik, ugyanarra az értékre, amit a forrás is ad. */
+/* ============================================================
+   A FORRÁS `_shell.css` ALAPOZÓ BLOKKJA, MÉRT HIBA JAVÍTÁSA.
+
+   A MÉRT HIBA. A `<select>`, a `<button>` és minden más natív vezérlő a
+   szülőjétől NEM örökli a betűtípust, azt a böngésző saját stílusa adja.
+   A projekt átemelt komponens CSS-ei (`select.css`, `button.css`,
+   `accordion.css`) pontosan úgy oldják ezt meg, ahogy a forrás:
+   `font-family: inherit`. Ez viszont csak akkor ad Robotót, ha a
+   láncban VAN valaki, aki a családot beállítja. A forrásban ez a
+   `_shell.css` `body` szabálya; abból korábban kizárólag a `margin: 0`
+   került át, tehát a `body` a böngésző alapértelmezésén maradt.
+   Chromium 141 alatt mérve: `body` és `select.select` számított
+   `font-family` értéke `"Times New Roman"`, azaz TALPAS betű, miközben
+   a design system saját `select.html` példáján ugyanez
+   `Roboto, -apple-system, BlinkMacSystemFont, system-ui, sans-serif`.
+   A `body` számított `color` értéke ugyanígy `rgb(0, 0, 0)` volt a
+   forrás `rgb(10, 18, 48)` helyett.
+
+   A JAVÍTÁS. A forrás `_shell.css` alapozó `body` szabálya és a
+   `button { font-family: inherit }` sora, deklarációnként bájtra
+   azonosan. A `margin: 0` a `body` szabályba olvad, ugyanazzal az
+   indokkal, ami eddig is állt mellette: a böngésző alapértelmezett 8px
+   margója nélkül a shell nem ér el a fal széléig, és a
+   `min-height: 100vh` mellé 16px függőleges túllógást ad.
+
+   AMI SZÁNDÉKOSAN NEM KERÜL ÁT. A forrás univerzális
+   `* { box-sizing: border-box; margin: 0; padding: 0; }` resetje (SPEC-007
+   4.2 szűkített átemelés): az minden komponens térközét átírná, ami
+   ennek a hibának a javításához nem kell. A hiányából eredő két konkrét
+   eset már pontszerűen javítva van (`.input` és `.textarea`
+   `box-sizing: border-box` sora). Ugyanígy kimarad a forrás
+   `html, body { min-height: 100% }` és `a { color: inherit }` sora: egyik
+   sem a betűtípusról szól, és a projekt magassági, illetve link
+   színezési viselkedése ma helyes.
+
+   Regresszió: apps/web/e2e/form-control-typography.spec.ts.
+   ============================================================ */
 body {
   margin: 0;
+  font-family: var(--ep-font-sans);
+  color: var(--ep-fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+button { font-family: inherit; }
 
 /* ============================================================
    A page-head függőleges térközének csökkentése, mert a nagy H1 cím

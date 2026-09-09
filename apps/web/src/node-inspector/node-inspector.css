@@ -61,6 +61,72 @@
   overflow-wrap: anywhere;
 }
 
+/* ============================================================
+   A PANEL BEZÁRÓ X GOMBJA.
+   Forrás: eggproject-design-components/components/drawer/drawer.css
+   `.drawer__close` szabályai, deklarációnként bájtra azonosan, csak a
+   szelektor neve a mi BEM blokkunkra cserélve. A design system maga is
+   így csinálja: ugyanez a deklarációkészlet fut `.modal__close` és
+   `.toast__close` néven is, komponensenként saját néven.
+
+   MIÉRT NEM A `.btn--ghost`. A design system `.btn--ghost` variánsának
+   szövegszíne `var(--ep-accent-fg)` (button.css 91. sor), ami az arany
+   `#8A6220`. Chromium 141 alatt mérve a korábbi
+   `<Button variant="ghost" size="sm" icon>` bezáró gomb számított
+   `color` értéke pontosan `rgb(138, 98, 32)` volt, tehát a bezárás
+   elsődleges akciónak látszott (felhasználói kifogás, 2026-09-09). A
+   design system a panel bezárásra NEM a gomb komponenst használja: a
+   Drawer és a Modal is saját, `--ep-fg-muted` színű vezérlőt kap. A
+   `NodeInspector` a Drawer alakját követi (jobb oldalra dokkolt panel,
+   fejléc címmel és bezáró X-szel, ugyanazzal az SVG útvonallal), ezért
+   a Drawer megoldása kerül át.
+
+   A méret a forrás 32x32 értéke marad. A "gombok sm méretűek"
+   felhasználói szabály a `.btn` méretskálájára vonatkozik; ez a vezérlő
+   nem `.btn`, hanem a design system dedikált bezáró vezérlője, aminek
+   egyetlen szállított mérete van.
+
+   AMI NEM KERÜL ÁT: a forrás `@media (forced-colors: active)` blokkja. Az
+   a Drawer EGÉSZÉT képezi le rendszerszínekre (overlay, panel, cím,
+   törzs, elválasztók, bezáró gomb); ebből egyedül a bezáró gombot
+   kiemelni fél megoldás lenne egy olyan fájlban, aminek ma egyetlen
+   forced-colors szabálya sincs. A most javított hiba a normál módú
+   színre vonatkozik.
+
+   Regresszió: apps/web/e2e/form-control-typography.spec.ts.
+   ============================================================ */
+.node-inspector__close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ep-radius-md);
+  background: transparent;
+  border: 0;
+  color: var(--ep-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--ep-dur-fast) var(--ep-ease-out),
+    background-color var(--ep-dur-fast) var(--ep-ease-out),
+    box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+}
+.node-inspector__close:hover {
+  background: var(--ep-bg-hover);
+  color: var(--ep-fg);
+}
+/* Keyboard focus only: design-system gold ring, no layout shift. Outline removed only
+   because the box-shadow ring replaces it; the ring survives hover (no box-shadow there). */
+.node-inspector__close:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+.node-inspector__close svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* A panel ÖNÁLLÓAN görög, a viewporton belül maradva: a görgetés itt van, a
    `.resizable-panel` így sosem kap második görgősávot. */
 .node-inspector__body {

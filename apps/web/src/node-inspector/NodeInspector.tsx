@@ -1,5 +1,5 @@
 import { NodeConfigSchema, type NodeConfig, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
-import { Button, FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
@@ -118,8 +118,9 @@ function renderConfigFields(
  * teszi, tehát a vászon mellette szűkül, és a sáv szélessége húzható
  * (SPEC-008 5.5). A panel `<aside>` elem, saját hozzáférhető névvel, tehát
  * a képernyőolvasó kiegészítő területként (`complementary`) találja meg. A
- * fejléc bezáró gombja ikon gomb (`.btn--icon`), aminek a hozzáférhető
- * nevét `aria-label` adja, mert nincs látható szövege.
+ * fejléc bezáró gombja a design system panel bezáró vezérlője
+ * (`.node-inspector__close`, a Drawer `.drawer__close` szabályaival), aminek
+ * a hozzáférhető nevét `aria-label` adja, mert nincs látható szövege.
  *
  * A HIBAJELZÉS EGY SZINTŰ: a hibaüzenet KIZÁRÓLAG a hibás mező ALATT áll,
  * `aria-invalid` és `aria-describedby` kötéssel, és csak akkor, ha a mező
@@ -146,11 +147,18 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
           <h2 className="node-inspector__title">{catalogEntry.label}</h2>
           <p className="node-inspector__node-id">{node.id}</p>
         </div>
-        <Button type="button" variant="ghost" size="sm" icon aria-label="Bezárás" onClick={onClose}>
+        {/* A design system a panel bezáró X-ét NEM a `.btn` gomb valamelyik
+            variánsával oldja meg: a Drawer és a Modal komponensnek is saját,
+            nevesített bezáró vezérlője van (`.drawer__close`,
+            `.modal__close`), mert a `.btn--ghost` szövegszíne az arany
+            `--ep-accent-fg`, tehát a bezárás elsődleges akciónak látszana. A
+            szabályok a `node-inspector.css` `.node-inspector__close`
+            blokkjában állnak, a forrás indoklásával együtt. */}
+        <button type="button" className="node-inspector__close" aria-label="Bezárás" onClick={onClose}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
             <path d="M4 4l8 8M12 4l-8 8" />
           </svg>
-        </Button>
+        </button>
       </div>
       <div className="node-inspector__body">
         <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>

@@ -573,3 +573,38 @@ coverage:e2e:report` exit 0-t ad.
 **A fennmaradó rés tételesen ellenőrizve: nincs új, dokumentálatlan tétel.** A mérés utáni
 `nyc report --reporter=text` szerint a 100 százalék alatti fájlok listája pontosan a fenti
 (12. szekció) táblázatra szűkül, egyetlen újdonság sem maradt.
+
+---
+
+## 14. Az űrlap vezérlő betűtípus és a bezáró gomb szín javítása utáni ratchet (2026-09-09)
+
+**Mit mértem.** Két, felhasználó által képpel bizonyított vizuális hiba javítása után
+(a `body` betűcsalád hiánya miatt talpas betűvel megjelenő natív űrlap vezérlők, és a
+node inspector arany, `.btn--ghost` variánsú bezáró gombja) újramérés, plusz egy új
+regressziós spec fájl (`apps/web/e2e/form-control-typography.spec.ts`, 3 teszt).
+
+**A mérés menete.** Törölt `apps/web/e2e/.nyc_output`, `bun run test:e2e`
+(141 Playwright teszt, mind zöld, `workers` alapértelmezett), majd
+`nyc report --reporter=json-summary` a pontos `pct` értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (`package.json`) |
+| ---------- | --------------- | --------- | ----------------------------- |
+| statements | 964 / 980       | **98.36** | 98.36                         |
+| branches   | 372 / 385       | **96.62** | 96.62                         |
+| functions  | 361 / 365       | **98.9**  | 98.9                          |
+| lines      | 926 / 942       | **98.3**  | 98.29                         |
+
+**Egyetlen metrika sem esett vissza, és egyik sem nőtt.** A négy hányados bájtra azonos a 13. szekció mérésével: az új spec fájl három tesztje már fedett kódutakat jár be (a
+szerkesztő megnyitása, a node kiválasztása, a beállítás panel kirajzolása), tehát nem hoz
+be új sort. A javítás maga CSS és jelölés szintű, futásidejű elágazást nem érint.
+
+**A ratchet szabály szerint** az `apps/web/package.json` `coverage:e2e:report`
+parancsának `--lines` kapcsolója `98.29`-ről `98.3`-ra emelkedett. Ez a 13. szekció
+befejezetlenül maradt ratchetje: az a szekció szövegében már `98.3` állt, de a
+`package.json` a régi `98.29` értéken maradt. A másik három kapcsoló változatlan
+(98.36/96.62/98.9). Az igazolás: a beállított küszöbbel `bun run coverage:e2e:report`
+exit 0-t ad.
+
+**A fennmaradó rés tételesen ellenőrizve: nincs új, dokumentálatlan tétel.** A mérés
+utáni `nyc report --reporter=text` szerint a 100 százalék alatti fájlok listája pontosan
+a 12. szekció táblázatára szűkül.

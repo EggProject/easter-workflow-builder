@@ -250,7 +250,7 @@ describe('NodeInspector', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('a bezárás IKON gomb, sm méretben, aria-label névvel (nincs látható szövege)', () => {
+  it('a bezárás a design system panel bezáró vezérlője, aria-label névvel (nincs látható szövege)', () => {
     const startNode = NODES_BY_TYPE[0]?.node;
     if (startNode === undefined) {
       throw new Error('a teszt nem talált start node fixture-t');
@@ -267,13 +267,12 @@ describe('NodeInspector', () => {
       );
     });
     const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
-    expect(closeButton?.className).toContain('btn--icon');
-    expect(closeButton?.className).toContain('btn--sm');
+    expect(closeButton?.className).toBe('node-inspector__close');
     expect(closeButton?.textContent).toBe('');
     expect(closeButton?.querySelector('svg')).not.toBeNull();
   });
 
-  it('a bezárás gomb NEM primary variánsú - a bezárás nem elsődleges művelet', () => {
+  it('a bezárás gomb egyáltalán nem `.btn` variáns - a bezárás nem elsődleges művelet', () => {
     const startNode = NODES_BY_TYPE[0]?.node;
     if (startNode === undefined) {
       throw new Error('a teszt nem talált start node fixture-t');
@@ -289,9 +288,14 @@ describe('NodeInspector', () => {
         />,
       );
     });
+    // A design system `.btn--ghost` variánsának szövegszíne az arany
+    // `--ep-accent-fg`, tehát a ghost sem semleges: a panel bezárására a
+    // design system saját, `--ep-fg-muted` színű vezérlője jár (Drawer,
+    // Modal). Ez a teszt csak a jelölést állítja; a TÉNYLEGES, számított
+    // színt az `apps/web/e2e/form-control-typography.spec.ts` méri valódi
+    // böngészőben, mert a jelölés önmagában nem bizonyít színt.
     const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
-    expect(closeButton?.className).toContain('btn--ghost');
-    expect(closeButton?.className).not.toContain('btn--primary');
+    expect(closeButton?.className).not.toContain('btn');
   });
 
   it('a panel MINDEN gombja sm méretű', () => {
