@@ -122,6 +122,16 @@ kapcsolat életben tartja a szervert, és a következő teszt `EADDRINUSE`-szal 
 **A küszöb pontosan ez a négy szám, felfelé kerekítés nélkül.** Ez ratchet: a lefedettség
 nőhet, csökkenni észrevétlenül nem tud.
 
+**Pontosítás (user döntés 2026-09-09, lásd 15. szekció):** a ratchet valójában a fedetlen sorok
+SZÁMÁRA vonatkozik, nem a százalékra. A cél az észrevétlen romlás kizárása, nem a százalék
+mindenáron való emelkedése. Ha egy változtatás fedett kódot töröl (a nevező zsugorodik), és a
+fedetlen tételek darabszáma egyetlen metrikán sem nő, a százalék emiatti csökkenése nem számít
+lefedettség-romlásnak: a küszöb ilyenkor lefelé követheti a mért értéket, kizárólag tételes
+levezetéssel (melyik fájlból mennyi fedett kód tűnt el, és a fedetlen tételek darabszáma előtte
+és utána azonos). Ha a fedetlen sorok száma nő, az valódi romlás: tesztet kell írni, a küszöböt
+nem szabad csökkenteni. Ez utóbbi tiltás a szabály eredeti, szigorú olvasata, és változatlanul
+érvényes.
+
 A számok nem a szöveges táblázatból, hanem a `--reporter=json-summary` gépi kimenetének `pct`
 mezőiből származnak. Az `istanbul-lib-coverage` `percent()` függvénye két tizedesre **lefelé**
 kerekít (`Math.floor(tmp / 10) / 100`), tehát a kiírt érték a tényleges `pct` érték, nem
@@ -645,6 +655,12 @@ kisebb százalékot ad.
 ÉSZREVÉTLENÜL csökkenni; itt a csökkenés mérve, tételesen levezetve és fedetlen sor nélkül
 történt. A `.claude/CLAUDE.md` 8. szekciójának "a küszöb pontosan a mért érték" mondata
 változatlanul érvényes.
+
+**Ez az eset vezette be az 5. szekció pontosított szabályát: a ratchet a fedetlen sorok
+SZÁMÁRA vonatkozik, nem a százalékra.** A jelen eset az elfogadott precedens erre a szabályra
+(user döntés 2026-09-09, átvezetve a `.claude/CLAUDE.md` 8. szekciójába is): fedett kód törlése
+miatti, fedetlen sor nélküli százalékcsökkenés lefelé is mozgathatja a küszöböt, tételes
+levezetéssel, pontosan a fenti bekezdés szerint.
 
 **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; a régi, magasabb
 küszöbbel (98.36 / 96.62 / 98.9 / 98.3) ugyanaz a nyers adat mind a négy metrikán

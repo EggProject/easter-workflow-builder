@@ -340,10 +340,19 @@ kötelező státuszcsekkje. A lánc mind a három szeme mérve, illetve dokument
 `coverage:e2e:report` scriptjének `--check-coverage` kapcsolója, mind a négy metrikára. A számokat
 ide nem írjuk (egy frissítés egy helyen történjen), a származtatás, a nem fedett részek tételes
 listája és a "nulla fájl kizárás" döntés a research fájlban áll. A küszöb pontosan a mért érték,
-felfelé kerekítés nélkül: a lefedettség nőhet, csökkenni észrevétlenül nem tud. Az `nyc`
-összehasonlítása szigorúan kisebb (`coverage < threshold`), tehát a küszöbbel egyenlő érték
-átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a `ci` job `needs` listája)
-az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+felfelé kerekítés nélkül. Az `nyc` összehasonlítása szigorúan kisebb (`coverage < threshold`),
+tehát a küszöbbel egyenlő érték átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a
+`ci` job `needs` listája) az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+
+**A ratchet valójában a fedetlen sorok számára vonatkozik, nem a százalékra** (user döntés
+2026-09-09). A cél az, hogy a lefedettség ne tudjon ÉSZREVÉTLENÜL romlani, nem az, hogy a
+százalék soha ne csökkenhessen. Ha a fedetlen tételek száma egyetlen metrikán sem nő, és a
+csökkenést kizárólag fedett kód törlése okozza (a nevező zsugorodik, a számláló nem), a küszöb
+lefelé követheti a mért értéket - de csakis tételes levezetéssel a research fájlban: melyik fájlból
+mennyi fedett kód tűnt el, és a fedetlen tételek darabszáma előtte és utána azonos. Ha a fedetlen
+sorok száma nő, az valódi lefedettség-romlás, és tesztet kell írni a hiányra, nem a küszöböt
+csökkenteni - ez a tiltás a korábbi, szigorú olvasat, és változatlanul érvényes erre az esetre.
+Elfogadott precedens: `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 15. szekció.
 
 **Az e2e küszöb nem 100 százalék, és ez felhasználói döntés.** A unit lefedettség változatlanul
 100 százalék, kizárás nélkül. Az e2e küszöb alatta van, mert marad néhány, e2e-vel elvileg sem

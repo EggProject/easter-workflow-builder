@@ -787,7 +787,7 @@ A csomag ezzel **tíz** téma mappából áll, egy szint mélyen, plusz az `inde
 **A jelen spec ezt a mechanizmust nem változtatja meg, és a küszöb értékét nem írja elő.** Ennek oka a ratchet természete: a négy szám a **tényleges mérés** eredménye, tehát csak a kód és a tesztek megírása után ismerhető meg. Amit a spec előír, az három szabály:
 
 1. **A küszöb a PLAN-009 zárásakor újramérődik**, és az új, mért értékre áll be, ugyanazzal a módszerrel, ugyanabba a research fájlba vezetve.
-2. **A küszöb egyik metrikán sem csökkenhet** a mai értékhez képest. Ha egy új képernyő lefedettsége a mai szint alá vinné az összesítést, a hiányzó teszt ugyanabban a lépésben íródik meg; a küszöb csökkentése nem megoldás.
+2. **A ratchet a fedetlen sorok számára vonatkozik, nem a százalékra** (pontosítva: user döntés 2026-09-09, `.claude/CLAUDE.md` 8. szekció, `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 15. szekció). Ha egy új képernyő fedetlen sort hagy hátra, a hiányzó teszt ugyanabban a lépésben íródik meg; a küszöb csökkentése ilyenkor nem megoldás. Ha viszont fedett kód törlése viszi le a százalékot, és a fedetlen tételek száma egyetlen metrikán sem nő, a küszöb lefelé követheti a mért értéket, kizárólag tételes levezetéssel a research fájlban.
 3. **A fájl kizárás továbbra is nulla.** A research 2.2 szekciója fájl szintű kizárás helyett a nem fedett sorok tételes indoklását választotta, és ez az elv a SPEC-008 új fájljaira is érvényes.
 
 **A `nyc` összehasonlítása szigorúan kisebb** (`coverage < threshold`), tehát a küszöbbel pontosan egyenlő érték átmegy; ezt a research 1. szekciója méréssel rögzítette, és a küszöb beállításánál számít.
