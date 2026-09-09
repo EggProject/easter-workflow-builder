@@ -29,6 +29,7 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
   return (
     <>
       <TextField
+        size="sm"
         label="Cím"
         value={config.title}
         error={titleError}
@@ -37,6 +38,7 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
         }}
       />
       <TextAreaField
+        size="sm"
         label="Törzs sablon (bodyTemplate)"
         value={config.bodyTemplate}
         error={bodyTemplateError}
@@ -45,6 +47,7 @@ export function HumanApprovalNodeFields(properties: Readonly<HumanApprovalNodeFi
         }}
       />
       <TextField
+        size="sm"
         type="number"
         label="Időkorlát ms-ben (üres = korlátlan)"
         value={toNumberFieldValue(config.timeoutMs)}

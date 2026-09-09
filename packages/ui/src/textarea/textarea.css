@@ -3,10 +3,11 @@
    Forrás: eggproject-design-components/components/textarea/textarea.css,
    bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
    csomag globálisan tölt be) kivételével. A fájl minden szabálya a
-   Textarea komponenshez tartozik, ezért szűkítés nem kellett; a
-   `--sm`/`--lg`/`--ghost` méret- és stílusvariáns propként nincs
-   kivezetve (lásd `TextAreaField.tsx`), de a szabályok bájtra átkerülnek,
-   mert ugyanennek a komponensnek a részei.
+   Textarea komponenshez tartozik, ezért szűkítés nem kellett. A `--sm`
+   méret variáns propként KI van vezetve (lásd `TextAreaField.tsx` `size`
+   propja, felhasználói kérés 2026-09-09), a `--lg`/`--ghost` nincs, mert
+   egyetlen képernyő sem igényli - a szabályok mindhárom variánsra bájtra
+   átkerülnek, mert ugyanennek a komponensnek a részei.
    HOZZÁADVA a forráshoz képest: egyetlen deklaráció, a `.textarea`
    `box-sizing: border-box` sora (az indoklás a deklaráció fölött áll).
    A fájl minden más sora bájtra azonos a forrással.

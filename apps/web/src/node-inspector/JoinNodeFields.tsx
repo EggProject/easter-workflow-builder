@@ -101,6 +101,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
 
   const modeSelect = (
     <SelectField
+      size="sm"
       label="Összefésülés módja"
       error={modeError}
       options={MODE_OPTIONS}
@@ -132,6 +133,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
       <>
         {modeSelect}
         <TextAreaField
+          size="sm"
           label="Forrás (source)"
           value={config.settings.source}
           error={sourceError}

@@ -29,6 +29,7 @@ export function ScriptNodeFields(properties: Readonly<ScriptNodeFieldsProperties
     <>
       <p role="alert">A motor a futtatáskor `unimplemented_node_type` hibával elutasítja ezt a csomópontot.</p>
       <TextAreaField
+        size="sm"
         label="Forrás (source)"
         value={config.source}
         error={sourceError}

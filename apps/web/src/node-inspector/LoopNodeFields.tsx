@@ -31,6 +31,7 @@ export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): 
   return (
     <>
       <TextField
+        size="sm"
         type="number"
         label="Max. iterációk száma"
         value={String(config.maxIterations)}
@@ -40,6 +41,7 @@ export function LoopNodeFields(properties: Readonly<LoopNodeFieldsProperties>): 
         }}
       />
       <TextAreaField
+        size="sm"
         label="Folytatás feltétel (continueExpression)"
         value={config.continueExpression}
         error={continueExpressionError}

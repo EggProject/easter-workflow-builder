@@ -59,6 +59,18 @@ describe('TextField', () => {
     expect(container.querySelector('.input-with-icon')).toBeNull();
   });
 
+  it('md méretre nem tesz hozzá méret módosítót, sm méretre igen', () => {
+    act(() => {
+      root.render(<TextField size="md" />);
+    });
+    expect(renderedInput().className).toBe('input');
+
+    act(() => {
+      root.render(<TextField size="sm" />);
+    });
+    expect(renderedInput().className).toBe('input input--sm');
+  });
+
   it('a label a .field__label elembe kerül, és a címke körbeveszi a mezőt', () => {
     act(() => {
       root.render(<TextField label="Név" />);

@@ -57,8 +57,8 @@ export {
 } from './select-field/SelectField.tsx';
 export { Skeleton, type SkeletonProperties, type SkeletonShape } from './skeleton/Skeleton.tsx';
 export { Tabs, type TabItem, type TabsProperties } from './tab/Tabs.tsx';
-export { TextAreaField, type TextAreaFieldProperties } from './textarea/TextAreaField.tsx';
-export { TextField, type TextFieldProperties } from './text-field/TextField.tsx';
+export { TextAreaField, type TextAreaFieldProperties, type TextAreaFieldSize } from './textarea/TextAreaField.tsx';
+export { TextField, type TextFieldProperties, type TextFieldSize } from './text-field/TextField.tsx';
 export { Toast, type ToastAction, type ToastProperties, type ToastVariant } from './toast/Toast.tsx';
 export { ToastViewport, type ToastViewportProperties, type ToastViewportPosition } from './toast/ToastViewport.tsx';
 export {

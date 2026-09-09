@@ -42,6 +42,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
   return (
     <>
       <TextAreaField
+        size="sm"
         label="Feltétel kifejezés"
         value={config.expression}
         error={expressionError}
@@ -52,6 +53,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
       {config.branches.map((branch, index) => (
         <div key={index} className="node-inspector__list-row">
           <TextField
+            size="sm"
             label="Ág kulcsa"
             value={branch.key}
             error={fieldErrors.get(`branches.${String(index)}.key`)}
@@ -60,6 +62,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
             }}
           />
           <TextField
+            size="sm"
             label="Ág címkéje"
             value={branch.label}
             error={fieldErrors.get(`branches.${String(index)}.label`)}
@@ -89,6 +92,7 @@ export function BranchNodeFields(properties: Readonly<BranchNodeFieldsProperties
         Ág hozzáadása
       </Button>
       <TextField
+        size="sm"
         label="Alapértelmezett ág kulcsa (ha egyik feltétel sem talál)"
         value={toTextFieldValue(config.defaultBranchKey)}
         error={defaultBranchKeyError}

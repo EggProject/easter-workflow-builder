@@ -59,6 +59,7 @@ function renderFieldControl(
     case 'text': {
       return (
         <TextField
+          size="sm"
           label={field.label}
           value={isString(rawValue) ? rawValue : ''}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +71,7 @@ function renderFieldControl(
     case 'textarea': {
       return (
         <TextAreaField
+          size="sm"
           label={field.label}
           value={isString(rawValue) ? rawValue : ''}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -81,6 +83,7 @@ function renderFieldControl(
     case 'number': {
       return (
         <TextField
+          size="sm"
           type="number"
           label={field.label}
           // eslint-disable-next-line unicorn/no-null -- a `nullable-number-field-value` a hiányzó számot `null`-ként kezeli, itt "nincs beállítva" jelentéssel.
@@ -105,6 +108,7 @@ function renderFieldControl(
     case 'string-list': {
       return (
         <TextAreaField
+          size="sm"
           label={field.label}
           value={toStringListFieldValue(isStringArray(rawValue) ? rawValue : [])}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -116,6 +120,7 @@ function renderFieldControl(
     case 'select': {
       return (
         <SelectField
+          size="sm"
           label={field.label}
           options={control.options.map((option) => ({ value: option, label: option }))}
           placeholder="nincs megadva"

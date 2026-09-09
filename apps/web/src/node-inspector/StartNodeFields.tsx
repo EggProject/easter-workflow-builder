@@ -38,6 +38,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
       {config.inputFields.map((field, index) => (
         <div key={index} className="node-inspector__list-row">
           <TextField
+            size="sm"
             label="Név"
             value={field.name}
             error={fieldErrors.get(`inputFields.${String(index)}.name`)}
@@ -46,6 +47,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             }}
           />
           <TextField
+            size="sm"
             label="Címke"
             value={field.label}
             error={fieldErrors.get(`inputFields.${String(index)}.label`)}
@@ -54,6 +56,7 @@ export function StartNodeFields(properties: Readonly<StartNodeFieldsProperties>)
             }}
           />
           <TextField
+            size="sm"
             label="Érték típusa"
             value={field.valueKind}
             error={fieldErrors.get(`inputFields.${String(index)}.valueKind`)}

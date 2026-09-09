@@ -121,6 +121,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
   return (
     <>
       <TextAreaField
+        size="sm"
         label="Prompt sablon"
         value={config.promptTemplate}
         error={promptTemplateError}
@@ -136,6 +137,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         }}
       />
       <SelectField
+        size="sm"
         label="Provider felülírás"
         error={providerIdError}
         options={[
@@ -163,6 +165,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <AccordionItem title="Modell és futási korlátok">
           <div className="node-inspector__group">
             <TextField
+              size="sm"
               label="Modell azonosító"
               value={toTextFieldValue(config.modelId)}
               error={modelIdError}
@@ -171,6 +174,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <SelectField
+              size="sm"
               label="Session mód"
               error={sessionModeError}
               options={SessionModeSchema.options.map((option) => ({ value: option, label: option }))}
@@ -183,6 +187,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextField
+              size="sm"
               type="number"
               label="Max. körök száma"
               value={toNumberFieldValue(config.maxTurns)}
@@ -192,6 +197,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextField
+              size="sm"
               type="number"
               label="Max. büdzsé (USD)"
               value={toNumberFieldValue(config.maxBudgetUsd)}
@@ -201,6 +207,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextField
+              size="sm"
               label="Effort"
               value={toTextFieldValue(config.effort)}
               error={effortError}
@@ -209,6 +216,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <SelectField
+              size="sm"
               label="Thinking mód"
               error={thinkingError}
               options={[
@@ -228,6 +236,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextField
+              size="sm"
               label="Jogosultsági mód"
               value={toTextFieldValue(config.permissionMode)}
               error={permissionModeError}
@@ -255,6 +264,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <AccordionItem title="Eszközök és környezet">
           <div className="node-inspector__group">
             <TextAreaField
+              size="sm"
               label="Engedélyezett eszközök"
               value={toStringListFieldValue(config.allowedTools)}
               error={allowedToolsError}
@@ -263,6 +273,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextAreaField
+              size="sm"
               label="Tiltott eszközök"
               value={toStringListFieldValue(config.disallowedTools)}
               error={disallowedToolsError}
@@ -284,6 +295,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextField
+              size="sm"
               label="Munkakönyvtár (cwd)"
               value={toTextFieldValue(config.cwd)}
               error={cwdError}
@@ -292,6 +304,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               }}
             />
             <TextAreaField
+              size="sm"
               label="További engedélyezett könyvtárak"
               value={toStringListFieldValue(config.additionalDirectories)}
               error={additionalDirectoriesError}

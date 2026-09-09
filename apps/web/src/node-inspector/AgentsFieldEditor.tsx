@@ -106,6 +106,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
                 {isExpanded ? 'Összecsukás' : 'Kibontás'}
               </Button>
               <TextField
+                size="sm"
                 aria-label={`"${key}" agent új neve`}
                 value={renameDraft}
                 onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -150,6 +151,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
       })}
       <div className="agents-field-editor__add">
         <TextField
+          size="sm"
           label="Új agent neve"
           value={newAgentName}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {

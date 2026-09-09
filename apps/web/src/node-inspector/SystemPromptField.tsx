@@ -65,6 +65,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
     return (
       <div className="node-inspector__group">
         <SelectField
+          size="sm"
           label="Rendszer prompt módja"
           error={error}
           options={MODE_OPTIONS}
@@ -79,6 +80,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
     return (
       <div className="node-inspector__group">
         <SelectField
+          size="sm"
           label="Rendszer prompt módja"
           error={error}
           options={MODE_OPTIONS}
@@ -86,6 +88,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
           onChange={handleModeChange}
         />
         <TextAreaField
+          size="sm"
           label="Rendszer prompt szövege"
           value={value}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -99,6 +102,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
   return (
     <div className="node-inspector__group">
       <SelectField
+        size="sm"
         label="Rendszer prompt módja"
         error={error}
         options={MODE_OPTIONS}
@@ -106,6 +110,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
         onChange={handleModeChange}
       />
       <TextAreaField
+        size="sm"
         label="Preset kiegészítés (append)"
         value={toTextFieldValue(value.append)}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -113,6 +118,7 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
         }}
       />
       <SelectField
+        size="sm"
         label="Dinamikus szekciók kizárása"
         options={[
           { value: '', label: 'nincs megadva' },

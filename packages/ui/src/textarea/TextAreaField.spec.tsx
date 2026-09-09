@@ -44,6 +44,18 @@ describe('TextAreaField', () => {
     expect(renderedTextArea().classList.contains('input')).toBe(false);
   });
 
+  it('md méretre nem tesz hozzá méret módosítót, sm méretre igen', () => {
+    act(() => {
+      root.render(<TextAreaField label="Forrás" size="md" />);
+    });
+    expect(renderedTextArea().className).toBe('textarea');
+
+    act(() => {
+      root.render(<TextAreaField label="Forrás" size="sm" />);
+    });
+    expect(renderedTextArea().className).toBe('textarea textarea--sm');
+  });
+
   it('a címke a .field burkolóban, a .field__label elemben áll', () => {
     act(() => {
       root.render(<TextAreaField label="Prompt sablon" />);

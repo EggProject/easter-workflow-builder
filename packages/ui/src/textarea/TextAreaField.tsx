@@ -9,7 +9,15 @@ import { useFieldErrorVisibility } from '../field-error-visibility/use-field-err
 import '../text-field/text-field.css';
 import './textarea.css';
 
+export type TextAreaFieldSize = 'sm' | 'md';
+
 export interface TextAreaFieldProperties extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  /**
+   * A design system `.textarea--sm` módosítója, a `TextField`/`SelectField`
+   * `size` propjának pontos párja. A natív `<textarea>`-nak nincs saját
+   * `size` attribútuma, tehát nincs szükség `Omit`-ra.
+   */
+  readonly size?: TextAreaFieldSize;
   /**
    * A mező fölött álló, nagybetűs címke szövege.
    */
@@ -41,11 +49,15 @@ export interface TextAreaFieldProperties extends TextareaHTMLAttributes<HTMLText
  * A hibás állapot osztálya a forrás szerint `.is-error` (nem `--error`,
  * ahogy az `.input` esetében), lásd `textarea.css`.
  *
- * A forrás `--sm`/`--lg`/`--ghost` variánsa propként nincs kivezetve, mert
- * egyetlen képernyő sem igényli.
+ * A forrás `--lg`/`--ghost` variánsa propként nincs kivezetve, mert egyetlen
+ * képernyő sem igényli. A `--sm` viszont IGEN (felhasználói kérés,
+ * 2026-09-09: "slim mode alatt --sm varianst ertettem"): a `size` prop a
+ * `TextField`/`SelectField` mintáját követi, alapértéke `md`, a gráf
+ * szerkesztő node inspectora pedig explicit `size="sm"`-et ad át.
  */
 export function TextAreaField(properties: Readonly<TextAreaFieldProperties>): ReactElement {
   const {
+    size = 'md',
     label,
     error,
     className,
@@ -74,7 +86,7 @@ export function TextAreaField(properties: Readonly<TextAreaFieldProperties>): Re
         {...rest}
         id={resolvedId}
         rows={rows ?? 3}
-        className={joinClassNames('textarea', isErrorVisible && 'is-error', className)}
+        className={joinClassNames('textarea', size === 'sm' && 'textarea--sm', isErrorVisible && 'is-error', className)}
         onBlur={handleBlur}
         aria-invalid={isErrorVisible ? 'true' : ariaInvalid}
         aria-describedby={joinAriaTokenList(ariaDescribedBy, isErrorVisible ? errorId : undefined)}

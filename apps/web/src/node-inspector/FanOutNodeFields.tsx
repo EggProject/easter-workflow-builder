@@ -23,6 +23,7 @@ export function FanOutNodeFields(properties: Readonly<FanOutNodeFieldsProperties
   return (
     <>
       <TextAreaField
+        size="sm"
         label="Elemek kifejezés (itemsExpression)"
         value={config.itemsExpression}
         error={itemsExpressionError}
@@ -31,6 +32,7 @@ export function FanOutNodeFields(properties: Readonly<FanOutNodeFieldsProperties
         }}
       />
       <TextAreaField
+        size="sm"
         label="Ág címke sablon (branchLabelTemplate)"
         value={config.branchLabelTemplate}
         error={branchLabelTemplateError}

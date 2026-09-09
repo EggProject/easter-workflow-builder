@@ -26,6 +26,7 @@ export function SubWorkflowNodeFields(properties: Readonly<SubWorkflowNodeFields
   return (
     <>
       <TextField
+        size="sm"
         label="Célzott workflow azonosítója"
         value={config.targetWorkflowId}
         error={targetWorkflowIdError}
@@ -34,6 +35,7 @@ export function SubWorkflowNodeFields(properties: Readonly<SubWorkflowNodeFields
         }}
       />
       <TextAreaField
+        size="sm"
         label="Bemenet leképezés (soronként kulcs=érték)"
         value={toStringRecordFieldValue(config.inputMapping)}
         error={inputMappingError}

@@ -4,7 +4,15 @@ import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import { useFieldErrorVisibility } from '../field-error-visibility/use-field-error-visibility.ts';
 import './text-field.css';
 
-export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElement> {
+export type TextFieldSize = 'sm' | 'md';
+
+export interface TextFieldProperties extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
+  /**
+   * A design system `.input--sm` módosítója, a `SelectField` `size`
+   * propjának pontos párja. A natív `<input>` saját, szám értékű `size`
+   * attribútuma emiatt nem elérhető ezen a komponensen.
+   */
+  readonly size?: TextFieldSize;
   /**
    * A mező fölött álló, nagybetűs címke szövege.
    */
@@ -40,9 +48,14 @@ export interface TextFieldProperties extends InputHTMLAttributes<HTMLInputElemen
  * a `useFieldErrorVisibility` szabályán: érintett (`blur`) VAGY már
  * megkísérelt űrlap beküldés. A hívó saját `onBlur` kezelője megmarad, a
  * komponens csak elé fűzi az érintettség jelölését.
+ *
+ * A `size` alapértéke `md`, a `SelectField` mintáját követve: a modálison
+ * kívüli, sűrű felületek (pl. a gráf szerkesztő node inspectora) explicit
+ * `size="sm"`-et adnak át, a modálisok pedig változatlanul hagyják.
  */
 export function TextField(properties: Readonly<TextFieldProperties>): ReactElement {
   const {
+    size = 'md',
     label,
     error,
     icon,
@@ -67,7 +80,12 @@ export function TextField(properties: Readonly<TextFieldProperties>): ReactEleme
 
   const inputElement = (
     <input
-      className={joinClassNames('input', isErrorVisible && 'input--error', inputClassName)}
+      className={joinClassNames(
+        'input',
+        size === 'sm' && 'input--sm',
+        isErrorVisible && 'input--error',
+        inputClassName,
+      )}
       {...rest}
       id={resolvedId}
       onBlur={handleBlur}

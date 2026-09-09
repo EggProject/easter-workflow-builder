@@ -28,6 +28,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
   return (
     <>
       <TextField
+        size="sm"
         type="number"
         label="Max. próbálkozások száma"
         value={String(config.maxAttempts)}
@@ -37,6 +38,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
         }}
       />
       <TextAreaField
+        size="sm"
         label="Várakozás próbálkozásonként, ms (soronként egy szám)"
         value={toNumberListFieldValue(config.backoffMs)}
         error={backoffMsError}
@@ -45,6 +47,7 @@ export function ErrorHandlerNodeFields(properties: Readonly<ErrorHandlerNodeFiel
         }}
       />
       <TextAreaField
+        size="sm"
         label="Kezelt hibafajták (soronként egy)"
         value={toStringListFieldValue(config.handledErrorKinds)}
         error={handledErrorKindsError}
