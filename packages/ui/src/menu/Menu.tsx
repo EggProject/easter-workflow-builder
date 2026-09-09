@@ -131,7 +131,9 @@ function isInsideMenu(
  * ezért a nyers jobbra igazítás keskeny viewporton (mérve: 320px) a panelt
  * a viewport BAL szélén túlra tolta. A `compute-panel-position.ts` ezért
  * mindig a viewporton belülre szorítja az eredményt - lásd ott a
- * dokumentációt és a mért esetet reprodukáló tesztet.
+ * dokumentációt és a mért esetet reprodukáló tesztet. Ugyanez a modul
+ * dönt a FÜGGŐLEGES irányról is: ha a trigger a viewport aljához közel ül
+ * (pl. a szerkesztő ragadós láblécében), a panel felfelé nyílik.
  *
  * MARADÉK KORLÁT. A pozíció csak NYITÁSKOR számolódik: ha a trigger körüli
  * görgethető ős (pl. a táblázat törzse) a menü NYITOTT állapotában
@@ -147,7 +149,7 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
   const { trigger, align = 'left', children } = properties;
 
   const [open, setOpen] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<PanelPosition>({ top: 0, left: 0 });
+  const [panelPosition, setPanelPosition] = useState<PanelPosition>({ top: 0, bottom: undefined, left: 0 });
   const anchorReference = useRef<HTMLSpanElement | null>(null);
   const panelReference = useRef<HTMLDivElement | null>(null);
   const triggerReference = useRef<HTMLButtonElement | null>(null);
@@ -234,7 +236,14 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
 
   function openMenu(triggerElement: HTMLButtonElement, intent: 'first' | 'last'): void {
     openIntentReference.current = intent;
-    setPanelPosition(computePanelPosition(triggerElement.getBoundingClientRect(), align, globalThis.innerWidth));
+    setPanelPosition(
+      computePanelPosition(
+        triggerElement.getBoundingClientRect(),
+        align,
+        globalThis.innerWidth,
+        globalThis.innerHeight,
+      ),
+    );
     setOpen(true);
   }
 
@@ -314,7 +323,7 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
           aria-labelledby={triggerId}
           tabIndex={-1}
           hidden={!open}
-          style={{ top: panelPosition.top, left: panelPosition.left }}
+          style={{ top: panelPosition.top, bottom: panelPosition.bottom, left: panelPosition.left }}
           onKeyDown={handlePanelKeyDown}
           onBlur={handleFocusOut}
         >

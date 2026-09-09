@@ -269,7 +269,14 @@ test('a React Flow vezérlő gombjai a design system tokenjeire vannak témázva
 });
 
 test('a beállítás panel önállóan görget, és nem vágódik le a viewport alján', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // A viewport magassága szándékosan 700px, nem a fájl többi tesztjének
+  // 900px-e: a node inspector mezői 2026-09-09 óta `size="sm"`-ek (fix(web,ui):
+  // a slim mode a design system --sm variánsát jelenti), ez a panel
+  // tartalmának magasságát 900px-es viewporton pontosan a rendelkezésre álló
+  // hellyel egyenlővé csökkentette (mérve: scrollHeight === clientHeight),
+  // tehát a görgetés a régi méreten már nem volt tesztelhető. 700px-en mérve
+  // ismét van mit görgetni.
+  await page.setViewportSize({ width: 1440, height: 700 });
   await page.goto(EDITOR_URL);
 
   // Az `agent_step` a legtöbb mezőt hordozó típus, tehát a panel tartalma

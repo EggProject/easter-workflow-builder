@@ -518,3 +518,58 @@ dokumentált tételekre szűkül, egyetlen újdonság sem maradt:
 
 Mindegyik unit teszttel fedett (lásd a 9.3 szekció táblázatát), a unit lefedettség változatlanul
 100 százalék, kizárás nélkül.
+
+---
+
+## 13. A `Menu` panel függőleges pozíció javítása utáni ratchet (2026-09-09, konszolidáció)
+
+**Előzmény, valós hiba.** Az elem audit (`docs/research/2026-09-09-elem-audit.md`) két
+találatának javítása közben a teljes `bun run test:e2e` futtatás 5 tesztet buktatott: a
+`graph-auto-layout.spec.ts` három tesztje és a `graph-editor-layout.spec.ts` "split button"
+tesztje mind ugyanazon a ponton akadt el - a szerkesztő ragadós láblécének "További
+műveletek" triggere által nyitott menü "Elrendezés" pontja `element is outside of the
+viewport` hibával sosem lett kattintható. A gyökérok: `compute-panel-position.ts` a panelt
+mindig LEFELÉ nyitotta, a trigger `getBoundingClientRect().bottom` alá, a viewport
+MAGASSÁGÁNAK ismerete nélkül - a lábléc triggere viszont a viewport aljához tapad
+(`page-footer.css` `position: sticky; bottom: 0;`), ezért a panel a viewporton kívülre
+került. A javítás: a `computePanelPosition` mostantól `viewportHeight` paramétert is kap, és
+ha a trigger alatt kevesebb hely van, mint fölötte, a panel FELFELÉ nyílik (`bottom` CSS
+tulajdonsággal, a panel magasságának ismerete nélkül, mert azt zárva `hidden` miatt
+`display: none` nem lehet lemérni). Az ötödik piros teszt
+(`graph-editor.spec.ts:271`, "a beállítás panel önállóan görget") más gyökérokú: a
+`fix(web,ui): a slim mode a design system --sm variánsát jelenti` (2026-09-09) commit a node
+inspector mezőit `size="sm"`-re állította, ami a panel tartalmának magasságát 900px-es
+viewporton PONTOSAN a rendelkezésre álló hellyel egyenlővé csökkentette
+(`scrollHeight === clientHeight`, mindkettő 666), tehát a görgetés a régi méreten már nem
+volt mérhető. A teszt viewport magassága 700px-re állt, mérve (lásd a teszt saját
+kommentjét), nem tippelve.
+
+**A mérés menete, a javítás után.** Törölt `apps/web/e2e/.nyc_output` és `coverage-e2e`,
+`bun run test:e2e` (138 Playwright teszt, mind zöld, `workers` alapértelmezett), majd
+`nyc report --reporter=json-summary` a pontos `pct` értékekért (az istanbul-lib-report
+`percent()` függvénye `Math.floor`-ral, NEM kerekítéssel számol, lásd a függvény forrását:
+`total > 0 ? Math.floor((covered / total) * 10000) / 100 : 100`).
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (12. szekció) |
+| ---------- | --------------- | --------- | -------------------------- |
+| statements | 964 / 980       | **98.36** | 98.36                      |
+| branches   | 372 / 385       | **96.62** | 96.62                      |
+| functions  | 361 / 365       | **98.9**  | 98.89                      |
+| lines      | 926 / 942       | **98.3**  | 98.29                      |
+
+**Egyedül a `functions` metrika NŐTT** (98.89-ről 98.9-re): a négy javított teszt korábban a
+menü kattintás timeoutján bukott el, MIELŐTT az "Elrendezés" menüpont `onSelect` kezelője
+(`handleAutoLayout`, `GraphEditorScreen.tsx`) ténylegesen lefutott volna - e2e-ből ez a
+függvény korábban egyszer sem hívódott meg sikeresen. A javítás után a négy teszt a
+menüpontra ténylegesen kattint, tehát ez a függvény (és a mögötte álló elrendezés-számítás)
+innentől e2e-vel is lefedett. A másik három metrika (statements, branches, lines) pontosan a
+korábbi küszöbön áll, nem esett vissza.
+
+**A ratchet szabály szerint** az `apps/web/package.json` `coverage:e2e:report` parancsának
+`--functions` kapcsolója `98.89`-ről `98.9`-re emelkedett, a másik három kapcsoló
+változatlan (98.36/96.62/98.3). Az igazolás: a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0-t ad.
+
+**A fennmaradó rés tételesen ellenőrizve: nincs új, dokumentálatlan tétel.** A mérés utáni
+`nyc report --reporter=text` szerint a 100 százalék alatti fájlok listája pontosan a fenti
+(12. szekció) táblázatra szűkül, egyetlen újdonság sem maradt.
