@@ -273,6 +273,27 @@ describe('NodeInspector', () => {
     expect(closeButton?.querySelector('svg')).not.toBeNull();
   });
 
+  it('a bezárás gomb NEM primary variánsú - a bezárás nem elsődleges művelet', () => {
+    const startNode = NODES_BY_TYPE[0]?.node;
+    if (startNode === undefined) {
+      throw new Error('a teszt nem talált start node fixture-t');
+    }
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
+      );
+    });
+    const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
+    expect(closeButton?.className).toContain('btn--ghost');
+    expect(closeButton?.className).not.toContain('btn--primary');
+  });
+
   it('a panel MINDEN gombja sm méretű', () => {
     const agentNode = NODES_BY_TYPE[1]?.node;
     if (agentNode === undefined) {
