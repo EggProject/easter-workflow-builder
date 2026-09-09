@@ -57,6 +57,7 @@
     "test": "vitest run --coverage",
     "test:e2e": "turbo run test:e2e",
     "coverage:e2e:report": "bash tooling/scripts/e2e-coverage.sh",
+    "screenshots": "cd apps/web && bun run screenshots",
     "dev": "turbo run dev"
   },
   "devDependencies": {
