@@ -169,7 +169,7 @@ a felsőáramú hiba kategória, mint a `drizzle-orm` a `packages/engine`-ben (`
 
 **Képernyőkép készítés: `bun run screenshots`.** Ez az EGYETLEN út, és a repóban él, nem
 munkamenetenként újraírt eldobható scriptben. A gráf fixtúrája az `e2e/showcase-graph.ts`
-(kilenc éllel, minden csomópont bekötve), a képek kimenete alapból az `apps/web/screenshots/`
+(tizenegy éllel, minden csomópont bekötve), a képek kimenete alapból az `apps/web/screenshots/`
 mappa, felülírható az `EASTER_SCREENSHOT_DIR` környezeti változóval. A parancs a panel megnyitása
 UTÁN nyomja meg a React Flow "Fit View" gombját, mert a `fitView` prop csak a kezdeti nézetre szól.
 A fixtúra alakját és minden élének kifestett vonalát az `e2e/showcase-graph.spec.ts` regressziós
