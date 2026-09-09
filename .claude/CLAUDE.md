@@ -667,6 +667,42 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   hatása. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk (gyökér `CLAUDE.md`,
   research V-19).
 
+**Képernyőkép és vizuális bizonyíték**
+
+- **A repón kívül élő képernyőkép készítő script háromszor adott hamis bizonyítékot.** A script
+  `/tmp/shots/` alatt élt, minden munkamenet újraírta, és kétszer ÜRES `edges` tömböt, egyszer
+  pedig két csomópontra szűkített gráfot adott a `readWorkflowGraph` mockon. Ahol nincs él, ott
+  nincs mit kirajzolni: a szállított képekről hiányoztak a vonalak, a felhasználó jogosan hitte,
+  hogy a termék romlott el, és a végrehajtó agent mindháromszor késznek jelentette. A termékkód
+  végig hibátlan volt, bisecttel és pixel méréssel igazolva. **A tanulság általános: minden
+  bizonyíték előállító eszköz a repóba tartozik, verziókövetve, mert amit munkamenetenként újra
+  kell írni, azt munkamenetenként újra el is lehet rontani.** Védelem: a fixtúra
+  (`apps/web/e2e/showcase-graph.ts`), a képernyőkép készítés
+  (`apps/web/e2e/capture-screenshots.ts`) és a `bun run screenshots` parancs a repóban van, a
+  fixtúra alakját (legalább öt él, minden csomópont bekötve) és minden élének kifestett vonalát
+  pedig az `apps/web/e2e/showcase-graph.spec.ts` regressziós teszt őrzi a `test:e2e` kapun
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció).
+- **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
+  keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
+  adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
+  nyomja meg a React Flow saját "Fit View" vezérlő gombját, és a záró állítása mérhető: nulla
+  csomópont lóg ki a vászon befoglaló dobozából (`showcase-graph.ts`, `countNodesOutsideCanvas`).
+- **A React Flow `minZoom` alapértelmezése 0.5, ezért a fixtúra szélessége felső korlátos.** Egy
+  1440x900-as ablakban, nyitott panel mellett a vászon 1013 pixel széles, tehát 1842 pixelnél
+  szélesebb gráfot a `fitView` már nem tud beilleszteni: a `minZoom`-on megáll. A bemutató fixtúra
+  emiatt négy oszlop széles (1582 pixel). Számítás és mérés:
+  `docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció.
+- **A kifestett vonal pixel mérése mérési szondát igényel, ha a kivágat nagyobb egy tenyérnyi üres
+  területnél.** A React Flow háttér pontmintáját és a csomópont kártyák árnyékát a HÁTTÉRSZÍNNEL
+  festő (tehát hibás) él is eltakarja, tehát az elrejtésekor újra előbukkannak, és ez önmagában
+  eltérést ad: mérve a hibás állapot 25-ig felment, miközben az ép állapot 16-ról indult, azaz a
+  két tartomány átfedett és a mérés nem döntött. A szonda mindkét képernyőképen eltünteti a nem
+  egyenletes hátteret (a pontmintát `display: none`, a kártyákat és a paneleket
+  `visibility: hidden` alá); ezzel a hibás állapot 3-ig, az ép 15-től felfelé megy, és a küszöb
+  mért szám lehet. `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
+  elmozdíthatná az éleket a két felvétel között
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
+
 **Adatbázis és Drizzle**
 
 - **A `JSON.stringify` kulcssorrend.** Az egész indexű kulcsokat (`"9"`, `"10"`) mindig növekvő
