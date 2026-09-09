@@ -33,6 +33,7 @@ const VENDORED_PREFIXES = ['packages/ui/src/design-token/', 'packages/ui/src/sel
 const VENDORED_FILES = new Set([
   'packages/ui/src/topnav-shell/topnav-shell.css',
   'packages/ui/src/button/button.css',
+  'packages/ui/src/button-group/button-group.css',
   'packages/ui/src/badge/badge.css',
   'packages/ui/src/card/card.css',
   'packages/ui/src/skeleton/skeleton.css',

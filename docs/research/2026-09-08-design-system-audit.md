@@ -2,7 +2,7 @@
 
 **Dátum:** 2026-09-08
 **Ág:** `feat/spec-008-grafszerkeszto` (HEAD `143f484`)
-**Kiváltó ok:** felhasználói visszajelzés — "csak olyan elemet hasznalhatsz amit tartalmazz [a design
+**Kiváltó ok:** felhasználói visszajelzés, amely szerint "csak olyan elemet hasznalhatsz amit tartalmazz [a design
 skill], ha valami hianyzik jelezned kell! kepeken latszik hogy inputokra sem jot hasznaltal vagy a
 css nagyon nincs rendben". Ez felderítés és ellenőrzés, kódot nem módosít.
 **Vizsgált fájlok:** `.claude/skills/eggproject-design*` (mind a négy skill), `packages/ui/src/`,
@@ -20,7 +20,7 @@ hittem el.
 ## 1. A design system teljes komponens leltára
 
 A négy skill közül az `eggproject-design-components` tartalmazza az egyedi komponenseket. A
-`components/` alatt **52 komponens mappa** van — ez a felderítésben említett szám, saját
+`components/` alatt **52 komponens mappa** van, ami a felderítésben említett szám, saját
 `find`/`ls` számlálással megerősítve, nem emlékezetből:
 
 ```
@@ -33,37 +33,37 @@ textarea, toast, toggle, tooltip
 ```
 
 A `references/component-catalog.md` saját szóhasználata szerint ez "32 eredeti + 20 shadcn parity
-kiegészítés" (a fájl 396. sora: "shadcn parity additions (20 components)"), összesen 52 — a két
+kiegészítés" (a fájl 396. sora: "shadcn parity additions (20 components)"), összesen 52. A két
 szám (könyvtárszámlálás és a katalógus própzája) egyezik.
 
 A másik három skill nem önálló komponens, hanem sablon/keret:
 
-| Skill                                                        | Mit ad                                                                                                                                                                                           | Releváns fájlok                                                        |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `eggproject-design`                                          | tokenek (szín, típus, spacing, radius, elevation, motion, **breakpoints**), betűtípus, logó                                                                                                      | `tokens/*.css`, `colors_and_type.css`, `references/token-reference.md` |
-| `eggproject-design-app-common`                               | **öt** oldalkeret (`_shell.css`): sidebar, topnav, marketing, docs, focus                                                                                                                        | `_shell.css`, `skeletons/shell-*.html`                                 |
-| `eggproject-design-admin-app-examples` / `-web-app-examples` | teljes, összeépített példaoldalak (analytics, billing, settings, signin, pricing, ...) — ezek NEM önálló, újrafelhasználható komponensek, hanem a fenti komponensekből összerakott minta-oldalak | `examples/*.html`, `examples/*.jsx`                                    |
+| Skill                                                        | Mit ad                                                                                                                                                                                             | Releváns fájlok                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `eggproject-design`                                          | tokenek (szín, típus, spacing, radius, elevation, motion, **breakpoints**), betűtípus, logó                                                                                                        | `tokens/*.css`, `colors_and_type.css`, `references/token-reference.md` |
+| `eggproject-design-app-common`                               | **öt** oldalkeret (`_shell.css`): sidebar, topnav, marketing, docs, focus                                                                                                                          | `_shell.css`, `skeletons/shell-*.html`                                 |
+| `eggproject-design-admin-app-examples` / `-web-app-examples` | teljes, összeépített példaoldalak (analytics, billing, settings, signin, pricing, ...), amelyek NEM önálló, újrafelhasználható komponensek, hanem a fenti komponensekből összerakott minta-oldalak | `examples/*.html`, `examples/*.jsx`                                    |
 
 ---
 
 ## 2. A projekt frontend komponens leltára
 
-### 2.1 `packages/ui/src/` — a design system átemelt témái
+### 2.1 A design system átemelt témái a `packages/ui/src/` mappában
 
 | Téma mappa          | Forrás komponens                                                                        | Hatókör a forráshoz képest                                                                |
 | ------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `button`            | `button/button.css`                                                                     | **teljes**, bájtra azonos (lásd 3. szekció)                                               |
-| `badge`             | `badge/badge.css`                                                                       | részleges — a `.chip` család kimaradt                                                     |
+| `badge`             | `badge/badge.css`                                                                       | részleges, mert a `.chip` család kimaradt                                                 |
 | `card`              | `card/card.css`                                                                         | **teljes**, bájtra azonos                                                                 |
 | `breadcrumb`        | `breadcrumb/breadcrumb.css`                                                             | részleges + dokumentált kiegészítés (`<ol>/<li>` szemantika)                              |
 | `modal`             | `modal/modal.css`                                                                       | **teljes**, bájtra azonos                                                                 |
-| `tab`               | `tabs/tabs.css`                                                                         | részleges — csak `UnderlineTabs`, Segmented/Pills kimaradt                                |
+| `tab`               | `tabs/tabs.css`                                                                         | részleges, mert csak `UnderlineTabs` maradt meg, a Segmented/Pills kimaradt               |
 | `toast`             | `toast/toast.css`                                                                       | **teljes**, bájtra azonos                                                                 |
-| `loading-indicator` | `loading/loading.css`                                                                   | részleges — csak `ProgressBar`, indeterminate/LogoSpinner kimaradt                        |
-| `skeleton`          | `skeleton/skeleton.css`                                                                 | részleges — `.skel-list*` (SkeletonList) kimaradt                                         |
+| `loading-indicator` | `loading/loading.css`                                                                   | részleges, mert csak `ProgressBar` maradt meg, az indeterminate/LogoSpinner kimaradt      |
+| `skeleton`          | `skeleton/skeleton.css`                                                                 | részleges, mert a `.skel-list*` (SkeletonList) kimaradt                                   |
 | `text-field`        | `input/input.css`                                                                       | részleges + 1 dokumentált hozzáadott sor (`box-sizing`)                                   |
-| `select-field`      | `select/select.css`                                                                     | részleges — csak natív `<select>` retrofit, Combobox kimaradt                             |
-| `form-control`      | `form-controls/form-controls.css`                                                       | részleges — csak Checkbox, Radio/Switch/ctrl-card kimaradt                                |
+| `select-field`      | `select/select.css`                                                                     | részleges, mert csak a natív `<select>` retrofit maradt meg, a Combobox kimaradt          |
+| `form-control`      | `form-controls/form-controls.css`                                                       | részleges, mert csak a Checkbox maradt meg, a Radio/Switch/ctrl-card kimaradt             |
 | `data-table`        | `data-table/datatable.css`                                                              | részleges + dokumentált mobil-specifikus kiegészítés                                      |
 | `menu`              | `menu/menu.css`                                                                         | részleges + dokumentált pozícionálási eltérés (`fixed` + portál)                          |
 | `resizable`         | `resizable/resizable.css`                                                               | **teljes**, bájtra azonos                                                                 |
@@ -73,11 +73,11 @@ A másik három skill nem önálló komponens, hanem sablon/keret:
 Minden sor forrása a saját CSS fájl fejlécének "Forrás: ..." komментje, amit a 3. szekcióban
 ténylegesen `diff`-eltem a skill fájljával.
 
-### 2.2 `apps/web/src/` — saját gyártmány (nincs a design systemben)
+### 2.2 Saját gyártmány az `apps/web/src/` mappában (nincs a design systemben)
 
 | Téma                           | Mit csinál                                          | Van-e design system megfelelő                                                                                                                                                            |
 | ------------------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graph-editor`                 | a React Flow vászon kerete, elrendezés              | nincs — a React Flow saját komponens, a design system nem ismeri                                                                                                                         |
+| `graph-editor`                 | a React Flow vászon kerete, elrendezés              | nincs, mert a React Flow saját komponens, amit a design system nem ismer                                                                                                                 |
 | `graph-node-card`              | a vászon egyedi node-doboza                         | nincs önálló "graph node" komponens a design systemben; a `.graph-node-card` CSS-e a `.card` mintáját követi (border+radius+bg-elevated+shadow), de **nem** a `.card` osztályt használja |
 | `node-inspector`               | a jobb oldali beállítás sáv, mezőnkénti szerkesztők | a `.field`/`.input`/`.select` osztályokra épül (`text-field`, `select-field` téma), de a `.inspector-section` doboz **saját, nem design system osztály** (lásd 5. és 7. szekció)         |
 | `workflow-list`, `run-history` | listaképernyők                                      | a design system komponenseire épülnek (`data-table`, `modal`, `badge`, `Button`)                                                                                                         |
@@ -85,24 +85,24 @@ ténylegesen `diff`-eltem a skill fájljával.
 
 ---
 
-## 3. Eltérések tételesen — bájtra egyeznek-e a source-szal
+## 3. Tételes eltérések, annak vizsgálatával, hogy bájtra egyeznek-e a source-szal
 
 Minden `packages/ui/src/**/*.css` fájlt szó szerint összevetettem a megfelelő
 `eggproject-design-components` / `eggproject-design-app-common` forrásfájllal (`diff`, a
 projekt saját fejléc-kommentjének kihagyásával). Eredmény: **minden egyes eltérés dokumentálva
 van a fájl tetején**, egy indoklással. Nem találtam egyetlen néma (dokumentálatlan) eltérést sem.
 
-| Fájl                                                                                                  | Eltérés a forrástól                                                                                                                                                     | Indokolt-e                                                                                                                                                                                      |
-| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `text-field/text-field.css`                                                                           | +1 sor: `.input { box-sizing: border-box; }`                                                                                                                            | **igen** — a fájl saját kommentje szerint mért hiba javítása: a projekt nem emeli át a forrás univerzális `* { box-sizing: border-box }` resetjét, enélkül a mező 30px-szel túlnyúlt a szülőjén |
-| `select-field/select-field.css`                                                                       | +1 szabály: `.select--error { border-color: var(--ep-danger); }`; a Combobox szakasz és a `menu.css` import kihagyva                                                    | **igen** — a forrás Select komponense nem ismer hibaüzenetet, a `SelectField` viszont a `TextField` hibamintáját veszi át; a Combobox nincs használva                                           |
-| `form-control/form-control.css`                                                                       | csak Checkbox marad, Radio/Switch/ctrl-card kihagyva                                                                                                                    | **igen** — SPEC-007 6.1 szerint a felület egyedül a törlés megerősítő jelölőnégyzetét használja                                                                                                 |
-| `tab/tab.css`                                                                                         | csak `.tabs` (UnderlineTabs) marad, `.seg`/`.pills` kihagyva                                                                                                            | **igen** — a felület a futás előzmények fülezésére csak a tablist változatot használja                                                                                                          |
-| `select-field`, `loading-indicator`, `skeleton`, `badge`, `breadcrumb`, `data-table`                  | további részleges kihagyások                                                                                                                                            | **igen**, minden esetben a fel nem használt al-komponensre hivatkozva                                                                                                                           |
-| `menu/menu.css`                                                                                       | a `.menu` pozíciója `position: fixed` + portál, a forrásban relatív/abszolút                                                                                            | **igen** — mért hiba: a táblázat sor műveletek triggere egy görgethető törzsben ül, a relatív pozíciós panel levágódott volna                                                                   |
-| `breadcrumb/breadcrumb.css`                                                                           | `.breadcrumb__list`/`.breadcrumb__listItem` új osztály, `<ol>/<li>` szemantikával                                                                                       | **igen** — a11y-indok, a forrás JSX-e nem `<ol>/<li>` szerkezetű                                                                                                                                |
-| `topnav-shell/topnav-shell.css`                                                                       | 8 különálló, dokumentált "ÚJ blokk" (faltól falig felülírás, magasságkitöltés, alsó légtér, page-head térköz, reszponzív navigáció, hamburger gomb, márkanév csonkolás) | **igen**, mindegyik mért hibára vagy felhasználói kérésre hivatkozik                                                                                                                            |
-| `button/button.css`, `card/card.css`, `modal/modal.css`, `toast/toast.css`, `resizable/resizable.css` | **nincs eltérés** — bájtra azonos (az `@import` sor kivételével, ami a globálisan betöltött tokenek miatt marad ki mindenhol)                                           | —                                                                                                                                                                                               |
+| Fájl                                                                                                  | Eltérés a forrástól                                                                                                                                                     | Indokolt-e                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text-field/text-field.css`                                                                           | +1 sor: `.input { box-sizing: border-box; }`                                                                                                                            | **igen**, mert a fájl saját kommentje szerint mért hiba javítása: a projekt nem emeli át a forrás univerzális `* { box-sizing: border-box }` resetjét, enélkül a mező 30px-szel túlnyúlt a szülőjén |
+| `select-field/select-field.css`                                                                       | +1 szabály: `.select--error { border-color: var(--ep-danger); }`; a Combobox szakasz és a `menu.css` import kihagyva                                                    | **igen**, mert a forrás Select komponense nem ismer hibaüzenetet, a `SelectField` viszont a `TextField` hibamintáját veszi át; a Combobox nincs használva                                           |
+| `form-control/form-control.css`                                                                       | csak Checkbox marad, Radio/Switch/ctrl-card kihagyva                                                                                                                    | **igen**, mert a SPEC-007 6.1 szerint a felület egyedül a törlés megerősítő jelölőnégyzetét használja                                                                                               |
+| `tab/tab.css`                                                                                         | csak `.tabs` (UnderlineTabs) marad, `.seg`/`.pills` kihagyva                                                                                                            | **igen**, mert a felület a futás előzmények fülezésére csak a tablist változatot használja                                                                                                          |
+| `select-field`, `loading-indicator`, `skeleton`, `badge`, `breadcrumb`, `data-table`                  | további részleges kihagyások                                                                                                                                            | **igen**, minden esetben a fel nem használt al-komponensre hivatkozva                                                                                                                               |
+| `menu/menu.css`                                                                                       | a `.menu` pozíciója `position: fixed` + portál, a forrásban relatív/abszolút                                                                                            | **igen**, ugyanis mért hiba állt fenn: a táblázat sor műveletek triggere egy görgethető törzsben ül, a relatív pozíciós panel levágódott volna                                                      |
+| `breadcrumb/breadcrumb.css`                                                                           | `.breadcrumb__list`/`.breadcrumb__listItem` új osztály, `<ol>/<li>` szemantikával                                                                                       | **igen**, a11y okból, mert a forrás JSX-e nem `<ol>/<li>` szerkezetű                                                                                                                                |
+| `topnav-shell/topnav-shell.css`                                                                       | 8 különálló, dokumentált "ÚJ blokk" (faltól falig felülírás, magasságkitöltés, alsó légtér, page-head térköz, reszponzív navigáció, hamburger gomb, márkanév csonkolás) | **igen**, mindegyik mért hibára vagy felhasználói kérésre hivatkozik                                                                                                                                |
+| `button/button.css`, `card/card.css`, `modal/modal.css`, `toast/toast.css`, `resizable/resizable.css` | **nincs eltérés**, mert bájtra azonos (az `@import` sor kivételével, ami a globálisan betöltött tokenek miatt marad ki mindenhol)                                       | nem releváns                                                                                                                                                                                        |
 
 **Összefoglaló verdikt a 3. szekcióra:** a `packages/ui` szinten **nincs "elsodródott", indokolatlan
 CSS eltérés**. Minden sor, ami nem egyezik a forrással, saját kommentben meg van indokolva, a
@@ -112,14 +112,14 @@ projekt szabálykönyve (`.claude/CLAUDE.md` 5. szekció "Csak azt írod át, am
 
 ## 4. Az input mezők részletes összevetése
 
-### 4.1 `text-field` (`<input>`) — RENDBEN
+### 4.1 A `text-field` (`<input>`) mező RENDBEN van
 
 `packages/ui/src/text-field/text-field.css` a `TextField.tsx`-szel együtt pontosan a design
 system `.field`/`.input`/`.field__label`/`.field__error` mintáját adja, natív `<input>`-ra építve
 (`TextField.tsx` `<input className={joinClassNames('input', hasError && 'input--error', ...)}>`).
 Ez a helyes, dokumentált átemelés.
 
-### 4.2 `select-field` (`<select>`) — RENDBEN
+### 4.2 A `select-field` (`<select>`) mező RENDBEN van
 
 `SelectField.tsx` natív `<select class="select">` elemet ad ki, ami **pontosan az a változat, amit
 maga a forrás CSS megnevez és támogat** ("Native `<select>` shares the .select shell", lásd a
@@ -127,11 +127,11 @@ maga a forrás CSS megnevez és támogat** ("Native `<select>` shares the .selec
 ezt explicit ki is mondja: a forrás `Select.jsx` egyedi listbox változatát (button trigger + `.menu`
 panel) tudatosan nem választották, mert az a hatókörön kívüli `Menu` komponens CSS-ét igényelné.
 
-### 4.3 `form-control` (jelölőnégyzet) — RENDBEN
+### 4.3 A `form-control` (jelölőnégyzet) RENDBEN van
 
 Csak a Checkbox alrészt emeli át, dokumentáltan (lásd 3. szekció).
 
-### 4.4 A többsoros mezők — **NEM design system elemet használnak**
+### 4.4 A többsoros mezők **NEM design system elemet használnak**
 
 Ez a súlyos találat. A design systemben **létezik egy önálló, kész `textarea` komponens**
 (`eggproject-design-components/components/textarea/textarea.css`), saját `.textarea` osztállyal,
@@ -157,7 +157,7 @@ osztályát** (az egysoros mező stílusát) alkalmazza egy `<textarea>` elemre:
 A fájl saját kommentje (16-23. sor) beismeri, hogy ez nem a design system bővítése: _"A
 `packages/ui` csomagnak nincs saját textarea komponense ... Ez a `node-inspector` téma saját,
 egyedi fogyasztóra szabott mezője, nem a design system bővítése"_. Ez az állítás **csak a
-`packages/ui`-ra igaz** — a tényleges forrás design systemben (`eggproject-design-components`)
+`packages/ui`-ra igaz**, hiszen a tényleges forrás design systemben (`eggproject-design-components`)
 VAN dedikált `textarea` komponens, csak azt soha nem emelték át. A `.node-inspector` saját CSS-e
 ezt tovább toldozza (`node-inspector.css` 158-160. sor: `.node-inspector textarea.input { resize:
 vertical; }`), mert az `.input` osztálynak nincs a design systemben `min-height`je vagy natív
@@ -169,22 +169,22 @@ többsoros geometriája.
 `JsonTextAreaField.tsx`, `LoopNodeFields.tsx`, `JoinNodeFields.tsx`, `ScriptNodeFields.tsx`,
 `AgentStepConfigFields.tsx`, `NodeInspector.tsx`, `HumanApprovalNodeFields.tsx`,
 `StructuredOutputField.tsx`, `FanOutNodeFields.tsx`, `SubWorkflowNodeFields.tsx`,
-`SandboxField.tsx` — vagyis **minden** többsoros mező a node inspectorban (prompt sablon, JSON
+`SandboxField.tsx`, vagyis **minden** többsoros mező a node inspectorban (prompt sablon, JSON
 szerkesztő, szkript törzs, stb.) ezt a nem design system elemet használja. Ez a felhasználó
 gyanújának pontos megerősítése: az inputokra valóban nem a helyes elemet használták, mert a
 helyes elem (`.textarea`) létezik a design systemben, csak sosem lett bevezetve.
 
-### 4.5 A szám mező natív spinnere — nem stílusozott, de ez a design system saját hiánya is
+### 4.5 A szám mező natív spinnere nem stílusozott, de ez a design system saját hiánya is
 
 A "Max. próbálkozások száma" mező (`ErrorHandlerNodeFields.tsx:28-36`) egy natív
 `<input type="number">` a `TextField`-en keresztül. A `TextField.tsx` a `type` propot változtatás
 nélkül továbbadja (`{...rest}` a natív `<input>`-ra, 36-57. sor), különleges kezelés nélkül.
 Sem a projekt `text-field.css`-e, sem az **eredeti forrás** `input.css`-e nem tartalmaz
-`::-webkit-inner-spin-button`/`::-webkit-outer-spin-button`/`appearance: textfield` szabályt —
-grep-pel ellenőrizve, nulla találat mindkét fában (`apps/web/src`, `packages/ui/src`). A mellékelt
+`::-webkit-inner-spin-button`/`::-webkit-outer-spin-button`/`appearance: textfield` szabályt, amit
+grep-pel ellenőriztem, nulla találat mindkét fában (`apps/web/src`, `packages/ui/src`). A mellékelt
 `editor-node-inspector-error.png` képen látható, natívan kirajzolt fel/le nyilas doboz emiatt
 **nem projekt-specifikus eltérés a forrástól**, hanem a design system `Input` komponensének saját,
-dokumentálatlan hiánya `type="number"` esetére — a forrás `input.html` demója sem mutat be
+dokumentálatlan hiánya `type="number"` esetére, mert a forrás `input.html` demója sem mutat be
 `type="number"` mezőt.
 
 ### 4.6 Összefoglaló verdikt az input mezőkre
@@ -201,7 +201,7 @@ dokumentálatlan hiánya `type="number"` esetére — a forrás `input.html` dem
 
 ## 5. A most kért öt elem verdiktje
 
-### 5.1 Split button / button group — **LÉTEZIK**
+### 5.1 A split button / button group komponens **LÉTEZIK**
 
 `eggproject-design-components/components/button-group/button-group.css` + `.html`. Osztály:
 `.button-group` (`.button-group--vertical` a függőleges variáns). A demo fájl kifejezetten
@@ -216,20 +216,20 @@ dokumentálatlan hiánya `type="number"` esetére — a forrás `input.html` dem
 </div>
 ```
 
-A `packages/ui`-ba **nincs átemelve** (nincs `packages/ui/src/button-group/` mappa) — a projekt
+A `packages/ui`-ba **nincs átemelve** (nincs `packages/ui/src/button-group/` mappa), így a projekt
 egyelőre nem használja, de a design system eleme létezik és pontosan a kért split button mintát adja.
 
-### 5.2 Accordion — **LÉTEZIK**
+### 5.2 Az Accordion komponens **LÉTEZIK**
 
-`eggproject-design-components/components/accordion/` — `Accordion.jsx`, `accordion.css`,
+Az `eggproject-design-components/components/accordion/` mappában található `Accordion.jsx`, `accordion.css`,
 `accordion.html`. Osztályok: `.accordion`, `.accordion__item`, `.accordion__heading` (natív
 `<h3>`), `.accordion__header` (gomb, `aria-expanded`), `.accordion__chevron`, `.accordion__body`
 (natív `hidden` attribútummal rejtett). Három vizuális variáns: `.accordion--bordered`,
-`.accordion--separated` (kártyánként külön doboz), `.accordion--subtle`. A SPEC-007 6.1 szekció 409. sora ezt kifejezetten a "kimarad, később pótlandó" 40 komponens között sorolja fel — vagyis a
+`.accordion--separated` (kártyánként külön doboz), `.accordion--subtle`. A SPEC-007 6.1 szekció 409. sora ezt kifejezetten a "kimarad, később pótlandó" 40 komponens között sorolja fel, vagyis a
 hiánya **dokumentáltan tudatos döntés**, nem felfedezetlen hiány. A `packages/ui`-ba **nincs
 átemelve**.
 
-### 5.3 Icon button variáns — **LÉTEZIK, és a `Button` komponens már be is köti**
+### 5.3 Az icon button variáns **LÉTEZIK, és a `Button` komponens már be is köti**
 
 `button.css` `.btn--icon` szabálya (négyzet geometria, minden szín-variánssal és mérettel
 kombinálható, lásd a 249-268. sor a forrásban). A `packages/ui/src/button/Button.tsx` **már
@@ -243,28 +243,28 @@ icon && 'btn--icon',
 ```
 
 Vagyis az icon button variáns nemcsak létezik a design systemben, hanem a projekt saját `Button`
-wrappere is kész rá — csak a `NodeInspector.tsx` "Bezárás" gombja (134. sor) nem ezt használja,
+wrappere is kész rá. Csak a `NodeInspector.tsx` "Bezárás" gombja (134. sor) nem ezt használja,
 hanem egy szöveges `size="sm"` gombot. Az elem tehát **rendelkezésre áll, csak nincs ehhez a
 konkrét gombhoz alkalmazva**.
 
-### 5.4 Sticky page footer (státusz + gombsor lehelyezése) — **HIÁNYZIK**
+### 5.4 A sticky page footer (státusz + gombsor lehelyezése) **HIÁNYZIK**
 
 A design system egyetlen skilljében sincs "oldal-szintű, lenn rögzített akciósáv" minta.
 Konkrétan, ami VAN:
 
-- `.app-side__footer` (`eggproject-design-app-common/_shell.css`) — ez a **sidebar shell**
+- `.app-side__footer` (`eggproject-design-app-common/_shell.css`), ami a **sidebar shell**
   alján álló, felhasználó-kártya jellegű doboz (avatar + név + téma váltó), nem egy tetszőleges
-  tartalmú, gombsort hordozó sáv, és nem is `position: sticky`/`fixed` a viewporthoz — a sidebar
+  tartalmú, gombsort hordozó sáv, és nem is `position: sticky`/`fixed` a viewporthoz, mert a sidebar
   saját `position: sticky; top: 0; height: 100vh` konténerén belül van.
-- `.modal__footer` (`eggproject-design-components/components/modal/modal.css`, 89-95. sor) — ez
+- `.modal__footer` (`eggproject-design-components/components/modal/modal.css`, 89-95. sor), ami
   **modális dialógushoz** tartozó lábléc, nem oldal-szintű.
-- `.design-mark-footer` (`eggproject-design-app-common/index.html`) — marketing oldal lábléce,
+- `.design-mark-footer` (`eggproject-design-app-common/index.html`), ami marketing oldal lábléce,
   nem sticky.
 
 Egyik sem a kért minta (egy teljes szélességű, a viewport aljához rögzített, görgetés közben is
 látható sáv állapot- és akció-elemekkel). **Ez ténylegesen hiányzó elem.**
 
-### 5.5 Small gomb méret variáns — **LÉTEZIK**, de a projekt nem következetesen alkalmazza
+### 5.5 A small gomb méret variáns **LÉTEZIK**, de a projekt nem következetesen alkalmazza
 
 `.btn--sm` létezik (`button.css` 244. sor: `padding: 7px 12px; font-size: 12px`), és a
 `packages/ui` `Button.tsx` `size` propján keresztül elérhető. Tényleges használat
@@ -272,7 +272,7 @@ látható sáv állapot- és akció-elemekkel). **Ez ténylegesen hiányzó elem
 
 | Kontextus                                                                                       | Méret                      |
 | ----------------------------------------------------------------------------------------------- | -------------------------- |
-| Sor-szintű akciók (törlés, átnevezés, összecsukás, menü trigger, futás megszakítás/újraindítás) | **`sm`** — 10 előfordulás  |
+| Sor-szintű akciók (törlés, átnevezés, összecsukás, menü trigger, futás megszakítás/újraindítás) | **`sm`** (10 előfordulás)  |
 | Node inspector "Bezárás"                                                                        | **`sm`**                   |
 | Szerkesztő felső eszköztár "Mentés", "Elrendezés"                                               | **`md` (alapértelmezett)** |
 | "Agent hozzáadása", "Bemeneti mező hozzáadása", "Ág hozzáadása" (lista-sor felvevő gombok)      | **`md` (alapértelmezett)** |
@@ -283,7 +283,7 @@ A felhasználó szabálya szerint ("a gombok alapból kicsik legyenek, és csak 
 például modálisban, legyenek default vagy large") **a modális gombok md mérete megfelel** a
 kimondott kivételnek. Viszont a szerkesztő eszköztár (Mentés/Elrendezés) és a lista-sor felvevő
 gombok (Agent/Bemeneti mező/Ág hozzáadása, Új workflow) **nem modálisban** vannak, mégis `md`
-méretűek — ez **nem hiányzó design system elem**, hanem következetlen alkalmazás: a `.btn--sm`
+méretűek, ami **nem hiányzó design system elem**, hanem következetlen alkalmazás: a `.btn--sm`
 elem megvan, csak nincs mindenhol alkalmazva, ahol a felhasználó szabálya szerint kellene.
 
 ---
@@ -298,7 +298,7 @@ A `node-inspector`/`graph-editor` területen viszont **valódi, vizuálisan igaz
 elrendezés** áll, három egymásba ágyazott, bordered+rounded+background szabállyal:
 
 1. **Legkülső: `.resizable-group`** (`packages/ui/src/resizable/resizable.css`, byte-azonos a
-   forrással) — a teljes vászon + node inspector elrendezést fogja körbe:
+   forrással), ami a teljes vászon + node inspector elrendezést fogja körbe:
 
    ```css
    .resizable-group {
@@ -311,13 +311,13 @@ elrendezés** áll, három egymásba ágyazott, bordered+rounded+background szab
    Ez pontosan a kártya vizuális receptje (lekerekített sarok + szegély + emelt háttér), csak nem
    `.card` néven. A mellékelt `editor-desktop-light.png` és `editor-node-inspector.png` képen ez a
    világos, lekerekített keret látszik a teljes szerkesztő terület körül, a szürke oldal-háttértől
-   elválasztva — ez maga a felhasználó által kifogásolt "kártya a szerkesztő köré".
+   elválasztva, ami maga a felhasználó által kifogásolt "kártya a szerkesztő köré".
 
-2. **Középen: `.node-inspector`** (`apps/web/src/node-inspector/node-inspector.css`, 12-19. sor) —
-   `background: var(--ep-bg-elevated)`, de **nincs saját szegélye/lekerekítése**, tehát önmagában
+2. **Középen: `.node-inspector`** (`apps/web/src/node-inspector/node-inspector.css`, 12-19. sor)
+   `background: var(--ep-bg-elevated)` tulajdonsággal rendelkezik, de **nincs saját szegélye/lekerekítése**, tehát önmagában
    nem card-szerű, csupán a `.resizable-group` jobb paneljét tölti ki.
 
-3. **Legbelül: `.inspector-section`** (`node-inspector.css`, 110-118. sor) — minden mezőcsoport
+3. **Legbelül: `.inspector-section`** (`node-inspector.css`, 110-118. sor), aminek hatására minden mezőcsoport
    (pl. "prompt és provider", "hibakezelő") saját dobozba kerül:
    ```css
    .inspector-section {
@@ -328,7 +328,7 @@ elrendezés** áll, három egymásba ágyazott, bordered+rounded+background szab
    ```
    A közvetlenül fölötte álló komment és a SPEC-008 253. sora is kimondja, hogy ez **szándékosan**
    "kártya alakú szakasz", a design system `settings.html` `.card`/`.card__header` mintáját
-   követve. **Csakhogy ez NEM a ténylegesen átemelt `.card` osztály** — a `packages/ui/src/card/
+   követve. **Csakhogy ez NEM a ténylegesen átemelt `.card` osztály.** A `packages/ui/src/card/
 card.css`-ben lévő, byte-azonos `.card` szabály `border-radius: var(--ep-radius-lg)`,
    `background: var(--ep-bg-elevated)` és `box-shadow: var(--ep-shadow-sm)` hármast ad, az
    `.inspector-section` viszont más radius tokent (`md`, nem `lg`), más háttér tokent (`--ep-bg`,
@@ -369,90 +369,90 @@ eleme**, hanem egy attól eltérő tokenkombinációjú, projekt-saját osztály
 `eggproject-design/tokens/breakpoints.css` (a `design-token/breakpoints.css`-ként byte-azonosan
 átemelve a `packages/ui`-ba):
 
-| Token                                                   | Érték        | Jelentés                                                                   |
-| ------------------------------------------------------- | ------------ | -------------------------------------------------------------------------- |
-| `--ep-screen-sm` … `--ep-screen-2xl`                    | 640 … 1536px | Tailwind v4 alapértelmezett töréspontok                                    |
-| `--ep-screen-3xl`                                       | **1920px**   | FHD / nagy monitor                                                         |
-| `--ep-screen-4xl`                                       | **2560px**   | QHD / ultrawide                                                            |
-| `--ep-layout-max-wide`                                  | 1440px       | "data-dense dashboards / wide tables"                                      |
-| `--ep-layout-max-fhd`                                   | 1920px       | kemény felső korlát FHD/ultrawide-on                                       |
-| `--ep-layout-max-full`                                  | `none`       | full-bleed szentinel — a token maga a "nincs max-width" jelentést hordozza |
-| `--ep-layout-measure`                                   | 65ch         | tipográfiai olvasási mérték                                                |
-| `--ep-layout-gutter-fluid`, `--ep-layout-section-fluid` | `clamp(...)` | fluid térköz                                                               |
+| Token                                                   | Érték        | Jelentés                                                                       |
+| ------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------ |
+| `--ep-screen-sm` … `--ep-screen-2xl`                    | 640 … 1536px | Tailwind v4 alapértelmezett töréspontok                                        |
+| `--ep-screen-3xl`                                       | **1920px**   | FHD / nagy monitor                                                             |
+| `--ep-screen-4xl`                                       | **2560px**   | QHD / ultrawide                                                                |
+| `--ep-layout-max-wide`                                  | 1440px       | "data-dense dashboards / wide tables"                                          |
+| `--ep-layout-max-fhd`                                   | 1920px       | kemény felső korlát FHD/ultrawide-on                                           |
+| `--ep-layout-max-full`                                  | `none`       | full-bleed szentinel, mert maga a token hordozza a "nincs max-width" jelentést |
+| `--ep-layout-measure`                                   | 65ch         | tipográfiai olvasási mérték                                                    |
+| `--ep-layout-gutter-fluid`, `--ep-layout-section-fluid` | `clamp(...)` | fluid térköz                                                                   |
 
 A fájl saját kommentje és a `SKILL.md` (143. és 169-171. sor) **kifejezetten kimondja**: _"4K
-(3840px) is NOT a separate breakpoint — it is handled via the max-width cap and full-bleed
-sentinel"_. Vagyis **nincs 4K-specifikus token** (nincs 3840px érték sehol egyik skillben sem —
-ellenőrizve grep-pel), a rendszer szándékosan a meglévő max-width sapkával (`--ep-layout-max-fhd`,
+(3840px) is NOT a separate breakpoint. It is handled via the max-width cap and full-bleed
+sentinel"_. Vagyis **nincs 4K-specifikus token** (nincs 3840px érték sehol egyik skillben sem, amit
+grep-pel ellenőriztem), a rendszer szándékosan a meglévő max-width sapkával (`--ep-layout-max-fhd`,
 `--ep-layout-max-wide`) és a full-bleed szentinellel (`--ep-layout-max-full: none`) oldja meg az
 ultrawide/4K esetet, nem egy új méret-tokennel.
 
 A projekt `topnav-shell.css` ezt már **használja is**: a "faltól falig" felülírás (91-98. sor)
 pontosan a `--ep-layout-max-full` szentinelre állítja a `--ep-layout-max-app` értékét.
 
-### 7.2 "Slim"/sűrű (compact) minta — nincs globális, csak komponensenkénti
+### 7.2 A "Slim"/sűrű (compact) minta nem globális, hanem csak komponensenkénti
 
 A négy skillben **nincs egyetlen globális "slim mode" vagy sűrűségi kapcsoló** (nincs olyan
 token vagy osztály, ami az egész felület térközét egyszerre sűrítené). Ami VAN, komponensenkénti
 `--sm`/`compact` módosító:
 
-- `.btn--sm`, `.input--sm`, `.select--sm`, `.textarea--sm` — kompakt méretvariáns
+- A `.btn--sm`, `.input--sm`, `.select--sm`, `.textarea--sm` osztályok kompakt méretvariánsok
 - `FeedIndicator` `compact` prop (csak a pötty, felirat nélkül)
 - `.pagination--compact`
 - `LineChart` `compact`/`--h-sm` magasság variáns
 
 A `DESIGN.md` 652. sora ezt nevesíti: _"Compact: `--sm` variant (7px 11px) for dense rows like
-data-table filters."_ — vagyis a "slim" design system szinten **komponensenkénti `sm`
+data-table filters."_, vagyis a "slim" design system szinten **komponensenkénti `sm`
 mérettel valósítható meg**, nem egy külön globális módban. Ez összecseng az 5.5 szekció
 találatával: a `.btn--sm` már létezik, "csak" következetesen kellene alkalmazni.
 
 ### 7.3 A szerkesztő köré vont kártya és a "faltól falig" ütközése
 
 A `.resizable-group` (6. szekció) mindig `border-radius: var(--ep-radius-xl)` + `1px` szegély +
-emelt háttér — ez a **design system Resizable komponensének** beépített, forrásból örökölt
-tulajdonsága, nincs hozzá "keret nélküli" variáns egyik skillben sem (ellenőrizve: a `resizable.css`
+emelt háttér, ami a **design system Resizable komponensének** beépített, forrásból örökölt
+tulajdonsága, és nincs hozzá "keret nélküli" variáns egyik skillben sem (ellenőrizve: a `resizable.css`
 forrásban egyetlen módosító osztály sincs a `.resizable-group`/`.resizable-group--vertical`
 kettőn kívül). Emellett az `.app-content` (a topnav shell átemelt, byte-azonos szabálya)
 `padding: 8px 40px 80px` értéket ad minden oldalon (a szerkesztő screen-re szűkítve az alsó padding
 már csökkentve van, lásd `topnav-shell.css` 172-174. sor, de az oldalsó 40px nem). A design system
-**nem ad zéró-térközű oldal-tartalom mintát** — kizárólag a max-width sapkát engedi el
+**nem ad zéró-térközű oldal-tartalom mintát**, mert kizárólag a max-width sapkát engedi el
 (`--ep-layout-max-full`), a `--ep-layout-gutter`/oldalsó padding elhagyására nincs dokumentált
 token vagy minta egyik skillben sem.
 
 ---
 
-## 8. Záró lista — mi hiányzik ténylegesen a design systemből, és mi csak rossz alkalmazás
+## 8. Záró lista arról, mi hiányzik ténylegesen a design systemből, és mi csak rossz alkalmazás
 
 ### 8.1 Ténylegesen hiányzó design system elem (a projekt nem tud mit átemelni)
 
-- **Sticky, oldal-szintű akció-sáv** (a kért "sticky page footer" minta) — egyik skillben sincs
+- **Sticky, oldal-szintű akció-sáv** (a kért "sticky page footer" minta), amelyhez egyik skillben sincs
   ilyen minta; a legközelebbi létező elemek a `.modal__footer` (csak modálishoz) és az
   `.app-side__footer` (csak a sidebar shell alján, nem is sticky a viewporthoz vízszintesen).
-- **Globális "slim mode" / oldal-szintű sűrűségi kapcsoló** — nincs, csak komponensenkénti `--sm`
+- **Globális "slim mode" / oldal-szintű sűrűségi kapcsoló** nincs, csak komponensenkénti `--sm`
   variáns létezik.
-- **4K-specifikus breakpoint token** — a design system ezt szándékosan nem ad (a `SKILL.md` szerint
+- **4K-specifikus breakpoint token**, amit a design system szándékosan nem ad (a `SKILL.md` szerint
   a max-width sapka + full-bleed szentinel a hivatalos minta helyette), tehát ez nem hiány, hanem
   tudatos tervezési döntés a forrásban.
-- **Keret nélküli (borderless) Resizable variáns** — a design system `.resizable-group`-ja mindig
+- **Keret nélküli (borderless) Resizable variáns**, mivel a design system `.resizable-group`-ja mindig
   kártya-receptű (szegély+lekerekítés+emelt háttér), nincs hozzá "sima" módosító.
 
 ### 8.2 Van a design systemben, csak a projekt nem emelte át vagy nem használja
 
-- **`textarea` komponens** — létezik, teljes CSS-sel, sosem lett a `packages/ui`-ba átemelve; a
+- A **`textarea` komponens** létezik, teljes CSS-sel, de sosem lett a `packages/ui`-ba átemelve; a
   projekt helyette az `.input` (egysoros) osztályt viseli 16 helyen `<textarea>`-n (4.4 szekció).
-- **`accordion` komponens** — létezik, a SPEC-007 dokumentáltan "később pótlandó"-nak jelölte; a
+- Az **`accordion` komponens** létezik, és a SPEC-007 dokumentáltan "később pótlandó"-nak jelölte; a
   node inspector ritkán szerkesztett mezőihez alkalmas lenne, de ma nincs bevezetve.
-- **`button-group` (split button)** — létezik, a `packages/ui`-ba nincs átemelve.
-- **`.btn--icon` variáns** — létezik ÉS a projekt `Button` komponense már támogatja is, csak a
+- A **`button-group` (split button)** létezik, de a `packages/ui`-ba nincs átemelve.
+- A **`.btn--icon` variáns** létezik ÉS a projekt `Button` komponense már támogatja is, csak a
   konkrét "Bezárás" gombhoz nincs alkalmazva.
-- **`.btn--sm`** — létezik és helyenként helyesen használt, de a szerkesztő eszköztár és a lista-
+- A **`.btn--sm`** létezik és helyenként helyesen használt, de a szerkesztő eszköztár és a lista-
   sor felvevő gombjai (nem modálisban) `md` méretűek maradtak.
 
 ### 8.3 Saját, a design systemben nem létező elem, amit a projekt bevezetett
 
-- **`.inspector-section`** (`node-inspector.css`) — kártya-szerű doboz, de más token-
+- Az **`.inspector-section`** (`node-inspector.css`) kártya-szerű doboz, de más token-
   kombinációval, mint a valódi `.card`; nem a design system eleme (6. szekció).
-- **A `.node-inspector textarea.input` minta** — az `.input` osztály többsoros mezőn való
+- **A `.node-inspector textarea.input` minta**, vagyis az `.input` osztály többsoros mezőn való
   felhasználása geometriai toldozással (`resize: vertical`), miközben a design system saját,
   erre szánt `.textarea` osztálya kihasználatlan marad (4.4 szekció).
 
