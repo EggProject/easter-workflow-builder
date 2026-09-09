@@ -502,6 +502,14 @@ szabálylista" ott áll részletesen, itt csak a lényeg.
   dokumentált megoldást, és nem is ajánlja. Ezeket a beépített felső korlátokat nem szabad
   nullázni vagy eltávolítani (research 8. szekció, NEM MEGERŐSÍTETT pont az
   `expect.timeout`/`test.timeout` nullázására).
+- **Vizuális állítást csak kifestett pixel bizonyít.** Ha a teszt tárgya az, hogy valami LÁTSZIK
+  (vonal, keret, szín), a DOM megléte és a `toBeVisible()` nem elég: mindkettő zöld marad, ha az
+  elem a háttér színével fest. A bizonyíték két képernyőkép ugyanarról a kivágatról, egyszer az
+  elemmel, egyszer elrejtve, és a két kép csatorna eltérése. Ehhez jön, hogy az állítás a VALÓS
+  alkalmazás alakján fusson, ne egy csak a tesztnek gyártott elrendezésen, és mindkét témában.
+  Mérten megkülönböztető: az él vonalán 236 (világos) és 53 (sötét) az ép, 0 és 1 az elrontott
+  érték, miközben a `toBeVisible()` mindkét esetben átment
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
 
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
@@ -728,6 +736,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
 | az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
 | az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
+| a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 

@@ -106,7 +106,11 @@ törölte.
 
 **A React Flow saját CSS-e a `--xy-*` változóin át van témázva** (`graph-editor.css`), a design
 system `--ep-*` tokenjeire; kitalált szín nincs. A szállított alapértelmezés mellett a vezérlő
-gombok sötét témában olvashatatlanok voltak (világos ikon fehér dobozon).
+gombok sötét témában olvashatatlanok voltak (világos ikon fehér dobozon). Az él vonalszíne
+(`--xy-edge-stroke`) a `--ep-border-strong` tokenre kötve **kifestett pixel szinten** áll
+regressziós teszt alatt (`e2e/graph-edge-stroke.spec.ts`), mert a DOM megléte és a
+`toBeVisible()` akkor is zöld marad, ha a vonal a háttér színével fest
+(`docs/research/2026-09-09-graf-el-vonal-meres.md`).
 
 ## Fájlok
 
