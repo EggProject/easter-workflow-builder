@@ -26,6 +26,12 @@ export interface ButtonGroupProperties extends HTMLAttributes<HTMLDivElement> {
  * szűkítési minta, mint a `Badge` `Chip` vagy a `Tabs` `Segmented`
  * esetében). A CSS bájtra azonosan átemelt, tehát ha egy jövőbeli
  * képernyőnek kell, csak a prop hiányzik hozzá, a stílus nem.
+ *
+ * A valódi split button (forrás "Mixed" mintája) egy `Menu` triggert is
+ * hordozhat gyerekként - a `Menu` a saját trigger gombját `.menu-anchor`
+ * spannel csomagolja, amihez a `button-group.css` végén álló, dokumentált
+ * kiegészítés adja ugyanazt a fúziós/lekerekítési receptet, mint a sima
+ * `.btn` testvérnek.
  */
 export function ButtonGroup(properties: Readonly<ButtonGroupProperties>): ReactElement {
   const { className, children, ...rest } = properties;

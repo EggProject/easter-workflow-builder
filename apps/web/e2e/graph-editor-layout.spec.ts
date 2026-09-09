@@ -134,7 +134,7 @@ test('NINCS card in card: a szerkesztő gyökér konténere nem visel kártya ke
   expect(frame.backgroundColor).toBe('rgba(0, 0, 0, 0)');
 });
 
-test('a lábléc ragadós, balra a státusszal és jobbra a sm méretű gombcsoporttal', async ({ page }) => {
+test('a lábléc ragadós, balra a státusszal és jobbra a sm méretű split button gombcsoporttal', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId('rf__node-n1')).toBeVisible();
@@ -142,28 +142,35 @@ test('a lábléc ragadós, balra a státusszal és jobbra a sm méretű gombcsop
   const actionGroup = page.getByRole('group', { name: 'Gráf műveletek' });
   await expect(actionGroup).toBeVisible();
   const saveButton = actionGroup.getByRole('button', { name: 'Mentés' });
-  const layoutButton = actionGroup.getByRole('button', { name: 'Elrendezés' });
+  // A design system "Mixed (split button)" mintája: az elsődleges "Mentés"
+  // mellett egy szöveg nélküli nyíl trigger nyitja a további műveletek
+  // (ma egyetlen: "Elrendezés") lenyíló menüjét - nem egy második, szöveges
+  // gomb.
+  const menuTrigger = actionGroup.getByRole('button', { name: 'További műveletek' });
   await expect(saveButton).toBeVisible();
-  await expect(layoutButton).toBeVisible();
+  await expect(menuTrigger).toBeVisible();
 
   // A gombok `sm` méretűek: a design system .btn--sm szabálya 12px
   // betűméretet ad, a md alapértelmezés 14px-et (button.css).
-  for (const button of [saveButton, layoutButton]) {
+  for (const button of [saveButton, menuTrigger]) {
     await expect(button).toHaveCSS('font-size', '12px');
   }
 
-  // A két gomb ÖSSZERAGASZTOTT: a második gomb bal széle a első jobb
-  // szélével esik egybe (a .button-group -1px margója miatt épp azon).
+  // A két gomb ÖSSZERAGASZTOTT: a nyíl trigger bal széle a "Mentés" gomb
+  // jobb szélével esik egybe (a .button-group -1px margója miatt épp azon).
   const saveBox = await saveButton.boundingBox();
-  const layoutBox = await layoutButton.boundingBox();
-  if (saveBox === null || layoutBox === null) {
+  const triggerBox = await menuTrigger.boundingBox();
+  if (saveBox === null || triggerBox === null) {
     throw new Error('hiányzó befoglaló doboz a gombcsoportban');
   }
-  expect(Math.abs(layoutBox.x - (saveBox.x + saveBox.width))).toBeLessThanOrEqual(1);
+  expect(Math.abs(triggerBox.x - (saveBox.x + saveBox.width))).toBeLessThanOrEqual(1);
 
-  // Az elrendezés gomb megnyomása után megjelenik a státusz - így van mit
-  // MÉRNI a bal oldalon, és egyben a jelzés meglétét is igazolja.
-  await layoutButton.click();
+  // A nyíl trigger megnyitja a menüt, ami billentyűzettel is elérhető
+  // (`Menu`, packages/ui/src/menu/Menu.tsx); az "Elrendezés" menüpont
+  // megnyomása után megjelenik a státusz - így van mit MÉRNI a bal oldalon,
+  // és egyben a jelzés meglétét is igazolja.
+  await menuTrigger.click();
+  await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
   const status = page.getByRole('status');
   await expect(status).toHaveText('Mentetlen változtatások');
 

@@ -289,7 +289,10 @@ test('az "Elrendezés" gomb balról jobbra rendezi a csomópontokat, és mentés
 
   const beforeStart = await requireBoundingBox(nodeLocator(page, 'n-start'));
 
-  await page.getByRole('button', { name: 'Elrendezés' }).click();
+  // Az "Elrendezés" a split button lenyíló menüjében van (2026-09-09): a
+  // "Mentés" melletti nyíl trigger nyitja, a menüpont ott aktiválja.
+  await page.getByRole('button', { name: 'További műveletek' }).click();
+  await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
 
   // A jelző megjelenik: a `layoutGraph` hívása a `currentNodes` állapotot
   // írta át, ami az `isGraphDirty`-t igazra váltja - mentés nem történt.
@@ -327,7 +330,10 @@ test('az elrendezés után az azonos rangú csomópontok között legalább `nod
 }) => {
   await loadEditor(page);
 
-  await page.getByRole('button', { name: 'Elrendezés' }).click();
+  // Az "Elrendezés" a split button lenyíló menüjében van (2026-09-09): a
+  // "Mentés" melletti nyíl trigger nyitja, a menüpont ott aktiválja.
+  await page.getByRole('button', { name: 'További műveletek' }).click();
+  await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
   await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
 
   const boxes = await readGraphLayoutBoxes(page);
@@ -365,7 +371,10 @@ test('az elrendezés után a nézet újra a teljes gráfra illeszkedik, egyetlen
 }) => {
   await loadEditor(page);
 
-  await page.getByRole('button', { name: 'Elrendezés' }).click();
+  // Az "Elrendezés" a split button lenyíló menüjében van (2026-09-09): a
+  // "Mentés" melletti nyíl trigger nyitja, a menüpont ott aktiválja.
+  await page.getByRole('button', { name: 'További műveletek' }).click();
+  await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
   await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
 
   // A React Flow saját, dokumentált `data-testid="rf__wrapper"` fogódzója a

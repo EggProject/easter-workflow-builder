@@ -237,10 +237,32 @@ describe('GraphEditorScreen', () => {
     }
     expect(group.getAttribute('role')).toBe('group');
     expect(group.getAttribute('aria-label')).toBe('Gráf műveletek');
+    // Valódi split button (design system "Mixed" mintája): elsődleges
+    // "Mentés" gomb, mellette egy szöveg nélküli nyíl trigger, ami a
+    // lenyíló menüt nyitja - nem két egyenrangú, szöveges gomb.
     const buttons = [...group.querySelectorAll('button')];
-    expect(buttons.map((button) => button.textContent)).toEqual(['Mentés', 'Elrendezés']);
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]?.textContent).toBe('Mentés');
+    expect(buttons[1]?.textContent).toBe('');
+    expect(buttons[1]?.getAttribute('aria-label')).toBe('További műveletek');
+    expect(buttons[1]?.getAttribute('aria-haspopup')).toBe('menu');
+    expect(buttons[1]?.classList.contains('btn--icon')).toBe(true);
     // Minden szerkesztő gomb `sm` méretű (a modális és a popup a kivétel).
     expect(buttons.every((button) => button.classList.contains('btn--sm'))).toBe(true);
+
+    // A nyíl trigger megnyitja a menüt, ami a "Elrendezés" menüpontot adja,
+    // és billentyűzettel is elérhető (a `Menu` már meglévő, tesztelt
+    // billentyűzet-kezelésén át, lásd `packages/ui/src/menu/Menu.tsx`).
+    act(() => {
+      buttons[1]?.click();
+    });
+    const menuPanel = document.body.querySelector('[role="menu"]');
+    if (menuPanel === null) {
+      throw new Error('a teszt nem talált nyitott menü panelt');
+    }
+    const menuItem = menuPanel.querySelector('[role="menuitem"]');
+    expect(menuItem?.textContent).toBe('Elrendezés');
+    expect(document.activeElement).toBe(menuItem);
 
     // A státusz a MÁSIK sávban áll, nem a gombok mellett.
     act(() => {
@@ -383,7 +405,20 @@ describe('GraphEditorScreen', () => {
       positionY: node.positionY,
     }));
 
-    const layoutButton = [...container.querySelectorAll('button')].find(
+    // Az "Elrendezés" a split button lenyíló menüjében van (2026-09-09):
+    // előbb a nyíl trigger nyitja meg a menüt, utána a menüpont kattintható.
+    const menuTrigger = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.getAttribute('aria-label') === 'További műveletek',
+    );
+    if (menuTrigger === undefined) {
+      throw new Error('a teszt nem talált "További műveletek" trigger gombot');
+    }
+    act(() => {
+      menuTrigger.click();
+    });
+    // A menü panel `createPortal`-lal a `document.body`-ba kerül
+    // (packages/ui/src/menu/Menu.tsx), tehát nem a `container` leszármazottja.
+    const layoutButton = [...document.body.querySelectorAll('button')].find(
       (button) => button.textContent === 'Elrendezés',
     );
     if (layoutButton === undefined) {

@@ -10,6 +10,8 @@ import {
 import {
   Button,
   ButtonGroup,
+  Menu,
+  MenuItem,
   PageFooter,
   Resizable,
   ResizableHandle,
@@ -50,6 +52,30 @@ function readWorkflowId(search: string): string | undefined {
 }
 
 /**
+ * A split button lenyíló nyíl ikonja - a design system `button-group.html`
+ * "Mixed (split button)" mintájának SAJÁT SVG-je, kézzel beágyazva, a
+ * repóban már meglévő ikon-konvenció szerint (ugyanaz a módszer, mint a
+ * `workflow-list-screen.tsx` hárompontos ikonja, nem külön ikon csomag).
+ */
+function DropdownChevronIcon(): ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="m3 5 4 4 4-4" />
+    </svg>
+  );
+}
+
+/**
  * A gráf szerkesztő képernyő: betöltés, mentés, mentetlen jelző és a mentés
  * előtti séma ellenőrzés (SPEC-008 5.5, T-009-17, AC12, AC13, AC15), plusz a
  * csomópont beállítás panel (`node-inspector`, T-009-18, AC16, AC17). A
@@ -60,11 +86,13 @@ function readWorkflowId(search: string): string | undefined {
  *
  * Az elrendezés 2026-09-09 óta három ponton más (felhasználói kérés):
  * a felső eszköztár megszűnt, helyette a képernyő aljához tapadó
- * `PageFooter` áll (balra a státusz, jobbra egy `ButtonGroup` split
- * button); a vászon köré vont kártya keret törlődött, tehát a
- * munkafelület faltól falig ér; és az osztott elrendezés aránya a
- * `localStorage`-be mentődik, majd a következő megnyitáskor visszatölt
- * (`graph-editor-layout.ts`).
+ * `PageFooter` áll (balra a státusz, jobbra egy valódi `ButtonGroup` split
+ * button: "Mentés" elsődleges gomb plusz egy `Menu`-vel nyíló nyíl trigger,
+ * ami az "Elrendezés" műveletet adja - a design system "Mixed (split
+ * button)" mintája, nem két egyenrangú, összeragasztott gomb); a vászon
+ * köré vont kártya keret törlődött, tehát a munkafelület faltól falig ér;
+ * és az osztott elrendezés aránya a `localStorage`-be mentődik, majd a
+ * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
 export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
   const { apiOrigin, fetchFunction, search } = properties;
@@ -308,8 +336,10 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       )}
       {/* A státusz és a művelet gombok a képernyő aljához tapadó
           akciósávban állnak (felhasználói kérés, 2026-09-09): balra a
-          státusz, jobbra egy összeragasztott gombcsoport, hogy a később
-          érkező további műveletek is ide kerülhessenek. A gombok `sm`
+          státusz, jobbra egy valódi split button (design system "Mixed"
+          mintája, `button-group.html`): az elsődleges "Mentés" művelet
+          mellett egy szöveg nélküli nyíl gomb nyitja a további műveletek
+          (ma egyetlen: "Elrendezés") lenyíló menüjét. A gombok `sm`
           méretűek, mert ez nem modális és nem popup felület. */}
       <PageFooter
         status={
@@ -324,9 +354,17 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
           <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}
           </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={handleAutoLayout} disabled={isLoading}>
-            Elrendezés
-          </Button>
+          <Menu
+            trigger={(triggerProperties) => (
+              <Button {...triggerProperties} type="button" size="sm" icon aria-label="További műveletek">
+                <DropdownChevronIcon />
+              </Button>
+            )}
+          >
+            <MenuItem onSelect={handleAutoLayout} disabled={isLoading}>
+              Elrendezés
+            </MenuItem>
+          </Menu>
         </ButtonGroup>
       </PageFooter>
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
