@@ -115,6 +115,17 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   alak `.readonly()`, az uniók `z.discriminatedUnion`. A `.parse()` tiltott, csak `.safeParse()`
   fut, és minden validáló függvény `Outcome<T>` alakban ad választ, hogy a dobó kivétel ne törje
   meg a projekt `Outcome` konvencióját (SPEC-005 7.2, 7.3, 7.4).
+- **A `protocol` a `db` domain uniót is duplikálhatja, ha gépi sodródás védelem tartozik hozzá.**
+  A hat drótszintű felsorolás mellé a `node-config` téma is így kerül be: a tíz ág Zod sémája a
+  `db` `NodeConfig` uniójának szándékos duplikátuma, mert az `apps/web` a `db` csomagtól nem
+  függhet, tehát enélkül a szerkesztő űrlapjának nincs típusa. A védelem helye kötött, az
+  `apps/server` csomag (az egyetlen, ahol a két oldal egyszerre látszik), a formája pedig a
+  meglévő `enum-drift-protection` téma mintája: megvalósítás nélküli regressziós teszt,
+  típusszintű kétirányú kölcsönös értékadhatóság a `typecheck` kapun, plusz futásidejű ág ott,
+  ahol a `db` guardot exportál. **Ami a `db` oldalon `Record<string, unknown>`, azt a séma sem
+  szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
+  megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
+  SPEC-008 5.3, user döntés 2026-09-05).
 
 **Fájlok és tesztek**
 
@@ -329,10 +340,19 @@ kötelező státuszcsekkje. A lánc mind a három szeme mérve, illetve dokument
 `coverage:e2e:report` scriptjének `--check-coverage` kapcsolója, mind a négy metrikára. A számokat
 ide nem írjuk (egy frissítés egy helyen történjen), a származtatás, a nem fedett részek tételes
 listája és a "nulla fájl kizárás" döntés a research fájlban áll. A küszöb pontosan a mért érték,
-felfelé kerekítés nélkül: a lefedettség nőhet, csökkenni észrevétlenül nem tud. Az `nyc`
-összehasonlítása szigorúan kisebb (`coverage < threshold`), tehát a küszöbbel egyenlő érték
-átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a `ci` job `needs` listája)
-az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+felfelé kerekítés nélkül. Az `nyc` összehasonlítása szigorúan kisebb (`coverage < threshold`),
+tehát a küszöbbel egyenlő érték átmegy. A kapu konfigurációját (a `--check-coverage` megléte és a
+`ci` job `needs` listája) az `apps/web/src/e2e-coverage-threshold/` regressziós tesztje őrzi.
+
+**A ratchet valójában a fedetlen sorok számára vonatkozik, nem a százalékra** (user döntés
+2026-09-09). A cél az, hogy a lefedettség ne tudjon ÉSZREVÉTLENÜL romlani, nem az, hogy a
+százalék soha ne csökkenhessen. Ha a fedetlen tételek száma egyetlen metrikán sem nő, és a
+csökkenést kizárólag fedett kód törlése okozza (a nevező zsugorodik, a számláló nem), a küszöb
+lefelé követheti a mért értéket - de csakis tételes levezetéssel a research fájlban: melyik fájlból
+mennyi fedett kód tűnt el, és a fedetlen tételek darabszáma előtte és utána azonos. Ha a fedetlen
+sorok száma nő, az valódi lefedettség-romlás, és tesztet kell írni a hiányra, nem a küszöböt
+csökkenteni - ez a tiltás a korábbi, szigorú olvasat, és változatlanul érvényes erre az esetre.
+Elfogadott precedens: `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 15. szekció.
 
 **Az e2e küszöb nem 100 százalék, és ez felhasználói döntés.** A unit lefedettség változatlanul
 100 százalék, kizárás nélkül. Az e2e küszöb alatta van, mert marad néhány, e2e-vel elvileg sem
@@ -491,6 +511,14 @@ szabálylista" ott áll részletesen, itt csak a lényeg.
   dokumentált megoldást, és nem is ajánlja. Ezeket a beépített felső korlátokat nem szabad
   nullázni vagy eltávolítani (research 8. szekció, NEM MEGERŐSÍTETT pont az
   `expect.timeout`/`test.timeout` nullázására).
+- **Vizuális állítást csak kifestett pixel bizonyít.** Ha a teszt tárgya az, hogy valami LÁTSZIK
+  (vonal, keret, szín), a DOM megléte és a `toBeVisible()` nem elég: mindkettő zöld marad, ha az
+  elem a háttér színével fest. A bizonyíték két képernyőkép ugyanarról a kivágatról, egyszer az
+  elemmel, egyszer elrejtve, és a két kép csatorna eltérése. Ehhez jön, hogy az állítás a VALÓS
+  alkalmazás alakján fusson, ne egy csak a tesztnek gyártott elrendezésen, és mindkét témában.
+  Mérten megkülönböztető: az él vonalán 236 (világos) és 53 (sötét) az ép, 0 és 1 az elrontott
+  érték, miközben a `toBeVisible()` mindkét esetben átment
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
 
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
@@ -552,6 +580,41 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   rendelkezésre álló területet "faltól falig" tölti ki. A kiterjesztés: a layoutnak minden
   támogatott viewport méreten reszponzívnak kell lennie, nem csak egyetlen, fix asztali
   szélességen.
+- **Csak létező design system elem használható.** Ami a `eggproject-design*` skillekben nincs
+  meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
+  emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
+  a kész `.textarea` komponens jár, nem az egysoros `.input` osztály
+  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09).
+- **Ha a forrás komponensnek React és statikus HTML változata is van, a React változat jár.** Mi
+  React alkalmazás vagyunk. A `select.css` mindkettőt kiszolgálja ugyanazon a `.select` héjon, de
+  a natív `<select>` retrofitről a forrás saját kommentje mondja ki, hogy a STATIKUS oldalaké
+  ("the native `<select>` retrofit ON STATIC PAGES uses the platform control"), és a platform
+  indikátorát rajzolja: a chevron a jobb szegélyre tapad (mérve 9px), a React trigger 22px-e
+  helyett. A natív ág megépítése ezért nem "bájtra másolás" volt, hanem a rossz ág kiválasztása
+  (`docs/research/2026-09-09-select-chevron-meres.md`, user kérés 2026-09-09).
+- **Tilos a card in card.** Kártya alakú dobozon (szegély plusz lekerekítés plusz saját
+  háttér) belül nem állhat második ilyen doboz, és nem lehet dupla belső térköz sem. Ami a
+  tagoláshoz kell: vagy összecsukható panel (`accordion`), vagy megnevezett, doboz nélküli
+  csoport. Kitalált, a design system `.card`-jától eltérő tokenkombinációjú "kártyaszerű"
+  osztály nem vezethető be (user kérés 2026-09-09).
+- **A gombok `sm` méretűek**, kivéve modálisban és popupban. A szöveg nélküli gomb ikon gomb
+  (`.btn--icon`), és **kötelező** hozzáférhető nevet adni neki (`aria-label`), különben a
+  `getByRole('button', { name })` locator sem találja, amire a projekt e2e tesztjei épülnek
+  (user kérés 2026-09-09).
+- **Az űrlap hibaüzenete kizárólag a mező alatt jelenik meg**, összesítő az űrlap tetején
+  nincs. A megjelenés szabálya: a mező **érintett és érvénytelen**, VAGY az űrlapot már
+  **legalább egyszer megpróbálták beküldeni** (és a beküldés hiba miatt nem sikerült) **és a
+  mező érvénytelen**. Ugyanez az érték dönt az `aria-invalid` kitételéről is, mert a WCAG 2.2
+  ARIA21 technika kimondja: "The aria-invalid attribute should not be set to 'true' before
+  input validation is performed"
+  (<https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21>). A mező és az üzenet összekötése
+  `aria-describedby`, a megjelenés eljuttatása a képernyőolvasóhoz `role="alert"`, mindkettő a
+  W3C WAI Forms Tutorial "User Notifications" lapja szerint
+  (<https://www.w3.org/WAI/tutorials/forms/notifications/>). **NEM MEGERŐSÍTETT**, és ezért nem
+  is állítjuk, hogy a WAI előírná az időzítést: a WCAG 3.3.1 Understanding lapja szerint "This
+  criterion does not mandate any particular way in which errors should be displayed"
+  (<https://www.w3.org/WAI/WCAG22/Understanding/error-identification>), tehát a fenti szabály
+  felhasználói termékdöntés (user kérés 2026-09-09).
 
 ---
 
@@ -603,6 +666,42 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kizárólag környezeti változó, a repóban semmit nem kell módosítani**, ezért a CI-re nincs
   hatása. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk (gyökér `CLAUDE.md`,
   research V-19).
+
+**Képernyőkép és vizuális bizonyíték**
+
+- **A repón kívül élő képernyőkép készítő script háromszor adott hamis bizonyítékot.** A script
+  `/tmp/shots/` alatt élt, minden munkamenet újraírta, és kétszer ÜRES `edges` tömböt, egyszer
+  pedig két csomópontra szűkített gráfot adott a `readWorkflowGraph` mockon. Ahol nincs él, ott
+  nincs mit kirajzolni: a szállított képekről hiányoztak a vonalak, a felhasználó jogosan hitte,
+  hogy a termék romlott el, és a végrehajtó agent mindháromszor késznek jelentette. A termékkód
+  végig hibátlan volt, bisecttel és pixel méréssel igazolva. **A tanulság általános: minden
+  bizonyíték előállító eszköz a repóba tartozik, verziókövetve, mert amit munkamenetenként újra
+  kell írni, azt munkamenetenként újra el is lehet rontani.** Védelem: a fixtúra
+  (`apps/web/e2e/showcase-graph.ts`), a képernyőkép készítés
+  (`apps/web/e2e/capture-screenshots.ts`) és a `bun run screenshots` parancs a repóban van, a
+  fixtúra alakját (legalább öt él, minden csomópont bekötve) és minden élének kifestett vonalát
+  pedig az `apps/web/e2e/showcase-graph.spec.ts` regressziós teszt őrzi a `test:e2e` kapun
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció).
+- **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
+  keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
+  adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
+  nyomja meg a React Flow saját "Fit View" vezérlő gombját, és a záró állítása mérhető: nulla
+  csomópont lóg ki a vászon befoglaló dobozából (`showcase-graph.ts`, `countNodesOutsideCanvas`).
+- **A React Flow `minZoom` alapértelmezése 0.5, ezért a fixtúra szélessége felső korlátos.** Egy
+  1440x900-as ablakban, nyitott panel mellett a vászon 1013 pixel széles, tehát 1842 pixelnél
+  szélesebb gráfot a `fitView` már nem tud beilleszteni: a `minZoom`-on megáll. A bemutató fixtúra
+  emiatt négy oszlop széles (1582 pixel). Számítás és mérés:
+  `docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció.
+- **A kifestett vonal pixel mérése mérési szondát igényel, ha a kivágat nagyobb egy tenyérnyi üres
+  területnél.** A React Flow háttér pontmintáját és a csomópont kártyák árnyékát a HÁTTÉRSZÍNNEL
+  festő (tehát hibás) él is eltakarja, tehát az elrejtésekor újra előbukkannak, és ez önmagában
+  eltérést ad: mérve a hibás állapot 25-ig felment, miközben az ép állapot 16-ról indult, azaz a
+  két tartomány átfedett és a mérés nem döntött. A szonda mindkét képernyőképen eltünteti a nem
+  egyenletes hátteret (a pontmintát `display: none`, a kártyákat és a paneleket
+  `visibility: hidden` alá); ezzel a hibás állapot 3-ig, az ép 15-től felfelé megy, és a küszöb
+  mért szám lehet. `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
+  elmozdíthatná az éleket a két felvétel között
+  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
 
 **Adatbázis és Drizzle**
 
@@ -689,6 +788,8 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
 | az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
 | az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
+| a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
+| a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
@@ -696,16 +797,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Egy nyitott tétel áll.**
+**Nyitott tétel jelenleg nincs.**
 
-**1. A fejlesztői REST hívás originje és a szerver CORS engedélyének hatóköre.**
-
-| Mező                      | Tartalom                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Melyik két forrás         | SPEC-006 5.7 (és 691. sor 8. kritériuma) kontra SPEC-007 O-4                                                                                                                                                                                                                                                                                                                      |
-| Mi az eltérés             | A SPEC-006 szerint a CORS engedély **kizárólag** a `STREAM_PATH` útvonalra vonatkozik, mert a REST hívás a Vite dev proxyn át, azonos originről érkezne (SPEC-005 5.8). A SPEC-007 viszont a REST hívást is a kötelező `VITE_API_ORIGIN` konfigurációra küldi, proxy nélkül. Ha a két origin fejlesztéskor eltér, a REST hívást a böngésző CORS okból eldobja                     |
-| Mi az érvényes viselkedés | Proxy szabály **nem íródik meg**, mert a `server.proxy` `target` mezője konkrét portot követel, amire nincs forrás (SPEC-006 O-1, SPEC-007 O-4), és tippelni tilos (4. szekció). A jelen kódban minden kliens hívás a `VITE_API_ORIGIN` értékre megy. Éles használatban a kérdés nem merül fel: a szerver szolgálja ki a felépített felületet, tehát azonos origin, és nincs CORS |
-| Mi zárná le               | A SPEC-006 O-1 termékdöntése a szerver portjáról és a dev szerver portjáról. Utána két út közül kell választani: a dev REST hívás proxyn megy (a SPEC-006 CORS engedélye változatlan marad), vagy közvetlenül (akkor a SPEC-006 5.7 hatóköre az `/api` előtagra is kiterjesztendő). A választást a usernek kell meghoznia, az askuserquestion tool-lal                            |
+A korábban itt állt hatodik tétel (a fejlesztői REST hívás originje és a szerver CORS engedélyének
+hatóköre) 2026-09-05-én lezárult: a user termékdöntése szerint a **szerver portja `3001`**, a Vite
+dev szerver az alapértelmezett `5173` porton marad, és a dev REST hívás a Vite proxyn megy. Ezzel a
+SPEC-006 CORS engedélye változatlan marad (kizárólag a `STREAM_PATH` útvonalra), az SSE csatorna
+pedig továbbra is közvetlenül a backend originre kapcsolódik, a proxyt megkerülve. A döntés
+átvezetve a SPEC-006 O-1 és 5.7, a SPEC-007 O-4 tételébe, és a SPEC-008 3. szekciója írja le a
+teljes elrendezést.
 
 A korábban itt állt öt tétel (a `.spec.tsx` fájlok és a
 `coverage.exclude` lista, a `CLAUDE.md` elhelyezés, a "nyolcadik kapu" elnevezés, a SPEC-001 14.
@@ -726,8 +826,8 @@ törölve. A kétszintű csomagok száma a PLAN-004 F1 fázisa óta a SPEC-002-b
 szekciójában is "három" (`core`, `provider-capability`, `db`).
 
 A szekció alábbi része az eljárás: mi a teendő, ha egy munkamenet tényleges, felhasználói döntést
-igénylő ellentmondást talál két forrásdokumentum között. A fenti 1. tétel pontosan ezt az
-eljárást követi.
+igénylő ellentmondást talál két forrásdokumentum között. A fent lezárt tétel pontosan ezt az
+eljárást követte, az 1 ... 4. pont szerint.
 
 1. **Nem döntjük el csendben.** Ha az egyik forrás egyértelműen elavult (a döntés megvan, csak
    nincs átvezetve), az nem ide tartozik: azt a talált helyen kell kijavítani, a döntéshez igazítva.

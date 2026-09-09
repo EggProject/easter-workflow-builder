@@ -1,0 +1,63 @@
+/* A gráf szerkesztő egyedi node kártyája (SPEC-008 5.1, 5.5). A mérete a
+   `--graph-node-card-width`/`--graph-node-card-height` custom propertyn át
+   jön, amit a `GraphEditorCanvas` a `graph-node-catalog` téma egyetlen mért
+   konstansából (T-009-19, SPEC-008 5.7, AC62) injektál `<style>` elemként.
+   Szándékosan `min-width`/`min-height`, nem fix `width`/`height`: az egyedi
+   node címke (`workflowNode.label`) tetszőlegesen hosszú lehet, és a kártya
+   ekkor a mértnél nagyobbra nő, ahelyett hogy a tartalom levágódna (lásd a
+   `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció
+   "Mit NEM zár le ez a mérés" bekezdését).
+
+   A `box-sizing: border-box` NEM stílus ízlés, hanem a konstans jelentésének
+   helyreállítása, és egy mért hiba javítása (research 7. szekció "A mért
+   érték doboz modellje"). A mérés a kártya `offsetWidth`/`offsetHeight`
+   értékét vette fel, ami DEFINÍCIÓ SZERINT border-box méret (keret és
+   belső margó együtt). A böngésző alapértelmezett `content-box` modelljében
+   viszont a `min-width`/`min-height` a TARTALOM dobozra vonatkozik, tehát a
+   358x106-os konstansból 392x132-es kirajzolt kártya lett (mérve: 358 + 2*16
+   belső margó + 2*1 keret = 392, illetve 106 + 2*12 + 2*1 = 132), miközben a
+   dagre elrendezés ugyanezt a konstanst 358x106-ként kapta meg. A két szám
+   különbsége ült rá a csomópontok közti hézagra: a dokumentált 50 egységes
+   `ranksep`-ből 16, az 50 egységes `nodesep`-ből 24 maradt. */
+.graph-node-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  min-width: var(--graph-node-card-width);
+  min-height: var(--graph-node-card-height);
+  border-radius: var(--ep-radius-md);
+  border: 1px solid var(--ep-border-subtle);
+  background: var(--ep-bg-elevated);
+  color: var(--ep-fg);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+.graph-node-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.graph-node-card__type {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ep-fg-muted);
+}
+
+.graph-node-card__label {
+  margin: 0;
+  font: var(--ep-text-small);
+  font-weight: 500;
+  color: var(--ep-fg);
+}
+
+.graph-node-card__warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ep-danger);
+}

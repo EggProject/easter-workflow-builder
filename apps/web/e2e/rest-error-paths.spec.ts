@@ -91,6 +91,23 @@ test('hibás alakú protokoll hiba törzsre a HTTP státusz szerepel az üzenetb
   await expect(page.getByRole('alert')).toHaveText('A szerver hibás választ adott (HTTP 500).');
 });
 
+test('nem 2xx válaszra, ha a törzs NEM érvényes JSON, ugyanaz a HTTP státuszos üzenet jön', async ({ page }) => {
+  // A `buildProtocolErrorOutcome` a `decodeResponseBody` hibaágán (érvénytelen
+  // JSON) a `parsed` értéket `undefined`-nek hagyja, tehát a `!parsed?.success`
+  // ág fut - ez eddig kizárólag a `response.ok === true` oldalon (200-as,
+  // sikeres válasz nem JSON törzzsel) volt lefedve, a `response.ok === false`
+  // oldalon nem.
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: 'ez nem json' }),
+    ),
+  ]);
+
+  await page.goto('/');
+
+  await expect(page.getByRole('alert')).toHaveText('A szerver hibás választ adott (HTTP 500).');
+});
+
 test('204-es, üres törzsű válasz a séma validáláson bukik el, a felület használható marad', async ({ page }) => {
   // A `decodeResponseBody` a 204-et `undefined` értékkel, sikeres ágon adja
   // tovább, és a `responseSchema` dönt róla. Egyetlen mai végpont sem ad

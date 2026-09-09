@@ -2,11 +2,16 @@ import { isOkOutcome, type EnvironmentReader, type Outcome } from '@easter-workf
 import type { FrontendConfig } from './frontend-config.ts';
 
 /**
- * A három kötelező környezeti változó neve. A Vite kizárólag a `VITE_`
+ * A négy kötelező környezeti változó neve. A Vite kizárólag a `VITE_`
  * előtagú változókat teszi elérhetővé a kliens kódnak
- * (https://vite.dev/guide/env-and-mode, SPEC-007 M-11).
+ * (https://vite.dev/guide/env-and-mode, SPEC-007 M-11). A `streamOrigin` a
+ * SPEC-008 3.3 szekció szerinti port döntés miatt vált külön az `apiOrigin`
+ * mezőtől: fejlesztéskor a REST hívás a Vite proxyn megy (`apiOrigin` a dev
+ * szerver saját originje), az SSE csatorna viszont a proxyt megkerülve
+ * közvetlenül a backend originre kapcsolódik (`streamOrigin`).
  */
 const API_ORIGIN_VARIABLE = 'VITE_API_ORIGIN';
+const STREAM_ORIGIN_VARIABLE = 'VITE_STREAM_ORIGIN';
 const LIST_LIMIT_VARIABLE = 'VITE_LIST_LIMIT';
 const STREAM_REPLAY_LIMIT_VARIABLE = 'VITE_STREAM_REPLAY_LIMIT';
 
@@ -57,6 +62,11 @@ export function readFrontendConfig(environment: EnvironmentReader): Outcome<Fron
     return apiOrigin;
   }
 
+  const streamOrigin = readRequiredText(environment, STREAM_ORIGIN_VARIABLE);
+  if (!isOkOutcome(streamOrigin)) {
+    return streamOrigin;
+  }
+
   const listLimit = readRequiredPositiveInteger(environment, LIST_LIMIT_VARIABLE);
   if (!isOkOutcome(listLimit)) {
     return listLimit;
@@ -71,6 +81,7 @@ export function readFrontendConfig(environment: EnvironmentReader): Outcome<Fron
     kind: 'ok',
     value: {
       apiOrigin: apiOrigin.value,
+      streamOrigin: streamOrigin.value,
       listLimit: listLimit.value,
       streamReplayLimit: streamReplayLimit.value,
     },

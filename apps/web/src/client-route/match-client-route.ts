@@ -7,7 +7,7 @@ import { CLIENT_ROUTE_TABLE, type ClientRouteId } from './client-route-table.ts'
  * vissza, sosem a szűkebb `ClientRouteId` uniót, és `as` kényszerítés
  * nélkül nem írható vissza (`.claude/CLAUDE.md` 5.).
  */
-const CLIENT_ROUTE_IDS: readonly ClientRouteId[] = ['workflowList', 'runHistory'];
+const CLIENT_ROUTE_IDS: readonly ClientRouteId[] = ['workflowList', 'runHistory', 'graphEditor', 'runView'];
 
 /**
  * A `pathname` illesztése a `CLIENT_ROUTE_TABLE` egy bejegyzésére (SPEC-007

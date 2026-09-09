@@ -28,6 +28,7 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                                                                                                        |
 | `src/relative-import-extension/`  | téma mappa, megvalósítás fájl nélkül: a `packages/*/src` és az `apps/*/src` alatt minden relatív import kiterjesztéssel áll (SPEC-006 M-5, M-6, M-7, PLAN-007 T-007-3); a `casing` téma `findRelativeImportSpecifiers` függvényét hívja újra                                                      |
 | `src/no-preserve-symlinks/`       | téma mappa, megvalósítás fájl nélkül: az `apps/server/src` és az `apps/server/package.json` scriptjei nem tartalmazzák a `--preserve-symlinks` kapcsolót (SPEC-006 3.6, M-4, PLAN-007 T-007-3)                                                                                                    |
+| `src/no-em-dash/`                 | téma mappa, megvalósítás fájl nélkül: a repó saját (nem vendorolt) `.md`/`.ts`/`.tsx`/`.css` fájljai nem tartalmaznak em dash-t (gyökér `CLAUDE.md` 6. szekció); a `packages/ui` bájtra átemelt design system fájljai a `.prettierignore` vendorolt blokkjával egyező, explicit listával kizártak |
 
 ## Függőségi irány
 

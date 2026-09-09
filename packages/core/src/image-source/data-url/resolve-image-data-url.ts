@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { describeError } from '../../http-client/error-description/describe-error.ts';
 import type { FetchFunction } from '../../http-client/request/fetch-function.ts';
 import { getBinary } from '../../http-client/request/get-binary.ts';
@@ -11,8 +10,22 @@ import type { ReadFileFunction } from './read-file-function.ts';
 
 const SUPPORTED_FORMATS_HINT = 'Támogatott formátumok: JPEG, PNG, WebP.';
 
+/**
+ * A base64 kódolás a szabványos `Uint8Array.prototype.toBase64()` metódussal
+ * megy, NEM a `node:buffer` modul `Buffer` osztályával. Az ok nem stílus,
+ * hanem egy mért, blokkoló hiba: a `core` csomag felülete egyetlen barrel
+ * (`src/index.ts`), amit az `apps/web` is érték szinten importál
+ * (`isOkOutcome`), a barrel pedig ezt a fájlt is behúzza. Egy modul szintű
+ * `import ... from 'node:buffer'` ezért `vite dev` alatt (ahol nincs
+ * tree shaking) a böngészőbe kerül, és az egész alkalmazást megbuktatja:
+ * "Module node:buffer has been externalized for browser compatibility."
+ * A `toBase64()` az ES2026 szabvány része, a böngészőkben és a Node 22 óta
+ * elérhető, tehát ugyanaz a kód fut mindkét oldalon.
+ * Forrás: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/toBase64
+ * és https://github.com/tc39/proposal-arraybuffer-base64
+ */
 function toDataUrl(mediaType: ImageMediaType, bytes: Uint8Array): string {
-  return `data:${mediaType};base64,${Buffer.from(bytes).toString('base64')}`;
+  return `data:${mediaType};base64,${bytes.toBase64()}`;
 }
 
 /**

@@ -26,6 +26,9 @@ coverage-e2e/
 .nyc_output/
 test-results/
 playwright-report/
+# a `bun run screenshots` alapertelmezett kimeneti mappaja (a script maga
+# verziokovetve van, a generalt kepek nem)
+apps/web/screenshots/
 blob-report/
 .playwright/
 

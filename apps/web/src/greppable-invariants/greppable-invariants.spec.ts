@@ -92,7 +92,14 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
   });
 
   it('(7) nincs ResizeObserver és IntersectionObserver hivatkozás', () => {
-    const offenders = PRODUCT_FILES.filter((file) => /ResizeObserver|IntersectionObserver/.test(file.content));
+    // A doksi sorok kiszűrve, ugyanazzal a `stripCommentLines` segédfüggvénnyel
+    // és ugyanabból az okból, mint a (4) és a (14) ellenőrzésnél: a szabály a
+    // tényleges API HIVATKOZÁST tiltja, nem azt a magyarázó mondatot, ami
+    // leírja, miért nem használunk saját megfigyelőt (`graph-editor` téma,
+    // 2026-09-05).
+    const offenders = PRODUCT_FILES.filter((file) =>
+      /ResizeObserver|IntersectionObserver/.test(stripCommentLines(file.content)),
+    );
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 
@@ -111,15 +118,26 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(timeoutOffenders.map((file) => file.relativePath)).toEqual([]);
   });
 
-  it('(9) nincs @xyflow/react import és nincs SPEC-008/SPEC-009 hatókörű fájl', () => {
+  it('(9) a @xyflow/react import kizárólag a három engedett témára szűkül, és nincs SPEC-009 hatókörű fájl', () => {
     // Tényleges import utasítás mintáját keresi, nem puszta részsztringet:
     // egy pusztán szöveges említés (pl. ennek a tesztnek a saját címe vagy
-    // egy magyarázó komment) nem termékkód import.
+    // egy magyarázó komment) nem termékkód import. A SPEC-008 F3 fázisa óta
+    // (PLAN-009 T-009-15, T-009-16) a `graph-node-card` és a `graph-editor`
+    // ténylegesen importálja a könyvtárat; a harmadik engedett téma, a
+    // `run-graph`, a SPEC-008 F4 fázisában érkezik (AC29, 12.3 szekció). A
+    // korábbi, teljes tiltás (SPEC-008 jóváhagyása előtti állapot) ezzel a
+    // szűkített, de nem nulla halmazzal váltódott fel.
     const xyflowModuleName = ['@xyflow', 'react'].join('/');
     const importPattern = new RegExp(`from ['"]${xyflowModuleName}['"]`);
-    const offenders = ALL_FILES.filter((file) => importPattern.test(file.content));
+    const allowedXyflowThemeNames = new Set(['graph-editor', 'graph-node-card', 'run-graph']);
+    const offenders = ALL_FILES.filter(
+      (file) =>
+        importPattern.test(file.content) && !allowedXyflowThemeNames.has(file.relativePath.split(path.sep)[0] ?? ''),
+    );
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
-    const outOfScopeThemeNames = new Set(['graph-editor', 'transcript-panel', 'settings-screen', 'workflow-canvas']);
+    // A `graph-auto-layout` téma szándékosan NEM engedett (SPEC-008 5.7: "az
+    // elrendezés tiszta függvény, és nem importál @xyflow/react szimbólumot").
+    const outOfScopeThemeNames = new Set(['settings-screen', 'skill-upload', 'mcp-server-config']);
     const themeDirectories = readdirSync(WEB_SRC, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
@@ -150,5 +168,20 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     for (const packageJsonPath of packageJsonPaths) {
       expect(readFileSync(packageJsonPath, 'utf8')).not.toContain('@testing-library');
     }
+  });
+
+  it('(13) a vite.config.ts nem tartalmaz port számot, origin literált és timeout mezőt a proxy szabályban (SPEC-008 3.3, M-79)', () => {
+    const viteConfigSource = readFileSync(path.join(WEB_SRC, '..', 'vite.config.ts'), 'utf8');
+    expect(viteConfigSource).not.toMatch(/localhost|:4173|:4174|:5173|:3000|:3001|:8080/);
+    expect(viteConfigSource).not.toMatch(/\btimeout\s*:/);
+  });
+
+  it('(14) nincs felülírt dagre nodesep/ranksep/edgesep/marginx/marginy opció (SPEC-008 5.7, M-93, AC61)', () => {
+    const forbiddenOptionNames = ['nodesep', 'ranksep', 'edgesep', 'marginx', 'marginy'];
+    const offenders = PRODUCT_FILES.filter((file) => {
+      const codeOnly = stripCommentLines(file.content);
+      return forbiddenOptionNames.some((optionName) => codeOnly.includes(optionName));
+    });
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 });

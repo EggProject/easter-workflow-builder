@@ -5,7 +5,7 @@
 // EGYETLEN, mérten indokolt kivétel, ld. `sse-reconnect.spec.ts`.
 import type { Page } from '@playwright/test';
 import { encodeStreamFrame, type StreamFrame } from '@easter-workflow-builder/protocol';
-import { API_ORIGIN } from './api-origin.ts';
+import { STREAM_ORIGIN } from './api-origin.ts';
 
 /**
  * Egyetlen, lezárt SSE válasz mockolása a megadott keretsorozattal. A
@@ -14,7 +14,7 @@ import { API_ORIGIN } from './api-origin.ts';
  * belül milyen kereteket kap a kliens - nem menet közbeni, élő beszúrást.
  */
 export async function mockSseFrames(page: Page, frames: readonly StreamFrame[]): Promise<void> {
-  await page.route(`${API_ORIGIN}/events**`, async (route) => {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
     const body = frames.map((frame) => encodeStreamFrame(frame)).join('');
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
   });

@@ -15,43 +15,138 @@ A SPEC-007 12.2 tizenkét téma mappája mind megvan: `app-mount`, `app-shell`, 
 pont a `src/app-mount/main.tsx`, amit az `index.html` modul scriptje tölt be; a `src/main.ts`
 ideiglenes e2e-váz megszűnt.
 
-A tizenkettőn felül négy további, megvalósítás nélküli invariáns téma mappa is van:
-`greppable-invariants` (T-008-31, tizenharmadik), `vite-istanbul-include-invariant` (T-008-18,
-tizennegyedik), `e2e-coverage-threshold` (tizenötödik, 2026-09-05) és
-`unit-test-network-isolation` (tizenhatodik, 2026-09-05). Ezek a `packages/ui`-ban már bevett
+A tizenkettőn felül öt további, megvalósítás nélküli invariáns téma mappa is van:
+`greppable-invariants` (T-008-31), `vite-istanbul-include-invariant` (T-008-18),
+`e2e-coverage-threshold` (2026-09-05), `unit-test-network-isolation` (2026-09-05) és
+`browser-safe-imports` (2026-09-05). Ezek a `packages/ui`-ban már bevett
 minta (`aria-token-list`, `class-name-list`, `component-boundary-invariant`,
 `media-query-breakpoint-invariant`) analógjai:
 egyik sem a SPEC-007 12.2 UI témái közé tartozik, hanem a SPEC-002 6.2 5. pontja szerinti
 konfigurációs invariáns saját mappában.
 
+**A SPEC-008 F3 fázisa (PLAN-009) folyamatban bővíti a gráf szerkesztővel.** Eddig elkészült
+témák: `graph-node-catalog` (T-009-14, tizenhetedik), `graph-node-card` (T-009-15,
+tizennyolcadik), `graph-editor` (T-009-16, tizenkilencedik), `node-inspector` (T-009-18,
+huszadik) és `graph-auto-layout` (T-009-19, huszonegyedik). A SPEC-008 11.2 szekciója tíz új
+témát ír elő összesen (a maradék öt a PLAN-009 hátralévő lépéseiben érkezik); a végleges
+"huszonnégy téma" végösszeg (SPEC-008 DoD 2.) és a jelen tényleges darabszám (tizenkettő
+SPEC-007 UI + négy invariáns + tíz SPEC-008 = huszonhat) közötti eltérés a PLAN-009 T-009-32
+(F8) zárásának hatóköre, nem ezé a lépésé.
+
+**A `graph-auto-layout` téma a `@dagrejs/dagre@3.1.1` hívást tiszta függvénybe zárja**
+(`layoutGraph`, SPEC-008 5.7, AC61, AC62): a bemenete és a kimenete is a domain szintű
+`WorkflowNodeInput`/`WorkflowEdgeInput` alak, nincs `@xyflow/react` import és DOM hivatkozás.
+Az egyetlen felülírt dagre opció a `rankdir` (`LR`); a csomópont méret a `graph-node-catalog`
+egyetlen mért konstansa (`GRAPH_NODE_CARD_WIDTH`/`GRAPH_NODE_CARD_HEIGHT`, T-009-19, M-94,
+`docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció), amit a
+`graph-node-card.css` egy `GraphEditorCanvas` által injektált custom propertyn át
+`min-width`/`min-height`-ként is olvas - egyetlen forrás, két fogyasztó, szám duplikáció
+nélkül. A `GraphEditorScreen` láblécének "Elrendezés" gombja hívja, szinkron, mentés
+nélkül (2026-09-09 óta a lábléc gombcsoportjából, a megszűnt felső eszköztár helyett).
+
+**A `node-inspector` téma a kiválasztott node `config` mezőjét szerkeszti** a `protocol`
+`node-config` sémája felett, típusonként külön mezőkkel (SPEC-008 5.1, 5.2, AC16). A
+mezőnkénti hiba a `NodeConfigSchema.safeParse` eredményéből, útvonal szerint jelenik meg,
+KIZÁRÓLAG a hibás mező alatt: a panel tetején álló összesítő 2026-09-09 óta nincs. A
+megjelenés szabályát a `packages/ui` `field-error-visibility` témája adja (érintett vagy már
+megkísérelt mentés), a "már megkísérelték" tényt a `NodeInspector` `isSaveAttempted` propja
+viszi le. **Kártya alakú szakasz doboz nincs** (tilos a card in card): a tagolás vagy
+`AccordionItem` panel, vagy megnevezett, doboz nélküli csoport (`InspectorFieldGroup`). A
+`SandboxConfig` és a `structuredOutput.schema` dokumentálatlan, `unknown` alakú mezői nyers JSON
+szerkesztőn mennek, nem bespoke mezőkön (a `packages/protocol` saját doksija szerint "tippelni
+tilos"). A téma **nem importál `zod`-ot közvetlenül**: a mezőnkénti hibalista a
+`fieldErrorsFromZodError` segédfüggvényen át, egy strukturális `ZodErrorLike` típussal megy, mert
+a drótszintű validálás kizárólag a `packages/protocol` felelőssége (`greppable-invariants`
+teszt (2)).
+
+**A `graph-editor` téma a T-009-17 óta a betöltést, a mentést és a mentetlen jelzőt is hordozza**
+(`GraphEditorScreen`), a `GraphEditorCanvas` mellett - a SPEC-008 11.2 táblázata ezt a témát
+eleve így írja le ("a vezérelt vászon, a mentés és a betöltés, a piszkos állapot"), tehát ez nem
+külön, tizenegyedik SPEC-008 téma. Az `app-shell.tsx` `'graphEditor'` ága a `GraphEditorScreen`-t
+rendereli, a többi képernyő mintáját követve.
+
+**A korábbi, ideiglenes `70vh` vászonmagasság 2026-09-05 óta nincs**: az `.app-content` ma
+határozott magasságot ad a gyerekeinek (`packages/ui` topnav shell), tehát a szerkesztő a
+maradék helyet tölti ki (`flex: 1`), belül pásztáz, és az OLDAL nem görget. A `70vh` mellett a
+csomópont rács túlnyúlt a viewporton, a beállítás panel alja pedig levágódott.
+
+**Az `.app-content` belső margója a szerkesztőn NULLA (2026-09-06, 2026-09-09-én kiterjesztve)**,
+mert a tartalom doboz mérete a flex-allokált magasságból számít, nem afölé: a görgetett listákra
+szánt 80px levonódott a vászon/panel rendelkezésre álló magasságából, üres sávot hagyva alattuk.
+A 2026-09-09-i felhasználói kérés ("faltol falig, slim designt csinaljunk") ezt az oldalsó 40px-re
+is kiterjesztette. A `topnav-shell.css` `.app-content:has(> .graph-editor-screen)` szabálya ezért
+teljesen nullázza a paddingot ezen az egy screen-en, regresszió
+`apps/web/e2e/graph-editor.spec.ts`-ben és `graph-editor-layout.spec.ts`-ben.
+
+**A szerkesztő elrendezése 2026-09-09 óta kártya keret nélküli, alsó akciósávval.** A vászon köré
+vont `.resizable-group` kártya recept (szegély, lekerekítés, emelt háttér) a fogyasztó oldalán
+törlődik, mert a design systemnek nincs keret nélküli Resizable variánsa, a `resizable.css` pedig
+bájtazonossági teszt alatt áll. A felső eszköztár helyére a `packages/ui` `page-footer` témája
+lépett: balra a státusz, jobbra egy `sm` méretű `ButtonGroup` split button. A vászon és a panel
+aránya a `localStorage` `eggGraphEditorLayout` kulcsán perzisztálódik
+(`src/graph-editor/graph-editor-layout.ts`), a hiányzó, a hibás JSON, a rossz alakú és a dobó
+tárolás ága mind az alapértelmezésre esik vissza. A háttér és a design system fedezete:
+`docs/research/2026-09-08-design-system-audit.md` 9. szekció.
+
+**A vászon a React Flow mért csomópont méretét saját nézeti állapotban tartja**
+(`src/graph-editor/measured-node-sizes.ts`, SPEC-008 5.5). Nélküle a vezérelt oda-vissza
+leképezés minden körben elnyelte a `measured` mezőt: a csomópontok tartósan
+`visibility: hidden` állapotban maradtak, egyetlen él sem rajzolódott ki, és a mérési hurok nem
+konvergált. Ez a téma **nem** hivatkozik `measured.width`, `measured.height` vagy
+`getBoundingClientRect()` értékre, tehát a SPEC-008 12.2 szabálya sértetlen: a mérettől függő
+ágak tiszta függvényben, szintetikus bemenettel tesztelhetők.
+
+**Ugyanezen okból nézeti állapot a kiválasztás is** (`src/graph-editor/graph-selection.ts`,
+SPEC-008 5.5, AC63). A `WorkflowEdgeInput` nem hordoz `selected` mezőt, tehát a vezérelt
+oda-vissza leképezés az él kiválasztását elnyelte: az élre kattintva nem került rá a `selected`
+osztály, ezért a React Flow dokumentált `deleteKeyCode` alapértelmezése (`Backspace`) sem
+találhatott törölni valót. Ugyanez igaz a csomópont kiválasztásának megszűnésére, amit a
+könyvtár élre kattintva küld: enélkül a `Backspace` a kiválasztott él helyett a csomópontot
+törölte.
+
+**A React Flow saját CSS-e a `--xy-*` változóin át van témázva** (`graph-editor.css`), a design
+system `--ep-*` tokenjeire; kitalált szín nincs. A szállított alapértelmezés mellett a vezérlő
+gombok sötét témában olvashatatlanok voltak (világos ikon fehér dobozon). Az él vonalszíne
+(`--xy-edge-stroke`) a `--ep-border-strong` tokenre kötve **kifestett pixel szinten** áll
+regressziós teszt alatt (`e2e/graph-edge-stroke.spec.ts`), mert a DOM megléte és a
+`toBeVisible()` akkor is zöld marad, ha a vonal a háttér színével fest
+(`docs/research/2026-09-09-graf-el-vonal-meres.md`).
+
 ## Fájlok
 
-| Téma / fájl                            | Tartalom                                                                                                                                                                        |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`                         | barrel, csak nevesített újraexport                                                                                                                                              |
-| `src/vite-env.d.ts`                    | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                                                                |
-| `src/app-mount/`                       | a valódi böngésző belépési pont: `main.tsx` (egy import, egy hívás) és `mount-app.tsx`, ami a `#root` hiányát és a hibás konfigurációt kezeli (SPEC-007 12.2)                   |
-| `src/app-shell/`                       | a topnav összeállítása: brand, navigáció, lenyíló menü, stream státusz kijelző (SPEC-007 12.2)                                                                                  |
-| `src/frontend-config/`                 | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja                                                  |
-| `src/client-route/`                    | a kliens oldali útvonaltábla (`workflowList`, `runHistory`) és a `pathname -> routeId` illesztő (SPEC-007 7.2, 12.2)                                                            |
-| `src/history-navigation/`              | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)                                                |
-| `src/not-found-route/`                 | az ismeretlen útvonal képernyője (SPEC-007 12.2)                                                                                                                                |
-| `src/protocol-error-message/`          | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                                                                   |
-| `src/request-state/`                   | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)                                                      |
-| `src/rest-client/`                     | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció)                                        |
-| `src/run-history/`                     | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                                         |
-| `src/stream-client/`                   | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                                             |
-| `src/workflow-list/`                   | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                                         |
-| `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                          |
-| `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                   |
-| `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)  |
-| `src/unit-test-network-isolation/`     | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vitest.setup.ts` `fetch` lezárását őrzi (unit teszt nem szólíthat meg hálózatot)                                      |
-| `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                                               |
-| `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`)                                                                                         |
-| `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                                              |
-| `vitest.setup.ts`                      | a React 19 `act()` környezet jelzése, a happy-dom projekt-környezetben hiányzó `globalThis.localStorage` pótlása (a `packages/ui` azonos fájljának párja) és a `fetch` lezárása |
-| `playwright.config.ts`                 | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                                           |
-| `e2e/`                                 | Playwright tesztek, a coverage fixture és a közös REST/SSE mockolási segédfüggvények (T-008-27..29)                                                                             |
+| Téma / fájl                            | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                         | barrel, csak nevesített újraexport                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `src/vite-env.d.ts`                    | **típus only** (nincs `.spec.ts` párja): az `import.meta.env` típusbővítése, `import` sor nélkül (SPEC-007 M-11)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/app-mount/`                       | a valódi böngésző belépési pont: `main.tsx` (egy import, egy hívás) és `mount-app.tsx`, ami a `#root` hiányát és a hibás konfigurációt kezeli (SPEC-007 12.2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `src/app-shell/`                       | a topnav összeállítása: brand, navigáció, lenyíló menü, stream státusz kijelző, és a nagy oldalcím helyén a morzsamenü összeállítása útvonalanként a `client-route` `label` mezőjéből (SPEC-007 12.2, 2026-09-06 kiegészítés)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `src/frontend-config/`                 | a kötelező, `VITE_` előtagú konfiguráció beolvasása `Outcome` alakban, **alapérték nélkül**; a hibaüzenet a változó nevét adja                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/client-route/`                    | a kliens oldali útvonaltábla (`workflowList`, `runHistory`, `graphEditor`, `runView`, PLAN-009 T-009-12), útvonalanként a `template` mellett a `label` emberi olvasható névvel (2026-09-06), és a `pathname -> routeId` illesztő, paraméteres ág nélkül (SPEC-007 7.2, 12.2, SPEC-008 5. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `src/history-navigation/`              | a `history`/`location` böngésző API befecskendezett portja, böngésző megvalósítás és a `useClientRoute` hook (SPEC-007 7.2, 9.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/not-found-route/`                 | az ismeretlen útvonal képernyője (SPEC-007 12.2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/protocol-error-message/`          | a `ProtocolErrorCode` magyar üzenet leképezése (SPEC-007 8.4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `src/request-state/`                   | négyállapotú (`idle`/`pending`/`success`/`failure`) async állapot típus és a `useRequestState` hook (SPEC-007 11. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src/rest-client/`                     | REST hívás a `packages/protocol` `ROUTE_TABLE` fölött, befecskendezett `FetchFunction`-nel, öt `Outcome` hibaággal (SPEC-007 8. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `src/run-history/`                     | a futás előzmények képernyő, fülekkel és élő állapot feliratkozással, plusz a státusz-jelvény leképezés (SPEC-007 10.2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `src/stream-client/`                   | `EventSourceFactory` és `streamId` generátor port, az öt SSE keret feldolgozása, a topnav státusz négy fázisa (SPEC-007 9. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `src/workflow-list/`                   | a workflow lista képernyő és a három soronkénti modális (létrehozás, átnevezés, törlés-hatás-összegzés) (SPEC-007 10.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `src/graph-node-catalog/`              | a tíz csomópont típus megjelenítési és handle táblája, `Record<NodeType, ...>` alakban, plusz a kártya méret konstans (T-009-19-től) (SPEC-008 5.1, 5.7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `src/graph-node-card/`                 | a vászon egyetlen egyedi node komponense, a `Handle` elemekkel és a `StepRunStatus` jelvény leképezéssel (SPEC-008 5.1, 5.5, AC21)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `src/graph-editor/`                    | a vezérelt `GraphEditorCanvas` (`@xyflow/react` felett), a `GraphEditorScreen` (betöltés, mentés, mentetlen jelző, mentés előtti séma ellenőrzés), a node/él leképezés, a mért csomópont méret és a kiválasztás nézeti állapota, az `isValidGraphConnection` szerkezeti szabálypár, és a `FitViewOnAutoLayout`, ami az automatikus elrendezés után újra a teljes gráfra illeszti a nézetet; a `graph-editor-layout.ts` a `localStorage` `eggGraphEditorLayout` kulcsán perzisztált osztott elrendezés arány (kulcs, alapértelmezés, typeguard, olvasás és írás, mindkét irányban `try`/`catch`-csel) (SPEC-008 5.4, 5.5, 5.7, 10., AC8-AC13, AC15, AC63, AC64-AC68)                                                                                                                                                     |
+| `src/node-inspector/`                  | a kiválasztott node `config` mezőjét szerkesztő, a vászon jobb szélére DOKKOLT, húzható sáv (a `packages/ui` `resizable` témájának jobb paneljében). A fontos mezők elöl állnak, panel nélkül; a ritkán szerkesztett csoportok `AccordionItem` panelben (`packages/ui` `accordion` téma), a kisebb, megnevezett egységek pedig doboz nélküli `InspectorFieldGroup` csoportban (`role="group"` plusz `aria-labelledby`, a `fieldset`/`legend` pár helyett, W3C WAI ARIA17). Kártya alakú szakasz doboz NINCS. A `protocol` séma feletti hiba EGY szinten, a hibás MEZŐ ALATT jelenik meg, a `FieldErrorsContext`/`useFieldError` páron át, `aria-invalid`, `aria-describedby` és `role="alert"` kötéssel, a `field-error-visibility` szabálya szerint (SPEC-008 5.1, 5.2, 10., AC16, AC16a-AC16d, AC17, AC60, AC69-AC73) |
+| `src/graph-auto-layout/`               | a `@dagrejs/dagre` hívás tiszta függvényként (`layoutGraph`), egyetlen felülírt opcióval (`rankdir`) és a `graph-node-catalog` kártya méret konstansával (SPEC-008 5.7, AC61, AC62)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `src/greppable-invariants/`            | tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy `describe` blokkban (T-008-31, SPEC-002 6.2 5. pont mintája)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `src/vite-istanbul-include-invariant/` | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vite.config.ts` istanbul `include` mintázatát `'src/**/*'` alakon rögzíti, nem `'src/*'` (T-008-18)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `src/e2e-coverage-threshold/`          | megvalósítás fájl nélküli téma: regressziós teszt, ami az e2e lefedettségi küszöb **kapu jellegét** őrzi (`--check-coverage` a scriptben, `e2e` a `ci` job `needs` listájában)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/unit-test-network-isolation/`     | megvalósítás fájl nélküli téma: regressziós teszt, ami a `vitest.setup.ts` `fetch` lezárását őrzi (unit teszt nem szólíthat meg hálózatot)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src/browser-safe-imports/`            | megvalósítás fájl nélküli téma: regressziós teszt, ami az `apps/web` futásidejű workspace zárt halmazát Node beépített modul (`node:*`) importtól védi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `index.html`                           | a Vite dev/build belépési HTML-je, a `src/app-mount/main.tsx`-re mutat, `<meta name="viewport">` a valódi mobil reszponzivitáshoz                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `vite.config.ts`                       | Vite 8 config, `vite-plugin-istanbul` a `VITE_COVERAGE=true` mögé rejtve (`requireEnv`), plusz a `/api` fejlesztői proxy szabály (SPEC-008 3.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `vitest.config.ts`                     | Vitest projekt config, `happy-dom` környezet (SPEC-001 9. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `vitest.setup.ts`                      | a React 19 `act()` környezet jelzése, a happy-dom projekt-környezetben hiányzó `globalThis.localStorage` pótlása (a `packages/ui` azonos fájljának párja) és a `fetch` lezárása                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `playwright.config.ts`                 | Playwright alap config, `retries: 0` (dokumentált alapértelmezés), `chromium` projekt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `playwright.screenshots.config.ts`     | a fenti config öröklése, kizárólag az `e2e/capture-screenshots.ts` futtatásával (`bun run screenshots`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `e2e/`                                 | Playwright tesztek, a coverage fixture, a közös REST/SSE mockolási segédfüggvények (T-008-27..29), a bemutató gráf fixtúra (`showcase-graph.ts`), a per-él pixel mérés (`edge-paint-measurement.ts`) és a képernyőkép készítés (`capture-screenshots.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ## Függőségi irány
 
@@ -61,7 +156,25 @@ a `db`, az `engine`, az `agent` vagy a `server` csomagtól függenie. Ez megegye
 (`@types/react`, `@types/react-dom`) katalógus hivatkozással állnak, a verziók forrása a
 `docs/research/2026-08-26-toolchain.md`.
 
+**Három új külső függőség a SPEC-008 óta**: `@xyflow/react`, `react-window` és `@dagrejs/dagre`,
+mindhárom katalógus hivatkozással (SPEC-008 4.2). Egyik sem a `packages/ui` függősége: a vászon a
+workflow node típusait ismeri (domain fogalom), a virtualizált lista egyetlen fogyasztóval spekulatív
+absztrakció lenne, a dagre hívás pedig a csomópont kártya méretét és a saját éllistát ismeri
+(SPEC-008 4.1). A `@xyflow/react@12.11.6` saját `.d.ts` fájljai `exactOptionalPropertyTypes: true`
+mellett típushibásak egymás között (`InternalNode<NodeType>` és `NodeOrigin` illesztése, `TS2344`
+több belső fájlban), ezért az `apps/web/tsconfig.json` `skipLibCheck: true` kapcsolót kapott - ugyanaz
+a felsőáramú hiba kategória, mint a `drizzle-orm` a `packages/engine`-ben (`.claude/CLAUDE.md` 12.).
+
 ## Szabályok
+
+**Képernyőkép készítés: `bun run screenshots`.** Ez az EGYETLEN út, és a repóban él, nem
+munkamenetenként újraírt eldobható scriptben. A gráf fixtúrája az `e2e/showcase-graph.ts`
+(tizenegy éllel, minden csomópont bekötve), a képek kimenete alapból az `apps/web/screenshots/`
+mappa, felülírható az `EASTER_SCREENSHOT_DIR` környezeti változóval. A parancs a panel megnyitása
+UTÁN nyomja meg a React Flow "Fit View" gombját, mert a `fitView` prop csak a kezdeti nézetre szól.
+A fixtúra alakját és minden élének kifestett vonalát az `e2e/showcase-graph.spec.ts` regressziós
+teszt őrzi a `test:e2e` kapun. A miértje és a mérés:
+[`../../docs/research/2026-09-09-graf-el-vonal-meres.md`](../../docs/research/2026-09-09-graf-el-vonal-meres.md) 6. és 7. szekció, `.claude/CLAUDE.md` 12. szekció.
 
 Ha a csomag valódi tartalmat kap, a `src/index.ts` `IS_WEB_PLACEHOLDER` konstansát törölni kell
 (megtörtént). A `src/` alatti mappaszerkezet a téma szerinti konvenciót követi, egy szint mélyen;
@@ -72,6 +185,25 @@ a `src/` alatt közvetlenül kizárólag az `index.ts` barrel és a `vite-env.d.
 időkorlát szám a `src/` alatt: mindegyik kötelező `VITE_` előtagú környezeti változó,
 alapérték nélkül (SPEC-007 O-4, O-5, O-6, 16. szekció 45. kritérium). A hiányzó változóról szóló
 hibaüzenet a változó **nevét** nevezi meg, az értékét soha.
+
+**A fejlesztői elrendezés, két origin (SPEC-008 3. szekció, a user termékdöntése 2026-09-05).**
+A szerver portja `3001`, a Vite dev szerver az alapértelmezett `5173` portján marad. Ebből
+következik, hogy a `frontend-config` két külön originnel dolgozik:
+
+| Csatorna          | Env változó          | Fejlesztéskor                                           | Élesben          |
+| ----------------- | -------------------- | ------------------------------------------------------- | ---------------- |
+| REST (`/api/...`) | `VITE_API_ORIGIN`    | a Vite dev szerver saját originje - **proxyn megy**     | a szerver origin |
+| SSE (`/events`)   | `VITE_STREAM_ORIGIN` | közvetlenül a backend originre, **a proxyt megkerülve** | a szerver origin |
+
+A `vite.config.ts` `server.proxy` mezője pontosan egy szabályt tartalmaz, a kulcsa a
+`protocol` csomag `API_BASE_PATH` értéke (`/api`), a `target` pedig a `loadEnv` mechanizmuson
+át a `VITE_STREAM_ORIGIN` értékét olvassa - **nem új env változó**, hanem a kliens config már
+meglévő mezőjének újrahasznosítása, mert fejlesztéskor az már a tényleges backend originre
+mutat. Az SSE csatorna azért kerüli meg a proxyt, mert a `docs/research/
+2026-09-05-plan009-f0-blokkolo-meresek.md` 4. szekciója szerint ez a szigorúbb, már beépített
+út, és a mérés (a lezárás és a `Last-Event-ID` fejléc helyesen működik a proxyn át is) nem ad
+okot a váltásra. A `timeout` mezőt a proxy szabály **nem állítja be** (M-79, nincs rá két
+független forrás).
 
 A `tsc --noEmit` (a `typecheck` script) a `src/**/*.ts` és a `src/**/*.tsx` fát fedi. Az `e2e/`
 saját `tsconfig.json`-nal rendelkezik (Node környezet, `tooling/tsconfig/node.json` alap), mert
@@ -100,10 +232,13 @@ már leszerelt happy-dom környezetben váltott ki React állapotfrissítést: a
 `src/unit-test-network-isolation/` regressziós tesztje őrzi.
 
 Az `e2e/sse-real-server.spec.ts` az **egyetlen** spec fájl, ami valódi hálózati szervert indít, és
-ez nem bővíthető második fájlra: a szerver a build időben rögzített `VITE_API_ORIGIN` portjára
+ez nem bővíthető második fájlra: a szerver a build időben rögzített `VITE_STREAM_ORIGIN` portjára
 kötődik, amit egyszerre csak egy teszt tarthat, ezért a fájl `test.describe.configure({ mode:
 'serial' })` beállítást kap, és a `server.close()` mellett `server.closeAllConnections()` hívást
-is (különben a nyitva hagyott SSE kapcsolat `EADDRINUSE` hibát okoz a következő tesztnél).
+is (különben a nyitva hagyott SSE kapcsolat `EADDRINUSE` hibát okoz a következő tesztnél). Az
+`e2e/api-origin.ts` `API_ORIGIN` és `STREAM_ORIGIN` konstansa (SPEC-008 3.3) szándékosan azonos
+értékű: a `page.route()` mindkét csatornát ugyanazon az originen fogja el, a kettő külön neve a
+REST és az SSE mock segédfüggvények szemantikai pontossága miatt kell, nem eltérő port miatt.
 
 Az `e2e/coverage-fixture.ts` `declare global { var __coverage__: unknown }` ambiens
 deklarációja szükséges, mert a `page.evaluate()` callback a böngészőben fut, és a

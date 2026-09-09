@@ -1,0 +1,50 @@
+/* A gráf szerkesztő vászon konténere (SPEC-008 5.5). A React Flow a
+   `.react-flow` gyökerén saját maga tölti ki a szülőjét 100%-ban, ehhez a
+   szülőnek explicit magassággal kell rendelkeznie - ezt adja ez az osztály,
+   amikor a `GraphEditorCanvas` egy rugalmas (`flex`) elrendezésű szülőbe
+   kerül (`app-shell` tartalom terület).
+
+   A `--xy-*` blokk a React Flow saját, DOKUMENTÁLT témázási felülete: a
+   `@xyflow/react/dist/style.css` minden színt
+   `var(--xy-<valami>, var(--xy-<valami>-default))` alakban olvas, tehát a
+   `--xy-` előtagú változó felülírása az egyetlen kitalált szín nélküli út.
+   Minden érték a design system saját `--ep-*` tokenje.
+
+   A MÉRT HIBA, ami ezt indokolja (2026-09-05, sötét téma): a vezérlő gombok
+   háttere a szállított `#fefefe` alapértelmezésen maradt, az ikon színe
+   viszont `--xy-controls-button-color-default: inherit`, ami a mi sötét
+   témás `--ep-fg` világos szövegszínünket örökölte - világos ikon fehér
+   dobozon, azaz üres, "törött" gombok. */
+.graph-editor-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--ep-bg-sunken);
+
+  --xy-controls-button-background-color: var(--ep-bg-elevated);
+  --xy-controls-button-background-color-hover: var(--ep-bg-hover);
+  --xy-controls-button-color: var(--ep-fg);
+  --xy-controls-button-color-hover: var(--ep-fg);
+  --xy-controls-button-border-color: var(--ep-divider);
+  --xy-controls-box-shadow: var(--ep-shadow-sm);
+
+  --xy-edge-stroke: var(--ep-border-strong);
+  --xy-edge-stroke-selected: var(--ep-accent);
+  --xy-connectionline-stroke: var(--ep-accent);
+
+  --xy-handle-background-color: var(--ep-accent);
+  --xy-handle-border-color: var(--ep-bg-elevated);
+
+  --xy-background-pattern-color: var(--ep-border-subtle);
+  --xy-attribution-background-color: var(--ep-bg-elevated);
+
+  --xy-selection-background-color: var(--ep-accent-bg);
+  --xy-selection-border: 1px dotted var(--ep-accent);
+}
+
+/* A React Flow attribúciós linkje a szállított CSS-ben fix `#999` színt kap,
+   ami a mi sötét témánkon alig olvasható. A link a licenc miatt marad, csak
+   a színe kerül a design system tokenjére. */
+.graph-editor-canvas .react-flow__attribution a {
+  color: var(--ep-fg-subtle);
+}

@@ -11,15 +11,24 @@ import './topnav-shell.css';
 
 /**
  * A topnav shell váza (SPEC-007 5.1): a bar (brand, navigáció, akciók) és a
- * content (oldal fejléc plusz a képernyő) szerkezete. A komponens domain
- * mentes: nem tudja, mi a brand, milyen navigáció vagy milyen tartalom kerül
- * bele, kizárólag a design system osztályneveit adja a megfelelő helyre.
+ * content (morzsamenü plusz a képernyő) szerkezete. A komponens domain
+ * mentes: nem tudja, mi a brand, milyen navigáció, milyen morzsamenü vagy
+ * milyen tartalom kerül bele, kizárólag a design system osztályneveit adja a
+ * megfelelő helyre.
  */
 export interface AppShellFrameProperties {
   readonly brand: ReactNode;
   readonly navigation: ReactNode;
   readonly actions: ReactNode;
-  readonly pageTitle: ReactNode;
+  /**
+   * A nagy oldalcím (`<h1 class="app-pagehead__title">`) helyett a
+   * menüsáv alatti morzsamenü (felhasználói kérés, 2026-09-06: a nagy
+   * cím felett és alatt is feleslegesen sok függőleges helyet foglalt).
+   * A hívó adja át a tényleges `Breadcrumb` komponenst - ez a komponens
+   * itt is csak a design system osztálynevét adja a helyéhez, a
+   * morzsamenü tartalmát nem ismeri.
+   */
+  readonly breadcrumb: ReactNode;
   readonly pageActions?: ReactNode;
   readonly children: ReactNode;
   /**
@@ -32,7 +41,7 @@ export interface AppShellFrameProperties {
 }
 
 export function AppShellFrame(properties: AppShellFrameProperties): ReactElement {
-  const { brand, navigation, actions, pageTitle, pageActions, children, isNavigationMenuOpen } = properties;
+  const { brand, navigation, actions, breadcrumb, pageActions, children, isNavigationMenuOpen } = properties;
 
   return (
     <div className="app-tn" data-navigation-open={isNavigationMenuOpen ?? false}>
@@ -45,7 +54,7 @@ export function AppShellFrame(properties: AppShellFrameProperties): ReactElement
         <div className="app-tn__inner">
           <div className="app-pagehead">
             <div className="app-pagehead__top">
-              <h1 className="app-pagehead__title">{pageTitle}</h1>
+              {breadcrumb}
               {pageActions === undefined ? undefined : <div className="app-pagehead__actions">{pageActions}</div>}
             </div>
           </div>

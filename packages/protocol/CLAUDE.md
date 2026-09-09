@@ -20,6 +20,7 @@ készülnek.
 | `src/provider/`       | a provider összefoglaló alakja és a kapcsolat teszt válasza                                                                                                                                                                                                             |
 | `src/settings/`       | a beállítás rekord, a részleges frissítés kérése, a párhuzamossági korlát nézete a beállított értékkel és a mért javaslattal                                                                                                                                            |
 | `src/event-stream/`   | a stream azonosító és URL építés, a feliratkozás kérés és állapot, az öt keret sémája diszkriminált unióban, a keret kódoló és dekódoló, a kurzor szabály, és a csomagszintű greppes invariáns teszt: nincs hálózati primitív, nincs port/időkorlát/lapméret/retry szám |
+| `src/node-config/`    | a `workflow_node.config` tíz ágú `NodeConfig` uniója, a `db` `NodeConfig` szándékos mirror sémája, plusz a négy duplikált provider-capability felsorolás (`ProviderId`, `ThinkingMode`, `AgentToolId`, `StructuredOutputStrategyId`)                                    |
 | `src/index.ts`        | barrel, csak nevesített újraexport                                                                                                                                                                                                                                      |
 
 ## Függőségi irány
@@ -34,9 +35,15 @@ tilos.
 A `src/` alatti mappaszerkezet a téma szerinti konvenciót követi, a részletek a lenti SPEC-005
 hivatkozásban. Minden bejövő Zod séma `z.strictObject`, minden kimenő séma `.readonly()`,
 `.default()` és `.transform()` tilos, `.parse(` tilos (csak `.safeParse(`), és a csomag nem nyit
-hálózatot (SPEC-005 7.3, 7.4, 10.1). A `providerId` a dróton egyszerű szöveg (`z.string()`), nem
-zárt felsorolás: a `ProviderId` unió a `provider-capability` csomagban él, amit a `protocol`
-azonos rétegen állva nem importálhat (SPEC-005 F-23).
+hálózatot (SPEC-005 7.3, 7.4, 10.1). A workflow és a futás szintű `providerId` mező (a
+`workflow-record.ts`, a `run-record.ts`, a `step-run-record.ts` és a `concurrency-limit-view.ts`
+sémáiban) a dróton egyszerű szöveg (`z.string()`), nem zárt felsorolás: a `ProviderId` unió a
+`provider-capability` csomagban él, amit a `protocol` azonos rétegen állva nem importálhat
+(SPEC-005 F-23). **Kivétel: a `node-config` téma** (PLAN-009 T-009-13, SPEC-005 7.7): ott a
+`ProviderId` és három társa (`ThinkingMode`, `AgentToolId`, `StructuredOutputStrategyId`) saját,
+duplikált Zod felsorolásként újra deklarálva él, ugyanazon okból, mint a hat, `db`-vel szemben
+duplikált felsorolás - a sodródás védelmét ott az `apps/server` `node-config-drift-protection`
+regressziós tesztje adja.
 
 ## Kapcsolódó dokumentumok
 

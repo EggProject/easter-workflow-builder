@@ -1,0 +1,130 @@
+/* A gráf szerkesztő képernyő elrendezése (SPEC-008 5.5, 10., T-009-17).
+
+   A vászon magassága NEM `vh` alapú: a képernyő az `.app-content`
+   maradék magasságát tölti ki (`flex: 1`), az `.app-content` pedig a topnav
+   shell blokkja szerint maga is `flex: 1`
+   (packages/ui/src/topnav-shell/topnav-shell.css). Így a vászon a
+   rendelkezésre álló területet tölti ki, és belül pásztáz és nagyít -
+   a korábbi `70vh` mellett a csomópont rács túlnyúlt a viewporton, és az
+   OLDAL görgött, nem a vászon.
+
+   A `min-height: 0` minden szinten kötelező: enélkül a flex elem
+   alapértelmezett `min-height: auto` értéke a tartalom magasságára feszítené
+   a dobozt, és a belső `overflow` (a vászon pásztázása, a beállítás panel
+   görgetése) sosem lépne életbe.
+
+   A képernyő két sávból áll: a törzs (vászon plusz beállítás panel) tölti ki
+   a helyet, alatta a `.page-footer` akciósáv áll (felhasználói kérés,
+   2026-09-09). A kettő között NINCS térköz (`gap`), mert a sáv szegélye
+   maga az elválasztás - a korábbi 12px-es `gap` a felső eszköztárhoz
+   tartozott, ami megszűnt. */
+.graph-editor-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* A betöltés jelző az egyetlen tartalom, aminek SZÜKSÉGE van oldalsó
+   térközre: a vászon faltól falig megy (lásd a topnav-shell.css
+   `.app-content:has(> .graph-editor-screen)` szabályát, ami az oldal belső
+   margóját nullázza ezen a képernyőn), a csontváz sorok viszont enélkül a
+   képernyő széléhez tapadnának. A --ep-layout-gutter a design system saját,
+   erre a célra szánt "horizontal page padding" tokenje. */
+.graph-editor-screen__loading {
+  flex: 1;
+  min-height: 0;
+  padding: var(--ep-space-6) var(--ep-layout-gutter);
+}
+
+/* A törzs egyetlen gyereke a `Resizable` osztott elrendezés
+   (`.resizable-group`): bal panel a vászon, jobb panel a dokkolt beállítás
+   sáv, közöttük a húzható `.resizable-handle` mint elválasztó. */
+.graph-editor-screen__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* A KÁRTYA KERET TÖRLÉSE (felhasználói kérés, 2026-09-09: "felesleges a
+   kartya a szerkeszto kore, csak felesleges eltartas" és "tilos a card in
+   card design").
+
+   A MÉRT ÁLLAPOT, amit ez javít. A design system `.resizable-group`
+   szabálya (packages/ui/src/resizable/resizable.css, bájtra azonos a
+   forrással) mindig kártya receptet visel: `border-radius:
+   var(--ep-radius-xl)`, `1px solid var(--ep-border)` szegély és
+   `background: var(--ep-bg-elevated)`. Ez a szerkesztő teljes területe
+   köré egy látható kártyát vont, azon belül pedig a beállítás panel
+   szakaszai további dobozokat - vagyis kártya a kártyában
+   (docs/research/2026-09-08-design-system-audit.md 6. szekció).
+
+   MIÉRT ITT, ÉS NEM A KOMPONENSBEN. A design systemnek NINCS keret nélküli
+   Resizable variánsa (az audit 8.1 pontja ezt tételesen kimondja), a
+   `resizable.css` pedig bájtazonossági regressziós teszt alatt áll
+   (packages/ui/src/resizable/resizable-byte-identity.spec.ts), tehát oda
+   nem vehető fel új módosító osztály anélkül, hogy az átemelés garanciája
+   elveszne. A törlés ezért a fogyasztó oldalán, erre az egy képernyőre
+   szűkítve áll. Regresszió: apps/web/e2e/graph-editor-layout.spec.ts. */
+.graph-editor-screen__body > .resizable-group {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.graph-editor-screen__canvas {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* A vászon panelje nem görög: a React Flow saját pásztázása viszi a
+   tartalmat, egy külső görgősáv csak elrontaná. A beállítás panel viszont
+   ÖNÁLLÓAN görög, azt a `.node-inspector__body` intézi. */
+.graph-editor-screen__body .resizable-panel:first-child {
+  overflow: hidden;
+}
+
+/* Amíg nincs kiválasztott csomópont, a jobb panel és az elválasztó nincs
+   kirenderelve (felhasználói kérés: "ez a jobb oldali panel akkor jelenjen
+   meg ha egy elemre kattintok"), tehát a vásznat a teljes szélességre kell
+   engedni. A `ResizablePanel` a méretét INLINE `flex-basis`/`flex-grow`/
+   `flex-shrink` stílusként adja, amit egy osztály szintű szabály nem tud
+   felülírni `!important` nélkül; grid elrendezésben viszont ezek a flex
+   tulajdonságok érvényüket vesztik, tehát az egyetlen `1fr` oszlop tisztán,
+   felülírás nélkül adja a teljes szélességet. */
+.graph-editor-screen__body--solo > .resizable-group {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+/* Szűk nézetben a vászon és a beállítás panel EGYMÁS ALÁ kerül, egyenlő
+   arányban osztozva a magasságon: a dokkolt sáv egy 320px-es kijelzőn
+   önmagában szélesebb lenne a viewportnál, tehát a sor elrendezés
+   vízszintes túllógást okozna (a szabálykönyv 11. szekciója ezt egyetlen
+   viewport méreten sem engedi). A töréspont a design system
+   --ep-screen-md tokenjének értéke (768px), ugyanaz, amit a topnav lenyíló
+   navigációja használ; kitalált szám nincs, az arány egyenlő osztás.
+
+   A húzható elválasztó ebben a sávban NEM jelenik meg, és nem is csak
+   vizuálisan rejtett: a `display: none` a hozzáférhetőségi fából is
+   kiveszi. Ez szándékos - vízszintes osztás nélkül nincs mit húzni, egy
+   `aria-orientation="vertical"` elválasztó pedig egymás alatti paneleken
+   téves állítást tenne. */
+@media (max-width: 768px) {
+  .graph-editor-screen__body > .resizable-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .graph-editor-screen__body--solo > .resizable-group {
+    grid-template-rows: 1fr;
+  }
+
+  .graph-editor-screen__body .resizable-handle {
+    display: none;
+  }
+}

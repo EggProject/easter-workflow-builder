@@ -38,7 +38,12 @@ interface ServerInstanceState {
 }
 
 export interface UseStreamConnectionInput {
-  readonly apiOrigin: string;
+  /**
+   * Az SSE végpont originje. Fejlesztéskor a backend origin, a Vite dev
+   * proxyt megkerülve (SPEC-005 5.8, SPEC-008 3.1) - ezért külön mező, nem az
+   * `apiOrigin` (ami a REST hívások, proxyzott originje).
+   */
+  readonly streamOrigin: string;
   readonly eventSourceFactory: EventSourceFactory;
   readonly streamIdGenerator: StreamIdGenerator;
 }
@@ -83,7 +88,7 @@ function computePhase(
  * (9.4 1. és 3. pont).
  */
 export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): StreamConnectionState {
-  const { apiOrigin, eventSourceFactory, streamIdGenerator } = input;
+  const { streamOrigin, eventSourceFactory, streamIdGenerator } = input;
   const [streamId] = useState<string>(streamIdGenerator);
   const [readyState, setReadyState] = useState<number>(0);
   const [hasConnectedOnce, setHasConnectedOnce] = useState<boolean>(false);
@@ -95,7 +100,7 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
   const [lastFrame, setLastFrame] = useState<StreamFrame | undefined>(undefined);
 
   useEffect(() => {
-    const source = eventSourceFactory(`${apiOrigin}${buildStreamUrl(streamId)}`);
+    const source = eventSourceFactory(`${streamOrigin}${buildStreamUrl(streamId)}`);
 
     function handleReadyStateChange(): void {
       setReadyState(source.readyState);
@@ -176,7 +181,7 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
     return () => {
       source.close();
     };
-  }, [apiOrigin, streamId, eventSourceFactory]);
+  }, [streamOrigin, streamId, eventSourceFactory]);
 
   return {
     streamId,

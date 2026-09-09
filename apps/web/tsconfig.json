@@ -9,7 +9,20 @@
     // `image-source` targykor `node:buffer` importjaval egyutt. Node tipusok
     // nelkul ez TS2591 hibat ad. Ugyanaz a mintazat, mint a `db`-tol fuggo
     // csomagok `skipLibCheck` kapcsoloja (.claude/CLAUDE.md 12.).
-    "types": ["node"]
+    "types": ["node"],
+    // A `@xyflow/react@12.11.6` (es a mogotte allo `@xyflow/system@0.0.82`)
+    // sajat .d.ts fajljai `exactOptionalPropertyTypes: true` mellett
+    // typushibasak egymas kozott: az `InternalNode<NodeType>` es a
+    // `NodeOrigin` generikus illesztese `TS2344`-et ad tobb belso fajlban
+    // (`useConnection.d.ts`, `store.d.ts`, `graph.d.ts`, `XYDrag.d.ts`),
+    // mert a konyvtar sajat tipusai nem az opcionalis mezo szigoru
+    // ertelmezesere keszultek - ugyanaz a felsoaramu kategoria, mint a
+    // `packages/engine/tsconfig.json` `drizzle-orm` indoklasa
+    // (.claude/CLAUDE.md 12.), csak itt a `@xyflow/react` az erintett
+    // csomag. Sajat meres: a hiba a `bun install`-lal telepitett, pontosan
+    // a `docs/research/2026-08-26-toolchain.md` altal rogzitett verzion
+    // jelentkezik.
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*.ts",

@@ -9,9 +9,12 @@ import { readFrontendConfig } from './read-frontend-config.ts';
 // az ágat futtatja.
 const ORIGIN_VALUE = 'origin-ertek';
 
+const STREAM_ORIGIN_VALUE = 'stream-origin-ertek';
+
 function environmentWith(overrides: Readonly<Record<string, string | undefined>>): EnvironmentReader {
   return {
     VITE_API_ORIGIN: ORIGIN_VALUE,
+    VITE_STREAM_ORIGIN: STREAM_ORIGIN_VALUE,
     VITE_LIST_LIMIT: '25',
     VITE_STREAM_REPLAY_LIMIT: '200',
     ...overrides,
@@ -19,12 +22,17 @@ function environmentWith(overrides: Readonly<Record<string, string | undefined>>
 }
 
 describe('readFrontendConfig', () => {
-  it('mind a három kötelező változóból felépíti a konfigurációt', () => {
+  it('mind a négy kötelező változóból felépíti a konfigurációt', () => {
     const outcome = readFrontendConfig(environmentWith({}));
 
     expect(outcome).toEqual({
       kind: 'ok',
-      value: { apiOrigin: ORIGIN_VALUE, listLimit: 25, streamReplayLimit: 200 },
+      value: {
+        apiOrigin: ORIGIN_VALUE,
+        streamOrigin: STREAM_ORIGIN_VALUE,
+        listLimit: 25,
+        streamReplayLimit: 200,
+      },
     });
   });
 
@@ -44,6 +52,12 @@ describe('readFrontendConfig', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_API_ORIGIN: ' '.repeat(3) }));
 
     expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_API_ORIGIN.' });
+  });
+
+  it('hiányzó stream origin esetén hibaágat ad, a változó nevével', () => {
+    const outcome = readFrontendConfig(environmentWith({ VITE_STREAM_ORIGIN: undefined }));
+
+    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_STREAM_ORIGIN.' });
   });
 
   it('hiányzó lista lapméret esetén hibaágat ad, a változó nevével', () => {

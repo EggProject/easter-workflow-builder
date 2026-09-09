@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppShell } from './app-shell.tsx';
 
 const API_ORIGIN = 'https://api.example.test';
+const STREAM_ORIGIN = 'https://stream.example.test';
 
 const catchAllFetchFunction: FetchFunction = () => Promise.resolve(Response.json([]));
 
@@ -83,7 +84,13 @@ describe('AppShell', () => {
   function render(): void {
     act(() => {
       root.render(
-        <AppShell apiOrigin={API_ORIGIN} listLimit={25} streamReplayLimit={50} fetchFunction={catchAllFetchFunction} />,
+        <AppShell
+          apiOrigin={API_ORIGIN}
+          streamOrigin={STREAM_ORIGIN}
+          listLimit={25}
+          streamReplayLimit={50}
+          fetchFunction={catchAllFetchFunction}
+        />,
       );
     });
   }
@@ -127,6 +134,32 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('Futás előzmények');
   });
 
+  it('a "/editor" útvonalon "Szerkesztő" morzsamenüvel a GraphEditorScreen tartalmát rajzolja', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Nincs `?workflowId=` a query stringben, tehát a `GraphEditorScreen`
+    // a hiányzó azonosító üzenetét mutatja, kérés nélkül (SPEC-008 5.3).
+    expect(container.textContent).toContain('Nincs megadva szerkesztendő workflow');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
+  });
+
+  it('a "/run" útvonalon a futás nézet helyőrzőjét rajzolja, "Futás nézet" morzsamenüvel', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/run');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Futás nézet (folyamatban).');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Futás nézet');
+  });
+
   it('ismeretlen útvonalon a "nem található" képernyőt rajzolja', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/nincs-ilyen');
@@ -136,6 +169,73 @@ describe('AppShell', () => {
     });
 
     expect(container.textContent).toContain('Az oldal nem található');
+  });
+
+  it('a "/" útvonalon a morzsamenü egyetlen, ős nélküli, aktuális "Workflow-k" elemet mutat', async () => {
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const breadcrumb = container.querySelector(':scope .app-pagehead nav[aria-label="Morzsamenü"]');
+    if (breadcrumb === null) {
+      throw new Error('a teszt nem talált morzsamenüt a page-head-ben');
+    }
+    expect(breadcrumb.querySelectorAll('a')).toHaveLength(0);
+    const current = breadcrumb.querySelector('[aria-current="page"]');
+    expect(current?.textContent).toBe('Workflow-k');
+  });
+
+  it('a "/runs" útvonalon a morzsamenü "Workflow-k" ős linket és "Futás előzmények" aktuális elemet mutat, a link kattintva visszavisz a gyökérre', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/runs');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const breadcrumb = container.querySelector(':scope .app-pagehead nav[aria-label="Morzsamenü"]');
+    if (breadcrumb === null) {
+      throw new Error('a teszt nem talált morzsamenüt a page-head-ben');
+    }
+    const ancestorLink = breadcrumb.querySelector<HTMLAnchorElement>('a');
+    expect(ancestorLink?.textContent).toBe('Workflow-k');
+    expect(ancestorLink?.getAttribute('href')).toBe('/');
+    expect(breadcrumb.querySelector('[aria-current="page"]')?.textContent).toBe('Futás előzmények');
+
+    act(() => {
+      ancestorLink?.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Új workflow');
+  });
+
+  it('ismeretlen útvonalon a morzsamenü "Workflow-k" ős linket és "Ismeretlen oldal" aktuális elemet mutat', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/nincs-ilyen');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const breadcrumb = container.querySelector(':scope .app-pagehead nav[aria-label="Morzsamenü"]');
+    if (breadcrumb === null) {
+      throw new Error('a teszt nem talált morzsamenüt a page-head-ben');
+    }
+    expect(breadcrumb.querySelector('a')?.textContent).toBe('Workflow-k');
+    expect(breadcrumb.querySelector('[aria-current="page"]')?.textContent).toBe('Ismeretlen oldal');
+  });
+
+  it('nincs nagy oldalcím (h1) egyetlen útvonalon sem', async () => {
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('h1')).toBeNull();
   });
 
   it('a topnav bal oldalán a márkajel logó jelenik meg, dekoratív (üres alt) képként', async () => {

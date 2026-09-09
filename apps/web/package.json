@@ -10,14 +10,19 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 96.83 --branches 94.02 --functions 97.7 --lines 96.75"
+    "screenshots": "playwright test --config playwright.screenshots.config.ts",
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 98.34 --branches 96.6 --functions 98.89 --lines 98.28"
   },
   "dependencies": {
+    "@dagrejs/dagre": "catalog:",
     "@easter-workflow-builder/core": "workspace:*",
     "@easter-workflow-builder/protocol": "workspace:*",
+    "@easter-workflow-builder/typeguards": "workspace:*",
     "@easter-workflow-builder/ui": "workspace:*",
+    "@xyflow/react": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-window": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
