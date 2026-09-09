@@ -20,6 +20,7 @@ export function NotFoundRoute(properties: Readonly<NotFoundRouteProperties>): Re
       <Card title="Az oldal nem található">Ez az útvonal nem létezik.</Card>
       <Button
         type="button"
+        size="sm"
         onClick={() => {
           navigate('workflowList');
         }}

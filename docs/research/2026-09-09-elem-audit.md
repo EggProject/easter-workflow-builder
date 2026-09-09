@@ -37,19 +37,19 @@ megjelölt "components + design tokens" hatókörnek; a belőle átemelt `topnav
 
 A mezőkhöz tartozó kulcsosztályok, a design system saját definíciója szerint:
 
-- **`.field`** (`input/input.css:12`): `display: flex; flex-direction: column; gap: 6px;` — "wrapper
+- **`.field`** (`input/input.css:12`): `display: flex; flex-direction: column; gap: 6px;` - "wrapper
   (label + input + optional error)" (a fájl saját fejléc-kommentje, `input.css:4`).
 - **`.field__label`** (`input/input.css:13-18`): nagybetűs overline címke.
 - **`.field__error`** (`input/input.css:100`): hibaüzenet a mező alatt.
 - **`.input`** (`input/input.css:20-42`): egysoros mező.
 - **`.select`** (`select/select.css:9-22`): "visual trigger (looks like `.input` but with chevron)"
-  — a komponens fejléc-kommentje szerint (`select.css:4-8`).
+  (a komponens fejléc-kommentje szerint, `select.css:4-8`).
 - **`.textarea`** (`textarea/textarea.css:8-23`): többsoros mező, saját `min-height`, saját
   `resize: vertical`, saját `.is-error` hibaosztály (NEM `--error`, lásd `textarea.css:5`, "States:
   `:focus`, `:disabled`, `:invalid` / `.is-error`").
 
 A tényleges HTML szerkezet, amit a design system SAJÁT valódi oldalpéldái (nem az elszigetelt
-komponens demó) használnak — ez a mérvadó minta, mert ez a "hogyan épül be egy űrlapba" válasz:
+komponens demó) használnak - ez a mérvadó minta, mert ez a "hogyan épül be egy űrlapba" válasz:
 
 ```html
 <!-- eggproject-design-admin-app-examples/examples/settings.html:177 -->
@@ -72,7 +72,7 @@ komponens demó) használnak — ez a mérvadó minta, mert ez a "hogyan épül 
 <div class="field">
   <label class="field__label" for="primary-contact">Primary contact</label>
   <select id="primary-contact" name="primaryContact" class="select">
-    <option value="anna" selected>Anna Kovács — Director of product</option>
+    <option value="anna" selected>Anna Kovács - Director of product</option>
     ...
   </select>
 </div>
@@ -80,7 +80,7 @@ komponens demó) használnak — ez a mérvadó minta, mert ez a "hogyan épül 
 
 **Ez a lényeg: a design system két valódi, összeépített oldalán (`settings.html`,
 `onboarding.html`) MINDEN `<select class="select">` kivétel nélkül `<div class="field">` +
-`<label class="field__label" for="...">` párban áll — pontosan ugyanabban a `.field` burkolóban,
+`<label class="field__label" for="...">` párban áll - pontosan ugyanabban a `.field` burkolóban,
 mint az `<input class="input">`.** Ez a felhasználó által idézett szabály ("ugyan azt a css class
 field-et kell hasznalni a mezokhoz") szó szerinti forrása.
 
@@ -95,7 +95,7 @@ button.select {
   align-items: center;
   gap: 10px;
 }
-/* Native <select> shares the .select shell but keeps the platform dropdown indicator —
+/* Native <select> shares the .select shell but keeps the platform dropdown indicator -
    no appearance:none, no custom caret. box-sizing keeps width:100% inside the field grid. */
 select.select {
   box-sizing: border-box;
@@ -105,7 +105,7 @@ select.select {
 
 A `references/component-catalog.md:139` ezt így nevezi meg: "**Native static consumers**
 (`onboarding.html`, `settings.html`) intentionally use native `<select class="select">` /
-`.select--sm` [...] — **not** React `Select`".
+`.select--sm` [...] - **not** React `Select`".
 
 ---
 
@@ -119,7 +119,7 @@ Ebből a 285-ből **239 pontosan megegyezik** egy design system osztállyal (`co
 osztálya között. Ez a 46 három csoportra bomlik (részletek a 6. szekcióban):
 
 1. **a `topnav-shell`/`app-shell` család** (`.app-tn*`, `.app-content`, `.app-pagehead*`, `.pill`
-   a navigációban stb.) — ezek NEM hiányoznak a design systemből, csak egy TESTVÉR skillből
+   a navigációban stb.) - ezek NEM hiányoznak a design systemből, csak egy TESTVÉR skillből
    (`eggproject-design-app-common/_shell.css`) jönnek, amit a feladat kijelölt "components +
    tokens" hatóköre nem fed le. Ezt a 2026-09-08-i audit már tételesen tárgyalta.
 2. **oldal-specifikus, kizárólag elrendezést adó saját osztályok**, amiknek nincs és nem is lehet
@@ -157,15 +157,15 @@ szabály fölötti komment megnevezi az okot (lásd 6. szekció táblázata).
 
 Minden más `<select` szómegjelenés a repóban vagy kommentben áll (`SelectField.tsx:23,59,69`,
 `StructuredOutputField.tsx:43`, `AgentStepConfigFields.tsx:148`), vagy teszt DOM-lekérdezés
-(`create-workflow-modal.spec.tsx:152,177` — `container.querySelector('select')`). Nincs második,
+(`create-workflow-modal.spec.tsx:152,177` - `container.querySelector('select')`). Nincs második,
 kézzel épített "select-szerű" widget (nincs `role="listbox"`/`aria-haspopup` a repóban a `Menu`
 komponensen kívül, ami akció-menü, nem érték-választó).
 
-### 3.2 A `select.select` retrofit szabály — bájtra megvan
+### 3.2 A `select.select` retrofit szabály - bájtra megvan
 
 ```css
 /* packages/ui/src/select-field/select-field.css:51-53 */
-/* Native <select> shares the .select shell but keeps the platform dropdown indicator —
+/* Native <select> shares the .select shell but keeps the platform dropdown indicator -
    no appearance:none, no custom caret. box-sizing keeps width:100% inside the field grid. */
 select.select {
   box-sizing: border-box;
@@ -175,12 +175,12 @@ select.select {
 
 Ez betűre azonos a forrás `select/select.css:29-30` szabályával. `diff`-fel ellenőrizve: a teljes
 `select-field.css` a forrástól **kizárólag** a fejléc-kommentben, a hozzáadott `.select--error`
-szabályban (54-60. sor) és a Combobox szakasz + a `menu.css` import hiányában tér el — mindhárom
+szabályban (54-60. sor) és a Combobox szakasz + a `menu.css` import hiányában tér el - mindhárom
 a fájl saját fejlécében megnevezve és indokolva. A `.select`, `button.select`, `select.select`,
 `.select__icon`, `.select__value`, `.select__caret`, `.select__panel`, `.select--sm`,
 `.select--open` szabályok szó szerint, formázásra is azonosak a forrással.
 
-### 3.3 A `SelectField` React komponens szerkezete — MEGFELEL a forrásnak, EGY kivétellel
+### 3.3 A `SelectField` React komponens szerkezete - MEGFELEL a forrásnak, EGY kivétellel
 
 `packages/ui/src/select-field/SelectField.tsx:126-136`, ha van `label` vagy `error`:
 
@@ -200,7 +200,7 @@ Ez pontosan a design system Input.jsx mintáját követi (`components/input/Inpu
 `<label className={fieldClassNames}>` majd `field__label`, mező, `field__error`), csak `<select>`-re
 alkalmazva. **Ez a helyes szerkezet.**
 
-**A kivétel — ez az egyetlen valódi hiba, amit ez az audit talált.** A `SelectField.tsx:122-124`:
+**A kivétel - ez az egyetlen valódi hiba, amit ez az audit talált.** A `SelectField.tsx:122-124`:
 
 ```tsx
 if (label === undefined && error === undefined) {
@@ -214,11 +214,11 @@ csupasz `<select class="select">`-et ad vissza. Ez az egyetlen a három mezőkom
 
 | Komponens       | `.field` burkoló mindig kiadva?                                                                                                    | Forrás                                       |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `TextField`     | **igen, mindig** — a `<label className={joinClassNames('field', className)}>` feltétel nélkül fut                                  | `text-field/TextField.tsx:80`                |
-| `TextAreaField` | **igen, mindig** — a `label` prop **kötelező** (`readonly label: string;`, nincs `?`), tehát nincs is olyan hívás, ami kihagyhatná | `textarea/TextAreaField.tsx:24,83`           |
-| `SelectField`   | **NEM mindig** — `label` ÉS `error` egyszerre `undefined` esetén bare `<select>` jön                                               | `select-field/SelectField.tsx:24-26,122-124` |
+| `TextField`     | **igen, mindig** - a `<label className={joinClassNames('field', className)}>` feltétel nélkül fut                                  | `text-field/TextField.tsx:80`                |
+| `TextAreaField` | **igen, mindig** - a `label` prop **kötelező** (`readonly label: string;`, nincs `?`), tehát nincs is olyan hívás, ami kihagyhatná | `textarea/TextAreaField.tsx:24,83`           |
+| `SelectField`   | **NEM mindig** - `label` ÉS `error` egyszerre `undefined` esetén bare `<select>` jön                                               | `select-field/SelectField.tsx:24-26,122-124` |
 
-Ez az API-szintű aszimmetria önmagában nem hiba (a komponens doksija — `SelectField.tsx:65-70` —
+Ez az API-szintű aszimmetria önmagában nem hiba (a komponens doksija, `SelectField.tsx:65-70`,
 kifejezetten megengedi a saját elrendezést hozó hívóknak, hogy `aria-label`-lel dolgozzanak), de
 **pontosan egy hívási hely él is ezzel a kihagyással**, és az a hely éppen megsérti a felhasználó
 kért szabályát.
@@ -250,7 +250,7 @@ kért szabályát.
 
 Ugyanabban az űrlapban a "Név" és a "Leírás" mező `label` propot kap, tehát mindkettő
 `<label class="field"><span class="field__label">Név</span><input class="input" .../></label>`
-alakban jelenik meg — LÁTHATÓ, nagybetűs felirattal a mező fölött. A "Provider" mező viszont csak
+alakban jelenik meg - LÁTHATÓ, nagybetűs felirattal a mező fölött. A "Provider" mező viszont csak
 `aria-label="Provider"`-t kap, `label` propot nem, tehát a 3.3 szekció szerinti kihagyási ág fut:
 **a "Provider" `<select>` egyáltalán nem kap `.field`/`.field__label` burkolót, nincs látható
 felirata**, miközben a design system mindkét valódi oldalpéldája (settings.html, onboarding.html,
@@ -259,7 +259,7 @@ felirata**, miközben a design system mindkét valódi oldalpéldája (settings.
    `.field` dobozban, mint a szomszédos `.input` mezőket.
 
 **Ez a felhasználó panaszának pontos, tételes megfelelője**: "ugyan azt a css class field-et kell
-hasznalni a mezokhoz" — a Név/Leírás mező igen, a Provider mező nem kapja meg ugyanazt a `.field`
+hasznalni a mezokhoz" - a Név/Leírás mező igen, a Provider mező nem kapja meg ugyanazt a `.field`
 szerkezetet, noha mindhárom ugyanabban az űrlapban áll, ugyanolyan jelentőségű mező.
 
 **Ez az EGYETLEN hely a teljes repóban, ahol ez előfordul.** A többi 9 `<SelectField>` hívás
@@ -277,7 +277,7 @@ szerkezetet, noha mindhárom ugyanabban az űrlapban áll, ugyanolyan jelentős�
 ### 3.5 Verdikt
 
 A `select` ELEM és a `select.select`/`.select--sm`/`.select--error` OSZTÁLYKÉSZLET helyesen, a
-design system dokumentált retrofit útján épül fel — ez a korábbi (2026-09-08-i) audit óta nem
+design system dokumentált retrofit útján épül fel - ez a korábbi (2026-09-08-i) audit óta nem
 változott hibásan, és ma is megfelel. **A hiba nem a `select` osztályban vagy elemben van, hanem
 egyetlen konkrét hívási helyen: a `create-workflow-modal.tsx` Provider mezője nem kapja meg a
 `.field`/`.field__label` burkolót**, mert nem ad át `label` propot a `SelectField`-nek. Ez
@@ -290,17 +290,17 @@ pontosan az az eltérés, amit a felhasználó a képernyőn észrevehetett.
 | Mező / hívás                                                                                      | Fájl:sor                                                | `.field` burkoló?                                                                                                                 | Látható `field__label`?                      |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | `TextField` minden hívása (11 db, pl. "Név", "Leírás", node-inspector mezők)                      | `text-field/TextField.tsx:80-81`                        | **igen, mindig**                                                                                                                  | igen, ha `label` megadva (mindenhol megadva) |
-| `SelectField` — "Rendszer prompt módja" ×3, "Dinamikus szekciók kizárása"                         | `node-inspector/SystemPromptField.tsx:67-121`           | igen                                                                                                                              | igen                                         |
-| `SelectField` — dinamikus `agents` mező                                                           | `node-inspector/AgentDefinitionEntryFields.tsx:118-131` | igen                                                                                                                              | igen                                         |
-| `SelectField` — "Összefésülés módja"                                                              | `node-inspector/JoinNodeFields.tsx:103-109`             | igen                                                                                                                              | igen                                         |
-| `SelectField` — "Provider felülírás", "Session mód", "Thinking mód"                               | `node-inspector/AgentStepConfigFields.tsx:138-219`      | igen                                                                                                                              | igen                                         |
-| `SelectField` — "Strukturált kimenet stratégiája"                                                 | `node-inspector/StructuredOutputField.tsx:38-47`        | igen                                                                                                                              | igen                                         |
-| **`SelectField` — "Provider"**                                                                    | `workflow-list/create-workflow-modal.tsx:120-130`       | **NEM**                                                                                                                           | **NEM (csak `aria-label`)**                  |
-| `TextAreaField` mind a 16 hívás (SystemPromptField, BranchNodeFields, stb.)                       | lásd a 3.3 táblázatot — a `label` KÖTELEZŐ prop         | **igen, mindig**                                                                                                                  | igen, mindig                                 |
-| `Checkbox` (`.ctrl`, nem `.field` — más design system komponens, a jelölőnégyzet saját burkolója) | `form-control/Checkbox.tsx:31`                          | n/a (`.ctrl`, helyesen, mert ez nem `.field`-alapú mező a forrásban sem)                                                          | `.ctrl__label`                               |
-| `ScriptNodeFields` "Futásidő (runtime)" — csak olvasható érték, nem szerkeszthető mező            | `node-inspector/ScriptNodeFields.tsx:39-42`             | igen, kézzel épített `<div className="field">`                                                                                    | igen                                         |
+| `SelectField` - "Rendszer prompt módja" ×3, "Dinamikus szekciók kizárása"                         | `node-inspector/SystemPromptField.tsx:67-121`           | igen                                                                                                                              | igen                                         |
+| `SelectField` - dinamikus `agents` mező                                                           | `node-inspector/AgentDefinitionEntryFields.tsx:118-131` | igen                                                                                                                              | igen                                         |
+| `SelectField` - "Összefésülés módja"                                                              | `node-inspector/JoinNodeFields.tsx:103-109`             | igen                                                                                                                              | igen                                         |
+| `SelectField` - "Provider felülírás", "Session mód", "Thinking mód"                               | `node-inspector/AgentStepConfigFields.tsx:138-219`      | igen                                                                                                                              | igen                                         |
+| `SelectField` - "Strukturált kimenet stratégiája"                                                 | `node-inspector/StructuredOutputField.tsx:38-47`        | igen                                                                                                                              | igen                                         |
+| **`SelectField` - "Provider"**                                                                    | `workflow-list/create-workflow-modal.tsx:120-130`       | **NEM**                                                                                                                           | **NEM (csak `aria-label`)**                  |
+| `TextAreaField` mind a 16 hívás (SystemPromptField, BranchNodeFields, stb.)                       | lásd a 3.3 táblázatot - a `label` KÖTELEZŐ prop         | **igen, mindig**                                                                                                                  | igen, mindig                                 |
+| `Checkbox` (`.ctrl`, nem `.field` - más design system komponens, a jelölőnégyzet saját burkolója) | `form-control/Checkbox.tsx:31`                          | n/a (`.ctrl`, helyesen, mert ez nem `.field`-alapú mező a forrásban sem)                                                          | `.ctrl__label`                               |
+| `ScriptNodeFields` "Futásidő (runtime)" - csak olvasható érték, nem szerkeszthető mező            | `node-inspector/ScriptNodeFields.tsx:39-42`             | igen, kézzel épített `<div className="field">`                                                                                    | igen                                         |
 | `AgentDefinitionEntryFields` "readonly" ág                                                        | `node-inspector/AgentDefinitionEntryFields.tsx:136-140` | igen, kézzel épített                                                                                                              | igen                                         |
-| `AgentStepConfigFields` "Skillek", "MCP szerverek" — csak olvasható                               | `node-inspector/AgentStepConfigFields.tsx:328,333`      | igen, kézzel épített                                                                                                              | igen                                         |
+| `AgentStepConfigFields` "Skillek", "MCP szerverek" - csak olvasható                               | `node-inspector/AgentStepConfigFields.tsx:328,333`      | igen, kézzel épített                                                                                                              | igen                                         |
 | `InspectorFieldGroup` (mezőCSOPORT címe, nem egyetlen mező)                                       | `node-inspector/InspectorFieldGroup.tsx:53-56`          | NEM `.field` (`.node-inspector__group`, szándékosan, mert ez több mezőt fog össze, nem egy mező), de a címke maga `.field__label` | igen (a csoport címe)                        |
 
 **Összefoglaló:** a `packages/ui` mind a három mezőkomponense (`TextField`, `SelectField`,
@@ -308,12 +308,12 @@ pontosan az az eltérés, amit a felhasználó a képernyőn észrevehetett.
 felcímkézve hívják őket, és a 10 `SelectField` hívásból 9 helyesen fel is címkézi. **Az egyetlen
 kivétel a 3.4 szekcióban tárgyalt "Provider" mező.** A `node-inspector` kézzel épített
 `<div className="field">` blokkjai (csak olvasható értékekhez) konzisztensen ugyanazt az osztályt
-használják, mint a valódi mezők — ez a design system saját tipográfiai osztályának (nem
+használják, mint a valódi mezők - ez a design system saját tipográfiai osztályának (nem
 form-elemhez kötött) legális újrafelhasználása, nem kitalált osztály.
 
 ---
 
-## 5. `text-field`, `textarea`, `form-control` (Checkbox) — bájtra ellenőrizve
+## 5. `text-field`, `textarea`, `form-control` (Checkbox) - bájtra ellenőrizve
 
 `diff` a design system forrás és a `packages/ui` fájl között (fejléc-komment nélkül):
 
@@ -329,7 +329,7 @@ form-elemhez kötött) legális újrafelhasználása, nem kitalált osztály.
 | `resizable/resizable.css` vs `resizable/resizable.css` (forrás)             | **nincs eltérés** a fejléc-kommenten kívül                                                                                                                                                                        | bájtra azonos                                                |
 
 A `textarea`-t korábban (2026-09-08-i audit 4.4 szekció) az `.input` osztály viselte egy
-`<textarea>`-n — ez **ma már javítva van**: a `packages/ui/src/textarea/` téma 2026-09-09-én
+`<textarea>`-n - ez **ma már javítva van**: a `packages/ui/src/textarea/` téma 2026-09-09-én
 készült el, a `TextAreaField.tsx` saját `.textarea`/`.is-error` osztályt ad
 (`TextAreaField.tsx:89`), a `node-inspector.css:98-102` pedig kifejezetten dokumentálja a
 váltást: "A `<textarea>` MA a saját `.textarea` osztályát viseli, nem az egysoros `.input`
@@ -344,26 +344,26 @@ A `node-inspector.css:9-16` fejléce szó szerint kimondja: "NINCS CARD IN CARD"
 
 ---
 
-## 6. Saját gyártású osztályok — mindegyik tételesen
+## 6. Saját gyártású osztályok - mindegyik tételesen
 
 | Osztály(csoport)                                                                                                                                      | Hol                                        | Indokolt-e, miért                                                                                                                                                                                                                                                                               |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.select--error`                                                                                                                                      | `select-field/select-field.css:60`         | **igen** — a forrás Select nem ismer hibaüzenetet, a `SelectField` a `TextField` `.input--error` mintáját veszi át bájtra azonos formában                                                                                                                                                       |
-| `.breadcrumb__list`, `.breadcrumb__listItem`                                                                                                          | `breadcrumb/breadcrumb.css`                | **igen** — a11y okból (`<ol>/<li>` szemantika), a forrás JSX-e nem ilyen szerkezetű; korábbi audit már jóváhagyta                                                                                                                                                                               |
-| `.data-table__cell--secondary`, `.data-table__cell--tertiary`                                                                                         | `data-table/data-table.css:146,187`        | **igen** — mért reszponzív hiba javítása (SPEC-007 5.3), a töréspont a design-token `--ep-screen-lg`/`--ep-screen-md` tokenje, kitalált szám nincs                                                                                                                                              |
-| `.data-table__label--visually-hidden`                                                                                                                 | `data-table/data-table.css:204`            | **igen** — W3C WAI C7 technika szó szerinti implementációja, ugyanaz, amit a `topnav-shell.css` is használ                                                                                                                                                                                      |
-| `.node-inspector*` (9 osztály: `__header`, `__identity`, `__title`, `__node-id`, `__body`, `__group`, `__list-row`, `__reason`, kártya-recept NÉLKÜL) | `node-inspector/node-inspector.css`        | **igen** — nincs design system megfelelő egy "csomópont beállítás panel" elrendezésre; a fájl saját feje kimondja: nincs kártya-recept egyik szabályon sem                                                                                                                                      |
-| `.graph-editor-screen*`, `.graph-editor-canvas`, `.graph-node-card*`                                                                                  | `graph-editor/`, `graph-node-card/`        | **igen** — a React Flow (`@xyflow/react`) vászon kerete, amit a design system nem ismerhet (harmadik féltől jövő könyvtár)                                                                                                                                                                      |
-| `.page-footer`, `.page-footer__status`, `.page-footer__actions`                                                                                       | `page-footer/page-footer.css`              | **igen, dokumentáltan** — a fejléc-komment tételesen megnevezi: nincs design system megfelelő ("sticky, oldal-szintű akciósáv" egyik skillben sincs, 2026-09-08-i audit 5.4/8.1), a recept két LÉTEZŐ mintából (`.app-tn__bar`, `.modal__footer--split`) áll össze, kizárólag design tokenekkel |
-| `.workflow-list__toolbar`                                                                                                                             | `workflow-list/workflow-list-screen.css:5` | **igen, triviális** — egyszerű flex konténer, nincs saját szín/szegély/lekerekítés, tehát nincs mit "design system elemre" cserélni                                                                                                                                                             |
-| `.agents-field-editor__entry-header`                                                                                                                  | `node-inspector.css:174-180`               | **igen, triviális** — ugyanaz, mint fent: elrendezés, kártya-chrome nélkül                                                                                                                                                                                                                      |
+| `.select--error`                                                                                                                                      | `select-field/select-field.css:60`         | **igen** - a forrás Select nem ismer hibaüzenetet, a `SelectField` a `TextField` `.input--error` mintáját veszi át bájtra azonos formában                                                                                                                                                       |
+| `.breadcrumb__list`, `.breadcrumb__listItem`                                                                                                          | `breadcrumb/breadcrumb.css`                | **igen** - a11y okból (`<ol>/<li>` szemantika), a forrás JSX-e nem ilyen szerkezetű; korábbi audit már jóváhagyta                                                                                                                                                                               |
+| `.data-table__cell--secondary`, `.data-table__cell--tertiary`                                                                                         | `data-table/data-table.css:146,187`        | **igen** - mért reszponzív hiba javítása (SPEC-007 5.3), a töréspont a design-token `--ep-screen-lg`/`--ep-screen-md` tokenje, kitalált szám nincs                                                                                                                                              |
+| `.data-table__label--visually-hidden`                                                                                                                 | `data-table/data-table.css:204`            | **igen** - W3C WAI C7 technika szó szerinti implementációja, ugyanaz, amit a `topnav-shell.css` is használ                                                                                                                                                                                      |
+| `.node-inspector*` (9 osztály: `__header`, `__identity`, `__title`, `__node-id`, `__body`, `__group`, `__list-row`, `__reason`, kártya-recept NÉLKÜL) | `node-inspector/node-inspector.css`        | **igen** - nincs design system megfelelő egy "csomópont beállítás panel" elrendezésre; a fájl saját feje kimondja: nincs kártya-recept egyik szabályon sem                                                                                                                                      |
+| `.graph-editor-screen*`, `.graph-editor-canvas`, `.graph-node-card*`                                                                                  | `graph-editor/`, `graph-node-card/`        | **igen** - a React Flow (`@xyflow/react`) vászon kerete, amit a design system nem ismerhet (harmadik féltől jövő könyvtár)                                                                                                                                                                      |
+| `.page-footer`, `.page-footer__status`, `.page-footer__actions`                                                                                       | `page-footer/page-footer.css`              | **igen, dokumentáltan** - a fejléc-komment tételesen megnevezi: nincs design system megfelelő ("sticky, oldal-szintű akciósáv" egyik skillben sincs, 2026-09-08-i audit 5.4/8.1), a recept két LÉTEZŐ mintából (`.app-tn__bar`, `.modal__footer--split`) áll össze, kizárólag design tokenekkel |
+| `.workflow-list__toolbar`                                                                                                                             | `workflow-list/workflow-list-screen.css:5` | **igen, triviális** - egyszerű flex konténer, nincs saját szín/szegély/lekerekítés, tehát nincs mit "design system elemre" cserélni                                                                                                                                                             |
+| `.agents-field-editor__entry-header`                                                                                                                  | `node-inspector.css:174-180`               | **igen, triviális** - ugyanaz, mint fent: elrendezés, kártya-chrome nélkül                                                                                                                                                                                                                      |
 | `.app-tn*`, `.app-content`, `.app-pagehead*`, `.pill` (a navigációban)                                                                                | `topnav-shell/topnav-shell.css`            | **igen, de más réteg**: ezek a `eggproject-design-app-common/_shell.css` TESTVÉR skill byte-azonos átemelt osztályai, nem saját találmány; a 2026-09-08-i audit ezt már külön, "topnav-shell" témaként tárgyalta 8 dokumentált kiegészítéssel                                                   |
 
 **Nem találtam egyetlen dokumentálatlan vagy indokolatlan saját osztályt sem.**
 
 ---
 
-## 7. Gombméret — a 2026-09-08-i audit egyik találata még mindig fennáll
+## 7. Gombméret - a 2026-09-08-i audit egyik találata még mindig fennáll
 
 A `.claude/CLAUDE.md` 11. szekció szabálya: "A gombok `sm` méretűek, kivéve modálisban és
 popupban." A `Button.tsx:44` alapértelmezése `size = 'md'`, tehát a `size` prop kihagyása `md`-t
@@ -391,16 +391,16 @@ tartozik, ezért tételesen rögzítem.
 - Nincs második, kézzel épített "select-szerű" widget a repóban (nincs `role="listbox"`,
   `aria-haspopup="listbox"` a `Menu` komponensen kívül, ami akció-menü, nem érték-választó).
 - A `DataTable.tsx`-ben (`packages/ui/src/data-table/DataTable.tsx`) nincs oldalméret-választó
-  `<select>` — a forrás `DataTable.jsx` demójában van (`data-table/DataTable.jsx:810`), de ez a mi
+  `<select>` - a forrás `DataTable.jsx` demójában van (`data-table/DataTable.jsx:810`), de ez a mi
   komponensünkben nincs átemelve, tehát itt nincs is mit ellenőrizni.
 - A `node-inspector/` egyetlen fájlja sem épít natív `<input>`/`<select>`/`<textarea>` elemet
-  közvetlenül — mindegyik a `packages/ui` `TextField`/`SelectField`/`TextAreaField`/`Checkbox`
+  közvetlenül - mindegyik a `packages/ui` `TextField`/`SelectField`/`TextAreaField`/`Checkbox`
   komponenseit importálja.
 - Nincs olyan CSS fájl a `packages/ui`/`apps/web` fában, ami byte-identity regressziós teszt
-  NÉLKÜL, de a fejlécében "bájtra azonos" állítást tesz, és ami közben ténylegesen eltérne — minden
+  NÉLKÜL, de a fejlécében "bájtra azonos" állítást tesz, és ami közben ténylegesen eltérne - minden
   ellenőrzött `diff` megegyezett a fejléc állításával.
 - **Megjegyzés, nem hiba**: byte-identity regressziós teszt ma csak öt témára van
-  (`topnav-shell`, `self-hosted-font`, `design-token`, `resizable`, `brand-mark`) — a `select-field`,
+  (`topnav-shell`, `self-hosted-font`, `design-token`, `resizable`, `brand-mark`) - a `select-field`,
   `text-field`, `textarea`, `button`, `button-group`, `accordion`, `form-control` fájlokra nincs
   ilyen automatikus védelem, tehát egy jövőbeli szerkesztés némán elsodródhatna a forrástól. Ez
   javaslat, nem talált hiba.
@@ -414,7 +414,7 @@ szabály, `.select`/`.select--sm`/`.select--error` osztályok, bájtra hű CSS).
 card-in-card probléma, amit a 2026-09-08-i audit talált, azóta javítva van. **Az egyetlen ma is
 fennálló, a felhasználó által leírt tünetet okozó eltérés**: a `create-workflow-modal.tsx` Provider
 mezője nem kapja meg a `.field`/`.field__label` burkolót, mert a `SelectField` hívás nem ad át
-`label` propot, csak `aria-label`-t — miközben a `SelectField` API-ja ezt megengedi (a `TextField`
+`label` propot, csak `aria-label`-t - miközben a `SelectField` API-ja ezt megengedi (a `TextField`
 és a `TextAreaField` nem engedné meg, mert azok mindig kiadják a `.field` burkolót). Emellett két,
 nem modális gomb (`workflow-list-screen.tsx` "Új workflow", `not-found-route.tsx` "Vissza a
 workflow listára") még mindig `md` méretű a szabálykönyv `sm`-alapértelmezése helyett.

@@ -118,7 +118,7 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
           }}
         />
         <SelectField
-          aria-label="Provider"
+          label="Provider"
           options={providerOptions}
           placeholder="Nincs megadva"
           loading={isProvidersLoading}

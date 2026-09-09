@@ -155,12 +155,13 @@ describe('SelectField', () => {
     expect(renderedSelect().className).toBe('select sajat');
   });
 
-  it('label nélkül és hiba nélkül csupasz select elemet ad, .field burkoló nélkül', () => {
+  it('label nélkül és hiba nélkül is a .field burkolóban áll, látható címke nélkül', () => {
     act(() => {
       root.render(<SelectField options={PROVIDER_OPTIONS} />);
     });
-    expect(container.querySelector('.field')).toBeNull();
-    expect(container.firstElementChild?.tagName).toBe('SELECT');
+    expect(container.querySelector('label.field')).not.toBeNull();
+    expect(container.querySelector('.field__label')).toBeNull();
+    expect(container.querySelector('.field__error')).toBeNull();
   });
 
   it('label megadásakor a .field burkolóba kerül, a címkével implicit összekötve', () => {

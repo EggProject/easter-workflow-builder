@@ -40,8 +40,9 @@ export interface SelectFieldProperties extends Omit<SelectHTMLAttributes<HTMLSel
   readonly loadingLabel?: string;
   /**
    * A mező fölött álló, nagybetűs címke szövege, a `TextField` `label`
-   * propjának pontos párja. Megadása esetén a mező a design system `.field`
-   * burkolóját kapja, a címkével implicit összekötve.
+   * propjának pontos párja. A mező a design system `.field` burkolóját
+   * mindig megkapja (lásd a komponens fejléc-kommentjét); a `label` csak azt
+   * dönti el, jelenik-e meg látható `field__label` felirat is benne.
    */
   readonly label?: string | undefined;
   /**
@@ -62,12 +63,15 @@ const NO_OPTIONS: readonly SelectFieldOption[] = [];
  * CSS-ét igényelné; a natív változatot maga a forrás CSS nevezi meg és
  * támogatja (`select.select` szabály).
  *
- * Címke és hibaüzenet: a `label` vagy az `error` megadásakor a mező a
- * `TextField` `.field` burkolójába kerül (címke fölé, hibaüzenet alá), a
- * hibaüzenet pedig `aria-describedby` és `aria-invalid` párral kötődik a
- * mezőhöz. Egyik sem kötelező: mindkettő nélkül a komponens változatlanul
- * csupasz `<select>` elemet ad, tehát a saját elrendezést hozó hívók
- * (`aria-label` plusz külső címke) érintetlenek maradnak.
+ * Címke és hibaüzenet: a mező mindig a `TextField` `.field` burkolójába
+ * kerül (címke fölé, hibaüzenet alá) - ugyanúgy, ahogy a `TextField` és a
+ * `TextAreaField` is feltétel nélkül kiadja ezt a burkolót. A `label`
+ * megadása csak azt dönti el, jelenik-e meg látható `field__label` felirat;
+ * enélkül is a `.field` áll, mert a design system minden valódi
+ * oldalpéldája (`settings.html`, `onboarding.html`) mindig ebben a
+ * burkolóban adja a `<select class="select">` elemet
+ * (`docs/research/2026-09-09-elem-audit.md` 3.3-3.5 szekció). A hibaüzenet
+ * `aria-describedby` és `aria-invalid` párral kötődik a mezőhöz.
  */
 export function SelectField(properties: Readonly<SelectFieldProperties>): ReactElement {
   const {
@@ -118,10 +122,6 @@ export function SelectField(properties: Readonly<SelectFieldProperties>): ReactE
       ))}
     </select>
   );
-
-  if (label === undefined && error === undefined) {
-    return selectElement;
-  }
 
   return (
     <label className="field">
