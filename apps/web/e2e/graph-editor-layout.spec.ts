@@ -252,3 +252,75 @@ test('a jobb oldali panel csak kiválasztásra jelenik meg, és az arány a loca
   );
   expect(restoredSizes).toEqual(['65%', '35%']);
 });
+
+test('dobó localStorage (szimulált privát böngészés) esetén az alapértelmezett arányra esik vissza, és a szerkesztő használható marad', async ({
+  page,
+}) => {
+  // A `readStoredLayoutSizes` `try`/`catch` ágát (`graph-editor-layout.ts`)
+  // valós böngészőben csak úgy lehet ténylegesen lefuttatni, ha a
+  // `localStorage.getItem` dob - ez normál böngészésben sosem történik meg,
+  // de Safari privát módban és letiltott tároláskor igen. A hook KIZÁRÓLAG
+  // a szerkesztő elrendezés kulcsára dob, más kulcsot (pl. a téma módot)
+  // változatlanul kiszolgál, hogy a többi felületi elem ne törjön el.
+  await page.addInitScript((storageKey: string) => {
+    const store = globalThis.localStorage;
+    const originalGetItem = store.getItem.bind(store);
+    // `Object.defineProperty` a `store` PÉLDÁNYÁN ad új tulajdonságot, nem a
+    // `Storage.prototype`-on: a `this` kötés elkerülése miatt (a projekt
+    // `unicorn/no-this-outside-of-class` szabálya tiltja), és hogy a
+    // `sessionStorage` (ugyanazt a prototípust örökli) érintetlen maradjon.
+    Object.defineProperty(store, 'getItem', {
+      configurable: true,
+      value: (key: string): string | null => {
+        if (key === storageKey) {
+          throw new Error('a tárolás le van tiltva (szimulált privát böngészés)');
+        }
+        return originalGetItem(key);
+      },
+    });
+  }, LAYOUT_STORAGE_KEY);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+  await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+  await page.getByTestId('rf__node-n1').click();
+  await expect(page.getByRole('button', { name: 'Bezárás' })).toBeVisible();
+
+  // A dobás elnyelve: az alapértelmezett [70, 30] arány áll be, a felület
+  // nem omlik össze.
+  const sizes = await page.evaluate(() =>
+    [...globalThis.document.querySelectorAll('.resizable-panel')].map(
+      (panel) => globalThis.getComputedStyle(panel).flexBasis,
+    ),
+  );
+  expect(sizes).toEqual(['70%', '30%']);
+});
+
+test('érvényes JSON, de rossz alakú tárolt kulcsra is az alapértelmezett arányra esik vissza', async ({ page }) => {
+  // A `readStoredLayoutSizes` `isLayoutSizePair` ellenőrzésének HAMIS ágát
+  // (`graph-editor-layout.ts`) egy korábbi teszt már a MEGFELELŐ alakú
+  // ([65, 35]) értékkel fedi - ez a teszt a másik oldalt, egy szintaktikailag
+  // érvényes, de rossz ALAKÚ tárolt értéket ad, amit a `JSON.parse` még
+  // hibátlanul feldolgoz, csak az `isLayoutSizePair` utasítja el.
+  await page.addInitScript(
+    (parameters: { readonly storageKey: string; readonly badShape: string }) => {
+      globalThis.localStorage.setItem(parameters.storageKey, parameters.badShape);
+    },
+    { storageKey: LAYOUT_STORAGE_KEY, badShape: JSON.stringify({ left: 70 }) },
+  );
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+  await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+  await page.getByTestId('rf__node-n1').click();
+  await expect(page.getByRole('button', { name: 'Bezárás' })).toBeVisible();
+
+  const sizes = await page.evaluate(() =>
+    [...globalThis.document.querySelectorAll('.resizable-panel')].map(
+      (panel) => globalThis.getComputedStyle(panel).flexBasis,
+    ),
+  );
+  expect(sizes).toEqual(['70%', '30%']);
+});

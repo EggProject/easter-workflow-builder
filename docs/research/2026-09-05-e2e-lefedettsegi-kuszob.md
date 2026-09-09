@@ -448,3 +448,73 @@ pedig kitisztítja a nem numerikus bevitelt. Ez az `error_handler` node `backoff
 (`apps/web/e2e/node-inspector.spec.ts`, "a mentés a séma ellenőrzésen elbukik...") ezt az utat
 járja végig, és ezzel fedi a `validate-graph-for-save.ts` hiba ágát és a `GraphEditorScreen`
 `setValidationMessage` ágát is.
+
+---
+
+## 13. Konszolidációs újramérés (2026-09-09): a két párhuzamos szerkesztő munkamenet egyesítése, az `isSaveAttempted` bekötése után
+
+**Kiváltó ok:** két párhuzamos munkamenet (a szerkesztő elrendezés faltól falig átalakítása, és a
+node inspector belső újratervezése) egyesítése a `feat/spec-008-grafszerkeszto` ágon, plusz a
+konszolidáció során talált, be nem kötött `NodeInspector` `isSaveAttempted` propjának javítása
+(`GraphEditorScreen` korábban nem adta át). A 12. szekció küszöbe
+(98.25/96.37/98.89/98.18) ezt a javítást még NEM tartalmazta, tehát újramérés kellett.
+
+**A javítás önmagában egy ág lefedettségét rontotta, ez indokolta a kódváltoztatást is, nem
+csak a tesztet.** A `NodeInspector.tsx` `isSaveAttempted` mezője korábban opcionális volt,
+`= false` alapértékkel. Amíg a `GraphEditorScreen` nem adta át a propot, e2e-vel MINDIG az
+alapérték ága futott (lefedve), az explicit érték ága SOHA (fedetlen) - ezt a bekötés előtti
+mérés is igazolta: pusztán a wiring bekötésétől (a default branch e2e-ből innentől elérhetetlenné
+válása) a branch százalék 96.37-ről 96.11-re esett, miközben a fedetlen ágak SZÁMA nem nőtt (14
+maradt, csak az áthelyeződés iránya fordult meg: a korábban fedett alapérték ág vált fedetlenné).
+Mivel az egyetlen production fogyasztó ezután MINDIG explicit értéket ad át, az alapérték ág
+LOGIKAILAG garantáltan sosem futna - ez a `.claude/CLAUDE.md` 5. szekciójának "nincs garantáltan
+sosem futó ág" szabályát sértette volna. A javítás ezért nem tesztírás, hanem a mező KÖTELEZŐVÉ
+tétele (nincs többé alapérték): ez teljesen megszünteti a branch konstrukciót, és a 10 érintett
+`NodeInspector.spec.tsx` render hívás mind explicit `isSaveAttempted={false}` (vagy `true`) értéket
+kapott.
+
+**Egy második, valós hiányt is talált a mérés: `graph-editor-layout.ts` két ága.** A perzisztált
+elrendezés arány `try`/`catch` ága (dobó `localStorage.getItem`) és az `isLayoutSizePair` hamis
+ága (érvényes JSON, rossz alak) e2e-vel korábban egyszer sem futott le - ezek viszont, a 2.2
+szekció tételeivel ellentétben, TÉNYLEGESEN elérhetők e2e-vel: a Playwright `page.addInitScript`
+képes a `localStorage.getItem`-et a navigáció ELŐTT úgy felülírni, hogy egy konkrét kulcsra
+dobjon (a `Storage.prototype` érintése nélkül, hogy a `sessionStorage` és más kulcsok
+érintetlenek maradjanak), illetve képes érvénytelen alakú értéket előre beírni a kulcsra. Két új
+teszt került az `apps/web/e2e/graph-editor-layout.spec.ts` fájlba, mindkettő ezt a technikát
+használja, és mindkét fedetlen ágat lezárja: `graph-editor-layout.ts` innentől 100 százalék mind a
+négy metrikán, e2e-vel is.
+
+**A mérés menete:** törölt `apps/web/e2e/.nyc_output` és `coverage-e2e`, `CI=true bun x
+playwright test` (138 Playwright teszt, mind zöld, `workers: 1`), majd `nyc report
+--reporter=json-summary` a pontos `pct` értékekért.
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (12. szekció) |
+| ---------- | --------------- | --------- | -------------------------- |
+| statements | 962 / 978       | **98.36** | 98.25                      |
+| branches   | 372 / 385       | **96.62** | 96.37                      |
+| functions  | 359 / 363       | **98.89** | 98.89                      |
+| lines      | 924 / 940       | **98.29** | 98.18                      |
+
+**Mind a négy metrika a korábbi küszöbön vagy fölötte áll** (a functions pontosan egyezik, a
+másik három nőtt), tehát a ratchet szabály szerint az `apps/web/package.json`
+`coverage:e2e:report` küszöbe erre a mért értékre állt
+(98.36/96.62/98.89/98.29). Az igazolás: a beállított küszöbbel `bun run coverage:e2e:report`
+exit 0-t ad.
+
+**A fennmaradó rés tételesen ellenőrizve: nincs új, dokumentálatlan tétel.** A mérés utáni
+`nyc report --reporter=text` szerint a 100 százalék alatti fájlok listája pontosan a korábban már
+dokumentált tételekre szűkül, egyetlen újdonság sem maradt:
+
+| Fájl                                                  | Fedetlen ág    | Forrás                                       |
+| ----------------------------------------------------- | -------------- | -------------------------------------------- |
+| `app-mount/mount-app.tsx`                             | 16, 21-22. sor | 2.2 szekció (build idejű `VITE_*` ág)        |
+| `frontend-config/read-frontend-config.ts`             | több sor       | 2.2 szekció (build idejű `VITE_*` ág)        |
+| `graph-editor/is-valid-connection.ts`                 | 36. sor        | 9.2 szekció (nincs bemenő handle a DOM-ban)  |
+| `graph-node-card/GraphNodeCard.tsx`                   | 74, 82. sor    | 8. szekció (`data.status` még nincs bekötve) |
+| `graph-node-card/step-run-status-badge.ts`            | 30. sor        | 9.1 szekció (ugyanaz a gyökérok)             |
+| `history-navigation/browser-history-location-port.ts` | 21. sor        | 2.2 szekció (`useEffect` cleanup)            |
+| `rest-client/perform-route-request.ts`                | 70. sor        | 2.2 szekció (`buildRoutePath` hiányzó param) |
+| `stream-client/use-stream-connection.ts`              | 182. sor       | 2.2 szekció (`EventSource` cleanup)          |
+
+Mindegyik unit teszttel fedett (lásd a 9.3 szekció táblázatát), a unit lefedettség változatlanul
+100 százalék, kizárás nélkül.
