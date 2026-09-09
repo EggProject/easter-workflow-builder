@@ -418,3 +418,38 @@ mezője nem kapja meg a `.field`/`.field__label` burkolót, mert a `SelectField`
 és a `TextAreaField` nem engedné meg, mert azok mindig kiadják a `.field` burkolót). Emellett két,
 nem modális gomb (`workflow-list-screen.tsx` "Új workflow", `not-found-route.tsx` "Vissza a
 workflow listára") még mindig `md` méretű a szabálykönyv `sm`-alapértelmezése helyett.
+
+---
+
+## 10. Helyesbítés (2026-09-09, ugyanaznap, mérés alapján)
+
+**A 9. szekció "a `select` ELEM ma helyesen ... épül" állítása a KIRAJZOLT eredmény szintjén
+hamis volt, és az audit módszere elégtelen: a számított stílust nem mérte.** A felhasználó
+képpel bizonyította, hogy a mi `select`-ünk talpas betűvel jelenik meg, a design systemé
+talpatlannal. Chromium alatt, `getComputedStyle` méréssel igazolva:
+
+| Tulajdonság   | Design system (`select.html`)            | A miénk (mérés előtt) | Egyezik |
+| ------------- | ---------------------------------------- | --------------------- | ------- |
+| `font-family` | `Roboto, -apple-system, ..., sans-serif` | `"Times New Roman"`   | NEM     |
+| `color`       | `rgb(10, 18, 48)`                        | `rgb(10, 18, 48)`     | igen    |
+| `border`      | `1px solid rgb(131, 144, 168)`           | ugyanaz               | igen    |
+| `radius`      | `12px`                                   | `12px`                | igen    |
+| `box-sizing`  | `border-box`                             | `border-box`          | igen    |
+
+**A gyökérok nem a `select-field` komponensé.** A `.select` szabály `font-family: inherit`
+deklarációja a `body` betűcsaládjától függ; a forrás `_shell.css`
+`body { font-family: var(--ep-font-sans) }` szabálya nem került át, csak a `margin: 0`.
+Rendszerszintű hiba volt tehát, ami minden öröklésre támaszkodó elemet érintett, köztük
+mind a négy natív űrlap vezérlőt. Az `input` és a `textarea` azért maradt Roboto, mert az ő
+CSS-ük külön ágon kapja meg a családot, nem az öröklésen.
+
+**Ugyanebben a mérésben derült ki a bezáró gomb színe is**: a `.btn--ghost` szövegszíne a
+design systemben `var(--ep-accent-fg)`, azaz az arany `#8A6220`; a node inspector bezáró
+gombjának mért színe pontosan `rgb(138, 98, 32)` volt. A design system a panel bezárására
+saját, `--ep-fg-muted` színű vezérlőt szállít (`.drawer__close`, `.modal__close`), nem a
+gomb komponenst.
+
+**A tanulság a módszerre.** Osztálynév és CSS forrásszöveg összehasonlítása nem bizonyít
+kirajzolt eredményt. Aki design system hűséget állít, annak a SZÁMÍTOTT stílust kell mérnie
+valódi böngészőben, mindkét oldalon. A regresszió ezt teszi:
+`apps/web/e2e/form-control-typography.spec.ts`.

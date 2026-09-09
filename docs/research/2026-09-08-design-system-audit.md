@@ -127,6 +127,17 @@ maga a forrás CSS megnevez és támogat** ("Native `<select>` shares the .selec
 ezt explicit ki is mondja: a forrás `Select.jsx` egyedi listbox változatát (button trigger + `.menu`
 panel) tudatosan nem választották, mert az a hatókörön kívüli `Menu` komponens CSS-ét igényelné.
 
+> **HELYESBÍTÉS (2026-09-09).** Ez a "rendben van" minősítés a JELÖLÉS és a CSS FORRÁSSZÖVEG
+> szintjén helyes, a KIRAJZOLT eredmény szintjén viszont hamis volt, és az audit módszere
+> emiatt elégtelen: a számított stílust nem mérte. A `.select` szabály `font-family: inherit`
+> deklarációja a `body` betűcsaládjától függ, ami a projektben nem volt beállítva (a forrás
+> `_shell.css` `body` szabályából csak a `margin: 0` került át), ezért a natív `<select>`
+> chromium alatt mérten `"Times New Roman"` TALPAS betűvel jelent meg, miközben a design
+> system saját példáján `Roboto`. Ugyanez érintette a `.btn` gombokat és minden más elemet,
+> ami az öröklésre támaszkodott. Javítva a `topnav-shell.css` `body` szabályával; a
+> regresszió a tényleges, számított stílust állítja:
+> `apps/web/e2e/form-control-typography.spec.ts`.
+
 ### 4.3 A `form-control` (jelölőnégyzet) RENDBEN van
 
 Csak a Checkbox alrészt emeli át, dokumentáltan (lásd 3. szekció).
