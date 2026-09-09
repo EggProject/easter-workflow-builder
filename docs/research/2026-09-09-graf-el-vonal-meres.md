@@ -102,7 +102,146 @@ A teszt a fenti, szándékosan elrontott állapotban mindkét témában elbukik,
 
 ---
 
-## 6. Amit ez a mérés NEM zár le
+## 6. A gyökérok megszüntetése: a fixtúra és a képernyőkép készítés a repóba került
+
+A 3. szekció megállapította, hogy a hiba a bizonyíték előállításában volt. A javítás ezt a
+lehetőséget zárja be, nem egy tünetet javít:
+
+| Ami korábban volt                                                  | Ami most van                                                         |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| a script a repón kívül, `/tmp/shots/` alatt                        | `apps/web/e2e/capture-screenshots.ts`, verziókövetve                 |
+| a fixtúra a scriptbe ágyazva, munkamenetenként újraírva            | `apps/web/e2e/showcase-graph.ts`, verziókövetve, tizenegy éllel      |
+| a fixtúrát semmi nem ellenőrizte                                   | `apps/web/e2e/showcase-graph.spec.ts` a `test:e2e` kapun             |
+| a nagyítás a betöltéskori `fitView` prop, a panel megnyitása előtt | a panel megnyitása UTÁN a React Flow saját "Fit View" vezérlő gombja |
+| a parancs munkamenetenként újra összerakva                         | `bun run screenshots`                                                |
+
+**Miért az `apps/web/e2e/` a helye, és miért nem a `tooling/scripts`.** A `tooling/scripts` a zajos
+parancsokhoz tartozó, token takarékos bash wrapperek és a teljes repóra vonatkozó konfigurációs
+ellenőrzések helye; a képernyőkép készítés egyik sem. A `tools/*` egy önálló csomag lenne, aminek
+importálnia kellene az `apps/web` e2e belső segédfüggvényeit, ami a rétegzés szerint tilos. Az
+`apps/web/e2e` viszont már ma is birtokolja mindazt, amire a képernyőkép készítésnek szüksége van:
+a Playwright felállást a `vite build` plusz `vite preview` webszerverrel és a kötelező `VITE_*`
+konfigurációval, a REST és az SSE `page.route()` mockolást, és a `protocol` típusokat, amikre a
+fixtúra épül. A capture fájl SZÁNDÉKOSAN nem `.spec.ts`, ezért a `playwright.config.ts`
+alapértelmezett `testMatch` mintája nem veszi fel; kizárólag a `playwright.screenshots.config.ts`
+futtatja, tehát a kilenc kapu és a `test:e2e` job ideje változatlan.
+
+**A négy oszlop nem esztétikai döntés.** A React Flow `minZoom` alapértelmezése `0.5` (a szállított
+`@xyflow/react@12.11.6` forrásában `minZoom = 0.5`), a `fitView` pedig
+`zoom = szélesség / (tartalom * (1 + padding))` alakban számol. 1440x900-as ablakban, nyitott
+beállítás panel mellett a vászon 1013 pixel széles, tehát a tartalom nem lehet szélesebb
+1013 / (0.5 * 1.1) = 1842 pixelnél, különben a `fitView` a `minZoom`-on megáll, és a gráf jobb széle
+levágódik. Négy oszlop a mért 358 pixeles kártyaszélességgel és a dagre alapértelmezett 50 pixeles
+`ranksep` értékével 1582 pixel; a mért illesztési nagyítás 0.58 (panellel) és 0.83 (panel nélkül).
+
+---
+
+## 7. A per-él pixel mérés: miért kell mérési szonda, és honnan jön a küszöb
+
+A 2. szekció mérése egyetlen, vízszintes élre és egy 16x17 pixeles, üres területre eső kivágatra
+szólt. A bemutató fixtúra kilenc éle ennél változatosabb (átlós görbék, oszlopon belüli
+visszakanyarodás), ezért a kivágat az él teljes befoglaló doboza, 8 pixel ráhagyással. Ezen a
+nagyobb kivágaton a 2. szekció metrikája **nem dönt**, és ezt mérés mutatta ki.
+
+**A kontroll mérés módja.** Az `apps/web/src/graph-editor/graph-editor.css` fájlhoz ideiglenesen
+hozzáadott `.react-flow__edge-path { stroke: var(--ep-bg-sunken); }` szabály, azaz a vonal pontosan
+a vászon háttérszínével fest. Mind a kilenc élen, mindkét témában, mindkét nézetben (panellel és
+panel nélkül), tehát 36 mérés állapotonként.
+
+| Állapot                    | Szonda nélkül | Szondával  |
+| -------------------------- | ------------- | ---------- |
+| hibás (háttérszínnel fest) | 1 ... 25      | 1 ... 3    |
+| ép (a jelenlegi termékkód) | 16 ... 136    | 15 ... 136 |
+
+**Szonda nélkül a két tartomány átfed** (a hibás állapot 25-ig felment, az ép állapot 16-ról
+indult), tehát a mérés nem tudott dönteni. Az ok mérten azonosított: a nagyobb kivágat áthalad a
+React Flow háttér pontmintáján és a csomópont kártyák árnyékán, ezeket pedig a háttérszínnel festő
+(tehát hibás) él is ELTAKARJA, így az elrejtésekor újra előbukkannak, és ez önmagában eltérést ad.
+
+**A szonda** ezért mindkét képernyőképen eltünteti a nem egyenletes hátteret: a pontmintát
+`display: none`, a csomópont kártyákat és a vezérlő paneleket `visibility: hidden` alá teszi. A
+`visibility` és nem a `display` azért, mert a `display: none` a React Flow méret figyelőjén át új
+`dimensions` változást váltana ki, ami az élek geometriáját is elmozdíthatná a két felvétel között.
+A szondával az él alatt egyetlen, egyenletes szín marad (`--ep-bg-sunken`), és a mérés pontosan azt
+kérdezi, amit kérdeznie kell: elüt-e az él vonala a vászon hátterétől.
+
+**A küszöb 8**, mert a mért hibás maximum 3 és a mért ép minimum 15 közé esik: több mint két és
+félszerese az előbbinek, és nagyjából fele az utóbbinak. A szám nem becslés, a fenti táblázatból
+származik. A helye: `apps/web/e2e/edge-paint-measurement.ts`,
+`EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE`.
+
+**Az ép állapot mért értékei, nyitott beállítás panel mellett (0.58-as nagyítás), élenként:**
+
+| Él                  | Világos | Sötét |
+| ------------------- | ------- | ----- |
+| `e-start-branch`    | 136     | 30    |
+| `e-branch-fanout`   | 136     | 32    |
+| `e-branch-agent`    | 136     | 30    |
+| `e-branch-script`   | 136     | 30    |
+| `e-fanout-loop`     | 72      | 16    |
+| `e-agent-join`      | 136     | 30    |
+| `e-script-approval` | 71      | 15    |
+| `e-loop-join`       | 135     | 31    |
+| `e-approval-join`   | 136     | 30    |
+
+A két alacsonyabb érték (`e-fanout-loop`, `e-script-approval`) a két tökéletesen VÍZSZINTES él: a
+0.58-as nagyításon az egy pixel vastag vonal két képpontsor között oszlik meg, tehát a
+csúcsértéke arányosan kisebb. Mind a kilenc érték a küszöb felett van, mindkét témában.
+
+**A regressziós teszt bukása igazolva.** A fenti, szándékosan elrontott állapotban a
+`showcase-graph.spec.ts` mindkét témás pixel mérése elbukik, az első élnél
+(`Expected: >= 8, Received: 1`, illetve `Received: 2`), miközben a fixtúra alakját őrző két
+állítás és a "teljes gráf a vásznon belül" állítás zöld marad. A CSS visszaállítása után mind a
+hat teszt zöld.
+
+---
+
+## 7/a. Frissítés 2026-09-10: a fixtúra végleges alakja tizenegy éllel, újramérve
+
+A fenti 7. szekció mérése a bemutató fixtúra egy KORÁBBI, kilenc élű állapotán készült. Azóta a
+fixtúra topológiája megváltozott: az `e-fanout-loop` és `e-script-approval` él eltűnt, helyette
+az `n-fanout`, `n-script`, `n-approval` és `n-loop` csomópont mind közvetlenül a `n-join`
+csomópontra köt (`e-fanout-join`, `e-script-join`, `e-approval-join`, `e-loop-join`), a
+`n-branch` pedig közvetlenül az `n-approval` és az `n-loop` csomópontra is
+(`e-branch-approval`, `e-branch-loop`). Az ok a `showcase-graph.ts` saját dokumentált
+invariánsa: minden él szigorúan balról jobbra, szomszédos oszlopok között halad, egy
+`fanout -> loop` közvetlen él viszont ugyanabban az oszlopban állna (mindkettő a 2. oszlopban),
+ami a React Flow alapértelmezett handle-elrendezésén levágódó kanyart adna. A végeredmény
+tizenegy él, minden csomópont bekötve.
+
+**Ez a mérés a VÉGLEGES, repóban lévő fixtúrát méri**, a `bun run test:e2e` kapun ténylegesen
+lefutó `showcase-graph.spec.ts` konzolkimenetéből, nem becslésből. Az ép állapot mért értékei
+(panel nyitva, 0.58-as illesztési nagyítás), mind a tizenegy élen:
+
+| Él                  | Világos | Sötét |
+| ------------------- | ------- | ----- |
+| `e-start-branch`    | 136     | 30    |
+| `e-branch-fanout`   | 136     | 30    |
+| `e-branch-agent`    | 141     | 34    |
+| `e-branch-script`   | 136     | 30    |
+| `e-branch-approval` | 138     | 33    |
+| `e-branch-loop`     | 136     | 30    |
+| `e-fanout-join`     | 136     | 30    |
+| `e-agent-join`      | 134     | 30    |
+| `e-script-join`     | 136     | 30    |
+| `e-approval-join`   | 134     | 30    |
+| `e-loop-join`       | 136     | 30    |
+
+Legkisebb mért érték 30 (sötét), legnagyobb 141 (világos, `e-branch-agent`) - mindkettő jóval a
+**8**-as küszöb felett, tehát a küszöb a végleges topológián is helytálló.
+
+**A szándékos rontás (háttérszínnel festő vonal) újra lefuttatva ugyanerre a fixtúrára**: a teszt
+az első élnél (`e-start-branch`) elbukik, mielőtt a többi élt mérhetné (a `for` ciklusban álló
+`expect` az első hibán megállítja a tesztet) - világos témában **1**, sötétben **2**, ami a 7.
+szekció korábban dokumentált, hibás állapotra mért 1...3 tartományába esik. A teszt mindkét
+témában elbukik (`Expected: >= 8, Received: 1`, illetve `Received: 2`), a fixtúra alakját őrző
+két állítás (legalább öt él, minden csomópont bekötve) viszont zöld marad, mert azok a
+`SHOWCASE_GRAPH` adatszerkezetét nézik, nem a kifestett pixelt. A CSS visszaállítása után mind a
+hat teszt zöld.
+
+---
+
+## 8. Amit ez a mérés NEM zár le
 
 - Kizárólag chromium ellen futott, mert az `apps/web/playwright.config.ts` ma csak azt
   definiálja. Firefox és WebKit: **nem ellenőrzött**.
