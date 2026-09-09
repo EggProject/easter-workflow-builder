@@ -3,19 +3,63 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
 
-function typeInto(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): void {
-  let prototype: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-  if (element instanceof HTMLInputElement) {
-    prototype = HTMLInputElement.prototype;
-  } else if (element instanceof HTMLTextAreaElement) {
-    prototype = HTMLTextAreaElement.prototype;
-  } else {
-    prototype = HTMLSelectElement.prototype;
-  }
+function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event('input', { bubbles: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+/**
+ * A `SelectField` trigger `role="combobox"` szerepű gomb; a mezőt a saját
+ * `.field` burkolóján belüli `.field__label` szövege azonosítja.
+ */
+function selectTrigger(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select triggert`);
+  }
+  return button;
+}
+
+/**
+ * A panel `createPortal`-lal a `document.body`-ba kerül, tehát NEM a
+ * `container` leszármazottja; a triggerhez az `aria-controls` köti.
+ */
+function selectPanel(trigger: HTMLButtonElement): HTMLElement {
+  const panelId = trigger.getAttribute('aria-controls');
+  const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+    (candidate) => candidate.id === panelId,
+  );
+  if (panel === undefined) {
+    throw new Error('a teszt nem találta a select panelt');
+  }
+  return panel;
+}
+
+function chooseOption(container: HTMLElement, label: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, label);
+  clickOn(trigger);
+  const option = [...selectPanel(trigger).querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
+  );
+  if (option === undefined) {
+    throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót a(z) "${label}" mezőben`);
+  }
+  clickOn(option);
 }
 
 const FULL_ENTRY: Readonly<Record<string, unknown>> = {
@@ -180,14 +224,17 @@ describe('AgentDefinitionEntryFields', () => {
     act(() => {
       root.render(<AgentDefinitionEntryFields value={FULL_ENTRY} onChange={onChange} />);
     });
-    const select = container.querySelector('select');
-    if (select === null) {
-      throw new Error('a teszt nem találta a memory legördülőt');
-    }
-    act(() => {
-      typeInto(select, 'local');
-    });
+    chooseOption(container, 'Memória hatóköre', 'local');
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: 'local' }));
+  });
+
+  it('a zárt lista üres értékű opciója üríti a mezőt', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(<AgentDefinitionEntryFields value={FULL_ENTRY} onChange={onChange} />);
+    });
+    chooseOption(container, 'Memória hatóköre', 'nincs megadva');
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: '' }));
   });
 
   it('a `skills` és az `mcpServers` mező olvasható, és megnevezi a SPEC-009 okot', () => {

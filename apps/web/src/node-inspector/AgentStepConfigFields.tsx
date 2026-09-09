@@ -145,17 +145,12 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           ...ProviderIdSchema.options.map((option) => ({ value: option, label: option })),
         ]}
         value={config.providerId ?? ''}
-        onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-          // A "nincs felülírás" opció értéke maga is üres string, és egy DOM
-          // szinten érvénytelen érték natív `<select>`-en happy-dom alatt
-          // (mért viselkedés) szintén üres stringre esik vissza - a két eset
-          // ezért egyetlen `.find` hívással, egy ágban kezelhető: külön "raw
-          // === ''" elágazás után a `matched !== undefined` false ága
-          // típusilag garantáltan sosem futna (`.claude/CLAUDE.md` 5.
-          // szekció), mert minden nem-üres `raw` a `ProviderIdSchema.options`
-          // egyik eleméből jön, sosem tetszőleges sztringből.
-          const matched = ProviderIdSchema.options.find((option) => option === event.target.value);
-          // eslint-disable-next-line unicorn/no-null -- a `providerId: ProviderId | null` `null` értéke jelenti a "nincs felülírás" (üres vagy DOM szinten érvénytelen) állapotot.
+        onChange={(nextValue) => {
+          // A `SelectField` az opciólista értéktípusát adja vissza, tehát a
+          // `nextValue` itt `'' | ProviderId`. A "nincs felülírás" opció
+          // értéke az üres string; a `.find` ezt szűri ki, más ága nincs.
+          const matched = ProviderIdSchema.options.find((option) => option === nextValue);
+          // eslint-disable-next-line unicorn/no-null -- a `providerId: ProviderId | null` `null` értéke jelenti a "nincs felülírás" állapotot.
           setField('providerId', matched ?? null);
         }}
       />
@@ -179,11 +174,8 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               error={sessionModeError}
               options={SessionModeSchema.options.map((option) => ({ value: option, label: option }))}
               value={config.sessionMode}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                const matched = SessionModeSchema.options.find((option) => option === event.target.value);
-                if (matched !== undefined) {
-                  setField('sessionMode', matched);
-                }
+              onChange={(nextValue) => {
+                setField('sessionMode', nextValue);
               }}
             />
             <TextField
@@ -224,14 +216,12 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
                 ...ThinkingModeSchema.options.map((option) => ({ value: option, label: option })),
               ]}
               value={config.thinking ?? ''}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                // Lásd a `providerId` mező fenti indoklását: a "nincs megadva" és a
-                // DOM szinten érvénytelen eset happy-dom alatt egyaránt üres
-                // stringre esik vissza, tehát egyetlen `.find` hívás fedi mindkét
-                // esetet - egy külön "raw === ''" elágazás után a `matched !==
-                // undefined` false ága garantáltan sosem futna.
-                const matched = ThinkingModeSchema.options.find((option) => option === event.target.value);
-                // eslint-disable-next-line unicorn/no-null -- a `thinking: ThinkingMode | null` "nincs megadva" (üres vagy DOM szinten érvénytelen) ága.
+              onChange={(nextValue) => {
+                // Lásd a `providerId` mező fenti indoklását: a `nextValue` itt
+                // `'' | ThinkingMode`, a `.find` az üres ("nincs megadva")
+                // értéket szűri ki.
+                const matched = ThinkingModeSchema.options.find((option) => option === nextValue);
+                // eslint-disable-next-line unicorn/no-null -- a `thinking: ThinkingMode | null` "nincs megadva" ága.
                 setField('thinking', matched ?? null);
               }}
             />

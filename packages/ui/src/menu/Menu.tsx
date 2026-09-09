@@ -13,6 +13,7 @@ import {
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import { computePanelPosition, type PanelPosition } from './compute-panel-position.ts';
+import { isInsideMenu } from './is-inside-menu.ts';
 import { MenuCloseContext } from './menu-close-context.ts';
 import { readPanelElement } from './read-panel-element.ts';
 import './menu.css';
@@ -67,24 +68,6 @@ function focusMenuItem(items: readonly HTMLButtonElement[], target: HTMLButtonEl
   }
   setRovingTabIndex(items, target);
   target.focus();
-}
-
-/**
- * Igaz, ha a `target` a `anchor` vagy a `panel` valamelyikének (akár közvetett)
- * leszármazottja. A panel és az anchor a DOM-ban 2026-09-04 óta KÜLÖN ágon
- * áll (lásd a `Menu` fejléc dokumentációját), ezért a "kívülre kattintás"/
- * "fókusz elhagyta a menüt" döntés mindkettőt meg kell vizsgálja.
- */
-function isInsideMenu(
-  anchor: HTMLSpanElement | null,
-  panel: HTMLDivElement | null,
-  target: EventTarget | null,
-): boolean {
-  if (!(target instanceof Node)) {
-    return false;
-  }
-  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- mérve (bun run test, packages/ui/src/menu): az `anchor?.contains`/`panel?.contains` opcionális láncolás a v8 lefedettségi eszköznél ÖNÁLLÓ, mindkét oldalon lefedendő branch-et hoz létre, holott `anchor`/`panel` a hívási pontokon a gyakorlatban SOHA nem null (lásd a fenti dokumentációt) - a `!== null &&` forma ezt a branch-et NEM hozza létre.
-  return (anchor !== null && anchor.contains(target)) || (panel !== null && panel.contains(target));
 }
 
 /**

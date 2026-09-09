@@ -4,33 +4,70 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SystemPromptField } from './SystemPromptField.tsx';
 
-function typeInto(element: HTMLSelectElement | HTMLTextAreaElement, value: string): void {
-  const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLTextAreaElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+function typeInto(element: HTMLTextAreaElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event('input', { bubbles: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function modeSelect(container: HTMLElement): HTMLSelectElement {
-  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
-    (candidate) => candidate.closest('label')?.textContent.includes('Rendszer prompt módja') === true,
-  );
-  if (select === undefined) {
-    throw new Error('a teszt nem talált mód választó select elemet');
-  }
-  return select;
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
 }
 
-function excludeSelect(container: HTMLElement): HTMLSelectElement {
-  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
-    (candidate) => candidate.closest('label')?.textContent.includes('Dinamikus szekciók kizárása') === true,
+/**
+ * A `SelectField` trigger `role="combobox"` szerepű gomb; a mezőt a saját
+ * `.field` burkolóján belüli `.field__label` szövege azonosítja.
+ */
+function selectTrigger(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
   );
-  if (select === undefined) {
-    throw new Error('a teszt nem talált exclude select elemet');
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select triggert`);
   }
-  return select;
+  return button;
 }
+
+/**
+ * A panel `createPortal`-lal a `document.body`-ba kerül, tehát NEM a
+ * `container` leszármazottja; a triggerhez az `aria-controls` köti.
+ */
+function selectPanel(trigger: HTMLButtonElement): HTMLElement {
+  const panelId = trigger.getAttribute('aria-controls');
+  const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+    (candidate) => candidate.id === panelId,
+  );
+  if (panel === undefined) {
+    throw new Error('a teszt nem találta a select panelt');
+  }
+  return panel;
+}
+
+function triggerLabel(trigger: HTMLButtonElement): string | null {
+  return trigger.querySelector('.select__value')?.textContent ?? null;
+}
+
+function chooseOption(container: HTMLElement, label: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, label);
+  clickOn(trigger);
+  const option = [...selectPanel(trigger).querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
+  );
+  if (option === undefined) {
+    throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót a(z) "${label}" mezőben`);
+  }
+  clickOn(option);
+}
+
+const MODE_LABEL = 'Rendszer prompt módja';
+const EXCLUDE_LABEL = 'Dinamikus szekciók kizárása';
 
 describe('SystemPromptField', () => {
   let container: HTMLDivElement;
@@ -53,7 +90,7 @@ describe('SystemPromptField', () => {
     act(() => {
       root.render(<SystemPromptField value={null} onChange={vi.fn()} />);
     });
-    expect(modeSelect(container).value).toBe('none');
+    expect(triggerLabel(selectTrigger(container, MODE_LABEL))).toBe('nincs megadva');
     expect(container.querySelector('textarea')).toBeNull();
   });
 
@@ -62,7 +99,7 @@ describe('SystemPromptField', () => {
     act(() => {
       root.render(<SystemPromptField value="egy prompt" onChange={onChange} />);
     });
-    expect(modeSelect(container).value).toBe('text');
+    expect(triggerLabel(selectTrigger(container, MODE_LABEL))).toBe('szabad szöveg');
     const textarea = container.querySelector('textarea');
     if (textarea === null) {
       throw new Error('a teszt nem találta a textarea-t');
@@ -84,7 +121,7 @@ describe('SystemPromptField', () => {
         />,
       );
     });
-    expect(modeSelect(container).value).toBe('preset');
+    expect(triggerLabel(selectTrigger(container, MODE_LABEL))).toBe('Claude Code preset');
     const appendTextarea = container.querySelector('textarea');
     if (appendTextarea === null) {
       throw new Error('a teszt nem találta az append textarea-t');
@@ -95,14 +132,10 @@ describe('SystemPromptField', () => {
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ append: null }));
 
-    expect(excludeSelect(container).value).toBe('true');
-    act(() => {
-      typeInto(excludeSelect(container), 'false');
-    });
+    expect(triggerLabel(selectTrigger(container, EXCLUDE_LABEL))).toBe('igen');
+    chooseOption(container, EXCLUDE_LABEL, 'nem');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ excludeDynamicSections: false }));
-    act(() => {
-      typeInto(excludeSelect(container), '');
-    });
+    chooseOption(container, EXCLUDE_LABEL, 'nincs megadva');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ excludeDynamicSections: null }));
   });
 
@@ -115,7 +148,7 @@ describe('SystemPromptField', () => {
         />,
       );
     });
-    expect(excludeSelect(container).value).toBe('');
+    expect(triggerLabel(selectTrigger(container, EXCLUDE_LABEL))).toBe('nincs megadva');
   });
 
   it('a mód váltása "nincs megadva"-ra `null` értéket ad', () => {
@@ -123,9 +156,7 @@ describe('SystemPromptField', () => {
     act(() => {
       root.render(<SystemPromptField value="szöveg" onChange={onChange} />);
     });
-    act(() => {
-      typeInto(modeSelect(container), 'none');
-    });
+    chooseOption(container, MODE_LABEL, 'nincs megadva');
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
@@ -134,9 +165,7 @@ describe('SystemPromptField', () => {
     act(() => {
       root.render(<SystemPromptField value={null} onChange={onChange} />);
     });
-    act(() => {
-      typeInto(modeSelect(container), 'text');
-    });
+    chooseOption(container, MODE_LABEL, 'szabad szöveg');
     expect(onChange).toHaveBeenCalledWith('');
   });
 
@@ -145,25 +174,12 @@ describe('SystemPromptField', () => {
     act(() => {
       root.render(<SystemPromptField value={null} onChange={onChange} />);
     });
-    act(() => {
-      typeInto(modeSelect(container), 'preset');
-    });
+    chooseOption(container, MODE_LABEL, 'Claude Code preset');
     expect(onChange).toHaveBeenCalledWith({
       type: 'preset',
       preset: 'claude_code',
       append: null,
       excludeDynamicSections: null,
     });
-  });
-
-  it('egy DOM szinten érvénytelen mód értékre nem hívja az onChange-et', () => {
-    const onChange = vi.fn();
-    act(() => {
-      root.render(<SystemPromptField value={null} onChange={onChange} />);
-    });
-    act(() => {
-      typeInto(modeSelect(container), 'nincs-ilyen-mod');
-    });
-    expect(onChange).not.toHaveBeenCalled();
   });
 });

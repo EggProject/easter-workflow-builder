@@ -17,11 +17,18 @@ export interface SystemPromptFieldProperties {
   readonly error?: string | undefined;
 }
 
+/**
+ * `as const`, hogy a `SelectField` értéktípusa a három módra szűküljön: így
+ * a mód kezelője kimerítő `switch` lehet, aminek nincs sosem futó ága
+ * (`.claude/CLAUDE.md` 5. szekció, 100 százalékos lefedettség).
+ */
 const MODE_OPTIONS = [
   { value: 'none', label: 'nincs megadva' },
   { value: 'text', label: 'szabad szöveg' },
   { value: 'preset', label: 'Claude Code preset' },
-];
+] as const;
+
+type SystemPromptMode = (typeof MODE_OPTIONS)[number]['value'];
 
 // A `PresetSystemPrompt` nullázható mezői a dróton ténylegesen `null` értéket
 // hordoznak (SPEC-005 protokoll alak).
@@ -45,19 +52,21 @@ const DEFAULT_PRESET: PresetSystemPrompt = {
 export function SystemPromptField(properties: Readonly<SystemPromptFieldProperties>): ReactElement {
   const { value, onChange, error } = properties;
 
-  function handleModeChange(event: ChangeEvent<HTMLSelectElement>): void {
-    const nextMode = event.target.value;
-    if (nextMode === 'none') {
-      // eslint-disable-next-line unicorn/no-null -- lásd a `DEFAULT_PRESET` fenti indoklását.
-      onChange(null);
-      return;
-    }
-    if (nextMode === 'text') {
-      onChange('');
-      return;
-    }
-    if (nextMode === 'preset') {
-      onChange(DEFAULT_PRESET);
+  function handleModeChange(nextMode: SystemPromptMode): void {
+    switch (nextMode) {
+      case 'none': {
+        // eslint-disable-next-line unicorn/no-null -- lásd a `DEFAULT_PRESET` fenti indoklását.
+        onChange(null);
+        break;
+      }
+      case 'text': {
+        onChange('');
+        break;
+      }
+      case 'preset': {
+        onChange(DEFAULT_PRESET);
+        break;
+      }
     }
   }
 
@@ -126,10 +135,9 @@ export function SystemPromptField(properties: Readonly<SystemPromptFieldProperti
           { value: 'false', label: 'nem' },
         ]}
         value={value.excludeDynamicSections === null ? '' : String(value.excludeDynamicSections)}
-        onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-          const raw = event.target.value;
+        onChange={(nextRaw) => {
           // eslint-disable-next-line unicorn/no-null -- lásd fent.
-          const nextExcludeDynamicSections = raw === '' ? null : raw === 'true';
+          const nextExcludeDynamicSections = nextRaw === '' ? null : nextRaw === 'true';
           onChange({ ...value, excludeDynamicSections: nextExcludeDynamicSections });
         }}
       />

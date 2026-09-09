@@ -170,7 +170,7 @@ test.describe('a design system betűtípusa a natív űrlap vezérlőkön', () =
     // viselő komponensek (`.select`, `.input`, `.btn`, `.accordion__trigger`)
     // a böngésző alapértelmezésére esnek vissza.
     expect(await computed(page, 'body', 'font-family')).toBe(expected);
-    expect(await computed(page, 'select.select', 'font-family')).toBe(expected);
+    expect(await computed(page, 'button.select', 'font-family')).toBe(expected);
     expect(await computed(page, 'input.input', 'font-family')).toBe(expected);
     expect(await computed(page, 'textarea.textarea', 'font-family')).toBe(expected);
     expect(await computed(page, 'button[aria-label="Bezárás"]', 'font-family')).toBe(expected);

@@ -18,8 +18,13 @@
      (nincs ikon-vezetésű elem),
    - .menu__shortcut (nincs billentyű-gyorsparancs felirat),
    - .menu__divider (nincs elválasztó),
-   - .menu__check (nincs jelölhető elem),
    valamint ezek forced-colors megfelelői a fájl végén.
+
+   A `.menu__check` 2026-09-09 óta ITT VAN, bájtra a forrásból: a
+   `SelectField` a design system `Select.jsx` listbox panelét építi meg, és
+   annak a kiválasztott opciója pontosan ezt az osztályt viseli (a forrás
+   `select.css` emiatt importálja a `menu.css` fájlt). A fenti felsorolásból
+   ezért kikerült.
 
    Átemelés dátuma: 2026-09-04. Licencállítás nincs (SPEC-007 4.4, M-34
    mintájára).
@@ -74,6 +79,14 @@
 
 .menu__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.menu__check {
+  width: 14px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ep-accent);
+  flex-shrink: 0;
+}
+.menu__check svg { width: 14px; height: 14px; }
+
 /* ============ MenuTrigger — pre-styled button container ============ */
 .menu-anchor { display: inline-block; }
 /* Closed panel is fully removed from layout + the a11y tree.
@@ -125,6 +138,7 @@
     outline: 2px solid Highlight;          /* not shadow-based; ≥2px */
     outline-offset: -2px;                  /* inside the item → no clipping, no layout shift */
   }
+  .menu__check { color: currentColor; }    /* follows item state: CanvasText / HighlightText / GrayText */
   .menu__item[disabled],
   .menu__item.is-disabled {                /* placed last → wins over the hover rule on equal specificity */
     color: GrayText;

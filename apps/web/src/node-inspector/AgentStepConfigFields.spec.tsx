@@ -7,29 +7,63 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 
-function typeInto(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): void {
-  let prototype: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-  if (element instanceof HTMLInputElement) {
-    prototype = HTMLInputElement.prototype;
-  } else if (element instanceof HTMLTextAreaElement) {
-    prototype = HTMLTextAreaElement.prototype;
-  } else {
-    prototype = HTMLSelectElement.prototype;
-  }
+function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event('input', { bubbles: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function selectByLabel(container: HTMLElement, label: string): HTMLSelectElement {
-  const select = [...container.querySelectorAll<HTMLSelectElement>('select')].find(
-    (candidate) => candidate.closest('label')?.textContent.includes(label) === true,
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+/**
+ * A `SelectField` trigger `role="combobox"` szerepű gomb; a mezőt a saját
+ * `.field` burkolóján belüli `.field__label` szövege azonosítja.
+ */
+function selectTrigger(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
   );
-  if (select === undefined) {
-    throw new Error(`a teszt nem talált "${label}" feliratú select elemet`);
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select triggert`);
   }
-  return select;
+  return button;
+}
+
+/**
+ * A panel `createPortal`-lal a `document.body`-ba kerül, tehát NEM a
+ * `container` leszármazottja; a triggerhez az `aria-controls` köti.
+ */
+function selectPanel(trigger: HTMLButtonElement): HTMLElement {
+  const panelId = trigger.getAttribute('aria-controls');
+  const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+    (candidate) => candidate.id === panelId,
+  );
+  if (panel === undefined) {
+    throw new Error('a teszt nem találta a select panelt');
+  }
+  return panel;
+}
+
+function chooseOption(container: HTMLElement, label: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, label);
+  clickOn(trigger);
+  const option = [...selectPanel(trigger).querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
+  );
+  if (option === undefined) {
+    throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót a(z) "${label}" mezőben`);
+  }
+  clickOn(option);
 }
 
 function checkboxByLabel(container: HTMLElement, label: string): HTMLInputElement {
@@ -109,23 +143,9 @@ describe('AgentStepConfigFields', () => {
   it('a provider felülírás kiválasztása frissíti a mezőt, majd vissza "nincs felülírás"-ra null lesz', () => {
     const onChange = vi.fn();
     render(BASE_CONFIG, onChange);
-    const select = selectByLabel(container, 'Provider felülírás');
-    act(() => {
-      typeInto(select, 'minimax');
-    });
+    chooseOption(container, 'Provider felülírás', 'minimax');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: 'minimax' }));
-    act(() => {
-      typeInto(select, '');
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: null }));
-  });
-
-  it('a provider felülírás DOM szinten érvénytelen értékére "nincs felülírás" állapotba esik vissza (mért happy-dom viselkedés)', () => {
-    const onChange = vi.fn();
-    render({ ...BASE_CONFIG, providerId: 'minimax' }, onChange);
-    act(() => {
-      typeInto(selectByLabel(container, 'Provider felülírás'), 'nincs-ilyen');
-    });
+    chooseOption(container, 'Provider felülírás', 'nincs felülírás (öröklés)');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: null }));
   });
 
@@ -142,19 +162,11 @@ describe('AgentStepConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ modelId: null }));
   });
 
-  it('a session mód kiválasztása frissíti a mezőt, DOM szinten érvénytelen értékre nem hív', () => {
+  it('a session mód kiválasztása frissíti a mezőt', () => {
     const onChange = vi.fn();
     render(BASE_CONFIG, onChange);
-    const select = selectByLabel(container, 'Session mód');
-    act(() => {
-      typeInto(select, 'continued');
-    });
+    chooseOption(container, 'Session mód', 'continued');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sessionMode: 'continued' }));
-    onChange.mockClear();
-    act(() => {
-      typeInto(select, 'nincs-ilyen');
-    });
-    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('a max. körök száma és a max. büdzsé mező szám mezőként szerkeszthető', () => {
@@ -195,26 +207,12 @@ describe('AgentStepConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ permissionMode: 'default' }));
   });
 
-  it('a thinking mód kiválasztása frissíti a mezőt, üresre és DOM szinten érvénytelen értékre is nullázza', () => {
+  it('a thinking mód kiválasztása frissíti a mezőt, az üres értékű opció nullázza', () => {
     const onChange = vi.fn();
     render(BASE_CONFIG, onChange);
-    const select = selectByLabel(container, 'Thinking mód');
-    act(() => {
-      typeInto(select, 'adaptive');
-    });
+    chooseOption(container, 'Thinking mód', 'adaptive');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ thinking: 'adaptive' }));
-    act(() => {
-      typeInto(select, '');
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ thinking: null }));
-    onChange.mockClear();
-    // Egy érvénytelen érték natív <select> elemen happy-dom alatt üres
-    // kiválasztásra esik vissza (mért viselkedés), ami ennél a mezőnél maga
-    // is egy érvényes, "nincs megadva" jelentésű ág - tehát az onChange EZ
-    // ESETBEN IS lefut, `thinking: null` értékkel.
-    act(() => {
-      typeInto(select, 'nincs-ilyen');
-    });
+    chooseOption(container, 'Thinking mód', 'nincs megadva');
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ thinking: null }));
   });
 
@@ -370,7 +368,7 @@ describe('AgentStepConfigFields', () => {
     // értékétől, különben a lenti `.find` az azonos szövegű `promptTemplate` textarea-t
     // találná meg elsőként (DOM sorrend szerint az korábban rendereltik).
     render({ ...BASE_CONFIG, systemPrompt: 'rendszer sablon' }, onChange);
-    expect(selectByLabel(container, 'Rendszer prompt módja')).toBeDefined();
+    expect(selectTrigger(container, 'Rendszer prompt módja')).toBeDefined();
     const systemPromptTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
       (textarea) => textarea.value === 'rendszer sablon',
     );
@@ -433,17 +431,17 @@ describe('AgentStepConfigFields', () => {
     );
     expect(promptErrorElement?.textContent).toBe('Kötelező mező');
 
-    const systemPromptModeSelect = selectByLabel(container, 'Rendszer prompt módja');
-    expect(systemPromptModeSelect.getAttribute('aria-invalid')).toBe('true');
+    const systemPromptModeTrigger = selectTrigger(container, 'Rendszer prompt módja');
+    expect(systemPromptModeTrigger.getAttribute('aria-invalid')).toBe('true');
     const systemPromptErrorElement = [...container.querySelectorAll('.field__error')].find(
-      (element) => element.id === systemPromptModeSelect.getAttribute('aria-describedby'),
+      (element) => element.id === systemPromptModeTrigger.getAttribute('aria-describedby'),
     );
     expect(systemPromptErrorElement?.textContent).toBe('Érvénytelen alak');
 
-    const providerSelect = selectByLabel(container, 'Provider felülírás');
-    expect(providerSelect.getAttribute('aria-invalid')).toBe('true');
+    const providerTrigger = selectTrigger(container, 'Provider felülírás');
+    expect(providerTrigger.getAttribute('aria-invalid')).toBe('true');
     const providerErrorElement = [...container.querySelectorAll('.field__error')].find(
-      (element) => element.id === providerSelect.getAttribute('aria-describedby'),
+      (element) => element.id === providerTrigger.getAttribute('aria-describedby'),
     );
     expect(providerErrorElement?.textContent).toBe('Ismeretlen provider');
   });

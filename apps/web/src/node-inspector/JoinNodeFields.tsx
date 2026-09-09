@@ -58,11 +58,17 @@ const DEFAULT_AGENT_STEP_SETTINGS: AgentStepConfig = {
   structuredOutput: null,
 };
 
+/**
+ * `as const`, hogy a `SelectField` értéktípusa a három módra szűküljön: így
+ * a mód kezelője kimerítő `switch` lehet, aminek nincs sosem futó ága
+ * (`.claude/CLAUDE.md` 5. szekció, 100 százalékos lefedettség). A `satisfies`
+ * őrzi, hogy minden felsorolt érték valóban `JoinNodeConfig` mód legyen.
+ */
 const MODE_OPTIONS = [
   { value: 'merge', label: 'összefésülés' },
   { value: 'script', label: 'szkript' },
   { value: 'ai_synthesis', label: 'AI szintézis' },
-];
+] as const satisfies readonly { readonly value: JoinNodeConfig['mode']; readonly label: string }[];
 
 /**
  * A `join` node szerkesztett mezői: `mode` és a módhoz tartozó `settings`
@@ -83,19 +89,21 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
   const modeError = useFieldError('mode');
   const sourceError = useFieldError('settings.source');
 
-  function handleModeChange(event: ChangeEvent<HTMLSelectElement>): void {
+  function handleModeChange(nextMode: JoinNodeConfig['mode']): void {
     const { onUnhandledError } = config;
-    const nextMode = event.target.value;
-    if (nextMode === 'merge') {
-      onChange({ type: 'join', mode: 'merge', settings: {}, onUnhandledError });
-      return;
-    }
-    if (nextMode === 'script') {
-      onChange({ type: 'join', mode: 'script', settings: { source: '', runtime: 'expression' }, onUnhandledError });
-      return;
-    }
-    if (nextMode === 'ai_synthesis') {
-      onChange({ type: 'join', mode: 'ai_synthesis', settings: DEFAULT_AGENT_STEP_SETTINGS, onUnhandledError });
+    switch (nextMode) {
+      case 'merge': {
+        onChange({ type: 'join', mode: 'merge', settings: {}, onUnhandledError });
+        break;
+      }
+      case 'script': {
+        onChange({ type: 'join', mode: 'script', settings: { source: '', runtime: 'expression' }, onUnhandledError });
+        break;
+      }
+      case 'ai_synthesis': {
+        onChange({ type: 'join', mode: 'ai_synthesis', settings: DEFAULT_AGENT_STEP_SETTINGS, onUnhandledError });
+        break;
+      }
     }
   }
 

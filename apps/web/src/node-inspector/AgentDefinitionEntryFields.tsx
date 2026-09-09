@@ -122,11 +122,14 @@ function renderFieldControl(
         <SelectField
           size="sm"
           label={field.label}
-          options={control.options.map((option) => ({ value: option, label: option }))}
+          options={[
+            { value: '', label: 'nincs megadva' },
+            ...control.options.map((option) => ({ value: option, label: option })),
+          ]}
           placeholder="nincs megadva"
           value={isString(rawValue) ? rawValue : ''}
-          onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-            setField(field.key, event.target.value);
+          onChange={(nextValue) => {
+            setField(field.key, nextValue);
           }}
         />
       );

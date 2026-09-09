@@ -40,17 +40,8 @@ export function StructuredOutputField(properties: Readonly<StructuredOutputField
             label="Strukturált kimenet stratégiája"
             options={StructuredOutputStrategyIdSchema.options.map((option) => ({ value: option, label: option }))}
             value={value.strategy}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-              // A `<select>` opciói magából a séma enum listájából épülnek, de a mező
-              // DOM szinten mégis tetszőleges sztringet hordozhat (pl. egyetlen egyező
-              // opció sincs, a natív `value` setter ekkor üres sztringre esik vissza) -
-              // a `.find` ezért valódi, nem kitalált védelem, nem holt ág.
-              const nextStrategy = StructuredOutputStrategyIdSchema.options.find(
-                (option) => option === event.target.value,
-              );
-              if (nextStrategy !== undefined) {
-                onChange({ ...value, strategy: nextStrategy });
-              }
+            onChange={(nextStrategy) => {
+              onChange({ ...value, strategy: nextStrategy });
             }}
           />
           <JsonTextAreaField

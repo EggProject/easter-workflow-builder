@@ -20,6 +20,7 @@ import type {
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
+import { chooseSelectOption, expectSelectedLabel } from './select-field.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
@@ -529,43 +530,51 @@ test.describe('agent_step node: prompt, provider öröklés, rendszer prompt', (
 
     // A `providerId` kezdetben `null`: az örökölt leírás látszik.
     await expect(panel.getByText('a globális alapértelmezést örökli: minimax')).toBeVisible();
-    await panel.getByRole('combobox', { name: 'Provider felülírás' }).selectOption('minimax');
+    await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Provider felülírás' }), 'minimax');
     // Felülírás esetén az örökölt leírás eltűnik.
     await expect(panel.getByText('a globális alapértelmezést örökli: minimax')).toBeAttached({ attached: false });
     // Vissza a "nincs felülírás (öröklés)" placeholder opcióra: az értéke
     // (üres sztring) egyetlen `ProviderIdSchema` opcióval sem egyezik, tehát
     // a `.find` hívás `undefined`-et ad, és a `matched ?? null` mentő ág fut.
-    await panel.getByRole('combobox', { name: 'Provider felülírás' }).selectOption('');
+    await chooseSelectOption(
+      page,
+      panel.getByRole('combobox', { name: 'Provider felülírás' }),
+      'nincs felülírás (öröklés)',
+    );
     await expect(panel.getByText('a globális alapértelmezést örökli: minimax')).toBeVisible();
     // Ismét felülírás, hogy a lenti megmaradás-ellenőrzés `minimax`-ot lásson.
-    await panel.getByRole('combobox', { name: 'Provider felülírás' }).selectOption('minimax');
+    await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Provider felülírás' }), 'minimax');
 
     // Rendszer prompt: nincs megadva -> szabad szöveg -> preset, mindhárom ág.
     const modeSelect = panel.getByRole('combobox', { name: 'Rendszer prompt módja' });
-    await expect(modeSelect).toHaveValue('none');
-    await modeSelect.selectOption('text');
+    await expectSelectedLabel(modeSelect, 'nincs megadva');
+    await chooseSelectOption(page, modeSelect, 'szabad szöveg');
     await panel.getByLabel('Rendszer prompt szövege').fill('Legyél tömör.');
-    await modeSelect.selectOption('preset');
+    await chooseSelectOption(page, modeSelect, 'Claude Code preset');
     await panel.getByLabel('Preset kiegészítés (append)').fill('Válaszolj magyarul.');
-    await panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }).selectOption('true');
+    await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'igen');
     // Mindhárom ág: igen -> nem -> nincs megadva (`null`).
-    await panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }).selectOption('false');
-    await expect(panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' })).toHaveValue('false');
-    await panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }).selectOption('');
-    await expect(panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' })).toHaveValue('');
-    await panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }).selectOption('true');
+    await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'nem');
+    await expectSelectedLabel(panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'nem');
+    await chooseSelectOption(
+      page,
+      panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }),
+      'nincs megadva',
+    );
+    await expectSelectedLabel(panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'nincs megadva');
+    await chooseSelectOption(page, panel.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'igen');
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
     await expect(reopened.getByLabel('Prompt sablon')).toHaveValue('Foglald össze röviden.');
-    await expect(reopened.getByRole('combobox', { name: 'Provider felülírás' })).toHaveValue('minimax');
-    await expect(reopened.getByRole('combobox', { name: 'Rendszer prompt módja' })).toHaveValue('preset');
+    await expectSelectedLabel(reopened.getByRole('combobox', { name: 'Provider felülírás' }), 'minimax');
+    await expectSelectedLabel(reopened.getByRole('combobox', { name: 'Rendszer prompt módja' }), 'Claude Code preset');
     await expect(reopened.getByLabel('Preset kiegészítés (append)')).toHaveValue('Válaszolj magyarul.');
-    await expect(reopened.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' })).toHaveValue('true');
+    await expectSelectedLabel(reopened.getByRole('combobox', { name: 'Dinamikus szekciók kizárása' }), 'igen');
 
     // Preset -> nincs megadva ág: a mező visszaáll `null`-ra.
-    await reopened.getByRole('combobox', { name: 'Rendszer prompt módja' }).selectOption('none');
-    await expect(reopened.getByRole('combobox', { name: 'Rendszer prompt módja' })).toHaveValue('none');
+    await chooseSelectOption(page, reopened.getByRole('combobox', { name: 'Rendszer prompt módja' }), 'nincs megadva');
+    await expectSelectedLabel(reopened.getByRole('combobox', { name: 'Rendszer prompt módja' }), 'nincs megadva');
   });
 });
 
@@ -576,18 +585,18 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     const panel = await openNode(page, 'n-agent');
     const limits = await openAccordion(panel, 'Modell és futási korlátok');
     await limits.getByLabel('Modell azonosító').fill('claude-opus-4');
-    await limits.getByRole('combobox', { name: 'Session mód' }).selectOption('continued');
+    await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Session mód' }), 'continued');
 
     await limits.getByLabel('Max. körök száma').fill('12');
     await limits.getByLabel('Max. büdzsé (USD)').fill('2.5');
     await limits.getByLabel('Effort').fill('high');
-    await limits.getByRole('combobox', { name: 'Thinking mód' }).selectOption('adaptive');
+    await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     // Vissza a "nincs megadva" placeholder opcióra, majd újra `adaptive`: az
     // üres érték egyetlen `ThinkingModeSchema` opcióval sem egyezik, tehát a
     // `.find` hívás `undefined`-et ad, és a `matched ?? null` mentő ág fut.
-    await limits.getByRole('combobox', { name: 'Thinking mód' }).selectOption('');
-    await expect(limits.getByRole('combobox', { name: 'Thinking mód' })).toHaveValue('');
-    await limits.getByRole('combobox', { name: 'Thinking mód' }).selectOption('adaptive');
+    await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Thinking mód' }), 'nincs megadva');
+    await expectSelectedLabel(limits.getByRole('combobox', { name: 'Thinking mód' }), 'nincs megadva');
+    await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await limits.getByLabel('Jogosultsági mód').fill('acceptEdits');
 
     const hooks = limits.getByRole('group', { name: 'Bekapcsolt motor hookok' });
@@ -603,11 +612,11 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     // Az összecsukható panel újranyitáskor ZÁRVA indul (alapértelmezés).
     const reopenedLimits = await openAccordion(reopened, 'Modell és futási korlátok');
     await expect(reopenedLimits.getByLabel('Modell azonosító')).toHaveValue('claude-opus-4');
-    await expect(reopenedLimits.getByRole('combobox', { name: 'Session mód' })).toHaveValue('continued');
+    await expectSelectedLabel(reopenedLimits.getByRole('combobox', { name: 'Session mód' }), 'continued');
     await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('12');
     await expect(reopenedLimits.getByLabel('Max. büdzsé (USD)')).toHaveValue('2.5');
     await expect(reopenedLimits.getByLabel('Effort')).toHaveValue('high');
-    await expect(reopenedLimits.getByRole('combobox', { name: 'Thinking mód' })).toHaveValue('adaptive');
+    await expectSelectedLabel(reopenedLimits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await expect(reopenedLimits.getByLabel('Jogosultsági mód')).toHaveValue('acceptEdits');
     await expect(
       reopenedLimits.getByRole('group', { name: 'Bekapcsolt motor hookok' }).getByRole('checkbox'),
@@ -660,7 +669,11 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
 
     // Strukturált kimenet: bekapcsolás, stratégia váltás, séma JSON szerkesztés.
     await group.getByText('Strukturált kimenet felülírás megadva').click();
-    await group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }).selectOption('sdk_output_format');
+    await chooseSelectOption(
+      page,
+      group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),
+      'sdk_output_format',
+    );
     await group.getByLabel('Kimenet séma (nyers JSON)').fill('{"type": "object"}');
 
     await closePanel(page);
@@ -678,7 +691,8 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     await expect(
       reopenedGroup.getByLabel('Sandbox beállítás (nyers JSON - öt mezője dokumentálatlan, unknown alakú)'),
     ).toHaveValue(/"failIfUnavailable": true/);
-    await expect(reopenedGroup.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' })).toHaveValue(
+    await expectSelectedLabel(
+      reopenedGroup.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),
       'sdk_output_format',
     );
     await expect(reopenedGroup.getByLabel('Kimenet séma (nyers JSON)')).toHaveValue('{\n  "type": "object"\n}');
@@ -744,7 +758,7 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     const kutatoTools = await openAccordion(kutatoGroup, 'Eszközök és környezet');
     await kutatoTools.getByLabel('Engedélyezett eszközök').fill('Read');
     await kutatoTools.getByLabel('Tiltott eszközök').fill('Bash');
-    await kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }).selectOption('project');
+    await chooseSelectOption(page, kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await kutatoTools.getByLabel('Kezdő üzenet').fill('Szia!');
 
     const kutatoReadOnly = await openAccordion(kutatoGroup, 'Skillek és MCP szerverek (csak olvasható)');
@@ -767,7 +781,7 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await expect(reopenedLimits.getByLabel('Max. körök száma')).toHaveValue('4');
     await expect(reopenedLimits.getByRole('checkbox', { name: 'Háttérben fut' })).toBeChecked();
     const reopenedTools = await openAccordion(reopenedKutato, 'Eszközök és környezet');
-    await expect(reopenedTools.getByRole('combobox', { name: 'Memória hatóköre' })).toHaveValue('project');
+    await expectSelectedLabel(reopenedTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await expect(reopenedTools.getByLabel('Kezdő üzenet')).toHaveValue('Szia!');
   });
 
@@ -869,7 +883,7 @@ test.describe('join node', () => {
   test('a három mód (merge/script/ai_synthesis) között váltva a megfelelő mezők jelennek meg', async ({ page }) => {
     const panel = await openNode(page, 'n-join');
     const modeSelect = panel.getByRole('combobox', { name: 'Összefésülés módja' });
-    await expect(modeSelect).toHaveValue('merge');
+    await expectSelectedLabel(modeSelect, 'összefésülés');
     const jsonField = panel.getByLabel('Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)');
     await expect(jsonField).toHaveValue('{}');
 
@@ -895,11 +909,11 @@ test.describe('join node', () => {
     await openNode(page, 'n-join');
     await expect(jsonField).toHaveValue('{\n  "strategy": "concat"\n}');
 
-    await modeSelect.selectOption('script');
+    await chooseSelectOption(page, modeSelect, 'szkript');
     await expect(panel.getByLabel('Forrás (source)')).toHaveValue('');
     await panel.getByLabel('Forrás (source)').fill('return input;');
 
-    await modeSelect.selectOption('ai_synthesis');
+    await chooseSelectOption(page, modeSelect, 'AI szintézis');
     await expect(panel.getByLabel('Prompt sablon')).toHaveValue('');
     // Az `ai_synthesis` alapértelmezett `agents` mezője üres - az al-agentek
     // panel zárva indul, tehát ki kell nyitni hozzá.
@@ -907,13 +921,13 @@ test.describe('join node', () => {
     await expect(joinAgents.getByText('Nincs felvett agent.')).toBeVisible();
     await panel.getByLabel('Prompt sablon').fill('Szintetizáld az ágak kimenetét.');
 
-    await modeSelect.selectOption('merge');
+    await chooseSelectOption(page, modeSelect, 'összefésülés');
     // Mód váltáskor a `settings` mindig visszaáll az alapértelmezettre.
     await expect(panel.getByLabel('Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)')).toHaveValue('{}');
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-join');
-    await expect(reopened.getByRole('combobox', { name: 'Összefésülés módja' })).toHaveValue('merge');
+    await expectSelectedLabel(reopened.getByRole('combobox', { name: 'Összefésülés módja' }), 'összefésülés');
   });
 });
 

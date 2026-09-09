@@ -119,13 +119,13 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
         />
         <SelectField
           label="Provider"
-          options={providerOptions}
+          options={[{ value: '', label: 'Nincs megadva' }, ...providerOptions]}
           placeholder="Nincs megadva"
           loading={isProvidersLoading}
           loadingLabel="betöltés"
           value={providerId}
-          onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-            setProviderId(event.target.value);
+          onChange={(nextProviderId) => {
+            setProviderId(nextProviderId);
           }}
         />
         {selectedProvider !== undefined && (

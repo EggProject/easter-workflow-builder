@@ -608,3 +608,45 @@ exit 0-t ad.
 **A fennmaradó rés tételesen ellenőrizve: nincs új, dokumentálatlan tétel.** A mérés
 utáni `nyc report --reporter=text` szerint a 100 százalék alatti fájlok listája pontosan
 a 12. szekció táblázatára szűkül.
+
+---
+
+## 15. A select chevron javítása utáni mérés (2026-09-09): a küszöb LEFELÉ mozdul, fedetlen sor nélkül
+
+A `SelectField` a design system `Select` React komponensére állt át (natív `<select>` helyett
+button trigger plusz listbox panel, lásd `docs/research/2026-09-09-select-chevron-meres.md`). A
+komponens szigorú generikus `onChange` szerződése (a kiválasztott opció ÉRTÉKÉT adja, az
+opciólistából következő típussal) feleslegessé tette a hívók sztringből visszaszűkítő
+`.find(...)` plusz `if` kódját az `AgentStepConfigFields`, a `StructuredOutputField`, a
+`JoinNodeFields` és a `SystemPromptField` fájlban, és azt a `.claude/CLAUDE.md` 5. szekció
+"tilos a garantáltan sosem futó ág" szabálya miatt törölni KELLETT.
+
+**A mért állapot (tiszta `e2e/.nyc_output`, 144 Playwright teszt, mind zöld):**
+
+| Metrika    | Fedett / összes | Százalék  | Előző (14. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 953 / 969       | **98.34** | 964 / 980 = 98.36   | 16 -> 16                       |
+| branches   | 370 / 383       | **96.6**  | 372 / 385 = 96.62   | 13 -> 13                       |
+| functions  | 359 / 363       | **98.89** | 361 / 365 = 98.9    | 4 -> 4                         |
+| lines      | 916 / 932       | **98.28** | 926 / 942 = 98.3    | 16 -> 16                       |
+
+**A négy százalék azért csökkent, mert FEDETT kód tűnt el, nem mert fedetlen keletkezett.** A
+fedetlen tételek DARABSZÁMA mind a négy metrikán bitre azonos maradt (16 / 13 / 4 / 16), és a
+fedetlen HELYEK is ugyanazok, mint a 9.1 táblázatban: `mount-app.tsx`,
+`read-frontend-config.ts`, `perform-route-request.ts` 70. sor, `use-stream-connection.ts` 182.
+sor, `browser-history-location-port.ts` 21. sor, `GraphNodeCard.tsx` 74/82. sor,
+`step-run-status-badge.ts` 30. sor, `is-valid-connection.ts` 36. sor. Új fedetlen sor NEM
+keletkezett. A nevező viszont 11 statementtel, 2 branch-csel, 2 függvénnyel és 10 sorral
+csökkent, és mivel a hányados 1 alatt van, azonos számú fedetlen tétel mellett a kisebb nevező
+kisebb százalékot ad.
+
+**Ezért a küszöb ebben az egy esetben LEFELÉ mozdul**, a mért értékre
+(98.34 / 96.6 / 98.89 / 98.28). A ratchet szabály célja az, hogy a lefedettség ne tudjon
+ÉSZREVÉTLENÜL csökkenni; itt a csökkenés mérve, tételesen levezetve és fedetlen sor nélkül
+történt. A `.claude/CLAUDE.md` 8. szekciójának "a küszöb pontosan a mért érték" mondata
+változatlanul érvényes.
+
+**Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; a régi, magasabb
+küszöbbel (98.36 / 96.62 / 98.9 / 98.3) ugyanaz a nyers adat mind a négy metrikán
+`ERROR: Coverage for ... does not meet global threshold` üzenettel exit 1-et adott, tehát a kapu
+ténylegesen kikényszerít, nem néma.

@@ -7,13 +7,65 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JoinNodeFields } from './JoinNodeFields.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 
-function typeInto(element: HTMLSelectElement | HTMLTextAreaElement, value: string): void {
-  const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLTextAreaElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+function typeInto(element: HTMLTextAreaElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event('input', { bubbles: true }));
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+/**
+ * A `SelectField` trigger `role="combobox"` szerepű gomb; a mezőt a saját
+ * `.field` burkolóján belüli `.field__label` szövege azonosítja.
+ */
+function selectTrigger(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select triggert`);
+  }
+  return button;
+}
+
+/**
+ * A panel `createPortal`-lal a `document.body`-ba kerül, tehát NEM a
+ * `container` leszármazottja; a triggerhez az `aria-controls` köti.
+ */
+function selectPanel(trigger: HTMLButtonElement): HTMLElement {
+  const panelId = trigger.getAttribute('aria-controls');
+  const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+    (candidate) => candidate.id === panelId,
+  );
+  if (panel === undefined) {
+    throw new Error('a teszt nem találta a select panelt');
+  }
+  return panel;
+}
+
+function chooseOption(container: HTMLElement, label: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, label);
+  clickOn(trigger);
+  const option = [...selectPanel(trigger).querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
+  );
+  if (option === undefined) {
+    throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót a(z) "${label}" mezőben`);
+  }
+  clickOn(option);
+}
+
+const MODE_LABEL = 'Összefésülés módja';
 
 const MERGE_CONFIG: JoinNodeConfig = {
   type: 'join',
@@ -164,13 +216,7 @@ describe('JoinNodeFields', () => {
         />,
       );
     });
-    const select = container.querySelector<HTMLSelectElement>('select');
-    if (select === null) {
-      throw new Error('a teszt nem találta a mód legördülőt');
-    }
-    act(() => {
-      typeInto(select, 'script');
-    });
+    chooseOption(container, MODE_LABEL, 'szkript');
     expect(onChange).toHaveBeenLastCalledWith({
       type: 'join',
       mode: 'script',
@@ -178,39 +224,20 @@ describe('JoinNodeFields', () => {
       onUnhandledError: 'fail_run',
     });
 
-    act(() => {
-      typeInto(select, 'ai_synthesis');
-    });
+    chooseOption(container, MODE_LABEL, 'AI szintézis');
     const lastCall = onChange.mock.calls.at(-1);
     if (lastCall === undefined) {
       throw new Error('a teszt nem talált onChange hívást');
     }
     expect(lastCall[0]).toMatchObject({ type: 'join', mode: 'ai_synthesis', onUnhandledError: 'fail_run' });
 
-    act(() => {
-      typeInto(select, 'merge');
-    });
+    chooseOption(container, MODE_LABEL, 'összefésülés');
     expect(onChange).toHaveBeenLastCalledWith({
       type: 'join',
       mode: 'merge',
       settings: {},
       onUnhandledError: 'fail_run',
     });
-  });
-
-  it('egy DOM szinten érvénytelen mód értékre nem hívja az onChange-et', () => {
-    const onChange = vi.fn();
-    act(() => {
-      root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />);
-    });
-    const select = container.querySelector<HTMLSelectElement>('select');
-    if (select === null) {
-      throw new Error('a teszt nem találta a mód legördülőt');
-    }
-    act(() => {
-      typeInto(select, 'nincs-ilyen-mod');
-    });
-    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('"script" módra a `settings.source` mezőnkénti hibája a forrás mező alatt jelenik meg', () => {

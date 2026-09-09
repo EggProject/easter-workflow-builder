@@ -1,27 +1,35 @@
 /* ============================================================
    EggProject — Select field (Select)
    Forrás: eggproject-design-components/components/select/select.css,
-   kizárólag a .select* szabályok, bájtra azonosan. Kihagyva a forrás két
-   @import sora (a design-token tokenek globálisan töltődnek; a
-   ../menu/menu.css pedig a Menu komponensé, ami NEM tagja a SPEC-007 12.1
-   tizenkét komponens listájának), és a teljes Combobox szakasz
-   (.combo, .combo__input, .combo__caret, .combo__panel, .combo__empty) -
-   a Combobox önálló forrás komponens, szintén nem tagja a listának.
+   kizárólag a .select* szabályok, bájtra azonosan. Kihagyva a forrás
+   @import sora a design-token tokenekre (azokat a csomag globálisan tölti
+   be), és a teljes Combobox szakasz (.combo, .combo__input, .combo__caret,
+   .combo__panel, .combo__empty) - a Combobox önálló forrás komponens.
    A forced-colors blokk emiatt csak a .select:focus-visible szelektort
    viszi tovább, a .combo__input:focus szelektor nélkül; a blokk fölötti
    magyarázó komment szövege változatlan marad, bár prózában megemlíti a
    combo inputot is.
-   MELYIK VÁLTOZAT ÉPÜL: a forrás Select.jsx egyedi listbox (button
-   trigger + .menu panel), ami a Menu komponens CSS-ét igényelné. Helyette
-   a natív <select> retrofit épül meg, amit maga a forrás CSS nevez meg és
-   támogat ("Native <select> shares the .select shell", select.select
-   szabály). A button trigger szabályai (.select__value, .select__caret,
-   .select__icon, .select--open, .select__panel) így ma nem aktívak, de
-   bájtra azonosan átkerülnek, mert ugyanennek a komponensnek a részei.
-   HOZZÁADVA a forráshoz képest: egyetlen szabály, a `.select--error`
-   (lásd az indoklást a szabály fölött). A fájl minden más sora bájtra
-   azonos a forrással.
-   Átemelés dátuma: 2026-09-01. Licencállítás nincs (SPEC-007 4.4, M-34).
+   MELYIK VÁLTOZAT ÉPÜL: a forrás Select.jsx button trigger plusz .menu
+   listbox panelje, ahogy a forrás React komponense szállítja. A forrás
+   másik ága, a natív <select> retrofit ("Native <select> shares the .select
+   shell", select.select szabály) a forrás saját szavai szerint a STATIKUS
+   oldalaké ("the native <select> retrofit ON STATIC PAGES uses the platform
+   control"), és a platform indikátorát rajzolja: a chevron a jobb szegélyre
+   tapad (mérve 9px a jobb széltől), szemben a forrás trigger 14px jobb
+   belső térközével (mérve 22px a jobb széltől). Mi React alkalmazás
+   vagyunk, tehát a forrás React változata jár - a mérés és a döntés
+   indoklása a docs/research/2026-09-09-select-chevron-meres.md fájlban áll.
+   A forrás .select* szabálykészlete emiatt ma teljes egészében AKTÍV; a
+   select.select szabály viszont inertté vált, de bájtra bent marad, mert
+   ugyanennek a komponensnek a része. A .menu panel szabályait a
+   ../menu/menu.css adja, ahogy a forrás select.css @import sora is teszi;
+   a SelectField.tsx ezért importálja azt a fájlt is.
+   HOZZÁADVA a forráshoz képest: egyetlen szabály, a `.select--error`, és
+   két deklaráció, a `.select` `box-sizing: border-box` és a
+   `.select__panel` `z-index` sora (az indoklás mindháromnál a helyén áll).
+   A fájl minden más sora bájtra azonos a forrással.
+   Átemelés dátuma: 2026-09-01, a trigger változatra váltás 2026-09-09.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
    ============================================================ */
 /* ============ Select ============
    .select         — visual trigger (looks like .input but with chevron)
@@ -43,6 +51,15 @@
   min-width: 200px;
   font-family: inherit;
   width: 100%;
+  /* HOZZÁADVA a forráshoz képest, a testvér `.input` szabály pontos
+     analógja: a forrás `_shell.css` univerzális `* { box-sizing:
+     border-box; }` resete szándékosan nem került át (SPEC-007 4.2),
+     tehát a trigger a böngésző `content-box` alapértelmezésén maradna, és
+     a `width: 100%` mellé a `padding: 10px 14px` és az 1px szegély
+     mindkét oldalon rájönne. A forrás `select.select` szabálya ugyanezt a
+     kapcsolót ugyanezzel az indokkal már viseli ("box-sizing keeps
+     width:100% inside the field grid"), csak a natív elemre. */
+  box-sizing: border-box;
   text-align: left;
 }
 /* The button trigger (React Select) lays out the value + caret; the native <select> retrofit
@@ -96,6 +113,18 @@ select.select { box-sizing: border-box; max-width: 100%; }
   margin-top: 6px;
   max-height: 280px;
   overflow-y: auto;
+  /* HOZZÁADVA a forráshoz képest, a PORTÁL eltérés következménye (mért hiba
+     javítása). A forrásban a panel a `.menu-anchor` gyermeke, tehát egy
+     modálison belül a modális rétegkontextusában, a tartalma FÖLÖTT jelenik
+     meg. Nálunk a panel a `document.body`-ba portálódik (lásd
+     `SelectField.tsx` fejléc), ezért a modális testvére lesz, és a
+     `menu.css` `z-index: 600` értékével a modális `z-index: 1000` alá
+     kerül: a `workflow-list.spec.ts` mérése szerint a modális beviteli
+     mezője ténylegesen elfogta az opcióra irányuló kattintást ("intercepts
+     pointer events"). Az érték nem találgatás: a design system saját
+     rétegskáláján 1100 az, ami a modális FÖLÉ kerül, ezt viseli az
+     `alert-dialog` és a `toast` komponens is. */
+  z-index: 1100;
 }
 
 @media (prefers-reduced-motion: reduce) {

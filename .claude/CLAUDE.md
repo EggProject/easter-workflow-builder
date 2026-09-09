@@ -576,6 +576,13 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
   a kész `.textarea` komponens jár, nem az egysoros `.input` osztály
   (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09).
+- **Ha a forrás komponensnek React és statikus HTML változata is van, a React változat jár.** Mi
+  React alkalmazás vagyunk. A `select.css` mindkettőt kiszolgálja ugyanazon a `.select` héjon, de
+  a natív `<select>` retrofitről a forrás saját kommentje mondja ki, hogy a STATIKUS oldalaké
+  ("the native `<select>` retrofit ON STATIC PAGES uses the platform control"), és a platform
+  indikátorát rajzolja: a chevron a jobb szegélyre tapad (mérve 9px), a React trigger 22px-e
+  helyett. A natív ág megépítése ezért nem "bájtra másolás" volt, hanem a rossz ág kiválasztása
+  (`docs/research/2026-09-09-select-chevron-meres.md`, user kérés 2026-09-09).
 - **Tilos a card in card.** Kártya alakú dobozon (szegély plusz lekerekítés plusz saját
   háttér) belül nem állhat második ilyen doboz, és nem lehet dupla belső térköz sem. Ami a
   tagoláshoz kell: vagy összecsukható panel (`accordion`), vagy megnevezett, doboz nélküli
@@ -737,6 +744,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
 | az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
 | a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
+| a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
