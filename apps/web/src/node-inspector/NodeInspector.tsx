@@ -32,10 +32,14 @@ export interface NodeInspectorProperties {
    * hiba miatt nem sikerült. Ilyenkor minden érvénytelen mező kiírja a
    * hibáját, akkor is, ha a felhasználó hozzá sem nyúlt - enélkül csak az
    * ÉRINTETT, érvénytelen mezők jeleznek. A tényt a beküldést ismerő
-   * fogyasztó (`GraphEditorScreen`) adja meg; alapértéke `false`, mert a
-   * panel önmagában nem tud a mentésről.
+   * fogyasztó (`GraphEditorScreen`) adja meg. KÖTELEZŐ mező, nincs
+   * alapértéke: az EGYETLEN production fogyasztó (`GraphEditorScreen`)
+   * mindig explicit értéket ad át, tehát egy opcionális + `false`
+   * alapértékű mező garantáltan sosem futna a default ágon e2e-vel - ez a
+   * `.claude/CLAUDE.md` 5. szekciójának "nincs garantáltan sosem futó ág"
+   * szabályát sértette volna (2026-09-09-i e2e lefedettségi mérés találta).
    */
-  readonly isSaveAttempted?: boolean;
+  readonly isSaveAttempted: boolean;
 }
 
 /**
@@ -126,7 +130,7 @@ function renderConfigFields(
  * szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
-  const { node, onChange, onClose, inheritedProviderDescription, isSaveAttempted = false } = properties;
+  const { node, onChange, onClose, inheritedProviderDescription, isSaveAttempted } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   const parsedConfig = NodeConfigSchema.safeParse(node.config);
   const fieldErrors = parsedConfig.success ? NO_FIELD_ERRORS : fieldErrorsFromZodError(parsedConfig.error);

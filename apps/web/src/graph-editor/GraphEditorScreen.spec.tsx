@@ -437,6 +437,52 @@ describe('GraphEditorScreen', () => {
     expect(container.textContent).toContain('maxIterations');
   });
 
+  it(
+    'sikertelen mentési kísérlet után az ÉRINTETLEN, érvénytelen mező is kiírja a hibáját a ' +
+      'node-inspectorban (isSaveAttempted wiring)',
+    async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      const invalidLoopNode: WorkflowNodeInput = {
+        id: 'n-3',
+        type: 'loop',
+        label: 'Ciklus',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'loop',
+          maxIterations: Number('nem szám'),
+          continueExpression: 'i < 5',
+          onUnhandledError: null,
+        },
+      };
+      act(() => {
+        lastCanvasProperties().onGraphChange([START_NODE, invalidLoopNode], []);
+      });
+
+      const saveButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Mentés');
+      if (saveButton === undefined) {
+        throw new Error('a teszt nem talált "Mentés" gombot');
+      }
+      await act(async () => {
+        saveButton.click();
+        await Promise.resolve();
+      });
+      expect(log.putBodies).toHaveLength(0);
+
+      // A sikertelen mentési kísérlet UTÁN nyitjuk meg a hibás node panelét:
+      // a mezőhöz nem nyúltunk (nincs focus/blur), a hibaüzenetnek mégis meg
+      // kell jelennie, mert az `isSaveAttempted` a `GraphEditorScreen`-ből a
+      // `NodeInspector`-ra megy - enélkül ez a teszt nulla találatot adna.
+      act(() => {
+        lastCanvasProperties().onSelectNode('n-3');
+      });
+      expect(container.querySelector('.field__error')).not.toBeNull();
+      expect(container.querySelector('[aria-invalid="true"]')).not.toBeNull();
+    },
+  );
+
   it('érvényes mentés után a piszkos jelző eltűnik, és sikeres Toast jelenik meg (AC15)', async () => {
     const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
     await renderScreen('?workflowId=wf-1', createFetchFunction(log));

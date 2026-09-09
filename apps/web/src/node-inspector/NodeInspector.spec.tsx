@@ -170,7 +170,13 @@ describe('NodeInspector', () => {
   it.each(NODES_BY_TYPE)('a(z) "$node.type" típusra a megfelelő mezőket rendereli', ({ node, legend }) => {
     act(() => {
       root.render(
-        <NodeInspector node={node} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={node}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     // A típus azonosítója a típusra jellemző, ELÖL álló mező (vagy gomb)
@@ -183,7 +189,13 @@ describe('NodeInspector', () => {
     for (const { node } of NODES_BY_TYPE) {
       act(() => {
         root.render(
-          <NodeInspector node={node} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+          <NodeInspector
+            node={node}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />,
         );
       });
       expect(container.querySelector('.inspector-section')).toBeNull();
@@ -198,7 +210,13 @@ describe('NodeInspector', () => {
     }
     act(() => {
       root.render(
-        <NodeInspector node={startNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     expect(container.textContent).toContain('Indítás');
@@ -213,7 +231,13 @@ describe('NodeInspector', () => {
     }
     act(() => {
       root.render(
-        <NodeInspector node={startNode} onChange={vi.fn()} onClose={onClose} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={onClose}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     const closeButton = container.querySelector('button[aria-label="Bezárás"]');
@@ -233,7 +257,13 @@ describe('NodeInspector', () => {
     }
     act(() => {
       root.render(
-        <NodeInspector node={startNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
@@ -250,7 +280,13 @@ describe('NodeInspector', () => {
     }
     act(() => {
       root.render(
-        <NodeInspector node={agentNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={agentNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     // Az `accordion__header` NEM `.btn`, hanem a design system saját panel
@@ -273,7 +309,13 @@ describe('NodeInspector', () => {
     };
     act(() => {
       root.render(
-        <NodeInspector node={invalidNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={invalidNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     expect(container.querySelector('.node-inspector__errors')).toBeNull();
@@ -291,7 +333,13 @@ describe('NodeInspector', () => {
     };
     act(() => {
       root.render(
-        <NodeInspector node={invalidNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={invalidNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     expect(container.querySelector('.field__error')).toBeNull();
@@ -309,7 +357,13 @@ describe('NodeInspector', () => {
     };
     act(() => {
       root.render(
-        <NodeInspector node={invalidNode} onChange={vi.fn()} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={invalidNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     const numberInput = container.querySelector<HTMLInputElement>('input[type="number"]');
@@ -361,7 +415,13 @@ describe('NodeInspector', () => {
     }
     act(() => {
       root.render(
-        <NodeInspector node={agentNode} onChange={onChange} onClose={vi.fn()} inheritedProviderDescription="nincs" />,
+        <NodeInspector
+          node={agentNode}
+          onChange={onChange}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
       );
     });
     const promptTextarea = [...container.querySelectorAll('textarea')].find((textarea) => textarea.value === 'sablon');

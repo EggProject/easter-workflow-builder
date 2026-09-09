@@ -85,6 +85,15 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   const [currentEdges, setCurrentEdges] = useState<readonly WorkflowEdgeInput[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [validationMessage, setValidationMessage] = useState<string | undefined>(undefined);
+  // Megkíséreltek-e már menteni úgy, hogy a mentés a séma ellenőrzésén
+  // elbukott (`isSaveAttempted`, T-009-18 harmadik maradéka): ilyenkor a
+  // node-inspectornak minden érvénytelen mezőn ki kell írnia a hibáját,
+  // akkor is, ha a felhasználó az adott mezőhöz még hozzá sem nyúlt. Csak a
+  // KLIENS oldali séma ellenőrzés hibája állítja igazra, mert csak az a
+  // hiba forrása ugyanannak a `NodeConfigSchema`-nak, amit a node-inspector
+  // is fut a mezőnkénti hibákhoz - a szerver oldali (hálózati/500) hiba nem
+  // mezőszintű, ahhoz nincs mit kiírni a panelen.
+  const [isSaveAttempted, setIsSaveAttempted] = useState(false);
   // Az automatikus elrendezések számlálója: a vászon ennek megváltozására
   // illeszti újra a nézetet (`GraphEditorCanvas.autoLayoutRevision`). Azért
   // külön számláló, és nem a `currentNodes` figyelése, mert a nézet
@@ -209,6 +218,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     const validated = validateGraphForSave(currentNodes, currentEdges);
     if (validated.kind === 'error') {
       setValidationMessage(validated.message);
+      setIsSaveAttempted(true);
       return;
     }
     setValidationMessage(undefined);
@@ -288,6 +298,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
                       setSelectedNodeId(undefined);
                     }}
                     inheritedProviderDescription={inheritedProviderDescription}
+                    isSaveAttempted={isSaveAttempted}
                   />
                 </ResizablePanel>
               </>
