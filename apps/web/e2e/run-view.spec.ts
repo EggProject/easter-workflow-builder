@@ -596,6 +596,51 @@ test('letiltott tárolás esetén az alapértelmezés áll be, a felület nem t�
   await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '70');
 });
 
+/**
+ * Regresszió a T-009-23 él esetére: a kézzel húzott arány NEM veszhet el, ha
+ * a nézet a fül sávba, majd vissza megy. A `Resizable` a fül sávban
+ * LESZEREL (a `Tabs` a másik ágat rajzolja), és visszaváltáskor a
+ * `defaultSizes` propból épül újra a kezdő állapota
+ * (`RunViewLayout.tsx` fejléc komment). Ha a hívó oldal ezt a propot
+ * CSATOLÁSKOR egyszer olvasott `useState` értékben tartaná, a
+ * visszacsatolás a RÉGI (a húzás előtti) arányt adná vissza, mert a
+ * `storeRunViewLayoutSizes` írása nem frissíti azt az állapotot.
+ *
+ * A teszt előbb billentyűzettel húz (`ResizableHandle` `ARROW_STEP_PERCENT`
+ * értéke 5, tehát három `ArrowLeft` 70-ről 55-re viszi a bal panelt, lásd
+ * `packages/ui/src/resizable/ResizableHandle.tsx`), majd a `--ep-screen-md`
+ * alá szűkítve fül sávba vált (az elválasztó eltűnik), végül visszaáll
+ * `--ep-screen-lg`-re, és a húzott arány megmaradását ellenőrzi.
+ */
+test('a fül sávba váltás után visszaváltva a kézzel húzott arány megmarad (T-009-23 regresszió)', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+  const separator = separatorLocator(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', '70');
+
+  await separator.focus();
+  await separator.press('ArrowLeft');
+  await separator.press('ArrowLeft');
+  await separator.press('ArrowLeft');
+  await expect(separator).toHaveAttribute('aria-valuenow', '55');
+  await expect
+    .poll(async () => page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY))
+    .toBe('[55,45]');
+
+  // Fül sávba váltás: a `Resizable` leszerel, az elválasztó eltűnik.
+  await page.setViewportSize({ width: MEDIUM_SCREEN_WIDTH - 1, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(page.getByRole('tablist', { name: 'Futás nézet' })).toBeVisible();
+  await expect(separator).toHaveCount(0);
+
+  // Vissza a horizontális sávba: a `Resizable` újracsatlakozik, a MENTETT
+  // aránnyal, nem az eredeti alapértelmezéssel.
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '55');
+});
+
 test('a tartalom terület magassága a viewport és a bar magasságából számít, üres sáv nélkül', async ({ page }) => {
   await mockRun(page);
   await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });

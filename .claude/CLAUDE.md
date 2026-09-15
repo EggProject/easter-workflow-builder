@@ -681,6 +681,27 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kizárólag környezeti változó, a repóban semmit nem kell módosítani**, ezért a CI-re nincs
   hatása. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk (gyökér `CLAUDE.md`,
   research V-19).
+- **`[INVALID_ANNOTATION]` figyelmeztetés a `VITE_COVERAGE=true` instrumentált buildben.** Az
+  Istanbul minden JSX feltételes ág elé (`feltétel ? (jsx1) : (jsx2)` alak) egy vessző operátoros
+  számlálót told (`cov_xxx().b[n][0]++, _jsx(...)`), ami a Babel/SWC JSX transzformáció
+  `/* @__PURE__ */` kommentjét eltolja a hívás elől. A Rolldown emiatt nem tudja értelmezni a
+  kommentet, és minden ilyen esetre `[INVALID_ANNOTATION]` figyelmeztetést ír a `webServer`
+  buildlogba. **Ártalmatlan minden eddig talált előfordulásra** (saját mérés, `vite build` a
+  `VITE_COVERAGE=true` env változóval, 2026-09-16: hét fájl, tizennégy előfordulás -
+  `src/app-shell/app-shell.tsx`, `src/graph-editor/GraphEditorScreen.tsx`,
+  `src/node-inspector/JoinNodeFields.tsx`, `src/run-control/RunControlBar.tsx`,
+  `src/run-history/run-history-screen.tsx`, `src/run-view/RunViewLayout.tsx`,
+  `src/workflow-list/workflow-list-screen.tsx`): mindegyik olyan `? (/* @__PURE__ */jsx(...)) :
+(/* @__PURE__ */jsx(...))` ág, aminek az eredménye MINDIG felhasznált (`return` vagy render
+  gyerek), tehát a PURE jelzés nem tehetne semmit: az csak akkor engedne eltávolítást, ha az
+  eredmény eldobva állna, ami itt sosem igaz. `VITE_COVERAGE` nélkül (a valódi, éles build) az
+  előfordulások száma NULLA (saját mérés), tehát a felhasználó felé szállított kód nem érintett.
+  **Ez a besorolás fájlonként újra ellenőrizendő, ha valaki egy `/* @__PURE__ */`-lel jelölt hívás
+  eredményét ELDOBva használná** (pl. egy csak mellékhatásért hívott függvény): a
+  `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy MÁSIK, nem JSX ternary
+  mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
+  megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
+  dokumentált és kezelt ott, külön jelenség, nem ez a hét fájl.
 
 **Képernyőkép és vizuális bizonyíték**
 

@@ -715,6 +715,8 @@ Az alkalmazás ezzel **huszonnégy** téma mappából áll. **Négy meglévő t�
 
 **Egy szint mély, tárgykör mappa nélkül.** A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül: a fájlnevek már megnevezik a csoportot. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 
+**A fenti tíz témán FELÜL egy tizenegyedik, `run-control` nevű téma is megvalósult (T-009-23), és ez a szekció eredetileg nem sorolta fel.** A futás vezérlését ez a szekció a `run-view` témába sorolta, de a végrehajtás során kiderült, hogy az indítás modálisa a SZERKESZTŐBŐL nyílik (6.5), tehát a `start` csomópont `inputFields` listájából épített `StartRunModal` és a futás nézet fejlécében álló `RunControlBar` a szerkesztő és a futás nézet KÖZÖS fogalma, nem az egyiké. Ez a szám ezért nem itt dől el: a `packages/ui` végösszegéhez hasonlóan (11.1) a tényleges `apps/web` téma darabszám egyeztetése a PLAN-009 T-009-32 (F8) zárásának hatóköre. Addig a tényleges állapot forrása az `apps/web/CLAUDE.md`, ami a `run-control` témát a SPEC-008 11.2 táblázatán felüli, tizenegyedik SPEC-008 témaként dokumentálja.
+
 ### 11.3 `packages/protocol`, egy új téma
 
 ```
