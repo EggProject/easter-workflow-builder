@@ -8,6 +8,9 @@
 // szervert egyetlen teszt sem szólít meg (.claude/CLAUDE.md 11. szekció).
 import type { NodeConfig, RunDetail, RunSnapshotResponse, StepRunRecord } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
@@ -263,6 +266,12 @@ async function mockRun(page: Page, overrides: RunViewMocks = {}): Promise<void> 
       route.fulfill(jsonBody(overrides.snapshot ?? SNAPSHOT, overrides.snapshotStatus ?? 200)),
     ),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
+    // A futás nézet a SAJÁT futására iratkozik fel az app szintű stream
+    // kapcsolaton (T-009-23): enélkül a hívás a `installApiMocks` "nincs mock"
+    // 404-esére futna.
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
   ]);
 }
 
@@ -389,4 +398,287 @@ test('a pillanatkép betöltésének hibájára a hibaüzenetet mutatja', async 
 
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByTestId('rf__wrapper')).toHaveCount(0);
+});
+
+// ============================================================
+// AZ OSZTOTT ELRENDEZÉS ÉS A HÁROM RESZPONZÍV SÁV (T-009-22, AC33, AC34).
+//
+// A sáv váltás kizárólag valódi böngészőben figyelhető meg: a `matchMedia`
+// tényleges illeszkedése a layout viewporton múlik, amit happy-dom alatt nem
+// a termékkód, hanem a környezet dönt el. A sáv ELRENDEZÉSÉT unit teszt fedi
+// (`RunViewLayout.spec.tsx`), a sáv VÁLASZTÁST pedig ez.
+//
+// A viewport szélességek a design system `breakpoints.css` tokenjeiből
+// olvasva, nem beírva - ugyanaz a módszer, mint a `responsive.spec.ts`
+// fájlban. Az elválasztó húzása pointer eseménnyel és a billentyűs mozgatás a
+// PLAN-009 T-009-29 hatóköre.
+// ============================================================
+
+const BREAKPOINTS_CSS_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  'packages',
+  'ui',
+  'src',
+  'design-token',
+  'breakpoints.css',
+);
+
+function breakpointTokenValue(tokenName: string): number {
+  const content = readFileSync(BREAKPOINTS_CSS_PATH, 'utf8');
+  const match = new RegExp(String.raw`${tokenName}:\s*(\d+)px`).exec(content);
+  if (match?.[1] === undefined) {
+    throw new Error(`A ${tokenName} token nem található a breakpoints.css fájlban.`);
+  }
+  return Number(match[1]);
+}
+
+const LARGE_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-lg');
+const MEDIUM_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-md');
+const RUN_VIEW_VIEWPORT_HEIGHT = 900;
+
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+
+function separatorLocator(page: Page): Locator {
+  return page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+}
+
+test('a --ep-screen-lg token szélességén és fölötte a gráf és a transcript egymás mellett áll', async ({ page }) => {
+  await mockRun(page);
+  for (const width of [LARGE_SCREEN_WIDTH, LARGE_SCREEN_WIDTH + 1]) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: RUN_VIEW_VIEWPORT_HEIGHT });
+      await page.goto(RUN_URL);
+      await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+      // Az elválasztó `aria-orientation` értéke a MÉRT bizonyíték a
+      // vízszintes osztásra: a W3C Window Splitter minta szerint egy
+      // egymás MELLETTI panelpárt elválasztó separator orientációja
+      // "vertical".
+      await expect(separatorLocator(page)).toHaveAttribute('aria-orientation', 'vertical');
+      await expect(page.getByRole('tablist', { name: 'Futás nézet' })).toHaveCount(0);
+
+      // A két panel TÉNYLEGESEN egymás mellett van: a transcript bal széle a
+      // gráf jobb széle után kezdődik, és a felső élük egy vonalban van.
+      const graphBox = await page.locator('.run-view-screen__graph').boundingBox();
+      const transcriptBox = await page.locator('.run-view-screen__transcript').boundingBox();
+      if (graphBox === null || transcriptBox === null) {
+        throw new Error('hiányzó befoglaló doboz az osztott elrendezésen');
+      }
+      expect(transcriptBox.x).toBeGreaterThanOrEqual(graphBox.x + graphBox.width);
+      expect(Math.abs(transcriptBox.y - graphBox.y)).toBeLessThanOrEqual(1);
+    });
+  }
+});
+
+test('a --ep-screen-md és a --ep-screen-lg között a gráf és a transcript egymás alatt áll', async ({ page }) => {
+  await mockRun(page);
+  for (const width of [MEDIUM_SCREEN_WIDTH, LARGE_SCREEN_WIDTH - 1]) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: RUN_VIEW_VIEWPORT_HEIGHT });
+      await page.goto(RUN_URL);
+      await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+      await expect(separatorLocator(page)).toHaveAttribute('aria-orientation', 'horizontal');
+      await expect(page.getByRole('tablist', { name: 'Futás nézet' })).toHaveCount(0);
+
+      const graphBox = await page.locator('.run-view-screen__graph').boundingBox();
+      const transcriptBox = await page.locator('.run-view-screen__transcript').boundingBox();
+      if (graphBox === null || transcriptBox === null) {
+        throw new Error('hiányzó befoglaló doboz az osztott elrendezésen');
+      }
+      expect(transcriptBox.y).toBeGreaterThanOrEqual(graphBox.y + graphBox.height);
+      expect(Math.abs(transcriptBox.x - graphBox.x)).toBeLessThanOrEqual(1);
+    });
+  }
+});
+
+test('a --ep-screen-md alatt fülek állnak, egyszerre egy nézettel, elválasztó nélkül', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: MEDIUM_SCREEN_WIDTH - 1, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+
+  const tabList = page.getByRole('tablist', { name: 'Futás nézet' });
+  await expect(tabList).toBeVisible();
+  await expect(separatorLocator(page)).toHaveCount(0);
+
+  const graphTab = page.getByRole('tab', { name: 'Gráf' });
+  const transcriptTab = page.getByRole('tab', { name: 'Transcript' });
+  await expect(graphTab).toHaveAttribute('aria-selected', 'true');
+  await expect(transcriptTab).toHaveAttribute('aria-selected', 'false');
+  await expect(page.getByText('A futás eseményei itt jelennek meg.')).toBeHidden();
+
+  await transcriptTab.click();
+  await expect(transcriptTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('A futás eseményei itt jelennek meg.')).toBeVisible();
+  // A gráf panelje FELCSATOLVA marad, csak rejtett: a natív `hidden`
+  // attribútum rejti, tehát a vászon állapota nem veszik el.
+  await expect(page.getByTestId('rf__wrapper')).toBeAttached();
+});
+
+test('a viewport szűkülése menet közben átváltja a sávot', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(separatorLocator(page)).toHaveAttribute('aria-orientation', 'vertical');
+
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH - 1, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(separatorLocator(page)).toHaveAttribute('aria-orientation', 'horizontal');
+
+  await page.setViewportSize({ width: MEDIUM_SCREEN_WIDTH - 1, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(page.getByRole('tablist', { name: 'Futás nézet' })).toBeVisible();
+  await expect(separatorLocator(page)).toHaveCount(0);
+});
+
+/**
+ * A tárolt arány beültetése a lap betöltése ELŐTT. `addInitScript`, nem
+ * `evaluate`: a `localStorage` olvasása a komponens csatolásakor, az első
+ * renderen történik, tehát egy betöltés utáni írás már nem hatna. Az
+ * `addInitScript` minden navigációra újra lefut, ezért tesztenként EGY
+ * beültetés áll (egy `reload` a beültetett értéket írná vissza).
+ */
+async function seedStoredLayout(page: Page, storedValue: string): Promise<void> {
+  await page.addInitScript(
+    ([key, value]: readonly string[]) => {
+      globalThis.localStorage.setItem(key ?? '', value ?? '');
+    },
+    [RUN_VIEW_LAYOUT_STORAGE_KEY, storedValue],
+  );
+}
+
+test('az elrendezés aránya a localStorage-ből töltődik vissza', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await seedStoredLayout(page, JSON.stringify([45, 55]));
+
+  await page.goto(RUN_URL);
+  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '45');
+});
+
+test('hibás alakú tárolt arányra az alapértelmezés áll be, és az íródik vissza', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await seedStoredLayout(page, JSON.stringify({ graph: 45 }));
+
+  await page.goto(RUN_URL);
+  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '70');
+  // A `Resizable` kezdő értesítése a helyes alakot írja vissza a tárolóba.
+  await expect
+    .poll(async () => page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY))
+    .toBe('[70,30]');
+});
+
+test('letiltott tárolás esetén az alapértelmezés áll be, a felület nem tör el', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+
+  // A privát ablak / letiltott tárolás esete a böngészőben: KIZÁRÓLAG a futás
+  // nézet kulcsának olvasása dob, minden más kulcs (pl. a téma váltó
+  // `eggTheme` kulcsa) változatlanul működik. Ez a `run-view-layout.spec.ts`
+  // `withThrowingLocalStorage` segédfüggvényének böngészőbeli párja: a
+  // `try`/`catch` ág e2e alatt csak így futtatható, mert a `localStorage`
+  // dobó viselkedését a Playwright nem tudja kívülről beállítani.
+  await page.addInitScript((key: string) => {
+    const storage = globalThis.localStorage;
+    const originalGetItem = storage.getItem.bind(storage);
+    storage.getItem = (name: string): ReturnType<Storage['getItem']> => {
+      if (name === key) {
+        throw new Error('a tárolás le van tiltva');
+      }
+      return originalGetItem(name);
+    };
+  }, RUN_VIEW_LAYOUT_STORAGE_KEY);
+
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '70');
+});
+
+/**
+ * Regresszió a T-009-23 él esetére: a kézzel húzott arány NEM veszhet el, ha
+ * a nézet a fül sávba, majd vissza megy. A `Resizable` a fül sávban
+ * LESZEREL (a `Tabs` a másik ágat rajzolja), és visszaváltáskor a
+ * `defaultSizes` propból épül újra a kezdő állapota
+ * (`RunViewLayout.tsx` fejléc komment). Ha a hívó oldal ezt a propot
+ * CSATOLÁSKOR egyszer olvasott `useState` értékben tartaná, a
+ * visszacsatolás a RÉGI (a húzás előtti) arányt adná vissza, mert a
+ * `storeRunViewLayoutSizes` írása nem frissíti azt az állapotot.
+ *
+ * A teszt előbb billentyűzettel húz (`ResizableHandle` `ARROW_STEP_PERCENT`
+ * értéke 5, tehát három `ArrowLeft` 70-ről 55-re viszi a bal panelt, lásd
+ * `packages/ui/src/resizable/ResizableHandle.tsx`), majd a `--ep-screen-md`
+ * alá szűkítve fül sávba vált (az elválasztó eltűnik), végül visszaáll
+ * `--ep-screen-lg`-re, és a húzott arány megmaradását ellenőrzi.
+ */
+test('a fül sávba váltás után visszaváltva a kézzel húzott arány megmarad (T-009-23 regresszió)', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+  const separator = separatorLocator(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', '70');
+
+  await separator.focus();
+  await separator.press('ArrowLeft');
+  await separator.press('ArrowLeft');
+  await separator.press('ArrowLeft');
+  await expect(separator).toHaveAttribute('aria-valuenow', '55');
+  await expect
+    .poll(async () => page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY))
+    .toBe('[55,45]');
+
+  // Fül sávba váltás: a `Resizable` leszerel, az elválasztó eltűnik.
+  await page.setViewportSize({ width: MEDIUM_SCREEN_WIDTH - 1, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(page.getByRole('tablist', { name: 'Futás nézet' })).toBeVisible();
+  await expect(separator).toHaveCount(0);
+
+  // Vissza a horizontális sávba: a `Resizable` újracsatlakozik, a MENTETT
+  // aránnyal, nem az eredeti alapértelmezéssel.
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '55');
+});
+
+test('a tartalom terület magassága a viewport és a bar magasságából számít, üres sáv nélkül', async ({ page }) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+  const measurement = await page.evaluate(() => {
+    function heightOf(selector: string): number {
+      const element = globalThis.document.querySelector(selector);
+      if (element === null) {
+        throw new Error(`a mérés nem találta a ${selector} elemet`);
+      }
+      return element.getBoundingClientRect().height;
+    }
+    const content = globalThis.document.querySelector('.app-content');
+    if (content === null) {
+      throw new Error('a mérés nem találta az .app-content elemet');
+    }
+    const contentStyle = globalThis.getComputedStyle(content);
+    return {
+      viewportHeight: globalThis.innerHeight,
+      barHeight: heightOf('.app-tn__bar'),
+      pageHeadHeight: heightOf('.app-pagehead'),
+      contentHeight: heightOf('.app-content'),
+      contentPaddingBottom: contentStyle.paddingBottom,
+      screenBottom: globalThis.document.querySelector('.run-view-screen')?.getBoundingClientRect().bottom ?? 0,
+    };
+  });
+
+  // A lánc: `.app-tn { height: 100vh }`, a bar fix magasságú, a maradékot a
+  // flex osztja. Kitalált szám nincs a futás nézet CSS-ében: a magasságot ez
+  // az egyenlőség adja.
+  expect(measurement.barHeight + measurement.pageHeadHeight + measurement.contentHeight).toBeCloseTo(
+    measurement.viewportHeight,
+    0,
+  );
+  // A screen a tartalom terület ALJÁIG ér: a görgetett listákra szánt 80px
+  // alsó belső margó ezen a screen-en nulla (SPEC-008 10. "faltól falig").
+  expect(measurement.contentPaddingBottom).toBe('0px');
+  expect(measurement.screenBottom).toBeCloseTo(measurement.viewportHeight, 0);
 });

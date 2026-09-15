@@ -29,7 +29,15 @@
 // beállítás a fájlon BELÜL is párhuzamosítana, ezért ez a fájl a dokumentált
 // `mode: 'serial'` beállítást kapja.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { RunEventRecord, RunSummary, StreamFrame, WorkflowSummary } from '@easter-workflow-builder/protocol';
+import type {
+  RunDetail,
+  RunEventRecord,
+  RunSnapshotResponse,
+  RunSummary,
+  StepRunRecord,
+  StreamFrame,
+  WorkflowSummary,
+} from '@easter-workflow-builder/protocol';
 import { encodeStreamFrame } from '@easter-workflow-builder/protocol';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
@@ -264,4 +272,89 @@ test('nem ismert runId-jű replay_complete nem változtat a pótlás alatti fut�
   // állítás a keret feldolgozása utáni állapoton is igaz marad, mert a
   // `setPendingReplayRunIds` frissítője az előző halmazt adja vissza.
   await expect(page.getByText('előzmények betöltése')).toBeVisible();
+});
+
+// ============================================================
+// A "MEGSZAKÍTÁS FOLYAMATBAN" ÁLLAPOT LEZÁRÁSA (T-009-23, SPEC-008 6.4, AC25).
+//
+// Ez a mérés a fenti 2. kivétel alá tartozik: egy MÁR MEGNYITOTT kapcsolatba
+// menet közben beszúrt `run_finished` keret hatását vizsgálja, amit a
+// `page.route()` mock nem tud előállítani ("Route is already handled!"). A
+// keret ELŐTTI, fennmaradó állapotot a `run-control.spec.ts` méri, mockolt
+// kapcsolaton.
+// ============================================================
+
+/* eslint-disable unicorn/no-null -- lásd a fájl fejlécének eslint-disable indoklását */
+
+const RUN_SNAPSHOT: RunSnapshotResponse = {
+  version: 1,
+  sdkVersionPin: '0.1.13',
+  workflow: { id: 'w-alfa', name: 'Alfa workflow', description: null },
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Kérés fogadása',
+      position: { x: 0, y: 0 },
+      config: { type: 'start', inputFields: [], onUnhandledError: null },
+      effectiveProviderId: 'claude-subscription',
+    },
+  ],
+  edges: [],
+};
+
+const NO_STEP_RUNS: readonly StepRunRecord[] = [];
+
+function runDetailWithStatus(status: RunDetail['status']): RunDetail {
+  return {
+    id: 'r-1',
+    workflowId: 'w-alfa',
+    status,
+    input: null,
+    providerId: 'claude-subscription',
+    rootRunId: 'r-1',
+    depth: 0,
+    workflowAncestry: ['w-alfa'],
+    graphSnapshotHash: 'd'.repeat(64),
+    persistedStreamDeltas: false,
+    restartedFromRunId: null,
+    createdAtMs: 1,
+    startedAtMs: 2,
+    finishedAtMs: status === 'running' ? null : 9,
+    errorKind: null,
+    errorMessage: null,
+  };
+}
+
+/* eslint-enable unicorn/no-null */
+
+test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finished keret zárja le', async ({ page }) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+
+  // A szerver oldali futás állapota a keret kiadása ELŐTT `running`, utána
+  // `cancelled`: a felület a `run_finished` keretre töltI újra a futás
+  // rekordját, és ettől vált a vezérlő sáv.
+  const runStatusHolder: { current: RunDetail['status'] } = { current: 'running' };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(runStatusHolder.current)))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+    mockRoute('interruptRun', async (route) => route.fulfill(jsonBody({ rootRunId: 'r-1', cancelledRunIds: ['r-1'] }))),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const interruptButton = page.getByRole('button', { name: 'Megszakítás' });
+  await interruptButton.click();
+  await expect(page.getByText('Megszakítás folyamatban')).toBeVisible();
+  await expect(interruptButton).toBeDisabled();
+
+  runStatusHolder.current = 'cancelled';
+  streamServer.push({ event: 'run_event', delivery: 'live', runEvent: RUN_EVENT_RECORD });
+
+  await expect(page.getByText('Megszakítás folyamatban')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
 });

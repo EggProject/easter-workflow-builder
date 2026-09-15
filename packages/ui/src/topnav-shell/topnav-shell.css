@@ -181,6 +181,36 @@
 }
 
 /* ============================================================
+   UGYANEZ A FUTÁS NÉZETRE (2026-09-15, PLAN-009 T-009-22). ÚJ, önálló
+   blokk - a fenti szabály egyetlen bájtja sem változott.
+
+   MIÉRT. A SPEC-008 10. szekciója a futás nézetre is kimondja: "A vászon
+   minden sávban a teljes rendelkezésre álló területet tölti ki, a
+   SPEC-007 5.2 faltól falig követelménye szerint". A futás nézet a
+   T-009-22 óta ugyanolyan teljes területű munkafelület, mint a
+   szerkesztő: a gráf és a transcript panel a rendelkezésre álló magasságot
+   `flex: 1`-gyel tölti ki, tehát az átemelt .app-content 80px alsó
+   paddingja (--ep-space-20) ugyanúgy levonódna a két panel magasságából,
+   üres sávot hagyva alattuk a viewport aljáig, az oldalsó 40px pedig
+   egy hasábba szorítaná a vásznat.
+
+   AMI HELYETTE VISZI AZ OLDALSÓ TÉRKÖZT. A screen két nem-vászon eleme
+   (a fejléc és a rajzon nem szereplő lépés futások listája) a
+   --ep-layout-gutter tokent kapja meg saját belső margóként
+   (apps/web/src/run-view/run-view.css), tehát a szöveg nem tapad a falhoz.
+
+   A HATÓKÖR. Ugyanaz a megkülönböztetés, mint a szerkesztőnél: a
+   `:has(> .run-view-screen)` azért működik, mert a RunViewScreen gyökere
+   megnevezett osztályt ad az .app-content közvetlen gyerekének. A szabály
+   specificitása (0,2,0) magasabb, mint a --ep-screen-md alatti reszponzív
+   .app-content szabályé (0,1,0), tehát a nullázás szűk nézetben, a Tabs
+   sávban is érvényes marad. Regresszió: apps/web/e2e/run-view.spec.ts.
+   ============================================================ */
+.app-content:has(> .run-view-screen) {
+  padding: 0;
+}
+
+/* ============================================================
    A FORRÁS `_shell.css` ALAPOZÓ BLOKKJA, MÉRT HIBA JAVÍTÁSA.
 
    A MÉRT HIBA. A `<select>`, a `<button>` és minden más natív vezérlő a

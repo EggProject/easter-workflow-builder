@@ -1,0 +1,74 @@
+/* A futás vezérlésének sávja a futás nézet fejlécében (SPEC-008 6.4, 6.5,
+   T-009-23).
+
+   NINCS KÁRTYA: se szegély, se lekerekítés, se saját háttér, mert a sáv a
+   fejléc belsejében áll, és a card in card tilos (`.claude/CLAUDE.md` 11.
+   szekció). A térközök kizárólag a design system `--ep-space-*` tokenjeiből
+   jönnek, kitalált szám nincs. Media query sincs: a sáv `flex-wrap`
+   szabállyal tördel, ami minden támogatott viewport szélességen működik,
+   töréspont nélkül. */
+.run-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+}
+
+.run-control__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ep-space-2);
+}
+
+/* A "megszakítás folyamatban" felirat: nem hibaüzenet, tehát a halványabb,
+   másodlagos szövegszín jár neki, ugyanúgy, mint a pillanatkép
+   figyelmeztetésnek. */
+.run-control__pending {
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+/* A művelet gomb a sáv jobb szélére kerül, hogy a bal oldali állapot és a
+   jobb oldali művelet szétváljon. */
+.run-control__actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: var(--ep-space-2);
+}
+
+/* A megszakított al-workflow futások megnevezett, doboz nélküli szakasza
+   (AC26). */
+.run-control__cancelled-runs-title {
+  margin: 0;
+  font: var(--ep-text-meta);
+  color: var(--ep-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.run-control__cancelled-runs-items {
+  margin: var(--ep-space-1) 0 0;
+  padding-inline-start: var(--ep-space-5);
+  font: var(--ep-text-code);
+}
+
+/* A futás hibája a fejléc alatt, TELJES SZÉLESSÉGBEN (SPEC-008 6.4). */
+.run-control__run-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+}
+
+.run-control__run-error-kind {
+  margin: 0;
+  font: var(--ep-text-meta);
+  color: var(--ep-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.run-control__run-error-message {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-danger);
+}

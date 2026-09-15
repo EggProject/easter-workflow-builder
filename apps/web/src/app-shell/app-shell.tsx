@@ -84,8 +84,11 @@ function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
  * Az alkalmazás gyökér összeállítása (SPEC-007 5.1 mermaid: `AppShell,
  * osztaly app-tn`): a topnav bar ÉS a útválasztott tartalom együtt, nem
  * csak egy csupasz topnav. Az egyetlen, app élettartamú
- * `useStreamConnection` itt épül, és a `run-history` képernyőnek adja
- * tovább, ami az egyetlen SSE fogyasztó (SPEC-007 10.2).
+ * `useStreamConnection` itt épül, és a két SSE fogyasztó képernyőnek adja
+ * tovább: a `run-history` a lista élő állapotához (SPEC-007 10.2), a
+ * `run-view` pedig a nézett futás `run_finished` eseményéhez (SPEC-008 6.4,
+ * PLAN-009 T-009-23). Egyszerre legfeljebb az egyik áll felcsatolva, tehát a
+ * `replaceStreamSubscriptions` csere szemantikája nem ütközik.
  */
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
   const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
@@ -245,10 +248,22 @@ function renderRouteContent(
       );
     }
     case 'graphEditor': {
-      return <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} />;
+      return (
+        <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />
+      );
     }
     case 'runView': {
-      return <RunViewScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />;
+      return (
+        <RunViewScreen
+          apiOrigin={apiOrigin}
+          fetchFunction={fetchFunction}
+          search={search}
+          navigate={navigate}
+          streamId={streamId}
+          lastFrame={lastFrame}
+          streamReplayLimit={streamReplayLimit}
+        />
+      );
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;
