@@ -56,6 +56,15 @@
   color: var(--ep-fg);
 }
 
+/* A futás nézet csomópont szintű összesítése (SPEC-008 6.3): másodlagos
+   szövegszín, mert nem az elsődleges információ a kártyán, hanem a
+   futásra vonatkozó részlet. */
+.graph-node-card__summary {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
 .graph-node-card__warning {
   margin: 0;
   font-size: 12px;

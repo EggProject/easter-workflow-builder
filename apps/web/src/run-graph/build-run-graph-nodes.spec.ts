@@ -67,19 +67,38 @@ const AGENT_NODE: WorkflowNodeInput = {
   },
 };
 
+const onOpenSubWorkflowRun = (): void => {
+  // a build tiszta függvény: a callback csak áthalad rajta
+};
+
+const LOOP_NODE: WorkflowNodeInput = {
+  id: 'n-loop',
+  type: 'loop',
+  label: 'Ciklus',
+  positionX: 0,
+  positionY: 0,
+  config: { type: 'loop', maxIterations: 3, continueExpression: 'i < 3', onUnhandledError: null },
+};
+
 describe('buildRunGraphNodes', () => {
-  it('lépés futás nélküli csomópontra nem tesz fel status kulcsot', () => {
-    const built = buildRunGraphNodes([AGENT_NODE], new Map());
+  it('lépés futás nélküli csomópontra nem tesz fel status és runDecoration kulcsot', () => {
+    const built = buildRunGraphNodes({
+      nodes: [AGENT_NODE],
+      nodeStepRuns: new Map(),
+      stepRuns: [],
+      onOpenSubWorkflowRun,
+    });
 
     expect(built).toHaveLength(1);
     expect(built[0]?.workflowNode.id).toBe('n-agent');
     expect(Object.hasOwn(built[0] ?? {}, 'status')).toBe(false);
+    expect(Object.hasOwn(built[0] ?? {}, 'runDecoration')).toBe(false);
   });
 
   it('a megjelenített lépés futás állapotát teszi a kártya adatába', () => {
-    const built = buildRunGraphNodes(
-      [AGENT_NODE],
-      new Map([
+    const built = buildRunGraphNodes({
+      nodes: [AGENT_NODE],
+      nodeStepRuns: new Map([
         [
           'n-agent',
           [
@@ -88,8 +107,23 @@ describe('buildRunGraphNodes', () => {
           ],
         ],
       ]),
-    );
+      stepRuns: [],
+      onOpenSubWorkflowRun,
+    });
 
     expect(built[0]?.status).toBe('running');
+  });
+
+  it('az összesítést és a navigációt EGY mezőben adja tovább', () => {
+    const loopStepRun = { ...BASE_STEP_RUN, id: 's-loop', nodeId: 'n-loop', nodeType: 'loop', iteration: 1 } as const;
+    const built = buildRunGraphNodes({
+      nodes: [LOOP_NODE],
+      nodeStepRuns: new Map([['n-loop', [loopStepRun]]]),
+      stepRuns: [loopStepRun],
+      onOpenSubWorkflowRun,
+    });
+
+    expect(built[0]?.runDecoration?.summary).toEqual({ kind: 'loop', iteration: 1, maxIterations: 3 });
+    expect(built[0]?.runDecoration?.onOpenSubWorkflowRun).toBe(onOpenSubWorkflowRun);
   });
 });

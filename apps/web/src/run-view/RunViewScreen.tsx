@@ -8,7 +8,7 @@ import {
   type StepRunRecord,
 } from '@easter-workflow-builder/protocol';
 import { Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
-import { useEffect, type MouseEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import type { RequestState } from '../request-state/request-state.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -134,6 +134,15 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const stepRunsState = useRequestState<readonly StepRunRecord[]>();
 
+  // Az al-workflow futás megnyitása UGYANERRE a képernyőre navigál, másik
+  // `?runId=` paraméterrel (SPEC-008 6.3, AC24).
+  const handleOpenSubWorkflowRun = useCallback(
+    (subWorkflowRunId: string): void => {
+      navigate('runView', `runId=${subWorkflowRunId}`);
+    },
+    [navigate],
+  );
+
   useEffect(() => {
     if (runId === undefined) {
       return;
@@ -203,7 +212,12 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
 
   const stepRuns = stepRunsState.state.value;
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
-  const graphNodes = buildRunGraphNodes(projected.value.nodes, merged.nodeStepRuns);
+  const graphNodes = buildRunGraphNodes({
+    nodes: projected.value.nodes,
+    nodeStepRuns: merged.nodeStepRuns,
+    stepRuns,
+    onOpenSubWorkflowRun: handleOpenSubWorkflowRun,
+  });
 
   return (
     <div className="run-view-screen">

@@ -1,10 +1,10 @@
 import type { NodeConfig } from '@easter-workflow-builder/protocol';
-import { Badge } from '@easter-workflow-builder/ui';
+import { Badge, Button } from '@easter-workflow-builder/ui';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { type GraphNodeOutputHandle, type GraphNodeOutputHandles } from '../graph-node-catalog/graph-node-catalog.ts';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
-import type { GraphNodeCardFlowNode } from './graph-node-card-data.ts';
+import type { GraphNodeCardFlowNode, GraphNodeRunDecoration } from './graph-node-card-data.ts';
 import { describeStepRunStatusBadge } from './step-run-status-badge.ts';
 import './graph-node-card.css';
 
@@ -61,6 +61,52 @@ function renderOutputHandle(handle: GraphNodeOutputHandle, topPercent: number): 
 }
 
 /**
+ * A futás nézet csomópont szintű összesítése a kártyán (SPEC-008 6.3, AC22,
+ * AC24). Kimerítő `switch` a `kind` mezőn, alapértelmezett ág nélkül: egy
+ * negyedik összesítés típus fordítási hibát adna.
+ *
+ * A `fan_out` nulla ág esete KÜLÖN, kimondott feliratot kap, mert egy néma,
+ * azonnal kész szétosztás egyébként hibának látszana (SPEC-008 6.3). A
+ * `sub_workflow` navigációja valódi gomb, `sm` méretben (nem modális és nem
+ * popup felület), hozzáférhető nevével a látható szövegéből.
+ */
+function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
+  const { summary, onOpenSubWorkflowRun } = decoration;
+  switch (summary.kind) {
+    case 'fan_out': {
+      return (
+        <p className="graph-node-card__summary">
+          {summary.branchCount === 0
+            ? 'nulla ág: a szétosztás egyetlen ágat sem indított'
+            : `${String(summary.branchCount)} ág, ${String(summary.succeededCount)} sikeres, ${String(summary.failedCount)} sikertelen`}
+        </p>
+      );
+    }
+    case 'loop': {
+      return (
+        <p className="graph-node-card__summary">
+          {`iteráció: ${String(summary.iteration)} / ${String(summary.maxIterations)}`}
+        </p>
+      );
+    }
+    case 'sub_workflow': {
+      return (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            onOpenSubWorkflowRun(summary.subWorkflowRunId);
+          }}
+        >
+          Al-workflow futás megnyitása
+        </Button>
+      );
+    }
+  }
+}
+
+/**
  * Az egyetlen egyedi node komponens a vásznon (SPEC-008 5.1, 5.5, M-56): a
  * tíz típus közötti különbséget a `GRAPH_NODE_CATALOG` adat tábla írja le,
  * nem tíz külön komponens. **Egyetlen ág sem függ mért node geometriától**
@@ -69,7 +115,7 @@ function renderOutputHandle(handle: GraphNodeOutputHandle, topPercent: number): 
  */
 export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNode>>): ReactElement {
   const { data } = properties;
-  const { workflowNode, status } = data;
+  const { workflowNode, status, runDecoration } = data;
   const catalogEntry = GRAPH_NODE_CATALOG[workflowNode.type];
   const statusBadge = status === undefined ? undefined : describeStepRunStatusBadge(status);
   const outputHandles = resolveOutputHandles(catalogEntry.outputHandles, workflowNode.config);
@@ -82,6 +128,7 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
         {statusBadge !== undefined && <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>}
       </div>
       <p className="graph-node-card__label">{workflowNode.label}</p>
+      {runDecoration !== undefined && renderRunSummary(runDecoration)}
       {workflowNode.type === 'script' && (
         <p className="graph-node-card__warning">A motor a futtatáskor elutasítja: nincs implementálva.</p>
       )}

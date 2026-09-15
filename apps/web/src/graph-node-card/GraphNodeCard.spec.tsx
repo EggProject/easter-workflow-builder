@@ -6,7 +6,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GraphNodeCard } from './GraphNodeCard.tsx';
-import type { GraphNodeCardFlowNode } from './graph-node-card-data.ts';
+import type { GraphNodeCardFlowNode, RunNodeSummary } from './graph-node-card-data.ts';
 
 const NODE_TYPES = { workflowNode: GraphNodeCard };
 
@@ -30,6 +30,17 @@ function buildFlowNode(workflowNode: WorkflowNodeInput, status?: StepRunStatus):
     data: status === undefined ? { workflowNode } : { workflowNode, status },
     ...TEST_NODE_SIZE,
   };
+}
+
+function buildDecoratedFlowNode(
+  workflowNode: WorkflowNodeInput,
+  summary: RunNodeSummary,
+  onOpenSubWorkflowRun: (subWorkflowRunId: string) => void = () => {
+    // a legtöbb összesítés nem navigál
+  },
+): GraphNodeCardFlowNode {
+  const base = buildFlowNode(workflowNode);
+  return { ...base, data: { ...base.data, runDecoration: { summary, onOpenSubWorkflowRun } } };
 }
 
 const AGENT_STEP_SETTINGS = {
@@ -278,5 +289,67 @@ describe('GraphNodeCard', () => {
   it('a node saját magyar címkéje megjelenik', () => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.human_approval)]);
     expect(container.textContent).toContain('Jóváhagyás');
+  });
+
+  it('futás összesítés nélkül nincs összesítő sor és nincs al-workflow gomb', () => {
+    renderNodes([buildFlowNode(WORKFLOW_NODES.fan_out)]);
+    expect(container.querySelector('.graph-node-card__summary')).toBeNull();
+    expect(container.querySelector('button')).toBeNull();
+  });
+
+  it('a fan_out összesítés az ág darabszámot, a sikeres és a bukott számot mutatja', () => {
+    renderNodes([
+      buildDecoratedFlowNode(WORKFLOW_NODES.fan_out, {
+        kind: 'fan_out',
+        branchCount: 4,
+        succeededCount: 3,
+        failedCount: 1,
+      }),
+    ]);
+    expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe('4 ág, 3 sikeres, 1 sikertelen');
+  });
+
+  it('a nulla ág eset külön, kimondott feliratot kap', () => {
+    renderNodes([
+      buildDecoratedFlowNode(WORKFLOW_NODES.fan_out, {
+        kind: 'fan_out',
+        branchCount: 0,
+        succeededCount: 0,
+        failedCount: 0,
+      }),
+    ]);
+    expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe(
+      'nulla ág: a szétosztás egyetlen ágat sem indított',
+    );
+  });
+
+  it('a loop összesítés az aktuális iterációt és a maxIterations korlátot mutatja', () => {
+    renderNodes([buildDecoratedFlowNode(WORKFLOW_NODES.loop, { kind: 'loop', iteration: 2, maxIterations: 5 })]);
+    expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe('iteráció: 2 / 5');
+  });
+
+  it('a sub_workflow összesítés gombja a subWorkflowRunId értékkel navigál', () => {
+    const openedRunIds: string[] = [];
+    renderNodes([
+      buildDecoratedFlowNode(
+        WORKFLOW_NODES.sub_workflow,
+        { kind: 'sub_workflow', subWorkflowRunId: 'r-42' },
+        (subWorkflowRunId) => {
+          openedRunIds.push(subWorkflowRunId);
+        },
+      ),
+    ]);
+
+    const button = container.querySelector('button');
+    if (button === null) {
+      throw new Error('a teszt nem talált al-workflow gombot');
+    }
+    expect(button.textContent).toBe('Al-workflow futás megnyitása');
+    expect(button.className).toContain('btn--sm');
+
+    act(() => {
+      button.click();
+    });
+    expect(openedRunIds).toEqual(['r-42']);
   });
 });

@@ -249,6 +249,37 @@ describe('RunViewScreen', () => {
     expect(list.querySelectorAll('li')).toHaveLength(1);
   });
 
+  it('a sub_workflow csomópont összesítésének navigációja ugyanerre a képernyőre visz, másik runId paraméterrel', async () => {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({
+        snapshot: {
+          ...SNAPSHOT,
+          nodes: [
+            {
+              id: 'n-sub',
+              type: 'sub_workflow',
+              label: 'Al-workflow',
+              position: { x: 0, y: 0 },
+              config: { type: 'sub_workflow', targetWorkflowId: 'wf-9', inputMapping: {}, onUnhandledError: null },
+              effectiveProviderId: 'minimax',
+            },
+          ],
+        },
+        stepRuns: [{ ...BASE_STEP_RUN, nodeId: 'n-sub', nodeType: 'sub_workflow', subWorkflowRunId: 'r-9' }],
+      }),
+    );
+
+    const decoration = lastCanvasProperties().nodes[0]?.runDecoration;
+    if (decoration === undefined) {
+      throw new Error('a teszt nem talált futás összesítést a sub_workflow csomóponton');
+    }
+    expect(decoration.summary).toEqual({ kind: 'sub_workflow', subWorkflowRunId: 'r-9' });
+
+    decoration.onOpenSubWorkflowRun('r-9');
+    expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-9');
+  });
+
   it('érvénytelen pillanatkép alakra a hibás mező útvonalát mutatja, rajz nélkül', async () => {
     await renderScreen(
       '?runId=r-3',
