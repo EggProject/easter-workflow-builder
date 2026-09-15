@@ -699,8 +699,21 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   manifeszt szándékosan nem tartalmaz nyers mért számot (4. szekció 3. pont), ezért determinisztikus.
   **A megkerülhetőség kimondva:** a két `sha256` érték kézzel átírható, és a repóba sosem kerülő,
   `/tmp` alatti script kimenetét egyetlen repón belüli kapu sem látja; a védelem azt zárja ki, hogy
-  a hiba ÉSZREVÉTLENÜL visszatérjen, nem azt, hogy valaki szándékosan hamisítson.
+  a hiba ÉSZREVÉTLENÜL visszatérjen, nem azt, hogy valaki szándékosan hamisítson. Ez a két tétel
+  a védelem ELVI korlátja, felhasználói döntés szerint elfogadva (2026-09-15): gépi kényszert nem
+  építünk rájuk.
   Forrás: felhasználói kérés 2026-09-15, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
+- **A gépi kényszer első alakjának három MÉRT rése, mind javítva (2026-09-15).** Egy független
+  ellenőrzés a fenti hat invariánson át tudott vinni egy rontó scriptet, három okból: a vizsgált
+  kiterjesztés lista nem ismerte az `.mts` és a `.cts` alakot; az első invariáns egy
+  karakterosztályos ablakban keresett, tehát BÁRMELY függvényhívás a `path` mező előtt
+  hatástalanította; és a hat szállított képből kettő (a nagyított kivágat) sosem kapott pixel
+  mérést, tehát a frissesség bizonyíték csak négyre szólt. A javítás: a két kiterjesztés felvéve;
+  az ablak teljesen megszűnt (egy fájlnak nem lehet EGYSZERRE képernyőkép hívása és `path`
+  opciója, ami a commitolt fán mérten egyetlen fájlra illeszkedik); és MINDEN szállított kép mért,
+  a futás nézet két új képét is beleértve. **A karakterosztályos ablak általános tanulsága:** egy
+  greppes invariánsban a tiltott karakterosztály mindig hagy kerülő utat egy másik karakterrel, a
+  puszta együttes jelenlét vizsgálata nem.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
