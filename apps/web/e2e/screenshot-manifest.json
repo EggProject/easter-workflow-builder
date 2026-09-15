@@ -1,6 +1,6 @@
 {
-  "fixtureSha256": "c62017ca5c23e518d72cd67ec0f601a3336c84a449b6eb300a855d4ea6c8e90a",
-  "captureScriptSha256": "e58cd275dfa43a29901564b215d7815e54d96b0368f51eaf8447378d15eff992",
+  "fixtureSha256": "a88c7129e66eda55c3c605990174fad3ec04f02d7567c3bf8211e013e420e8db",
+  "captureScriptSha256": "dafa42d0ac04fd2ee97c181d7e8e7eea8c787e38f7a035a44eff167292c441ea",
   "fixtureEdgeIds": [
     "e-start-branch",
     "e-branch-fanout",
@@ -65,6 +65,70 @@
     },
     {
       "name": "editor-panel-light.png",
+      "paintedEdgeIds": [
+        "e-start-branch",
+        "e-branch-fanout",
+        "e-branch-agent",
+        "e-branch-script",
+        "e-branch-approval",
+        "e-branch-loop",
+        "e-fanout-join",
+        "e-agent-join",
+        "e-script-join",
+        "e-approval-join",
+        "e-loop-join"
+      ]
+    },
+    {
+      "name": "graph-edges-dark.png",
+      "paintedEdgeIds": [
+        "e-start-branch",
+        "e-branch-fanout",
+        "e-branch-agent",
+        "e-branch-script",
+        "e-branch-approval",
+        "e-branch-loop",
+        "e-fanout-join",
+        "e-agent-join",
+        "e-script-join",
+        "e-approval-join",
+        "e-loop-join"
+      ]
+    },
+    {
+      "name": "graph-edges-light.png",
+      "paintedEdgeIds": [
+        "e-start-branch",
+        "e-branch-fanout",
+        "e-branch-agent",
+        "e-branch-script",
+        "e-branch-approval",
+        "e-branch-loop",
+        "e-fanout-join",
+        "e-agent-join",
+        "e-script-join",
+        "e-approval-join",
+        "e-loop-join"
+      ]
+    },
+    {
+      "name": "run-view-dark.png",
+      "paintedEdgeIds": [
+        "e-start-branch",
+        "e-branch-fanout",
+        "e-branch-agent",
+        "e-branch-script",
+        "e-branch-approval",
+        "e-branch-loop",
+        "e-fanout-join",
+        "e-agent-join",
+        "e-script-join",
+        "e-approval-join",
+        "e-loop-join"
+      ]
+    },
+    {
+      "name": "run-view-light.png",
       "paintedEdgeIds": [
         "e-start-branch",
         "e-branch-fanout",

@@ -72,8 +72,16 @@ const SCREENSHOTS_CONFIG_FILE = 'apps/web/playwright.screenshots.config.ts';
 /**
  * Minden kiterjesztés, amiben egy képernyőkép készítő lépés megjelenhet:
  * TypeScript és JavaScript forrás, plusz a bash wrapperek.
+ *
+ * Az `.mts` és a `.cts` 2026-09-15 óta szerepel a listán. Enélkül egy
+ * `.mts` kiterjesztésű, teljesen nyílt, `path` opciós képernyőkép hívást és
+ * PNG fájlnevet tartalmazó fájl MINDKÉT invariánson átcsúszott, mérten (egy független
+ * ellenőrzés így vitte át a védelmet). A két kiterjesztést a Node maga ismeri
+ * fel TypeScript modulként, és a Playwright dokumentált `testMatch`
+ * alapértelmezése is felveszi a `c`/`m` előtagos változatokat, tehát valós,
+ * futó kódot tud hordozni.
  */
-const CHECKED_EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.sh'];
+const CHECKED_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.sh'];
 
 /**
  * A fixtúra alsó korlátja élekben. Ugyanaz a szám, amit a fixtúra alakját
@@ -83,17 +91,28 @@ const CHECKED_EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.sh'];
 const MINIMUM_EDGE_COUNT = 5;
 
 /**
- * A mért képek alsó korlátja. A szentesített csővezeték ma NÉGY képen mér
- * élenkénti kifestettséget: két elrendezés (nyitott beállítás panel és
- * kiválasztás nélküli vászon) a két témában. Ratchet: ha új mért kép
- * érkezik, ez a szám felfelé követi.
+ * A mért képek alsó korlátja. A szentesített csővezeték 2026-09-15 óta MINDEN
+ * szállított képen mér élenkénti kifestettséget: négy elrendezés (nyitott
+ * beállítás panel, kiválasztás nélküli vászon, futás nézet és a nagyított
+ * kivágat) a két témában. Korábban a nagyított kivágat két képe kimaradt,
+ * tehát a frissesség bizonyíték a hat szállított képből csak négyre szólt.
+ * Ratchet: ha új mért kép érkezik, ez a szám felfelé követi.
  */
-const MINIMUM_MEASURED_IMAGE_COUNT = 4;
+const MINIMUM_MEASURED_IMAGE_COUNT = 8;
 
 /**
  * Mindkét témában kell mért kép (`.claude/CLAUDE.md` 11. szekció).
  */
 const REQUIRED_THEME_NAMES = ['light', 'dark'] as const;
+
+/**
+ * Minden képernyő, amiről kötelező mért kép. A `run-view` 2026-09-15-i
+ * felhasználói kérés: a futás nézetre addig nulla szállított vizuális
+ * bizonyíték volt, holott a felület megépült. A két név a kép fájlnevének
+ * előtagja, tehát a mindkét témára szóló követelmény a téma nevekkel együtt
+ * nyolc kombinációt ír le.
+ */
+const REQUIRED_SCREEN_NAMES = ['editor-', 'run-view-'] as const;
 
 /**
  * A keresett szavak DARABOKBAN állnak, és futásidőben állnak össze, hogy a
@@ -108,14 +127,25 @@ const SNAPSHOT_WORD = ['Snap', 'shot'].join('');
 const PNG_EXTENSION = ['p', 'ng'].join('');
 
 /**
- * A képernyőkép FÁJLBA írásának mintája: képernyőkép hívás, aminek az opció
- * objektumában `path` mező áll. Ez a pontos, mérhető választóvonal a
- * szentesített csővezeték és a pixel MÉRÉS között: az
- * `edge-paint-measurement.ts` és a `graph-edge-stroke.spec.ts` is hív
- * képernyőkép készítést, de `path` nélkül, memóriában tartott bufferre -
- * azok nem szállított képet állítanak elő.
+ * A `path` OPCIÓ mintája. Ez a pontos, mérhető választóvonal a szentesített
+ * csővezeték és a pixel MÉRÉS között: az `edge-paint-measurement.ts`, a
+ * `graph-edge-stroke.spec.ts` és a `select-chevron-position.spec.ts` is hív
+ * képernyőkép készítést, de `path` nélkül, memóriában tartott bufferre - azok
+ * nem szállított képet állítanak elő.
+ *
+ * MIÉRT NEM EGY ABLAKOS REGEX, ami a hívástól a `path` mezőig ér. Az első
+ * alak a hívás után egy `[^)]{0,400}?` ablakban kereste a mezőt, és a tiltott
+ * záró zárójel miatt BÁRMELY függvényhívás az opció objektumban, a `path` mező
+ * ELŐTT hatástalanította: mérve, egy kivágat számító hívást és utána a mezőt
+ * tartalmazó opció objektum elkerülte (egy független ellenőrzés így vitte át a
+ * védelmet, 2026-09-15). Bármilyen tiltott karakterosztállyal ugyanez a kerülő
+ * út nyílna újra egy másik karakterrel, ezért az ablak teljesen megszűnt: a
+ * fájlnak egyszerűen nem lehet EGYSZERRE képernyőkép hívása és `path`
+ * opciója. Mérve a commitolt fán: erre a két minta EGYÜTT pontosan egyetlen
+ * fájlra illeszkedik, a szentesített `capture-screenshots.ts`-re, tehát a
+ * szigorítás ma nulla hamis jelzést ad.
  */
-const SCREENSHOT_TO_FILE_PATTERN = new RegExp(String.raw`${SCREENSHOT_WORD}\(\s*\{[^)]{0,400}?\bpath\s*:`);
+const PATH_OPTION_PATTERN = /\bpath\s*:/;
 
 /**
  * A Playwright saját, lemezre író képösszehasonlító assertionjei. A repo nem
@@ -129,9 +159,10 @@ const SNAPSHOT_ASSERTION_PATTERN = new RegExp(
 
 /**
  * Bármilyen képernyőkép hívás, `path` opció nélkül is. Önmagában nem hiba (a
- * pixel mérés is ilyet hív), a PNG fájlnév mintával EGYÜTT viszont az: ez
- * fogja meg azt a kerülő utat, ami a buffert a hívástól elválasztva,
- * `writeFileSync` hívással írja lemezre.
+ * pixel mérés is ilyet hív), de mindkét invariáns ebből indul: a `path`
+ * opcióval együtt a szállított kép közvetlen kiírását jelenti (1. invariáns),
+ * a PNG fájlnévvel együtt pedig azt a kerülő utat, ami a buffert a hívástól
+ * elválasztva, `writeFileSync` hívással írja lemezre (2. invariáns).
  */
 const ANY_SCREENSHOT_CALL = `${SCREENSHOT_WORD}(`;
 
@@ -257,7 +288,9 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
   it('(1) a szentesített fájlon kívül egyetlen commitolt fájl sem ír képernyőképet lemezre', () => {
     const root = repoRoot();
     const offenders = listOtherCodeFiles(root).filter(
-      (file) => SCREENSHOT_TO_FILE_PATTERN.test(file.content) || SNAPSHOT_ASSERTION_PATTERN.test(file.content),
+      (file) =>
+        (file.content.includes(ANY_SCREENSHOT_CALL) && PATH_OPTION_PATTERN.test(file.content)) ||
+        SNAPSHOT_ASSERTION_PATTERN.test(file.content),
     );
     expect(offenders.map((file) => file.trackedPath)).toEqual([]);
   });
@@ -324,6 +357,9 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
     const imageNames = manifest.images.map((image) => image.name);
     for (const themeName of REQUIRED_THEME_NAMES) {
       expect(imageNames.filter((name) => name.includes(themeName)).length).toBeGreaterThan(0);
+      for (const screenName of REQUIRED_SCREEN_NAMES) {
+        expect(imageNames.filter((name) => name.startsWith(screenName) && name.includes(themeName))).not.toEqual([]);
+      }
     }
   });
 });

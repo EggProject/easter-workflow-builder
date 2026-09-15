@@ -210,6 +210,13 @@ A fixtúra alakját és minden élének kifestett vonalát az `e2e/showcase-grap
 teszt őrzi a `test:e2e` kapun. A miértje és a mérés:
 [`../../docs/research/2026-09-09-graf-el-vonal-meres.md`](../../docs/research/2026-09-09-graf-el-vonal-meres.md) 6. és 7. szekció, `.claude/CLAUDE.md` 12. szekció.
 
+**Nyolc kép készül, és MINDEGYIK pixel mérést kap** (2026-09-15): a szerkesztő két elrendezése, a
+FUTÁS nézet és a nagyított kivágat, mindegyik világos és sötét témában. A futás nézet pillanatképe
+UGYANABBÓL a gráfból származik (`SHOWCASE_RUN_SNAPSHOT` a `SHOWCASE_GRAPH` drótszintű vetülete),
+tehát az él azonosítók mindkét nézetben azonosak, és a manifeszt egyetlen éllistát követel meg
+minden képre. A mért értékek táblázata:
+[`../../docs/research/2026-09-09-graf-el-vonal-meres.md`](../../docs/research/2026-09-09-graf-el-vonal-meres.md) 7/b. szekció.
+
 **A szentesített út GÉPI kényszer, nem csak szabály** (2026-09-15). A csővezeték minden futása
 bizonyítékot hagy az `e2e/screenshot-manifest.json` fájlban: a fixtúra és a szentesített script
 `sha256` lenyomatát, plusz képenként azoknak az éleknek az azonosítóját, amiknek a vonalát a pixel

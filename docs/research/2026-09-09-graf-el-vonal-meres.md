@@ -241,6 +241,48 @@ hat teszt zöld.
 
 ---
 
+## 7/b. Frissítés 2026-09-15: nyolc kép, mind mért, a futás nézettel együtt
+
+Egy független ellenőrzés két rést talált a szállított bizonyítékon: a hat kép közül **kettő** (a
+nagyított kivágat, `graph-edges-light.png` és `graph-edges-dark.png`) sosem kapott pixel mérést és
+nem szerepelt a manifesztben, továbbá a most megépült **futás nézetről** (`run-view`, `run-graph`
+téma) egyetlen szállított kép sem készült. Mindkettő javítva.
+
+**A futás nézet fixtúrája SZÁRMAZTATOTT, nem új.** A `SHOWCASE_RUN_SNAPSHOT` a `SHOWCASE_GRAPH`
+csomópontjait és éleit fordítja a `RunSnapshotResponse` drótszintű alakjára, tehát a tizenegy él
+AZONOSÍTÓJA mindkét nézetben azonos, és a manifeszt egyetlen `fixtureEdgeIds` listát tud minden
+képre megkövetelni. Egy második, saját éllistát hordozó fixtúra pontosan azt a rést nyitná újra,
+amiről a 3. és a 6. szekció szól.
+
+**A mérés** (`bun run screenshots`, nyolc kép, képenként mind a tizenegy él, összesen 88 mérés,
+`EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE = 8`):
+
+| Kép                             | Mért élek | Legkisebb csatorna eltérés | Legnagyobb |
+| ------------------------------- | --------- | -------------------------- | ---------- |
+| `editor-panel-light.png`        | 11        | 134                        | 141        |
+| `editor-panel-dark.png`         | 11        | 30                         | 34         |
+| `editor-no-selection-light.png` | 11        | 193                        | 198        |
+| `editor-no-selection-dark.png`  | 11        | 43                         | 47         |
+| `run-view-light.png`            | 11        | 28                         | 54         |
+| `run-view-dark.png`             | 11        | 64                         | 129        |
+| `graph-edges-light.png`         | 11        | 177                        | 236        |
+| `graph-edges-dark.png`          | 11        | 40                         | 53         |
+
+Mind a 88 érték a **8**-as küszöb felett van, a legkisebb 28. A futás nézet két képén a
+tartomány szélesebb, mint a szerkesztőn, mert a csak olvasható vászon a teljes lapszélességet
+használja (nincs beállítás panel), tehát a `fitView` nagyobb nagyítást ad, és a ferde élek
+vonalvastagsága élsimítás után élenként eltérően fed.
+
+**A nagyított kivágat mérése ugyanazon az oldalállapoton fut, mint a kép**, `deviceScaleFactor: 2`
+mellett is: a mérés a saját, `clip` paraméteres képernyőképét készíti, tehát a kétszeres
+pixelsűrűség mindkét felvételre egyformán vonatkozik, és a különbség képezhető.
+
+**A gépi kényszer ratchetje ennek megfelelően 4-ről 8-ra emelve**
+(`screenshot-pipeline.spec.ts`, `MINIMUM_MEASURED_IMAGE_COUNT`), plusz új, kötött követelmény,
+hogy mind a két képernyőről (`editor-`, `run-view-`) legyen mért kép MINDKÉT témában.
+
+---
+
 ## 8. Amit ez a mérés NEM zár le
 
 - Kizárólag chromium ellen futott, mert az `apps/web/playwright.config.ts` ma csak azt

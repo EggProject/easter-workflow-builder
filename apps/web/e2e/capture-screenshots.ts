@@ -49,7 +49,9 @@ import {
   countNodesOutsideCanvas,
   fitShowcaseGraphIntoView,
   installShowcaseMocks,
+  installShowcaseRunMocks,
   openShowcaseEditor,
+  openShowcaseRunView,
   SHOWCASE_GRAPH,
   SHOWCASE_SELECTED_NODE_ID,
 } from './showcase-graph.ts';
@@ -145,15 +147,20 @@ for (const theme of ['light', 'dark'] as const) {
   test.describe(`${theme} téma`, () => {
     test.use({ colorScheme: theme, viewport: VIEWPORT });
 
+    // A `beforeEach` KIZÁRÓLAG a témát állítja: a mockolás tesztenként külön
+    // megy, mert a szerkesztő és a futás nézet más végpontokat hív. Egyetlen
+    // közös telepítés esetén a később regisztrált útvonal minta nyerne (a
+    // Playwright a legutóbb regisztráltat próbálja először), és a korábbi
+    // telepítés csendben soha nem szólalna meg.
     test.beforeEach(async ({ page }) => {
       await page.addInitScript((mode: string) => {
         globalThis.localStorage.setItem('eggTheme', mode);
       }, theme);
-      await installShowcaseMocks(page);
     });
 
     test(`editor-panel-${theme}`, async ({ page }) => {
       const imageName = `editor-panel-${theme}.png`;
+      await installShowcaseMocks(page);
       await openShowcaseEditor(page);
       // ELŐSZÖR a panel nyílik meg, UTÁNA jön az illesztés: a beállítás panel
       // elveszi a vászon szélességének egy részét, tehát a nyitás előtt
@@ -169,7 +176,24 @@ for (const theme of ['light', 'dark'] as const) {
 
     test(`editor-no-selection-${theme}`, async ({ page }) => {
       const imageName = `editor-no-selection-${theme}.png`;
+      await installShowcaseMocks(page);
       await openShowcaseEditor(page);
+      await fitShowcaseGraphIntoView(page);
+      expect(await countNodesOutsideCanvas(page)).toBe(0);
+
+      await page.screenshot({ path: outputPath(imageName) });
+      await recordPaintedEdges(page, imageName);
+    });
+
+    // A FUTÁS nézet, ugyanabból a gráfból: a pillanatkép a `SHOWCASE_GRAPH`
+    // származtatott alakja, tehát ugyanaz a tizenegy él van rajta, és a pixel
+    // mérés ugyanazt a listát tudja igazolni. Enélkül a most megépült
+    // felületre (`run-view`, `run-graph`) nulla szállított vizuális bizonyíték
+    // lenne (felhasználói kérés, 2026-09-15).
+    test(`run-view-${theme}`, async ({ page }) => {
+      const imageName = `run-view-${theme}.png`;
+      await installShowcaseRunMocks(page);
+      await openShowcaseRunView(page);
       await fitShowcaseGraphIntoView(page);
       expect(await countNodesOutsideCanvas(page)).toBe(0);
 
@@ -181,6 +205,8 @@ for (const theme of ['light', 'dark'] as const) {
       test.use({ deviceScaleFactor: 2 });
 
       test(`graph-edges-${theme}`, async ({ page }) => {
+        const imageName = `graph-edges-${theme}.png`;
+        await installShowcaseMocks(page);
         await openShowcaseEditor(page);
         await fitShowcaseGraphIntoView(page);
         // A teljes vászon, kétszeres pixelsűrűségen: ezen a kivágaton az
@@ -201,7 +227,11 @@ for (const theme of ['light', 'dark'] as const) {
           const bottom = Math.min(globalThis.innerHeight, Math.ceil(rect.bottom));
           return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
         });
-        await page.screenshot({ path: outputPath(`graph-edges-${theme}.png`), clip });
+        await page.screenshot({ path: outputPath(imageName), clip });
+        // 2026-09-15 óta ez a két kép is MÉRT: korábban a nagyított kivágat
+        // kimaradt a manifesztből, tehát a frissesség bizonyíték a hat
+        // szállított képből csak négyre szólt.
+        await recordPaintedEdges(page, imageName);
       });
     });
   });

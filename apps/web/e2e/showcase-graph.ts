@@ -18,7 +18,10 @@
 // visszatérni.
 import type {
   NodeConfig,
+  RunDetail,
+  RunSnapshotResponse,
   SettingsRecord,
+  StepRunRecord,
   WorkflowDetail,
   WorkflowGraphDocument,
 } from '@easter-workflow-builder/protocol';
@@ -343,11 +346,157 @@ const SHOWCASE_WORKFLOW: WorkflowDetail = {
   updatedAtMs: 1,
 };
 
-const SHOWCASE_SETTINGS: SettingsRecord = { defaultProviderId: 'minimax', persistStreamDeltas: false };
+const SHOWCASE_PROVIDER_ID = 'minimax';
+
+const SHOWCASE_SETTINGS: SettingsRecord = { defaultProviderId: SHOWCASE_PROVIDER_ID, persistStreamDeltas: false };
+
+/**
+ * Az Agent SDK pinelt verziója, szó szerint az az érték, ami a csomagok
+ * `package.json` fájljaiban a `@anthropic-ai/claude-agent-sdk` mellett áll; a
+ * pinelés okát a `docs/research/2026-08-26-toolchain.md` írja le. A futás nézet
+ * fejléce ezt az értéket nevezi meg, tehát a szállított képernyőképen a valódi
+ * pin látszik, nem kitalált szám.
+ */
+const SHOWCASE_SDK_VERSION_PIN = '0.3.245';
+
+const SHOWCASE_RUN_ID = 'run-bemutato';
+
+/**
+ * A futás PILLANATKÉPE, UGYANABBÓL az egyetlen gráfból származtatva
+ * (2026-09-15). A `SHOWCASE_GRAPH` csomópontjait és éleit fordítja a
+ * `RunSnapshotResponse` drótszintű alakjára: a pozíció `position: { x, y }`
+ * mezőbe kerül, és minden csomópont megkapja a hatályos provider azonosítót.
+ *
+ * MIÉRT SZÁRMAZTATOTT, ÉS NEM SAJÁT LISTA. Az él AZONOSÍTÓK így mindkét
+ * nézetben azonosak, tehát a bizonyíték manifeszt egyetlen `fixtureEdgeIds`
+ * listát tud minden képre megkövetelni. Egy második, saját éllistát hordozó
+ * fixtúra pontosan azt a rést nyitná újra, ami a háromszori hibát okozta: egy
+ * éltelenné csonkult második fixtúrán a pixel mérésnek nem lenne mit mérnie,
+ * és a hiányt semmi nem jelezné.
+ */
+export const SHOWCASE_RUN_SNAPSHOT: RunSnapshotResponse = {
+  version: 1,
+  sdkVersionPin: SHOWCASE_SDK_VERSION_PIN,
+  workflow: { id: SHOWCASE_WORKFLOW.id, name: SHOWCASE_WORKFLOW.name, description: SHOWCASE_WORKFLOW.description },
+  nodes: SHOWCASE_GRAPH.nodes.map((node) => ({
+    id: node.id,
+    type: node.type,
+    label: node.label,
+    position: { x: node.positionX, y: node.positionY },
+    config: node.config,
+    effectiveProviderId: SHOWCASE_PROVIDER_ID,
+  })),
+  edges: SHOWCASE_GRAPH.edges.map((edge) => ({
+    id: edge.id,
+    sourceNodeId: edge.sourceNodeId,
+    targetNodeId: edge.targetNodeId,
+    sourceHandle: edge.sourceHandle,
+    targetHandle: edge.targetHandle,
+    branchKey: edge.branchKey,
+  })),
+};
+
+const SHOWCASE_RUN_DETAIL: RunDetail = {
+  id: SHOWCASE_RUN_ID,
+  workflowId: SHOWCASE_WORKFLOW.id,
+  status: 'running',
+  input: null,
+  providerId: SHOWCASE_PROVIDER_ID,
+  rootRunId: SHOWCASE_RUN_ID,
+  depth: 0,
+  workflowAncestry: [SHOWCASE_WORKFLOW.id],
+  graphSnapshotHash: 'a'.repeat(64),
+  persistedStreamDeltas: false,
+  restartedFromRunId: null,
+  createdAtMs: 1,
+  startedAtMs: 2,
+  finishedAtMs: null,
+  errorKind: null,
+  errorMessage: null,
+};
+
+const SHOWCASE_BASE_STEP_RUN: StepRunRecord = {
+  id: 'sr-start',
+  runId: SHOWCASE_RUN_ID,
+  nodeId: 'n-start',
+  nodeType: 'start',
+  parentStepRunId: null,
+  iteration: 0,
+  attempt: 1,
+  status: 'succeeded',
+  providerId: SHOWCASE_PROVIDER_ID,
+  modelId: null,
+  sessionMode: null,
+  sdkSessionId: null,
+  resumedFromSessionId: null,
+  forkedSession: false,
+  structuredOutputStrategy: null,
+  output: null,
+  resultSubtype: null,
+  numTurns: null,
+  inputTokens: null,
+  outputTokens: null,
+  cacheReadInputTokens: null,
+  cacheCreationInputTokens: null,
+  subWorkflowRunId: null,
+  errorKind: null,
+  errorMessage: null,
+  startedAtMs: 2,
+  finishedAtMs: 3,
+  createdAtMs: 2,
+};
+
+/**
+ * A bemutató futás lépés futásai. Minden sor a pillanatkép egy LÉTEZŐ
+ * csomópontjára hivatkozik, tehát a "rajzon nem szereplő lépés futások" lista
+ * nem jelenik meg, és a képernyőképen a rajz marad a főszereplő. A statuszok
+ * szándékosan eltérők, hogy a kártyák jelvényei ne egyetlen állapotot
+ * mutassanak; a `join` csomópontnak nincs sora, mert a futás még nem ért el
+ * odáig, és a "még nem futott" kártya is a valós felület része.
+ */
+export const SHOWCASE_RUN_STEP_RUNS: readonly StepRunRecord[] = [
+  SHOWCASE_BASE_STEP_RUN,
+  { ...SHOWCASE_BASE_STEP_RUN, id: 'sr-branch', nodeId: 'n-branch', nodeType: 'branch' },
+  {
+    ...SHOWCASE_BASE_STEP_RUN,
+    id: 'sr-fanout',
+    nodeId: 'n-fanout',
+    nodeType: 'fan_out',
+    output: ['egy', 'ketto', 'harom'],
+  },
+  {
+    ...SHOWCASE_BASE_STEP_RUN,
+    id: 'sr-agent',
+    nodeId: 'n-agent',
+    nodeType: 'agent_step',
+    status: 'running',
+    finishedAtMs: null,
+  },
+  { ...SHOWCASE_BASE_STEP_RUN, id: 'sr-script', nodeId: 'n-script', nodeType: 'script' },
+  {
+    ...SHOWCASE_BASE_STEP_RUN,
+    id: 'sr-approval',
+    nodeId: 'n-approval',
+    nodeType: 'human_approval',
+    status: 'waiting_approval',
+    finishedAtMs: null,
+  },
+  {
+    ...SHOWCASE_BASE_STEP_RUN,
+    id: 'sr-loop',
+    nodeId: 'n-loop',
+    nodeType: 'loop',
+    status: 'running',
+    iteration: 2,
+    finishedAtMs: null,
+  },
+];
 
 /* eslint-enable unicorn/no-null */
 
 export const SHOWCASE_EDITOR_URL = `/editor?workflowId=${SHOWCASE_WORKFLOW.id}`;
+
+export const SHOWCASE_RUN_URL = `/run?runId=${SHOWCASE_RUN_ID}`;
 
 /**
  * A kiválasztott csomópont a beállítás panelt nyitó képernyőképeken. Az
@@ -370,23 +519,56 @@ export async function installShowcaseMocks(page: Page): Promise<void> {
 }
 
 /**
- * A szerkesztő megnyitása, majd várakozás arra, hogy MINDEN csomópont
- * látható és MINDEN él a DOM-ban legyen. Állapot alapú várakozás, nincs
- * időzítő (`.claude/CLAUDE.md` 11. szekció).
+ * Ugyanez a FUTÁS nézet három végpontjára (`getRun`, `readRunSnapshot`,
+ * `listStepRuns`), a származtatott pillanatképpel. A `readSettings` azért
+ * szerepel, mert a topnav shell is kérdezi: a hiányzó mock az
+ * `installApiMocks` szerint 404-et adna, ami hibaüzenetet tenne a
+ * képernyőképre.
+ */
+export async function installShowcaseRunMocks(page: Page): Promise<void> {
+  await mockIdleStream(page);
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_DETAIL))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_STEP_RUNS))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SHOWCASE_SETTINGS))),
+  ]);
+}
+
+/**
+ * Várakozás arra, hogy MINDEN csomópont látható és MINDEN él a DOM-ban legyen.
+ * Állapot alapú várakozás, nincs időzítő (`.claude/CLAUDE.md` 11. szekció).
  *
  * Az élekre `toBeAttached` és nem `toBeVisible` jár: a Playwright láthatóság
  * definíciója nem üres befoglaló dobozt kíván, egy vízszintes él doboza
  * viszont 0 magas (mérve 2026-09-05). A vonal tényleges láthatóságát a
  * pixel mérés állítja (`edge-paint-measurement.ts`), nem ez.
  */
-export async function openShowcaseEditor(page: Page): Promise<void> {
-  await page.goto(SHOWCASE_EDITOR_URL);
+async function waitForShowcaseGraph(page: Page): Promise<void> {
   for (const node of SHOWCASE_GRAPH.nodes) {
     await expect(page.getByTestId(`rf__node-${node.id}`)).toBeVisible();
   }
   for (const edge of SHOWCASE_GRAPH.edges) {
     await expect(page.getByTestId(`rf__edge-${edge.id}`)).toBeAttached();
   }
+}
+
+/**
+ * A szerkesztő megnyitása, majd várakozás a teljes gráf kirajzolására.
+ */
+export async function openShowcaseEditor(page: Page): Promise<void> {
+  await page.goto(SHOWCASE_EDITOR_URL);
+  await waitForShowcaseGraph(page);
+}
+
+/**
+ * A futás nézet megnyitása, majd várakozás a teljes gráf kirajzolására. A rajz
+ * ugyanabból a gráfból épül, mint a szerkesztőé, tehát ugyanazt a csomópont és
+ * él készletet kell megvárni.
+ */
+export async function openShowcaseRunView(page: Page): Promise<void> {
+  await page.goto(SHOWCASE_RUN_URL);
+  await waitForShowcaseGraph(page);
 }
 
 /**
