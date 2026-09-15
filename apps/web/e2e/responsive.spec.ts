@@ -14,8 +14,11 @@
 // egy `devices['Pixel 7']` preseten futó, valódi mobil emulációs teszt
 // fedi le, nem csak a `setViewportSize`-os asztali szimuláció.
 import type {
+  RunDetail,
+  RunSnapshotResponse,
   RunSummary,
   SettingsRecord,
+  StepRunRecord,
   WorkflowDetail,
   WorkflowGraphDocument,
   WorkflowSummary,
@@ -82,9 +85,84 @@ const EDITOR_WORKFLOW: WorkflowDetail = {
 
 const EDITOR_SETTINGS: SettingsRecord = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
 
+// A futás nézet fixture-jei (2026-09-15, T-009-22): a rajz és a transcript
+// panel a --ep-screen-lg fölött egy nem törő flex sor, a --ep-screen-md alatt
+// pedig fülekre esik. Egyik sáv sem okozhat vízszintes túllógást, ezt a lenti,
+// minden támogatott szélességen futó teszt őrzi.
+const RUN_DETAIL: RunDetail = {
+  id: 'run-resp',
+  workflowId: 'w-alfa',
+  status: 'running',
+  input: null,
+  providerId: 'claude-subscription',
+  rootRunId: 'run-resp',
+  depth: 0,
+  workflowAncestry: ['w-alfa'],
+  graphSnapshotHash: 'c'.repeat(64),
+  persistedStreamDeltas: false,
+  restartedFromRunId: null,
+  createdAtMs: 1,
+  startedAtMs: 2,
+  finishedAtMs: null,
+  errorKind: null,
+  errorMessage: null,
+};
+
+const RUN_SNAPSHOT: RunSnapshotResponse = {
+  version: 1,
+  sdkVersionPin: '0.1.13',
+  workflow: { id: 'w-alfa', name: 'Alfa workflow', description: null },
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Ügyfél kérés fogadása',
+      position: { x: 0, y: 0 },
+      config: { type: 'start', inputFields: [], onUnhandledError: null },
+      effectiveProviderId: 'claude-subscription',
+    },
+  ],
+  edges: [],
+};
+
+const RUN_STEP_RUNS: readonly StepRunRecord[] = [
+  {
+    id: 'sr-resp',
+    runId: 'run-resp',
+    nodeId: 'n1',
+    nodeType: 'start',
+    parentStepRunId: null,
+    iteration: 0,
+    attempt: 1,
+    status: 'succeeded',
+    providerId: 'claude-subscription',
+    modelId: null,
+    sessionMode: null,
+    sdkSessionId: null,
+    resumedFromSessionId: null,
+    forkedSession: false,
+    structuredOutputStrategy: null,
+    output: null,
+    resultSubtype: null,
+    numTurns: null,
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadInputTokens: null,
+    cacheCreationInputTokens: null,
+    subWorkflowRunId: null,
+    errorKind: null,
+    errorMessage: null,
+    startedAtMs: 2,
+    finishedAtMs: 3,
+    createdAtMs: 2,
+  },
+];
+
 /* eslint-enable unicorn/no-null */
 
 const EDITOR_URL = '/editor?workflowId=w-alfa';
+
+const RUN_VIEW_URL = '/run?runId=run-resp';
 
 test.beforeEach(async ({ page }) => {
   await mockIdleStream(page);
@@ -97,6 +175,9 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(EDITOR_GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(EDITOR_WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(EDITOR_SETTINGS))),
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(RUN_STEP_RUNS))),
   ]);
 });
 
@@ -266,6 +347,20 @@ test('a gráf szerkesztő egyetlen támogatott viewport szélességen sem lóg t
       // A csomópont LÁTHATÓSÁGÁRA vár, nem csak a csatoltságára: a
       // `visibility: hidden` regresszió (lásd graph-editor.spec.ts) minden
       // szélességen elbuktatná ezt a tesztet is.
+      await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+      await expect
+        .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
+        .toBe(0);
+    });
+  }
+});
+
+test('a futás nézet egyetlen támogatott viewport szélességen sem lóg túl vízszintesen', async ({ page }) => {
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(RUN_VIEW_URL);
       await expect(page.getByTestId('rf__node-n1')).toBeVisible();
 
       await expect

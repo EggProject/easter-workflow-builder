@@ -8,7 +8,7 @@ import {
   type StepRunRecord,
 } from '@easter-workflow-builder/protocol';
 import { Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
-import { useCallback, useEffect, type MouseEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import type { RequestState } from '../request-state/request-state.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -19,6 +19,9 @@ import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
 import { buildRunGraphNodes } from '../run-graph/build-run-graph-nodes.ts';
 import { mergeSnapshotStepRuns } from '../run-graph/merge-snapshot-step-runs.ts';
 import { projectSnapshotGraph } from '../run-graph/project-snapshot-graph.ts';
+import { RunViewLayout } from './RunViewLayout.tsx';
+import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
+import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
 import './run-view.css';
 
 export interface RunViewScreenProperties {
@@ -117,14 +120,31 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
 }
 
 /**
- * Az élő futás nézet képernyője (SPEC-008 6. szekció, T-009-20). Három
- * végpontból épül: a futás rekordja (`GET /api/runs/{runId}`) adja az
- * al-workflow hierarchiát, a pillanatkép (`GET /api/runs/{runId}/snapshot`) a
- * rajzot, a lépés futások (`GET /api/runs/{runId}/steps`) pedig a dekorációt.
+ * A transcript panel helye az osztott elrendezésben. A panel TARTALMA a
+ * PLAN-009 T-009-25 hatóköre (virtualizált lista, automatikus görgetés); ez a
+ * lépés az elrendezést állítja fel, tehát a panel egy kimondott, mindig
+ * kirajzolódó felirattal áll itt. Elágazás nincs benne: egy "ha még nincs
+ * transcript" ág garantáltan mindig ugyanarra futna, ami tiltott halott ág
+ * lenne (`.claude/CLAUDE.md` 5. szekció).
+ */
+function TranscriptPlaceholder(): ReactElement {
+  return <p className="run-view-screen__transcript-note">A futás eseményei itt jelennek meg.</p>;
+}
+
+/**
+ * Az élő futás nézet képernyője (SPEC-008 6. szekció, 10., T-009-20,
+ * T-009-22). Három végpontból épül: a futás rekordja (`GET /api/runs/{runId}`)
+ * adja az al-workflow hierarchiát, a pillanatkép
+ * (`GET /api/runs/{runId}/snapshot`) a rajzot, a lépés futások
+ * (`GET /api/runs/{runId}/steps`) pedig a dekorációt.
  *
- * Az osztott elrendezés, a három reszponzív sáv és a futás vezérlése a
- * PLAN-009 T-009-22 és T-009-23 lépésének hatóköre; ez a lépés a rajzot és a
- * fejlécet állítja fel.
+ * A rajz és a transcript panel a `RunViewLayout` osztott elrendezésében áll,
+ * a `useRunViewLayoutBand` hook által kiválasztott reszponzív sáv szerint. Az
+ * arány a `localStorage`-be mentődik, és a következő megnyitáskor visszatölt,
+ * a gráf szerkesztő már bevált mintája szerint (`run-view-layout.ts`).
+ *
+ * A futás vezérlése (indítás, megszakítás, újraindítás) a PLAN-009 T-009-23
+ * lépésének hatóköre.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
   const { apiOrigin, fetchFunction, search, navigate } = properties;
@@ -133,6 +153,14 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const stepRunsState = useRequestState<readonly StepRunRecord[]>();
+  const layoutBand = useRunViewLayoutBand();
+  // A perzisztált arány EGYSZER, csatoláskor olvasódik be (lusta `useState`
+  // kezdőérték), ugyanabból az okból, mint a gráf szerkesztőben: a
+  // `Resizable` a `defaultSizes` propot szintén csak a saját kezdő
+  // állapotához használja, tehát a későbbi olvasások amúgy sem hatnának. Az
+  // írás a `storeRunViewLayoutSizes` modul szintű függvényén megy, aminek a
+  // hivatkozása stabil, tehát a `Resizable` értesítő hatása nem futhat körbe.
+  const [initialLayoutSizes] = useState<readonly number[]>(readStoredRunViewLayoutSizes);
 
   // Az al-workflow futás megnyitása UGYANERRE a képernyőre navigál, másik
   // `?runId=` paraméterrel (SPEC-008 6.3, AC24).
@@ -222,7 +250,15 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   return (
     <div className="run-view-screen">
       <RunViewHeader snapshot={snapshot} runDetail={runState.state.value} navigate={navigate} />
-      <RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />
+      <div className="run-view-screen__body">
+        <RunViewLayout
+          band={layoutBand}
+          graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
+          transcript={<TranscriptPlaceholder />}
+          defaultSizes={initialLayoutSizes}
+          onSizesChange={storeRunViewLayoutSizes}
+        />
+      </div>
       {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}
     </div>
   );

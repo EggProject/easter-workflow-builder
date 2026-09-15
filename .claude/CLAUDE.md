@@ -580,6 +580,21 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   rendelkezésre álló területet "faltól falig" tölti ki. A kiterjesztés: a layoutnak minden
   támogatott viewport méreten reszponzívnak kell lennie, nem csak egyetlen, fix asztali
   szélességen.
+- **A teljes területű munkafelületen az `.app-content` belső margója nulla.** Ma két ilyen
+  screen van, a gráf szerkesztő és a futás nézet; mindkettőnek önálló, `:has(> .<screen>)`
+  szabálya van a `topnav-shell.css` fájlban, és mindkettőn a screen nem-vászon elemei kapják
+  meg a `--ep-layout-gutter` oldalsó térközt. A próba, ami eldönti, jár-e egy screennek: a
+  tartalma `flex: 1`-gyel tölti-e ki az `.app-content` tartalom dobozát (ilyenkor a 80px alsó
+  padding üres sávot hagy alatta), vagy hosszú, görgetett lista (ilyenkor a padding a szánt
+  légtér) (SPEC-008 10., T-009-22).
+- **A töréspont literál akkor is token érték, ha JS-ben áll.** A
+  `media-query-breakpoint-invariant` teszt kizárólag CSS fájlokat vizsgál, van viszont olyan
+  reszponzív váltás, amit CSS-sel nem lehet megoldani: ha a két sáv DOM szerkezete vagy ARIA
+  szemantikája más (`Tabs` kontra `Resizable`, illetve az elválasztó `aria-orientation`
+  értéke), akkor a váltás `matchMedia` bekötésen megy. Ilyenkor a query literálhoz **saját
+  regressziós teszt kell**, ami magából a `design-token/breakpoints.css` fájlból olvasott
+  token értékkel hasonlítja össze; kitalált szám JS-ben sem állhat. Precedens:
+  `apps/web/src/run-view/run-view-layout-band.spec.ts` (SPEC-008 10., T-009-22).
 - **Csak létező design system elem használható.** Ami a `eggproject-design*` skillekben nincs
   meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
   emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunGraphCanvasProperties } from '../run-graph/RunGraphCanvas.tsx';
 import { RunViewScreen } from './RunViewScreen.tsx';
+import { RUN_VIEW_LAYOUT_STORAGE_KEY } from './run-view-layout.ts';
 
 /**
  * A `RunGraphCanvas` mockolva: ez a spec a `RunViewScreen` SAJÁT felelősségét
@@ -139,6 +140,7 @@ describe('RunViewScreen', () => {
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
     navigate.mockClear();
+    globalThis.localStorage.clear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -278,6 +280,28 @@ describe('RunViewScreen', () => {
 
     decoration.onOpenSubWorkflowRun('r-9');
     expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-9');
+  });
+
+  it('a rajz és a transcript panel az osztott elrendezésben áll, húzható elválasztóval', async () => {
+    // A happy-dom `innerWidth` alapértéke 1024, ami a --ep-screen-lg token
+    // értéke, tehát a hook a vízszintes sávot választja: ez a képernyő
+    // ALAPESETE. A három sáv elrendezését a `RunViewLayout.spec.tsx`, a sáv
+    // választást a `use-run-view-layout-band.spec.tsx` fedi.
+    await renderScreen('?runId=r-3', createFetchFunction());
+
+    const body = container.querySelector('.run-view-screen__body');
+    expect(body?.querySelector('.resizable-group')).not.toBeNull();
+    expect(container.querySelector('.run-view-screen__graph')).not.toBeNull();
+    expect(container.querySelector('.run-view-screen__transcript-note')?.textContent).toContain('futás eseményei');
+    expect(container.querySelector('[role="separator"]')?.getAttribute('aria-orientation')).toBe('vertical');
+  });
+
+  it('a tárolt elrendezés arányt betölti, és a Resizable kezdő értesítését visszaírja', async () => {
+    globalThis.localStorage.setItem(RUN_VIEW_LAYOUT_STORAGE_KEY, JSON.stringify([40, 60]));
+    await renderScreen('?runId=r-3', createFetchFunction());
+
+    expect(container.querySelector('[role="separator"]')?.getAttribute('aria-valuenow')).toBe('40');
+    expect(globalThis.localStorage.getItem(RUN_VIEW_LAYOUT_STORAGE_KEY)).toBe('[40,60]');
   });
 
   it('érvénytelen pillanatkép alakra a hibás mező útvonalát mutatja, rajz nélkül', async () => {

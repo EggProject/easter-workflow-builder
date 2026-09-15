@@ -722,3 +722,49 @@ szekció módszere szerint.
 a nyers adaton egyetlen századdal magasabb küszöbbel (98.64 / 97.49 / 99.25 / 98.58) mind a négy
 metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel **exit 1**, tehát a
 kapu a mért érték mellett tényleg a határon áll, nem tartalékkal.
+
+---
+
+## 17. A futás nézet osztott elrendezése utáni ratchet (2026-09-15): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-22 lépése (a `run-view` téma osztott elrendezése, a három reszponzív sáv, a
+`localStorage`-ba perzisztált arány) öt új termékkód fájlt hozott az `apps/web/src/run-view`
+mappába, és kilenc új Playwright tesztet (`run-view.spec.ts` hét, `responsive.spec.ts` egy
+viewport hurok, plusz a letiltott tárolás ága).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e`, **167
+Playwright teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (16. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1125 / 1140     | **98.68** | 1084 / 1099 = 98.63 | 15 -> **15**                   |
+| branches   | 433 / 444       | **97.52** | 427 / 438 = 97.48   | 11 -> **11**                   |
+| functions  | 405 / 408       | **99.26** | 395 / 398 = 99.24   | 3 -> **3**                     |
+| lines      | 1082 / 1097     | **98.63** | 1041 / 1056 = 98.57 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A fedetlen darabszám mind a négy metrikán VÁLTOZATLAN, a nevező
+viszont nőtt (statements 1099 -> 1140, branches 438 -> 444, functions 398 -> 408, lines
+1056 -> 1097), tehát a százalék emelkedett. A küszöb a `.claude/CLAUDE.md` 8. szekció "a küszöb
+pontosan a mért érték" szabálya szerint a négy mért számra húzva, felfelé kerekítés nélkül. A 16. szekció hatos fedetlen listája szó szerint érvényben marad, új sor nem került rá.
+
+**Az öt új fájl mind 100 százalék mind a négy metrikán** (`nyc` per fájl riport):
+`RunViewLayout.tsx`, `run-view-layout-band.ts`, `run-view-layout.ts`,
+`use-run-view-layout-band.ts` és a módosított `RunViewScreen.tsx`.
+
+**Két tétel igényelt célzott e2e tesztet, különben új fedetlen sor keletkezett volna:**
+
+| Hely                                          | Miért nem fedte a meglévő teszt                                                                                       | Mi fedi le most                                                                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `run-view-layout.ts` `catch` ága (readStored) | a `localStorage` dobó viselkedését a Playwright kívülről nem tudja beállítani, egy friss böngésző kontextus sosem dob | `addInitScript`, ami KIZÁRÓLAG a futás nézet kulcsára cseréli a `localStorage.getItem` metódust dobóra (a többi kulcs változatlan) |
+| a hibás alakú tárolt érték visszaesési ága    | egy friss kontextusban nincs tárolt érték, tehát a `JSON.parse` és a typeguard sor sem futott                         | két teszt, `addInitScript`-tel beültetett érvényes, illetve rossz alakú tárolt aránnyal                                            |
+
+**Az `addInitScript` és nem `evaluate`:** a `localStorage` olvasása a komponens csatolásakor, az
+első renderen történik, tehát egy betöltés utáni írás már nem hatna. Ugyanebből következik, hogy
+tesztenként EGY beültetés áll: az `addInitScript` minden navigációra újra lefut, tehát egy
+`reload` visszaírná a beültetett értéket (ez elsőre mért hibát adott: a "hibás érték" ág a reload
+után a beültetett ÉRVÉNYES arányt látta).
+
+**Az igazolás:** a beállított, mért küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon
+a nyers adaton egyetlen századdal magasabb küszöbbel (98.69 / 97.53 / 99.27 / 98.64) mind a négy
+metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel bukik, tehát a kapu a
+mért érték mellett a határon áll, nem tartalékkal.
