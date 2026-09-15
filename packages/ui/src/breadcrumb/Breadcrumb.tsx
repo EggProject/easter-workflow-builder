@@ -27,7 +27,30 @@ export interface BreadcrumbProperties {
    * jelölésű, nem interaktív elem.
    */
   readonly current: string;
+  /**
+   * A morzsamenü hozzáférhető neve. Elhagyva a `DEFAULT_BREADCRUMB_LABEL`
+   * áll, tehát a meglévő hívók viselkedése nem változik.
+   *
+   * **Miért kell egyáltalán kivezetni.** A W3C APG landmark mintája szó
+   * szerint kimondja: "If a page includes more than one `navigation`
+   * landmark, each should have a unique label"
+   * (https://www.w3.org/WAI/ARIA/apg/patterns/landmarks/examples/navigation.html),
+   * és ugyanezt írja elő az ARIA11 WCAG technika is
+   * (https://w3c.github.io/wcag/techniques/aria/ARIA11). Az `apps/web` futás
+   * nézetén két morzsasor áll egyszerre: az útvonal morzsája a topnav alatt,
+   * és az al-workflow hierarchia morzsája a képernyő fejlécében (SPEC-008
+   * 6.3), tehát fix, azonos név mellett a kettő megkülönböztethetetlen
+   * lenne. A forrás komponens `aria-label` értéke kötött ("Breadcrumb"),
+   * ezért ez dokumentált, szándékos eltérés a forrástól, ugyanúgy, mint az
+   * `<ol>`/`<li>` szemantika kiegészítése.
+   */
+  readonly label?: string;
 }
+
+/**
+ * A morzsamenü alapértelmezett hozzáférhető neve.
+ */
+const DEFAULT_BREADCRUMB_LABEL = 'Morzsamenü';
 
 /**
  * A design system kész `breadcrumb` komponensének átemelt, TypeScript+TSX
@@ -55,10 +78,10 @@ export interface BreadcrumbProperties {
  * kizárás nélküli ág lefedettség).
  */
 export function Breadcrumb(properties: Readonly<BreadcrumbProperties>): ReactElement {
-  const { ancestors = [], current } = properties;
+  const { ancestors = [], current, label = DEFAULT_BREADCRUMB_LABEL } = properties;
 
   return (
-    <nav className="breadcrumb" aria-label="Morzsamenü">
+    <nav className="breadcrumb" aria-label={label}>
       <ol className="breadcrumb__list">
         {ancestors.map((ancestor) => (
           <li className="breadcrumb__listItem" key={ancestor.href}>

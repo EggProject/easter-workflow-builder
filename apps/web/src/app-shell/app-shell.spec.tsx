@@ -148,7 +148,7 @@ describe('AppShell', () => {
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
   });
 
-  it('a "/run" útvonalon a futás nézet helyőrzőjét rajzolja, "Futás nézet" morzsamenüvel', async () => {
+  it('a "/run" útvonalon a RunViewScreen tartalmát rajzolja, "Futás nézet" morzsamenüvel', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/run');
     render();
@@ -156,7 +156,9 @@ describe('AppShell', () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain('Futás nézet (folyamatban).');
+    // Nincs `?runId=` a query stringben, tehát a `RunViewScreen` a hiányzó
+    // azonosító üzenetét mutatja, kérés nélkül (SPEC-008 5. szekció).
+    expect(container.textContent).toContain('Nincs megadva megtekintendő futás');
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Futás nézet');
   });
 

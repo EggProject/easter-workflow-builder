@@ -82,13 +82,16 @@ test('a böngésző vissza gombja (popstate) visszaállítja az előző útvonal
   expect(new URL(page.url()).pathname).toBe('/');
 });
 
-test('a "/run" útvonalon a futás nézet helyőrzője jelenik meg, "Futás nézet" morzsamenüvel', async ({ page }) => {
-  // A `runView` ág (SPEC-008 T-009-20 ... T-009-27 helyőrzője) a
-  // `renderRouteContent` switch ötödik ága; a `resolveBreadcrumbCurrent`
+test('a "/run" útvonalon a futás nézet a hiányzó runId paramétert nevezi meg, "Futás nézet" morzsamenüvel', async ({
+  page,
+}) => {
+  // A `runView` ág a `renderRouteContent` switch ötödik ága, ami a T-009-20
+  // óta a valódi `RunViewScreen`-t rendereli; a `resolveBreadcrumbCurrent`
   // pedig a topnav alatti morzsamenü aktuális elemét adja (2026-09-06, a
-  // nagy oldalcím felváltása).
+  // nagy oldalcím felváltása). `?runId=` nélkül a képernyő a hiányzó
+  // paramétert nevezi meg, kérés nélkül (SPEC-008 5. szekció).
   await page.goto('/run');
 
   await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Futás nézet')).toBeVisible();
-  await expect(page.getByText('Futás nézet (folyamatban).')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Nincs megadva megtekintendő futás');
 });

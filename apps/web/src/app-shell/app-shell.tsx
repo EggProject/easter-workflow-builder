@@ -13,6 +13,7 @@ import { browserHistoryLocationPort } from '../history-navigation/browser-histor
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
 import { RunHistoryScreen } from '../run-history/run-history-screen.tsx';
+import { RunViewScreen } from '../run-view/RunViewScreen.tsx';
 import { browserEventSourceFactory } from '../stream-client/browser-event-source-factory.ts';
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
 import { useStreamConnection, type StreamConnectionPhase } from '../stream-client/use-stream-connection.ts';
@@ -247,9 +248,7 @@ function renderRouteContent(
       return <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} />;
     }
     case 'runView': {
-      // A tényleges futás nézet a T-009-20 ... T-009-27 lépések tárgya
-      // (SPEC-008 F4 ... F6 fázis), ugyanazon okból helyőrző.
-      return <p>Futás nézet (folyamatban).</p>;
+      return <RunViewScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />;
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

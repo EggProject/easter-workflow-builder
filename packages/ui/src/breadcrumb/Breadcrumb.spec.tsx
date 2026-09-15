@@ -86,4 +86,12 @@ describe('Breadcrumb', () => {
     expect(links.map((link) => link.getAttribute('href'))).toEqual(['/elso', '/masodik']);
     expect(renderedNav().querySelectorAll('.breadcrumb__separator')).toHaveLength(2);
   });
+
+  it('a label prop felülírja a hozzáférhető nevet (két morzsasor egy lapon, W3C APG landmark minta)', () => {
+    act(() => {
+      root.render(<Breadcrumb current="Gyökér workflow" label="Al-workflow útvonal" />);
+    });
+
+    expect(renderedNav().getAttribute('aria-label')).toBe('Al-workflow útvonal');
+  });
 });

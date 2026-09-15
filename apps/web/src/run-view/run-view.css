@@ -1,0 +1,38 @@
+/* Az élő futás nézet elrendezése (SPEC-008 6. szekció, T-009-20).
+
+   A képernyő az `.app-content` maradék magasságát tölti ki (`flex: 1`),
+   ugyanúgy, mint a gráf szerkesztő: a vászon belül pásztáz, és az OLDAL nem
+   görget. A `min-height: 0` minden szinten kötelező, különben a flex elem
+   alapértelmezett `min-height: auto` értéke a tartalom magasságára feszítené
+   a dobozt, és a belső `overflow` sosem lépne életbe.
+
+   Az osztott elrendezés, a három reszponzív sáv és a vezérlő gombok a
+   PLAN-009 T-009-22 és T-009-23 lépésének hatóköre, ezért ebben a fájlban
+   MÉG nincs media query. */
+.run-view-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: var(--ep-space-3);
+}
+
+.run-view-screen__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+}
+
+/* A kimondott figyelmeztetés, hogy a rajz pillanatkép (AC20). Nem hibaüzenet,
+   tehát a halványabb, másodlagos szövegszín jár neki. */
+.run-view-screen__snapshot-note {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+.run-view-screen__loading {
+  flex: 1;
+  min-height: 0;
+  padding: var(--ep-space-6) 0;
+}
