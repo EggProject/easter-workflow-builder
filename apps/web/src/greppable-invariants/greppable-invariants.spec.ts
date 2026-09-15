@@ -1,4 +1,4 @@
-// Tizenkét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Tizenöt, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -182,6 +182,30 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       const codeOnly = stripCommentLines(file.content);
       return forbiddenOptionNames.some((optionName) => codeOnly.includes(optionName));
     });
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(15) egyetlen ág sem függ mért csomópont geometriától (nincs `measured.` olvasás és `getBoundingClientRect(` hívás)', () => {
+    // A PLAN-009 T-009-15 elfogadási kritériuma szó szerint ezt a két mintát
+    // kéri, és a SPEC-008 12.2 szabálya áll mögötte: a mért csomópont méret
+    // KIZÁRÓLAG a React Flow saját `dimensions` változásából jut a nézeti
+    // állapotba (`graph-editor/measured-node-sizes.ts`), tehát a termékkód sem
+    // a `measured` tulajdonságot nem olvassa, sem a DOM-tól nem kér
+    // geometriát. Enélkül a mérettől függő ágak csak valós böngészőben
+    // lennének tesztelhetők, a happy-dom unit tesztek pedig nulla node méretet
+    // látnak (M-53, M-54).
+    //
+    // A pont (`measured.`) a tulajdonság OLVASÁSÁT fogja meg. A mező ÍRÁSA
+    // (`measured: size`) szándékosan nem tiltott: az a `withMeasuredNodeSize`
+    // egyetlen szentesített útja, amin a méret visszakerül a könyvtárhoz.
+    //
+    // A doksi sorok kiszűrve, ugyanazzal a `stripCommentLines`
+    // segédfüggvénnyel és ugyanabból az okból, mint a (4), a (7) és a (14)
+    // ellenőrzésnél: mindkét minta ma pontosan azokban a magyarázó
+    // kommentekben szerepel, amik kimondják, hogy nincs ilyen hivatkozás
+    // (`GraphNodeCard.tsx`, `RunGraphCanvas.tsx`).
+    const measuredGeometryPattern = /measured\.|getBoundingClientRect\(/;
+    const offenders = PRODUCT_FILES.filter((file) => measuredGeometryPattern.test(stripCommentLines(file.content)));
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 });
