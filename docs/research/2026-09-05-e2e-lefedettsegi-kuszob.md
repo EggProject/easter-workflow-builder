@@ -768,3 +768,62 @@ után a beültetett ÉRVÉNYES arányt látta).
 a nyers adaton egyetlen századdal magasabb küszöbbel (98.69 / 97.53 / 99.27 / 98.64) mind a négy
 metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel bukik, tehát a kapu a
 mért érték mellett a határon áll, nem tartalékkal.
+
+---
+
+## 18. A futás vezérlése utáni ratchet (2026-09-16): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-23 lépése (a `run-control` téma: indítás modális a `start` csomópont
+`inputFields` listájából, megszakítás, újraindítás, a futás hibaállapota) öt új termékkód fájlt
+hozott az `apps/web/src/run-control` mappába, egy hatodikat az `apps/web/src/run-view` mappába
+(`is-run-finished-frame.ts`), és tizennégy új Playwright tesztet (`run-control.spec.ts`
+tizenhárom, plusz egy a `sse-real-server.spec.ts` fájlban).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e`, **182
+Playwright teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (17. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1214 / 1229     | **98.77** | 1125 / 1140 = 98.68 | 15 -> **15**                   |
+| branches   | 488 / 499       | **97.79** | 433 / 444 = 97.52   | 11 -> **11**                   |
+| functions  | 433 / 436       | **99.31** | 405 / 408 = 99.26   | 3 -> **3**                     |
+| lines      | 1168 / 1183     | **98.73** | 1082 / 1097 = 98.63 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A fedetlen darabszám mind a négy metrikán VÁLTOZATLAN, a nevező
+viszont nőtt (statements 1140 -> 1229, branches 444 -> 499, functions 408 -> 436, lines
+1097 -> 1183), tehát a százalék emelkedett. A küszöb a `.claude/CLAUDE.md` 8. szekció "a küszöb
+pontosan a mért érték" szabálya szerint a négy mért számra húzva, felfelé kerekítés nélkül. A 16.
+szekció hatos fedetlen listája szó szerint érvényben marad, új sor nem került rá.
+
+**A hat új fájl mind 100 százalék mind a négy metrikán** (`nyc` per fájl riport):
+`RunControlBar.tsx`, `StartRunModal.tsx`, `read-start-input-fields.ts`,
+`run-control-availability.ts`, `start-run-values.ts` és
+`run-view/is-run-finished-frame.ts`; a módosított `GraphEditorScreen.tsx` és `RunViewScreen.tsx`
+szintén.
+
+**Négy tétel igényelt célzott e2e tesztet, különben új fedetlen ág keletkezett volna:**
+
+| Hely                                                            | Miért nem fedte a meglévő teszt                                          | Mi fedi le most                                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `RunControlBar.tsx` megszakítás hibaága                         | a boldog út mockja mindig 200-at ad                                      | `failingAction: 'interrupt'`, 409-es `conflict` válasz                        |
+| `RunControlBar.tsx` újraindítás hibaága                         | mint fent                                                                | `failingAction: 'restart'`, 409-es `conflict` válasz                          |
+| `StartRunModal.tsx` `errorMessage` ága                          | a modálissal indított futás mockja mindig sikeres volt                   | modálison indított futás 409-es válasszal, a modális nyitva marad             |
+| `GraphEditorScreen.tsx` lábléc indítás hibaága (modális NÉLKÜL) | üres `inputFields` esetén nincs modális, tehát az üzenet a láblécben áll | üres `inputFields` plusz 409-es `startRun` válasz, a lábléc `role="alert"`-je |
+
+**Két ág MEGSZŰNT, nem tesztet kapott** (a szabálykönyv 5. szekciója szerint tilos olyan ágat
+bevezetni, ami garantáltan sosem fut):
+
+1. `isRunRestartable` **törölve**: a `RunControlBar` egyetlen ternáriában dönt a két gomb között
+   az `isRunInterruptible` tagadásával, tehát a burkoló függvénynek nem volt termékkód hívója.
+2. A `start-run-values.ts` két `values[field.name] ?? ''` fallbackja **megszűnt**: mindkét
+   függvény a szerkesztett értékek rekordját járja be (`Object.entries`), és a mezőlistát csak a
+   kötelezőség eldöntésére használja. A rekord kulcsai a mezőlistából származnak
+   (`buildInitialStartRunValues`), tehát a "hiányzó kulcsú mező" ág a gyakorlatban sosem futott
+   volna le; a hiányzó bemenet végső ellenőrzése a motoré (`missing_required_input`,
+   SPEC-004 4.8).
+
+**Az igazolás:** a beállított, mért küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon
+a nyers adaton egyetlen századdal magasabb küszöbbel (98.78 / 97.80 / 99.32 / 98.74) mind a négy
+metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel bukik (saját, most
+futtatott kontroll mérés: négy `ERROR` sor), tehát a kapu a mért érték mellett a határon áll, nem
+tartalékkal.

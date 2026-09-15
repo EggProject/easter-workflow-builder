@@ -266,6 +266,12 @@ async function mockRun(page: Page, overrides: RunViewMocks = {}): Promise<void> 
       route.fulfill(jsonBody(overrides.snapshot ?? SNAPSHOT, overrides.snapshotStatus ?? 200)),
     ),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
+    // A futás nézet a SAJÁT futására iratkozik fel az app szintű stream
+    // kapcsolaton (T-009-23): enélkül a hívás a `installApiMocks` "nincs mock"
+    // 404-esére futna.
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
   ]);
 }
 

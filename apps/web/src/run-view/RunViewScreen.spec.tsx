@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null -- a szintetikus drótszintű fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak (SPEC-005 protokoll alak) */
 import type { FetchFunction } from '@easter-workflow-builder/core';
+import type { StreamFrame } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -101,21 +102,38 @@ const BASE_STEP_RUN = {
   createdAtMs: 20,
 };
 
+const STREAM_ID = 'stream-1';
+const STREAM_REPLAY_LIMIT = 100;
+
 interface FetchOverrides {
   readonly runDetail?: unknown;
   readonly snapshot?: unknown;
   readonly stepRuns?: unknown;
+  /**
+   * A `GET /api/runs/{runId}` hívások naplója: a `run_finished` keretre
+   * kiváltott újratöltés ebből mérhető.
+   */
+  readonly runDetailUrls?: string[];
+  /**
+   * A `PUT /api/streams/{streamId}/subscriptions` hívások törzsei.
+   */
+  readonly subscriptionBodies?: string[];
 }
 
 function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
-  return (input) => {
+  return (input, init) => {
     const { pathname } = new URL(input);
+    if (pathname.endsWith('/subscriptions')) {
+      overrides.subscriptionBodies?.push(typeof init.body === 'string' ? init.body : '{}');
+      return Promise.resolve(Response.json({ streamId: STREAM_ID, subscriptions: [] }));
+    }
     if (pathname.endsWith('/snapshot')) {
       return Promise.resolve(Response.json(overrides.snapshot ?? SNAPSHOT));
     }
     if (pathname.endsWith('/steps')) {
       return Promise.resolve(Response.json(overrides.stepRuns ?? [BASE_STEP_RUN]));
     }
+    overrides.runDetailUrls?.push(pathname);
     return Promise.resolve(Response.json(overrides.runDetail ?? RUN_DETAIL));
   };
 }
@@ -131,6 +149,38 @@ const pendingFetchFunction: FetchFunction = () =>
   new Promise<Response>(() => {
     // szándékosan sosem oldódik fel
   });
+
+/**
+ * Egy `run_finished` motor esemény élő SSE kerete a megadott futásra
+ * (SPEC-004 13. szekció táblázata).
+ */
+function runFinishedFrame(runId: string): StreamFrame {
+  return {
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: {
+      id: 42,
+      runId,
+      stepRunId: null,
+      origin: 'engine',
+      kind: 'run_finished',
+      occurredAtMs: 50,
+      sdkMessageType: null,
+      sdkMessageSubtype: null,
+      sdkSessionId: null,
+      sdkUuid: null,
+      parentToolUseId: null,
+      toolName: null,
+      toolUseId: null,
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadInputTokens: null,
+      cacheCreationInputTokens: null,
+      numTurns: null,
+      payload: {},
+    },
+  };
+}
 
 describe('RunViewScreen', () => {
   let container: HTMLDivElement;
@@ -153,10 +203,18 @@ describe('RunViewScreen', () => {
     container.remove();
   });
 
-  async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
+  async function renderScreen(search: string, fetchFunction: FetchFunction, lastFrame?: StreamFrame): Promise<void> {
     await act(async () => {
       root.render(
-        <RunViewScreen apiOrigin={API_ORIGIN} fetchFunction={fetchFunction} search={search} navigate={navigate} />,
+        <RunViewScreen
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+          search={search}
+          navigate={navigate}
+          streamId={STREAM_ID}
+          lastFrame={lastFrame}
+          streamReplayLimit={STREAM_REPLAY_LIMIT}
+        />,
       );
       await Promise.resolve();
       await Promise.resolve();
@@ -177,6 +235,9 @@ describe('RunViewScreen', () => {
           fetchFunction={pendingFetchFunction}
           search="?runId=r-3"
           navigate={navigate}
+          streamId={STREAM_ID}
+          lastFrame={undefined}
+          streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
       );
     });
@@ -326,5 +387,73 @@ describe('RunViewScreen', () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('maxIterations');
     expect(capturedCanvasProperties).toHaveLength(0);
+  });
+
+  // ============================================================
+  // A FUTÁS VEZÉRLÉSE ÉS AZ ÉLŐ ÁLLAPOT (T-009-23, SPEC-008 6.4, 6.5).
+  // ============================================================
+
+  it('a fejlécben áll a futás vezérlő sávja, az állapot jelvényével', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction());
+
+    const control = container.querySelector(':scope .run-view-screen__header .run-control');
+    expect(control?.querySelector('.badge')?.textContent).toBe('fut');
+    expect(control?.querySelector(':scope .run-control__actions button')?.textContent).toBe('Megszakítás');
+  });
+
+  it('feliratkozik a nézett futásra az app szintű stream kapcsolaton', async () => {
+    const subscriptionBodies: string[] = [];
+    await renderScreen('?runId=r-3', createFetchFunction({ subscriptionBodies }));
+
+    expect(subscriptionBodies).toEqual([
+      JSON.stringify({ runs: [{ runId: 'r-3', fromEventId: 0, replayLimit: STREAM_REPLAY_LIMIT }] }),
+    ]);
+  });
+
+  it('a saját futás run_finished keretére újratölti a futás rekordját', async () => {
+    const runDetailUrls: string[] = [];
+    const fetchFunction = createFetchFunction({ runDetailUrls });
+    await renderScreen('?runId=r-3', fetchFunction);
+    expect(runDetailUrls).toHaveLength(1);
+
+    await renderScreen('?runId=r-3', fetchFunction, runFinishedFrame('r-3'));
+
+    expect(runDetailUrls).toHaveLength(2);
+  });
+
+  it('másik futás run_finished keretére nem tölt újra', async () => {
+    const runDetailUrls: string[] = [];
+    const fetchFunction = createFetchFunction({ runDetailUrls });
+    await renderScreen('?runId=r-3', fetchFunction);
+
+    await renderScreen('?runId=r-3', fetchFunction, runFinishedFrame('r-99'));
+
+    expect(runDetailUrls).toHaveLength(1);
+  });
+
+  it('az újratöltés alatt a rajz a helyén marad, csontváz nélkül', async () => {
+    const runDetailUrls: string[] = [];
+    const fetchFunction = createFetchFunction({ runDetailUrls });
+    await renderScreen('?runId=r-3', fetchFunction);
+
+    // A keret megérkezése a futás rekordjának újratöltését indítja: a
+    // kérés `pending`, de a KORÁBBI rekord a helyén marad, tehát a rajz nem
+    // villog.
+    act(() => {
+      root.render(
+        <RunViewScreen
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+          search="?runId=r-3"
+          navigate={navigate}
+          streamId={STREAM_ID}
+          lastFrame={runFinishedFrame('r-3')}
+          streamReplayLimit={STREAM_REPLAY_LIMIT}
+        />,
+      );
+    });
+
+    expect(container.querySelector('.run-view-screen__loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
   });
 });

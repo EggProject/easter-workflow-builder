@@ -3,9 +3,11 @@ import {
   RunDetailSchema,
   RunSnapshotResponseSchema,
   StepRunRecordSchema,
+  SubscriptionStateSchema,
   type RunDetail,
   type RunSnapshotResponse,
   type StepRunRecord,
+  type StreamFrame,
 } from '@easter-workflow-builder/protocol';
 import { Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
@@ -13,13 +15,16 @@ import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-r
 import type { RequestState } from '../request-state/request-state.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { arraySchema } from '../rest-client/array-schema.ts';
+import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
+import { RunControlBar } from '../run-control/RunControlBar.tsx';
 import { RunGraphCanvas } from '../run-graph/RunGraphCanvas.tsx';
 import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
 import { buildRunGraphNodes } from '../run-graph/build-run-graph-nodes.ts';
 import { mergeSnapshotStepRuns } from '../run-graph/merge-snapshot-step-runs.ts';
 import { projectSnapshotGraph } from '../run-graph/project-snapshot-graph.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
+import { isRunFinishedFrame } from './is-run-finished-frame.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
 import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
 import './run-view.css';
@@ -34,6 +39,15 @@ export interface RunViewScreenProperties {
    */
   readonly search: string;
   readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
+  /**
+   * Az app szintű, egyetlen SSE kapcsolat azonosítója és utolsó kerete
+   * (SPEC-007 9.1). A futás nézet a SAJÁT futására iratkozik fel, mert amíg
+   * ez a képernyő áll, a `run-history` képernyő (a másik fogyasztó) nincs
+   * felcsatolva.
+   */
+  readonly streamId: string;
+  readonly lastFrame: StreamFrame | undefined;
+  readonly streamReplayLimit: number;
 }
 
 const STEP_RUN_LIST_SCHEMA = arraySchema(StepRunRecordSchema);
@@ -90,12 +104,17 @@ interface RunViewHeaderProperties {
   readonly snapshot: RunSnapshotResponse;
   readonly runDetail: RunDetail;
   readonly navigate: RunViewScreenProperties['navigate'];
+  readonly apiOrigin: string;
+  readonly fetchFunction: FetchFunction;
+  readonly onRestarted: (newRunId: string) => void;
 }
 
 /**
- * A futás nézet fejléce (SPEC-008 6.2, 6.3, AC20, AC24): az al-workflow
- * hierarchia morzsasora, a workflow neve, és a kimondott figyelmeztetés, hogy
- * a rajz a futás PILLANATKÉPE, a hozzá tartozó `sdkVersionPin` értékkel.
+ * A futás nézet fejléce (SPEC-008 6.2, 6.3, 6.4, 6.5, AC20, AC24, AC25,
+ * AC26, AC27): az al-workflow hierarchia morzsasora, a workflow neve, a
+ * kimondott figyelmeztetés, hogy a rajz a futás PILLANATKÉPE (a hozzá tartozó
+ * `sdkVersionPin` értékkel), és a futás vezérlő sávja (állapot jelvény,
+ * megszakítás vagy újraindítás, a futás hibája).
  *
  * A morzsasor saját, egyedi hozzáférhető nevet kap, mert a topnav alatt már
  * áll egy másik morzsasor (az útvonalé), és a W3C APG landmark mintája szerint
@@ -103,7 +122,7 @@ interface RunViewHeaderProperties {
  * (<https://www.w3.org/WAI/ARIA/apg/patterns/landmarks/examples/navigation.html>).
  */
 function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElement {
-  const { snapshot, runDetail, navigate } = properties;
+  const { snapshot, runDetail, navigate, apiOrigin, fetchFunction, onRestarted } = properties;
 
   return (
     <header className="run-view-screen__header">
@@ -115,6 +134,12 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
       <p className="run-view-screen__snapshot-note">
         A rajz a futás pillanatképe, nem a workflow mai gráfja. Agent SDK verzió: {snapshot.sdkVersionPin}
       </p>
+      <RunControlBar
+        runDetail={runDetail}
+        apiOrigin={apiOrigin}
+        fetchFunction={fetchFunction}
+        onRestarted={onRestarted}
+      />
     </header>
   );
 }
@@ -133,9 +158,9 @@ function TranscriptPlaceholder(): ReactElement {
 
 /**
  * Az élő futás nézet képernyője (SPEC-008 6. szekció, 10., T-009-20,
- * T-009-22). Három végpontból épül: a futás rekordja (`GET /api/runs/{runId}`)
- * adja az al-workflow hierarchiát, a pillanatkép
- * (`GET /api/runs/{runId}/snapshot`) a rajzot, a lépés futások
+ * T-009-22, T-009-23). Három végpontból épül: a futás rekordja
+ * (`GET /api/runs/{runId}`) adja az al-workflow hierarchiát és az állapotot, a
+ * pillanatkép (`GET /api/runs/{runId}/snapshot`) a rajzot, a lépés futások
  * (`GET /api/runs/{runId}/steps`) pedig a dekorációt.
  *
  * A rajz és a transcript panel a `RunViewLayout` osztott elrendezésében áll,
@@ -143,47 +168,64 @@ function TranscriptPlaceholder(): ReactElement {
  * arány a `localStorage`-be mentődik, és a következő megnyitáskor visszatölt,
  * a gráf szerkesztő már bevált mintája szerint (`run-view-layout.ts`).
  *
- * A futás vezérlése (indítás, megszakítás, újraindítás) a PLAN-009 T-009-23
- * lépésének hatóköre.
+ * A FUTÁS VEZÉRLÉSE (T-009-23). A megszakítás és az újraindítás a
+ * `RunControlBar` komponensben áll, ez a képernyő a hozzá tartozó ÁLLAPOT
+ * frissítését adja: feliratkozik a saját futására az app szintű SSE
+ * kapcsolaton, és a `run_finished` keretre újratölti a futás rekordját. Enélkül
+ * a "megszakítás folyamatban" állapotot semmi nem zárná le, mert a megszakítás
+ * REST válasza még nem a megszakítás befejezése (SPEC-004 9., SPEC-008 6.4).
+ * A lépés futások és a rajz ÉLŐ frissülése a T-009-25 és a T-009-30 hatóköre.
+ *
+ * A futás rekordja azért külön `useState` értékben is áll, nem csak a
+ * `useRequestState` állapotában: az újratöltés alatt a kérés `pending`-re
+ * vált, és a csontváz visszatérése ilyenkor az egész rajzot villogtatná. A
+ * hibaág ellenben VÁLTOZATLAN: egy elbukó betöltés (az első vagy egy
+ * újratöltés) a képernyő helyén a hibaüzenetet mutatja, mert a futás
+ * rekordjának elérhetetlensége nem elhallgatható.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate } = properties;
+  const { apiOrigin, fetchFunction, search, navigate, streamId, lastFrame, streamReplayLimit } = properties;
   const runId = readRunId(search);
 
   const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const stepRunsState = useRequestState<readonly StepRunRecord[]>();
+  const [runDetail, setRunDetail] = useState<RunDetail | undefined>(undefined);
   const layoutBand = useRunViewLayoutBand();
-  // A perzisztált arány EGYSZER, csatoláskor olvasódik be (lusta `useState`
-  // kezdőérték), ugyanabból az okból, mint a gráf szerkesztőben: a
-  // `Resizable` a `defaultSizes` propot szintén csak a saját kezdő
-  // állapotához használja, tehát a későbbi olvasások amúgy sem hatnának. Az
-  // írás a `storeRunViewLayoutSizes` modul szintű függvényén megy, aminek a
-  // hivatkozása stabil, tehát a `Resizable` értesítő hatása nem futhat körbe.
-  const [initialLayoutSizes] = useState<readonly number[]>(readStoredRunViewLayoutSizes);
 
-  // Az al-workflow futás megnyitása UGYANERRE a képernyőre navigál, másik
-  // `?runId=` paraméterrel (SPEC-008 6.3, AC24).
-  const handleOpenSubWorkflowRun = useCallback(
-    (subWorkflowRunId: string): void => {
-      navigate('runView', `runId=${subWorkflowRunId}`);
+  // Az al-workflow futás megnyitása és az újraindítás UGYANERRE a képernyőre
+  // navigál, másik `?runId=` paraméterrel (SPEC-008 6.3, 6.5, AC24).
+  const navigateToRun = useCallback(
+    (targetRunId: string): void => {
+      navigate('runView', `runId=${targetRunId}`);
     },
     [navigate],
+  );
+
+  const loadRunDetail = useCallback(
+    (currentRunId: string): Promise<void> => {
+      return runState.run(async () => {
+        const outcome = await requestRouteWithoutBody({
+          routeId: 'getRun',
+          parameters: { runId: currentRunId },
+          responseSchema: RunDetailSchema,
+          fetchFunction,
+          apiOrigin,
+        });
+        if (outcome.kind === 'ok') {
+          setRunDetail(outcome.value);
+        }
+        return outcome;
+      });
+    },
+    [runState.run, fetchFunction, apiOrigin],
   );
 
   useEffect(() => {
     if (runId === undefined) {
       return;
     }
-    void runState.run(() =>
-      requestRouteWithoutBody({
-        routeId: 'getRun',
-        parameters: { runId },
-        responseSchema: RunDetailSchema,
-        fetchFunction,
-        apiOrigin,
-      }),
-    );
+    void loadRunDetail(runId);
     void snapshotState.run(() =>
       requestRouteWithoutBody({
         routeId: 'readRunSnapshot',
@@ -209,6 +251,31 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     // szabályt.
   }, [runId, apiOrigin, fetchFunction]);
 
+  useEffect(() => {
+    if (runId === undefined) {
+      return;
+    }
+    // A stream feliratkozás a NÉZETT futásra szűkül, állapottól függetlenül: a
+    // pótlás (`fromEventId: 0`) a már lezárt futásnál is a teljes előzményt
+    // adja, ami a transcript panel bemenete lesz (T-009-25). Egy állapot
+    // szerinti elágazás itt csak sosem futó ágat szülne.
+    void requestRoute({
+      routeId: 'replaceStreamSubscriptions',
+      parameters: { streamId },
+      body: { runs: [{ runId, fromEventId: 0, replayLimit: streamReplayLimit }] },
+      responseSchema: SubscriptionStateSchema,
+      fetchFunction,
+      apiOrigin,
+    });
+  }, [runId, streamId, streamReplayLimit, fetchFunction, apiOrigin]);
+
+  useEffect(() => {
+    if (runId === undefined || !isRunFinishedFrame(lastFrame, runId)) {
+      return;
+    }
+    void loadRunDetail(runId);
+  }, [runId, lastFrame, loadRunDetail]);
+
   if (runId === undefined) {
     return <p role="alert">Nincs megadva megtekintendő futás (hiányzó "runId" query paraméter).</p>;
   }
@@ -218,11 +285,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     return <p role="alert">{failureMessage}</p>;
   }
 
-  if (
-    runState.state.status !== 'success' ||
-    snapshotState.state.status !== 'success' ||
-    stepRunsState.state.status !== 'success'
-  ) {
+  if (runDetail === undefined || snapshotState.state.status !== 'success' || stepRunsState.state.status !== 'success') {
     // Várakozás jelzése: a betöltés alatt csontváz áll, nem üres képernyő
     // (`.claude/CLAUDE.md` 11. szekció).
     return (
@@ -244,18 +307,34 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     nodes: projected.value.nodes,
     nodeStepRuns: merged.nodeStepRuns,
     stepRuns,
-    onOpenSubWorkflowRun: handleOpenSubWorkflowRun,
+    onOpenSubWorkflowRun: navigateToRun,
   });
 
   return (
     <div className="run-view-screen">
-      <RunViewHeader snapshot={snapshot} runDetail={runState.state.value} navigate={navigate} />
+      <RunViewHeader
+        snapshot={snapshot}
+        runDetail={runDetail}
+        navigate={navigate}
+        apiOrigin={apiOrigin}
+        fetchFunction={fetchFunction}
+        onRestarted={navigateToRun}
+      />
       <div className="run-view-screen__body">
         <RunViewLayout
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
           transcript={<TranscriptPlaceholder />}
-          defaultSizes={initialLayoutSizes}
+          // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
+          // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
+          // visszaváltáskor a `defaultSizes` propból épül újra a kezdő
+          // állapota. Egy csatoláskor beolvasott, `useState`-ben tartott érték
+          // ilyenkor a kézzel húzott arányt eldobná (a T-009-22 független
+          // ellenőrzésének él esete). A `localStorage` olvasás a
+          // `readStoredRunViewLayoutSizes` saját `try`/`catch` ágán megy, és a
+          // képernyő nem renderel újra húzás közben, tehát az olvasás nem
+          // kerül forró útra.
+          defaultSizes={readStoredRunViewLayoutSizes()}
           onSizesChange={storeRunViewLayoutSizes}
         />
       </div>
