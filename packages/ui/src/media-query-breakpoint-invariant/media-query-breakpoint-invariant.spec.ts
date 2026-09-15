@@ -3,7 +3,7 @@
 // meg (SPEC-007 5.3, PLAN-008 T-008-9). A tokenek megvannak
 // (design-token/breakpoints.css, M-26), de a media queryket saját kézzel
 // kell megírni, mert az M-28 mérés szerint az átemelt forrás egyetlen
-// media querye sem érinti a .app-tn bart — ez a teszt őrzi, hogy ahol
+// media querye sem érinti a .app-tn bart. Ez a teszt őrzi, hogy ahol
 // mégis írunk ilyet, ott ne kerüljön be kitalált töréspont.
 //
 // Megvalósítás fájl nélküli téma (.claude/CLAUDE.md 5. szekció,
@@ -15,7 +15,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // Kizárólag a packages/ui és az apps/web forrásfáján álló CSS fájlokat
-// nézzük — pontosan azt a két gyökeret, amit a T-008-9 elfogadási
+// nézzük: pontosan azt a két gyökeret, amit a T-008-9 elfogadási
 // kritériuma megnevez.
 const SOURCE_TREE_CSS_PATTERN = /^(?:packages\/ui|apps\/web)\/src\/.*\.css$/;
 

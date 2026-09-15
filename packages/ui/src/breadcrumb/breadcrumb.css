@@ -1,0 +1,85 @@
+/* ============================================================
+   EggProject — Breadcrumb (szűkített átemelés, WAI-ARIA APG lista
+   szemantikával kiegészítve, lásd Breadcrumb.tsx fejléc komment).
+   Forrás: eggproject-design-components/components/breadcrumb/
+   breadcrumb.css, a `.breadcrumb`/`.breadcrumb__item`/
+   `.breadcrumb__item--current`/`.breadcrumb__separator` szabályok. A
+   `separator` variánsok (chevron/dot), az `icon` és az összecsukás
+   (`.breadcrumb__more`) nincs átemelve (Breadcrumb.tsx fejléc komment).
+   ÚJ, a forrásban nem létező szabály a `.breadcrumb__list`
+   (`<ol>` lista-alapértelmezés nullázása) és a `.breadcrumb__listItem`
+   (`<li>` inline elrendezés), mert a forrás JSX nem `<ol>`/`<li>`
+   szerkezetű.
+   ============================================================ */
+.breadcrumb {
+  display: block;
+}
+
+.breadcrumb__list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+}
+
+.breadcrumb__listItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.breadcrumb__item {
+  color: var(--ep-fg-muted);
+  text-decoration: none;
+  padding: 4px 6px;
+  border-radius: var(--ep-radius-sm);
+  transition:
+    color var(--ep-dur-fast) var(--ep-ease-out),
+    background-color var(--ep-dur-fast) var(--ep-ease-out);
+}
+.breadcrumb__item:hover { color: var(--ep-fg); background: var(--ep-bg-hover); }
+/* Billentyűzet fókusz csak a navigálható linkeken - az aktuális <span>-nak
+   nincs href-je, tehát sosem cél. A token kétrétegű gyűrű váltja az UA
+   körvonalat ugyanabban a szabályban, sarok-illesztve, elrendezés-eltolás
+   nélkül, animálatlanul (a forrás breadcrumb.css szó szerinti mintája). */
+.breadcrumb__item[href]:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+.breadcrumb__item--current {
+  color: var(--ep-fg);
+  font-weight: 600;
+}
+
+.breadcrumb__separator {
+  color: var(--ep-fg-faint);
+  font: 400 13px var(--ep-font-sans);
+  user-select: none;
+}
+
+/* ---- Forced colors: az UA elhagyja a box-shadow gyűrűt, ezért a link
+        billentyűs fókusza valódi rendszer körvonalat kap. A linkek, az
+        aktuális elem (font-weight 600 + CanvasText) és az elválasztó a
+        natív rendszerszín-leképezésen át marad megkülönböztethető - extra
+        szabály nélkül (a forrás breadcrumb.css szó szerinti mintája). ---- */
+@media (forced-colors: active) {
+  .breadcrumb__item[href]:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
+
+/* ---- Reduced motion: a hover szín/háttér átmenet kikapcsol, a
+        végállapotok megmaradnak (a forrás breadcrumb.css szó szerinti
+        mintája). ---- */
+@media (prefers-reduced-motion: reduce) {
+  .breadcrumb__item {
+    transition: none;
+  }
+}

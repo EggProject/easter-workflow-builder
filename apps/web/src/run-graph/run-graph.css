@@ -1,0 +1,83 @@
+/* A futás nézet csak olvasható vászna és a rajzon nem szereplő lépés futások
+   listája (SPEC-008 6.2, T-009-20).
+
+   A vászon a rendelkezésre álló magasságot tölti ki, és belül pásztáz: a
+   `min-height: 0` azért kötelező, mert a flex elem alapértelmezett
+   `min-height: auto` értéke a tartalom magasságára feszítené a dobozt, és a
+   belső `overflow` sosem lépne életbe (ugyanaz az ok, mint a
+   `graph-editor-screen.css`-ben). */
+.run-graph-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* AZ AL-WORKFLOW GOMB KATTINTHATÓSÁGA A CSAK OLVASHATÓ VÁSZNON.
+
+   A mért állapot, amit ez javít: a React Flow a csomópont doboznak INLINE
+   `pointer-events` értéket ad, és az `all` helyett `none` jár neki, ha a node
+   se nem húzható, se nem kiválasztható, és nincs rajta kattintás kezelő
+   (`@xyflow/react` `dist/esm/index.mjs`: `pointerEvents: hasPointerEvents ?
+   'all' : 'none'`, ahol a `hasPointerEvents` az `isDraggable || onClick ||
+   onMouseEnter || onMouseMove || onMouseLeave` értéke). A futás nézet vászna
+   PONTOSAN ilyen (AC19), tehát a `sub_workflow` csomópont gombja kattintásra
+   nem reagált: a Playwright mérése szerint a `.react-flow__pane` fogta el a
+   pointer eseményt.
+
+   Miért a gombon, és miért nem a node dobozon: az inline stílust egy osztály
+   szintű szabály csak `!important`-tal tudná felülírni, egy LESZÁRMAZOTT
+   explicit `pointer-events: auto` értéke viszont a CSS szabályai szerint
+   önmagában visszaadja a találati tesztet, az ős `none` értéke ellenére.
+   Regresszió: `apps/web/e2e/run-view.spec.ts`. */
+.run-graph-canvas .react-flow__node .btn {
+  pointer-events: auto;
+}
+
+/* Megnevezett, doboz nélküli szakasz: se szegély, se lekerekítés, se saját
+   háttér, tehát nem kártya (tilos a card in card). A tagolást a fejléc és a
+   térköz adja, kizárólag design system tokenekkel. */
+.unmatched-step-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+  padding: var(--ep-space-4) 0 0;
+  border-top: 1px solid var(--ep-border-subtle);
+}
+
+.unmatched-step-run-list__title {
+  margin: 0;
+  font: var(--ep-text-small);
+  font-weight: 600;
+  color: var(--ep-fg);
+}
+
+.unmatched-step-run-list__hint {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+.unmatched-step-run-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unmatched-step-run-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-space-3);
+}
+
+.unmatched-step-run-list__node-id {
+  font: var(--ep-text-code);
+  color: var(--ep-fg);
+}
+
+.unmatched-step-run-list__node-type {
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}

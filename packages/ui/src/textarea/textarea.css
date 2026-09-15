@@ -1,0 +1,133 @@
+/* ============================================================
+   EggProject — Textarea
+   Forrás: eggproject-design-components/components/textarea/textarea.css,
+   bájtra azonos a forrás @import sora (a design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. A fájl minden szabálya a
+   Textarea komponenshez tartozik, ezért szűkítés nem kellett. A `--sm`
+   méret variáns propként KI van vezetve (lásd `TextAreaField.tsx` `size`
+   propja, felhasználói kérés 2026-09-09), a `--lg`/`--ghost` nincs, mert
+   egyetlen képernyő sem igényli - a szabályok mindhárom variánsra bájtra
+   átkerülnek, mert ugyanennek a komponensnek a részei.
+   HOZZÁADVA a forráshoz képest: egyetlen deklaráció, a `.textarea`
+   `box-sizing: border-box` sora (az indoklás a deklaráció fölött áll).
+   A fájl minden más sora bájtra azonos a forrással.
+   Átemelés dátuma: 2026-09-09. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Textarea ============
+   Structure:
+     .textarea[ .textarea--sm | .textarea--lg | .textarea--ghost ]
+   States: :focus, :disabled, :invalid / .is-error
+   Size variants via .textarea--sm / .textarea--lg
+============================================ */
+.textarea {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  font: var(--ep-text-body);
+  font-family: var(--ep-font-sans);
+  color: var(--ep-fg);
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-control-border);
+  border-radius: var(--ep-radius-md);
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.55;
+  transition: border-color var(--ep-dur-base) var(--ep-ease-out),
+              box-shadow var(--ep-dur-base) var(--ep-ease-out);
+  outline: none;
+  -webkit-appearance: none;
+  /* HOZZÁADVA a forráshoz képest, MÉRT hiba javítása, a testvér `.input`
+     szabállyal AZONOS okból és azonos alakban (lásd `text-field.css`): a
+     forrás univerzális `* { box-sizing: border-box }` resetje szándékosan
+     NEM került át (SPEC-007 4.2 szűkített átemelés), tehát a `.textarea` a
+     böngésző `content-box` alapértelmezésén maradt, és a `width: 100%`
+     mellé a `padding: 10px 14px` plusz az 1px szegély mindkét oldalon
+     rájött. Mérés (`apps/web/e2e/node-inspector.spec.ts`, "egyetlen mező
+     sem lóg ki a panelből"): a beállítás panelben mind a négy `<textarea>`
+     túlnyúlt a szülőjén. */
+  box-sizing: border-box;
+}
+
+.textarea::placeholder {
+  color: var(--ep-fg-placeholder);
+}
+
+.textarea:read-only {
+  background: var(--ep-bg-sunken);
+  color: var(--ep-fg);
+  border-color: var(--ep-fg-subtle);
+  opacity: 1;
+  cursor: text;
+}
+
+.textarea:where(:not(:disabled)):hover {
+  border-color: var(--ep-fg);
+}
+
+.textarea:focus {
+  border-color: var(--ep-accent);
+  box-shadow: var(--ep-shadow-focus);
+}
+
+.textarea:disabled {
+  background: var(--ep-bg-sunken);
+  color: var(--ep-fg-subtle);
+  cursor: not-allowed;
+  opacity: 0.65;
+  resize: none;
+}
+
+/* Browser autofill — keep themed text + caret; defer the UA background paint via a
+   near-infinite background-color transition. No box-shadow set, so the focus ring survives. */
+.textarea:autofill,
+.textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--ep-fg);
+  caret-color: var(--ep-fg);
+  transition: background-color 600000s 0s;
+}
+
+.textarea.is-error,
+.textarea:user-invalid {
+  border-color: var(--ep-danger);
+  box-shadow: 0 0 0 3px var(--ep-danger-bg);
+}
+
+/* Size variants */
+.textarea--sm {
+  padding: 7px 10px;
+  font-size: 13px;
+  min-height: 60px;
+  border-radius: var(--ep-radius-sm);
+}
+
+.textarea--lg {
+  padding: 13px 16px;
+  font-size: 15px;
+  min-height: 120px;
+  border-radius: var(--ep-radius-lg);
+}
+
+/* Ghost: no border/bg, just underline */
+.textarea--ghost {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ep-border);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.textarea--ghost:where(:read-only) {
+  border-bottom-color: var(--ep-fg-subtle);
+}
+.textarea--ghost:focus {
+  outline: revert;
+  border-bottom-color: var(--ep-accent);
+  box-shadow: var(--ep-shadow-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textarea {
+    transition: none;
+  }
+}

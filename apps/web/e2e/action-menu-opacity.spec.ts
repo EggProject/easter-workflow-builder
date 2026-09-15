@@ -1,6 +1,3 @@
-/* eslint-disable unicorn/no-null -- a WorkflowSummary nullable mezői a
-   protokoll szerint ténylegesen `null` értéket hordoznak
-   (packages/protocol/src/workflow/workflow-record.ts). */
 // Regresszió (felhasználói bejelentés, docs/research/
 // 2026-09-05-menu-atlatszatlansag.md): a sor műveletek hárompontos
 // triggeréből nyíló `Menu` panelje a nyitási animáció (`packages/ui/src/menu/

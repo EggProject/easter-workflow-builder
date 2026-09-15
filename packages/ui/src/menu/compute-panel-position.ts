@@ -1,5 +1,16 @@
 export interface PanelPosition {
-  readonly top: number;
+  /**
+   * Nyitás lefelé esetén állítva, felfelé nyitáskor `undefined` (a `Menu`
+   * ilyenkor a `bottom` mezőt adja át a `style`-nak).
+   */
+  readonly top: number | undefined;
+  /**
+   * Nyitás felfelé esetén állítva (a lábléc-menü esete, ahol a trigger a
+   * viewport aljához közel ül): a panel ALJÁT rögzíti a triggerhez képest,
+   * a panel MAGASSÁGÁNAK ismerete nélkül - a panel zárva `hidden` (tehát
+   * `display: none`), a valós magassága nyitás előtt nem mérhető.
+   */
+  readonly bottom: number | undefined;
   readonly left: number;
 }
 
@@ -43,19 +54,37 @@ function clampLeft(left: number, panelWidth: number, viewportWidth: number): num
  * viewport-szélen túlra tolhatja - az `apps/web/e2e/responsive.spec.ts`
  * 320px szélességen ezt ténylegesen elő is idézte.
  *
- * A `viewportWidth` paraméter explicit (nem `globalThis.innerWidth`-et
- * olvas belül), hogy a függvény tiszta, DOM nélkül, valós számokkal
- * közvetlenül tesztelhető legyen - a happy-dom teszt környezet
- * `getBoundingClientRect()`-je mindig nulla téglalapot ad, ami a
- * viewport-szorítás ágát élő DOM-on keresztül tesztelhetetlenné tenné.
+ * A `viewportWidth`/`viewportHeight` paraméter explicit (nem
+ * `globalThis.innerWidth`/`innerHeight`-et olvas belül), hogy a függvény
+ * tiszta, DOM nélkül, valós számokkal közvetlenül tesztelhető legyen - a
+ * happy-dom teszt környezet `getBoundingClientRect()`-je mindig nulla
+ * téglalapot ad, ami a viewport-szorítás ágát élő DOM-on keresztül
+ * tesztelhetetlenné tenné.
+ *
+ * FÜGGŐLEGES IRÁNY (flip). Ha a trigger alatt kevesebb hely marad a
+ * viewport aljáig, mint a trigger fölött a viewport tetejéig, a panel
+ * FELFELÉ nyílik: a `bottom` mező áll, a `top` `undefined` marad. Ez egy
+ * mért, valódi hiba javítása - a szerkesztő láblécének "További
+ * műveletek" triggere a viewport aljához tapad (`page-footer.css`
+ * `position: sticky; bottom: 0;`), ahol a korábbi, mindig lefelé nyíló
+ * logika a panelt a viewporton kívülre, gyakorlatilag elérhetetlenül
+ * helyezte (`apps/web/e2e/graph-editor-layout.spec.ts` mérte: "element is
+ * outside of the viewport"). A döntés a panel MAGASSÁGÁNAK ismerete
+ * NÉLKÜL működik, mert a `bottom` CSS-tulajdonság a panel alját rögzíti a
+ * viewport aljához képest, a magasságot a tartalom önmaga adja.
  */
 export function computePanelPosition(
-  triggerRect: Pick<DOMRect, 'bottom' | 'left' | 'right'>,
+  triggerRect: Pick<DOMRect, 'bottom' | 'left' | 'right' | 'top'>,
   align: 'left' | 'right',
   viewportWidth: number,
+  viewportHeight: number,
 ): PanelPosition {
-  const top = triggerRect.bottom + PANEL_GAP_PX;
   const idealLeft = align === 'right' ? triggerRect.right - ESTIMATED_PANEL_WIDTH_PX : triggerRect.left;
   const left = clampLeft(idealLeft, ESTIMATED_PANEL_WIDTH_PX, viewportWidth);
-  return { top, left };
+  const spaceBelow = viewportHeight - triggerRect.bottom;
+  const spaceAbove = triggerRect.top;
+  if (spaceBelow >= spaceAbove) {
+    return { top: triggerRect.bottom + PANEL_GAP_PX, bottom: undefined, left };
+  }
+  return { top: undefined, bottom: viewportHeight - triggerRect.top + PANEL_GAP_PX, left };
 }

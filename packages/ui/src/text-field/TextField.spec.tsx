@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FieldErrorVisibilityContext } from '../field-error-visibility/field-error-visibility-context.ts';
 import { TextField } from './TextField.tsx';
 
 describe('TextField', () => {
@@ -36,6 +37,17 @@ describe('TextField', () => {
     return label;
   }
 
+  /**
+   * A mező elhagyása: innentől "érintett", tehát a hibaüzenete láthatóvá
+   * válhat (`useFieldErrorVisibility`).
+   */
+  function blurInput(): void {
+    act(() => {
+      renderedInput().focus();
+      renderedInput().blur();
+    });
+  }
+
   it('alapértelmezésben a "field" és az "input" osztálylistát rajzolja ki', () => {
     act(() => {
       root.render(<TextField />);
@@ -45,6 +57,18 @@ describe('TextField', () => {
     expect(container.querySelector('.field__label')).toBeNull();
     expect(container.querySelector('.field__error')).toBeNull();
     expect(container.querySelector('.input-with-icon')).toBeNull();
+  });
+
+  it('md méretre nem tesz hozzá méret módosítót, sm méretre igen', () => {
+    act(() => {
+      root.render(<TextField size="md" />);
+    });
+    expect(renderedInput().className).toBe('input');
+
+    act(() => {
+      root.render(<TextField size="sm" />);
+    });
+    expect(renderedInput().className).toBe('input input--sm');
   });
 
   it('a label a .field__label elembe kerül, és a címke körbeveszi a mezőt', () => {
@@ -69,16 +93,50 @@ describe('TextField', () => {
     expect(renderedInput().id).toBe('workflow-nev');
   });
 
-  it('error esetén hibás állapot: input--error, aria-invalid és a hibaüzenet eleme', () => {
+  it('érintetlen mezőn nincs hibaüzenet, akkor sem, ha az érték érvénytelen', () => {
     act(() => {
       root.render(<TextField id="nev" error="Kötelező mező" />);
     });
+    expect(container.querySelector('.field__error')).toBeNull();
+    expect(renderedInput().className).toBe('input');
+    expect(renderedInput().getAttribute('aria-invalid')).toBeNull();
+    expect(renderedInput().getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('érintés után hibás állapot: input--error, aria-invalid és a hibaüzenet eleme', () => {
+    act(() => {
+      root.render(<TextField id="nev" error="Kötelező mező" />);
+    });
+    blurInput();
     expect(renderedInput().className).toBe('input input--error');
     expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
     expect(renderedInput().getAttribute('aria-describedby')).toBe('nev-error');
     const errorElement = container.querySelector('.field__error');
     expect(errorElement?.textContent).toBe('Kötelező mező');
     expect(errorElement?.id).toBe('nev-error');
+    expect(errorElement?.getAttribute('role')).toBe('alert');
+  });
+
+  it('megkísérelt beküldés után érintetlen mezőn is látszik a hibaüzenet', () => {
+    act(() => {
+      root.render(
+        <FieldErrorVisibilityContext.Provider value>
+          <TextField id="nev" error="Kötelező mező" />
+        </FieldErrorVisibilityContext.Provider>,
+      );
+    });
+    expect(container.querySelector('.field__error')?.textContent).toBe('Kötelező mező');
+    expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a hívó saját onBlur kezelője megmarad az érintettség jelölése mellett', () => {
+    const onBlur = vi.fn();
+    act(() => {
+      root.render(<TextField id="nev" error="Kötelező mező" onBlur={onBlur} />);
+    });
+    blurInput();
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.field__error')).not.toBeNull();
   });
 
   it('hiba nélkül a hívó aria-invalid értéke változatlanul megy át', () => {
@@ -88,10 +146,11 @@ describe('TextField', () => {
     expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('hiba és hívói aria-invalid együtt: a komponens hibája erősebb', () => {
+  it('látható hiba és hívói aria-invalid együtt: a komponens hibája erősebb', () => {
     act(() => {
       root.render(<TextField aria-invalid={false} error="Hibás" />);
     });
+    blurInput();
     expect(renderedInput().getAttribute('aria-invalid')).toBe('true');
   });
 
@@ -113,6 +172,7 @@ describe('TextField', () => {
     act(() => {
       root.render(<TextField id="nev" aria-describedby="sugo" error="Hibás" />);
     });
+    blurInput();
     expect(renderedInput().getAttribute('aria-describedby')).toBe('sugo nev-error');
   });
 
@@ -120,6 +180,7 @@ describe('TextField', () => {
     act(() => {
       root.render(<TextField id="nev" aria-describedby="nev-error sugo" error="Hibás" />);
     });
+    blurInput();
     expect(renderedInput().getAttribute('aria-describedby')).toBe('nev-error sugo');
   });
 

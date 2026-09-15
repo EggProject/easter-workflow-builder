@@ -11,24 +11,25 @@ merítés" (signal and drain) mintát valósítja meg.
 
 ## Fájlok
 
-| Mappa                    | Felelősség                                                                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server-config/`         | env változó nevek, a `ServerConfig` alak, a `process.env` másolatából `Outcome` alakot adó olvasó, indulási log leíró                             |
-| `engine-assembly/`       | a motor kilenc portjának valódi bekötése, a `createEngine` hívás, a valós `EventPublisherPort` és a publikált esemény osztályozása                |
-| `startup-sequence/`      | az indulás 1 ... 7. lépése, lépésenkénti hibakezeléssel és kilépési kód beállítással                                                              |
-| `shutdown-sequence/`     | a szabályos leállás 2 ... 6. lépése (SSE nyelők zárása is), és a két jelkezelő felvétele                                                          |
-| `http-server/`           | a `node:http` szerver, a `127.0.0.1` bind, a kérés törzs olvasás, a JSON válasz kiírás, CORS fejlécek, a `ServerResponse` SSE nyelővé csomagolása |
-| `route-dispatch/`        | a `ROUTE_TABLE` alapú illesztő, paraméter kinyerés, a `404`/`405` ág, a `RouteHandler` típus                                                      |
-| `route-registry/`        | a `Record<RouteId, RouteHandler>` kimerítő összeállítása, mind a 26 azonosító valódi kezelőre kötve                                               |
-| `error-mapping/`         | a SPEC-005 8.3 táblázat: az `Outcome` üzenetéből a hibaosztály név kiolvasása, `ProtocolErrorCode` leképezés                                      |
-| `workflow-endpoint/`     | a SPEC-005 4.2 A táblázat nyolc végpontjának kezelője                                                                                             |
-| `run-endpoint/`          | a SPEC-005 4.2 B táblázat nyolc futás végpontjának kezelője                                                                                       |
-| `approval-endpoint/`     | a SPEC-005 4.2 C táblázat jóváhagyási végpontjai                                                                                                  |
-| `provider-endpoint/`     | a SPEC-005 4.2 D táblázat provider lista és kapcsolat teszt végpontja                                                                             |
-| `settings-endpoint/`     | a SPEC-005 4.2 E táblázat beállítás és párhuzamossági korlát végpontjai                                                                           |
-| `stream-registry/`       | a streamId -> futás feliratkozások és az élő kapcsolatok nyilvántartása, a teljes csere végpont                                                   |
-| `stream-connection/`     | a `GET /events` kapcsolat kiszolgálása: replay, "jelzés és merítés" élő kézbesítés, keep-alive                                                    |
-| `enum-drift-protection/` | a SPEC-005 7.6 megvalósítás nélküli regressziós tesztje                                                                                           |
+| Mappa                           | Felelősség                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server-config/`                | env változó nevek, a `ServerConfig` alak, a `process.env` másolatából `Outcome` alakot adó olvasó, indulási log leíró                             |
+| `engine-assembly/`              | a motor kilenc portjának valódi bekötése, a `createEngine` hívás, a valós `EventPublisherPort` és a publikált esemény osztályozása                |
+| `startup-sequence/`             | az indulás 1 ... 7. lépése, lépésenkénti hibakezeléssel és kilépési kód beállítással                                                              |
+| `shutdown-sequence/`            | a szabályos leállás 2 ... 6. lépése (SSE nyelők zárása is), és a két jelkezelő felvétele                                                          |
+| `http-server/`                  | a `node:http` szerver, a `127.0.0.1` bind, a kérés törzs olvasás, a JSON válasz kiírás, CORS fejlécek, a `ServerResponse` SSE nyelővé csomagolása |
+| `route-dispatch/`               | a `ROUTE_TABLE` alapú illesztő, paraméter kinyerés, a `404`/`405` ág, a `RouteHandler` típus                                                      |
+| `route-registry/`               | a `Record<RouteId, RouteHandler>` kimerítő összeállítása, mind a 26 azonosító valódi kezelőre kötve                                               |
+| `error-mapping/`                | a SPEC-005 8.3 táblázat: az `Outcome` üzenetéből a hibaosztály név kiolvasása, `ProtocolErrorCode` leképezés                                      |
+| `workflow-endpoint/`            | a SPEC-005 4.2 A táblázat nyolc végpontjának kezelője                                                                                             |
+| `run-endpoint/`                 | a SPEC-005 4.2 B táblázat nyolc futás végpontjának kezelője                                                                                       |
+| `approval-endpoint/`            | a SPEC-005 4.2 C táblázat jóváhagyási végpontjai                                                                                                  |
+| `provider-endpoint/`            | a SPEC-005 4.2 D táblázat provider lista és kapcsolat teszt végpontja                                                                             |
+| `settings-endpoint/`            | a SPEC-005 4.2 E táblázat beállítás és párhuzamossági korlát végpontjai                                                                           |
+| `stream-registry/`              | a streamId -> futás feliratkozások és az élő kapcsolatok nyilvántartása, a teljes csere végpont                                                   |
+| `stream-connection/`            | a `GET /events` kapcsolat kiszolgálása: replay, "jelzés és merítés" élő kézbesítés, keep-alive                                                    |
+| `enum-drift-protection/`        | a SPEC-005 7.6 megvalósítás nélküli regressziós tesztje                                                                                           |
+| `node-config-drift-protection/` | a `NodeConfig` tíz ágú uniójának megvalósítás nélküli regressziós tesztje (PLAN-009 T-009-13, SPEC-005 7.7)                                       |
 
 ## Függőségi irány
 

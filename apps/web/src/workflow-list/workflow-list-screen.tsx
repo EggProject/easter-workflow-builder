@@ -204,6 +204,7 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
       <div className="workflow-list__toolbar">
         <Button
           type="button"
+          size="sm"
           onClick={() => {
             setIsCreateModalOpen(true);
           }}

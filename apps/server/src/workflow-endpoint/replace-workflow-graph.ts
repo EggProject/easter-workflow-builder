@@ -13,12 +13,16 @@ function malformedNodeConfigMessage(nodeId: string): string {
 }
 
 /**
- * A wire `WorkflowNodeInputSchema.config` mezője `unknown` (a `protocol` L1
- * réteg nem ismerheti a `NodeConfig` uniót, SPEC-005 F-23); a szerver, ami
- * már L6 rétegen áll, az `isNodeConfig` guarddal szűkíti a `db` hívása
- * előtt. A wire `type` mezőt a `db` `WorkflowNodeInput` nem kéri (a
- * `config.type` diszkriminátor már hordozza, `workflow-repository.ts`
- * doksija), ezért itt nem kerül át.
+ * A wire `WorkflowNodeInputSchema.config` mezője a `protocol` saját,
+ * duplikált `NodeConfig` uniója (PLAN-009 T-009-13, SPEC-005 7.7): a `protocol`
+ * L1 réteg a `db` domain típusát változatlanul nem importálhatja, de a Zod
+ * séma innentől a helyes ágakra szűkít, nem `unknown`-ra. A szerver, ami már
+ * L6 rétegen áll, az `isNodeConfig` guarddal így is átvezet a `db` saját
+ * `NodeConfig` típusára a `db` hívása előtt - a két oldal egyezését az
+ * `apps/server` `node-config-drift-protection` regressziós tesztje őrzi. A
+ * wire `type` mezőt a `db` `WorkflowNodeInput` nem kéri (a `config.type`
+ * diszkriminátor már hordozza, `workflow-repository.ts` doksija), ezért itt
+ * nem kerül át.
  */
 function toDatabaseNode(node: ReplaceGraphRequest['nodes'][number]): WorkflowNodeInput | undefined {
   if (!isNodeConfig(node.config)) {

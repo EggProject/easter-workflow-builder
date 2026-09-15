@@ -1,0 +1,111 @@
+/* ============================================================
+   EggProject — Resizable
+   Forrás: eggproject-design-components/components/resizable/resizable.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-05.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Resizable ============
+   Structure:
+     .resizable-group[ .resizable-group--vertical ]
+       > .resizable-panel (a pane)
+       > .resizable-handle (drag handle between panels)
+       > .resizable-panel
+   JS sets flex-basis on panels; handles are draggable.
+============================================ */
+.resizable-group {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--ep-radius-xl);
+  border: 1px solid var(--ep-border);
+  background: var(--ep-bg-elevated);
+}
+
+.resizable-group--vertical {
+  flex-direction: column;
+}
+
+.resizable-panel {
+  overflow: auto;
+  flex: 1 1 0;
+  min-width: 80px;
+  min-height: 60px;
+}
+
+/* Handle */
+.resizable-handle {
+  flex: 0 0 5px;
+  background: var(--ep-divider);
+  cursor: col-resize;
+  position: relative;
+  transition: background var(--ep-dur-fast);
+}
+.resizable-group--vertical .resizable-handle {
+  cursor: row-resize;
+}
+.resizable-handle:hover,
+.resizable-handle.is-dragging {
+  background: var(--ep-border);
+}
+.resizable-handle.is-dragging {
+  background: var(--ep-accent);
+}
+
+/* Center grip icon */
+.resizable-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 20px;
+  border-radius: var(--ep-radius-pill);
+  background: var(--ep-border-strong);
+  opacity: 0.3;
+}
+.resizable-group--vertical .resizable-handle::before {
+  width: 20px; height: 3px;
+}
+.resizable-handle:hover::before,
+.resizable-handle.is-dragging::before {
+  opacity: 0.6;
+}
+
+/* Keyboard focus: the house-style --ep-shadow-focus is an OUTSET ring, which
+   .resizable-group's overflow:hidden would clip on the cross-axis edges. Use
+   an inset gold (--ep-accent) ring instead so the indicator is always fully
+   visible inside the narrow handle and never clipped. */
+.resizable-handle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ep-accent);
+}
+
+/* Forced colors (Windows High Contrast): the token-tinted handle/grip are
+   flattened by the UA, so re-express the separator, its drag/hover state and
+   the focus ring with system colors. System colors only. */
+@media (forced-colors: active) {
+  .resizable-group { border-color: CanvasText; }
+  .resizable-handle { background: ButtonText; }
+  .resizable-handle::before { background: Canvas; opacity: 1; }
+  .resizable-handle:hover,
+  .resizable-handle.is-dragging { background: Highlight; }
+  .resizable-handle:hover::before,
+  .resizable-handle.is-dragging::before { background: HighlightText; }
+  .resizable-handle:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    box-shadow: none;
+  }
+}
+
+/* Reduced motion: the only animated property is the handle-background micro
+   transition; drop it (and the grip) so no drag/hover motion plays. The focus
+   ring is a static box-shadow, never animated. */
+@media (prefers-reduced-motion: reduce) {
+  .resizable-handle,
+  .resizable-handle::before {
+    transition: none;
+  }
+}

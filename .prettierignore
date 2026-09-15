@@ -16,6 +16,7 @@ packages/ui/src/design-token
 packages/ui/src/self-hosted-font
 packages/ui/src/topnav-shell/topnav-shell.css
 packages/ui/src/button/button.css
+packages/ui/src/button-group/button-group.css
 packages/ui/src/badge/badge.css
 packages/ui/src/card/card.css
 packages/ui/src/skeleton/skeleton.css
@@ -28,3 +29,7 @@ packages/ui/src/modal/modal.css
 packages/ui/src/tab/tab.css
 packages/ui/src/data-table/data-table.css
 packages/ui/src/menu/menu.css
+packages/ui/src/resizable/resizable.css
+packages/ui/src/breadcrumb/breadcrumb.css
+packages/ui/src/textarea/textarea.css
+packages/ui/src/accordion/accordion.css

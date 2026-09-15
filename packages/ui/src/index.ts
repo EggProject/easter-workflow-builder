@@ -16,9 +16,23 @@ export { isThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODE_VALUES, type ThemeMode 
 export { ThemeModeToggle } from './theme-mode/ThemeModeToggle.tsx';
 export { useThemeMode, type UseThemeModeResult } from './theme-mode/use-theme-mode.ts';
 
+// Az űrlap mezők hibaüzenetének megjelenési szabálya (érintett vagy már
+// megkísérelt beküldés). A kontextust a beküldést ismerő űrlap adja meg; a
+// hook a `TextField`, a `SelectField` és a `TextAreaField` közös belső
+// használatán túl a saját mezőt író fogyasztóknak is elérhető.
+export { FieldErrorVisibilityContext } from './field-error-visibility/field-error-visibility-context.ts';
+export {
+  useFieldErrorVisibility,
+  type FieldErrorVisibility,
+} from './field-error-visibility/use-field-error-visibility.ts';
+
 // Komponensek.
+export { Accordion, type AccordionProperties } from './accordion/Accordion.tsx';
+export { AccordionItem, type AccordionItemProperties } from './accordion/AccordionItem.tsx';
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
+export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
+export { ButtonGroup, type ButtonGroupProperties } from './button-group/ButtonGroup.tsx';
 export { Card, type CardProperties } from './card/Card.tsx';
 export {
   DataTable,
@@ -31,6 +45,10 @@ export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from '.
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';
 export { MenuItem, type MenuItemProperties } from './menu/MenuItem.tsx';
 export { Modal, type ModalIconVariant, type ModalProperties, type ModalSize } from './modal/Modal.tsx';
+export { PageFooter, type PageFooterProperties } from './page-footer/PageFooter.tsx';
+export { Resizable, type ResizableProperties } from './resizable/Resizable.tsx';
+export { ResizableHandle, type ResizableHandleProperties } from './resizable/ResizableHandle.tsx';
+export { ResizablePanel, type ResizablePanelProperties } from './resizable/ResizablePanel.tsx';
 export {
   SelectField,
   type SelectFieldOption,
@@ -39,7 +57,8 @@ export {
 } from './select-field/SelectField.tsx';
 export { Skeleton, type SkeletonProperties, type SkeletonShape } from './skeleton/Skeleton.tsx';
 export { Tabs, type TabItem, type TabsProperties } from './tab/Tabs.tsx';
-export { TextField, type TextFieldProperties } from './text-field/TextField.tsx';
+export { TextAreaField, type TextAreaFieldProperties, type TextAreaFieldSize } from './textarea/TextAreaField.tsx';
+export { TextField, type TextFieldProperties, type TextFieldSize } from './text-field/TextField.tsx';
 export { Toast, type ToastAction, type ToastProperties, type ToastVariant } from './toast/Toast.tsx';
 export { ToastViewport, type ToastViewportProperties, type ToastViewportPosition } from './toast/ToastViewport.tsx';
 export {

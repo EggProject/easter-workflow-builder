@@ -1,0 +1,109 @@
+/* ============================================================
+   EggProject — Button group (split button)
+   Forrás: eggproject-design-components/components/button-group/
+   button-group.css, bájtra azonos a forrás @import sora
+   (design-token tokenek, amiket a csomag globálisan tölt be)
+   kivételével. Átemelés dátuma: 2026-09-09.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+
+   HOZZÁADVA a forráshoz képest: a fájl végén egy dokumentált blokk, ami a
+   `Menu` render-prop trigger `.menu-anchor` csomagolójára adja ugyanazt a
+   fúziós/lekerekítési receptet, mint a sima `.btn` testvérnek jár - lásd a
+   blokk saját fejléc kommentjét lent.
+   ============================================================ */
+
+/* ============ Button Group ============
+   Structure:
+     .button-group[ .button-group--vertical ]
+       > .btn (any variant)
+   Collapses borders between adjacent buttons and
+   rounds only the outer corners.
+============================================ */
+.button-group {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.button-group--vertical {
+  flex-direction: column;
+}
+
+/* Fuse borders between buttons */
+.button-group > .btn {
+  border-radius: 0;
+  position: relative;
+}
+.button-group > .btn:not(:first-child) {
+  margin-left: -1px;
+}
+.button-group--vertical > .btn:not(:first-child) {
+  margin-left: 0;
+  margin-top: -1px;
+}
+
+/* Round outer corners */
+.button-group > .btn:first-child {
+  border-top-left-radius: var(--ep-radius-md);
+  border-bottom-left-radius: var(--ep-radius-md);
+}
+.button-group > .btn:last-child {
+  border-top-right-radius: var(--ep-radius-md);
+  border-bottom-right-radius: var(--ep-radius-md);
+}
+
+.button-group--vertical > .btn:first-child {
+  border-radius: var(--ep-radius-md) var(--ep-radius-md) 0 0;
+}
+.button-group--vertical > .btn:last-child {
+  border-radius: 0 0 var(--ep-radius-md) var(--ep-radius-md);
+}
+
+/* Keep active/focused button on top */
+.button-group > .btn:hover,
+.button-group > .btn:focus,
+.button-group > .btn.is-active {
+  z-index: 1;
+}
+
+/* Active state for segmented control use */
+.button-group > .btn.is-active {
+  background: var(--ep-accent);
+  color: var(--ep-accent-on);
+  border-color: var(--ep-accent);
+}
+
+/* ============ Egyedi kiegészítés: Menu trigger a csoportban ============
+   A forrás "Mixed (split button)" mintája szerint a lenyíló nyíl gomb egy
+   sima `.btn` testvér (lásd `button-group.html`). A projekt `Menu`
+   komponense (`packages/ui/src/menu/Menu.tsx`) viszont a triggerét egy
+   `<span class="menu-anchor">` elembe csomagolja - a fókusz-visszaállítás
+   és a "kívülre kattintás" észleléséhez -, tehát a trigger gomb NEM
+   közvetlen gyereke a `.button-group`-nak, és a fenti `.button-group >
+   .btn` szabályok nem találják meg. Ez a blokk ugyanazt a fúziós/
+   lekerekítési receptet adja a `.menu-anchor`-ba csomagolt gombra, mint
+   amit a sima `.btn` testvér kapna - ez a Menu API render-prop jellegének
+   következménye, nem design system eltérés, a design system saját CSS-e
+   ilyen esetet nem ismer. */
+.button-group > .menu-anchor {
+  display: flex;
+}
+.button-group > .menu-anchor > .btn {
+  border-radius: 0;
+  position: relative;
+}
+.button-group > .menu-anchor:not(:first-child) > .btn {
+  margin-left: -1px;
+}
+.button-group > .menu-anchor:first-child > .btn {
+  border-top-left-radius: var(--ep-radius-md);
+  border-bottom-left-radius: var(--ep-radius-md);
+}
+.button-group > .menu-anchor:last-child > .btn {
+  border-top-right-radius: var(--ep-radius-md);
+  border-bottom-right-radius: var(--ep-radius-md);
+}
+.button-group > .menu-anchor.is-open > .btn,
+.button-group > .menu-anchor > .btn:hover,
+.button-group > .menu-anchor > .btn:focus {
+  z-index: 1;
+}

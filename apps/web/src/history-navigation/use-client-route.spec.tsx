@@ -104,6 +104,24 @@ describe('useClientRoute', () => {
     expect(latest?.search).toBe('');
   });
 
+  it('navigate query paraméterrel a kérdőjeles alakot tolja be, és a routeId a puszta útvonalra illeszkedik', () => {
+    const port = createFakePort('/');
+    act(() => {
+      root.render(<HookHarness port={port} />);
+    });
+
+    act(() => {
+      latest?.navigate('runView', 'runId=r-1');
+    });
+
+    // A `pushState` a teljes URL-t kapja (a query stringgel együtt), az
+    // útvonal illesztés viszont a puszta sablonra megy: a `CLIENT_ROUTE_TABLE`
+    // bejegyzései paraméter nélküliek (SPEC-008 5. szekció bevezetője).
+    expect(port.pathname()).toBe('/run?runId=r-1');
+    expect(latest?.routeId).toBe('runView');
+    expect(latest?.search).toBe('?runId=r-1');
+  });
+
   it('popstate eseményre a location.pathname alapján újraszámol', () => {
     const port = createFakePort('/');
     act(() => {

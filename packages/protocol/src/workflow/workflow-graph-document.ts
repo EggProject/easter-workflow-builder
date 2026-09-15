@@ -1,18 +1,22 @@
 import { z } from 'zod';
+import { NodeConfigSchema } from '../node-config/node-config.ts';
 import { NodeTypeSchema } from './node-type.ts';
 
 /**
- * A node beállítása a dróton `unknown` marad (SPEC-005 3.3 szekció elve a
- * `run_event` payloadra: "a drótszintű alak amúgy sem azonos a tárolási
- * alakkal"). A tíz `NodeConfig` ág (`AgentStepConfig` és társai) a `db`
- * csomag domain típusa, amit a `protocol` L1 rétegként nem importálhat
- * (SPEC-005 F-23); egy tíz ágú, kézzel másolt duplikátum séma egy második,
- * elcsúszásra képes forrás lenne, épp amit a Zod séma réteg (7.1 szekció) el
- * akar kerülni. A mély ellenőrzést a szerver végzi a `db` `isNodeConfig`
- * guardjával, a validált értéket adva tovább (SPEC-005 7.2 utolsó bekezdése:
- * "a Zod a bemenet és a guard a kimenet felé áll").
+ * A node beállítása a `NodeConfigSchema` tíz ágú diszkriminált uniója, a `db`
+ * `NodeConfig` uniójának szándékos mirror sémája (SPEC-005 7.7,
+ * `.claude/CLAUDE.md` 5. szekció "A `protocol` a `db` domain uniót is
+ * duplikálhatja..."). A korábbi `z.unknown()` alak avval indokolta magát,
+ * hogy a `protocol` L1 rétegként a `db` domain típusát nem importálhatja
+ * (SPEC-005 F-23) - ez változatlanul igaz, de a duplikáció maga nem elcsúszó
+ * forrás: az `apps/server` `node-config-drift-protection` regressziós tesztje
+ * típusszinten kényszeríti ki a két oldal kölcsönös egyenlőségét, plusz
+ * futásidejű ellenőrzést ad a `db` `isNodeConfig` guardján keresztül. A mély
+ * ellenőrzést a szerver továbbra is elvégzi a `db` `isNodeConfig` guardjával
+ * (SPEC-005 7.2 utolsó bekezdése: "a Zod a bemenet és a guard a kimenet felé
+ * áll"), de a Zod séma innentől a helyes ágakra szűkít, nem `unknown`-ra.
  */
-const NODE_CONFIG_SCHEMA = z.unknown();
+const NODE_CONFIG_SCHEMA = NodeConfigSchema;
 
 export const WorkflowNodeInputSchema = z.strictObject({
   id: z.string(),

@@ -59,12 +59,62 @@ function submitForm(container: HTMLElement): void {
   form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
-function typeInto(input: HTMLInputElement | HTMLSelectElement, value: string): void {
-  const prototype = input instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLSelectElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+function typeInto(input: HTMLInputElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
   descriptor?.set?.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
+/**
+ * A `SelectField` trigger `role="combobox"` szerepű gomb; a mezőt a saját
+ * `.field` burkolóján belüli `.field__label` szövege azonosítja.
+ */
+function selectTrigger(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button.select')].find(
+    (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === label,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${label}" feliratú select triggert`);
+  }
+  return button;
+}
+
+/**
+ * A panel `createPortal`-lal a `document.body`-ba kerül, tehát NEM a
+ * `container` leszármazottja; a triggerhez az `aria-controls` köti.
+ */
+function selectPanel(trigger: HTMLButtonElement): HTMLElement {
+  const panelId = trigger.getAttribute('aria-controls');
+  const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+    (candidate) => candidate.id === panelId,
+  );
+  if (panel === undefined) {
+    throw new Error('a teszt nem találta a select panelt');
+  }
+  return panel;
+}
+
+function chooseOption(container: HTMLElement, label: string, optionLabel: string): void {
+  const trigger = selectTrigger(container, label);
+  clickOn(trigger);
+  const option = [...selectPanel(trigger).querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (candidate) => candidate.querySelector('.menu__text')?.textContent === optionLabel,
+  );
+  if (option === undefined) {
+    throw new Error(`a teszt nem talált "${optionLabel}" feliratú opciót a(z) "${label}" mezőben`);
+  }
+  clickOn(option);
 }
 
 describe('CreateWorkflowModal', () => {
@@ -113,8 +163,8 @@ describe('CreateWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    const select = container.querySelector('select');
-    expect(select?.querySelectorAll('option')).toHaveLength(2);
+    const panel = selectPanel(selectTrigger(container, 'Provider'));
+    expect(panel.querySelectorAll('[role="option"]')).toHaveLength(2);
   });
 
   it('provider választás nélkül nem ír ki env változó nevet', async () => {
@@ -149,13 +199,7 @@ describe('CreateWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    const select = container.querySelector('select');
-    if (select === null) {
-      throw new Error('a teszt nem talált <select> elemet');
-    }
-    act(() => {
-      typeInto(select, 'minimax');
-    });
+    chooseOption(container, 'Provider', 'MiniMax');
 
     expect(container.textContent).toContain('Szükséges környezeti változók: MINIMAX_API_KEY');
   });
@@ -174,13 +218,7 @@ describe('CreateWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    const select = container.querySelector('select');
-    if (select === null) {
-      throw new Error('a teszt nem talált <select> elemet');
-    }
-    act(() => {
-      typeInto(select, 'claude-subscription');
-    });
+    chooseOption(container, 'Provider', 'Claude előfizetés');
 
     expect(container.textContent).toContain('Ehhez a providerhez nem kell környezeti változó.');
   });
@@ -263,15 +301,14 @@ describe('CreateWorkflowModal', () => {
     const inputs = container.querySelectorAll('input');
     const nameInput = inputs[0];
     const descriptionInput = inputs[1];
-    const select = container.querySelector('select');
-    if (nameInput === undefined || descriptionInput === undefined || select === null) {
+    if (nameInput === undefined || descriptionInput === undefined) {
       throw new Error('a teszt nem talált minden mezőt');
     }
     act(() => {
       typeInto(nameInput, 'Alfa');
       typeInto(descriptionInput, 'egy leírás');
-      typeInto(select, 'claude-subscription');
     });
+    chooseOption(container, 'Provider', 'Claude előfizetés');
 
     await act(async () => {
       submitForm(container);

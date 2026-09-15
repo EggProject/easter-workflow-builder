@@ -1,10 +1,19 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
-import { AppShellFrame, logoMarkUrl, ThemeModeToggle } from '@easter-workflow-builder/ui';
-import { useEffect, useState, type ReactElement } from 'react';
+import {
+  AppShellFrame,
+  Breadcrumb,
+  logoMarkUrl,
+  ThemeModeToggle,
+  type BreadcrumbAncestor,
+} from '@easter-workflow-builder/ui';
+import { useEffect, useState, type MouseEvent, type ReactElement } from 'react';
+import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
+import { GraphEditorScreen } from '../graph-editor/GraphEditorScreen.tsx';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
 import { RunHistoryScreen } from '../run-history/run-history-screen.tsx';
+import { RunViewScreen } from '../run-view/RunViewScreen.tsx';
 import { browserEventSourceFactory } from '../stream-client/browser-event-source-factory.ts';
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
 import { useStreamConnection, type StreamConnectionPhase } from '../stream-client/use-stream-connection.ts';
@@ -12,6 +21,7 @@ import { WorkflowListScreen } from '../workflow-list/workflow-list-screen.tsx';
 
 export interface AppShellProperties {
   readonly apiOrigin: string;
+  readonly streamOrigin: string;
   readonly listLimit: number;
   readonly streamReplayLimit: number;
   readonly fetchFunction: FetchFunction;
@@ -31,6 +41,46 @@ const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string
 };
 
 /**
+ * Az ismeretlen (`undefined`) útvonal morzsamenü végpontjának neve
+ * (2026-09-06). Nem a `CLIENT_ROUTE_TABLE` tagja, mert nincs hozzá valódi
+ * útvonal sablon - ez a `NotFoundRoute` képernyő egyetlen, nem duplikált
+ * felirata.
+ */
+const NOT_FOUND_BREADCRUMB_LABEL = 'Ismeretlen oldal';
+
+/**
+ * A morzsamenü elemei útvonalanként (2026-09-06, a nagy oldalcím
+ * felváltása). A `workflowList` az alkalmazás gyökere: ott a "Workflow-k"
+ * maga az aktuális, ős nélküli elem (WAI-ARIA APG Breadcrumb Pattern - az
+ * aktuális elemnek nincs elődje a lista élén). Minden más útvonalon a
+ * "Workflow-k" az első, kattintható ős, mert minden képernyő innen érhető
+ * el. Az útvonal nevek a `CLIENT_ROUTE_TABLE` `label` mezőjéből jönnek, nem
+ * duplikálva itt (`.claude/CLAUDE.md` 5. szekció).
+ */
+function buildBreadcrumbAncestors(
+  routeId: ClientRouteId | undefined,
+  navigate: (routeId: ClientRouteId) => void,
+): readonly BreadcrumbAncestor[] {
+  if (routeId === 'workflowList') {
+    return [];
+  }
+  return [
+    {
+      label: CLIENT_ROUTE_TABLE.workflowList.label,
+      href: CLIENT_ROUTE_TABLE.workflowList.template,
+      onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+        navigate('workflowList');
+      },
+    },
+  ];
+}
+
+function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
+  return routeId === undefined ? NOT_FOUND_BREADCRUMB_LABEL : CLIENT_ROUTE_TABLE[routeId].label;
+}
+
+/**
  * Az alkalmazás gyökér összeállítása (SPEC-007 5.1 mermaid: `AppShell,
  * osztaly app-tn`): a topnav bar ÉS a útválasztott tartalom együtt, nem
  * csak egy csupasz topnav. Az egyetlen, app élettartamú
@@ -38,11 +88,11 @@ const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string
  * tovább, ami az egyetlen SSE fogyasztó (SPEC-007 10.2).
  */
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
-  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
+  const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
 
   const { routeId, search, navigate } = useClientRoute(browserHistoryLocationPort);
   const streamConnection = useStreamConnection({
-    apiOrigin,
+    streamOrigin,
     eventSourceFactory: browserEventSourceFactory,
     streamIdGenerator: browserStreamIdGenerator,
   });
@@ -69,7 +119,12 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
   return (
     <AppShellFrame
       isNavigationMenuOpen={isNavigationMenuOpen}
-      pageTitle={routeId === 'runHistory' ? 'Futás előzmények' : 'Workflow-k'}
+      breadcrumb={
+        <Breadcrumb
+          ancestors={buildBreadcrumbAncestors(routeId, navigate)}
+          current={resolveBreadcrumbCurrent(routeId)}
+        />
+      }
       brand={
         <>
           <button
@@ -102,24 +157,24 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
       navigation={
         <>
           <a
-            href="/"
+            href={CLIENT_ROUTE_TABLE.workflowList.template}
             className={routeId === 'workflowList' ? 'is-on' : undefined}
             onClick={(event) => {
               event.preventDefault();
               navigate('workflowList');
             }}
           >
-            Workflow-k
+            {CLIENT_ROUTE_TABLE.workflowList.label}
           </a>
           <a
-            href="/runs"
+            href={CLIENT_ROUTE_TABLE.runHistory.template}
             className={routeId === 'runHistory' ? 'is-on' : undefined}
             onClick={(event) => {
               event.preventDefault();
               navigate('runHistory');
             }}
           >
-            Futás előzmények
+            {CLIENT_ROUTE_TABLE.runHistory.label}
           </a>
         </>
       }
@@ -188,6 +243,12 @@ function renderRouteContent(
           serverRestartCount={serverRestartCount}
         />
       );
+    }
+    case 'graphEditor': {
+      return <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} />;
+    }
+    case 'runView': {
+      return <RunViewScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />;
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

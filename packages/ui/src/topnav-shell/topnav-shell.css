@@ -98,6 +98,158 @@
 }
 
 /* ============================================================
+   A tartalom terület függőleges kitöltése (2026-09-05). ÚJ, önálló
+   blokk — a fenti, átemelt szabályok egyetlen bájtja sem változott.
+
+   A MÉRT HIBA. Az `.app-tn__main` már `flex: 1`, de a benne álló
+   `.app-tn__inner` és `.app-content` nem adta tovább ezt a magasságot:
+   egy `height: 100%` a gyerekükön 0-ra oldódott fel. Emiatt a gráf
+   szerkesztő vászna kénytelen volt viewport-relatív (`70vh`) magasságot
+   használni, ami valós böngészőben a csomópont rácsot a viewporton
+   túlnyújtotta, és az OLDALT görgette a vászon pásztázása helyett.
+
+   A JAVÍTÁS. A shell magassága HATÁROZOTT (`height: 100vh`), nem csak
+   alsó korlát: az átemelt `min-height: 100vh` mellett egy magas
+   gyerek (a szerkesztő beállítás panelje 2265px-re mérve) az egész
+   láncot megnyújtotta volna, és a `flex: 1` semmit nem korlátozna, mert
+   egy határozatlan magasságú flex konténerben nincs mit elosztani. A
+   határozott magasság mellett a görgetés helye az `.app-content` lesz
+   (`overflow: auto`), tehát a hosszú listák ugyanúgy görgethetők, csak
+   a tartalom területén belül, a dokumentum törzse helyett. A
+   `min-height: 0` azért kell, mert egy flex elem alapértelmezett
+   `min-height: auto` értéke a tartalom magasságára feszítené a dobozt,
+   és a belső `overflow` sosem lépne életbe.
+   ============================================================ */
+.app-tn {
+  height: 100vh;
+}
+.app-tn__main {
+  min-height: 0;
+}
+.app-tn__inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ============================================================
+   A gráf szerkesztő FALTÓL FALIG tartalom területe (2026-09-06,
+   2026-09-09-én kiterjesztve). ÚJ, önálló blokk - a fenti, átemelt
+   .app-content szabály (36-39. sor) egyetlen bájtja sem változott.
+
+   A MÉRT HIBA (2026-09-06). Az átemelt .app-content 80px alsó paddingje
+   (--ep-space-20) egy hosszú, GÖRGETETT lista (workflow lista, futás
+   előzmények) aljára szánt légtér. A gráf szerkesztő a fenti blokk
+   .app-content flex:1 szabályára épülve az .app-content TARTALOM
+   dobozát tölti ki (apps/web graph-editor-screen.css); mivel a padding
+   a tartalom doboz köré kerül, nem a flex-allokált külső méretbe
+   számít bele, a 80px levonódik a vászon és a dokkolt beállítás panel
+   rendelkezésre álló magasságából. Mérve (chromium, 1440x900,
+   editor-node-inspector.png): a vászon/panel alsó éle a viewport
+   aljától 80px-re végződött, üres sávot hagyva alatta.
+
+   A KITERJESZTÉS (2026-09-09, felhasználói kérés: "faltol falig, slim
+   designt csinaljunk"). Ugyanez az oldalsó 40px belső margóra is igaz:
+   a szerkesztő vászna nem egy hasáb az oldal közepén, hanem a teljes
+   területet elfoglaló munkafelület, az aljához tapadó akciósáv pedig
+   szintén a teljes szélességet kéri. Ezért a padding ezen az egy
+   screen-en TELJESEN nullázódik, nem csak alul csökken. Kitalált szám
+   így nincs is: a `0` az egyetlen érték.
+
+   A HATÓKÖR. Kizárólag a gráf szerkesztő screen-re szűkítve: a
+   `:has(> .graph-editor-screen)` azért használható megkülönböztetésül,
+   mert EGYEDÜL ez a screen ad megnevezett osztályt az .app-content
+   közvetlen gyerekének (a workflow lista és a futás előzmények screen
+   gyökere osztály nélküli div, GraphEditorScreen.tsx). A szabály
+   specificitása (0,2,0) magasabb, mint a --ep-screen-md alatti
+   reszponzív .app-content szabályé (0,1,0), tehát a nullázás szűk
+   nézetben is érvényes marad. A `:has()` a chromiumban Chrome 105 óta
+   (2022) natívan támogatott (https://developer.chrome.com/blog/has-m105/,
+   https://caniuse.com/css-has), a projekt e2e Playwright futtatása
+   kizárólag chromium ellen megy (apps/web/playwright.config.ts,
+   SPEC-007 13.4). Regresszió: apps/web/e2e/graph-editor.spec.ts és
+   apps/web/e2e/graph-editor-layout.spec.ts.
+   ============================================================ */
+.app-content:has(> .graph-editor-screen) {
+  padding: 0;
+}
+
+/* ============================================================
+   A FORRÁS `_shell.css` ALAPOZÓ BLOKKJA, MÉRT HIBA JAVÍTÁSA.
+
+   A MÉRT HIBA. A `<select>`, a `<button>` és minden más natív vezérlő a
+   szülőjétől NEM örökli a betűtípust, azt a böngésző saját stílusa adja.
+   A projekt átemelt komponens CSS-ei (`select.css`, `button.css`,
+   `accordion.css`) pontosan úgy oldják ezt meg, ahogy a forrás:
+   `font-family: inherit`. Ez viszont csak akkor ad Robotót, ha a
+   láncban VAN valaki, aki a családot beállítja. A forrásban ez a
+   `_shell.css` `body` szabálya; abból korábban kizárólag a `margin: 0`
+   került át, tehát a `body` a böngésző alapértelmezésén maradt.
+   Chromium 141 alatt mérve: `body` és `select.select` számított
+   `font-family` értéke `"Times New Roman"`, azaz TALPAS betű, miközben
+   a design system saját `select.html` példáján ugyanez
+   `Roboto, -apple-system, BlinkMacSystemFont, system-ui, sans-serif`.
+   A `body` számított `color` értéke ugyanígy `rgb(0, 0, 0)` volt a
+   forrás `rgb(10, 18, 48)` helyett.
+
+   A JAVÍTÁS. A forrás `_shell.css` alapozó `body` szabálya és a
+   `button { font-family: inherit }` sora, deklarációnként bájtra
+   azonosan. A `margin: 0` a `body` szabályba olvad, ugyanazzal az
+   indokkal, ami eddig is állt mellette: a böngésző alapértelmezett 8px
+   margója nélkül a shell nem ér el a fal széléig, és a
+   `min-height: 100vh` mellé 16px függőleges túllógást ad.
+
+   AMI SZÁNDÉKOSAN NEM KERÜL ÁT. A forrás univerzális
+   `* { box-sizing: border-box; margin: 0; padding: 0; }` resetje (SPEC-007
+   4.2 szűkített átemelés): az minden komponens térközét átírná, ami
+   ennek a hibának a javításához nem kell. A hiányából eredő két konkrét
+   eset már pontszerűen javítva van (`.input` és `.textarea`
+   `box-sizing: border-box` sora). Ugyanígy kimarad a forrás
+   `html, body { min-height: 100% }` és `a { color: inherit }` sora: egyik
+   sem a betűtípusról szól, és a projekt magassági, illetve link
+   színezési viselkedése ma helyes.
+
+   Regresszió: apps/web/e2e/form-control-typography.spec.ts.
+   ============================================================ */
+body {
+  margin: 0;
+  font-family: var(--ep-font-sans);
+  color: var(--ep-fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button { font-family: inherit; }
+
+/* ============================================================
+   A page-head függőleges térközének csökkentése, mert a nagy H1 cím
+   megszűnt, helyette a menüsáv alatti kompakt morzsamenü áll
+   (felhasználói kérés, 2026-09-06). ÚJ, önálló blokk - a fenti, átemelt
+   .app-pagehead szabály egyetlen bájtja sem változott.
+
+   A MÉRT PROBLÉMA. Az átemelt .app-pagehead 32px felső és 20px alsó belső
+   margót ad, egy 36px betűméretű H1-hez tervezve (font: 400 36px/1.1).
+   A cím eltávolítása után (AppShellFrame.tsx) ez a térköz a nála jóval
+   alacsonyabb, 13px-es morzsamenü körül feleslegesen nagy marad.
+
+   A JAVÍTÁS. A design system saját spacing skálájának (design-token/
+   spacing.css) tokenjeire állítva: --ep-space-3 (12px) felül és alul - a
+   --ep-space-10 (40px) oldalsó margó VÁLTOZATLAN, mert az illeszkedik az
+   .app-content ugyanolyan 40px oldalsó térközéhez (nem kitalált szám,
+   mindkét érték a token skála tagja).
+   ============================================================ */
+.app-pagehead {
+  padding-top: var(--ep-space-3);
+  padding-bottom: var(--ep-space-3);
+}
+
+/* ============================================================
    Reszponzív: navigáció lenyíló menübe (SPEC-007 5.3, M-26, M-29).
    ÚJ, a forrásban nem létező szabály: az M-28 mérés szerint a
    forrás _shell.css három media querye egyike sem érinti a

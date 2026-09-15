@@ -23,7 +23,7 @@
 //      `computePhase` `reconnecting` ágára fut - a `replaying` felirat így
 //      csak egy meg nem figyelhető pillanatra jelenik meg.
 //
-// SOROS FUTÁS. A teszt szerver a `VITE_API_ORIGIN` build időben rögzített
+// SOROS FUTÁS. A teszt szerver a `VITE_STREAM_ORIGIN` build időben rögzített
 // portjára kötődik (nem választható meg szabadon, mert az `EventSource` URL-je
 // abból épül), tehát egyszerre csak egy teszt tarthatja. A `fullyParallel`
 // beállítás a fájlon BELÜL is párhuzamosítana, ezért ez a fájl a dokumentált
@@ -33,18 +33,18 @@ import type { RunEventRecord, RunSummary, StreamFrame, WorkflowSummary } from '@
 import { encodeStreamFrame } from '@easter-workflow-builder/protocol';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { API_ORIGIN, PREVIEW_ORIGIN } from './api-origin.ts';
+import { PREVIEW_ORIGIN, STREAM_ORIGIN } from './api-origin.ts';
 
 test.describe.configure({ mode: 'serial' });
 
-// A tényleges portszám az `API_ORIGIN`-ből származik, nem külön literál:
+// A tényleges portszám a `STREAM_ORIGIN`-ből származik, nem külön literál:
 // a valódi teszt szervernek PONTOSAN arra a portra kell kötődnie, amit a
-// build időben rögzített `VITE_API_ORIGIN` is hordoz.
-const REAL_SERVER_PORT = Number(new URL(API_ORIGIN).port);
+// build időben rögzített `VITE_STREAM_ORIGIN` is hordoz.
+const REAL_SERVER_PORT = Number(new URL(STREAM_ORIGIN).port);
 
 /**
  * A Vite preview szerver és ez a teszt szerver más origin (4173 kontra
- * `API_ORIGIN` 4174), tehát az `EventSource` valódi, hitelesítő adatok
+ * `STREAM_ORIGIN` 4174), tehát az `EventSource` valódi, hitelesítő adatok
  * nélküli CORS kérést indít: `Access-Control-Allow-Origin` fejléc nélkül a
  * böngésző a választ nem adja át a JS rétegnek (a `readyState` sosem ér
  * OPEN-ig, a `page.route()`-mockolt esetekkel ellentétben, ahol a CDP által

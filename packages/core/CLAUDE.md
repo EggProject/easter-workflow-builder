@@ -30,13 +30,19 @@ Típus-only fájlok, nincs hozzájuk `.spec.ts` (SPEC-002 6.3): `outcome.ts`,
 
 A `core` egyetlen workspace csomagtól sem függ, L0 réteg (SPEC-002 4. szekció). Ez a legalsó
 csomag a függőségi gráfban, minden más termékcsomag ebből építkezhet. Külső csomagot sem
-használ: se `axios`, se `dotenv`, a Node beépített `fetch` és `Buffer` a teljes eszközkészlet.
+használ: se `axios`, se `dotenv`, a szabványos `fetch` és a szabványos base64 kódolás
+(`Uint8Array.prototype.toBase64()`) a teljes eszközkészlet.
 
 ## Szabályok
 
 Konkrét szolgáltatás végpontja, környezeti változó neve vagy alapértelmezése nem kerülhet ide,
 azok a kliens csomagokban vannak (`minimax-client`, `firecrawl-client`). A `src/` alatti
 mappaszerkezet a téma szerinti konvenciót követi, a részletek a lenti SPEC-002 hivatkozásban.
+
+**Node beépített modult (`node:*`) egyetlen fájl sem importálhat.** A csomag felülete egyetlen
+barrel, amit az `apps/web` is érték szinten importál, tehát a barrel minden modulja bekerül a
+böngésző modulgráfjába; `vite dev` alatt (tree shaking nélkül) egy `node:` import az egész
+frontendet megbuktatja. Az `apps/web/src/browser-safe-imports/` regressziós teszt őrzi.
 
 ## Kapcsolódó dokumentumok
 

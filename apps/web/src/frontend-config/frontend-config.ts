@@ -7,9 +7,17 @@
  */
 export interface FrontendConfig {
   /**
-   * Az az origin, amin a szerver REST és SSE végpontjai elérhetők (O-4).
+   * Az az origin, amin a szerver REST végpontjai elérhetők. Fejlesztéskor a
+   * Vite dev szerver saját originje, mert a REST hívás a `/api` proxy
+   * szabályon megy át; élesben a szerver origin (SPEC-008 3.3).
    */
   readonly apiOrigin: string;
+  /**
+   * Az az origin, amin a szerver SSE (`/events`) végpontja elérhető.
+   * Fejlesztéskor a backend origin, a proxyt megkerülve (SPEC-005 5.8,
+   * SPEC-008 3.1); élesben megegyezik az `apiOrigin` értékével.
+   */
+  readonly streamOrigin: string;
   /**
    * A lista végpontok `limit` paramétere (O-6).
    */

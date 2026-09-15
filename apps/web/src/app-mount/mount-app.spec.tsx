@@ -64,6 +64,7 @@ describe('mountApp', () => {
 
   it('érvényes konfigurációval a WorkflowListScreen tartalmát rajzolja a #root alá', async () => {
     vi.stubEnv('VITE_API_ORIGIN', 'https://api.example.test');
+    vi.stubEnv('VITE_STREAM_ORIGIN', 'https://stream.example.test');
     vi.stubEnv('VITE_LIST_LIMIT', '25');
     vi.stubEnv('VITE_STREAM_REPLAY_LIMIT', '50');
     Object.assign(globalThis, { EventSource: FakeEventSource });

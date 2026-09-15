@@ -13,6 +13,7 @@ import {
 import { createPortal } from 'react-dom';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import { computePanelPosition, type PanelPosition } from './compute-panel-position.ts';
+import { isInsideMenu } from './is-inside-menu.ts';
 import { MenuCloseContext } from './menu-close-context.ts';
 import { readPanelElement } from './read-panel-element.ts';
 import './menu.css';
@@ -70,24 +71,6 @@ function focusMenuItem(items: readonly HTMLButtonElement[], target: HTMLButtonEl
 }
 
 /**
- * Igaz, ha a `target` a `anchor` vagy a `panel` valamelyikének (akár közvetett)
- * leszármazottja. A panel és az anchor a DOM-ban 2026-09-04 óta KÜLÖN ágon
- * áll (lásd a `Menu` fejléc dokumentációját), ezért a "kívülre kattintás"/
- * "fókusz elhagyta a menüt" döntés mindkettőt meg kell vizsgálja.
- */
-function isInsideMenu(
-  anchor: HTMLSpanElement | null,
-  panel: HTMLDivElement | null,
-  target: EventTarget | null,
-): boolean {
-  if (!(target instanceof Node)) {
-    return false;
-  }
-  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- mérve (bun run test, packages/ui/src/menu): az `anchor?.contains`/`panel?.contains` opcionális láncolás a v8 lefedettségi eszköznél ÖNÁLLÓ, mindkét oldalon lefedendő branch-et hoz létre, holott `anchor`/`panel` a hívási pontokon a gyakorlatban SOHA nem null (lásd a fenti dokumentációt) - a `!== null &&` forma ezt a branch-et NEM hozza létre.
-  return (anchor !== null && anchor.contains(target)) || (panel !== null && panel.contains(target));
-}
-
-/**
  * A design-token `.menu` lebegő művelet menü (felhasználói kérés: táblázat
  * sor műveletek egy hárompontos triggerből nyílva). A forrás `Menu`/
  * `MenuItem` pár DOKUMENTÁLT RÉSZHALMAZA: a `MenuLabel`, `MenuDivider`,
@@ -131,7 +114,9 @@ function isInsideMenu(
  * ezért a nyers jobbra igazítás keskeny viewporton (mérve: 320px) a panelt
  * a viewport BAL szélén túlra tolta. A `compute-panel-position.ts` ezért
  * mindig a viewporton belülre szorítja az eredményt - lásd ott a
- * dokumentációt és a mért esetet reprodukáló tesztet.
+ * dokumentációt és a mért esetet reprodukáló tesztet. Ugyanez a modul
+ * dönt a FÜGGŐLEGES irányról is: ha a trigger a viewport aljához közel ül
+ * (pl. a szerkesztő ragadós láblécében), a panel felfelé nyílik.
  *
  * MARADÉK KORLÁT. A pozíció csak NYITÁSKOR számolódik: ha a trigger körüli
  * görgethető ős (pl. a táblázat törzse) a menü NYITOTT állapotában
@@ -147,7 +132,7 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
   const { trigger, align = 'left', children } = properties;
 
   const [open, setOpen] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<PanelPosition>({ top: 0, left: 0 });
+  const [panelPosition, setPanelPosition] = useState<PanelPosition>({ top: 0, bottom: undefined, left: 0 });
   const anchorReference = useRef<HTMLSpanElement | null>(null);
   const panelReference = useRef<HTMLDivElement | null>(null);
   const triggerReference = useRef<HTMLButtonElement | null>(null);
@@ -234,7 +219,14 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
 
   function openMenu(triggerElement: HTMLButtonElement, intent: 'first' | 'last'): void {
     openIntentReference.current = intent;
-    setPanelPosition(computePanelPosition(triggerElement.getBoundingClientRect(), align, globalThis.innerWidth));
+    setPanelPosition(
+      computePanelPosition(
+        triggerElement.getBoundingClientRect(),
+        align,
+        globalThis.innerWidth,
+        globalThis.innerHeight,
+      ),
+    );
     setOpen(true);
   }
 
@@ -314,7 +306,7 @@ export function Menu(properties: Readonly<MenuProperties>): ReactElement {
           aria-labelledby={triggerId}
           tabIndex={-1}
           hidden={!open}
-          style={{ top: panelPosition.top, left: panelPosition.left }}
+          style={{ top: panelPosition.top, bottom: panelPosition.bottom, left: panelPosition.left }}
           onKeyDown={handlePanelKeyDown}
           onBlur={handleFocusOut}
         >

@@ -1,0 +1,246 @@
+/* A csomópont beállítás panel: a vászon jobb szélére DOKKOLT sáv (SPEC-008
+   5.2, 5.5). Nem lebeg és nem takarja a vásznat - a `graph-editor-screen`
+   egy `Resizable` osztott elrendezés jobb paneljébe teszi, tehát a vászon
+   mellette szűkül, az elválasztó pedig a húzható `.resizable-handle`.
+
+   Minden térköz a design system `--ep-space-*` tokenjeiből jön, minden
+   tipográfia a `--ep-text-*` tokenekből; kitalált pixel érték nincs.
+
+   NINCS CARD IN CARD. A panel egy kártya alakú `.resizable-group`
+   belsejében ül, ezért itt egyetlen szabály sem rajzol második kártyát:
+   nincs szegély plusz lekerekítés plusz saját háttér kombináció egyetlen
+   belső dobozon sem. A korábbi `.inspector-section` (kitalált, a design
+   system `.card`-jától eltérő tokenkombinációjú kártya) és a panel tetején
+   álló, szegélyezett hibaösszesítő emiatt megszűnt
+   (`docs/research/2026-09-08-design-system-audit.md` 6. szekció,
+   felhasználói kérés 2026-09-09).
+
+   A panel SAJÁT hátteret kap (`--ep-bg-elevated`), a vászon a nála
+   mélyebb `--ep-bg-sunken` felületen ül (`graph-editor.css`), tehát a két
+   terület a húzható elválasztó nélkül is elkülönül. */
+.node-inspector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--ep-bg-elevated);
+}
+
+/* A fejléc a görgethető törzsön KÍVÜL áll, tehát görgetés közben is látszik,
+   `position: sticky` nélkül: a panel oszlop irányú flex, a fejléc a nem
+   zsugorodó első elem, a törzs kapja a maradékot. */
+.node-inspector__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ep-space-3);
+  padding: var(--ep-space-4) var(--ep-space-5);
+  border-bottom: 1px solid var(--ep-divider);
+  flex: 0 0 auto;
+}
+
+.node-inspector__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+  min-width: 0;
+}
+
+.node-inspector__title {
+  margin: 0;
+  font: var(--ep-text-h4);
+  color: var(--ep-fg);
+  overflow-wrap: anywhere;
+}
+
+.node-inspector__node-id {
+  margin: 0;
+  font: var(--ep-text-code);
+  color: var(--ep-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   A PANEL BEZÁRÓ X GOMBJA.
+   Forrás: eggproject-design-components/components/drawer/drawer.css
+   `.drawer__close` szabályai, deklarációnként bájtra azonosan, csak a
+   szelektor neve a mi BEM blokkunkra cserélve. A design system maga is
+   így csinálja: ugyanez a deklarációkészlet fut `.modal__close` és
+   `.toast__close` néven is, komponensenként saját néven.
+
+   MIÉRT NEM A `.btn--ghost`. A design system `.btn--ghost` variánsának
+   szövegszíne `var(--ep-accent-fg)` (button.css 91. sor), ami az arany
+   `#8A6220`. Chromium 141 alatt mérve a korábbi
+   `<Button variant="ghost" size="sm" icon>` bezáró gomb számított
+   `color` értéke pontosan `rgb(138, 98, 32)` volt, tehát a bezárás
+   elsődleges akciónak látszott (felhasználói kifogás, 2026-09-09). A
+   design system a panel bezárásra NEM a gomb komponenst használja: a
+   Drawer és a Modal is saját, `--ep-fg-muted` színű vezérlőt kap. A
+   `NodeInspector` a Drawer alakját követi (jobb oldalra dokkolt panel,
+   fejléc címmel és bezáró X-szel, ugyanazzal az SVG útvonallal), ezért
+   a Drawer megoldása kerül át.
+
+   A méret a forrás 32x32 értéke marad. A "gombok sm méretűek"
+   felhasználói szabály a `.btn` méretskálájára vonatkozik; ez a vezérlő
+   nem `.btn`, hanem a design system dedikált bezáró vezérlője, aminek
+   egyetlen szállított mérete van.
+
+   AMI NEM KERÜL ÁT: a forrás `@media (forced-colors: active)` blokkja. Az
+   a Drawer EGÉSZÉT képezi le rendszerszínekre (overlay, panel, cím,
+   törzs, elválasztók, bezáró gomb); ebből egyedül a bezáró gombot
+   kiemelni fél megoldás lenne egy olyan fájlban, aminek ma egyetlen
+   forced-colors szabálya sincs. A most javított hiba a normál módú
+   színre vonatkozik.
+
+   Regresszió: apps/web/e2e/form-control-typography.spec.ts.
+   ============================================================ */
+.node-inspector__close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ep-radius-md);
+  background: transparent;
+  border: 0;
+  color: var(--ep-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--ep-dur-fast) var(--ep-ease-out),
+    background-color var(--ep-dur-fast) var(--ep-ease-out),
+    box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+}
+.node-inspector__close:hover {
+  background: var(--ep-bg-hover);
+  color: var(--ep-fg);
+}
+/* Keyboard focus only: design-system gold ring, no layout shift. Outline removed only
+   because the box-shadow ring replaces it; the ring survives hover (no box-shadow there). */
+.node-inspector__close:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+.node-inspector__close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* A panel ÖNÁLLÓAN görög, a viewporton belül maradva: a görgetés itt van, a
+   `.resizable-panel` így sosem kap második görgősávot. */
+.node-inspector__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-5);
+  padding: var(--ep-space-5);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ============ Megnevezett mezőcsoport (`InspectorFieldGroup`) ============
+   TISZTA ELRENDEZÉS, kártya chrome nélkül: nincs szegély, nincs
+   lekerekítés, nincs saját háttér és nincs belső térköz, tehát nem tud
+   dupla eltartást vagy dobozt a dobozban adni. A csoport CÍMKÉJE a design
+   system saját `.field__label` osztálya (`text-field` téma), nem egy
+   kitalált szakaszcím osztály. */
+.node-inspector__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-5);
+  min-width: 0;
+}
+
+/* Az összecsukható panelek (`packages/ui` `accordion` téma) törzse a
+   forrásból örökölt `padding: 0 4px 18px` értéket viszi. A benne álló
+   mezőcsoport a saját, `--ep-space-5` térközével dolgozik; itt csak azt
+   kell kimondani, hogy a törzs egy szűk sávban se engedjen kilógni semmit. */
+.node-inspector .accordion__body {
+  min-width: 0;
+}
+
+/* ============ Mezők ============
+   1. A `.input` (`text-field` téma) és a `.textarea` (`textarea` téma) is
+      a design systemből jön. A `<textarea>` MA a saját `.textarea`
+      osztályát viseli, nem az egysoros `.input` osztályt, tehát a
+      korábban ide írt `resize: vertical` toldás megszűnt: a `resize` és a
+      `min-height` a komponens saját CSS-ében van.
+   2. A HIBAÜZENET HELYE MINDIG FENN VAN TARTVA: a `.field` a panelben
+      gridre vált, aminek a harmadik sora legalább egy sornyi magas, akkor
+      is, ha nincs hiba. Így a hibaüzenet megjelenése nem tolja el a panel
+      többi mezőjét (a layout nem ugrik). A `.field` alap `gap` értéke a
+      design systemé marad.
+
+      A fenntartott magasság a `--ep-space-5` token (20px), NEM a nála
+      kisebb `--ep-space-4` (16px): a hibaüzenet a `--ep-text-meta` tokent
+      viseli, ami `500 12px/1.4`, tehát a tényleges sormagassága 16,8px.
+      16px-es fenntartott sorral a mérés 0,8px elmozdulást mutatott a
+      szomszédos mezőn (`apps/web/e2e/node-inspector.spec.ts`, "a
+      hibaüzenet megjelenése nem tolja el a szomszédos mezőt"); a
+      következő skálalépcső ezt nullára viszi. */
+.node-inspector .input,
+.node-inspector .textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.node-inspector .field {
+  min-width: 0;
+}
+
+/* A fenntartott hibaüzenet sor KIZÁRÓLAG a valódi mezőkre vonatkozik. A
+   `TextField`, a `SelectField` és a `TextAreaField` `<label class="field">`
+   elemet ad, tehát a címke szerinti szűkítés pontosan ezeket fogja meg. A
+   panelben `<div class="field">` alakban álló dobozok NEM mezők: vagy több
+   mezőt fognak össze (`SystemPromptField`, `SandboxField`,
+   `StructuredOutputField`), vagy csak olvasható értéket mutatnak
+   (`Skillek`, `MCP szerverek`, `Futásidő`) - egyiknek sincs hibaüzenete,
+   tehát fenntartott hely sem kell nekik. Enélkül a csoportosító dobozok
+   üres, fenntartott sora mérten 32px felesleges rést nyitott a mezők
+   között. */
+.node-inspector label.field {
+  display: grid;
+  grid-template-rows: auto auto minmax(var(--ep-space-5), auto);
+}
+
+/* Az örökölt provider megnevezése és a "SPEC-009 hatóköre" indoklások. */
+.node-inspector__reason {
+  margin: 0;
+  font: var(--ep-text-meta);
+  color: var(--ep-fg-muted);
+}
+
+/* Több mezőt egy sorba rendező lista sor (bemeneti mezők, ágak, agent
+   bejegyzések). Törhető, hogy szűk panelben se lógjon ki semmi, és a
+   gombja a mezők aljához igazodjon. Egyetlen elválasztó szegélyt visel,
+   háttér és lekerekítés nélkül: a sorok elhatárolása kell, nem egy újabb
+   kártya. */
+.node-inspector__list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ep-space-3);
+  padding-bottom: var(--ep-space-3);
+  border-bottom: 1px solid var(--ep-divider);
+  min-width: 0;
+}
+
+/* A lista sor mezői egyenlően osztoznak a soron, és 200px alatt új sorba
+   törnek. A 200px nem kitalált szám: a design system `.select` szabályának
+   `min-width: 200px` deklarációjával azonos (`packages/ui/src/select-field/
+   select-field.css`), tehát a natív választó és a szöveges mező ugyanazon a
+   ponton tör új sorba - enélkül a `.select` szélesebb maradna a sorban lévő
+   szöveges mezőknél, és kilógna. */
+.node-inspector__list-row > .field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.agents-field-editor__entry-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ep-space-3);
+  min-width: 0;
+}

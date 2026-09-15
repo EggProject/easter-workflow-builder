@@ -15,7 +15,7 @@ const VALID_NODE = {
   label: 'Start',
   positionX: 0,
   positionY: 0,
-  config: { inputFields: [] },
+  config: { type: 'start', inputFields: [], onUnhandledError: null },
 };
 
 const VALID_EDGE = {
@@ -28,7 +28,7 @@ const VALID_EDGE = {
 };
 
 describe('WorkflowNodeInputSchema', () => {
-  it('elfogadja az érvényes node bemenetet, tetszőleges config alakkal', () => {
+  it('elfogadja az érvényes node bemenetet, a NodeConfigSchema szerint érvényes config alakkal', () => {
     expect(WorkflowNodeInputSchema.safeParse(VALID_NODE).success).toBe(true);
   });
 

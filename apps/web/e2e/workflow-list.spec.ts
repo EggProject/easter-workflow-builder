@@ -9,6 +9,7 @@
 import type { WorkflowSummary } from '@easter-workflow-builder/protocol';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
+import { chooseSelectOption } from './select-field.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
 const ALFA: WorkflowSummary = {
@@ -38,7 +39,7 @@ test('betölti és megjeleníti a workflow listát', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Workflow-k' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Workflow-k')).toBeVisible();
   const table = page.getByRole('table', { name: 'Workflow-k' });
   await expect(table.getByRole('row', { name: /Alfa workflow/ })).toBeVisible();
   await expect(table.getByRole('row', { name: /Béta workflow/ })).toBeVisible();
@@ -88,7 +89,7 @@ test('új workflow létrehozása a modálison keresztül', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: 'Új workflow' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Név').fill('Gamma workflow');
-  await dialog.getByRole('combobox', { name: 'Provider' }).selectOption('claude-subscription');
+  await chooseSelectOption(page, dialog.getByRole('combobox', { name: 'Provider' }), 'Claude Code');
   await dialog.getByRole('button', { name: 'Létrehozás' }).click();
 
   await expect(dialog).toBeHidden();
@@ -145,7 +146,7 @@ test('a kiválasztott provider szükséges környezeti változóit a modális ki
   await page.getByRole('button', { name: 'Új workflow' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Új workflow' });
-  await dialog.getByRole('combobox', { name: 'Provider' }).selectOption('minimax');
+  await chooseSelectOption(page, dialog.getByRole('combobox', { name: 'Provider' }), 'MiniMax');
 
   // Kizárólag a változó NEVE jelenik meg, az értéke soha
   // (SPEC-007 16. szekció 49. kritérium).
@@ -412,7 +413,7 @@ test('futás indítása a Futás előzmények útvonalra navigál', async ({ pag
   await row.getByRole('button', { name: /^Műveletek/ }).click();
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Futás előzmények' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Futás előzmények')).toBeVisible();
 });
 
 test('a futás indítás hibájára toast jelenik meg, és a lista marad a helyén', async ({ page }) => {
@@ -429,5 +430,5 @@ test('a futás indítás hibájára toast jelenik meg, és a lista marad a hely�
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
   await expect(page.getByText('A futás indítása sikertelen')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Workflow-k' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Workflow-k')).toBeVisible();
 });
