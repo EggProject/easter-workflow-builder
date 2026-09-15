@@ -666,3 +666,59 @@ levezetéssel, pontosan a fenti bekezdés szerint.
 küszöbbel (98.36 / 96.62 / 98.9 / 98.3) ugyanaz a nyers adat mind a négy metrikán
 `ERROR: Coverage for ... does not meet global threshold` üzenettel exit 1-et adott, tehát a kapu
 ténylegesen kikényszerít, nem néma.
+
+---
+
+## 16. A futás nézet megérkezése utáni ratchet (2026-09-15): a küszöb FELFELÉ mozdul
+
+A PLAN-009 F4 fázisának két lépése (T-009-20 a `run-graph` és a `run-view` témával, T-009-21 a
+`fan_out`, a `loop` és a `sub_workflow` megjelenítésével) új képernyőt hozott, és hozzá e2e
+tesztet (`apps/web/e2e/run-view.spec.ts`). A küszöb viszont a 15. szekció mérésén maradt, tehát a
+kapu a valóságnál alacsonyabban állt: egy visszaesés észrevétlenül átment volna rajta. Ezt
+javítja ez a szekció (független ellenőrzés talált rá, 2026-09-15).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, `TURBO_FORCE=true` mellett újrafuttatott
+`bun run test:e2e`, **158 Playwright teszt, mind zöld**):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (15. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1084 / 1099     | **98.63** | 953 / 969 = 98.34   | 16 -> **15**                   |
+| branches   | 427 / 438       | **97.48** | 370 / 383 = 96.6    | 13 -> **11**                   |
+| functions  | 395 / 398       | **99.24** | 359 / 363 = 98.89   | 4 -> **3**                     |
+| lines      | 1041 / 1056     | **98.57** | 916 / 932 = 98.28   | 16 -> **15**                   |
+
+**Mind a négy metrikán a küszöb FÖLÖTT volt a mért érték, és a fedetlen tételek darabszáma is
+csökkent.** Ez a ratchet legegyszerűbb esete: a `.claude/CLAUDE.md` 8. szekció "a küszöb pontosan
+a mért érték" szabálya szerint a küszöb felhúzva a mért négy számra, felfelé kerekítés nélkül.
+
+**Mi tűnt el a fedetlen listáról.** A 15. szekció felsorolásából két tétel lett fedett, pontosan
+a most megérkezett futás nézet e2e tesztje miatt:
+
+| Fájl                       | Előző fedetlen hely | Most  | Mi fedi le                                                                      |
+| -------------------------- | ------------------- | ----- | ------------------------------------------------------------------------------- |
+| `GraphNodeCard.tsx`        | 74. és 82. sor      | fedve | a futás nézeti összesítés és a `StepRunStatus` jelvény valós vásznon rajzolódik |
+| `step-run-status-badge.ts` | 30. sor             | fedve | ugyanaz: a `run-view.spec.ts` a kártyák jelvényén át hívja a leképezést         |
+
+Ezzel a 9.4 szekció nyitott kérdése ("a `GraphNodeCard.tsx` / `step-run-status-badge.ts` kizárás
+jövője") **magától lezárult**: nem kizárás kellett, hanem a hozzá tartozó képernyő e2e tesztje.
+
+**A maradék fedetlen tételek, fájlonként** (mind a négy metrika darabszámával, a fenti
+összegzés bontása):
+
+| Fájl                                | stmt | branch | func | line | Miért nem érhető el e2e-vel                                 |
+| ----------------------------------- | ---- | ------ | ---- | ---- | ----------------------------------------------------------- |
+| `mount-app.tsx`                     | 3    | 2      | 0    | 3    | a `#root` hiánya és a hibás `VITE_*` konfiguráció ága (2.2) |
+| `read-frontend-config.ts`           | 8    | 7      | 1    | 8    | build időben rögzülő konfiguráció hibaágai (2.2)            |
+| `is-valid-connection.ts` 36. sor    | 1    | 1      | 0    | 1    | felhasználói úton nem előidézhető hibaág (8. szekció)       |
+| `browser-history-location-port.ts`  | 1    | 0      | 1    | 1    | `useEffect` leszerelési cleanup, csak unmountkor fut (2.2)  |
+| `perform-route-request.ts` 70. sor  | 1    | 1      | 0    | 1    | 8. szekció szerinti elérhetetlen ág                         |
+| `use-stream-connection.ts` 182. sor | 1    | 0      | 1    | 1    | `useEffect` cleanup, csak leszereléskor fut (2.2)           |
+
+Összesen 15 / 11 / 3 / 15, ami bitre egyezik a fenti táblázat "fedett / összes" különbségeivel.
+**Fájl kizárás továbbra is NULLA** (3. szekció), és mind a hat tétel unit teszttel fedett, a 9.3
+szekció módszere szerint.
+
+**Az igazolás:** a beállított, mért küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon
+a nyers adaton egyetlen századdal magasabb küszöbbel (98.64 / 97.49 / 99.25 / 98.58) mind a négy
+metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel **exit 1**, tehát a
+kapu a mért érték mellett tényleg a határon áll, nem tartalékkal.
