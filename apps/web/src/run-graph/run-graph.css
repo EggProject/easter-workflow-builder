@@ -12,6 +12,27 @@
   min-height: 0;
 }
 
+/* AZ AL-WORKFLOW GOMB KATTINTHATÓSÁGA A CSAK OLVASHATÓ VÁSZNON.
+
+   A mért állapot, amit ez javít: a React Flow a csomópont doboznak INLINE
+   `pointer-events` értéket ad, és az `all` helyett `none` jár neki, ha a node
+   se nem húzható, se nem kiválasztható, és nincs rajta kattintás kezelő
+   (`@xyflow/react` `dist/esm/index.mjs`: `pointerEvents: hasPointerEvents ?
+   'all' : 'none'`, ahol a `hasPointerEvents` az `isDraggable || onClick ||
+   onMouseEnter || onMouseMove || onMouseLeave` értéke). A futás nézet vászna
+   PONTOSAN ilyen (AC19), tehát a `sub_workflow` csomópont gombja kattintásra
+   nem reagált: a Playwright mérése szerint a `.react-flow__pane` fogta el a
+   pointer eseményt.
+
+   Miért a gombon, és miért nem a node dobozon: az inline stílust egy osztály
+   szintű szabály csak `!important`-tal tudná felülírni, egy LESZÁRMAZOTT
+   explicit `pointer-events: auto` értéke viszont a CSS szabályai szerint
+   önmagában visszaadja a találati tesztet, az ős `none` értéke ellenére.
+   Regresszió: `apps/web/e2e/run-view.spec.ts`. */
+.run-graph-canvas .react-flow__node .btn {
+  pointer-events: auto;
+}
+
 /* Megnevezett, doboz nélküli szakasz: se szegély, se lekerekítés, se saját
    háttér, tehát nem kártya (tilos a card in card). A tagolást a fejléc és a
    térköz adja, kizárólag design system tokenekkel. */
