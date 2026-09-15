@@ -23,11 +23,28 @@
 //
 // A KIMENET HELYE: az `EASTER_SCREENSHOT_DIR` környezeti változó, vagy
 // alapértelmezésben az `apps/web/screenshots/` mappa (a `.gitignore` kizárja).
+//
+// A BIZONYÍTÉK MANIFESZT. A képek maguk nincsenek verziókövetve (nem is
+// lehetnek: a Playwright saját dokumentációja szerint "Screenshots differ
+// between browsers and platforms", ezért a snapshot fájlnév is platformot
+// kódol, <https://playwright.dev/docs/test-snapshots>), ezért a futás
+// bizonyítéka kerül a repóba: a `screenshot-manifest.json`. Ez rögzíti annak
+// a KÉT fájlnak a `sha256` lenyomatát, amiből a kép származik (a fixtúra és
+// ez a script), és képenként azoknak az éleknek az azonosítóját, amiknek a
+// vonala a pixel mérés szerint TÉNYLEGESEN ki volt festve. A manifesztet a
+// `tooling/scripts/src/screenshot-pipeline/` regressziós tesztje ellenőrzi a
+// `bun run test` kapun: ha a fixtúra vagy ez a script megváltozik és a
+// szentesített csővezeték nem futott le újra, a lenyomat elavul és a kapu
+// bukik. Nyers mért számok SZÁNDÉKOSAN nem kerülnek a manifesztbe (a
+// `.claude/CLAUDE.md` 4. szekció 3. pontja szerint a mérési próza és a nyers
+// szám a `docs/research/` alá tartozik, nem a kódba), így a manifeszt két
+// futás között bájtra azonos marad, ha semmi valódi nem változott.
 import { expect, test, type Page } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { measureEdgePaintDifference } from './edge-paint-measurement.ts';
+import { EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE, measureEdgePaintDifference } from './edge-paint-measurement.ts';
 import {
   countNodesOutsideCanvas,
   fitShowcaseGraphIntoView,
@@ -37,9 +54,13 @@ import {
   SHOWCASE_SELECTED_NODE_ID,
 } from './showcase-graph.ts';
 
-const DEFAULT_OUTPUT_DIRECTORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'screenshots');
+const E2E_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+
+const DEFAULT_OUTPUT_DIRECTORY = path.join(E2E_DIRECTORY, '..', 'screenshots');
 
 const OUTPUT_DIRECTORY = process.env['EASTER_SCREENSHOT_DIR'] ?? DEFAULT_OUTPUT_DIRECTORY;
+
+const MANIFEST_PATH = path.join(E2E_DIRECTORY, 'screenshot-manifest.json');
 
 /**
  * Ugyanaz az ablakméret, amin a gráf él mérés készült
@@ -53,17 +74,71 @@ function outputPath(name: string): string {
   return path.join(OUTPUT_DIRECTORY, name);
 }
 
+function sha256OfFile(filePath: string): string {
+  return createHash('sha256').update(readFileSync(filePath)).digest('hex');
+}
+
+/**
+ * A képenként mért, ténylegesen kifestett élek. Kizárólag ebben a futásban
+ * keletkezett bejegyzéseket tartalmaz: a manifeszt minden mérés után ebből
+ * íródik újra, tehát egy korábbi futás bejegyzése nem tud átszivárogni.
+ */
+const measuredImages = new Map<string, readonly string[]>();
+
+/**
+ * UTF-16 kódegység összehasonlító. Explicit komparátor kell (a
+ * `unicorn/require-array-sort-compare` nem engedi el), és NEM `localeCompare`,
+ * mert az locale függő, tehát nem determinisztikus kimenetet adna
+ * (`packages/db` CLAUDE.md ugyanezen okból).
+ */
+function compareCodeUnits(left: string, right: string): number {
+  if (left === right) {
+    return 0;
+  }
+  return left < right ? -1 : 1;
+}
+
+/**
+ * A bizonyíték manifeszt kiírása. Minden mérés után lefut, tehát egy
+ * megszakadt vagy worker újraindítás után részlegessé váló futás hiányos
+ * manifesztet hagy, amit a `screenshot-pipeline` kapu elbuktat: a védelem
+ * ZÁRVA hibázik, nem nyitva.
+ */
+function writeManifest(): void {
+  const images = [...measuredImages]
+    .map(([name, paintedEdgeIds]) => ({ name, paintedEdgeIds }))
+    .toSorted((left, right) => compareCodeUnits(left.name, right.name));
+  const manifest = {
+    fixtureSha256: sha256OfFile(path.join(E2E_DIRECTORY, 'showcase-graph.ts')),
+    captureScriptSha256: sha256OfFile(path.join(E2E_DIRECTORY, 'capture-screenshots.ts')),
+    fixtureEdgeIds: SHOWCASE_GRAPH.edges.map((edge) => edge.id),
+    images,
+  };
+  // Két szóköz behúzás és záró újsor: ez a Prettier alakja JSON fájlra, tehát
+  // a `bun run format:check` kapu a generált fájlon is zöld marad.
+  writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, undefined, 2)}\n`, 'utf8');
+}
+
 /**
  * A kifestett vonalak megszámolása UGYANAZON az oldalállapoton, amiről a
  * képernyőkép készült. Ez a szám a bizonyíték arra, hogy a képen ténylegesen
  * látszanak a vonalak, nem csak a DOM-ban vannak ott.
+ *
+ * Az él azonosítója CSAK a küszöböt teljesítő mérés után kerül a
+ * manifesztbe, tehát a manifeszt nem tud kifestetlen vonalat bizonyítékként
+ * felmutatni: a küszöb alatti mérés elbuktatja a futást.
  */
-async function reportPaintedEdges(page: Page, imageName: string): Promise<void> {
+async function recordPaintedEdges(page: Page, imageName: string): Promise<void> {
+  const paintedEdgeIds: string[] = [];
   for (const edge of SHOWCASE_GRAPH.edges) {
     const difference = await measureEdgePaintDifference(page, edge.id);
     // eslint-disable-next-line no-console -- ez a script kimenete, a mért szám a bizonyíték
     console.log(`${imageName} ${edge.id}: legnagyobb csatorna eltérés ${String(difference)}`);
+    expect(difference).toBeGreaterThanOrEqual(EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE);
+    paintedEdgeIds.push(edge.id);
   }
+  measuredImages.set(imageName, paintedEdgeIds);
+  writeManifest();
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -89,7 +164,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(await countNodesOutsideCanvas(page)).toBe(0);
 
       await page.screenshot({ path: outputPath(imageName) });
-      await reportPaintedEdges(page, imageName);
+      await recordPaintedEdges(page, imageName);
     });
 
     test(`editor-no-selection-${theme}`, async ({ page }) => {
@@ -99,7 +174,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(await countNodesOutsideCanvas(page)).toBe(0);
 
       await page.screenshot({ path: outputPath(imageName) });
-      await reportPaintedEdges(page, imageName);
+      await recordPaintedEdges(page, imageName);
     });
 
     test.describe('nagyított kivágat', () => {

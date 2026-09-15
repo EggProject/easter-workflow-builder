@@ -682,6 +682,25 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   fixtúra alakját (legalább öt él, minden csomópont bekötve) és minden élének kifestett vonalát
   pedig az `apps/web/e2e/showcase-graph.spec.ts` regressziós teszt őrzi a `test:e2e` kapun
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció).
+- **A fenti védelem 2026-09-15-ig KIZÁRÓLAG SZÖVEGES volt**, és egy független ellenőrzés jogosan
+  mondta ki, hogy semmi nem buktatja el azt a munkamenetet, ami megint saját, eldobható scriptet ír
+  saját, éltelen fixtúrával. A **gépi** védelem neve
+  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hat invariáns a
+  `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
+  Amit fog: a
+  szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
+  képernyőképet lemezre, a szentesített script nem tarthat saját gráf literált, `mockRoute` vagy
+  `page.route` hívást, a `screenshots` npm scriptek és a Playwright config a szentesített fájlra
+  mutatnak, és a csővezeték minden futása bizonyítékot hagy az
+  `apps/web/e2e/screenshot-manifest.json` fájlban (a fixtúra és a script `sha256` lenyomata, plusz
+  képenként a pixel méréssel kifestettnek igazolt élek azonosítója). Ha a fixtúra vagy a script
+  megváltozik, a lenyomat elavul és a kapu bukik, amíg a valódi Chromium futás le nem fut újra -
+  éltelen fixtúrával viszont az a futás elbukik, tehát friss bizonyíték nem keletkezhet belőle. A
+  manifeszt szándékosan nem tartalmaz nyers mért számot (4. szekció 3. pont), ezért determinisztikus.
+  **A megkerülhetőség kimondva:** a két `sha256` érték kézzel átírható, és a repóba sosem kerülő,
+  `/tmp` alatti script kimenetét egyetlen repón belüli kapu sem látja; a védelem azt zárja ki, hogy
+  a hiba ÉSZREVÉTLENÜL visszatérjen, nem azt, hogy valaki szándékosan hamisítson.
+  Forrás: felhasználói kérés 2026-09-15, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
