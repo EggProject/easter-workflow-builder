@@ -1,6 +1,6 @@
 {
   "fixtureSha256": "a88c7129e66eda55c3c605990174fad3ec04f02d7567c3bf8211e013e420e8db",
-  "captureScriptSha256": "dafa42d0ac04fd2ee97c181d7e8e7eea8c787e38f7a035a44eff167292c441ea",
+  "captureScriptSha256": "b61fb5db44285c77a778c90b9d8aa8d6b654e44b6f67aa6eaaab51c7e3ccc43c",
   "fixtureEdgeIds": [
     "e-start-branch",
     "e-branch-fanout",

@@ -1,0 +1,21 @@
+/* Egy transcript sor (SPEC-008 7.2, PLAN-009 T-009-24). A "Claude Code CLI
+   szerű" megjelenés két eleme innen jön: a monospace betűkép, és az eredet
+   (`sdk`/`engine`) bal szegély színe - kizárólag design system tokenekből,
+   saját szín érték nélkül. */
+.run-event-row {
+  font-family: var(--ep-font-mono);
+  border-left: 3px solid transparent;
+}
+
+.run-event-row--origin-sdk {
+  border-left-color: var(--ep-accent);
+}
+.run-event-row--origin-engine {
+  border-left-color: var(--ep-fg-muted);
+}
+
+.run-event-row__payload {
+  font: var(--ep-text-code);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

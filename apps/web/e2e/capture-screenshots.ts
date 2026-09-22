@@ -134,7 +134,6 @@ async function recordPaintedEdges(page: Page, imageName: string): Promise<void> 
   const paintedEdgeIds: string[] = [];
   for (const edge of SHOWCASE_GRAPH.edges) {
     const difference = await measureEdgePaintDifference(page, edge.id);
-    // eslint-disable-next-line no-console -- ez a script kimenete, a mért szám a bizonyíték
     console.log(`${imageName} ${edge.id}: legnagyobb csatorna eltérés ${String(difference)}`);
     expect(difference).toBeGreaterThanOrEqual(EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE);
     paintedEdgeIds.push(edge.id);

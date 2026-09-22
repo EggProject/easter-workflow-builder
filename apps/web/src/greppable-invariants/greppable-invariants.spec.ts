@@ -1,9 +1,10 @@
-// Tizenöt, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Tizenhat, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
 // elemzés helyett - ugyanaz a minta, mint a `vite-istanbul-include-invariant`
-// témáé.
+// témáé. A tizenhatodik a T-009-24 lépéssel érkezett (SPEC-008 AC37): a
+// transcript sorokban nem jelenhet meg költség mező.
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -206,6 +207,18 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     // (`GraphNodeCard.tsx`, `RunGraphCanvas.tsx`).
     const measuredGeometryPattern = /measured\.|getBoundingClientRect\(/;
     const offenders = PRODUCT_FILES.filter((file) => measuredGeometryPattern.test(stripCommentLines(file.content)));
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(16) nincs költség mező a transcript sorokban (total_cost_usd, cost minta, SPEC-008 AC37, T-009-24)', () => {
+    // A `run_event.payload.total_cost_usd` first-party árazással számol, és a
+    // MiniMax providernél nem értelmezhető (research 2. szekció); a
+    // `run-event-row` téma emiatt sosem olvassa ki és sosem jeleníti meg. A
+    // doksi sorok kiszűrve, ugyanazzal a `stripCommentLines` segédfüggvénnyel,
+    // mint a (4), a (7), a (14) és a (15) ellenőrzésnél: ez a mondat maga is
+    // említi a mezőt, de az magyarázat, nem termékkód literál.
+    const costFieldPattern = /total_cost_usd|\bcost\b/i;
+    const offenders = PRODUCT_FILES.filter((file) => costFieldPattern.test(stripCommentLines(file.content)));
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 });
