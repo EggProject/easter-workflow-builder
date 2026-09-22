@@ -44,8 +44,17 @@ describe('summarizeRunEventRow', () => {
       expect(summary.kindLabel.length).toBeGreaterThan(0);
       expect(summary.bodyText.length).toBeGreaterThan(0);
       expect(summary.originLabel.length).toBeGreaterThan(0);
-      // AC5 / AC37: költség sehol nem jelenik meg egyetlen sor szövegében sem.
-      expect(summary.bodyText).not.toMatch(/total_cost_usd|\bcost\b/i);
+      // Költség mezője kizárólag az `sdk_result` sornak van (user döntés 2026-09-23).
+      expect(summary.costEstimateText === undefined).toBe(kind !== 'sdk_result');
+    }
+  });
+
+  it('egyetlen sor szövegében sincs gondolatjel', () => {
+    for (const kind of RunEventKindSchema.options) {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind, toolName: 'web_search', toolUseId: 'tool-abc', parentToolUseId: 'tool-xyz' }),
+      );
+      expect(`${summary.kindLabel} ${summary.bodyText}`).not.toContain('\u{2014}');
     }
   });
 
@@ -92,17 +101,86 @@ describe('summarizeRunEventRow', () => {
   describe('sdk_user', () => {
     it('eszköz eredmény esetén megnevezi a parentToolUseId-t', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_user', parentToolUseId: 'tool-xyz' }));
-      expect(summary.bodyText).toContain('tool-xyz');
+      expect(summary.bodyText).toBe('Eszköz eredmény (hívás: tool-xyz): Felhasználói bemenet');
     });
 
-    it('parentToolUseId nélkül általános felhasználói bemenet szöveget ad', () => {
+    it('parentToolUseId nélkül és szöveg nélkül általános felhasználói bemenet szöveget ad', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_user' }));
       expect(summary.bodyText).toBe('Felhasználói bemenet');
+    });
+
+    it('a puszta szöveges content mezőt mutatja felhasználói fordulatként', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_user', payload: { message: { role: 'user', content: 'Foglald össze a cikket' } } }),
+      );
+      expect(summary.bodyText).toBe('Foglald össze a cikket');
+    });
+
+    it('a text blokkok szövegét egymás után fűzi', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({
+          kind: 'sdk_user',
+          payload: {
+            message: {
+              content: [
+                { type: 'text', text: 'Első' },
+                { type: 'text', text: 'Második' },
+              ],
+            },
+          },
+        }),
+      );
+      expect(summary.bodyText).toBe('Első Második');
+    });
+
+    it('a tool_result blokk szöveges és blokk listás content mezőjét is kiolvassa, a nem objektum elemet kihagyja', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({
+          kind: 'sdk_user',
+          parentToolUseId: 'tool-xyz',
+          payload: {
+            message: {
+              content: [
+                { type: 'tool_result', tool_use_id: 'call-1', content: 'kész' },
+                { type: 'tool_result', tool_use_id: 'call-2', content: [{ type: 'text', text: 'teszt' }] },
+                42,
+              ],
+            },
+          },
+        }),
+      );
+      expect(summary.bodyText).toBe('Eszköz eredmény (hívás: tool-xyz): kész teszt');
+    });
+  });
+
+  describe('sdk_stream_event', () => {
+    it.each([
+      ['text_delta', { type: 'text_delta', text: 'Szia' }, 'Szia'] as const,
+      ['thinking_delta', { type: 'thinking_delta', thinking: 'gondolkodom' }, 'gondolkodom'] as const,
+      ['input_json_delta', { type: 'input_json_delta', partial_json: '{"q":' }, '{"q":'] as const,
+    ])('%s: a részleges szöveget mutatja', (_name, delta, expected) => {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_stream_event', payload: { event: { type: 'content_block_delta', delta } } }),
+      );
+      expect(summary.kindLabel).toBe('Streamelt részlet');
+      expect(summary.bodyText).toBe(expected);
+    });
+
+    it('szöveg nélküli eseménynél az esemény típusát nevezi meg', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_stream_event', payload: { event: { type: 'message_start' } } }),
+      );
+      expect(summary.bodyText).toBe('Stream esemény: message_start');
+    });
+
+    it('esemény nélküli payloadnál általános szöveget ad', () => {
+      const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_stream_event' }));
+      expect(summary.bodyText).toBe('Stream esemény');
     });
   });
 
   describe('sdk_result', () => {
-    it('mind a négy token számot és a numTurns értéket mutatja, költség nélkül', () => {
+    it('mind a négy token számot és a numTurns értéket mutatja, a költség külön mezőben áll', () => {
       const summary = summarizeRunEventRow(
         makeRecord({
           kind: 'sdk_result',
@@ -118,12 +196,35 @@ describe('summarizeRunEventRow', () => {
       expect(summary.bodyText).toContain('gyorsítótár olvasás: 3');
       expect(summary.bodyText).toContain('gyorsítótár írás: 4');
       expect(summary.bodyText).toContain('fordulók: 5');
-      expect(summary.bodyText).not.toMatch(/total_cost_usd|\bcost\b/i);
+      expect(summary.bodyText).not.toContain('$');
     });
 
     it('hiányzó token adat és numTurns esetén a nincs token adat és ismeretlen szöveget adja', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_result' }));
       expect(summary.bodyText).toBe('nincs token adat, fordulók: ismeretlen');
+    });
+
+    // A kerekítés a pinelt CLI `/cost` kijelzésének szabálya (research
+    // 2026-09-23 5. szekció); a két mért érték az M-13 és az M-28 futásé.
+    it.each([
+      [0.213108, '$0.2131'] as const,
+      [0.497899, '$0.4979'] as const,
+      [0.5, '$0.5000'] as const,
+      [1.23456, '$1.23'] as const,
+    ])('a total_cost_usd %s értékét %s alakban adja', (totalCostUsd, expected) => {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_result', payload: { type: 'result', total_cost_usd: totalCostUsd } }),
+      );
+      expect(summary.costEstimateText).toBe(expected);
+    });
+
+    it.each([
+      ['hiányzó mező', { type: 'result' }] as const,
+      ['nem szám', { type: 'result', total_cost_usd: '0.21' }] as const,
+      ['nem objektum payload', 'nem objektum'] as const,
+    ])('%s esetén a költség ismeretlen', (_name, payload) => {
+      const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_result', payload }));
+      expect(summary.costEstimateText).toBe('ismeretlen');
     });
   });
 

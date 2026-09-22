@@ -99,14 +99,27 @@ describe('RunEventRow', () => {
     expect(header().parentElement?.tagName).toBe('H3');
   });
 
-  it('az sdk eredetű sor a run-event-row--origin-sdk osztályt kapja', () => {
+  it('a fejléc szövege a típuscímkét kettősponttal választja el a törzstől, gondolatjel nélkül', () => {
+    act(() => {
+      root.render(<RunEventRow record={BASE_RECORD} />);
+    });
+    expect(header().textContent).toContain('Eszközhívás: web_search (tool-abc123)');
+    expect(header().textContent).not.toContain('\u{2014}');
+  });
+
+  it('az sdk eredetű sor a run-event-row--origin-sdk osztályt és a Bot jelölőt kapja a jelölő oszlopban', () => {
     act(() => {
       root.render(<RunEventRow record={BASE_RECORD} />);
     });
     expect(container.querySelector('.run-event-row')?.classList.contains('run-event-row--origin-sdk')).toBe(true);
+    // A jelölő oszlop a fejléc ELSŐ gyereke, a cím előtt (SPEC-008 7.2 1. pont).
+    const markerColumn = header().firstElementChild;
+    expect(markerColumn?.getAttribute('class')).toBe('accordion__icon');
+    expect(markerColumn?.querySelector('svg')?.dataset['originMarker']).toBe('sdk');
+    expect(markerColumn?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('az engine eredetű sor a run-event-row--origin-engine osztályt kapja', () => {
+  it('az engine eredetű sor a run-event-row--origin-engine osztályt és a Workflow jelölőt kapja', () => {
     act(() => {
       root.render(
         <RunEventRow
@@ -116,12 +129,70 @@ describe('RunEventRow', () => {
     });
     expect(container.querySelector('.run-event-row')?.classList.contains('run-event-row--origin-engine')).toBe(true);
     expect(header().textContent).toContain('Motor');
+    const markerColumn = header().firstElementChild;
+    expect(markerColumn?.getAttribute('class')).toBe('accordion__icon');
+    expect(markerColumn?.querySelector('svg')?.dataset['originMarker']).toBe('engine');
   });
 
-  it('sehol nem jelenik meg költség szöveg a kirajzolt fejlécben', () => {
+  it('a két eredet jelölője eltérő alakú, tehát nem csak a szín különbözteti meg őket', () => {
     act(() => {
-      root.render(<RunEventRow record={{ ...BASE_RECORD, kind: 'sdk_result', numTurns: 3 }} />);
+      root.render(<RunEventRow record={BASE_RECORD} />);
     });
-    expect(header().textContent).not.toMatch(/total_cost_usd|\bcost\b/i);
+    const sdkMarkup = header().firstElementChild?.getHTML();
+    act(() => {
+      root.render(
+        <RunEventRow
+          record={{ ...BASE_RECORD, origin: 'engine', kind: 'run_started', toolName: null, toolUseId: null }}
+        />,
+      );
+    });
+    const engineMarkup = header().firstElementChild?.getHTML();
+    expect(sdkMarkup).toBeDefined();
+    expect(engineMarkup).toBeDefined();
+    expect(sdkMarkup).not.toBe(engineMarkup);
+  });
+
+  describe('az sdk_result költség mezője (user döntés 2026-09-23)', () => {
+    const RESULT_RECORD: RunEventRecord = {
+      ...BASE_RECORD,
+      kind: 'sdk_result',
+      toolName: null,
+      toolUseId: null,
+      numTurns: 3,
+      payload: { type: 'result', subtype: 'success', total_cost_usd: 0.213108, num_turns: 3 },
+    };
+
+    it('az összesítő sorban külön, megnevezett meta mezőként jelenik meg, SDK becslésként', () => {
+      act(() => {
+        root.render(<RunEventRow record={RESULT_RECORD} />);
+      });
+      expect(container.querySelector('.accordion__meta')?.textContent).toBe('Költség (SDK becslés): $0.2131');
+      expect(container.querySelector('.accordion__title')?.textContent).not.toContain('$0.2131');
+    });
+
+    it('a kinyitott nézetben is külön mezőként áll, a jelentését kimondó magyarázattal', () => {
+      act(() => {
+        root.render(<RunEventRow record={RESULT_RECORD} />);
+      });
+      act(() => {
+        header().click();
+      });
+      const costField = body().querySelector('.run-event-row__cost');
+      expect(costField?.querySelector('strong')?.textContent).toBe('Költség (SDK becslés):');
+      expect(costField?.textContent).toContain('$0.2131');
+      expect(costField?.textContent).toContain('becslés, nem számla');
+      expect(costField?.textContent).toContain('MiniMax provider mellett nem a valós költség');
+      expect(costField?.textContent).toContain('Claude előfizetésnél');
+      // A nyers payload továbbra is teljes egészében látszik a mező alatt.
+      expect(body().textContent).toContain('"total_cost_usd": 0.213108');
+    });
+
+    it('nem sdk_result sorban nincs sem meta, sem költség mező', () => {
+      act(() => {
+        root.render(<RunEventRow record={BASE_RECORD} />);
+      });
+      expect(container.querySelector('.accordion__meta')).toBeNull();
+      expect(container.querySelector('.run-event-row__cost')).toBeNull();
+    });
   });
 });

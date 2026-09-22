@@ -1,27 +1,44 @@
-import { isNonEmptyString, isRecord } from '@easter-workflow-builder/typeguards';
+import { isNonEmptyString, isNumber, isRecord } from '@easter-workflow-builder/typeguards';
 import type { RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
 
 /**
  * Egy transcript sor összegzett, magyar szövegű tartalma (SPEC-008 7.1,
  * PLAN-009 T-009-24). A `RunEventRow` komponens ebből építi a panel
  * fejlécének szövegét; a nyers `payload` a sor kinyitott állapotában,
- * változatlan JSON formában látszik, ezért itt nem kerül feldolgozásra.
+ * változatlan JSON formában látszik.
  */
 export interface RunEventRowSummary {
   readonly originLabel: string;
   readonly kindLabel: string;
   readonly bodyText: string;
+  /**
+   * Kizárólag az `sdk_result` sornál van értéke: a `total_cost_usd` mező
+   * kijelzésre formázva, vagy `ismeretlen`, ha a payloadban nincs szám. Az
+   * érték az Agent SDK saját becslése, nem valós költség (user döntés
+   * 2026-09-23, `docs/research/2026-09-23-sdk-koltseg-becsles.md`), ezért a
+   * felület mindig ezzel a megnevezéssel mutatja.
+   */
+  readonly costEstimateText: string | undefined;
 }
 
 interface KindDescription {
   readonly kindLabel: string;
   readonly bodyText: string;
+  readonly costEstimateText?: string;
 }
 
 const ORIGIN_LABEL: Readonly<Record<RunEventOrigin, string>> = {
   sdk: 'SDK',
   engine: 'Motor',
 };
+
+/**
+ * A stream esemény `delta` objektumának szöveget hordozó mezői, a mért
+ * `text_delta`, `thinking_delta` és `input_json_delta` alfajta szerint
+ * (`docs/research/2026-09-23-sdk-koltseg-becsles.md` 6. szekció). A
+ * `signature_delta` aláírása nem szöveg, ezért nincs a listán.
+ */
+const STREAM_DELTA_TEXT_KEYS = ['text', 'thinking', 'partial_json'] as const;
 
 /**
  * Ismeretlen elemű tömb-e az érték. Ugyanaz a minta, mint a
@@ -34,13 +51,17 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
 }
 
 /**
+ * Egy mező a nyers, `unknown` típusú payloadból, ha az objektum.
+ */
+function readPayloadField(payload: unknown, key: string): unknown {
+  return isRecord(payload) ? payload[key] : undefined;
+}
+
+/**
  * Egy nem üres szöveges mező a nyers, `unknown` típusú payloadból.
  */
 function readPayloadString(payload: unknown, key: string): string | undefined {
-  if (!isRecord(payload)) {
-    return undefined;
-  }
-  const value = payload[key];
+  const value = readPayloadField(payload, key);
   return isNonEmptyString(value) ? value : undefined;
 }
 
@@ -48,28 +69,28 @@ function readPayloadString(payload: unknown, key: string): string | undefined {
  * Egy beágyazott objektum egy nem üres szöveges mezője a payloadból.
  */
 function readNestedPayloadString(payload: unknown, outerKey: string, innerKey: string): string | undefined {
-  if (!isRecord(payload)) {
-    return undefined;
-  }
-  return readPayloadString(payload[outerKey], innerKey);
+  return readPayloadString(readPayloadField(payload, outerKey), innerKey);
+}
+
+/**
+ * Egy véges szám mező a payloadból (a `NaN` és a végtelen kiesik).
+ */
+function readPayloadNumber(payload: unknown, key: string): number | undefined {
+  const value = readPayloadField(payload, key);
+  return isNumber(value) ? value : undefined;
 }
 
 /**
  * Egy tömb mező elemszáma a payloadból.
  */
 function readPayloadArrayLength(payload: unknown, key: string): number | undefined {
-  if (!isRecord(payload)) {
-    return undefined;
-  }
-  const value = payload[key];
+  const value = readPayloadField(payload, key);
   return isUnknownArray(value) ? value.length : undefined;
 }
 
 /**
  * A négy token szám kompakt, magyar nyelvű összefoglalója (SPEC-008 7.1,
- * `sdk_assistant` és `sdk_result` sor). **Költség nincs**: a
- * `total_cost_usd` a nyers payloadban marad, itt nem jelenik meg
- * (greppes invariáns őrzi, `greppable-invariants.spec.ts` (16)).
+ * `sdk_assistant` és `sdk_result` sor).
  */
 function formatTokenCounts(record: RunEventRecord): string {
   const parts: string[] = [];
@@ -89,24 +110,86 @@ function formatTokenCounts(record: RunEventRecord): string {
 }
 
 /**
+ * A `total_cost_usd` kijelzett alakja. A kerekítés a pinelt CLI saját
+ * `/cost` kijelzésének szabálya: fél dollár felett két, alatta négy tizedes
+ * (`docs/research/2026-09-23-sdk-koltseg-becsles.md` 5. szekció), hogy a
+ * szám a CLI kimenetével összevethető maradjon.
+ */
+function formatCostEstimate(costUsd: number | undefined): string {
+  if (costUsd === undefined) {
+    return 'ismeretlen';
+  }
+  return `$${costUsd > 0.5 ? costUsd.toFixed(2) : costUsd.toFixed(4)}`;
+}
+
+/**
+ * Egy üzenet `content` mezőjének szöveges részei: a puszta szöveg, a
+ * `text` blokkok, és a `tool_result` blokkok szöveges vagy blokk listás
+ * `content` mezője, rekurzívan.
+ */
+function collectContentTexts(content: unknown): readonly string[] {
+  if (isNonEmptyString(content)) {
+    return [content];
+  }
+  if (!isUnknownArray(content)) {
+    return [];
+  }
+  return content.flatMap((block) => {
+    const text = readPayloadString(block, 'text');
+    return text === undefined ? collectContentTexts(readPayloadField(block, 'content')) : [text];
+  });
+}
+
+/**
  * Az `sdk_assistant` sor leírása: eszközhívás névvel és azonosítóval, ha van.
  */
 function describeAssistant(record: RunEventRecord): KindDescription {
   const tokenSummary = formatTokenCounts(record);
   if (record.toolName !== null && record.toolUseId !== null) {
-    return { kindLabel: 'Eszközhívás', bodyText: `${record.toolName} (${record.toolUseId}) — ${tokenSummary}` };
+    return {
+      kindLabel: 'Eszközhívás',
+      bodyText: `${record.toolName} (${record.toolUseId}), tokenek: ${tokenSummary}`,
+    };
   }
-  return { kindLabel: 'Asszisztens üzenet', bodyText: `Válasz szöveg — ${tokenSummary}` };
+  return { kindLabel: 'Asszisztens üzenet', bodyText: `Válasz szöveg, tokenek: ${tokenSummary}` };
 }
 
 /**
- * Az `sdk_user` sor leírása: eszköz eredmény, ha a `parentToolUseId` jelen van.
+ * Az `sdk_user` sor leírása (SPEC-008 7.1): a felhasználói fordulat
+ * szövege, és a `parentToolUseId`, ha eszköz eredmény.
  */
 function describeUser(record: RunEventRecord): KindDescription {
+  const turnText = collectContentTexts(readPayloadField(readPayloadField(record.payload, 'message'), 'content')).join(
+    ' ',
+  );
+  const turnDescription = turnText.length > 0 ? turnText : 'Felhasználói bemenet';
   if (record.parentToolUseId !== null) {
-    return { kindLabel: 'Felhasználói üzenet', bodyText: `Eszköz eredmény — hívás: ${record.parentToolUseId}` };
+    return {
+      kindLabel: 'Felhasználói üzenet',
+      bodyText: `Eszköz eredmény (hívás: ${record.parentToolUseId}): ${turnDescription}`,
+    };
   }
-  return { kindLabel: 'Felhasználói üzenet', bodyText: 'Felhasználói bemenet' };
+  return { kindLabel: 'Felhasználói üzenet', bodyText: turnDescription };
+}
+
+/**
+ * Az `sdk_stream_event` sor leírása (SPEC-008 7.1): a részleges szöveg a
+ * `event.delta` objektumból; ha az esemény nem hordoz szöveget (pl.
+ * `message_start`), az esemény típusa.
+ */
+function describeStreamEvent(payload: unknown): KindDescription {
+  const delta = readPayloadField(readPayloadField(payload, 'event'), 'delta');
+  const partialText = STREAM_DELTA_TEXT_KEYS.map((key) => readPayloadString(delta, key)).find(
+    (text) => text !== undefined,
+  );
+  if (partialText !== undefined) {
+    return { kindLabel: 'Streamelt részlet', bodyText: partialText };
+  }
+  const eventType = readNestedPayloadString(payload, 'event', 'type');
+  return {
+    kindLabel: 'Streamelt részlet',
+    bodyText: eventType === undefined ? 'Stream esemény' : `Stream esemény: ${eventType}`,
+  };
 }
 
 /**
@@ -135,11 +218,15 @@ function describeRunEventKind(record: RunEventRecord): KindDescription {
       return describeUser(record);
     }
     case 'sdk_stream_event': {
-      return { kindLabel: 'Streamelt részlet', bodyText: 'Részleges szöveg érkezik (élő stream)' };
+      return describeStreamEvent(record.payload);
     }
     case 'sdk_result': {
       const turnsLabel = record.numTurns === null ? 'ismeretlen' : String(record.numTurns);
-      return { kindLabel: 'Eredmény', bodyText: `${formatTokenCounts(record)}, fordulók: ${turnsLabel}` };
+      return {
+        kindLabel: 'Eredmény',
+        bodyText: `${formatTokenCounts(record)}, fordulók: ${turnsLabel}`,
+        costEstimateText: formatCostEstimate(readPayloadNumber(record.payload, 'total_cost_usd')),
+      };
     }
     case 'sdk_system': {
       const subtype = record.sdkMessageSubtype;
@@ -223,6 +310,11 @@ function describeRunEventKind(record: RunEventRecord): KindDescription {
  * Egy `RunEventRecord` sor összegzése, a `RunEventRow` komponens bemenete.
  */
 export function summarizeRunEventRow(record: RunEventRecord): RunEventRowSummary {
-  const { kindLabel, bodyText } = describeRunEventKind(record);
-  return { originLabel: ORIGIN_LABEL[record.origin], kindLabel, bodyText };
+  const description = describeRunEventKind(record);
+  return {
+    originLabel: ORIGIN_LABEL[record.origin],
+    kindLabel: description.kindLabel,
+    bodyText: description.bodyText,
+    costEstimateText: description.costEstimateText,
+  };
 }
