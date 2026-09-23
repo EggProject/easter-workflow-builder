@@ -270,7 +270,8 @@ szelektoron állt, a futás nézet vászna a könyvtár világos alapértelmezé
 is (fehér gomb, szürke attribúció, 2026-09-23). **Az él, a fogantyú, a pontminta és a kijelölés
 sorai NEM közösek**, a `graph-editor.css`-ben állnak: a futás nézetre átvéve annak élét sötétben a
 harmadára gyengítették és a pontmintáját eltüntették, ezért a futás nézet ezeken a könyvtár
-alapértelmezését festi (regresszió: `e2e/run-graph-paint.spec.ts`, kifestett pixel mért
+alapértelmezését festi, és a user döntése szerint (2026-09-24) így is marad, design system token
+nélkül (nem kért változás elleni őr: `e2e/run-graph-paint.spec.ts`, kifestett pixel mért
 küszöbbel, mindkét témában). A `colorMode` prop szándékosan nincs megadva: a témát a `data-theme` attribútum
 váltja a `--ep-*` tokeneken át, élőben, JS nélkül (`docs/research/2026-09-23-react-flow-sotet-tema.md`,
 regresszió: `e2e/react-flow-theme.spec.ts`, kifestett pixel mindkét vásznon és mindkét témában). Az él vonalszíne

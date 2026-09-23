@@ -165,9 +165,10 @@ kifestettnek fogadta el.
 tartja (a 3. szekció táblázatának hét sora); az él, a kapcsolódási vonal, a fogantyú, a pontminta
 és a kijelölés sorai szó szerint visszakerültek a `graph-editor.css` `.graph-editor-canvas`
 blokkjába, ahol a `7229769` előtt álltak. A futás nézet ezeken ismét a React Flow szállított
-alapértelmezését festi (él `#b1b1b7`, pont `#91919a`, `@xyflow/react@12.11.6` `dist/style.css` 6. és 24. sor; mért számított érték `rgb(177, 177, 183)` és `rgb(145, 145, 154)`). **Javaslat, nem
-döntés:** hogy a futás nézet éle és pontmintája design system tokenre kerüljön-e, az külön
-termékdöntés; ez a javítás csak a nem kért változást vonja vissza.
+alapértelmezését festi (él `#b1b1b7`, pont `#91919a`, `@xyflow/react@12.11.6` `dist/style.css` 6. és 24. sor; mért számított érték `rgb(177, 177, 183)` és `rgb(145, 145, 154)`). **Lezárt
+termékdöntés (user, 2026-09-24):** a futás nézet éle és pontmintája mindkét témában ezen a React
+Flow alapértelmezésen marad, design system tokent nem kap. A javítás tehát a nem kért változást
+vonta vissza, és a visszaállított festés a végleges.
 
 **A mérés módja.** Eldobható mérő spec a repón kívül (`/private/tmp/runview-vaszon/`, a
 `screenshot-pipeline` invariáns miatt), valódi Chromium (`@playwright/test@1.62.1`), 1440x900,
@@ -201,8 +202,10 @@ csontváz területe, ami UGYANANNAK a buildnek két egymás utáni futása köz�
 (`.react-flow__edge-path { stroke: <a mért háttér pixel> }`): élenként világosban 2..3, sötétben
 1..2.
 
-**A kapu teszt:** `apps/web/e2e/run-graph-paint.spec.ts`, a `test:e2e` kapun, a futás nézet
-bemutató futásán, témánként egy él és egy pontminta teszt. A küszöbök a fenti táblázatból:
+**A kapu teszt, nem kért változás elleni őr:** `apps/web/e2e/run-graph-paint.spec.ts`, a
+`test:e2e` kapun, a futás nézet bemutató futásán, témánként egy él és egy pontminta teszt. A fenti
+döntés miatt nem azt állítja, hogy ez a helyes festés, hanem azt, hogy a mostani festés ne
+változzon kéretlenül (user döntés, 2026-09-24). A küszöbök a fenti táblázatból:
 
 | állítás                 | küszöb | a legerősebb hibás állapot | az ép állapot legkisebb értéke | származtatás                                     |
 | ----------------------- | ------ | -------------------------- | ------------------------------ | ------------------------------------------------ |
@@ -220,6 +223,31 @@ Playwright configjával: négy tesztből három bukik (világos pontminta `Expec
 4`; sötét él `Expected: >= 39, Received: 15`; sötét pontminta `Expected: >= 13, Received: 6`), a
 világos él átmegy (a fenti ok). A javított állapoton mind a négy zöld, élenként ugyanazokkal a
 számokkal, mint a fenti mérés.
+
+**Az őr ismert felbontási korlátja (2026-09-24).** Az őr nem minden kéretlen változást lát; ez a
+korlát leírása, nem javítandó hiba. Egy független ellenőrzés mérése szerint, a teljes kaput
+értve (a 7. szekció referencia összevetésével együtt):
+
+- A referencia összevetés felső korlátja **6**, az ép állapot eltérése **0..2**.
+- Világos témában egy közeli árnyalat átmegy: a **#a8a8ae** (a `#b1b1b7`-től csatornánként -9)
+  legnagyobb eltérése **6**, a **#acacb2** (csatornánként -5) legnagyobb eltérése **4**.
+- A **#babac0**, a **#a5a5ab** és a **#a9b1c1** **7**-tel bukik.
+- Az él teljes elrejtését a referencia teszt NEM fogja meg, az alsó korlátos teszt igen.
+- A pontminta `display: none` elrejtése nem az állításon bukik, hanem a szonda várakozásának
+  időtúllépésén: a szonda a felvétel előtt a pontminta nem `none` számított `display` értékére
+  vár (`expect.poll`).
+
+**Saját ismétlés, a valódi kapu specen** (2026-09-24, a `run-graph.css` végére ideiglenesen írt
+rontással, a repó Playwright configjával, egy futás változatonként): minden fenti pont
+reprodukálódott. Az árnyalatok a `.run-graph-canvas { --xy-edge-stroke: <szín> }` szabállyal:
+világosban a #a8a8ae 3..6, a #acacb2 2..4 (mindkettő zöld), a #babac0, a #a9b1c1 és a #a5a5ab az
+első 7-es élen bukik. Sötét témában a #babac0 és a #a9b1c1 átmegy (legnagyobb eltérés 6), a
+#a5a5ab ott is 7-tel bukik. A teljes elrejtést három módon mérve (a `.react-flow__edges` réteg, az
+él `<g>` csoportja, illetve az útvonal `display: none` alatt) a referencia teszt mindhárom esetben
+élenként 0-t mér és zöld, mert a kivágat az elrejtett útvonal üres befoglaló dobozából számolódik;
+az alsó korlát `Received: 0`-val bukik. A `.react-flow__background { display: none }` rontás
+mellett mind a hat teszt a szonda `Expected: not "none"` várakozásának 5000 ms-os időtúllépésén
+bukik, mert az él mérés szondája is a pontminta visszatérésére vár.
 
 ## 7. Rés a futás nézet él kapuján: referencia festés összevetés (2026-09-23)
 

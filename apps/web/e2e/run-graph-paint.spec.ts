@@ -1,14 +1,25 @@
-// Regressziós e2e: a FUTÁS NÉZET vásznán az élek és a háttér pontmintája
-// ténylegesen, a mért erősséggel ki van festve, mindkét témában (2026-09-23).
+// NEM KÉRT VÁLTOZÁS ELLENI ŐR (e2e): a FUTÁS NÉZET vásznán az élek és a háttér
+// pontmintája a MOSTANI festéssel marad, mindkét témában (2026-09-23).
 //
-// A HIBA, AMIT ŐRIZ. A vezérlő gombok és az attribúció sötét témás javítása
-// (`7229769`) a szerkesztő teljes `--xy-*` blokkját a futás nézetre is
-// ráhúzta, amit senki nem kért: a futás nézet éle sötét témában a harmadára
-// gyengült, a pontmintája pedig mindkét témában gyakorlatilag eltűnt. Egyetlen
-// kapu sem vette észre, mert a `react-flow-theme.spec.ts` csak a gombot és az
-// attribúciót méri, a `showcase-graph.spec.ts` csak a szerkesztő élét, a
-// `bun run screenshots` pedig nem kapu, és a 8-as közös küszöbe a gyengült élt
-// is kifestettnek fogadta el.
+// MIT ŐRIZ, ÉS MIT NEM. A futás nézet éle és pontmintája mindkét témában a
+// React Flow témázatlan, világos alapértelmezésével fest (a vászon `colorMode`
+// nélkül a `react-flow light` osztályt viseli), a szerkesztő a design system
+// `--xy-*` tokenjeivel. A user döntése (2026-09-24): ez így marad, a futás
+// nézet nem kap design system tokent. A teszt tehát NEM azt állítja, hogy ez a
+// helyes festés, hanem azt, hogy a mostani festés ne változzon kéretlenül; egy
+// kért változtatás a referencia festés és a küszöbök újramérésével jár. A
+// felbontás ismert korlátja (mekkora eltérést lát és mekkorát nem):
+// `docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció.
+//
+// A NEM KÉRT VÁLTOZÁS, AMI MIATT LÉTREJÖTT. A vezérlő gombok és az attribúció
+// sötét témás javítása (`7229769`) a szerkesztő teljes `--xy-*` blokkját a
+// futás nézetre is ráhúzta, amit senki nem kért: a futás nézet éle sötét
+// témában a harmadára gyengült, a pontmintája pedig mindkét témában
+// gyakorlatilag eltűnt. Egyetlen kapu sem vette észre, mert a
+// `react-flow-theme.spec.ts` csak a gombot és az attribúciót méri, a
+// `showcase-graph.spec.ts` csak a szerkesztő élét, a `bun run screenshots`
+// pedig nem kapu, és a 8-as közös küszöbe a gyengült élt is kifestettnek
+// fogadta el.
 //
 // A MÓDSZER a szabálykönyv 11. szekciója szerint: két képernyőkép UGYANARRÓL a
 // kivágatról, egyszer az elemmel, egyszer elrejtve, és a két kép legnagyobb
@@ -50,9 +61,11 @@ const VIEWPORT = { width: 1440, height: 900 };
 const EDGE_MINIMUM_CHANNEL_DIFFERENCE = { light: 12, dark: 39 } as const;
 
 /**
- * A futás nézet élének VÁRT festése, mindkét témában: a React Flow szállított
- * alapértelmezése, mert a vászon `colorMode` nélkül a `react-flow light`
- * osztályt viseli, és a `--xy-edge-*` változókat a futás nézeten semmi nem
+ * A futás nézet élének MOSTANI festése, mindkét témában, amit a teszt a nem
+ * kért változás ellen őriz (user döntés 2026-09-24, nem a helyes festés
+ * állítása): a React Flow szállított alapértelmezése, mert a vászon
+ * `colorMode` nélkül a `react-flow light` osztályt viseli, és a
+ * `--xy-edge-*` változókat a futás nézeten semmi nem
  * írja felül (`--xy-edge-stroke-default: #b1b1b7`,
  * `--xy-edge-stroke-width-default: 1`; `@xyflow/react@12.11.6`
  * `dist/style.css` 6. és 7. sor, https://reactflow.dev/learn/customization/theming).
@@ -61,7 +74,7 @@ const EDGE_MINIMUM_CHANNEL_DIFFERENCE = { light: 12, dark: 39 } as const;
  * fogja: világosban az erősebb (`7229769`, 69..136) és a felére gyengített
  * (12..21) él is átment rajta, és a gyengített él tartománya az ép 21..40-es
  * tartományával átfed, tehát egy közös alsó-felső sáv sem választaná el. A
- * referencia összevetés az élt UGYANAZON a geometrián a várt festéssel
+ * referencia összevetés az élt UGYANAZON a geometrián a mostani festéssel
  * rajzolja újra, így élenként mér, nem tartományt hasonlít.
  */
 const RUN_VIEW_EDGE_REFERENCE_PAINT: EdgeReferencePaint = { stroke: '#b1b1b7', strokeWidth: '1px' };
