@@ -1,5 +1,5 @@
 import { isNonEmptyString, isNumber, isRecord } from '@easter-workflow-builder/typeguards';
-import type { RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
+import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
 
 /**
  * Egy transcript sor összegzett, magyar szövegű tartalma (SPEC-008 7.1,
@@ -12,19 +12,28 @@ export interface RunEventRowSummary {
   readonly kindLabel: string;
   readonly bodyText: string;
   /**
-   * Kizárólag az `sdk_result` sornál van értéke: a `total_cost_usd` mező
-   * kijelzésre formázva, vagy `ismeretlen`, ha a payloadban nincs szám. Az
-   * érték az Agent SDK saját becslése, nem valós költség (user döntés
-   * 2026-09-23, `docs/research/2026-09-23-sdk-koltseg-becsles.md`), ezért a
-   * felület mindig ezzel a megnevezéssel mutatja.
+   * Kizárólag az `sdk_result` sornál és kizárólag `claude-subscription`
+   * providernél van értéke: a `total_cost_usd` mező kijelzésre formázva,
+   * vagy `ismeretlen`, ha a payloadban nincs szám. `minimax` providernél a
+   * mező sosem kap értéket, lásd `costHiddenForMinimax` (user döntés
+   * 2026-09-23, pontosítva: "MiniMaxnál ne látszódjon",
+   * `docs/research/2026-09-23-sdk-koltseg-becsles.md`).
    */
   readonly costEstimateText: string | undefined;
+  /**
+   * Igaz, ha a sor `sdk_result` és a lépés feloldott providere `minimax`:
+   * ilyenkor a költség mező helyett egy mondat mondja ki, hogy az SDK erre
+   * a providerre nem számol valós költséget. A `RunEventRow` ebből dönti
+   * el, hogy a magyarázó mondatot megjeleníti-e.
+   */
+  readonly costHiddenForMinimax: boolean;
 }
 
 interface KindDescription {
   readonly kindLabel: string;
   readonly bodyText: string;
   readonly costEstimateText?: string;
+  readonly costHiddenForMinimax?: boolean;
 }
 
 const ORIGIN_LABEL: Readonly<Record<RunEventOrigin, string>> = {
@@ -209,7 +218,7 @@ function describeHook(payload: unknown, kindLabel: string, fallbackBodyText: str
  * egy huszonhatodik érték felvétele ott a `switch-exhaustiveness-check`
  * ESLint szabály és a TypeScript ellenőrzés miatt itt fordítási hibát ad.
  */
-function describeRunEventKind(record: RunEventRecord): KindDescription {
+function describeRunEventKind(record: RunEventRecord, providerId: ProviderId): KindDescription {
   switch (record.kind) {
     case 'sdk_assistant': {
       return describeAssistant(record);
@@ -222,9 +231,13 @@ function describeRunEventKind(record: RunEventRecord): KindDescription {
     }
     case 'sdk_result': {
       const turnsLabel = record.numTurns === null ? 'ismeretlen' : String(record.numTurns);
+      const bodyText = `${formatTokenCounts(record)}, fordulók: ${turnsLabel}`;
+      if (providerId === 'minimax') {
+        return { kindLabel: 'Eredmény', bodyText, costHiddenForMinimax: true };
+      }
       return {
         kindLabel: 'Eredmény',
-        bodyText: `${formatTokenCounts(record)}, fordulók: ${turnsLabel}`,
+        bodyText,
         costEstimateText: formatCostEstimate(readPayloadNumber(record.payload, 'total_cost_usd')),
       };
     }
@@ -308,13 +321,24 @@ function describeRunEventKind(record: RunEventRecord): KindDescription {
 
 /**
  * Egy `RunEventRecord` sor összegzése, a `RunEventRow` komponens bemenete.
+ *
+ * A `providerId` a lépés ténylegesen feloldott providere (a hívó a
+ * `record.stepRunId`-hoz tartozó `StepRunRecord.providerId` mezőből
+ * biztosítja, SPEC-008 7.1). Alapértéke `claude-subscription`, hogy a nem
+ * költséggel foglalkozó tesztesetek (a `RunEventKind` mind a huszonöt
+ * értékét lefedő eset) ne kelljen egyenként kiegészíteni; a valódi
+ * felhasználásban (`RunEventRow`) ez mindig explicit érték.
  */
-export function summarizeRunEventRow(record: RunEventRecord): RunEventRowSummary {
-  const description = describeRunEventKind(record);
+export function summarizeRunEventRow(
+  record: RunEventRecord,
+  providerId: ProviderId = 'claude-subscription',
+): RunEventRowSummary {
+  const description = describeRunEventKind(record, providerId);
   return {
     originLabel: ORIGIN_LABEL[record.origin],
     kindLabel: description.kindLabel,
     bodyText: description.bodyText,
     costEstimateText: description.costEstimateText,
+    costHiddenForMinimax: description.costHiddenForMinimax ?? false,
   };
 }

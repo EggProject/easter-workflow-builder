@@ -44,8 +44,19 @@ describe('summarizeRunEventRow', () => {
       expect(summary.kindLabel.length).toBeGreaterThan(0);
       expect(summary.bodyText.length).toBeGreaterThan(0);
       expect(summary.originLabel.length).toBeGreaterThan(0);
-      // Költség mezője kizárólag az `sdk_result` sornak van (user döntés 2026-09-23).
+      // Költség mezője kizárólag az `sdk_result` sornak és kizárólag
+      // `claude-subscription` (az alapértelmezett) providernek van (user
+      // döntés 2026-09-23, pontosítva).
       expect(summary.costEstimateText === undefined).toBe(kind !== 'sdk_result');
+      expect(summary.costHiddenForMinimax).toBe(false);
+    }
+  });
+
+  it('mind a huszonöt RunEventKind értékre, minimax providerrel: costHiddenForMinimax csak sdk_result esetén igaz', () => {
+    for (const kind of RunEventKindSchema.options) {
+      const summary = summarizeRunEventRow(makeRecord({ kind }), 'minimax');
+      expect(summary.costHiddenForMinimax).toBe(kind === 'sdk_result');
+      expect(summary.costEstimateText).toBeUndefined();
     }
   });
 
@@ -225,6 +236,30 @@ describe('summarizeRunEventRow', () => {
     ])('%s esetén a költség ismeretlen', (_name, payload) => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_result', payload }));
       expect(summary.costEstimateText).toBe('ismeretlen');
+    });
+
+    describe('minimax provider mellett (user döntés 2026-09-23, pontosítva: "MiniMaxnál ne látszódjon")', () => {
+      it('a költség sosem kap értéket, még akkor sem, ha a payload tartalmazza a total_cost_usd mezőt', () => {
+        const summary = summarizeRunEventRow(
+          makeRecord({ kind: 'sdk_result', payload: { type: 'result', total_cost_usd: 0.213108 } }),
+          'minimax',
+        );
+        expect(summary.costEstimateText).toBeUndefined();
+      });
+
+      it('a costHiddenForMinimax jelző igaz', () => {
+        const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_result' }), 'minimax');
+        expect(summary.costHiddenForMinimax).toBe(true);
+      });
+    });
+
+    it('claude-subscription providert explicit megadva a viselkedés az alapértelmezettel egyezik', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_result', payload: { type: 'result', total_cost_usd: 0.213108 } }),
+        'claude-subscription',
+      );
+      expect(summary.costEstimateText).toBe('$0.2131');
+      expect(summary.costHiddenForMinimax).toBe(false);
     });
   });
 

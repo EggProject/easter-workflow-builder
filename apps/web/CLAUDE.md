@@ -50,10 +50,13 @@ prop a forrás `Accordion.jsx` része, a korábbi átemelés hagyta ki, T-009-24
 `sdk_assistant` sor a `toolName`-t és a `toolUseId`-t, az `sdk_user` sor a felhasználói fordulat
 szövegét (és eszköz eredménynél a `parentToolUseId`-t), az `sdk_stream_event` sor a részleges
 szöveget, az `sdk_result` sor mind a négy token számot és a `numTurns` értéket mutatja. **Az
-`sdk_result` költsége megjelenik** (user döntés 2026-09-23, ami a korábbi tiltást visszavonta): az
-összesítő sor `meta` szlotjában és a kinyitott nézetben is külön, "Költség (SDK becslés)" nevű
-mezőként, mert a szám egyik providernél sem a valós költség
-(`docs/research/2026-09-23-sdk-koltseg-becsles.md`). **Az `sdk_context_usage` ágnak élő
+`sdk_result` költsége providerfüggő** (user döntés 2026-09-23, pontosítva: "MiniMaxnál ne
+látszódjon"): `claude-subscription` provider mellett az összesítő sor `meta` szlotjában és a
+kinyitott nézetben is külön, "Költség (SDK becslés)" nevű mezőként jelenik meg; `minimax`
+provider mellett a mező sehol nem jelenik meg, csak a kinyitott nézetben egy mondat mondja ki,
+miért nem. A megkülönböztetés forrása a lépés feloldott `StepRunRecord.providerId` mezője, amit a
+`RunEventRow` külön propként kap, mert a `RunEventRecord` maga nem hordozza
+(`docs/research/2026-09-23-sdk-koltseg-becsles.md`, SPEC-008 7.1). **Az `sdk_context_usage` ágnak élő
 gyakorlatban nincs tesztadata**: a pinelt SDK-ban nincs önálló üzenet erre, a `context_usage` az
 `SDKAssistantMessage` egy mezője (SPEC-008 7.1, `packages/db` `CLAUDE.md` nyitott pontja), ezért a
 leképezés a `kind` értéket kezeli, a teszt szintetikus rekorddal fedi, de valós futás ilyen sort

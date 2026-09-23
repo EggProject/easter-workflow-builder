@@ -1,28 +1,45 @@
 import type { ReactElement } from 'react';
-import type { RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
+import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
 import { AccordionItem, joinClassNames } from '@easter-workflow-builder/ui';
 import { summarizeRunEventRow } from './run-event-row-summary.ts';
 import './run-event-row.css';
 
 export interface RunEventRowProperties {
   readonly record: RunEventRecord;
+  /**
+   * A lépés ténylegesen feloldott providere. A forrás a `StepRunRecord.providerId`
+   * mező (`record.stepRunId` alapján kikeresve), amit az engine a háromszintű
+   * feloldás eredményeként ír a lépés futás sorába - NEM a modell név szövege,
+   * mert az törékeny és felülírható (user döntés 2026-09-23, SPEC-008 7.1,
+   * `docs/research/2026-09-23-sdk-koltseg-becsles.md`). A feloldást maga a
+   * hívó (a transcript panel, T-009-25) végzi.
+   */
+  readonly providerId: ProviderId;
 }
 
 /**
  * A költség mező megnevezése. Az `sdk_result` `total_cost_usd` értéke az
- * Agent SDK becslése, nem valós költség, ezért a felirat ezt mondja ki
- * (user döntés 2026-09-23, `docs/research/2026-09-23-sdk-koltseg-becsles.md`).
+ * Agent SDK becslése, nem valós költség, ezért a felirat ezt mondja ki. A
+ * mező kizárólag `claude-subscription` provider mellett jelenik meg (user
+ * döntés 2026-09-23, pontosítva: "MiniMaxnál ne látszódjon",
+ * `docs/research/2026-09-23-sdk-koltseg-becsles.md`).
  */
 const COST_FIELD_LABEL = 'Költség (SDK becslés)';
 
 /**
- * A kinyitott sorban a költség mező mellett álló magyarázat, a research fájl
- * két forrással igazolt megállapításai szerint, providerenként.
+ * A kinyitott sorban a költség mező mellett álló magyarázat, `claude-subscription`
+ * provider mellett.
  */
 const COST_FIELD_EXPLANATION =
-  'Az Agent SDK a saját, beépített ártáblájából számolja, tehát becslés, nem számla. A MiniMax-M3 modellre ' +
-  'az SDK-nak nincs ára, ezért MiniMax provider mellett nem a valós költség; Claude előfizetésnél a ' +
+  'Az Agent SDK a saját, beépített ártáblájából számolja, tehát becslés, nem számla. Claude előfizetésnél a ' +
   'számlázás szempontjából nem releváns.';
+
+/**
+ * A kinyitott sorban megjelenő magyarázat `minimax` provider mellett, a
+ * költség mező helyén (a mező maga sehol nem jelenik meg).
+ */
+const COST_HIDDEN_FOR_MINIMAX_EXPLANATION =
+  'A MiniMax-M3 modellre az Agent SDK nem ismer valós árat, ezért a költség becslése ennél a providernél nem jelenik meg.';
 
 /**
  * Egy `run_event` sor időbélyege, óra:perc:másodperc alakban, magyar
@@ -89,12 +106,14 @@ function OriginMarkerIcon(properties: Readonly<{ origin: RunEventOrigin }>): Rea
  * `icon` szlotja: a design system `.accordion__icon` doboza 18x18-as és
  * `flex-shrink: 0`, tehát minden sorban azonos szélességű bal oldali
  * oszlopot ad, és az eredetet ikon alakkal, nem csak színnel jelöli. Az
- * `sdk_result` sor költség mezője a `meta` szlotba kerül, a kinyitott
- * nézetben pedig külön, megnevezett mezőként is megjelenik.
+ * `sdk_result` sor költség mezője `claude-subscription` provider mellett a
+ * `meta` szlotba kerül, a kinyitott nézetben pedig külön, megnevezett
+ * mezőként is megjelenik; `minimax` provider mellett a mező sehol nem
+ * jelenik meg, csak a kinyitott nézetben egy magyarázó mondat áll a helyén.
  */
 export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactElement {
-  const { record } = properties;
-  const summary = summarizeRunEventRow(record);
+  const { record, providerId } = properties;
+  const summary = summarizeRunEventRow(record, providerId);
   const title = `${formatOccurredAt(record.occurredAtMs)} · ${summary.originLabel} · ${summary.kindLabel}: ${summary.bodyText}`;
   const costMeta =
     summary.costEstimateText === undefined ? undefined : `${COST_FIELD_LABEL}: ${summary.costEstimateText}`;
@@ -110,6 +129,11 @@ export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactE
             <p>{COST_FIELD_EXPLANATION}</p>
           </div>
         )}
+        {summary.costHiddenForMinimax ? (
+          <div className="run-event-row__cost">
+            <p>{COST_HIDDEN_FOR_MINIMAX_EXPLANATION}</p>
+          </div>
+        ) : undefined}
         <pre className="run-event-row__payload">{JSON.stringify(record.payload, undefined, 2)}</pre>
       </AccordionItem>
     </div>
