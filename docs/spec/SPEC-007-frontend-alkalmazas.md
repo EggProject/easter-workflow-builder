@@ -836,6 +836,8 @@ döntést a design system saját példája hozta meg, nem ez a munkamenet - a ma
 (kék/arany/krém gyűrűk, sötét tintaszín nélkül) nem támaszkodnak világos hátérre úgy, ahogy a
 wordmark sötét szövege tenné.
 
+**Egy újabb téma mappa, 2026-09-23-i felületi kiegészítésben.** Az `alert` a design system `alert` komponensének bájtra azonosan átemelt alakja (`packages/ui` CLAUDE.md), a futás nézet (SPEC-008) átmeneti szerver hiba jelzésére szolgál, "Várakozás a szerverre" felirattal.
+
 **Egy szint mély, tárgykör mappa nélkül.** A csomag egy tárgykörű: minden téma a design system átemeléséről szól. A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül, mert a fájlnevek már megnevezik a csoportot (a `Button.tsx` mellett álló `button.css` nem lehet másé), tehát a második feltétel egy szinttel lejjebb elbukik. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 
 **Amit szándékosan nem csináltunk:** nincs `components/`, `styles/`, `assets/`, `hooks/` vagy `types/` mappa. Az utolsó a SPEC-002 tiltott név listáján áll, a többi technikai réteg, nem domain fogalom.
