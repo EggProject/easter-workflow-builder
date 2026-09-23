@@ -24,7 +24,12 @@
 // `docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció.
 import type { Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
-import { maximumChannelDifference, measureEdgePaintDifference } from './edge-paint-measurement.ts';
+import {
+  maximumChannelDifference,
+  measureEdgePaintDifference,
+  measureEdgeReferenceDifference,
+  type EdgeReferencePaint,
+} from './edge-paint-measurement.ts';
 import {
   fitShowcaseGraphIntoView,
   installShowcaseRunMocks,
@@ -43,6 +48,33 @@ const VIEWPORT = { width: 1440, height: 900 };
  * elkapja, nem csak az eltűnést.
  */
 const EDGE_MINIMUM_CHANNEL_DIFFERENCE = { light: 12, dark: 39 } as const;
+
+/**
+ * A futás nézet élének VÁRT festése, mindkét témában: a React Flow szállított
+ * alapértelmezése, mert a vászon `colorMode` nélkül a `react-flow light`
+ * osztályt viseli, és a `--xy-edge-*` változókat a futás nézeten semmi nem
+ * írja felül (`--xy-edge-stroke-default: #b1b1b7`,
+ * `--xy-edge-stroke-width-default: 1`; `@xyflow/react@12.11.6`
+ * `dist/style.css` 6. és 7. sor, https://reactflow.dev/learn/customization/theming).
+ *
+ * MIÉRT REFERENCIA, ÉS NEM FELSŐ KORLÁT. Az alsó korlát csak az eltűnést
+ * fogja: világosban az erősebb (`7229769`, 69..136) és a felére gyengített
+ * (12..21) él is átment rajta, és a gyengített él tartománya az ép 21..40-es
+ * tartományával átfed, tehát egy közös alsó-felső sáv sem választaná el. A
+ * referencia összevetés az élt UGYANAZON a geometrián a várt festéssel
+ * rajzolja újra, így élenként mér, nem tartományt hasonlít.
+ */
+const RUN_VIEW_EDGE_REFERENCE_PAINT: EdgeReferencePaint = { stroke: '#b1b1b7', strokeWidth: '1px' };
+
+/**
+ * Az eltérés felső korlátja a referencia festéstől, mindkét témában. Ép
+ * állapotban a mért legnagyobb érték 2 (a raszterezés zaja a végpontok
+ * körül), a legenyhébb mért rontás (a felére gyengített él, világos téma)
+ * legkisebb értéke 10: a 6 a kettő egész felezőpontja. A `7229769` erősebb
+ * festése világosban 48..98, sötétben 33..65, a gyengített él sötétben
+ * 24..49 (`docs/research/2026-09-23-react-flow-sotet-tema.md` 7. szekció).
+ */
+const EDGE_REFERENCE_MAXIMUM_CHANNEL_DIFFERENCE = 6;
 
 /**
  * A pontminta alsó korlátja, mindkét témában. A `7229769` állapotában a mért
@@ -156,6 +188,14 @@ for (const theme of ['light', 'dark'] as const) {
         const difference = await measureEdgePaintDifference(page, edge.id);
         console.log(`futás nézet ${theme} ${edge.id}: legnagyobb csatorna eltérés ${String(difference)}`);
         expect(difference).toBeGreaterThanOrEqual(minimum);
+      }
+    });
+
+    test('MINDEN él a React Flow alapértelmezett festésével fest, se erősebben, se gyengébben', async ({ page }) => {
+      for (const edge of SHOWCASE_GRAPH.edges) {
+        const difference = await measureEdgeReferenceDifference(page, edge.id, RUN_VIEW_EDGE_REFERENCE_PAINT);
+        console.log(`futás nézet ${theme} ${edge.id}: eltérés a referencia festéstől ${String(difference)}`);
+        expect(difference).toBeLessThanOrEqual(EDGE_REFERENCE_MAXIMUM_CHANNEL_DIFFERENCE);
       }
     });
 

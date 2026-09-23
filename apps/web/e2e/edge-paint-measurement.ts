@@ -65,8 +65,35 @@ const BACKGROUND_SELECTOR = '.react-flow__background';
  */
 const PROBE_BASE_RULES = `${BACKGROUND_SELECTOR} { display: none !important; } .react-flow__node, .react-flow__panel { visibility: hidden !important; }`;
 
+function edgeSelector(edgeId: string): string {
+  return `[data-testid="rf__edge-${edgeId}"]`;
+}
+
 function edgePathSelector(edgeId: string): string {
-  return `[data-testid="rf__edge-${edgeId}"] .react-flow__edge-path`;
+  return `${edgeSelector(edgeId)} .react-flow__edge-path`;
+}
+
+/**
+ * A szonda stíluslapjának írása: egyetlen, a mérés idejére beszúrt elem,
+ * aminek a tartalmát minden lépés felülírja, hogy a szonda visszavonható
+ * legyen.
+ */
+async function writeProbeStyle(page: Page, rule: string): Promise<void> {
+  await page.evaluate(
+    (input: { readonly styleId: string; readonly rule: string }) => {
+      const document_ = globalThis.document;
+      const existing = document_.querySelector(`#${input.styleId}`);
+      if (existing === null) {
+        const created = document_.createElement('style');
+        created.id = input.styleId;
+        created.textContent = input.rule;
+        document_.head.append(created);
+        return;
+      }
+      existing.textContent = input.rule;
+    },
+    { styleId: PROBE_STYLE_ID, rule },
+  );
 }
 
 async function readDisplay(page: Page, selector: string): Promise<string> {
@@ -85,21 +112,7 @@ async function readDisplay(page: Page, selector: string): Promise<string> {
 async function applyProbe(page: Page, hiddenEdgeId: string | undefined): Promise<void> {
   const edgeRule = hiddenEdgeId === undefined ? '' : `${edgePathSelector(hiddenEdgeId)} { display: none !important; }`;
 
-  await page.evaluate(
-    (input: { readonly styleId: string; readonly rule: string }) => {
-      const document_ = globalThis.document;
-      const existing = document_.querySelector(`#${input.styleId}`);
-      if (existing === null) {
-        const created = document_.createElement('style');
-        created.id = input.styleId;
-        created.textContent = input.rule;
-        document_.head.append(created);
-        return;
-      }
-      existing.textContent = input.rule;
-    },
-    { styleId: PROBE_STYLE_ID, rule: `${PROBE_BASE_RULES} ${edgeRule}` },
-  );
+  await writeProbeStyle(page, `${PROBE_BASE_RULES} ${edgeRule}`);
 
   await expect.poll(async () => readDisplay(page, BACKGROUND_SELECTOR)).toBe('none');
   if (hiddenEdgeId === undefined) {
@@ -195,4 +208,90 @@ export async function measureEdgePaintDifference(page: Page, edgeId: string): Pr
   const blankShot = await page.screenshot({ clip });
   await clearProbe(page);
   return maximumChannelDifference(page, paintedShot.toString('base64'), blankShot.toString('base64'));
+}
+
+/**
+ * Az él VÁRT festése, amihez a tényleges festést hasonlítjuk: a vonal színe és
+ * vastagsága, CSS értékként.
+ */
+export interface EdgeReferencePaint {
+  readonly stroke: string;
+  readonly strokeWidth: string;
+}
+
+/**
+ * A referencia szabály beállítását jelző egyedi CSS változó. A várakozás ezt
+ * figyeli, mert az ép állapotban a referencia minden festési értéke
+ * egyezik a ténylegessel, tehát azokból nem derülne ki, hogy a szabály
+ * illeszkedett-e.
+ */
+const REFERENCE_MARKER_PROPERTY = '--edge-paint-reference';
+
+/**
+ * A referencia festés szabályai EGYETLEN élre (2026-09-23). Az útvonal
+ * `all: initial` alá kerül, tehát SEMMILYEN szerzői szabály (osztály, `--xy-*`
+ * változó, átlátszóság, szűrő, szaggatás) nem hat rá; a geometriát a
+ * saját `d` attribútumából kapja vissza (`d` a Chromiumban CSS tulajdonság,
+ * amit az `all` szintén alaphelyzetbe tenne), a festést pedig kizárólag a
+ * `reference` adja. Az ősök (a közös `.react-flow__edges` réteg, az él saját
+ * `<svg>` burkolója és `<g>` csoportja) nem kaphatnak `all: initial`-t, mert
+ * az a pozíciójukat is elvenné; rajtuk az átlátszóság lánca áll alaphelyzetben.
+ */
+function edgeReferenceRules(edgeId: string, pathData: string, reference: EdgeReferencePaint): string {
+  const edge = edgeSelector(edgeId);
+  return [
+    `.react-flow__edges, .react-flow__edges > svg:has(> ${edge}), ${edge} { opacity: 1 !important; filter: none !important; mix-blend-mode: normal !important; }`,
+    `${edgePathSelector(edgeId)} { all: initial !important; d: path("${pathData}") !important; fill: none !important; stroke: ${reference.stroke} !important; stroke-width: ${reference.strokeWidth} !important; ${REFERENCE_MARKER_PROPERTY}: on; }`,
+  ].join(' ');
+}
+
+async function readEdgePathData(page: Page, edgeId: string): Promise<string> {
+  return page.evaluate((selector: string) => {
+    const path = globalThis.document.querySelector(selector);
+    const pathData = path?.getAttribute('d');
+    if (pathData === null || pathData === undefined) {
+      throw new Error(`a mérés nem találta az él útvonalának d attribútumát: ${selector}`);
+    }
+    return pathData;
+  }, edgePathSelector(edgeId));
+}
+
+async function readReferenceMarker(page: Page, edgeId: string): Promise<string> {
+  return page.evaluate(
+    (input: { readonly selector: string; readonly property: string }) => {
+      const element = globalThis.document.querySelector(input.selector);
+      return element === null
+        ? 'missing'
+        : globalThis.getComputedStyle(element).getPropertyValue(input.property).trim();
+    },
+    { selector: edgePathSelector(edgeId), property: REFERENCE_MARKER_PROPERTY },
+  );
+}
+
+/**
+ * EGYETLEN él TÉNYLEGES festésének összevetése a VÁRT festéssel (2026-09-23):
+ * a kivágat az él befoglaló doboza, az első kép a valós él, a második
+ * UGYANAZ a geometria a `reference` festéssel. A visszaadott szám a két kép
+ * legnagyobb csatorna eltérése. Az alsó korlátos `measureEdgePaintDifference`
+ * csak azt mondja meg, hogy a vonal LÁTSZIK-e; ez azt, hogy a várt festéstől
+ * mennyire tér el, tehát az erősebb és a gyengébb festést is elkapja. Ép
+ * állapotban sem mindig 0: a Chromium raszterezése ugyanazt a vonalat a
+ * végpontok körül 1..2 szinttel eltérően adhatja vissza, attól függően, hogy
+ * a kivágat melyik része raszterizálódott újra a szonda váltásakor (mérve,
+ * `docs/research/2026-09-23-react-flow-sotet-tema.md` 7. szekció).
+ */
+export async function measureEdgeReferenceDifference(
+  page: Page,
+  edgeId: string,
+  reference: EdgeReferencePaint,
+): Promise<number> {
+  const clip = await edgeClip(page, edgeId);
+  await applyProbe(page, undefined);
+  const paintedShot = await page.screenshot({ clip });
+  const pathData = await readEdgePathData(page, edgeId);
+  await writeProbeStyle(page, `${PROBE_BASE_RULES} ${edgeReferenceRules(edgeId, pathData, reference)}`);
+  await expect.poll(async () => readReferenceMarker(page, edgeId)).toBe('on');
+  const referenceShot = await page.screenshot({ clip });
+  await clearProbe(page);
+  return maximumChannelDifference(page, paintedShot.toString('base64'), referenceShot.toString('base64'));
 }

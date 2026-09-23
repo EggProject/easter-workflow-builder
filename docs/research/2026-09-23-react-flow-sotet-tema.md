@@ -212,9 +212,97 @@ bemutató futásán, témánként egy él és egy pontminta teszt. A küszöbök
 
 Világosban a `7229769` éle ERŐSEBB volt az épnél (69..136), tehát ott az él küszöbe csak az
 eltűnést és a háttérszínnel festést fogja; a világos regressziót a pontminta állítása fogja.
+**Ez csak a teljes `7229769` visszaállításra igaz**: ha kizárólag az él festése változik, a
+pontminta ép marad, és az él alsó korlátja sem bukik. A rést a 7. szekció zárja.
 
 **A bukás igazolva.** A két CSS fájl a `7229769` állapotára visszaállítva, a spec a repó
 Playwright configjával: négy tesztből három bukik (világos pontminta `Expected: >= 13, Received:
 4`; sötét él `Expected: >= 39, Received: 15`; sötét pontminta `Expected: >= 13, Received: 6`), a
 világos él átmegy (a fenti ok). A javított állapoton mind a négy zöld, élenként ugyanazokkal a
 számokkal, mint a fenti mérés.
+
+## 7. Rés a futás nézet él kapuján: referencia festés összevetés (2026-09-23)
+
+**A rés.** Egy független ellenőrzés két kísérlettel igazolta, hogy a 6. szekció él állítása
+világos témában csak alsó korlát: (a) ha kizárólag a futás nézet éle kapja a `7229769` erősebb
+festését (69..136 az ép 21..40 helyett), a teljes e2e készlet zöld; (b) ha a világos él a felére
+gyengül (12..22), a teszt négyből négy zöld. A pontminta állítás egyik esetben sem bukik, mert a
+pontminta ép marad.
+
+**Miért nem felső korlát a meglévő mérésre.** A "látszik-e" mérés (él be, él ki) élenként más
+értéket ad, és a gyengített él tartománya (világosban 12..21) az ép tartomány (21..40) alsó
+szélével átfed, tehát egyetlen közös alsó-felső sáv sem választaná el a kettőt. Élenkénti mért
+táblázat pedig minden geometria változásnál elavulna.
+
+**A választott forma: referencia festés, élenként.** Ugyanarról a kivágatról két kép: a valós él,
+és UGYANAZ a geometria a várt festéssel újrarajzolva. A várt festés a React Flow szállított
+alapértelmezése, mert a futás nézet vásznán semmi nem írja felül a `--xy-edge-*` változókat, és
+a gyökér osztálya `colorMode` nélkül mindkét témában `react-flow light`:
+`--xy-edge-stroke-default: #b1b1b7`, `--xy-edge-stroke-width-default: 1`. Források: a telepített
+`@xyflow/react@12.11.6` `dist/style.css` 6. és 7. sor; a publikált
+<https://unpkg.com/@xyflow/react@12.11.6/dist/style.css>; a build előtti
+<https://raw.githubusercontent.com/xyflow/xyflow/main/packages/system/src/styles/init.css> 6. és 7. sor; a <https://reactflow.dev/learn/customization/theming> változó táblázata (`#b1b1b7`),
+mind lekérve 2026-09-23-án.
+
+A referencia szabály az útvonalat `all: initial` alá teszi, tehát semmilyen szerzői szabály
+(osztály, `--xy-*` változó, átlátszóság, szűrő) nem hat rá; a geometriát a saját `d`
+attribútumából kapja vissza (`d: path(...)`, mert az `all` a Chromiumban a `d` tulajdonságot is
+alaphelyzetbe tenné), a festést kizárólag a várt szín és vastagság adja. Az ősökön (a közös
+`.react-flow__edges` réteg, az él `<svg>` burkolója és `<g>` csoportja) az `opacity`, a `filter` és
+a `mix-blend-mode` áll alaphelyzetben; `all: initial`-t nem kaphatnak, mert az a pozíciójukat is
+elvenné. **A módszer elvi korlátja:** ami a közös `.react-flow__viewport` vagy afölötti ős
+festését változtatja (az a csomópontokat is érinti), azt ez az összevetés nem látja.
+
+**Mérés.** Eldobható mérő spec a repón kívül (`/private/tmp/feed-edge-meres/`, a
+`screenshot-pipeline` invariáns miatt), valódi Chromium (`@playwright/test@1.62.1`), 1440x900, a
+repó `showcase-graph.ts` bemutató futása, a kapu teszttel azonos segédfüggvénnyel
+(`measureEdgeReferenceDifference`). A rontások futásidőben befecskendezett stíluslapként, négy
+párhuzamos worker, tesztenként négy ismétlés, tizenegy él, tehát állapotonként és témánként 44
+mérés. A táblázatban a legkisebb és a legnagyobb érték.
+
+| állapot                                                           | világos: látszik | világos: referencia | sötét: látszik | sötét: referencia |
+| ----------------------------------------------------------------- | ---------------- | ------------------- | -------------- | ----------------- |
+| ép                                                                | 21..40           | 0..2                | 47..95         | 0..2              |
+| (a) `--xy-edge-stroke: var(--ep-border-strong)` (a `7229769` éle) | 69..136          | 48..98              | 15..31         | 33..65            |
+| (b) `stroke-opacity: 0.5` az útvonalon                            | 12..21           | 10..20              | 23..47         | 24..48            |
+| (b) `opacity: 0.5` az útvonalon                                   | 12..21           | 10..20              | 23..47         | 24..48            |
+| (b) `--xy-edge-stroke-width: 0.5`                                 | 12..20           | 11..21              | 23..47         | 24..48            |
+| (b) `opacity: 0.5` az él `<g>` csoportján                         | 12..21           | 10..20              | 23..47         | 24..49            |
+| (b) fél erősségű szín (`color-mix`, 50 százalék)                  | 11..20           | 10..20              | 23..47         | 24..49            |
+
+A (b) sorok "látszik" értéke világosban (11..21) egyezik az ellenőrzés 12..22-es számával.
+
+**Az ép állapot nem mindig 0.** Az ép 88 mérésből 58 volt 0, 12 volt 1, 18 volt 2. A 0-tól eltérő
+pixelek mindig az él végpontjai körül, a csomópontok helyén állnak, és akkor is előfordulnak, ha
+ugyanazt az állapotot kétszer fényképezzük le, a kettő között egy másik szonda állapottal: a
+Chromium a szonda váltásakor csak a kivágat egy részét raszterizálja újra, és az újra
+raszterizált rész széle 1..2 szinttel eltérhet. Mért, sikertelen kísérletek a zaj megszüntetésére
+(mind a fenti futtatókörnyezetben): két `requestAnimationFrame` várakozás a felvétel előtt
+(egymagában 264 összevetésből kettőben még eltért); két egymást követő, bitre azonos felvételig
+várás (a Playwright `toHaveScreenshot` feltétele, "wait until two consecutive page screenshots
+yield the same result", <https://playwright.dev/docs/api/class-pageassertions>), ami azonnal
+teljesült, a zaj mégis megmaradt; az él elrejtése és visszahozása a felvétel előtt, ami rontott
+rajta. A zaj tehát nem beálló, hanem a raszterezés előtörténetétől függ, ezért a pontos egyezés
+helyett mért felső korlát kell.
+
+**A küszöb.** Ép állapotban a legnagyobb érték 2, a legenyhébb rontás legkisebb értéke 10 (a
+felére gyengített él, világos téma): a **6** a kettő egész felezőpontja, mindkét témára. A sötét
+téma tartaléka nagyobb (a legkisebb rontás 24).
+
+**A bukás igazolva, a valódi termék CSS-en.** A `run-graph.css` végére írt rontással, a repó
+Playwright configjával (build plusz `vite preview`), a kapu specen:
+
+| állapot                           | világos, referencia teszt     | sötét, referencia teszt       | sötét, meglévő alsó korlát |
+| --------------------------------- | ----------------------------- | ----------------------------- | -------------------------- |
+| ép                                | zöld (élenként 0..2)          | zöld (élenként 0..2)          | zöld                       |
+| (a) `--xy-edge-stroke` rontás     | bukik, `<= 6`, `Received: 48` | bukik, `<= 6`, `Received: 33` | bukik (`15`)               |
+| (b) `stroke-opacity: 0.5`         | bukik, `<= 6`, `Received: 11` | bukik, `<= 6`, `Received: 24` | bukik (`23`)               |
+| (b) `--xy-edge-stroke-width: 0.5` | bukik, `<= 6`, `Received: 11` | bukik, `<= 6`, `Received: 24` | bukik (`23`)               |
+
+A világos téma alsó korlátja és pontminta állítása mindhárom rontáson zöld marad: a rést
+kizárólag az új állítás zárja. A teszt az első eltérő élen megáll, ezért a `Received` az első
+bukó él értéke.
+
+**Ami nyitva marad, javaslat, nem döntés.** A pontminta állítása ugyanígy egyoldalú (csak alsó
+korlát); a felére gyengített pontmintát sötétben nem fogná. Ugyanez a referencia forma
+átvihető rá, ha kérik.
