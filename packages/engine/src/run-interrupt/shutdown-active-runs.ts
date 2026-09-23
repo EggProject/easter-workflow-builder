@@ -113,6 +113,7 @@ export async function shutdownActiveRuns(
   }
   await stopAndAwaitRunTree(
     handles,
+    'interrupted',
     dependencies.agentQueryRegistry,
     dependencies.approvalRegistry,
     dependencies.concurrencyGate,

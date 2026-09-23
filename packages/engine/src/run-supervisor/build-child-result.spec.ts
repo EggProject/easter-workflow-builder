@@ -58,6 +58,13 @@ describe('buildChildResult', () => {
     expect(outcome.kind).toBe('ok');
     expect(outcome.kind === 'ok' ? outcome.value.run.id : '').toBe('run-1');
     expect(outcome.kind === 'ok' ? outcome.value.output : undefined).toStrictEqual({ kesz: true });
+    expect(outcome.kind === 'ok' && 'stopTargetStatus' in outcome.value).toBe(false);
+  });
+
+  it('leállított gyereknél a kézikönyv célállapotát is adja', () => {
+    const outcome = buildChildResult(COMPLETION, RUN, GRAPH, EXECUTED, 'interrupted');
+
+    expect(outcome.kind === 'ok' ? outcome.value.stopTargetStatus : undefined).toBe('interrupted');
   });
 
   it('a léptetés hibája megy tovább', () => {

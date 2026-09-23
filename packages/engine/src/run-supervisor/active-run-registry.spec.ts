@@ -12,16 +12,16 @@ const SUCCEEDED: Outcome<RunCompletion> = {
 /* eslint-enable unicorn/no-null */
 
 function handleOf(runId: string, rootRunId = runId): ActiveRunHandle {
-  let isStopRequested = false;
+  let stopTargetStatus: 'cancelled' | 'interrupted' | undefined;
   return {
     runId,
     rootRunId,
     workflowId: 'wf-1',
     completion: Promise.resolve(SUCCEEDED),
-    requestStop: () => {
-      isStopRequested = true;
+    requestStop: (targetStatus) => {
+      stopTargetStatus = targetStatus;
     },
-    isStopRequested: () => isStopRequested,
+    stopTargetStatus: () => stopTargetStatus,
   };
 }
 
@@ -81,12 +81,12 @@ describe('createActiveRunRegistry', () => {
     expect(registry.listDescendants('unoka')).toStrictEqual([]);
   });
 
-  it('a requestStop a kézikönyvön keresztül állítja a leállítási jelzést', () => {
+  it('a requestStop a kézikönyvön keresztül állítja a leállítás célállapotát', () => {
     const handle = handleOf('run-1');
 
-    expect(handle.isStopRequested()).toBe(false);
-    handle.requestStop();
+    expect(handle.stopTargetStatus()).toBeUndefined();
+    handle.requestStop('cancelled');
 
-    expect(handle.isStopRequested()).toBe(true);
+    expect(handle.stopTargetStatus()).toBe('cancelled');
   });
 });

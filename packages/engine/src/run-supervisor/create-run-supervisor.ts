@@ -251,16 +251,18 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    */
   function launch(execution: RunExecution, run: WorkflowRunRecord, parentRunId: string | undefined): ActiveRunHandle {
     const completion = runToCompletion(execution);
+    let stopTargetStatus: 'cancelled' | 'interrupted' | undefined;
     const handle: ActiveRunHandle = {
       runId: execution.runId,
       rootRunId: run.rootRunId,
       ...(parentRunId !== undefined && { parentRunId }),
       workflowId: run.workflowId,
       completion,
-      requestStop: () => {
+      requestStop: (targetStatus) => {
         execution.stopRequested = true;
+        stopTargetStatus ??= targetStatus;
       },
-      isStopRequested: () => execution.stopRequested,
+      stopTargetStatus: () => stopTargetStatus,
     };
     registry.register(handle);
     return handle;
@@ -311,7 +313,8 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * A gyerek futás terminális rekordja és kimenete (SPEC-004 5.9 6. pont). A
    * rekordot **újra beolvassuk**, mert a `startChildRun` óta a futás
    * terminális állapotba került; a kimenetet a `collectTerminalOutput` adja a
-   * gyerek lefutott példányaiból.
+   * gyerek lefutott példányaiból. Leállított gyereknél a sor ekkor még
+   * `running`, ezért a kézikönyv célállapota is megy (`ChildWorkflowRunResult`).
    */
   async function awaitChildCompletion(started: StartedRunInternals): Promise<Outcome<ChildWorkflowRunResult>> {
     const completion = await started.handle.completion;
@@ -320,6 +323,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       ports.database.runs.getRun(started.run.id),
       started.execution.topology.graph,
       started.execution.executedInstances,
+      started.handle.stopTargetStatus(),
     );
   }
 

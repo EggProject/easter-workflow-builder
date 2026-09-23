@@ -407,7 +407,7 @@ sorrendet felcserélve a sorrend teszt (`expected [ 'interrupt', …(1) ] to str
 Plusz a `run-recovery.spec.ts` három `cancelRuns` esete, az `active-run-registry.spec.ts`
 `listDescendants` esete és a `cancel-active-run-tree.spec.ts` három esete.
 
-**Mellékes lelet, mérve, nem javítva: a `sub_workflow_finished` esemény `status` mezője `running`.**
+**Mellékes lelet, mérve, a kilencedik körben javítva (lent): a `sub_workflow_finished` esemény `status` mezője `running`.**
 Mindkét úton (a `fail_run` és a felhasználói megszakítás, a javítás előtt és után is) a szülő
 `sub` lépésének `sub_workflow_finished` eseménye `status: "running"` értéket hordoz, a lépés
 hibaüzenete pedig "`running` állapotban zárt". Mérve a valódi szerveren: `POST
@@ -480,7 +480,7 @@ marad, és egy új motor példányon érkező döntés `illegal_status_transitio
 előtt is zöld, mert a helyreállítás a `waiting_approval` sort is `interrupted`-be viszi; a feladata a
 helyreállítás őrzése, nem az ablaké.
 
-**A `sub_workflow_finished` esemény `status` mezője: mérve mindhárom úton, nem javítva.** Motor
+**A `sub_workflow_finished` esemény `status` mezője: mérve mindhárom úton, a kilencedik körben javítva (lent).** Motor
 szintű próba a valódi szerveren, a hetedik kör workflow-jával (gyerek és unoka jóváhagyásra vár),
 a javítás előtt és után is azonos eredménnyel:
 
@@ -507,8 +507,59 @@ hívásakor, és a leállított, még nem terminális gyerekre a végrehajtó ez
 ír, a sorát a fa zárása viszi `cancelled`, illetve `interrupted` állapotba, ami a 8.3 "a saját útján
 zár" mondatának felülírása; (c) a fa DB zárása alulról felfelé, futásonként, ami a 9. szekció 5.
 pontjának egy tranzakciós szabályát írná felül. A lépés végállapota ettől helyes a spec szerint,
-csak az esemény és az üzenet mond elavult állapotot.
+csak az esemény és az üzenet mond elavult állapotot. A user az (a) irányt választotta
+(2026-09-23), lásd a kilencedik kört.
 Mellékmegfigyelés a szabályos leállás útjáról: a `sub` lépés itt is a saját útján zár
 (`failed`), míg egy kemény leállás utáni helyreállítás ugyanezt a sort `interrupted`-be vinné; a
 futó agent lépés ugyanígy a saját `result` üzenete szerint zár (a mérésben az `a2` `succeeded`). Ez
 a 10.2 2. pontjából következik ("ugyanúgy, mint a 9. szekcióban"), nem ennek a körnek a tárgya.
+
+**A `sub_workflow_finished` esemény `status` mezője: mérve, javítva (2026-09-24, kilencedik kör).**
+A user döntése (2026-09-23): a leállítás pillanatában ismert célállapot (`cancelled` vagy
+`interrupted`) a `requestStop` hívásakor a leállított futás kézikönyvére kerül, és a leállított,
+még nem terminális gyerekre a `sub_workflow` végrehajtó ezt adja az eseményben és a lépés
+üzenetében, a fa DB zárása előtt. Spec szabályt nem ír felül: a fa zárása egy tranzakció marad (9.
+szekció 5. pont, 10.2 3. pont), és a `sub` lépés a saját útján zár (8.3).
+
+**A célállapot egyezik a fa zárásával.** Kódolvasás a `packages/db` `run-recovery.ts` fájlban: a
+`cancelRunTree` és a `cancelRuns` a nem terminális (`pending`, `running`) futásokat `cancelled`, a
+`recoverInterruptedRuns` `interrupted` állapotba viszi, a terminálisakat nem írja át. A három út
+célállapota tehát: felhasználói megszakítás `cancelled` (`cancelRunTree`), `fail_run` `cancelled`
+(`cancelRuns`, user döntés 2026-09-23, `62a4c9b`), szabályos leállás `interrupted`
+(`recoverInterruptedRuns`). Ha a gyerek sora a léptetése lezárulásakor már terminális (a leállítás
+a saját záró írása után érte), a sor állapota dönt, mert azt a fa zárása sem írja át.
+
+| Tétel     | Érték                                                                                                                                                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Futtató   | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `c2639ef` commitja a munkapéldányban (előtte), illetve ugyanez a javítással (utána); a két állapot kizárólag a `packages/engine/src` mappában tér el                                                                                  |
+| Szerver   | a 6. szekció felállása: a valódi `apps/server` modulok (a `registerShutdownSignalHandlers` leállási sorrendjével) és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő           |
+| Workflow  | a hetedik kör workflow-ja: szülő `start` után `a1` (300 ms után nem sikeres `result`) és `sub`; másik fa `start -> o-sub`; gyerek `c-jov` és `c-sub`; unoka `start -> u-jov`, minden jóváhagyás `timeoutMs: null`                                                                    |
+| Menet     | a gyerek és az unoka jóváhagyásának megvárása után a megszakítás úton `POST /api/runs/<id>/interrupt` a másik fára, a `fail_run` úton a szülő terminális állapotának megvárása, a leállás úton `SIGTERM`; az első két úton utána szintén `SIGTERM`, a kilépés után a fájl kiolvasása |
+| Kiolvasás | a gyökér, a gyerek és az unoka sora, a `sub` (illetve `o-sub`) és a `c-sub` lépés `sub_workflow_finished` eseményének `status` mezője, a lépés hibaüzenetében megnevezett állapot, és hogy ez a kettő egyezik-e a gyerek sorával                                                     |
+
+| Út (5 futás útonként)    | A gyökér      | Gyerek, unoka sora | `sub`, `c-sub` lépés            | Esemény és üzenet, előtte | Esemény és üzenet, utána | Egyezik a sorral, előtte / utána |
+| ------------------------ | ------------- | ------------------ | ------------------------------- | ------------------------- | ------------------------ | -------------------------------- |
+| felhasználói megszakítás | `cancelled`   | `cancelled`        | `failed`, `sub_workflow_failed` | `running`                 | `cancelled`              | 0/10 / 10/10                     |
+| `fail_run` (`a1` bukik)  | `failed`      | `cancelled`        | `failed`, `sub_workflow_failed` | `running`                 | `cancelled`              | 0/10 / 10/10                     |
+| szabályos leállás        | `interrupted` | `interrupted`      | `failed`, `sub_workflow_failed` | `running`                 | `interrupted`            | 0/10 / 10/10                     |
+
+Az egyezés számlálója futásonként két lépés (a gyerek és az unoka futásáé). A gyökér, a sorok és
+a lépések végállapota előtte és utána azonos: a javítás csak az eseményt és az üzenetet érinti.
+
+**A javítás.** Az `ActiveRunHandle.requestStop` a célállapotot kapja paraméterül, és a kézikönyv
+`stopTargetStatus()` metódusa adja vissza; az első hívás értéke marad meg. A `stopAndAwaitRunTree`
+a hívó célállapotával hívja: a `cancelActiveRunTree` (megszakítás és `fail_run`) `cancelled`-del, a
+`shutdownActiveRuns` `interrupted`-del. A `run-supervisor` a gyerek léptetésének lezárulása után a
+kézikönyv célállapotát a `ChildWorkflowRunResult.stopTargetStatus` mezőjébe teszi, a `sub_workflow`
+végrehajtó pedig a még `running` sorú gyereknél ezt adja az eseményben és az üzenetben.
+
+**A regresszió.** A `create-engine.spec.ts` három új tesztje (megszakítás, `fail_run`, szabályos
+leállás, egy háromszintű fán) a gyerek és az unoka szintjén egyetlen állításban vizsgálja a `sub`
+lépés végállapotát, a `sub_workflow_finished` események `status` mezőjét a `db` naplójából, a
+lépés üzenetében megnevezett állapotot és a gyerek sorát a fa zárása után. A javítás előtt mindhárom
+bukott, mindkét szinten `running` eseménnyel és üzenettel; utána zöld. Egy negyedik, határ teszt (a
+nem leállított, elutasított jóváhagyás miatt `failed` gyerek) előtte és utána is zöld. Plusz az
+`execute-sub-workflow.spec.ts` három új esete (a két célállapot a még `running` sorú gyereknél, és
+a már terminális sorú, leállított gyerek, ahol a sor állapota dönt), a `build-child-result.spec.ts`
+célállapot esete, és a `create-run-supervisor.spec.ts` bővítése: egy második `requestStop` a
+célállapotot nem írja felül.

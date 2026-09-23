@@ -401,7 +401,7 @@ describe('createHumanApprovalRepository', () => {
 
     // User döntés 2026-09-23: a lépés állapota dönt. Mindegyik lezárás a
     // motor valódi útját hívja: a fail_run és a megszakítás a jóváhagyás
-    // lépését markStepCancelled-del zárja (cancel-waiting-approval-step-runs),
+    // lépését markStepCancelled-del zárja (close-waiting-approval-step-runs),
     // a megszakítás DB zárása cancelRunTree, a sub_workflow fa lezárása
     // cancelRuns, az időkorlát markStepFailed. A decision mindegyiknél NULL.
     it('csak a waiting_approval lépésű jóváhagyást adja, a döntés nélkül lezártat nem', () => {

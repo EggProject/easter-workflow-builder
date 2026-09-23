@@ -73,14 +73,14 @@ const SUCCEEDED: Outcome<RunCompletion> = {
 };
 
 function handleOf(run: WorkflowRunRecord): ActiveRunHandle & { readonly requestStop: ReturnType<typeof vi.fn> } {
-  const requestStop = vi.fn();
+  const requestStop = vi.fn<ActiveRunHandle['requestStop']>();
   return {
     runId: run.id,
     rootRunId: run.rootRunId,
     workflowId: run.workflowId,
     completion: Promise.resolve(SUCCEEDED),
     requestStop,
-    isStopRequested: () => requestStop.mock.calls.length > 0,
+    stopTargetStatus: () => requestStop.mock.calls[0]?.[0],
   };
 }
 
@@ -117,7 +117,7 @@ describe('cancelActiveRunTree', () => {
     );
 
     expect(result.cancelledRunIds).toStrictEqual([target.run.id]);
-    expect(handle.requestStop).toHaveBeenCalledOnce();
+    expect(handle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
     expect(interrupt).toHaveBeenCalledOnce();
     expect(okOrThrow(database.runs.getRun(target.run.id)).status).toBe('cancelled');
     expect(okOrThrow(database.stepRuns.getStepRun(target.approvalStepRunId)).status).toBe('cancelled');

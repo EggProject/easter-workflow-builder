@@ -50,10 +50,22 @@ export interface ActiveRunHandle {
    * A záró állapot írásának elhagyása szándékos: a megszakítás (9. szekció 5. pont) és a szabályos leállás (10.2) a futást és minden nem terminális
    * lépését **egyetlen tranzakcióban** zárja le, a `db` oldalon. Ha a hurok is
    * írna, két, egymással versenyző állapotváltás keletkezne ugyanarra a sorra.
+   *
+   * A `targetStatus` az az állapot, amibe a leállító fél DB zárása a futást
+   * viszi: a felhasználói megszakítás és a `fail_run` `cancelled`, a szabályos
+   * leállás `interrupted` (SPEC-004 8.3, 9. szekció 5. pont, 10.2 3. pont).
+   * Az első hívás értéke marad meg: a leállítás pillanatában ismert
+   * célállapot (user döntés 2026-09-23).
    */
-  readonly requestStop: () => void;
+  readonly requestStop: (targetStatus: 'cancelled' | 'interrupted') => void;
 
-  readonly isStopRequested: () => boolean;
+  /**
+   * Az első `requestStop` célállapota, leállítás nélkül `undefined`. A
+   * leállított al-workflow futás szülő `sub_workflow` lépése ezt adja a
+   * `sub_workflow_finished` eseményben, mert a futás sorát még a fa DB
+   * zárása előtt olvassa (`ChildWorkflowRunResult`).
+   */
+  readonly stopTargetStatus: () => 'cancelled' | 'interrupted' | undefined;
 }
 
 /**

@@ -104,14 +104,14 @@ const RESOLVED_SUCCESS: Outcome<RunCompletion> = {
 };
 
 function handleOf(run: WorkflowRunRecord): ActiveRunHandle & { readonly requestStop: ReturnType<typeof vi.fn> } {
-  const requestStop = vi.fn();
+  const requestStop = vi.fn<ActiveRunHandle['requestStop']>();
   return {
     runId: run.id,
     rootRunId: run.rootRunId,
     workflowId: run.workflowId,
     completion: Promise.resolve(RESOLVED_SUCCESS),
     requestStop,
-    isStopRequested: () => requestStop.mock.calls.length > 0,
+    stopTargetStatus: () => requestStop.mock.calls[0]?.[0],
   };
 }
 
@@ -183,8 +183,8 @@ describe('shutdownActiveRuns', () => {
     const result = okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [firstHandle, secondHandle], registry)));
 
     expect(result.recoveredRunCount).toBe(2);
-    expect(firstHandle.requestStop).toHaveBeenCalledTimes(1);
-    expect(secondHandle.requestStop).toHaveBeenCalledTimes(1);
+    expect(firstHandle.requestStop).toHaveBeenCalledExactlyOnceWith('interrupted');
+    expect(secondHandle.requestStop).toHaveBeenCalledExactlyOnceWith('interrupted');
     expect(firstInterrupt).toHaveBeenCalledTimes(1);
     expect(secondInterrupt).toHaveBeenCalledTimes(1);
 
@@ -272,16 +272,8 @@ describe('shutdownActiveRuns', () => {
     const registry = createAgentQueryRegistry();
     const seeded = seedRootRun(database, 'lassu');
     const { promise: completion, resolve } = Promise.withResolvers<Outcome<RunCompletion>>();
-    const handle: ActiveRunHandle = {
-      runId: seeded.run.id,
-      rootRunId: seeded.run.rootRunId,
-      workflowId: seeded.run.workflowId,
-      completion,
-      requestStop: () => {
-        // nincs teendő: ez a teszt a sorrendet vizsgálja, nem a jelzést
-      },
-      isStopRequested: () => false,
-    };
+    // Ez a teszt a sorrendet vizsgálja, nem a jelzést.
+    const handle: ActiveRunHandle = { ...handleOf(seeded.run), completion };
 
     let hasSettled = false;
     const call = (async (): Promise<void> => {
@@ -306,20 +298,14 @@ describe('shutdownActiveRuns', () => {
     const database = openMemoryDatabase();
     const registry = createAgentQueryRegistry();
     const seeded = seedRootRun(database, 'zart-kapcsolat');
+    // Ez a teszt a lezárt kapcsolat hibaágát vizsgálja, nem a requestStop hívást.
     const handle: ActiveRunHandle = {
-      runId: seeded.run.id,
-      rootRunId: seeded.run.rootRunId,
-      workflowId: seeded.run.workflowId,
+      ...handleOf(seeded.run),
       completion: (async () => {
         await Promise.resolve();
         database.close();
         return RESOLVED_SUCCESS;
       })(),
-      requestStop: () => {
-        // szándékosan nem csinál semmit: ez a teszt a lezárt kapcsolat
-        // hibaágát vizsgálja, nem a requestStop hívást
-      },
-      isStopRequested: () => false,
     };
 
     const published: unknown[] = [];

@@ -129,14 +129,14 @@ const RESOLVED_SUCCESS: Outcome<RunCompletion> = {
  * ennek a fájlnak a tárgya (lásd `stop-and-await-run-tree.spec.ts`).
  */
 function handleOf(run: WorkflowRunRecord): ActiveRunHandle & { readonly requestStop: ReturnType<typeof vi.fn> } {
-  const requestStop = vi.fn();
+  const requestStop = vi.fn<ActiveRunHandle['requestStop']>();
   return {
     runId: run.id,
     rootRunId: run.rootRunId,
     workflowId: run.workflowId,
     completion: Promise.resolve(RESOLVED_SUCCESS),
     requestStop,
-    isStopRequested: () => requestStop.mock.calls.length > 0,
+    stopTargetStatus: () => requestStop.mock.calls[0]?.[0],
   };
 }
 
@@ -202,7 +202,7 @@ describe('interruptRun', () => {
 
     expect(outcome.rootRunId).toBe(seeded.run.rootRunId);
     expect(outcome.cancelledRunIds).toStrictEqual([seeded.run.id]);
-    expect(handle.requestStop).toHaveBeenCalledTimes(1);
+    expect(handle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
     expect(interruptSpy).toHaveBeenCalledTimes(1);
 
     const runRow = okOrThrow(database.runs.getRun(seeded.run.id));
@@ -267,8 +267,8 @@ describe('interruptRun', () => {
     expect(new Set(outcome.cancelledRunIds)).toStrictEqual(new Set([root.run.id, child.run.id]));
     expect(rootInterrupt).toHaveBeenCalledTimes(1);
     expect(childInterrupt).toHaveBeenCalledTimes(1);
-    expect(rootHandle.requestStop).toHaveBeenCalledTimes(1);
-    expect(childHandle.requestStop).toHaveBeenCalledTimes(1);
+    expect(rootHandle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
+    expect(childHandle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
 
     expect(okOrThrow(database.runs.getRun(root.run.id)).status).toBe('cancelled');
     expect(okOrThrow(database.runs.getRun(child.run.id)).status).toBe('cancelled');
@@ -429,20 +429,14 @@ describe('interruptRun', () => {
     // `await Promise.all(...)`-ja után a `cancelRunTree` a már zárt
     // kapcsolaton fut, a `transaction` `isClosed` ága valódi
     // `database_closed` hibát ad (`open-database.ts`).
+    // Ez a teszt a lezárt kapcsolat hibaágát vizsgálja, nem a requestStop hívást.
     const handle: ActiveRunHandle = {
-      runId: seeded.run.id,
-      rootRunId: seeded.run.rootRunId,
-      workflowId: seeded.run.workflowId,
+      ...handleOf(seeded.run),
       completion: (async () => {
         await Promise.resolve();
         database.close();
         return RESOLVED_SUCCESS;
       })(),
-      requestStop: () => {
-        // szándékosan nem csinál semmit: ez a teszt a lezárt kapcsolat
-        // hibaágát vizsgálja, nem a requestStop hívást
-      },
-      isStopRequested: () => false,
     };
 
     const published: unknown[] = [];

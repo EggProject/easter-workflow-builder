@@ -69,6 +69,7 @@ export async function cancelActiveRunTree(
   }
   await stopAndAwaitRunTree(
     handles,
+    'cancelled',
     dependencies.agentQueryRegistry,
     dependencies.approvalRegistry,
     dependencies.concurrencyGate,

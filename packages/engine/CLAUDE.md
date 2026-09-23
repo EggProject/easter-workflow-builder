@@ -182,10 +182,20 @@ Mérve a valódi `apps/server` modulokon, hamis agenttel, a gyerek és az unoka 
 előtte a szülő 3000 ms-mal a bukás után is `running`, a gyerek döntése HTTP 200 és a `sub` lépés
 `succeeded` egy `failed` futásban; utána a szülő 5 ... 12 ms-mal a bukás után `failed`, a gyerek és
 az unoka `cancelled`, az utólagos döntés HTTP 409 `conflict`, egy másik futás gyerek fája érintetlen
-(`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, hetedik kör). **Mérve, nem
-javítva:** a `sub_workflow_finished` esemény `status` mezője ilyenkor `running`, a felhasználói
-megszakítás útján is, mert a végrehajtó a gyerek sorát a `completion` teljesülésekor olvassa, a fa
-tranzakciója pedig csak utána fut.
+(`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, hetedik kör).
+
+**A leállított gyerek `sub_workflow_finished` eseménye a leállítás célállapotát mondja (user döntés
+2026-09-23, SPEC-004 9. szekció, 13. szekció).** A `sub_workflow` végrehajtó a gyerek sorát a gyerek
+`completion`-jének teljesülésekor olvassa, a fa DB zárása pedig csak utána fut, tehát a leállított
+gyerek sora ekkor még `running`. Ezért a `requestStop` a leállító fél célállapotát kapja
+(`cancelActiveRunTree`: `cancelled`, `shutdownActiveRuns`: `interrupted`, a `stopAndAwaitRunTree`
+paraméterén át), a kézikönyv `stopTargetStatus()` metódusa adja vissza (az első hívás értéke marad),
+a `run-supervisor` a `ChildWorkflowRunResult.stopTargetStatus` mezőjébe teszi, és a végrehajtó a még
+`running` sorú gyereknél ezt írja az eseménybe és a lépés hibaüzenetébe. A már terminális sorú
+gyereknél a sor állapota dönt, mert a fa zárása csak a nem terminális sorokat írja. Mérve a valódi
+`apps/server` modulokon, gyerekre és unokára, mindhárom úton: előtte `running`, utána a célállapot,
+ami mind a 30 esetben egyezik a gyerek sorával a fa zárása után (research 7. szekció, kilencedik
+kör).
 
 **A `NodeExecutionOutcome` és a `NodeExecutionResult` szétválasztása (T-005-31, AC-51).** A külső
 megszakítás miatt lezáratlanul maradó lépés NEM a `NodeExecutionOutcome` ága, hanem a szélesebb
@@ -892,14 +902,14 @@ nem mond ki tételesen.
 léptetés innentől háttérben megy, és az előrehaladást az `eventPublisher` port közvetíti. A
 háttérfolyamathoz egyetlen fogódzó van, az `ActiveRunHandle`:
 
-| Mező                | Mit ad                                                                          |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `runId`             | a futás azonosítója                                                             |
-| `rootRunId`         | a futás fájának gyökere (SPEC-003 4.8), az al-workflow futásokkal közös         |
-| `workflowId`        | a futó workflow                                                                 |
-| `completion`        | `Promise<Outcome<RunCompletion>>`, a léptetés eredménye; **soha nem utasít el** |
-| `requestStop()`     | a hurok nem indít több lépést, és a záró állapotot **nem** ő írja               |
-| `isStopRequested()` | a jelzés olvasása                                                               |
+| Mező                  | Mit ad                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `runId`               | a futás azonosítója                                                                                   |
+| `rootRunId`           | a futás fájának gyökere (SPEC-003 4.8), az al-workflow futásokkal közös                               |
+| `workflowId`          | a futó workflow                                                                                       |
+| `completion`          | `Promise<Outcome<RunCompletion>>`, a léptetés eredménye; **soha nem utasít el**                       |
+| `requestStop(target)` | a hurok nem indít több lépést, a záró állapotot **nem** ő írja; a `target` a leállító fél célállapota |
+| `stopTargetStatus()`  | az első `requestStop` célállapota (`cancelled` vagy `interrupted`), leállítás nélkül `undefined`      |
 
 **Amit a T-005-26 (megszakítás) ebből használ, lezárva.** A 9. szekció 2. pontjának ("a szabályozó
 ebből a futásból többé nem enged induló lépést, és a sorban álló lépései kiesnek") első fele a

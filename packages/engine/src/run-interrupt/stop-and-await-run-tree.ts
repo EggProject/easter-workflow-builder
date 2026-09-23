@@ -15,7 +15,10 @@ import { interruptLiveAgentQueries } from './interrupt-live-agent-queries.ts';
  *
  * 1. `requestStop()` minden kapott kézikönyvön: a léptető hurok ezekből a
  *    futásokból többé nem indít új példányt (9. szekció 2. pont, 10.2
- *    szekció 1. pont). Ez memóriabeli, szinkron jelzés - nem vár semmire.
+ *    szekció 1. pont). Ez memóriabeli, szinkron jelzés - nem vár semmire. A
+ *    `stopTargetStatus` a hívó DB zárásának célállapota (`cancelled`, illetve
+ *    `interrupted`), ami a kézikönyvre kerül: a leállított al-workflow futás
+ *    szülő lépése ezt adja az eseményében (`ActiveRunHandle.requestStop`).
  * 2. **A szabályozó sorában álló agent lépések elutasítása**
  *    (`concurrencyGate.denyWaitingForRunIds`, 9. szekció 2. pont, "a sorban
  *    álló lépései kiesnek"): a már elindított, de helyet még nem kapott
@@ -54,12 +57,13 @@ import { interruptLiveAgentQueries } from './interrupt-live-agent-queries.ts';
  */
 export async function stopAndAwaitRunTree(
   handles: readonly ActiveRunHandle[],
+  stopTargetStatus: 'cancelled' | 'interrupted',
   agentQueryRegistry: AgentQueryRegistry,
   approvalRegistry: ApprovalWaitRegistry,
   concurrencyGate: Pick<ConcurrencyGate, 'denyWaitingForRunIds'>,
 ): Promise<void> {
   for (const handle of handles) {
-    handle.requestStop();
+    handle.requestStop(stopTargetStatus);
   }
 
   const runIds = new Set(handles.map((handle) => handle.runId));

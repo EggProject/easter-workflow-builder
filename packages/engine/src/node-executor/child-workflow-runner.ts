@@ -40,10 +40,17 @@ export interface ChildWorkflowRunRequest {
 /**
  * Egy lezárult al-workflow futás eredménye (SPEC-004 5.9 6. pont).
  *
- * - `run`: a gyerek futás **terminális** rekordja. A `status` mezője dönti el,
- *   hogy a szülő lépés `succeeded` vagy `sub_workflow_failed` osztállyal
- *   `failed` állapotban zár, és ugyanez a mező megy ki a
- *   `sub_workflow_finished` esemény payloadjában.
+ * - `run`: a gyerek futás rekordja a léptetésének lezárulása után. A `status`
+ *   mezője dönti el, hogy a szülő lépés `succeeded` vagy `sub_workflow_failed`
+ *   osztállyal `failed` állapotban zár, és ugyanez a mező megy ki a
+ *   `sub_workflow_finished` esemény payloadjában. Kivétel a leállított gyerek:
+ *   a sorát a fa DB zárása egy tranzakcióban írja (SPEC-004 9. szekció 5.
+ *   pont, 10.2 3. pont), ami csak a rekord itteni beolvasása után fut, tehát
+ *   itt még `running`.
+ * - `stopTargetStatus`: csak leállított gyereknél, a kézikönyvére a
+ *   `requestStop` hívásakor került célállapot (`ActiveRunHandle`). A még
+ *   `running` sorú gyereknél ezt adja a végrehajtó az eseményben és a lépés
+ *   üzenetében: pontosan ezt írja a fa DB zárása (user döntés 2026-09-23).
  * - `output`: a gyerek futás kimenete, amit a szülő lépés kimeneteként
  *   tárolunk. A spec ezt "a gyerek futás terminális node-jainak kimenete"
  *   néven nevezi meg, de a "terminális node kimenete" fogalomnak ebben a
@@ -58,6 +65,7 @@ export interface ChildWorkflowRunRequest {
 export interface ChildWorkflowRunResult {
   readonly run: WorkflowRunRecord;
   readonly output: unknown;
+  readonly stopTargetStatus?: 'cancelled' | 'interrupted';
 }
 
 /**

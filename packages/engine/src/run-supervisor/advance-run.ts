@@ -578,7 +578,7 @@ async function stopFailedRun(runId: string, dependencies: NodeExecutorDependenci
  * testvér a futást a döntésig nyitva tartaná, mert annak nincs `AgentQuery`-je.
  *
  * **A lezárt várakozású jóváhagyás sora ugyanebben a szinkron menetben
- * `cancelled`** (`run-interrupt/cancel-waiting-approval-step-runs.ts`), az
+ * `cancelled`** (`run-interrupt/close-waiting-approval-step-runs.ts`), az
  * `interrupt()` előtt, nem a `finishRun` záró írásában: a futó testvér
  * folyamának kimerüléséig tartó leállási ablakban érkező döntés így a lépés
  * sorának `cancelled` állapotán bukik (`illegal_status_transition`), ahelyett

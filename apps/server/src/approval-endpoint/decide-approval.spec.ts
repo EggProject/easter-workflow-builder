@@ -171,7 +171,7 @@ describe('createDecideApprovalHandler', () => {
   // User döntés 2026-09-23: a döntés nélkül lezárt jóváhagyás (megszakítás,
   // fail_run, sub_workflow fa) kikerül a függő listából, a döntése ettől
   // még conflict, nem not_found. A lezárást a motor útja szerint a lépés
-  // sorának markStepCancelled hívása végzi (cancel-waiting-approval-step-runs).
+  // sorának markStepCancelled hívása végzi (close-waiting-approval-step-runs).
   it('döntés nélkül lezárt jóváhagyásra érkező döntés conflict (HTTP 409), a decision NULL marad', async () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = createTestRunAndWaitingStep(database);

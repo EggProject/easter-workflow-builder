@@ -21,16 +21,16 @@ const SUCCEEDED: Outcome<RunCompletion> = {
  */
 function controlledHandle(runId: string, rootRunId: string): { handle: ActiveRunHandle; resolve: () => void } {
   const { promise: completion, resolve: resolveCompletion } = Promise.withResolvers<Outcome<RunCompletion>>();
-  let hasRequestedStop = false;
+  let stopTargetStatus: 'cancelled' | 'interrupted' | undefined;
   const handle: ActiveRunHandle = {
     runId,
     rootRunId,
     workflowId: 'wf',
     completion,
-    requestStop: () => {
-      hasRequestedStop = true;
+    requestStop: (targetStatus) => {
+      stopTargetStatus = targetStatus;
     },
-    isStopRequested: () => hasRequestedStop,
+    stopTargetStatus: () => stopTargetStatus,
   };
   return {
     handle,
@@ -57,18 +57,27 @@ function fakeQuery(interrupt: () => Promise<void>): AgentQuery {
 }
 
 describe('stopAndAwaitRunTree', () => {
-  it('minden kapott kézikönyvön requestStop-ot hív', async () => {
-    const registry = createAgentQueryRegistry();
-    const first = controlledHandle('run-1', 'root-1');
-    const second = controlledHandle('run-2', 'root-1');
-    first.resolve();
-    second.resolve();
+  it.each(['cancelled', 'interrupted'] as const)(
+    'minden kapott kézikönyvön requestStop-ot hív, a(z) %s célállapottal',
+    async (stopTargetStatus) => {
+      const registry = createAgentQueryRegistry();
+      const first = controlledHandle('run-1', 'root-1');
+      const second = controlledHandle('run-2', 'root-1');
+      first.resolve();
+      second.resolve();
 
-    await stopAndAwaitRunTree([first.handle, second.handle], registry, createApprovalWaitRegistry(), openGate());
+      await stopAndAwaitRunTree(
+        [first.handle, second.handle],
+        stopTargetStatus,
+        registry,
+        createApprovalWaitRegistry(),
+        openGate(),
+      );
 
-    expect(first.handle.isStopRequested()).toBe(true);
-    expect(second.handle.isStopRequested()).toBe(true);
-  });
+      expect(first.handle.stopTargetStatus()).toBe(stopTargetStatus);
+      expect(second.handle.stopTargetStatus()).toBe(stopTargetStatus);
+    },
+  );
 
   it('interrupt()-et hív minden, a kapott futásokhoz tartozó élő query-n, máshoz tartozón nem', async () => {
     const registry = createAgentQueryRegistry();
@@ -79,7 +88,7 @@ describe('stopAndAwaitRunTree', () => {
     const { handle, resolve } = controlledHandle('run-1', 'root-1');
     resolve();
 
-    await stopAndAwaitRunTree([handle], registry, createApprovalWaitRegistry(), openGate());
+    await stopAndAwaitRunTree([handle], 'cancelled', registry, createApprovalWaitRegistry(), openGate());
 
     expect(interruptInTree).toHaveBeenCalledTimes(1);
     expect(interruptOutsideTree).not.toHaveBeenCalled();
@@ -92,7 +101,13 @@ describe('stopAndAwaitRunTree', () => {
 
     let hasSettled = false;
     const call = (async (): Promise<void> => {
-      await stopAndAwaitRunTree([first.handle, second.handle], registry, createApprovalWaitRegistry(), openGate());
+      await stopAndAwaitRunTree(
+        [first.handle, second.handle],
+        'cancelled',
+        registry,
+        createApprovalWaitRegistry(),
+        openGate(),
+      );
       hasSettled = true;
     })();
 
@@ -119,21 +134,14 @@ describe('stopAndAwaitRunTree', () => {
     // már feloldódott: pontosan ez a valós lánc (a `human_approval`
     // végrehajtója a döntésre vár, tehát a léptető hurok addig nem lép ki).
     const { promise: completion, resolve } = Promise.withResolvers<Outcome<RunCompletion>>();
-    const handle: ActiveRunHandle = {
-      runId: 'run-1',
-      rootRunId: 'root-1',
-      workflowId: 'wf',
-      completion,
-      requestStop: () => {
-        // ebben a tesztben nincs szerepe: a lezárást a jóváhagyás feloldása vezérli
-      },
-      isStopRequested: () => false,
-    };
+    // A `requestStop`-nak ebben a tesztben nincs szerepe: a lezárást a
+    // jóváhagyás feloldása vezérli.
+    const handle: ActiveRunHandle = { ...controlledHandle('run-1', 'root-1').handle, completion };
     void inTree.then(() => {
       resolve(SUCCEEDED);
     });
 
-    await stopAndAwaitRunTree([handle], registry, approvalRegistry, openGate());
+    await stopAndAwaitRunTree([handle], 'cancelled', registry, approvalRegistry, openGate());
 
     await expect(inTree).resolves.toStrictEqual({ kind: 'interrupted' });
     // A fán kívüli futás várakozója érintetlen: a döntése változatlanul megjön.
@@ -177,16 +185,13 @@ describe('stopAndAwaitRunTree', () => {
     // `completion` csak az elutasítás után teljesül.
     const { promise: completion, resolve } = Promise.withResolvers<Outcome<RunCompletion>>();
     const handle: ActiveRunHandle = {
-      runId: 'run-1',
-      rootRunId: 'root-1',
-      workflowId: 'wf',
+      ...controlledHandle('run-1', 'root-1').handle,
       completion,
       requestStop: () => {
         events.push('requestStop:run-1');
       },
-      isStopRequested: () => false,
     };
-    const waiting = stopAndAwaitRunTree([handle], registry, createApprovalWaitRegistry(), gate);
+    const waiting = stopAndAwaitRunTree([handle], 'cancelled', registry, createApprovalWaitRegistry(), gate);
 
     expect(events).toStrictEqual(['granted:step-running', 'requestStop:run-1', 'denied:step-1']);
     expect(gate.waitingRequestCount('minimax')).toBe(1);
@@ -203,7 +208,7 @@ describe('stopAndAwaitRunTree', () => {
     const interruptSpy = vi.fn(() => Promise.resolve());
     registry.register('run-x', 'step-x', fakeQuery(interruptSpy));
 
-    await stopAndAwaitRunTree([], registry, createApprovalWaitRegistry(), openGate());
+    await stopAndAwaitRunTree([], 'cancelled', registry, createApprovalWaitRegistry(), openGate());
 
     expect(interruptSpy).not.toHaveBeenCalled();
   });
