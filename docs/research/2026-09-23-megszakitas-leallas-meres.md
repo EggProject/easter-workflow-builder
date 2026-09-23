@@ -265,7 +265,9 @@ folyam vége előtt vagy után érkezik, nem mért.
 **Ami nyitva marad, mérve.** (1) A `GET /api/approvals` a lezárt jóváhagyást továbbra is
 visszaadja (`decision IS NULL`), a döntése 409-et ad; a felhasználói megszakítás után ugyanez
 mérve (`start -> human_approval`, `POST /api/runs/<id>/interrupt`: a lista 1 elemű, a döntés 409).
-(2) A várakozás lezárása és a záró írás közti ablakban (egy futó, megszakított testvér folyamának
+Lezárva, 2026-09-23, a `c849d2c` commit user döntésével: a lista a lépés `waiting_approval`
+állapotából szűr, nem a `decision IS NULL` feltételből, tehát a lezárt jóváhagyás kikerül belőle
+(SPEC-004 8.3, a 15. szekció O-9 tétele). (2) A várakozás lezárása és a záró írás közti ablakban (egy futó, megszakított testvér folyamának
 kimerülése alatt) érkező döntés átment: lezárva, lásd a hatodik kört lent. (3) A `fail_run` a testvér `sub_workflow`
 gyerek futását nem állítja le: motor szintű próba, a gyerek `start -> human_approval`, a szülő a
 bukás után sem terminális. Lezárva, lásd a hetedik kört lent.
@@ -338,7 +340,10 @@ szerinti olvasása. Nem javítva, a két forrás ellentmond egymásnak: a SPEC-0
 szekciója kimondja, hogy egy második hívás `conflict` hibát ad; a SPEC-006 1. szekciója ("Amit NEM
 dönt el") viszont kimondja, hogy a szerver új repository metódus nélkül képez le, és ahol a
 leképezés nem teljes, az nyitott kérdés, nem a felület csendes bővítése. A `conflict` válaszhoz új
-`db` olvasó metódus kellene, tehát ez user döntés.
+`db` olvasó metódus kellene, tehát ez user döntés. Lezárva, 2026-09-23, a `c849d2c` commit user
+döntésével: a `HumanApprovalRepository` új `getApproval(approvalId)` olvasót kapott, a
+`decide-approval.ts` ezzel olvas a függő lista helyett; a második döntés HTTP 409 `conflict`
+(`already_decided`), a nem létező azonosító HTTP 404 `not_found` (SPEC-005 4.2, SPEC-004 8.3).
 
 **Leállás közben a 503.** Ugyanezen a szerveren a 6. szekció félbe küldött indító kérése a javítás
 után `503 Service Unavailable` választ kap, a törzsben `service_unavailable` kóddal és
