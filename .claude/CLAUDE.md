@@ -715,7 +715,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy MÁSIK, nem JSX ternary
   mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
   megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
-  dokumentált és kezelt ott, külön jelenség, nem ez a hét fájl.
+  dokumentált és kezelt ott, külön jelenség, nem ez a kilenc fájl.
 
 **Frontend állapot és layout**
 

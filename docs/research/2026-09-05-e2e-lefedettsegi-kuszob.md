@@ -956,3 +956,64 @@ Playwright készlet újrafuttatása (`bun run test:e2e`, majd `nyc report --repo
 "Fedett / összes" nyers számpárokért, ahogy a korábbi szekciók teszik) ezért ebben a munkamenetben
 nem történt meg, hogy ne ütközzön a párhuzamos munkával. A négy százalék és a fedetlen darabszám
 forrása emiatt a fenti 1 ... 3. pont keresztellenőrzése, nem egy itt újrafuttatott mérés.
+
+---
+
+## 22. A várakozás jelzés utáni ratchet (2026-09-23, `b75960d`): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `b75960d` commit (`Futás nézet: a szerver leállása alatt az utolsó állapot
+marad, várakozás jelzéssel`) a szabályos leállás (`run_interrupted`) utáni újratöltés Vite
+proxytól kapott HTTP 502 válaszát kezeli: a `rest-client` réteg `RouteOutcome` típusa mostantól
+`isTransient` jelzőt hordoz (hálózati hiba, HTTP 502 és 503, RFC 9110 15.6.3, 15.6.4), a
+`run-view` pedig egy átmeneti újratöltési hibára a korábbi állapotot tartja meg, "Várakozás a
+szerverre" `role="status"` jelzéssel, az `Alert` design system komponens átemelésével.
+
+**A mért állapot, a commit üzenete szerint:**
+
+| Metrika    | Százalék (`b75960d`) | Előző (21. szekció) |
+| ---------- | -------------------- | ------------------- |
+| statements | 98.96                | 98.96               |
+| branches   | **98.35**            | 98.33               |
+| functions  | 99.39                | 99.39               |
+| lines      | 98.92                | 98.92               |
+
+**Nulla új fedetlen tétel.** A commit üzenete szerint a fedetlen tételek száma változatlanul
+15/11/3/15, bitre egyezik a 21. szekció darabszámával; a `branches` denominátora nőtt (az új
+`isTransient` elágazások mind fedettek), a régi 11 fedetlen ág darabszáma nem.
+
+**Ellenőrzés ebben a munkamenetben, nem vakon átvéve.**
+
+1. `git show b75960d -- apps/web/package.json`: a `coverage:e2e:report` script kizárólag a
+   `--branches` kapcsolóját változtatta, `98.33`-ról `98.35`-re; a másik három kapcsoló
+   (`--statements 98.96`, `--functions 99.39`, `--lines 98.92`) a diffben nem szerepel, tehát
+   valóban változatlan.
+2. A jelenlegi `apps/web/package.json` (a `feat/spec-008-futas-nezet` ágon) ugyanezt a négy
+   értéket tartalmazza, tehát a commit óta nem módosult.
+3. A commit négy érintett `rest-client` fájlja közül három (`route-outcome.ts` új, kizárólag
+   típusdefiníció, futásidejű elágazás nélkül; `request-route.ts` és
+   `request-route-without-body.ts` csak a visszatérési típus `Outcome` -> `RouteOutcome`
+   cseréjét kapta, futásidejű ág nem változott bennük) nem hozhat létre új, mérhető ágat. A
+   negyedik, `perform-route-request.ts`, a 2.2 szekció óta dokumentált, e2e-vel elvileg sem
+   elérhető `buildRoutePath` hibaágat tartalmazza (a hiányzó útvonal paraméter ága); a diff ezt a
+   `return` ágat a korábbi 70. sorról a 81. sorra tolta el, a feltétel és az elérhetetlenségi
+   indoklás (2.2 szekció: "a felület minden hívása betöltött rekordból veszi az azonosítót")
+   érintetlen. A fájlba került három ÚJ `isTransient` elágazás (`TRANSIENT_HTTP_STATUSES.has(...)`,
+   a hálózati hiba ág, a 502/503 protokoll hiba ág) a saját `perform-route-request.spec.ts`
+   kiegészítésével (`it.each([502, 503])`, plusz egy külön 503 protokoll hiba teszt) és a
+   hibrid SSE e2e tesztekkel (`sse-real-server.spec.ts`, a leállás 502-vel és az újraindulás
+   forgatókönyve) fedett, tehát nem hagy új rést.
+4. A `run-view`, `run-event-row` és `packages/ui` érintett fájljai (`RunViewScreen.tsx`,
+   `blocking-failure-message.ts`, `run-event-row-summary.ts`, az átemelt `Alert` komponens)
+   egyike sem szerepel a 16. szekció óta érvényes hat fedetlen tételen (`mount-app.tsx`,
+   `read-frontend-config.ts`, `is-valid-connection.ts` 36. sor,
+   `browser-history-location-port.ts` cleanup sora, `perform-route-request.ts` `buildRoutePath`
+   ága, `use-stream-connection.ts` cleanup sora); a commit üzenete szerint mindegyiket saját
+   unit teszt (`RunViewScreen.spec.tsx`, `blocking-failure-message.spec.ts`, `Alert.spec.tsx`,
+   `run-event-row-summary.spec.ts`) és a hibrid SSE e2e fedi.
+
+**Ami ebből a munkamenetből NEM ELLENŐRZÖTT.** Ugyanazon okból, mint a 21. szekcióban: a jelen
+dokumentum-átvezetés kizárólag a `docs/` alatti fájlokat érinti, egy párhuzamos munkamenet pedig
+élő kódot ír ugyanezen az ágon (a valódi `apps/server` mérés előtte/utána dokumentációja még
+folyamatban), ezért a teljes Playwright készlet újrafuttatása ebben a munkamenetben nem történt
+meg. A négy százalék és a fedetlen darabszám forrása a fenti 1 ... 4. pont keresztellenőrzése, nem
+egy itt újrafuttatott mérés.
