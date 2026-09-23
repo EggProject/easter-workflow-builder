@@ -11,6 +11,7 @@ import {
   type MeasuredNodeSizes,
 } from '../graph-editor/measured-node-sizes.ts';
 import '@xyflow/react/dist/style.css';
+import '../graph-editor/graph-canvas-theme.css';
 import './run-graph.css';
 
 /**
@@ -90,7 +91,10 @@ export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): 
   }, []);
 
   return (
-    <div className="run-graph-canvas">
+    // A `graph-canvas-theme` a szerkesztővel közös React Flow téma: nélküle a
+    // vezérlő gombok és az attribúció sötét témában a szállított világos
+    // alapértelmezést festették (2026-09-23).
+    <div className="run-graph-canvas graph-canvas-theme">
       <GraphNodeCardSizeStyle />
       <ReactFlow
         nodes={flowNodes}
