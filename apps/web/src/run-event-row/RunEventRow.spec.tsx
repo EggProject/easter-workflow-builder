@@ -227,6 +227,21 @@ describe('RunEventRow', () => {
       });
     });
 
+    describe('fel nem oldott provider mellett (T-009-25)', () => {
+      it('nincs meta mező, a kinyitott nézetben pedig sem költség, sem MiniMax állítás, csak a saját magyarázat', () => {
+        act(() => {
+          root.render(<RunEventRow record={RESULT_RECORD} providerId={undefined} />);
+        });
+        expect(container.querySelector('.accordion__meta')).toBeNull();
+        act(() => {
+          header().click();
+        });
+        expect(body().textContent).not.toContain('Költség (SDK becslés)');
+        expect(body().textContent).not.toContain('MiniMax');
+        expect(body().textContent).toContain('A lépés providere ebben a nézetben nem ismert');
+      });
+    });
+
     it('nem sdk_result sorban nincs sem meta, sem költség mező, egyik provideren sem', () => {
       act(() => {
         root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);

@@ -11,6 +11,35 @@
   color: var(--ep-accent);
 }
 
+/* A cím és a költség meta EGY sorra csonkolt, ellipszissel, nem tördelt
+   (T-009-25). Két ok:
+   1. A virtualizált lista sormagassága így a tartalom hosszától és a panel
+      szélességétől független: minden összecsukott sor ugyanolyan magas,
+      tehát a még nem kirajzolt sorok becsült magassága pontos, és az aljára
+      görgetés a becsült pozícióra is pontosan érkezik (lásd
+      `transcript-panel/collapsed-transcript-row-height.ts`). Tördelt címnél
+      a magasság a szövegtől ÉS a húzható panel szélességétől függene, tehát
+      minden átméretezés minden sor magasságát megváltoztatná.
+   2. A teljes szöveg nem vész el: a gomb hozzáférhető neve a teljes cím
+      (a `text-overflow` csak a festést vágja), és a kinyitott sor a teljes,
+      tördelt payloadot mutatja.
+   Az `overflow: hidden` a lényeg, két okból. A `text-overflow` csak nem
+   `visible` túlcsordulású dobozon hat (CSS Overflow 3, 5.1,
+   <https://www.w3.org/TR/css-overflow-3/#text-overflow>). És a `hidden`
+   érték görgető konténerré teszi a flex elemet, amire a `min-width: auto`
+   nullára old fel, nem a tartalom legszélesebb, törhetetlen szavára (CSS
+   Flexbox 1, 4.5, <https://www.w3.org/TR/css-flexbox-1/#min-size-auto>);
+   enélkül a cím egy 400 karakteres URL-nél mért 3400 pixelre feszülne.
+   Külön `min-width: 0` ezért nem kell: saját mérés szerint nélküle is
+   ugyanaz a geometria. A meta ugyanígy csonkolható, hogy a legkeskenyebb
+   panelen se lógjon ki a sorból. */
+.run-event-row .accordion__title,
+.run-event-row .accordion__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .run-event-row__cost > p {
   margin: 0;
 }

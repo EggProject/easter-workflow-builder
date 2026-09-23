@@ -29,7 +29,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { mockIdleStream } from './sse-mock.ts';
+import { mockIdleStream, mockSseFrames } from './sse-mock.ts';
+import { longUrlToolResultRecord, makeRunEventRecord, replayFrames, sdkResultRecord } from './transcript-fixture.ts';
 
 const ALFA: WorkflowSummary = {
   id: 'w-alfa',
@@ -366,6 +367,57 @@ test('a futás nézet egyetlen támogatott viewport szélességen sem lóg túl 
       await expect
         .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
         .toBe(0);
+    });
+  }
+});
+
+test('a futás nézet transcriptje egy 400 karakteres, szóköz nélküli URL címmel sem lóg túl vízszintesen (T-009-25)', async ({
+  page,
+}) => {
+  // A független ellenőrzés mérése szerint csonkolás nélkül egy ilyen cím 3400
+  // pixel széles, és a dokumentum 1440 és 375 pixelen is vízszintesen
+  // görgetett. A két szélesség a támogatott halmazon felül is szerepel.
+  const records = [
+    makeRunEventRecord(1, RUN_DETAIL.id),
+    longUrlToolResultRecord(2, RUN_DETAIL.id, 'sr-resp'),
+    sdkResultRecord(3, RUN_DETAIL.id, 'sr-resp'),
+  ];
+  await mockSseFrames(page, replayFrames(RUN_DETAIL.id, records));
+  // A --ep-screen-md alatt a futás nézet fül sávra vált, és a transcript a
+  // második fülön áll; a token értéke a design system forrásából jön.
+  const mediumWidth = Number(/--ep-screen-md:\s*(\d+)px/.exec(readFileSync(BREAKPOINTS_CSS_PATH, 'utf8'))?.[1]);
+  expect(mediumWidth).toBeGreaterThan(0);
+
+  const widths = [...new Set([...SUPPORTED_VIEWPORT_WIDTHS, 375, 1440])].toSorted((a, b) => a - b);
+  for (const width of widths) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(RUN_VIEW_URL);
+      if (width < mediumWidth) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      const list = page.getByRole('list', { name: 'Futás eseményei' });
+      await expect(list.getByRole('listitem')).toHaveCount(records.length);
+
+      // A dokumentum törzse nem görget vízszintesen (szabálykönyv 11. szekció).
+      await expect
+        .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
+        .toBe(0);
+      // A lista SAJÁT görgető doboza sem: a `react-window` `overflow-y: auto`
+      // gyökere miatt egy kilógó cím nem a dokumentumot, hanem a listát
+      // görgetné vízszintesen, amit a dokumentum mérése önmagában nem fogna.
+      expect(await list.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+      // A hosszú cím valóban csonkolt: a tartalma szélesebb a dobozánál, a
+      // doboz pedig a listán belül marad.
+      const longTitle = list.getByRole('listitem').nth(1).locator('.accordion__title');
+      const titleOverflow = await longTitle.evaluate((element) => element.scrollWidth - element.clientWidth);
+      expect(titleOverflow).toBeGreaterThan(0);
+      const titleBox = await longTitle.boundingBox();
+      const listBox = await list.boundingBox();
+      if (titleBox === null || listBox === null) {
+        throw new Error('hiányzó befoglaló doboz');
+      }
+      expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(listBox.x + listBox.width);
     });
   }
 });

@@ -23,6 +23,9 @@ import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
 import { buildRunGraphNodes } from '../run-graph/build-run-graph-nodes.ts';
 import { mergeSnapshotStepRuns } from '../run-graph/merge-snapshot-step-runs.ts';
 import { projectSnapshotGraph } from '../run-graph/project-snapshot-graph.ts';
+import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
+import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
+import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
 import { isRunFinishedFrame } from './is-run-finished-frame.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
@@ -47,6 +50,12 @@ export interface RunViewScreenProperties {
    */
   readonly streamId: string;
   readonly lastFrame: StreamFrame | undefined;
+  /**
+   * Az app szintű SSE kapcsolat veszteségmentes keret feliratkozása: a
+   * transcript panel minden keretet ezen kap, nem a `lastFrame` mezőből
+   * (T-009-25, `stream-client/subscribe-to-stream-frames.ts`).
+   */
+  readonly subscribeToFrames: SubscribeToStreamFrames;
   readonly streamReplayLimit: number;
 }
 
@@ -145,18 +154,6 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
 }
 
 /**
- * A transcript panel helye az osztott elrendezésben. A panel TARTALMA a
- * PLAN-009 T-009-25 hatóköre (virtualizált lista, automatikus görgetés); ez a
- * lépés az elrendezést állítja fel, tehát a panel egy kimondott, mindig
- * kirajzolódó felirattal áll itt. Elágazás nincs benne: egy "ha még nincs
- * transcript" ág garantáltan mindig ugyanarra futna, ami tiltott halott ág
- * lenne (`.claude/CLAUDE.md` 5. szekció).
- */
-function TranscriptPlaceholder(): ReactElement {
-  return <p className="run-view-screen__transcript-note">A futás eseményei itt jelennek meg.</p>;
-}
-
-/**
  * Az élő futás nézet képernyője (SPEC-008 6. szekció, 10., T-009-20,
  * T-009-22, T-009-23). Három végpontból épül: a futás rekordja
  * (`GET /api/runs/{runId}`) adja az al-workflow hierarchiát és az állapotot, a
@@ -174,7 +171,13 @@ function TranscriptPlaceholder(): ReactElement {
  * kapcsolaton, és a `run_finished` keretre újratölti a futás rekordját. Enélkül
  * a "megszakítás folyamatban" állapotot semmi nem zárná le, mert a megszakítás
  * REST válasza még nem a megszakítás befejezése (SPEC-004 9., SPEC-008 6.4).
- * A lépés futások és a rajz ÉLŐ frissülése a T-009-25 és a T-009-30 hatóköre.
+ *
+ * A TRANSCRIPT (T-009-25) a stream kereteiből épül, a `useRunTranscript`
+ * hookkal, ami a betöltési ágak ELŐTT, a képernyő legelején iratkozik fel,
+ * hogy a pótlás egyetlen kerete se érkezzen feliratkozó nélkül. A panel a
+ * `TranscriptPanel`. A lépés futások és a rajz ÉLŐ frissülése nem ennek a
+ * lépésnek a része: a lépés futások a képernyő megnyitásakor egyszer
+ * töltődnek be.
  *
  * A futás rekordja azért külön `useState` értékben is áll, nem csak a
  * `useRequestState` állapotában: az újratöltés alatt a kérés `pending`-re
@@ -184,8 +187,10 @@ function TranscriptPlaceholder(): ReactElement {
  * rekordjának elérhetetlensége nem elhallgatható.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate, streamId, lastFrame, streamReplayLimit } = properties;
+  const { apiOrigin, fetchFunction, search, navigate, streamId, lastFrame, subscribeToFrames, streamReplayLimit } =
+    properties;
   const runId = readRunId(search);
+  const transcript = useRunTranscript(runId, subscribeToFrames);
 
   const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
@@ -324,7 +329,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         <RunViewLayout
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
-          transcript={<TranscriptPlaceholder />}
+          // A `key` a futás azonosítója: egy másik futásra navigálva a panel
+          // (és a görgetés állapota) tiszta lappal indul.
+          transcript={<TranscriptPanel key={runId} transcript={transcript} stepRuns={stepRuns} />}
           // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
           // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
           // visszaváltáskor a `defaultSizes` propból épül újra a kezdő

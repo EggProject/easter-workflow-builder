@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { buildStreamUrl, decodeStreamFrame, type StreamFrame } from '@easter-workflow-builder/protocol';
 import type { EventSourceFactory } from './event-source-like.ts';
 import type { StreamIdGenerator } from './stream-id-generator.ts';
+import type { SubscribeToStreamFrames } from './subscribe-to-stream-frames.ts';
 
 /**
  * A topnav státusz kijelzőjének négy állapota (SPEC-007 11. szekció 14 ...
@@ -23,6 +24,13 @@ export interface StreamConnectionState {
    * töltik újra az adatukat (SPEC-005 5.2).
    */
   readonly serverRestartCount: number;
+  /**
+   * Minden dekódolt keret, egyenként és kihagyás nélkül (T-009-25). A
+   * `lastFrame` egy löketből csak az utolsót adja át, lásd
+   * `subscribe-to-stream-frames.ts`. Stabil hivatkozás a komponens teljes
+   * élettartama alatt.
+   */
+  readonly subscribeToFrames: SubscribeToStreamFrames;
 }
 
 /**
@@ -98,6 +106,18 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
   });
   const [pendingReplayRunIds, setPendingReplayRunIds] = useState<ReadonlySet<string>>(new Set());
   const [lastFrame, setLastFrame] = useState<StreamFrame | undefined>(undefined);
+  // A feliratkozók halmaza a komponens élettartamára egyszer jön létre, és
+  // sosem cserélődik: a tartalma változik, nem a hivatkozása.
+  const [frameListeners] = useState(() => new Set<(frame: StreamFrame) => void>());
+  const subscribeToFrames = useCallback<SubscribeToStreamFrames>(
+    (listener) => {
+      frameListeners.add(listener);
+      return () => {
+        frameListeners.delete(listener);
+      };
+    },
+    [frameListeners],
+  );
 
   useEffect(() => {
     const source = eventSourceFactory(`${streamOrigin}${buildStreamUrl(streamId)}`);
@@ -124,6 +144,9 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
       const frame = decoded.value;
       setReadyState(source.readyState);
       setLastFrame(frame);
+      for (const listener of frameListeners) {
+        listener(frame);
+      }
 
       // Kimerítő `switch` a keret `event` mezőjén, mind az öt ággal
       // (SPEC-007 9.2, 16. szekció 42. kritérium): a
@@ -181,7 +204,7 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
     return () => {
       source.close();
     };
-  }, [streamOrigin, streamId, eventSourceFactory]);
+  }, [streamOrigin, streamId, eventSourceFactory, frameListeners]);
 
   return {
     streamId,
@@ -189,5 +212,6 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
     lastFrame,
     serverInstanceId: serverInstance.serverInstanceId,
     serverRestartCount: serverInstance.restartCount,
+    subscribeToFrames,
   };
 }

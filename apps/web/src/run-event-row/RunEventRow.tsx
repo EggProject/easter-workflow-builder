@@ -12,9 +12,10 @@ export interface RunEventRowProperties {
    * feloldás eredményeként ír a lépés futás sorába - NEM a modell név szövege,
    * mert az törékeny és felülírható (user döntés 2026-09-23, SPEC-008 7.1,
    * `docs/research/2026-09-23-sdk-koltseg-becsles.md`). A feloldást maga a
-   * hívó (a transcript panel, T-009-25) végzi.
+   * hívó (a transcript panel, T-009-25) végzi. `undefined`, ha a feloldás
+   * nem sikerült: ilyenkor a sor egyik providerre sem tesz állítást.
    */
-  readonly providerId: ProviderId;
+  readonly providerId: ProviderId | undefined;
 }
 
 /**
@@ -40,6 +41,14 @@ const COST_FIELD_EXPLANATION =
  */
 const COST_HIDDEN_FOR_MINIMAX_EXPLANATION =
   'A MiniMax-M3 modellre az Agent SDK nem ismer valós árat, ezért a költség becslése ennél a providernél nem jelenik meg.';
+
+/**
+ * A kinyitott sorban megjelenő magyarázat, ha a lépés providere nem oldható
+ * fel (T-009-25): a költség mező ilyenkor sem jelenik meg, mert csak
+ * `claude-subscription` provider mellett járna.
+ */
+const COST_HIDDEN_FOR_UNKNOWN_PROVIDER_EXPLANATION =
+  'A lépés providere ebben a nézetben nem ismert, ezért a költség becslése nem jelenik meg.';
 
 /**
  * Egy `run_event` sor időbélyege, óra:perc:másodperc alakban, magyar
@@ -132,6 +141,11 @@ export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactE
         {summary.costHiddenForMinimax ? (
           <div className="run-event-row__cost">
             <p>{COST_HIDDEN_FOR_MINIMAX_EXPLANATION}</p>
+          </div>
+        ) : undefined}
+        {summary.costHiddenForUnknownProvider ? (
+          <div className="run-event-row__cost">
+            <p>{COST_HIDDEN_FOR_UNKNOWN_PROVIDER_EXPLANATION}</p>
           </div>
         ) : undefined}
         <pre className="run-event-row__payload">{JSON.stringify(record.payload, undefined, 2)}</pre>

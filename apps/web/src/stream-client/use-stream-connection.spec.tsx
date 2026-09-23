@@ -334,6 +334,50 @@ describe('useStreamConnection', () => {
     expect(latest?.phase).toBe('reconnecting');
   });
 
+  it('a subscribeToFrames minden keretet kihagyás nélkül átad, egy löketen belül is, a lastFrame viszont csak az utolsót', () => {
+    const source = render();
+    const received: string[] = [];
+    let unsubscribe: (() => void) | undefined;
+    act(() => {
+      unsubscribe = latest?.subscribeToFrames((frame) => {
+        received.push(frame.event);
+      });
+    });
+
+    // Egyetlen `act` blokk = egyetlen React render köteg: a `lastFrame`
+    // állapotból ilyenkor csak a legutolsó keret olvasható ki, a feliratkozó
+    // viszont mind a hármat megkapja.
+    act(() => {
+      source.dispatch(
+        'protocol_error',
+        frameData({ event: 'protocol_error', code: 'internal', message: 'első', runId: null }),
+      );
+      source.dispatch('replay_complete', frameData({ event: 'replay_complete', runId: 'run-1', throughEventId: null }));
+      source.dispatch(
+        'protocol_error',
+        frameData({ event: 'protocol_error', code: 'internal', message: 'harmadik', runId: null }),
+      );
+    });
+    expect(received).toEqual(['protocol_error', 'replay_complete', 'protocol_error']);
+    expect(latest?.lastFrame).toMatchObject({ event: 'protocol_error', message: 'harmadik' });
+
+    act(() => {
+      unsubscribe?.();
+      source.dispatch('replay_complete', frameData({ event: 'replay_complete', runId: 'run-1', throughEventId: null }));
+    });
+    expect(received).toHaveLength(3);
+  });
+
+  it('a subscribeToFrames hivatkozása renderek között stabil', () => {
+    const source = render();
+    const first = latest?.subscribeToFrames;
+    act(() => {
+      source.readyState = OPEN;
+      source.dispatch('open');
+    });
+    expect(latest?.subscribeToFrames).toBe(first);
+  });
+
   it('leszereléskor lezárja a kapcsolatot', () => {
     const source = render();
     act(() => {

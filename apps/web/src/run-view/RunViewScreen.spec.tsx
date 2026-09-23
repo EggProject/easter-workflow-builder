@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunGraphCanvasProperties } from '../run-graph/RunGraphCanvas.tsx';
+import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
 import { RunViewScreen } from './RunViewScreen.tsx';
 import { RUN_VIEW_LAYOUT_STORAGE_KEY } from './run-view-layout.ts';
 
@@ -105,6 +106,26 @@ const BASE_STEP_RUN = {
 const STREAM_ID = 'stream-1';
 const STREAM_REPLAY_LIMIT = 100;
 
+/**
+ * A veszteségmentes keret feliratkozás teszt duplikátuma: a feliratkozókat
+ * egy halmazban tartja, az `emitFrame` pedig mindegyiknek átadja a keretet,
+ * ugyanúgy, mint a `useStreamConnection` kezelője.
+ */
+const frameListeners = new Set<(frame: StreamFrame) => void>();
+
+const subscribeToFrames: SubscribeToStreamFrames = (listener) => {
+  frameListeners.add(listener);
+  return () => {
+    frameListeners.delete(listener);
+  };
+};
+
+function emitFrame(frame: StreamFrame): void {
+  for (const listener of frameListeners) {
+    listener(frame);
+  }
+}
+
 interface FetchOverrides {
   readonly runDetail?: unknown;
   readonly snapshot?: unknown;
@@ -182,6 +203,29 @@ function runFinishedFrame(runId: string): StreamFrame {
   };
 }
 
+/**
+ * Egy `sdk_result` sor pótolt kerete a megadott lépés futáshoz: ennek a
+ * sornak a költség megjelenítése függ a lépés providerétől.
+ */
+function sdkResultFrame(id: number, stepRunId: string): StreamFrame {
+  const finished = runFinishedFrame('r-3');
+  if (finished.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return {
+    ...finished,
+    delivery: 'replayed',
+    runEvent: {
+      ...finished.runEvent,
+      id,
+      stepRunId,
+      origin: 'sdk',
+      kind: 'sdk_result',
+      payload: { type: 'result', total_cost_usd: 0.213108 },
+    },
+  };
+}
+
 describe('RunViewScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -189,6 +233,7 @@ describe('RunViewScreen', () => {
 
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
+    frameListeners.clear();
     navigate.mockClear();
     globalThis.localStorage.clear();
     container = document.createElement('div');
@@ -213,6 +258,7 @@ describe('RunViewScreen', () => {
           navigate={navigate}
           streamId={STREAM_ID}
           lastFrame={lastFrame}
+          subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
       );
@@ -237,6 +283,7 @@ describe('RunViewScreen', () => {
           navigate={navigate}
           streamId={STREAM_ID}
           lastFrame={undefined}
+          subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
       );
@@ -353,8 +400,100 @@ describe('RunViewScreen', () => {
     const body = container.querySelector('.run-view-screen__body');
     expect(body?.querySelector('.resizable-group')).not.toBeNull();
     expect(container.querySelector('.run-view-screen__graph')).not.toBeNull();
-    expect(container.querySelector('.run-view-screen__transcript-note')?.textContent).toContain('futás eseményei');
+    expect(container.querySelector(':scope .run-view-screen__transcript .transcript-panel')).not.toBeNull();
     expect(container.querySelector('[role="separator"]')?.getAttribute('aria-orientation')).toBe('vertical');
+  });
+
+  describe('a transcript panel (T-009-25)', () => {
+    it('a helykitöltő helyén a panel áll, és a pótlás lezárulta előtt a betöltést jelzi', async () => {
+      await renderScreen('?runId=r-3', createFetchFunction());
+
+      const panel = container.querySelector(':scope .run-view-screen__transcript .transcript-panel');
+      expect(panel?.querySelector('[role="status"]')?.textContent).toBe('Előzmények betöltése');
+      expect(panel?.querySelectorAll('.skel').length).toBeGreaterThan(0);
+      expect(container.textContent).not.toContain('A futás eseményei itt jelennek meg.');
+    });
+
+    it('minden sort a RunEventRow rajzol, a lépés futás providerId mezője szerint: MiniMax mellett nincs költség', async () => {
+      await renderScreen('?runId=r-3', createFetchFunction({ stepRuns: [BASE_STEP_RUN] }));
+      act(() => {
+        emitFrame(sdkResultFrame(1, 's-1'));
+        emitFrame({ event: 'replay_complete', runId: 'r-3', throughEventId: 1 });
+      });
+
+      const rows = container.querySelectorAll(':scope .transcript-panel [role="listitem"] .run-event-row');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.querySelector('.accordion__meta')).toBeNull();
+      expect(rows[0]?.textContent).not.toContain('$0.2131');
+    });
+
+    it('claude-subscription providerű lépés sorában a költség a meta szlotban látszik', async () => {
+      await renderScreen(
+        '?runId=r-3',
+        createFetchFunction({ stepRuns: [{ ...BASE_STEP_RUN, providerId: 'claude-subscription' }] }),
+      );
+      act(() => {
+        emitFrame(sdkResultFrame(1, 's-1'));
+      });
+
+      const meta = container.querySelector(':scope .transcript-panel .run-event-row .accordion__meta');
+      expect(meta?.textContent).toBe('Költség (SDK becslés): $0.2131');
+    });
+
+    it('a képernyő betöltése ALATT érkező keretek sem vesznek el: a feliratkozás a betöltési ágak előtt él', async () => {
+      const pendingResolvers: (() => void)[] = [];
+      const baseFetch = createFetchFunction();
+      const deferredFetch: FetchFunction = (input, init) =>
+        new Promise<Response>((resolve) => {
+          pendingResolvers.push(() => {
+            void baseFetch(input, init).then(resolve);
+          });
+        });
+
+      act(() => {
+        root.render(
+          <RunViewScreen
+            apiOrigin={API_ORIGIN}
+            fetchFunction={deferredFetch}
+            search="?runId=r-3"
+            navigate={navigate}
+            streamId={STREAM_ID}
+            lastFrame={undefined}
+            subscribeToFrames={subscribeToFrames}
+            streamReplayLimit={STREAM_REPLAY_LIMIT}
+          />,
+        );
+      });
+      expect(container.querySelector('.run-view-screen__loading')).not.toBeNull();
+      act(() => {
+        emitFrame(sdkResultFrame(1, 's-1'));
+        emitFrame(sdkResultFrame(2, 's-1'));
+      });
+
+      await act(async () => {
+        for (const resolvePending of pendingResolvers) {
+          resolvePending();
+        }
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(container.querySelectorAll(':scope .transcript-panel .run-event-row')).toHaveLength(2);
+    });
+
+    it('leszereléskor leiratkozik a keretekről', async () => {
+      await renderScreen('?runId=r-3', createFetchFunction());
+      expect(frameListeners.size).toBe(1);
+      act(() => {
+        root.unmount();
+      });
+      expect(frameListeners.size).toBe(0);
+      // Az `afterEach` újra leszerelné a gyökeret: egy friss, üres gyökér
+      // kerül a helyére, hogy a második `unmount` ne dobjon.
+      root = createRoot(container);
+    });
   });
 
   it('a tárolt elrendezés arányt betölti, és a Resizable kezdő értesítését visszaírja', async () => {
@@ -448,6 +587,7 @@ describe('RunViewScreen', () => {
           navigate={navigate}
           streamId={STREAM_ID}
           lastFrame={runFinishedFrame('r-3')}
+          subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
       );

@@ -1,0 +1,37 @@
+/* A transcript panel (SPEC-008 7., PLAN-009 T-009-25). A panel a futás nézet
+   transcript oldalának teljes magasságát kitölti, és a görgetést a
+   `react-window` `List` maga végzi (a gyökér elemének saját, inline
+   `overflow-y: auto` stílusa van): a külső oldal nem görget. A `min-height: 0`
+   ugyanazért kell, mint a `run-view.css` minden flex szintjén, különben a
+   flex elem a tartalma magasságára feszülne, és a lista belső görgetése
+   sosem lépne életbe.
+
+   Doboz nélküli terület: se szegély, se lekerekítés, se saját háttér, tehát
+   nem kártya (tilos a card in card). Minden szín és térköz design system
+   token. */
+.transcript-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--ep-space-2);
+}
+
+.transcript-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ep-space-2);
+}
+
+.transcript-panel__status,
+.transcript-panel__empty {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+.transcript-panel__list {
+  min-height: 0;
+}

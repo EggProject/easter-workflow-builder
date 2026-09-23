@@ -116,6 +116,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     navigate,
     streamId: streamConnection.streamId,
     lastFrame: streamConnection.lastFrame,
+    subscribeToFrames: streamConnection.subscribeToFrames,
     serverRestartCount: streamConnection.serverRestartCount,
   });
 
@@ -202,6 +203,7 @@ interface RouteContentDependencies {
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
   readonly streamId: string;
   readonly lastFrame: ReturnType<typeof useStreamConnection>['lastFrame'];
+  readonly subscribeToFrames: ReturnType<typeof useStreamConnection>['subscribeToFrames'];
   readonly serverRestartCount: number;
 }
 
@@ -218,6 +220,7 @@ function renderRouteContent(
     navigate,
     streamId,
     lastFrame,
+    subscribeToFrames,
     serverRestartCount,
   } = dependencies;
 
@@ -261,6 +264,7 @@ function renderRouteContent(
           navigate={navigate}
           streamId={streamId}
           lastFrame={lastFrame}
+          subscribeToFrames={subscribeToFrames}
           streamReplayLimit={streamReplayLimit}
         />
       );

@@ -119,17 +119,13 @@
   overflow: hidden;
 }
 
-/* A transcript oldal ÖNÁLLÓAN görög (a virtualizált lista a T-009-25
-   hatóköre), és megnevezett, doboz nélküli terület: se szegély, se
+/* A transcript oldal megnevezett, doboz nélküli terület: se szegély, se
    lekerekítés, se saját háttér, tehát nem kártya (tilos a card in card). A
-   belső térköz egyetlen szinten van, itt. */
+   belső térköz egyetlen szinten van, itt. A görgetést a transcript panel
+   virtualizált listája maga végzi (T-009-25, `transcript-panel.css`), ezért
+   ez a burkoló NEM görget: egy második görgetősáv itt a lista saját
+   görgetését és az aljára tapadást zavarná meg. */
 .run-view-screen__transcript {
-  overflow: auto;
+  overflow: hidden;
   padding: var(--ep-space-4);
-}
-
-.run-view-screen__transcript-note {
-  margin: 0;
-  font: var(--ep-text-small);
-  color: var(--ep-fg-muted);
 }

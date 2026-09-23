@@ -687,10 +687,11 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `/* @__PURE__ */` kommentjét eltolja a hívás elől. A Rolldown emiatt nem tudja értelmezni a
   kommentet, és minden ilyen esetre `[INVALID_ANNOTATION]` figyelmeztetést ír a `webServer`
   buildlogba. **Ártalmatlan minden eddig talált előfordulásra** (saját mérés, `vite build` a
-  `VITE_COVERAGE=true` env változóval, 2026-09-16: hét fájl, tizennégy előfordulás -
+  `VITE_COVERAGE=true` env változóval, 2026-09-23, T-009-25: kilenc fájl, húsz előfordulás -
   `src/app-shell/app-shell.tsx`, `src/graph-editor/GraphEditorScreen.tsx`,
   `src/node-inspector/JoinNodeFields.tsx`, `src/run-control/RunControlBar.tsx`,
-  `src/run-history/run-history-screen.tsx`, `src/run-view/RunViewLayout.tsx`,
+  `src/run-event-row/RunEventRow.tsx`, `src/run-history/run-history-screen.tsx`,
+  `src/run-view/RunViewLayout.tsx`, `src/transcript-panel/TranscriptPanel.tsx`,
   `src/workflow-list/workflow-list-screen.tsx`): mindegyik olyan `? (/* @__PURE__ */jsx(...)) :
 (/* @__PURE__ */jsx(...))` ág, aminek az eredménye MINDIG felhasznált (`return` vagy render
   gyerek), tehát a PURE jelzés nem tehetne semmit: az csak akkor engedne eltávolítást, ha az
@@ -702,6 +703,24 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
   megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
   dokumentált és kezelt ott, külön jelenség, nem ez a hét fájl.
+
+**Frontend állapot és layout**
+
+- **A `lastFrame` állapot egy löketből csak az utolsó keretet adja át.** A React a natív
+  `EventSource` kezelőből jövő frissítéseket egy renderbe vonja össze, tehát egy `lastFrame`
+  függésű effekt a köztes kereteket sosem látja: valós Chromiumban egyetlen hálózati darabban
+  érkező 10, 1000 és 3000 keretre az effekt mindháromszor EGYSZER futott, a függvény alakú
+  állapotfrissítés viszont mindet megkapta (saját mérés,
+  `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). Ami minden keretet igényel
+  (a transcript), az a `stream-client` `subscribeToFrames` útján iratkozik fel, és függvény
+  alakban frissít; a `lastFrame` csak "valami történt, tölts újra" jelzésre való. Védelem: a
+  `use-stream-connection.spec.tsx` és a `use-run-transcript.spec.tsx` egy render kötegen belüli
+  keretsorozatra mér.
+- **A dokumentum `scrollWidth` mérése nem látja a saját görgető dobozban maradó túllógást.** A
+  `react-window` lista gyökere `overflow-y: auto`, amitől az `overflow-x` is `auto` lesz, tehát
+  egy kilógó transcript sor a LISTÁT görgeti vízszintesen, a dokumentumot nem: csonkolás nélkül
+  mérve a dokumentum túllógása 0, a listáé 3719 pixel (375 pixelen). A vízszintes túllógás
+  tesztje ezért a görgető dobozt is méri (`responsive.spec.ts`, T-009-25).
 
 **Képernyőkép és vizuális bizonyíték**
 
@@ -858,6 +877,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
 | a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
 | a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
+| a transcript panel: keret veszteség, sormagasság, cím csonkolás     | `docs/research/2026-09-23-transcript-panel-meresek.md`                         |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 

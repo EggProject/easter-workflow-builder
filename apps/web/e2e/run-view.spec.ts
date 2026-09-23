@@ -508,11 +508,15 @@ test('a --ep-screen-md alatt fülek állnak, egyszerre egy nézettel, elválaszt
   const transcriptTab = page.getByRole('tab', { name: 'Transcript' });
   await expect(graphTab).toHaveAttribute('aria-selected', 'true');
   await expect(transcriptTab).toHaveAttribute('aria-selected', 'false');
-  await expect(page.getByText('A futás eseményei itt jelennek meg.')).toBeHidden();
+  // A transcript panel (T-009-25): az üres, pótlást le nem záró stream mock
+  // mellett a fejléce az előzmények betöltését jelzi. A topnav állapot
+  // kijelzője kisbetűvel írja ugyanezt, ezért az `exact` egyezés.
+  const transcriptLoading = page.getByText('Előzmények betöltése', { exact: true });
+  await expect(transcriptLoading).toBeHidden();
 
   await transcriptTab.click();
   await expect(transcriptTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('A futás eseményei itt jelennek meg.')).toBeVisible();
+  await expect(transcriptLoading).toBeVisible();
   // A gráf panelje FELCSATOLVA marad, csak rejtett: a natív `hidden`
   // attribútum rejti, tehát a vászon állapota nem veszik el.
   await expect(page.getByTestId('rf__wrapper')).toBeAttached();

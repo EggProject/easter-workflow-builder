@@ -27,6 +27,15 @@ export interface RunEventRowSummary {
    * el, hogy a magyarázó mondatot megjeleníti-e.
    */
   readonly costHiddenForMinimax: boolean;
+  /**
+   * Igaz, ha a sor `sdk_result`, de a lépés providere nem oldható fel (a
+   * `stepRunId` nem szerepel a betöltött lépés futások között, vagy a tárolt
+   * érték nem ismert provider azonosító). Ilyenkor sem költség, sem a MiniMax
+   * magyarázat nem jelenik meg, mert mindkettő egy konkrét providerre tett
+   * állítás lenne; helyette egy mondat mondja ki, miért nincs költség
+   * (T-009-25).
+   */
+  readonly costHiddenForUnknownProvider: boolean;
 }
 
 interface KindDescription {
@@ -34,6 +43,7 @@ interface KindDescription {
   readonly bodyText: string;
   readonly costEstimateText?: string;
   readonly costHiddenForMinimax?: boolean;
+  readonly costHiddenForUnknownProvider?: boolean;
 }
 
 const ORIGIN_LABEL: Readonly<Record<RunEventOrigin, string>> = {
@@ -218,7 +228,7 @@ function describeHook(payload: unknown, kindLabel: string, fallbackBodyText: str
  * egy huszonhatodik érték felvétele ott a `switch-exhaustiveness-check`
  * ESLint szabály és a TypeScript ellenőrzés miatt itt fordítási hibát ad.
  */
-function describeRunEventKind(record: RunEventRecord, providerId: ProviderId): KindDescription {
+function describeRunEventKind(record: RunEventRecord, providerId: ProviderId | undefined): KindDescription {
   switch (record.kind) {
     case 'sdk_assistant': {
       return describeAssistant(record);
@@ -232,6 +242,9 @@ function describeRunEventKind(record: RunEventRecord, providerId: ProviderId): K
     case 'sdk_result': {
       const turnsLabel = record.numTurns === null ? 'ismeretlen' : String(record.numTurns);
       const bodyText = `${formatTokenCounts(record)}, fordulók: ${turnsLabel}`;
+      if (providerId === undefined) {
+        return { kindLabel: 'Eredmény', bodyText, costHiddenForUnknownProvider: true };
+      }
       if (providerId === 'minimax') {
         return { kindLabel: 'Eredmény', bodyText, costHiddenForMinimax: true };
       }
@@ -324,15 +337,11 @@ function describeRunEventKind(record: RunEventRecord, providerId: ProviderId): K
  *
  * A `providerId` a lépés ténylegesen feloldott providere (a hívó a
  * `record.stepRunId`-hoz tartozó `StepRunRecord.providerId` mezőből
- * biztosítja, SPEC-008 7.1). Alapértéke `claude-subscription`, hogy a nem
- * költséggel foglalkozó tesztesetek (a `RunEventKind` mind a huszonöt
- * értékét lefedő eset) ne kelljen egyenként kiegészíteni; a valódi
- * felhasználásban (`RunEventRow`) ez mindig explicit érték.
+ * biztosítja, SPEC-008 7.1), vagy `undefined`, ha a feloldás nem sikerült
+ * (T-009-25). Alapérték nincs: egy alapérték a sikertelen feloldást
+ * csendben egy konkrét providerré változtatná.
  */
-export function summarizeRunEventRow(
-  record: RunEventRecord,
-  providerId: ProviderId = 'claude-subscription',
-): RunEventRowSummary {
+export function summarizeRunEventRow(record: RunEventRecord, providerId: ProviderId | undefined): RunEventRowSummary {
   const description = describeRunEventKind(record, providerId);
   return {
     originLabel: ORIGIN_LABEL[record.origin],
@@ -340,5 +349,6 @@ export function summarizeRunEventRow(
     bodyText: description.bodyText,
     costEstimateText: description.costEstimateText,
     costHiddenForMinimax: description.costHiddenForMinimax ?? false,
+    costHiddenForUnknownProvider: description.costHiddenForUnknownProvider ?? false,
   };
 }
