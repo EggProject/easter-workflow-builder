@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, isNull } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { StepRunRepository } from '../step-run/step-run-repository.ts';
+import { stepRunTable } from '../step-run/step-run.ts';
+import type { StepRunStatus } from '../step-run/step-run-status.ts';
 import { humanApprovalTable } from './human-approval.ts';
 import { isApprovalDecision } from './is-approval-decision.ts';
 import type { ApprovalDecision } from './approval-decision.ts';
@@ -52,12 +54,25 @@ export interface HumanApprovalRecord {
 export interface HumanApprovalRepository {
   requestApproval(input: RequestApprovalInput): Outcome<HumanApprovalRecord>;
   decideApproval(input: DecideApprovalInput): Outcome<HumanApprovalRecord>;
+  getApproval(approvalId: string): Outcome<HumanApprovalRecord>;
   getApprovalForStep(stepRunId: string): Outcome<HumanApprovalRecord>;
   listPendingApprovals(): Outcome<readonly HumanApprovalRecord[]>;
 }
 
+/**
+ * A lépés állapota, amiben a jóváhagyás döntésre vár (user döntés
+ * 2026-09-23): a függő lista ebből dönt, nem a `decision` oszlopból, mert a
+ * döntés nélkül lezárt jóváhagyás (megszakítás, `fail_run`, a `sub_workflow`
+ * fa lezárása, időkorlát) `decision` mezője NULL marad (SPEC-004 8.3).
+ */
+const WAITING_APPROVAL_STATUS: StepRunStatus = 'waiting_approval';
+
 function notFoundMessage(stepRunId: string): string {
   return `A(z) "${stepRunId}" lépés futáshoz nem tartozik jóváhagyási kérés (not_found).`;
+}
+
+function approvalNotFoundMessage(approvalId: string): string {
+  return `A(z) "${approvalId}" azonosítójú jóváhagyás nem létezik (not_found).`;
 }
 
 function alreadyDecidedMessage(stepRunId: string): string {
@@ -265,6 +280,23 @@ export function createHumanApprovalRepository(
     });
   }
 
+  /**
+   * A jóváhagyás az azonosítója szerint, a döntésétől és a lépés állapotától
+   * függetlenül (user döntés 2026-09-23). A szerver döntési végpontja ezzel
+   * választja szét a nem létező azonosítót (`not_found`) a már eldöntött vagy
+   * döntés nélkül lezárt jóváhagyástól, amire a döntés `conflict` (SPEC-005
+   * 8.2).
+   */
+  function getApproval(approvalId: string): Outcome<HumanApprovalRecord> {
+    return transaction(() => {
+      const row = database.select().from(humanApprovalTable).where(eq(humanApprovalTable.id, approvalId)).get();
+      if (row === undefined) {
+        return { kind: 'error', message: approvalNotFoundMessage(approvalId) };
+      }
+      return toHumanApprovalRecord(row);
+    });
+  }
+
   function getApprovalForStep(stepRunId: string): Outcome<HumanApprovalRecord> {
     return transaction(() => {
       const row = database.select().from(humanApprovalTable).where(eq(humanApprovalTable.stepRunId, stepRunId)).get();
@@ -276,22 +308,28 @@ export function createHumanApprovalRepository(
   }
 
   /**
-   * `decision IS NULL`, `requested_at_ms` szerint növekvő sorrendben: a
-   * `human_approval_pending_idx` `(decision, requested_at_ms)` indexet
-   * használja ki (SPEC-003 4.12 szekció, F-10: SQLite az indexben tárolja a
-   * NULL értékeket is).
+   * Csak a ténylegesen döntésre váró jóváhagyás: a lépés sora
+   * `waiting_approval` (user döntés 2026-09-23, SPEC-003 4.12). A döntés
+   * nélkül lezárt jóváhagyás `decision` mezője NULL marad, tehát a `decision
+   * IS NULL` önmagában nem elég. A szűrés egyetlen `SELECT` a lépés sorára
+   * kötve, így nincs ablak a lezárás és a lista között: a lépés sorának
+   * `cancelled`, `failed` vagy `interrupted` írása után a jóváhagyás egyetlen
+   * lekérdezésben sem jelenik meg. A `decision IS NULL` feltétel is marad,
+   * ez garantálja a `toPendingApprovalRecord` `decision: null` mezőjét.
+   * Sorrend: `requested_at_ms` szerint növekvő.
    */
   function listPendingApprovals(): Outcome<readonly HumanApprovalRecord[]> {
     return transaction(() => {
       const rows = database
-        .select()
+        .select(getTableColumns(humanApprovalTable))
         .from(humanApprovalTable)
-        .where(isNull(humanApprovalTable.decision))
+        .innerJoin(stepRunTable, eq(stepRunTable.id, humanApprovalTable.stepRunId))
+        .where(and(isNull(humanApprovalTable.decision), eq(stepRunTable.status, WAITING_APPROVAL_STATUS)))
         .orderBy(asc(humanApprovalTable.requestedAtMs))
         .all();
       return { kind: 'ok', value: rows.map((row) => toPendingApprovalRecord(row)) };
     });
   }
 
-  return { requestApproval, decideApproval, getApprovalForStep, listPendingApprovals };
+  return { requestApproval, decideApproval, getApproval, getApprovalForStep, listPendingApprovals };
 }

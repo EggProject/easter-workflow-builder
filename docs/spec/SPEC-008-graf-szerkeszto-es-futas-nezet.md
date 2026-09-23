@@ -601,9 +601,9 @@ A `human_approval` csomópont a motorban `waiting_approval` állapotba viszi a l
 | a futás nézet fejlécénél | egy kiemelt sáv, ami megnevezi, hogy a futás beavatkozásra vár                                  |
 | a jóváhagyás panelen     | a `title`, a `body`, és a `payload` formázott alakja, két gombbal: "Jóváhagyás" és "Elutasítás" |
 
-**A lista forrása a `GET /api/approvals`**, ami minden függő jóváhagyást ad; a futás nézet a saját `runId` értékére szűr. A döntés a `POST /api/approvals/{approvalId}/decision` hívás, `ApprovalDecisionRequest` törzzsel, aminek egyetlen mezője a `decision`, két értékkel.
+**A lista forrása a `GET /api/approvals`**, ami minden függő jóváhagyást ad; a futás nézet a saját `runId` értékére szűr. Függő az a jóváhagyás, aminek a lépése `waiting_approval` állapotú (user döntés 2026-09-23, SPEC-003 4.12): a döntés nélkül lezárt jóváhagyás (megszakítás, `fail_run`, a `sub_workflow` fa lezárása, időkorlát) nem szerepel a listában, a felület tehát nem kínál rá döntést. A döntés a `POST /api/approvals/{approvalId}/decision` hívás, `ApprovalDecisionRequest` törzzsel, aminek egyetlen mezője a `decision`, két értékkel.
 
-**A döntés visszavonhatatlan, és a felület ezt kimondja.** A `human_approval_step_uq` egyedi index miatt lépésenként pontosan egy jóváhagyás létezik, és a `decision` mező egyszer íródik; egy második hívás `conflict` hibát ad. A gombok a küldés pillanatában letiltódnak, és a válaszig letiltva maradnak.
+**A döntés visszavonhatatlan, és a felület ezt kimondja.** A `human_approval_step_uq` egyedi index miatt lépésenként pontosan egy jóváhagyás létezik, és a `decision` mező egyszer íródik; egy második hívás `conflict` hibát ad, és a döntés nélkül lezárt jóváhagyásra érkező döntés is (`not_found` csak nem létező azonosítóra jön, SPEC-005 4.2, user döntés 2026-09-23). A gombok a küldés pillanatában letiltódnak, és a válaszig letiltva maradnak.
 
 **A lejárt jóváhagyás nem a felület dolga.** A `timeoutMs` lejártakor a motor a lépést `failed` állapotba viszi `approval_timed_out` hibával, és a `decision` mező `NULL` marad (SPEC-004). A felület ezt ugyanúgy hibás lépésként mutatja, mint bármely más `failed` lépést, a hiba nevének megjelenítésével.
 

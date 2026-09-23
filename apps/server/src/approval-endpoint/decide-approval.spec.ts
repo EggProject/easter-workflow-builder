@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import type { Engine } from '@easter-workflow-builder/engine';
+import { httpStatusForErrorCode } from '@easter-workflow-builder/protocol';
+import { mapOutcomeMessageToErrorCode } from '../error-mapping/map-outcome-message-to-error-code.ts';
 import { createDecideApprovalHandler } from './decide-approval.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -14,6 +16,14 @@ function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
 
 function openMemoryDatabase(): DatabaseContext {
   return okOrThrow(openDatabase(':memory:'));
+}
+
+/**
+ * A hibaág HTTP státusza, ugyanazon a láncon, amin a `create-http-server.ts`
+ * a kezelő hibaágát válaszra képezi.
+ */
+function httpStatusOf(message: string): number {
+  return httpStatusForErrorCode(mapOutcomeMessageToErrorCode(message));
 }
 
 function unused<TValue>(): Promise<TValue> {
@@ -122,7 +132,7 @@ describe('createDecideApprovalHandler', () => {
     expect(result.kind === 'ok' && result.value.body).toMatchObject({ decision: 'approved' });
   });
 
-  it('nem függőben lévő approvalId-ra not_found hibát ad', async () => {
+  it('nem létező approvalId-ra not_found hibát ad (HTTP 404)', async () => {
     const database = openMemoryDatabase();
     const handler = createDecideApprovalHandler(database, buildFakeEngine(database));
 
@@ -134,6 +144,53 @@ describe('createDecideApprovalHandler', () => {
 
     expect(result.kind).toBe('error');
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
+    expect(result.kind === 'error' && httpStatusOf(result.message)).toBe(404);
+  });
+
+  // User döntés 2026-09-23: a már eldöntött jóváhagyás második döntése
+  // conflict, nem not_found (a javítás előtt 404 volt, mert a kezelő a függő
+  // listában kereste az azonosítót).
+  it('már eldöntött jóváhagyásra érkező döntés conflict (HTTP 409), az első döntés érintetlen', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = createTestRunAndWaitingStep(database);
+    const approval = okOrThrow(
+      database.approvals.requestApproval({ runId, stepRunId, title: 'Cím', body: 'Törzs', payload: {} }),
+    );
+    const handler = createDecideApprovalHandler(database, buildFakeEngine(database));
+    const context = { parameters: { approvalId: approval.id }, query: new URLSearchParams() };
+    const first = await handler({ ...context, body: { decision: 'approved' } });
+    expect(first.kind).toBe('ok');
+
+    const result = await handler({ ...context, body: { decision: 'rejected' } });
+
+    expect(result.kind === 'error' && result.message).toContain('(already_decided)');
+    expect(result.kind === 'error' && httpStatusOf(result.message)).toBe(409);
+    expect(okOrThrow(database.approvals.getApproval(approval.id)).decision).toBe('approved');
+  });
+
+  // User döntés 2026-09-23: a döntés nélkül lezárt jóváhagyás (megszakítás,
+  // fail_run, sub_workflow fa) kikerül a függő listából, a döntése ettől
+  // még conflict, nem not_found. A lezárást a motor útja szerint a lépés
+  // sorának markStepCancelled hívása végzi (cancel-waiting-approval-step-runs).
+  it('döntés nélkül lezárt jóváhagyásra érkező döntés conflict (HTTP 409), a decision NULL marad', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = createTestRunAndWaitingStep(database);
+    const approval = okOrThrow(
+      database.approvals.requestApproval({ runId, stepRunId, title: 'Cím', body: 'Törzs', payload: {} }),
+    );
+    okOrThrow(database.stepRuns.markStepCancelled(stepRunId));
+    const handler = createDecideApprovalHandler(database, buildFakeEngine(database));
+
+    const result = await handler({
+      parameters: { approvalId: approval.id },
+      query: new URLSearchParams(),
+      body: { decision: 'approved' },
+    });
+
+    expect(result.kind === 'error' && result.message).toContain('(illegal_status_transition)');
+    expect(result.kind === 'error' && httpStatusOf(result.message)).toBe(409);
+    expect(okOrThrow(database.approvals.getApproval(approval.id)).decision).toBeNull();
+    expect(okOrThrow(database.stepRuns.getStepRun(stepRunId)).status).toBe('cancelled');
   });
 
   it('érvénytelen kérés törzsre invalid_request hibát ad, a listát sem kérdezi le', async () => {
@@ -176,7 +233,7 @@ describe('createDecideApprovalHandler', () => {
     expect(result.kind).toBe('error');
   });
 
-  it('a listPendingApprovals hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
+  it('a getApproval hibaágát változatlanul továbbadja (lezárt adatbázis kapcsolat)', async () => {
     const database = openMemoryDatabase();
     database.close();
     const handler = createDecideApprovalHandler(database, buildFakeEngine(database));

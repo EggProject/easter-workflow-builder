@@ -15,14 +15,17 @@ function openMemoryDatabase(): DatabaseContext {
   return okOrThrow(openDatabase(':memory:'));
 }
 
-function createTestRunAndWaitingStep(database: DatabaseContext): { runId: string; stepRunId: string } {
+function createTestRunAndWaitingStep(
+  database: DatabaseContext,
+  nodeId = 'start-1',
+): { runId: string; stepRunId: string } {
   const workflow = okOrThrow(database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }));
   okOrThrow(
     database.workflows.replaceGraph(
       workflow.id,
       [
         {
-          id: 'start-1',
+          id: nodeId,
           label: 'Start',
           positionX: 0,
           positionY: 0,
@@ -57,7 +60,7 @@ function createTestRunAndWaitingStep(database: DatabaseContext): { runId: string
   const step = okOrThrow(
     database.stepRuns.createStepRun({
       runId: run.id,
-      nodeId: 'start-1',
+      nodeId,
       nodeType: 'human_approval',
       parentStepRunId: null,
       providerId: 'claude-subscription',
@@ -82,6 +85,22 @@ describe('createListPendingApprovalsHandler', () => {
 
     expect(result.kind).toBe('ok');
     expect(result.kind === 'ok' && result.value.body).toMatchObject([{ stepRunId }]);
+  });
+
+  // User döntés 2026-09-23: a döntés nélkül lezárt jóváhagyás (a lépés sora
+  // már nem waiting_approval) nem jelenik meg a listában.
+  it('a döntés nélkül lezárt jóváhagyást nem adja vissza, a várakozót igen', async () => {
+    const database = openMemoryDatabase();
+    const waiting = createTestRunAndWaitingStep(database);
+    okOrThrow(database.approvals.requestApproval({ ...waiting, title: 'Vár', body: 'Törzs', payload: {} }));
+    const closed = createTestRunAndWaitingStep(database, 'start-2');
+    okOrThrow(database.approvals.requestApproval({ ...closed, title: 'Lezárt', body: 'Törzs', payload: {} }));
+    okOrThrow(database.stepRuns.markStepCancelled(closed.stepRunId));
+    const handler = createListPendingApprovalsHandler(database);
+
+    const result = await handler({ parameters: {}, query: new URLSearchParams(), body: undefined });
+
+    expect(result.kind === 'ok' && result.value.body).toMatchObject([{ stepRunId: waiting.stepRunId }]);
   });
 
   it('üres listára üres tömböt ad', async () => {

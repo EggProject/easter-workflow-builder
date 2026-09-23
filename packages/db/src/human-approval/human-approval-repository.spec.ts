@@ -12,6 +12,7 @@ import { computeSnapshotHash } from '../graph-snapshot/snapshot-hash/compute-sna
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
 import { stepRunTable } from '../step-run/step-run.ts';
 import { createStepRunRepository, type StepRunRepository } from '../step-run/step-run-repository.ts';
+import { createRunRecovery } from '../run-recovery/run-recovery.ts';
 import { humanApprovalTable } from './human-approval.ts';
 import {
   createHumanApprovalRepository,
@@ -291,6 +292,29 @@ describe('createHumanApprovalRepository', () => {
     });
   });
 
+  describe('getApproval', () => {
+    it('not_found hibaágat ad ismeretlen approvalId-ra', () => {
+      const { sqlite, repository } = openRepository();
+      expect(errorOrThrow(repository.getApproval('nincs-ilyen'))).toContain('(not_found)');
+      sqlite.close();
+    });
+
+    it('az azonosító szerint adja vissza a jóváhagyást, a döntése és a lépés állapota után is', () => {
+      const { sqlite, database, stepRuns, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'run-1');
+      const stepRunId = createRunningStep(stepRuns, 'run-1');
+      const created = okOrThrow(repository.requestApproval(baseRequestInput('run-1', stepRunId)));
+
+      expect(okOrThrow(repository.getApproval(created.id))).toStrictEqual(created);
+
+      const decided = okOrThrow(repository.decideApproval({ stepRunId, decision: 'rejected' }));
+      expect(okOrThrow(repository.getApproval(created.id))).toStrictEqual(decided);
+
+      sqlite.close();
+    });
+  });
+
   describe('getApprovalForStep', () => {
     it('not_found hibaágat ad ismeretlen stepRunId-ra', () => {
       const { sqlite, repository } = openRepository();
@@ -371,6 +395,42 @@ describe('createHumanApprovalRepository', () => {
       const pending = okOrThrow(repository.listPendingApprovals());
       expect(pending.map((approval) => approval.stepRunId)).toStrictEqual([step2, step1]);
       expect(pending.every((approval) => approval.decision === null)).toBe(true);
+
+      sqlite.close();
+    });
+
+    // User döntés 2026-09-23: a lépés állapota dönt. Mindegyik lezárás a
+    // motor valódi útját hívja: a fail_run és a megszakítás a jóváhagyás
+    // lépését markStepCancelled-del zárja (cancel-waiting-approval-step-runs),
+    // a megszakítás DB zárása cancelRunTree, a sub_workflow fa lezárása
+    // cancelRuns, az időkorlát markStepFailed. A decision mindegyiknél NULL.
+    it('csak a waiting_approval lépésű jóváhagyást adja, a döntés nélkül lezártat nem', () => {
+      const { sqlite, database, stepRuns, repository } = openRepository();
+      const recovery = createRunRecovery(database, makeTransaction(database));
+      insertWorkflow(database, 'w1');
+      const requestApprovalInNewRun = (runId: string): string => {
+        insertRun(database, 'w1', runId);
+        const stepRunId = createRunningStep(stepRuns, runId);
+        okOrThrow(repository.requestApproval(baseRequestInput(runId, stepRunId)));
+        return stepRunId;
+      };
+      const waiting = requestApprovalInNewRun('run-waiting');
+      const failRun = requestApprovalInNewRun('run-fail');
+      const interrupt = requestApprovalInNewRun('run-interrupt');
+      const tree = requestApprovalInNewRun('run-tree');
+      const timeout = requestApprovalInNewRun('run-timeout');
+
+      okOrThrow(stepRuns.markStepCancelled(failRun));
+      okOrThrow(recovery.cancelRunTree('run-interrupt'));
+      okOrThrow(recovery.cancelRuns(['run-tree']));
+      okOrThrow(stepRuns.markStepFailed(timeout, 'approval_timed_out', 'lejárt'));
+
+      const pending = okOrThrow(repository.listPendingApprovals());
+      expect(pending.map((approval) => approval.stepRunId)).toStrictEqual([waiting]);
+      for (const closed of [failRun, interrupt, tree, timeout]) {
+        expect(okOrThrow(stepRuns.getStepRun(closed)).status).not.toBe('waiting_approval');
+        expect(okOrThrow(repository.getApprovalForStep(closed)).decision).toBeNull();
+      }
 
       sqlite.close();
     });

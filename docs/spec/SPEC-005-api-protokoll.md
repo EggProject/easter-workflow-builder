@@ -168,12 +168,14 @@ A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol
 
 **C. Jóváhagyás (2 végpont)**
 
-| #   | Metódus és útvonal                          | Kérés                                                             | Válasz                         | Motor vagy repository            | Saját hibaágai                             |
-| --- | ------------------------------------------- | ----------------------------------------------------------------- | ------------------------------ | -------------------------------- | ------------------------------------------ |
-| 17  | `GET /api/approvals`                        | nincs                                                             | `PendingApproval` lista        | `approvals.listPendingApprovals` | nincs                                      |
-| 18  | `POST /api/approvals/{approvalId}/decision` | `ApprovalDecisionRequest`: `decision`, `approved` vagy `rejected` | `PendingApproval`, a döntéssel | `engine.decideApproval`          | `not_found`, `conflict`, `invalid_request` |
+| #   | Metódus és útvonal                          | Kérés                                                             | Válasz                         | Motor vagy repository                            | Saját hibaágai                             |
+| --- | ------------------------------------------- | ----------------------------------------------------------------- | ------------------------------ | ------------------------------------------------ | ------------------------------------------ |
+| 17  | `GET /api/approvals`                        | nincs                                                             | `PendingApproval` lista        | `approvals.listPendingApprovals`                 | nincs                                      |
+| 18  | `POST /api/approvals/{approvalId}/decision` | `ApprovalDecisionRequest`: `decision`, `approved` vagy `rejected` | `PendingApproval`, a döntéssel | `approvals.getApproval`, `engine.decideApproval` | `not_found`, `conflict`, `invalid_request` |
 
 A 17. végpont válasza a `requestedAtMs` mezőt is hordozza, tehát a felület a SPEC-004 5.8 pontja szerint meg tudja mutatni, mióta vár a jóváhagyás; a "mióta" különbséget a felület számolja, a szerver nem küld periodikus, csak azért létező eseményt. A döntés a **motoron** megy át, nem közvetlenül a repositoryn, mert a döntés és a lépés állapotváltása egy tranzakció, és utána a futás léptetése is a motor dolga (SPEC-004 5.8).
+
+**A 17. végpont csak a döntésre váró jóváhagyást adja, a 18. végpont hibakódja az azonosító létezésén dönt** (user döntés 2026-09-23). Függő az a jóváhagyás, aminek a lépés sora `waiting_approval` (SPEC-003 4.12); a döntés nélkül lezárt jóváhagyás (megszakítás, `fail_run`, a `sub_workflow` fa lezárása, időkorlát) nem jelenik meg a listában, pedig a `decision` mezője NULL marad. A 18. végpont a jóváhagyást az azonosítója szerint olvassa (`approvals.getApproval`), nem a függő listából: `not_found` csak akkor jön, ha az azonosító nem létezik. A már eldöntött jóváhagyás második döntése `already_decided`, a döntés nélkül lezárté a lépés sorának terminális állapotán `illegal_status_transition`, mindkettő `conflict` (8.2: az erőforrás létezik, de az állapota nem engedi a műveletet). A javítás előtt a kezelő a függő listában kereste az azonosítót, ezért a már eldöntött jóváhagyás második döntése `404` volt (mérve a valódi szerver moduljain, SPEC-004 8.3).
 
 **D. Provider (2 végpont)**
 
@@ -470,7 +472,7 @@ Az `Outcome` hibaága kizárólag szöveget hordoz, és a hibaosztály neve zár
 | Forrás hibaosztály                                                                        | `ProtocolErrorCode`   | Miért                                                                                    |
 | ----------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------- |
 | `not_found`                                                                               | `not_found`           | közvetlen megfelelés                                                                     |
-| `illegal_status_transition`                                                               | `conflict`            | az erőforrás létezik, csak az állapota nem engedi a műveletet                            |
+| `illegal_status_transition`, `already_decided`                                            | `conflict`            | az erőforrás létezik, csak az állapota nem engedi a műveletet                            |
 | `no_default_provider`                                                                     | `unprocessable`       | a kérés jó, a rendszer beállítása hiányos                                                |
 | `foreign_key_violation`, `duplicate_event`, `graph_snapshot_hash_collision`               | `conflict`            | egyidejű vagy ütköző írás                                                                |
 | `malformed_graph_document`, `unknown_graph_document_version`, `non_canonicalizable_value` | `unprocessable`       | a tárolt vagy a küldött dokumentum nem dolgozható fel                                    |
