@@ -1,8 +1,8 @@
 import type { ProtocolErrorCode } from '@easter-workflow-builder/protocol';
 
 /**
- * A `ProtocolErrorCode` mind az öt értékéhez tartozó magyar mondat (SPEC-007
- * 8.4). Kimerítő `switch`: egy hatodik kód a `protocol` csomagban fordítási
+ * A `ProtocolErrorCode` mind a hat értékéhez tartozó magyar mondat (SPEC-007
+ * 8.4). Kimerítő `switch`: egy hetedik kód a `protocol` csomagban fordítási
  * hibát adna (`switch-exhaustiveness-check`).
  */
 export function protocolErrorMessage(code: ProtocolErrorCode): string {
@@ -21,6 +21,9 @@ export function protocolErrorMessage(code: ProtocolErrorCode): string {
     }
     case 'internal': {
       return 'Váratlan szerver hiba történt.';
+    }
+    case 'service_unavailable': {
+      return 'A szerver átmenetileg nem érhető el, például éppen leáll.';
     }
   }
 }

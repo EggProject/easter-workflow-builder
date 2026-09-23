@@ -432,6 +432,25 @@ async function waitForStepQueued(database: DatabaseContext, runId: string, nodeI
   throw new Error(`a(z) ${nodeId} lépés nem állt sorba`);
 }
 
+/**
+ * Megvárja, amíg a futás három agent lépéséből pontosan egy fut és kettő
+ * sorban áll (korlát 1 mellett), és visszaadja a futó lépés node azonosítóját:
+ * a kiosztás sorrendje a futtathatóvá válás sorrendje, amit a teszt nem köt ki.
+ */
+async function waitForOneRunningTwoQueued(database: DatabaseContext, runId: string): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const agentSteps = okOrThrow(database.stepRuns.listStepRuns(runId)).filter((row) => row.nodeType === 'agent_step');
+    const running = agentSteps.filter((row) => row.status === 'running');
+    const pendingCount = agentSteps.filter((row) => row.status === 'pending').length;
+    const [runningStep] = running;
+    if (runningStep !== undefined && pendingCount === 2 && running.length === 1) {
+      return runningStep.nodeId;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${runId} futásban nem állt be egy futó és két sorban álló lépés`);
+}
+
 const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'cancelled', 'interrupted'] as const;
 
 describe('createEngine', () => {
@@ -672,6 +691,114 @@ describe('createEngine', () => {
       expect(summary.rootRunId).toBe(started.run.id);
       expect(summary.cancelledRunIds).toContain(started.run.id);
       expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('cancelled');
+    });
+
+    it('REGRESSZIÓ: korlát 1 mellett a futás sorban álló agent lépései a megszakítás után sem indulnak el, egyetlen agent hívás történik, a soruk cancelled (SPEC-004 9. szekció 2. pont)', async () => {
+      const controlled = controlledMessageIterable('parhuzamos');
+      let runCalls = 0;
+      // Az első hívás a megszakításig fut; minden további hívás azonnal
+      // sikeres volna, tehát a javítás nélkül a két sorban álló lépés a
+      // felszabaduló helyen egymás után lefutna, és a hívásszám három lenne.
+      const runner: AgentQueryRunner = {
+        run: () => {
+          runCalls += 1;
+          if (runCalls > 1) {
+            return {
+              kind: 'ok',
+              value: { messages: messageIterable(successMessages(runCalls)), interrupt: () => Promise.resolve() },
+            };
+          }
+          return {
+            kind: 'ok',
+            value: {
+              messages: controlled.messages,
+              interrupt: () => {
+                controlled.release();
+                return Promise.resolve();
+              },
+            },
+          };
+        },
+      };
+      const harness = openHarness({ agentQueryRunner: runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'parhuzamos',
+        [startNode('start'), agentNode('a1', 'egy'), agentNode('a2', 'ketto'), agentNode('a3', 'harom')],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2'), edgeOf('e3', 'start', 'a3')],
+      );
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const runningNodeId = await waitForOneRunningTwoQueued(harness.database, started.run.id);
+
+      const summary = okOrThrow(await harness.engine.interruptRun(started.run.id));
+
+      expect(runCalls).toBe(1);
+      expect(summary.cancelledRunIds).toStrictEqual([started.run.id]);
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('cancelled');
+      const queuedSteps = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).filter(
+        (step) => step.nodeType === 'agent_step' && step.nodeId !== runningNodeId,
+      );
+      expect(queuedSteps.map((step) => step.status)).toStrictEqual(['cancelled', 'cancelled']);
+      // A kivett lépés el sem indult, tehát `step_started` eseménye sincs.
+      for (const step of queuedSteps) {
+        expect(findEventPayloadStatus(harness.published, 'step_started', step.id)).toBeUndefined();
+      }
+    });
+
+    it('REGRESSZIÓ: egy csak sorban álló futás megszakítása nem vár a helyet foglaló MÁSIK futásra, és nem indít agent hívást (SPEC-004 9. szekció 2. pont)', async () => {
+      const controlled = controlledMessageIterable('masik-futas');
+      let runCalls = 0;
+      const runner: AgentQueryRunner = {
+        run: () => {
+          runCalls += 1;
+          if (runCalls > 1) {
+            return {
+              kind: 'ok',
+              value: { messages: messageIterable(successMessages(runCalls)), interrupt: () => Promise.resolve() },
+            };
+          }
+          return { kind: 'ok', value: agentQueryOf(controlled.messages) };
+        },
+      };
+      const harness = openHarness({ agentQueryRunner: runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'csak-sorban-allo',
+        [startNode('start'), agentNode('a1', 'lassu')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const holding = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, holding.run.id, 'a1');
+      const queued = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepQueued(harness.database, queued.run.id, 'a1');
+
+      // A másik futás lépése a teszt végéig fut: ha a megszakítás rá várna,
+      // a hívás itt nem érne véget.
+      const progress = { hasSettled: false };
+      const interrupting = (async (): Promise<Outcome<unknown>> => {
+        const outcome = await harness.engine.interruptRun(queued.run.id);
+        progress.hasSettled = true;
+        return outcome;
+      })();
+      for (let attempt = 0; attempt < 2000 && !progress.hasSettled; attempt += 1) {
+        await Promise.resolve();
+      }
+
+      expect(progress.hasSettled).toBe(true);
+      expect(runCalls).toBe(1);
+      expect(okOrThrow(harness.database.runs.getRun(queued.run.id)).status).toBe('cancelled');
+      expect(
+        okOrThrow(harness.database.stepRuns.listStepRuns(queued.run.id))
+          .filter((step) => step.nodeId === 'a1')
+          .map((step) => step.status),
+      ).toStrictEqual(['cancelled']);
+
+      controlled.release();
+      okOrThrow(await interrupting);
+      expect(await waitForRunStatus(harness.database, holding.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
+      expect(runCalls).toBe(1);
     });
   });
 

@@ -24,14 +24,14 @@ import type { AgentQueryRegistry } from './agent-query-registry.ts';
  * ez a függvény nem avatkozik bele, csak a jelzést adja, és megvárja, hogy
  * mindegyik jelzés nyugtázódjon.
  *
- * **Amit szándékosan NEM tesz.** Nem szakítja meg azt az agent lépést, ami a
+ * **Amit szándékosan NEM tesz.** Nem éri el azt az agent lépést, ami a
  * hívás pillanatában még párhuzamossági helyre vár, tehát még nem hívta meg a
- * `agentQueryRunner.run(...)`-t és nincs a regiszterben. Ez nem ennek a
- * függvénynek a hiánya, hanem a `AgentQueryRegistry` életciklusának
- * következménye, és pontosan ugyanígy viselkedik a T-005-26 óta a külső
- * megszakítás is: a helyre váró lépés a `requestStop()`/`failRunRequested`
- * jelzéstől függetlenül lefut, mert a jelzés csak ÚJ példány indítását
- * akadályozza meg.
+ * `agentQueryRunner.run(...)`-t és nincs a regiszterben: annak nincs mit
+ * megszakítani, hanem ki kell venni a sorból. A külső megszakítás és a
+ * szabályos leállás ezt a `stopAndAwaitRunTree` 2. pontjában teszi meg
+ * (`ConcurrencyGate.denyWaitingForRunIds`). A `fail_run` ág ezt NEM teszi:
+ * ott a helyre váró testvér lépés a `failRunRequested` jelzéstől
+ * függetlenül lefut, mert a jelzés csak ÚJ példány indítását akadályozza meg.
  */
 export async function interruptLiveAgentQueries(
   runIds: ReadonlySet<string>,

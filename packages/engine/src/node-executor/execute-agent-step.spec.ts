@@ -290,7 +290,7 @@ function dependenciesOf(
 function recordingGate(): { readonly gate: ConcurrencyGate; readonly calls: readonly string[] } {
   const calls: string[] = [];
   const gate: ConcurrencyGate = {
-    requestSlot: (providerId, requestId, onGranted) => {
+    requestSlot: (providerId, _runId, requestId, onGranted) => {
       calls.push(`request:${providerId}:${requestId}`);
       onGranted();
     },
@@ -298,6 +298,7 @@ function recordingGate(): { readonly gate: ConcurrencyGate; readonly calls: read
       calls.push(`release:${requestId}`);
       return { kind: 'ok', value: undefined };
     },
+    denyWaitingForRunIds: notCalled,
     close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,

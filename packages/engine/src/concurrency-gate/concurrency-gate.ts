@@ -24,37 +24,61 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
  *    egyetlen időzítőt, mikrotask ürítést és valós időt sem használ, a
  *    kiosztás sorrendje közvetlenül megfigyelhető.
  * 2. A hívó oldalon egy sor a teljes áthidalás egy `await` pontig:
- *    `await new Promise<void>((resolve) => { gate.requestSlot(providerId, stepRunId, resolve); })`.
+ *    `await new Promise<boolean>((resolve) => { gate.requestSlot(providerId, runId, stepRunId, () => resolve(true), () => resolve(false)); })`.
  *    A Promise az `agent-step` réteg fogalma, nem a szabályozóé.
  *
  * A visszahívás előtt a szabályozó belső nyilvántartása már frissült, tehát
  * az `onGranted` törzse biztonságosan hívhat újabb `requestSlot` vagy
  * `releaseSlot` műveletet.
  *
- * **A lezárt szabályozó nem enged több lépést indulni** (SPEC-004 10.2 1.
- * pont): a `close` után minden várakozó és minden új kérés az `onDenied`
- * visszahívást kapja, szintén szinkron, és az `onGranted` soha nem fut le rá.
+ * **Az elutasítás két úton jön, mindkettő az `onDenied` visszahívással**,
+ * szintén szinkron, és az `onGranted` utána soha nem fut le a kérésre:
+ *
+ * - a megszakított futások sorban álló kérései (`denyWaitingForRunIds`,
+ *   SPEC-004 9. szekció 2. pont, "a sorban álló lépései kiesnek");
+ * - a lezárt szabályozó minden várakozója és minden új kérése (`close`,
+ *   SPEC-004 10.2 1. pont).
  */
 export interface ConcurrencyGate {
   /**
    * Hely kérése egy providerre. A `requestId` a hívó által adott, futás
    * közben egyedi azonosító (éles futásban a `step_run` sor azonosítója); a
    * szabályozó nem generál azonosítót, mert az az `idGenerator` port dolga
-   * (SPEC-004 3.2).
+   * (SPEC-004 3.2). A `runId` a kérő lépés futása: csak a
+   * `denyWaitingForRunIds` olvassa, a kiosztás sorrendjére nincs hatása.
    */
-  requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void, onDenied: () => void): void;
+  requestSlot(
+    providerId: ProviderId,
+    runId: string,
+    requestId: string,
+    onGranted: () => void,
+    onDenied: () => void,
+  ): void;
 
   /**
    * A `requestId` hely vagy várakozó bejegyzés felszabadítása. Foglalt hely
    * esetén a felszabaduló helyet azonnal megkapja az adott provider sorának
    * legelső várakozója, ha van. Még sorban álló (helyet nem kapott) kérésre a
-   * bejegyzés kiesik a sorból, és a visszahívása soha nem fut le: ez a
-   * megszakítás útja (9. szekció 2. pont, "a sorban álló lépései kiesnek").
+   * bejegyzés kiesik a sorból, és a visszahívása soha nem fut le. A motor ezt
+   * az ágat nem használja: a megszakítás a `denyWaitingForRunIds` úton megy,
+   * mert a várakozó hívónak visszahívás kell, különben örökre várna.
    *
    * Ismeretlen azonosítóra `unknown_concurrency_slot` hibaág. Lásd a téma
    * indoklását a `packages/engine/CLAUDE.md` fájlban.
    */
   releaseSlot(requestId: string): Outcome<void>;
+
+  /**
+   * A megadott futások MINDEN sorban álló, helyet még nem kapott kérése
+   * kiesik a sorból, és érkezési sorrendben `onDenied` visszahívást kap
+   * (SPEC-004 9. szekció 2. pont). A megszakítás közös menete
+   * (`stopAndAwaitRunTree`) hívja, a futás fájának minden `runId`-jával, még
+   * a `completion` megvárása előtt: enélkül egy sorban álló lépés a megszakítás
+   * után felszabaduló helyet megkapná, és `interrupt()` nélkül végigfutna.
+   * A már kiosztott helyek érintetlenek, azokat a futó lépés a saját
+   * `finally` ágán szabadítja fel; más futás várakozója sem változik.
+   */
+  denyWaitingForRunIds(runIds: ReadonlySet<string>): void;
 
   /**
    * A szabályozó végleges lezárása a szabályos leálláskor (SPEC-004 10.2 1.

@@ -578,15 +578,16 @@ flowchart TD
 
 ### 8.4 A `ProtocolErrorCode` és a felhasználónak szánt szöveg
 
-A `protocol` csomag öt kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli hatodik kód fordítási hibát ad (`switch-exhaustiveness-check`).
+A `protocol` csomag hat kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli hetedik kód fordítási hibát ad (`switch-exhaustiveness-check`). A hatodik kód, a `service_unavailable`, 2026-09-23 óta létezik (SPEC-005 8.2).
 
-| Kód               | Mit lát a felhasználó                                          |
-| ----------------- | -------------------------------------------------------------- |
-| `invalid_request` | a kérés nem volt érvényes, a szerver által megnevezett mezővel |
-| `not_found`       | a keresett elem nem létezik, esetleg időközben törölték        |
-| `conflict`        | az elem állapota most nem engedi a műveletet                   |
-| `unprocessable`   | a kérés rendben volt, de a rendszer nem tudja végrehajtani     |
-| `internal`        | váratlan szerver hiba                                          |
+| Kód                   | Mit lát a felhasználó                                          |
+| --------------------- | -------------------------------------------------------------- |
+| `invalid_request`     | a kérés nem volt érvényes, a szerver által megnevezett mezővel |
+| `not_found`           | a keresett elem nem létezik, esetleg időközben törölték        |
+| `conflict`            | az elem állapota most nem engedi a műveletet                   |
+| `unprocessable`       | a kérés rendben volt, de a rendszer nem tudja végrehajtani     |
+| `internal`            | váratlan szerver hiba                                          |
+| `service_unavailable` | a szerver átmenetileg nem érhető el, például éppen leáll       |
 
 **A szerver `message` mezője megjelenik a felületen**, a fenti mondat mellett, mert az hordozza a hibaosztály nevét, ami a felhasználó számára is információ (SPEC-005 8.4). A felület ezt nem elemzi és nem próbálja lefordítani.
 

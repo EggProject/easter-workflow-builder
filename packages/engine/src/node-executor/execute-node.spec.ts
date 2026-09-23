@@ -145,10 +145,11 @@ const failingRunner: AgentQueryRunner = { run: () => ({ kind: 'error', message: 
 
 function openGate(): ConcurrencyGate {
   return {
-    requestSlot: (_providerId, _requestId, onGranted) => {
+    requestSlot: (_providerId, _runId, _requestId, onGranted) => {
       onGranted();
     },
     releaseSlot: () => ({ kind: 'ok', value: undefined }),
+    denyWaitingForRunIds: notCalled,
     close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,

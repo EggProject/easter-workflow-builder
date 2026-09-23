@@ -135,6 +135,9 @@ function dependenciesOf(
       close: () => {
         calls.push('concurrencyGate.close');
       },
+      denyWaitingForRunIds: () => {
+        calls.push('concurrencyGate.denyWaitingForRunIds');
+      },
     },
     agentQueryRegistry,
     approvalRegistry: createApprovalWaitRegistry(),
@@ -218,7 +221,12 @@ describe('shutdownActiveRuns', () => {
 
     okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [], registry, [], calls)));
 
-    expect(calls).toStrictEqual(['stopAcceptingRuns', 'concurrencyGate.close', 'listActiveRuns']);
+    expect(calls).toStrictEqual([
+      'stopAcceptingRuns',
+      'concurrencyGate.close',
+      'listActiveRuns',
+      'concurrencyGate.denyWaitingForRunIds',
+    ]);
 
     database.close();
   });

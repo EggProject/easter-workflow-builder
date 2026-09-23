@@ -631,6 +631,7 @@ describe('executeSubWorkflow holtpont mentesség', () => {
         await new Promise<void>((resolve) => {
           gate.requestSlot(
             'minimax',
+            'gyerek-futas',
             'gyerek-lepes',
             () => {
               grants.push('gyerek-lepes');

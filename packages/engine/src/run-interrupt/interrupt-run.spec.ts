@@ -10,6 +10,8 @@ import type {
 import { openDatabase } from '@easter-workflow-builder/db';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { AgentQuery } from '@easter-workflow-builder/agent';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
+import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
@@ -158,6 +160,7 @@ function dependenciesOf(
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
   published: unknown[] = [],
+  concurrencyGate: ConcurrencyGate = createConcurrencyGate(() => null),
 ): InterruptRunDependencies {
   const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
   return {
@@ -168,6 +171,7 @@ function dependenciesOf(
       },
     },
     runSupervisor,
+    concurrencyGate,
     agentQueryRegistry,
     approvalRegistry: createApprovalWaitRegistry(),
   };
@@ -270,6 +274,40 @@ describe('interruptRun', () => {
     expect(okOrThrow(database.runs.getRun(child.run.id)).status).toBe('cancelled');
     expect(okOrThrow(database.stepRuns.getStepRun(root.step.id)).status).toBe('cancelled');
     expect(okOrThrow(database.stepRuns.getStepRun(child.step.id)).status).toBe('cancelled');
+
+    database.close();
+  });
+
+  it('REGRESSZIÓ: a fa (az al-workflow futással együtt) sorban álló agent lépéseit kiveszi a szabályozó sorából, egy másik fáét nem (SPEC-004 9. szekció 2. pont)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const child = seedChildRun(database, root.run);
+    const other = seedRootRun(database);
+    // A nulla korlát mellett minden kérés sorba áll.
+    const gate = createConcurrencyGate(() => 0);
+    const denied: string[] = [];
+    for (const runId of [root.run.id, child.run.id, other.run.id]) {
+      gate.requestSlot(
+        'minimax',
+        runId,
+        `varakozo-${runId}`,
+        () => {
+          throw new Error(`a(z) ${runId} kérése nem kaphat helyet`);
+        },
+        () => {
+          denied.push(runId);
+        },
+      );
+    }
+
+    const handles = [handleOf(root.run), handleOf(child.run), handleOf(other.run)];
+    const dependencies = dependenciesOf(database, handles, registry, [], gate);
+
+    okOrThrow(await interruptRun(root.run.id, dependencies));
+
+    expect(denied).toStrictEqual([root.run.id, child.run.id]);
+    expect(gate.waitingRequestCount('minimax')).toBe(1);
 
     database.close();
   });

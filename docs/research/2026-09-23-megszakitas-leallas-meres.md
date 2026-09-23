@@ -106,3 +106,75 @@ kap, a lépés `interrupted` eredménnyel, `pending` sorral tér vissza, amit a
 tesztje és az `apps/server` `run-shutdown-sequence.spec.ts` félbe küldött kéréses tesztje őrzi;
 mindhárom a javítás visszavonására bukik (mérve: `expected '' to contain '(engine_shutting_down)'`,
 `expected 2 to be 1`, `expected 200 to be 500`).
+
+## 7. A megszakítás és a sorban álló lépések (2026-09-23, harmadik kör)
+
+Egy független mérés azt állította, hogy a REST megszakítás nem veszi ki a sorból a futás
+várakozó agent lépéseit: ezek a megszakítás után elindulnak, `interrupt()` nélkül végigfutnak, és
+a megszakító kérés a végükig nem válaszol. A mérés megerősítette.
+
+| Tétel       | Érték                                                                                                                                                                                                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató     | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `cc9e761` commitja (előtte), illetve a javítás munkapéldánya (utána)                                                                                                                                                       |
+| Szerver     | a 6. szekció felállása: a valódi `apps/server` modulok és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő                                                           |
+| Hamis lépés | megszakítás nélkül 8000 ms után sikeres `result`, `interrupt()` után 1000 ms alatt zár (szintén sikeres `result`-tal, ezért a megszakított, futó lépés `succeeded`)                                                                                                       |
+| A eset      | `start` után három párhuzamos `agent_step`, `claude-subscription`, a párhuzamossági korlát 1 (`PUT /api/settings/concurrency-limits/claude-subscription`); egy lépés fut, kettő `pending`; `POST /api/runs/<id>/interrupt`; SSE feliratkozás a futásra (`fromEventId: 0`) |
+| B eset      | `start -> agent_step`, korlát 1; az A futás lépése foglalja a helyet, a B futás lépése sorban áll; a B futás megszakítása                                                                                                                                                 |
+
+| Eset      | A megszakító kérés válasza | Agent hívás | A sorban álló lépések végállapota                                 | Élő lezáró keret                                              |
+| --------- | -------------------------- | ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| A, előtte | 17043 ms                   | 3           | elindultak (+1013 és +9023 ms), `succeeded`, `cancelled` futásban | SSE-n nem mérve; a `run_finished` sor a 17041. ms-ban íródott |
+| A, utána  | 1012 ms, illetve 1015 ms   | 1           | `cancelled`, `step_started` esemény nélkül                        | `delivery: live`, `run_finished`, `status: cancelled`         |
+| B, előtte | 15030 ms                   | 2           | a B lépése a helyet megkapta, lefutott, `succeeded`               | SSE-n nem mérve                                               |
+| B, utána  | 2 ms, illetve 3 ms         | 1 (az A-é)  | `cancelled`; az A futás ettől függetlenül `succeeded`             | `delivery: live`, `run_finished`, `status: cancelled`         |
+
+A két "utána" szám két független mérő futás eredménye (a korábbi ellenőrző mérő scriptje, illetve
+egy SSE kapcsolatot is figyelő változat).
+
+**A gyökérok.** A SPEC-004 9. szekció 2. pontjának két fele ("a szabályozó ebből a futásból többé
+nem enged induló lépést, és a sorban álló lépései kiesnek") közül csak az első volt megvalósítva:
+a `requestStop()` a léptető hurok új példányainak indítását tartja vissza, a már elindított, de
+párhuzamossági helyre váró agent lépést viszont nem éri el. A szabályozónak nem volt olyan
+művelete, ami egy várakozót visszahívással zárt volna; a `releaseSlot` sorból való eltávolítása
+visszahívás nélküli, és a motor nem is hívta. A `packages/engine/CLAUDE.md` állítása, hogy a 2.
+pontot a `requestStop()` pontosan lefedi, hamis volt.
+
+**A javítás.** A `ConcurrencyGate.requestSlot` átveszi a kérő lépés futásának `runId`-ját, és az
+új `denyWaitingForRunIds` a megnevezett futások minden várakozóját érkezési sorrendben kiveszi a
+sorból és `onDenied` visszahívással zárja. A megszakítás és a szabályos leállás közös menete
+(`stopAndAwaitRunTree`) a `requestStop()` után, a `completion` megvárása előtt hívja, a fa minden
+futására. Az elutasított lépés a meglévő úton `interrupted` eredménnyel tér vissza (ugyanaz, mint
+a lezárt szabályozónál, 6. szekció), a sora `pending` marad, és a `cancelRunTree` tranzakciója
+`cancelled` állapotba viszi.
+
+**A megszakító kérés válasza.** A SPEC-005 15. végpontja az `InterruptSummaryResponse` alakot adja,
+aminek a `cancelledRunIds` mezője a DB oldali zárás eredménye, és a SPEC-004 9. szekció 4. és 5.
+pontja szerint a zárás a megszakított lépések folyamának kimerülése után fut. A spec tehát nem
+azonnali elfogadást és aszinkron lezárást ír elő, hanem szinkron összegzést. A javítás ezt nem
+változtatta meg: a válasz a megszakított, futó lépés leállásáig vár (a mérésben a hamis lépés
+1000 ms-a), a sorban állókéig nem.
+
+**A regresszió.** A `packages/engine` `create-engine.spec.ts` két tesztje (korlát 1, három
+párhuzamos lépés; illetve egy csak sorban álló futás), a `stop-and-await-run-tree.spec.ts` és az
+`interrupt-run.spec.ts` egy-egy tesztje, valamint a `create-concurrency-gate.spec.ts` új
+`denyWaitingForRunIds` esetei. A javítás visszavonására (a `denyWaitingForRunIds` hívás törlése a
+`stopAndAwaitRunTree`-ből) mérve mind a négy menet teszt bukik; a két motor szintű teszt üzenete:
+`expected 3 to be 1` (agent hívásszám), illetve `expected false to be true` (a megszakítás a másik
+futás lépésére várva nem ért véget).
+
+**Mellékmegfigyelés, nem javítva: a `fail_run` ág.** Ugyanez a rés a `fail_run` hibapolitikánál
+is megvan, és ez a javítás nem terjed ki rá. Mérve (`create-engine` szintű próba, korlát 1, a
+`fail_run` politikájú első agent lépés az első hívásban bukik): a két sorban álló testvér lépés
+lefutott, a futás `failed`, az agent hívás 3. Ott a sorban álló lépés `pending` sorát a
+`markRunFailed` útján semmi nem zárná le, tehát a megoldáshoz a futás záró tranzakcióját is
+bővíteni kell; ez külön döntés.
+
+**Leállás közben a 503.** Ugyanezen a szerveren a 6. szekció félbe küldött indító kérése a javítás
+után `503 Service Unavailable` választ kap, a törzsben `service_unavailable` kóddal és
+`engine_shutting_down` hibaosztállyal; futás nem jön létre, a kilépés 3035 ms. A kód forrása az
+RFC 9110 15.6.4 (<https://www.rfc-editor.org/rfc/rfc9110.html#name-503-service-unavailable>),
+megerősítve az IANA HTTP státusz regiszterrel
+(<https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml>) és az MDN
+leírásával (<https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/503>). A
+`Retry-After` fejléc az RFC szerint elhagyható ("MAY"), és nincs forrásunk az újraindulás idejére,
+ezért nem küldjük.

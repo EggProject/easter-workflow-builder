@@ -1,3 +1,4 @@
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
@@ -10,26 +11,36 @@ import { interruptLiveAgentQueries } from './interrupt-live-agent-queries.ts';
  * szűkíti (`ActiveRunHandle.rootRunId` szerint), a `shutdownActiveRuns` a
  * `RunSupervisor.listActiveRuns()` TELJES listáját adja.
  *
- * Négy lépés, ebben a sorrendben:
+ * Öt lépés, ebben a sorrendben:
  *
- * 1. `requestStop()` minden kapott kézikönyvön: a szabályozó ezekből a
- *    futásokból többé nem enged induló lépést (9. szekció 2. pont, 10.2
+ * 1. `requestStop()` minden kapott kézikönyvön: a léptető hurok ezekből a
+ *    futásokból többé nem indít új példányt (9. szekció 2. pont, 10.2
  *    szekció 1. pont). Ez memóriabeli, szinkron jelzés - nem vár semmire.
- * 2. **A várakozó `human_approval` lépések lezárása** (T-005-31, AC-51): a
+ * 2. **A szabályozó sorában álló agent lépések elutasítása**
+ *    (`concurrencyGate.denyWaitingForRunIds`, 9. szekció 2. pont, "a sorban
+ *    álló lépései kiesnek"): a már elindított, de helyet még nem kapott
+ *    példányt az 1. pont nem éri el, mert az csak az ÚJ példányt tartja
+ *    vissza. Enélkül a 3. és 4. pont után felszabaduló helyet megkapná, és
+ *    `interrupt()` nélkül, teljes hosszában végigfutna, az 5. pont
+ *    várakozása pedig kivárná (mérve, `docs/research/2026-09-23-megszakitas-leallas-meres.md`
+ *    7. szekció). Az elutasított lépés `interrupted` eredménnyel tér vissza,
+ *    a sora `pending` marad, és a hívó DB oldali zárása viszi tovább.
+ *    Szinkron, nem vár semmire.
+ * 3. **A várakozó `human_approval` lépések lezárása** (T-005-31, AC-51): a
  *    `approvalRegistry.cancelWaitingForRunIds(...)` `interrupted` jelzéssel
  *    oldja fel minden érintett futás döntésre váró lépését. Enélkül egy
  *    korlátlan várakozású (`timeoutMs: null`) jóváhagyáson álló futás
- *    `completion` Promise-a SOSEM teljesülne, tehát a lenti 4. lépés örökre
+ *    `completion` Promise-a SOSEM teljesülne, tehát a lenti 5. lépés örökre
  *    megállna: annak a lépésnek nincs `AgentQuery`-je, amin `interrupt()`-et
  *    lehetne hívni. Szinkron, nem vár semmire.
- * 3. `interrupt()` minden élő `AgentQuery`-n, amit a kapott futások
+ * 4. `interrupt()` minden élő `AgentQuery`-n, amit a kapott futások
  *    `runId`-jai alapján az `agentQueryRegistry` ismer (9. szekció 3. pont,
  *    10.2 szekció 2. pont), a közös `interruptLiveAgentQueries` primitívvel.
  *    Az üzenetfolyam kimerítése és a beérkezett üzenetek beírása ETTŐL a
  *    ponttól a `runAgentStep` meglévő ciklusában magától megtörténik
  *    (SPEC-004 9. szekció 4. pont) - ez a függvény nem avatkozik bele, csak a
  *    jelzést adja.
- * 4. Minden kapott kézikönyv `completion` Promise-ának megvárása: ez akkor
+ * 5. Minden kapott kézikönyv `completion` Promise-ának megvárása: ez akkor
  *    teljesül, amikor a `run-supervisor` léptető hurka kilép, mert nincs
  *    több futtatható vagy folyamatban lévő példány (`advance-run.ts`
  *    `runSchedulingLoop`). A `completion` SOSEM utasít el (`ActiveRunHandle`
@@ -45,12 +56,14 @@ export async function stopAndAwaitRunTree(
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: AgentQueryRegistry,
   approvalRegistry: ApprovalWaitRegistry,
+  concurrencyGate: Pick<ConcurrencyGate, 'denyWaitingForRunIds'>,
 ): Promise<void> {
   for (const handle of handles) {
     handle.requestStop();
   }
 
   const runIds = new Set(handles.map((handle) => handle.runId));
+  concurrencyGate.denyWaitingForRunIds(runIds);
   approvalRegistry.cancelWaitingForRunIds(runIds);
   await interruptLiveAgentQueries(runIds, agentQueryRegistry);
 

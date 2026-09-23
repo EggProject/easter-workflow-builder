@@ -34,8 +34,9 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
  *   `interrupt()`-et lehetne hívni, ezért a várakozását az
  *   `ApprovalWaitRegistry.cancelWaitingForRunIds` zárja le;
  * - az agent lépés közös életciklusában (`agent-node-lifecycle.ts`), ha a
- *   szabályos leállás lezárta a szabályozót, mielőtt a lépés helyet kapott
- *   (SPEC-004 10.2 1. pont). A sor ekkor `pending` állapotban marad.
+ *   szabályozó elutasította a még helyre váró lépést: a megszakítás kivette a
+ *   sorból (SPEC-004 9. szekció 2. pont), vagy a szabályos leállás lezárta a
+ *   szabályozót (10.2 1. pont). A sor ekkor `pending` állapotban marad.
  *
  * A már futó agent lépéseket a `interruptLiveAgentQueries` szakítja meg, ott
  * az SDK folyam kimerítése után a lépés a szokásos ágak valamelyikén, lezárt

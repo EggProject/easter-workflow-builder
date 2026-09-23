@@ -357,7 +357,7 @@ describe('runShutdownSequence', () => {
     });
   });
 
-  it('REGRESSZIÓ: a jel ELŐTT fejléccel megkezdett, de csak a leállás alatt befejezett indító kérés nem indít futást, hanem engine_shutting_down hibát kap (SPEC-006 8.2, SPEC-004 10.2 1. pont)', async () => {
+  it('REGRESSZIÓ: a jel ELŐTT fejléccel megkezdett, de csak a leállás alatt befejezett indító kérés nem indít futást, hanem 503 service_unavailable választ kap engine_shutting_down hibaosztállyal (SPEC-006 8.2, SPEC-004 10.2 1. pont, SPEC-005 8.2)', async () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
@@ -418,8 +418,8 @@ describe('runShutdownSequence', () => {
     agent.release();
     const exitCode = await shutdown;
 
-    expect(response.statusCode).toBe(500);
-    expect(responseBody).toMatchObject({ code: 'internal' });
+    expect(response.statusCode).toBe(503);
+    expect(responseBody).toMatchObject({ code: 'service_unavailable' });
     expect(isRecord(responseBody) && isString(responseBody['message']) ? responseBody['message'] : '').toContain(
       '(engine_shutting_down)',
     );

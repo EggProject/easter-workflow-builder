@@ -16,15 +16,17 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  * `InterruptRunDependencies`-nél (`interrupt-run.ts`): ez a téma nem indít
  * futást és nem old fel providert, csak a MÁR futó futásokat kérdezi le, és
  * az újak indítását tiltja le. A `concurrencyGate` a motor egyetlen, közös
- * szabályozója, amit a leállás lezár (0. pont lent); ebből is csak a `close`
- * kell. Az `eventPublisher` a lezáró `run_interrupted` esemény élő kiadásához
- * kell (4. pont lent).
+ * szabályozója, amit a leállás lezár (0. pont lent); ebből a `close` és a
+ * közös `stopAndAwaitRunTree` menet `denyWaitingForRunIds` hívása kell. Az
+ * utóbbi a `close` után már üres sort talál, mert a `close` minden
+ * várakozót elutasított. Az `eventPublisher` a lezáró `run_interrupted`
+ * esemény élő kiadásához kell (4. pont lent).
  */
 export interface ShutdownActiveRunsDependencies {
   readonly database: DatabaseContext;
   readonly eventPublisher: EventPublisherPort;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'stopAcceptingRuns'>;
-  readonly concurrencyGate: Pick<ConcurrencyGate, 'close'>;
+  readonly concurrencyGate: Pick<ConcurrencyGate, 'close' | 'denyWaitingForRunIds'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
   readonly approvalRegistry: ApprovalWaitRegistry;
 }
@@ -86,7 +88,12 @@ export async function shutdownActiveRuns(
   dependencies.runSupervisor.stopAcceptingRuns();
   dependencies.concurrencyGate.close();
   const handles = dependencies.runSupervisor.listActiveRuns();
-  await stopAndAwaitRunTree(handles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
+  await stopAndAwaitRunTree(
+    handles,
+    dependencies.agentQueryRegistry,
+    dependencies.approvalRegistry,
+    dependencies.concurrencyGate,
+  );
   const recovered = dependencies.database.recovery.recoverInterruptedRuns('graceful_shutdown');
   if (recovered.kind === 'error') {
     return recovered;

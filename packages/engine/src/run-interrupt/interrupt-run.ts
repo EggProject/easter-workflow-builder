@@ -1,4 +1,5 @@
 import type { Outcome } from '@easter-workflow-builder/core';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { EngineEvent } from '../engine-event/engine-event.ts';
@@ -24,11 +25,16 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  *
  * Az `eventPublisher` a lezáró `run_finished` esemény élő kiadásához kell
  * (lásd az `interruptRun` 5. pontját).
+ *
+ * A `concurrencyGate` a motor egyetlen, közös szabályozója; ebből csak a
+ * `denyWaitingForRunIds` kell, amivel a `stopAndAwaitRunTree` a fa sorban
+ * álló agent lépéseit kiveszi a sorból (lásd ott a 2. pontot).
  */
 export interface InterruptRunDependencies {
   readonly database: DatabaseContext;
   readonly eventPublisher: EventPublisherPort;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
+  readonly concurrencyGate: Pick<ConcurrencyGate, 'denyWaitingForRunIds'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
   readonly approvalRegistry: ApprovalWaitRegistry;
 }
@@ -59,12 +65,14 @@ export interface InterruptRunResult {
  * 2. **A fa aktív kézikönyveinek kiválasztása**: a `RunSupervisor.listActiveRuns()`
  *    listáját a `rootRunId` szerint szűkíti (9. szekció 3. pont, a
  *    `run-supervisor` CLAUDE.md "Amit a T-005-26 ebből használ" bekezdése).
- * 3. **`requestStop()` és `interrupt()` minden érintett futáson és élő
- *    `AgentQuery`-n**, majd a `completion` Promise-ok megvárása - ez a
- *    `stopAndAwaitRunTree` közös menete (9. szekció 2 ... 4. pont). A
- *    beérkezett üzenetek beírása és a hely felszabadítása a meglévő
- *    `runAgentStep`/`agent-node-lifecycle` `finally` ágain magától
- *    megtörténik, ezt a függvény nem ismétli meg.
+ * 3. **`requestStop()`, a sorban álló agent lépések elutasítása és
+ *    `interrupt()` minden érintett futáson és élő `AgentQuery`-n**, majd a
+ *    `completion` Promise-ok megvárása - ez a `stopAndAwaitRunTree` közös
+ *    menete (9. szekció 2 ... 4. pont). A várakozás tehát csak a MÁR FUTÓ,
+ *    megszakított lépések folyamának kimerüléséig tart, a sorban állókéig
+ *    nem, mert azok el sem indulnak. A beérkezett üzenetek beírása és a hely
+ *    felszabadítása a meglévő `runAgentStep`/`agent-node-lifecycle`
+ *    `finally` ágain magától megtörténik, ezt a függvény nem ismétli meg.
  * 4. **A DB oldali zárás egy tranzakcióban** (`database.recovery.cancelRunTree`,
  *    9. szekció 5. pont): a fa minden nem terminális futása `cancelled`, a
  *    nem terminális lépéseik szintén, futásonként egy `run_finished` esemény
@@ -112,7 +120,12 @@ export async function interruptRun(
   const rootRunId = target.value.rootRunId;
 
   const treeHandles = dependencies.runSupervisor.listActiveRuns().filter((handle) => handle.rootRunId === rootRunId);
-  await stopAndAwaitRunTree(treeHandles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
+  await stopAndAwaitRunTree(
+    treeHandles,
+    dependencies.agentQueryRegistry,
+    dependencies.approvalRegistry,
+    dependencies.concurrencyGate,
+  );
 
   const cancelled = dependencies.database.recovery.cancelRunTree(rootRunId);
   if (cancelled.kind === 'error') {

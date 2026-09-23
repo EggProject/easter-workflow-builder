@@ -20,6 +20,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
@@ -290,6 +291,7 @@ interface Harness {
   readonly sleepCalls: SleepCall[];
   readonly approvalRegistry: ApprovalWaitRegistry;
   readonly agentQueryRegistry: AgentQueryRegistry;
+  readonly concurrencyGate: ConcurrencyGate;
   readonly interruptedPrompts: string[];
 }
 
@@ -332,9 +334,10 @@ function openHarness(options: HarnessOptions = {}): Harness {
     },
     processEnvironment: { read: () => null },
   };
+  const concurrencyGate = createConcurrencyGate(() => null);
   const supervisor = createRunSupervisor({
     ports,
-    concurrencyGate: createConcurrencyGate(() => null),
+    concurrencyGate,
     approvalRegistry,
     agentQueryRegistry,
     installedAgentSdkVersion: INSTALLED,
@@ -342,7 +345,16 @@ function openHarness(options: HarnessOptions = {}): Harness {
   if (options.withoutDefaultProvider !== true) {
     okOrThrow(database.settings.setDefaultProvider('minimax'));
   }
-  return { database, supervisor, published, sleepCalls, approvalRegistry, agentQueryRegistry, interruptedPrompts };
+  return {
+    database,
+    supervisor,
+    published,
+    sleepCalls,
+    approvalRegistry,
+    agentQueryRegistry,
+    concurrencyGate,
+    interruptedPrompts,
+  };
 }
 
 function agentStepConfig(promptTemplate: string): AgentStepConfig {
@@ -940,6 +952,7 @@ describe('createRunSupervisor', () => {
             },
           },
           runSupervisor: harness.supervisor,
+          concurrencyGate: harness.concurrencyGate,
           agentQueryRegistry: harness.agentQueryRegistry,
           approvalRegistry: harness.approvalRegistry,
         }),

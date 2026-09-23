@@ -243,12 +243,15 @@ async function runAfterSlotGranted(
  * ilyenkor eldobódik, mert egy hibás szabályozó állapot súlyosabb, mint egy
  * egyébként lezárt lépés eredménye.
  *
- * **A lezárt szabályozó elutasítását `interrupted` eredménnyel zárja**
- * (SPEC-004 10.2 1. pont, `ConcurrencyGate.close`): a lépés ilyenkor el sem
- * indul, tehát nincs `markStepRunning`, nincs `AgentQuery` és nincs mit
- * felszabadítani. A `step_run` sor `pending` állapotban marad, és a leállás
- * `recoverInterruptedRuns` tranzakciója zárja `interrupted` állapotba
- * (`node-executor-result.ts`), ugyanúgy, mint a jóváhagyásra váró lépést.
+ * **A szabályozó elutasítását `interrupted` eredménnyel zárja**: a
+ * megszakított futás sorban álló lépését (SPEC-004 9. szekció 2. pont,
+ * `ConcurrencyGate.denyWaitingForRunIds`) és a lezárt szabályozóét (10.2 1.
+ * pont, `ConcurrencyGate.close`). A lépés ilyenkor el sem indul, tehát nincs
+ * `markStepRunning`, nincs `AgentQuery` és nincs mit felszabadítani. A
+ * `step_run` sor `pending` állapotban marad, és a megszakítás
+ * `cancelRunTree` (`cancelled`), illetve a leállás `recoverInterruptedRuns`
+ * (`interrupted`) tranzakciója zárja (`node-executor-result.ts`), ugyanúgy,
+ * mint a jóváhagyásra váró lépést.
  *
  * **Az `agentQueryRegistry` paramétert változatlanul továbbadja a
  * `runAgentStep`-nek** (SPEC-004 9. szekció 3. pont, PLAN-005 T-005-26): ez a
@@ -289,6 +292,7 @@ export async function runAgentNodeLifecycle(
   const isGranted = await new Promise<boolean>((resolve) => {
     gate.requestSlot(
       providerId,
+      runId,
       stepRunId,
       () => {
         resolve(true);

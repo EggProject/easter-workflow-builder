@@ -20,7 +20,8 @@ function createTestGate(): {
   readonly denied: readonly string[];
   // Nyílfüggvény mező, nem metódus szignatúra: a tesztek destruktúrálva veszik
   // ki, amit a `@typescript-eslint/unbound-method` metódus alakban jelezne.
-  readonly request: (providerId: ProviderId, requestId: string) => void;
+  // A `runId` csak a futásonkénti elutasítás tesztjeinek számít.
+  readonly request: (providerId: ProviderId, requestId: string, runId?: string) => void;
 } {
   const limits = new Map<ProviderId, number>();
   const granted: string[] = [];
@@ -32,9 +33,10 @@ function createTestGate(): {
     limits,
     granted,
     denied,
-    request: (providerId, requestId) => {
+    request: (providerId, requestId, runId = 'futas') => {
       gate.requestSlot(
         providerId,
+        runId,
         requestId,
         () => {
           granted.push(requestId);
@@ -178,6 +180,89 @@ describe('createConcurrencyGate', () => {
     gate.releaseSlot('m1');
 
     expect(granted).toStrictEqual(['m1', 'c1', 'c2', 'm2']);
+  });
+
+  describe('denyWaitingForRunIds: a megszakított futás sorban álló lépései kiesnek (SPEC-004 9. szekció 2. pont)', () => {
+    it('a megnevezett futások várakozói érkezési sorrendben elutasítást kapnak, a többi futásé és a foglalt hely érintetlen', () => {
+      const { gate, limits, granted, denied, request } = createTestGate();
+      limits.set('minimax', 1);
+      limits.set('claude-subscription', 0);
+
+      request('minimax', 'a1', 'futas-a');
+      request('minimax', 'a2', 'futas-a');
+      request('minimax', 'b1', 'futas-b');
+      request('claude-subscription', 'c1', 'futas-c');
+      request('minimax', 'a3', 'futas-a');
+
+      gate.denyWaitingForRunIds(new Set(['futas-a', 'futas-c']));
+
+      expect(granted).toStrictEqual(['a1']);
+      expect(denied).toStrictEqual(['a2', 'c1', 'a3']);
+      expect(gate.occupiedSlotCount('minimax')).toBe(1);
+      expect(gate.waitingRequestCount('minimax')).toBe(1);
+      expect(gate.waitingRequestCount('claude-subscription')).toBe(0);
+    });
+
+    it('a felszabaduló helyet a megmaradt várakozó kapja, az elutasított soha', () => {
+      const { gate, limits, granted, denied, request } = createTestGate();
+      limits.set('minimax', 1);
+
+      request('minimax', 'a1', 'futas-a');
+      request('minimax', 'a2', 'futas-a');
+      request('minimax', 'b1', 'futas-b');
+      gate.denyWaitingForRunIds(new Set(['futas-a']));
+
+      expect(gate.releaseSlot('a1')).toStrictEqual({ kind: 'ok', value: undefined });
+
+      expect(granted).toStrictEqual(['a1', 'b1']);
+      expect(denied).toStrictEqual(['a2']);
+      // Az elutasított kérésnek nincs mit felszabadítania.
+      expect(gate.releaseSlot('a2').kind).toBe('error');
+    });
+
+    it('az elutasító visszahívás már a frissített sort látja: az onnan indított új kérés sorba áll, nem esik ki', () => {
+      const { gate, limits } = createTestGate();
+      limits.set('minimax', 1);
+      const events: string[] = [];
+      gate.requestSlot(
+        'minimax',
+        'futas-b',
+        'b1',
+        () => {
+          events.push('granted:b1');
+        },
+        () => {
+          events.push('denied:b1');
+        },
+      );
+      gate.requestSlot(
+        'minimax',
+        'futas-a',
+        'a1',
+        () => {
+          events.push('granted:a1');
+        },
+        () => {
+          events.push('denied:a1');
+          gate.requestSlot(
+            'minimax',
+            'futas-a',
+            'a2',
+            () => {
+              events.push('granted:a2');
+            },
+            () => {
+              events.push('denied:a2');
+            },
+          );
+        },
+      );
+
+      gate.denyWaitingForRunIds(new Set(['futas-a']));
+
+      expect(events).toStrictEqual(['granted:b1', 'denied:a1']);
+      expect(gate.waitingRequestCount('minimax')).toBe(1);
+    });
   });
 
   describe('close: a lezárt szabályozó nem enged több lépést indulni (SPEC-004 10.2 1. pont)', () => {

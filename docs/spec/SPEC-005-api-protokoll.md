@@ -151,16 +151,18 @@ A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol
 
 **B. Futás (8 végpont)**
 
-| #   | Metódus és útvonal                      | Kérés                                                                         | Válasz                                  | Motor vagy repository                             | Saját hibaágai                                  |
-| --- | --------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
-| 9   | `POST /api/workflows/{workflowId}/runs` | `StartRunRequest`: `input`                                                    | `StartedRunResponse`: `runId`, `status` | `engine.startRun`                                 | `not_found`, `invalid_request`, `unprocessable` |
-| 10  | `GET /api/runs`                         | query: `limit` (kötelező), `workflowId` (elhagyható)                          | `RunSummary` lista                      | `runs.listRuns` vagy `listRunsForWorkflow`        | `invalid_request`                               |
-| 11  | `GET /api/runs/{runId}`                 | nincs                                                                         | `RunDetail`                             | `runs.getRun`                                     | `not_found`                                     |
-| 12  | `GET /api/runs/{runId}/snapshot`        | nincs                                                                         | `RunSnapshotResponse`                   | `runs.readSnapshot`                               | `not_found`                                     |
-| 13  | `GET /api/runs/{runId}/steps`           | nincs                                                                         | `StepRunRecord` lista                   | `stepRuns.listStepRuns`                           | `not_found`                                     |
-| 14  | `GET /api/runs/{runId}/events`          | query: `limit` (kötelező), plusz **vagy** `afterEventId` **vagy** `stepRunId` | `TranscriptPage`                        | `events.readEventsSince` vagy `readEventsForStep` | `not_found`, `invalid_request`                  |
-| 15  | `POST /api/runs/{runId}/interrupt`      | üres törzs                                                                    | `InterruptSummaryResponse`              | `engine.interruptRun`                             | `not_found`, `conflict`                         |
-| 16  | `POST /api/runs/{runId}/restart`        | `RestartRunRequest`: `input` (elhagyható, alapból az eredeti bemenet)         | `StartedRunResponse`                    | `engine.restartRun`                               | `not_found`, `unprocessable`                    |
+| #   | Metódus és útvonal                      | Kérés                                                                         | Válasz                                  | Motor vagy repository                             | Saját hibaágai                                                         |
+| --- | --------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
+| 9   | `POST /api/workflows/{workflowId}/runs` | `StartRunRequest`: `input`                                                    | `StartedRunResponse`: `runId`, `status` | `engine.startRun`                                 | `not_found`, `invalid_request`, `unprocessable`, `service_unavailable` |
+| 10  | `GET /api/runs`                         | query: `limit` (kötelező), `workflowId` (elhagyható)                          | `RunSummary` lista                      | `runs.listRuns` vagy `listRunsForWorkflow`        | `invalid_request`                                                      |
+| 11  | `GET /api/runs/{runId}`                 | nincs                                                                         | `RunDetail`                             | `runs.getRun`                                     | `not_found`                                                            |
+| 12  | `GET /api/runs/{runId}/snapshot`        | nincs                                                                         | `RunSnapshotResponse`                   | `runs.readSnapshot`                               | `not_found`                                                            |
+| 13  | `GET /api/runs/{runId}/steps`           | nincs                                                                         | `StepRunRecord` lista                   | `stepRuns.listStepRuns`                           | `not_found`                                                            |
+| 14  | `GET /api/runs/{runId}/events`          | query: `limit` (kötelező), plusz **vagy** `afterEventId` **vagy** `stepRunId` | `TranscriptPage`                        | `events.readEventsSince` vagy `readEventsForStep` | `not_found`, `invalid_request`                                         |
+| 15  | `POST /api/runs/{runId}/interrupt`      | üres törzs                                                                    | `InterruptSummaryResponse`              | `engine.interruptRun`                             | `not_found`, `conflict`                                                |
+| 16  | `POST /api/runs/{runId}/restart`        | `RestartRunRequest`: `input` (elhagyható, alapból az eredeti bemenet)         | `StartedRunResponse`                    | `engine.restartRun`                               | `not_found`, `unprocessable`, `service_unavailable`                    |
+
+**A 15. végpont válasza szinkron összegzés, nem azonnali elfogadás.** A spec nem ír elő `202` választ és aszinkron lezárást: az `InterruptSummaryResponse` `cancelledRunIds` mezője a motor DB oldali zárásának eredménye, ami a SPEC-004 9. szekció 4. és 5. pontja szerint a megszakított, MÁR FUTÓ agent lépések folyamának kimerülése után fut le. A válasz ezért ennyit vár: a futó lépések természetes végét nem, a sorban álló lépésekét sem, mert azok el sem indulnak (SPEC-004 9. szekció 2. pont). Mérve a valódi szerver moduljain, hamis agenttel, ami `interrupt()` után 1000 ms alatt zár: három párhuzamos agent lépés és korlát 1 mellett a válasz 17043 ms helyett 1012 ms, egy csak sorban álló futásra 15030 ms helyett 2 ms (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció). A lezáró `run_finished` keret ettől függetlenül élőben is kimegy.
 
 **A 14. végpont két alakja egy sémaunió, nem feltételes mező.** A query string vagy `{ limit, afterEventId }`, vagy `{ limit, stepRunId }`; a két `z.strictObject` kizárja egymást, mert mindegyik elutasítja a másik kulcsát. Így nem keletkezik olyan kombináció, aminek a jelentése nem meghatározott, és a szerver oldalon nincs elágazás azon, hogy "melyik mező van kitöltve", csak azon, hogy a unió melyik ága illeszkedett. A `readEventsForStep` bemenete nem tartalmaz kurzort (SPEC-003 9.2), ezért a `stepRunId` ágon `afterEventId` sem küldhető: a séma ezt kizárja, nem a szerver.
 
@@ -450,30 +452,34 @@ Ugyanez az alak áll a REST hibaválasz törzsében és a `protocol_error` SSE k
 
 ### 8.2 A `ProtocolErrorCode` zárt szótára
 
-Öt érték, mindegyikhez pontosan egy HTTP státusz. A leképezés tiszta függvény a `protocol-error` témában, tehát a szerver nem talál ki státuszt.
+Hat érték, mindegyikhez pontosan egy HTTP státusz. A leképezés tiszta függvény a `protocol-error` témában, tehát a szerver nem talál ki státuszt.
 
-| `code`            | HTTP  | Mikor                                                               |
-| ----------------- | ----- | ------------------------------------------------------------------- |
-| `invalid_request` | `400` | a bejövő alak nem illeszkedik a sémára                              |
-| `not_found`       | `404` | a megnevezett erőforrás nem létezik                                 |
-| `conflict`        | `409` | az erőforrás létezik, de az állapota nem engedi a műveletet         |
-| `unprocessable`   | `422` | a kérés jól formált és az erőforrás létezik, de a domain elutasítja |
-| `internal`        | `500` | minden más, beleértve az előre nem látott hibát                     |
+| `code`                | HTTP  | Mikor                                                               |
+| --------------------- | ----- | ------------------------------------------------------------------- |
+| `invalid_request`     | `400` | a bejövő alak nem illeszkedik a sémára                              |
+| `not_found`           | `404` | a megnevezett erőforrás nem létezik                                 |
+| `conflict`            | `409` | az erőforrás létezik, de az állapota nem engedi a műveletet         |
+| `unprocessable`       | `422` | a kérés jól formált és az erőforrás létezik, de a domain elutasítja |
+| `internal`            | `500` | minden más, beleértve az előre nem látott hibát                     |
+| `service_unavailable` | `503` | a szerver átmenetileg nem fogad új futást, mert éppen leáll         |
 
 ### 8.3 A `db` és a motor hibaosztályai
 
 Az `Outcome` hibaága kizárólag szöveget hordoz, és a hibaosztály neve zárójelben, szó szerint áll az üzenetben (F-22). A leképezés szerződése:
 
-| Forrás hibaosztály                                                                        | `ProtocolErrorCode` | Miért                                                            |
-| ----------------------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `not_found`                                                                               | `not_found`         | közvetlen megfelelés                                             |
-| `illegal_status_transition`                                                               | `conflict`          | az erőforrás létezik, csak az állapota nem engedi a műveletet    |
-| `no_default_provider`                                                                     | `unprocessable`     | a kérés jó, a rendszer beállítása hiányos                        |
-| `foreign_key_violation`, `duplicate_event`, `graph_snapshot_hash_collision`               | `conflict`          | egyidejű vagy ütköző írás                                        |
-| `malformed_graph_document`, `unknown_graph_document_version`, `non_canonicalizable_value` | `unprocessable`     | a tárolt vagy a küldött dokumentum nem dolgozható fel            |
-| `database_closed`                                                                         | `internal`          | a folyamat állapota, nem a kérésé                                |
-| minden motor eredetű validációs hibaosztály (a SPEC-004 4.7 és 11.2 ellenőrzései)         | `unprocessable`     | a gráf tárolható, de nem futtatható                              |
-| minden más, névvel nem illeszkedő üzenet                                                  | `internal`          | a be nem sorolt eset nem kaphat kedvezőbb kódot, mint a besorolt |
+| Forrás hibaosztály                                                                        | `ProtocolErrorCode`   | Miért                                                                                    |
+| ----------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| `not_found`                                                                               | `not_found`           | közvetlen megfelelés                                                                     |
+| `illegal_status_transition`                                                               | `conflict`            | az erőforrás létezik, csak az állapota nem engedi a műveletet                            |
+| `no_default_provider`                                                                     | `unprocessable`       | a kérés jó, a rendszer beállítása hiányos                                                |
+| `foreign_key_violation`, `duplicate_event`, `graph_snapshot_hash_collision`               | `conflict`            | egyidejű vagy ütköző írás                                                                |
+| `malformed_graph_document`, `unknown_graph_document_version`, `non_canonicalizable_value` | `unprocessable`       | a tárolt vagy a küldött dokumentum nem dolgozható fel                                    |
+| `database_closed`                                                                         | `internal`            | a folyamat állapota, nem a kérésé                                                        |
+| `engine_shutting_down`                                                                    | `service_unavailable` | a folyamat átmeneti állapota: a leálló motor új futást nem indít (SPEC-004 10.2 1. pont) |
+| minden motor eredetű validációs hibaosztály (a SPEC-004 4.7 és 11.2 ellenőrzései)         | `unprocessable`       | a gráf tárolható, de nem futtatható                                                      |
+| minden más, névvel nem illeszkedő üzenet                                                  | `internal`            | a be nem sorolt eset nem kaphat kedvezőbb kódot, mint a besorolt                         |
+
+**A `service_unavailable` kód 2026-09-23 óta létezik.** Előtte az `engine_shutting_down` a "minden más" sorra esett, tehát a leállás közben érkező indító kérés `500` választ kapott, `internal` kóddal (SPEC-006 M-36). Az RFC 9110 15.6.4 szerint a `503` azt jelenti, hogy a szerver átmeneti túlterhelés vagy tervezett karbantartás miatt jelenleg nem tudja kiszolgálni a kérést, és ez várhatóan némi késleltetés után megszűnik (<https://www.rfc-editor.org/rfc/rfc9110.html#name-503-service-unavailable>; megerősítve: az IANA HTTP státusz regiszter 503-as sora ugyanerre a szekcióra hivatkozik, <https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml>, és az MDN leírása is átmeneti állapotot ír, <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/503>). A leálló szerver ilyen állapot: a kérésben nincs hiba, és újraindulás után ugyanaz a kérés sikerülhet. Mérve a valódi szerver moduljain: a leállás alatt befejezett indító kérés válasza `503 Service Unavailable`, `service_unavailable` kóddal és `engine_shutting_down` hibaosztállyal (SPEC-006 8.2). **`Retry-After` fejlécet nem küldünk**: az RFC ezt csak megengedi ("MAY"), és nincs forrásunk, amiből a szerver újraindulásának ideje számként következne.
 
 **A táblázat implementációja a szerver dolga, nem a `protocol` csomagé** (3.3). A `protocol` csak a célszótárat és a státusz leképezést adja; a "melyik forrás melyik célra" döntés a hívás helyén dől el, ahol tudható, melyik művelet melyik hibaosztályt hozhatja.
 
@@ -645,7 +651,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### Hibakezelés
 
-37. A `ProtocolErrorCode` öt értékű zárt szótár, és mindegyikhez pontosan egy HTTP státusz tartozik, tiszta függvényben. Mind az öt érték külön teszteset, és mindegyikhez tartozik előidéző eset.
+37. A `ProtocolErrorCode` hat értékű zárt szótár, és mindegyikhez pontosan egy HTTP státusz tartozik, tiszta függvényben. Mind a hat érték külön teszteset, és mindegyikhez tartozik előidéző eset.
 38. Ugyanaz a `ProtocolErrorBody` alak áll a REST hibaválaszban és a `protocol_error` SSE keretben; két külön hiba alak nincs.
 39. A 8.3 leképezési táblázat a `packages/db` mind a tíz hibaosztályát megnevezi, és kimondja a szabályt minden be nem sorolt üzenetre.
 40. A hiba boríték sémájának nincs `stack`, `sql`, `path` vagy szabad `details` mezője.

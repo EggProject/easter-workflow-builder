@@ -131,7 +131,7 @@ test('204-es, üres törzsű válasz a séma validáláson bukik el, a felület 
 });
 
 /**
- * A `protocolErrorMessage` öt kódjából négy eddig egyetlen e2e úton sem
+ * A `protocolErrorMessage` hat kódjából öt eddig egyetlen e2e úton sem
  * futott le (csak az `internal`). A HTTP státusz kódonként eltér, hogy az
  * eset a valóságos szerver viselkedést utánozza, de a felület kizárólag a
  * törzs `code` mezőjéből választja a mondatot.
@@ -141,6 +141,11 @@ const PROTOCOL_ERROR_CASES = [
   { code: 'not_found', status: 404, sentence: 'A keresett elem nem létezik, esetleg időközben törölték.' },
   { code: 'conflict', status: 409, sentence: 'Az elem állapota most nem engedi a műveletet.' },
   { code: 'unprocessable', status: 422, sentence: 'A kérés rendben volt, de a rendszer nem tudja végrehajtani.' },
+  {
+    code: 'service_unavailable',
+    status: 503,
+    sentence: 'A szerver átmenetileg nem érhető el, például éppen leáll.',
+  },
 ] as const satisfies readonly { code: ProtocolErrorCode; status: number; sentence: string }[];
 
 for (const errorCase of PROTOCOL_ERROR_CASES) {

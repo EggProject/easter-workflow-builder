@@ -1,3 +1,4 @@
+import type { EngineErrorKind } from '@easter-workflow-builder/engine';
 import type { ProtocolErrorCode } from '@easter-workflow-builder/protocol';
 
 /**
@@ -47,6 +48,16 @@ const UNPROCESSABLE_ERROR_CLASSES: ReadonlySet<string> = new Set([
   'expression_evaluator_unavailable',
 ]);
 
+/**
+ * A `service_unavailable` kódra (HTTP 503) képződő egyetlen hibaosztály: a
+ * leálló motor az új futást ezzel utasítja el (SPEC-004 10.2 1. pont). A
+ * folyamat átmeneti állapota, nem a kérésé, ami pontosan a 503 jelentése
+ * (RFC 9110 15.6.4). A `satisfies` a sodródás védelem típusszintű ága: ha a
+ * motor átnevezi vagy elveszi a hibaosztályt, a `typecheck` kapu bukik,
+ * ahelyett hogy a leképezés csendben `internal` kódra esne vissza.
+ */
+const SERVICE_UNAVAILABLE_ERROR_CLASS = 'engine_shutting_down' satisfies EngineErrorKind;
+
 function extractTrailingErrorClass(message: string): string | undefined {
   const match = TRAILING_ERROR_CLASS_PATTERN.exec(message);
   return match?.[1];
@@ -72,6 +83,9 @@ export function mapOutcomeMessageToErrorCode(message: string): ProtocolErrorCode
   }
   if (UNPROCESSABLE_ERROR_CLASSES.has(errorClass)) {
     return 'unprocessable';
+  }
+  if (errorClass === SERVICE_UNAVAILABLE_ERROR_CLASS) {
+    return 'service_unavailable';
   }
   // A `database_closed` (8.3 6. sora) és minden más be nem sorolt eset itt esik: `internal`.
   return 'internal';

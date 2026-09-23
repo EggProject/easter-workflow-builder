@@ -335,7 +335,7 @@ function recordingGate(releaseOverride?: (requestId: string) => Outcome<void>): 
 } {
   const calls: string[] = [];
   const gate: ConcurrencyGate = {
-    requestSlot: (providerId, requestId, onGranted) => {
+    requestSlot: (providerId, _runId, requestId, onGranted) => {
       calls.push(`request:${providerId}:${requestId}`);
       onGranted();
     },
@@ -343,6 +343,7 @@ function recordingGate(releaseOverride?: (requestId: string) => Outcome<void>): 
       calls.push(`release:${requestId}`);
       return releaseOverride === undefined ? { kind: 'ok', value: undefined } : releaseOverride(requestId);
     },
+    denyWaitingForRunIds: notCalled,
     close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,
@@ -380,15 +381,17 @@ describe('runAgentNodeLifecycle', () => {
     const published: unknown[] = [];
     const { gate, calls } = recordingGate();
     let stepRunIdAtGrant: string | undefined;
+    let runIdAtGrant: string | undefined;
     const observingGate: ConcurrencyGate = {
       ...gate,
-      requestSlot: (providerId, requestId, onGranted, onDenied) => {
+      requestSlot: (providerId, requestRunId, requestId, onGranted, onDenied) => {
         // A hely kérésekor a step_run MÉG pending, mert a markStepRunning csak
         // a hely megszerzése UTÁN fut le (SPEC-004 5.2 1. pont).
         const beforeRunning = okOrThrow(database.stepRuns.getStepRun(requestId));
         expect(beforeRunning.status).toBe('pending');
         stepRunIdAtGrant = requestId;
-        gate.requestSlot(providerId, requestId, onGranted, onDenied);
+        runIdAtGrant = requestRunId;
+        gate.requestSlot(providerId, requestRunId, requestId, onGranted, onDenied);
       },
     };
     const dependencies = dependenciesOf({
@@ -407,6 +410,9 @@ describe('runAgentNodeLifecycle', () => {
 
     expect(outcome.kind).toBe('succeeded');
     expect(stepRunIdAtGrant).toBe(outcome.stepRun.id);
+    // A kérés a lépés futását nevezi meg: a megszakítás e szerint veszi ki a
+    // sorból (`ConcurrencyGate.denyWaitingForRunIds`).
+    expect(runIdAtGrant).toBe(runId);
     expect(calls).toStrictEqual([`request:minimax:${outcome.stepRun.id}`, `release:${outcome.stepRun.id}`]);
     expect(outcome.stepRun.status).toBe('succeeded');
     expect(outcome.stepRun.resultSubtype).toBe('success');
@@ -621,9 +627,10 @@ describe('runAgentNodeLifecycle', () => {
     const { gate } = recordingGate();
     const racyGate: ConcurrencyGate = {
       ...gate,
-      requestSlot: (providerId, requestId, onGranted, onDenied) => {
+      requestSlot: (providerId, requestRunId, requestId, onGranted, onDenied) => {
         gate.requestSlot(
           providerId,
+          requestRunId,
           requestId,
           () => {
             okOrThrow(database.stepRuns.markStepCancelled(requestId));
@@ -778,6 +785,7 @@ describe('runAgentNodeLifecycle', () => {
     // sorba áll; a lezárás a sorban éri.
     gate.requestSlot(
       'minimax',
+      'masik-futas',
       'masik-lepes',
       () => {
         // a hely a másik lépésé, a teszt nem futtat rajta semmit
@@ -800,6 +808,39 @@ describe('runAgentNodeLifecycle', () => {
     // szabadított fel semmit.
     expect(gate.occupiedSlotCount('minimax')).toBe(1);
     expect(gate.releaseSlot('masik-lepes')).toStrictEqual({ kind: 'ok', value: undefined });
+
+    database.close();
+  });
+
+  it('a sorban álló lépést a futás megszakítása kiveszi a sorból: interrupted, a step_run pending marad, provider hívás és felszabadítás nincs (SPEC-004 9. szekció 2. pont)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const gate = createConcurrencyGate(() => 1);
+    gate.requestSlot(
+      'minimax',
+      'masik-futas',
+      'masik-lepes',
+      () => {
+        // a hely a másik futás lépéséé, a teszt nem futtat rajta semmit
+      },
+      notCalled,
+    );
+    const runnerCalled = { called: false };
+    const dependencies = dependenciesOf({ database, agentQueryRunner: neverCalledRunner(runnerCalled) });
+
+    const pending = runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
+    expect(gate.waitingRequestCount('minimax')).toBe(1);
+    gate.denyWaitingForRunIds(new Set([runId]));
+    const outcome = okOrThrow(await pending);
+
+    expect(outcome).toStrictEqual({ kind: 'interrupted' });
+    expect(runnerCalled.called).toBe(false);
+    const [stepRun] = okOrThrow(database.stepRuns.listStepRuns(runId));
+    expect(stepRun?.status).toBe('pending');
+    // A felszabaduló hely már nem jut a kivett lépésnek.
+    expect(gate.releaseSlot('masik-lepes')).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(gate.occupiedSlotCount('minimax')).toBe(0);
+    expect(runnerCalled.called).toBe(false);
 
     database.close();
   });
