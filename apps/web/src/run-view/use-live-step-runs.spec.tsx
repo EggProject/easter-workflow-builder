@@ -169,7 +169,7 @@ describe('useLiveStepRuns', () => {
 
     expect(urls).toEqual([]);
     expect(frameListeners.size).toBe(0);
-    expect(latest).toEqual({ stepRuns: undefined, failureMessage: undefined });
+    expect(latest).toEqual({ stepRuns: undefined, failure: undefined });
   });
 
   it('csatoláskor betölti a futás lépés futásait', async () => {
@@ -178,7 +178,7 @@ describe('useLiveStepRuns', () => {
 
     expect(urls).toEqual(['/api/runs/r-1/steps']);
     expect(latest?.stepRuns).toEqual([RUNNING_STEP_RUN]);
-    expect(latest?.failureMessage).toBeUndefined();
+    expect(latest?.failure).toBeUndefined();
   });
 
   it('élő step_finished keretre újratölt, és a csomópont állapota a friss sorból jön', async () => {
@@ -244,7 +244,7 @@ describe('useLiveStepRuns', () => {
     const urls: string[] = [];
     await render('r-1', createStepRunsFetch([new Error('kapcsolat megszakadt'), [SUCCEEDED_STEP_RUN]], urls));
 
-    expect(latest?.failureMessage).toBe('A szerver nem érhető el.');
+    expect(latest?.failure).toEqual({ kind: 'error', message: 'A szerver nem érhető el.', isTransient: true });
     expect(latest?.stepRuns).toBeUndefined();
 
     act(() => {
@@ -252,7 +252,7 @@ describe('useLiveStepRuns', () => {
     });
     await flush();
 
-    expect(latest).toEqual({ stepRuns: [SUCCEEDED_STEP_RUN], failureMessage: undefined });
+    expect(latest).toEqual({ stepRuns: [SUCCEEDED_STEP_RUN], failure: undefined });
   });
 
   it('az újratöltés hibája mellett a korábbi sorok megmaradnak', async () => {
@@ -264,7 +264,10 @@ describe('useLiveStepRuns', () => {
     });
     await flush();
 
-    expect(latest).toEqual({ stepRuns: [RUNNING_STEP_RUN], failureMessage: 'A szerver nem érhető el.' });
+    expect(latest).toEqual({
+      stepRuns: [RUNNING_STEP_RUN],
+      failure: { kind: 'error', message: 'A szerver nem érhető el.', isTransient: true },
+    });
   });
 
   it('másik futásra váltáskor a régi futás késve érkező válasza eldobódik', async () => {
@@ -310,7 +313,7 @@ describe('useLiveStepRuns', () => {
     await render('r-2', pendingFetch);
 
     expect(urls).toEqual(['/api/runs/r-1/steps', '/api/runs/r-2/steps']);
-    expect(latest).toEqual({ stepRuns: undefined, failureMessage: undefined });
+    expect(latest).toEqual({ stepRuns: undefined, failure: undefined });
   });
 
   it('a serverRestartCount változására újratölt, és a korábbi sorok addig a helyükön maradnak (SPEC-005 5.2)', async () => {
@@ -328,7 +331,7 @@ describe('useLiveStepRuns', () => {
     expect(latest?.stepRuns).toEqual([RUNNING_STEP_RUN]);
 
     await flush();
-    expect(latest).toEqual({ stepRuns: [interruptedStepRun], failureMessage: undefined });
+    expect(latest).toEqual({ stepRuns: [interruptedStepRun], failure: undefined });
   });
 
   it('a serverRestartCount változása után is egyetlen feliratkozó marad, és a jelző keret tovább újratölt', async () => {

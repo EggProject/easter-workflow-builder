@@ -407,11 +407,21 @@ describe('summarizeRunEventRow', () => {
     expect(summary.bodyText).toBe('Kontextushasználati esemény');
   });
 
+  it('run_interrupted esetén a lezárt, a szerver leállása miatt félbeszakadt futást nevezi meg, nem folyamatban lévő megszakítást', () => {
+    const summary = summarizeRunEventRow(
+      makeRecord({ kind: 'run_interrupted', payload: { reason: 'graceful_shutdown' } }),
+      'claude-subscription',
+    );
+    expect(summary.kindLabel).toBe('Futás félbeszakítva');
+    expect(summary.bodyText).toBe('A futás a szerver leállása miatt félbeszakadt');
+    expect(`${summary.kindLabel} ${summary.bodyText}`).not.toContain('megszakítás');
+  });
+
   describe('a tizenhárom engine eredetű kind', () => {
     it.each([
       ['run_started', 'Futás indult'] as const,
       ['run_finished', 'Futás befejeződött'] as const,
-      ['run_interrupted', 'Futás megszakítva'] as const,
+      ['run_interrupted', 'Futás félbeszakítva'] as const,
       ['step_started', 'Lépés elindult'] as const,
       ['step_finished', 'Lépés befejeződött'] as const,
       ['branch_taken', 'Elágazás'] as const,

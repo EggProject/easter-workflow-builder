@@ -297,7 +297,12 @@ function describeRunEventKind(record: RunEventRecord, providerId: ProviderId | u
       return { kindLabel: 'Futás befejeződött', bodyText: 'A futás véget ért' };
     }
     case 'run_interrupted': {
-      return { kindLabel: 'Futás megszakítva', bodyText: 'A futás megszakítás alatt áll' };
+      // Terminális állapot, nem folyamat: a szerver leállása (szabályos
+      // leállás vagy az indulási helyreállítás) LEZÁRTA a futást. A
+      // `megszakítás` szó a felhasználó döntésének (`cancelled`) foglalt
+      // (SPEC-004 9., 10.2 "Miért `interrupted` és nem `cancelled`"), ezért a
+      // felirat a futás jelvényével azonos "félbeszakítva".
+      return { kindLabel: 'Futás félbeszakítva', bodyText: 'A futás a szerver leállása miatt félbeszakadt' };
     }
     case 'step_started': {
       return { kindLabel: 'Lépés elindult', bodyText: 'Egy lépés végrehajtása elkezdődött' };

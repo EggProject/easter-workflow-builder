@@ -29,6 +29,7 @@ export {
 // Komponensek.
 export { Accordion, type AccordionProperties } from './accordion/Accordion.tsx';
 export { AccordionItem, type AccordionItemProperties } from './accordion/AccordionItem.tsx';
+export { Alert, type AlertProperties, type AlertVariant } from './alert/Alert.tsx';
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
 export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';

@@ -6,13 +6,13 @@ import {
   type RunDetail,
   type RunSnapshotResponse,
 } from '@easter-workflow-builder/protocol';
-import { Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
+import { Alert, Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
-import type { RequestState } from '../request-state/request-state.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
+import type { RouteFailure } from '../rest-client/route-outcome.ts';
 import { RunControlBar } from '../run-control/RunControlBar.tsx';
 import { RunGraphCanvas } from '../run-graph/RunGraphCanvas.tsx';
 import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
@@ -23,6 +23,7 @@ import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stre
 import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
 import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
+import { blockingFailureMessage } from './blocking-failure-message.ts';
 import { isRunClosingFrame } from './is-run-closing-frame.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
 import { useLiveStepRuns } from './use-live-step-runs.ts';
@@ -67,21 +68,17 @@ function readRunId(search: string): string | undefined {
 }
 
 /**
- * Az első hibás állapot üzenete a párhuzamos betöltések közül, vagy
- * `undefined`, ha egyik sem hibás. Azért egy közös leolvasás, és nem
- * egymás utáni `if` ágak, mert a felület egyetlen hibaüzenetet mutat: a
- * végpontok ugyanahhoz a futáshoz tartoznak, tehát az elsőnek elbukó
- * megnevezése elég. A lépés futások hibája (`useLiveStepRuns`) a hívó oldalon
- * ezek UTÁN következik.
+ * A futás rekordjának utolsó sikeres betöltése és a legutóbbi betöltés hibája.
+ * Egyetlen állapotban áll, a `useLiveStepRuns` mintájára: egy sikeres
+ * betöltés a hibát is törli, egy hibás pedig a korábbi rekordot a helyén
+ * hagyja.
  */
-function firstFailureMessage(states: readonly RequestState<unknown>[]): string | undefined {
-  for (const state of states) {
-    if (state.status === 'failure') {
-      return state.message;
-    }
-  }
-  return undefined;
+interface RunDetailLoad {
+  readonly runDetail: RunDetail | undefined;
+  readonly failure: RouteFailure | undefined;
 }
+
+const EMPTY_RUN_DETAIL_LOAD: RunDetailLoad = { runDetail: undefined, failure: undefined };
 
 /**
  * Az al-workflow hierarchia morzsasora a `RunDetail.workflowAncestry`
@@ -195,12 +192,26 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * lépés futás lista a megnyitáskor betöltődik, majd minden jelző keretre
  * összevont újratöltéssel frissül, oldal újratöltés nélkül.
  *
- * A futás rekordja azért külön `useState` értékben is áll, nem csak a
- * `useRequestState` állapotában: az újratöltés alatt a kérés `pending`-re
- * vált, és a csontváz visszatérése ilyenkor az egész rajzot villogtatná. A
- * hibaág ellenben VÁLTOZATLAN: egy elbukó betöltés (az első vagy egy
- * újratöltés) a képernyő helyén a hibaüzenetet mutatja, mert a futás
- * rekordjának elérhetetlensége nem elhallgatható.
+ * A futás rekordja saját `useState` értékben áll, nem `useRequestState`
+ * állapotban: az újratöltés alatt egy `pending` állapot a csontvázat hozná
+ * vissza, és az az egész rajzot villogtatná.
+ *
+ * ÁTMENETI HIBA ÚJRATÖLTÉSKOR (a szerver leállása). A szabályos leállás
+ * `run_interrupted` kerete még a nyitott SSE kapcsolaton érkezik, de a rá
+ * indított újratöltést a szerver már nem fogadja (a fejlesztői Vite proxy
+ * 502-t ad). Ha a futás rekordjának vagy a lépés futásoknak az újratöltése
+ * ÁTMENETI hibával bukik (`RouteFailure.isTransient`: hálózati hiba, 502,
+ * 503), és van korábbi sikeres betöltés, az utolsó ismert rajz és transcript
+ * a helyén marad, fölötte pedig figyelmeztetés jelzi a szerverre várakozást;
+ * a szerver újraindulása (`serverRestartCount`) utáni újratöltés hozza
+ * helyre. A döntés a HTTP válaszon áll, nem a stream fázisán: a fázis azt
+ * mondja meg, hogy az SSE kapcsolat él-e, azt nem, hogy az adott hiba
+ * átmeneti-e (egy 404 vagy 500 újracsatlakozás alatt sem az), és a hibás
+ * válasz meg a kapcsolat bontása közti sorrend a leállás lefolyásától függ,
+ * nem garantált. Minden más hiba, és az átmeneti hiba is, ha nincs mit
+ * helyette mutatni, a képernyő helyén jelenik meg
+ * (`blocking-failure-message.ts`). Ha a szerver nem jön vissza, a
+ * figyelmeztetés marad, tehát a felület nem válik csendessé.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
   const {
@@ -217,9 +228,8 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const transcript = useRunTranscript(runId, subscribeToFrames);
   const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount });
 
-  const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
-  const [runDetail, setRunDetail] = useState<RunDetail | undefined>(undefined);
+  const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
   const layoutBand = useRunViewLayoutBand();
 
   // Az al-workflow futás megnyitása és az újraindítás UGYANERRE a képernyőre
@@ -232,23 +242,29 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   );
 
   const loadRunDetail = useCallback(
-    (currentRunId: string): Promise<void> => {
-      return runState.run(async () => {
-        const outcome = await requestRouteWithoutBody({
-          routeId: 'getRun',
-          parameters: { runId: currentRunId },
-          responseSchema: RunDetailSchema,
-          fetchFunction,
-          apiOrigin,
-        });
-        if (outcome.kind === 'ok') {
-          setRunDetail(outcome.value);
-        }
-        return outcome;
+    async (currentRunId: string): Promise<void> => {
+      const outcome = await requestRouteWithoutBody({
+        routeId: 'getRun',
+        parameters: { runId: currentRunId },
+        responseSchema: RunDetailSchema,
+        fetchFunction,
+        apiOrigin,
       });
+      if (outcome.kind === 'ok') {
+        setRunDetailLoad({ runDetail: outcome.value, failure: undefined });
+        return;
+      }
+      setRunDetailLoad((previous) => ({ ...previous, failure: outcome }));
     },
-    [runState.run, fetchFunction, apiOrigin],
+    [fetchFunction, apiOrigin],
   );
+
+  // Másik futásra váltáskor a korábbi futás rekordja és hibája törlődik, hogy
+  // egy átmeneti hiba mellett ne a RÉGI futás rekordja álljon az új futás
+  // rajza fölött (a `useLiveStepRuns` azonos mintája).
+  useEffect(() => {
+    setRunDetailLoad(EMPTY_RUN_DETAIL_LOAD);
+  }, [runId]);
 
   useEffect(() => {
     if (runId === undefined) {
@@ -320,12 +336,20 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     return <p role="alert">Nincs megadva megtekintendő futás (hiányzó "runId" query paraméter).</p>;
   }
 
-  const failureMessage = firstFailureMessage([runState.state, snapshotState.state]) ?? liveStepRuns.failureMessage;
-  if (failureMessage !== undefined) {
-    return <p role="alert">{failureMessage}</p>;
+  const { runDetail, failure: runDetailFailure } = runDetailLoad;
+  const { stepRuns, failure: stepRunsFailure } = liveStepRuns;
+  // A sorrend a három végpont sorrendje: a felület egyetlen hibaüzenetet
+  // mutat, és a végpontok ugyanahhoz a futáshoz tartoznak, tehát az elsőnek
+  // elbukó megnevezése elég. A pillanatkép nem töltődik újra (SPEC-003 5.5),
+  // tehát a hibájának sosincs korábbi értéke, ami helyette látszhatna.
+  const blockingMessage =
+    blockingFailureMessage(runDetailFailure, runDetail !== undefined) ??
+    (snapshotState.state.status === 'failure' ? snapshotState.state.message : undefined) ??
+    blockingFailureMessage(stepRunsFailure, stepRuns !== undefined);
+  if (blockingMessage !== undefined) {
+    return <p role="alert">{blockingMessage}</p>;
   }
 
-  const { stepRuns } = liveStepRuns;
   if (runDetail === undefined || stepRuns === undefined || snapshotState.state.status !== 'success') {
     // Várakozás jelzése: a betöltés alatt csontváz áll, nem üres képernyő
     // (`.claude/CLAUDE.md` 11. szekció).
@@ -349,6 +373,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     stepRuns,
     onOpenSubWorkflowRun: navigateToRun,
   });
+  // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
+  // a fenti blokkoló ágon áll meg.
+  const transientFailure = runDetailFailure ?? stepRunsFailure;
 
   return (
     <div className="run-view-screen">
@@ -360,6 +387,14 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         fetchFunction={fetchFunction}
         onRestarted={navigateToRun}
       />
+      {transientFailure !== undefined && (
+        // Várakozás jelzése (`.claude/CLAUDE.md` 11. szekció): a design system
+        // kész, tartós állapotjelző `Alert` blokkja, `role="status"` szereppel.
+        <Alert variant="warning" title="Várakozás a szerverre" className="run-view-screen__server-wait">
+          Az utolsó ismert állapot látszik, a szerver újraindulása után a nézet magától frissül. A legutóbbi frissítés
+          hibája: {transientFailure.message}
+        </Alert>
+      )}
       <div className="run-view-screen__body">
         <RunViewLayout
           band={layoutBand}

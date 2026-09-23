@@ -41,6 +41,14 @@
   padding-inline: var(--ep-layout-gutter);
 }
 
+/* A szerverre várakozás jelzése (a design system `.alert` blokkja) a fejléc
+   alatt, ugyanazzal az oldalsó térközzel. Margó és nem belső térköz, mert a
+   blokknak saját háttere és lekerekítése van, amit a térköznek kívül kell
+   hagynia. */
+.run-view-screen__server-wait {
+  margin-inline: var(--ep-layout-gutter);
+}
+
 /* A kimondott figyelmeztetés, hogy a rajz pillanatkép (AC20). Nem hibaüzenet,
    tehát a halványabb, másodlagos szövegszín jár neki. */
 .run-view-screen__snapshot-note {

@@ -32,6 +32,7 @@ export type { RequestState } from './request-state/request-state.ts';
 export { useRequestState, type UseRequestStateResult } from './request-state/use-request-state.ts';
 
 // rest-client: REST hívás a packages/protocol ROUTE_TABLE fölött.
+export type { RouteFailure, RouteOutcome } from './rest-client/route-outcome.ts';
 export type { SafeParsableSchema, SafeParseOutcome } from './rest-client/safe-parsable-schema.ts';
 export { arraySchema } from './rest-client/array-schema.ts';
 export { browserFetchFunction } from './rest-client/browser-fetch-function.ts';

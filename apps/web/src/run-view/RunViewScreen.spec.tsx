@@ -142,9 +142,19 @@ interface FetchOverrides {
   /**
    * A `GET /api/runs/{runId}/steps` egymás utáni válaszai (T-009-25a): a
    * hívások sorban kapják az elemeit, az utolsó ismétlődik; egy `Error` elem
-   * hálózati hibát szimulál. Ha meg van adva, a `stepRuns` mező nem számít.
+   * hálózati hibát szimulál, egy `HttpStatus` elem üres törzsű hibaválaszt ad.
+   * Ha meg van adva, a `stepRuns` mező nem számít.
    */
   readonly stepRunResponses?: readonly unknown[];
+  /**
+   * A `GET /api/runs/{runId}` egymás utáni válaszai, a `stepRunResponses`
+   * szabályai szerint. Ha meg van adva, a `runDetail` mező nem számít.
+   */
+  readonly runDetailResponses?: readonly unknown[];
+  /**
+   * A `GET /api/runs/{runId}/snapshot` válaszának felülírása egy hibaválasszal.
+   */
+  readonly snapshotStatus?: HttpStatus;
   /**
    * A `GET /api/runs/{runId}/steps` hívások naplója.
    */
@@ -155,9 +165,32 @@ interface FetchOverrides {
   readonly snapshotUrls?: string[];
 }
 
+/**
+ * Egy üres törzsű HTTP hibaválasz státusza a válaszsorozatokban (például a
+ * fejlesztői Vite proxy 502-je, amikor a backend nem fogad kapcsolatot).
+ */
+class HttpStatus {
+  readonly status: number;
+
+  constructor(status: number) {
+    this.status = status;
+  }
+}
+
+function respondWith(response: unknown): Promise<Response> {
+  if (response instanceof Error) {
+    return Promise.reject(response);
+  }
+  if (response instanceof HttpStatus) {
+    return Promise.resolve(new Response('', { status: response.status, headers: { 'Content-Type': 'text/plain' } }));
+  }
+  return Promise.resolve(Response.json(response));
+}
+
 function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
   const stepRunResponses = overrides.stepRunResponses ?? [overrides.stepRuns ?? [BASE_STEP_RUN]];
   let stepRunCallCount = 0;
+  let runDetailCallCount = 0;
   return (input, init) => {
     const { pathname } = new URL(input);
     if (pathname.endsWith('/subscriptions')) {
@@ -166,16 +199,17 @@ function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
     }
     if (pathname.endsWith('/snapshot')) {
       overrides.snapshotUrls?.push(pathname);
-      return Promise.resolve(Response.json(overrides.snapshot ?? SNAPSHOT));
+      return respondWith(overrides.snapshotStatus ?? overrides.snapshot ?? SNAPSHOT);
     }
     if (pathname.endsWith('/steps')) {
       overrides.stepRunUrls?.push(pathname);
       stepRunCallCount += 1;
-      const response = stepRunResponses[Math.min(stepRunCallCount, stepRunResponses.length) - 1];
-      return response instanceof Error ? Promise.reject(response) : Promise.resolve(Response.json(response));
+      return respondWith(stepRunResponses[Math.min(stepRunCallCount, stepRunResponses.length) - 1]);
     }
     overrides.runDetailUrls?.push(pathname);
-    return Promise.resolve(Response.json(overrides.runDetail ?? RUN_DETAIL));
+    runDetailCallCount += 1;
+    const runDetailResponses = overrides.runDetailResponses ?? [overrides.runDetail ?? RUN_DETAIL];
+    return respondWith(runDetailResponses[Math.min(runDetailCallCount, runDetailResponses.length) - 1]);
   };
 }
 
@@ -792,5 +826,136 @@ describe('RunViewScreen', () => {
     await renderScreen('?runId=r-3', createFetchFunction({ stepRunResponses: [new Error('kapcsolat megszakadt')] }));
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+  });
+
+  // ============================================================
+  // ÁTMENETI HIBA ÚJRATÖLTÉSKOR: A SZERVER LEÁLLÁSA (2026-09-23).
+  //
+  // A szabályos leállás `run_interrupted` kerete még a nyitott SSE
+  // kapcsolaton érkezik, de a rá indított újratöltést a szerver már nem
+  // fogadja: a fejlesztői Vite proxy 502-t ad. A mért hiba: a teljes futás
+  // nézet helyén a "HTTP 502" riasztás állt az újraindulásig.
+  // ============================================================
+
+  /**
+   * A szerverre várakozás jelzése (`Alert`, `role="status"`), vagy `null`.
+   */
+  function serverWaitStatus(): Element | null {
+    return container.querySelector('.run-view-screen__server-wait[role="status"]');
+  }
+
+  it('a run_interrupted keretre indított újratöltés 502 válasza mellett a rajz, a fejléc és a transcript a helyén marad, és várakozás jelzés jelenik meg', async () => {
+    const runDetailUrls: string[] = [];
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({
+        runDetailUrls,
+        runDetailResponses: [RUN_DETAIL, new HttpStatus(502)],
+        stepRunResponses: [[{ ...BASE_STEP_RUN, status: 'running' }], new HttpStatus(502)],
+      }),
+    );
+    expect(serverWaitStatus()).toBeNull();
+
+    await emitFramesAndFlush([runInterruptedFrame('r-3')]);
+
+    expect(runDetailUrls).toHaveLength(2);
+    expect(container.querySelector('p[role="alert"]')).toBeNull();
+    expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
+    expect(headerActionText()).toBe('Megszakítás');
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('running');
+    expect(container.querySelector(':scope .run-view-screen__transcript .transcript-panel')).not.toBeNull();
+    expect(container.querySelector(':scope .transcript-panel .run-event-row')?.textContent).toContain(
+      'Futás félbeszakítva',
+    );
+    const status = serverWaitStatus();
+    expect(status?.querySelector('.alert__title')?.textContent).toBe('Várakozás a szerverre');
+    expect(status?.querySelector('.alert__message')?.textContent).toContain(
+      'A szerver hibás választ adott (HTTP 502).',
+    );
+    expect(status?.classList.contains('alert--warning')).toBe(true);
+  });
+
+  it('a szerver újraindulása utáni sikeres újratöltés leveszi a várakozás jelzést, és a nézet a lezárt futást mutatja', async () => {
+    const fetchFunction = createFetchFunction({
+      runDetailResponses: [RUN_DETAIL, new HttpStatus(502), { ...RUN_DETAIL, status: 'interrupted', finishedAtMs: 40 }],
+      stepRunResponses: [
+        [{ ...BASE_STEP_RUN, status: 'running' }],
+        new HttpStatus(502),
+        [{ ...BASE_STEP_RUN, status: 'interrupted' }],
+      ],
+    });
+    await renderScreen('?runId=r-3', fetchFunction, 0);
+    await emitFramesAndFlush([runInterruptedFrame('r-3')]);
+    expect(serverWaitStatus()).not.toBeNull();
+
+    await renderScreen('?runId=r-3', fetchFunction, 1);
+
+    expect(serverWaitStatus()).toBeNull();
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('interrupted');
+    expect(headerActionText()).toBe('Újraindítás');
+  });
+
+  it('ha a szerver nem jön vissza, a várakozás jelzés a további sikertelen újratöltések után is látszik, a rajz mellett', async () => {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({
+        runDetailResponses: [RUN_DETAIL, new Error('kapcsolat megszakadt')],
+        stepRunResponses: [[BASE_STEP_RUN], new Error('kapcsolat megszakadt')],
+      }),
+    );
+
+    await emitFramesAndFlush([runInterruptedFrame('r-3')]);
+    await emitFramesAndFlush([stepEventFrame('step_finished', 'live', 44)]);
+
+    expect(serverWaitStatus()?.querySelector('.alert__message')?.textContent).toContain('A szerver nem érhető el.');
+    expect(container.querySelector('p[role="alert"]')).toBeNull();
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('succeeded');
+  });
+
+  it('csak a lépés futások átmeneti újratöltési hibája is a rajz mellett jelez, nem a helyén', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ stepRunResponses: [[BASE_STEP_RUN], new HttpStatus(503)] }));
+
+    await emitFramesAndFlush([stepEventFrame('step_finished', 'live', 44)]);
+
+    expect(container.querySelector('p[role="alert"]')).toBeNull();
+    expect(serverWaitStatus()?.querySelector('.alert__message')?.textContent).toContain('HTTP 503');
+  });
+
+  it('nem átmeneti újratöltési hiba (HTTP 500) továbbra is a képernyő helyén áll', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailResponses: [RUN_DETAIL, new HttpStatus(500)] }));
+
+    await emitFramesAndFlush([runInterruptedFrame('r-3')]);
+
+    expect(container.querySelector('p[role="alert"]')?.textContent).toBe('A szerver hibás választ adott (HTTP 500).');
+    expect(container.querySelector('.run-view-screen__header')).toBeNull();
+    expect(serverWaitStatus()).toBeNull();
+  });
+
+  it('az első betöltés átmeneti hibája a képernyő helyén áll, mert nincs korábbi állapot', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailResponses: [new HttpStatus(502)] }));
+
+    expect(container.querySelector('p[role="alert"]')?.textContent).toBe('A szerver hibás választ adott (HTTP 502).');
+    expect(serverWaitStatus()).toBeNull();
+  });
+
+  it('a pillanatkép betöltésének hibája a képernyő helyén áll', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ snapshotStatus: new HttpStatus(502) }));
+
+    expect(container.querySelector('p[role="alert"]')?.textContent).toBe('A szerver hibás választ adott (HTTP 502).');
+    expect(capturedCanvasProperties).toHaveLength(0);
+  });
+
+  it('másik futásra váltva a korábbi futás rekordja nem marad az új futás átmeneti hibája mellett', async () => {
+    const fetchFunction = createFetchFunction({ runDetailResponses: [RUN_DETAIL, new HttpStatus(502)] });
+    await renderScreen('?runId=r-3', fetchFunction);
+    expect(headerActionText()).toBe('Megszakítás');
+
+    // Az új futás rekordjának ELSŐ betöltése bukik átmenetileg: korábbi
+    // értéke nincs, tehát a képernyő helyén a hiba áll, nem a régi futás
+    // fejléce.
+    await renderScreen('?runId=r-4', fetchFunction);
+
+    expect(container.querySelector('p[role="alert"]')?.textContent).toBe('A szerver hibás választ adott (HTTP 502).');
+    expect(container.querySelector('.run-view-screen__header')).toBeNull();
   });
 });

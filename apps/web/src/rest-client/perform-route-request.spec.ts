@@ -62,11 +62,11 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome.kind).toBe('error');
+    expect(outcome).toMatchObject({ kind: 'error', isTransient: false });
     expect(fetchFunction).not.toHaveBeenCalled();
   });
 
-  it('hálózati hiba esetén Outcome hibaágat ad', async () => {
+  it('hálózati hiba esetén átmeneti Outcome hibaágat ad', async () => {
     const outcome = await performRouteRequest({
       routeId: 'listWorkflows',
       parameters: {},
@@ -79,7 +79,7 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome).toEqual({ kind: 'error', message: 'A szerver nem érhető el.' });
+    expect(outcome).toEqual({ kind: 'error', message: 'A szerver nem érhető el.', isTransient: true });
   });
 
   it('lemondás (AbortError) esetén ugyanazon az ágon Outcome hibaágat ad', async () => {
@@ -114,6 +114,7 @@ describe('performRouteRequest', () => {
     expect(outcome).toEqual({
       kind: 'error',
       message: 'A keresett elem nem létezik, esetleg időközben törölték.: workflow-1 nem található',
+      isTransient: false,
     });
   });
 
@@ -130,7 +131,54 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome).toEqual({ kind: 'error', message: 'A szerver hibás választ adott (HTTP 500).' });
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A szerver hibás választ adott (HTTP 500).',
+      isTransient: false,
+    });
+  });
+
+  // A Vite 8 fejlesztői proxy üres, `text/plain` törzsű 502-t ad, ha a backend
+  // nem fogad kapcsolatot (a telepített `vite` forrása, a proxy `error`
+  // eseménykezelője); a 503 az RFC 9110 15.6.4 szerinti átmeneti állapot.
+  it.each([502, 503])('HTTP %i válaszra átmeneti hibaágat ad', async (status) => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(new Response('', { status, headers: { 'Content-Type': 'text/plain' } })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: `A szerver hibás választ adott (HTTP ${String(status)}).`,
+      isTransient: true,
+    });
+  });
+
+  it('protokoll hiba törzzsel érkező 503 válaszra is átmeneti hibaágat ad, a kód szerinti mondattal', async () => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(jsonResponse(503, { code: 'not_found', message: 'leállás' })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A keresett elem nem létezik, esetleg időközben törölték.: leállás',
+      isTransient: true,
+    });
   });
 
   it('204 válaszra a séma undefined bemenettel fut, és a séma szerinti értéket adja', async () => {
@@ -162,7 +210,11 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome).toEqual({ kind: 'error', message: 'A szerver nem érvényes JSON választ adott.' });
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A szerver nem érvényes JSON választ adott.',
+      isTransient: false,
+    });
   });
 
   it('200 válaszra, ha a törzs nem illeszkedik a responseSchema-ra, Outcome hibaágat ad a mezőúttal', async () => {
@@ -178,7 +230,7 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome).toEqual({ kind: 'error', message: 'A szerver váratlan választ adott (name).' });
+    expect(outcome).toEqual({ kind: 'error', message: 'A szerver váratlan választ adott (name).', isTransient: false });
   });
 
   it('a mezőút hiányában "(gyökér)" jelölést ad', async () => {
@@ -198,7 +250,11 @@ describe('performRouteRequest', () => {
       signal: undefined,
     });
 
-    expect(outcome).toEqual({ kind: 'error', message: 'A szerver váratlan választ adott ((gyökér)).' });
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A szerver váratlan választ adott ((gyökér)).',
+      isTransient: false,
+    });
   });
 
   it('sikeres 200 válaszra a séma szerinti típusos értéket adja, a query paraméterekkel együtt hívva', async () => {

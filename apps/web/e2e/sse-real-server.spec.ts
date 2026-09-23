@@ -29,6 +29,7 @@
 // beállítás a fájlon BELÜL is párhuzamosítana, ezért ez a fájl a dokumentált
 // `mode: 'serial'` beállítást kapja.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type {
   RunDetail,
   RunEventKind,
@@ -710,8 +711,8 @@ test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, �
   });
 
   await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
-  // `exact`: a transcript panel `run_interrupted` sorának fejléc gombja is
-  // tartalmazza a "megszakítás" szórészt a hozzáférhető nevében.
+  // `exact`: a név részszöveges illesztése a transcript panel soronkénti
+  // fejléc gombjaira is ráillhetne.
   await expect(page.getByRole('button', { name: 'Megszakítás', exact: true })).toBeHidden();
   await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
 });
@@ -768,6 +769,225 @@ test('szerver újraindulás után a futás nézet újra feliratkozik, újratölt
   await expect(node.getByText('sikertelen', { exact: true })).toBeVisible();
   expect(calls.listStepRuns).toBe(3);
   expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+// ============================================================
+// A SZERVER LEÁLLÁSA ALATT A FUTÁS NÉZET A HELYÉN MARAD (2026-09-23).
+//
+// A valódi `apps/server` elleni mérés: a szabályos leállás `run_interrupted`
+// kerete még a NYITOTT SSE kapcsolaton érkezik, de a rá indított újratöltés
+// a fejlesztői Vite proxytól 502-t kap (a backend már nem fogad kapcsolatot),
+// és a teljes futás nézet helyén a "HTTP 502" riasztás állt az újraindulásig.
+// A fenti 2. és 3. kivétel alá tartozik: menet közben beszúrt keret, utána a
+// kapcsolat megszakadása és egy új példány. A leállás alatti állapot a valódi
+// hálózati hiba: a port egy olyan TCP szerveré, ami minden kapcsolatot
+// azonnal lezár, tehát a böngésző `EventSource`-a hálózati hibát kap, és a
+// HTML szabvány szerint újra próbálkozik (nem zárja le a kapcsolatot).
+// ============================================================
+
+/**
+ * A Vite fejlesztői proxy válasza, ha a backend nem fogad kapcsolatot: üres,
+ * `text/plain` törzsű 502 (a telepített `vite` forrásának proxy `error`
+ * eseménykezelője).
+ */
+const BAD_GATEWAY = { status: 502, contentType: 'text/plain', body: '' };
+
+/**
+ * Egy szerver példány `GET /events` végpontja: rövid `retry` (a böngésző a
+ * megszakadás után gyorsan próbálkozzon újra, SPEC-005 5.7), a példány
+ * `stream_ready` kerete, és nyitva hagyott kapcsolat, amibe menet közben
+ * keret szúrható.
+ */
+function startStreamServerInstance(serverInstanceId: string): {
+  readonly server: Server;
+  readonly push: (frame: StreamFrame) => void;
+  /**
+   * Minden nyitott válasz szabályos lezárása: a már kiírt keretek kimennek,
+   * a valódi szerver leállási sorrendje szerint (SPEC-006 8.2).
+   */
+  readonly endAll: () => void;
+} {
+  const openResponses = new Set<ServerResponse>();
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url?.startsWith('/events') !== true) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, SSE_RESPONSE_HEADERS);
+    openResponses.add(response);
+    response.write('retry: 50\n\n');
+    response.write(encodeStreamFrame(streamReadyFrame(serverInstanceId, [])));
+  });
+  server.listen(REAL_SERVER_PORT);
+  return {
+    server,
+    push: (frame) => {
+      for (const response of openResponses) {
+        response.write(encodeStreamFrame(frame));
+      }
+    },
+    endAll: () => {
+      for (const response of openResponses) {
+        response.end();
+      }
+      openResponses.clear();
+    },
+  };
+}
+
+/**
+ * A leállt szerver: a porton minden TCP kapcsolatot azonnal lezár, és
+ * számolja a böngésző újracsatlakozási kísérleteit. A számláló a teszt
+ * állapot alapú várakozásának jele (`expect.poll`), nem egy időzítő.
+ */
+function startDownServer(): { readonly server: NetServer; readonly attempts: { count: number } } {
+  const attempts = { count: 0 };
+  const server = createNetServer((socket) => {
+    attempts.count += 1;
+    socket.destroy();
+  });
+  server.listen(REAL_SERVER_PORT);
+  return { server, attempts };
+}
+
+async function closeServer(server: NetServer): Promise<void> {
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+  });
+}
+
+const downServerHolder: { current: NetServer | undefined } = { current: undefined };
+
+test.afterEach(async () => {
+  if (downServerHolder.current === undefined) {
+    return;
+  }
+  await closeServer(downServerHolder.current);
+  downServerHolder.current = undefined;
+});
+
+interface ShutdownMockState {
+  down: boolean;
+  runStatus: RunDetail['status'];
+  stepRuns: readonly StepRunRecord[];
+}
+
+/**
+ * A futás nézet REST mockjai, a leállás alatt (`down`) a Vite proxy 502
+ * válaszával.
+ */
+async function mockRunViewWithShutdown(page: Page, state: ShutdownMockState): Promise<void> {
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) =>
+      route.fulfill(state.down ? BAD_GATEWAY : jsonBody(runDetailWithStatus(state.runStatus))),
+    ),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(state.down ? BAD_GATEWAY : jsonBody(state.stepRuns))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(state.down ? BAD_GATEWAY : jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+}
+
+/**
+ * A szabályos leállás a kliens felől: a REST már 502-t ad, a `run_interrupted`
+ * kerete még élőben kimegy a nyitott kapcsolaton, UTÁNA a kapcsolat lezárul, és
+ * a port a leállt szerveré lesz. Visszatér, amikor a böngésző legalább egyszer
+ * sikertelenül próbált újracsatlakozni.
+ */
+async function shutDownStreamServer(
+  instance: ReturnType<typeof startStreamServerInstance>,
+  state: ShutdownMockState,
+): Promise<{ readonly attempts: { count: number } }> {
+  state.down = true;
+  instance.push({
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: makeRunEventRecord(9, 'r-1', { kind: 'run_interrupted', payload: { reason: 'graceful_shutdown' } }),
+  });
+  instance.endAll();
+  await closeServer(instance.server);
+  serverHolder.current = undefined;
+  const down = startDownServer();
+  downServerHolder.current = down.server;
+  await expect.poll(() => down.attempts.count).toBeGreaterThan(0);
+  return down;
+}
+
+test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az utolsó állapotot mutatja várakozás jelzéssel, és az újraindulás után helyreáll', async ({
+  page,
+}) => {
+  const first = startStreamServerInstance('s-1');
+  serverHolder.current = first.server;
+  const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
+  await mockRunViewWithShutdown(page, state);
+
+  await page.goto('/run?runId=r-1');
+  const node = nodeLocator(page, 'n1');
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+  await expect(page.getByText('kapcsolódás', { exact: true })).toBeHidden();
+  await setNoReloadMarker(page);
+
+  await shutDownStreamServer(first, state);
+
+  const serverWait = page.getByRole('status').filter({ hasText: 'Várakozás a szerverre' });
+  await expect(serverWait).toBeVisible();
+  await expect(serverWait).toContainText('A szerver hibás választ adott (HTTP 502).');
+  await expect(page.getByText('újracsatlakozás', { exact: true })).toBeVisible();
+  // Az utolsó ismert rajz, fejléc és transcript a helyén: a 502 NEM cserélte
+  // le a nézetet.
+  await expect(page.getByRole('alert').filter({ hasText: 'HTTP 502' })).toBeHidden();
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Megszakítás', exact: true })).toBeVisible();
+  await expect(page.getByText('A futás a szerver leállása miatt félbeszakadt')).toBeVisible();
+
+  // Újraindulás ugyanazon az adatbázison: a helyreállítás a futást és a
+  // lépést `interrupted` állapotban hagyta, az új példány azonosítója más.
+  state.down = false;
+  state.runStatus = 'interrupted';
+  state.stepRuns = [stepRun('interrupted')];
+  if (downServerHolder.current !== undefined) {
+    await closeServer(downServerHolder.current);
+    downServerHolder.current = undefined;
+  }
+  serverHolder.current = startStreamServerInstance('s-2').server;
+
+  await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
+  await expect(serverWait).toBeHidden();
+  await expect(page.getByText('újracsatlakozás', { exact: true })).toBeHidden();
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+test('ha a szerver nem jön vissza, a futás nézet több sikertelen újracsatlakozás után is kimondja a várakozást, nem válik csendessé', async ({
+  page,
+}) => {
+  const first = startStreamServerInstance('s-1');
+  serverHolder.current = first.server;
+  const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
+  await mockRunViewWithShutdown(page, state);
+
+  await page.goto('/run?runId=r-1');
+  const node = nodeLocator(page, 'n1');
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+  await expect(page.getByText('kapcsolódás', { exact: true })).toBeHidden();
+
+  const down = await shutDownStreamServer(first, state);
+  const serverWait = page.getByRole('status').filter({ hasText: 'Várakozás a szerverre' });
+  await expect(serverWait).toBeVisible();
+
+  // A böngésző tovább próbálkozik (a HTML szabvány szerint hálózati hibára
+  // újracsatlakozik): a számláló növekedése a jel, hogy idő telt el.
+  const attemptsBefore = down.attempts.count;
+  await expect.poll(() => down.attempts.count).toBeGreaterThanOrEqual(attemptsBefore + 3);
+
+  await expect(serverWait).toBeVisible();
+  await expect(serverWait).toContainText('a szerver újraindulása után a nézet magától frissül');
+  await expect(page.getByText('újracsatlakozás', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'HTTP 502' })).toBeHidden();
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
 });
 
 test('a futás előzmények listája run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi', async ({

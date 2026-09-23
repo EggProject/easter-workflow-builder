@@ -1,6 +1,7 @@
 import type { FetchFunction, Outcome } from '@easter-workflow-builder/core';
 import { buildRoutePath, ProtocolErrorBodySchema, ROUTE_TABLE, type RouteId } from '@easter-workflow-builder/protocol';
 import { protocolErrorMessage } from '../protocol-error-message/protocol-error-message.ts';
+import type { RouteOutcome } from './route-outcome.ts';
 import type { SafeParsableSchema } from './safe-parsable-schema.ts';
 
 /**
@@ -51,23 +52,33 @@ async function decodeResponseBody(response: Response): Promise<Outcome<unknown>>
   }
 }
 
-async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<Outcome<TValue>> {
+/**
+ * Az átmeneti HTTP státuszok (`route-outcome.ts`): 502 és 503.
+ */
+const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([502, 503]);
+
+async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<RouteOutcome<TValue>> {
+  const isTransient = TRANSIENT_HTTP_STATUSES.has(response.status);
   const decoded = await decodeResponseBody(response);
   const parsed = decoded.kind === 'ok' ? ProtocolErrorBodySchema.safeParse(decoded.value) : undefined;
   if (!parsed?.success) {
-    return { kind: 'error', message: `A szerver hibás választ adott (HTTP ${String(response.status)}).` };
+    return { kind: 'error', message: `A szerver hibás választ adott (HTTP ${String(response.status)}).`, isTransient };
   }
-  return { kind: 'error', message: `${protocolErrorMessage(parsed.data.code)}: ${parsed.data.message}` };
+  return {
+    kind: 'error',
+    message: `${protocolErrorMessage(parsed.data.code)}: ${parsed.data.message}`,
+    isTransient,
+  };
 }
 
 export async function performRouteRequest<TValue>(
   input: Readonly<PerformRouteRequestInput<TValue>>,
-): Promise<Outcome<TValue>> {
+): Promise<RouteOutcome<TValue>> {
   const { routeId, parameters, query, hasBody, body, responseSchema, fetchFunction, apiOrigin, signal } = input;
 
   const pathOutcome = buildRoutePath(routeId, parameters);
   if (pathOutcome.kind === 'error') {
-    return { kind: 'error', message: pathOutcome.message };
+    return { kind: 'error', message: pathOutcome.message, isTransient: false };
   }
 
   const url = buildRequestUrl(apiOrigin, pathOutcome.value, query);
@@ -84,7 +95,7 @@ export async function performRouteRequest<TValue>(
       body: hasBody ? JSON.stringify(body) : null,
     });
   } catch {
-    return { kind: 'error', message: 'A szerver nem érhető el.' };
+    return { kind: 'error', message: 'A szerver nem érhető el.', isTransient: true };
   }
 
   if (!response.ok) {
@@ -93,13 +104,13 @@ export async function performRouteRequest<TValue>(
 
   const decoded = await decodeResponseBody(response);
   if (decoded.kind === 'error') {
-    return decoded;
+    return { ...decoded, isTransient: false };
   }
 
   const parsed = responseSchema.safeParse(decoded.value);
   if (!parsed.success) {
     const paths = parsed.error.issues.map((issue) => (issue.path.length === 0 ? '(gyökér)' : issue.path.join('.')));
-    return { kind: 'error', message: `A szerver váratlan választ adott (${paths.join(', ')}).` };
+    return { kind: 'error', message: `A szerver váratlan választ adott (${paths.join(', ')}).`, isTransient: false };
   }
   return { kind: 'ok', value: parsed.data };
 }

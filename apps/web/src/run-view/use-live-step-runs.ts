@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createCoalescedReload } from '../request-state/create-coalesced-reload.ts';
 import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
+import type { RouteFailure } from '../rest-client/route-outcome.ts';
 import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
 import { isStepRunListChangeFrame } from './is-step-run-list-change-frame.ts';
 
@@ -30,13 +31,15 @@ export interface LiveStepRuns {
    */
   readonly stepRuns: readonly StepRunRecord[] | undefined;
   /**
-   * A legutóbbi betöltés hibaüzenete; egy későbbi sikeres betöltés törli.
+   * A legutóbbi betöltés hibája, az átmeneti jelzővel együtt (a képernyő ebből
+   * dönti el, hogy a korábbi lista mellett jelez, vagy a hibát mutatja a rajz
+   * helyett); egy későbbi sikeres betöltés törli.
    */
-  readonly failureMessage: string | undefined;
+  readonly failure: RouteFailure | undefined;
 }
 
 const STEP_RUN_LIST_SCHEMA = arraySchema(StepRunRecordSchema);
-const EMPTY_LIVE_STEP_RUNS: LiveStepRuns = { stepRuns: undefined, failureMessage: undefined };
+const EMPTY_LIVE_STEP_RUNS: LiveStepRuns = { stepRuns: undefined, failure: undefined };
 
 /**
  * A nézett futás lépés futásai, élőben frissítve (SPEC-008 6.2, PLAN-009
@@ -91,10 +94,10 @@ export function useLiveStepRuns(input: Readonly<UseLiveStepRunsInput>): LiveStep
         return;
       }
       if (outcome.kind === 'ok') {
-        setState({ stepRuns: outcome.value, failureMessage: undefined });
+        setState({ stepRuns: outcome.value, failure: undefined });
         return;
       }
-      setState((previous) => ({ ...previous, failureMessage: outcome.message }));
+      setState((previous) => ({ ...previous, failure: outcome }));
     });
 
     requestReload();
