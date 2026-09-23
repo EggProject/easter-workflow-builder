@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { findRelativeImportSpecifiers } from './find-relative-import-specifiers.ts';
-import type { RelativeImportSpecifier } from './find-relative-import-specifiers.ts';
+import { findRelativeSpecifierCandidates } from './find-relative-specifier-candidates.ts';
 
 export interface CasingMismatch {
   /**
@@ -58,28 +58,23 @@ function isScannableSourceFile(trackedPath: string): boolean {
   return SCANNABLE_EXTENSIONS.some((extension) => trackedPath.endsWith(extension));
 }
 
-// Egyetlen import specifikátorhoz eldönti, hogy eltérés-e - visszatér
-// `undefined`-nal, ha nem (akár mert pontosan egyezik, akár mert a git
-// egyáltalán nem ismeri a célfájlt, ami más hiba, nem ennek az
-// ellenőrzésnek a dolga).
-function resolveMismatch(
+// Egyetlen import specifikátorhoz eldönti, hogy eltérés-e: ha igen, a git
+// szerinti valódi betűzést adja vissza, ha nem, `undefined`-ot (akár mert
+// pontosan egyezik, akár mert a git egyáltalán nem ismeri a célfájlt, ami
+// más hiba, nem ennek az ellenőrzésnek a dolga).
+function findCaseOnlyMatch(
   trackedPath: string,
-  { specifier, line }: RelativeImportSpecifier,
+  specifier: string,
   trackedSet: ReadonlySet<string>,
   lowercaseToTracked: ReadonlyMap<string, string>,
-): CasingMismatch | undefined {
+): string | undefined {
   const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(trackedPath), specifier));
 
   if (trackedSet.has(resolved)) {
     return undefined;
   }
 
-  const caseInsensitiveMatch = lowercaseToTracked.get(resolved.toLowerCase());
-  if (caseInsensitiveMatch === undefined) {
-    return undefined;
-  }
-
-  return { file: trackedPath, line, specifier, trackedPath: caseInsensitiveMatch };
+  return lowercaseToTracked.get(resolved.toLowerCase());
 }
 
 export function findCasingMismatches(repoRoot: string): readonly CasingMismatch[] {
@@ -98,12 +93,23 @@ export function findCasingMismatches(repoRoot: string): readonly CasingMismatch[
     }
 
     const sourceText = readFileSync(path.join(repoRoot, trackedPath), 'utf8');
-    const specifiers = findRelativeImportSpecifiers(trackedPath, sourceText);
 
-    for (const specifier of specifiers) {
-      const mismatch = resolveMismatch(trackedPath, specifier, trackedSet, lowercaseToTracked);
-      if (mismatch !== undefined) {
-        mismatches.push(mismatch);
+    // A drága, parser alapú kinyerés csak akkor fut, ha az előszűrő nem tud
+    // dönteni, vagy legalább egy jelöltje eltérésnek látszik; a garanciát a
+    // `find-relative-specifier-candidates.ts` fejléce írja le.
+    const candidates = findRelativeSpecifierCandidates(sourceText);
+    if (
+      candidates?.every(
+        (candidate) => findCaseOnlyMatch(trackedPath, candidate, trackedSet, lowercaseToTracked) === undefined,
+      ) === true
+    ) {
+      continue;
+    }
+
+    for (const { specifier, line } of findRelativeImportSpecifiers(trackedPath, sourceText)) {
+      const caseOnlyMatch = findCaseOnlyMatch(trackedPath, specifier, trackedSet, lowercaseToTracked);
+      if (caseOnlyMatch !== undefined) {
+        mismatches.push({ file: trackedPath, line, specifier, trackedPath: caseOnlyMatch });
       }
     }
   }

@@ -672,6 +672,16 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   lefedettség egyetlen, gyökér szintű folyamatban gyűlik: a `test.sh` és a `//#test` task is
   közvetlenül a gyökér `vitest run --coverage` parancsot hívja. Ugyanez az elv a Prettiernél is
   (gyökér `CLAUDE.md`, `tooling/scripts` CLAUDE.md).
+- **A teszt törzse az 5000 ms-os alapértelmezett korlát alá esik, a gyűjtési fázis nem.** Két
+  időzített bomba állt a határon, és a CI-t egy olyan commitnál buktatta el, ami hozzájuk sem
+  nyúlt. (1) Repó szintű TypeScript parse a teszt törzsében: a V8 coverage a `typescript` csomag
+  kódját is műszerezi, ezért a teljes repó AST-je sokszorosára lassul, és a költség a repó
+  méretével nő. Védelem: a `tooling/scripts` `casing` témájának előszűrője, ami a parse-ot csak a
+  gyanús fájlokra futtatja. (2) A teljes alkalmazás modulgráfját betöltő dinamikus `import()` a
+  teszt törzsében: a gráfot statikus, előtöltő importtal kell a gyűjtési fázisba tenni
+  (`apps/web/src/app-mount/main.spec.ts`). Időkorlátot emelni csak a teszt terhelés alatt mért
+  eloszlásából szabad (user kérés 2026-09-23). Mérés és a korlát közeli tesztek listája:
+  `docs/research/2026-09-23-teszt-idokorlat-bombak.md`.
 - **A `//#test` név nem lehetett sima `test`.** A Turborepo `--dry=json` mérés szerint a
   nem-prefixelt taskok kihagyják a `//` csomagot, tehát a per-csomag taskgráf a gyökeret sosem
   érintené (`tooling/scripts` CLAUDE.md, SPEC-001 V-18).

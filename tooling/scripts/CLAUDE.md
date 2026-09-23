@@ -23,7 +23,7 @@ wrapperek maguk bash fájlok, nem TypeScript).
 | `check-dependency-graph.sh`       | ellenőrzi, hogy a workspace függőségi gráfja aciklikus-e, és minden éle a SPEC-002 4. szekció rétegbesorolása szerint szigorúan csökkenő rétegszám felé mutat-e; a tényleges logika `src/dependency-graph/`                                                                                             |
 | `e2e-coverage.sh`                 | az `apps/web` `coverage:e2e:report` scriptjének (`nyc report`) burkolója; **stdout: csak az nyc táblázat, stderr: fejléc és minden hiba** - lásd lent                                                                                                                                                   |
 | `db-drift.sh`                     | ellenőrzi, hogy a `packages/db` séma (a `.ts` tábla fájlok) és a commitolt `packages/db/drizzle` migrációk szinkronban vannak-e (SPEC-003 10.3 szekció, 15. szekció 36. kritérium); **stdout: csak összegzés, stderr: minden hiba** - lásd lent                                                         |
-| `src/casing/`                     | téma mappa: a `casing.sh` mögötti tényleges ellenőrzés (`check-casing.ts`) és a rá épülő `.spec.ts` regressziós teszt                                                                                                                                                                                   |
+| `src/casing/`                     | téma mappa: a `casing.sh` mögötti tényleges ellenőrzés (`check-casing.ts`), a rá épülő `.spec.ts` regressziós teszt, és a parser nélküli előszűrő (`find-relative-specifier-candidates.ts`), ami a TypeScript parse-ot csak a gyanús fájlokra futtatja                                                  |
 | `src/dependency-graph/`           | téma mappa: a `check-dependency-graph.sh` mögötti réteg-hozzárendelés (`package-layer.ts`), a `package.json`-ok beolvasása (`read-workspace-packages.ts`), a tiszta ellenőrző logika (`find-dependency-graph-violations.ts`, `.spec.ts`-sel) és a CLI belépési pont (`check-dependency-graph.ts`)       |
 | `src/turbo-e2e-coverage-outputs/` | téma mappa, megvalósítás fájl nélkül: a `turbo.json` `test:e2e` taskjának `outputs`/`inputs` invariánsát őrző `.spec.ts` regressziós teszt                                                                                                                                                              |
 | `src/relative-import-extension/`  | téma mappa, megvalósítás fájl nélkül: a `packages/*/src` és az `apps/*/src` alatt minden relatív import kiterjesztéssel áll (SPEC-006 M-5, M-6, M-7, PLAN-007 T-007-3); a `casing` téma `findRelativeImportSpecifiers` függvényét hívja újra                                                            |
@@ -59,6 +59,14 @@ helyen sosem jelenhet meg.
   `vitest.config.ts` `tooling-scripts` projektje vesz fel - a `tooling/scripts` nincs a
   `packages/*`/`apps/*` mintában, ugyanaz a mechanizmus, mint a `wire-probe-regression`
   projektnél.
+- A `find-casing-mismatches.ts` és a `relative-import-extension.spec.ts` a teljes TypeScript
+  parse-ot csak akkor futtatja egy fájlra, ha a `find-relative-specifier-candidates.ts`
+  előszűrője nem tud dönteni, vagy gyanús jelöltet talál. Indok: a gyökér `bun run test` V8
+  coverage alatt fut, ami a `typescript` csomag kódját is műszerezi, és a teljes repó parse-a
+  így a CI-ban túllépte az 5000 ms-os teszt időkorlátot. Az előszűrő garanciája (a jelöltek
+  a valódi specifikátorok bővebb halmaza) a fájl fejlécében áll, a mérés a
+  [`../../docs/research/2026-09-23-teszt-idokorlat-bombak.md`](../../docs/research/2026-09-23-teszt-idokorlat-bombak.md)
+  fájlban.
 - A `test.sh` a Vitest `--reporter=json --outputFile=...` kimenetéből olvassa a teszt
   összegzőt (`numTotalTests`/`numPassedTests`/`numFailedTests`, `jq`-val), a hibás
   tesztek nevét és üzenetét pedig a `testResults[].assertionResults[]` tömbből. A
