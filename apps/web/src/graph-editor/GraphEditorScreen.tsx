@@ -18,7 +18,6 @@ import {
   Resizable,
   ResizableHandle,
   ResizablePanel,
-  Skeleton,
   ToastViewport,
   joinClassNames,
   useToasts,
@@ -33,6 +32,7 @@ import { requestRouteWithoutBody } from '../rest-client/request-route-without-bo
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { StartRunModal } from '../run-control/StartRunModal.tsx';
 import { readStartInputFields } from '../run-control/read-start-input-fields.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
@@ -334,7 +334,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     <div className="graph-editor-screen">
       {isLoading ? (
         <div className="graph-editor-screen__loading">
-          <Skeleton shape="text" lines={4} />
+          <ThemedSkeleton shape="text" lines={4} />
         </div>
       ) : (
         <div

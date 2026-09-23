@@ -196,11 +196,20 @@ kommentje szerint viszont az "Interaction surfaces" tokenek épp a komponensek n
 `paper-100/200` használatát váltják ki; a skeleton ezt a migrációt nem kapta meg. A csökkentett
 mozgás ág (`--ep-bg-pressed`) téma függő, tehát ott a hiba nem jelentkezik.
 
-**Nyitva, user döntésre vár.** A szabálykönyv 11. szekciója szerint saját token nem készül, és a
-forrással azonos CSS nem íródik át csendben. Mi a viselkedés addig: sötét témában a csontváz
-világos sávokat fest, a forrással azonosan. Mi zárná le: vagy a forrás javítása a design system
-skillben és bájtra azonos újraátemelés, vagy a forrás meglévő `ink` változatának a sötét
-témához kötése (a téma feloldását ilyenkor a fogyasztó végzi).
+**Lezárva (user döntés, 2026-09-23).** A forrás meglévő `ink` változata köti a sötét témát,
+nem a forrás javítása/újraátemelés: a `packages/ui` `skeleton.css` bájtra azonos marad, új
+token, új szín és új CSS szabály nem készül. A téma feloldását a fogyasztó végzi: az
+`apps/web` `themed-skeleton` témája (`ThemedSkeleton`, `useIsDarkTheme`) egyetlen helyen olvassa
+ki az élő `data-theme` attribútumot (`MutationObserver` a `packages/ui` `useThemeMode` által írt
+attribútumon, újratöltés nélkül is naprakész), és minden `Skeleton` hívást erre a burkolóra
+cserél, hogy a döntés ne ismétlődjön hívásonként. Megerősítő újramérés, ugyanazzal a
+scripttel, a friss `apps/web` build ellen: világos témában a sáv pixelei változatlanok
+(237,232,220 ... 245,242,233, panel háttér 246,243,235), sötét témában a számított
+`background-image` `linear-gradient(90deg, rgb(42, 52, 71) 0%, rgb(62, 74, 96) 50%, rgb(42, 52,
+71) 100%)` (a `--ep-slate-700`/`--ep-slate-600` token számított értéke), a kifestett sáv pixelei
+44,54,73 ... 60,72,94 között, a panel háttere változatlanul 11,13,18. Élő témaváltásnál (oldal
+újratöltés nélkül) a `.skel--ink` módosító azonnal meg- és eltűnik, e2e regresszió:
+`apps/web/e2e/skeleton-theme.spec.ts`.
 
 **A futó, üres transcript** (ugyanazzal a scripttel, a pótlás `replay_complete` keretével, mindkét
 témában azonos eredmény). Előtte: `running` és `succeeded` futásnál is "A futásnak még nincs

@@ -15,7 +15,6 @@ import {
   Button,
   DataTable,
   ProgressBar,
-  Skeleton,
   Tabs,
   ToastViewport,
   useToasts,
@@ -28,6 +27,7 @@ import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { describeRunStatusBadge } from './run-status-badge.ts';
 
 /**
@@ -370,7 +370,7 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
       <Tabs items={tabItems} active={activeTabId} onChange={setActiveTabId} aria-label="Futás lista fülek" />
       {isReloading && <ProgressBar isLabelVisible={false} ariaLabel="a lista frissítése folyamatban" value={100} />}
       {isFirstLoad ? (
-        <Skeleton shape="text" lines={4} />
+        <ThemedSkeleton shape="text" lines={4} />
       ) : (
         <DataTable
           rows={rows}

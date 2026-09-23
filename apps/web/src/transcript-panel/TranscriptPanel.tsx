@@ -1,9 +1,10 @@
 import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
-import { Button, Skeleton } from '@easter-workflow-builder/ui';
+import { Button } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
 import { RunEventRow } from '../run-event-row/RunEventRow.tsx';
 import { isRunInterruptible } from '../run-control/run-control-availability.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
@@ -107,7 +108,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
         // saját betöltés jelzése (`RunViewScreen`), hogy a két egymást
         // követő csontváz ne ugorjon.
         <div className="transcript-panel__loading">
-          <Skeleton shape="text" lines={4} />
+          <ThemedSkeleton shape="text" lines={4} />
         </div>
       ) : (
         <>

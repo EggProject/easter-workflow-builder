@@ -6,13 +6,14 @@ import {
   type RunDetail,
   type RunSnapshotResponse,
 } from '@easter-workflow-builder/protocol';
-import { Alert, Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
+import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import type { RouteFailure } from '../rest-client/route-outcome.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { RunControlBar } from '../run-control/RunControlBar.tsx';
 import { RunGraphCanvas } from '../run-graph/RunGraphCanvas.tsx';
 import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
@@ -355,7 +356,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     // (`.claude/CLAUDE.md` 11. szekció).
     return (
       <div className="run-view-screen__loading" role="status">
-        <Skeleton shape="text" lines={4} />
+        <ThemedSkeleton shape="text" lines={4} />
       </div>
     );
   }
