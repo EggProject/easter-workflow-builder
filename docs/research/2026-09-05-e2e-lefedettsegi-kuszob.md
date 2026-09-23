@@ -1039,3 +1039,33 @@ shardban, **206 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
 (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report`
 exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (98.97 / 98.37 / 99.40 /
 98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 24. A témázott csontváz és a futás nézet vászon javítása utáni ratchet (2026-09-23): a statements küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az `f3ac259` commit (`Skeleton sötét téma: .skel--ink bekötése ThemedSkeleton
+komponensen keresztül`) új, e2e-vel fedett kódot hozott (`apps/web/src/themed-skeleton/`: a
+`ThemedSkeleton` burkoló és a `useIsDarkTheme` hook), a statements aránya 98.97-re nőtt, a küszöb
+viszont 98.96-on maradt. A rákövetkező javítás (a futás nézet éle és pontmintája,
+`docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció) kizárólag CSS-t és egy új e2e
+spec fájlt (`run-graph-paint.spec.ts`) érint, TypeScript termékkódot nem, tehát a mért értéket nem
+mozdíthatja; a mérés ezen az állapoton készült.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet négy
+shardban, **213 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (23. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1449 / 1464     | **98.97** | 98.96                      | 15 -> **15**                   |
+| branches   | 660 / 671       | 98.36     | 98.36                      | 11 -> **11**                   |
+| functions  | 496 / 499       | 99.39     | 99.39                      | 3 -> **3**                     |
+| lines      | 1395 / 1410     | 98.93     | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező a statements, a functions és a lines metrikán nőtt (+8, +5,
++8, a `themed-skeleton` két fájlja), a fedetlen darabszám egyiken sem; a fedetlen sorok ugyanabban
+a hat fájlban állnak, mint a 16. szekció óta (`mount-app.tsx`, `read-frontend-config.ts`,
+`is-valid-connection.ts`, `browser-history-location-port.ts`, `perform-route-request.ts`,
+`use-stream-connection.ts`). A küszöb a mért statements értékre húzva (98.96 -> **98.97**), a másik
+három a mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/web/package.json`). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (98.98 / 98.37 / 99.40 / 98.94) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).

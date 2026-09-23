@@ -67,8 +67,14 @@ osztálya mind a négy esetben `react-flow light`.
   `prefers-color-scheme: dark` media query dönt.
 
 **Független harmadik megerősítés.** A publikált build <https://unpkg.com/@xyflow/react@12.11.6/dist/style.css>
-ugyanezeket az értékeket adja, a build előtti forrás
-<https://raw.githubusercontent.com/xyflow/xyflow/main/packages/system/src/styles/style.css> és
+ugyanezeket az értékeket adja. A build előtti forrásban az értékek KÉT fájlban állnak: a vezérlő
+gomb `-default` változói (`#fefefe` világos, `#2b2b2b` sötét) a
+<https://raw.githubusercontent.com/xyflow/xyflow/main/packages/system/src/styles/style.css>
+fájlban, az attribúció háttér változója (`rgba(255, 255, 255, 0.5)` világos,
+`rgba(150, 150, 150, 0.25)` sötét) és a link fix `#999` színe viszont NEM ott, hanem a
+<https://raw.githubusercontent.com/xyflow/xyflow/main/packages/system/src/styles/init.css>
+fájlban: a `style.css`-ben az `attribution` szóra nulla találat van (mindkét fájl lekérve
+2026-09-23-án, a `main` ágról). A `colorMode` feloldása:
 <https://raw.githubusercontent.com/xyflow/xyflow/main/packages/react/src/hooks/useColorModeClass.ts>.
 
 **Nem megerősített a dokumentáció szövegében**: hogy a `colorMode="system"` a
@@ -76,6 +82,11 @@ ugyanezeket az értékeket adja, a build előtti forrás
 szövege nem. A javítás a `colorMode`-ot nem használja, tehát a döntés nem függ tőle.
 
 ## 3. A döntés: közös `--xy-*` blokk, `colorMode` nélkül
+
+**Részben felülírva, lásd a 6. szekciót.** A közös fájlban mára KIZÁRÓLAG a vezérlő gomb és az
+attribúció sorai állnak (az alábbi táblázat hét sora); az él, a kapcsolódási vonal, a fogantyú, a
+pontminta és a kijelölés sorai visszakerültek a `graph-editor.css`-be, mert a futás nézetre
+átvéve annak élét és pontmintáját elhalványították.
 
 A `--xy-*` blokk a `graph-editor.css`-ből a közös `apps/web/src/graph-editor/graph-canvas-theme.css`
 fájlba költözött, `.graph-canvas-theme` osztályon, és MINDKÉT vászon konténere viseli
@@ -110,9 +121,10 @@ vásznon. Az indok a token saját kommentje a `packages/ui/src/design-token/them
 | `--xy-attribution-background-color`            | `--ep-bg-elevated` | ugyanaz a lebegő panel felület, mint a vezérlőé           |
 | attribúció link `color` (a fix `#999` helyett) | `--ep-fg-subtle`   | "tertiary / meta" szöveg                                  |
 
-A blokk többi sora (él, kapcsolódási vonal, fogantyú, háttér minta, kijelölés) szintén
-változatlan; a futás nézetben ezek eddig a könyvtár világos alapértékén álltak, mostantól a
-szerkesztővel azonosak. Ez látható változás a futás nézet élein, fogantyúin és pontmintáján.
+A blokk többi sora (él, kapcsolódási vonal, fogantyú, háttér minta, kijelölés) ebben a lépésben
+szintén a közös fájlba került; a futás nézetben ezek addig a könyvtár világos alapértékén álltak.
+Ez a futás nézet élein, fogantyúin és pontmintáján NEM KÉRT, látható változás volt, amit a 6.
+szekció visszavont.
 
 ## 4. Mérés utána
 
@@ -138,3 +150,71 @@ ugyanazon a képernyőképen, tehát küszöb szám nincs; a váltás után a go
 `expect.poll` alatt megváltozik. Szándékos rontással mérve (a futás nézet konténeréről levéve a
 `graph-canvas-theme` osztályt) a futás nézet tesztje már a világos szakaszban elbukik (254,254,254
 a várt 255,255,255 helyett), a szerkesztő tesztje átmegy.
+
+## 6. Regresszió és javítás: a futás nézet éle és pontmintája (2026-09-23)
+
+**A hiba.** A 3. szekció döntése a szerkesztő TELJES `--xy-*` blokkját tette közössé, nem csak a
+kért vezérlő és attribúció sorokat. Egy független ellenőrzés mérte ki, hogy a futás nézet éle
+sötét témában a harmadára gyengült, a pontmintája pedig mindkét témában gyakorlatilag eltűnt; a
+szerkesztő változatlan maradt. Kapu nem fogta meg: a `react-flow-theme.spec.ts` csak a gombot és
+az attribúciót méri, a `showcase-graph.spec.ts` csak a szerkesztő élét, a `bun run screenshots`
+nem kapu, a közös 8-as él küszöb (`edge-paint-measurement.ts`) pedig a gyengült élt is
+kifestettnek fogadta el.
+
+**A javítás.** A közös `graph-canvas-theme.css` kizárólag a vezérlő gomb és az attribúció sorait
+tartja (a 3. szekció táblázatának hét sora); az él, a kapcsolódási vonal, a fogantyú, a pontminta
+és a kijelölés sorai szó szerint visszakerültek a `graph-editor.css` `.graph-editor-canvas`
+blokkjába, ahol a `7229769` előtt álltak. A futás nézet ezeken ismét a React Flow szállított
+alapértelmezését festi (él `#b1b1b7`, pont `#91919a`, `@xyflow/react@12.11.6` `dist/style.css` 6. és 24. sor; mért számított érték `rgb(177, 177, 183)` és `rgb(145, 145, 154)`). **Javaslat, nem
+döntés:** hogy a futás nézet éle és pontmintája design system tokenre kerüljön-e, az külön
+termékdöntés; ez a javítás csak a nem kért változást vonja vissza.
+
+**A mérés módja.** Eldobható mérő spec a repón kívül (`/private/tmp/runview-vaszon/`, a
+`screenshot-pipeline` invariáns miatt), valódi Chromium (`@playwright/test@1.62.1`), 1440x900,
+a repó `showcase-graph.ts` bemutató futása és szerkesztője (tizenegy él, a "Fit View" gomb után;
+illesztési nagyítás a futás nézetben 0.58, a szerkesztőben 0.83), három `vite build` a három
+állapotról. Él: a `measureEdgePaintDifference` szondás mérése élenként, a táblázatban a
+tizenegy él legkisebb és legnagyobb értéke. Pontminta: a teljes vászon kivágata, a csomópont, az
+él és a panel mindkét képről `visibility: hidden` alatt, egyszer a pontmintával, egyszer
+`.react-flow__background { display: none }` mellett, a két kép legnagyobb csatorna eltérése.
+Gomb és attribúció: a 4. szekció pontjai.
+
+| vászon, téma         | állapot                  | él (min..max) | pontminta | gomb pixel  | attribúció pixel |
+| -------------------- | ------------------------ | ------------- | --------- | ----------- | ---------------- |
+| futás nézet, világos | `7229769` előtt          | 21..40        | 21        | 254,254,254 | 251,249,245      |
+| futás nézet, világos | `7229769`                | 69..136       | 4         | 255,255,255 | 255,255,255      |
+| futás nézet, világos | javítás                  | 21..40        | 21        | 255,255,255 | 255,255,255      |
+| futás nézet, sötét   | `7229769` előtt          | 47..95        | 29        | 254,254,254 | 133,134,137      |
+| futás nézet, sötét   | `7229769`                | 15..31        | 6         | 27,30,36    | 27,30,36         |
+| futás nézet, sötét   | javítás                  | 47..95        | 29        | 27,30,36    | 27,30,36         |
+| szerkesztő, világos  | mindhárom állapot azonos | 193..198      | 7         | 255,255,255 | 255,255,255      |
+| szerkesztő, sötét    | mindhárom állapot azonos | 43..47        | 11        | 27,30,36    | 27,30,36         |
+
+A javítás után a futás nézet mind a tizenegy élének értéke élenként, bitre azonos a `7229769`
+előtti állapotéval, mindkét témában; a szerkesztő élenkénti értékei mindhárom állapotban azonosak.
+**Teljes képernyőkép összevetés** (az előtte és a javított build, pixelenként): a futás nézeten
+kizárólag a bal alsó vezérlő és a jobb alsó attribúció területe tér el, plusz a transcript panel
+csontváz területe, ami UGYANANNAK a buildnek két egymás utáni futása között is ugyanígy eltér
+(animáció); a szerkesztőn csak ez utóbbi fajta, futásról futásra változó eltérés van.
+
+**A szándékos rontás a küszöbhöz.** A futás nézet élének vonala a vászon háttérszínével festve
+(`.react-flow__edge-path { stroke: <a mért háttér pixel> }`): élenként világosban 2..3, sötétben
+1..2.
+
+**A kapu teszt:** `apps/web/e2e/run-graph-paint.spec.ts`, a `test:e2e` kapun, a futás nézet
+bemutató futásán, témánként egy él és egy pontminta teszt. A küszöbök a fenti táblázatból:
+
+| állítás                 | küszöb | a legerősebb hibás állapot | az ép állapot legkisebb értéke | származtatás                                     |
+| ----------------------- | ------ | -------------------------- | ------------------------------ | ------------------------------------------------ |
+| él, világos             | 12     | 3 (háttérszínnel festő)    | 21                             | a 3 és a 21 egész felezőpontja                   |
+| él, sötét               | 39     | 31 (`7229769`)             | 47                             | a 31 és a 47 felezőpontja                        |
+| pontminta, mindkét téma | 13     | 6 (`7229769`, sötét)       | 21 (világos)                   | a 6 és a 21 egész felezőpontja, lefelé kerekítve |
+
+Világosban a `7229769` éle ERŐSEBB volt az épnél (69..136), tehát ott az él küszöbe csak az
+eltűnést és a háttérszínnel festést fogja; a világos regressziót a pontminta állítása fogja.
+
+**A bukás igazolva.** A két CSS fájl a `7229769` állapotára visszaállítva, a spec a repó
+Playwright configjával: négy tesztből három bukik (világos pontminta `Expected: >= 13, Received:
+4`; sötét él `Expected: >= 39, Received: 15`; sötét pontminta `Expected: >= 13, Received: 6`), a
+világos él átmegy (a fenti ok). A javított állapoton mind a négy zöld, élenként ugyanazokkal a
+számokkal, mint a fenti mérés.
