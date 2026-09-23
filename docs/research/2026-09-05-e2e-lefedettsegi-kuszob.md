@@ -1069,3 +1069,28 @@ három a mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/we
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (98.98 / 98.37 / 99.40 / 98.94) mind a négy metrika `ERROR`
 sorral bukik (négy `ERROR`, exit 1).
+
+## 25. A topnav stream jelző `FeedIndicator` átállása utáni ratchet (2026-09-23): a functions küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A topnav stream állapot jelzője a nyers `<span>` helyett a design system
+`FeedIndicator` komponensét használja, egy új, e2e-vel fedett `apps/web` fájlon át
+(`apps/web/src/app-shell/StreamStatusIndicator.tsx`: a négy stream fázis leképezése a forrás
+állapotaira, és a sötét témás `ink` felület). A `packages/ui` új `dot` és `feed-indicator` témája
+nem része az `apps/web` e2e műszerezésének, a unit kapu fedi őket, 100 százalékon.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet egy
+futásban, három workerrel, **218 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (24. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1451 / 1466     | 98.97     | 98.97                      | 15 -> **15**                   |
+| branches   | 660 / 671       | 98.36     | 98.36                      | 11 -> **11**                   |
+| functions  | 497 / 500       | **99.40** | 99.39                      | 3 -> **3**                     |
+| lines      | 1397 / 1412     | 98.93     | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező a statements, a functions és a lines metrikán nőtt (+2, +1,
++2, a `StreamStatusIndicator.tsx`), a fedetlen darabszám egyiken sem. A küszöb a mért functions
+értékre húzva (99.39 -> **99.4**), a másik három a mért értékkel már egyezett, felfelé kerekítés
+nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(98.98 / 98.37 / 99.41 / 98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

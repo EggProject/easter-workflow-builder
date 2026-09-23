@@ -51,6 +51,8 @@ const VENDORED_FILES = new Set([
   'packages/ui/src/textarea/textarea.css',
   'packages/ui/src/accordion/accordion.css',
   'packages/ui/src/alert/alert.css',
+  'packages/ui/src/dot/dot.css',
+  'packages/ui/src/feed-indicator/feed-indicator.css',
 ]);
 
 function repoRoot(): string {

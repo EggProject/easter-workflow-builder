@@ -6,8 +6,8 @@ import type { SubscribeToStreamFrames } from './subscribe-to-stream-frames.ts';
 
 /**
  * A topnav státusz kijelzőjének négy állapota (SPEC-007 11. szekció 14 ...
- * 16. async pontja). A `live` állapothoz nincs önálló szöveg (11. szekció),
- * ezért a hívó ezt az egy ágat nem jelzi ki.
+ * 16. async pontja). Mind a négyet a `FeedIndicator` jelzi ki, a `live`
+ * állapotot is, "élő" felirattal (`app-shell/StreamStatusIndicator.tsx`).
  */
 export type StreamConnectionPhase = 'connecting' | 'reconnecting' | 'replaying' | 'live';
 
@@ -74,8 +74,7 @@ const FRAME_EVENT_NAMES = [
  * A négy állapot kiszámítása (SPEC-007 9.4, 11. szekció 14 ... 16. pont):
  * amíg a kapcsolat `CONNECTING` (nem `OPEN`), az első csatlakozás
  * "kapcsolódás", minden utána következő "újracsatlakozás"; `OPEN` állapotban
- * a folyamatban lévő pótlás "előzmények betöltése", különben "élő" (jelzés
- * nélkül).
+ * a folyamatban lévő pótlás "előzmények betöltése", különben "élő".
  */
 function computePhase(
   readyState: number,

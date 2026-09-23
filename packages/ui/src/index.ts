@@ -41,6 +41,16 @@ export {
   type DataTableColumn,
   type DataTableProperties,
 } from './data-table/DataTable.tsx';
+export { Dot, type DotProperties, type DotSize, type DotTone } from './dot/Dot.tsx';
+export {
+  FeedIndicator,
+  type FeedIndicatorProperties,
+  type FeedIndicatorSize,
+  type FeedIndicatorState,
+  type FeedIndicatorStateSpecification,
+  type FeedIndicatorSurface,
+  type FeedIndicatorVariant,
+} from './feed-indicator/FeedIndicator.tsx';
 export { Checkbox, type CheckboxProperties } from './form-control/Checkbox.tsx';
 export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from './loading-indicator/ProgressBar.tsx';
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';

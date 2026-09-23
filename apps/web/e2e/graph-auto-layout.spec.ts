@@ -18,6 +18,13 @@ import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
+/**
+ * A szerkesztő mentetlen jelzőjének szövege. A `getByRole('status')` a
+ * topnav stream jelzőjét is megtalálja (`FeedIndicator`, `role="status"`,
+ * 2026-09-23), ezért a szerkesztő jelzője a szövegével szűrve áll.
+ */
+const UNSAVED_CHANGES_TEXT = 'Mentetlen változtatások';
+
 const AGENT_STEP_CONFIG: NodeConfig = {
   type: 'agent_step',
   promptTemplate: 'Foglald össze a bemenetet.',
@@ -285,7 +292,7 @@ test('az "Elrendezés" gomb balról jobbra rendezi a csomópontokat, és mentés
   await expect(nodeLocator(page, 'n-agent-b')).toBeVisible();
 
   // Betöltés után a gráf még nem piszkos: a jelző nincs a DOM-ban.
-  await expect(page.getByRole('status')).toBeHidden();
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toBeHidden();
 
   const beforeStart = await requireBoundingBox(nodeLocator(page, 'n-start'));
 
@@ -296,7 +303,9 @@ test('az "Elrendezés" gomb balról jobbra rendezi a csomópontokat, és mentés
 
   // A jelző megjelenik: a `layoutGraph` hívása a `currentNodes` állapotot
   // írta át, ami az `isGraphDirty`-t igazra váltja - mentés nem történt.
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
   expect(saveCallCount).toBe(0);
 
   const afterStart = await requireBoundingBox(nodeLocator(page, 'n-start'));
@@ -334,7 +343,9 @@ test('az elrendezés után az azonos rangú csomópontok között legalább `nod
   // "Mentés" melletti nyíl trigger nyitja, a menüpont ott aktiválja.
   await page.getByRole('button', { name: 'További műveletek' }).click();
   await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 
   const boxes = await readGraphLayoutBoxes(page);
   const agentB = requireLayoutBox(boxes, 'n-agent-b');
@@ -375,7 +386,9 @@ test('az elrendezés után a nézet újra a teljes gráfra illeszkedik, egyetlen
   // "Mentés" melletti nyíl trigger nyitja, a menüpont ott aktiválja.
   await page.getByRole('button', { name: 'További műveletek' }).click();
   await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 
   // A React Flow saját, dokumentált `data-testid="rf__wrapper"` fogódzója a
   // vászon gyökerén - ugyanaz a `rf__` előtagú kivétel, mint a node testid-nél.

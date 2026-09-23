@@ -19,6 +19,13 @@ import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
+/**
+ * A szerkesztő mentetlen jelzőjének szövege. A `getByRole('status')` a
+ * topnav stream jelzőjét is megtalálja (`FeedIndicator`, `role="status"`,
+ * 2026-09-23), ezért a szerkesztő jelzője a szövegével szűrve áll.
+ */
+const UNSAVED_CHANGES_TEXT = 'Mentetlen változtatások';
+
 const GRAPH: WorkflowGraphDocument = {
   nodes: [
     {
@@ -171,7 +178,7 @@ test('a lábléc ragadós, balra a státusszal és jobbra a sm méretű split bu
   // és egyben a jelzés meglétét is igazolja.
   await menuTrigger.click();
   await page.getByRole('menuitem', { name: 'Elrendezés' }).click();
-  const status = page.getByRole('status');
+  const status = page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT });
   await expect(status).toHaveText('Mentetlen változtatások');
 
   const geometry = await page.evaluate(() => {

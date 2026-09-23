@@ -16,8 +16,9 @@ import { RunHistoryScreen } from '../run-history/run-history-screen.tsx';
 import { RunViewScreen } from '../run-view/RunViewScreen.tsx';
 import { browserEventSourceFactory } from '../stream-client/browser-event-source-factory.ts';
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
-import { useStreamConnection, type StreamConnectionPhase } from '../stream-client/use-stream-connection.ts';
+import { useStreamConnection } from '../stream-client/use-stream-connection.ts';
 import { WorkflowListScreen } from '../workflow-list/workflow-list-screen.tsx';
+import { StreamStatusIndicator } from './StreamStatusIndicator.tsx';
 
 export interface AppShellProperties {
   readonly apiOrigin: string;
@@ -26,19 +27,6 @@ export interface AppShellProperties {
   readonly streamReplayLimit: number;
   readonly fetchFunction: FetchFunction;
 }
-
-/**
- * A stream kapcsolat státusz szövege a topnav `.app-tn__actions` sávjában
- * (SPEC-007 11. szekció 14 ... 16. async pont). A `live` fázisnak nincs
- * önálló szövege (a `useStreamConnection` dokumentációja szerint), ezért a
- * leképezés csak három fázist fed; a negyedik a hívó oldalon `undefined`-et
- * ad, jelzés nélkül.
- */
-const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string>>> = {
-  connecting: 'kapcsolódás',
-  replaying: 'előzmények betöltése',
-  reconnecting: 'újracsatlakozás',
-};
 
 /**
  * Az ismeretlen (`undefined`) útvonal morzsamenü végpontjának neve
@@ -109,8 +97,6 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
   useEffect(() => {
     setIsNavigationMenuOpen(false);
   }, [routeId]);
-
-  const streamStatusLabel = STREAM_STATUS_LABEL[streamConnection.phase];
 
   const content = renderRouteContent(routeId, {
     apiOrigin,
@@ -188,7 +174,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
       }
       actions={
         <>
-          {streamStatusLabel === undefined ? undefined : <span>{streamStatusLabel}</span>}
+          <StreamStatusIndicator phase={streamConnection.phase} />
           <ThemeModeToggle />
         </>
       }
