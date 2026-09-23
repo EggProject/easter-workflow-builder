@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null -- a RunEventRecord és a StepRunRecord nullázható mezői a dróton ténylegesen `null` értéket hordoznak (SPEC-003 4.10, 6.2) */
-import type { RunEventRecord, StepRunRecord } from '@easter-workflow-builder/protocol';
+import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -87,9 +87,13 @@ describe('TranscriptPanel', () => {
     container.remove();
   });
 
-  function renderPanel(transcript: RunTranscriptState, stepRuns: readonly StepRunRecord[] = []): void {
+  function renderPanel(
+    transcript: RunTranscriptState,
+    stepRuns: readonly StepRunRecord[] = [],
+    runStatus: RunStatus = 'running',
+  ): void {
     act(() => {
-      root.render(<TranscriptPanel transcript={transcript} stepRuns={stepRuns} />);
+      root.render(<TranscriptPanel transcript={transcript} stepRuns={stepRuns} runStatus={runStatus} />);
     });
   }
 
@@ -101,21 +105,55 @@ describe('TranscriptPanel', () => {
     return element;
   }
 
-  it('az első lap betöltése alatt a fejlécben az előzmények betöltését, a lista helyén csontvázat mutat', () => {
-    renderPanel(transcriptOf([], false));
+  function statusTexts(): readonly (string | null)[] {
+    return [...container.querySelectorAll('[role="status"]')].map((element) => element.textContent);
+  }
 
-    expect(container.querySelector('[role="status"]')?.textContent).toBe('Előzmények betöltése');
-    expect(container.querySelectorAll(':scope .transcript-panel__loading .skel')).toHaveLength(4);
-    expect(container.querySelector('[role="list"]')).toBeNull();
-  });
+  it.each(['running', 'succeeded'] satisfies RunStatus[])(
+    '%s futás első lapjának betöltése alatt a fejlécben az előzmények betöltését, a lista helyén csontvázat mutat',
+    (runStatus) => {
+      renderPanel(transcriptOf([], false), [], runStatus);
 
-  it('lezárult pótlás és nulla esemény mellett kimondja, hogy nincs esemény, betöltés jelzés nélkül', () => {
+      expect(statusTexts()).toEqual(['Előzmények betöltése']);
+      expect(container.querySelectorAll(':scope .transcript-panel__loading .skel')).toHaveLength(4);
+      expect(container.querySelector('[role="list"]')).toBeNull();
+      expect(container.querySelector('.transcript-panel__empty')).toBeNull();
+    },
+  );
+
+  it.each(['pending', 'running'] satisfies RunStatus[])(
+    'lezárult pótlás és nulla esemény mellett a még tartó (%s) futás az első eseményre várakozást jelzi',
+    (runStatus) => {
+      renderPanel(transcriptOf([], true), [], runStatus);
+
+      expect(statusTexts()).toEqual(['Várakozás az első eseményre']);
+      expect(container.querySelector('.transcript-panel__empty')).toBeNull();
+      expect(container.querySelector('.transcript-panel__loading')).toBeNull();
+      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    },
+  );
+
+  it.each(['succeeded', 'failed', 'cancelled', 'interrupted'] satisfies RunStatus[])(
+    'lezárult pótlás és nulla esemény mellett a lezárt (%s) futás kimondja, hogy nincs esemény, várakozás jelzés nélkül',
+    (runStatus) => {
+      renderPanel(transcriptOf([], true), [], runStatus);
+
+      expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe('A futásnak nincs eseménye.');
+      expect(statusTexts()).toEqual([]);
+      expect(container.querySelector('.transcript-panel__loading')).toBeNull();
+      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    },
+  );
+
+  it('a még tartó futás első eseménye után a várakozás jelzés eltűnik', () => {
     renderPanel(transcriptOf([], true));
+    expect(statusTexts()).toEqual(['Várakozás az első eseményre']);
 
-    expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe('A futásnak még nincs eseménye.');
-    expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
-    expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    renderPanel(transcriptOf([makeRecord(1)], true));
+    expect(statusTexts()).toEqual([]);
+    expect(list().querySelectorAll('.run-event-row')).toHaveLength(1);
   });
 
   it('a pótlás alatt már megérkezett sorok látszanak, a fejléc közben még a betöltést jelzi', () => {

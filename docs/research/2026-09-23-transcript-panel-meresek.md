@@ -167,3 +167,43 @@ után is az utolsó sor látszik (mérve, 375x812).
 - A lépés futások élő frissülése: a panel a providert a képernyő megnyitásakor betöltött
   `StepRunRecord` listából oldja fel; egy később indult lépés `sdk_result` sora addig "nem ismert
   provider" állapotban áll, amíg a lista újra nem töltődik.
+
+## 10. A csontváz színe a két témában, és a futó, üres transcript
+
+**Módszer.** Eldobható mérő script a repón kívül (a `screenshot-pipeline` invariáns miatt):
+`vite build` a scratchpadbe, `node:http` statikus kiszolgálás, a REST hívások `page.route()`
+mockon, az SSE egy nyitva tartott `node:http` kapcsolaton, valódi Chromium, 1440x900. A pótlás
+lezáró `replay_complete` kerete nélkül a transcript a csontváz állapotban marad. Mért érték a
+`.transcript-panel__loading .skel` elemek számított `background-image` értéke, és a kifestett
+pixel (`page.screenshot({ animations: 'disabled' })`, a PNG a böngészőben, canvasszal dekódolva)
+mind a négy sáv 10, 50 és 90 százalékánál, plusz a panel háttere az első sáv fölött.
+
+| Téma    | számított `background-image`                                          | sáv pixelek (RGB)           | panel háttér (RGB) |
+| ------- | --------------------------------------------------------------------- | --------------------------- | ------------------ |
+| világos | `linear-gradient(90deg, rgb(236, 231, 218), rgb(246, 243, 235), ...)` | 237,232,219 ... 245,242,233 | 246,243,235        |
+| sötét   | ugyanaz                                                               | 237,232,219 ... 245,242,233 | 11,13,18           |
+
+**Gyökérok: a design system forrása, nem az átemelés.** A forrás
+`eggproject-design-components/components/skeleton/skeleton.css` `.skel` szabálya a nyers paletta
+`--ep-paper-200` és `--ep-paper-100` tokenjére épül, amit a `theme-dark.css` nem definiál felül,
+tehát a sáv mindkét témában ugyanazt a világos krémszínt festi. Az átemelt `packages/ui`
+`skeleton.css` `.skel` szabályai bájtra azonosak a forrással (a `diff` eltérése kizárólag a
+fejlécben dokumentált `.skel-list*` kihagyás), a `theme-dark.css` is bájtra azonos, és az
+`apps/web` alatt nincs `.skel` felülírás. A forrás `DESIGN.md` "Skeleton" szekciója ezt a
+leképezést nevesítve rögzíti (világos shimmer: `--ep-paper-200`/`--ep-paper-100`; sötét
+felületre az opt-in `ink` változat: `--ep-slate-700`/`--ep-slate-600`), a `theme-light.css` saját
+kommentje szerint viszont az "Interaction surfaces" tokenek épp a komponensek nyers
+`paper-100/200` használatát váltják ki; a skeleton ezt a migrációt nem kapta meg. A csökkentett
+mozgás ág (`--ep-bg-pressed`) téma függő, tehát ott a hiba nem jelentkezik.
+
+**Nyitva, user döntésre vár.** A szabálykönyv 11. szekciója szerint saját token nem készül, és a
+forrással azonos CSS nem íródik át csendben. Mi a viselkedés addig: sötét témában a csontváz
+világos sávokat fest, a forrással azonosan. Mi zárná le: vagy a forrás javítása a design system
+skillben és bájtra azonos újraátemelés, vagy a forrás meglévő `ink` változatának a sötét
+témához kötése (a téma feloldását ilyenkor a fogyasztó végzi).
+
+**A futó, üres transcript** (ugyanazzal a scripttel, a pótlás `replay_complete` keretével, mindkét
+témában azonos eredmény). Előtte: `running` és `succeeded` futásnál is "A futásnak még nincs
+eseménye.", `role="status"` elem nélkül. Utána: `running` futásnál egyetlen `role="status"` elem,
+"Várakozás az első eseményre"; `succeeded` futásnál "A futásnak nincs eseménye.", státusz elem
+nélkül.

@@ -1017,3 +1017,25 @@ dokumentum-átvezetés kizárólag a `docs/` alatti fájlokat érinti, egy párh
 folyamatban), ezért a teljes Playwright készlet újrafuttatása ebben a munkamenetben nem történt
 meg. A négy százalék és a fedetlen darabszám forrása a fenti 1 ... 4. pont keresztellenőrzése, nem
 egy itt újrafuttatott mérés.
+
+## 23. A transcript várakozás jelzése utáni ratchet (2026-09-23): a küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A futó (`pending` vagy `running`), még esemény nélküli futás transcriptje a
+lezárult pótlás után `role="status"` várakozás jelzést kap, a lezárt, üres futás pedig nem
+státusz mondatot (SPEC-008 9. szekció 16. pont). Az új elágazás mindkét ágát a
+`transcript-panel.spec.ts` e2e tesztjei futtatják (futó üres mindkét témában, lezárt üres).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet nyolc
+shardban, **206 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (22. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1441 / 1456     | 98.96     | 98.96                      | 15 -> **15**                   |
+| branches   | 660 / 671       | **98.36** | 98.35                      | 11 -> **11**                   |
+| functions  | 491 / 494       | 99.39     | 99.39                      | 3 -> **3**                     |
+| lines      | 1387 / 1402     | **98.93** | 98.92                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A küszöb a mért négy számra húzva, felfelé kerekítés nélkül
+(`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report`
+exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (98.97 / 98.37 / 99.40 /
+98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

@@ -135,9 +135,9 @@ const MIXED_RECORDS: readonly RunEventRecord[] = [
  * A futás nézet REST mockjai; a workflow lista mockja az elnavigáló teszt
  * célképernyőjéhez kell.
  */
-async function mockRunViewRoutes(page: Page): Promise<void> {
+async function mockRunViewRoutes(page: Page, runDetail: RunDetail = RUN_DETAIL): Promise<void> {
   await installApiMocks(page, [
-    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetail))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
@@ -147,9 +147,13 @@ async function mockRunViewRoutes(page: Page): Promise<void> {
   ]);
 }
 
-async function mockTranscript(page: Page, records: readonly RunEventRecord[]): Promise<void> {
+async function mockTranscript(
+  page: Page,
+  records: readonly RunEventRecord[],
+  runDetail: RunDetail = RUN_DETAIL,
+): Promise<void> {
   await mockSseFrames(page, replayFrames(RUN_ID, records));
-  await mockRunViewRoutes(page);
+  await mockRunViewRoutes(page, runDetail);
 }
 
 function transcriptList(page: Page): Locator {
@@ -686,15 +690,41 @@ test('a fül sávban a transcript fül megnyitásakor és egy fülváltás után
   await expect(list.getByRole('listitem').last()).toBeInViewport();
 });
 
-test('esemény nélküli, lezárt pótlás után a panel kimondja, hogy nincs esemény, és elnavigálva leiratkozik', async ({
+const FIRST_EVENT_WAIT_TEXT = 'Várakozás az első eseményre';
+
+// A futó, még esemény nélküli futás a betöltéstől (csontváz) és a lezárt,
+// üres futástól is különböző állapot (SPEC-008 9. szekció 16. pont): a
+// lezárult pótlás után a panel státusz szöveggel mondja ki, hogy az agent
+// első eseményére vár. Mindkét témában, mert a jelzés színe téma token.
+for (const theme of ['light', 'dark'] as const) {
+  test(`futó, esemény nélküli futás: lezárult pótlás után látható várakozás jelzés (${theme} téma)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript((mode: string) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+    }, theme);
+    await mockTranscript(page, []);
+    await page.goto(RUN_URL);
+
+    const waitStatus = page.getByRole('status').filter({ hasText: FIRST_EVENT_WAIT_TEXT });
+    await expect(waitStatus).toBeVisible();
+    await expect(page.getByText('Előzmények betöltése', { exact: true })).toBeHidden();
+    await expect(page.getByText('A futásnak nincs eseménye.')).toBeHidden();
+    await expect(page.locator('.transcript-panel__loading')).toHaveCount(0);
+  });
+}
+
+test('esemény nélküli, lezárt pótlás után a lezárt futás kimondja, hogy nincs esemény, és elnavigálva leiratkozik', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await mockTranscript(page, []);
+  await mockTranscript(page, [], { ...RUN_DETAIL, status: 'succeeded', finishedAtMs: 3 });
   await page.goto(RUN_URL);
 
-  await expect(page.getByText('A futásnak még nincs eseménye.')).toBeVisible();
+  await expect(page.getByText('A futásnak nincs eseménye.')).toBeVisible();
   await expect(page.getByText('Előzmények betöltése', { exact: true })).toBeHidden();
+  await expect(page.getByRole('status').filter({ hasText: FIRST_EVENT_WAIT_TEXT })).toHaveCount(0);
 
   // A képernyő leszerelése a keret feliratkozás lezárását is lefuttatja.
   await page.getByRole('link', { name: 'Workflow-k' }).first().click();

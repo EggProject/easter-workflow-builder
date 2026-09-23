@@ -401,7 +401,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
           // A `key` a futás azonosítója: egy másik futásra navigálva a panel
           // (és a görgetés állapota) tiszta lappal indul.
-          transcript={<TranscriptPanel key={runId} transcript={transcript} stepRuns={stepRuns} />}
+          transcript={
+            <TranscriptPanel key={runId} transcript={transcript} stepRuns={stepRuns} runStatus={runDetail.status} />
+          }
           // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
           // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
           // visszaváltáskor a `defaultSizes` propból épül újra a kezdő

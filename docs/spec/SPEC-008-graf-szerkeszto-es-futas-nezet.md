@@ -628,6 +628,9 @@ A `human_approval` csomópont a motorban `waiting_approval` állapotba viszi a l
 | 13  | a futás újraindítása                                    | a gomb letiltva, benne spinner, majd navigáció az új futásra                 | mint az 5. pont                                      |
 | 14  | a függő jóváhagyások lekérése                           | `ProgressBar` a jóváhagyás sávban                                            | a sáv helye már látszik                              |
 | 15  | a jóváhagyási döntés elküldése                          | mindkét gomb letiltva, spinner a megnyomotton                                | a dupla küldés kizárása, és látszik, melyiket nyomta |
+| 16  | a még tartó futás első eseménye, lezárult pótlás után   | `role="status"` szöveg a lista helyén: "Várakozás az első eseményre"         | a futás tart, de az agent még nem válaszolt          |
+
+**A transcript üres listája három különböző állapot** (user kérés 2026-09-23): a pótlás alatt a 9. pont csontváza áll, a lezárult pótlás után a még tartó (`pending` vagy `running`) futás a 16. pont várakozás jelzését kapja, a lezárt futás pedig egy nem státusz mondatot ("A futásnak nincs eseménye."), mert ott már nincs mire várni.
 
 **Ami szándékosan nem async pont:** az elválasztó húzása, a vászon pásztázása és az automatikus elrendezés gombja. Mind a három szinkron, helyi művelet, tehát jelzés nélkül fut, és ezt kimondjuk, hogy a 15. szekció 35. kritériuma egyértelmű legyen. Az elrendezés azért szinkron, mert a dagre hívás tiszta függvény a helyi node és él listán (5.7), tehát nincs hálózat és nincs várakozás.
 

@@ -1,8 +1,9 @@
-import type { RunEventRecord, StepRunRecord } from '@easter-workflow-builder/protocol';
+import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { Button, Skeleton } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
 import { RunEventRow } from '../run-event-row/RunEventRow.tsx';
+import { isRunInterruptible } from '../run-control/run-control-availability.ts';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
@@ -16,6 +17,11 @@ export interface TranscriptPanelProperties {
    * providere, amitől a költség megjelenítése függ (SPEC-008 7.1).
    */
   readonly stepRuns: readonly StepRunRecord[];
+  /**
+   * A futás állapota: ettől függ, hogy a lezárult pótlás utáni üres lista
+   * várakozás (a futás még tart) vagy végleges (a futás lezárult).
+   */
+  readonly runStatus: RunStatus;
 }
 
 interface TranscriptRowProperties {
@@ -62,14 +68,21 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * felgörgetett állapotban az "ugrás az aljára" gomb megnevezi az új
  * események számát.
  *
- * **Várakozás jelzése** (SPEC-008 9. szekció 9. és 11. pontja): amíg a
+ * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
- * egyetlen sor sincs, a lista helyén csontváz.
+ * egyetlen sor sincs, a lista helyén csontváz. A lezárult pótlás utáni üres
+ * lista két különböző állapot: ha a futás még tart, az agent első eseményére
+ * várunk, és ezt `role="status"` szöveg mondja ki; ha a futás lezárult, a
+ * lista véglegesen üres, és ezt egy nem státusz mondat mondja ki.
  */
 export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>): ReactElement {
-  const { transcript, stepRuns } = properties;
+  const { transcript, stepRuns, runStatus } = properties;
   const { records, isReplayComplete } = transcript;
   const rowCount = records.length;
+  // A futás pontosan akkor tart még, ha megszakítható: a hat állapot nem
+  // terminális csoportja a `pending` és a `running`
+  // (`run-control-availability.ts`, SPEC-004 9. és 10. szekció).
+  const isRunInProgress = isRunInterruptible(runStatus);
   const { setList, onRowsRendered, onResize, unseenCount, jumpToBottom } = useTranscriptAutoScroll(rowCount);
   const rowHeight = useDynamicRowHeight({ defaultRowHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT });
 
@@ -98,7 +111,14 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
         </div>
       ) : (
         <>
-          {rowCount === 0 && <p className="transcript-panel__empty">A futásnak még nincs eseménye.</p>}
+          {rowCount === 0 &&
+            (isRunInProgress ? (
+              <p className="transcript-panel__status" role="status">
+                Várakozás az első eseményre
+              </p>
+            ) : (
+              <p className="transcript-panel__empty">A futásnak nincs eseménye.</p>
+            ))}
           <List
             aria-label="Futás eseményei"
             className="transcript-panel__list"
