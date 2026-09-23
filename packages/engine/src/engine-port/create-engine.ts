@@ -213,6 +213,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
       database: dependencies.database,
       eventPublisher: dependencies.eventPublisher,
       runSupervisor,
+      concurrencyGate,
       agentQueryRegistry,
       approvalRegistry,
     });

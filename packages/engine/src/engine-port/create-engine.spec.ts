@@ -417,6 +417,21 @@ async function waitForStepRunning(database: DatabaseContext, runId: string, node
   throw new Error(`a(z) ${nodeId} lépés nem indult el`);
 }
 
+/**
+ * Megvárja, amíg egy adott node példányának `pending` sora létrejön: a
+ * korlátozott szabályozó mellett ez a sorban álló, helyre váró lépés.
+ */
+async function waitForStepQueued(database: DatabaseContext, runId: string, nodeId: string): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+    if (step?.status === 'pending') {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés nem állt sorba`);
+}
+
 const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'cancelled', 'interrupted'] as const;
 
 describe('createEngine', () => {
@@ -689,6 +704,102 @@ describe('createEngine', () => {
 
       expect(summary.interruptedRunCount).toBeGreaterThanOrEqual(1);
       expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('interrupted');
+    });
+
+    it('REGRESSZIÓ: a futó agent lépés leállítása KÖZBEN hívott startRun engine_shutting_down hibát ad, és nem indít futást (SPEC-004 10.2 1. pont)', async () => {
+      const controlled = controlledMessageIterable('leallas-kozben');
+      const { promise: interruptCalled, resolve: signalInterrupt } = Promise.withResolvers<undefined>();
+      let runCalls = 0;
+      const holdingRunner: AgentQueryRunner = {
+        run: () => {
+          runCalls += 1;
+          return {
+            kind: 'ok',
+            value: {
+              messages: controlled.messages,
+              // A leállítás itt SZÁNDÉKOSAN nem enged azonnal: a lépés
+              // "leállítása tart", amíg a teszt el nem engedi, és közben
+              // érkezik az új indítás.
+              interrupt: () => {
+                signalInterrupt(undefined);
+                return Promise.resolve();
+              },
+            },
+          };
+        },
+      };
+      const harness = openHarness({ agentQueryRunner: holdingRunner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas-kozben',
+        [startNode('start'), agentNode('a1', 'lassu')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+      const first = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, first.run.id, 'a1');
+
+      const shutdown = harness.engine.shutdown();
+      await interruptCalled;
+      const second = await harness.engine.startRun({ workflowId, input: {} });
+      controlled.release();
+      const summary = okOrThrow(await shutdown);
+
+      expect(second.kind === 'error' ? second.message : '').toContain('(engine_shutting_down)');
+      expect(okOrThrow(harness.database.runs.listRuns()).map((run) => run.id)).toStrictEqual([first.run.id]);
+      expect(runCalls).toBe(1);
+      expect(summary.interruptedRunCount).toBe(1);
+      expect(okOrThrow(harness.database.runs.getRun(first.run.id)).status).toBe('interrupted');
+    });
+
+    it('REGRESSZIÓ: a szabályozó sorában álló agent lépés a leállás után sem indul el, amikor a futó lépés felszabadítja a helyet (SPEC-004 10.2 1. pont)', async () => {
+      const controlled = controlledMessageIterable('sorban-allo');
+      let runCalls = 0;
+      // Az első hívás a leállításig fut; minden további hívás azonnal
+      // sikeres volna, tehát a javítás nélkül a sorban álló lépés helyet
+      // kapna, lefutna, és a hívásszám kettő lenne.
+      const runner: AgentQueryRunner = {
+        run: () => {
+          runCalls += 1;
+          if (runCalls > 1) {
+            return {
+              kind: 'ok',
+              value: { messages: messageIterable(successMessages(runCalls)), interrupt: () => Promise.resolve() },
+            };
+          }
+          return {
+            kind: 'ok',
+            value: {
+              messages: controlled.messages,
+              interrupt: () => {
+                controlled.release();
+                return Promise.resolve();
+              },
+            },
+          };
+        },
+      };
+      const harness = openHarness({ agentQueryRunner: runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'sorban-allo',
+        [startNode('start'), agentNode('a1', 'lassu')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const running = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, running.run.id, 'a1');
+      const queued = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepQueued(harness.database, queued.run.id, 'a1');
+
+      const summary = okOrThrow(await harness.engine.shutdown());
+
+      expect(runCalls).toBe(1);
+      expect(summary.interruptedRunCount).toBe(2);
+      expect(okOrThrow(harness.database.runs.getRun(queued.run.id)).status).toBe('interrupted');
+      const queuedSteps = okOrThrow(harness.database.stepRuns.listStepRuns(queued.run.id));
+      expect(queuedSteps.filter((step) => step.nodeId === 'a1').map((step) => step.status)).toStrictEqual([
+        'interrupted',
+      ]);
     });
 
     it('a helyreállítás Outcome hibaágát továbbadja', async () => {

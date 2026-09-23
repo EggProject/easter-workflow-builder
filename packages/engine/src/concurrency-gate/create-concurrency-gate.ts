@@ -11,6 +11,7 @@ interface WaitingRequest {
   readonly providerId: ProviderId;
   readonly requestId: string;
   readonly onGranted: () => void;
+  readonly onDenied: () => void;
 }
 
 /**
@@ -47,6 +48,12 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
    * `requestId` -> a várakozó kérés, a térkép sorrendje az érkezési sorrend.
    */
   const waitingRequests = new Map<string, WaitingRequest>();
+  /**
+   * A `close` óta igaz. Csak a `requestSlot` olvassa: a lezáráskor a sor
+   * kiürül, és új bejegyzés nem kerülhet bele, tehát a `grantNextWaiting`
+   * lezárt szabályozón magától sem talál kiszolgálható kérést.
+   */
+  let isClosed = false;
 
   function occupiedSlotCount(providerId: ProviderId): number {
     return occupiedSlots
@@ -86,13 +93,26 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
     next.onGranted();
   }
 
-  function requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void): void {
+  function requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void, onDenied: () => void): void {
+    if (isClosed) {
+      onDenied();
+      return;
+    }
     if (hasFreeSlot(providerId)) {
       occupiedSlots.set(requestId, providerId);
       onGranted();
       return;
     }
-    waitingRequests.set(requestId, { providerId, requestId, onGranted });
+    waitingRequests.set(requestId, { providerId, requestId, onGranted, onDenied });
+  }
+
+  function close(): void {
+    isClosed = true;
+    const denied = waitingRequests.values().toArray();
+    waitingRequests.clear();
+    for (const request of denied) {
+      request.onDenied();
+    }
   }
 
   function releaseSlot(requestId: string): Outcome<void> {
@@ -114,5 +134,5 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
     };
   }
 
-  return { requestSlot, releaseSlot, occupiedSlotCount, waitingRequestCount };
+  return { requestSlot, releaseSlot, close, occupiedSlotCount, waitingRequestCount };
 }

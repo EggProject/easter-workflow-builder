@@ -20,6 +20,7 @@ import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 
 /**
  * A `agent_step` és a `join` `ai_synthesis` módja közös élettartama (SPEC-004
@@ -242,6 +243,13 @@ async function runAfterSlotGranted(
  * ilyenkor eldobódik, mert egy hibás szabályozó állapot súlyosabb, mint egy
  * egyébként lezárt lépés eredménye.
  *
+ * **A lezárt szabályozó elutasítását `interrupted` eredménnyel zárja**
+ * (SPEC-004 10.2 1. pont, `ConcurrencyGate.close`): a lépés ilyenkor el sem
+ * indul, tehát nincs `markStepRunning`, nincs `AgentQuery` és nincs mit
+ * felszabadítani. A `step_run` sor `pending` állapotban marad, és a leállás
+ * `recoverInterruptedRuns` tranzakciója zárja `interrupted` állapotba
+ * (`node-executor-result.ts`), ugyanúgy, mint a jóváhagyásra váró lépést.
+ *
  * **Az `agentQueryRegistry` paramétert változatlanul továbbadja a
  * `runAgentStep`-nek** (SPEC-004 9. szekció 3. pont, PLAN-005 T-005-26): ez a
  * réteg maga nem regisztrál semmit, csak a hely kérésének/felszabadításának
@@ -253,7 +261,7 @@ export async function runAgentNodeLifecycle(
   ports: EngineDependencies,
   gate: ConcurrencyGate,
   agentQueryRegistry: AgentQueryRegistry,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const { instance, nodeType, config } = input;
   const nodeId = instance.instance.nodeId;
   const { runId, providerId } = instance;
@@ -278,9 +286,21 @@ export async function runAgentNodeLifecycle(
   }
   const stepRunId = created.value.id;
 
-  await new Promise<void>((resolve) => {
-    gate.requestSlot(providerId, stepRunId, resolve);
+  const isGranted = await new Promise<boolean>((resolve) => {
+    gate.requestSlot(
+      providerId,
+      stepRunId,
+      () => {
+        resolve(true);
+      },
+      () => {
+        resolve(false);
+      },
+    );
   });
+  if (!isGranted) {
+    return { kind: 'ok', value: { kind: 'interrupted' } };
+  }
 
   try {
     return await runAfterSlotGranted(input, stepRunId, ports, agentQueryRegistry);

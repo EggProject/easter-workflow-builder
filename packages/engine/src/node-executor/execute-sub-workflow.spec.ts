@@ -629,10 +629,15 @@ describe('executeSubWorkflow holtpont mentesség', () => {
     const { runner } = fakeRunner(database, {
       beforeAwaitResolves: async () => {
         await new Promise<void>((resolve) => {
-          gate.requestSlot('minimax', 'gyerek-lepes', () => {
-            grants.push('gyerek-lepes');
-            resolve();
-          });
+          gate.requestSlot(
+            'minimax',
+            'gyerek-lepes',
+            () => {
+              grants.push('gyerek-lepes');
+              resolve();
+            },
+            notCalled,
+          );
         });
         okOrThrow(gate.releaseSlot('gyerek-lepes'));
       },

@@ -10,7 +10,7 @@ import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.t
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
-import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 
 type AgentStepNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'agent_step' }>;
 
@@ -47,7 +47,7 @@ export function executeAgentStep(
   ports: EngineDependencies,
   gate: ConcurrencyGate,
   agentQueryRegistry: AgentQueryRegistry,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   return runAgentNodeLifecycle(
     {
       instance: input.instance,

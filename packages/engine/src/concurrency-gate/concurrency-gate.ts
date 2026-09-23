@@ -30,6 +30,10 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
  * A visszahívás előtt a szabályozó belső nyilvántartása már frissült, tehát
  * az `onGranted` törzse biztonságosan hívhat újabb `requestSlot` vagy
  * `releaseSlot` műveletet.
+ *
+ * **A lezárt szabályozó nem enged több lépést indulni** (SPEC-004 10.2 1.
+ * pont): a `close` után minden várakozó és minden új kérés az `onDenied`
+ * visszahívást kapja, szintén szinkron, és az `onGranted` soha nem fut le rá.
  */
 export interface ConcurrencyGate {
   /**
@@ -38,7 +42,7 @@ export interface ConcurrencyGate {
    * szabályozó nem generál azonosítót, mert az az `idGenerator` port dolga
    * (SPEC-004 3.2).
    */
-  requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void): void;
+  requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void, onDenied: () => void): void;
 
   /**
    * A `requestId` hely vagy várakozó bejegyzés felszabadítása. Foglalt hely
@@ -51,6 +55,16 @@ export interface ConcurrencyGate {
    * indoklását a `packages/engine/CLAUDE.md` fájlban.
    */
   releaseSlot(requestId: string): Outcome<void>;
+
+  /**
+   * A szabályozó végleges lezárása a szabályos leálláskor (SPEC-004 10.2 1.
+   * pont). A sorban álló kérések azonnal, érkezési sorrendben `onDenied`
+   * visszahívást kapnak és kiesnek a sorból; a lezárás után érkező kérés
+   * ugyanígy. A már kiosztott helyek foglaltak maradnak, és a `releaseSlot`
+   * változatlanul felszabadítja őket, csak a felszabaduló helyet nem kapja meg
+   * senki. Visszanyitás nincs: a leálló motor nem indul újra.
+   */
+  close(): void;
 
   /**
    * A providerhez tartozó, jelenleg foglalt helyek száma.

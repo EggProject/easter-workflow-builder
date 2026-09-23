@@ -91,4 +91,10 @@ export type EngineErrorKind =
   // CÉLJÁT köti `error_handler` node-hoz, a fordítottját nem). Ilyenkor a
   // motor nem talál ki hibaosztályt és kísérletszámot, hanem megnevezett
   // hibával leállítja a futást.
-  | 'run_execution_failed';
+  | 'run_execution_failed'
+  // 10.2 1. pont: a szabályos leállás kezdete után a motor új futást nem
+  // indít (gyökér, újraindított és al-workflow futást sem), hanem ezzel a
+  // hibaosztállyal utasítja el. Mérve: enélkül egy a jel előtt fogadott, de
+  // csak utána beérkező törzsű indító kérés új futást indított, aminek az agent
+  // lépése a leállás alatt megszakítás nélkül végigfutott (SPEC-006 8.2).
+  | 'engine_shutting_down';

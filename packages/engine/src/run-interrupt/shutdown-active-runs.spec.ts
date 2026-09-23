@@ -112,8 +112,17 @@ function dependenciesOf(
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
   published: unknown[] = [],
+  calls: string[] = [],
 ): ShutdownActiveRunsDependencies {
-  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
+  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'stopAcceptingRuns'> = {
+    listActiveRuns: () => {
+      calls.push('listActiveRuns');
+      return handles;
+    },
+    stopAcceptingRuns: () => {
+      calls.push('stopAcceptingRuns');
+    },
+  };
   return {
     database,
     eventPublisher: {
@@ -122,6 +131,11 @@ function dependenciesOf(
       },
     },
     runSupervisor,
+    concurrencyGate: {
+      close: () => {
+        calls.push('concurrencyGate.close');
+      },
+    },
     agentQueryRegistry,
     approvalRegistry: createApprovalWaitRegistry(),
   };
@@ -193,6 +207,18 @@ describe('shutdownActiveRuns', () => {
     expect(interruptSpy).toHaveBeenCalledTimes(1);
     expect(okOrThrow(database.runs.getRun(tracked.run.id)).status).toBe('interrupted');
     expect(okOrThrow(database.runs.getRun(untracked.run.id)).status).toBe('interrupted');
+
+    database.close();
+  });
+
+  it('az aktív futások lekérdezése ELŐTT tiltja le az új futást és zárja le a szabályozót (SPEC-004 10.2 1. pont)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const calls: string[] = [];
+
+    okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [], registry, [], calls)));
+
+    expect(calls).toStrictEqual(['stopAcceptingRuns', 'concurrencyGate.close', 'listActiveRuns']);
 
     database.close();
   });

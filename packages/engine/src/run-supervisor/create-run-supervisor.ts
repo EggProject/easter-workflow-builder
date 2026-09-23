@@ -74,6 +74,11 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    */
   const childCompletions = new Map<string, Promise<Outcome<ChildWorkflowRunResult>>>();
 
+  /**
+   * A `stopAcceptingRuns` óta igaz (SPEC-004 10.2 1. pont).
+   */
+  let isAcceptingRuns = true;
+
   const nodeExecutorDependencies: NodeExecutorDependencies = {
     ports,
     concurrencyGate: dependencies.concurrencyGate,
@@ -84,9 +89,20 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
 
   /**
    * A SPEC-004 4.8 menet 1 ... 7. lépése, ebben a sorrendben. **Az 1 ... 5. lépés egyetlen adatot sem ír**: egy érvénytelen workflow soha nem hoz létre
-   * `workflow_run` sort.
+   * `workflow_run` sort. A leállás kezdete után (`stopAcceptingRuns`) már az
+   * 1. lépés előtt elutasít, szintén írás nélkül.
    */
   function startRunInternals(request: StartRunRequest): Outcome<StartedRunInternals> {
+    if (!isAcceptingRuns) {
+      return {
+        kind: 'error',
+        message: formatEngineErrorMessage(
+          'engine_shutting_down',
+          `A(z) "${request.workflowId}" workflow futása nem indul el, mert a motor szabályos leállása már elkezdődött`,
+        ),
+      };
+    }
+
     // 1. A workflow, a gráfja és a globális beállítás olvasása. A három
     //    olvasás eredményét a `collectRunInputs` fűzi össze, hogy a hívási
     //    helyen egyetlen, ténylegesen mindkét kimenetében előforduló elágazás
@@ -319,5 +335,8 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     awaitChildRun,
     listActiveRuns: () => registry.list(),
     getActiveRun: (runId) => registry.get(runId),
+    stopAcceptingRuns: () => {
+      isAcceptingRuns = false;
+    },
   };
 }

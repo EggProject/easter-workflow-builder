@@ -5,6 +5,7 @@ import type { DatabaseContext, GraphSnapshotDocument } from '@easter-workflow-bu
 import { openDatabase } from '@easter-workflow-builder/db';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { shutdownActiveRuns } from '../run-interrupt/shutdown-active-runs.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
@@ -111,7 +112,12 @@ describe('a szabályos leállás és a durva leállás utáni indulási helyreá
 
     okOrThrow(runStartupRecovery(viaStartupRecovery.database));
 
-    const noActiveRuns: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => [] };
+    const noActiveRuns: Pick<RunSupervisor, 'listActiveRuns' | 'stopAcceptingRuns'> = {
+      listActiveRuns: () => [],
+      stopAcceptingRuns: () => {
+        // ennek a tesztnek nincs futás indítása, amit le kellene tiltani
+      },
+    };
     okOrThrow(
       await shutdownActiveRuns({
         database: viaGracefulShutdown.database,
@@ -121,6 +127,7 @@ describe('a szabályos leállás és a durva leállás utáni indulási helyreá
           },
         },
         runSupervisor: noActiveRuns,
+        concurrencyGate: createConcurrencyGate(() => null),
         agentQueryRegistry: createAgentQueryRegistry(),
         approvalRegistry: createApprovalWaitRegistry(),
       }),

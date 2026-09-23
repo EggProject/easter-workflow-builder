@@ -22,12 +22,29 @@ import type { TemplateRendererPort } from '../engine-port/template-renderer-port
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { runAgentNodeLifecycle, type AgentNodeLifecycleInput } from './agent-node-lifecycle.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
+import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
     throw new Error(`váratlan hibaág: ${outcome.message}`);
   }
   return outcome.value;
+}
+
+/**
+ * A LEZÁRULT kimenet a `NodeExecutionResult` értékből. Az `interrupted` ág
+ * (`node-executor-result.ts`) csak a lezárt szabályozó elutasításakor áll
+ * elő, amit az `agent-node-lifecycle.spec.ts` és az
+ * `execute-join-ai-synthesis.spec.ts` külön tesztesete vizsgál; ezekben a
+ * tesztesetekben váratlan kimenet.
+ */
+function settledOrThrow(outcome: Outcome<NodeExecutionResult>): NodeExecutionOutcome {
+  const value = okOrThrow(outcome);
+  if (value.kind === 'interrupted') {
+    throw new Error('váratlan interrupted kimenet');
+  }
+  return value;
 }
 
 // Lokális, tesztre szűkített guardok, ugyanaz a minta, mint a
@@ -326,6 +343,7 @@ function recordingGate(releaseOverride?: (requestId: string) => Outcome<void>): 
       calls.push(`release:${requestId}`);
       return releaseOverride === undefined ? { kind: 'ok', value: undefined } : releaseOverride(requestId);
     },
+    close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,
   };
@@ -364,13 +382,13 @@ describe('runAgentNodeLifecycle', () => {
     let stepRunIdAtGrant: string | undefined;
     const observingGate: ConcurrencyGate = {
       ...gate,
-      requestSlot: (providerId, requestId, onGranted) => {
+      requestSlot: (providerId, requestId, onGranted, onDenied) => {
         // A hely kérésekor a step_run MÉG pending, mert a markStepRunning csak
         // a hely megszerzése UTÁN fut le (SPEC-004 5.2 1. pont).
         const beforeRunning = okOrThrow(database.stepRuns.getStepRun(requestId));
         expect(beforeRunning.status).toBe('pending');
         stepRunIdAtGrant = requestId;
-        gate.requestSlot(providerId, requestId, onGranted);
+        gate.requestSlot(providerId, requestId, onGranted, onDenied);
       },
     };
     const dependencies = dependenciesOf({
@@ -383,7 +401,7 @@ describe('runAgentNodeLifecycle', () => {
       },
     });
 
-    const outcome = okOrThrow(
+    const outcome = settledOrThrow(
       await runAgentNodeLifecycle(inputOf(runId), dependencies, observingGate, agentQueryRegistry),
     );
 
@@ -528,7 +546,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('hibasSubtype'), { request: undefined }),
     });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry));
+    const outcome = settledOrThrow(await runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('agent_result_not_success');
@@ -548,7 +566,7 @@ describe('runAgentNodeLifecycle', () => {
     const dependencies = dependenciesOf({ database, agentQueryRunner: neverCalledRunner(runnerCalled) });
     const input = inputOf(runId, { config: agentStepConfig({ modelId: 'ismeretlen' }) });
 
-    const outcome = okOrThrow(await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry));
+    const outcome = settledOrThrow(await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry));
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : '').toBe('unknown_model_id');
@@ -603,11 +621,16 @@ describe('runAgentNodeLifecycle', () => {
     const { gate } = recordingGate();
     const racyGate: ConcurrencyGate = {
       ...gate,
-      requestSlot: (providerId, requestId, onGranted) => {
-        gate.requestSlot(providerId, requestId, () => {
-          okOrThrow(database.stepRuns.markStepCancelled(requestId));
-          onGranted();
-        });
+      requestSlot: (providerId, requestId, onGranted, onDenied) => {
+        gate.requestSlot(
+          providerId,
+          requestId,
+          () => {
+            okOrThrow(database.stepRuns.markStepCancelled(requestId));
+            onGranted();
+          },
+          onDenied,
+        );
       },
     };
     const dependencies = dependenciesOf({
@@ -747,6 +770,40 @@ describe('runAgentNodeLifecycle', () => {
     database.close();
   });
 
+  it('a sorban álló lépés a szabályozó lezárásakor el sem indul: interrupted, a step_run pending marad, provider hívás és felszabadítás nincs (SPEC-004 10.2 1. pont)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const gate = createConcurrencyGate(() => 1);
+    // Egy másik lépés foglalja az egyetlen helyet, tehát a vizsgált lépés
+    // sorba áll; a lezárás a sorban éri.
+    gate.requestSlot(
+      'minimax',
+      'masik-lepes',
+      () => {
+        // a hely a másik lépésé, a teszt nem futtat rajta semmit
+      },
+      notCalled,
+    );
+    const runnerCalled = { called: false };
+    const dependencies = dependenciesOf({ database, agentQueryRunner: neverCalledRunner(runnerCalled) });
+
+    const pending = runAgentNodeLifecycle(inputOf(runId), dependencies, gate, agentQueryRegistry);
+    expect(gate.waitingRequestCount('minimax')).toBe(1);
+    gate.close();
+    const outcome = okOrThrow(await pending);
+
+    expect(outcome).toStrictEqual({ kind: 'interrupted' });
+    expect(runnerCalled.called).toBe(false);
+    const [stepRun] = okOrThrow(database.stepRuns.listStepRuns(runId));
+    expect(stepRun?.status).toBe('pending');
+    // A foglalt hely a másik lépésé maradt, az elutasított lépés nem
+    // szabadított fel semmit.
+    expect(gate.occupiedSlotCount('minimax')).toBe(1);
+    expect(gate.releaseSlot('masik-lepes')).toStrictEqual({ kind: 'ok', value: undefined });
+
+    database.close();
+  });
+
   it('a join nodeType-tal hívva a step_run node_type oszlopa join, nem agent_step', async () => {
     const database = openMemoryDatabase();
     const { runId } = seedRun(database);
@@ -756,7 +813,7 @@ describe('runAgentNodeLifecycle', () => {
       agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
     });
 
-    const outcome = okOrThrow(
+    const outcome = settledOrThrow(
       await runAgentNodeLifecycle(inputOf(runId, { nodeType: 'join' }), dependencies, gate, agentQueryRegistry),
     );
 

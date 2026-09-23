@@ -49,12 +49,13 @@ describe('findRelativeSpecifierCandidates', () => {
       'const text = "idézet: \'./szoveg.ts\'";',
       'export * from "./c.ts";',
       "export { d } from './d.ts';",
+      "const lazy = async () => import('./e.ts');",
     ].join('\n');
 
     const candidates = findRelativeSpecifierCandidates(sourceText);
     const exact = findRelativeImportSpecifiers('x.ts', sourceText).map(({ specifier }) => specifier);
 
-    expect(exact).toEqual(['./a.ts', '../b.ts', './c.ts', './d.ts']);
+    expect(exact).toEqual(['./a.ts', '../b.ts', './c.ts', './d.ts', './e.ts']);
     expect(candidates).toEqual(expect.arrayContaining(exact));
   });
 });

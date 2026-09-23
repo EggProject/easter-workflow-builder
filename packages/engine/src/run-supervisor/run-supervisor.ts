@@ -112,4 +112,14 @@ export interface RunSupervisor extends ChildWorkflowRunner {
    * (a kézikönyv a lezáráskor kiesik a nyilvántartásból).
    */
   readonly getActiveRun: (runId: string) => ActiveRunHandle | undefined;
+
+  /**
+   * A szabályos leállás kezdete (SPEC-004 10.2 1. pont): ettől kezdve minden
+   * futás indítás (`startRun`, a rá épülő `restartRun`, és a `startChildRun`)
+   * `engine_shutting_down` hibával, adatírás nélkül tér vissza. Visszavonás
+   * nincs. A `shutdownActiveRuns` hívja, MIELŐTT az aktív futásokat
+   * lekérdezné, így a lekérdezés után nem kerülhet be olyan futás, amit a
+   * leállás nem állít meg.
+   */
+  readonly stopAcceptingRuns: () => void;
 }

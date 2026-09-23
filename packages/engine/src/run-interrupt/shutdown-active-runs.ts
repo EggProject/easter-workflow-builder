@@ -1,5 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RecoverInterruptedRunsResult } from '@easter-workflow-builder/db';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { EngineEvent } from '../engine-event/engine-event.ts';
@@ -10,17 +11,20 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
 
 /**
  * A `shutdownActiveRuns` függősége. A `runSupervisor` szándékosan csak a
- * `listActiveRuns` metódust várja (`Pick`, nem a teljes `RunSupervisor`),
- * ugyanaz az elv, mint az `InterruptRunDependencies`-nél
- * (`interrupt-run.ts`): ez a téma nem indít futást és nem old fel providert,
- * csak a MÁR futó futásokat kérdezi le. A `createEngine` (T-005-28) a saját,
- * teljes `RunSupervisor` példányát adja majd ide. Az `eventPublisher` a
- * lezáró `run_interrupted` esemény élő kiadásához kell (4. pont lent).
+ * `listActiveRuns` és a `stopAcceptingRuns` metódust várja (`Pick`, nem a
+ * teljes `RunSupervisor`), ugyanaz az elv, mint az
+ * `InterruptRunDependencies`-nél (`interrupt-run.ts`): ez a téma nem indít
+ * futást és nem old fel providert, csak a MÁR futó futásokat kérdezi le, és
+ * az újak indítását tiltja le. A `concurrencyGate` a motor egyetlen, közös
+ * szabályozója, amit a leállás lezár (0. pont lent); ebből is csak a `close`
+ * kell. Az `eventPublisher` a lezáró `run_interrupted` esemény élő kiadásához
+ * kell (4. pont lent).
  */
 export interface ShutdownActiveRunsDependencies {
   readonly database: DatabaseContext;
   readonly eventPublisher: EventPublisherPort;
-  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
+  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'stopAcceptingRuns'>;
+  readonly concurrencyGate: Pick<ConcurrencyGate, 'close'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
   readonly approvalRegistry: ApprovalWaitRegistry;
 }
@@ -30,6 +34,15 @@ export interface ShutdownActiveRunsDependencies {
  * T-005-27), a `createEngine` (T-005-28) `shutdown()` metódusának alapja.
  * `SIGINT`/`SIGTERM` esetén a hívó ezt hívja meg:
  *
+ * 0. **Új futás és új lépés többé nem indul** (10.2 1. pont): a
+ *    `runSupervisor.stopAcceptingRuns()` után minden futás indítás
+ *    `engine_shutting_down` hibát ad, a `concurrencyGate.close()` után pedig
+ *    egyetlen agent lépés sem kap helyet, a sorban állók sem. Mindkettő
+ *    szinkron, és az 1. pont ELŐTT fut, tehát a lekérdezett lista a leállás
+ *    teljes hatóköre marad. Mérve: e pont nélkül egy a jel előtt fogadott, de
+ *    csak utána beérkező törzsű indító kérés új futást indított, aminek az
+ *    agent lépése `interrupt()` nélkül végigfutott, és a kilépést a lépés
+ *    teljes hosszával késleltette (SPEC-006 8.2).
  * 1. **MINDEN aktív futás lekérdezése** (`runSupervisor.listActiveRuns()`,
  *    NEM egyetlen futás fájára szűkítve, ellentétben az `interruptRun`-nal -
  *    a szabályos leállás a TELJES szervert viszi le, nem egy felhasználói
@@ -70,6 +83,8 @@ export interface ShutdownActiveRunsDependencies {
 export async function shutdownActiveRuns(
   dependencies: ShutdownActiveRunsDependencies,
 ): Promise<Outcome<RecoverInterruptedRunsResult>> {
+  dependencies.runSupervisor.stopAcceptingRuns();
+  dependencies.concurrencyGate.close();
   const handles = dependencies.runSupervisor.listActiveRuns();
   await stopAndAwaitRunTree(handles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
   const recovered = dependencies.database.recovery.recoverInterruptedRuns('graceful_shutdown');

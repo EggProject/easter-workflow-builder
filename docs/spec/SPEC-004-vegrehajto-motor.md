@@ -550,7 +550,7 @@ A motor `startRun` művelete **nem indul el, amíg a helyreállítás nem futott
 
 `SIGINT` vagy `SIGTERM` esetén a szerver a `engine.shutdown()` műveletet hívja:
 
-1. A szabályozó nem enged több lépést indulni.
+1. A szabályozó nem enged több lépést indulni, és a motor új futást sem indít. Mindkettő az aktív futások lekérdezése **előtt**, szinkron történik, tehát a lekérdezett lista a leállás teljes hatóköre: a `startRun`, a rá épülő `restartRun` és az al-workflow indítás `engine_shutting_down` hibával, adatírás nélkül utasít el, a szabályozó pedig lezárul (`ConcurrencyGate.close`), így a sorban álló agent lépések el sem indulnak (`interrupted` eredménnyel térnek vissza, a soruk `pending` marad, és a 3. pont zárja), a felszabaduló helyet pedig senki nem kapja meg. Mérve: e pont megvalósítása előtt egy a jel előtt fejléccel megkezdett, de csak a leállás alatt befejezett indító kérés új futást indított, aminek az agent lépése `interrupt()` nélkül végigfutott, és a kilépést a lépés teljes hosszával késleltette (SPEC-006 8.2, M-36).
 2. Minden élő agent lépésen `interrupt()`, majd a folyam kimerítése, ugyanúgy, mint a 9. szekcióban.
 3. Minden érintett futás `interrupted` állapotba megy (`markRunInterrupted`), a nem terminális lépéseivel együtt, és futásonként egy `run_interrupted` esemény íródik.
 4. A motor ezeket az eseményeket minden érintett futásra **élőben is kiadja** (`publish`), ugyanazon okból, mint a 9. szekció 5. pontjában. Hogy a keret el is érje a klienst, ahhoz az SSE kapcsolatoknak a `shutdown` alatt még nyitva kell lenniük: ezt a szerver leállási sorrendje biztosítja (SPEC-006 8.2).

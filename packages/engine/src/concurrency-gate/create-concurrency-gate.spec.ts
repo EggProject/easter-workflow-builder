@@ -17,22 +17,32 @@ function createTestGate(): {
   readonly gate: ConcurrencyGate;
   readonly limits: Map<ProviderId, number>;
   readonly granted: readonly string[];
+  readonly denied: readonly string[];
   // Nyílfüggvény mező, nem metódus szignatúra: a tesztek destruktúrálva veszik
   // ki, amit a `@typescript-eslint/unbound-method` metódus alakban jelezne.
   readonly request: (providerId: ProviderId, requestId: string) => void;
 } {
   const limits = new Map<ProviderId, number>();
   const granted: string[] = [];
+  const denied: string[] = [];
   const gate = createConcurrencyGate((providerId) => limits.get(providerId) ?? null);
 
   return {
     gate,
     limits,
     granted,
+    denied,
     request: (providerId, requestId) => {
-      gate.requestSlot(providerId, requestId, () => {
-        granted.push(requestId);
-      });
+      gate.requestSlot(
+        providerId,
+        requestId,
+        () => {
+          granted.push(requestId);
+        },
+        () => {
+          denied.push(requestId);
+        },
+      );
     },
   };
 }
@@ -168,6 +178,56 @@ describe('createConcurrencyGate', () => {
     gate.releaseSlot('m1');
 
     expect(granted).toStrictEqual(['m1', 'c1', 'c2', 'm2']);
+  });
+
+  describe('close: a lezárt szabályozó nem enged több lépést indulni (SPEC-004 10.2 1. pont)', () => {
+    it('a sorban álló kérések érkezési sorrendben elutasítást kapnak és kiesnek a sorból', () => {
+      const { gate, limits, granted, denied, request } = createTestGate();
+      limits.set('minimax', 1);
+
+      request('minimax', 'l1');
+      request('minimax', 'l2');
+      request('claude-subscription', 'c1');
+      limits.set('claude-subscription', 0);
+      request('claude-subscription', 'c2');
+      request('minimax', 'l3');
+
+      gate.close();
+
+      expect(granted).toStrictEqual(['l1', 'c1']);
+      expect(denied).toStrictEqual(['l2', 'c2', 'l3']);
+      expect(gate.waitingRequestCount('minimax')).toBe(0);
+      expect(gate.waitingRequestCount('claude-subscription')).toBe(0);
+    });
+
+    it('a lezárás után érkező kérés korlát nélkül, szabad hely mellett is azonnal elutasítást kap', () => {
+      const { gate, granted, denied, request } = createTestGate();
+
+      gate.close();
+      request('minimax', 'l1');
+
+      expect(granted).toStrictEqual([]);
+      expect(denied).toStrictEqual(['l1']);
+      expect(gate.occupiedSlotCount('minimax')).toBe(0);
+    });
+
+    it('a már kiosztott hely felszabadítható, de a felszabaduló helyet senki nem kapja meg', () => {
+      const { gate, limits, granted, denied, request } = createTestGate();
+      limits.set('minimax', 1);
+
+      request('minimax', 'l1');
+      request('minimax', 'l2');
+      gate.close();
+
+      expect(gate.releaseSlot('l1')).toStrictEqual({ kind: 'ok', value: undefined });
+      request('minimax', 'l3');
+
+      expect(granted).toStrictEqual(['l1']);
+      expect(denied).toStrictEqual(['l2', 'l3']);
+      expect(gate.occupiedSlotCount('minimax')).toBe(0);
+      // Az elutasított kérésnek nincs mit felszabadítania.
+      expect(gate.releaseSlot('l2').kind).toBe('error');
+    });
   });
 
   it('a futás közben csökkentett korlát azonnal érvénybe lép', () => {

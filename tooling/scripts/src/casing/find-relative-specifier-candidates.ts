@@ -8,7 +8,9 @@
  * Ez a függvény csak szövegkereséssel dolgozik, a hívó pedig kizárólag
  * akkor futtatja a pontos, parser alapú kinyerést, ha egy jelölt gyanús.
  *
- * A garancia, amire a hívók építenek: minden relatív modul specifikátor
+ * A garancia, amire a hívók építenek: minden relatív modul specifikátor,
+ * amit a `findRelativeImportSpecifiers` kinyer (az `import`/`export ... from`
+ * deklarációé és a dinamikus `import()` hívás string literál argumentuma),
  * `StringLiteral` token, aminek a feldolgozott értéke `./` vagy `../`
  * kezdetű. Ha a nyers alakjában nincs visszaperjel és sortörés, a nyers
  * és a feldolgozott érték bájtra azonos, tehát a szövegben idézőjel, `./`
@@ -23,7 +25,9 @@
  */
 
 // A TypeScript szkenner a `'` és a `"` karakterrel nyit `StringLiteral`
-// tokent; az import deklaráció modul specifikátora csak ilyen lehet.
+// tokent; az import deklaráció modul specifikátora és a pontos kinyerés által
+// látott dinamikus `import()` argumentum csak ilyen lehet. A template literál
+// argumentumot a pontos kinyerés sem látja, ezért a backtick itt nem kell.
 const QUOTES = ["'", '"'];
 
 // Visszaperjellel kezdődő nyers alak (`\x2e/`, `.\/`, `..\/` és társaik)

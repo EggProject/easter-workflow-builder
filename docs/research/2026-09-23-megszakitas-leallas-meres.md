@@ -69,3 +69,40 @@ A három javítás regresszióját a `packages/engine` `interrupt-run.spec.ts`,
 `shutdown-active-runs.spec.ts`, `create-run-supervisor.spec.ts` és az `apps/server`
 `run-shutdown-sequence.spec.ts` tesztje őrzi; az utóbbi valódi HTTP SSE kapcsolaton ellenőrzi a
 leállási sorrendet.
+
+## 6. Leállás közben induló futás (2026-09-23, második kör)
+
+Egy független ellenőrzés azt állította, hogy a jel előtt fejléccel megkezdett, de csak a leállás
+alatt befejezett indító kérés új futást indít, és a SPEC-004 10.2 1. pontja ("A szabályozó nem
+enged több lépést indulni") nincs megvalósítva. A mérés megerősítette.
+
+| Tétel       | Érték                                                                                                                                                                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Futtató     | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `808c854` commitja (előtte), illetve a javítás munkapéldánya (utána)                                                                                                                                                                                                                  |
+| Szerver     | a valódi `apps/server` modulok (`createHttpServer`, `buildRouteHandlers`, `createStreamRegistry`, `registerShutdownSignalHandlers`, `buildEngineDependencies`) és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő (4. szekció) |
+| Workflow    | `start -> agent_step`, `claude-subscription`, `claude-sonnet-5`                                                                                                                                                                                                                                                                      |
+| Hamis lépés | megszakítás nélkül 8000 ms után sikeres `result`, `interrupt()` után 3000 ms alatt ér véget                                                                                                                                                                                                                                          |
+| Menet       | 1. indító `POST`, a lépés elindul; 2. nyers TCP kapcsolaton egy második indító `POST` fejléce (`Content-Length: 12`), törzs nélkül; 3. 100 ms múlva `SIGTERM`; 4. 500 ms múlva a törzs; 5. a kilépésig eltelt idő a `SIGTERM`-től mérve, utána az adatbázis újranyitása                                                              |
+
+| Eset                           | Válasz a második kérésre                  | Futások          | Agent futtató hívás                                                                                        | Kilépés       |
+| ------------------------------ | ----------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------- | ------------- |
+| előtte, második kérés nélkül   | nincs                                     | 1, `interrupted` | 1                                                                                                          | 3050 ms       |
+| előtte, félbe küldött kéréssel | `200`, új futás                           | 2, `interrupted` | 2, a második a jel után (a szerver naplójában 509 ms-mal az első `interrupt()` után), `interrupt()` nélkül | 8536 ms       |
+| utána, félbe küldött kéréssel  | `500`, `internal`, `engine_shutting_down` | 1, `interrupted` | 1                                                                                                          | 3031, 3031 ms |
+| utána, második kérés nélkül    | nincs                                     | 1, `interrupted` | 1                                                                                                          | 3039 ms       |
+
+**A gyökérok.** A `shutdownActiveRuns` az aktív futások listáját a leállás elején egyszer kérdezte
+le, a `startRun` viszont semmilyen leállási jelzést nem nézett, tehát a lekérdezés után induló
+futás kimaradt a `requestStop` és az `interrupt()` hívásból. Ugyanez a rés a szabályozóban is
+megvolt: egy sorban álló agent lépés a leállás alatt felszabaduló helyet megkapta, és `interrupt()`
+nélkül végigfutott (a `packages/engine` `create-engine.spec.ts` regressziós tesztje ezt
+korlátozott szabályozóval reprodukálja).
+
+**A javítás.** A leállás a lekérdezés ELŐTT, szinkron letiltja az új futást
+(`RunSupervisor.stopAcceptingRuns`, utána minden indítás `engine_shutting_down` hibát ad) és
+lezárja a szabályozót (`ConcurrencyGate.close`, utána minden sorban álló és új kérés elutasítást
+kap, a lépés `interrupted` eredménnyel, `pending` sorral tér vissza, amit a
+`recoverInterruptedRuns` zár). A regressziót a `packages/engine` `create-engine.spec.ts` két
+tesztje és az `apps/server` `run-shutdown-sequence.spec.ts` félbe küldött kéréses tesztje őrzi;
+mindhárom a javítás visszavonására bukik (mérve: `expected '' to contain '(engine_shutting_down)'`,
+`expected 2 to be 1`, `expected 200 to be 500`).

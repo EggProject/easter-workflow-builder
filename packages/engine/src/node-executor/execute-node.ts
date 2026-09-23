@@ -11,7 +11,6 @@ import { executeStart } from './execute-start.ts';
 import { executeSubWorkflow } from './execute-sub-workflow.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import type { ExecuteNodeRequest } from './execute-node-request.ts';
-import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorDependencies } from './node-executor-dependencies.ts';
 
@@ -35,7 +34,7 @@ function executeJoinNode(
   config: JoinNodeConfig,
   request: ExecuteNodeRequest,
   dependencies: NodeExecutorDependencies,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const { instance, runContext, graph, joinInputs } = request;
   switch (config.mode) {
     case 'merge': {

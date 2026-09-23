@@ -578,6 +578,29 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
+    it('a stopAcceptingRuns után érvényes workflow-ra is engine_shutting_down hibát ad, gyökér és al-workflow futásra is, és nem jön létre workflow_run sor (SPEC-004 10.2 1. pont)', async () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas',
+        [startNode('start'), agentNode('a1', 'sikeres')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      harness.supervisor.stopAcceptingRuns();
+      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const child = await harness.supervisor.startChildRun({
+        targetWorkflowId: workflowId,
+        input: {},
+        parent: { rootRunId: 'szulo', depth: 0, workflowAncestry: [] },
+      });
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
+      expect(child.kind === 'error' ? child.message : '').toContain('(engine_shutting_down)');
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
+    });
+
     it('érvénytelen gráf (script node) esetén nem jön létre workflow_run sor', () => {
       const harness = openHarness();
       const workflowId = createWorkflow(

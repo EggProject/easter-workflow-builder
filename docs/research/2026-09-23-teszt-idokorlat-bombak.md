@@ -159,23 +159,20 @@ check:casing` kapu `1` kilépési kóddal állt meg.
 Küszöb: az 5000 ms-os korlát fele, 2500 ms. Mérve a teljes suite-tal együtt, `--coverage`
 mellett, a javítás ELŐTT.
 
-| Teszt                                                      | helyi (ms) | CI (ms)   | Állapot                                                 |
-| ---------------------------------------------------------- | ---------- | --------- | ------------------------------------------------------- |
-| `apps/web/src/app-mount/main.spec.ts`                      | 2463-3638  | 442-635   | javítva (4.2)                                           |
-| `tooling/scripts/src/casing/check-casing.spec.ts`          | 3018-3071  | 3221-5019 | javítva (4.1)                                           |
-| `apps/server/src/main.spec.ts`                             | 3024-3316  | 1033-1233 | **nem javítva**, a párhuzamos agent területe, lásd lent |
-| `tooling/scripts/src/relative-import-extension/...spec.ts` | 2648-2760  | 2895-4331 | javítva (4.1)                                           |
+| Teszt                                                      | helyi (ms) | CI (ms)   | Állapot              |
+| ---------------------------------------------------------- | ---------- | --------- | -------------------- |
+| `apps/web/src/app-mount/main.spec.ts`                      | 2463-3638  | 442-635   | javítva (4.2)        |
+| `tooling/scripts/src/casing/check-casing.spec.ts`          | 3018-3071  | 3221-5019 | javítva (4.1)        |
+| `apps/server/src/main.spec.ts`                             | 3024-3316  | 1033-1233 | javítva (9. szekció) |
+| `tooling/scripts/src/relative-import-extension/...spec.ts` | 2648-2760  | 2895-4331 | javítva (4.1)        |
 
 Figyelőlista, 1000 és 2500 ms között (csak helyben, a CI-ban mindegyik 300 ms alatt maradt, tehát
 a CI napló nem is írta ki a tesztenkénti idejüket): `screenshot-pipeline.spec.ts` (1) 1451-1797 és
 (2) 1393-1676, `no-em-dash.spec.ts` 1226-1657. Mindhárom a teljes repó fájljait olvassa, a helyi
 lassúságuk a mount fájlolvasásából jön.
 
-**Az `apps/server/src/main.spec.ts`**, nem ellenőrzött feltevés: a teszt törzsében ugyanaz a minta
-áll (`await import('./main.ts')`), mint a javítás előtti `apps/web` belépési pont tesztjében, tehát
-valószínűleg ugyanaz a gyökérok. Mi zárná le: egy előtöltő import a `main.ts` saját moduljára és a
-teszt törzsének újramérése. A javítás a párhuzamosan dolgozó agent területén van, ezért nem nyúltunk
-hozzá.
+**Az `apps/server/src/main.spec.ts`**: a feltevést a 9. szekció mérése igazolta, a javítás ott
+áll.
 
 ## 8. Nyitott pontok
 
@@ -187,3 +184,35 @@ hozzá.
   idejénél. A helyi igazolás ezért négy shardon és `--merge-reports --coverage` összefésüléssel
   ment (1. szekció, sharding doksi): az "utána S1", "S2" és "S3" futás összefésülve egyaránt 491
   tesztfájl, 3810 teszt, mind zöld, a lefedettség mind a négy metrikán 100 százalék.
+
+## 9. `apps/server/src/main.spec.ts` (2026-09-23, második kör)
+
+Egy független ellenőrzés hét helyi futásból 2862-3701 ms-ot mért, és kétszer 5005 ms-nál bukást
+(egyszer egyedül futtatva); a CI-ban 1131 ms.
+
+**A gyökérok mérése.** Egy ideiglenes, mérés után törölt `.spec.ts` fájl a teszt törzsével azonos
+workerben két részre bontotta az időt: a `./startup-sequence/run-startup-sequence.ts` modulgráf
+dinamikus betöltése, majd a `./main.ts` importja (ami a `runStartupSequence`-et hívja, és a
+hiányzó `EASTER_SERVER_PORT` miatt `1` kilépési kóddal azonnal visszatér).
+
+| Rész                                 | `--coverage` mellett (ms) | coverage nélkül (ms) |
+| ------------------------------------ | ------------------------- | -------------------- |
+| a szerver modulgráf betöltése        | 2672, 2493, 2471          | 2474, 2360           |
+| a `main.ts` importja és a hívás maga | 4, 4, 5                   | 4, 4                 |
+
+**Gyökérok:** ugyanaz, mint a 3.2 szekcióban. A teszt törzsében álló dinamikus `import('./main.ts')`
+a teljes szerver modulgráf transzformálását és kiértékelését a teszt időkorlátjába számítja, holott
+a teszt tárgya csak a `main.ts` egyetlen hívása.
+
+**A javítás.** `import './startup-sequence/run-startup-sequence.ts';` a fájl tetején: a gráf a
+gyűjtési fázisban töltődik be, amire a Vitest nem alkalmaz időkorlátot (1. szekció). A `main.ts`
+nem változott. Szándékos rontás: a `main.ts` hívását `void runStartupSequence;` sorra cserélve a
+teszt bukott (`expected undefined to be 1`), visszaállítás után zöld.
+
+| Mérés (helyi sandbox, `--coverage`)                                                         | előtte (ms)      | utána (ms) |
+| ------------------------------------------------------------------------------------------- | ---------------- | ---------- |
+| egyedül futtatva, teszt szint                                                               | 2677, 2848, 2739 | 6, 6, 6    |
+| terhelés alatt: `apps/server`, `packages/engine`, `packages/db` egy hívásban, 218 tesztfájl | 2437, 3144       | 7, 10      |
+
+Utána a Vitest összegzője szerint a gyűjtési fázis ("import") vette át az időt: egyedül futtatva
+2,60-2,77 s.

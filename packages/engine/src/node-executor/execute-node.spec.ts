@@ -149,6 +149,7 @@ function openGate(): ConcurrencyGate {
       onGranted();
     },
     releaseSlot: () => ({ kind: 'ok', value: undefined }),
+    close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,
   };
