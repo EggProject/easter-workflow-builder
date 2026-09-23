@@ -53,8 +53,4 @@ describe('isRunFinishedFrame', () => {
     };
     expect(isRunFinishedFrame(transient, 'r-1')).toBe(false);
   });
-
-  it('keret nélkül hamis', () => {
-    expect(isRunFinishedFrame(undefined, 'r-1')).toBe(false);
-  });
 });

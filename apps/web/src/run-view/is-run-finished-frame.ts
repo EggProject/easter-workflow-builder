@@ -11,6 +11,6 @@ import type { StreamFrame } from '@easter-workflow-builder/protocol';
  * pontja). A `runId` egyezés azért kell, mert egyetlen stream kapcsolat több
  * futásra is fel lehet iratkozva (SPEC-005 5.2).
  */
-export function isRunFinishedFrame(frame: StreamFrame | undefined, runId: string): boolean {
-  return frame?.event === 'run_event' && frame.runEvent.kind === 'run_finished' && frame.runEvent.runId === runId;
+export function isRunFinishedFrame(frame: StreamFrame, runId: string): boolean {
+  return frame.event === 'run_event' && frame.runEvent.kind === 'run_finished' && frame.runEvent.runId === runId;
 }

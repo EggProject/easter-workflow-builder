@@ -706,16 +706,26 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 **Frontend állapot és layout**
 
-- **A `lastFrame` állapot egy löketből csak az utolsó keretet adja át.** A React a natív
-  `EventSource` kezelőből jövő frissítéseket egy renderbe vonja össze, tehát egy `lastFrame`
-  függésű effekt a köztes kereteket sosem látja: valós Chromiumban egyetlen hálózati darabban
-  érkező 10, 1000 és 3000 keretre az effekt mindháromszor EGYSZER futott, a függvény alakú
-  állapotfrissítés viszont mindet megkapta (saját mérés,
-  `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). Ami minden keretet igényel
-  (a transcript), az a `stream-client` `subscribeToFrames` útján iratkozik fel, és függvény
-  alakban frissít; a `lastFrame` csak "valami történt, tölts újra" jelzésre való. Védelem: a
-  `use-stream-connection.spec.tsx` és a `use-run-transcript.spec.tsx` egy render kötegen belüli
-  keretsorozatra mér.
+- **Egy "legutolsó érték" alakú React állapot löketben érkező eseményfolyamnál keretet veszít, az
+  újratöltést kiváltó jelzéseket is.** A React a natív `EventSource` kezelőből jövő frissítéseket
+  egy renderbe vonja össze, tehát egy `lastFrame` függésű effekt a köztes kereteket sosem látja:
+  valós Chromiumban egyetlen hálózati darabban érkező 10, 1000 és 3000 keretre az effekt
+  mindháromszor EGYSZER futott, a függvény alakú állapotfrissítés viszont mindet megkapta (saját
+  mérés, `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). **A korábbi
+  feltevés, hogy az ilyen állapot "valami történt, tölts újra" jelzésre még jó, hamisnak bizonyult**:
+  a jelzés szűrője (melyik keret, melyik futás) is csak az utolsó keretet látja. A szerver a pótlás
+  végén szinkron `replay_complete` keretet ír, így a `run_finished` után a futás nézet fejléce
+  "fut" állapotban ragadt, a futás előzmények listája pedig egy `run_event` plusz `protocol_error`
+  löketre nem töltött újra; mindkettő valódi böngészőben mérve (T-009-25a,
+  `docs/research/2026-09-23-elo-csomopont-allapot.md`). A szabály: stream keretet kizárólag a
+  `stream-client` `subscribeToFrames` útja ad, keretenként; a `lastFrame` állapot törölve. Ha egy
+  keret újratöltést vált ki, a kérések összevonva futnak (`createCoalescedReload`), különben a
+  veszteségmentes út egy ezer keretes pótlásból kérés vihart csinálna. Védelem: az
+  `apps/web/e2e/sse-real-server.spec.ts` löket tesztjei (`pushBatch`: egy `write` hívásban küldött
+  keretek) a futás nézet fejlécére, a csomópont jelvényére és a futás előzmények listájára, plusz
+  a `use-stream-connection.spec.tsx`, `RunViewScreen.spec.tsx`, `run-history-screen.spec.tsx` és
+  `use-live-step-runs.spec.tsx` egy render kötegen belüli keretsorozatra mért tesztjei; a régi
+  kódon mind az öt e2e teszt elbukik.
 - **A dokumentum `scrollWidth` mérése nem látja a saját görgető dobozban maradó túllógást.** A
   `react-window` lista gyökere `overflow-y: auto`, amitől az `overflow-x` is `auto` lesz, tehát
   egy kilógó transcript sor a LISTÁT görgeti vízszintesen, a dokumentumot nem: csonkolás nélkül
@@ -878,6 +888,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 | a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
 | a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
 | a transcript panel: keret veszteség, sormagasság, cím csonkolás     | `docs/research/2026-09-23-transcript-panel-meresek.md`                         |
+| a csomópontok élő állapota, a löketben érkező keretek mérése        | `docs/research/2026-09-23-elo-csomopont-allapot.md`                            |
 | a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
 | egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 

@@ -459,17 +459,25 @@ Az arány az `aria-valuemin={5}` és `aria-valuemax={95}` korlátok között moz
 
 ### 6.2 Hogyan jelöli a rajzon, hol tart a futás
 
-A gráf a pillanatképből épül, a dekoráció pedig a `GET /api/runs/{runId}/steps` válaszából, majd élőben az SSE keretekből frissül.
+A gráf a pillanatképből épül, a dekoráció pedig a `GET /api/runs/{runId}/steps` válaszából. **Élőben is ez a válasz marad a dekoráció egyetlen forrása**: az SSE keret nem hordozza a csomópont állapotát, csak jelzi, hogy a lépés futás lista megváltozott, és a felület erre újratölti a listát, oldal újratöltés nélkül (a menet lent, "Az élő frissítés" bekezdésben).
 
-| Amit a felhasználó lát               | Miből jön                                                                                   |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| a csomópont állapota                 | a hozzá tartozó `StepRunRecord.status`, a `StepRunStatus` nyolc értékének leképezésével     |
-| melyik lépés fut éppen               | `status === 'running'`, plusz a `step_started` és a `step_finished` engine esemény          |
-| melyik lépés vár jóváhagyásra        | `status === 'waiting_approval'`, plusz az `approval_requested` esemény                      |
-| hányadik próbálkozásnál tart         | `StepRunRecord.attempt`, ha nagyobb mint egy                                                |
-| hányadik iterációnál tart egy `loop` | `StepRunRecord.iteration`, plusz a `loop_iteration_started` esemény                         |
-| melyik ág futott egy `branch` után   | a `branch_taken` esemény, ami a megfelelő élt kiemeli                                       |
-| melyik al-workflow futás indult      | `StepRunRecord.subWorkflowRunId`, ami a `?runId=` paraméterrel egy másik futás nézetre visz |
+| Amit a felhasználó lát               | Miből jön                                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| a csomópont állapota                 | a hozzá tartozó `StepRunRecord.status`, a `StepRunStatus` nyolc értékének leképezésével                                                     |
+| melyik lépés fut éppen               | `status === 'running'`; a `step_started` és a `step_finished` engine esemény az újratöltés jelzője                                          |
+| melyik lépés vár jóváhagyásra        | `status === 'waiting_approval'`; az `approval_requested` esemény az újratöltés jelzője                                                      |
+| hányadik próbálkozásnál tart         | `StepRunRecord.attempt`, ha nagyobb mint egy (**nincs megvalósítva**, lásd lent)                                                            |
+| hányadik iterációnál tart egy `loop` | `StepRunRecord.iteration`; a `loop` minden kiértékelése saját lépés futás, `step_started` és `step_finished` eseménnyel                     |
+| melyik ág futott egy `branch` után   | a `branch_taken` esemény, ami a megfelelő élt kiemeli (**nincs megvalósítva**, lásd lent)                                                   |
+| melyik al-workflow futás indult      | `StepRunRecord.subWorkflowRunId`, ami a `?runId=` paraméterrel egy másik futás nézetre visz; a `sub_workflow_started` az újratöltés jelzője |
+
+**Az élő frissítés (PLAN-009 T-009-25a, egy független ellenőrzés nyomán pótolt terv hiány).** A futás nézet a lépés futás listát megnyitáskor betölti, majd a veszteségmentes `subscribeToFrames` úton érkező jelző keretekre újratölti (`apps/web/src/run-view/use-live-step-runs.ts`). Jelző keret a nézett futás **élő** (`delivery: 'live'`) `run_event` kerete, ha a `kind` hat érték egyike: `step_started`, `step_finished`, `approval_requested`, `sub_workflow_started`, `run_finished`, `run_interrupted`; ezek mindegyikének kiírását egy `step_run` sor változása előzi meg (a forráshelyek az `is-step-run-list-change-frame.ts` fejlécében). A `run_finished` és a `run_interrupted` azért jelző, mert a megszakítás és a helyreállítás a nem terminális lépéseket lépés szintű esemény NÉLKÜL zárja le (`packages/db` `run-recovery.ts`). Szintén jelző a nézett futás `replay_complete` kerete; a pótolt (`replayed`) keret viszont nem, mert a szerver a pótlás minden keretét egy menetben küldi, és a végén szinkron a `replay_complete` keretet (`apps/server` `handle-stream-connection.ts`), tehát egy tetszőleges hosszú pótlás pontosan egy újratöltést ad. Az újratöltés kérések összevonva futnak: egyszerre legfeljebb egy kérés áll folyamatban, és a futása alatt érkező bármennyi jelzés egyetlen utólagos kérést ad (`apps/web/src/request-state/create-coalesced-reload.ts`). Mérve: egy löketben érkező ezer keretes pótlás a csatoláskori betöltéssel együtt kettő `listStepRuns` kérést ad (`docs/research/2026-09-23-elo-csomopont-allapot.md`).
+
+**Miért nem a keretből épül közvetlenül a csomópont állapota.** A `run_event.payload` a dróton `unknown` (SPEC-005), a `step_started` payloadja nem hordozza a `parentStepRunId` mezőt (a `fan_out` összesítés alapja) és a `subWorkflowRunId` értéket, a megszakítás pedig lépés szintű esemény nélkül zár. A keretből épített állapot ezért vagy hiányos, vagy a megszakított lépést futónak mutatná.
+
+**Kimondott korlát.** Az ügynök lépés a párhuzamossági helyre várva `pending` sorként jön létre, esemény nélkül (`packages/engine` `agent-node-lifecycle.ts`): ezt az állapotot a rajz a következő jelző keretig nem mutatja, utána igen.
+
+**Nincs megvalósítva, és a PLAN-009 egyetlen lépése sem fedi (2026-09-23-i ellenőrzés).** A táblázat két sora: a próbálkozás száma (`attempt`) a kártyán nem jelenik meg, és a `branch_taken` esemény élt nem emel ki. Ez nem döntés, csak a megvalósult állapot rögzítése; a lezárásuk külön tervlépést igényel.
 
 **A csomópont állapotjelzése nem szín, hanem szöveg és forma együtt.** A kártyán a `Badge` komponens jeleníti meg az állapotot magyar szóval, és a kártya kerete is változik; a szín önmagában nem hordozhat információt, mert az a színlátás zavarával élő felhasználót kizárná. Ez a szabály nem új: a `Badge` variánsai már ma feliratot hordoznak (SPEC-007 6.1).
 

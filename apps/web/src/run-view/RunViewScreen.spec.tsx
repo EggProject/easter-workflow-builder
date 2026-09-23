@@ -139,9 +139,21 @@ interface FetchOverrides {
    * A `PUT /api/streams/{streamId}/subscriptions` hívások törzsei.
    */
   readonly subscriptionBodies?: string[];
+  /**
+   * A `GET /api/runs/{runId}/steps` egymás utáni válaszai (T-009-25a): a
+   * hívások sorban kapják az elemeit, az utolsó ismétlődik; egy `Error` elem
+   * hálózati hibát szimulál. Ha meg van adva, a `stepRuns` mező nem számít.
+   */
+  readonly stepRunResponses?: readonly unknown[];
+  /**
+   * A `GET /api/runs/{runId}/steps` hívások naplója.
+   */
+  readonly stepRunUrls?: string[];
 }
 
 function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
+  const stepRunResponses = overrides.stepRunResponses ?? [overrides.stepRuns ?? [BASE_STEP_RUN]];
+  let stepRunCallCount = 0;
   return (input, init) => {
     const { pathname } = new URL(input);
     if (pathname.endsWith('/subscriptions')) {
@@ -152,7 +164,10 @@ function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
       return Promise.resolve(Response.json(overrides.snapshot ?? SNAPSHOT));
     }
     if (pathname.endsWith('/steps')) {
-      return Promise.resolve(Response.json(overrides.stepRuns ?? [BASE_STEP_RUN]));
+      overrides.stepRunUrls?.push(pathname);
+      stepRunCallCount += 1;
+      const response = stepRunResponses[Math.min(stepRunCallCount, stepRunResponses.length) - 1];
+      return response instanceof Error ? Promise.reject(response) : Promise.resolve(Response.json(response));
     }
     overrides.runDetailUrls?.push(pathname);
     return Promise.resolve(Response.json(overrides.runDetail ?? RUN_DETAIL));
@@ -204,6 +219,39 @@ function runFinishedFrame(runId: string): StreamFrame {
 }
 
 /**
+ * Egy lépés szintű motor esemény kerete a nézett futás `s-1` lépés futására
+ * (T-009-25a).
+ */
+function stepEventFrame(
+  kind: 'step_started' | 'step_finished',
+  delivery: 'live' | 'replayed',
+  id: number,
+): StreamFrame {
+  const finished = runFinishedFrame('r-3');
+  if (finished.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return { ...finished, delivery, runEvent: { ...finished.runEvent, id, stepRunId: 's-1', kind } };
+}
+
+/**
+ * A keretek EGYETLEN szinkron sorozatban (egy `act` blokkban, tehát egy
+ * React render kötegben), majd a kiváltott kérések lefutása.
+ */
+async function emitFramesAndFlush(frames: readonly StreamFrame[]): Promise<void> {
+  act(() => {
+    for (const frame of frames) {
+      emitFrame(frame);
+    }
+  });
+  await act(async () => {
+    for (let index = 0; index < 8; index += 1) {
+      await Promise.resolve();
+    }
+  });
+}
+
+/**
  * Egy `sdk_result` sor pótolt kerete a megadott lépés futáshoz: ennek a
  * sornak a költség megjelenítése függ a lépés providerétől.
  */
@@ -248,7 +296,7 @@ describe('RunViewScreen', () => {
     container.remove();
   });
 
-  async function renderScreen(search: string, fetchFunction: FetchFunction, lastFrame?: StreamFrame): Promise<void> {
+  async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
     await act(async () => {
       root.render(
         <RunViewScreen
@@ -257,7 +305,6 @@ describe('RunViewScreen', () => {
           search={search}
           navigate={navigate}
           streamId={STREAM_ID}
-          lastFrame={lastFrame}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
@@ -282,7 +329,6 @@ describe('RunViewScreen', () => {
           search="?runId=r-3"
           navigate={navigate}
           streamId={STREAM_ID}
-          lastFrame={undefined}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
         />,
@@ -458,7 +504,6 @@ describe('RunViewScreen', () => {
             search="?runId=r-3"
             navigate={navigate}
             streamId={STREAM_ID}
-            lastFrame={undefined}
             subscribeToFrames={subscribeToFrames}
             streamReplayLimit={STREAM_REPLAY_LIMIT}
           />,
@@ -485,7 +530,9 @@ describe('RunViewScreen', () => {
 
     it('leszereléskor leiratkozik a keretekről', async () => {
       await renderScreen('?runId=r-3', createFetchFunction());
-      expect(frameListeners.size).toBe(1);
+      // Három feliratkozó: a transcript, a csomópontok élő állapota és a
+      // futás lezárásának felismerése (T-009-25, T-009-25a).
+      expect(frameListeners.size).toBe(3);
       act(() => {
         root.unmount();
       });
@@ -551,49 +598,71 @@ describe('RunViewScreen', () => {
 
   it('a saját futás run_finished keretére újratölti a futás rekordját', async () => {
     const runDetailUrls: string[] = [];
-    const fetchFunction = createFetchFunction({ runDetailUrls });
-    await renderScreen('?runId=r-3', fetchFunction);
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
     expect(runDetailUrls).toHaveLength(1);
 
-    await renderScreen('?runId=r-3', fetchFunction, runFinishedFrame('r-3'));
+    await emitFramesAndFlush([runFinishedFrame('r-3')]);
 
     expect(runDetailUrls).toHaveLength(2);
   });
 
   it('másik futás run_finished keretére nem tölt újra', async () => {
     const runDetailUrls: string[] = [];
-    const fetchFunction = createFetchFunction({ runDetailUrls });
-    await renderScreen('?runId=r-3', fetchFunction);
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
 
-    await renderScreen('?runId=r-3', fetchFunction, runFinishedFrame('r-99'));
+    await emitFramesAndFlush([runFinishedFrame('r-99')]);
 
     expect(runDetailUrls).toHaveLength(1);
   });
 
+  it('a run_finished keret akkor is újratölt, ha UGYANABBAN a löketben replay_complete követi (T-009-25a)', async () => {
+    // A szerver a pótlás végén szinkron küldi a `replay_complete` keretet
+    // (`apps/server` `handle-stream-connection.ts` `replayRun`): egy "utolsó
+    // keret" alakú állapot ebből a löketből csak a `replay_complete` keretet
+    // adná át, és a fejléc "fut" állapotban ragadna.
+    const runDetailUrls: string[] = [];
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
+
+    await emitFramesAndFlush([runFinishedFrame('r-3'), { event: 'replay_complete', runId: 'r-3', throughEventId: 42 }]);
+
+    expect(runDetailUrls).toHaveLength(2);
+  });
+
   it('az újratöltés alatt a rajz a helyén marad, csontváz nélkül', async () => {
     const runDetailUrls: string[] = [];
-    const fetchFunction = createFetchFunction({ runDetailUrls });
-    await renderScreen('?runId=r-3', fetchFunction);
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
 
     // A keret megérkezése a futás rekordjának újratöltését indítja: a
     // kérés `pending`, de a KORÁBBI rekord a helyén marad, tehát a rajz nem
     // villog.
     act(() => {
-      root.render(
-        <RunViewScreen
-          apiOrigin={API_ORIGIN}
-          fetchFunction={fetchFunction}
-          search="?runId=r-3"
-          navigate={navigate}
-          streamId={STREAM_ID}
-          lastFrame={runFinishedFrame('r-3')}
-          subscribeToFrames={subscribeToFrames}
-          streamReplayLimit={STREAM_REPLAY_LIMIT}
-        />,
-      );
+      emitFrame(runFinishedFrame('r-3'));
     });
 
+    expect(runDetailUrls).toHaveLength(2);
     expect(container.querySelector('.run-view-screen__loading')).toBeNull();
     expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
+  });
+
+  // ============================================================
+  // A CSOMÓPONTOK ÉLŐ ÁLLAPOTA (T-009-25a, SPEC-008 6.2).
+  // ============================================================
+
+  it('élő step_started keretre a csomópont állapota újratöltés után frissül, oldal újratöltés nélkül', async () => {
+    const stepRunUrls: string[] = [];
+    const stepRunResponses = [[{ ...BASE_STEP_RUN, status: 'pending' }], [{ ...BASE_STEP_RUN, status: 'running' }]];
+    await renderScreen('?runId=r-3', createFetchFunction({ stepRunResponses, stepRunUrls }));
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('pending');
+
+    await emitFramesAndFlush([stepEventFrame('step_started', 'live', 43)]);
+
+    expect(stepRunUrls).toHaveLength(2);
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('running');
+  });
+
+  it('a lépés futások újratöltésének hibáját a képernyő helyén mutatja', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ stepRunResponses: [new Error('kapcsolat megszakadt')] }));
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 });

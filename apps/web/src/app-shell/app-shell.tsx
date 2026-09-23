@@ -86,9 +86,12 @@ function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
  * csak egy csupasz topnav. Az egyetlen, app élettartamú
  * `useStreamConnection` itt épül, és a két SSE fogyasztó képernyőnek adja
  * tovább: a `run-history` a lista élő állapotához (SPEC-007 10.2), a
- * `run-view` pedig a nézett futás `run_finished` eseményéhez (SPEC-008 6.4,
- * PLAN-009 T-009-23). Egyszerre legfeljebb az egyik áll felcsatolva, tehát a
- * `replaceStreamSubscriptions` csere szemantikája nem ütközik.
+ * `run-view` pedig a transcripthez, a csomópontok élő állapotához és a
+ * nézett futás `run_finished` eseményéhez (SPEC-008 6.2, 6.4, PLAN-009
+ * T-009-23, T-009-25, T-009-25a). Mindkettő a veszteségmentes
+ * `subscribeToFrames` úton kapja a kereteket. Egyszerre legfeljebb az egyik
+ * áll felcsatolva, tehát a `replaceStreamSubscriptions` csere szemantikája
+ * nem ütközik.
  */
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
   const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
@@ -115,7 +118,6 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     search,
     navigate,
     streamId: streamConnection.streamId,
-    lastFrame: streamConnection.lastFrame,
     subscribeToFrames: streamConnection.subscribeToFrames,
     serverRestartCount: streamConnection.serverRestartCount,
   });
@@ -202,7 +204,6 @@ interface RouteContentDependencies {
   readonly search: string;
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
   readonly streamId: string;
-  readonly lastFrame: ReturnType<typeof useStreamConnection>['lastFrame'];
   readonly subscribeToFrames: ReturnType<typeof useStreamConnection>['subscribeToFrames'];
   readonly serverRestartCount: number;
 }
@@ -219,7 +220,6 @@ function renderRouteContent(
     search,
     navigate,
     streamId,
-    lastFrame,
     subscribeToFrames,
     serverRestartCount,
   } = dependencies;
@@ -245,7 +245,7 @@ function renderRouteContent(
           fetchFunction={fetchFunction}
           search={search}
           streamId={streamId}
-          lastFrame={lastFrame}
+          subscribeToFrames={subscribeToFrames}
           serverRestartCount={serverRestartCount}
         />
       );
@@ -263,7 +263,6 @@ function renderRouteContent(
           search={search}
           navigate={navigate}
           streamId={streamId}
-          lastFrame={lastFrame}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={streamReplayLimit}
         />

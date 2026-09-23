@@ -2,19 +2,15 @@ import type { FetchFunction } from '@easter-workflow-builder/core';
 import {
   RunDetailSchema,
   RunSnapshotResponseSchema,
-  StepRunRecordSchema,
   SubscriptionStateSchema,
   type RunDetail,
   type RunSnapshotResponse,
-  type StepRunRecord,
-  type StreamFrame,
 } from '@easter-workflow-builder/protocol';
 import { Breadcrumb, Skeleton, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import type { RequestState } from '../request-state/request-state.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
-import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { RunControlBar } from '../run-control/RunControlBar.tsx';
@@ -29,6 +25,7 @@ import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
 import { isRunFinishedFrame } from './is-run-finished-frame.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
+import { useLiveStepRuns } from './use-live-step-runs.ts';
 import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
 import './run-view.css';
 
@@ -43,34 +40,32 @@ export interface RunViewScreenProperties {
   readonly search: string;
   readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
   /**
-   * Az app szintű, egyetlen SSE kapcsolat azonosítója és utolsó kerete
-   * (SPEC-007 9.1). A futás nézet a SAJÁT futására iratkozik fel, mert amíg
-   * ez a képernyő áll, a `run-history` képernyő (a másik fogyasztó) nincs
-   * felcsatolva.
+   * Az app szintű, egyetlen SSE kapcsolat azonosítója (SPEC-007 9.1). A
+   * futás nézet a SAJÁT futására iratkozik fel, mert amíg ez a képernyő áll,
+   * a `run-history` képernyő (a másik fogyasztó) nincs felcsatolva.
    */
   readonly streamId: string;
-  readonly lastFrame: StreamFrame | undefined;
   /**
    * Az app szintű SSE kapcsolat veszteségmentes keret feliratkozása: a
-   * transcript panel minden keretet ezen kap, nem a `lastFrame` mezőből
-   * (T-009-25, `stream-client/subscribe-to-stream-frames.ts`).
+   * transcript panel, a csomópontok élő állapota és a futás lezárásának
+   * felismerése is minden keretet ezen kap, egyenként
+   * (`stream-client/subscribe-to-stream-frames.ts`, T-009-25, T-009-25a).
    */
   readonly subscribeToFrames: SubscribeToStreamFrames;
   readonly streamReplayLimit: number;
 }
-
-const STEP_RUN_LIST_SCHEMA = arraySchema(StepRunRecordSchema);
 
 function readRunId(search: string): string | undefined {
   return new URLSearchParams(search).get('runId') ?? undefined;
 }
 
 /**
- * Az első hibás állapot üzenete a három párhuzamos betöltés közül, vagy
- * `undefined`, ha egyik sem hibás. Azért egy közös leolvasás, és nem három
- * egymás utáni `if`, mert a felület egyetlen hibaüzenetet mutat: a három
- * végpont ugyanahhoz a futáshoz tartozik, tehát az elsőnek elbukó
- * megnevezése elég.
+ * Az első hibás állapot üzenete a párhuzamos betöltések közül, vagy
+ * `undefined`, ha egyik sem hibás. Azért egy közös leolvasás, és nem
+ * egymás utáni `if` ágak, mert a felület egyetlen hibaüzenetet mutat: a
+ * végpontok ugyanahhoz a futáshoz tartoznak, tehát az elsőnek elbukó
+ * megnevezése elég. A lépés futások hibája (`useLiveStepRuns`) a hívó oldalon
+ * ezek UTÁN következik.
  */
 function firstFailureMessage(states: readonly RequestState<unknown>[]): string | undefined {
   for (const state of states) {
@@ -171,13 +166,18 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * kapcsolaton, és a `run_finished` keretre újratölti a futás rekordját. Enélkül
  * a "megszakítás folyamatban" állapotot semmi nem zárná le, mert a megszakítás
  * REST válasza még nem a megszakítás befejezése (SPEC-004 9., SPEC-008 6.4).
+ * A keret a veszteségmentes `subscribeToFrames` úton jön (T-009-25a): a
+ * szerver a pótlás végén szinkron küldi a `replay_complete` keretet, tehát a
+ * `run_finished` gyakran nem a löket UTOLSÓ kerete.
  *
  * A TRANSCRIPT (T-009-25) a stream kereteiből épül, a `useRunTranscript`
  * hookkal, ami a betöltési ágak ELŐTT, a képernyő legelején iratkozik fel,
  * hogy a pótlás egyetlen kerete se érkezzen feliratkozó nélkül. A panel a
- * `TranscriptPanel`. A lépés futások és a rajz ÉLŐ frissülése nem ennek a
- * lépésnek a része: a lépés futások a képernyő megnyitásakor egyszer
- * töltődnek be.
+ * `TranscriptPanel`.
+ *
+ * A CSOMÓPONTOK ÉLŐ ÁLLAPOTA (T-009-25a) a `useLiveStepRuns` hookból jön: a
+ * lépés futás lista a megnyitáskor betöltődik, majd minden jelző keretre
+ * összevont újratöltéssel frissül, oldal újratöltés nélkül.
  *
  * A futás rekordja azért külön `useState` értékben is áll, nem csak a
  * `useRequestState` állapotában: az újratöltés alatt a kérés `pending`-re
@@ -187,14 +187,13 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * rekordjának elérhetetlensége nem elhallgatható.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate, streamId, lastFrame, subscribeToFrames, streamReplayLimit } =
-    properties;
+  const { apiOrigin, fetchFunction, search, navigate, streamId, subscribeToFrames, streamReplayLimit } = properties;
   const runId = readRunId(search);
   const transcript = useRunTranscript(runId, subscribeToFrames);
+  const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin });
 
   const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
-  const stepRunsState = useRequestState<readonly StepRunRecord[]>();
   const [runDetail, setRunDetail] = useState<RunDetail | undefined>(undefined);
   const layoutBand = useRunViewLayoutBand();
 
@@ -240,15 +239,6 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         apiOrigin,
       }),
     );
-    void stepRunsState.run(() =>
-      requestRouteWithoutBody({
-        routeId: 'listStepRuns',
-        parameters: { runId },
-        responseSchema: STEP_RUN_LIST_SCHEMA,
-        fetchFunction,
-        apiOrigin,
-      }),
-    );
     // A `run` hívások szándékosan nincsenek a dependency listán, ugyanabból az
     // okból, mint a `GraphEditorScreen`-ben: a `useRequestState` saját
     // `useCallback`-je stabil, de a hívó oldali objektum nem az, és a projekt
@@ -275,22 +265,27 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   }, [runId, streamId, streamReplayLimit, fetchFunction, apiOrigin]);
 
   useEffect(() => {
-    if (runId === undefined || !isRunFinishedFrame(lastFrame, runId)) {
+    if (runId === undefined) {
       return;
     }
-    void loadRunDetail(runId);
-  }, [runId, lastFrame, loadRunDetail]);
+    return subscribeToFrames((frame) => {
+      if (isRunFinishedFrame(frame, runId)) {
+        void loadRunDetail(runId);
+      }
+    });
+  }, [runId, subscribeToFrames, loadRunDetail]);
 
   if (runId === undefined) {
     return <p role="alert">Nincs megadva megtekintendő futás (hiányzó "runId" query paraméter).</p>;
   }
 
-  const failureMessage = firstFailureMessage([runState.state, snapshotState.state, stepRunsState.state]);
+  const failureMessage = firstFailureMessage([runState.state, snapshotState.state]) ?? liveStepRuns.failureMessage;
   if (failureMessage !== undefined) {
     return <p role="alert">{failureMessage}</p>;
   }
 
-  if (runDetail === undefined || snapshotState.state.status !== 'success' || stepRunsState.state.status !== 'success') {
+  const { stepRuns } = liveStepRuns;
+  if (runDetail === undefined || stepRuns === undefined || snapshotState.state.status !== 'success') {
     // Várakozás jelzése: a betöltés alatt csontváz áll, nem üres képernyő
     // (`.claude/CLAUDE.md` 11. szekció).
     return (
@@ -306,7 +301,6 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     return <p role="alert">{projected.message}</p>;
   }
 
-  const stepRuns = stepRunsState.state.value;
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,

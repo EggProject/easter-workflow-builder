@@ -872,3 +872,34 @@ A küszöb a mért négy számra húzva, felfelé kerekítés nélkül (`apps/we
 **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon a nyers
 adaton egyetlen századdal magasabb küszöbbel (98.93 / 98.23 / 99.38 / 98.89) mind a négy metrika
 `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 20. A csomópontok élő állapota utáni ratchet (2026-09-23): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-25a lépése a `useLiveStepRuns` hookot, a jelző keret predikátumát és az újratöltés
+összevonóját hozta, és törölte a `lastFrame` állapotot. **Az első mérés (az új e2e tesztekkel, de a
+futás váltás tesztje nélkül) a küszöb alá esett**: a fedetlen darabszám statements, branches és
+lines metrikán is eggyel nőtt (16, 12, 3, 16), mert a `use-live-step-runs.ts` eldobó ága (a futás
+váltásakor késve érkező válasz) e2e alatt nem futott. A szabálykönyv 8. szekciója szerint ez
+valódi romlás, tehát teszt készült rá: `e2e/run-view.spec.ts` "másik futásra váltáskor a régi futás
+késve érkező lépés futás válasza eldobódik", ami az eldobás törlésére mérten bukik.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet négy
+shardban, **199 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (19. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1426 / 1441     | **98.95** | 1386 / 1401 = 98.92 | 15 -> **15**                   |
+| branches   | 622 / 633       | **98.26** | 608 / 619 = 98.22   | 11 -> **11**                   |
+| functions  | 487 / 490       | **99.38** | 476 / 479 = 99.37   | 3 -> **3**                     |
+| lines      | 1373 / 1388     | **98.91** | 1334 / 1349 = 98.88 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**, a fedetlen lista a 16. szekció hat tétele, változatlanul. A
+`use-stream-connection.ts` tételének sorszáma 205-ről 203-ra tolódott, mert a `lastFrame` állapot
+két sora törlődött; a tétel ugyanaz (az `EventSource` lezárása az app szintű hook leszerelésekor).
+A `run-view`, a `run-history` és a `request-state` mappa mind a négy metrikán 100 százalék.
+
+A küszöb a mért négy számra húzva, felfelé kerekítés nélkül (`apps/web/package.json`).
+
+**Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon a nyers
+adaton egyetlen századdal magasabb küszöbbel (98.96 / 98.27 / 99.39 / 98.92) mind a négy metrika
+`ERROR` sorral bukik (négy `ERROR`, exit 1).

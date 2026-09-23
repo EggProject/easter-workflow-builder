@@ -31,6 +31,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type {
   RunDetail,
+  RunEventKind,
   RunEventRecord,
   RunSnapshotResponse,
   RunSummary,
@@ -39,9 +40,27 @@ import type {
   WorkflowSummary,
 } from '@easter-workflow-builder/protocol';
 import { encodeStreamFrame } from '@easter-workflow-builder/protocol';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { PREVIEW_ORIGIN, STREAM_ORIGIN } from './api-origin.ts';
+import { makeRunEventRecord } from './transcript-fixture.ts';
+
+declare global {
+  // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
+  // TypeScript a `globalThis` kiegészítését csak `var` alakban engedi.
+  /**
+   * A lapon belül KIADOTT `GET /api/runs/{runId}/steps` kérések száma
+   * (T-009-25a). A lapon belül számol, a `fetch` hívás pillanatában, nem a
+   * Playwright route kezelőjében, mert az utóbbi aszinkron fut: egy késve
+   * meghívott kezelő miatt a számláló a felület állapotához képest lemaradhatna.
+   */
+  var e2eStepRunFetchCounter: { count: number } | undefined;
+  /**
+   * A lap betöltése UTÁN beállított jelző: ha a lap újratöltődne, eltűnne.
+   */
+  var e2eNoReloadMarker: boolean | undefined;
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -172,6 +191,13 @@ interface OpenStreamServer {
    * csatlakozott, a keret a sorban vár, és a csatlakozáskor megy ki.
    */
   readonly push: (frame: StreamFrame) => void;
+  /**
+   * Több keret beszúrása EGYETLEN `write` hívással, tehát egy hálózati
+   * darabban, egy löketben: pontosan így érkezik a szerver pótlása
+   * (`apps/server` `handle-stream-connection.ts` `replayRun`), és a végén
+   * szinkron kiírt `replay_complete` (T-009-25a).
+   */
+  readonly pushBatch: (frames: readonly StreamFrame[]) => void;
 }
 
 /**
@@ -202,6 +228,13 @@ function startOpenStreamServer(initialFrames: readonly StreamFrame[]): OpenStrea
       pendingFrames.push(frame);
       for (const response of openResponses) {
         response.write(encodeStreamFrame(frame));
+      }
+    },
+    pushBatch: (frames) => {
+      pendingFrames.push(...frames);
+      const chunk = frames.map((frame) => encodeStreamFrame(frame)).join('');
+      for (const response of openResponses) {
+        response.write(chunk);
       }
     },
   };
@@ -357,4 +390,261 @@ test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finish
 
   await expect(page.getByText('Megszakítás folyamatban')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
+});
+
+// ============================================================
+// A CSOMÓPONTOK ÉLŐ ÁLLAPOTA ÉS A LÖKETBEN ÉRKEZŐ KERETEK (T-009-25a,
+// SPEC-008 6.2).
+//
+// Mind a fenti 2. és 3. kivétel alá tartozik: egy MÁR MEGNYITOTT, nyitva
+// maradó kapcsolatba menet közben beszúrt keretek hatását vizsgálja. A
+// `pushBatch` több keretet EGYETLEN `write` hívással küld, ahogy a szerver a
+// pótlást és a végén a `replay_complete` keretet: egy "legutolsó keret"
+// alakú állapot egy ilyen löketből csak az utolsót adná át.
+// ============================================================
+
+/* eslint-disable unicorn/no-null -- lásd a fájl fejlécének eslint-disable indoklását */
+
+function stepRun(status: StepRunRecord['status']): StepRunRecord {
+  return {
+    id: 's-1',
+    runId: 'r-1',
+    nodeId: 'n1',
+    nodeType: 'start',
+    parentStepRunId: null,
+    iteration: 0,
+    attempt: 1,
+    status,
+    providerId: 'claude-subscription',
+    modelId: null,
+    sessionMode: null,
+    sdkSessionId: null,
+    resumedFromSessionId: null,
+    forkedSession: false,
+    structuredOutputStrategy: null,
+    output: null,
+    resultSubtype: null,
+    numTurns: null,
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadInputTokens: null,
+    cacheCreationInputTokens: null,
+    subWorkflowRunId: null,
+    errorKind: null,
+    errorMessage: null,
+    startedAtMs: 2,
+    finishedAtMs: null,
+    createdAtMs: 2,
+  };
+}
+
+/* eslint-enable unicorn/no-null */
+
+/**
+ * Egy lépés szintű motor esemény kerete az `r-1` futás `s-1` lépés futására.
+ */
+function stepEventFrame(id: number, kind: RunEventKind, delivery: 'live' | 'replayed'): StreamFrame {
+  return {
+    event: 'run_event',
+    delivery,
+    runEvent: makeRunEventRecord(id, 'r-1', { stepRunId: 's-1', kind }),
+  };
+}
+
+/**
+ * A kiadott `listStepRuns` kérések számlálója a lapon belül, a lap saját
+ * `fetch` hívásába kötve, a betöltés ELŐTT (`addInitScript`).
+ */
+async function installStepRunFetchCounter(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const counter = { count: 0 };
+    // `Object.defineProperties`, nem értékadás: a globális objektum
+    // tulajdonságának közvetlen írását a lint tiltja
+    // (`unicorn/no-global-object-property-assignment`).
+    Object.defineProperties(globalThis, {
+      e2eStepRunFetchCounter: { configurable: true, value: counter },
+      fetch: {
+        configurable: true,
+        writable: true,
+        value: (...parameters: Parameters<typeof fetch>) => {
+          const [input] = parameters;
+          const url = input instanceof Request ? input.url : String(input);
+          if (new URL(url).pathname.endsWith('/steps')) {
+            counter.count += 1;
+          }
+          return originalFetch(...parameters);
+        },
+      },
+    });
+  });
+}
+
+async function readStepRunFetchCount(page: Page): Promise<number | undefined> {
+  return page.evaluate(() => globalThis.e2eStepRunFetchCounter?.count);
+}
+
+async function setNoReloadMarker(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    Object.defineProperty(globalThis, 'e2eNoReloadMarker', { configurable: true, value: true });
+  });
+}
+
+async function readNoReloadMarker(page: Page): Promise<boolean | undefined> {
+  return page.evaluate(() => globalThis.e2eNoReloadMarker);
+}
+
+/**
+ * Lásd a `run-view.spec.ts` `nodeLocator` doksiját: a `getByTestId`
+ * kizárólag a React Flow saját, dokumentált `rf__` előtagú fogódzójára áll
+ * (SPEC-008 12.3 locator kivétel).
+ */
+function nodeLocator(page: Page, nodeId: string): Locator {
+  return page.getByTestId(`rf__node-${nodeId}`);
+}
+
+interface RunViewMockState {
+  runStatus: RunDetail['status'];
+  stepRuns: readonly StepRunRecord[];
+}
+
+/**
+ * A futás nézet REST mockjai: a futás rekordja és a lépés futások a teszt
+ * által menet közben átírható `state` objektumból jönnek.
+ */
+async function mockRunView(page: Page, state: RunViewMockState): Promise<void> {
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(state.runStatus)))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(state.stepRuns))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+}
+
+for (const finished of [
+  { status: 'succeeded', label: 'sikeres' },
+  { status: 'failed', label: 'sikertelen' },
+] as const) {
+  test(`élő step_started keretre "fut", step_finished keretre "${finished.label}" jelvény a csomóponton, oldal újratöltés nélkül`, async ({
+    page,
+  }) => {
+    const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+    serverHolder.current = streamServer.server;
+    const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
+    await mockRunView(page, state);
+
+    await page.goto('/run?runId=r-1');
+    const node = nodeLocator(page, 'n1');
+    await expect(node).toBeVisible();
+    await expect(node.getByText('fut', { exact: true })).toBeHidden();
+    await setNoReloadMarker(page);
+
+    state.stepRuns = [stepRun('running')];
+    streamServer.push(stepEventFrame(1, 'step_started', 'live'));
+    await expect(node.getByText('fut', { exact: true })).toBeVisible();
+
+    state.stepRuns = [stepRun(finished.status)];
+    streamServer.push(stepEventFrame(2, 'step_finished', 'live'));
+    await expect(node.getByText(finished.label, { exact: true })).toBeVisible();
+    await expect(node.getByText('fut', { exact: true })).toBeHidden();
+
+    expect(await readNoReloadMarker(page)).toBe(true);
+  });
+}
+
+test('egy löketben érkező ezer keretes pótlás után a csomópont állapota helyes, és pontosan EGY újratöltés fut', async ({
+  page,
+}) => {
+  // A `stream_ready` a futást pótlás alatt állónak jelzi: a topnav az
+  // "előzmények betöltése" fázist mutatja, amíg a `replay_complete` meg nem jön.
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  serverHolder.current = streamServer.server;
+  const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+  await mockRunView(page, state);
+  await installStepRunFetchCounter(page);
+
+  await page.goto('/run?runId=r-1');
+  const node = nodeLocator(page, 'n1');
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+  await expect(page.getByText('előzmények betöltése', { exact: true })).toBeVisible();
+  expect(await readStepRunFetchCount(page)).toBe(1);
+
+  // A szerver oldali állapot a pótlásban szereplő események UTÁN: a lépés
+  // lezárult. A löket 1000 pótolt keret (lépés és SDK események vegyesen),
+  // a végén a futás `replay_complete` kerete, mind EGY hálózati darabban.
+  state.stepRuns = [stepRun('succeeded')];
+  const replayKinds: readonly RunEventKind[] = ['step_started', 'sdk_assistant', 'sdk_user', 'step_finished'];
+  const replayed = Array.from({ length: 1000 }, (_, index) =>
+    stepEventFrame(index + 1, replayKinds[index % replayKinds.length] ?? 'step_started', 'replayed'),
+  );
+  streamServer.pushBatch([...replayed, { event: 'replay_complete', runId: 'r-1', throughEventId: 1000 }]);
+
+  await expect(node.getByText('sikeres', { exact: true })).toBeVisible();
+  await expect(page.getByText('előzmények betöltése', { exact: true })).toBeHidden();
+  // A lapon belüli számláló a `fetch` kiadásakor nő, tehát a felület "sikeres"
+  // állapotában már minden kiváltott kérést tartalmaz: a csatoláskori betöltés
+  // és a `replay_complete` keretre indított EGY újratöltés.
+  expect(await readStepRunFetchCount(page)).toBe(2);
+
+  // Az élő szakasz ezután is frissít: egy élő jelző keret pontosan egy újabb
+  // kérést ad.
+  state.stepRuns = [stepRun('failed')];
+  streamServer.push(stepEventFrame(1001, 'step_finished', 'live'));
+  await expect(node.getByText('sikertelen', { exact: true })).toBeVisible();
+  expect(await readStepRunFetchCount(page)).toBe(3);
+});
+
+test('a run_finished keret a fejlécet akkor is lezárja, ha UGYANABBAN a löketben replay_complete követi', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
+  await mockRunView(page, state);
+
+  await page.goto('/run?runId=r-1');
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+
+  // A szerver a pótlás végén SZINKRON írja a `replay_complete` keretet: a
+  // `run_finished` így nem a löket utolsó kerete.
+  state.runStatus = 'succeeded';
+  streamServer.pushBatch([
+    { event: 'run_event', delivery: 'replayed', runEvent: RUN_EVENT_RECORD },
+    { event: 'replay_complete', runId: 'r-1', throughEventId: RUN_EVENT_RECORD.id },
+  ]);
+
+  await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeHidden();
+});
+
+test('a futás előzmények listája run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const listRunsCalls: { count: number } = { count: 0 };
+  await installApiMocks(page, [
+    mockRoute('listRuns', async (route) => {
+      listRunsCalls.count += 1;
+      await route.fulfill(jsonBody([RUN_PENDING]));
+    }),
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([WORKFLOW]))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/runs');
+  await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
+  const callCountBeforeBatch = listRunsCalls.count;
+
+  streamServer.pushBatch([
+    { event: 'run_event', delivery: 'live', runEvent: makeRunEventRecord(7, 'r-1', { kind: 'run_started' }) },
+    // eslint-disable-next-line unicorn/no-null -- a protocol_error `runId` mezője a dróton valódi `null`, kapcsolat szintű hibánál (SPEC-005 5.4)
+    { event: 'protocol_error', code: 'invalid_request', message: 'hibás fejléc', runId: null },
+  ]);
+
+  await expect.poll(() => listRunsCalls.count).toBe(callCountBeforeBatch + 1);
 });

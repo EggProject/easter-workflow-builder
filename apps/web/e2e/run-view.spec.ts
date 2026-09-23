@@ -686,3 +686,88 @@ test('a tartalom terület magassága a viewport és a bar magasságából szám�
   expect(measurement.contentPaddingBottom).toBe('0px');
   expect(measurement.screenBottom).toBeCloseTo(measurement.viewportHeight, 0);
 });
+
+declare global {
+  // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
+  // TypeScript a `globalThis` kiegészítését csak `var` alakban engedi.
+  /**
+   * Beállt-e már a lapon a késleltetett `run-9` lépés futás válasz
+   * törzsének beolvasása (T-009-25a). A beolvasás után a termékkód lánca
+   * (dekódolás, séma, eldobás) már csak mikrotaszkokon fut, tehát egy ezt
+   * követő `page.evaluate` a lánc végét látja.
+   */
+  var e2eLateStepRunBodyRead: boolean | undefined;
+}
+
+test('másik futásra váltáskor a régi futás késve érkező lépés futás válasza eldobódik (T-009-25a)', async ({
+  page,
+}) => {
+  // A lépés futás lista hookja (`use-live-step-runs.ts`) a futás váltásakor a
+  // még folyamatban lévő kérés válaszát eldobja. A `use-live-step-runs.spec.tsx`
+  // determinisztikus unit tesztje mellett ez a teszt a valódi böngészős
+  // útvonalat játssza le: al-workflow futásra navigálás, a `run-9` betöltése
+  // közben vissza lépés, és csak UTÁNA érkezik a `run-9` válasza. Az eldobás
+  // törlésére mérten bukik (`docs/research/2026-09-23-elo-csomopont-allapot.md`).
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const runNineStepsRequested = Promise.withResolvers<undefined>();
+  const releaseRunNineSteps = Promise.withResolvers<undefined>();
+  await mockIdleStream(page);
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
+    mockRoute('listStepRuns', async (route, url) => {
+      if (url.pathname.includes('/run-9/')) {
+        runNineStepsRequested.resolve(undefined);
+        await releaseRunNineSteps.promise;
+        await route.fulfill(jsonBody([{ ...BASE_STEP_RUN, id: 'sr-9', runId: 'run-9', status: 'failed' }]));
+        return;
+      }
+      await route.fulfill(jsonBody(STEP_RUNS));
+    }),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await page.addInitScript(() => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      writable: true,
+      value: async (...parameters: Parameters<typeof fetch>) => {
+        const response = await originalFetch(...parameters);
+        const [input] = parameters;
+        const url = input instanceof Request ? input.url : String(input);
+        if (!new URL(url).pathname.endsWith('/run-9/steps')) {
+          return response;
+        }
+        const readText = response.text.bind(response);
+        Object.defineProperty(response, 'text', {
+          value: async () => {
+            const text = await readText();
+            Object.defineProperty(globalThis, 'e2eLateStepRunBodyRead', { configurable: true, value: true });
+            return text;
+          },
+        });
+        return response;
+      },
+    });
+  });
+
+  await page.goto(RUN_URL);
+  const startNode = nodeLocator(page, 'r-start');
+  await expect(startNode.getByText('sikeres', { exact: true })).toBeVisible();
+  await nodeLocator(page, 'r-sub').getByRole('button', { name: 'Al-workflow futás megnyitása' }).click();
+  await expect(page).toHaveURL(/\/run\?runId=run-9$/);
+  await runNineStepsRequested.promise;
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/run\?runId=run-2$/);
+  await expect(startNode.getByText('sikeres', { exact: true })).toBeVisible();
+
+  releaseRunNineSteps.resolve(undefined);
+  await expect.poll(() => page.evaluate(() => globalThis.e2eLateStepRunBodyRead)).toBe(true);
+
+  // A `run-9` sora (`failed`) nem íródott a `run-2` nézetébe.
+  await expect(startNode.getByText('sikeres', { exact: true })).toBeVisible();
+  await expect(startNode.getByText('sikertelen', { exact: true })).toBeHidden();
+});

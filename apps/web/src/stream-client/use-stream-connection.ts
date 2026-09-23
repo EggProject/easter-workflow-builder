@@ -14,7 +14,6 @@ export type StreamConnectionPhase = 'connecting' | 'reconnecting' | 'replaying' 
 export interface StreamConnectionState {
   readonly streamId: string;
   readonly phase: StreamConnectionPhase;
-  readonly lastFrame: StreamFrame | undefined;
   readonly serverInstanceId: string | undefined;
   /**
    * Hányszor váltott a szerver példány azonosítója egy MÁSIK ismert értékre
@@ -25,8 +24,8 @@ export interface StreamConnectionState {
    */
   readonly serverRestartCount: number;
   /**
-   * Minden dekódolt keret, egyenként és kihagyás nélkül (T-009-25). A
-   * `lastFrame` egy löketből csak az utolsót adja át, lásd
+   * Minden dekódolt keret, egyenként és kihagyás nélkül (T-009-25,
+   * T-009-25a): a képernyők EZEN az egy úton kapják a kereteket, lásd
    * `subscribe-to-stream-frames.ts`. Stabil hivatkozás a komponens teljes
    * élettartama alatt.
    */
@@ -105,7 +104,6 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
     restartCount: 0,
   });
   const [pendingReplayRunIds, setPendingReplayRunIds] = useState<ReadonlySet<string>>(new Set());
-  const [lastFrame, setLastFrame] = useState<StreamFrame | undefined>(undefined);
   // A feliratkozók halmaza a komponens élettartamára egyszer jön létre, és
   // sosem cserélődik: a tartalma változik, nem a hivatkozása.
   const [frameListeners] = useState(() => new Set<(frame: StreamFrame) => void>());
@@ -143,7 +141,6 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
 
       const frame = decoded.value;
       setReadyState(source.readyState);
-      setLastFrame(frame);
       for (const listener of frameListeners) {
         listener(frame);
       }
@@ -186,9 +183,10 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
         case 'run_event':
         case 'run_event_transient':
         case 'protocol_error': {
-          // Erre a három keretre a fenti `setLastFrame` az egyetlen teendő:
-          // a képernyők a `lastFrame` mezőből dolgoznak, a `protocol_error`
-          // pedig szándékosan NEM zárja le a kapcsolatot (SPEC-007 9.2).
+          // Erre a három keretre a feliratkozók fenti értesítése az egyetlen
+          // teendő: a képernyők a `subscribeToFrames` úton dolgoznak, a
+          // `protocol_error` pedig szándékosan NEM zárja le a kapcsolatot
+          // (SPEC-007 9.2).
           break;
         }
       }
@@ -209,7 +207,6 @@ export function useStreamConnection(input: Readonly<UseStreamConnectionInput>): 
   return {
     streamId,
     phase: computePhase(readyState, hasConnectedOnce, pendingReplayRunIds.size),
-    lastFrame,
     serverInstanceId: serverInstance.serverInstanceId,
     serverRestartCount: serverInstance.restartCount,
     subscribeToFrames,
