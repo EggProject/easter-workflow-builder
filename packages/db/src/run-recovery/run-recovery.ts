@@ -28,8 +28,16 @@ const NON_TERMINAL_RUN_STATUSES: readonly RunStatus[] = ['pending', 'running'];
  */
 const NON_TERMINAL_STEP_RUN_STATUSES: readonly StepRunStatus[] = ['pending', 'running', 'waiting_approval'];
 
+/**
+ * A `recoveredRunIds` a ténylegesen `interrupted` állapotba vitt futások
+ * azonosítója, a `cancelRunTree` `cancelledRunIds` mezőjének párja: a
+ * szabályos leállás (`packages/engine` `shutdownActiveRuns`) ebből adja ki
+ * élőben a futásonként beírt `run_interrupted` eseményt, mert a `db` réteg
+ * maga nem publikál (SPEC-004 10.2 3. pont).
+ */
 export interface RecoverInterruptedRunsResult {
   readonly recoveredRunCount: number;
+  readonly recoveredRunIds: readonly string[];
 }
 
 export interface CancelRunTreeResult {
@@ -146,7 +154,7 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
         .all();
 
       if (interruptedRuns.length === 0) {
-        return { kind: 'ok', value: { recoveredRunCount: 0 } };
+        return { kind: 'ok', value: { recoveredRunCount: 0, recoveredRunIds: [] } };
       }
 
       const runIds = interruptedRuns.map((row) => row.id);
@@ -192,7 +200,7 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
         });
       }
 
-      return { kind: 'ok', value: { recoveredRunCount: runIds.length } };
+      return { kind: 'ok', value: { recoveredRunCount: runIds.length, recoveredRunIds: runIds } };
     });
   }
 

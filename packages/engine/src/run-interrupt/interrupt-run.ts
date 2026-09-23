@@ -1,5 +1,7 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
+import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
+import type { EngineEvent } from '../engine-event/engine-event.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
@@ -19,9 +21,13 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  * ezen zárja le a fa várakozó `human_approval` lépéseit, ami nélkül egy
  * korlátlan várakozású jóváhagyáson álló futás megszakítása sosem fejeződne
  * be (AC-51, lásd `stop-and-await-run-tree.ts` 2. pontját).
+ *
+ * Az `eventPublisher` a lezáró `run_finished` esemény élő kiadásához kell
+ * (lásd az `interruptRun` 5. pontját).
  */
 export interface InterruptRunDependencies {
   readonly database: DatabaseContext;
+  readonly eventPublisher: EventPublisherPort;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
   readonly approvalRegistry: ApprovalWaitRegistry;
@@ -63,6 +69,13 @@ export interface InterruptRunResult {
  *    9. szekció 5. pont): a fa minden nem terminális futása `cancelled`, a
  *    nem terminális lépéseik szintén, futásonként egy `run_finished` esemény
  *    `status: 'cancelled'`-lel.
+ * 5. **A lezáró esemény élő kiadása** (`eventPublisher.publish`), minden
+ *    megszakított futásra, a sikeres DB zárás UTÁN. A sort a `db` a 4.
+ *    pont tranzakciójában már megírta, ezért itt nincs `writeEngineEvent`:
+ *    ugyanaz a minta, mint a `run_started` kiadása a `run-supervisor`
+ *    `startValidatedRun` menetében. Enélkül az élő nézet sosem tudná meg,
+ *    hogy a futás lezárult: a léptető hurok a `stopRequested` ágon
+ *    szándékosan nem ír eseményt (`advance-run.ts` `finishRun`).
  *
  * **A `pending` állapotú futás külön ág NÉLKÜL megszakad.** A SPEC-004 9.
  * szekció "Megszakítás indulás előtt" bekezdése szerint a `pending ->
@@ -104,6 +117,18 @@ export async function interruptRun(
   const cancelled = dependencies.database.recovery.cancelRunTree(rootRunId);
   if (cancelled.kind === 'error') {
     return cancelled;
+  }
+
+  // A payload mezőről mezőre az, amit a `db` `cancelRunTree` a sorba írt.
+  for (const cancelledRunId of cancelled.value.cancelledRunIds) {
+    dependencies.eventPublisher.publish({
+      kind: 'run_finished',
+      runId: cancelledRunId,
+      // eslint-disable-next-line unicorn/no-null -- a `run_finished` futás szintű esemény, a `run_event.step_run_id` valódi NULL értéke (SPEC-003 6.2)
+      stepRunId: null,
+      // eslint-disable-next-line unicorn/no-null -- a felhasználói megszakítás nem hibaosztály, a `null` a "nincs hiba" valódi értéke (SPEC-004 13. szekció)
+      payload: { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 },
+    } satisfies EngineEvent);
   }
 
   return { kind: 'ok', value: { rootRunId, cancelledRunIds: cancelled.value.cancelledRunIds } };

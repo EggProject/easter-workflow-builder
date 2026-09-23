@@ -8,6 +8,7 @@ import type {
   WorkflowRunRecord,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { AgentQuery } from '@easter-workflow-builder/agent';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
@@ -148,13 +149,28 @@ function fakeQuery(): { query: AgentQuery; interruptSpy: ReturnType<typeof vi.fn
   };
 }
 
+/**
+ * A `published` tömb a kiadott események naplója: a hívó akkor adja át, ha a
+ * teszt az élő kiadást vizsgálja.
+ */
 function dependenciesOf(
   database: DatabaseContext,
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
+  published: unknown[] = [],
 ): InterruptRunDependencies {
   const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
-  return { database, runSupervisor, agentQueryRegistry, approvalRegistry: createApprovalWaitRegistry() };
+  return {
+    database,
+    eventPublisher: {
+      publish: (event) => {
+        published.push(event);
+      },
+    },
+    runSupervisor,
+    agentQueryRegistry,
+    approvalRegistry: createApprovalWaitRegistry(),
+  };
 }
 
 describe('interruptRun', () => {
@@ -271,17 +287,19 @@ describe('interruptRun', () => {
     database.close();
   });
 
-  it('már teljesen terminális célra üres cancelledRunIds, hiba nélkül', async () => {
+  it('már teljesen terminális célra üres cancelledRunIds, hiba nélkül, és nem ad ki eseményt', async () => {
     const database = openMemoryDatabase();
     const registry = createAgentQueryRegistry();
     const seeded = seedRootRun(database);
     okOrThrow(database.stepRuns.markStepSucceeded(seeded.step.id));
     okOrThrow(database.runs.markRunSucceeded(seeded.run.id));
+    const published: unknown[] = [];
 
-    const outcome = okOrThrow(await interruptRun(seeded.run.id, dependenciesOf(database, [], registry)));
+    const outcome = okOrThrow(await interruptRun(seeded.run.id, dependenciesOf(database, [], registry, published)));
 
     expect(outcome.cancelledRunIds).toStrictEqual([]);
     expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('succeeded');
+    expect(published).toStrictEqual([]);
 
     database.close();
   });
@@ -312,9 +330,50 @@ describe('interruptRun', () => {
       isStopRequested: () => false,
     };
 
-    const outcome = await interruptRun(seeded.run.id, dependenciesOf(database, [handle], registry));
+    const published: unknown[] = [];
+
+    const outcome = await interruptRun(seeded.run.id, dependenciesOf(database, [handle], registry, published));
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('database_closed');
+    // A DB zárás nem sikerült, tehát nincs mit élőben kiadni.
+    expect(published).toStrictEqual([]);
+  });
+
+  it('a lezáró run_finished eseményt a fa MINDEN megszakított futására élőben is kiadja, a DB írás UTÁN', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const child = seedChildRun(database, root.run);
+    const published: unknown[] = [];
+    // A kiadás pillanatában a sornak már a naplóban kell állnia: az SSE réteg
+    // a jelzésre az adatbázisból csapol le (SPEC-006 6.5), tehát egy korai
+    // kiadás üres lecsapolást adna.
+    const kindsAtPublish: string[][] = [];
+    const dependencies = dependenciesOf(database, [handleOf(root.run), handleOf(child.run)], registry);
+    const recording: InterruptRunDependencies = {
+      ...dependencies,
+      eventPublisher: {
+        publish: (event) => {
+          published.push(event);
+          const runId = isRecord(event) && typeof event['runId'] === 'string' ? event['runId'] : '';
+          kindsAtPublish.push(okOrThrow(database.events.readEventsSince(runId, 0, 10)).map((row) => row.kind));
+        },
+      },
+    };
+
+    okOrThrow(await interruptRun(root.run.id, recording));
+
+    const cancelledPayload = { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 };
+    expect(published).toHaveLength(2);
+    for (const runId of [root.run.id, child.run.id]) {
+      expect(published).toContainEqual({ kind: 'run_finished', runId, stepRunId: null, payload: cancelledPayload });
+    }
+    expect(kindsAtPublish).toHaveLength(2);
+    for (const kinds of kindsAtPublish) {
+      expect(kinds).toContain('run_finished');
+    }
+
+    database.close();
   });
 });

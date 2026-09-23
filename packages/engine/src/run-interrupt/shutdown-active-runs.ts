@@ -1,6 +1,8 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RecoverInterruptedRunsResult } from '@easter-workflow-builder/db';
 import type { DatabaseContext } from '../engine-port/database-port.ts';
+import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
+import type { EngineEvent } from '../engine-event/engine-event.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
@@ -12,10 +14,12 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  * ugyanaz az elv, mint az `InterruptRunDependencies`-nél
  * (`interrupt-run.ts`): ez a téma nem indít futást és nem old fel providert,
  * csak a MÁR futó futásokat kérdezi le. A `createEngine` (T-005-28) a saját,
- * teljes `RunSupervisor` példányát adja majd ide.
+ * teljes `RunSupervisor` példányát adja majd ide. Az `eventPublisher` a
+ * lezáró `run_interrupted` esemény élő kiadásához kell (4. pont lent).
  */
 export interface ShutdownActiveRunsDependencies {
   readonly database: DatabaseContext;
+  readonly eventPublisher: EventPublisherPort;
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
   readonly agentQueryRegistry: AgentQueryRegistry;
   readonly approvalRegistry: ApprovalWaitRegistry;
@@ -41,6 +45,13 @@ export interface ShutdownActiveRunsDependencies {
  *    `pending`/`running` futás és nem terminális lépésük `interrupted`
  *    állapotba megy, futásonként egy `run_interrupted` eseménnyel (10.2
  *    szekció 3. pont).
+ * 4. **A lezáró esemény élő kiadása** (`eventPublisher.publish`) a 3. pont
+ *    által visszaadott MINDEN futásra (`recoveredRunIds`, nem a kézikönyvek
+ *    listája, mert a helyreállítás hatóköre a teljes adatbázis). A sort a
+ *    `db` már megírta, ezért nincs `writeEngineEvent`, ugyanaz a minta, mint
+ *    az `interruptRun` 5. pontja. Az élő SSE kapcsolatoknak ekkor még
+ *    nyitva kell lenniük: ezt a szerver leállási sorrendje biztosítja
+ *    (SPEC-006 8.2).
  *
  * **Miért NEM kell külön `interruptRunTree`-szerű, `rootRunId` szerint
  * szűkített DB primitíva.** A `stopAndAwaitRunTree` utáni 2. lépés
@@ -61,5 +72,20 @@ export async function shutdownActiveRuns(
 ): Promise<Outcome<RecoverInterruptedRunsResult>> {
   const handles = dependencies.runSupervisor.listActiveRuns();
   await stopAndAwaitRunTree(handles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
-  return dependencies.database.recovery.recoverInterruptedRuns('graceful_shutdown');
+  const recovered = dependencies.database.recovery.recoverInterruptedRuns('graceful_shutdown');
+  if (recovered.kind === 'error') {
+    return recovered;
+  }
+
+  for (const runId of recovered.value.recoveredRunIds) {
+    dependencies.eventPublisher.publish({
+      kind: 'run_interrupted',
+      runId,
+      // eslint-disable-next-line unicorn/no-null -- a `run_interrupted` futás szintű esemény, a `run_event.step_run_id` valódi NULL értéke (SPEC-003 6.2)
+      stepRunId: null,
+      payload: { reason: 'graceful_shutdown' },
+    } satisfies EngineEvent);
+  }
+
+  return recovered;
 }

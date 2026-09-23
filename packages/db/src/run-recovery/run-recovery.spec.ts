@@ -141,6 +141,9 @@ describe('createRunRecovery', () => {
 
       const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(2);
+      // Az azonosítók listája a szabályos leállás élő kiadásának bemenete
+      // (`packages/engine` `shutdownActiveRuns`): pontosan az érintett futások.
+      expect(new Set(result.recoveredRunIds)).toStrictEqual(new Set(['run-pending', 'run-running']));
 
       const runPending = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'run-pending')).get();
       expect(runPending?.status).toBe('interrupted');
@@ -230,6 +233,7 @@ describe('createRunRecovery', () => {
 
       const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(0);
+      expect(result.recoveredRunIds).toStrictEqual([]);
 
       const events = database.select().from(runEventTable).all();
       expect(events).toHaveLength(0);

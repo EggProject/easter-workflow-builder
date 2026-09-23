@@ -16,7 +16,7 @@ merítés" (signal and drain) mintát valósítja meg.
 | `server-config/`                | env változó nevek, a `ServerConfig` alak, a `process.env` másolatából `Outcome` alakot adó olvasó, indulási log leíró                             |
 | `engine-assembly/`              | a motor kilenc portjának valódi bekötése, a `createEngine` hívás, a valós `EventPublisherPort` és a publikált esemény osztályozása                |
 | `startup-sequence/`             | az indulás 1 ... 7. lépése, lépésenkénti hibakezeléssel és kilépési kód beállítással                                                              |
-| `shutdown-sequence/`            | a szabályos leállás 2 ... 6. lépése (SSE nyelők zárása is), és a két jelkezelő felvétele                                                          |
+| `shutdown-sequence/`            | a szabályos leállás 2 ... 7. lépése (az SSE nyelők a motor UTÁN zárulnak, SPEC-006 8.2), és a két jelkezelő felvétele                             |
 | `http-server/`                  | a `node:http` szerver, a `127.0.0.1` bind, a kérés törzs olvasás, a JSON válasz kiírás, CORS fejlécek, a `ServerResponse` SSE nyelővé csomagolása |
 | `route-dispatch/`               | a `ROUTE_TABLE` alapú illesztő, paraméter kinyerés, a `404`/`405` ág, a `RouteHandler` típus                                                      |
 | `route-registry/`               | a `Record<RouteId, RouteHandler>` kimerítő összeállítása, mind a 26 azonosító valódi kezelőre kötve                                               |

@@ -725,7 +725,10 @@ RunStatus[]`) adja a listát, típusosan, nem szabad szövegként. A `RETURNING 
    adja vissza az érintett futások azonosítóját (`.returning({ id: ... }).all()`), tehát nincs
    szükség külön `SELECT`-re előtte - ugyanaz az elv, mint a `transitionRun` egysoros
    `RETURNING`-jánál, csak itt sok sorra egyszerre.
-2. Nulla érintett futásnál azonnali `{ recoveredRunCount: 0 }` visszatérés, esemény írása nélkül.
+2. Nulla érintett futásnál azonnali `{ recoveredRunCount: 0, recoveredRunIds: [] }` visszatérés,
+   esemény írása nélkül. Egyébként a `recoveredRunIds` az 1. lépés `RETURNING id` listája (a
+   `cancelRunTree` `cancelledRunIds` párja): a `packages/engine` `shutdownActiveRuns` ebből adja ki
+   élőben a futásonként beírt `run_interrupted` eseményt, mert a `db` réteg maga nem publikál.
 3. `UPDATE step_run SET status = 'interrupted', finished_at_ms = :now WHERE run_id IN (:runIds)
 AND status IN ('pending', 'running', 'waiting_approval')` - a `NON_TERMINAL_STEP_RUN_STATUSES`
    konstans adja a listát. Csak a fenti 1. lépésben ténylegesen megszakított futások lépés

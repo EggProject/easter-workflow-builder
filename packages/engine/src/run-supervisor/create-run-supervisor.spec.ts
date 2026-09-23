@@ -13,6 +13,7 @@ import type {
   WorkflowNodeInput,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type {
   Fact,
   ModelDescriptor,
@@ -910,6 +911,11 @@ describe('createRunSupervisor', () => {
       const summary = okOrThrow(
         await interruptRun(started.run.id, {
           database: harness.database,
+          eventPublisher: {
+            publish: (event) => {
+              harness.published.push(event);
+            },
+          },
           runSupervisor: harness.supervisor,
           agentQueryRegistry: harness.agentQueryRegistry,
           approvalRegistry: harness.approvalRegistry,
@@ -921,6 +927,19 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.stepRuns.getStepRun(stepRunId)).status).toBe('cancelled');
       // A jóváhagyás utáni lépés sosem indult el.
       expect(stepRunsOf(harness.database, started.run.id).map((row) => row.nodeId)).toStrictEqual(['start', 'jov']);
+      // A lezáró esemény élőben is kiment, és pontosan egyszer: a léptető
+      // hurok a `stopRequested` ágon nem ír, a megszakító fél igen.
+      const finishedEvents = harness.published.filter(
+        (event) => isRecord(event) && event['runId'] === started.run.id && event['kind'] === 'run_finished',
+      );
+      expect(finishedEvents).toStrictEqual([
+        {
+          kind: 'run_finished',
+          runId: started.run.id,
+          stepRunId: null,
+          payload: { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 },
+        },
+      ]);
     });
 
     it('elutasítás rejected él nélkül: a 8.3 politika dönt, approval_rejected osztállyal', async () => {

@@ -103,13 +103,28 @@ function fakeQuery(): { query: AgentQuery; interruptSpy: ReturnType<typeof vi.fn
   };
 }
 
+/**
+ * A `published` tömb a kiadott események naplója, ugyanaz a minta, mint az
+ * `interrupt-run.spec.ts` `dependenciesOf` függvényében.
+ */
 function dependenciesOf(
   database: DatabaseContext,
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
+  published: unknown[] = [],
 ): ShutdownActiveRunsDependencies {
   const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
-  return { database, runSupervisor, agentQueryRegistry, approvalRegistry: createApprovalWaitRegistry() };
+  return {
+    database,
+    eventPublisher: {
+      publish: (event) => {
+        published.push(event);
+      },
+    },
+    runSupervisor,
+    agentQueryRegistry,
+    approvalRegistry: createApprovalWaitRegistry(),
+  };
 }
 
 describe('shutdownActiveRuns', () => {
@@ -157,9 +172,24 @@ describe('shutdownActiveRuns', () => {
     // Az `untracked` futásra SZÁNDÉKOSAN nincs kézikönyv a listában: a
     // `recoverInterruptedRuns` mégis eléri, mert a hatóköre a teljes
     // adatbázis, nem a `listActiveRuns()` listája (10.1/10.2 szekció).
-    const result = okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [trackedHandle], registry)));
+    const published: unknown[] = [];
+    const result = okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [trackedHandle], registry, published)));
 
     expect(result.recoveredRunCount).toBe(2);
+    // Az élő kiadás a helyreállítás hatókörét követi, nem a kézikönyvekét:
+    // a nem nyilvántartott futás lezáró eseménye is kimegy (SPEC-004 10.2).
+    expect(published).toHaveLength(2);
+    for (const runId of [tracked.run.id, untracked.run.id]) {
+      expect(published).toContainEqual({
+        kind: 'run_interrupted',
+        runId,
+        stepRunId: null,
+        payload: { reason: 'graceful_shutdown' },
+      });
+      expect(okOrThrow(database.events.readEventsSince(runId, 0, 10)).map((row) => row.kind)).toContain(
+        'run_interrupted',
+      );
+    }
     expect(interruptSpy).toHaveBeenCalledTimes(1);
     expect(okOrThrow(database.runs.getRun(tracked.run.id)).status).toBe('interrupted');
     expect(okOrThrow(database.runs.getRun(untracked.run.id)).status).toBe('interrupted');
@@ -171,9 +201,11 @@ describe('shutdownActiveRuns', () => {
     const database = openMemoryDatabase();
     const registry = createAgentQueryRegistry();
 
-    const result = okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [], registry)));
+    const published: unknown[] = [];
+    const result = okOrThrow(await shutdownActiveRuns(dependenciesOf(database, [], registry, published)));
 
     expect(result.recoveredRunCount).toBe(0);
+    expect(published).toStrictEqual([]);
 
     database.close();
   });
@@ -233,9 +265,12 @@ describe('shutdownActiveRuns', () => {
       isStopRequested: () => false,
     };
 
-    const outcome = await shutdownActiveRuns(dependenciesOf(database, [handle], registry));
+    const published: unknown[] = [];
+    const outcome = await shutdownActiveRuns(dependenciesOf(database, [handle], registry, published));
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('database_closed');
+    // A DB zárás nem sikerült, tehát nincs mit élőben kiadni.
+    expect(published).toStrictEqual([]);
   });
 });

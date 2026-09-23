@@ -115,6 +115,11 @@ describe('a szabályos leállás és a durva leállás utáni indulási helyreá
     okOrThrow(
       await shutdownActiveRuns({
         database: viaGracefulShutdown.database,
+        eventPublisher: {
+          publish: () => {
+            // szándékosan üres: ez a teszt a DB végállapotot hasonlítja össze, az élő kiadást a `shutdown-active-runs.spec.ts` vizsgálja
+          },
+        },
         runSupervisor: noActiveRuns,
         agentQueryRegistry: createAgentQueryRegistry(),
         approvalRegistry: createApprovalWaitRegistry(),

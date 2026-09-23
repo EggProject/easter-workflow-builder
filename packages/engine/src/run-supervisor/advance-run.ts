@@ -594,7 +594,9 @@ async function runSchedulingLoop(
  *
  * **Külső leállítás után nem írunk állapotot.** A megszakítás (9. szekció 5. pont) és a szabályos leállás (10.2) a futást és minden nem terminális lépését
  * egyetlen tranzakcióban zárja le; ha a hurok is írna, két, egymással
- * versenyző állapotváltás keletkezne ugyanarra a sorra.
+ * versenyző állapotváltás keletkezne ugyanarra a sorra. A lezáró esemény élő
+ * kiadása is a megszakító félé (`run-interrupt/interrupt-run.ts` 5. pont,
+ * `run-interrupt/shutdown-active-runs.ts` 4. pont), nem ezé az ágé.
  */
 function finishRun(execution: RunExecution, dependencies: NodeExecutorDependencies): Outcome<RunCompletion> {
   const completion = resolveRunCompletion(execution.unhandledErrors);
