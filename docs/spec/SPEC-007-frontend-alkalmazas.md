@@ -718,6 +718,9 @@ forrásnak), `streaming` "élő frissítéseket kap". A forrás `stale` és `idl
 megfelelő fázis. A nem kompakt alak `role="status"` élő régió, a forrás angol `"<felirat> feed"`
 neve helyett `Stream kapcsolat: <felirat>` hozzáférhető névvel; sötét témában a forrás `ink`
 felülete, ugyanazzal a feloldással, mint a csontváz `ink` változata (`apps/web` `useIsDarkTheme`).
+Az `ink` felületen a pötty a forrás ink példái szerint gyűrűt kap (`dotProps`: `ring`, `halo`
+nélkül), világos témában változatlan (user döntés 2026-09-24,
+`docs/research/2026-09-24-feed-indicator-ink-gyuru.md`).
 Regresszió: `apps/web/e2e/stream-status-indicator.spec.ts`.
 
 **Amit szándékosan nem csinálunk:** nincs teljes képernyős, blokkoló betöltő réteg. Egyik async pont sem indokol olyan jelzést, ami a felhasználót minden mástól elzárja.

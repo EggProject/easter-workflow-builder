@@ -1,4 +1,9 @@
-import { FeedIndicator, type FeedIndicatorState } from '@easter-workflow-builder/ui';
+import {
+  FeedIndicator,
+  type DotProperties,
+  type FeedIndicatorState,
+  type FeedIndicatorSurface,
+} from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import type { StreamConnectionPhase } from '../stream-client/use-stream-connection.ts';
 import { useIsDarkTheme } from '../themed-skeleton/use-is-dark-theme.ts';
@@ -32,6 +37,31 @@ const STREAM_STATUS_PRESENTATION: Readonly<Record<StreamConnectionPhase, StreamS
   live: { state: 'streaming', label: 'élő' },
 };
 
+interface StreamStatusSurface {
+  readonly surface: FeedIndicatorSurface;
+  readonly dotProperties: DotProperties;
+}
+
+/**
+ * Világos témában a forrás `paper` felülete, a pötty az állapot saját
+ * módosítóival: a forrás paper példái gyűrűt nem adnak.
+ */
+const PAPER_SURFACE: StreamStatusSurface = { surface: 'paper', dotProperties: {} };
+
+/**
+ * Sötét témában a forrás `ink` felülete, és a pötty gyűrűt kap `halo` nélkül,
+ * ahogy a forrás "Ink surface" példái (`feed-indicator.html`) mindhárom
+ * állapotban adják (user döntés 2026-09-24). A `disconnected` állapotban a
+ * `dot.css` később álló `hollow` szabálya nyer, tehát ott a körvonal fest, a
+ * forrás saját ink példájával azonosan. A gyűrű a forrás `dotProps`
+ * útján jön, ami az állapotból számolt módosítók UTÁN terül szét. A `halo:
+ * false` a gyűrű kifestésének is feltétele: a `dot.css` kétosztályos
+ * `.ep-dot--halo.ep-dot--success` szabálya erősebb az egyosztályos
+ * `.ep-dot--ring`-nél, tehát az élő fázisban elnyomná a gyűrűt
+ * (`docs/research/2026-09-24-feed-indicator-ink-gyuru.md`).
+ */
+const INK_SURFACE: StreamStatusSurface = { surface: 'ink', dotProperties: { ring: true, halo: false } };
+
 export interface StreamStatusIndicatorProperties {
   readonly phase: StreamConnectionPhase;
 }
@@ -39,21 +69,22 @@ export interface StreamStatusIndicatorProperties {
 /**
  * A topnav `.app-tn__actions` sávjának stream kapcsolat jelzője, a design
  * system `FeedIndicator` komponensén (a korábbi nyers `<span>` helyett). A
- * felület sötét témában a forrás `ink` változata, ugyanazzal a feloldással,
- * mint a `ThemedSkeleton` (`useIsDarkTheme`, user döntés 2026-09-23 a
- * skeleton `ink` változatára): a forrás nem kompakt alakja `role="status"`
- * élő régió, a forrás `"<felirat> feed"` angol neve helyett a hozzáférhető név
- * magyar, a forrás saját attribútum továbbadásán át.
+ * felület sötét témában a forrás `ink` változata, gyűrűs pöttyel, ugyanazzal a
+ * feloldással, mint a `ThemedSkeleton` (`useIsDarkTheme`, user döntés
+ * 2026-09-23 a skeleton `ink` változatára): a forrás nem kompakt alakja
+ * `role="status"` élő régió, a forrás `"<felirat> feed"` angol neve helyett a
+ * hozzáférhető név magyar, a forrás saját attribútum továbbadásán át.
  */
 export function StreamStatusIndicator(properties: Readonly<StreamStatusIndicatorProperties>): ReactElement {
   const { state, label } = STREAM_STATUS_PRESENTATION[properties.phase];
-  const isDarkTheme = useIsDarkTheme();
+  const { surface, dotProperties } = useIsDarkTheme() ? INK_SURFACE : PAPER_SURFACE;
 
   return (
     <FeedIndicator
       state={state}
       label={label}
-      surface={isDarkTheme ? 'ink' : 'paper'}
+      surface={surface}
+      dotProps={dotProperties}
       aria-label={`Stream kapcsolat: ${label}`}
     />
   );

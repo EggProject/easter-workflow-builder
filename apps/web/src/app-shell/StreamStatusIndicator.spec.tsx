@@ -60,16 +60,42 @@ describe('StreamStatusIndicator', () => {
     expect(renderedFeed().className).toBe('ep-feed ep-feed--streaming ep-feed--md ep-feed--ink');
   });
 
-  it('élő témaváltásra újratöltés nélkül vált a paper és az ink felület között', async () => {
+  // A forrás "Ink surface" példái a pöttyre gyűrűt tesznek, halo nélkül (user
+  // döntés 2026-09-24); a többi módosító az állapotból jön.
+  const darkPhaseCases: readonly (readonly [StreamConnectionPhase, string])[] = [
+    ['connecting', 'ep-dot ep-dot--info ep-dot--md ep-dot--ring ep-dot--pulse'],
+    ['replaying', 'ep-dot ep-dot--info ep-dot--md ep-dot--ring ep-dot--pulse'],
+    ['reconnecting', 'ep-dot ep-dot--danger ep-dot--md ep-dot--ring ep-dot--hollow'],
+    ['live', 'ep-dot ep-dot--success ep-dot--md ep-dot--ring ep-dot--pulse'],
+  ];
+
+  it.each(darkPhaseCases)('sötét témában a "%s" fázis pöttye gyűrűt kap, halo nélkül', (phase, dotClassName) => {
+    document.documentElement.dataset['theme'] = 'dark';
+    act(() => {
+      root.render(<StreamStatusIndicator phase={phase} />);
+    });
+    expect(renderedFeed().querySelector(':scope > .ep-dot')?.className).toBe(dotClassName);
+  });
+
+  it('élő témaváltásra újratöltés nélkül vált a paper és az ink felület között, a gyűrűvel együtt, és vissza', async () => {
     act(() => {
       root.render(<StreamStatusIndicator phase="reconnecting" />);
     });
     expect(renderedFeed().classList.contains('ep-feed--ink')).toBe(false);
+    expect(renderedFeed().querySelector(':scope > .ep-dot')?.classList.contains('ep-dot--ring')).toBe(false);
 
     await act(async () => {
       document.documentElement.dataset['theme'] = 'dark';
       await Promise.resolve();
     });
     expect(renderedFeed().classList.contains('ep-feed--ink')).toBe(true);
+    expect(renderedFeed().querySelector(':scope > .ep-dot')?.classList.contains('ep-dot--ring')).toBe(true);
+
+    await act(async () => {
+      document.documentElement.dataset['theme'] = 'light';
+      await Promise.resolve();
+    });
+    expect(renderedFeed().classList.contains('ep-feed--ink')).toBe(false);
+    expect(renderedFeed().querySelector(':scope > .ep-dot')?.classList.contains('ep-dot--ring')).toBe(false);
   });
 });
