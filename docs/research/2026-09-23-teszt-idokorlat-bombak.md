@@ -117,19 +117,25 @@ Helyi, a teljes suite-tal együtt, `--coverage` mellett (terhelés alatt). "E" =
 teljes suite, "S" = négy shardra bontott teljes suite (a sandbox parancs időkorlátja miatt, 8.
 szekció):
 
-| Teszt                               | előtte E1 | előtte E2 | előtte S1 | utána S1 | utána S2 |
-| ----------------------------------- | --------- | --------- | --------- | -------- | -------- |
-| `check-casing.spec.ts`              | 3071      | 3024      | 3018      | 2022     | 1440     |
-| `relative-import-extension.spec.ts` | 2760      | 2648      | 2724      | 1472     | 1390     |
-| `app-mount/main.spec.ts`            | 3638      | 3367      | 2463      | 43       | 40       |
+| Teszt                               | előtte E1 | előtte E2 | előtte S1 | utána S1 | utána S2 | utána S3 |
+| ----------------------------------- | --------- | --------- | --------- | -------- | -------- | -------- |
+| `check-casing.spec.ts`              | 3071      | 3024      | 3018      | 2022     | 1440     | 1466     |
+| `relative-import-extension.spec.ts` | 2760      | 2648      | 2724      | 1472     | 1390     | 1321     |
+| `app-mount/main.spec.ts`            | 3638      | 3367      | 2463      | 43       | 40       | 36       |
 
-CI, a Test job naplójából, teszt szinten, a javítás előtt (run azonosító):
+A helyi "utána" idő nagyobbik része a megosztott mount fájlolvasása (4.1 szétbontás), ami a CI
+natív fájlrendszerén nincs jelen; a CI számok ezt mutatják.
 
-| Teszt                               | 35796717087 | 35802378720 | 35808999237 | 35813724443   |
-| ----------------------------------- | ----------- | ----------- | ----------- | ------------- |
-| `check-casing.spec.ts`              | 3221        | 4976        | 4996        | 5019 (bukott) |
-| `relative-import-extension.spec.ts` | 2895        | 4281        | 4331        | 3972          |
-| `app-mount/main.spec.ts`            | 442         | 609         | 571         | 635           |
+CI, a Test job naplójából, teszt szinten (run azonosító). Az `app-mount/main.spec.ts` a javítás
+után 300 ms alá esett, ezért a CI napló (Vitest `slowTestThreshold` alapértéke 300 ms, telepített
+`vitest/dist/chunks/defaults.9aQKnqFk.js`) a teszt szintű idejét nem írja ki, csak a fájl szintűt;
+az utóbbi a teszt idejének felső korlátja:
+
+| Teszt                               | 35796717087 | 35802378720 | 35808999237 | 35813724443   | utána: 35820006956 | utána: ugyanaz, 2. kísérlet |
+| ----------------------------------- | ----------- | ----------- | ----------- | ------------- | ------------------ | --------------------------- |
+| `check-casing.spec.ts`              | 3221        | 4976        | 4996        | 5019 (bukott) | 522                | 529                         |
+| `relative-import-extension.spec.ts` | 2895        | 4281        | 4331        | 3972          | 335                | 352                         |
+| `app-mount/main.spec.ts`            | 442         | 609         | 571         | 635           | fájl szinten 93    | fájl szinten 87             |
 
 ## 6. A szándékos rontás igazolása
 
@@ -179,5 +185,5 @@ hozzá.
 - A teljes `bun run test` egyetlen hívásban helyben nem fut le: a sandbox parancs időkorlátja
   (mérve 121 és 178 s között változott) rövidebb a teljes suite coverage-dzsel együtt mért
   idejénél. A helyi igazolás ezért négy shardon és `--merge-reports --coverage` összefésüléssel
-  ment (1. szekció, sharding doksi): az "utána S1" és "utána S2" futás összefésülve egyaránt 491
+  ment (1. szekció, sharding doksi): az "utána S1", "S2" és "S3" futás összefésülve egyaránt 491
   tesztfájl, 3810 teszt, mind zöld, a lefedettség mind a négy metrikán 100 százalék.
