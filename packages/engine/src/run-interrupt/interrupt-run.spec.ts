@@ -312,6 +312,83 @@ describe('interruptRun', () => {
     database.close();
   });
 
+  it('REGRESSZIÓ: a fa döntésre váró jóváhagyásának sora már a futó lépések leállásának kivárása ELŐTT cancelled, egy másik fáé nem (SPEC-004 8.3)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const other = seedRootRun(database);
+    const approvalStepRunIds = [root, other].map((seeded) => {
+      const stepRunId = okOrThrow(
+        database.stepRuns.createStepRun({
+          runId: seeded.run.id,
+          nodeId: `jov-${seeded.run.id}`,
+          nodeType: 'human_approval',
+          parentStepRunId: null,
+          providerId: 'minimax',
+          modelId: null,
+          sessionMode: null,
+          structuredOutputStrategy: null,
+          subWorkflowRunId: null,
+        }),
+      ).id;
+      okOrThrow(database.stepRuns.markStepRunning(stepRunId));
+      okOrThrow(
+        database.approvals.requestApproval({
+          runId: seeded.run.id,
+          stepRunId,
+          title: 'döntés',
+          body: 'szöveg',
+          payload: {},
+        }),
+      );
+      return stepRunId;
+    });
+    // A futó lépés leállása a teszt kezében van: amíg a `completion` nem
+    // teljesül, a megszakítás a leállási ablakban áll.
+    const { promise: completion, resolve: finishRun } = Promise.withResolvers<Outcome<RunCompletion>>();
+    const rootHandle: ActiveRunHandle = { ...handleOf(root.run), completion };
+
+    const interrupting = interruptRun(
+      root.run.id,
+      dependenciesOf(database, [rootHandle, handleOf(other.run)], registry),
+    );
+
+    expect(approvalStepRunIds.map((id) => okOrThrow(database.stepRuns.getStepRun(id)).status)).toStrictEqual([
+      'cancelled',
+      'waiting_approval',
+    ]);
+    finishRun(RESOLVED_SUCCESS);
+    okOrThrow(await interrupting);
+    expect(okOrThrow(database.runs.getRun(root.run.id)).status).toBe('cancelled');
+
+    database.close();
+  });
+
+  it('a jóváhagyás sorok lezárásának hibáját továbbadja, és a fát nem állítja le', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const seeded = seedRootRun(database);
+    const { query, interruptSpy } = fakeQuery();
+    registry.register(seeded.run.id, seeded.step.id, query);
+    const handle = handleOf(seeded.run);
+    const failing: DatabaseContext = {
+      ...database,
+      stepRuns: {
+        ...database.stepRuns,
+        listStepRuns: () => ({ kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' }),
+      },
+    };
+
+    const outcome = await interruptRun(seeded.run.id, dependenciesOf(failing, [handle], registry));
+
+    expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+    expect(handle.requestStop).not.toHaveBeenCalled();
+    expect(interruptSpy).not.toHaveBeenCalled();
+    expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('running');
+
+    database.close();
+  });
+
   it('pending futásra (nincs aktív kézikönyv) is lezárja a DB-t, közvetlen pending -> cancelled átmenettel', async () => {
     const database = openMemoryDatabase();
     const registry = createAgentQueryRegistry();

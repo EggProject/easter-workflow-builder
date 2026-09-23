@@ -392,9 +392,9 @@ function insertPendingSibling(database: DatabaseContext, runId: string): string 
   ).id;
 }
 
-// A `fail_run` miatt várakozásában lezárt jóváhagyás nyoma: a végrehajtó
-// `interrupted` eredménnyel tért vissza, a sora `waiting_approval` maradt
-// (`execute-human-approval.ts` 6. pont).
+// Egy döntésre váró jóváhagyás sora (`waiting_approval`, `decision` NULL),
+// végrehajtó nélkül: a `fail_run` menete a várakozás lezárásával egy időben
+// zárja (`runSchedulingLoop`).
 function insertWaitingApproval(database: DatabaseContext, runId: string): string {
   const stepRunId = okOrThrow(
     database.stepRuns.createStepRun({
@@ -654,7 +654,35 @@ describe('advanceRun', () => {
       expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('failed');
     });
 
-    it('a lépés sorok olvasásának hibáját továbbadja, a futás sorát nem írja', async () => {
+    it('a záró menetben a lépés sorok olvasásának hibáját továbbadja, a futás sorát nem írja', async () => {
+      // Az első olvasás a `fail_run` menet jóváhagyás lezárásáé, a második a
+      // záró meneté: csak az utóbbi hibázik.
+      let listCalls = 0;
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            listStepRuns: (runId) => {
+              listCalls += 1;
+              return listCalls === 1
+                ? database.stepRuns.listStepRuns(runId)
+                : { kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' };
+            },
+          },
+        }),
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(listCalls).toBe(2);
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    });
+
+    it('a jóváhagyás sorok lezárásának hibáját továbbadja: a futás run_execution_failed, a futó testvér interrupt()-ja akkor is lefut', async () => {
+      const interrupted: string[] = [];
       const fixture = openFixture({
         document: FAIL_RUN_DOCUMENT,
         wrapDatabase: (database) => ({
@@ -665,11 +693,20 @@ describe('advanceRun', () => {
           },
         }),
       });
+      fixture.dependencies.agentQueryRegistry.register(fixture.execution.runId, 'futo-testver', {
+        messages: agentMessages('futo-testver', Promise.resolve(undefined)),
+        interrupt: () => {
+          interrupted.push('futo-testver');
+          return Promise.resolve();
+        },
+      });
 
       const outcome = await advanceRun(fixture.execution, fixture.dependencies);
 
       expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
-      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+      expect(interrupted).toStrictEqual(['futo-testver']);
+      const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+      expect([run.status, run.errorKind]).toStrictEqual(['failed', 'run_execution_failed']);
     });
 
     it('a cancelled állapotváltás hibáját továbbadja, a futás sorát nem írja', async () => {

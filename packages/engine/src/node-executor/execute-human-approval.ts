@@ -151,9 +151,9 @@ function failApproval(
  *    `interrupted` kimenettel, `step_run` állapotváltás és esemény írás
  *    NÉLKÜL. A lépés sorát a lezárást kérő fél zárja le, és a hívók
  *    KÜLÖNBÖZŐ záró állapotot írnak (`cancelled` a felhasználói
- *    megszakításnál és a `fail_run` záró menetében, `interrupted` a szabályos
- *    leállásnál), amit ez a végrehajtó nem tudna eldönteni
- *    (`approval-wait-signal.ts`).
+ *    megszakításnál és a `fail_run`-nál, már a várakozás lezárásakor;
+ *    `interrupted` a szabályos leállásnál), amit ez a végrehajtó nem tudna
+ *    eldönteni (`approval-wait-signal.ts`).
  * 7. **Lejáratkor**: `finishStepRunFailed` `approval_timed_out` osztállyal - a
  *    `human_approval.decision` oszlop NULL marad, mert a `db.approvals
  *    .decideApproval(...)` sosem hívódott (`human-approval-repository.ts`
@@ -255,10 +255,10 @@ export async function executeHumanApproval(
 
   const raced = await raceApprovalDecision(runId, stepRunId, config.timeoutMs, ports, registry);
 
-  // A várakozást a megszakítás vagy a szabályos leállás zárta le: a végrehajtó
-  // egyetlen állapotváltást és egyetlen eseményt sem ír, a lépés sorát a
-  // megszakítást kérő fél zárja le a futás sorával EGYETLEN tranzakcióban
-  // (`approval-wait-signal.ts` doksija).
+  // A várakozást a megszakítás, a szabályos leállás vagy a `fail_run` zárta
+  // le: a végrehajtó egyetlen állapotváltást és egyetlen eseményt sem ír, a
+  // lépés sorát a lezárást kérő fél zárja le (`approval-wait-signal.ts`
+  // doksija).
   if (raced.kind === 'interrupted') {
     return { kind: 'ok', value: { kind: 'interrupted' } };
   }

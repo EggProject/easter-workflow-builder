@@ -266,11 +266,79 @@ folyam vége előtt vagy után érkezik, nem mért.
 visszaadja (`decision IS NULL`), a döntése 409-et ad; a felhasználói megszakítás után ugyanez
 mérve (`start -> human_approval`, `POST /api/runs/<id>/interrupt`: a lista 1 elemű, a döntés 409).
 (2) A várakozás lezárása és a záró írás közti ablakban (egy futó, megszakított testvér folyamának
-kimerülése alatt) érkező döntés átmegy: motor szintű próba, a testvér folyamát a próba tartja
-nyitva; `fail_run` mellett a döntés sikeres, a jóváhagyás `succeeded`, a futás `failed`; a
-felhasználói megszakításnál ugyanígy, a futás `cancelled`. (3) A `fail_run` a testvér `sub_workflow`
+kimerülése alatt) érkező döntés átment: lezárva, lásd a hatodik kört lent. (3) A `fail_run` a testvér `sub_workflow`
 gyerek futását nem állítja le: motor szintű próba, a gyerek `start -> human_approval`, a szülő a
 bukás után sem terminális.
+
+**A leállási ablakban érkező jóváhagyási döntés: mérve, javítva (2026-09-23, hatodik kör).** Egy
+független ellenőrzés a `7229769` commiton azt mérte, hogy a fenti (2) pont a valódi szerveren is
+előáll: a `fail_run` (vagy a felhasználói megszakítás) a döntésre váró jóváhagyás várakozását
+lezárja, de egy futó testvér `interrupt()` utáni kimerülése alatt beküldött döntés HTTP 200-at
+kap. A SPEC-004 8.3 és a 43. kritérium szerint a lezárt jóváhagyásra érkező döntés
+`illegal_status_transition`, és semmit nem módosít, tehát ez hiba volt, nem nyitott kérdés.
+
+| Tétel     | Érték                                                                                                                                                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató   | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `f3ac259` commitja (előtte; a motor kódja azonos a `7229769`-ével), illetve a javítás munkapéldánya (utána)                                                             |
+| Szerver   | a 6. szekció felállása: a valódi `apps/server` modulok és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő        |
+| Hamis     | az `a1` 300 ms után nem sikeres `result`-tal bukik (`fail_run`); az `a2` megszakítás nélkül 8000 ms, `interrupt()` után 1000 ms alatt zár, sikeres `result`-tal                                                        |
+| A eset    | `start` után `a1`, `a2` és `jov` (`human_approval`, `timeoutMs: null`); az `a1` bukása után a kliens a szerver naplójában megvárja az `a2` `interrupt()`-ját, és azonnal döntést küld (`approved`)                     |
+| B eset    | `start` után `a2` és `jov`; `POST /api/runs/<id>/interrupt` (a válaszát nem várva), a kliens megvárja az `a2` `interrupt()`-ját, és azonnal döntést küld                                                               |
+| Kiolvasás | a döntés válasza és a futás állapota a döntés után, a lépések végállapota, a `jov` lépés eseményei (`GET /api/runs/<id>/events`), és a `human_approval.decision` oszlop közvetlenül a fájlból, a szerver leállása után |
+
+| Eset      | A döntés válasza                  | A futás a döntéskor | A futás vége | `jov` lépés | `decision` | A `jov` eseményei                    |
+| --------- | --------------------------------- | ------------------- | ------------ | ----------- | ---------- | ------------------------------------ |
+| A, előtte | HTTP 200, háromból háromszor      | `running`           | `failed`     | `succeeded` | `approved` | `step_started`, `approval_requested` |
+| A, utána  | HTTP 409 `conflict`, ötből ötször | `running`           | `failed`     | `cancelled` | NULL       | `step_started`, `approval_requested` |
+| B, előtte | HTTP 200, kettőből kétszer        | `running`           | `cancelled`  | `succeeded` | `approved` | `step_started`, `approval_requested` |
+| B, utána  | HTTP 409 `conflict`, ötből ötször | `running`           | `cancelled`  | `cancelled` | NULL       | `step_started`, `approval_requested` |
+
+A 409 törzsében a hibaosztály `illegal_status_transition` (a `markStepSucceeded` üzenete). A
+döntés válasza minden mérésben legfeljebb 196 ms-mal az `interrupt()` után megjött, a futó lépés
+1000 ms-os kimerülésén belül, és a futás a döntéskor `running` volt; a megszakító kérés válasza a B
+esetben 1009 ... 1021 ms. Az A esetben a szerver eseményhurka a bukás után egy nem vizsgált okból
+kb. 180 ms-ig foglalt, a javítás előtt és után is (egy az `interrupt()` után közbeiktatott `GET`
+177, 182 és 188 ms-ig tartott), ezért ott a döntés válasza 182 ... 196 ms, egy mérésben 10 ms; ez
+nem a javítás hatása.
+
+**A gyökérok.** A compare and set feltételek épek: a `db` `decideApproval` a `decision IS NULL`
+feltétellel, a `markStepSucceeded` a `status IN (...)` feltétellel ír. A hiba az, hogy a lezárás a
+leállási ablakban csak memóriában létezett: az `ApprovalWaitRegistry.cancelWaitingForRunIds` a
+várakozót törölte, a lépés sora viszont a futás záró írásáig (`fail_run`: `finishRun`,
+megszakítás: `cancelRunTree`) `waiting_approval` maradt, `decision` NULL-lal, a futás sora pedig
+`running`. A döntés tehát egy érvényes, de elavult állapotot látott: a `db` elfogadta, a
+`notifyDecided` nem talált várakozót, így esemény sem íródott, és a záró írás a már terminális
+sort nem írta át. Futás állapot ellenőrzés sem segített volna, mert a futás az ablakban `running`.
+
+**A javítás.** A döntésre váró jóváhagyás sora a várakozás lezárásával egy szinkron menetben,
+egyetlen `await` nélkül megy `cancelled` állapotba (`cancelWaitingApprovalStepRuns`, a
+`run-interrupt` témában): a `fail_run` hurok a `cancelWaitingForRunIds` után, az `interrupt()`
+előtt, az `interruptRun` a `stopAndAwaitRunTree` előtt, a fa aktív futásaira. Az ablakban érkező
+döntés így a `cancelled` soron bukik (`illegal_status_transition`), és a tranzakciója a
+`human_approval` sor írását is visszagörgeti. A `fail_run` záró menete ezután csak a `pending`
+sorokat zárja: azokat a hurok menete szándékosan nem, mert a szabályozó a helyet egy `Promise`
+feloldásával adja át, és a `markStepRunning` csak egy későbbi folytatásban fut. A szabályos leállás
+útja változatlan (`interrupted` a `recoverInterruptedRuns`-ban); rá ez a kör nem mért.
+
+**A regresszió.** A `create-engine.spec.ts` két új tesztje (`fail_run`, illetve felhasználói
+megszakítás, mindkettőben egy `interrupt()` után csak a teszt jelére kimerülő testvér tartja nyitva
+az ablakot): a javítás előtt mindkettő bukott (`expected '' to contain
+'(illegal_status_transition)'`). Részenként visszavonva: a hurok oldali írás nélkül öt teszt bukik
+(a két `create-engine` jóváhagyásos `fail_run` teszt és három `advance-run` teszt), az
+`interruptRun` oldali nélkül három (a `create-engine` megszakításos teszt és két `interrupt-run`
+teszt). Plusz a `cancel-waiting-approval-step-runs.spec.ts` öt esete.
+
+**Mellékes lelet, mérve: a már eldöntött jóváhagyás második döntése 404.** Ugyanezen a szerveren
+(`start -> human_approval`, jóváhagyás, majd egy második döntés ugyanarra az `approvalId`-ra): az
+első HTTP 200, a második HTTP 404 `not_found` ("függőben lévő jóváhagyás nem található"), a
+javítás előtt és után is. Az ok a `decide-approval.ts` kezelő: az `approvalId`-t a függő lista
+(`decision IS NULL`) elemei között keresi, mert a `HumanApprovalRepository`-nak nincs `approvalId`
+szerinti olvasása. Nem javítva, a két forrás ellentmond egymásnak: a SPEC-005 8.2 szerint a
+`conflict` az "erőforrás létezik, de az állapota nem engedi a műveletet" esete, és a SPEC-008 8.
+szekciója kimondja, hogy egy második hívás `conflict` hibát ad; a SPEC-006 1. szekciója ("Amit NEM
+dönt el") viszont kimondja, hogy a szerver új repository metódus nélkül képez le, és ahol a
+leképezés nem teljes, az nyitott kérdés, nem a felület csendes bővítése. A `conflict` válaszhoz új
+`db` olvasó metódus kellene, tehát ez user döntés.
 
 **Leállás közben a 503.** Ugyanezen a szerveren a 6. szekció félbe küldött indító kérése a javítás
 után `503 Service Unavailable` választ kap, a törzsben `service_unavailable` kóddal és

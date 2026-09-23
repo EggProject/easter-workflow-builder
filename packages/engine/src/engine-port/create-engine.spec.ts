@@ -158,9 +158,13 @@ function hasPublishedEvent(published: readonly unknown[], kind: string, stepRunI
  * - `runs_until_interrupt`: magától SOSEM ér véget, csak az `interrupt()`
  *   után, sikeres `result` üzenettel (a megszakított, futó lépés a meglévő
  *   úton, a saját eredménye szerint zár, SPEC-004 9. szekció 4. pont);
+ * - `drains_until_released`: az `interrupt()` után sem ér véget, csak a
+ *   `releaseDrain()` hívásra, sikeres `result` üzenettel. Ez a leállási ablak:
+ *   a folyam kimerülése alatt a futás még nem terminális (SPEC-004 9. szekció
+ *   4. pont), és a teszt ebben az ablakban cselekedhet;
  * - `succeeds`: azonnal sikeres.
  */
-type ScriptedCall = 'fails_when_released' | 'runs_until_interrupt' | 'succeeds';
+type ScriptedCall = 'fails_when_released' | 'runs_until_interrupt' | 'drains_until_released' | 'succeeds';
 
 /**
  * Hívásonként előre megírt hamis agent futtató a `fail_run` tesztekhez. A
@@ -172,9 +176,11 @@ type ScriptedCall = 'fails_when_released' | 'runs_until_interrupt' | 'succeeds';
 function scriptedRunner(script: readonly ScriptedCall[]): {
   readonly runner: AgentQueryRunner;
   readonly releaseFailure: () => void;
+  readonly releaseDrain: () => void;
   readonly calls: { run: number; interrupt: number };
 } {
   const { promise: failureGate, resolve: openFailureGate } = Promise.withResolvers<undefined>();
+  const { promise: drainGate, resolve: openDrainGate } = Promise.withResolvers<undefined>();
   const calls = { run: 0, interrupt: 0 };
 
   async function* failingMessages(sessionId: string): AsyncGenerator {
@@ -183,6 +189,19 @@ function scriptedRunner(script: readonly ScriptedCall[]): {
     yield {
       type: 'result',
       subtype: 'error_max_turns',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  async function* drainingMessages(sessionId: string): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await drainGate;
+    yield {
+      type: 'result',
+      subtype: 'success',
       session_id: sessionId,
       uuid: `${sessionId}-2`,
       num_turns: 1,
@@ -199,6 +218,18 @@ function scriptedRunner(script: readonly ScriptedCall[]): {
         return {
           kind: 'ok',
           value: { messages: messageIterable(successMessages(calls.run)), interrupt: () => Promise.resolve() },
+        };
+      }
+      if (behaviour === 'drains_until_released') {
+        return {
+          kind: 'ok',
+          value: {
+            messages: drainingMessages(sessionId),
+            interrupt: () => {
+              calls.interrupt += 1;
+              return Promise.resolve();
+            },
+          },
         };
       }
       const controlled = controlledMessageIterable(sessionId);
@@ -219,6 +250,9 @@ function scriptedRunner(script: readonly ScriptedCall[]): {
     runner,
     releaseFailure: () => {
       openFailureGate(undefined);
+    },
+    releaseDrain: () => {
+      openDrainGate(undefined);
     },
     calls,
   };
@@ -568,6 +602,23 @@ async function waitForRunningAndQueued(
   );
 }
 
+/**
+ * Megvárja, amíg a hamis futtató `interrupt()` hívásainak száma eléri a
+ * `count` értéket. A `fail_run` és a megszakítás a döntésre váró jóváhagyás
+ * várakozását ugyanabban a szinkron menetben zárja le, amiben az
+ * `interrupt()`-ot hívja, tehát a számláló a leállási ablak kezdetének
+ * megfigyelhető jele.
+ */
+async function waitForInterruptCalls(calls: { readonly interrupt: number }, count: number): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    if (calls.interrupt === count) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`az interrupt() hívások száma nem érte el a(z) ${String(count)} értéket`);
+}
+
 const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'cancelled', 'interrupted'] as const;
 
 /**
@@ -832,6 +883,42 @@ describe('createEngine', () => {
       expect(summary.rootRunId).toBe(started.run.id);
       expect(summary.cancelledRunIds).toContain(started.run.id);
       expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('cancelled');
+    });
+
+    it('REGRESSZIÓ: a leállási ablakban (a futó lépés folyamának kimerülése alatt) érkező jóváhagyási döntés illegal_status_transition hibát ad, és semmit nem módosít', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'megszakitas-leallasi-ablak',
+        [startNode('start'), agentNode('a1', 'egy'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'jov')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 1, 0);
+      const approvalStepRunId = await waitForPendingApproval(harness.database, started.run.id);
+
+      const interrupting = harness.engine.interruptRun(started.run.id);
+      await waitForInterruptCalls(scripted.calls, 1);
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('running');
+
+      const late = await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' });
+
+      // A javítás előtt a döntés átment, a lépés `succeeded` lett egy
+      // `cancelled` futásban.
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+
+      scripted.releaseDrain();
+      const summary = okOrThrow(await interrupting);
+
+      expect(summary.cancelledRunIds).toStrictEqual([started.run.id]);
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+      expect(hasPublishedEvent(harness.published, 'step_finished', approvalStepRunId)).toBe(false);
+      expect(hasPublishedEvent(harness.published, 'approval_decided', approvalStepRunId)).toBe(false);
     });
 
     it('REGRESSZIÓ: korlát 1 mellett a futás sorban álló agent lépései a megszakítás után sem indulnak el, egyetlen agent hívás történik, a soruk cancelled (SPEC-004 9. szekció 2. pont)', async () => {
@@ -1119,6 +1206,41 @@ describe('createEngine', () => {
       expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
       expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('failed');
       expect(harness.published).toHaveLength(publishedBefore);
+    });
+
+    it('REGRESSZIÓ: a leállási ablakban (a futó testvér folyamának kimerülése alatt) érkező döntés illegal_status_transition hibát ad, és semmit nem módosít', async () => {
+      const scripted = scriptedRunner(['fails_when_released', 'drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-leallasi-ablak',
+        [startNode('start'), agentNode('a1', 'egy'), agentNode('a2', 'ketto'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2'), edgeOf('e3', 'start', 'jov')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 2, 0);
+      const approvalStepRunId = await waitForPendingApproval(harness.database, started.run.id);
+
+      scripted.releaseFailure();
+      await waitForInterruptCalls(scripted.calls, 1);
+      // A leállási ablak: a futó testvér megkapta az `interrupt()`-ot, de a
+      // folyama még nem merült ki, tehát a futás nem terminális.
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('running');
+
+      const late = await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' });
+
+      // A javítás előtt a döntés átment, a lépés `succeeded` lett.
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+
+      scripted.releaseDrain();
+
+      expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+      expect(hasPublishedEvent(harness.published, 'step_finished', approvalStepRunId)).toBe(false);
+      expect(hasPublishedEvent(harness.published, 'approval_decided', approvalStepRunId)).toBe(false);
     });
 
     it('REGRESSZIÓ: egy MÁSIK futás döntésre váró jóváhagyása érintetlen marad, és a döntés után a saját útján zár', async () => {

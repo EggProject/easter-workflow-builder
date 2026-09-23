@@ -6,6 +6,7 @@ import type { EngineEvent } from '../engine-event/engine-event.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
+import { cancelWaitingApprovalStepRuns } from './cancel-waiting-approval-step-runs.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
 
 /**
@@ -65,6 +66,12 @@ export interface InterruptRunResult {
  * 2. **A fa aktív kézikönyveinek kiválasztása**: a `RunSupervisor.listActiveRuns()`
  *    listáját a `rootRunId` szerint szűkíti (9. szekció 3. pont, a
  *    `run-supervisor` CLAUDE.md "Amit a T-005-26 ebből használ" bekezdése).
+ *    Ugyanebben a szinkron menetben, a 3. pont előtt a fa döntésre váró
+ *    jóváhagyásainak sora `cancelled` (`cancelWaitingApprovalStepRuns`), nem a
+ *    4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
+ *    lépések leállásáig tartó ablakban érkező döntés így a sor állapotán bukik
+ *    (`illegal_status_transition`), ahelyett hogy a `db` elfogadná. Ha az írás
+ *    hibázik, a függvény a fa leállítása nélkül adja vissza a hibát.
  * 3. **`requestStop()`, a sorban álló agent lépések elutasítása és
  *    `interrupt()` minden érintett futáson és élő `AgentQuery`-n**, majd a
  *    `completion` Promise-ok megvárása - ez a `stopAndAwaitRunTree` közös
@@ -120,6 +127,13 @@ export async function interruptRun(
   const rootRunId = target.value.rootRunId;
 
   const treeHandles = dependencies.runSupervisor.listActiveRuns().filter((handle) => handle.rootRunId === rootRunId);
+  const approvalsClosed = cancelWaitingApprovalStepRuns(
+    new Set(treeHandles.map((handle) => handle.runId)),
+    dependencies.database,
+  );
+  if (approvalsClosed.kind === 'error') {
+    return approvalsClosed;
+  }
   await stopAndAwaitRunTree(
     treeHandles,
     dependencies.agentQueryRegistry,

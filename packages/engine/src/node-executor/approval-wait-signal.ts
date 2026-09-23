@@ -12,13 +12,14 @@ import type { ApprovalDecision } from '@easter-workflow-builder/db';
  * - `interrupted`: a várakozást a megszakítás, a szabályos leállás vagy a
  *   futás `fail_run` politikájú bukása zárta le (`cancelWaitingForRunIds`),
  *   tehát **nincs döntés**. A végrehajtó ilyenkor egyetlen állapotváltást és
- *   egyetlen eseményt sem ír: a lépés sorát a lezárást kérő fél zárja le
- *   (`run-interrupt/interrupt-run.ts` `cancelRunTree` és
- *   `shutdown-active-runs.ts` `recoverInterruptedRuns` a futás sorával egy
- *   tranzakcióban, illetve `run-supervisor/advance-run.ts` `finishRun` a
- *   `markRunFailed` előtt). A záró állapot hívónként más (`cancelled`,
- *   `interrupted`, `cancelled`), amit a végrehajtó nem tudna eldönteni -
- *   ezért nem is dönt.
+ *   egyetlen eseményt sem ír: a lépés sorát a lezárást kérő fél zárja le. A
+ *   megszakítás (`run-interrupt/interrupt-run.ts`) és a `fail_run`
+ *   (`run-supervisor/advance-run.ts`) a várakozás lezárásával egy szinkron
+ *   menetben, `cancelled` állapotba (`cancelWaitingApprovalStepRuns`), hogy a
+ *   leállási ablakban érkező döntés a sor állapotán bukjon; a szabályos
+ *   leállás a futás sorával egy tranzakcióban, `interrupted` állapotba
+ *   (`shutdown-active-runs.ts` `recoverInterruptedRuns`). A záró állapot
+ *   hívónként más, amit a végrehajtó nem tudna eldönteni - ezért nem is dönt.
  *
  * A harmadik lehetséges kimenet, az időkorlát lejárata, szándékosan NEM
  * ebben az unióban áll: azt a végrehajtó a `clock.sleep` versenyéből maga
