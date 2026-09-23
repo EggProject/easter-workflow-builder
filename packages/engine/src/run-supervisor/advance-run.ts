@@ -17,7 +17,7 @@ import type { NodeExecutionResult } from '../node-executor/node-executor-result.
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { buildRunContext } from '../run-context/build-run-context.ts';
 import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
-import { cancelWaitingApprovalStepRuns } from '../run-interrupt/cancel-waiting-approval-step-runs.ts';
+import { closeWaitingApprovalStepRuns } from '../run-interrupt/close-waiting-approval-step-runs.ts';
 import { interruptLiveAgentQueries } from '../run-interrupt/interrupt-live-agent-queries.ts';
 import { advanceScheduler } from '../scheduling/advance-scheduler.ts';
 import { buildScopedKey } from '../scheduling/build-scoped-key.ts';
@@ -552,7 +552,7 @@ async function stopFailedRun(runId: string, dependencies: NodeExecutorDependenci
   const runIds = new Set([runId]);
   dependencies.concurrencyGate.denyWaitingForRunIds(runIds);
   dependencies.approvalRegistry.cancelWaitingForRunIds(runIds);
-  const approvalsClosed = cancelWaitingApprovalStepRuns(runIds, dependencies.ports.database);
+  const approvalsClosed = closeWaitingApprovalStepRuns(runIds, 'cancelled', dependencies.ports.database);
   const childRunTreesClosing = dependencies.childWorkflowRunner.cancelChildRunTrees(runId);
   await interruptLiveAgentQueries(runIds, dependencies.agentQueryRegistry);
   const childRunTreesClosed = await childRunTreesClosing;

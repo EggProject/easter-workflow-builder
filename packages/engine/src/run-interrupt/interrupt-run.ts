@@ -54,7 +54,7 @@ export interface InterruptRunResult {
  *    amit a `fail_run` hibapolitika is hív a bukott futás al-workflow
  *    futásaira (SPEC-004 8.3). Ugyanebben a szinkron menetben, a 3. pont
  *    előtt a fa döntésre váró jóváhagyásainak sora `cancelled`
- *    (`cancelWaitingApprovalStepRuns`), nem a 4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
+ *    (`closeWaitingApprovalStepRuns`), nem a 4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
  *    lépések leállásáig tartó ablakban érkező döntés így a sor állapotán bukik
  *    (`illegal_status_transition`), ahelyett hogy a `db` elfogadná. Ha az írás
  *    hibázik, a függvény a fa leállítása nélkül adja vissza a hibát.

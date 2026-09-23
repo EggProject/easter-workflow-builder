@@ -150,10 +150,10 @@ function failApproval(
  *    `fail_run` politikájú bukásnál, 8.3): a végrehajtó AZONNAL visszatér az
  *    `interrupted` kimenettel, `step_run` állapotváltás és esemény írás
  *    NÉLKÜL. A lépés sorát a lezárást kérő fél zárja le, és a hívók
- *    KÜLÖNBÖZŐ záró állapotot írnak (`cancelled` a felhasználói
- *    megszakításnál és a `fail_run`-nál, már a várakozás lezárásakor;
- *    `interrupted` a szabályos leállásnál), amit ez a végrehajtó nem tudna
- *    eldönteni (`approval-wait-signal.ts`).
+ *    KÜLÖNBÖZŐ záró állapotot írnak, mindhárman már a várakozás
+ *    lezárásakor (`cancelled` a felhasználói megszakításnál és a
+ *    `fail_run`-nál, `interrupted` a szabályos leállásnál), amit ez a
+ *    végrehajtó nem tudna eldönteni (`approval-wait-signal.ts`).
  * 7. **Lejáratkor**: `finishStepRunFailed` `approval_timed_out` osztállyal - a
  *    `human_approval.decision` oszlop NULL marad, mert a `db.approvals
  *    .decideApproval(...)` sosem hívódott (`human-approval-repository.ts`

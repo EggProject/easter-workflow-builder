@@ -19,6 +19,7 @@ import type {
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
 import { isRecord } from '@easter-workflow-builder/typeguards';
+import { runStartupRecovery } from '../startup-recovery/run-startup-recovery.ts';
 import { createEngine } from './create-engine.ts';
 import type { EngineDependencies } from './engine-dependencies.ts';
 import type { EventPublisherPort } from './event-publisher-port.ts';
@@ -1660,6 +1661,71 @@ describe('createEngine', () => {
       expect(queuedSteps.filter((step) => step.nodeId === 'a1').map((step) => step.status)).toStrictEqual([
         'interrupted',
       ]);
+    });
+
+    it('REGRESSZIÓ: a leállási ablakban (a futó testvér folyamának kimerülése alatt) érkező jóváhagyási döntés illegal_status_transition hibát ad, semmit nem módosít, és a jóváhagyás lépése interrupted (SPEC-004 10.2 3. pont)', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas-leallasi-ablak',
+        [startNode('start'), agentNode('a1', 'egy'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'jov')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 1, 0);
+      const approvalStepRunId = await waitForPendingApproval(harness.database, started.run.id);
+
+      const shuttingDown = harness.engine.shutdown();
+      await waitForInterruptCalls(scripted.calls, 1);
+      // A leállási ablak: a futó testvér megkapta az `interrupt()`-ot, de a
+      // folyama még nem merült ki, tehát a futás nem terminális.
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('running');
+
+      const late = await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' });
+
+      // A javítás előtt a döntés átment, a lépés `succeeded` lett egy
+      // `interrupted` futásban.
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('interrupted');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+
+      scripted.releaseDrain();
+      const summary = okOrThrow(await shuttingDown);
+
+      expect(summary.interruptedRunCount).toBe(1);
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('interrupted');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('interrupted');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+      expect(hasPublishedEvent(harness.published, 'step_finished', approvalStepRunId)).toBe(false);
+      expect(hasPublishedEvent(harness.published, 'approval_decided', approvalStepRunId)).toBe(false);
+    });
+
+    it('a leállás utáni újraindítás helyreállítása (runStartupRecovery) a jóváhagyás lépését interrupted állapotban hagyja, és egy új motor példányon érkező döntés is illegal_status_transition (SPEC-004 10.1, 10.2)', async () => {
+      const scripted = scriptedRunner(['runs_until_interrupt']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas-ujrainditas',
+        [startNode('start'), agentNode('a1', 'egy'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'jov')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 1, 0);
+      const approvalStepRunId = await waitForPendingApproval(harness.database, started.run.id);
+      okOrThrow(await harness.engine.shutdown());
+
+      // Az újraindítás: ugyanazon az adatbázison az indulási helyreállítás,
+      // majd egy új motor példány (SPEC-004 10.1 sorrend).
+      const recovered = okOrThrow(runStartupRecovery(harness.database));
+      const restarted = openHarness({ database: harness.database });
+      const late = await restarted.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' });
+
+      expect(recovered.recoveredRunCount).toBe(0);
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('interrupted');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('interrupted');
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
     });
 
     it('a helyreállítás Outcome hibaágát továbbadja', async () => {

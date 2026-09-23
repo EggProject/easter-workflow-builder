@@ -318,7 +318,7 @@ döntés így a `cancelled` soron bukik (`illegal_status_transition`), és a tra
 `human_approval` sor írását is visszagörgeti. A `fail_run` záró menete ezután csak a `pending`
 sorokat zárja: azokat a hurok menete szándékosan nem, mert a szabályozó a helyet egy `Promise`
 feloldásával adja át, és a `markStepRunning` csak egy későbbi folytatásban fut. A szabályos leállás
-útja változatlan (`interrupted` a `recoverInterruptedRuns`-ban); rá ez a kör nem mért.
+útját ez a kör nem mérte és nem változtatta; a nyolcadik kör mérte és javította (lent).
 
 **A regresszió.** A `create-engine.spec.ts` két új tesztje (`fail_run`, illetve felhasználói
 megszakítás, mindkettőben egy `interrupt()` után csak a teszt jelére kimerülő testvér tartja nyitva
@@ -413,3 +413,97 @@ hibaüzenete pedig "`running` állapotban zárt". Mérve a valódi szerveren: `P
 záró állapotot, a fa tranzakciója (`cancelRunTree`, illetve `cancelRuns`) pedig csak az összes
 `completion` után fut. A lépés végállapota ettől helyes, az esemény és az üzenet nem a tényleges
 terminális állapotot mondja; a javítás a megszakítás közös menetét is érintené, ezért külön döntés.
+
+**A szabályos leállás (`SIGTERM`) ablakában érkező jóváhagyási döntés: mérve, javítva (2026-09-23,
+nyolcadik kör).** Egy független ellenőrzés a `fce40c1` commiton azt mérte, hogy a hatodik kör
+hibája a szabályos leállás útján megmaradt: a `shutdownActiveRuns` a döntésre váró jóváhagyás
+várakozását lezárja, de a sorát nem, tehát egy futó testvér `interrupt()` utáni kimerülése alatt
+beküldött döntést a `db` elfogadja. A mérés megerősítette.
+
+| Tétel     | Érték                                                                                                                                                                                                                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató   | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `62a4c9b` commitja `git archive` munkafában (előtte), illetve ugyanez a fa a javítás `packages/engine/src` mappájával (utána); a két fa kizárólag a motor forrásában tér el                                                                            |
+| Szerver   | a 6. szekció felállása: a valódi `apps/server` modulok (a `registerShutdownSignalHandlers` leállási sorrendjével) és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő                            |
+| Hamis     | az `a2` megszakítás nélkül 8000 ms, `interrupt()` után 1500 ms alatt zár, sikeres `result`-tal                                                                                                                                                                                                        |
+| Workflow  | `start` után `a2` és `jov` (`human_approval`, `timeoutMs: null`)                                                                                                                                                                                                                                      |
+| Menet     | a `jov` várakozása után nyers TCP kapcsolaton a döntési kérés (`POST /api/approvals/<id>/decision`) fejléce, törzs nélkül; 50 ms múlva `SIGTERM`; a kliens a szerver naplójában megvárja az `a2` `interrupt()`-ját, majd 200 ms múlva elküldi a törzset (`approved`)                                  |
+| Kiolvasás | a döntés válasza, a kilépés után közvetlenül a fájlból a futás, a lépések, a `human_approval.decision` oszlop és a `jov` lépés eseményei; utána újraindítás ugyanazon a fájlon (`runStartupRecovery`, majd `GET /api/runs/<id>` és egy új döntés ugyanarra a jóváhagyásra), végül a fájl újraolvasása |
+
+| Eset             | A törzs az `interrupt()` után | Az `a2` kimerülése | A döntés válasza                    | A futás vége  | `jov` lépés   | `decision` | A `jov` eseményei                    |
+| ---------------- | ----------------------------- | ------------------ | ----------------------------------- | ------------- | ------------- | ---------- | ------------------------------------ |
+| előtte (6 futás) | 206 ... 209 ms                | 1502 ... 1506 ms   | HTTP 200, hatból hatszor            | `interrupted` | `succeeded`   | `approved` | `step_started`, `approval_requested` |
+| utána (6 futás)  | 204 ... 208 ms                | 1503 ... 1507 ms   | HTTP 409 `conflict`, hatból hatszor | `interrupted` | `interrupted` | NULL       | `step_started`, `approval_requested` |
+
+A 409 törzsében a hibaosztály `illegal_status_transition` (a `markStepSucceeded` üzenete). A
+kilépési kód mindkét esetben `0`.
+
+| Újraindítás után | A helyreállítás   | A futás       | `jov` lépés   | `decision` | Új döntés ugyanarra a jóváhagyásra |
+| ---------------- | ----------------- | ------------- | ------------- | ---------- | ---------------------------------- |
+| előtte (1 futás) | 0 futást érintett | `interrupted` | `succeeded`   | `approved` | HTTP 404 `not_found`               |
+| utána (5 futás)  | 0 futást érintett | `interrupted` | `interrupted` | NULL       | HTTP 409 `conflict`                |
+
+**A végállapot: `interrupted`, nem `cancelled`.** A SPEC-004 10.2 3. pontja szerint a szabályos
+leállásnál minden érintett futás és nem terminális lépése `interrupted`, a 8.3 szerint az
+`interrupted` "az indulási helyreállításnak és a szabályos leállásnak fenntartott", a 10.2
+"Miért `interrupted` és nem `cancelled`" bekezdése szerint a `cancelled` a felhasználó döntése. A
+SPEC-003 7.2 a `waiting_approval -> interrupted` átmenetet ismeri. A kemény leállás utáni
+helyreállítás is `interrupted`-et ír erre a sorra, tehát a két út a jóváhagyás lépésén azonos
+végállapotra jut (10.2 "A szabályos és a durva leállás ugyanoda érkezik").
+
+**A javítás.** Ugyanaz a mechanizmus, mint a hatodik körben, a célállapotra paraméterezve: a
+`cancelWaitingApprovalStepRuns` neve `closeWaitingApprovalStepRuns` lett
+(`run-interrupt/close-waiting-approval-step-runs.ts`), és egy `'cancelled' | 'interrupted'`
+paramétert kapott. A felhasználói megszakítás és a `fail_run` `cancelled`-del, a
+`shutdownActiveRuns` `interrupted`-del hívja, az aktív futások lekérdezése után, a
+`stopAndAwaitRunTree` előtt, egyetlen `await` nélkül: a várakozás lezárása (a
+`stopAndAwaitRunTree` szinkron része) és a sor lezárása ugyanabban a szinkron menetben fut. A
+hatókör a kézikönyvvel bíró futások köre; egy kézikönyv nélküli futás jóváhagyására nem vár
+végrehajtó, azt a `recoverInterruptedRuns` tranzakciója zárja, ugyanúgy, mint eddig. Ha az írás
+hibázik, a `shutdownActiveRuns` a futások leállítása és a helyreállítás nélkül adja vissza a
+hibát (a `cancelActiveRunTree` mintája); a szerver ekkor `1` kóddal lép ki, és a következő indulás
+helyreállítása zár.
+
+**A regresszió.** A `create-engine.spec.ts` új tesztje (a `shutdown()` alatt egy `interrupt()`
+után csak a teszt jelére kimerülő testvér tartja nyitva az ablakot): a javítás előtt bukott
+(`expected '' to contain '(illegal_status_transition)'`), utána zöld. A `shutdown-active-runs.spec.ts`
+két új esete (a jóváhagyás sora már a `completion` megvárása előtt `interrupted`, a kézikönyv
+nélküli futásé csak a helyreállítás után; a lezárás hibája leállítás és helyreállítás nélkül megy
+vissza) a javítás előtt szintén bukott. A `close-waiting-approval-step-runs.spec.ts` a két
+célállapotra paraméterezett. A leállás utáni újraindítást egy új `create-engine` teszt őrzi: a
+`shutdown()` után a `runStartupRecovery` nulla futást érint, a jóváhagyás lépése `interrupted`
+marad, és egy új motor példányon érkező döntés `illegal_status_transition`. Ez a teszt a javítás
+előtt is zöld, mert a helyreállítás a `waiting_approval` sort is `interrupted`-be viszi; a feladata a
+helyreállítás őrzése, nem az ablaké.
+
+**A `sub_workflow_finished` esemény `status` mezője: mérve mindhárom úton, nem javítva.** Motor
+szintű próba a valódi szerveren, a hetedik kör workflow-jával (gyerek és unoka jóváhagyásra vár),
+a javítás előtt és után is azonos eredménnyel:
+
+| Út                       | A gyökér      | Gyerek, unoka | A szülő `sub` lépése            | `sub_workflow_finished.status` | A lépés üzenete             |
+| ------------------------ | ------------- | ------------- | ------------------------------- | ------------------------------ | --------------------------- |
+| felhasználói megszakítás | `cancelled`   | `cancelled`   | `failed`, `sub_workflow_failed` | `running`                      | "`running` állapotban zárt" |
+| `fail_run` (`a1` bukik)  | `failed`      | `cancelled`   | `failed`, `sub_workflow_failed` | `running`                      | "`running` állapotban zárt" |
+| szabályos leállás        | `interrupted` | `interrupted` | `failed`, `sub_workflow_failed` | `running`                      | "`running` állapotban zárt" |
+
+Ugyanez áll a gyerek `c-sub` lépésére (az unoka futására) is. A SPEC-004 13. szekciójának
+táblázata szerint az esemény "gyerek futás terminális" állapotában íródik, a payload `status`
+mezővel, az 5.9 6. pont a gyerek `failed`, `cancelled` vagy `interrupted` végállapotát sorolja fel,
+a motor `SubWorkflowFinishedPayload` doksija pedig "a gyerek futás terminális állapotba
+lépésekor" íródó eseményt ír le: a `running` érték tehát a spec szerint hibás. A javítás módját
+viszont a spec nem dönti el, mert a három szabály a leállított gyerekre egyszerre nem teljesíthető:
+a fa DB zárása egy tranzakció a fa összes `completion`-je után (9. szekció 5. pont, 10.2 3. pont),
+a szülő `completion`-je a `sub` lépés saját zárására vár (8.3: "a saját útján zár"), a `sub` lépés
+pedig a gyerek sorát a gyerek `completion`-jekor olvassa. A megszakítás és a leállás útján a
+szülő is a lezárt fában áll, tehát a végrehajtó a gyerek tényleges terminális sorát nem
+várhatja meg holtpont nélkül. Ez termékdöntés. Lehetséges irányok (javaslat, nem döntés): (a) a
+leállítás célállapota (`cancelled` vagy `interrupted`) a kézikönyvre kerül a `requestStop`
+hívásakor, és a leállított, még nem terminális gyerekre a végrehajtó ezt adja az eseményben és az
+üzenetben, a fa DB zárása előtt; (b) a leállított gyerekre a `sub` lépés nem zár és eseményt sem
+ír, a sorát a fa zárása viszi `cancelled`, illetve `interrupted` állapotba, ami a 8.3 "a saját útján
+zár" mondatának felülírása; (c) a fa DB zárása alulról felfelé, futásonként, ami a 9. szekció 5.
+pontjának egy tranzakciós szabályát írná felül. A lépés végállapota ettől helyes a spec szerint,
+csak az esemény és az üzenet mond elavult állapotot.
+Mellékmegfigyelés a szabályos leállás útjáról: a `sub` lépés itt is a saját útján zár
+(`failed`), míg egy kemény leállás utáni helyreállítás ugyanezt a sort `interrupted`-be vinné; a
+futó agent lépés ugyanígy a saját `result` üzenete szerint zár (a mérésben az `a2` `succeeded`). Ez
+a 10.2 2. pontjából következik ("ugyanúgy, mint a 9. szekcióban"), nem ennek a körnek a tárgya.

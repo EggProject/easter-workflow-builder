@@ -7,7 +7,7 @@ import type { EngineEvent } from '../engine-event/engine-event.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
-import { cancelWaitingApprovalStepRuns } from './cancel-waiting-approval-step-runs.ts';
+import { closeWaitingApprovalStepRuns } from './close-waiting-approval-step-runs.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
 
 /**
@@ -39,7 +39,7 @@ export interface CancelActiveRunTreeDependencies {
  * A menet, ebben a sorrendben:
  *
  * 1. A futások döntésre váró jóváhagyásainak sora `cancelled`
- *    (`cancelWaitingApprovalStepRuns`), ugyanabban a szinkron menetben, mint a
+ *    (`closeWaitingApprovalStepRuns`), ugyanabban a szinkron menetben, mint a
  *    várakozásuk lezárása a 2. pontban: a futó lépések leállásáig tartó
  *    ablakban érkező döntés így a sor állapotán bukik
  *    (`illegal_status_transition`). Ha az írás hibázik, a függvény a futások
@@ -59,8 +59,9 @@ export async function cancelActiveRunTree(
   closeInDatabase: () => Outcome<CancelRunTreeResult>,
   dependencies: CancelActiveRunTreeDependencies,
 ): Promise<Outcome<CancelRunTreeResult>> {
-  const approvalsClosed = cancelWaitingApprovalStepRuns(
+  const approvalsClosed = closeWaitingApprovalStepRuns(
     new Set(handles.map((handle) => handle.runId)),
+    'cancelled',
     dependencies.database,
   );
   if (approvalsClosed.kind === 'error') {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { DatabaseContext, StepRunStatus } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
-import { cancelWaitingApprovalStepRuns } from './cancel-waiting-approval-step-runs.ts';
+import { closeWaitingApprovalStepRuns } from './close-waiting-approval-step-runs.ts';
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
   if (!isOkOutcome(outcome)) {
@@ -59,23 +59,29 @@ function statusOf(database: DatabaseContext, stepRunId: string): StepRunStatus {
   return okOrThrow(database.stepRuns.getStepRun(stepRunId)).status;
 }
 
-describe('cancelWaitingApprovalStepRuns', () => {
-  it('a megnevezett futások waiting_approval sorát cancelled állapotba viszi, a döntés NULL marad', () => {
-    const database = okOrThrow(openDatabase(':memory:'));
-    const first = seedRunningRun(database, 'elso');
-    const second = seedRunningRun(database, 'masodik');
-    const firstApproval = seedWaitingApproval(database, first, 'jov-1');
-    const secondApproval = seedWaitingApproval(database, second, 'jov-2');
+// A két záró állapot: a megszakítás és a `fail_run` (`cancelled`), illetve a szabályos leállás (`interrupted`).
+const CLOSED_STATUSES = ['cancelled', 'interrupted'] as const;
 
-    okOrThrow(cancelWaitingApprovalStepRuns(new Set([first, second]), database));
+describe('closeWaitingApprovalStepRuns', () => {
+  it.each(CLOSED_STATUSES)(
+    'a megnevezett futások waiting_approval sorát %s állapotba viszi, a döntés NULL marad',
+    (closedStatus) => {
+      const database = okOrThrow(openDatabase(':memory:'));
+      const first = seedRunningRun(database, 'elso');
+      const second = seedRunningRun(database, 'masodik');
+      const firstApproval = seedWaitingApproval(database, first, 'jov-1');
+      const secondApproval = seedWaitingApproval(database, second, 'jov-2');
 
-    expect([statusOf(database, firstApproval), statusOf(database, secondApproval)]).toStrictEqual([
-      'cancelled',
-      'cancelled',
-    ]);
-    expect(okOrThrow(database.approvals.getApprovalForStep(firstApproval)).decision).toBeNull();
-    database.close();
-  });
+      okOrThrow(closeWaitingApprovalStepRuns(new Set([first, second]), closedStatus, database));
+
+      expect([statusOf(database, firstApproval), statusOf(database, secondApproval)]).toStrictEqual([
+        closedStatus,
+        closedStatus,
+      ]);
+      expect(okOrThrow(database.approvals.getApprovalForStep(firstApproval)).decision).toBeNull();
+      database.close();
+    },
+  );
 
   it('más állapotú sort és más futás sorát nem érinti', () => {
     const database = okOrThrow(openDatabase(':memory:'));
@@ -86,38 +92,41 @@ describe('cancelWaitingApprovalStepRuns', () => {
     okOrThrow(database.stepRuns.markStepRunning(runningStep));
     const otherApproval = seedWaitingApproval(database, other, 'jov-masik');
 
-    okOrThrow(cancelWaitingApprovalStepRuns(new Set([target]), database));
+    okOrThrow(closeWaitingApprovalStepRuns(new Set([target]), 'cancelled', database));
 
     expect([statusOf(database, pendingStep), statusOf(database, runningStep)]).toStrictEqual(['pending', 'running']);
     expect(statusOf(database, otherApproval)).toBe('waiting_approval');
     database.close();
   });
 
-  it('a lezárt sorra érkező döntés illegal_status_transition hibával bukik, és a döntés sem íródik be', () => {
-    const database = okOrThrow(openDatabase(':memory:'));
-    const runId = seedRunningRun(database, 'kesei-dontes');
-    const approval = seedWaitingApproval(database, runId, 'jov');
+  it.each(CLOSED_STATUSES)(
+    'a %s állapotba lezárt sorra érkező döntés illegal_status_transition hibával bukik, és a döntés sem íródik be',
+    (closedStatus) => {
+      const database = okOrThrow(openDatabase(':memory:'));
+      const runId = seedRunningRun(database, 'kesei-dontes');
+      const approval = seedWaitingApproval(database, runId, 'jov');
 
-    okOrThrow(cancelWaitingApprovalStepRuns(new Set([runId]), database));
-    const late = database.approvals.decideApproval({ stepRunId: approval, decision: 'approved' });
+      okOrThrow(closeWaitingApprovalStepRuns(new Set([runId]), closedStatus, database));
+      const late = database.approvals.decideApproval({ stepRunId: approval, decision: 'approved' });
 
-    expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
-    expect(statusOf(database, approval)).toBe('cancelled');
-    expect(okOrThrow(database.approvals.getApprovalForStep(approval)).decision).toBeNull();
-    database.close();
-  });
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(statusOf(database, approval)).toBe(closedStatus);
+      expect(okOrThrow(database.approvals.getApprovalForStep(approval)).decision).toBeNull();
+      database.close();
+    },
+  );
 
   it('a lépés sorok olvasásának hibáját továbbadja', () => {
     const database = okOrThrow(openDatabase(':memory:'));
     const runId = seedRunningRun(database, 'olvasasi-hiba');
     database.close();
 
-    const outcome = cancelWaitingApprovalStepRuns(new Set([runId]), database);
+    const outcome = closeWaitingApprovalStepRuns(new Set([runId]), 'cancelled', database);
 
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('(database_closed)');
   });
 
-  it('a cancelled állapotváltás hibáját továbbadja', () => {
+  it.each(CLOSED_STATUSES)('a %s állapotváltás hibáját továbbadja', (closedStatus) => {
     const database = okOrThrow(openDatabase(':memory:'));
     const runId = seedRunningRun(database, 'irasi-hiba');
     const approval = seedWaitingApproval(database, runId, 'jov');
@@ -126,10 +135,11 @@ describe('cancelWaitingApprovalStepRuns', () => {
       stepRuns: {
         ...database.stepRuns,
         markStepCancelled: () => ({ kind: 'error', message: 'teszt: a lépés nem zárható' }),
+        markStepInterrupted: () => ({ kind: 'error', message: 'teszt: a lépés nem zárható' }),
       },
     };
 
-    const outcome = cancelWaitingApprovalStepRuns(new Set([runId]), failing);
+    const outcome = closeWaitingApprovalStepRuns(new Set([runId]), closedStatus, failing);
 
     expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés nem zárható');
     expect(statusOf(database, approval)).toBe('waiting_approval');

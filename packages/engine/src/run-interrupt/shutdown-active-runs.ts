@@ -7,6 +7,7 @@ import type { EngineEvent } from '../engine-event/engine-event.ts';
 import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { AgentQueryRegistry } from './agent-query-registry.ts';
+import { closeWaitingApprovalStepRuns } from './close-waiting-approval-step-runs.ts';
 import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
 
 /**
@@ -49,6 +50,20 @@ export interface ShutdownActiveRunsDependencies {
  *    NEM egyetlen futás fájára szűkítve, ellentétben az `interruptRun`-nal -
  *    a szabályos leállás a TELJES szervert viszi le, nem egy felhasználói
  *    kérést szolgál ki egyetlen futásra).
+ * 1a. **A döntésre váró jóváhagyások sora `interrupted`**
+ *    (`closeWaitingApprovalStepRuns`), ugyanabban a szinkron menetben, mint a
+ *    várakozásuk lezárása a 2. pontban, nem a 3. pont tranzakciójában: a
+ *    futó lépések leállásáig tartó ablakban érkező döntés így a sor
+ *    állapotán bukik (`illegal_status_transition`), ugyanaz a mechanizmus,
+ *    mint a felhasználói megszakításnál és a `fail_run`-nál, csak a záró
+ *    állapot más (SPEC-004 10.2 3. pont, 8.3). Mérve: e pont nélkül a jel
+ *    előtt fejléccel megkezdett, az ablakban befejezett döntési kérés HTTP
+ *    200-at kapott, a lépés `succeeded` lett egy `interrupted` futásban,
+ *    esemény nélkül (`docs/research/2026-09-23-megszakitas-leallas-meres.md`
+ *    7. szekció). Ha az írás hibázik, a függvény a futások leállítása és a
+ *    helyreállítás nélkül adja vissza a hibát, ugyanúgy, mint a
+ *    `cancelActiveRunTree`; a következő indulás helyreállítása ugyanoda
+ *    érkezik (10.2 "A szabályos és a durva leállás ugyanoda érkezik").
  * 2. **`stopAndAwaitRunTree`** (MÁR KÉSZ, T-005-26 - lásd ott) mindegyikükre:
  *    a szabályozó egyikükből sem enged több lépést indulni, minden élő
  *    agent lépés `AgentQuery`-jén lefut az `interrupt()`, és a függvény
@@ -88,6 +103,14 @@ export async function shutdownActiveRuns(
   dependencies.runSupervisor.stopAcceptingRuns();
   dependencies.concurrencyGate.close();
   const handles = dependencies.runSupervisor.listActiveRuns();
+  const approvalsClosed = closeWaitingApprovalStepRuns(
+    new Set(handles.map((handle) => handle.runId)),
+    'interrupted',
+    dependencies.database,
+  );
+  if (approvalsClosed.kind === 'error') {
+    return approvalsClosed;
+  }
   await stopAndAwaitRunTree(
     handles,
     dependencies.agentQueryRegistry,

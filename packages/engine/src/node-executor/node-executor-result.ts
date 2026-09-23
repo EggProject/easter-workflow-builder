@@ -20,7 +20,8 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
  * **Az `interrupted` ág nem hordoz `stepRun` rekordot**, mert a sor ilyenkor
  * nem feltétlenül terminális (`waiting_approval`, illetve `pending`), és a
  * lezárása a lezárást kérő félé (a `waiting_approval` sort a megszakítás és a
- * `fail_run` már a várakozás lezárásakor `cancelled`-be viszi, a többit a
+ * `fail_run` már a várakozás lezárásakor `cancelled`-be, a szabályos leállás
+ * `interrupted`-be viszi, a többit a
  * `cancelRunTree` `cancelled`-del, a `recoverInterruptedRuns`
  * `interrupted`-del, illetve a `fail_run` záró menete `cancelled`-del zárja,
  * `approval-wait-signal.ts`). A hívó (`run-supervisor/advance-run.ts`) ezen az
