@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, type SQL } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Outcome } from '@easter-workflow-builder/core';
 import { workflowRunTable } from '../workflow-run/workflow-run.ts';
@@ -98,6 +98,17 @@ export interface RunRecovery {
    * (`cancelledRunIds` üres lista, ha nincs mit megszakítani).
    */
   cancelRunTree(rootRunId: string): Outcome<CancelRunTreeResult>;
+
+  /**
+   * Ugyanaz a zárás, mint a `cancelRunTree`, a hatókör viszont a megnevezett
+   * futások listája, nem egy teljes fa. A `fail_run` hibapolitika hívja a
+   * bukott futás al-workflow futásaira (SPEC-004 8.3): a bukott futás maga és
+   * az ősei nem kerülhetnek `cancelled` állapotba, a `root_run_id` szerinti
+   * szűrés viszont őket is elvinné. A listát a hívó állítja össze a motor
+   * memóriájából. A már terminális futás érintetlen marad, üres lista üres
+   * `cancelledRunIds`-t ad.
+   */
+  cancelRuns(runIds: readonly string[]): Outcome<CancelRunTreeResult>;
 }
 
 /**
@@ -205,16 +216,8 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
   }
 
   /**
-   * `cancelRunTree`, a felhasználói megszakítás (`interruptRun`, `engine`
-   * `run-interrupt` téma) DB oldali zárása (SPEC-004 9. szekció 5. pont).
-   * Ugyanaz a tömeges `UPDATE ... WHERE status IN (...) RETURNING id` minta,
-   * mint a `recoverInterruptedRuns`-ban, két eltéréssel: a szűrés a
-   * `root_run_id` oszlopra szűkít (a `workflow_run_root_idx` index, egyetlen
-   * futás fájára, nem a teljes adatbázisra), és a célállapot `cancelled`,
-   * `run_finished` eseménnyel `interrupted`/`run_interrupted` helyett - a
-   * kettő a `workflow_run.status` oszlopban különbözteti meg a felhasználói
-   * döntést (`cancelled`) a rendszer döntésétől (`interrupted`, SPEC-004 10.2
-   * szekció "Miért `interrupted` és nem `cancelled`").
+   * A `cancelRunTree` és a `cancelRuns` közös tranzakciója; a kettő
+   * kizárólag a `scope` feltételben tér el.
    *
    * A `run_finished` payload alakja szó szerint a `packages/engine`
    * `RunFinishedPayload` mezőit követi (`status`, `errorKind`, `errorMessage`,
@@ -224,16 +227,14 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
    * (fordított rétegirány lenne), ezért a mezőnevek itt szó szerint,
    * duplikálva állnak.
    */
-  function cancelRunTree(rootRunId: string): Outcome<CancelRunTreeResult> {
+  function cancelRunsWithin(scope: SQL): Outcome<CancelRunTreeResult> {
     return transaction(() => {
       const now = new Date();
 
       const cancelledRuns = database
         .update(workflowRunTable)
         .set({ status: 'cancelled', finishedAtMs: now })
-        .where(
-          and(eq(workflowRunTable.rootRunId, rootRunId), inArray(workflowRunTable.status, NON_TERMINAL_RUN_STATUSES)),
-        )
+        .where(and(scope, inArray(workflowRunTable.status, NON_TERMINAL_RUN_STATUSES)))
         .returning({ id: workflowRunTable.id })
         .all();
 
@@ -271,5 +272,27 @@ export function createRunRecovery(database: BetterSQLite3Database, transaction: 
     });
   }
 
-  return { recoverInterruptedRuns, cancelRunTree };
+  /**
+   * `cancelRunTree`, a felhasználói megszakítás (`interruptRun`, `engine`
+   * `run-interrupt` téma) DB oldali zárása (SPEC-004 9. szekció 5. pont).
+   * Ugyanaz a tömeges `UPDATE ... WHERE status IN (...) RETURNING id` minta,
+   * mint a `recoverInterruptedRuns`-ban, két eltéréssel: a szűrés a
+   * `root_run_id` oszlopra szűkít (a `workflow_run_root_idx` index, egyetlen
+   * futás fájára, nem a teljes adatbázisra), és a célállapot `cancelled`,
+   * `run_finished` eseménnyel `interrupted`/`run_interrupted` helyett - a
+   * kettő a `workflow_run.status` oszlopban különbözteti meg a felhasználói
+   * döntést (`cancelled`) a rendszer döntésétől (`interrupted`, SPEC-004 10.2
+   * szekció "Miért `interrupted` és nem `cancelled`").
+   */
+  function cancelRunTree(rootRunId: string): Outcome<CancelRunTreeResult> {
+    return cancelRunsWithin(eq(workflowRunTable.rootRunId, rootRunId));
+  }
+
+  // Üres listára a Drizzle `inArray` egy `false` feltételt ad (a telepített
+  // `drizzle-orm` `sql/expressions/conditions.js` forrása), tehát nincs érintett sor.
+  function cancelRuns(runIds: readonly string[]): Outcome<CancelRunTreeResult> {
+    return cancelRunsWithin(inArray(workflowRunTable.id, runIds));
+  }
+
+  return { recoverInterruptedRuns, cancelRunTree, cancelRuns };
 }

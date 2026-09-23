@@ -179,7 +179,11 @@ function registryDecidingImmediately(database: DatabaseContext): ApprovalWaitReg
   };
 }
 
-const notCalledRunner: ChildWorkflowRunner = { startChildRun: notCalled, awaitChildRun: notCalled };
+const notCalledRunner: ChildWorkflowRunner = {
+  startChildRun: notCalled,
+  awaitChildRun: notCalled,
+  cancelChildRunTrees: notCalled,
+};
 
 function dependenciesOf(
   database: DatabaseContext,

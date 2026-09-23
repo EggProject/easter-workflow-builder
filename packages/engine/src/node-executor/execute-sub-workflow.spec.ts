@@ -199,6 +199,7 @@ function fakeRunner(
       const run = okOrThrow(TERMINAL_MARKERS[options.childStatus ?? 'succeeded'](database, childRunId));
       return { kind: 'ok', value: { run, output: options.output ?? { eredmeny: 'kesz' } } };
     },
+    cancelChildRunTrees: notCalled,
   };
   return { runner, requests };
 }
@@ -288,6 +289,7 @@ describe('executeSubWorkflow', () => {
       depth: parentRun.depth,
       workflowAncestry: parentRun.workflowAncestry,
     });
+    expect(request.parentRunId).toBe(parentRun.id);
   });
 
   it('a gyerek a SAJÁT workflow provider felülírását kapja, a szülőé nem szivárog át', async () => {

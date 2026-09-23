@@ -29,6 +29,15 @@ export interface ActiveRunHandle {
    */
   readonly rootRunId: string;
 
+  /**
+   * Al-workflow futásnál az a futás, aminek a `sub_workflow` lépése elindította
+   * (SPEC-004 5.9 3. pont); gyökér futásnál hiányzik. A `fail_run`
+   * hibapolitika ezzel választja ki a bukott futás alfáját
+   * (`ActiveRunRegistry.listDescendants`), mert a `rootRunId` szerinti szűrés
+   * a bukott futást és az őseit is elvinné.
+   */
+  readonly parentRunId?: string;
+
   readonly workflowId: string;
 
   readonly completion: Promise<Outcome<RunCompletion>>;
@@ -63,6 +72,12 @@ export interface ActiveRunRegistry {
   release(runId: string): void;
   get(runId: string): ActiveRunHandle | undefined;
   list(): readonly ActiveRunHandle[];
+
+  /**
+   * A megnevezett futás minden aktív leszármazottja (gyerek, unoka, ...) a
+   * `parentRunId` láncon, a futás maga nélkül.
+   */
+  listDescendants(runId: string): readonly ActiveRunHandle[];
 }
 
 /**
@@ -74,6 +89,15 @@ export interface ActiveRunRegistry {
 export function createActiveRunRegistry(): ActiveRunRegistry {
   const handles = new Map<string, ActiveRunHandle>();
 
+  // Mélységi bejárás a `parentRunId` láncon: minden gyerek után a saját alfája.
+  function listDescendants(runId: string): readonly ActiveRunHandle[] {
+    return handles
+      .values()
+      .filter((handle) => handle.parentRunId === runId)
+      .flatMap((child) => [child, ...listDescendants(child.runId)])
+      .toArray();
+  }
+
   return {
     register: (handle) => {
       handles.set(handle.runId, handle);
@@ -83,5 +107,6 @@ export function createActiveRunRegistry(): ActiveRunRegistry {
     },
     get: (runId) => handles.get(runId),
     list: () => handles.values().toArray(),
+    listDescendants,
   };
 }

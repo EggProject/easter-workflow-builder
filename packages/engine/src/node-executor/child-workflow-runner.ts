@@ -1,4 +1,4 @@
-import type { StartRunParentContext, WorkflowRunRecord } from '@easter-workflow-builder/db';
+import type { CancelRunTreeResult, StartRunParentContext, WorkflowRunRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 
 /**
@@ -24,11 +24,17 @@ import type { Outcome } from '@easter-workflow-builder/core';
  *   változatlanul, ahogy a `db` `StartRunParentContext` várja. A gyerek
  *   értékeit (azonos gyökér, `depth + 1`, bővített ancestry) a `startRun`
  *   vezeti le ebből, tehát a motorban nincs erre külön számítás.
+ * - `parentRunId`: a szülő futás azonosítója. Nem kerül adatbázisba (a
+ *   kapcsolatot ott a `step_run.sub_workflow_run_id` hordozza), a gyerek
+ *   futás kézikönyve kapja meg (`ActiveRunHandle.parentRunId`), hogy a
+ *   `cancelChildRunTrees` a szülő alfáját a memóriából, az adatbázis írásától
+ *   függetlenül találja meg.
  */
 export interface ChildWorkflowRunRequest {
   readonly targetWorkflowId: string;
   readonly input: Readonly<Record<string, unknown>>;
   readonly parent: StartRunParentContext;
+  readonly parentRunId: string;
 }
 
 /**
@@ -101,4 +107,16 @@ export interface ChildWorkflowRunner {
    * kimenetének visszaadása.
    */
   readonly awaitChildRun: (childRunId: string) => Promise<Outcome<ChildWorkflowRunResult>>;
+
+  /**
+   * A megnevezett futás összes aktív al-workflow futásának (gyerek, unoka,
+   * ...) megszakítása a felhasználói megszakítás fa mechanizmusával
+   * (SPEC-004 9. szekció 2 ... 5. pont, `run-interrupt/cancel-active-run-tree.ts`):
+   * a futások `cancelled` állapotban zárnak, a döntésre váró jóváhagyásaikkal
+   * együtt. A megnevezett futás maga nem változik. Nem a `sub_workflow`
+   * végrehajtó hívja, hanem a léptető hurok a `fail_run` hibapolitikában
+   * (SPEC-004 8.3, user döntés 2026-09-23): a gyerek lezárulása után a futó
+   * `sub_workflow` lépés a saját útján zár (5.9 6. pont).
+   */
+  readonly cancelChildRunTrees: (parentRunId: string) => Promise<Outcome<CancelRunTreeResult>>;
 }

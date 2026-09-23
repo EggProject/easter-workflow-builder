@@ -1,11 +1,12 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { StartRunInput, WorkflowRunRecord } from '@easter-workflow-builder/db';
+import type { CancelRunTreeResult, StartRunInput, WorkflowRunRecord } from '@easter-workflow-builder/db';
 import { collectSessionSourceNodes } from '../agent-step/collect-session-source-nodes.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ChildWorkflowRunRequest, ChildWorkflowRunResult } from '../node-executor/child-workflow-runner.ts';
 import type { ValidatedRun } from '../run-validation/validated-run.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { resolveEffectiveProvider } from '../provider-resolution/resolve-effective-provider.ts';
+import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
@@ -46,6 +47,15 @@ interface StartedRunInternals {
 }
 
 /**
+ * A futás indításának belső kérése: al-workflow futásnál a szülő futás
+ * azonosítójával, amit a kézikönyv hordoz (`ActiveRunHandle.parentRunId`). A
+ * publikus `StartRunRequest` nem kapja meg, mert gyökér futásnak nincs szülője.
+ */
+interface InternalStartRunRequest extends StartRunRequest {
+  readonly parentRunId?: string;
+}
+
+/**
  * A futás életciklusának vezetője (SPEC-004 4.8, 4.4 ... 4.6, 8.4,
  * PLAN-005 T-005-25).
  *
@@ -83,7 +93,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     ports,
     concurrencyGate: dependencies.concurrencyGate,
     approvalRegistry: dependencies.approvalRegistry,
-    childWorkflowRunner: { startChildRun, awaitChildRun },
+    childWorkflowRunner: { startChildRun, awaitChildRun, cancelChildRunTrees },
     agentQueryRegistry: dependencies.agentQueryRegistry,
   };
 
@@ -92,7 +102,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * `workflow_run` sort. A leállás kezdete után (`stopAcceptingRuns`) már az
    * 1. lépés előtt elutasít, szintén írás nélkül.
    */
-  function startRunInternals(request: StartRunRequest): Outcome<StartedRunInternals> {
+  function startRunInternals(request: InternalStartRunRequest): Outcome<StartedRunInternals> {
     if (!isAcceptingRuns) {
       return {
         kind: 'error',
@@ -174,7 +184,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * élő kiadása, a `markRunRunning`, végül a `start` node példányának
    * ütemezése és a háttérfolyamat elindítása.
    */
-  function startValidatedRun(request: StartRunRequest, prepared: PreparedRun): Outcome<StartedRunInternals> {
+  function startValidatedRun(request: InternalStartRunRequest, prepared: PreparedRun): Outcome<StartedRunInternals> {
     const startRunInput: StartRunInput = {
       workflowId: request.workflowId,
       input: request.input,
@@ -227,7 +237,10 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       stopRequested: false,
     };
 
-    return { kind: 'ok', value: { run: running.value, handle: launch(execution, running.value), execution } };
+    return {
+      kind: 'ok',
+      value: { run: running.value, handle: launch(execution, running.value, request.parentRunId), execution },
+    };
   }
 
   /**
@@ -236,11 +249,12 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * kézikönyvet a nyilvántartásból, hogy az ne nőjön a lefutott futások
    * számával.
    */
-  function launch(execution: RunExecution, run: WorkflowRunRecord): ActiveRunHandle {
+  function launch(execution: RunExecution, run: WorkflowRunRecord, parentRunId: string | undefined): ActiveRunHandle {
     const completion = runToCompletion(execution);
     const handle: ActiveRunHandle = {
       runId: execution.runId,
       rootRunId: run.rootRunId,
+      ...(parentRunId !== undefined && { parentRunId }),
       workflowId: run.workflowId,
       completion,
       requestStop: () => {
@@ -284,6 +298,7 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
       workflowId: request.targetWorkflowId,
       input: request.input,
       parent: request.parent,
+      parentRunId: request.parentRunId,
     });
     if (started.kind === 'error') {
       return Promise.resolve(started);
@@ -329,10 +344,35 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     return pending;
   }
 
+  /**
+   * A `ChildWorkflowRunner` harmadik fele: a futás összes aktív
+   * leszármazottjának lezárása a felhasználói megszakítás fa mechanizmusával
+   * (`cancelActiveRunTree`), a `db` `cancelRuns` primitívjével, mert a
+   * `cancelRunTree` a `rootRunId` szerint a futást és az őseit is lezárná.
+   * A leszármazottakat a kézikönyvek `parentRunId` lánca adja, nem az
+   * adatbázis: a `step_run.sub_workflow_run_id` a gyerek indítása után egy
+   * `await`-tel később íródik.
+   */
+  function cancelChildRunTrees(parentRunId: string): Promise<Outcome<CancelRunTreeResult>> {
+    const descendants = registry.listDescendants(parentRunId);
+    return cancelActiveRunTree(
+      descendants,
+      () => ports.database.recovery.cancelRuns(descendants.map((handle) => handle.runId)),
+      {
+        database: ports.database,
+        eventPublisher: ports.eventPublisher,
+        concurrencyGate: dependencies.concurrencyGate,
+        agentQueryRegistry: dependencies.agentQueryRegistry,
+        approvalRegistry: dependencies.approvalRegistry,
+      },
+    );
+  }
+
   return {
     startRun,
     startChildRun,
     awaitChildRun,
+    cancelChildRunTrees,
     listActiveRuns: () => registry.list(),
     getActiveRun: (runId) => registry.get(runId),
     stopAcceptingRuns: () => {

@@ -22,6 +22,7 @@ import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-ga
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import type { ChildWorkflowRunner } from '../node-executor/child-workflow-runner.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
@@ -438,6 +439,9 @@ interface FixtureOptions {
   readonly agentQueryRunner?: AgentQueryRunner;
   readonly concurrencyGate?: ConcurrencyGate;
   readonly passThroughTemplates?: boolean;
+  // A `fail_run` a futás al-workflow futásainak lezárását kéri; megadás
+  // nélkül nincs lezárandó gyerek futás.
+  readonly cancelChildRunTrees?: ChildWorkflowRunner['cancelChildRunTrees'];
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -494,7 +498,12 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     ports,
     concurrencyGate: options.concurrencyGate ?? createConcurrencyGate(() => null),
     approvalRegistry: createApprovalWaitRegistry(),
-    childWorkflowRunner: { startChildRun: notCalled, awaitChildRun: notCalled },
+    childWorkflowRunner: {
+      startChildRun: notCalled,
+      awaitChildRun: notCalled,
+      cancelChildRunTrees:
+        options.cancelChildRunTrees ?? (() => Promise.resolve({ kind: 'ok', value: { cancelledRunIds: [] } })),
+    },
     agentQueryRegistry: createAgentQueryRegistry(),
   };
 
@@ -812,6 +821,44 @@ describe('advanceRun', () => {
       );
       const countOf = (status: string): number => agentSteps.filter((step) => step.status === status).length;
       expect([countOf('succeeded'), countOf('cancelled')]).toStrictEqual([1, 1]);
+    });
+  });
+
+  describe('fail_run: a futás al-workflow futásai cancelled állapotban zárnak (SPEC-004 8.3, user döntés 2026-09-23)', () => {
+    it('a lezárásukat pontosan egyszer, a saját runId-ra kéri, a futó testvérek interrupt() hívása ELŐTT', async () => {
+      const order: string[] = [];
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        cancelChildRunTrees: (parentRunId) => {
+          order.push(`gyerekek:${parentRunId}`);
+          return Promise.resolve({ kind: 'ok', value: { cancelledRunIds: [] } });
+        },
+      });
+      fixture.dependencies.agentQueryRegistry.register(fixture.execution.runId, 'futo-testver', {
+        messages: agentMessages('futo-testver', Promise.resolve(undefined)),
+        interrupt: () => {
+          order.push('interrupt');
+          return Promise.resolve();
+        },
+      });
+
+      const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+      expect(completion.status).toBe('failed');
+      expect(order).toStrictEqual([`gyerekek:${fixture.execution.runId}`, 'interrupt']);
+    });
+
+    it('a lezárásuk hibáját továbbadja: a futás run_execution_failed', async () => {
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        cancelChildRunTrees: () => Promise.resolve({ kind: 'error', message: 'teszt: a gyerek futások nem zárhatók' }),
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a gyerek futások nem zárhatók');
+      const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+      expect([run.status, run.errorKind]).toStrictEqual(['failed', 'run_execution_failed']);
     });
   });
 

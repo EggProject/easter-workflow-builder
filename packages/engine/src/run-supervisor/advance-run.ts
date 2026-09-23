@@ -544,9 +544,26 @@ function startReadyInstances(
 }
 
 /**
+ * A `fail_run` leállítási menete a bukott futásra, a `runSchedulingLoop`
+ * doksijában leírt sorrendben. Az első hibaágat adja vissza: a jóváhagyás
+ * sorok írásáét, különben a gyerek futások lezárásáét.
+ */
+async function stopFailedRun(runId: string, dependencies: NodeExecutorDependencies): Promise<Outcome<unknown>> {
+  const runIds = new Set([runId]);
+  dependencies.concurrencyGate.denyWaitingForRunIds(runIds);
+  dependencies.approvalRegistry.cancelWaitingForRunIds(runIds);
+  const approvalsClosed = cancelWaitingApprovalStepRuns(runIds, dependencies.ports.database);
+  const childRunTreesClosing = dependencies.childWorkflowRunner.cancelChildRunTrees(runId);
+  await interruptLiveAgentQueries(runIds, dependencies.agentQueryRegistry);
+  const childRunTreesClosed = await childRunTreesClosing;
+  return approvalsClosed.kind === 'error' ? approvalsClosed : childRunTreesClosed;
+}
+
+/**
  * A léptető hurok (SPEC-004 4.4 ... 4.6): amíg van futtatható vagy futó
  * példány, minden futtathatót elindít, majd megvárja, hogy **legalább egy**
- * befejeződjön, és az eredményét beépíti a futás állapotába.
+ * befejeződjön, és az eredményét beépíti a futás állapotába. A sikeres ág
+ * értéke nem hordoz adatot, a hívó csak a hibaágat vizsgálja.
  *
  * **`fail_run` és külső leállítás után nem indul új lépés**, és a `fail_run`
  * a MÁR elindított testvér lépéseket is leállítja (8.3 táblázat: "a motor
@@ -577,6 +594,20 @@ function startReadyInstances(
  * tesztje őrzi (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7.
  * szekció); a valódi SDK nyugtájának időzítése nem mért.
  *
+ * **A futó `sub_workflow` testvér gyerek futásai `cancelled` állapotban
+ * zárnak** (user döntés 2026-09-23), a felhasználói megszakítás fa
+ * mechanizmusával (`ChildWorkflowRunner.cancelChildRunTrees`,
+ * `run-interrupt/cancel-active-run-tree.ts`), a futás teljes alfájára
+ * (gyerek, unoka, ...), de a futás maga és az ősei nélkül. A hívás szinkron
+ * része (a leszármazottak sorból kivétele, várakozásaik lezárása, `interrupt()`
+ * a lépéseiken) a saját futás `interrupt()` hívása ELŐTT fut, ugyanazon okból,
+ * mint a saját sor kivétele; a gyerekek lezárulásának megvárása utána. A
+ * lezárult gyerek után a `sub_workflow` lépés a saját útján zár (5.9 6. pont:
+ * `failed`, `sub_workflow_failed`). Ha a gyerekek jóváhagyás sorainak írása
+ * hibázik, a közös menet a gyerekek leállítása nélkül adja vissza a hibát,
+ * ugyanúgy, mint a megszakításnál; ilyenkor a `sub_workflow` lépés a gyerek
+ * természetes végéig vár, és a hurok utána adja vissza a hibát.
+ *
  * Pontosan egyszer fut le futásonként - erre való a `hasInterruptedSiblings`
  * jelző, mert a `fail_run` után új lépés már nem indul. Ha a bukott lépés
  * maga foglalt helyet, a sorból kivétel már a helye felszabadítása előtt
@@ -598,19 +629,15 @@ function startReadyInstances(
 async function runSchedulingLoop(
   execution: RunExecution,
   dependencies: NodeExecutorDependencies,
-): Promise<Outcome<void>> {
+): Promise<Outcome<unknown>> {
   const inFlight = new Map<string, Promise<CompletedExecution>>();
   let hasInterruptedSiblings = false;
-  let approvalsClosed = OK;
+  let stopped: Outcome<unknown> = OK;
 
   for (;;) {
     if (!hasInterruptedSiblings && execution.failRunRequested) {
       hasInterruptedSiblings = true;
-      const runIds = new Set([execution.runId]);
-      dependencies.concurrencyGate.denyWaitingForRunIds(runIds);
-      dependencies.approvalRegistry.cancelWaitingForRunIds(runIds);
-      approvalsClosed = cancelWaitingApprovalStepRuns(runIds, dependencies.ports.database);
-      await interruptLiveAgentQueries(runIds, dependencies.agentQueryRegistry);
+      stopped = await stopFailedRun(execution.runId, dependencies);
     }
     if (!execution.failRunRequested && !execution.stopRequested) {
       const started = startReadyInstances(execution, dependencies, inFlight);
@@ -619,7 +646,7 @@ async function runSchedulingLoop(
       }
     }
     if (inFlight.size === 0) {
-      return approvalsClosed;
+      return stopped;
     }
 
     const completed = await Promise.race(inFlight.values());

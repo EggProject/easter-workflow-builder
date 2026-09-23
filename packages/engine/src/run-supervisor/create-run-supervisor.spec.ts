@@ -605,6 +605,7 @@ describe('createRunSupervisor', () => {
         targetWorkflowId: workflowId,
         input: {},
         parent: { rootRunId: 'szulo', depth: 0, workflowAncestry: [] },
+        parentRunId: 'szulo',
       });
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');

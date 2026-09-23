@@ -1,13 +1,7 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
-import type { DatabaseContext } from '../engine-port/database-port.ts';
-import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
-import type { EngineEvent } from '../engine-event/engine-event.ts';
-import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
-import type { AgentQueryRegistry } from './agent-query-registry.ts';
-import { cancelWaitingApprovalStepRuns } from './cancel-waiting-approval-step-runs.ts';
-import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
+import type { CancelActiveRunTreeDependencies } from './cancel-active-run-tree.ts';
+import { cancelActiveRunTree } from './cancel-active-run-tree.ts';
 
 /**
  * Az `interruptRun` függősége. A `runSupervisor` szándékosan csak a
@@ -19,25 +13,15 @@ import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
  * majd ide, adapter nélkül, mert az triviálisan illeszkedik erre a
  * szűkebb felületre.
  *
- * Az `approvalRegistry` a T-005-31 óta kötelező mező: a `stopAndAwaitRunTree`
- * ezen zárja le a fa várakozó `human_approval` lépéseit, ami nélkül egy
- * korlátlan várakozású jóváhagyáson álló futás megszakítása sosem fejeződne
- * be (AC-51, lásd `stop-and-await-run-tree.ts` 2. pontját).
- *
- * Az `eventPublisher` a lezáró `run_finished` esemény élő kiadásához kell
- * (lásd az `interruptRun` 5. pontját).
- *
- * A `concurrencyGate` a motor egyetlen, közös szabályozója; ebből csak a
- * `denyWaitingForRunIds` kell, amivel a `stopAndAwaitRunTree` a fa sorban
- * álló agent lépéseit kiveszi a sorból (lásd ott a 2. pontot).
+ * A többi mező a fa lezárásáé (`cancelActiveRunTree`, lásd ott): az
+ * `approvalRegistry` a T-005-31 óta kötelező, mert nélküle egy korlátlan
+ * várakozású jóváhagyáson álló futás megszakítása sosem fejeződne be (AC-51),
+ * az `eventPublisher` a lezáró `run_finished` esemény élő kiadásához kell, a
+ * `concurrencyGate`-ből pedig csak a `denyWaitingForRunIds`, amivel a fa
+ * sorban álló agent lépései kiesnek a sorból.
  */
-export interface InterruptRunDependencies {
-  readonly database: DatabaseContext;
-  readonly eventPublisher: EventPublisherPort;
+export interface InterruptRunDependencies extends CancelActiveRunTreeDependencies {
   readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
-  readonly concurrencyGate: Pick<ConcurrencyGate, 'denyWaitingForRunIds'>;
-  readonly agentQueryRegistry: AgentQueryRegistry;
-  readonly approvalRegistry: ApprovalWaitRegistry;
 }
 
 /**
@@ -66,9 +50,11 @@ export interface InterruptRunResult {
  * 2. **A fa aktív kézikönyveinek kiválasztása**: a `RunSupervisor.listActiveRuns()`
  *    listáját a `rootRunId` szerint szűkíti (9. szekció 3. pont, a
  *    `run-supervisor` CLAUDE.md "Amit a T-005-26 ebből használ" bekezdése).
- *    Ugyanebben a szinkron menetben, a 3. pont előtt a fa döntésre váró
- *    jóváhagyásainak sora `cancelled` (`cancelWaitingApprovalStepRuns`), nem a
- *    4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
+ *    A 2 ... 5. pont további része a `cancelActiveRunTree` közös menete,
+ *    amit a `fail_run` hibapolitika is hív a bukott futás al-workflow
+ *    futásaira (SPEC-004 8.3). Ugyanebben a szinkron menetben, a 3. pont
+ *    előtt a fa döntésre váró jóváhagyásainak sora `cancelled`
+ *    (`cancelWaitingApprovalStepRuns`), nem a 4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
  *    lépések leállásáig tartó ablakban érkező döntés így a sor állapotán bukik
  *    (`illegal_status_transition`), ahelyett hogy a `db` elfogadná. Ha az írás
  *    hibázik, a függvény a fa leállítása nélkül adja vissza a hibát.
@@ -127,35 +113,13 @@ export async function interruptRun(
   const rootRunId = target.value.rootRunId;
 
   const treeHandles = dependencies.runSupervisor.listActiveRuns().filter((handle) => handle.rootRunId === rootRunId);
-  const approvalsClosed = cancelWaitingApprovalStepRuns(
-    new Set(treeHandles.map((handle) => handle.runId)),
-    dependencies.database,
-  );
-  if (approvalsClosed.kind === 'error') {
-    return approvalsClosed;
-  }
-  await stopAndAwaitRunTree(
+  const cancelled = await cancelActiveRunTree(
     treeHandles,
-    dependencies.agentQueryRegistry,
-    dependencies.approvalRegistry,
-    dependencies.concurrencyGate,
+    () => dependencies.database.recovery.cancelRunTree(rootRunId),
+    dependencies,
   );
-
-  const cancelled = dependencies.database.recovery.cancelRunTree(rootRunId);
   if (cancelled.kind === 'error') {
     return cancelled;
-  }
-
-  // A payload mezőről mezőre az, amit a `db` `cancelRunTree` a sorba írt.
-  for (const cancelledRunId of cancelled.value.cancelledRunIds) {
-    dependencies.eventPublisher.publish({
-      kind: 'run_finished',
-      runId: cancelledRunId,
-      // eslint-disable-next-line unicorn/no-null -- a `run_finished` futás szintű esemény, a `run_event.step_run_id` valódi NULL értéke (SPEC-003 6.2)
-      stepRunId: null,
-      // eslint-disable-next-line unicorn/no-null -- a felhasználói megszakítás nem hibaosztály, a `null` a "nincs hiba" valódi értéke (SPEC-004 13. szekció)
-      payload: { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 },
-    } satisfies EngineEvent);
   }
 
   return { kind: 'ok', value: { rootRunId, cancelledRunIds: cancelled.value.cancelledRunIds } };

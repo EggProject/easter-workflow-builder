@@ -268,7 +268,7 @@ mérve (`start -> human_approval`, `POST /api/runs/<id>/interrupt`: a lista 1 el
 (2) A várakozás lezárása és a záró írás közti ablakban (egy futó, megszakított testvér folyamának
 kimerülése alatt) érkező döntés átment: lezárva, lásd a hatodik kört lent. (3) A `fail_run` a testvér `sub_workflow`
 gyerek futását nem állítja le: motor szintű próba, a gyerek `start -> human_approval`, a szülő a
-bukás után sem terminális.
+bukás után sem terminális. Lezárva, lásd a hetedik kört lent.
 
 **A leállási ablakban érkező jóváhagyási döntés: mérve, javítva (2026-09-23, hatodik kör).** Egy
 független ellenőrzés a `7229769` commiton azt mérte, hogy a fenti (2) pont a valódi szerveren is
@@ -349,3 +349,67 @@ megerősítve az IANA HTTP státusz regiszterrel
 leírásával (<https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/503>). A
 `Retry-After` fejléc az RFC szerint elhagyható ("MAY"), és nincs forrásunk az újraindulás idejére,
 ezért nem küldjük.
+
+**A `fail_run` és a futó `sub_workflow` testvér gyerek futása: mérve, javítva (2026-09-23, hetedik
+kör).** Egy független ellenőrzés a `7229769` commiton azt mérte, hogy ha a futás `fail_run` miatt
+bukik, miközben egy testvér `sub_workflow` lépés gyerek futása jóváhagyásra vár, a szülő és a
+`sub` lépés 3000 ms-mal a bukás után is `running`, a gyerek jóváhagyása után pedig a `sub` lépés
+`succeeded` egy `failed` futásban. A user döntése (2026-09-23): a gyerek futás `cancelled`, ugyanazzal
+a fa mechanizmussal, mint a felhasználói megszakításnál, a szülő azonnal `failed`.
+
+| Tétel    | Érték                                                                                                                                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató  | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `fce40c1` commitja külön munkafában (előtte), illetve a javítás munkapéldánya (utána)                                                                                               |
+| Szerver  | a 6. szekció felállása: a valódi `apps/server` modulok és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő                    |
+| Workflow | szülő: `start` után `a1` (`agent_step`, `fail_run`, 300 ms után nem sikeres `result`) és `sub` (`sub_workflow`); gyerek: `start` után `c-jov` (`human_approval`, `timeoutMs: null`) és `c-sub` az unokára; unoka: `start -> u-jov` |
+| Másik fa | egy másik workflow `start -> o-sub` ugyanerre a gyerek workflow-ra, a szülő előtt indítva; a gyereke és az unokája szintén jóváhagyásra vár                                                                                        |
+| Kliens   | a bukás (a szerver napló `STEP_END`) után legfeljebb 3000 ms-ig `GET /api/runs/<id>`, majd döntés (`approved`) a gyerek és az unoka jóváhagyására, végül a másik fa két jóváhagyására                                              |
+
+| Eset             | A szülő futás a bukás után                                              | `sub` lépés                     | Gyerek, unoka                                          | Döntés a gyerek és az unoka jóváhagyására | A másik fa                                                         |
+| ---------------- | ----------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------ |
+| előtte (3 futás) | 3000 ms-nál `running`; `failed` csak a döntések után (3200 ... 3211 ms) | döntés után `succeeded`         | döntés után `succeeded`                                | HTTP 200, 200                             | `running`, a döntései után `succeeded`                             |
+| utána (5 futás)  | `failed` 6, 5, 12, 12, illetve 11 ms-mal a bukás után                   | `failed`, `sub_workflow_failed` | `cancelled`, a `c-jov` és az `u-jov` lépés `cancelled` | HTTP 409 `conflict`, 409 `conflict`       | `running`, `c-jov` `waiting_approval`; a döntései után `succeeded` |
+
+**A fa mechanizmus, és miért nem a `cancelRunTree`.** A felhasználói megszakítás a fa aktív
+futásaira három dolgot hív: a jóváhagyás sorok lezárását (`cancelWaitingApprovalStepRuns`), a
+`stopAndAwaitRunTree` menetet (`requestStop()`, a sorból kivétel, a várakozások lezárása,
+`interrupt()`, a `completion` megvárása), majd a `db` `cancelRunTree` tranzakcióját és a
+`run_finished` élő kiadását. Ez a sorozat most egy közös függvény (`run-interrupt/cancel-active-run-tree.ts`),
+amit az `interruptRun` és a `fail_run` is hív, és csak a hatókörben térnek el. A `cancelRunTree` a
+`root_run_id` szerint szűr, tehát a bukott futást (és beágyazott esetben az őseit) is `cancelled`
+állapotba vinné, holott a bukott futás `failed`; ezért a `db` kapott egy `cancelRuns(runIds)`
+műveletet, ugyanazzal a tranzakcióval (közös belső menet), a megnevezett futásokra szűkítve. A
+leszármazottakat a motor a memóriából választja ki: a futás kézikönyve (`ActiveRunHandle`) a
+`parentRunId` mezőben hordozza a szülőt, és a nyilvántartás `listDescendants` bejárása adja az
+alfát. Nem az adatbázisból, mert a `step_run.sub_workflow_run_id` a gyerek futás indítása után egy
+`await`-tel később íródik. A leszármazottak lezárását a léptető hurok a bukott futás
+`interrupt()` hívása ELŐTT indítja (a szinkron része a sorból kivétel), a lezárulásukat utána várja.
+
+**A `sub` lépés végállapota.** `failed`, `sub_workflow_failed` osztállyal: a SPEC-004 5.9 6. pontja
+szerint a nem `succeeded` gyerek után a szülő lépés `failed`, és a 8.3 szerint a futó, megszakított
+lépés a saját útján zár, a motor terminális sort nem ír át. A SPEC-003 7.2 a `running -> cancelled`
+átmenetet is megengedné, az állapotgép tehát egyedül nem dönt. A felhasználói megszakításnál
+ugyanez a végállapot (mérve, lent).
+
+**A regresszió.** A `create-engine.spec.ts` négy új tesztje: a gyerek `cancelled`, a jóváhagyása
+lezárul, a szülő a döntés nélkül `failed`, az utólagos döntés `illegal_status_transition`; az unoka
+is `cancelled`; egy másik futás gyerek fája érintetlen; `fail_branch` határ (a gyerek a döntésig
+vár). A javítás előtti kódon a három `fail_run` teszt bukott (`a futás nem érte el a várt
+állapotot`), a határteszt zöld volt. Az `advance-run.spec.ts` két új esete: a lezárás pontosan
+egyszer, a saját `runId`-ra, az `interrupt()` előtt; a lezárás hibája `run_execution_failed`. A
+hurok hívását visszavonva öt teszt bukik (a három `create-engine` és a két `advance-run`), a
+sorrendet felcserélve a sorrend teszt (`expected [ 'interrupt', …(1) ] to strictly equal [ …(2) ]`).
+Plusz a `run-recovery.spec.ts` három `cancelRuns` esete, az `active-run-registry.spec.ts`
+`listDescendants` esete és a `cancel-active-run-tree.spec.ts` három esete.
+
+**Mellékes lelet, mérve, nem javítva: a `sub_workflow_finished` esemény `status` mezője `running`.**
+Mindkét úton (a `fail_run` és a felhasználói megszakítás, a javítás előtt és után is) a szülő
+`sub` lépésének `sub_workflow_finished` eseménye `status: "running"` értéket hordoz, a lépés
+hibaüzenete pedig "`running` állapotban zárt". Mérve a valódi szerveren: `POST
+/api/runs/<id>/interrupt` a másik fára, előtte és utána is `o-sub` `failed`/`sub_workflow_failed`,
+`sub_workflow_finished.status = "running"`, a gyökér `cancelled`. Az ok kódolvasásból: a
+`sub_workflow` végrehajtó a gyerek `completion`-jének teljesülésekor olvassa a gyerek sorát
+(`create-run-supervisor.ts` `awaitChildCompletion`), a leállított gyerek léptető hurka viszont nem ír
+záró állapotot, a fa tranzakciója (`cancelRunTree`, illetve `cancelRuns`) pedig csak az összes
+`completion` után fut. A lépés végállapota ettől helyes, az esemény és az üzenet nem a tényleges
+terminális állapotot mondja; a javítás a megszakítás közös menetét is érintené, ezért külön döntés.

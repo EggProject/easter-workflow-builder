@@ -223,6 +223,7 @@ export async function executeSubWorkflow(
       depth: parentRun.value.depth,
       workflowAncestry: parentRun.value.workflowAncestry,
     },
+    parentRunId: runId,
   });
   if (childRun.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(

@@ -645,6 +645,56 @@ function threeParallelAgentSteps(
   );
 }
 
+function subWorkflowNode(
+  id: string,
+  targetWorkflowId: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, { type: 'sub_workflow', targetWorkflowId, inputMapping: {}, onUnhandledError });
+}
+
+/**
+ * Egy gyerek workflow, aminek egyetlen lépése egy korlátlan várakozású
+ * jóváhagyás: a futása magától sosem ér véget, csak döntésre vagy
+ * megszakításra.
+ */
+function waitingChildWorkflow(database: DatabaseContext, name: string, prefix: string): string {
+  return createWorkflow(
+    database,
+    name,
+    [startNode(`${prefix}-start`), approvalNode(`${prefix}-jov`, null)],
+    [edgeOf(`${prefix}-e1`, `${prefix}-start`, `${prefix}-jov`)],
+  );
+}
+
+/**
+ * Megvárja, amíg a futás `sub_workflow` lépésének sora megkapja a gyerek
+ * futás azonosítóját (SPEC-004 5.9 3. pont), és visszaadja.
+ */
+async function waitForChildRunId(database: DatabaseContext, runId: string, nodeId: string): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const childRunId = okOrThrow(database.stepRuns.listStepRuns(runId)).find(
+      (row) => row.nodeId === nodeId,
+    )?.subWorkflowRunId;
+    if (typeof childRunId === 'string') {
+      return childRunId;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés gyerek futása nem indult el`);
+}
+
+// Egy futás élőben kiadott `run_finished` eseményének `payload.status` mezője.
+function findRunFinishedStatus(published: readonly unknown[], runId: string): unknown {
+  const event = published.find(
+    (candidate) => isRecord(candidate) && candidate['kind'] === 'run_finished' && candidate['runId'] === runId,
+  );
+  if (!isRecord(event) || !isRecord(event['payload'])) {
+    return undefined;
+  }
+  return event['payload']['status'];
+}
+
 describe('createEngine', () => {
   it('VÉGPONTTÓL VÉGPONTIG: startRun egy egyszerű start -> agent_step gráfon succeeded futást ad', async () => {
     const harness = openHarness();
@@ -1318,6 +1368,170 @@ describe('createEngine', () => {
       // A döntést a végrehajtó kapta meg, nem egy korábban lezárt várakozás:
       // lezárt várakozás után a sor ugyan átmenne, de esemény nem íródna.
       expect(hasPublishedEvent(harness.published, 'approval_decided', approvalStepRunId)).toBe(true);
+    });
+
+    it('REGRESSZIÓ: a futó sub_workflow testvér gyerek futása a bukás után cancelled, a várakozó jóváhagyása lezárul, a szülő a gyerek döntése nélkül failed, az utólagos döntés illegal_status_transition hibát ad', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const childWorkflowId = waitingChildWorkflow(harness.database, 'gyerek-jovahagyassal', 'c');
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-sub-workflow',
+        [startNode('start'), agentNode('a1', 'egy'), subWorkflowNode('sub', childWorkflowId)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'sub')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, started.run.id, 'a1');
+      const childRunId = await waitForChildRunId(harness.database, started.run.id, 'sub');
+      const childApprovalStepRunId = await waitForPendingApproval(harness.database, childRunId);
+
+      scripted.releaseFailure();
+      // A javítás előtt a szülő a gyerek döntéséig `running` maradt, ez a
+      // várakozás tehát elbukott.
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).errorKind).toBe('agent_result_not_success');
+      expect(okOrThrow(harness.database.runs.getRun(childRunId)).status).toBe('cancelled');
+      expect(findRunFinishedStatus(harness.published, childRunId)).toBe('cancelled');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(childApprovalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(childApprovalStepRunId)).decision).toBeNull();
+      // A futó `sub_workflow` lépés a saját eredménye szerint zár: a gyerek
+      // nem `succeeded`, tehát `failed`, `sub_workflow_failed` osztállyal
+      // (SPEC-004 5.9 6. pont, 8.3).
+      const subStep = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).find(
+        (step) => step.nodeId === 'sub',
+      );
+      expect([subStep?.status, subStep?.errorKind]).toStrictEqual(['failed', 'sub_workflow_failed']);
+      const publishedBefore = harness.published.length;
+
+      const late = await harness.engine.decideApproval({ stepRunId: childApprovalStepRunId, decision: 'approved' });
+
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(childApprovalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(childApprovalStepRunId)).decision).toBeNull();
+      expect(okOrThrow(harness.database.runs.getRun(childRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('failed');
+      expect(harness.published).toHaveLength(publishedBefore);
+    });
+
+    it('REGRESSZIÓ: a gyerek futás al-workflow futása (unoka) is cancelled, a várakozó jóváhagyásával együtt', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const grandchildWorkflowId = waitingChildWorkflow(harness.database, 'unoka-jovahagyassal', 'u');
+      const childWorkflowId = createWorkflow(
+        harness.database,
+        'gyerek-unokaval',
+        [startNode('c-start'), subWorkflowNode('c-sub', grandchildWorkflowId)],
+        [edgeOf('c-e1', 'c-start', 'c-sub')],
+      );
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-unoka',
+        [startNode('start'), agentNode('a1', 'egy'), subWorkflowNode('sub', childWorkflowId)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'sub')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, started.run.id, 'a1');
+      const childRunId = await waitForChildRunId(harness.database, started.run.id, 'sub');
+      const grandchildRunId = await waitForChildRunId(harness.database, childRunId, 'c-sub');
+      const grandchildApprovalStepRunId = await waitForPendingApproval(harness.database, grandchildRunId);
+
+      scripted.releaseFailure();
+
+      expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(childRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.runs.getRun(grandchildRunId)).status).toBe('cancelled');
+      expect(findRunFinishedStatus(harness.published, grandchildRunId)).toBe('cancelled');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(grandchildApprovalStepRunId)).status).toBe('cancelled');
+      const late = await harness.engine.decideApproval({
+        stepRunId: grandchildApprovalStepRunId,
+        decision: 'approved',
+      });
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+    });
+
+    it('REGRESSZIÓ: egy MÁSIK futás gyerek futása és annak várakozó jóváhagyása érintetlen, a döntés után a saját útján zár', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const childWorkflowId = waitingChildWorkflow(harness.database, 'gyerek-jovahagyassal', 'c');
+      const failingWorkflowId = createWorkflow(
+        harness.database,
+        'fail-run-sub-workflow',
+        [startNode('start'), agentNode('a1', 'egy'), subWorkflowNode('sub', childWorkflowId)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'sub')],
+      );
+      const otherWorkflowId = createWorkflow(
+        harness.database,
+        'masik-sub-workflow',
+        // A node és az él azonosítója az adatbázisban globálisan egyedi.
+        [startNode('start-b'), subWorkflowNode('sub-b', childWorkflowId)],
+        [edgeOf('eb1', 'start-b', 'sub-b')],
+      );
+      const other = okOrThrow(await harness.engine.startRun({ workflowId: otherWorkflowId, input: {} }));
+      const otherChildRunId = await waitForChildRunId(harness.database, other.run.id, 'sub-b');
+      const otherApprovalStepRunId = await waitForPendingApproval(harness.database, otherChildRunId);
+      const failing = okOrThrow(await harness.engine.startRun({ workflowId: failingWorkflowId, input: {} }));
+      await waitForStepRunning(harness.database, failing.run.id, 'a1');
+      const failingChildRunId = await waitForChildRunId(harness.database, failing.run.id, 'sub');
+      await waitForPendingApproval(harness.database, failingChildRunId);
+
+      scripted.releaseFailure();
+
+      expect(await waitForRunStatus(harness.database, failing.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(failingChildRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.runs.getRun(other.run.id)).status).toBe('running');
+      expect(okOrThrow(harness.database.runs.getRun(otherChildRunId)).status).toBe('running');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(otherApprovalStepRunId)).status).toBe('waiting_approval');
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: otherApprovalStepRunId, decision: 'approved' }));
+
+      expect(await waitForRunStatus(harness.database, other.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
+      expect(okOrThrow(harness.database.runs.getRun(otherChildRunId)).status).toBe('succeeded');
+    });
+
+    it('HATÁR: fail_branch mellett a futó sub_workflow testvér gyerek futása a bukás feldolgozása után is vár, és a szülő csak a gyerek döntése után failed (SPEC-004 8.3, 8.4)', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const childWorkflowId = waitingChildWorkflow(harness.database, 'gyerek-jovahagyassal', 'c');
+      // Az `utana` a bukás feldolgozásának megfigyelhető jele, ugyanúgy, mint
+      // a jóváhagyásos `fail_branch` határtesztben.
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-branch-sub-workflow',
+        [
+          startNode('start'),
+          agentNode('a1', 'egy', 'fail_branch'),
+          agentNode('utana', 'utana'),
+          subWorkflowNode('sub', childWorkflowId),
+        ],
+        [
+          edgeOf('e1', 'start', 'a1'),
+          edgeOf('e2', 'start', 'utana'),
+          edgeOf('e3', 'a1', 'utana'),
+          edgeOf('e4', 'start', 'sub'),
+        ],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, started.run.id, 'a1');
+      const childRunId = await waitForChildRunId(harness.database, started.run.id, 'sub');
+      const childApprovalStepRunId = await waitForPendingApproval(harness.database, childRunId);
+
+      scripted.releaseFailure();
+      await waitForStepStatus(harness.database, started.run.id, 'utana', 'succeeded');
+
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('running');
+      expect(okOrThrow(harness.database.runs.getRun(childRunId)).status).toBe('running');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(childApprovalStepRunId)).status).toBe('waiting_approval');
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: childApprovalStepRunId, decision: 'approved' }));
+
+      expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(childRunId)).status).toBe('succeeded');
+      const subStep = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).find(
+        (step) => step.nodeId === 'sub',
+      );
+      expect(subStep?.status).toBe('succeeded');
     });
   });
 
