@@ -46,7 +46,7 @@ termékdöntés volt.
 ### Amit NEM dönt el
 
 - **Nem változtatja meg a két port szerződését.** A `TemplateRendererPort` és az `ExpressionEvaluatorPort` szignatúrája (SPEC-004 3.2) változatlan; a motor továbbra sem ismer nyelvet, csak a portot.
-- **Nem változtatja meg a három csomópont eredmény kezelését** (M-102). A `branch` nem string eredményének szigorúbb kezelése nyitott kérdés (O-6), nem csendes módosítás.
+- **A `fan_out` és a `loop` csomópont eredmény kezelése változatlan marad** (M-102). **A `branch` csomópont kezelése a user O-6 döntésével módosul**: a nem string eredmény `expression_evaluation_failed` hibával bukik (7.5, 15. szekció, O-6 lezárva), ami felülírja a SPEC-004 M-102 tényt és az 5. szekció "nincs egyezés, a `defaultBranchKey` dönt" leírását a nem string esetre.
 - **Nem vezet be új hibaosztályt.** A meglévő `template_render_failed` és `expression_evaluation_failed` hordozza a fordítási és a futásidejű hibát is (9. szekció).
 - **Nem vezet be sablon vagy kifejezés mezőt olyan helyre, ahol ma nincs.** A `systemPrompt`, a `human_approval` `title` és a `sub_workflow` `inputMapping` nem sablon és nem kifejezés.
 - **Nem ad számot korlátra dokumentált forrás vagy mérés nélkül.** A csomag dokumentált alapértékein túli korlát nyitott kérdés (8. szekció, 15. szekció).
@@ -315,7 +315,7 @@ A `steps` kulcsa a node azonosító, ami a dróton tetszőleges szöveg (M-107).
 ### 5.4 A hiányzó adat
 
 - **CEL:** a hiányzó map kulcs hiba (M-121), tehát a lépés `expression_evaluation_failed` osztállyal bukik. Opcionális mezőt a `has()` makróval kell vizsgálni, például `has(input.prioritas) ? input.prioritas : "normal"`.
-- **Mustache:** a hiányzó név üres szöveget ad (M-114), hiba nélkül. Ennek a szigorú kezelése nyitott kérdés (O-4).
+- **Mustache:** a hiányzó név viselkedése O-4 szerint kettéválik. A sima változó tag (`{{név}}`, `{{{név}}}`, `{{& név}}`) fel nem oldható neve **`template_render_failed`** hibát ad, megnevezve a nevet (6.7). A szakasz és a fordított szakasz (`{{#név}}...{{/név}}`, `{{^név}}...{{/név}}`) hiányzó névvel változatlanul a Mustache alapértelmezett, hiba nélküli viselkedését kapja (M-114), mert ott a hiány a szándék.
 
 ## 6. A sablon nyelv: Mustache
 
@@ -348,8 +348,9 @@ dokumentált oka az, hogy a promptot XML szerű jelölésként elemzi; a mi moto
 elemzi, tehát ez az ok ránk nem érvényes (research 6. szekció).
 
 **A megvalósítás módja.** Az escape a `Mustache.render` negyedik, `config` argumentumában, **hívásonként**
-áll (M-112), egy `(value: unknown) => string` függvénnyel, ami az értéket `String(value)` alakra
-hozza. **A globális `Mustache.escape` felülírása tilos**, mert az a modul minden hívóját
+áll (M-112), egy `(value: unknown) => string` függvénnyel, ami az értéket a 6.5 szerint alakítja
+szöveggé: szám, logikai érték és `null` `String(value)` alakra, tömb és sima objektum
+`JSON.stringify(value)` alakra (O-5 lezárva). **A globális `Mustache.escape` felülírása tilos**, mert az a modul minden hívóját
 érintené; ugyanezt az okot a LangChain JS forrása is kimondja (M-113).
 
 ### 6.2 `compile` és `render`
@@ -386,11 +387,20 @@ kritérium); a kikapcsolást a 12. kritérium futtatott tesztje igazolja.
 
 ### 6.5 A behelyettesített érték szöveggé alakítása
 
-Az escape függvény `String(value)`. Ebből következik: a szám és a logikai érték a szokásos
-szöveges alakot kapja; egy tömb vesszővel összefűzve jelenik meg; **egy objektum
-`[object Object]` szöveget ad.** Egy korábbi lépés strukturált kimenetének egészét tehát nem lehet
-egyetlen `{{steps.x}}` hivatkozással a promptba tenni; a mezőit egyenként, vagy szakasszal kell
-bejárni. Ennek a JSON alakú kiírása termékdöntés, nyitott kérdés (O-5).
+**A döntés (O-5 lezárva, 2026-09-23, user döntés): tömb és objektum JSON szövegként íródik ki,
+nem `[object Object]` és nem vesszővel összefűzve.** Az escape függvény ezért típus szerint dönt:
+a szám, a logikai érték és a `null` a szokásos szöveges alakját kapja (`String(value)`); a tömb és
+a sima objektum (a 7.4 szerinti prototípus alapú guarddal felismerve, `Object.prototype` vagy
+`null` prototípussal) a `JSON.stringify(value)` eredményét kapja. Egy korábbi lépés strukturált
+kimenetének egésze ezért egyetlen `{{steps.x}}` hivatkozással is olvasható a promptban, JSON
+alakban; a mezőnkénti vagy szakaszos bejárás (6.4) emellett továbbra is elérhető, ha csak egy-egy
+mezőre van szükség.
+
+**Miért nem dobhat kivételt a `JSON.stringify`.** A sablon kontextusa kizárólag a `RunContext`
+adata (5.1), ami a `step_run.output` JSON kerekútján (M-106) vagy közvetlenül a futás bemenetéből
+származik, tehát nem tartalmazhat `BigInt`, `Map` vagy más nem JSON értéket (M-129); a CEL
+kifejezés eredménye is a 7.4 szerint már JSON-ra normalizálva kerül a `steps` rekordba, mielőtt a
+sablon látná. A `JSON.stringify` a sablon kontextusán emiatt kivétel nélkül fut.
 
 ### 6.6 A név feloldás szűkítése saját adat tulajdonságra
 
@@ -426,6 +436,30 @@ szakaszokon vagy a pontozott neveken eltér a könyvtár dokumentált viselkedé
 sablon lista bármely eleme függvényt hív, a terv megáll, és a kérdés a userhez megy: a lehetséges
 következő lépés (saját, a Mustache részhalmazát renderelő kód, vagy egy másik Mustache
 implementáció) a user döntését igényli.
+
+### 6.7 A hiányzó név szigorú kezelése (O-4 lezárva)
+
+**A döntés, 2026-09-23, user döntés: hiba legyen.** A sima változó tag (`{{név}}`, a nyers
+`{{{név}}}` és a `{{& név}}` is) fel nem oldható neve **`template_render_failed`** hibát ad,
+megnevezve a nevet. **Ez kizárólag a sima változó tagra vonatkozik.** A szakasz és a fordított
+szakasz (`{{#név}}...{{/név}}`, `{{^név}}...{{/név}}`) hiányzó névvel változatlanul a Mustache
+szemantikája szerint viselkedik (M-114): a szakasz nem renderel, a fordított szakasz igen, mert
+ott a hiány maga a szándék (egy opcionális blokk vagy egy "nincs elem" ág).
+
+**A mechanizmus.** A `mustache.js` erre nem ad kapcsolót (M-114), tehát saját ellenőrzés kell, a
+6.6 szerinti feloldási szabály pontos követésével: a saját `Context` alosztály meg tudja
+különböztetni, hogy egy `lookup` hívás sima változó feloldásból jön-e (a `Writer.prototype.render`
+`{{név}}` ága) vagy szakaszból (`renderSection`, `renderInverted`), mert a könyvtár a kettőt külön
+hívja. A sima változó ágon egy fel nem oldható név (a 6.6 szerinti, saját tulajdonságra szűkített
+feloldás szerint hiányzó) a `render` hívást hibaágra viszi, a nevet idézve; a szakasz ágon a
+hiányzó név a könyvtár alapértelmezett, hiba nélküli viselkedését kapja.
+
+**A pontozott név.** A hibaüzenet a teljes, kért nevet nevezi meg (például `input.nemletezik`),
+nem csak az első hiányzó szegmenst, mert ez az, amit a felhasználó a sablonba írt.
+
+**A F0 mérés eleme.** A PLAN-010 T-010-3 blokkoló mérése ellenőrzi, hogy a fenti megkülönböztetés
+a pinelt könyvtárral ténylegesen megvalósítható-e a `render`/`renderSection` hívási úton; ha nem,
+a terv megáll, és a kérdés a userhez megy, ugyanúgy, ahogy a 6.6 visszaútja.
 
 ## 7. A kifejezés nyelv: CEL
 
@@ -497,11 +531,16 @@ CEL specifikus.
 
 ### 7.5 A három kifejezés csomópont
 
-| Csomópont | Mező                 | Elvárt eredmény                                          | Ha más típust ad (M-102, változatlan)                                                                                           | Példa                                                    |
-| --------- | -------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `branch`  | `expression`         | CEL `string`, egy bekötött `branch_key` értéke           | "nincs egyezés": a `defaultBranchKey` dönt, ha van és be van kötve; különben a lépés `branch_no_matching_edge` osztállyal bukik | `input.pontszam >= 50.0 ? "magas" : "alacsony"`          |
-| `fan_out` | `itemsExpression`    | CEL `list`, ami a 7.4 szerint JSON tömbre normalizálható | a lépés `fan_out_items_not_a_list` osztállyal bukik; a nem normalizálható elem `expression_evaluation_failed`                   | `input.elemek.filter(e, e.aktiv).map(e, e.nev)`          |
-| `loop`    | `continueExpression` | CEL `bool`                                               | a lépés `expression_evaluation_failed` osztállyal bukik                                                                         | `iteration < 3` vagy `steps["ellenorzes"].kesz == false` |
+| Csomópont | Mező                 | Elvárt eredmény                                          | Ha más típust ad (M-102, változatlan)                                                                                                                                                                                    | Példa                                                    |
+| --------- | -------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `branch`  | `expression`         | CEL `string`, egy bekötött `branch_key` értéke           | **nem string eredmény (O-6 lezárva): `expression_evaluation_failed` osztállyal bukik.** String eredmény, ami "nincs egyezés"-t ad: a `defaultBranchKey` dönt, ha van és be van kötve; különben `branch_no_matching_edge` | `input.pontszam >= 50.0 ? "magas" : "alacsony"`          |
+| `fan_out` | `itemsExpression`    | CEL `list`, ami a 7.4 szerint JSON tömbre normalizálható | a lépés `fan_out_items_not_a_list` osztállyal bukik; a nem normalizálható elem `expression_evaluation_failed`                                                                                                            | `input.elemek.filter(e, e.aktiv).map(e, e.nev)`          |
+| `loop`    | `continueExpression` | CEL `bool`                                               | a lépés `expression_evaluation_failed` osztállyal bukik                                                                                                                                                                  | `iteration < 3` vagy `steps["ellenorzes"].kesz == false` |
+
+**A `branch` nem string ágának fenti kezelése felülírja a SPEC-004 M-102 tényt és az 5. szekció
+`branch` végrehajtó táblázatának korábbi leírását** ("nincs egyezés", a `defaultBranchKey` dönt,
+minden nem string eredményre); a SPEC-004 érintett helye ugyanerre a döntésre hivatkozva javítva
+(13. szekció).
 
 **A `loop` saját `continueExpression`-je által látott `iteration` értéke** a motor hatókör
 vermétől függ (SPEC-004 4.3, 4.6, `buildRunContext`), és a spec nem állítja kódolvasásból. A
@@ -597,9 +636,10 @@ elutasító port állította elő (M-104), ami a bekötés cseréjével megszűn
 2. az `expression_evaluator_unavailable` érték kikerül az `EngineErrorKind` unióból, a
    `isEngineErrorKind` guardból és a szerver `unprocessable` halmazából, ugyanabból az okból.
 
-**Ez a pont a user jóváhagyására vár.** Ha a user az osztály megtartását kéri, az 1. pont
-változatlan, a 2. pont elmarad, és az osztály használatlan értékként áll tovább, ezt a
-`packages/engine` `CLAUDE.md` fájlja jelzi.
+**Lezárva, 2026-09-23, a user döntésével: a törlés jóváhagyva.** Mindkét pont változatlanul
+végrehajtandó: a két `create-rejecting-*.ts` fájl és a tesztje törlődik, és az
+`expression_evaluator_unavailable` érték kikerül az `EngineErrorKind` unióból, az
+`isEngineErrorKind` guardból és a szerver `unprocessable` halmazából.
 
 ### 9.5 Az üzenet alakja
 
@@ -700,15 +740,15 @@ elvárások a 16. szekció 48 ... 50. kritériumában állnak.
 **A SPEC-004 O-1 a user 2026-09-23-i döntésével lezárult:** a sablon nyelv Mustache, a kifejezés
 nyelv CEL, a szállított implementációt a jelen spec írja le.
 
-| Dokumentum                              | Mi változik                                                                                                                                                                                                                                 | Mikor                                                            |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| SPEC-004                                | a 15. szekció O-1 sora lezárva, a 3.2 port táblázat "Ki adja" oszlopa, az 1. szekció "Amit NEM dönt el" első pontja, a 16. szekció kockázat sora, a 17. szekció 68. kritériuma és a 4.7 táblázat utáni új bekezdés a SPEC-010-re hivatkozik | a jelen spec commitjában                                         |
-| SPEC-006                                | az 1. szekció "Amit NEM dönt el" pontja és a 9.1 `engine-assembly` sora a SPEC-010-re hivatkozik                                                                                                                                            | a jelen spec commitjában                                         |
-| SPEC-008                                | az 5.4 szekció egy, a 10. szekcióra hivatkozó mondattal bővül                                                                                                                                                                               | a jelen spec commitjában                                         |
-| `docs/research/2026-08-26-toolchain.md` | a két csomag verziója, két forrással                                                                                                                                                                                                        | a jelen spec commitjában                                         |
-| `.claude/CLAUDE.md`                     | a 7. szekció stack listája és indoklás táblája, a 13. szekció táblázata                                                                                                                                                                     | a jelen spec commitjában                                         |
-| SPEC-005                                | a 8.3 táblázat gráf validációs sora a két osztállyal (9.3)                                                                                                                                                                                  | a PLAN-010 végrehajtásakor, a kóddal együtt                      |
-| `.claude/CLAUDE.md`                     | a 6. szekció csomagszáma és rétegleírása az új csomaggal                                                                                                                                                                                    | a PLAN-010 végrehajtásakor, amikor a csomag ténylegesen létrejön |
+| Dokumentum                              | Mi változik                                                                                                                                                                                                                                                                                                                                                                                                                      | Mikor                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| SPEC-004                                | a 15. szekció O-1 sora lezárva, a 3.2 port táblázat "Ki adja" oszlopa, az 1. szekció "Amit NEM dönt el" első pontja, a 16. szekció kockázat sora, a 17. szekció 68. kritériuma és a 4.7 táblázat utáni új bekezdés a SPEC-010-re hivatkozik; az O-6 lezárása miatt az M-102 tény és az 5. szekció `branch` végrehajtó táblázata utáni új bekezdés kimondja, hogy a nem string eredmény kezelése a SPEC-010 7.5 szerint felülírva | a jelen spec commitjában                                         |
+| SPEC-006                                | az 1. szekció "Amit NEM dönt el" pontja és a 9.1 `engine-assembly` sora a SPEC-010-re hivatkozik                                                                                                                                                                                                                                                                                                                                 | a jelen spec commitjában                                         |
+| SPEC-008                                | az 5.4 szekció egy, a 10. szekcióra hivatkozó mondattal bővül                                                                                                                                                                                                                                                                                                                                                                    | a jelen spec commitjában                                         |
+| `docs/research/2026-08-26-toolchain.md` | a két csomag verziója, két forrással                                                                                                                                                                                                                                                                                                                                                                                             | a jelen spec commitjában                                         |
+| `.claude/CLAUDE.md`                     | a 7. szekció stack listája és indoklás táblája, a 13. szekció táblázata                                                                                                                                                                                                                                                                                                                                                          | a jelen spec commitjában                                         |
+| SPEC-005                                | a 8.3 táblázat gráf validációs sora a két osztállyal (9.3)                                                                                                                                                                                                                                                                                                                                                                       | a PLAN-010 végrehajtásakor, a kóddal együtt                      |
+| `.claude/CLAUDE.md`                     | a 6. szekció csomagszáma és rétegleírása az új csomaggal                                                                                                                                                                                                                                                                                                                                                                         | a PLAN-010 végrehajtásakor, amikor a csomag ténylegesen létrejön |
 
 ## 14. Kockázatok
 
@@ -730,14 +770,14 @@ nyelv CEL, a szállított implementációt a jelen spec írja le.
 
 Egyik sem zárható le tippeléssel.
 
-| #   | Kérdés                                                                              | Addig                                                                                                                                                       | Mi zárná le                                                                                                                                                                                                         |
-| --- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| O-1 | A sablon és a kifejezés szövegének legnagyobb hossza                                | a Mustache sablonra nincs korlát; a CEL kifejezést a csomag parse idejű AST korlátai határolják (M-125), karakterszám korlát nincs                          | termékdöntés egy értékről, és egy mérés, ami megmutatja, a választott érték alatt a `compile` és a kiértékelés ideje a szerveren elfogadható-e                                                                      |
-| O-2 | A kiértékelés és a renderelés idejének, lépésszámának korlátja                      | nincs korlát; a CEL terminál (M-120), de a beágyazott makró exponenciális lehet (M-123), és a szinkron hívás a szerver eseményhurkát blokkolja (8. szekció) | egy mérés a legrosszabb esetre a mi `RunContext` méreteinken, és egy döntés arról, hogy a kiértékelés külön szálra kerül-e, vagy a makró láncolást korlátozzuk, ahogy a CEL spec ajánlja                            |
-| O-3 | A renderelt szöveg, a kifejezés eredménye és a `fan_out` elemszám legnagyobb mérete | nincs korlát                                                                                                                                                | termékdöntés, és egy mérés a `step_run.output` és a `run_event` írásának viselkedéséről nagy értéken                                                                                                                |
-| O-4 | A hiányzó Mustache név szigorú kezelése                                             | üres szöveg, a könyvtár dokumentált alapértéke (M-114)                                                                                                      | termékdöntés: marad az üres szöveg, vagy a hiányzó név `template_render_failed` hiba; az utóbbihoz a `mustache.js` nem ad kapcsolót, tehát saját ellenőrzés kellene, a feloldási szabály (M-116) pontos követésével |
-| O-5 | Egy objektum vagy tömb behelyettesítése a sablonban                                 | `String(value)`: az objektum `[object Object]`, a tömb vesszővel összefűzve (6.5)                                                                           | termékdöntés: marad, vagy az objektum és a tömb JSON szövegként íródik ki                                                                                                                                           |
-| O-6 | A `branch` nem string eredménye                                                     | a SPEC-004 szerinti viselkedés: "nincs egyezés", a `defaultBranchKey` dönt (M-102)                                                                          | termékdöntés: marad, vagy a nem string eredmény `expression_evaluation_failed` hiba, ahogy a `loop` nem logikai eredménye                                                                                           |
+| #   | Kérdés                                                                              | Addig                                                                                                                                                                                                                                                                                                          | Mi zárná le                                                                                                                                                                              |
+| --- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O-1 | A sablon és a kifejezés szövegének legnagyobb hossza                                | a Mustache sablonra nincs korlát; a CEL kifejezést a csomag parse idejű AST korlátai határolják (M-125), karakterszám korlát nincs                                                                                                                                                                             | termékdöntés egy értékről, és egy mérés, ami megmutatja, a választott érték alatt a `compile` és a kiértékelés ideje a szerveren elfogadható-e                                           |
+| O-2 | A kiértékelés és a renderelés idejének, lépésszámának korlátja                      | nincs korlát; a CEL terminál (M-120), de a beágyazott makró exponenciális lehet (M-123), és a szinkron hívás a szerver eseményhurkát blokkolja (8. szekció)                                                                                                                                                    | egy mérés a legrosszabb esetre a mi `RunContext` méreteinken, és egy döntés arról, hogy a kiértékelés külön szálra kerül-e, vagy a makró láncolást korlátozzuk, ahogy a CEL spec ajánlja |
+| O-3 | A renderelt szöveg, a kifejezés eredménye és a `fan_out` elemszám legnagyobb mérete | nincs korlát                                                                                                                                                                                                                                                                                                   | termékdöntés, és egy mérés a `step_run.output` és a `run_event` írásának viselkedéséről nagy értéken                                                                                     |
+| O-4 | A hiányzó Mustache név szigorú kezelése                                             | **Lezárva, 2026-09-23, a user döntésével:** a sima változó tag hiányzó neve `template_render_failed` hibát ad, megnevezve a nevet; a szakasz és a fordított szakasz hiányzó névvel változatlanul a Mustache szemantikája szerint viselkedik, mert ott a hiány a szándék (6.7)                                  | lezárva                                                                                                                                                                                  |
+| O-5 | Egy objektum vagy tömb behelyettesítése a sablonban                                 | **Lezárva, 2026-09-23, a user döntésével:** a tömb és az objektum JSON szövegként íródik ki, nem `[object Object]` és nem vesszővel összefűzve (6.5)                                                                                                                                                           | lezárva                                                                                                                                                                                  |
+| O-6 | A `branch` nem string eredménye                                                     | **Lezárva, 2026-09-23, a user döntésével:** a nem string eredmény `expression_evaluation_failed` hibával bukik, ahogy a `loop` nem logikai eredménye; ez felülírja a SPEC-004 M-102 és az 5. szekció korábbi "nincs egyezés, a `defaultBranchKey` dönt" leírását a nem string esetre (7.5, SPEC-004 átvezetve) | lezárva                                                                                                                                                                                  |
 
 ## 16. Elfogadási kritériumok
 
@@ -761,7 +801,7 @@ Egyik sem zárható le tippeléssel.
 13. A `compile` a zárt listájú négy `parseTemplate` hibára (le nem zárt tag, meg nem nyitott szakasz, le nem zárt szakasz, érvénytelen határoló) `Outcome` hibaágat ad, kivétel nélkül; érvényes sablonra `ok`.
 14. A `render` egyetlen bemenetre sem dob kivételt: minden könyvtári kivétel `Outcome` hibaágként jön vissza. **A név feloldás a 6.6 szerint saját adat tulajdonságra szűkített, és függvényt nem hív:** a F0 támadó sablon listájának minden eleme (köztük a `{{toString}}`, a `{{input.constructor.constructor.name}}`, a `{{#constructor}}x{{/constructor}}` és a `{{input.items.constructor.fromAsync}}`) üres szöveget ad, mint egy hiányzó név, és a futtató folyamat nem kap kezeletlen promise elutasítást; futtatott teszt a valódi könyvtáron igazolja. A szakasz, a fordított szakasz, a `.` név és a pontozott név a szűkítés mellett is a 6.4 táblázat szerint működik.
 15. A `{{> x}}` partial hivatkozás üres szöveget ad, fájl olvasás nélkül.
-16. A 6.5 szerinti szöveggé alakítás: szám, logikai érték, tömb és objektum behelyettesítése a táblázat szerinti szöveget adja; futtatott teszt mind a négyre.
+16. A 6.5 szerinti szöveggé alakítás: szám, logikai érték és `null` behelyettesítése `String(value)` szöveget ad, a tömb és az objektum behelyettesítése a `JSON.stringify(value)` szöveget adja, nem `[object Object]`-et és nem vesszővel összefűzött listát (O-5 lezárva); futtatott teszt mind a négy típusra.
 
 ### A kifejezés nyelv
 
@@ -797,7 +837,7 @@ Egyik sem zárható le tippeléssel.
 37. A `buildEngineDependencies` a `createMustacheTemplateRenderer()` és a `createCelExpressionEvaluator()` eredményét köti be; futtatott teszt igazolja, hogy egy érvényes sablon és kifejezés `compile` hívása `ok`.
 38. A két `create-rejecting-*.ts` fájl és a tesztje megszűnt, és az `apps/server/src` alatt nincs rájuk hivatkozás.
 39. Az `error-mapping` `unprocessable` halmaza tartalmazza a `template_render_failed` és az `expression_evaluation_failed` osztályt, és egy futás indítási elutasítás ezekkel `422` választ ad; futtatott teszt mindkettőre.
-40. A 9.4 döntés a user válasza szerint végrehajtva: vagy az `expression_evaluator_unavailable` sehol nem szerepel a `packages/engine/src` és az `apps/server/src` alatt, vagy használatlan értékként megmaradt, és a `packages/engine` `CLAUDE.md` ezt jelzi.
+40. A 9.4 döntés (törlés jóváhagyva) végrehajtva: az `expression_evaluator_unavailable` sehol nem szerepel a `packages/engine/src` és az `apps/server/src` alatt, és a két `create-rejecting-*.ts` fájl a tesztjével együtt megszűnt.
 41. A 11.2 sodródás védelem létezik az `apps/server` alatt, megvalósítás nélküli regressziós téma mappában; a `RUN_CONTEXT_VARIABLE_NAMES` elemeinek uniója és a `keyof RunContext` típusszinten egyezik, és a védelmet egy szándékos elrontás `typecheck` bukása igazolja.
 42. A SPEC-006 1. és 9.1 szekciója, és a SPEC-005 8.3 táblázata a SPEC-010-re hivatkozik.
 
@@ -823,6 +863,12 @@ Egyik sem zárható le tippeléssel.
 54. A `packages/workflow-language/src`, az `apps/server/src` és az `apps/web/src` alatt nincs `any`, `as` típuskényszerítés (az `as const` kivételével) és új `eslint-disable` sor a két könyvtár típusai miatt.
 55. A lefedettség mind a négy metrikán 100 százalék, a `coverage.exclude` lista nem bővült; az e2e fedetlen tételek száma egyik metrikán sem nőtt.
 56. Mind a kilenc minőségi kapu nulla kilépési kóddal fut a teljes workspace-en; a kapuk mérvadó listája a `.claude/CLAUDE.md` 8. szekciója.
+
+### Az O-4, O-5 és O-6 lezárása (user döntés, 2026-09-23)
+
+57. A `render` egy tömb vagy egy sima objektum értékre a `JSON.stringify` eredményét adja szövegként, nem `[object Object]`-et és nem vesszővel összefűzött listát; futtatott teszt mindkét típusra, beágyazott mezőkkel is (O-5).
+58. A `render` egy sima változó tag (`{{név}}`, `{{{név}}}`, `{{& név}}`) fel nem oldható nevére `Outcome` hibaágat ad `template_render_failed` jelleggel, a hiányzó nevet a hibaüzenetben idézve; ugyanaz a hiányzó név egy szakaszban vagy fordított szakaszban (`{{#név}}`, `{{^név}}`) nem hibát ad, hanem a Mustache alapértelmezett, hiba nélküli viselkedését. Futtatott teszt mindhárom alakra és a szakasz/fordított szakasz ellenpéldájára (O-4).
+59. A `branch` csomópont nem string kiértékelési eredménye `expression_evaluation_failed` osztállyal bukik; egy string, de egyetlen bekötött `branch_key`-hez sem illeszkedő eredmény változatlanul a `defaultBranchKey`, ennek hiányában a `branch_no_matching_edge` úton dől el. Futtatott teszt mindkét ágra, a `packages/engine` `execute-branch.spec.ts` bővítésével (O-6).
 
 ## 17. Kapcsolódó dokumentumok
 

@@ -315,6 +315,13 @@ Közös szabályok minden végrehajtóra:
 | 9   | `sub_workflow`   | `targetWorkflowId`, `inputMapping`                                  | ancestry ellenőrzés, gyerek futás indítása és megvárása, kimenet átvétele (5.9)                                                     | közvetve, a gyerek lépésein át | `workflow_recursion_detected`, `sub_workflow_failed`, `unresolvable_step_reference`                                               |
 | 10  | `script`         | nincs                                                               | **nem létezik végrehajtója**; a 4.7 validáció elutasítja a futást                                                                   | nincs                          | `unimplemented_node_type`, a validációban                                                                                         |
 
+**A `branch` node kiértékelési eredményének pontos kezelése a SPEC-010 7.5 szekciójában áll, és
+felülírja a jelen táblázat hibaágai mögötti, a kód SPEC-010 előtti állapotából mért viselkedést**
+(SPEC-010 M-102): a nem string eredmény `expression_evaluation_failed` osztállyal bukik, és a
+`defaultBranchKey` kizárólag akkor dönt, ha az eredmény string, de egyetlen bekötött `branch_key`
+értékhez sem illeszkedik ("nincs egyezés"); ekkor a hiányzó bekötés `branch_no_matching_edge`
+hibát ad (user döntés, SPEC-010 O-6, 2026-09-23).
+
 ### 5.2 Az `agent_step` életciklusa
 
 1. **Hely kérése a párhuzamossági szabályozótól** (7. szekció). A lépés addig `pending` állapotban áll, amíg helyet nem kap; a `markStepRunning` csak a hely megszerzése után fut le, tehát a `running` állapot azt jelenti, hogy a lépés ténylegesen dolgozik.

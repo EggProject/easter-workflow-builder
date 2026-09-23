@@ -903,3 +903,56 @@ A küszöb a mért négy számra húzva, felfelé kerekítés nélkül (`apps/we
 **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon a nyers
 adaton egyetlen századdal magasabb küszöbbel (98.96 / 98.27 / 99.39 / 98.92) mind a négy metrika
 `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 21. A futás nézet újrafeliratkozása utáni ratchet (2026-09-23, `49846b4`): a küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `49846b4` commit (`Futás nézet: újrafeliratkozás szerver újraindulás után,
+minden lezáró keret frissíti a fejlécet`) két, valódi böngészőben mért kliens oldali hibát
+javított: (1) a `RunViewScreen` mostantól megkapja a `serverRestartCount` értéket, és a
+változására újra kiadja a `PUT` feliratkozást, újratölti a futás rekordját és a lépés futásokat
+(`useLiveStepRuns`, SPEC-005 5.2, SPEC-007 AC44); (2) az `is-run-finished-frame.ts` helyére az
+`is-run-closing-frame.ts` lépett: kimerítő `switch` a `RunEventKind` mind a huszonöt értékén, ami
+a `run_finished` mellett a `run_interrupted` keretet is lezárónak veszi (SPEC-003 7.1, SPEC-004
+10.1, 10.2), korábban csak a `run_finished` frissítette a fejlécet. A commit két új e2e tesztet
+vett fel a hibrid SSE úton (`apps/web/e2e/sse-real-server.spec.ts`): "élő run_interrupted keretre
+(szabályos leállás) a fejléc átvált, és megjelenik az Újraindítás gomb", és "szerver újraindulás
+után a futás nézet újra feliratkozik, újratölti a futást és a lépéseket, és az utána érkező élő
+keret frissíti a rajzot".
+
+**A mért állapot, a commit üzenete szerint:**
+
+| Metrika    | Százalék (`49846b4`) | Előző (20. szekció) |
+| ---------- | -------------------- | ------------------- |
+| statements | **98.96**            | 98.95               |
+| branches   | **98.33**            | 98.26               |
+| functions  | **99.39**            | 99.38               |
+| lines      | **98.92**            | 98.91               |
+
+**Nulla új fedetlen tétel.** A commit üzenete szerint a fedetlen tételek száma változatlanul
+15/11/3/15, bitre egyezik a 20. szekció darabszámával. A küszöb a mért négy számra húzva, felfelé
+kerekítés nélkül (`apps/web/package.json` `coverage:e2e:report`).
+
+**Ellenőrzés ebben a munkamenetben, nem vakon átvéve.** A négy szám és a fedetlen darabszám nem egy
+ebben a munkamenetben újrafuttatott méréssel, hanem a következő, egymástól független forrásokkal
+keresztellenőrzött:
+
+1. `git show 49846b4 -- apps/web/package.json`: a `coverage:e2e:report` script `--statements`,
+   `--branches`, `--functions`, `--lines` kapcsolói `98.95/98.26/99.38/98.91`-ről pontosan
+   `98.96/98.33/99.39/98.92`-re változtak, bájtra megegyezve a commit üzenetében állított
+   értékkel.
+2. A jelenlegi `apps/web/package.json` (a `feat/spec-008-futas-nezet` ágon) ugyanezt a négy
+   értéket tartalmazza, tehát a commit óta nem módosult.
+3. A commit által érintett öt forrásfájl (`app-shell.tsx`, `RunViewScreen.tsx`, az új
+   `is-run-closing-frame.ts`, a törölt `is-run-finished-frame.ts`, `use-live-step-runs.ts`)
+   egyike sem szerepel a 16. szekció óta érvényes hat fedetlen tételen (`mount-app.tsx`,
+   `read-frontend-config.ts`, `is-valid-connection.ts` 36. sor, `browser-history-location-port.ts`
+   cleanup sora, `perform-route-request.ts` 70. sor, `use-stream-connection.ts` cleanup sora), ami
+   összhangban áll a commit üzenetének "fedetlen tételek száma változatlan" állításával: az új kód
+   (a kimerítő switch mind a huszonöt ága, a két effekt) e2e-vel teljesen lefedett.
+
+**Ami ebből a munkamenetből NEM ELLENŐRZÖTT.** A jelen dokumentum-átvezetés kizárólag a `docs/`
+alatti fájlokat érinti, és egy párhuzamos munkamenet élő kódot ír ugyanezen az ágon; a teljes
+Playwright készlet újrafuttatása (`bun run test:e2e`, majd `nyc report --reporter=json-summary` a
+"Fedett / összes" nyers számpárokért, ahogy a korábbi szekciók teszik) ezért ebben a munkamenetben
+nem történt meg, hogy ne ütközzön a párhuzamos munkával. A négy százalék és a fedetlen darabszám
+forrása emiatt a fenti 1 ... 3. pont keresztellenőrzése, nem egy itt újrafuttatott mérés.
