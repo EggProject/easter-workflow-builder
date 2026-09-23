@@ -360,7 +360,7 @@ A `protocol` ma **hat** drótszintű felsorolást deklarál a `db` uniójának s
 
 ### 5.4 Mit validál a kliens, és mit nem
 
-**A kliens kizárólag azt ellenőrzi, amit a protokoll séma maga megkövetel.** A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut a felépített dokumentumon, és hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás. **Az 5.3 döntés után ez a `config` mezőre is kiterjed**, mert a séma a tíz ág diszkriminált uniója, tehát az `error.issues[].path` a config mezőútvonalát is megadja. Ettől nem lesz több a kliens oldali szabály: a séma **alakot** ellenőriz, nem gráf szemantikát, és a séma forrása változatlanul egyetlen csomag. Ezen felül két, tisztán szerkesztői ellenőrzés fut, mert mindkettő a szerkesztő saját állapotáról szól, nem a gráf szemantikájáról:
+**A kliens kizárólag azt ellenőrzi, amit a protokoll séma maga megkövetel, plusz a sablon és a kifejezés mezők fordítását (lásd a szekció végi kiegészítést, SPEC-010 10.).** A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut a felépített dokumentumon, és hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás. **Az 5.3 döntés után ez a `config` mezőre is kiterjed**, mert a séma a tíz ág diszkriminált uniója, tehát az `error.issues[].path` a config mezőútvonalát is megadja. Ettől nem lesz több a kliens oldali szabály: a séma **alakot** ellenőriz, nem gráf szemantikát, és a séma forrása változatlanul egyetlen csomag. Ezen felül két, tisztán szerkesztői ellenőrzés fut, mert mindkettő a szerkesztő saját állapotáról szól, nem a gráf szemantikájáról:
 
 1. **Van-e mentetlen változás**, és ha van, az elnavigálás megerősítést kér.
 2. **Van-e olyan él, aminek a forrása vagy a célja már törölt csomópont**, mert azt a szerkesztő saját törlési művelete okozná, és a `PUT` idegen kulcs hibát adna.
@@ -370,6 +370,8 @@ A `protocol` ma **hat** drótszintű felsorolást deklarál a `db` uniójának s
 1. **Két forrás keletkezne**, ami elcsúszhat; a `.claude/CLAUDE.md` egyetlen forrás elve ezt tiltja.
 2. **A szerver hibaüzenete a `ProtocolErrorBody.message` mezőben már megérkezik**, és a SPEC-007 kimondja, hogy ezt elemzés nélkül jelenítjük meg.
 3. **A 100 százalékos lefedettség** minden lemásolt ághoz tesztet követelne, ami a motor tesztjeinek duplikátuma lenne.
+
+**Kiegészítés, SPEC-010 10. szekció:** a sablon és a kifejezés mezők **fordítása** a mentés előtt a szerkesztőben is lefut, és a hiba a mező alatt jelenik meg. Ez nem gráf szemantikai validáció, és a fenti három ok egyike sem áll rá, mert a szerkesztő ugyanazt a `workflow-language` csomagot hívja, amit a szerver.
 
 **Az `isValidConnection` viszont bekötésre kerül** (M-59), mert az nem szemantikai validáció, hanem a szerkesztés közbeni, azonnali visszajelzés két, tisztán szerkezeti szabályra: egy handle-ből nem indulhat két él ugyanabba a célba, és a `start` csomópontnak nincs bemenő handle-je, tehát oda nem lehet kötni. Mindkettő a handle tábla adatából következik (5.1), nem a motor szabályaiból.
 

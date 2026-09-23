@@ -265,19 +265,22 @@ A rögzített verziók egyetlen forrása: `docs/research/2026-08-26-toolchain.md
 
 **A stack, szám nélkül.** TypeScript, Bun (csomagkezelő és workspace), Node (runtime), Turborepo,
 React, Vite, `@xyflow/react`, Drizzle ORM + `better-sqlite3`, `ws`, `pino` + `pino-roll`, Vitest,
-Playwright, ESLint flat config (gyökér `CLAUDE.md`).
+Playwright, ESLint flat config (gyökér `CLAUDE.md`). A workflow sablon nyelve Mustache
+(`mustache`), a kifejezés nyelve CEL (`@marcbachmann/cel-js`); a bevezetésük a PLAN-010 szerint
+történik (user döntés 2026-09-23, SPEC-010).
 
 **Miért ezek, röviden**
 
-| Döntés                                                                                                    | Indok                                                                                                       |
-| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                 | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API |
-| Bun csak csomagkezelő és workspace, a runtime Node                                                        | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik          |
-| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                            | Turborepo 2.x                                                                                               |
-| Nincs TypeScript projekt referencia, nincs `composite`                                                    | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)            |
-| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                               | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                    |
-| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                         |
-| Az Agent SDK verziója pinelve                                                                             | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                 |
+| Döntés                                                                                                    | Indok                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                 | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API                                                                                                                                                                                                                    |
+| Bun csak csomagkezelő és workspace, a runtime Node                                                        | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik                                                                                                                                                                                                                             |
+| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                            | Turborepo 2.x                                                                                                                                                                                                                                                                                                                  |
+| Nincs TypeScript projekt referencia, nincs `composite`                                                    | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)                                                                                                                                                                                                                               |
+| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                               | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                                                                                                                                                                                                                                       |
+| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                                                                                                                                                                                                                                            |
+| Az Agent SDK verziója pinelve                                                                             | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                                                                                                                                                                                                                                    |
+| Sablon nyelv Mustache, kifejezés nyelv CEL, mindkét csomag pontos verzióval pinelve                       | a Mustache logika mentes, a CEL nem Turing-teljes (user döntés, SPEC-010 4.); a CEL JS binding fiatal, ezért a frissítése előtt a blokkoló mérés regresszióként fut (SPEC-010 4.2 1. pont); a Mustache név feloldás saját adat tulajdonságra szűkített, mert szűkítés nélkül egy sablon a szervert leállíthatja (SPEC-010 6.6) |
 
 **Tiltások**
 
@@ -880,27 +883,29 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 13. Hol keresd a részleteket
 
-| Téma                                                                | Forrás                                                                         |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv | `docs/spec/SPEC-000-provider-wire-measurement.md`                              |
-| a mérések kiértékelése, tervezési következmények                    | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md` |
-| monorepo, toolchain, ESLint szabályok, CI, wrapperek                | `docs/spec/SPEC-001-monorepo-toolchain.md`                                     |
-| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel           | `docs/research/2026-08-26-spec001-ellenorzesek.md`                             |
-| csomag architektúra, mappa és csomagnév konvenció                   | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                        |
-| domain modell, perzisztencia, állapotgépek, repository réteg        | `docs/spec/SPEC-003-domain-perzisztencia.md`                                   |
-| a `packages/db` belső szerkezetének bontási terve                   | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                 |
-| rögzített verziók és a mögöttük álló okok                           | `docs/research/2026-08-26-toolchain.md`                                        |
-| tároló motor kiértékelés, méretmérések                              | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
-| SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
-| Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
-| az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
-| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
-| a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
-| a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
-| a transcript panel: keret veszteség, sormagasság, cím csonkolás     | `docs/research/2026-09-23-transcript-panel-meresek.md`                         |
-| a csomópontok élő állapota, a löketben érkező keretek mérése        | `docs/research/2026-09-23-elo-csomopont-allapot.md`                            |
-| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
-| egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
+| Téma                                                                 | Forrás                                                                         |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv  | `docs/spec/SPEC-000-provider-wire-measurement.md`                              |
+| a mérések kiértékelése, tervezési következmények                     | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md` |
+| monorepo, toolchain, ESLint szabályok, CI, wrapperek                 | `docs/spec/SPEC-001-monorepo-toolchain.md`                                     |
+| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel            | `docs/research/2026-08-26-spec001-ellenorzesek.md`                             |
+| csomag architektúra, mappa és csomagnév konvenció                    | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                        |
+| domain modell, perzisztencia, állapotgépek, repository réteg         | `docs/spec/SPEC-003-domain-perzisztencia.md`                                   |
+| a `packages/db` belső szerkezetének bontási terve                    | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                 |
+| rögzített verziók és a mögöttük álló okok                            | `docs/research/2026-08-26-toolchain.md`                                        |
+| tároló motor kiértékelés, méretmérések                               | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
+| SDK session log kontra `run_event` és `graph_snapshot`               | `docs/research/2026-08-28-sdk-session-log.md`                                  |
+| Playwright e2e teszt szabályok, a 15 tételes szabálylista            | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| az SSE mockolás mérése, a hibrid döntés bizonyítéka                  | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
+| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése   | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
+| a gráf éleinek kifestett vonala, a bisect és a pixel mérés           | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
+| a select chevron helyének mérése, a React kontra natív ág döntése    | `docs/research/2026-09-09-select-chevron-meres.md`                             |
+| a transcript panel: keret veszteség, sormagasság, cím csonkolás      | `docs/research/2026-09-23-transcript-panel-meresek.md`                         |
+| a csomópontok élő állapota, a löketben érkező keretek mérése         | `docs/research/2026-09-23-elo-csomopont-allapot.md`                            |
+| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek      | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
+| a sablon nyelv (Mustache) és a kifejezés nyelv (CEL) implementációja | `docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md`                              |
+| a sablon és kifejezés nyelv jelöltjei, csomagjai, forrásai           | `docs/research/2026-09-23-sablon-es-kifejezes-nyelv.md`, `...-csomagok.md`     |
+| egy konkrét csomag felelőssége, fájljai, saját szabályai             | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
 ---
 

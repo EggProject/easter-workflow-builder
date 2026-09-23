@@ -32,6 +32,9 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | `ws`                             | 8.21.3                     |                                                       |
 | `pino` / `pino-roll`             | 10.3.1 / 4.0.0             | log rotation                                          |
 | `zod`                            | `^4.0.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent |
+| `mustache`                       | 4.2.0                      | **pinelve**, sablon nyelv, SPEC-010, lásd lent        |
+| `@types/mustache`                | 4.2.6                      | **pinelve**, dev függőség, SPEC-010, lásd lent        |
+| `@marcbachmann/cel-js`           | 8.0.0                      | **pinelve**, kifejezés nyelv, SPEC-010, lásd lent     |
 
 ## `drizzle-kit` és `@types/better-sqlite3` verzió, 2026-08-27 (T-003-2, SPEC-003)
 
@@ -160,6 +163,25 @@ A `2026-09-05-grafszerkeszto-es-transcript.md` kutatás még `@xyflow/react@12.1
 `react-window@2.3.0`-t mért; a fenti két sor a ténylegesen a katalógusba és a
 `bun.lock`-ba kerülő verziót rögzíti. Egyik csomag `peerDependencies` mezője, licence és
 DOM/API alakja sem változott a mért patch verzióhoz képest.
+
+## Sablon és kifejezés nyelv csomagok, 2026-09-23 (SPEC-010)
+
+A user döntése (sablon nyelv: Mustache, kifejezés nyelv: CEL) után élő npm registry lekérdezés,
+két független forrással. A jelöltek összevetése és a választás indoka:
+`docs/research/2026-09-23-sablon-es-kifejezes-csomagok.md`.
+
+| Csomag                 | Verzió  | Forrás 1                                                               | Forrás 2                                                                                                    |
+| ---------------------- | ------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `mustache`             | `4.2.0` | `https://registry.npmjs.org/mustache` (`dist-tags.latest`)             | `https://cdn.jsdelivr.net/npm/mustache@4.2.0/package.json`, `https://unpkg.com/mustache@4.2.0/package.json` |
+| `@types/mustache`      | `4.2.6` | `https://registry.npmjs.org/@types/mustache` (`dist-tags.latest`)      | `https://cdn.jsdelivr.net/npm/@types/mustache@4.2.6/package.json`                                           |
+| `@marcbachmann/cel-js` | `8.0.0` | `https://registry.npmjs.org/@marcbachmann/cel-js` (`dist-tags.latest`) | `https://unpkg.com/@marcbachmann/cel-js@8.0.0/package.json`, plusz a GitHub `v8.0.0` release                |
+
+Mindhárom **pontos verzióval** kerül a `packages/workflow-language` `package.json` fájljába,
+tartomány nélkül (SPEC-010 4. szekció). A `@marcbachmann/cel-js` fiatal csomag, sűrű főverzió
+lépéssel; a frissítése külön, forrásolt lépés, a PLAN-010 F0 mérésének regressziós
+megismétlésével. A `mustache` utolsó kiadása 2021-03-28-i; a kockázat kezelése a SPEC-010 4.1
+szekciójában áll. A csomagok még nincsenek telepítve: a `bun.lock` a PLAN-010 T-010-7 lépésében
+frissül.
 
 ## GitHub Actions verziók
 
