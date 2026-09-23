@@ -619,6 +619,157 @@ test('a run_finished keret a fejlécet akkor is lezárja, ha UGYANABBAN a löket
   await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeHidden();
 });
 
+// ============================================================
+// A FUTÁS LEZÁRÁSA SZABÁLYOS LEÁLLÁSKOR ÉS A SZERVER ÚJRAINDULÁS (SPEC-004
+// 10.1, 10.2, SPEC-005 5.2, SPEC-007 AC44).
+//
+// Mind a fenti 2. és 3. kivétel alá tartozik: a `run_interrupted` keret egy
+// MÁR MEGNYITOTT kapcsolatba érkezik menet közben, az újraindulás pedig a
+// kapcsolat lezárása és egy ÚJ kapcsolat megnyitása, amin eltérő
+// `serverInstanceId` jön. A `route.fulfill()` lezárt válasza egyiket sem tudja
+// előállítani.
+// ============================================================
+
+interface RestartableStreamServer {
+  readonly server: Server;
+  /**
+   * A szerver újraindulás szimulációja: minden nyitott kapcsolatot lezár, és
+   * a böngésző következő kapcsolata már új `serverInstanceId` értéket kap,
+   * feliratkozás NÉLKÜL: az `apps/server` a `serverInstanceId` értéket
+   * induláskor generálja, a feliratkozásokat memóriában tartja, és ismeretlen
+   * `streamId` értékre üres listát ad (`stream-registry/create-stream-registry.ts`
+   * `getSubscriptions`), amit a kapcsolat első `stream_ready` kerete küld ki
+   * (`stream-connection/handle-stream-connection.ts`).
+   */
+  readonly restart: () => void;
+  readonly push: (frame: StreamFrame) => void;
+}
+
+/**
+ * `GET /events` végpont, ami minden kapcsolaton az aktuális szerver példány
+ * `stream_ready` keretét küldi, és a kapcsolatot nyitva hagyja. A rövid
+ * `retry` azért kell, hogy a lezárás után a böngésző a natív
+ * újracsatlakozással gyorsan visszatérjen (SPEC-005 5.7), a
+ * `startLastEventIdServer` mintájára.
+ */
+function startRestartableStreamServer(): RestartableStreamServer {
+  const openResponses = new Set<ServerResponse>();
+  const instance = { index: 1 };
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url?.startsWith('/events') !== true) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, SSE_RESPONSE_HEADERS);
+    openResponses.add(response);
+    response.write('retry: 50\n\n');
+    const readyFrame = streamReadyFrame(`s-${String(instance.index)}`, []);
+    response.write(encodeStreamFrame(readyFrame));
+  });
+  server.listen(REAL_SERVER_PORT);
+
+  return {
+    server,
+    restart: () => {
+      instance.index += 1;
+      for (const response of openResponses) {
+        response.end();
+      }
+      openResponses.clear();
+    },
+    push: (frame) => {
+      for (const response of openResponses) {
+        response.write(encodeStreamFrame(frame));
+      }
+    },
+  };
+}
+
+test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, és megjelenik az Újraindítás gomb', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+  await mockRunView(page, state);
+
+  await page.goto('/run?runId=r-1');
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+  const node = nodeLocator(page, 'n1');
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+
+  // A szerver a futást és a lépést ELŐBB viszi `interrupted` állapotba, és
+  // csak utána adja ki élőben a keretet (SPEC-004 10.2 3. és 4. pont).
+  state.runStatus = 'interrupted';
+  state.stepRuns = [stepRun('interrupted')];
+  streamServer.push({
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: makeRunEventRecord(9, 'r-1', { kind: 'run_interrupted', payload: { reason: 'graceful_shutdown' } }),
+  });
+
+  await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
+  // `exact`: a transcript panel `run_interrupted` sorának fejléc gombja is
+  // tartalmazza a "megszakítás" szórészt a hozzáférhető nevében.
+  await expect(page.getByRole('button', { name: 'Megszakítás', exact: true })).toBeHidden();
+  await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
+});
+
+test('szerver újraindulás után a futás nézet újra feliratkozik, újratölti a futást és a lépéseket, és az utána érkező élő keret frissíti a rajzot', async ({
+  page,
+}) => {
+  const streamServer = startRestartableStreamServer();
+  serverHolder.current = streamServer.server;
+  const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+  const calls = { subscriptions: 0, getRun: 0, listStepRuns: 0 };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => {
+      calls.getRun += 1;
+      await route.fulfill(jsonBody(runDetailWithStatus(state.runStatus)));
+    }),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => {
+      calls.listStepRuns += 1;
+      await route.fulfill(jsonBody(state.stepRuns));
+    }),
+    mockRoute('replaceStreamSubscriptions', async (route) => {
+      calls.subscriptions += 1;
+      await route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] }));
+    }),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const node = nodeLocator(page, 'n1');
+  await expect(node.getByText('fut', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+  await expect.poll(() => calls.subscriptions).toBe(1);
+  expect(calls).toEqual({ subscriptions: 1, getRun: 1, listStepRuns: 1 });
+  await setNoReloadMarker(page);
+
+  // Az újraindult szerver indulási helyreállítása a futást és a nem
+  // terminális lépést `interrupted` állapotba vitte, lépés szintű esemény
+  // nélkül (SPEC-004 10.1), a feliratkozás pedig elveszett.
+  state.runStatus = 'interrupted';
+  state.stepRuns = [stepRun('interrupted')];
+  streamServer.restart();
+
+  await expect.poll(() => calls.subscriptions).toBe(2);
+  await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
+  // A felület a válaszok tartalmát mutatja, tehát mindkét kezelő lefutott.
+  expect(calls).toEqual({ subscriptions: 2, getRun: 2, listStepRuns: 2 });
+
+  // Az új kapcsolat élő kerete eljut a nézetig, és a rajz frissül. A keret
+  // tartalma szintetikus: azt méri, hogy az újracsatlakozás után a keret út
+  // (feliratkozó, jelző szűrő, újratöltés) ép maradt.
+  state.stepRuns = [stepRun('failed')];
+  streamServer.push(stepEventFrame(10, 'step_finished', 'live'));
+  await expect(node.getByText('sikertelen', { exact: true })).toBeVisible();
+  expect(calls.listStepRuns).toBe(3);
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
 test('a futás előzmények listája run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi', async ({
   page,
 }) => {

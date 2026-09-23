@@ -23,7 +23,7 @@ import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stre
 import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
 import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
-import { isRunFinishedFrame } from './is-run-finished-frame.ts';
+import { isRunClosingFrame } from './is-run-closing-frame.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
 import { useLiveStepRuns } from './use-live-step-runs.ts';
 import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
@@ -53,6 +53,13 @@ export interface RunViewScreenProperties {
    */
   readonly subscribeToFrames: SubscribeToStreamFrames;
   readonly streamReplayLimit: number;
+  /**
+   * Hányszor váltott a szerver példány azonosítója (`stream_ready` keret,
+   * SPEC-007 9.2, 16. szekció 44. kritérium). A szerver a feliratkozásokat
+   * memóriában tartja, tehát egy újraindulás után a futás nézet újra
+   * feliratkozik, és újratölti a futást és a lépéseket (SPEC-005 5.2).
+   */
+  readonly serverRestartCount: number;
 }
 
 function readRunId(search: string): string | undefined {
@@ -163,12 +170,21 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * A FUTÁS VEZÉRLÉSE (T-009-23). A megszakítás és az újraindítás a
  * `RunControlBar` komponensben áll, ez a képernyő a hozzá tartozó ÁLLAPOT
  * frissítését adja: feliratkozik a saját futására az app szintű SSE
- * kapcsolaton, és a `run_finished` keretre újratölti a futás rekordját. Enélkül
- * a "megszakítás folyamatban" állapotot semmi nem zárná le, mert a megszakítás
- * REST válasza még nem a megszakítás befejezése (SPEC-004 9., SPEC-008 6.4).
- * A keret a veszteségmentes `subscribeToFrames` úton jön (T-009-25a): a
- * szerver a pótlás végén szinkron küldi a `replay_complete` keretet, tehát a
- * `run_finished` gyakran nem a löket UTOLSÓ kerete.
+ * kapcsolaton, és minden, a futást lezáró keretre (`run_finished`,
+ * `run_interrupted`, `is-run-closing-frame.ts`) újratölti a futás rekordját.
+ * Enélkül a "megszakítás folyamatban" állapotot semmi nem zárná le, mert a
+ * megszakítás REST válasza még nem a megszakítás befejezése (SPEC-004 9.,
+ * SPEC-008 6.4), a szabályos leállás `run_interrupted` kerete után pedig az
+ * "Újraindítás" gomb nem jelenne meg (SPEC-004 10.2). A keret a
+ * veszteségmentes `subscribeToFrames` úton jön (T-009-25a): a szerver a
+ * pótlás végén szinkron küldi a `replay_complete` keretet, tehát a lezáró
+ * keret gyakran nem a löket UTOLSÓ kerete.
+ *
+ * SZERVER ÚJRAINDULÁS (SPEC-005 5.2, SPEC-007 AC44). A `serverRestartCount`
+ * változására a képernyő újra kiadja a feliratkozást (a szerver a
+ * feliratkozásokat memóriában tartja, tehát az újraindulással elvesztek), és
+ * újratölti a futás rekordját és a lépés futásokat. A pillanatkép nem töltődik
+ * újra, mert megváltoztathatatlan (SPEC-003 5.5).
  *
  * A TRANSCRIPT (T-009-25) a stream kereteiből épül, a `useRunTranscript`
  * hookkal, ami a betöltési ágak ELŐTT, a képernyő legelején iratkozik fel,
@@ -187,10 +203,19 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * rekordjának elérhetetlensége nem elhallgatható.
  */
 export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate, streamId, subscribeToFrames, streamReplayLimit } = properties;
+  const {
+    apiOrigin,
+    fetchFunction,
+    search,
+    navigate,
+    streamId,
+    subscribeToFrames,
+    streamReplayLimit,
+    serverRestartCount,
+  } = properties;
   const runId = readRunId(search);
   const transcript = useRunTranscript(runId, subscribeToFrames);
-  const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin });
+  const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount });
 
   const runState = useRequestState<RunDetail>();
   const snapshotState = useRequestState<RunSnapshotResponse>();
@@ -230,6 +255,15 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
       return;
     }
     void loadRunDetail(runId);
+    // A `serverRestartCount` szándékosan dependency, holott a törzs nem
+    // olvassa: a szerver újraindulása ugyanazt a betöltést váltja ki, mint a
+    // csatolás, elágazás nélkül (a `run-history-screen.tsx` mintája).
+  }, [runId, loadRunDetail, serverRestartCount]);
+
+  useEffect(() => {
+    if (runId === undefined) {
+      return;
+    }
     void snapshotState.run(() =>
       requestRouteWithoutBody({
         routeId: 'readRunSnapshot',
@@ -239,7 +273,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         apiOrigin,
       }),
     );
-    // A `run` hívások szándékosan nincsenek a dependency listán, ugyanabból az
+    // A `snapshotState.run` szándékosan nincs a dependency listán, ugyanabból az
     // okból, mint a `GraphEditorScreen`-ben: a `useRequestState` saját
     // `useCallback`-je stabil, de a hívó oldali objektum nem az, és a projekt
     // ESLint konfigurációja nem tartalmazza a `react-hooks/exhaustive-deps`
@@ -254,6 +288,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     // pótlás (`fromEventId: 0`) a már lezárt futásnál is a teljes előzményt
     // adja, ami a transcript panel bemenete lesz (T-009-25). Egy állapot
     // szerinti elágazás itt csak sosem futó ágat szülne.
+    //
+    // A `serverRestartCount` szándékosan dependency, holott a törzs nem
+    // olvassa: a szerver a feliratkozásokat memóriában tartja, tehát az
+    // újraindulás után a feliratkozást újra ki kell adni (SPEC-005 5.2). A
+    // pótlás ekkor is `fromEventId: 0`-tól megy, a transcript kurzora
+    // (`reduce-run-transcript-frame.ts`, `afterEventId`) a már látott
+    // kereteket eldobja.
     void requestRoute({
       routeId: 'replaceStreamSubscriptions',
       parameters: { streamId },
@@ -262,14 +303,14 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
       fetchFunction,
       apiOrigin,
     });
-  }, [runId, streamId, streamReplayLimit, fetchFunction, apiOrigin]);
+  }, [runId, streamId, streamReplayLimit, fetchFunction, apiOrigin, serverRestartCount]);
 
   useEffect(() => {
     if (runId === undefined) {
       return;
     }
     return subscribeToFrames((frame) => {
-      if (isRunFinishedFrame(frame, runId)) {
+      if (isRunClosingFrame(frame, runId)) {
         void loadRunDetail(runId);
       }
     });

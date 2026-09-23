@@ -12,6 +12,15 @@ export interface UseLiveStepRunsInput {
   readonly subscribeToFrames: SubscribeToStreamFrames;
   readonly fetchFunction: FetchFunction;
   readonly apiOrigin: string;
+  /**
+   * Hányszor indult újra a szerver (`useStreamConnection`, SPEC-007 9.2,
+   * AC44). Minden változása újratöltést vált ki: az újraindulás
+   * helyreállítása a nem terminális lépéseket lépés szintű esemény nélkül
+   * viszi `interrupted` állapotba (SPEC-004 10.1), és a SPEC-005 5.2 szerint
+   * ilyenkor a nézet elavult, újra kell kérdezni, nem elég a feliratkozást
+   * pótolni.
+   */
+  readonly serverRestartCount: number;
 }
 
 export interface LiveStepRuns {
@@ -50,13 +59,21 @@ const EMPTY_LIVE_STEP_RUNS: LiveStepRuns = { stepRuns: undefined, failureMessage
  * hívja, így a pótlás egyetlen kerete sem érkezhet feliratkozó nélkül. Egy
  * másik futásra váltáskor (vagy leszereléskor) a még folyamatban lévő kérés
  * válasza eldobódik, hogy a régi futás sorai ne íródjanak az újéba.
+ *
+ * **Szerver újraindulás után** (`serverRestartCount` változása) a lista
+ * újratöltődik, a korábbi sorok viszont a helyükön maradnak, hogy a rajz ne
+ * villogjon: az állapot törlése ezért külön effektben áll, és kizárólag a
+ * futás váltására fut.
  */
 export function useLiveStepRuns(input: Readonly<UseLiveStepRunsInput>): LiveStepRuns {
-  const { runId, subscribeToFrames, fetchFunction, apiOrigin } = input;
+  const { runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount } = input;
   const [state, setState] = useState<LiveStepRuns>(EMPTY_LIVE_STEP_RUNS);
 
   useEffect(() => {
     setState(EMPTY_LIVE_STEP_RUNS);
+  }, [runId]);
+
+  useEffect(() => {
     if (runId === undefined) {
       return;
     }
@@ -91,7 +108,10 @@ export function useLiveStepRuns(input: Readonly<UseLiveStepRunsInput>): LiveStep
       isDisposed = true;
       unsubscribe();
     };
-  }, [runId, subscribeToFrames, fetchFunction, apiOrigin]);
+    // A `serverRestartCount` szándékosan dependency, holott a törzs nem
+    // olvassa: a változása ugyanazt a betöltést váltja ki, mint a csatolás,
+    // elágazás nélkül, a `run-history-screen.tsx` mintájára.
+  }, [runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount]);
 
   return state;
 }

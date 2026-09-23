@@ -117,20 +117,34 @@ describe('useLiveStepRuns', () => {
   function HookHarness(properties: {
     readonly runId: string | undefined;
     readonly fetchFunction: FetchFunction;
+    readonly serverRestartCount: number;
   }): null {
     latest = useLiveStepRuns({
       runId: properties.runId,
       subscribeToFrames,
       fetchFunction: properties.fetchFunction,
       apiOrigin: API_ORIGIN,
+      serverRestartCount: properties.serverRestartCount,
     });
     return null;
   }
 
-  async function render(runId: string | undefined, fetchFunction: FetchFunction): Promise<void> {
+  function renderWithoutFlush(
+    runId: string | undefined,
+    fetchFunction: FetchFunction,
+    serverRestartCount: number,
+  ): void {
     act(() => {
-      root.render(<HookHarness runId={runId} fetchFunction={fetchFunction} />);
+      root.render(<HookHarness runId={runId} fetchFunction={fetchFunction} serverRestartCount={serverRestartCount} />);
     });
+  }
+
+  async function render(
+    runId: string | undefined,
+    fetchFunction: FetchFunction,
+    serverRestartCount = 0,
+  ): Promise<void> {
+    renderWithoutFlush(runId, fetchFunction, serverRestartCount);
     await flush();
   }
 
@@ -279,6 +293,58 @@ describe('useLiveStepRuns', () => {
     await flush();
 
     expect(latest?.stepRuns).toEqual([{ ...SUCCEEDED_STEP_RUN, runId: 'r-2' }]);
+  });
+
+  it('másik futásra váltáskor a régi futás sorai azonnal eltűnnek, még az új betöltés előtt', async () => {
+    const urls: string[] = [];
+    const pendingFetch: FetchFunction = (input) => {
+      urls.push(new URL(input).pathname);
+      return new Promise<Response>(() => {
+        // szándékosan sosem oldódik fel: a váltás utáni, betöltés előtti
+        // állapot a megfigyelés tárgya
+      });
+    };
+    await render('r-1', createStepRunsFetch([[RUNNING_STEP_RUN]], urls));
+    expect(latest?.stepRuns).toEqual([RUNNING_STEP_RUN]);
+
+    await render('r-2', pendingFetch);
+
+    expect(urls).toEqual(['/api/runs/r-1/steps', '/api/runs/r-2/steps']);
+    expect(latest).toEqual({ stepRuns: undefined, failureMessage: undefined });
+  });
+
+  it('a serverRestartCount változására újratölt, és a korábbi sorok addig a helyükön maradnak (SPEC-005 5.2)', async () => {
+    const urls: string[] = [];
+    const interruptedStepRun: StepRunRecord = { ...RUNNING_STEP_RUN, status: 'interrupted', finishedAtMs: 40 };
+    const fetchFunction = createStepRunsFetch([[RUNNING_STEP_RUN], [interruptedStepRun]], urls);
+    await render('r-1', fetchFunction, 0);
+    expect(urls).toHaveLength(1);
+
+    // A szerver újraindult: a helyreállítás a lépést lépés szintű esemény
+    // nélkül vitte `interrupted` állapotba (SPEC-004 10.1), tehát keret nem
+    // jelez, csak a számláló.
+    renderWithoutFlush('r-1', fetchFunction, 1);
+    expect(urls).toHaveLength(2);
+    expect(latest?.stepRuns).toEqual([RUNNING_STEP_RUN]);
+
+    await flush();
+    expect(latest).toEqual({ stepRuns: [interruptedStepRun], failureMessage: undefined });
+  });
+
+  it('a serverRestartCount változása után is egyetlen feliratkozó marad, és a jelző keret tovább újratölt', async () => {
+    const urls: string[] = [];
+    const fetchFunction = createStepRunsFetch([[RUNNING_STEP_RUN], [RUNNING_STEP_RUN], [SUCCEEDED_STEP_RUN]], urls);
+    await render('r-1', fetchFunction, 0);
+    await render('r-1', fetchFunction, 1);
+    expect(frameListeners.size).toBe(1);
+
+    act(() => {
+      emitFrame(runEventFrame('step_finished', 'live', 2));
+    });
+    await flush();
+
+    expect(urls).toHaveLength(3);
+    expect(latest?.stepRuns).toEqual([SUCCEEDED_STEP_RUN]);
   });
 
   it('leszereléskor leiratkozik a keretekről', async () => {

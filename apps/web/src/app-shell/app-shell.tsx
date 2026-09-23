@@ -87,9 +87,11 @@ function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
  * `useStreamConnection` itt épül, és a két SSE fogyasztó képernyőnek adja
  * tovább: a `run-history` a lista élő állapotához (SPEC-007 10.2), a
  * `run-view` pedig a transcripthez, a csomópontok élő állapotához és a
- * nézett futás `run_finished` eseményéhez (SPEC-008 6.2, 6.4, PLAN-009
- * T-009-23, T-009-25, T-009-25a). Mindkettő a veszteségmentes
- * `subscribeToFrames` úton kapja a kereteket. Egyszerre legfeljebb az egyik
+ * nézett futás lezáró (`run_finished`, `run_interrupted`) eseményéhez
+ * (SPEC-008 6.2, 6.4, PLAN-009 T-009-23, T-009-25, T-009-25a). Mindkettő a
+ * veszteségmentes `subscribeToFrames` úton kapja a kereteket, és mindkettő
+ * megkapja a `serverRestartCount` értéket, amire újra feliratkozik és
+ * újratölt (SPEC-005 5.2, SPEC-007 AC44). Egyszerre legfeljebb az egyik
  * áll felcsatolva, tehát a `replaceStreamSubscriptions` csere szemantikája
  * nem ütközik.
  */
@@ -265,6 +267,7 @@ function renderRouteContent(
           streamId={streamId}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={streamReplayLimit}
+          serverRestartCount={serverRestartCount}
         />
       );
     }

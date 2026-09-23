@@ -149,6 +149,10 @@ interface FetchOverrides {
    * A `GET /api/runs/{runId}/steps` hívások naplója.
    */
   readonly stepRunUrls?: string[];
+  /**
+   * A `GET /api/runs/{runId}/snapshot` hívások naplója.
+   */
+  readonly snapshotUrls?: string[];
 }
 
 function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
@@ -161,6 +165,7 @@ function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
       return Promise.resolve(Response.json({ streamId: STREAM_ID, subscriptions: [] }));
     }
     if (pathname.endsWith('/snapshot')) {
+      overrides.snapshotUrls?.push(pathname);
       return Promise.resolve(Response.json(overrides.snapshot ?? SNAPSHOT));
     }
     if (pathname.endsWith('/steps')) {
@@ -215,6 +220,21 @@ function runFinishedFrame(runId: string): StreamFrame {
       numTurns: null,
       payload: {},
     },
+  };
+}
+
+/**
+ * Egy `run_interrupted` motor esemény élő SSE kerete a megadott futásra: a
+ * szabályos leállás élőben kiadja (SPEC-004 10.2 4. pont).
+ */
+function runInterruptedFrame(runId: string): StreamFrame {
+  const finished = runFinishedFrame(runId);
+  if (finished.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return {
+    ...finished,
+    runEvent: { ...finished.runEvent, kind: 'run_interrupted', payload: { reason: 'graceful_shutdown' } },
   };
 }
 
@@ -296,7 +316,15 @@ describe('RunViewScreen', () => {
     container.remove();
   });
 
-  async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
+  /**
+   * A fejléc vezérlő sávjának egyetlen gombja: nem terminális futásnál a
+   * megszakítás, terminálisnál az újraindítás (`RunControlBar`).
+   */
+  function headerActionText(): string | null | undefined {
+    return container.querySelector(':scope .run-view-screen__header .run-control__actions button')?.textContent;
+  }
+
+  async function renderScreen(search: string, fetchFunction: FetchFunction, serverRestartCount = 0): Promise<void> {
     await act(async () => {
       root.render(
         <RunViewScreen
@@ -307,6 +335,7 @@ describe('RunViewScreen', () => {
           streamId={STREAM_ID}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
+          serverRestartCount={serverRestartCount}
         />,
       );
       await Promise.resolve();
@@ -331,6 +360,7 @@ describe('RunViewScreen', () => {
           streamId={STREAM_ID}
           subscribeToFrames={subscribeToFrames}
           streamReplayLimit={STREAM_REPLAY_LIMIT}
+          serverRestartCount={0}
         />,
       );
     });
@@ -506,6 +536,7 @@ describe('RunViewScreen', () => {
             streamId={STREAM_ID}
             subscribeToFrames={subscribeToFrames}
             streamReplayLimit={STREAM_REPLAY_LIMIT}
+            serverRestartCount={0}
           />,
         );
       });
@@ -628,6 +659,34 @@ describe('RunViewScreen', () => {
     expect(runDetailUrls).toHaveLength(2);
   });
 
+  it('a saját futás run_interrupted keretére is újratölti a futás rekordját, és a fejléc az újraindítást kínálja', async () => {
+    const runDetailUrls: string[] = [];
+    const overrides: { runDetail: unknown; runDetailUrls: string[] } = { runDetail: RUN_DETAIL, runDetailUrls };
+    await renderScreen('?runId=r-3', createFetchFunction(overrides));
+    expect(headerActionText()).toBe('Megszakítás');
+
+    // A szerver oldali futás a keret kiadása ELŐTT már `interrupted`
+    // (SPEC-004 10.2 3. és 4. pont: előbb a `markRunInterrupted`, utána a
+    // kiadás).
+    overrides.runDetail = { ...RUN_DETAIL, status: 'interrupted', finishedAtMs: 40 };
+    await emitFramesAndFlush([runInterruptedFrame('r-3')]);
+
+    expect(runDetailUrls).toHaveLength(2);
+    expect(container.querySelector(':scope .run-view-screen__header .run-control .badge')?.textContent).toBe(
+      'félbeszakítva',
+    );
+    expect(headerActionText()).toBe('Újraindítás');
+  });
+
+  it('másik futás run_interrupted keretére nem tölt újra', async () => {
+    const runDetailUrls: string[] = [];
+    await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
+
+    await emitFramesAndFlush([runInterruptedFrame('r-99')]);
+
+    expect(runDetailUrls).toHaveLength(1);
+  });
+
   it('az újratöltés alatt a rajz a helyén marad, csontváz nélkül', async () => {
     const runDetailUrls: string[] = [];
     await renderScreen('?runId=r-3', createFetchFunction({ runDetailUrls }));
@@ -640,6 +699,75 @@ describe('RunViewScreen', () => {
     });
 
     expect(runDetailUrls).toHaveLength(2);
+    expect(container.querySelector('.run-view-screen__loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
+  });
+
+  // ============================================================
+  // SZERVER ÚJRAINDULÁS (SPEC-005 5.2, SPEC-007 AC44).
+  // ============================================================
+
+  it('a serverRestartCount növekedésére újra feliratkozik, újratölti a futást és a lépéseket, a pillanatképet nem', async () => {
+    const subscriptionBodies: string[] = [];
+    const runDetailUrls: string[] = [];
+    const stepRunUrls: string[] = [];
+    const snapshotUrls: string[] = [];
+    // Kizárólag a `runDetail` mező írható: a teszt a szerver oldali futás
+    // állapotát a második betöltés előtt átírja.
+    const overrides: Omit<FetchOverrides, 'runDetail'> & { runDetail: unknown } = {
+      runDetail: RUN_DETAIL,
+      subscriptionBodies,
+      runDetailUrls,
+      stepRunUrls,
+      snapshotUrls,
+      stepRunResponses: [[{ ...BASE_STEP_RUN, status: 'running' }], [{ ...BASE_STEP_RUN, status: 'interrupted' }]],
+    };
+    const fetchFunction = createFetchFunction(overrides);
+    await renderScreen('?runId=r-3', fetchFunction, 0);
+    expect([subscriptionBodies, runDetailUrls, stepRunUrls, snapshotUrls].map((log) => log.length)).toEqual([
+      1, 1, 1, 1,
+    ]);
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('running');
+
+    // Az indulási helyreállítás a futást és a nem terminális lépést
+    // `interrupted` állapotba vitte (SPEC-004 10.1), a feliratkozás pedig a
+    // szerver memóriájával együtt elveszett.
+    overrides.runDetail = { ...RUN_DETAIL, status: 'interrupted', finishedAtMs: 40 };
+    await renderScreen('?runId=r-3', fetchFunction, 1);
+
+    expect(subscriptionBodies).toEqual([
+      JSON.stringify({ runs: [{ runId: 'r-3', fromEventId: 0, replayLimit: STREAM_REPLAY_LIMIT }] }),
+      JSON.stringify({ runs: [{ runId: 'r-3', fromEventId: 0, replayLimit: STREAM_REPLAY_LIMIT }] }),
+    ]);
+    expect(runDetailUrls).toHaveLength(2);
+    expect(stepRunUrls).toHaveLength(2);
+    expect(snapshotUrls).toHaveLength(1);
+    expect(lastCanvasProperties().nodes[0]?.status).toBe('interrupted');
+    expect(headerActionText()).toBe('Újraindítás');
+  });
+
+  it('a szerver újraindulás utáni újratöltés alatt a rajz a helyén marad, csontváz nélkül', async () => {
+    const stepRunUrls: string[] = [];
+    const fetchFunction = createFetchFunction({ stepRunUrls });
+    await renderScreen('?runId=r-3', fetchFunction, 0);
+
+    // Ugyanaz a `fetchFunction` példány: kizárólag a számláló változik.
+    act(() => {
+      root.render(
+        <RunViewScreen
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+          search="?runId=r-3"
+          navigate={navigate}
+          streamId={STREAM_ID}
+          subscribeToFrames={subscribeToFrames}
+          streamReplayLimit={STREAM_REPLAY_LIMIT}
+          serverRestartCount={1}
+        />,
+      );
+    });
+
+    expect(stepRunUrls).toHaveLength(2);
     expect(container.querySelector('.run-view-screen__loading')).toBeNull();
     expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
   });
