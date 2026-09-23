@@ -162,12 +162,56 @@ párhuzamos lépés; illetve egy csak sorban álló futás), a `stop-and-await-r
 `expected 3 to be 1` (agent hívásszám), illetve `expected false to be true` (a megszakítás a másik
 futás lépésére várva nem ért véget).
 
-**Mellékmegfigyelés, nem javítva: a `fail_run` ág.** Ugyanez a rés a `fail_run` hibapolitikánál
-is megvan, és ez a javítás nem terjed ki rá. Mérve (`create-engine` szintű próba, korlát 1, a
-`fail_run` politikájú első agent lépés az első hívásban bukik): a két sorban álló testvér lépés
-lefutott, a futás `failed`, az agent hívás 3. Ott a sorban álló lépés `pending` sorát a
-`markRunFailed` útján semmi nem zárná le, tehát a megoldáshoz a futás záró tranzakcióját is
-bővíteni kell; ez külön döntés.
+**A `fail_run` ág: mérve, javítva (2026-09-23, negyedik kör).** Ugyanez a rés a `fail_run`
+hibapolitikánál is megvolt, és a fenti javítás nem terjedt ki rá. Az első mérés (`create-engine`
+szintű próba, korlát 1, a `fail_run` politikájú első agent lépés az első hívásban bukik): a két
+sorban álló testvér lefutott, a futás `failed`, az agent hívás 3. Egy független ellenőrzés a
+`b75960d` commiton ugyanezt mérte: az a2 2 ms-mal a bukás után elindult, az a3 megszakítás nélkül
+végigfutott, a futás kb. 10 s-nál lett `failed`; korlát 2 mellett az a3 4 ms-mal a bukás után
+indult.
+
+| Tétel       | Érték                                                                                                                                                                                                            |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató     | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `634bb9d` commitja (előtte: a három érintett motor fájl a commit szerinti alakjában), illetve a javítás munkapéldánya (utána)                                     |
+| Felállás    | a valódi motor (`createEngine`) `:memory:` adatbázissal, a munkamenet eldobható mérő scriptjéből; valós API hívás nincs, a sablon renderelő átengedő                                                             |
+| Hamis lépés | a helyet elsőként kapó agent lépés 300 ms után nem sikeres `result`-tal bukik; minden további hívás megszakítás nélkül 8000 ms után sikeres, `interrupt()` után 1000 ms alatt zár (szintén sikeres `result`-tal) |
+| Workflow    | `start` után három párhuzamos `agent_step` (`a1`, `a2`, `a3`), mind `onUnhandledError: 'fail_run'`, a párhuzamossági korlát 1, illetve 2                                                                         |
+
+| Eset             | Agent hívás | `interrupt()` | Sorban álló testvér                                    | A futás `failed`, a bukástól |
+| ---------------- | ----------- | ------------- | ------------------------------------------------------ | ---------------------------- |
+| korlát 1, előtte | 3           | 1             | `a2` +4 ms-nál, `a3` +1008 ms-nál indult, `succeeded`  | 9013 ms                      |
+| korlát 1, utána  | 1           | 0             | `a2`, `a3` `cancelled`, `step_started` nélkül          | 6 ms                         |
+| korlát 2, előtte | 3           | 2             | `a3` +4 ms-nál indult, megszakítva, `succeeded`        | 1010 ms                      |
+| korlát 2, utána  | 2           | 1             | `a3` `cancelled`; a futó `a2` megszakítva, `succeeded` | 1009 ms                      |
+
+A korlát 2 melletti 1009 ms a futó, megszakított testvér folyamának kimerülése (a hamis lépés
+`interrupt()` utáni 1000 ms-a), nem a természetes 8000 ms-os vége: a 9. szekció 4. pontja szerint a
+megszakított lépés üzenetei a folyam végéig beíródnak.
+
+**A gyökérok.** Két rés. (1) A hurok a `fail_run` után csak `interrupt()`-ot hívott, a szabályozó
+sorában álló testvéreket nem vette ki. (2) Ha a bukott lépés maga foglalt helyet, a hurok erről
+későn értesül: a lépés `finally` ága a `releaseSlot` hívással a felszabaduló helyet szinkron a sor
+következő elemének adja, és annak folytatása a hurok előtt jut szóhoz (a +4 ms-os indulás).
+
+**A javítás.** A `fail_run` ugyanazt a mechanizmust használja, mint a külső megszakítás, új
+szabályozó művelet nélkül: `denyWaitingForRunIds` a futás `runId`-jára, a futó testvéren
+`interrupt()`. A kivételt két hely végzi: a bukott, helyet foglaló lépés a helye felszabadítása
+ELŐTT (a hurok a futtatás előtt a `resolveErrorRoute` döntéséből megmondja neki, hogy a `failed`
+kimenete `fail_run`), és a léptető hurok az `interrupt()` előtt (a helyet nem foglaló lépés, például
+elutasított jóváhagyás bukására). A kivett lépés `pending` sorát a futás záró menete a
+`markRunFailed` előtt `cancelled` állapotba viszi. A végállapot indoka: a SPEC-004 8.3 nem nevezi
+meg, a SPEC-003 7.2 állapotgépében a `pending` sorból a `running` mellett csak a `cancelled` ("a
+futás megszakadt, mielőtt a lépés elindult") és az indulási helyreállításnak fenntartott
+`interrupted` vezet ki, `skipped` állapot nincs. A futó, megszakított testvér a saját eredménye
+szerint zár, ugyanúgy, mint a külső megszakításnál; a záró menet terminális sort nem ír át.
+
+**A regresszió.** A `packages/engine` `create-engine.spec.ts` öt tesztje (korlát 1; korlát 2; egy
+másik futás sorban álló lépése; helyet nem foglaló lépés bukása; `fail_branch` határ), plusz az
+`agent-node-lifecycle.spec.ts` és az `advance-run.spec.ts` új esetei. A javítás előtt a négy
+`fail_run` regressziós teszt bukott (`expected 3 to be 1`, `expected 3 to be 2`, `expected 3 to be
+2`, `expected 2 to be 1`). Részenként visszavonva: a lépés oldali kivétel nélkül a három agent
+bukásos teszt bukik, a hurok oldali nélkül a jóváhagyásos, a záró menet nélkül mind a négy (a sor
+`pending` marad).
 
 **Leállás közben a 503.** Ugyanezen a szerveren a 6. szekció félbe küldött indító kérése a javítás
 után `503 Service Unavailable` választ kap, a törzsben `service_unavailable` kóddal és

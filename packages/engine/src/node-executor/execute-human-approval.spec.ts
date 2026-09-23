@@ -91,6 +91,7 @@ function instanceOf(runId: string): NodeExecutionInstance {
     iteration: 0,
     attempt: 1,
     providerId: 'minimax',
+    failureStopsRun: false,
   };
 }
 

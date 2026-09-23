@@ -244,14 +244,24 @@ async function runAfterSlotGranted(
  * egyébként lezárt lépés eredménye.
  *
  * **A szabályozó elutasítását `interrupted` eredménnyel zárja**: a
- * megszakított futás sorban álló lépését (SPEC-004 9. szekció 2. pont,
- * `ConcurrencyGate.denyWaitingForRunIds`) és a lezárt szabályozóét (10.2 1.
- * pont, `ConcurrencyGate.close`). A lépés ilyenkor el sem indul, tehát nincs
- * `markStepRunning`, nincs `AgentQuery` és nincs mit felszabadítani. A
- * `step_run` sor `pending` állapotban marad, és a megszakítás
- * `cancelRunTree` (`cancelled`), illetve a leállás `recoverInterruptedRuns`
- * (`interrupted`) tranzakciója zárja (`node-executor-result.ts`), ugyanúgy,
- * mint a jóváhagyásra váró lépést.
+ * megszakított vagy `fail_run` politikával bukott futás sorban álló lépését
+ * (SPEC-004 9. szekció 2. pont, 8.3, `ConcurrencyGate.denyWaitingForRunIds`)
+ * és a lezárt szabályozóét (10.2 1. pont, `ConcurrencyGate.close`). A lépés
+ * ilyenkor el sem indul, tehát nincs `markStepRunning`, nincs `AgentQuery` és
+ * nincs mit felszabadítani. A `step_run` sor `pending` állapotban marad, és a
+ * megszakítás `cancelRunTree` (`cancelled`), a `fail_run` záró menete
+ * (`cancelled`, `run-supervisor/advance-run.ts`), illetve a leállás
+ * `recoverInterruptedRuns` (`interrupted`) írása zárja
+ * (`node-executor-result.ts`), ugyanúgy, mint a jóváhagyásra váró lépést.
+ *
+ * **A `fail_run` politikával bukott lépés a helye felszabadítása ELŐTT
+ * kiveszi a saját futásának sorban álló lépéseit** (8.3, "minden nem
+ * terminális lépést lezár"; `NodeExecutionInstance.failureStopsRun`). A
+ * felszabaduló helyet a `releaseSlot` szinkron adja a sor következő elemének,
+ * és az a léptető hurok előtt jut szóhoz: enélkül a bukott lépés testvére a
+ * hurok reakciója előtt elindulna. Mérve: korlát 1 mellett 3 agent hívás
+ * helyett 1 (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7.
+ * szekció). Más futás várakozóját ez nem érinti.
  *
  * **Az `agentQueryRegistry` paramétert változatlanul továbbadja a
  * `runAgentStep`-nek** (SPEC-004 9. szekció 3. pont, PLAN-005 T-005-26): ez a
@@ -307,7 +317,11 @@ export async function runAgentNodeLifecycle(
   }
 
   try {
-    return await runAfterSlotGranted(input, stepRunId, ports, agentQueryRegistry);
+    const outcome = await runAfterSlotGranted(input, stepRunId, ports, agentQueryRegistry);
+    if (outcome.kind === 'ok' && outcome.value.kind === 'failed' && instance.failureStopsRun) {
+      gate.denyWaitingForRunIds(new Set([runId]));
+    }
+    return outcome;
   } finally {
     const released = gate.releaseSlot(stepRunId);
     if (released.kind === 'error') {

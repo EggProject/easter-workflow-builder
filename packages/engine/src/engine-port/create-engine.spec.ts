@@ -6,6 +6,7 @@ import type {
   AgentStepConfig,
   DatabaseContext,
   NodeConfig,
+  UnhandledErrorPolicy,
   WorkflowEdgeInput,
   WorkflowNodeInput,
 } from '@easter-workflow-builder/db';
@@ -136,6 +137,91 @@ function findEventPayloadStatus(published: readonly unknown[], kind: string, ste
     return undefined;
   }
   return event['payload']['status'];
+}
+
+/**
+ * Kiadott-e a motor adott `kind` és `stepRunId` eseményt. A `step_started`
+ * payloadjának nincs `status` mezője, ezért annak hiányát nem a
+ * `findEventPayloadStatus` `undefined` értéke bizonyítja, hanem ez.
+ */
+function hasPublishedEvent(published: readonly unknown[], kind: string, stepRunId: string): boolean {
+  return published.some(
+    (candidate) => isRecord(candidate) && candidate['kind'] === kind && candidate['stepRunId'] === stepRunId,
+  );
+}
+
+/**
+ * Egy hamis agent hívás viselkedése a `scriptedRunner` forgatókönyvében:
+ *
+ * - `fails_when_released`: az `init` után a `releaseFailure()` hívásig vár,
+ *   utána nem sikeres `result` üzenettel zár (`agent_result_not_success`);
+ * - `runs_until_interrupt`: magától SOSEM ér véget, csak az `interrupt()`
+ *   után, sikeres `result` üzenettel (a megszakított, futó lépés a meglévő
+ *   úton, a saját eredménye szerint zár, SPEC-004 9. szekció 4. pont);
+ * - `succeeds`: azonnal sikeres.
+ */
+type ScriptedCall = 'fails_when_released' | 'runs_until_interrupt' | 'succeeds';
+
+/**
+ * Hívásonként előre megírt hamis agent futtató a `fail_run` tesztekhez. A
+ * hívások sorrendje a hely kiosztásának sorrendje, nem a node azonosítóé,
+ * ezért a forgatókönyv hívás sorszám szerint szól; a forgatókönyvön túli
+ * hívás `succeeds`. A számlálók a teszt fő mérőszámai: hány agent hívás
+ * történt, és hányszor futott `interrupt()`.
+ */
+function scriptedRunner(script: readonly ScriptedCall[]): {
+  readonly runner: AgentQueryRunner;
+  readonly releaseFailure: () => void;
+  readonly calls: { run: number; interrupt: number };
+} {
+  const { promise: failureGate, resolve: openFailureGate } = Promise.withResolvers<undefined>();
+  const calls = { run: 0, interrupt: 0 };
+
+  async function* failingMessages(sessionId: string): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await failureGate;
+    yield {
+      type: 'result',
+      subtype: 'error_max_turns',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  const runner: AgentQueryRunner = {
+    run: () => {
+      calls.run += 1;
+      const sessionId = `hivas-${String(calls.run)}`;
+      const behaviour = script[calls.run - 1] ?? 'succeeds';
+      if (behaviour === 'succeeds') {
+        return {
+          kind: 'ok',
+          value: { messages: messageIterable(successMessages(calls.run)), interrupt: () => Promise.resolve() },
+        };
+      }
+      const controlled = controlledMessageIterable(sessionId);
+      return {
+        kind: 'ok',
+        value: {
+          messages: behaviour === 'fails_when_released' ? failingMessages(sessionId) : controlled.messages,
+          interrupt: () => {
+            calls.interrupt += 1;
+            controlled.release();
+            return Promise.resolve();
+          },
+        },
+      };
+    },
+  };
+  return {
+    runner,
+    releaseFailure: () => {
+      openFailureGate(undefined);
+    },
+    calls,
+  };
 }
 
 function agentQueryOf(messages: AsyncIterable<unknown>): AgentQuery {
@@ -350,8 +436,12 @@ function agentStepConfig(promptTemplate: string): AgentStepConfig {
     structuredOutput: null,
   };
 }
-function agentNode(id: string, promptTemplate: string): WorkflowNodeInput {
-  return nodeOf(id, { type: 'agent_step', onUnhandledError: 'fail_run', ...agentStepConfig(promptTemplate) });
+function agentNode(
+  id: string,
+  promptTemplate: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, { type: 'agent_step', onUnhandledError, ...agentStepConfig(promptTemplate) });
 }
 function approvalNode(id: string, timeoutMs: number | null): WorkflowNodeInput {
   return nodeOf(id, {
@@ -433,25 +523,56 @@ async function waitForStepQueued(database: DatabaseContext, runId: string, nodeI
 }
 
 /**
- * Megvárja, amíg a futás három agent lépéséből pontosan egy fut és kettő
- * sorban áll (korlát 1 mellett), és visszaadja a futó lépés node azonosítóját:
- * a kiosztás sorrendje a futtathatóvá válás sorrendje, amit a teszt nem köt ki.
+ * Megvárja, amíg a futás agent lépéseiből pontosan `runningCount` fut és
+ * `queuedCount` sorban áll (korlátozott szabályozó mellett), és visszaadja a
+ * futó lépések node azonosítóját: a kiosztás sorrendje a futtathatóvá válás
+ * sorrendje, amit a teszt nem köt ki.
  */
-async function waitForOneRunningTwoQueued(database: DatabaseContext, runId: string): Promise<string> {
+async function waitForRunningAndQueued(
+  database: DatabaseContext,
+  runId: string,
+  runningCount: number,
+  queuedCount: number,
+): Promise<readonly string[]> {
   for (let attempt = 0; attempt < 2000; attempt += 1) {
     const agentSteps = okOrThrow(database.stepRuns.listStepRuns(runId)).filter((row) => row.nodeType === 'agent_step');
     const running = agentSteps.filter((row) => row.status === 'running');
     const pendingCount = agentSteps.filter((row) => row.status === 'pending').length;
-    const [runningStep] = running;
-    if (runningStep !== undefined && pendingCount === 2 && running.length === 1) {
-      return runningStep.nodeId;
+    if (pendingCount === queuedCount && running.length === runningCount) {
+      return running.map((row) => row.nodeId);
     }
     await Promise.resolve();
   }
-  throw new Error(`a(z) ${runId} futásban nem állt be egy futó és két sorban álló lépés`);
+  throw new Error(
+    `a(z) ${runId} futásban nem állt be ${String(runningCount)} futó és ${String(queuedCount)} sorban álló lépés`,
+  );
 }
 
 const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'cancelled', 'interrupted'] as const;
+
+/**
+ * Három párhuzamos agent lépés a `start` után, a `fail_run` tesztekhez.
+ * Mindhárom ugyanazzal a politikával, mert a helyet elsőként megkapó (tehát a
+ * forgatókönyv első hívását kapó) lépés kiléte a futtathatóvá válás
+ * sorrendjén múlik, amit a teszt nem köt ki.
+ */
+function threeParallelAgentSteps(
+  database: DatabaseContext,
+  name: string,
+  onUnhandledError: UnhandledErrorPolicy,
+): string {
+  return createWorkflow(
+    database,
+    name,
+    [
+      startNode('start'),
+      agentNode('a1', 'egy', onUnhandledError),
+      agentNode('a2', 'ketto', onUnhandledError),
+      agentNode('a3', 'harom', onUnhandledError),
+    ],
+    [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2'), edgeOf('e3', 'start', 'a3')],
+  );
+}
 
 describe('createEngine', () => {
   it('VÉGPONTTÓL VÉGPONTIG: startRun egy egyszerű start -> agent_step gráfon succeeded futást ad', async () => {
@@ -729,7 +850,7 @@ describe('createEngine', () => {
       );
       okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
       const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
-      const runningNodeId = await waitForOneRunningTwoQueued(harness.database, started.run.id);
+      const [runningNodeId] = await waitForRunningAndQueued(harness.database, started.run.id, 1, 2);
 
       const summary = okOrThrow(await harness.engine.interruptRun(started.run.id));
 
@@ -742,7 +863,7 @@ describe('createEngine', () => {
       expect(queuedSteps.map((step) => step.status)).toStrictEqual(['cancelled', 'cancelled']);
       // A kivett lépés el sem indult, tehát `step_started` eseménye sincs.
       for (const step of queuedSteps) {
-        expect(findEventPayloadStatus(harness.published, 'step_started', step.id)).toBeUndefined();
+        expect(hasPublishedEvent(harness.published, 'step_started', step.id)).toBe(false);
       }
     });
 
@@ -799,6 +920,150 @@ describe('createEngine', () => {
       okOrThrow(await interrupting);
       expect(await waitForRunStatus(harness.database, holding.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
       expect(runCalls).toBe(1);
+    });
+  });
+
+  describe('fail_run hibapolitika: a testvér lépések leállítása (SPEC-004 8.3, 43. kritérium)', () => {
+    it('REGRESSZIÓ: korlát 1 mellett a bukás után a két sorban álló testvér el sem indul, egyetlen agent hívás történik, a soruk cancelled, a futás failed', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = threeParallelAgentSteps(harness.database, 'fail-run-korlat-1', 'fail_run');
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const [failingNodeId] = await waitForRunningAndQueued(harness.database, started.run.id, 1, 2);
+
+      scripted.releaseFailure();
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(scripted.calls.run).toBe(1);
+      expect(status).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).errorKind).toBe('agent_result_not_success');
+      const siblings = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).filter(
+        (step) => step.nodeType === 'agent_step' && step.nodeId !== failingNodeId,
+      );
+      expect(siblings.map((step) => step.status)).toStrictEqual(['cancelled', 'cancelled']);
+      for (const step of siblings) {
+        expect(hasPublishedEvent(harness.published, 'step_started', step.id)).toBe(false);
+      }
+    });
+
+    it('REGRESSZIÓ: korlát 2 mellett a futó testvér interrupt()-ot kap, a sorban álló el sem indul, és a futás a futó testvér természetes vége nélkül failed', async () => {
+      // A második hívás magától SOSEM ér véget: ha a motor a természetes
+      // lefutására várna, a futás nem érne terminális állapotba.
+      const scripted = scriptedRunner(['fails_when_released', 'runs_until_interrupt']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = threeParallelAgentSteps(harness.database, 'fail-run-korlat-2', 'fail_run');
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 2));
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 2, 1);
+
+      scripted.releaseFailure();
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(scripted.calls.run).toBe(2);
+      expect(scripted.calls.interrupt).toBe(1);
+      expect(status).toBe('failed');
+      const agentSteps = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).filter(
+        (step) => step.nodeType === 'agent_step',
+      );
+      // A bukott lépés failed; a megszakított, futó testvér a saját
+      // (megszakítás utáni) eredménye szerint zár; a sorban álló cancelled.
+      const countOf = (status: string): number => agentSteps.filter((step) => step.status === status).length;
+      expect([countOf('failed'), countOf('succeeded'), countOf('cancelled')]).toStrictEqual([1, 1, 1]);
+      const queued = agentSteps.find((step) => step.status === 'cancelled');
+      expect(hasPublishedEvent(harness.published, 'step_started', queued?.id ?? '')).toBe(false);
+    });
+
+    it('REGRESSZIÓ: egy MÁSIK futás sorban álló lépése érintetlen: a felszabaduló helyet megkapja és lefut, a bukott futás testvére nem', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const failingWorkflowId = createWorkflow(
+        harness.database,
+        'fail-run-futas',
+        [startNode('start'), agentNode('a1', 'egy'), agentNode('a2', 'ketto')],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2')],
+      );
+      const otherWorkflowId = createWorkflow(
+        harness.database,
+        'masik-futas',
+        // A node és az él azonosítója az adatbázisban globálisan egyedi.
+        [startNode('start-b'), agentNode('b1', 'masik')],
+        [edgeOf('eb1', 'start-b', 'b1')],
+      );
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const failing = okOrThrow(await harness.engine.startRun({ workflowId: failingWorkflowId, input: {} }));
+      const [failingNodeId] = await waitForRunningAndQueued(harness.database, failing.run.id, 1, 1);
+      const other = okOrThrow(await harness.engine.startRun({ workflowId: otherWorkflowId, input: {} }));
+      await waitForStepQueued(harness.database, other.run.id, 'b1');
+
+      scripted.releaseFailure();
+
+      expect(await waitForRunStatus(harness.database, failing.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(await waitForRunStatus(harness.database, other.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
+      // Két hívás: a bukott lépésé és a másik futás lépéséé; a bukott futás
+      // sorban álló testvére nem kapott hívást.
+      expect(scripted.calls.run).toBe(2);
+      const sibling = okOrThrow(harness.database.stepRuns.listStepRuns(failing.run.id)).find(
+        (step) => step.nodeType === 'agent_step' && step.nodeId !== failingNodeId,
+      );
+      expect(sibling?.status).toBe('cancelled');
+      expect(
+        okOrThrow(harness.database.stepRuns.listStepRuns(other.run.id))
+          .filter((step) => step.nodeId === 'b1')
+          .map((step) => step.status),
+      ).toStrictEqual(['succeeded']);
+    });
+
+    it('REGRESSZIÓ: helyet nem foglaló lépés bukása (elutasított jóváhagyás) után is kiesik a sorból a testvér, és a futó testvér interrupt()-ot kap', async () => {
+      // A hibázó lépés itt nem agent lépés, tehát a saját helyét sem
+      // szabadítja fel: a sorban álló testvért a léptető hurok veszi ki a
+      // sorból, MIELŐTT a futó testvér a megszakítás után felszabadítaná a
+      // helyet.
+      const scripted = scriptedRunner(['runs_until_interrupt']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-jovahagyas',
+        [startNode('start'), agentNode('a1', 'egy'), agentNode('a2', 'ketto'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2'), edgeOf('e3', 'start', 'jov')],
+      );
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const [runningNodeId] = await waitForRunningAndQueued(harness.database, started.run.id, 1, 1);
+      const approvalStepRunId = await waitForPendingApproval(harness.database);
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'rejected' }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(scripted.calls.run).toBe(1);
+      expect(scripted.calls.interrupt).toBe(1);
+      expect(status).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).errorKind).toBe('approval_rejected');
+      const queued = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).find(
+        (step) => step.nodeType === 'agent_step' && step.nodeId !== runningNodeId,
+      );
+      expect(queued?.status).toBe('cancelled');
+      expect(hasPublishedEvent(harness.published, 'step_started', queued?.id ?? '')).toBe(false);
+    });
+
+    it('HATÁR: fail_branch mellett a sorban álló testvérek a bukás után is lefutnak, a futás a végén failed (SPEC-004 8.3, 8.4)', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = threeParallelAgentSteps(harness.database, 'fail-branch-korlat-1', 'fail_branch');
+      okOrThrow(harness.database.concurrencyLimits.setLimit('minimax', 1));
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const [failingNodeId] = await waitForRunningAndQueued(harness.database, started.run.id, 1, 2);
+
+      scripted.releaseFailure();
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(scripted.calls.run).toBe(3);
+      expect(scripted.calls.interrupt).toBe(0);
+      expect(status).toBe('failed');
+      const siblings = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).filter(
+        (step) => step.nodeType === 'agent_step' && step.nodeId !== failingNodeId,
+      );
+      expect(siblings.map((step) => step.status)).toStrictEqual(['succeeded', 'succeeded']);
     });
   });
 

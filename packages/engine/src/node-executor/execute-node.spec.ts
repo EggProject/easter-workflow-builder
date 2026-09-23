@@ -321,6 +321,7 @@ function plainRequest(runId: string, nodeId: string, config: PlainNodeConfig): E
       iteration: 0,
       attempt: 1,
       providerId: 'minimax',
+      failureStopsRun: false,
     },
     runContext: emptyRunContext,
     graph,

@@ -269,6 +269,36 @@ function retryDocument(handler: NodeConfig): GraphSnapshotDocument {
   };
 }
 
+// A `br` kifejezése hibát ad, `on_error` éle nincs, a politikája `fail_run`:
+// a futás a hurok végén `failed` állapotban zár.
+const FAIL_RUN_DOCUMENT: GraphSnapshotDocument = {
+  version: 1,
+  sdkVersionPin: INSTALLED,
+  workflow: { id: 'wf', name: 'teszt', description: null },
+  nodes: [node('start', START), node('br', FAILING_BRANCH)],
+  edges: [edge('e1', 'start', 'br')],
+};
+
+// A szabályozó sorából kivett agent lépés nyoma: a `createStepRun` utáni
+// `pending` sor, amit a lépés el sem indított (`agent-node-lifecycle.ts`).
+function insertPendingSibling(database: DatabaseContext, runId: string): string {
+  return okOrThrow(
+    database.stepRuns.createStepRun({
+      runId,
+      nodeId: 'testver',
+      nodeType: 'agent_step',
+      parentStepRunId: null,
+      iteration: 0,
+      attempt: 1,
+      providerId: 'minimax',
+      modelId: 'modell-1',
+      sessionMode: 'isolated',
+      structuredOutputStrategy: null,
+      subWorkflowRunId: null,
+    }),
+  ).id;
+}
+
 interface Fixture {
   readonly database: DatabaseContext;
   readonly execution: RunExecution;
@@ -283,6 +313,9 @@ interface FixtureOptions {
   readonly onNowMs?: () => void;
   readonly onSleep?: () => void;
   readonly evaluate?: (expression: string) => Outcome<unknown>;
+  // A motor portjára kerülő adatbázis: a fixture a valódi `:memory:`
+  // példányt készíti elő, a teszt ennek egy-egy műveletét cserélheti hibára.
+  readonly wrapDatabase?: (database: DatabaseContext) => DatabaseContext;
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -316,7 +349,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
   };
   const runner: AgentQueryRunner = { run: notCalled };
   const ports: EngineDependencies = {
-    database,
+    database: options.wrapDatabase?.(database) ?? database,
     agentQueryRunner: runner,
     providerDescriptorLookup: descriptorOf,
     expressionEvaluator: {
@@ -476,6 +509,62 @@ describe('advanceRun', () => {
     expect(steps.filter((step) => step.nodeId === 'br')).toHaveLength(1);
     expect(steps.filter((step) => step.nodeId === 'le')).toHaveLength(1);
     expect(steps.filter((step) => step.nodeId === 'jn')).toHaveLength(1);
+  });
+
+  describe('fail_run: a sorból kivett testvérek pending sora cancelled lesz (SPEC-004 8.3, SPEC-003 7.2)', () => {
+    it('a pending sor cancelled, a terminális sorok érintetlenek, a futás failed', async () => {
+      const fixture = openFixture({ document: FAIL_RUN_DOCUMENT });
+      const siblingId = insertPendingSibling(fixture.database, fixture.execution.runId);
+
+      const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+      expect(completion.status).toBe('failed');
+      const steps = okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId));
+      expect(steps.map((step) => [step.nodeId, step.status])).toStrictEqual([
+        ['testver', 'cancelled'],
+        ['start', 'succeeded'],
+        ['br', 'failed'],
+      ]);
+      expect(okOrThrow(fixture.database.stepRuns.getStepRun(siblingId)).status).toBe('cancelled');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('failed');
+    });
+
+    it('a lépés sorok olvasásának hibáját továbbadja, a futás sorát nem írja', async () => {
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            listStepRuns: () => ({ kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' }),
+          },
+        }),
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    });
+
+    it('a cancelled állapotváltás hibáját továbbadja, a futás sorát nem írja', async () => {
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            markStepCancelled: () => ({ kind: 'error', message: 'teszt: a lépés nem zárható' }),
+          },
+        }),
+      });
+      insertPendingSibling(fixture.database, fixture.execution.runId);
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés nem zárható');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    });
   });
 
   it('a run_finished esemény írásának hibáját továbbadja', async () => {

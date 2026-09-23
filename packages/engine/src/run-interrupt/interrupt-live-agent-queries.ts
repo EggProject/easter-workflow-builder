@@ -28,10 +28,10 @@ import type { AgentQueryRegistry } from './agent-query-registry.ts';
  * hívás pillanatában még párhuzamossági helyre vár, tehát még nem hívta meg a
  * `agentQueryRunner.run(...)`-t és nincs a regiszterben: annak nincs mit
  * megszakítani, hanem ki kell venni a sorból. A külső megszakítás és a
- * szabályos leállás ezt a `stopAndAwaitRunTree` 2. pontjában teszi meg
- * (`ConcurrencyGate.denyWaitingForRunIds`). A `fail_run` ág ezt NEM teszi:
- * ott a helyre váró testvér lépés a `failRunRequested` jelzéstől
- * függetlenül lefut, mert a jelzés csak ÚJ példány indítását akadályozza meg.
+ * szabályos leállás ezt a `stopAndAwaitRunTree` 2. pontjában teszi meg, a
+ * `fail_run` ág a léptető hurokban, mindkettő EZEN hívás előtt
+ * (`ConcurrencyGate.denyWaitingForRunIds`): fordított sorrendben a megszakított
+ * lépés felszabaduló helyét a sorban álló testvér kapná meg.
  */
 export async function interruptLiveAgentQueries(
   runIds: ReadonlySet<string>,

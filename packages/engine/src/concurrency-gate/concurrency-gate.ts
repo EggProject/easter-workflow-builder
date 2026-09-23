@@ -34,8 +34,9 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
  * **Az elutasítás két úton jön, mindkettő az `onDenied` visszahívással**,
  * szintén szinkron, és az `onGranted` utána soha nem fut le a kérésre:
  *
- * - a megszakított futások sorban álló kérései (`denyWaitingForRunIds`,
- *   SPEC-004 9. szekció 2. pont, "a sorban álló lépései kiesnek");
+ * - a megszakított, illetve `fail_run` politikával bukott futások sorban álló
+ *   kérései (`denyWaitingForRunIds`, SPEC-004 9. szekció 2. pont, "a sorban
+ *   álló lépései kiesnek"; 8.3);
  * - a lezárt szabályozó minden várakozója és minden új kérése (`close`,
  *   SPEC-004 10.2 1. pont).
  */
@@ -75,6 +76,10 @@ export interface ConcurrencyGate {
    * (`stopAndAwaitRunTree`) hívja, a futás fájának minden `runId`-jával, még
    * a `completion` megvárása előtt: enélkül egy sorban álló lépés a megszakítás
    * után felszabaduló helyet megkapná, és `interrupt()` nélkül végigfutna.
+   * Ugyanezért hívja a `fail_run` politika (8.3) a bukott futás `runId`-jával
+   * két helyen: a bukott, helyet foglaló lépés a helye felszabadítása előtt
+   * (`agent-node-lifecycle.ts`), a léptető hurok pedig a futó testvérek
+   * `interrupt()` hívása előtt (`run-supervisor/advance-run.ts`).
    * A már kiosztott helyek érintetlenek, azokat a futó lépés a saját
    * `finally` ágán szabadítja fel; más futás várakozója sem változik.
    */

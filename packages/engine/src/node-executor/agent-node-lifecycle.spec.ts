@@ -289,6 +289,7 @@ function instanceOf(runId: string): NodeExecutionInstance {
     iteration: 0,
     attempt: 1,
     providerId: 'minimax',
+    failureStopsRun: false,
   };
 }
 
@@ -560,6 +561,53 @@ describe('runAgentNodeLifecycle', () => {
     expect(outcome.stepRun.numTurns).toBe(8);
     expect(outcome.stepRun.inputTokens).toBe(5);
     expect(calls.some((call) => call.startsWith('release:'))).toBe(true);
+
+    database.close();
+  });
+
+  it('fail_run politikájú bukott lépés a helye felszabadítása ELŐTT kiveszi a futása sorban álló lépéseit (SPEC-004 8.3)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const { gate } = recordingGate();
+    const order: string[] = [];
+    const observingGate: ConcurrencyGate = {
+      ...gate,
+      denyWaitingForRunIds: (runIds) => {
+        order.push(`deny:${[...runIds].join(',')}`);
+      },
+      releaseSlot: (requestId) => {
+        order.push('release');
+        return gate.releaseSlot(requestId);
+      },
+    };
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('hibasSubtype'), { request: undefined }),
+    });
+    const input = inputOf(runId, { instance: { ...instanceOf(runId), failureStopsRun: true } });
+
+    const outcome = settledOrThrow(await runAgentNodeLifecycle(input, dependencies, observingGate, agentQueryRegistry));
+
+    expect(outcome.kind).toBe('failed');
+    expect(order).toStrictEqual([`deny:${runId}`, 'release']);
+
+    database.close();
+  });
+
+  it('fail_run politikájú, de SIKERES lépés nem nyúl a sorhoz (a rögzítő szabályozó elutasító művelete hívásra dob)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const { gate, calls } = recordingGate();
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), { request: undefined }),
+    });
+    const input = inputOf(runId, { instance: { ...instanceOf(runId), failureStopsRun: true } });
+
+    const outcome = settledOrThrow(await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry));
+
+    expect(outcome.kind).toBe('succeeded');
+    expect(calls).toStrictEqual([`request:minimax:${outcome.stepRun.id}`, `release:${outcome.stepRun.id}`]);
 
     database.close();
   });

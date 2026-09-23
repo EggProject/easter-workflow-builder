@@ -1,6 +1,7 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { SnapshotEdge, StepRunRecord } from '@easter-workflow-builder/db';
 import type { BranchContext } from '../branch-scope/branch-scope.ts';
+import type { DatabaseContext } from '../engine-port/database-port.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { FailureEscapeKey } from '../error-policy/resolve-error-route.ts';
@@ -439,6 +440,15 @@ function buildRequest(
     iteration: iterationOf(execution, plan, instance),
     attempt: execution.retryAttempts.get(instanceKeyOf(instance)) ?? 1,
     providerId: plan.providerId,
+    // Ugyanaz a döntés, amit a `failed` kimenet feldolgozása hoz
+    // (`applyCompletion` `failed` ága, `on_error` menekülő kulccsal).
+    failureStopsRun:
+      resolveErrorRoute({
+        graph: execution.topology.graph,
+        nodeId: instance.nodeId,
+        escapeKey: 'on_error',
+        onUnhandledError: plan.onUnhandledError,
+      }).kind === 'fail_run',
   };
   const joinInputs = collectJoinInputs(execution.scheduler, execution.topology, execution.executedInstances, instance);
   const failure = execution.pendingFailures.get(instanceKeyOf(instance));
@@ -538,19 +548,27 @@ function startReadyInstances(
  * befejeződjön, és az eredményét beépíti a futás állapotába.
  *
  * **`fail_run` és külső leállítás után nem indul új lépés**, és a `fail_run`
- * a MÁR futó testvér lépéseket is megszakítja (8.3 táblázat: "a motor
- * megszakítja a többi futó lépést"). A megszakítás elemi lépése ugyanaz a
- * primitíva, amit a külső megszakítás is használ
- * (`run-interrupt/interrupt-live-agent-queries.ts`), és pontosan egyszer fut
- * le futásonként - erre való a `hasInterruptedSiblings` jelző, mert a
- * `fail_run` után új lépés már nem indul, tehát új megszakítandó `AgentQuery`
- * sem keletkezik.
+ * a MÁR elindított testvér lépéseket is leállítja (8.3 táblázat: "a motor
+ * megszakítja a többi futó lépést, minden nem terminális lépést lezár").
+ * Ugyanaz a két primitíva, ugyanabban a sorrendben, amit a külső megszakítás
+ * is használ (`run-interrupt/stop-and-await-run-tree.ts` 2. és 4. pont):
+ * előbb a szabályozó sorában álló testvérek kivétele
+ * (`ConcurrencyGate.denyWaitingForRunIds`), utána `interrupt()` a futókon
+ * (`run-interrupt/interrupt-live-agent-queries.ts`). Fordított sorrendben a
+ * megszakított lépés felszabaduló helyét a sorban álló testvér kapná meg.
+ * Pontosan egyszer fut le futásonként - erre való a `hasInterruptedSiblings`
+ * jelző, mert a `fail_run` után új lépés már nem indul. Ha a bukott lépés
+ * maga foglalt helyet, a sorból kivétel már a helye felszabadítása előtt
+ * megtörtént (`node-executor/agent-node-lifecycle.ts`), itt tehát üres sort
+ * talál; helyet nem foglaló lépés (például elutasított jóváhagyás) bukásánál
+ * viszont ez az egyetlen hely, ami kiveszi őket.
  *
- * **A DB oldali zárás NEM változik a megszakítással.** A `fail_run` továbbra
- * is a `finishRun` menetén, `resolveRunCompletion` + `markRunFailed` úton zár
- * (8.4), nem a `run-interrupt` téma `cancelRunTree` primitívjén: az
- * `interrupt()` itt csak a folyamatban lévő provider hívásokat állítja le,
- * nem tesz felhasználói megszakítást a futásból.
+ * **A DB oldali zárás a `finishRun` menetén marad.** A `fail_run` a
+ * `resolveRunCompletion` + `markRunFailed` úton zár (8.4), nem a
+ * `run-interrupt` téma `cancelRunTree` primitívjén: az `interrupt()` itt csak
+ * a folyamatban lévő provider hívásokat állítja le, nem tesz felhasználói
+ * megszakítást a futásból. A sorból kivett testvérek `pending` sorát a
+ * `finishRun` zárja (`cancelPendingStepRuns`).
  *
  * **A külső leállítás (`stopRequested`) NEM indít innen megszakítást**: azt a
  * `stopAndAwaitRunTree` már elvégezte, mielőtt a `completion` Promise-ra várni
@@ -566,7 +584,9 @@ async function runSchedulingLoop(
   for (;;) {
     if (!hasInterruptedSiblings && execution.failRunRequested) {
       hasInterruptedSiblings = true;
-      await interruptLiveAgentQueries(new Set([execution.runId]), dependencies.agentQueryRegistry);
+      const runIds = new Set([execution.runId]);
+      dependencies.concurrencyGate.denyWaitingForRunIds(runIds);
+      await interruptLiveAgentQueries(runIds, dependencies.agentQueryRegistry);
     }
     if (!execution.failRunRequested && !execution.stopRequested) {
       const started = startReadyInstances(execution, dependencies, inFlight);
@@ -589,6 +609,36 @@ async function runSchedulingLoop(
 }
 
 /**
+ * A `fail_run` záró lépése a futás sorának írása előtt (SPEC-004 8.3:
+ * "minden nem terminális lépést lezár"): a futás minden `pending` lépés sora
+ * `cancelled` állapotba megy (SPEC-003 7.2, `pending -> cancelled`, "a futás
+ * megszakadt, mielőtt a lépés elindult").
+ *
+ * Ilyen sort a szabályozó sorából kivett testvér lépés hagy maga után
+ * (`agent-node-lifecycle.ts`, `interrupted` eredmény). Más nem terminális sor
+ * itt nem lehet: a hurok ekkorra minden elindított példányt megvárt, tehát a
+ * `running` és a `waiting_approval` sor a saját végrehajtóján már lezárult.
+ * Ugyanaz a végállapot, amit a külső megszakítás `cancelRunTree` tranzakciója
+ * ír ugyanerre a sorra (9. szekció 2. pont); lépés eseményt az sem ír.
+ */
+function cancelPendingStepRuns(runId: string, database: DatabaseContext): Outcome<void> {
+  const steps = database.stepRuns.listStepRuns(runId);
+  if (steps.kind === 'error') {
+    return steps;
+  }
+  for (const step of steps.value) {
+    if (step.status !== 'pending') {
+      continue;
+    }
+    const cancelled = database.stepRuns.markStepCancelled(step.id);
+    if (cancelled.kind === 'error') {
+      return cancelled;
+    }
+  }
+  return OK;
+}
+
+/**
  * A futás záró állapotának kiírása (SPEC-004 8.4): `resolveRunCompletion`,
  * majd a megfelelő nevesített állapotváltó és a `run_finished` esemény.
  *
@@ -605,6 +655,12 @@ function finishRun(execution: RunExecution, dependencies: NodeExecutorDependenci
   }
 
   const { database } = dependencies.ports;
+  if (execution.failRunRequested) {
+    const closed = cancelPendingStepRuns(execution.runId, database);
+    if (closed.kind === 'error') {
+      return closed;
+    }
+  }
   const marked =
     completion.status === 'succeeded'
       ? database.runs.markRunSucceeded(execution.runId)
