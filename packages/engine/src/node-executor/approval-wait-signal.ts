@@ -9,14 +9,16 @@ import type { ApprovalDecision } from '@easter-workflow-builder/db';
  * - `decided`: megérkezett az ember hozta döntés (`notifyDecided`), a
  *   végrehajtó a szokásos úton zár (visszaolvasott sor, `step_finished` és
  *   `approval_decided` esemény);
- * - `interrupted`: a várakozást a megszakítás vagy a szabályos leállás zárta le
- *   (`cancelWaitingForRunIds`), tehát **nincs döntés**. A végrehajtó ilyenkor
- *   egyetlen állapotváltást és egyetlen eseményt sem ír: a lépés sorát a
- *   megszakítást kérő fél zárja le, egyetlen tranzakcióban, a futás sorával
- *   együtt (`run-interrupt/interrupt-run.ts` `cancelRunTree`, illetve
- *   `shutdown-active-runs.ts` `recoverInterruptedRuns`). A kettő MÁS záró
- *   állapotot ír (`cancelled`, illetve `interrupted`), amit a végrehajtó nem
- *   tudna eldönteni - ezért nem is dönt.
+ * - `interrupted`: a várakozást a megszakítás, a szabályos leállás vagy a
+ *   futás `fail_run` politikájú bukása zárta le (`cancelWaitingForRunIds`),
+ *   tehát **nincs döntés**. A végrehajtó ilyenkor egyetlen állapotváltást és
+ *   egyetlen eseményt sem ír: a lépés sorát a lezárást kérő fél zárja le
+ *   (`run-interrupt/interrupt-run.ts` `cancelRunTree` és
+ *   `shutdown-active-runs.ts` `recoverInterruptedRuns` a futás sorával egy
+ *   tranzakcióban, illetve `run-supervisor/advance-run.ts` `finishRun` a
+ *   `markRunFailed` előtt). A záró állapot hívónként más (`cancelled`,
+ *   `interrupted`, `cancelled`), amit a végrehajtó nem tudna eldönteni -
+ *   ezért nem is dönt.
  *
  * A harmadik lehetséges kimenet, az időkorlát lejárata, szándékosan NEM
  * ebben az unióban áll: azt a végrehajtó a `clock.sleep` versenyéből maga

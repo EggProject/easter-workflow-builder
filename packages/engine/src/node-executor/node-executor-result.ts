@@ -19,13 +19,13 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
  *
  * **Az `interrupted` ág nem hordoz `stepRun` rekordot**, mert a sor ilyenkor
  * nem terminális (`waiting_approval`, illetve `pending`), és a lezárása a
- * megszakítást kérő fél egyetlen tranzakciójában történik (`cancelRunTree`
- * `cancelled`-del, illetve `recoverInterruptedRuns` `interrupted`-del,
+ * lezárást kérő félé (`cancelRunTree` `cancelled`-del, `recoverInterruptedRuns`
+ * `interrupted`-del, illetve a `fail_run` záró menete `cancelled`-del,
  * `approval-wait-signal.ts`). A hívó (`run-supervisor/advance-run.ts`) ezen az
  * ágon sem `SchedulingEvent`-et nem épít, sem a lefutott példányok közé nem
  * veszi fel a példányt: a futás léptetése ekkor amúgy is a `stopRequested`
- * jelzés alatt áll, tehát a hurok nem indít több lépést és a záró állapotot
- * sem ő írja (`ActiveRunHandle.requestStop` doksija).
+ * vagy a `failRunRequested` jelzés alatt áll, tehát a hurok nem indít több
+ * lépést (`ActiveRunHandle.requestStop` doksija, SPEC-004 8.3).
  *
  * Két helyen keletkezhet az `interrupted` ág:
  *

@@ -118,11 +118,13 @@ ugyanabban a commitban bővül (SPEC-002 6.7).
 **A `fail_run` a külső megszakítás mechanizmusát használja (T-005-31, 2026-09-23, AC-43).** A
 SPEC-004 8.3 táblázat `fail_run` sora előírja, hogy a motor a kezeletlen hiba után a testvér
 lépéseket leállítsa és minden nem terminális lépést lezárjon, nem csak új lépés indítását
-akadályozza meg. Ugyanaz a két primitíva, ugyanabban a sorrendben, mint a `stopAndAwaitRunTree` 2.
-és 4. pontjában: előbb a futás sorban álló agent lépéseinek kivétele a szabályozó sorából
-(`ConcurrencyGate.denyWaitingForRunIds`), utána `interrupt()` a futókon
+akadályozza meg. Ugyanaz a három primitíva, ugyanabban a sorrendben, mint a `stopAndAwaitRunTree`
+2 ... 4. pontjában: a futás sorban álló agent lépéseinek kivétele a szabályozó sorából
+(`ConcurrencyGate.denyWaitingForRunIds`), a döntésre váró jóváhagyások várakozásának lezárása
+(`ApprovalWaitRegistry.cancelWaitingForRunIds`), végül `interrupt()` a futókon
 (`interruptLiveAgentQueries`). A kivett lépés a meglévő úton `interrupted` eredménnyel tér vissza,
-`markStepRunning`, `step_started` és provider hívás nélkül, `pending` sorral. Három hely:
+`markStepRunning`, `step_started` és provider hívás nélkül, `pending` sorral; a lezárt várakozású
+jóváhagyás szintén `interrupted` eredménnyel, `waiting_approval` sorral. Három hely:
 
 - **a bukott, helyet foglaló lépés** (`node-executor/agent-node-lifecycle.ts`) a helye
   felszabadítása ELŐTT veszi ki a saját futásának várakozóit, ha a
@@ -131,24 +133,35 @@ akadályozza meg. Ugyanaz a két primitíva, ugyanabban a sorrendben, mint a `st
   a sor következő elemének, és az a hurok reakciója előtt elindul (mérve: 4 ms-mal a bukás után);
 - **a léptető hurok** (`run-supervisor/advance-run.ts`) a `failRunRequested` igazra váltása után,
   pontosan egyszer, a SAJÁT `runId`-jára: ez viszi el a sort, ha a bukott lépés nem foglalt helyet
-  (például elutasított jóváhagyás), és ez hívja az `interrupt()`-ot;
-- **a záró menet** (`finishRun`) a `markRunFailed` előtt a futás minden `pending` sorát
-  `cancelled` állapotba viszi (SPEC-003 7.2 `pending -> cancelled`); a hurok ekkorra minden
-  elindított példányt megvárt, tehát más nem terminális sor nem maradhat.
+  (például elutasított jóváhagyás), ez zárja le a testvér jóváhagyások várakozását, és ez hívja
+  az `interrupt()`-ot. A sorból kivétel az `interrupt()` ELŐTT áll: az `AgentQuery` szerződése nem
+  köti ki, hogy a nyugta a folyam vége előtt érkezik, és ha utána, fordított sorrendben a
+  megszakított lépés felszabaduló helyét a sorban álló testvér kapná meg. Ezt az `advance-run.spec.ts`
+  sorrend tesztje őrzi (a nyugta a hely felszabadítása után; fordított sorrenddel `expected 2 to
+be 1`); a valódi SDK nyugtájának időzítése nem mért;
+- **a záró menet** (`finishRun`, `cancelStoppedStepRuns`) a `markRunFailed` előtt a futás minden
+  `pending` és `waiting_approval` sorát `cancelled` állapotba viszi (SPEC-003 7.2); a hurok ekkorra
+  minden elindított példányt megvárt, tehát `running` sor nem maradhat. A `human_approval` sor
+  `decision` mezője NULL marad (nincs állapot oszlopa), egy utólagos döntés a lépés sorának
+  `cancelled` állapotán `illegal_status_transition` hibával bukik, ugyanúgy, mint a megszakítás
+  után.
 
 **A teljes `stopAndAwaitRunTree` menetet itt nem lehet hívni**: az a saját `completion`
 Promise-át várná meg, ami holtpont, és a `cancelled` záró állapotot készítené elő, holott a
 `fail_run` záró állapota `failed` (8.4). Mérve (korlát 1, a bukás 300 ms-nál, a testvérek
 természetes hossza 8000 ms): előtte 3 agent hívás és a futás 9013 ms-mal a bukás után `failed`,
-utána 1 hívás, 6 ms, a két testvér `cancelled`
+utána 1 hívás, 6 ms, a két testvér `cancelled`. Döntésre váró, korlátlan várakozású
+(`timeoutMs: null`) testvér jóváhagyással, a valódi `apps/server` modulokon, hamis agenttel: előtte
+a futás a döntésig `running` maradt, utána 2 ... 6 ms-mal a bukás után `failed`
 (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció). A fájl irányában nincs kör:
 az `interrupt-live-agent-queries.ts` csak az `agent-query-registry.ts`-től függ.
 
-**Amit a `fail_run` ma NEM visz el, kimondva:** egy testvér ág **várakozó `human_approval`**
-lépése (`timeoutMs: null`). A `fail_run` a `cancelWaitingForRunIds`-t nem hívja, mert a végrehajtó
-`interrupted` kimenete után a sor `waiting_approval` állapotban maradna, a záró menet pedig csak a
-`pending` sorokat zárja. Amíg ez így van, egy `fail_run` mellé ütemezett, korlátlan várakozású
-jóváhagyás a futást a döntésig nyitva tartja. Megnevezett hiány, nem elfogadott végállapot.
+**Amit a `fail_run` ma NEM visz el, kimondva (mérve, SPEC-004 8.3 "Nyitott"):** (1) a testvér
+`sub_workflow` lépés gyerek futását, mert a leállítás a saját `runId`-ra szűkít: ha a gyerek
+jóváhagyásra vár, a bukott szülő a bukás után sem terminális; (2) a várakozás lezárása és a
+záró menet közti ablakban (egy futó testvér folyamának kimerülése alatt) érkező döntést, ami a
+jóváhagyás lépését `succeeded` állapotba viszi egy `failed` futásban. A (2) a megszakítás útján is
+ugyanígy megvan. Megnevezett hiány, nem elfogadott végállapot.
 
 **A `NodeExecutionOutcome` és a `NodeExecutionResult` szétválasztása (T-005-31, AC-51).** A külső
 megszakítás miatt lezáratlanul maradó lépés NEM a `NodeExecutionOutcome` ága, hanem a szélesebb

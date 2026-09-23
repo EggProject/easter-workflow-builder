@@ -213,6 +213,65 @@ másik futás sorban álló lépése; helyet nem foglaló lépés bukása; `fail
 bukásos teszt bukik, a hurok oldali nélkül a jóváhagyásos, a záró menet nélkül mind a négy (a sor
 `pending` marad).
 
+**A `fail_run` és a döntésre váró jóváhagyás testvér: mérve, javítva (2026-09-23, ötödik kör).** Egy
+független ellenőrzés a `8ce9d5d` commiton azt mérte, hogy a `fail_run` a döntésre váró
+`human_approval` testvért nem zárja le: a futás a döntésig `running`, jóváhagyáskor a lépés
+`succeeded` egy `fail_run` futásban, `timeoutMs: null` mellett a futás korlátlanul nyitva marad. A
+SPEC-004 8.3 ezt tévesen nyitott kérdésnek jelölte, holott a táblázat szerint a `fail_run` "minden
+nem terminális lépést lezár", és a SPEC-003 7.2-ben a `waiting_approval -> cancelled` átmenet
+létezik.
+
+| Tétel    | Érték                                                                                                                                                                                                             |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató  | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `e26da34` commitja (előtte), illetve a javítás munkapéldánya (utána)                                                                                               |
+| Szerver  | a 6. szekció felállása: a valódi `apps/server` modulok és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő   |
+| Workflow | `start` után egy `agent_step` (`a1`, `fail_run`, 300 ms után nem sikeres `result`) és egy `human_approval` (`jov`, `timeoutMs: null`); egy másik workflow `start -> human_approval` (`jov-b`) párhuzamos futással |
+| Kliens   | 10 ms-onként `GET /api/runs/<id>` legfeljebb 3000 ms-ig, utána `GET /api/approvals`, majd döntés `POST /api/approvals/<id>/decision` (`approved`)                                                                 |
+
+| Eset   | A futás a bukás után                                                         | `jov` lépés             | Utólagos döntés                                                      | A másik futás                         |
+| ------ | ---------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------- | ------------------------------------- |
+| előtte | 3000 ms-nál `running`; `failed` csak a döntés után, 2716 ms-mal a bukás után | döntés után `succeeded` | HTTP 200, a döntés átment                                            | nem mérve                             |
+| utána  | `failed` 4, 6, illetve 2 ms-mal a bukás után (három futás)                   | `cancelled`             | HTTP 409 `conflict`, `illegal_status_transition`; semmi nem változik | `running`, `jov-b` `waiting_approval` |
+
+**A javítás.** A léptető hurok a `fail_run` után, a sorból kivétel és az `interrupt()` között
+`ApprovalWaitRegistry.cancelWaitingForRunIds`-t hív a futás `runId`-jára, ugyanazt, amit a
+megszakítás (`stopAndAwaitRunTree` 3. pont). A végrehajtó a meglévő úton `interrupted`
+eredménnyel, állapotváltás és esemény nélkül tér vissza, a `waiting_approval` sort a záró menet a
+`markRunFailed` előtt `cancelled` állapotba viszi, a `pending` sorral együtt. A `human_approval`
+sornak nincs állapot oszlopa: a `decision` NULL marad, ugyanúgy, mint a megszakítás után.
+
+**A regresszió.** A `create-engine.spec.ts` három új tesztje (a jóváhagyás `cancelled`, a futás
+döntés nélkül `failed`, az utólagos döntés `illegal_status_transition`; egy másik futás
+jóváhagyása érintetlen; `fail_branch` határ: a jóváhagyás a bukás feldolgozása után is vár), valamint
+az `advance-run.spec.ts` záró menet tesztje. A javítás előtt a két `fail_run` teszt bukott (a futás
+nem ért terminális állapotba) és a záró menet tesztje (`expected 'waiting_approval' to be
+'cancelled'`). Részenként visszavonva: a várakozás lezárása nélkül a két `create-engine` teszt, a
+záró menet `waiting_approval` ága nélkül a záró menet tesztje és az első `create-engine` teszt
+bukik. Ha a lezárás minden kezeletlen hibára lefutna, nem csak `fail_run`-ra, a `fail_branch`
+határteszt bukik (`approval_decided` esemény nincs).
+
+**A sorrend kérdés.** A hurok kommentje azt állította, hogy fordított sorrendben (előbb
+`interrupt()`, utána a sorból kivétel) a megszakított lépés felszabaduló helyét a sorban álló
+testvér kapná meg, de a sorrend felcserélésére egyetlen teszt sem bukott (mérve, a javítás előtti
+tesztkészlettel). Az ok kódolvasásból: minden meglévő hamis agent az `interrupt()` nyugtáját
+azonnal, `Promise.resolve()`-val adja, a megszakított lépés pedig csak a folyama kimerítése és a
+sora lezárása után szabadítja fel a helyét, tehát a kivétel a nyugta után is időben jön. Az `AgentQuery`
+szerződése a nyugta időzítését nem köti ki. Az `advance-run.spec.ts` új sorrend tesztje olyan hamis
+agenttel fut, ami a nyugtát a megszakított lépés helyének felszabadítása után adja (a szabályozó
+`releaseSlot` hívását figyelve): a mostani sorrenddel 1 agent hívás, felcserélt sorrenddel 2
+(`expected 2 to be 1`). A sorrend tehát ilyen nyugta mellett számít; hogy a valódi SDK nyugtája a
+folyam vége előtt vagy után érkezik, nem mért.
+
+**Ami nyitva marad, mérve.** (1) A `GET /api/approvals` a lezárt jóváhagyást továbbra is
+visszaadja (`decision IS NULL`), a döntése 409-et ad; a felhasználói megszakítás után ugyanez
+mérve (`start -> human_approval`, `POST /api/runs/<id>/interrupt`: a lista 1 elemű, a döntés 409).
+(2) A várakozás lezárása és a záró írás közti ablakban (egy futó, megszakított testvér folyamának
+kimerülése alatt) érkező döntés átmegy: motor szintű próba, a testvér folyamát a próba tartja
+nyitva; `fail_run` mellett a döntés sikeres, a jóváhagyás `succeeded`, a futás `failed`; a
+felhasználói megszakításnál ugyanígy, a futás `cancelled`. (3) A `fail_run` a testvér `sub_workflow`
+gyerek futását nem állítja le: motor szintű próba, a gyerek `start -> human_approval`, a szülő a
+bukás után sem terminális.
+
 **Leállás közben a 503.** Ugyanezen a szerveren a 6. szekció félbe küldött indító kérése a javítás
 után `503 Service Unavailable` választ kap, a törzsben `service_unavailable` kóddal és
 `engine_shutting_down` hibaosztállyal; futás nem jön létre, a kilépés 3035 ms. A kód forrása az

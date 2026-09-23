@@ -70,7 +70,10 @@ export interface ApprovalWaitRegistry {
    * `requestStop()` után, még a `completion` Promise-ok megvárása ELŐTT:
    * enélkül egy korlátlan várakozású `human_approval` lépésen álló futás
    * `completion` Promise-a sosem teljesülne, tehát a megszakítás és a
-   * szabályos leállás is örökre megállna.
+   * szabályos leállás is örökre megállna. Ugyanezért hívja a `fail_run`
+   * hibapolitika (SPEC-004 8.3) a bukott futás `runId`-jával a léptető
+   * hurokban (`run-supervisor/advance-run.ts`): enélkül a testvér jóváhagyás
+   * a bukott futást a döntésig nyitva tartaná.
    *
    * A `runIds` szándékosan `ReadonlySet`, nem tömb, ugyanabból az okból, mint
    * az `AgentQueryRegistry.listForRunIds` esetén: a hívó egy fa (vagy a teljes

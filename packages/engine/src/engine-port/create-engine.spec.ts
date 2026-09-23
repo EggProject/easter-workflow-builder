@@ -480,9 +480,13 @@ async function waitForRunStatus(
   throw new Error(`a(z) ${runId} futás nem érte el a várt állapotot`);
 }
 
-async function waitForPendingApproval(database: DatabaseContext): Promise<string> {
+// A `runId` megadásával csak az adott futás jóváhagyását várja: két futás
+// egyidejű várakozásánál a lista első eleme nem feltétlenül az övé.
+async function waitForPendingApproval(database: DatabaseContext, runId?: string): Promise<string> {
   for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const [pending] = okOrThrow(database.approvals.listPendingApprovals());
+    const pending = okOrThrow(database.approvals.listPendingApprovals()).find(
+      (approval) => runId === undefined || approval.runId === runId,
+    );
     if (pending !== undefined) {
       return pending.stepRunId;
     }
@@ -520,6 +524,22 @@ async function waitForStepQueued(database: DatabaseContext, runId: string, nodeI
     await Promise.resolve();
   }
   throw new Error(`a(z) ${nodeId} lépés nem állt sorba`);
+}
+
+async function waitForStepStatus(
+  database: DatabaseContext,
+  runId: string,
+  nodeId: string,
+  status: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+    if (step?.status === status) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés nem érte el a(z) ${status} állapotot`);
 }
 
 /**
@@ -1064,6 +1084,118 @@ describe('createEngine', () => {
         (step) => step.nodeType === 'agent_step' && step.nodeId !== failingNodeId,
       );
       expect(siblings.map((step) => step.status)).toStrictEqual(['succeeded', 'succeeded']);
+    });
+
+    it('REGRESSZIÓ: a döntésre váró human_approval testvér a bukás után cancelled, a futás döntés nélkül failed, az utólagos döntés illegal_status_transition hibát ad és semmit nem módosít', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-varakozo-jovahagyas',
+        [startNode('start'), agentNode('a1', 'egy'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'jov')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, started.run.id, 1, 0);
+      const approvalStepRunId = await waitForPendingApproval(harness.database);
+
+      scripted.releaseFailure();
+      // A javítás előtt a futás a döntésig `running` maradt, ez a várakozás
+      // tehát elbukott.
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).errorKind).toBe('agent_result_not_success');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      // A `human_approval` táblának nincs állapot oszlopa: a döntés NULL marad,
+      // ugyanúgy, mint a felhasználói megszakítás után.
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+      const publishedBefore = harness.published.length;
+
+      const late = await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' });
+
+      expect(late.kind === 'error' ? late.message : '').toContain('(illegal_status_transition)');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(harness.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('failed');
+      expect(harness.published).toHaveLength(publishedBefore);
+    });
+
+    it('REGRESSZIÓ: egy MÁSIK futás döntésre váró jóváhagyása érintetlen marad, és a döntés után a saját útján zár', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const failingWorkflowId = createWorkflow(
+        harness.database,
+        'fail-run-jovahagyassal',
+        [startNode('start'), agentNode('a1', 'egy'), approvalNode('jov', null)],
+        [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'jov')],
+      );
+      const otherWorkflowId = createWorkflow(
+        harness.database,
+        'masik-jovahagyas',
+        // A node és az él azonosítója az adatbázisban globálisan egyedi.
+        [startNode('start-b'), approvalNode('jov-b', null)],
+        [edgeOf('eb1', 'start-b', 'jov-b')],
+      );
+      const other = okOrThrow(await harness.engine.startRun({ workflowId: otherWorkflowId, input: {} }));
+      const otherApprovalStepRunId = await waitForPendingApproval(harness.database, other.run.id);
+      const failing = okOrThrow(await harness.engine.startRun({ workflowId: failingWorkflowId, input: {} }));
+      await waitForRunningAndQueued(harness.database, failing.run.id, 1, 0);
+      await waitForPendingApproval(harness.database, failing.run.id);
+
+      scripted.releaseFailure();
+
+      expect(await waitForRunStatus(harness.database, failing.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(other.run.id)).status).toBe('running');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(otherApprovalStepRunId)).status).toBe('waiting_approval');
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: otherApprovalStepRunId, decision: 'approved' }));
+
+      expect(await waitForRunStatus(harness.database, other.run.id, TERMINAL_RUN_STATUSES)).toBe('succeeded');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(otherApprovalStepRunId)).status).toBe('succeeded');
+    });
+
+    it('HATÁR: fail_branch mellett a döntésre váró jóváhagyás a bukás feldolgozása után is vár, és a futás csak a döntés után failed (SPEC-004 8.3, 8.4)', async () => {
+      const scripted = scriptedRunner(['fails_when_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      // A `utana` két bejövő éle (`start`, `a1`) miatt csak akkor válik
+      // futtathatóvá, amikor a léptető hurok az `a1` bukását már feldolgozta
+      // (a `fail_branch` halott jelölése, SPEC-004 4.4 2. pont): a sora a
+      // teszt megfigyelhető jele, hogy a hurok a bukásra már reagált.
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-branch-jovahagyas',
+        [
+          startNode('start'),
+          agentNode('a1', 'egy', 'fail_branch'),
+          agentNode('utana', 'utana'),
+          approvalNode('jov', null),
+        ],
+        [
+          edgeOf('e1', 'start', 'a1'),
+          edgeOf('e2', 'start', 'utana'),
+          edgeOf('e3', 'a1', 'utana'),
+          edgeOf('e4', 'start', 'jov'),
+        ],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      await waitForStepRunning(harness.database, started.run.id, 'a1');
+      const approvalStepRunId = await waitForPendingApproval(harness.database);
+
+      scripted.releaseFailure();
+      await waitForStepStatus(harness.database, started.run.id, 'utana', 'succeeded');
+
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('running');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('waiting_approval');
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'approved' }));
+
+      expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).errorKind).toBe('agent_result_not_success');
+      expect(okOrThrow(harness.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('succeeded');
+      // A döntést a végrehajtó kapta meg, nem egy korábban lezárt várakozás:
+      // lezárt várakozás után a sor ugyan átmenne, de esemény nem íródna.
+      expect(hasPublishedEvent(harness.published, 'approval_decided', approvalStepRunId)).toBe(true);
     });
   });
 

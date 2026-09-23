@@ -30,8 +30,11 @@ import type { AgentQueryRegistry } from './agent-query-registry.ts';
  * megszakítani, hanem ki kell venni a sorból. A külső megszakítás és a
  * szabályos leállás ezt a `stopAndAwaitRunTree` 2. pontjában teszi meg, a
  * `fail_run` ág a léptető hurokban, mindkettő EZEN hívás előtt
- * (`ConcurrencyGate.denyWaitingForRunIds`): fordított sorrendben a megszakított
- * lépés felszabaduló helyét a sorban álló testvér kapná meg.
+ * (`ConcurrencyGate.denyWaitingForRunIds`): ha az `interrupt()` nyugtája a
+ * megszakított lépés helyének felszabadítása után érkezik (az `AgentQuery`
+ * szerződése ezt nem zárja ki), fordított sorrendben a felszabaduló helyet a
+ * sorban álló testvér kapná meg (`run-supervisor/advance-run.spec.ts`, sorrend
+ * teszt). A valódi SDK nyugtájának időzítése nem mért.
  */
 export async function interruptLiveAgentQueries(
   runIds: ReadonlySet<string>,
