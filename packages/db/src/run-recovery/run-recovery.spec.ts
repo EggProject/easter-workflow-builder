@@ -141,6 +141,9 @@ describe('createRunRecovery', () => {
 
       const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(2);
+      // Az azonosítók listája a szabályos leállás élő kiadásának bemenete
+      // (`packages/engine` `shutdownActiveRuns`): pontosan az érintett futások.
+      expect(new Set(result.recoveredRunIds)).toStrictEqual(new Set(['run-pending', 'run-running']));
 
       const runPending = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'run-pending')).get();
       expect(runPending?.status).toBe('interrupted');
@@ -230,6 +233,7 @@ describe('createRunRecovery', () => {
 
       const result = okOrThrow(repository.recoverInterruptedRuns('startup_recovery'));
       expect(result.recoveredRunCount).toBe(0);
+      expect(result.recoveredRunIds).toStrictEqual([]);
 
       const events = database.select().from(runEventTable).all();
       expect(events).toHaveLength(0);
@@ -368,6 +372,82 @@ describe('createRunRecovery', () => {
 
       const result = okOrThrow(repository.cancelRunTree('nincs-ilyen-futas'));
       expect(result.cancelledRunIds).toStrictEqual([]);
+
+      sqlite.close();
+    });
+  });
+
+  describe('cancelRuns', () => {
+    it('csak a megnevezett futásokat viszi cancelled állapotba, a gyökérük és az azonos gyökerű testvérük érintetlen', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'root-run', 'running');
+      insertStep(database, 'root-run', 'root-step', 'running');
+      insertRun(database, 'w1', 'child-run', 'running', 'root-run');
+      insertStep(database, 'child-run', 'child-step', 'waiting_approval');
+      insertStep(database, 'child-run', 'child-done', 'succeeded');
+      insertRun(database, 'w1', 'grandchild-run', 'running', 'root-run');
+      insertStep(database, 'grandchild-run', 'grandchild-step', 'pending');
+      insertRun(database, 'w1', 'sibling-run', 'running', 'root-run');
+
+      const result = okOrThrow(repository.cancelRuns(['child-run', 'grandchild-run']));
+
+      expect(new Set(result.cancelledRunIds)).toStrictEqual(new Set(['child-run', 'grandchild-run']));
+      const statusOf = (runId: string): string | undefined =>
+        database.select().from(workflowRunTable).where(eq(workflowRunTable.id, runId)).get()?.status;
+      expect(['root-run', 'child-run', 'grandchild-run', 'sibling-run'].map((runId) => statusOf(runId))).toStrictEqual([
+        'running',
+        'cancelled',
+        'cancelled',
+        'running',
+      ]);
+      const stepStatusOf = (stepId: string): string | undefined =>
+        database.select().from(stepRunTable).where(eq(stepRunTable.id, stepId)).get()?.status;
+      expect(
+        ['root-step', 'child-step', 'child-done', 'grandchild-step'].map((stepId) => stepStatusOf(stepId)),
+      ).toStrictEqual(['running', 'cancelled', 'succeeded', 'cancelled']);
+      const events = database.select().from(runEventTable).all();
+      expect(new Set(events.map((event) => `${event.runId}:${event.kind}`))).toStrictEqual(
+        new Set(['child-run:run_finished', 'grandchild-run:run_finished']),
+      );
+      expect(events).toHaveLength(2);
+      for (const event of events) {
+        expect(event.payload).toStrictEqual({
+          status: 'cancelled',
+          errorKind: null,
+          errorMessage: null,
+          failedBranchCount: 0,
+        });
+      }
+
+      sqlite.close();
+    });
+
+    it('a megnevezett, de már terminális futást érintetlenül hagyja', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'done-run', 'failed');
+
+      const result = okOrThrow(repository.cancelRuns(['done-run']));
+
+      expect(result.cancelledRunIds).toStrictEqual([]);
+      const run = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'done-run')).get();
+      expect(run?.status).toBe('failed');
+      expect(database.select().from(runEventTable).all()).toHaveLength(0);
+
+      sqlite.close();
+    });
+
+    it('üres listára cancelledRunIds üres lista, és egyetlen futást sem érint', () => {
+      const { sqlite, database, repository } = openRepository();
+      insertWorkflow(database, 'w1');
+      insertRun(database, 'w1', 'root-run', 'running');
+
+      const result = okOrThrow(repository.cancelRuns([]));
+
+      expect(result.cancelledRunIds).toStrictEqual([]);
+      const run = database.select().from(workflowRunTable).where(eq(workflowRunTable.id, 'root-run')).get();
+      expect(run?.status).toBe('running');
 
       sqlite.close();
     });

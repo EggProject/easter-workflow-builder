@@ -88,7 +88,6 @@ for (const theme of ['light', 'dark'] as const) {
       const differences: number[] = [];
       for (const edge of SHOWCASE_GRAPH.edges) {
         const difference = await measureEdgePaintDifference(page, edge.id);
-        // eslint-disable-next-line no-console -- a mért szám a bizonyíték, a riportban látszania kell
         console.log(`${theme} ${edge.id}: legnagyobb csatorna eltérés ${String(difference)}`);
         expect(difference).toBeGreaterThanOrEqual(EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE);
         differences.push(difference);

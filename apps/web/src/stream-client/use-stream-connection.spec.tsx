@@ -1,6 +1,7 @@
 /* eslint-disable unicorn/no-null -- a RunEventRecord és a keret sémák nullázható mezői (stepRunId, sdkMessageType stb., throughEventId, runId) a dróton ténylegesen `null` értéket hordoznak, nem helyőrző `undefined`-et (SPEC-003 6.2, SPEC-005 5.4 táblázat) */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import type { StreamFrame } from '@easter-workflow-builder/protocol';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { EventSourceLike } from './event-source-like.ts';
 import { useStreamConnection, type StreamConnectionState } from './use-stream-connection.ts';
@@ -94,6 +95,19 @@ describe('useStreamConnection', () => {
     container.remove();
   });
 
+  /**
+   * Feliratkozik a keretekre, és a kapott kereteket egy tömbbe gyűjti.
+   */
+  function recordFrames(): StreamFrame[] {
+    const received: StreamFrame[] = [];
+    act(() => {
+      latest?.subscribeToFrames((frame) => {
+        received.push(frame);
+      });
+    });
+    return received;
+  }
+
   function render(streamOrigin = 'https://api.example.test'): FakeEventSource {
     act(() => {
       root.render(<HookHarness streamOrigin={streamOrigin} />);
@@ -108,7 +122,6 @@ describe('useStreamConnection', () => {
     render();
     expect(latest?.streamId).toBe('stream-1');
     expect(latest?.phase).toBe('connecting');
-    expect(latest?.lastFrame).toBeUndefined();
     expect(latest?.serverInstanceId).toBeUndefined();
   });
 
@@ -128,6 +141,7 @@ describe('useStreamConnection', () => {
 
   it('stream_ready keretre eltárolja a serverInstanceId-t, üres subscriptions esetén marad live', () => {
     const source = render();
+    const received = recordFrames();
     act(() => {
       source.readyState = OPEN;
       source.dispatch('open');
@@ -138,12 +152,14 @@ describe('useStreamConnection', () => {
     });
     expect(latest?.serverInstanceId).toBe('srv-1');
     expect(latest?.phase).toBe('live');
-    expect(latest?.lastFrame).toEqual({
-      event: 'stream_ready',
-      streamId: 'stream-1',
-      serverInstanceId: 'srv-1',
-      subscriptions: [],
-    });
+    expect(received).toEqual([
+      {
+        event: 'stream_ready',
+        streamId: 'stream-1',
+        serverInstanceId: 'srv-1',
+        subscriptions: [],
+      },
+    ]);
   });
 
   /**
@@ -241,8 +257,9 @@ describe('useStreamConnection', () => {
     expect(latest?.phase).toBe('live');
   });
 
-  it('run_event és run_event_transient keretre a lastFrame frissül', () => {
+  it('run_event és run_event_transient keretet a feliratkozó megkap', () => {
     const source = render();
+    const received = recordFrames();
     act(() => {
       source.dispatch(
         'run_event',
@@ -273,7 +290,7 @@ describe('useStreamConnection', () => {
         }),
       );
     });
-    expect(latest?.lastFrame?.event).toBe('run_event');
+    expect(received.map((frame) => frame.event)).toEqual(['run_event']);
 
     act(() => {
       source.dispatch(
@@ -288,35 +305,38 @@ describe('useStreamConnection', () => {
         }),
       );
     });
-    expect(latest?.lastFrame?.event).toBe('run_event_transient');
+    expect(received.map((frame) => frame.event)).toEqual(['run_event', 'run_event_transient']);
   });
 
-  it('protocol_error keretre a lastFrame frissül, a kapcsolat nyitva marad', () => {
+  it('protocol_error keretet a feliratkozó megkap, a kapcsolat nyitva marad', () => {
     const source = render();
+    const received = recordFrames();
     act(() => {
       source.dispatch(
         'protocol_error',
         frameData({ event: 'protocol_error', code: 'internal', message: 'hiba', runId: null }),
       );
     });
-    expect(latest?.lastFrame?.event).toBe('protocol_error');
+    expect(received.map((frame) => frame.event)).toEqual(['protocol_error']);
     expect(source.closeCallCount).toBe(0);
   });
 
-  it('hibás JSON keretet eldob, a lastFrame nem változik', () => {
+  it('hibás JSON keretet eldob, a feliratkozó nem kap semmit', () => {
     const source = render();
+    const received = recordFrames();
     act(() => {
       source.dispatch('run_event', '{nem json');
     });
-    expect(latest?.lastFrame).toBeUndefined();
+    expect(received).toEqual([]);
   });
 
-  it('a sémának nem megfelelő keretet eldob, a lastFrame nem változik', () => {
+  it('a sémának nem megfelelő keretet eldob, a feliratkozó nem kap semmit', () => {
     const source = render();
+    const received = recordFrames();
     act(() => {
       source.dispatch('run_event', frameData({ event: 'ismeretlen_esemeny' }));
     });
-    expect(latest?.lastFrame).toBeUndefined();
+    expect(received).toEqual([]);
   });
 
   it('error eseményre, ha korábban már csatlakozott, reconnecting fázisba lép', () => {
@@ -332,6 +352,49 @@ describe('useStreamConnection', () => {
       source.dispatch('error');
     });
     expect(latest?.phase).toBe('reconnecting');
+  });
+
+  it('a subscribeToFrames minden keretet kihagyás nélkül átad, egy löketen belül is', () => {
+    const source = render();
+    const received: string[] = [];
+    let unsubscribe: (() => void) | undefined;
+    act(() => {
+      unsubscribe = latest?.subscribeToFrames((frame) => {
+        received.push(frame.event);
+      });
+    });
+
+    // Egyetlen `act` blokk = egyetlen React render köteg: egy "legutolsó
+    // keret" alakú állapotból ilyenkor csak a harmadik lenne kiolvasható
+    // (T-009-25a), a feliratkozó viszont mind a hármat megkapja.
+    act(() => {
+      source.dispatch(
+        'protocol_error',
+        frameData({ event: 'protocol_error', code: 'internal', message: 'első', runId: null }),
+      );
+      source.dispatch('replay_complete', frameData({ event: 'replay_complete', runId: 'run-1', throughEventId: null }));
+      source.dispatch(
+        'protocol_error',
+        frameData({ event: 'protocol_error', code: 'internal', message: 'harmadik', runId: null }),
+      );
+    });
+    expect(received).toEqual(['protocol_error', 'replay_complete', 'protocol_error']);
+
+    act(() => {
+      unsubscribe?.();
+      source.dispatch('replay_complete', frameData({ event: 'replay_complete', runId: 'run-1', throughEventId: null }));
+    });
+    expect(received).toHaveLength(3);
+  });
+
+  it('a subscribeToFrames hivatkozása renderek között stabil', () => {
+    const source = render();
+    const first = latest?.subscribeToFrames;
+    act(() => {
+      source.readyState = OPEN;
+      source.dispatch('open');
+    });
+    expect(latest?.subscribeToFrames).toBe(first);
   });
 
   it('leszereléskor lezárja a kapcsolatot', () => {

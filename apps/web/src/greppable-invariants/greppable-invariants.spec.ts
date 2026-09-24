@@ -1,9 +1,13 @@
-// Tizenöt, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Tizenhét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
 // elemzés helyett - ugyanaz a minta, mint a `vite-istanbul-include-invariant`
-// témáé.
+// témáé. A T-009-24 lépéssel érkezett tizenhatodik (a transcript sorokban
+// nem jelenhet meg költség mező, SPEC-008 AC37) TÖRÖLVE: a user 2026-09-23-i
+// döntése ("Költség külön mezőként is látszódjon") a tiltást visszavonta, a
+// költség SDK becslésként jelenik meg (`run-event-row` téma). A mai (16) és
+// (17) a T-009-25 lépéssel érkezett (SPEC-008 AC39, AC40).
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -207,5 +211,34 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     const measuredGeometryPattern = /measured\.|getBoundingClientRect\(/;
     const offenders = PRODUCT_FILES.filter((file) => measuredGeometryPattern.test(stripCommentLines(file.content)));
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(16) a react-window 1.x két megszűnt lista komponensének neve sehol nem szerepel, sem a src, sem az e2e alatt (SPEC-008 AC39, M-69)', () => {
+    // A két név a 2.x API-ban megszűnt (`List` és `Grid` a helyük), egy
+    // elavult tutorial szerint írt kód nem fordulna le. A neveket a teszt
+    // darabokból rakja össze, különben a saját forrása illeszkedne rájuk.
+    const removedNames = [['Fixed', 'Size', 'List'].join(''), ['Variable', 'Size', 'List'].join('')];
+    const e2eFiles = listSourceFiles(path.join(WEB_SRC, '..', 'e2e'), ['.ts', '.tsx']);
+    const offenders = [...ALL_FILES, ...e2eFiles].filter((file) =>
+      removedNames.some((name) => file.content.includes(name)),
+    );
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+    // A pozitív oldal: a transcript ténylegesen a 2.x `List` komponenst használja.
+    const panelSource = readFileSync(path.join(WEB_SRC, 'transcript-panel', 'TranscriptPanel.tsx'), 'utf8');
+    expect(panelSource).toMatch(/import \{[^}]*\bList\b[^}]*\} from 'react-window';/);
+  });
+
+  it('(17) nincs görgetési pixel küszöb: termékkód nem olvas görgetési geometriát, az aljára tapadást a sorindex predikátum dönti el (SPEC-008 7.4, AC40)', () => {
+    // Egy `scrollTop + clientHeight >= scrollHeight - X` alakú feltételhez
+    // ezek közül legalább egy mező kellene; ha egyik sem szerepel a
+    // termékkódban, pixel küszöb szám sem állhat sehol. A doksi sorok
+    // kiszűrve, ugyanazzal a `stripCommentLines` segédfüggvénnyel és
+    // ugyanabból az okból, mint a (4), a (7), a (14) és a (15) ellenőrzésnél:
+    // a predikátum JSDoc-ja éppen ezt az elhagyott alternatívát nevezi meg.
+    const scrollGeometryPattern = /\b(?:scrollTop|scrollHeight|scrollY|clientHeight|offsetHeight|pageYOffset)\b/;
+    const offenders = PRODUCT_FILES.filter((file) => scrollGeometryPattern.test(stripCommentLines(file.content)));
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+    const predicateSource = readFileSync(path.join(WEB_SRC, 'transcript-panel', 'is-last-row-visible.ts'), 'utf8');
+    expect(predicateSource).toContain('visibleRows.stopIndex === rowCount - 1');
   });
 });

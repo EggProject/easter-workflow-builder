@@ -265,19 +265,22 @@ A rögzített verziók egyetlen forrása: `docs/research/2026-08-26-toolchain.md
 
 **A stack, szám nélkül.** TypeScript, Bun (csomagkezelő és workspace), Node (runtime), Turborepo,
 React, Vite, `@xyflow/react`, Drizzle ORM + `better-sqlite3`, `ws`, `pino` + `pino-roll`, Vitest,
-Playwright, ESLint flat config (gyökér `CLAUDE.md`).
+Playwright, ESLint flat config (gyökér `CLAUDE.md`). A workflow sablon nyelve Mustache
+(`mustache`), a kifejezés nyelve CEL (`@marcbachmann/cel-js`); a bevezetésük a PLAN-010 szerint
+történik (user döntés 2026-09-23, SPEC-010).
 
 **Miért ezek, röviden**
 
-| Döntés                                                                                                    | Indok                                                                                                       |
-| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                 | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API |
-| Bun csak csomagkezelő és workspace, a runtime Node                                                        | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik          |
-| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                            | Turborepo 2.x                                                                                               |
-| Nincs TypeScript projekt referencia, nincs `composite`                                                    | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)            |
-| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                               | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                    |
-| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                         |
-| Az Agent SDK verziója pinelve                                                                             | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                 |
+| Döntés                                                                                                    | Indok                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TypeScript 6.0.x fix, nem frissítjük 7-re                                                                 | a `typescript-eslint` peer range-e `<6.1.0`, a TS 7 támogatás "not planned", mert nincs stabil compiler API                                                                                                                                                                                                                    |
+| Bun csak csomagkezelő és workspace, a runtime Node                                                        | a Vitest 4 Bun alatt nem támogatott, a v8 coverage `node:inspector`-t igényel, ami Bunban hiányzik                                                                                                                                                                                                                             |
+| Turborepo `tasks` séma, nincs `pipeline` kulcs                                                            | Turborepo 2.x                                                                                                                                                                                                                                                                                                                  |
+| Nincs TypeScript projekt referencia, nincs `composite`                                                    | a Turborepo hivatalos ajánlása; a build sorrendet a `turbo.json` `dependsOn` adja (SPEC-001 D-1)                                                                                                                                                                                                                               |
+| Forrás fogyasztás: az `exports` a `./src/index.ts`-re mutat                                               | méréssel igazolt, nincs build lépés a könyvtárcsomagokban (SPEC-001 V-1)                                                                                                                                                                                                                                                       |
+| Prettier formáz, ESLint nem; `eslint-config-prettier/flat` az utolsó elem, `eslint-plugin-prettier` nincs | a Prettier saját dokumentált ajánlása (SPEC-001 8.)                                                                                                                                                                                                                                                                            |
+| Az Agent SDK verziója pinelve                                                                             | a kimenő request body mezőlista verziónként bővül, egy új mező MiniMax ellen 400-at okozhat                                                                                                                                                                                                                                    |
+| Sablon nyelv Mustache, kifejezés nyelv CEL, mindkét csomag pontos verzióval pinelve                       | a Mustache logika mentes, a CEL nem Turing-teljes (user döntés, SPEC-010 4.); a CEL JS binding fiatal, ezért a frissítése előtt a blokkoló mérés regresszióként fut (SPEC-010 4.2 1. pont); a Mustache név feloldás saját adat tulajdonságra szűkített, mert szűkítés nélkül egy sablon a szervert leállíthatja (SPEC-010 6.6) |
 
 **Tiltások**
 
@@ -520,6 +523,23 @@ szabálylista" ott áll részletesen, itt csak a lényeg.
   érték, miközben a `toBeVisible()` mindkét esetben átment
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
 
+**A Playwright lokálisan legfeljebb HÁROM workert használhat** (user kérés 2026-09-24): "A
+Playwright teszteknél maximum három worker futhat. Több nem, lokál... mert megöli a gépet." A
+korlát a TELJES GÉPRE vonatkozik, nem konfigurációnként: lokálisan egyszerre csak egy Playwright
+folyamat futhat, az e2e shardok (`--shard=1/3` ... `3/3`) egymás UTÁN, sorban futnak, nem
+párhuzamosan, mert két egyidejű Playwright folyamat együttes worker száma is a korlát alá esik.
+A `apps/web/playwright.config.ts` és `playwright.screenshots.config.ts` `workers` mezője ezt
+kódolja (`docs/research/2026-09-24-playwright-worker-korlat.md`), a
+`apps/web/src/playwright-worker-limit/` regressziós tesztje őrzi a `test` kapun.
+**Nyitott pont a CI-ági workers érték méretezésére** (a 4. szekció 2. pontja szerinti
+jelöléssel): a user kifejezett kérése szerint "CI-ban futhat több is, mert az elviseli... ha
+elviseli, ott majd meg kell nézni" - tehát a tényleges CI worker szám felső korlátja jelenleg
+NEM MÉRT. Mi a viselkedés addig: a CI-ági érték változatlan marad azon, amit a config már eddig
+is használt (jelenleg `1`, a `docs/ci#workers` ajánlása szerint). Mi zárná le: a tényleges CI
+futtatókörnyezet terhelhetőségének mérése (hány worker fut le stabilan a GitHub Actions
+runneren), és a mérés eredményének átvezetése ebbe a szakaszba és a `playwright.config.ts`
+kommentjébe.
+
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
 
@@ -562,6 +582,13 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
 - **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
   hivatkozva. A SPEC-007 13.4 ezt megteszi.
+- **Egy keret egy felhasználói eseménnyel egy feladatban** a nyitott `node:http` kapcsolaton
+  sem küldhető: a hálózati keret a kattintás és a böngésző következő renderelési lépése közé
+  nem időzíthető megbízhatóan (mérve, `docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció). Ilyenkor a keret a lapon rögzített, valódi `EventSource` példányon, az esemény
+  capture fázisában kiváltott `MessageEvent`-ként érkezik, a hálózati kerettel azonos alakban
+  (`captureEventSources` az `apps/web/e2e/sse-real-server.spec.ts` fájlban); a kapcsolat
+  maga a teszt szerveren nyitott. Ez nem a hálózati út mockja, csak az időzítésé, ezért csak
+  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4).
 - **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
   `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
   a mérést meg kell ismételni azokra a motorokra is.
@@ -580,6 +607,21 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   rendelkezésre álló területet "faltól falig" tölti ki. A kiterjesztés: a layoutnak minden
   támogatott viewport méreten reszponzívnak kell lennie, nem csak egyetlen, fix asztali
   szélességen.
+- **A teljes területű munkafelületen az `.app-content` belső margója nulla.** Ma két ilyen
+  screen van, a gráf szerkesztő és a futás nézet; mindkettőnek önálló, `:has(> .<screen>)`
+  szabálya van a `topnav-shell.css` fájlban, és mindkettőn a screen nem-vászon elemei kapják
+  meg a `--ep-layout-gutter` oldalsó térközt. A próba, ami eldönti, jár-e egy screennek: a
+  tartalma `flex: 1`-gyel tölti-e ki az `.app-content` tartalom dobozát (ilyenkor a 80px alsó
+  padding üres sávot hagy alatta), vagy hosszú, görgetett lista (ilyenkor a padding a szánt
+  légtér) (SPEC-008 10., T-009-22).
+- **A töréspont literál akkor is token érték, ha JS-ben áll.** A
+  `media-query-breakpoint-invariant` teszt kizárólag CSS fájlokat vizsgál, van viszont olyan
+  reszponzív váltás, amit CSS-sel nem lehet megoldani: ha a két sáv DOM szerkezete vagy ARIA
+  szemantikája más (`Tabs` kontra `Resizable`, illetve az elválasztó `aria-orientation`
+  értéke), akkor a váltás `matchMedia` bekötésen megy. Ilyenkor a query literálhoz **saját
+  regressziós teszt kell**, ami magából a `design-token/breakpoints.css` fájlból olvasott
+  token értékkel hasonlítja össze; kitalált szám JS-ben sem állhat. Precedens:
+  `apps/web/src/run-view/run-view-layout-band.spec.ts` (SPEC-008 10., T-009-22).
 - **Csak létező design system elem használható.** Ami a `eggproject-design*` skillekben nincs
   meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
   emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
@@ -657,6 +699,16 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   lefedettség egyetlen, gyökér szintű folyamatban gyűlik: a `test.sh` és a `//#test` task is
   közvetlenül a gyökér `vitest run --coverage` parancsot hívja. Ugyanez az elv a Prettiernél is
   (gyökér `CLAUDE.md`, `tooling/scripts` CLAUDE.md).
+- **A teszt törzse az 5000 ms-os alapértelmezett korlát alá esik, a gyűjtési fázis nem.** Két
+  időzített bomba állt a határon, és a CI-t egy olyan commitnál buktatta el, ami hozzájuk sem
+  nyúlt. (1) Repó szintű TypeScript parse a teszt törzsében: a V8 coverage a `typescript` csomag
+  kódját is műszerezi, ezért a teljes repó AST-je sokszorosára lassul, és a költség a repó
+  méretével nő. Védelem: a `tooling/scripts` `casing` témájának előszűrője, ami a parse-ot csak a
+  gyanús fájlokra futtatja. (2) A teljes alkalmazás modulgráfját betöltő dinamikus `import()` a
+  teszt törzsében: a gráfot statikus, előtöltő importtal kell a gyűjtési fázisba tenni
+  (`apps/web/src/app-mount/main.spec.ts`). Időkorlátot emelni csak a teszt terhelés alatt mért
+  eloszlásából szabad (user kérés 2026-09-23). Mérés és a korlát közeli tesztek listája:
+  `docs/research/2026-09-23-teszt-idokorlat-bombak.md`.
 - **A `//#test` név nem lehetett sima `test`.** A Turborepo `--dry=json` mérés szerint a
   nem-prefixelt taskok kihagyják a `//` csomagot, tehát a per-csomag taskgráf a gyökeret sosem
   érintené (`tooling/scripts` CLAUDE.md, SPEC-001 V-18).
@@ -666,6 +718,92 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kizárólag környezeti változó, a repóban semmit nem kell módosítani**, ezért a CI-re nincs
   hatása. `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`-et nem használunk (gyökér `CLAUDE.md`,
   research V-19).
+- **`[INVALID_ANNOTATION]` figyelmeztetés a `VITE_COVERAGE=true` instrumentált buildben.** Az
+  Istanbul minden JSX feltételes ág elé (`feltétel ? (jsx1) : (jsx2)` alak) egy vessző operátoros
+  számlálót told (`cov_xxx().b[n][0]++, _jsx(...)`), ami a Babel/SWC JSX transzformáció
+  `/* @__PURE__ */` kommentjét eltolja a hívás elől. A Rolldown emiatt nem tudja értelmezni a
+  kommentet, és minden ilyen esetre `[INVALID_ANNOTATION]` figyelmeztetést ír a `webServer`
+  buildlogba. **Ártalmatlan minden eddig talált előfordulásra** (saját mérés, `vite build` a
+  `VITE_COVERAGE=true` env változóval, 2026-09-23, T-009-25: kilenc fájl, húsz előfordulás -
+  `src/app-shell/app-shell.tsx`, `src/graph-editor/GraphEditorScreen.tsx`,
+  `src/node-inspector/JoinNodeFields.tsx`, `src/run-control/RunControlBar.tsx`,
+  `src/run-event-row/RunEventRow.tsx`, `src/run-history/run-history-screen.tsx`,
+  `src/run-view/RunViewLayout.tsx`, `src/transcript-panel/TranscriptPanel.tsx`,
+  `src/workflow-list/workflow-list-screen.tsx`): mindegyik olyan `? (/* @__PURE__ */jsx(...)) :
+(/* @__PURE__ */jsx(...))` ág, aminek az eredménye MINDIG felhasznált (`return` vagy render
+  gyerek), tehát a PURE jelzés nem tehetne semmit: az csak akkor engedne eltávolítást, ha az
+  eredmény eldobva állna, ami itt sosem igaz. `VITE_COVERAGE` nélkül (a valódi, éles build) az
+  előfordulások száma NULLA (saját mérés), tehát a felhasználó felé szállított kód nem érintett.
+  **Ez a besorolás fájlonként újra ellenőrizendő, ha valaki egy `/* @__PURE__ */`-lel jelölt hívás
+  eredményét ELDOBva használná** (pl. egy csak mellékhatásért hívott függvény): a
+  `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy MÁSIK, nem JSX ternary
+  mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
+  megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
+  dokumentált és kezelt ott, külön jelenség, nem ez a kilenc fájl. **Újramérve 2026-09-24**
+  (a transcript sor tipográfiája után, a `test:e2e` `webServer` buildlogjából): nyolc fájl,
+  huszonhét előfordulás, az `app-shell.tsx` már nincs köztük. A `RunEventRow.tsx` egyik új
+  előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
+  számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
+  felhasznált, tehát a besorolás változatlan.
+
+**Frontend állapot és layout**
+
+- **Egy "legutolsó érték" alakú React állapot löketben érkező eseményfolyamnál keretet veszít, az
+  újratöltést kiváltó jelzéseket is.** A React a natív `EventSource` kezelőből jövő frissítéseket
+  egy renderbe vonja össze, tehát egy `lastFrame` függésű effekt a köztes kereteket sosem látja:
+  valós Chromiumban egyetlen hálózati darabban érkező 10, 1000 és 3000 keretre az effekt
+  mindháromszor EGYSZER futott, a függvény alakú állapotfrissítés viszont mindet megkapta (saját
+  mérés, `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). **A korábbi
+  feltevés, hogy az ilyen állapot "valami történt, tölts újra" jelzésre még jó, hamisnak bizonyult**:
+  a jelzés szűrője (melyik keret, melyik futás) is csak az utolsó keretet látja. A szerver a pótlás
+  végén szinkron `replay_complete` keretet ír, így a `run_finished` után a futás nézet fejléce
+  "fut" állapotban ragadt, a futás előzmények listája pedig egy `run_event` plusz `protocol_error`
+  löketre nem töltött újra; mindkettő valódi böngészőben mérve (T-009-25a,
+  `docs/research/2026-09-23-elo-csomopont-allapot.md`). A szabály: stream keretet kizárólag a
+  `stream-client` `subscribeToFrames` útja ad, keretenként; a `lastFrame` állapot törölve. Ha egy
+  keret újratöltést vált ki, a kérések összevonva futnak (`createCoalescedReload`), különben a
+  veszteségmentes út egy ezer keretes pótlásból kérés vihart csinálna. Védelem: az
+  `apps/web/e2e/sse-real-server.spec.ts` löket tesztjei (`pushBatch`: egy `write` hívásban küldött
+  keretek) a futás nézet fejlécére, a csomópont jelvényére és a futás előzmények listájára, plusz
+  a `use-stream-connection.spec.tsx`, `RunViewScreen.spec.tsx`, `run-history-screen.spec.tsx` és
+  `use-live-step-runs.spec.tsx` egy render kötegen belüli keretsorozatra mért tesztjei; a régi
+  kódon mind az öt e2e teszt elbukik.
+- **A dokumentum `scrollWidth` mérése nem látja a saját görgető dobozban maradó túllógást.** A
+  `react-window` lista gyökere `overflow-y: auto`, amitől az `overflow-x` is `auto` lesz, tehát
+  egy kilógó transcript sor a LISTÁT görgeti vízszintesen, a dokumentumot nem: csonkolás nélkül
+  mérve a dokumentum túllógása 0, a listáé 3719 pixel (375 pixelen). A vízszintes túllógás
+  tesztje ezért a görgető dobozt is méri (`responsive.spec.ts`, T-009-25).
+- **A `toBeInViewport()` alapértéke a részleges láthatóságot is elfogadja** (a `ratio` alapértéke
+  0, <https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>).
+  A transcript görgetés tesztjei emiatt nem vették észre, hogy az utolsó sor alja lemarad: a
+  becslésnél egy pixellel magasabb átmeneti sor miatt, és mert a `height: 100%` plusz belső
+  térközű burkoló `box-sizing` nélkül a lista alsó 16 pixelét a panel levágta. Ha egy teszt tárgya
+  az, hogy valami TELJESEN látszik, `toBeInViewport({ ratio: 1 })` kell, ami a levágó ősöket is
+  figyelembe veszi. Védelem: `apps/web/e2e/sse-real-server.spec.ts` lista alja tesztjei
+  (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
+- **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
+  kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
+  a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
+  kinyitott sort elrántotta, már a `dfcaa38` előtt is (40 ms-os streamnél véletlen fázisú
+  kinyitások harmadában). A szabály: felhasználói layout változás után görgetési döntés csak a
+  mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click` eseményétől a
+  mérésig kikapcsolja a követést, és a mérés előtti jelentés nem kapcsolhatja vissza. Védelem: a
+  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` négy
+  kinyitási út e2e tesztje mindkét témában, amelyekben egy sor a kattintással egy feladatban
+  érkezik (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. és 16. szekció).
+- **Egy "várj a következő X-ig" állapotnak mindig kell kilépés arra az esetre is, ha X sosem
+  jön.** A `d598677` a kinyitás után a mérésig visszatartotta a görgetést ÉS az érkezések
+  számlálását; egy képkockán belüli ki-be csukás (dupla kattintás) után a sor magassága nem
+  változott, mérés nem jött, és a lista végleg megállt: nem követett, gomb sem jelent meg, és a
+  kézi görgetés sem oldotta fel. A javított hook a váltásokat fejlécenként párosítja (páros számú
+  kattintás = nincs mérendő változás), a várakozás alatt is számol, és az ugrás gomb mindig lezárja.
+  Védelem: `sse-real-server.spec.ts` dupla kattintás tesztjei tárolt sorokkal (research 16.
+  szekció).
+- **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
+  pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
+  gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
+  magasra állításával minden összecsukott sor egyforma, és az eredeti követés 0 pixelre pontos
+  (research 16. szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 
@@ -805,25 +943,29 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 13. Hol keresd a részleteket
 
-| Téma                                                                | Forrás                                                                         |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv | `docs/spec/SPEC-000-provider-wire-measurement.md`                              |
-| a mérések kiértékelése, tervezési következmények                    | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md` |
-| monorepo, toolchain, ESLint szabályok, CI, wrapperek                | `docs/spec/SPEC-001-monorepo-toolchain.md`                                     |
-| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel           | `docs/research/2026-08-26-spec001-ellenorzesek.md`                             |
-| csomag architektúra, mappa és csomagnév konvenció                   | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                        |
-| domain modell, perzisztencia, állapotgépek, repository réteg        | `docs/spec/SPEC-003-domain-perzisztencia.md`                                   |
-| a `packages/db` belső szerkezetének bontási terve                   | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                 |
-| rögzített verziók és a mögöttük álló okok                           | `docs/research/2026-08-26-toolchain.md`                                        |
-| tároló motor kiértékelés, méretmérések                              | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
-| SDK session log kontra `run_event` és `graph_snapshot`              | `docs/research/2026-08-28-sdk-session-log.md`                                  |
-| Playwright e2e teszt szabályok, a 15 tételes szabálylista           | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
-| az SSE mockolás mérése, a hibrid döntés bizonyítéka                 | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
-| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése  | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
-| a gráf éleinek kifestett vonala, a bisect és a pixel mérés          | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
-| a select chevron helyének mérése, a React kontra natív ág döntése   | `docs/research/2026-09-09-select-chevron-meres.md`                             |
-| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek     | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
-| egy konkrét csomag felelőssége, fájljai, saját szabályai            | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
+| Téma                                                                 | Forrás                                                                         |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| provider drótszintű mérés, `ProviderCapabilityDescriptor` típusterv  | `docs/spec/SPEC-000-provider-wire-measurement.md`                              |
+| a mérések kiértékelése, tervezési következmények                     | `docs/research/2026-08-26-spec000-kiertekeles.md`, `...-meresi-jegyzokonyv.md` |
+| monorepo, toolchain, ESLint szabályok, CI, wrapperek                 | `docs/spec/SPEC-001-monorepo-toolchain.md`                                     |
+| a SPEC-001 ellenőrzési pontjai (V-1 ... V-20), mérésekkel            | `docs/research/2026-08-26-spec001-ellenorzesek.md`                             |
+| csomag architektúra, mappa és csomagnév konvenció                    | `docs/spec/SPEC-002-csomag-architektura.md`, 6. szekció                        |
+| domain modell, perzisztencia, állapotgépek, repository réteg         | `docs/spec/SPEC-003-domain-perzisztencia.md`                                   |
+| a `packages/db` belső szerkezetének bontási terve                    | `docs/plan/PLAN-004-csomag-belso-szerkezet.md`                                 |
+| rögzített verziók és a mögöttük álló okok                            | `docs/research/2026-08-26-toolchain.md`                                        |
+| tároló motor kiértékelés, méretmérések                               | `docs/research/2026-08-27-tarolo-motor-ertekeles.md`                           |
+| SDK session log kontra `run_event` és `graph_snapshot`               | `docs/research/2026-08-28-sdk-session-log.md`                                  |
+| Playwright e2e teszt szabályok, a 15 tételes szabálylista            | `docs/research/2026-08-29-playwright-teszt-szabalyok.md`                       |
+| az SSE mockolás mérése, a hibrid döntés bizonyítéka                  | `docs/research/2026-08-30-sse-mockolas-meres.md`                               |
+| az e2e lefedettségi küszöb mérése, származtatása, kizárási döntése   | `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`                          |
+| a gráf éleinek kifestett vonala, a bisect és a pixel mérés           | `docs/research/2026-09-09-graf-el-vonal-meres.md`                              |
+| a select chevron helyének mérése, a React kontra natív ág döntése    | `docs/research/2026-09-09-select-chevron-meres.md`                             |
+| a transcript panel: keret veszteség, sormagasság, cím csonkolás      | `docs/research/2026-09-23-transcript-panel-meresek.md`                         |
+| a csomópontok élő állapota, a löketben érkező keretek mérése         | `docs/research/2026-09-23-elo-csomopont-allapot.md`                            |
+| a frontend alkalmazás váza, a `packages/ui` és a kliens rétegek      | `docs/spec/SPEC-007-frontend-alkalmazas.md`                                    |
+| a sablon nyelv (Mustache) és a kifejezés nyelv (CEL) implementációja | `docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md`                              |
+| a sablon és kifejezés nyelv jelöltjei, csomagjai, forrásai           | `docs/research/2026-09-23-sablon-es-kifejezes-nyelv.md`, `...-csomagok.md`     |
+| egy konkrét csomag felelőssége, fájljai, saját szabályai             | az adott csomag gyökerének `CLAUDE.md` fájlja                                  |
 
 ---
 

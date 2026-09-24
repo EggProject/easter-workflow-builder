@@ -29,6 +29,15 @@ export interface ActiveRunHandle {
    */
   readonly rootRunId: string;
 
+  /**
+   * Al-workflow futásnál az a futás, aminek a `sub_workflow` lépése elindította
+   * (SPEC-004 5.9 3. pont); gyökér futásnál hiányzik. A `fail_run`
+   * hibapolitika ezzel választja ki a bukott futás alfáját
+   * (`ActiveRunRegistry.listDescendants`), mert a `rootRunId` szerinti szűrés
+   * a bukott futást és az őseit is elvinné.
+   */
+  readonly parentRunId?: string;
+
   readonly workflowId: string;
 
   readonly completion: Promise<Outcome<RunCompletion>>;
@@ -41,10 +50,22 @@ export interface ActiveRunHandle {
    * A záró állapot írásának elhagyása szándékos: a megszakítás (9. szekció 5. pont) és a szabályos leállás (10.2) a futást és minden nem terminális
    * lépését **egyetlen tranzakcióban** zárja le, a `db` oldalon. Ha a hurok is
    * írna, két, egymással versenyző állapotváltás keletkezne ugyanarra a sorra.
+   *
+   * A `targetStatus` az az állapot, amibe a leállító fél DB zárása a futást
+   * viszi: a felhasználói megszakítás és a `fail_run` `cancelled`, a szabályos
+   * leállás `interrupted` (SPEC-004 8.3, 9. szekció 5. pont, 10.2 3. pont).
+   * Az első hívás értéke marad meg: a leállítás pillanatában ismert
+   * célállapot (user döntés 2026-09-23).
    */
-  readonly requestStop: () => void;
+  readonly requestStop: (targetStatus: 'cancelled' | 'interrupted') => void;
 
-  readonly isStopRequested: () => boolean;
+  /**
+   * Az első `requestStop` célállapota, leállítás nélkül `undefined`. A
+   * leállított al-workflow futás szülő `sub_workflow` lépése ezt adja a
+   * `sub_workflow_finished` eseményben, mert a futás sorát még a fa DB
+   * zárása előtt olvassa (`ChildWorkflowRunResult`).
+   */
+  readonly stopTargetStatus: () => 'cancelled' | 'interrupted' | undefined;
 }
 
 /**
@@ -63,6 +84,12 @@ export interface ActiveRunRegistry {
   release(runId: string): void;
   get(runId: string): ActiveRunHandle | undefined;
   list(): readonly ActiveRunHandle[];
+
+  /**
+   * A megnevezett futás minden aktív leszármazottja (gyerek, unoka, ...) a
+   * `parentRunId` láncon, a futás maga nélkül.
+   */
+  listDescendants(runId: string): readonly ActiveRunHandle[];
 }
 
 /**
@@ -74,6 +101,15 @@ export interface ActiveRunRegistry {
 export function createActiveRunRegistry(): ActiveRunRegistry {
   const handles = new Map<string, ActiveRunHandle>();
 
+  // Mélységi bejárás a `parentRunId` láncon: minden gyerek után a saját alfája.
+  function listDescendants(runId: string): readonly ActiveRunHandle[] {
+    return handles
+      .values()
+      .filter((handle) => handle.parentRunId === runId)
+      .flatMap((child) => [child, ...listDescendants(child.runId)])
+      .toArray();
+  }
+
   return {
     register: (handle) => {
       handles.set(handle.runId, handle);
@@ -83,5 +119,6 @@ export function createActiveRunRegistry(): ActiveRunRegistry {
     },
     get: (runId) => handles.get(runId),
     list: () => handles.values().toArray(),
+    listDescendants,
   };
 }

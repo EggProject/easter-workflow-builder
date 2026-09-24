@@ -28,6 +28,13 @@ import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
+/**
+ * A szerkesztő mentetlen jelzőjének szövege. A `getByRole('status')` a
+ * topnav stream jelzőjét is megtalálja (`FeedIndicator`, `role="status"`,
+ * 2026-09-23), ezért a szerkesztő jelzője a szövegével szűrve áll.
+ */
+const UNSAVED_CHANGES_TEXT = 'Mentetlen változtatások';
+
 const AGENT_STEP_CONFIG: NodeConfig = {
   type: 'agent_step',
   promptTemplate: 'Foglald össze a bemenetet.',
@@ -334,7 +341,7 @@ test('a ciklus csomópont elnevezett kimenetéről induló kapcsolat mentéskor 
   expect(newEdge?.branchKey).toBe('continue');
 
   // Sikeres mentés után a baseline frissül, a gráf már nem piszkos.
-  await expect(page.getByRole('status')).toBeHidden();
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toBeHidden();
 });
 
 test('mentés közben a gomb "Mentés..." feliratot mutat, amíg a válasz nem érkezik meg', async ({ page }) => {
@@ -380,13 +387,17 @@ test('sikertelen mentésre hibaüzenet jelenik meg, és a gráf piszkos marad', 
   const source = await handleCenter(page, 'n-agent-a', 'Kimenet');
   const target = await handleCenter(page, 'n-agent-b', 'Bemenet');
   await dragConnection(page, source, target);
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 
   await page.getByRole('button', { name: /^Mentés/ }).click();
   await expect(page.getByText('A mentés sikertelen')).toBeVisible();
   await expect(page.getByText('A szerver hibás választ adott (HTTP 500).')).toBeVisible();
   // A baseline nem frissült, a jelző mentés után is látszik.
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 });
 
 test('a gráf betöltési hibája a képernyőn jelenik meg', async ({ page }) => {

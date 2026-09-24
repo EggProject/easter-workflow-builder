@@ -20,6 +20,15 @@ import type { StepInstanceReference } from '../run-context/step-instance-referen
  * A `providerId` a `ValidatedRun.effectiveProviderByNodeId` már feloldott
  * értéke (11.1), amit a `step_started` esemény és a `createStepRun` hívás is
  * felhasznál.
+ *
+ * A `failureStopsRun` azt mondja ki, hogy a példány `failed` kimenete a 8.3
+ * `fail_run` politikát váltja ki (nincs `on_error` éle, és a politika
+ * `fail_run`). A hívó a `resolveErrorRoute` döntéséből számítja, ugyanabból,
+ * amivel a kimenetet később feldolgozza. Csak a helyet foglaló lépés olvassa
+ * (`agent-node-lifecycle.ts`): a futás sorban álló testvéreit a saját
+ * helyének felszabadítása ELŐTT kell kivennie a szabályozó sorából, mert a
+ * felszabaduló helyet a sor következő eleme szinkron kapja meg, még mielőtt a
+ * léptető hurok a bukásról tudna.
  */
 export interface NodeExecutionInstance {
   readonly runId: string;
@@ -28,4 +37,5 @@ export interface NodeExecutionInstance {
   readonly iteration: number;
   readonly attempt: number;
   readonly providerId: ProviderId;
+  readonly failureStopsRun: boolean;
 }

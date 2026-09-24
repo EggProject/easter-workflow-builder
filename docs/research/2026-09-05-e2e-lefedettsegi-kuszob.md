@@ -722,3 +722,609 @@ szekció módszere szerint.
 a nyers adaton egyetlen századdal magasabb küszöbbel (98.64 / 97.49 / 99.25 / 98.58) mind a négy
 metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel **exit 1**, tehát a
 kapu a mért érték mellett tényleg a határon áll, nem tartalékkal.
+
+---
+
+## 17. A futás nézet osztott elrendezése utáni ratchet (2026-09-15): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-22 lépése (a `run-view` téma osztott elrendezése, a három reszponzív sáv, a
+`localStorage`-ba perzisztált arány) öt új termékkód fájlt hozott az `apps/web/src/run-view`
+mappába, és kilenc új Playwright tesztet (`run-view.spec.ts` hét, `responsive.spec.ts` egy
+viewport hurok, plusz a letiltott tárolás ága).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e`, **167
+Playwright teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (16. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1125 / 1140     | **98.68** | 1084 / 1099 = 98.63 | 15 -> **15**                   |
+| branches   | 433 / 444       | **97.52** | 427 / 438 = 97.48   | 11 -> **11**                   |
+| functions  | 405 / 408       | **99.26** | 395 / 398 = 99.24   | 3 -> **3**                     |
+| lines      | 1082 / 1097     | **98.63** | 1041 / 1056 = 98.57 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A fedetlen darabszám mind a négy metrikán VÁLTOZATLAN, a nevező
+viszont nőtt (statements 1099 -> 1140, branches 438 -> 444, functions 398 -> 408, lines
+1056 -> 1097), tehát a százalék emelkedett. A küszöb a `.claude/CLAUDE.md` 8. szekció "a küszöb
+pontosan a mért érték" szabálya szerint a négy mért számra húzva, felfelé kerekítés nélkül. A 16. szekció hatos fedetlen listája szó szerint érvényben marad, új sor nem került rá.
+
+**Az öt új fájl mind 100 százalék mind a négy metrikán** (`nyc` per fájl riport):
+`RunViewLayout.tsx`, `run-view-layout-band.ts`, `run-view-layout.ts`,
+`use-run-view-layout-band.ts` és a módosított `RunViewScreen.tsx`.
+
+**Két tétel igényelt célzott e2e tesztet, különben új fedetlen sor keletkezett volna:**
+
+| Hely                                          | Miért nem fedte a meglévő teszt                                                                                       | Mi fedi le most                                                                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `run-view-layout.ts` `catch` ága (readStored) | a `localStorage` dobó viselkedését a Playwright kívülről nem tudja beállítani, egy friss böngésző kontextus sosem dob | `addInitScript`, ami KIZÁRÓLAG a futás nézet kulcsára cseréli a `localStorage.getItem` metódust dobóra (a többi kulcs változatlan) |
+| a hibás alakú tárolt érték visszaesési ága    | egy friss kontextusban nincs tárolt érték, tehát a `JSON.parse` és a typeguard sor sem futott                         | két teszt, `addInitScript`-tel beültetett érvényes, illetve rossz alakú tárolt aránnyal                                            |
+
+**Az `addInitScript` és nem `evaluate`:** a `localStorage` olvasása a komponens csatolásakor, az
+első renderen történik, tehát egy betöltés utáni írás már nem hatna. Ugyanebből következik, hogy
+tesztenként EGY beültetés áll: az `addInitScript` minden navigációra újra lefut, tehát egy
+`reload` visszaírná a beültetett értéket (ez elsőre mért hibát adott: a "hibás érték" ág a reload
+után a beültetett ÉRVÉNYES arányt látta).
+
+**Az igazolás:** a beállított, mért küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon
+a nyers adaton egyetlen századdal magasabb küszöbbel (98.69 / 97.53 / 99.27 / 98.64) mind a négy
+metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel bukik, tehát a kapu a
+mért érték mellett a határon áll, nem tartalékkal.
+
+---
+
+## 18. A futás vezérlése utáni ratchet (2026-09-16): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-23 lépése (a `run-control` téma: indítás modális a `start` csomópont
+`inputFields` listájából, megszakítás, újraindítás, a futás hibaállapota) öt új termékkód fájlt
+hozott az `apps/web/src/run-control` mappába, egy hatodikat az `apps/web/src/run-view` mappába
+(`is-run-finished-frame.ts`), és tizennégy új Playwright tesztet (`run-control.spec.ts`
+tizenhárom, plusz egy a `sse-real-server.spec.ts` fájlban).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e`, **182
+Playwright teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (17. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1214 / 1229     | **98.77** | 1125 / 1140 = 98.68 | 15 -> **15**                   |
+| branches   | 488 / 499       | **97.79** | 433 / 444 = 97.52   | 11 -> **11**                   |
+| functions  | 433 / 436       | **99.31** | 405 / 408 = 99.26   | 3 -> **3**                     |
+| lines      | 1168 / 1183     | **98.73** | 1082 / 1097 = 98.63 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A fedetlen darabszám mind a négy metrikán VÁLTOZATLAN, a nevező
+viszont nőtt (statements 1140 -> 1229, branches 444 -> 499, functions 408 -> 436, lines
+1097 -> 1183), tehát a százalék emelkedett. A küszöb a `.claude/CLAUDE.md` 8. szekció "a küszöb
+pontosan a mért érték" szabálya szerint a négy mért számra húzva, felfelé kerekítés nélkül. A 16.
+szekció hatos fedetlen listája szó szerint érvényben marad, új sor nem került rá.
+
+**A hat új fájl mind 100 százalék mind a négy metrikán** (`nyc` per fájl riport):
+`RunControlBar.tsx`, `StartRunModal.tsx`, `read-start-input-fields.ts`,
+`run-control-availability.ts`, `start-run-values.ts` és
+`run-view/is-run-finished-frame.ts`; a módosított `GraphEditorScreen.tsx` és `RunViewScreen.tsx`
+szintén.
+
+**Négy tétel igényelt célzott e2e tesztet, különben új fedetlen ág keletkezett volna:**
+
+| Hely                                                            | Miért nem fedte a meglévő teszt                                          | Mi fedi le most                                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `RunControlBar.tsx` megszakítás hibaága                         | a boldog út mockja mindig 200-at ad                                      | `failingAction: 'interrupt'`, 409-es `conflict` válasz                        |
+| `RunControlBar.tsx` újraindítás hibaága                         | mint fent                                                                | `failingAction: 'restart'`, 409-es `conflict` válasz                          |
+| `StartRunModal.tsx` `errorMessage` ága                          | a modálissal indított futás mockja mindig sikeres volt                   | modálison indított futás 409-es válasszal, a modális nyitva marad             |
+| `GraphEditorScreen.tsx` lábléc indítás hibaága (modális NÉLKÜL) | üres `inputFields` esetén nincs modális, tehát az üzenet a láblécben áll | üres `inputFields` plusz 409-es `startRun` válasz, a lábléc `role="alert"`-je |
+
+**Két ág MEGSZŰNT, nem tesztet kapott** (a szabálykönyv 5. szekciója szerint tilos olyan ágat
+bevezetni, ami garantáltan sosem fut):
+
+1. `isRunRestartable` **törölve**: a `RunControlBar` egyetlen ternáriában dönt a két gomb között
+   az `isRunInterruptible` tagadásával, tehát a burkoló függvénynek nem volt termékkód hívója.
+2. A `start-run-values.ts` két `values[field.name] ?? ''` fallbackja **megszűnt**: mindkét
+   függvény a szerkesztett értékek rekordját járja be (`Object.entries`), és a mezőlistát csak a
+   kötelezőség eldöntésére használja. A rekord kulcsai a mezőlistából származnak
+   (`buildInitialStartRunValues`), tehát a "hiányzó kulcsú mező" ág a gyakorlatban sosem futott
+   volna le; a hiányzó bemenet végső ellenőrzése a motoré (`missing_required_input`,
+   SPEC-004 4.8).
+
+**Az igazolás:** a beállított, mért küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon
+a nyers adaton egyetlen századdal magasabb küszöbbel (98.78 / 97.80 / 99.32 / 98.74) mind a négy
+metrika `ERROR: Coverage for ... does not meet global threshold` üzenettel bukik (saját, most
+futtatott kontroll mérés: négy `ERROR` sor), tehát a kapu a mért érték mellett a határon áll, nem
+tartalékkal.
+
+## 19. A transcript panel utáni ratchet (2026-09-23): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-25 lépése a `transcript-panel` témát hozta, és vele a böngészőbe került a
+T-009-24 óta létező, de addig sehol fel nem csatolt `run-event-row` téma is. **Az első mérés
+(új e2e tesztek nélkül) a küszöb alá esett**, mert a most betöltött kód nagy része nem futott:
+
+| Metrika    | Fedett / összes | Százalék | Fedetlen darab |
+| ---------- | --------------- | -------- | -------------- |
+| statements | 1334 / 1395     | 95.62    | 61             |
+| branches   | 554 / 619       | 89.49    | 65             |
+| functions  | 466 / 476       | 97.89    | 10             |
+| lines      | 1284 / 1344     | 95.53    | 60             |
+
+A szabálykönyv 8. szekciója szerint ez VALÓDI lefedettség-romlás (a fedetlen darabszám nőtt),
+tehát nem a küszöb csökkent, hanem tesztek készültek a hiányra (`e2e/transcript-panel.spec.ts`):
+a huszonöt `kind` és a payload változatok mind kirajzolva (48 sor, a unit teszt esetkészletének
+megfelelője), az automatikus görgetés mindkét ága két egymást követő, lezárt SSE válasszal, az
+"ugrás az aljára" gomb, az üres, lezárt pótlás, egy másik futás kerete, egy átmeneti keret és a
+képernyő leszerelése (a keret feliratkozás lezárása).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet nyolc
+shardban, **193 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (18. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1386 / 1401     | **98.92** | 1214 / 1229 = 98.77 | 15 -> **15**                   |
+| branches   | 608 / 619       | **98.22** | 488 / 499 = 97.79   | 11 -> **11**                   |
+| functions  | 476 / 479       | **99.37** | 433 / 436 = 99.31   | 3 -> **3**                     |
+| lines      | 1334 / 1349     | **98.88** | 1168 / 1183 = 98.73 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**, és a fedetlen lista összetétele is a 16. szekció hat tétele,
+változatlanul: `mount-app.tsx` (3/2/0/3), `read-frontend-config.ts` (8/7/1/8),
+`is-valid-connection.ts` (1/1/0/1), `browser-history-location-port.ts` (1/0/1/1),
+`perform-route-request.ts` (1/1/0/1) és `use-stream-connection.ts` (1/0/1/1). Az utolsó
+tétel sorszáma a 16. szekció óta 182-ről 205-re tolódott, mert a `subscribeToFrames` a fájl elejére
+került; a tétel ugyanaz: az `EventSource` lezárása az app szintű hook leszerelésekor, ami e2e alatt
+nem fut. A `run-event-row`, a `transcript-panel` és a `run-view` mappa mind a négy metrikán 100
+százalék.
+
+A küszöb a mért négy számra húzva, felfelé kerekítés nélkül (`apps/web/package.json`).
+
+**Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon a nyers
+adaton egyetlen századdal magasabb küszöbbel (98.93 / 98.23 / 99.38 / 98.89) mind a négy metrika
+`ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 20. A csomópontok élő állapota utáni ratchet (2026-09-23): a küszöb FELFELÉ mozdul
+
+A PLAN-009 T-009-25a lépése a `useLiveStepRuns` hookot, a jelző keret predikátumát és az újratöltés
+összevonóját hozta, és törölte a `lastFrame` állapotot. **Az első mérés (az új e2e tesztekkel, de a
+futás váltás tesztje nélkül) a küszöb alá esett**: a fedetlen darabszám statements, branches és
+lines metrikán is eggyel nőtt (16, 12, 3, 16), mert a `use-live-step-runs.ts` eldobó ága (a futás
+váltásakor késve érkező válasz) e2e alatt nem futott. A szabálykönyv 8. szekciója szerint ez
+valódi romlás, tehát teszt készült rá: `e2e/run-view.spec.ts` "másik futásra váltáskor a régi futás
+késve érkező lépés futás válasza eldobódik", ami az eldobás törlésére mérten bukik.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet négy
+shardban, **199 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző (19. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1426 / 1441     | **98.95** | 1386 / 1401 = 98.92 | 15 -> **15**                   |
+| branches   | 622 / 633       | **98.26** | 608 / 619 = 98.22   | 11 -> **11**                   |
+| functions  | 487 / 490       | **99.38** | 476 / 479 = 99.37   | 3 -> **3**                     |
+| lines      | 1373 / 1388     | **98.91** | 1334 / 1349 = 98.88 | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**, a fedetlen lista a 16. szekció hat tétele, változatlanul. A
+`use-stream-connection.ts` tételének sorszáma 205-ről 203-ra tolódott, mert a `lastFrame` állapot
+két sora törlődött; a tétel ugyanaz (az `EventSource` lezárása az app szintű hook leszerelésekor).
+A `run-view`, a `run-history` és a `request-state` mappa mind a négy metrikán 100 százalék.
+
+A küszöb a mért négy számra húzva, felfelé kerekítés nélkül (`apps/web/package.json`).
+
+**Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` **exit 0**; ugyanazon a nyers
+adaton egyetlen századdal magasabb küszöbbel (98.96 / 98.27 / 99.39 / 98.92) mind a négy metrika
+`ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 21. A futás nézet újrafeliratkozása utáni ratchet (2026-09-23, `49846b4`): a küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `49846b4` commit (`Futás nézet: újrafeliratkozás szerver újraindulás után,
+minden lezáró keret frissíti a fejlécet`) két, valódi böngészőben mért kliens oldali hibát
+javított: (1) a `RunViewScreen` mostantól megkapja a `serverRestartCount` értéket, és a
+változására újra kiadja a `PUT` feliratkozást, újratölti a futás rekordját és a lépés futásokat
+(`useLiveStepRuns`, SPEC-005 5.2, SPEC-007 AC44); (2) az `is-run-finished-frame.ts` helyére az
+`is-run-closing-frame.ts` lépett: kimerítő `switch` a `RunEventKind` mind a huszonöt értékén, ami
+a `run_finished` mellett a `run_interrupted` keretet is lezárónak veszi (SPEC-003 7.1, SPEC-004
+10.1, 10.2), korábban csak a `run_finished` frissítette a fejlécet. A commit két új e2e tesztet
+vett fel a hibrid SSE úton (`apps/web/e2e/sse-real-server.spec.ts`): "élő run_interrupted keretre
+(szabályos leállás) a fejléc átvált, és megjelenik az Újraindítás gomb", és "szerver újraindulás
+után a futás nézet újra feliratkozik, újratölti a futást és a lépéseket, és az utána érkező élő
+keret frissíti a rajzot".
+
+**A mért állapot, a commit üzenete szerint:**
+
+| Metrika    | Százalék (`49846b4`) | Előző (20. szekció) |
+| ---------- | -------------------- | ------------------- |
+| statements | **98.96**            | 98.95               |
+| branches   | **98.33**            | 98.26               |
+| functions  | **99.39**            | 99.38               |
+| lines      | **98.92**            | 98.91               |
+
+**Nulla új fedetlen tétel.** A commit üzenete szerint a fedetlen tételek száma változatlanul
+15/11/3/15, bitre egyezik a 20. szekció darabszámával. A küszöb a mért négy számra húzva, felfelé
+kerekítés nélkül (`apps/web/package.json` `coverage:e2e:report`).
+
+**Ellenőrzés ebben a munkamenetben, nem vakon átvéve.** A négy szám és a fedetlen darabszám nem egy
+ebben a munkamenetben újrafuttatott méréssel, hanem a következő, egymástól független forrásokkal
+keresztellenőrzött:
+
+1. `git show 49846b4 -- apps/web/package.json`: a `coverage:e2e:report` script `--statements`,
+   `--branches`, `--functions`, `--lines` kapcsolói `98.95/98.26/99.38/98.91`-ről pontosan
+   `98.96/98.33/99.39/98.92`-re változtak, bájtra megegyezve a commit üzenetében állított
+   értékkel.
+2. A jelenlegi `apps/web/package.json` (a `feat/spec-008-futas-nezet` ágon) ugyanezt a négy
+   értéket tartalmazza, tehát a commit óta nem módosult.
+3. A commit által érintett öt forrásfájl (`app-shell.tsx`, `RunViewScreen.tsx`, az új
+   `is-run-closing-frame.ts`, a törölt `is-run-finished-frame.ts`, `use-live-step-runs.ts`)
+   egyike sem szerepel a 16. szekció óta érvényes hat fedetlen tételen (`mount-app.tsx`,
+   `read-frontend-config.ts`, `is-valid-connection.ts` 36. sor, `browser-history-location-port.ts`
+   cleanup sora, `perform-route-request.ts` 70. sor, `use-stream-connection.ts` cleanup sora), ami
+   összhangban áll a commit üzenetének "fedetlen tételek száma változatlan" állításával: az új kód
+   (a kimerítő switch mind a huszonöt ága, a két effekt) e2e-vel teljesen lefedett.
+
+**Ami ebből a munkamenetből NEM ELLENŐRZÖTT.** A jelen dokumentum-átvezetés kizárólag a `docs/`
+alatti fájlokat érinti, és egy párhuzamos munkamenet élő kódot ír ugyanezen az ágon; a teljes
+Playwright készlet újrafuttatása (`bun run test:e2e`, majd `nyc report --reporter=json-summary` a
+"Fedett / összes" nyers számpárokért, ahogy a korábbi szekciók teszik) ezért ebben a munkamenetben
+nem történt meg, hogy ne ütközzön a párhuzamos munkával. A négy százalék és a fedetlen darabszám
+forrása emiatt a fenti 1 ... 3. pont keresztellenőrzése, nem egy itt újrafuttatott mérés.
+
+---
+
+## 22. A várakozás jelzés utáni ratchet (2026-09-23, `b75960d`): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `b75960d` commit (`Futás nézet: a szerver leállása alatt az utolsó állapot
+marad, várakozás jelzéssel`) a szabályos leállás (`run_interrupted`) utáni újratöltés Vite
+proxytól kapott HTTP 502 válaszát kezeli: a `rest-client` réteg `RouteOutcome` típusa mostantól
+`isTransient` jelzőt hordoz (hálózati hiba, HTTP 502 és 503, RFC 9110 15.6.3, 15.6.4), a
+`run-view` pedig egy átmeneti újratöltési hibára a korábbi állapotot tartja meg, "Várakozás a
+szerverre" `role="status"` jelzéssel, az `Alert` design system komponens átemelésével.
+
+**A mért állapot, a commit üzenete szerint:**
+
+| Metrika    | Százalék (`b75960d`) | Előző (21. szekció) |
+| ---------- | -------------------- | ------------------- |
+| statements | 98.96                | 98.96               |
+| branches   | **98.35**            | 98.33               |
+| functions  | 99.39                | 99.39               |
+| lines      | 98.92                | 98.92               |
+
+**Nulla új fedetlen tétel.** A commit üzenete szerint a fedetlen tételek száma változatlanul
+15/11/3/15, bitre egyezik a 21. szekció darabszámával; a `branches` denominátora nőtt (az új
+`isTransient` elágazások mind fedettek), a régi 11 fedetlen ág darabszáma nem.
+
+**Ellenőrzés ebben a munkamenetben, nem vakon átvéve.**
+
+1. `git show b75960d -- apps/web/package.json`: a `coverage:e2e:report` script kizárólag a
+   `--branches` kapcsolóját változtatta, `98.33`-ról `98.35`-re; a másik három kapcsoló
+   (`--statements 98.96`, `--functions 99.39`, `--lines 98.92`) a diffben nem szerepel, tehát
+   valóban változatlan.
+2. A jelenlegi `apps/web/package.json` (a `feat/spec-008-futas-nezet` ágon) ugyanezt a négy
+   értéket tartalmazza, tehát a commit óta nem módosult.
+3. A commit négy érintett `rest-client` fájlja közül három (`route-outcome.ts` új, kizárólag
+   típusdefiníció, futásidejű elágazás nélkül; `request-route.ts` és
+   `request-route-without-body.ts` csak a visszatérési típus `Outcome` -> `RouteOutcome`
+   cseréjét kapta, futásidejű ág nem változott bennük) nem hozhat létre új, mérhető ágat. A
+   negyedik, `perform-route-request.ts`, a 2.2 szekció óta dokumentált, e2e-vel elvileg sem
+   elérhető `buildRoutePath` hibaágat tartalmazza (a hiányzó útvonal paraméter ága); a diff ezt a
+   `return` ágat a korábbi 70. sorról a 81. sorra tolta el, a feltétel és az elérhetetlenségi
+   indoklás (2.2 szekció: "a felület minden hívása betöltött rekordból veszi az azonosítót")
+   érintetlen. A fájlba került három ÚJ `isTransient` elágazás (`TRANSIENT_HTTP_STATUSES.has(...)`,
+   a hálózati hiba ág, a 502/503 protokoll hiba ág) a saját `perform-route-request.spec.ts`
+   kiegészítésével (`it.each([502, 503])`, plusz egy külön 503 protokoll hiba teszt) és a
+   hibrid SSE e2e tesztekkel (`sse-real-server.spec.ts`, a leállás 502-vel és az újraindulás
+   forgatókönyve) fedett, tehát nem hagy új rést.
+4. A `run-view`, `run-event-row` és `packages/ui` érintett fájljai (`RunViewScreen.tsx`,
+   `blocking-failure-message.ts`, `run-event-row-summary.ts`, az átemelt `Alert` komponens)
+   egyike sem szerepel a 16. szekció óta érvényes hat fedetlen tételen (`mount-app.tsx`,
+   `read-frontend-config.ts`, `is-valid-connection.ts` 36. sor,
+   `browser-history-location-port.ts` cleanup sora, `perform-route-request.ts` `buildRoutePath`
+   ága, `use-stream-connection.ts` cleanup sora); a commit üzenete szerint mindegyiket saját
+   unit teszt (`RunViewScreen.spec.tsx`, `blocking-failure-message.spec.ts`, `Alert.spec.tsx`,
+   `run-event-row-summary.spec.ts`) és a hibrid SSE e2e fedi.
+
+**Ami ebből a munkamenetből NEM ELLENŐRZÖTT.** Ugyanazon okból, mint a 21. szekcióban: a jelen
+dokumentum-átvezetés kizárólag a `docs/` alatti fájlokat érinti, egy párhuzamos munkamenet pedig
+élő kódot ír ugyanezen az ágon (a valódi `apps/server` mérés előtte/utána dokumentációja még
+folyamatban), ezért a teljes Playwright készlet újrafuttatása ebben a munkamenetben nem történt
+meg. A négy százalék és a fedetlen darabszám forrása a fenti 1 ... 4. pont keresztellenőrzése, nem
+egy itt újrafuttatott mérés.
+
+## 23. A transcript várakozás jelzése utáni ratchet (2026-09-23): a küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A futó (`pending` vagy `running`), még esemény nélküli futás transcriptje a
+lezárult pótlás után `role="status"` várakozás jelzést kap, a lezárt, üres futás pedig nem
+státusz mondatot (SPEC-008 9. szekció 16. pont). Az új elágazás mindkét ágát a
+`transcript-panel.spec.ts` e2e tesztjei futtatják (futó üres mindkét témában, lezárt üres).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet nyolc
+shardban, **206 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (22. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1441 / 1456     | 98.96     | 98.96                      | 15 -> **15**                   |
+| branches   | 660 / 671       | **98.36** | 98.35                      | 11 -> **11**                   |
+| functions  | 491 / 494       | 99.39     | 99.39                      | 3 -> **3**                     |
+| lines      | 1387 / 1402     | **98.93** | 98.92                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A küszöb a mért négy számra húzva, felfelé kerekítés nélkül
+(`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report`
+exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (98.97 / 98.37 / 99.40 /
+98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 24. A témázott csontváz és a futás nézet vászon javítása utáni ratchet (2026-09-23): a statements küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az `f3ac259` commit (`Skeleton sötét téma: .skel--ink bekötése ThemedSkeleton
+komponensen keresztül`) új, e2e-vel fedett kódot hozott (`apps/web/src/themed-skeleton/`: a
+`ThemedSkeleton` burkoló és a `useIsDarkTheme` hook), a statements aránya 98.97-re nőtt, a küszöb
+viszont 98.96-on maradt. A rákövetkező javítás (a futás nézet éle és pontmintája,
+`docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció) kizárólag CSS-t és egy új e2e
+spec fájlt (`run-graph-paint.spec.ts`) érint, TypeScript termékkódot nem, tehát a mért értéket nem
+mozdíthatja; a mérés ezen az állapoton készült.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet négy
+shardban, **213 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (23. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1449 / 1464     | **98.97** | 98.96                      | 15 -> **15**                   |
+| branches   | 660 / 671       | 98.36     | 98.36                      | 11 -> **11**                   |
+| functions  | 496 / 499       | 99.39     | 99.39                      | 3 -> **3**                     |
+| lines      | 1395 / 1410     | 98.93     | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező a statements, a functions és a lines metrikán nőtt (+8, +5,
++8, a `themed-skeleton` két fájlja), a fedetlen darabszám egyiken sem; a fedetlen sorok ugyanabban
+a hat fájlban állnak, mint a 16. szekció óta (`mount-app.tsx`, `read-frontend-config.ts`,
+`is-valid-connection.ts`, `browser-history-location-port.ts`, `perform-route-request.ts`,
+`use-stream-connection.ts`). A küszöb a mért statements értékre húzva (98.96 -> **98.97**), a másik
+három a mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/web/package.json`). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (98.98 / 98.37 / 99.40 / 98.94) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 25. A topnav stream jelző `FeedIndicator` átállása utáni ratchet (2026-09-23): a functions küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A topnav stream állapot jelzője a nyers `<span>` helyett a design system
+`FeedIndicator` komponensét használja, egy új, e2e-vel fedett `apps/web` fájlon át
+(`apps/web/src/app-shell/StreamStatusIndicator.tsx`: a négy stream fázis leképezése a forrás
+állapotaira, és a sötét témás `ink` felület). A `packages/ui` új `dot` és `feed-indicator` témája
+nem része az `apps/web` e2e műszerezésének, a unit kapu fedi őket, 100 százalékon.
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet egy
+futásban, három workerrel, **218 teszt, mind zöld**, majd `bun run coverage:e2e:report`):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (24. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1451 / 1466     | 98.97     | 98.97                      | 15 -> **15**                   |
+| branches   | 660 / 671       | 98.36     | 98.36                      | 11 -> **11**                   |
+| functions  | 497 / 500       | **99.40** | 99.39                      | 3 -> **3**                     |
+| lines      | 1397 / 1412     | 98.93     | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező a statements, a functions és a lines metrikán nőtt (+2, +1,
++2, a `StreamStatusIndicator.tsx`), a fedetlen darabszám egyiken sem. A küszöb a mért functions
+értékre húzva (99.39 -> **99.4**), a másik három a mért értékkel már egyezett, felfelé kerekítés
+nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(98.98 / 98.37 / 99.41 / 98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 26. A delta kapcsoló átmeneti sorai utáni ratchet (2026-09-24, PLAN-009 T-009-26): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A transcript panel a `run_event_transient` kereteket megjelölt, átmeneti sorként
+rajzolja, és ha a futás `persistedStreamDeltas` értéke hamis, a panel tetején egy magyarázó mondat
+áll (`apps/web/src/transcript-panel/`: `reduce-run-transcript-frame.ts` új ága, az új
+`to-transient-row-record.ts`, a `TranscriptPanel.tsx` mondata; `apps/web/src/run-event-row/RunEventRow.tsx`
+jelölése). Az első mérés három új fedetlen tételt talált, mindhármat teszttel vagy egyszerűbb
+kóddal zártuk, nem a küszöb csökkentésével:
+
+| Tétel                                                               | Megoldás                                                                                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunEventRow.tsx` `isTransient = false` alapérték ága               | a prop kötelező lett, alapérték nélkül: az egyetlen hívó (a transcript panel) minden sorra megadja                                    |
+| `TranscriptPanel.tsx` a fejléc sávon belüli mondat `undefined` ága  | a mondat a fejléc sávból a panel tetejére került, önálló feltétellel; így az ág kombináció (fejléc látszik ÉS tárolt delták) megszűnt |
+| `reduce-run-transcript-frame.ts` másik futás átmeneti keretének ága | a `transcript-panel.spec.ts` két fázisú tesztje a figyelmen kívül hagyott keretek közé egy MÁSIK futás átmeneti keretét is felvette   |
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet három
+shardban, `--shard=1/3`, `2/3`, `3/3`, egyenként 75 teszt, **225 teszt, mind zöld**, majd
+`bun run coverage:e2e:report`). A shardolás oka a fejlesztői sandbox egy hívásra eső időkorlátja;
+a műszerezett adat tesztenként külön fájlba íródik (`coverage-fixture.ts`), tehát a három shard
+nyers adata ugyanaz a halmaz, mint egy egyben futtatott készleté:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (25. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1463 / 1478     | **98.98** | 98.97                      | 15 -> **15**                   |
+| branches   | 664 / 675       | **98.37** | 98.36                      | 11 -> **11**                   |
+| functions  | 498 / 501       | 99.40     | 99.4                       | 3 -> **3**                     |
+| lines      | 1409 / 1424     | **98.94** | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+12, +4, +1, +12), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 25. szekcióéval (`mount-app.tsx`,
+`read-frontend-config.ts`, `is-valid-connection.ts`, `browser-history-location-port.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`). A küszöb a mért statements, branches és
+lines értékre húzva (98.97 -> **98.98**, 98.36 -> **98.37**, 98.93 -> **98.94**), a functions a
+mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a
+beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
+századdal magasabb küszöbbel (98.99 / 98.38 / 99.41 / 98.95) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`, exit 1).
+
+## 27. A transcript sor tipográfiája és a `rowKey` utáni ratchet (2026-09-24): a functions küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A transcript sor fejléce a meta darabokat külön, a design system Code szerepével
+rajzolja (`apps/web/src/run-event-row/RunEventRow.tsx`: a `CodeText` és a `SegmentedText`
+komponens, a `run-event-row-summary.ts` darabolása), a lista pedig `rowKey`-t kap
+(`apps/web/src/transcript-panel/transcript-row-key.ts`). Mind e2e-vel fedett új kód
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 11. és 12. szekció).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e` egy futásban,
+**226 teszt, mind zöld**, majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (26. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1468 / 1483     | 98.98     | 98.98                      | 15 -> **15**                   |
+| branches   | 665 / 676       | 98.37     | 98.37                      | 11 -> **11**                   |
+| functions  | 507 / 510       | **99.41** | 99.4                       | 3 -> **3**                     |
+| lines      | 1412 / 1427     | 98.94     | 98.94                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+5, +1, +9, +3), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 26. szekcióéval. A küszöb a mért
+functions értékre húzva (99.4 -> **99.41**), a másik három a mért értékkel már egyezett, felfelé
+kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(98.99 / 98.38 / 99.42 / 98.95) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 28. A transcript lista alja és az eredmény sor metája utáni ratchet (2026-09-24): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az automatikus követés a mért sormagassághoz igazít, a felhasználó beavatkozása
+felfüggeszti (`apps/web/src/transcript-panel/use-transcript-auto-scroll.ts`), az `sdk_result` sor
+metája csak az összeg (`apps/web/src/run-event-row/RunEventRow.tsx`), és nyolc új e2e teszt méri
+az utolsó sor teljes láthatóságát (`apps/web/e2e/sse-real-server.spec.ts`,
+`docs/research/2026-09-23-transcript-panel-meresek.md` 13. és 14. szekció).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet hat
+shardban, `playwright test --shard=i/6`, **234 teszt, mind zöld**, majd `bun run
+coverage:e2e:report`; a darabszámok a `nyc report --reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (27. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1487 / 1502     | **99.00** | 98.98                      | 15 -> **15**                   |
+| branches   | 669 / 680       | **98.38** | 98.37                      | 11 -> **11**                   |
+| functions  | 512 / 515       | 99.41     | 99.41                      | 3 -> **3**                     |
+| lines      | 1431 / 1446     | **98.96** | 98.94                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+19, +4, +5, +19), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 27. szekcióéval. A küszöb a mért
+statements, branches és lines értékre húzva (98.98 -> **99**, 98.37 -> **98.38**, 98.94 ->
+**98.96**; a statements pontos értéke 99,0013), a functions a mért értékkel már egyezett, felfelé
+kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(99.01 / 98.39 / 99.42 / 98.97) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 29. Az `approval-prompt` téma utáni ratchet (2026-09-24, T-009-27): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `human_approval` jóváhagyás felülete (`apps/web/src/approval-prompt/`): a
+`usePendingApprovals` hook, az `ApprovalPromptCard` (döntés gombpár, `conflict`/`not_found`
+hibaüzenet), az `ApprovalPromptPanel`, a `pending-approval-requested-at-by-step-run.ts` híd a
+`run-graph` felé, és a `describeWaitingApprovalDuration` (`apps/web/src/graph-node-card/`) mind új
+kód. Négy új e2e teszt fedi (`apps/web/e2e/approval-prompt.spec.ts`): a várakozási idő mindhárom
+sávja plusz a `Math.max(0, ...)` szorítás ága, a Jóváhagyás gomb sikeres döntése (a lista
+kiürül), az Elutasítás gomb `conflict` hibaága (a lista újratöltődik, a kártya a helyén marad), és
+a jóváhagyás lista `GET /api/approvals` betöltési hibaága (`ApprovalPromptPanel.tsx` `failureMessage`
+ága).
+
+**Mérési buktató, ami az első mérést érvénytelenítette.** A `bun run screenshots` parancs (a
+`playwright.screenshots.config.ts` a `coverage-fixture.ts` ugyanazon `test` fixtúráját importálja,
+mint a `test:e2e`) ugyanabba az `apps/web/e2e/.nyc_output` mappába ír. A képernyőképezés futtatása a
+lefedettségi mérés ELŐTT tehát screenshot-futásból származó lefedettséggel szennyezi a `nyc report`
+bemenetét, miközben a CI `e2e` jobja (`.github/workflows/ci.yml` 232. sor) kizárólag `bun run
+test:e2e`-t futtat, screenshotot sohasem. Az első mérés (`99.08 / 98.54 / 99.45 / 99.02`, 237
+teszt) pontosan ilyen szennyezett állapotból jött, és nem egyezett azzal, amit a CI valaha
+kiszámolna. A helyes eljárás: `rm -rf apps/web/e2e/.nyc_output`, majd **kizárólag** `bun run
+test:e2e`, utána `bun run coverage:e2e:report` - ugyanaz a sorrend, amit a CI `e2e` jobja követ.
+
+**A tiszta mérés egy valódi, átmeneti regressziót fedett fel.** A szennyezés nélküli első
+lefutás a fedetlen branch darabszámot 11-ről 12-re emelte: az `ApprovalPromptPanel.tsx` `37`. sora
+(`{failureMessage !== undefined && <p role="alert">{failureMessage}</p>}`, a GET lista betöltési
+hibaága) egyetlen akkor létező teszt által sem volt lefedve, mert mind a három akkori
+`approval-prompt.spec.ts` teszt sikeres `listPendingApprovals` mockkal indult. A projekt szabálya
+szerint (8. szekció, "ha a fedetlen sorok száma nő, azt teszttel kell fedezni, nem a küszöböt
+csökkenteni") ez negyedik tesztet igényelt, nem küszöb-alkalmazkodást: a
+`'a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a panelen'` teszt egy `500`-as
+`listPendingApprovals` választ mockol, és a panelen megjelenő `role="alert"` elemet ellenőrzi (a
+`workflow-list.spec.ts` lista-betöltési-hiba mintájának megfelelően).
+
+**A végleges, tiszta mérés** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e` egy
+futásban, **238 teszt, mind zöld**, majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (28. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1543 / 1558     | **99.03** | 99                         | 15 -> **15**                   |
+| branches   | 697 / 708       | **98.44** | 98.38                      | 11 -> **11**                   |
+| functions  | 530 / 533       | **99.43** | 99.41                      | 3 -> **3**                     |
+| lines      | 1485 / 1500     | **99**    | 98.96                      | 15 -> **15**                   |
+
+**Nulla nettó új fedetlen tétel.** A negyedik teszt pontosan azt a branchet zárta le, amit a
+harmadikig maradt lyuk nyitva hagyott: a fedetlen darabszám mind a négy metrikán visszaállt a 28.
+szekció alapértékére (15/11/3/15), az átmeneti 12-es branch-érték a negyedik teszt után 11-re
+csökkent. A küszöb mind a négy mért értékre húzva (99 -> **99.03**, 98.38 -> **98.44**, 99.41 ->
+**99.43**, 98.96 -> **99**), felfelé kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a
+beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
+századdal magasabb küszöbbel
+(99.04 / 98.45 / 99.44 / 99.01) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 30. A transcript sor kinyitása élő stream közben utáni ratchet (2026-09-24): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `use-transcript-auto-scroll.ts` kinyitás utáni várakozása (a `click` felfüggesztő
+eseményként, a `TogglePhase` három állapota, a visszatartott görgetés feloldása a mérés utáni
+jelentéskor) új kód; hat új e2e teszt fedi (`apps/web/e2e/sse-real-server.spec.ts`, a kinyitás
+három útja mindkét témában, `docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, utána kizárólag
+`bun run test:e2e` egy futásban (**244 teszt, mind zöld**), majd `bun run coverage:e2e:report`; a
+darabszámok a `nyc report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (29. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1565 / 1580     | **99.05** | 99.03                      | 15 -> **15**                   |
+| branches   | 704 / 715       | **98.46** | 98.44                      | 11 -> **11**                   |
+| functions  | 532 / 535       | **99.43** | 99.43                      | 3 -> **3**                     |
+| lines      | 1506 / 1521     | **99.01** | 99                         | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a fedetlen darabszám mind a négy metrikán változatlan, a nevező nőtt,
+tehát a százalék három metrikán nő, a functions értéke változatlan. A küszöb a mért értékre húzva
+(99.03 -> **99.05**, 98.44 -> **98.46**, 99.43 marad, 99 -> **99.01**), felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0506 / 98,4615 / 99,4393 / 99,0138, tehát egyik
+sincs a küszöb alatt). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0;
+ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (99.06 / 98.47 / 99.44 / 99.02) mind
+a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 31. Az egyforma sormagasság és a görgetés egyszerűsítése utáni ratchet (2026-09-24): két küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `use-transcript-auto-scroll.ts` újragörgető gépezete (`dfcaa38`) és a kinyitás
+utáni várakozása (`d598677`) kivezetve, helyette a kattintástól a mérésig tartó, mindig kilépő
+szünet (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció); az e2e bővült (a
+kinyitás négy útja a kattintással egy feladatban érkező sorral, két dupla kattintás teszt mindkét
+témában, a sormagasság teszt, a törzsbe kattintás).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**251 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, ugyanabba a nyers
+könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (30. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1569 / 1584     | **99.05** | 99.05                      | 15 -> **15**                   |
+| branches   | 714 / 725       | **98.48** | 98.46                      | 11 -> **11**                   |
+| functions  | 534 / 537       | **99.44** | 99.43                      | 3 -> **3**                     |
+| lines      | 1509 / 1524     | **99.01** | 99.01                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** Az első teljes futás után a kattintás kezelő két korai visszatérése
+(nem elem cél, fejlécen kívüli kattintás) fedetlen volt (17 / 13 / 3 / 17): a nem elem ág egy
+`&&` operandusába olvadt (valódi böngészőben kattintás célja mindig elem), a fejlécen kívüli
+kattintást az egér út e2e tesztje fedi (a kinyitott törzsbe kattintás nem vált sort). Utána a
+fedetlen darabszám mind a négy metrikán a 30. szekció értéke. A küszöb a mért értékre húzva
+(98.46 -> **98.48**, 99.43 -> **99.44**, a másik kettő marad), felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0530 / 98,4828 / 99,4413 / 99,0157). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.06 / 98.49 / 99.45 / 99.02) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 32. A jóváhagyás panel javítása utáni ratchet (2026-09-24, T-009-27 javítás): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az `approval-prompt` téma javítása egy független ellenőrzés nyomán
+(`docs/research/2026-09-24-jovahagyas-panel-helye.md`): a panel a transcript sávba került, a lista
+élőben frissül (`is-approval-list-change-frame.ts`), a döntés állapota a képernyő szintjén él
+(`use-approval-decisions.ts`, `reduce-approval-decisions.ts`, `select-displayed-approvals.ts`), a
+csomóponton abszolút időpont áll (`describe-waiting-approval-since.ts`). Az `approval-prompt.spec.ts`
+tizenegy tesztre bővült (vászon magasság három viewporton, siker, újratöltési hiba, `conflict`,
+átmeneti hiba újrapróbálással, első betöltés jelzése, két futás váltás), a `sse-real-server.spec.ts`
+egy élő frissítés teszttel.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**257 teszt, mind zöld**; a sandboxban tíz `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (31. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1612 / 1627     | **99.07** | 99.05                      | 15 -> **15**                   |
+| branches   | 742 / 753       | **98.53** | 98.48                      | 11 -> **11**                   |
+| functions  | 552 / 555       | **99.45** | 99.44                      | 3 -> **3**                     |
+| lines      | 1552 / 1567     | **99.04** | 99.01                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** Az első teljes futás után az új kód négy pontja fedetlen volt: a panel
+első betöltésének `ProgressBar` ága, a futás váltása után érkező döntés válasz eldobása
+(`reduce-approval-decisions.ts`), az átmeneti hiba nyugtázása, és a futás váltása után érkező lista
+válasz eldobása (`use-pending-approvals.ts`). Mindegyiket egy új e2e teszt fedi, nem küszöb
+alkalmazkodás (8. szekció); a két futás váltás teszt a védő feltétel törlésére mérten bukik. A
+küszöb a mért értékre húzva, felfelé kerekítés nélkül (`apps/web/package.json`; a pontos arányok
+99,0781 / 98,5392 / 99,4595 / 99,0428). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(99.08 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

@@ -20,6 +20,11 @@ export interface RunGraphNodesInput {
    */
   readonly stepRuns: readonly StepRunRecord[];
   readonly onOpenSubWorkflowRun: (subWorkflowRunId: string) => void;
+  /**
+   * Lépés futás azonosító -> a hozzá tartozó függő jóváhagyás `requestedAtMs`
+   * mezője (T-009-27, `approval-prompt/pending-approval-requested-at-by-step-run.ts`).
+   */
+  readonly pendingApprovalRequestedAtByStepRunId: ReadonlyMap<string, number>;
 }
 
 /**
@@ -33,12 +38,12 @@ export interface RunGraphNodesInput {
  * alakú objektum nem egyenértékű a kulcs hiányával.
  */
 export function buildRunGraphNodes(input: Readonly<RunGraphNodesInput>): readonly GraphNodeCardData[] {
-  const { nodes, nodeStepRuns, stepRuns, onOpenSubWorkflowRun } = input;
+  const { nodes, nodeStepRuns, stepRuns, onOpenSubWorkflowRun, pendingApprovalRequestedAtByStepRunId } = input;
 
   return nodes.map((workflowNode) => {
     const ownStepRuns = nodeStepRuns.get(workflowNode.id) ?? [];
     const displayed = pickDisplayedStepRun(ownStepRuns);
-    const summary = describeRunNodeSummary(workflowNode, ownStepRuns, stepRuns);
+    const summary = describeRunNodeSummary(workflowNode, ownStepRuns, stepRuns, pendingApprovalRequestedAtByStepRunId);
     return {
       workflowNode,
       ...(displayed !== undefined && { status: displayed.status }),

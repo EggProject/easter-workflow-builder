@@ -11,7 +11,7 @@ import type { ExecutableNodeConfig } from '../run-validation/executable-node-con
 import { runAgentNodeLifecycle } from './agent-node-lifecycle.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
-import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 
 type JoinAiSynthesisNodeConfig = Extract<
   ExecutableNodeConfig,
@@ -61,7 +61,7 @@ export async function executeJoinAiSynthesis(
   ports: EngineDependencies,
   gate: ConcurrencyGate,
   agentQueryRegistry: AgentQueryRegistry,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const outcome = await runAgentNodeLifecycle(
     {
       instance: input.instance,
@@ -77,7 +77,10 @@ export async function executeJoinAiSynthesis(
     gate,
     agentQueryRegistry,
   );
-  if (outcome.kind === 'error') {
+  // A lezárt szabályozó miatt el sem indult lépés nem zárult le, tehát a
+  // `join_resolved` sem íródik: a sort a leállás tranzakciója zárja
+  // (`agent-node-lifecycle.ts`).
+  if (outcome.kind === 'error' || outcome.value.kind === 'interrupted') {
     return outcome;
   }
 

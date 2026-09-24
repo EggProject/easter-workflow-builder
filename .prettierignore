@@ -7,6 +7,8 @@ test-results
 bun.lock
 tools/wire-probe/artifacts
 tools/wire-probe/.proxy.log
+# a shardolt vitest futas --merge-reports osszefuzese hozza letre
+.vitest-reports
 
 # Vendorolt, valtozatlanul atemelt eggproject-design fajlok (SPEC-007 4.5):
 # a bajtazonossag a garancia, a Prettier ne formazza at oket. A komponens
@@ -33,3 +35,6 @@ packages/ui/src/resizable/resizable.css
 packages/ui/src/breadcrumb/breadcrumb.css
 packages/ui/src/textarea/textarea.css
 packages/ui/src/accordion/accordion.css
+packages/ui/src/alert/alert.css
+packages/ui/src/dot/dot.css
+packages/ui/src/feed-indicator/feed-indicator.css

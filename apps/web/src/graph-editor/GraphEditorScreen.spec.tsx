@@ -173,9 +173,11 @@ const failingPutFetchFunction: FetchFunction = (input, init) => {
 describe('GraphEditorScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
+  const navigate = vi.fn();
 
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
+    navigate.mockClear();
     // A perzisztált elrendezés arány tesztek közötti átszivárgásának
     // megelőzése: a `Resizable` a csatoláskor is jelent, tehát minden
     // renderelés ír a kulcsra.
@@ -194,7 +196,9 @@ describe('GraphEditorScreen', () => {
 
   async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
     await act(async () => {
-      root.render(<GraphEditorScreen apiOrigin={API_ORIGIN} fetchFunction={fetchFunction} search={search} />);
+      root.render(
+        <GraphEditorScreen apiOrigin={API_ORIGIN} fetchFunction={fetchFunction} search={search} navigate={navigate} />,
+      );
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
@@ -569,5 +573,212 @@ describe('GraphEditorScreen', () => {
 
     expect(container.querySelector('.toast__title')?.textContent).toBe('A mentés sikertelen');
     expect(container.textContent).toContain('Mentetlen változtatások');
+  });
+
+  // ============================================================
+  // A FUTÁS INDÍTÁSA (T-009-23, SPEC-008 6.5, AC28).
+  // ============================================================
+
+  interface StartRunLog {
+    readonly postBodies: string[];
+  }
+
+  /**
+   * A `GET /graph` a megadott `start` node config-gal tér vissza, a
+   * `POST /runs` pedig az indított futás azonosítóját adja. A POST törzsek
+   * naplózva, hogy a teszt a `StartRunRequest.input` alakját is mérhesse.
+   */
+  function createStartRunFetchFunction(
+    log: StartRunLog,
+    startInputFields: readonly { name: string; label: string; valueKind: string; required: boolean }[],
+    startRunStatus = 200,
+  ): FetchFunction {
+    return (input, init) => {
+      if (init.method === 'POST') {
+        log.postBodies.push(typeof init.body === 'string' ? init.body : '{}');
+        if (startRunStatus === 200) {
+          return Promise.resolve(jsonResponse({ runId: 'r-7', status: 'pending' }));
+        }
+        return Promise.resolve(new Response('nem sikerult', { status: startRunStatus }));
+      }
+      const pathname = new URL(input).pathname;
+      if (pathname.endsWith('/graph')) {
+        return Promise.resolve(
+          jsonResponse({
+            nodes: [
+              {
+                ...START_NODE,
+                config: { type: 'start', inputFields: startInputFields, onUnhandledError: null },
+                createdAtMs: 0,
+                updatedAtMs: 0,
+              },
+              { ...AGENT_NODE, createdAtMs: 0, updatedAtMs: 0 },
+            ],
+            edges: [{ ...EDGE_INPUT, createdAtMs: 0 }],
+          }),
+        );
+      }
+      if (pathname === '/api/settings') {
+        return Promise.resolve(jsonResponse(SETTINGS_RECORD));
+      }
+      return Promise.resolve(jsonResponse(WORKFLOW_DETAIL));
+    };
+  }
+
+  function startButton(): HTMLButtonElement {
+    const button = [...container.querySelectorAll<HTMLButtonElement>(':scope .page-footer button')].find(
+      (candidate) => candidate.textContent === 'Futás indítása',
+    );
+    if (button === undefined) {
+      throw new Error('a teszt nem talált "Indítás" gombot a láblécben');
+    }
+    return button;
+  }
+
+  it('ÜRES inputFields lista esetén a modális NEM nyílik meg, a futás közvetlenül indul', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, []));
+
+    await act(async () => {
+      startButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(log.postBodies).toEqual([JSON.stringify({ input: {} })]);
+    expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-7');
+  });
+
+  it('NEM ÜRES inputFields lista esetén a modális nyílik meg, kérés nélkül', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
+
+    act(() => {
+      startButton().click();
+    });
+
+    const dialog = container.querySelector('[role="dialog"]');
+    expect(dialog?.querySelector('.modal__title')?.textContent).toBe('Futás indítása');
+    expect(dialog?.querySelector('.field__label')?.textContent).toBe('Téma');
+    expect(log.postBodies).toEqual([]);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('a modális "Mégse" gombja bezárja a modálist, indítás nélkül', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
+
+    act(() => {
+      startButton().click();
+    });
+    const cancelButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(':scope [role="dialog"] .modal__footer button'),
+    ].find((candidate) => candidate.textContent === 'Mégse');
+    if (cancelButton === undefined) {
+      throw new Error('a teszt nem talált "Mégse" gombot a modálisban');
+    }
+    act(() => {
+      cancelButton.click();
+    });
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(log.postBodies).toEqual([]);
+  });
+
+  it('a modális beküldése a start mezők értékeit küldi el, és a futás nézetre navigál', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }];
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields));
+
+    act(() => {
+      startButton().click();
+    });
+    const field = container.querySelector<HTMLInputElement>(':scope [role="dialog"] input.input');
+    if (field === null) {
+      throw new Error('a teszt nem talált bemeneti mezőt a modálisban');
+    }
+    act(() => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      descriptor?.set?.call(field, 'AI hírek');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const form = container.querySelector(':scope [role="dialog"] form');
+    if (form === null) {
+      throw new Error('a teszt nem talált űrlapot a modálisban');
+    }
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(log.postBodies).toEqual([JSON.stringify({ input: { topic: 'AI hírek' } })]);
+    expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-7');
+  });
+
+  it('mentetlen változás mellett az indítás gomb letiltva', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, []));
+    expect(startButton().disabled).toBe(false);
+
+    const initialNodes = lastCanvasProperties().nodes;
+    act(() => {
+      lastCanvasProperties().onGraphChange(
+        initialNodes.map((node) => (node.id === 'n-1' ? { ...node, positionX: 99 } : node)),
+        [],
+      );
+    });
+
+    expect(startButton().disabled).toBe(true);
+  });
+
+  it('üres gráf mellett az indítás gomb letiltva', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, []));
+
+    act(() => {
+      lastCanvasProperties().onGraphChange([], []);
+    });
+
+    expect(startButton().disabled).toBe(true);
+  });
+
+  it('modális nélküli indítás hibáját a lábléc státusza írja ki', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, [], 500));
+
+    await act(async () => {
+      startButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(':scope .page-footer [role="alert"]')?.textContent).not.toBe('');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('modálissal indított futás hibája a modálisban látszik, a láblécben nem', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    const fields = [{ name: 'topic', label: 'Téma', valueKind: 'string', required: false }];
+    await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, fields, 500));
+
+    act(() => {
+      startButton().click();
+    });
+    const form = container.querySelector(':scope [role="dialog"] form');
+    if (form === null) {
+      throw new Error('a teszt nem talált űrlapot a modálisban');
+    }
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(':scope [role="dialog"] form [role="alert"]')).not.toBeNull();
+    expect(container.querySelector(':scope .page-footer [role="alert"]')).toBeNull();
   });
 });

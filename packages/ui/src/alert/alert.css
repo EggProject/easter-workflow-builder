@@ -1,0 +1,170 @@
+/* ============================================================
+   EggProject: Alert
+   Forrás: eggproject-design-components/components/alert/alert.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-23.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Alert / Banner ============
+   Inline status block — not a toast. Use for persistent state like
+   "your invoice is overdue" or "draft saved on this device".
+
+   Variants: info (default) · success · warning · danger · ink
+   Tone:     soft (default — tinted background) · subtle (border only)
+============================================ */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--ep-radius-md);
+  border: 1px solid transparent;
+  background: var(--ep-blue-50);
+}
+
+.alert__icon {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  color: var(--ep-accent);
+  margin-top: 1px;
+}
+.alert__body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.alert__title {
+  font: 600 14px/1.4 var(--ep-font-sans);
+  color: var(--ep-fg);
+}
+.alert__message {
+  font: 400 13px/1.5 var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+}
+.alert__message a, .alert__link {
+  color: var(--ep-accent);
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+.alert__actions { display: flex; gap: 8px; margin-top: 8px; }
+.alert__action {
+  font: 500 13px var(--ep-font-sans);
+  background: transparent;
+  border: 0;
+  color: var(--ep-fg);
+  padding: 4px 10px;
+  border-radius: var(--ep-radius-sm);
+  cursor: pointer;
+  margin-left: -10px;
+}
+.alert__action:hover { background: rgba(10, 18, 48, 0.06); }
+.alert__action--primary { background: var(--ep-ink-900); color: var(--ep-paper-100); margin-left: 0; }
+.alert__action--primary:hover { background: #000; }
+
+.alert__close {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0;
+  border-radius: var(--ep-radius-sm);
+  color: var(--ep-fg-subtle); cursor: pointer; flex-shrink: 0;
+}
+.alert__close:hover { background: rgba(10, 18, 48, 0.06); color: var(--ep-fg); }
+.alert__close svg { width: 14px; height: 14px; }
+
+/* ---- Variants (soft) ---- */
+.alert--info    { background: var(--ep-accent-bg);    }
+.alert--info    .alert__icon { color: var(--ep-accent); }
+.alert--success { background: var(--ep-success-bg); }
+.alert--success .alert__icon { color: var(--ep-success); }
+.alert--warning { background: var(--ep-warning-bg); }
+.alert--warning .alert__icon { color: var(--ep-warning-fg); }
+.alert--danger  { background: var(--ep-danger-bg);  }
+.alert--danger  .alert__icon { color: var(--ep-danger); }
+.alert--ink     { background: var(--ep-ink-900); color: var(--ep-paper-100); }
+.alert--ink     .alert__icon { color: var(--ep-yolk-500); }
+.alert--ink     .alert__title { color: var(--ep-paper-50); }
+.alert--ink     .alert__message   { color: var(--ep-slate-300); }
+.alert--ink     .alert__message a { color: var(--ep-blue-300); }
+.alert--ink     .alert__action { color: var(--ep-paper-100); }
+.alert--ink     .alert__action:hover { background: rgba(255,255,255,0.08); }
+.alert--ink     .alert__action--primary { background: var(--ep-paper-50); color: var(--ep-ink-900); }
+.alert--ink     .alert__close { color: var(--ep-slate-300); }
+.alert--ink     .alert__close:hover { background: rgba(255,255,255,0.08); color: var(--ep-paper-50); }
+
+/* ---- Subtle tone: border-only, no fill ---- */
+.alert--subtle {
+  background: var(--ep-bg-elevated);
+  border-color: var(--ep-border);
+}
+.alert--subtle.alert--info    { border-left: 3px solid var(--ep-blue-600); }
+.alert--subtle.alert--success { border-left: 3px solid var(--ep-success); }
+.alert--subtle.alert--warning { border-left: 3px solid var(--ep-warning); }
+.alert--subtle.alert--danger  { border-left: 3px solid var(--ep-danger);  }
+
+/* ---- Full-width banner — for top-of-page system messages ---- */
+.alert--banner {
+  border-radius: 0;
+  padding: 12px 24px;
+  border-left: 0; border-right: 0;
+  border-top: 0;
+}
+
+/* ============================================================
+   Forced colors (Windows High Contrast): every variant background is a tinted
+   token, the base border is `transparent`, and the subtle tone signals severity
+   only through a colour-coded left stripe — all of which flatten or vanish in
+   HCM, so an alert could lose its outline and the subtle tone its meaning. Pin
+   every alert to system colours with a real 1px system border; the variant tints
+   collapse to the same neutral surface — severity is never colour-only here, it
+   is carried by the real title/message text and the root's status/alert role.
+   The subtle tone's coloured 3px left stripe becomes a plain system border so it
+   is not the sole HCM cue. The decorative .alert__icon (aria-hidden in the JSX)
+   stays visible via CanvasText and never fakes a per-variant meaning. Dismiss and
+   action controls (transparent fill / no border in normal CSS) become real
+   system-coloured buttons with visible borders and a visible focus ring; the
+   primary action maps to Highlight/HighlightText. Layout-only wrappers carry no
+   colour rule — .alert__body and .alert__actions are flex containers whose
+   children carry the visibility, and .alert--banner inherits the base .alert
+   system border (its normal rule zeroes three sides, leaving a CanvasText bottom
+   separator). System colours only; no token/hex/rgb/hsl; no forced-color-adjust;
+   no motion introduced. Live emulation not run — source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .alert,
+  .alert--info,
+  .alert--success,
+  .alert--warning,
+  .alert--danger,
+  .alert--ink,
+  .alert--subtle {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  /* Subtle tone: replace the colour-coded left stripe with a plain system border. */
+  .alert--subtle.alert--info,
+  .alert--subtle.alert--success,
+  .alert--subtle.alert--warning,
+  .alert--subtle.alert--danger {
+    border-left: 1px solid CanvasText;
+  }
+  /* Decorative icon stays visible; never the sole meaning. */
+  .alert__icon { color: CanvasText; }
+  .alert__title,
+  .alert__message { color: CanvasText; }
+  /* Dismiss + secondary action: real system-coloured controls with a visible edge. */
+  .alert__close,
+  .alert__action {
+    background: ButtonFace;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .alert__action--primary {
+    background: Highlight;
+    color: HighlightText;
+    border: 1px solid Highlight;
+  }
+  .alert__close:focus-visible,
+  .alert__action:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

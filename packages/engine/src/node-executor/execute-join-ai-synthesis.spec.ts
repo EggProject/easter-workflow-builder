@@ -18,10 +18,13 @@ import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
+import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { executeJoinAiSynthesis } from './execute-join-ai-synthesis.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
+import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 
 type JoinAiSynthesisNodeConfig = Extract<
   ExecutableNodeConfig,
@@ -33,6 +36,21 @@ function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
     throw new Error(`váratlan hibaág: ${outcome.message}`);
   }
   return outcome.value;
+}
+
+/**
+ * A LEZÁRULT kimenet a `NodeExecutionResult` értékből. Az `interrupted` ág
+ * (`node-executor-result.ts`) csak a lezárt szabályozó elutasításakor áll
+ * elő, amit az `agent-node-lifecycle.spec.ts` és az
+ * `execute-join-ai-synthesis.spec.ts` külön tesztesete vizsgál; ezekben a
+ * tesztesetekben váratlan kimenet.
+ */
+function settledOrThrow(outcome: Outcome<NodeExecutionResult>): NodeExecutionOutcome {
+  const value = okOrThrow(outcome);
+  if (value.kind === 'interrupted') {
+    throw new Error('váratlan interrupted kimenet');
+  }
+  return value;
 }
 
 function isUnknownArray(value: unknown): value is readonly unknown[] {
@@ -244,6 +262,7 @@ function instanceOf(runId: string): NodeExecutionInstance {
     iteration: 0,
     attempt: 1,
     providerId: 'minimax',
+    failureStopsRun: false,
   };
 }
 
@@ -275,7 +294,7 @@ function dependenciesOf(database: DatabaseContext, agentQueryRunner: AgentQueryR
 function recordingGate(): { readonly gate: ConcurrencyGate; readonly calls: readonly string[] } {
   const calls: string[] = [];
   const gate: ConcurrencyGate = {
-    requestSlot: (providerId, requestId, onGranted) => {
+    requestSlot: (providerId, _runId, requestId, onGranted) => {
       calls.push(`request:${providerId}:${requestId}`);
       onGranted();
     },
@@ -283,6 +302,8 @@ function recordingGate(): { readonly gate: ConcurrencyGate; readonly calls: read
       calls.push(`release:${requestId}`);
       return { kind: 'ok', value: undefined };
     },
+    denyWaitingForRunIds: notCalled,
+    close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,
   };
@@ -317,7 +338,7 @@ describe('executeJoinAiSynthesis', () => {
     const dependencies = dependenciesOf(database, fakeRunner(fixtureMessages('sikeres')));
     const joinInputs = ['ág-1 kimenete', 'ág-2 kimenete'];
 
-    const outcome = okOrThrow(
+    const outcome = settledOrThrow(
       await executeJoinAiSynthesis(
         {
           instance: instanceOf(runId),
@@ -356,7 +377,7 @@ describe('executeJoinAiSynthesis', () => {
     const dependencies = dependenciesOf(database, fakeRunner(fixtureMessages('hibasSubtype')));
     const joinInputs = ['egyetlen ág kimenete'];
 
-    const outcome = okOrThrow(
+    const outcome = settledOrThrow(
       await executeJoinAiSynthesis(
         {
           instance: instanceOf(runId),
@@ -404,6 +425,38 @@ describe('executeJoinAiSynthesis', () => {
     );
 
     expect(outcome.kind).toBe('error');
+
+    database.close();
+  });
+
+  it('a lezárt szabályozó miatt el sem induló lépésre interrupted kimenetet ad, join_resolved írása nélkül (SPEC-004 10.2 1. pont)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const gate = createConcurrencyGate(() => null);
+    gate.close();
+    const dependencies = dependenciesOf(database, fakeRunner(fixtureMessages('sikeres')));
+
+    const outcome = await executeJoinAiSynthesis(
+      {
+        instance: instanceOf(runId),
+        config: joinAiSynthesisConfig(),
+        descriptor: descriptor(),
+        runContext: baseRunContext(['ág kimenete']),
+        graph,
+        sessionSourceNodes: { sourceNodeIds: new Set(['j']), continuedNodeIds: new Set() },
+        sessionInstances: [],
+        joinInputs: ['ág kimenete'],
+      },
+      dependencies,
+      gate,
+      createAgentQueryRegistry(),
+    );
+
+    expect(outcome).toStrictEqual({ kind: 'ok', value: { kind: 'interrupted' } });
+    const [stepRun] = okOrThrow(database.stepRuns.listStepRuns(runId));
+    expect(stepRun?.status).toBe('pending');
+    const events = okOrThrow(database.events.readEventsForStep(stepRun?.id ?? '', 10));
+    expect(events.map((event) => event.kind)).not.toContain('join_resolved');
 
     database.close();
   });

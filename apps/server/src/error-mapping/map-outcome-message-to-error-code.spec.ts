@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatEngineErrorMessage } from '@easter-workflow-builder/engine';
 import { mapOutcomeMessageToErrorCode } from './map-outcome-message-to-error-code.ts';
 
 describe('mapOutcomeMessageToErrorCode', () => {
@@ -33,6 +34,14 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'expression_evaluator_unavailable',
   ])('a(z) %s hibaosztályt unprocessable kódra képezi', (errorClass) => {
     expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('unprocessable');
+  });
+
+  it('a motor valódi engine_shutting_down üzenetét service_unavailable kódra képezi (SPEC-005 8.3, sodródás védelem futásidejű ága)', () => {
+    // Az üzenetet a motor saját formázója állítja elő, tehát ha a motor a
+    // hibaosztály nevét vagy az üzenet alakját megváltoztatja, ez a teszt bukik.
+    const message = formatEngineErrorMessage('engine_shutting_down', 'A motor leáll, új futás nem indul');
+
+    expect(mapOutcomeMessageToErrorCode(message)).toBe('service_unavailable');
   });
 
   it('a database_closed hibaosztályt internal kódra képezi', () => {

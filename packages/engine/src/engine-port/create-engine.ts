@@ -120,7 +120,9 @@ export function createEngine(dependencies: EngineDependencies): Engine {
   function interruptRun(runId: string): Promise<Outcome<InterruptSummary>> {
     return interruptRunTree(runId, {
       database: dependencies.database,
+      eventPublisher: dependencies.eventPublisher,
       runSupervisor,
+      concurrencyGate,
       agentQueryRegistry,
       approvalRegistry,
     });
@@ -210,7 +212,9 @@ export function createEngine(dependencies: EngineDependencies): Engine {
   async function shutdown(): Promise<Outcome<ShutdownSummary>> {
     const recovered = await shutdownActiveRuns({
       database: dependencies.database,
+      eventPublisher: dependencies.eventPublisher,
       runSupervisor,
+      concurrencyGate,
       agentQueryRegistry,
       approvalRegistry,
     });

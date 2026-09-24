@@ -16,8 +16,9 @@ import { RunHistoryScreen } from '../run-history/run-history-screen.tsx';
 import { RunViewScreen } from '../run-view/RunViewScreen.tsx';
 import { browserEventSourceFactory } from '../stream-client/browser-event-source-factory.ts';
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
-import { useStreamConnection, type StreamConnectionPhase } from '../stream-client/use-stream-connection.ts';
+import { useStreamConnection } from '../stream-client/use-stream-connection.ts';
 import { WorkflowListScreen } from '../workflow-list/workflow-list-screen.tsx';
+import { StreamStatusIndicator } from './StreamStatusIndicator.tsx';
 
 export interface AppShellProperties {
   readonly apiOrigin: string;
@@ -26,19 +27,6 @@ export interface AppShellProperties {
   readonly streamReplayLimit: number;
   readonly fetchFunction: FetchFunction;
 }
-
-/**
- * A stream kapcsolat státusz szövege a topnav `.app-tn__actions` sávjában
- * (SPEC-007 11. szekció 14 ... 16. async pont). A `live` fázisnak nincs
- * önálló szövege (a `useStreamConnection` dokumentációja szerint), ezért a
- * leképezés csak három fázist fed; a negyedik a hívó oldalon `undefined`-et
- * ad, jelzés nélkül.
- */
-const STREAM_STATUS_LABEL: Readonly<Partial<Record<StreamConnectionPhase, string>>> = {
-  connecting: 'kapcsolódás',
-  replaying: 'előzmények betöltése',
-  reconnecting: 'újracsatlakozás',
-};
 
 /**
  * Az ismeretlen (`undefined`) útvonal morzsamenü végpontjának neve
@@ -84,8 +72,16 @@ function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
  * Az alkalmazás gyökér összeállítása (SPEC-007 5.1 mermaid: `AppShell,
  * osztaly app-tn`): a topnav bar ÉS a útválasztott tartalom együtt, nem
  * csak egy csupasz topnav. Az egyetlen, app élettartamú
- * `useStreamConnection` itt épül, és a `run-history` képernyőnek adja
- * tovább, ami az egyetlen SSE fogyasztó (SPEC-007 10.2).
+ * `useStreamConnection` itt épül, és a két SSE fogyasztó képernyőnek adja
+ * tovább: a `run-history` a lista élő állapotához (SPEC-007 10.2), a
+ * `run-view` pedig a transcripthez, a csomópontok élő állapotához és a
+ * nézett futás lezáró (`run_finished`, `run_interrupted`) eseményéhez
+ * (SPEC-008 6.2, 6.4, PLAN-009 T-009-23, T-009-25, T-009-25a). Mindkettő a
+ * veszteségmentes `subscribeToFrames` úton kapja a kereteket, és mindkettő
+ * megkapja a `serverRestartCount` értéket, amire újra feliratkozik és
+ * újratölt (SPEC-005 5.2, SPEC-007 AC44). Egyszerre legfeljebb az egyik
+ * áll felcsatolva, tehát a `replaceStreamSubscriptions` csere szemantikája
+ * nem ütközik.
  */
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
   const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
@@ -102,8 +98,6 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     setIsNavigationMenuOpen(false);
   }, [routeId]);
 
-  const streamStatusLabel = STREAM_STATUS_LABEL[streamConnection.phase];
-
   const content = renderRouteContent(routeId, {
     apiOrigin,
     listLimit,
@@ -112,7 +106,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     search,
     navigate,
     streamId: streamConnection.streamId,
-    lastFrame: streamConnection.lastFrame,
+    subscribeToFrames: streamConnection.subscribeToFrames,
     serverRestartCount: streamConnection.serverRestartCount,
   });
 
@@ -180,7 +174,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
       }
       actions={
         <>
-          {streamStatusLabel === undefined ? undefined : <span>{streamStatusLabel}</span>}
+          <StreamStatusIndicator phase={streamConnection.phase} />
           <ThemeModeToggle />
         </>
       }
@@ -198,7 +192,7 @@ interface RouteContentDependencies {
   readonly search: string;
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
   readonly streamId: string;
-  readonly lastFrame: ReturnType<typeof useStreamConnection>['lastFrame'];
+  readonly subscribeToFrames: ReturnType<typeof useStreamConnection>['subscribeToFrames'];
   readonly serverRestartCount: number;
 }
 
@@ -214,7 +208,7 @@ function renderRouteContent(
     search,
     navigate,
     streamId,
-    lastFrame,
+    subscribeToFrames,
     serverRestartCount,
   } = dependencies;
 
@@ -239,16 +233,29 @@ function renderRouteContent(
           fetchFunction={fetchFunction}
           search={search}
           streamId={streamId}
-          lastFrame={lastFrame}
+          subscribeToFrames={subscribeToFrames}
           serverRestartCount={serverRestartCount}
         />
       );
     }
     case 'graphEditor': {
-      return <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} />;
+      return (
+        <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />
+      );
     }
     case 'runView': {
-      return <RunViewScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />;
+      return (
+        <RunViewScreen
+          apiOrigin={apiOrigin}
+          fetchFunction={fetchFunction}
+          search={search}
+          navigate={navigate}
+          streamId={streamId}
+          subscribeToFrames={subscribeToFrames}
+          streamReplayLimit={streamReplayLimit}
+          serverRestartCount={serverRestartCount}
+        />
+      );
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

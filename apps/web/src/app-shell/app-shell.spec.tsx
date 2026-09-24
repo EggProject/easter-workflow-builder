@@ -105,7 +105,7 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('kapcsolódás');
   });
 
-  it('a kapcsolat megnyílása után, várakozó pótlás nélkül, nincs stream státusz felirat', async () => {
+  it('a kapcsolat megnyílása után, várakozó pótlás nélkül, "élő" stream státuszt mutat', async () => {
     render();
     await act(async () => {
       await Promise.resolve();
@@ -121,6 +121,7 @@ describe('AppShell', () => {
     });
 
     expect(container.textContent).not.toContain('kapcsolódás');
+    expect(container.querySelector(':scope .app-tn__actions .ep-feed__label')?.textContent).toBe('élő');
   });
 
   it('a "/runs" útvonalon a futás előzmények tartalmát rajzolja', async () => {

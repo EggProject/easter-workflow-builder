@@ -58,8 +58,9 @@ type ApprovalWaitResult =
  * időkorlát szám"). Ilyenkor a függvény közvetlenül a döntésre váró
  * `Promise`-t adja vissza, `AbortController` és `Promise.race` nélkül. Ez az
  * ág a T-005-31 óta sem vár ÖRÖKRE: a `waitForDecision` `interrupted`
- * jelzéssel is feloldódhat, amit a megszakítás vagy a szabályos leállás
- * (`ApprovalWaitRegistry.cancelWaitingForRunIds`) küld.
+ * jelzéssel is feloldódhat, amit a megszakítás, a szabályos leállás vagy a
+ * futás `fail_run` politikájú bukása (`ApprovalWaitRegistry.cancelWaitingForRunIds`)
+ * küld.
  *
  * **`timeoutMs !== null`: a vesztes ágat meg kell szakítani.** Ha a döntés
  * vagy a megszakítás nyer, a `sleep`-et a `controller.abort()` állítja le; a
@@ -145,13 +146,14 @@ function failApproval(
  *    `clock` portból számítva (nem a repository saját, `new Date()` alapú
  *    időbélyegéből, ugyanaz a determinizmus elv, mint minden más eseménynél).
  * 5. Várakozás a `raceApprovalDecision` szerint.
- * 6. **Megszakításkor** (T-005-31, SPEC-004 9. szekció, 10.2 szekció): a
- *    végrehajtó AZONNAL visszatér az `interrupted` kimenettel, `step_run`
- *    állapotváltás és esemény írás NÉLKÜL. A lépés sorát a megszakítást kérő
- *    fél zárja le, a futás sorával egyetlen tranzakcióban - és a két hívó két
- *    KÜLÖNBÖZŐ záró állapotot ír (`cancelled` a felhasználói megszakításnál,
- *    `interrupted` a szabályos leállásnál), amit ez a végrehajtó nem tudna
- *    eldönteni (`approval-wait-signal.ts`).
+ * 6. **Megszakításkor** (T-005-31, SPEC-004 9. szekció, 10.2 szekció, és a
+ *    `fail_run` politikájú bukásnál, 8.3): a végrehajtó AZONNAL visszatér az
+ *    `interrupted` kimenettel, `step_run` állapotváltás és esemény írás
+ *    NÉLKÜL. A lépés sorát a lezárást kérő fél zárja le, és a hívók
+ *    KÜLÖNBÖZŐ záró állapotot írnak, mindhárman már a várakozás
+ *    lezárásakor (`cancelled` a felhasználói megszakításnál és a
+ *    `fail_run`-nál, `interrupted` a szabályos leállásnál), amit ez a
+ *    végrehajtó nem tudna eldönteni (`approval-wait-signal.ts`).
  * 7. **Lejáratkor**: `finishStepRunFailed` `approval_timed_out` osztállyal - a
  *    `human_approval.decision` oszlop NULL marad, mert a `db.approvals
  *    .decideApproval(...)` sosem hívódott (`human-approval-repository.ts`
@@ -253,10 +255,10 @@ export async function executeHumanApproval(
 
   const raced = await raceApprovalDecision(runId, stepRunId, config.timeoutMs, ports, registry);
 
-  // A várakozást a megszakítás vagy a szabályos leállás zárta le: a végrehajtó
-  // egyetlen állapotváltást és egyetlen eseményt sem ír, a lépés sorát a
-  // megszakítást kérő fél zárja le a futás sorával EGYETLEN tranzakcióban
-  // (`approval-wait-signal.ts` doksija).
+  // A várakozást a megszakítás, a szabályos leállás vagy a `fail_run` zárta
+  // le: a végrehajtó egyetlen állapotváltást és egyetlen eseményt sem ír, a
+  // lépés sorát a lezárást kérő fél zárja le (`approval-wait-signal.ts`
+  // doksija).
   if (raced.kind === 'interrupted') {
     return { kind: 'ok', value: { kind: 'interrupted' } };
   }

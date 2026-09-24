@@ -1,30 +1,29 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { DatabaseContext } from '../engine-port/database-port.ts';
-import type { ApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
-import type { AgentQueryRegistry } from './agent-query-registry.ts';
-import { stopAndAwaitRunTree } from './stop-and-await-run-tree.ts';
+import type { CancelActiveRunTreeDependencies } from './cancel-active-run-tree.ts';
+import { cancelActiveRunTree } from './cancel-active-run-tree.ts';
 
 /**
  * Az `interruptRun` függősége. A `runSupervisor` szándékosan csak a
- * `listActiveRuns` metódust várja (`Pick`, nem a teljes `RunSupervisor`): ez
- * a téma nem indít futást és nem old fel providert, csak a MÁR futó
- * futásokat kérdezi le, ugyanaz az elv, mint az `agent-step` téma
+ * `listActiveRuns` és az `isAcceptingRuns` metódust várja (`Pick`, nem a
+ * teljes `RunSupervisor`): ez a téma nem indít futást és nem old fel
+ * providert, csak a MÁR futó futásokat kérdezi le, és azt, hogy a szabályos
+ * leállás elkezdődött-e, ugyanaz az elv, mint az `agent-step` téma
  * `EngineDependencies` újrahasználásánál (`.claude/CLAUDE.md` "Minimum kód").
  * A `createEngine` (T-005-28) a saját, teljes `RunSupervisor` példányát adja
  * majd ide, adapter nélkül, mert az triviálisan illeszkedik erre a
  * szűkebb felületre.
  *
- * Az `approvalRegistry` a T-005-31 óta kötelező mező: a `stopAndAwaitRunTree`
- * ezen zárja le a fa várakozó `human_approval` lépéseit, ami nélkül egy
- * korlátlan várakozású jóváhagyáson álló futás megszakítása sosem fejeződne
- * be (AC-51, lásd `stop-and-await-run-tree.ts` 2. pontját).
+ * A többi mező a fa lezárásáé (`cancelActiveRunTree`, lásd ott): az
+ * `approvalRegistry` a T-005-31 óta kötelező, mert nélküle egy korlátlan
+ * várakozású jóváhagyáson álló futás megszakítása sosem fejeződne be (AC-51),
+ * az `eventPublisher` a lezáró `run_finished` esemény élő kiadásához kell, a
+ * `concurrencyGate`-ből pedig csak a `denyWaitingForRunIds`, amivel a fa
+ * sorban álló agent lépései kiesnek a sorból.
  */
-export interface InterruptRunDependencies {
-  readonly database: DatabaseContext;
-  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
-  readonly agentQueryRegistry: AgentQueryRegistry;
-  readonly approvalRegistry: ApprovalWaitRegistry;
+export interface InterruptRunDependencies extends CancelActiveRunTreeDependencies {
+  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'isAcceptingRuns'>;
 }
 
 /**
@@ -46,6 +45,18 @@ export interface InterruptRunResult {
  * `rootRunId` szerint azonos gyökerű futásokon, az al-workflow futásokat is
  * beleértve) végzi el a hat pontot:
  *
+ * 0. **A szabályos leállás alatt nem fut le** (user döntés 2026-09-24): ha a
+ *    `runSupervisor.isAcceptingRuns()` hamis, a függvény `engine_shutting_down`
+ *    hibával, olvasás és írás nélkül tér vissza, és a futást a leállás zárja
+ *    `interrupted` állapotba (SPEC-004 9., 10.2). Ugyanaz a jelzés, amin a
+ *    futás indítás elutasítása áll. Enélkül a leállás alatt érkező
+ *    megszakítás a leállás által már `interrupted` célú fát `cancelled`
+ *    állapotba írta, miközben a szülő lépés eseménye `interrupted` volt, ha
+ *    egy másik futás tovább tartotta a leállást; ha nem, a válasz a
+ *    kapcsolatok zárása után készült el, és a kliens `socket hang up` hibát
+ *    kapott (mérve, `docs/research/2026-09-23-megszakitas-leallas-meres.md`
+ *    7. szekció). A már folyamatban lévő megszakítást a később kezdődő
+ *    leállás nem érinti: az a saját `cancelled` zárásával fejeződik be.
  * 1. **A cél futás beolvasása** (`database.runs.getRun`): innen jön a
  *    `rootRunId`, amivel a fa többi tagja azonosítható. Ismeretlen `runId`-ra
  *    a `not_found` hiba változatlanul, `Outcome` hibaágként megy tovább -
@@ -53,16 +64,33 @@ export interface InterruptRunResult {
  * 2. **A fa aktív kézikönyveinek kiválasztása**: a `RunSupervisor.listActiveRuns()`
  *    listáját a `rootRunId` szerint szűkíti (9. szekció 3. pont, a
  *    `run-supervisor` CLAUDE.md "Amit a T-005-26 ebből használ" bekezdése).
- * 3. **`requestStop()` és `interrupt()` minden érintett futáson és élő
- *    `AgentQuery`-n**, majd a `completion` Promise-ok megvárása - ez a
- *    `stopAndAwaitRunTree` közös menete (9. szekció 2 ... 4. pont). A
- *    beérkezett üzenetek beírása és a hely felszabadítása a meglévő
- *    `runAgentStep`/`agent-node-lifecycle` `finally` ágain magától
- *    megtörténik, ezt a függvény nem ismétli meg.
+ *    A 2 ... 5. pont további része a `cancelActiveRunTree` közös menete,
+ *    amit a `fail_run` hibapolitika is hív a bukott futás al-workflow
+ *    futásaira (SPEC-004 8.3). Ugyanebben a szinkron menetben, a 3. pont
+ *    előtt a fa döntésre váró jóváhagyásainak sora `cancelled`
+ *    (`closeWaitingApprovalStepRuns`), nem a 4. pont tranzakciójában: a 3. pont a várakozásukat lezárja, és a futó
+ *    lépések leállásáig tartó ablakban érkező döntés így a sor állapotán bukik
+ *    (`illegal_status_transition`), ahelyett hogy a `db` elfogadná. Ha az írás
+ *    hibázik, a függvény a fa leállítása nélkül adja vissza a hibát.
+ * 3. **`requestStop()`, a sorban álló agent lépések elutasítása és
+ *    `interrupt()` minden érintett futáson és élő `AgentQuery`-n**, majd a
+ *    `completion` Promise-ok megvárása - ez a `stopAndAwaitRunTree` közös
+ *    menete (9. szekció 2 ... 4. pont). A várakozás tehát csak a MÁR FUTÓ,
+ *    megszakított lépések folyamának kimerüléséig tart, a sorban állókéig
+ *    nem, mert azok el sem indulnak. A beérkezett üzenetek beírása és a hely
+ *    felszabadítása a meglévő `runAgentStep`/`agent-node-lifecycle`
+ *    `finally` ágain magától megtörténik, ezt a függvény nem ismétli meg.
  * 4. **A DB oldali zárás egy tranzakcióban** (`database.recovery.cancelRunTree`,
  *    9. szekció 5. pont): a fa minden nem terminális futása `cancelled`, a
  *    nem terminális lépéseik szintén, futásonként egy `run_finished` esemény
  *    `status: 'cancelled'`-lel.
+ * 5. **A lezáró esemény élő kiadása** (`eventPublisher.publish`), minden
+ *    megszakított futásra, a sikeres DB zárás UTÁN. A sort a `db` a 4.
+ *    pont tranzakciójában már megírta, ezért itt nincs `writeEngineEvent`:
+ *    ugyanaz a minta, mint a `run_started` kiadása a `run-supervisor`
+ *    `startValidatedRun` menetében. Enélkül az élő nézet sosem tudná meg,
+ *    hogy a futás lezárult: a léptető hurok a `stopRequested` ágon
+ *    szándékosan nem ír eseményt (`advance-run.ts` `finishRun`).
  *
  * **A `pending` állapotú futás külön ág NÉLKÜL megszakad.** A SPEC-004 9.
  * szekció "Megszakítás indulás előtt" bekezdése szerint a `pending ->
@@ -92,6 +120,16 @@ export async function interruptRun(
   runId: string,
   dependencies: InterruptRunDependencies,
 ): Promise<Outcome<InterruptRunResult>> {
+  if (!dependencies.runSupervisor.isAcceptingRuns()) {
+    return {
+      kind: 'error',
+      message: formatEngineErrorMessage(
+        'engine_shutting_down',
+        `A(z) "${runId}" futás megszakítása nem fut le, mert a motor szabályos leállása már elkezdődött, és a futást a leállás zárja`,
+      ),
+    };
+  }
+
   const target = dependencies.database.runs.getRun(runId);
   if (target.kind === 'error') {
     return target;
@@ -99,9 +137,11 @@ export async function interruptRun(
   const rootRunId = target.value.rootRunId;
 
   const treeHandles = dependencies.runSupervisor.listActiveRuns().filter((handle) => handle.rootRunId === rootRunId);
-  await stopAndAwaitRunTree(treeHandles, dependencies.agentQueryRegistry, dependencies.approvalRegistry);
-
-  const cancelled = dependencies.database.recovery.cancelRunTree(rootRunId);
+  const cancelled = await cancelActiveRunTree(
+    treeHandles,
+    () => dependencies.database.recovery.cancelRunTree(rootRunId),
+    dependencies,
+  );
   if (cancelled.kind === 'error') {
     return cancelled;
   }

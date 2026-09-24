@@ -145,10 +145,12 @@ const failingRunner: AgentQueryRunner = { run: () => ({ kind: 'error', message: 
 
 function openGate(): ConcurrencyGate {
   return {
-    requestSlot: (_providerId, _requestId, onGranted) => {
+    requestSlot: (_providerId, _runId, _requestId, onGranted) => {
       onGranted();
     },
     releaseSlot: () => ({ kind: 'ok', value: undefined }),
+    denyWaitingForRunIds: notCalled,
+    close: notCalled,
     occupiedSlotCount: () => 0,
     waitingRequestCount: () => 0,
   };
@@ -177,7 +179,11 @@ function registryDecidingImmediately(database: DatabaseContext): ApprovalWaitReg
   };
 }
 
-const notCalledRunner: ChildWorkflowRunner = { startChildRun: notCalled, awaitChildRun: notCalled };
+const notCalledRunner: ChildWorkflowRunner = {
+  startChildRun: notCalled,
+  awaitChildRun: notCalled,
+  cancelChildRunTrees: notCalled,
+};
 
 function dependenciesOf(
   database: DatabaseContext,
@@ -319,6 +325,7 @@ function plainRequest(runId: string, nodeId: string, config: PlainNodeConfig): E
       iteration: 0,
       attempt: 1,
       providerId: 'minimax',
+      failureStopsRun: false,
     },
     runContext: emptyRunContext,
     graph,

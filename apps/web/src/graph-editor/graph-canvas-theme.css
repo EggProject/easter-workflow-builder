@@ -1,0 +1,47 @@
+/* A React Flow vásznak KÖZÖS témája, KIZÁRÓLAG a vezérlő gombokra és az
+   attribúcióra: a szerkesztő (`GraphEditorCanvas`) és a futás nézet
+   (`RunGraphCanvas`) konténere egyaránt viseli ezt az osztályt.
+
+   Az él, a fogantyú, a pontminta és a kijelölés színe SZÁNDÉKOSAN nincs itt,
+   hanem a szerkesztő saját `graph-editor.css` blokkjában: amikor ezek is ide
+   kerültek, a futás nézet éle sötét témában a harmadára gyengült, a
+   pontmintája pedig mindkét témában eltűnt, amit senki nem kért. A futás nézet
+   ezeken a React Flow szállított alapértelmezését festi, ugyanúgy, mint
+   előtte (`docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció,
+   regresszió: `e2e/run-graph-paint.spec.ts`).
+
+   A `--xy-*` blokk a React Flow saját, DOKUMENTÁLT témázási felülete
+   (https://reactflow.dev/learn/customization/theming): a
+   `@xyflow/react/dist/style.css` minden színt
+   `var(--xy-<valami>, var(--xy-<valami>-default))` alakban olvas, tehát a
+   `--xy-` előtagú változó felülírása az egyetlen kitalált szín nélküli út.
+   Minden érték a design system saját `--ep-*` tokenje, és a tokeneket a
+   `<html>` `data-theme` attribútuma váltja (`packages/ui` `useThemeMode`), így
+   a vászon a téma váltót élőben, újratöltés nélkül követi. A React Flow
+   `colorMode` propja ehhez nem kell: az csak a `-default` értékeket cseréli a
+   könyvtár saját hex palettájára, amit az itt kötött változók úgyis
+   felülírnak (`docs/research/2026-09-23-react-flow-sotet-tema.md`).
+
+   A MÉRT HIBÁK, amik ezt indokolják. 2026-09-05, szerkesztő, sötét téma: a
+   vezérlő gombok háttere a szállított `#fefefe` alapértelmezésen maradt, az
+   ikon színe viszont `--xy-controls-button-color-default: inherit`, ami a mi
+   sötét témás `--ep-fg` világos szövegszínünket örökölte, azaz üres, "törött"
+   gombok. 2026-09-23, futás nézet, sötét téma: ugyanez, mert a blokk addig
+   csak a szerkesztő konténerén állt, a futás nézet vásznán nem. */
+.graph-canvas-theme {
+  --xy-controls-button-background-color: var(--ep-bg-elevated);
+  --xy-controls-button-background-color-hover: var(--ep-bg-hover);
+  --xy-controls-button-color: var(--ep-fg);
+  --xy-controls-button-color-hover: var(--ep-fg);
+  --xy-controls-button-border-color: var(--ep-divider);
+  --xy-controls-box-shadow: var(--ep-shadow-sm);
+
+  --xy-attribution-background-color: var(--ep-bg-elevated);
+}
+
+/* A React Flow attribúciós linkje a szállított CSS-ben fix `#999` színt kap,
+   ami a mi sötét témánkon alig olvasható. A link a licenc miatt marad, csak
+   a színe kerül a design system tokenjére. */
+.graph-canvas-theme .react-flow__attribution a {
+  color: var(--ep-fg-subtle);
+}

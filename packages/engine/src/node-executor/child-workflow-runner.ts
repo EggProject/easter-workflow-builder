@@ -1,4 +1,4 @@
-import type { StartRunParentContext, WorkflowRunRecord } from '@easter-workflow-builder/db';
+import type { CancelRunTreeResult, StartRunParentContext, WorkflowRunRecord } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 
 /**
@@ -24,20 +24,33 @@ import type { Outcome } from '@easter-workflow-builder/core';
  *   változatlanul, ahogy a `db` `StartRunParentContext` várja. A gyerek
  *   értékeit (azonos gyökér, `depth + 1`, bővített ancestry) a `startRun`
  *   vezeti le ebből, tehát a motorban nincs erre külön számítás.
+ * - `parentRunId`: a szülő futás azonosítója. Nem kerül adatbázisba (a
+ *   kapcsolatot ott a `step_run.sub_workflow_run_id` hordozza), a gyerek
+ *   futás kézikönyve kapja meg (`ActiveRunHandle.parentRunId`), hogy a
+ *   `cancelChildRunTrees` a szülő alfáját a memóriából, az adatbázis írásától
+ *   függetlenül találja meg.
  */
 export interface ChildWorkflowRunRequest {
   readonly targetWorkflowId: string;
   readonly input: Readonly<Record<string, unknown>>;
   readonly parent: StartRunParentContext;
+  readonly parentRunId: string;
 }
 
 /**
  * Egy lezárult al-workflow futás eredménye (SPEC-004 5.9 6. pont).
  *
- * - `run`: a gyerek futás **terminális** rekordja. A `status` mezője dönti el,
- *   hogy a szülő lépés `succeeded` vagy `sub_workflow_failed` osztállyal
- *   `failed` állapotban zár, és ugyanez a mező megy ki a
- *   `sub_workflow_finished` esemény payloadjában.
+ * - `run`: a gyerek futás rekordja a léptetésének lezárulása után. A `status`
+ *   mezője dönti el, hogy a szülő lépés `succeeded` vagy `sub_workflow_failed`
+ *   osztállyal `failed` állapotban zár, és ugyanez a mező megy ki a
+ *   `sub_workflow_finished` esemény payloadjában. Kivétel a leállított gyerek:
+ *   a sorát a fa DB zárása egy tranzakcióban írja (SPEC-004 9. szekció 5.
+ *   pont, 10.2 3. pont), ami csak a rekord itteni beolvasása után fut, tehát
+ *   itt még `running`.
+ * - `stopTargetStatus`: csak leállított gyereknél, a kézikönyvére a
+ *   `requestStop` hívásakor került célállapot (`ActiveRunHandle`). A még
+ *   `running` sorú gyereknél ezt adja a végrehajtó az eseményben és a lépés
+ *   üzenetében: pontosan ezt írja a fa DB zárása (user döntés 2026-09-23).
  * - `output`: a gyerek futás kimenete, amit a szülő lépés kimeneteként
  *   tárolunk. A spec ezt "a gyerek futás terminális node-jainak kimenete"
  *   néven nevezi meg, de a "terminális node kimenete" fogalomnak ebben a
@@ -52,6 +65,7 @@ export interface ChildWorkflowRunRequest {
 export interface ChildWorkflowRunResult {
   readonly run: WorkflowRunRecord;
   readonly output: unknown;
+  readonly stopTargetStatus?: 'cancelled' | 'interrupted';
 }
 
 /**
@@ -101,4 +115,18 @@ export interface ChildWorkflowRunner {
    * kimenetének visszaadása.
    */
   readonly awaitChildRun: (childRunId: string) => Promise<Outcome<ChildWorkflowRunResult>>;
+
+  /**
+   * A megnevezett futás összes aktív al-workflow futásának (gyerek, unoka,
+   * ...) megszakítása a felhasználói megszakítás fa mechanizmusával
+   * (SPEC-004 9. szekció 2 ... 5. pont, `run-interrupt/cancel-active-run-tree.ts`):
+   * a futások `cancelled` állapotban zárnak, a döntésre váró jóváhagyásaikkal
+   * együtt, kivéve a szabályos leállás által már `interrupted` célú futást: ott
+   * az első leállítás célállapota marad (SPEC-004 9. szekció, 10.2). A
+   * megnevezett futás maga nem változik. Nem a `sub_workflow`
+   * végrehajtó hívja, hanem a léptető hurok a `fail_run` hibapolitikában
+   * (SPEC-004 8.3, user döntés 2026-09-23): a gyerek lezárulása után a futó
+   * `sub_workflow` lépés a saját útján zár (5.9 6. pont).
+   */
+  readonly cancelChildRunTrees: (parentRunId: string) => Promise<Outcome<CancelRunTreeResult>>;
 }

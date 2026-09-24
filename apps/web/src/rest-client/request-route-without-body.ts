@@ -1,6 +1,7 @@
-import type { FetchFunction, Outcome } from '@easter-workflow-builder/core';
+import type { FetchFunction } from '@easter-workflow-builder/core';
 import type { RouteId } from '@easter-workflow-builder/protocol';
 import { performRouteRequest } from './perform-route-request.ts';
+import type { RouteOutcome } from './route-outcome.ts';
 import type { SafeParsableSchema } from './safe-parsable-schema.ts';
 
 export interface RequestRouteWithoutBodyInput<TValue> {
@@ -20,7 +21,7 @@ export interface RequestRouteWithoutBodyInput<TValue> {
  */
 export function requestRouteWithoutBody<TValue>(
   input: Readonly<RequestRouteWithoutBodyInput<TValue>>,
-): Promise<Outcome<TValue>> {
+): Promise<RouteOutcome<TValue>> {
   return performRouteRequest({
     routeId: input.routeId,
     parameters: input.parameters ?? {},

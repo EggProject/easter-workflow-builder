@@ -4,21 +4,16 @@ import type { Engine } from '@easter-workflow-builder/engine';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 import { toPendingApproval } from './to-pending-approval.ts';
 
-function notFoundMessage(approvalId: string): string {
-  return `A(z) "${approvalId}" azonosítójú, függőben lévő jóváhagyás nem található (not_found).`;
-}
-
 /**
  * `POST /api/approvals/{approvalId}/decision` (SPEC-005 4.2 C táblázat 18.
- * sora). A `HumanApprovalRepository` nem ismer `getApprovalById` metódust
- * (a repository felülete `packages/db/src/human-approval` alatt zárt, a
- * jelen lépés nem bővíti, SPEC-006 1. szekció "Amit NEM dönt el"), a döntés
- * viszont a motor `decideApproval` metódusán át `stepRunId` alapján megy
- * (`ApprovalDecisionInput`). A kezelő ezért a `listPendingApprovals`
- * listájában keresi meg az `approvalId`-t: ha nincs a függőben lévők
- * között, `not_found`-ot ad - ez a döntött vagy sosem létezett esetet
- * egységesen kezeli, mert a repository nem ad módot a kettő szétválasztására
- * `stepRunId` nélkül.
+ * sora). A jóváhagyást az azonosítója szerint olvassa (`getApproval`, user
+ * döntés 2026-09-23), nem a függő listából: a nem létező azonosító így
+ * `not_found` (404), a létező, de már eldöntött vagy döntés nélkül lezárt
+ * jóváhagyás viszont eljut a motorig, és a `db` compare and set döntése
+ * bukik rajta: `already_decided`, illetve a lépés sorának terminális
+ * állapotán `illegal_status_transition`, mindkettő `conflict` (409, SPEC-005
+ * 8.2). A döntés a motor `decideApproval` metódusán át `stepRunId` alapján
+ * megy (`ApprovalDecisionInput`).
  */
 export function createDecideApprovalHandler(database: DatabaseContext, engine: Engine): RouteHandler {
   return async (context) => {
@@ -28,21 +23,18 @@ export function createDecideApprovalHandler(database: DatabaseContext, engine: E
     }
 
     const approvalId = context.parameters['approvalId'] ?? '';
-    const pending = database.approvals.listPendingApprovals();
-    if (pending.kind === 'error') {
-      return pending;
-    }
-    const match = pending.value.find((record) => record.id === approvalId);
-    if (match === undefined) {
-      return { kind: 'error', message: notFoundMessage(approvalId) };
+    const approval = database.approvals.getApproval(approvalId);
+    if (approval.kind === 'error') {
+      return approval;
     }
 
-    const decided = await engine.decideApproval({ stepRunId: match.stepRunId, decision: parsedBody.data.decision });
+    const { stepRunId } = approval.value;
+    const decided = await engine.decideApproval({ stepRunId, decision: parsedBody.data.decision });
     if (decided.kind === 'error') {
       return decided;
     }
 
-    const updated = database.approvals.getApprovalForStep(match.stepRunId);
+    const updated = database.approvals.getApprovalForStep(stepRunId);
     if (updated.kind === 'error') {
       return updated;
     }

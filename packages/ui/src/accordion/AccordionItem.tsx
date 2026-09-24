@@ -4,10 +4,25 @@ import './accordion.css';
 
 export interface AccordionItemProperties {
   /**
-   * A panel fejlécének szövege; egyben a nyitott panel hozzáférhető neve
-   * (`role="region"` plusz `aria-labelledby`).
+   * A panel fejlécének tartalma; a szövege egyben a nyitott panel
+   * hozzáférhető neve (`role="region"` plusz `aria-labelledby`). A forrás
+   * `Accordion.jsx` a `title` értékét típus nélkül, csomópontként rajzolja,
+   * ezért nem csak szöveg lehet: a transcript sor a meta darabjait külön
+   * elemben adja át (`apps/web` `run-event-row`, user döntés 2026-09-24).
    */
-  readonly title: string;
+  readonly title: ReactNode;
+  /**
+   * Opcionális jelölő a fejléc bal szélén, a forrás `.accordion__icon`
+   * szlotjában: 18x18-as, `flex-shrink: 0` doboz, tehát minden sorban
+   * ugyanolyan széles oszlopot ad. A jelölő hozzáférhetőségéről (pl.
+   * `aria-hidden` az SVG-n) a hívó dönt, ahogy a forrásban is.
+   */
+  readonly icon?: ReactNode;
+  /**
+   * Opcionális, jobb oldali kiegészítő szöveg a cím után (darabszám,
+   * állapot), a forrás `.accordion__meta` szlotjában.
+   */
+  readonly meta?: ReactNode;
   /**
    * Nyitva induljon-e a panel. Alapértéke `false`: a ritkán szerkesztett
    * mezők zárva indulnak, ez az egész téma bevezetésének oka.
@@ -25,6 +40,8 @@ export interface AccordionItemProperties {
  * fejlécre mutató `aria-labelledby` névvel, és a natív `hidden`
  * attribútummal tűnik el. A natív gomb miatt a nyitás és a zárás
  * BILLENTYŰZETRŐL is működik (`Enter` és `Space`), külön kezelő nélkül.
+ * A fejléc sorrendje is a forrásé: `icon`, cím, `meta`, chevron; az `icon`
+ * és a `meta` szlot csak akkor kerül a DOM-ba, ha a hívó átadja.
  *
  * A nyitottságot a panel MAGA tartja, nem a szülő `Accordion`: így a
  * forrás `cloneElement` alapú, aláhúzással kezdődő privát propjai
@@ -32,7 +49,7 @@ export interface AccordionItemProperties {
  * amit a projekt tilt), és minden panel egymástól függetlenül nyitható.
  */
 export function AccordionItem(properties: Readonly<AccordionItemProperties>): ReactElement {
-  const { title, defaultOpen = false, children } = properties;
+  const { title, icon, meta, defaultOpen = false, children } = properties;
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const automaticId = useId();
   const triggerId = `${automaticId}-trigger`;
@@ -51,7 +68,9 @@ export function AccordionItem(properties: Readonly<AccordionItemProperties>): Re
             setIsOpen((currentIsOpen) => !currentIsOpen);
           }}
         >
+          {icon === undefined ? undefined : <span className="accordion__icon">{icon}</span>}
           <span className="accordion__title">{title}</span>
+          {meta === undefined ? undefined : <span className="accordion__meta">{meta}</span>}
           <svg
             className="accordion__chevron"
             viewBox="0 0 16 16"

@@ -24,16 +24,24 @@ function closeHttpServer(server: Server): Promise<void> {
 }
 
 /**
- * A szabályos leállás 2 ... 6. lépése (SPEC-006 8.1, 8.2). A `server.close()`
- * után nem jön be új kapcsolat; a 3. lépés minden nyitott SSE nyelőt lezár
- * (`streamRegistry.closeAllConnections()`, SPEC-006 8.2 3. lépés) - ez
- * `engine.shutdown()` ELŐTT fut, mert a stream kapcsolatok sosem járnak le
- * maguktól, és a `server.close()` visszahívása nélkülük soha nem futna le. A
- * `closeAllConnections()` a fennmaradt (idle) kapcsolatokat zárja, majd a
- * motor és az adatbázis zár, ebben a sorrendben.
+ * A szabályos leállás 2 ... 7. lépése (SPEC-006 8.1, 8.2), ebben a sorrendben:
  *
- * A visszatérési érték a kilépési kód (SPEC-006 8.2 7. lépés): `0`, ha minden
- * lépés sikerült, `1`, ha az `engine.shutdown()` hibaágat adott. A
+ * 2. `server.close()`: új kapcsolat nem jön be, a tétlen kapcsolatok
+ *    lezárulnak. A visszahívását itt még NEM várjuk meg: az csak akkor fut
+ *    le, amikor minden kapcsolat véget ért, a nyitott SSE kapcsolat viszont
+ *    magától sosem ér véget, tehát a várakozás a leállást elakasztaná
+ *    (SPEC-006 8.2, mérve).
+ * 3. `engine.shutdown()`: minden futás leáll, és a futásonként beírt
+ *    `run_interrupted` esemény élőben is kimegy. Ezért áll a motor az SSE
+ *    nyelők lezárása ELŐTT: lezárt kapcsolaton a lezáró keret nem érné el a
+ *    klienst.
+ * 4 ... 5. A nyitott SSE nyelők (`streamRegistry.closeAllConnections()`),
+ *    majd a maradék kapcsolatok (`server.closeAllConnections()`) zárása.
+ * 6. A 2. lépés visszahívásának megvárása.
+ * 7. `database.close()`, a motor után, mert a `shutdown` még ír.
+ *
+ * A visszatérési érték a kilépési kód (8. lépés): `0`, ha minden lépés
+ * sikerült, `1`, ha az `engine.shutdown()` hibaágat adott. A
  * `process.exitCode` beállítása a hívó (`register-shutdown-signal-handlers.ts`)
  * dolga, ez a függvény nem nyúl a globális `process` objektumhoz.
  */
@@ -41,11 +49,14 @@ export async function runShutdownSequence(dependencies: ShutdownDependencies): P
   const { server, engine, database, logger, streamRegistry } = dependencies;
 
   logger.info('A szerver leállása elkezdődött.');
-  await closeHttpServer(server);
-  streamRegistry.closeAllConnections();
-  server.closeAllConnections();
+  const httpServerClosed = closeHttpServer(server);
 
   const shutdownResult = await engine.shutdown();
+
+  streamRegistry.closeAllConnections();
+  server.closeAllConnections();
+  await httpServerClosed;
+
   if (shutdownResult.kind === 'error') {
     logger.error({ message: shutdownResult.message }, 'A motor leállása hibával zárult.');
     database.close();

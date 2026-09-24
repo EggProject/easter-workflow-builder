@@ -25,6 +25,7 @@ import { isNodeDeselected, mergeEdgeSelection, type SelectedEdgeIds } from './gr
 import { isValidGraphConnection } from './is-valid-connection.ts';
 import { mergeMeasuredNodeSizes, withMeasuredNodeSize, type MeasuredNodeSizes } from './measured-node-sizes.ts';
 import '@xyflow/react/dist/style.css';
+import './graph-canvas-theme.css';
 import './graph-editor.css';
 
 /**
@@ -198,7 +199,7 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
   );
 
   return (
-    <div className="graph-editor-canvas">
+    <div className="graph-editor-canvas graph-canvas-theme">
       {/* A mért kártya méret konstans CSS custom propertyvé fordítása, a
           `graph-node-card` téma egyetlen komponensében (a futás nézet csak
           olvasható vászna ugyanezt használja, T-009-20). */}

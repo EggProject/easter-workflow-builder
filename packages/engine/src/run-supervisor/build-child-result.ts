@@ -14,12 +14,17 @@ import { collectTerminalOutput } from './collect-terminal-output.ts';
  * Ugyanaz a megfontolás, mint a `collectRunInputs` esetén: éles futásban a
  * `getRun` a lezárult futásra sosem hibázik, tehát ha a függvény maga hívná,
  * az az ág sosem futna le. Bemenetként viszont mindkét hibaág előidézhető.
+ *
+ * A `stopTargetStatus` a gyerek kézikönyvének célállapota
+ * (`ActiveRunHandle.stopTargetStatus`); csak leállított gyereknél kerül az
+ * eredménybe.
  */
 export function buildChildResult(
   completion: Outcome<RunCompletion>,
   run: Outcome<WorkflowRunRecord>,
   graph: ExecutableGraph,
   executedInstances: readonly ExecutedStepInstance[],
+  stopTargetStatus?: 'cancelled' | 'interrupted',
 ): Outcome<ChildWorkflowRunResult> {
   if (completion.kind === 'error') {
     return completion;
@@ -29,6 +34,10 @@ export function buildChildResult(
   }
   return {
     kind: 'ok',
-    value: { run: run.value, output: collectTerminalOutput(graph, executedInstances) },
+    value: {
+      run: run.value,
+      output: collectTerminalOutput(graph, executedInstances),
+      ...(stopTargetStatus !== undefined && { stopTargetStatus }),
+    },
   };
 }

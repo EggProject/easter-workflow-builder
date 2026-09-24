@@ -790,6 +790,12 @@ Az M-28 ugyanezt a suffixes azonosítóval is megerősítette: ott a `canonicalM
 suffix tehát a költségszámítás kulcsát is megváltoztatja, de a first-party árazás ettől még
 first-party marad.
 
+**2026-09-23-i pontosítás és felülírás.** A fenti "vagy elrejti" ágat a user döntése felülírta: a
+transcript a költséget megjeleníti, "Költség (SDK becslés)" felirattal. A szám eredetét a
+`2026-09-23-sdk-koltseg-becsles.md` fájl két forrással és az összes artefaktum újraszámolásával
+tisztázza: az SDK a MiniMax-M3 modellt nem ismeri fel, és a beépített, Claude listaárral egyező
+tartalék díjtétellel számol.
+
 ### 5.6 Párhuzamos ágak és kérésszám
 
 **Az M-31 a kliens belső subagent párhuzamosságát méri, nem a workflow motorét.**

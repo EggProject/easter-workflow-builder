@@ -12,16 +12,16 @@ const SUCCEEDED: Outcome<RunCompletion> = {
 /* eslint-enable unicorn/no-null */
 
 function handleOf(runId: string, rootRunId = runId): ActiveRunHandle {
-  let isStopRequested = false;
+  let stopTargetStatus: 'cancelled' | 'interrupted' | undefined;
   return {
     runId,
     rootRunId,
     workflowId: 'wf-1',
     completion: Promise.resolve(SUCCEEDED),
-    requestStop: () => {
-      isStopRequested = true;
+    requestStop: (targetStatus) => {
+      stopTargetStatus = targetStatus;
     },
-    isStopRequested: () => isStopRequested,
+    stopTargetStatus: () => stopTargetStatus,
   };
 }
 
@@ -67,12 +67,26 @@ describe('createActiveRunRegistry', () => {
     expect(tree.map((handle) => handle.runId)).toStrictEqual(['run-1', 'run-2']);
   });
 
-  it('a requestStop a kézikönyvön keresztül állítja a leállítási jelzést', () => {
+  it('a listDescendants a parentRunId láncon a teljes alfát adja, a futás maga, a testvér alfája és a másik fa nélkül (a fail_run útja)', () => {
+    const registry = createActiveRunRegistry();
+    registry.register(handleOf('gyoker'));
+    registry.register({ ...handleOf('bukott', 'gyoker'), parentRunId: 'gyoker' });
+    registry.register({ ...handleOf('gyerek', 'gyoker'), parentRunId: 'bukott' });
+    registry.register({ ...handleOf('testver', 'gyoker'), parentRunId: 'gyoker' });
+    registry.register({ ...handleOf('unoka', 'gyoker'), parentRunId: 'gyerek' });
+    registry.register({ ...handleOf('testver-gyereke', 'gyoker'), parentRunId: 'testver' });
+    registry.register(handleOf('masik-fa'));
+
+    expect(registry.listDescendants('bukott').map((handle) => handle.runId)).toStrictEqual(['gyerek', 'unoka']);
+    expect(registry.listDescendants('unoka')).toStrictEqual([]);
+  });
+
+  it('a requestStop a kézikönyvön keresztül állítja a leállítás célállapotát', () => {
     const handle = handleOf('run-1');
 
-    expect(handle.isStopRequested()).toBe(false);
-    handle.requestStop();
+    expect(handle.stopTargetStatus()).toBeUndefined();
+    handle.requestStop('cancelled');
 
-    expect(handle.isStopRequested()).toBe(true);
+    expect(handle.stopTargetStatus()).toBe('cancelled');
   });
 });

@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { findRelativeImportSpecifiers } from '../casing/find-relative-import-specifiers.ts';
+import { findRelativeSpecifierCandidates } from '../casing/find-relative-specifier-candidates.ts';
 
 // Ugyanaz a kiterjesztés lista, mint a `casing` témában: ezekben a
 // fájltípusokban fordulhat elő `import`/`export ... from` deklaráció.
@@ -61,6 +62,15 @@ function findExtensionlessImports(root: string): readonly ExtensionlessImport[] 
     }
 
     const sourceText = readFileSync(path.join(root, trackedPath), 'utf8');
+
+    // Ugyanaz az előszűrés, mint a `casing` témában: a parser alapú kinyerés
+    // csak akkor fut, ha az előszűrő nem tud dönteni, vagy legalább egy
+    // jelöltje kiterjesztés nélkülinek látszik.
+    const candidates = findRelativeSpecifierCandidates(sourceText);
+    if (candidates?.every((candidate) => EXTENSION_SUFFIX_PATTERN.test(candidate)) === true) {
+      continue;
+    }
+
     for (const { specifier, line } of findRelativeImportSpecifiers(trackedPath, sourceText)) {
       if (!EXTENSION_SUFFIX_PATTERN.test(specifier)) {
         found.push({ file: trackedPath, line, specifier });

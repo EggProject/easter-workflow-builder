@@ -8,7 +8,10 @@ import type {
   WorkflowRunRecord,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { AgentQuery } from '@easter-workflow-builder/agent';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
+import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { RunCompletion } from '../error-policy/run-completion.ts';
 import type { ActiveRunHandle } from '../run-supervisor/active-run-registry.ts';
@@ -126,14 +129,14 @@ const RESOLVED_SUCCESS: Outcome<RunCompletion> = {
  * ennek a fájlnak a tárgya (lásd `stop-and-await-run-tree.spec.ts`).
  */
 function handleOf(run: WorkflowRunRecord): ActiveRunHandle & { readonly requestStop: ReturnType<typeof vi.fn> } {
-  const requestStop = vi.fn();
+  const requestStop = vi.fn<ActiveRunHandle['requestStop']>();
   return {
     runId: run.id,
     rootRunId: run.rootRunId,
     workflowId: run.workflowId,
     completion: Promise.resolve(RESOLVED_SUCCESS),
     requestStop,
-    isStopRequested: () => requestStop.mock.calls.length > 0,
+    stopTargetStatus: () => requestStop.mock.calls[0]?.[0],
   };
 }
 
@@ -148,13 +151,33 @@ function fakeQuery(): { query: AgentQuery; interruptSpy: ReturnType<typeof vi.fn
   };
 }
 
+/**
+ * A `published` tömb a kiadott események naplója: a hívó akkor adja át, ha a
+ * teszt az élő kiadást vizsgálja.
+ */
 function dependenciesOf(
   database: DatabaseContext,
   handles: readonly ActiveRunHandle[],
   agentQueryRegistry: ReturnType<typeof createAgentQueryRegistry>,
+  published: unknown[] = [],
+  concurrencyGate: ConcurrencyGate = createConcurrencyGate(() => null),
 ): InterruptRunDependencies {
-  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
-  return { database, runSupervisor, agentQueryRegistry, approvalRegistry: createApprovalWaitRegistry() };
+  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'isAcceptingRuns'> = {
+    listActiveRuns: () => handles,
+    isAcceptingRuns: () => true,
+  };
+  return {
+    database,
+    eventPublisher: {
+      publish: (event) => {
+        published.push(event);
+      },
+    },
+    runSupervisor,
+    concurrencyGate,
+    agentQueryRegistry,
+    approvalRegistry: createApprovalWaitRegistry(),
+  };
 }
 
 describe('interruptRun', () => {
@@ -166,6 +189,30 @@ describe('interruptRun', () => {
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('not_found');
+
+    database.close();
+  });
+
+  it('a szabályos leállás kezdete után engine_shutting_down hibát ad, és a fán semmit nem csinál: nincs requestStop, nincs interrupt, a sorok és az események változatlanok (user döntés 2026-09-24)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const seeded = seedRootRun(database);
+    const { query, interruptSpy } = fakeQuery();
+    registry.register(seeded.run.id, seeded.step.id, query);
+    const handle = handleOf(seeded.run);
+    const eventsBefore = okOrThrow(database.events.readEventsSince(seeded.run.id, 0, 10));
+
+    const outcome = await interruptRun(seeded.run.id, {
+      ...dependenciesOf(database, [handle], registry),
+      runSupervisor: { listActiveRuns: () => [handle], isAcceptingRuns: () => false },
+    });
+
+    expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
+    expect(handle.requestStop).not.toHaveBeenCalled();
+    expect(interruptSpy).not.toHaveBeenCalled();
+    expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('running');
+    expect(okOrThrow(database.stepRuns.getStepRun(seeded.step.id)).status).toBe('running');
+    expect(okOrThrow(database.events.readEventsSince(seeded.run.id, 0, 10))).toStrictEqual(eventsBefore);
 
     database.close();
   });
@@ -182,7 +229,7 @@ describe('interruptRun', () => {
 
     expect(outcome.rootRunId).toBe(seeded.run.rootRunId);
     expect(outcome.cancelledRunIds).toStrictEqual([seeded.run.id]);
-    expect(handle.requestStop).toHaveBeenCalledTimes(1);
+    expect(handle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
     expect(interruptSpy).toHaveBeenCalledTimes(1);
 
     const runRow = okOrThrow(database.runs.getRun(seeded.run.id));
@@ -247,13 +294,124 @@ describe('interruptRun', () => {
     expect(new Set(outcome.cancelledRunIds)).toStrictEqual(new Set([root.run.id, child.run.id]));
     expect(rootInterrupt).toHaveBeenCalledTimes(1);
     expect(childInterrupt).toHaveBeenCalledTimes(1);
-    expect(rootHandle.requestStop).toHaveBeenCalledTimes(1);
-    expect(childHandle.requestStop).toHaveBeenCalledTimes(1);
+    expect(rootHandle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
+    expect(childHandle.requestStop).toHaveBeenCalledExactlyOnceWith('cancelled');
 
     expect(okOrThrow(database.runs.getRun(root.run.id)).status).toBe('cancelled');
     expect(okOrThrow(database.runs.getRun(child.run.id)).status).toBe('cancelled');
     expect(okOrThrow(database.stepRuns.getStepRun(root.step.id)).status).toBe('cancelled');
     expect(okOrThrow(database.stepRuns.getStepRun(child.step.id)).status).toBe('cancelled');
+
+    database.close();
+  });
+
+  it('REGRESSZIÓ: a fa (az al-workflow futással együtt) sorban álló agent lépéseit kiveszi a szabályozó sorából, egy másik fáét nem (SPEC-004 9. szekció 2. pont)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const child = seedChildRun(database, root.run);
+    const other = seedRootRun(database);
+    // A nulla korlát mellett minden kérés sorba áll.
+    const gate = createConcurrencyGate(() => 0);
+    const denied: string[] = [];
+    for (const runId of [root.run.id, child.run.id, other.run.id]) {
+      gate.requestSlot(
+        'minimax',
+        runId,
+        `varakozo-${runId}`,
+        () => {
+          throw new Error(`a(z) ${runId} kérése nem kaphat helyet`);
+        },
+        () => {
+          denied.push(runId);
+        },
+      );
+    }
+
+    const handles = [handleOf(root.run), handleOf(child.run), handleOf(other.run)];
+    const dependencies = dependenciesOf(database, handles, registry, [], gate);
+
+    okOrThrow(await interruptRun(root.run.id, dependencies));
+
+    expect(denied).toStrictEqual([root.run.id, child.run.id]);
+    expect(gate.waitingRequestCount('minimax')).toBe(1);
+
+    database.close();
+  });
+
+  it('REGRESSZIÓ: a fa döntésre váró jóváhagyásának sora már a futó lépések leállásának kivárása ELŐTT cancelled, egy másik fáé nem (SPEC-004 8.3)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const other = seedRootRun(database);
+    const approvalStepRunIds = [root, other].map((seeded) => {
+      const stepRunId = okOrThrow(
+        database.stepRuns.createStepRun({
+          runId: seeded.run.id,
+          nodeId: `jov-${seeded.run.id}`,
+          nodeType: 'human_approval',
+          parentStepRunId: null,
+          providerId: 'minimax',
+          modelId: null,
+          sessionMode: null,
+          structuredOutputStrategy: null,
+          subWorkflowRunId: null,
+        }),
+      ).id;
+      okOrThrow(database.stepRuns.markStepRunning(stepRunId));
+      okOrThrow(
+        database.approvals.requestApproval({
+          runId: seeded.run.id,
+          stepRunId,
+          title: 'döntés',
+          body: 'szöveg',
+          payload: {},
+        }),
+      );
+      return stepRunId;
+    });
+    // A futó lépés leállása a teszt kezében van: amíg a `completion` nem
+    // teljesül, a megszakítás a leállási ablakban áll.
+    const { promise: completion, resolve: finishRun } = Promise.withResolvers<Outcome<RunCompletion>>();
+    const rootHandle: ActiveRunHandle = { ...handleOf(root.run), completion };
+
+    const interrupting = interruptRun(
+      root.run.id,
+      dependenciesOf(database, [rootHandle, handleOf(other.run)], registry),
+    );
+
+    expect(approvalStepRunIds.map((id) => okOrThrow(database.stepRuns.getStepRun(id)).status)).toStrictEqual([
+      'cancelled',
+      'waiting_approval',
+    ]);
+    finishRun(RESOLVED_SUCCESS);
+    okOrThrow(await interrupting);
+    expect(okOrThrow(database.runs.getRun(root.run.id)).status).toBe('cancelled');
+
+    database.close();
+  });
+
+  it('a jóváhagyás sorok lezárásának hibáját továbbadja, és a fát nem állítja le', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const seeded = seedRootRun(database);
+    const { query, interruptSpy } = fakeQuery();
+    registry.register(seeded.run.id, seeded.step.id, query);
+    const handle = handleOf(seeded.run);
+    const failing: DatabaseContext = {
+      ...database,
+      stepRuns: {
+        ...database.stepRuns,
+        listStepRuns: () => ({ kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' }),
+      },
+    };
+
+    const outcome = await interruptRun(seeded.run.id, dependenciesOf(failing, [handle], registry));
+
+    expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+    expect(handle.requestStop).not.toHaveBeenCalled();
+    expect(interruptSpy).not.toHaveBeenCalled();
+    expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('running');
 
     database.close();
   });
@@ -271,17 +429,19 @@ describe('interruptRun', () => {
     database.close();
   });
 
-  it('már teljesen terminális célra üres cancelledRunIds, hiba nélkül', async () => {
+  it('már teljesen terminális célra üres cancelledRunIds, hiba nélkül, és nem ad ki eseményt', async () => {
     const database = openMemoryDatabase();
     const registry = createAgentQueryRegistry();
     const seeded = seedRootRun(database);
     okOrThrow(database.stepRuns.markStepSucceeded(seeded.step.id));
     okOrThrow(database.runs.markRunSucceeded(seeded.run.id));
+    const published: unknown[] = [];
 
-    const outcome = okOrThrow(await interruptRun(seeded.run.id, dependenciesOf(database, [], registry)));
+    const outcome = okOrThrow(await interruptRun(seeded.run.id, dependenciesOf(database, [], registry, published)));
 
     expect(outcome.cancelledRunIds).toStrictEqual([]);
     expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('succeeded');
+    expect(published).toStrictEqual([]);
 
     database.close();
   });
@@ -296,25 +456,60 @@ describe('interruptRun', () => {
     // `await Promise.all(...)`-ja után a `cancelRunTree` a már zárt
     // kapcsolaton fut, a `transaction` `isClosed` ága valódi
     // `database_closed` hibát ad (`open-database.ts`).
+    // Ez a teszt a lezárt kapcsolat hibaágát vizsgálja, nem a requestStop hívást.
     const handle: ActiveRunHandle = {
-      runId: seeded.run.id,
-      rootRunId: seeded.run.rootRunId,
-      workflowId: seeded.run.workflowId,
+      ...handleOf(seeded.run),
       completion: (async () => {
         await Promise.resolve();
         database.close();
         return RESOLVED_SUCCESS;
       })(),
-      requestStop: () => {
-        // szándékosan nem csinál semmit: ez a teszt a lezárt kapcsolat
-        // hibaágát vizsgálja, nem a requestStop hívást
-      },
-      isStopRequested: () => false,
     };
 
-    const outcome = await interruptRun(seeded.run.id, dependenciesOf(database, [handle], registry));
+    const published: unknown[] = [];
+
+    const outcome = await interruptRun(seeded.run.id, dependenciesOf(database, [handle], registry, published));
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('database_closed');
+    // A DB zárás nem sikerült, tehát nincs mit élőben kiadni.
+    expect(published).toStrictEqual([]);
+  });
+
+  it('a lezáró run_finished eseményt a fa MINDEN megszakított futására élőben is kiadja, a DB írás UTÁN', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const root = seedRootRun(database);
+    const child = seedChildRun(database, root.run);
+    const published: unknown[] = [];
+    // A kiadás pillanatában a sornak már a naplóban kell állnia: az SSE réteg
+    // a jelzésre az adatbázisból csapol le (SPEC-006 6.5), tehát egy korai
+    // kiadás üres lecsapolást adna.
+    const kindsAtPublish: string[][] = [];
+    const dependencies = dependenciesOf(database, [handleOf(root.run), handleOf(child.run)], registry);
+    const recording: InterruptRunDependencies = {
+      ...dependencies,
+      eventPublisher: {
+        publish: (event) => {
+          published.push(event);
+          const runId = isRecord(event) && typeof event['runId'] === 'string' ? event['runId'] : '';
+          kindsAtPublish.push(okOrThrow(database.events.readEventsSince(runId, 0, 10)).map((row) => row.kind));
+        },
+      },
+    };
+
+    okOrThrow(await interruptRun(root.run.id, recording));
+
+    const cancelledPayload = { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 };
+    expect(published).toHaveLength(2);
+    for (const runId of [root.run.id, child.run.id]) {
+      expect(published).toContainEqual({ kind: 'run_finished', runId, stepRunId: null, payload: cancelledPayload });
+    }
+    expect(kindsAtPublish).toHaveLength(2);
+    for (const kinds of kindsAtPublish) {
+      expect(kinds).toContain('run_finished');
+    }
+
+    database.close();
   });
 });

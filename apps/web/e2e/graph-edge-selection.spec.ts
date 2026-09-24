@@ -32,6 +32,13 @@ import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
+/**
+ * A szerkesztő mentetlen jelzőjének szövege. A `getByRole('status')` a
+ * topnav stream jelzőjét is megtalálja (`FeedIndicator`, `role="status"`,
+ * 2026-09-23), ezért a szerkesztő jelzője a szövegével szűrve áll.
+ */
+const UNSAVED_CHANGES_TEXT = 'Mentetlen változtatások';
+
 const AGENT_STEP_CONFIG: NodeConfig = {
   type: 'agent_step',
   promptTemplate: 'Foglald össze a bemenetet.',
@@ -188,7 +195,9 @@ test('a kiválasztott él a Backspace billentyűre törlődik, a másik él és 
   await expect(nodeLocator(page, 'n3')).toBeVisible();
   // A törlés a szerkesztett gráfot módosítja, tehát a mentetlen jelző
   // megjelenik (SPEC-008 5.5).
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 });
 
 test('a kiválasztott csomópont a Backspace billentyűre törlődik, a rá kötött éllel együtt', async ({ page }) => {
@@ -204,7 +213,9 @@ test('a kiválasztott csomópont a Backspace billentyűre törlődik, a rá köt
   await expect(nodeLocator(page, 'n1')).toBeVisible();
   await expect(nodeLocator(page, 'n2')).toBeVisible();
   await expect(edgeLocator(page)).toBeVisible();
-  await expect(page.getByRole('status')).toHaveText('Mentetlen változtatások');
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
 });
 
 test('kiválasztott csomópont mellett az élre kattintva a Backspace az ÉLT törli, nem a csomópontot', async ({

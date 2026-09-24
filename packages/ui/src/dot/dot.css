@@ -1,0 +1,132 @@
+/* ============================================================
+   EggProject: Dot
+   Forrás: eggproject-design-components/components/dot/dot.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-23.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============================================================
+   Dot — standalone status atom
+   The smallest particle of the EggProject status system.
+   For paired-with-text usage, prefer .badge with .badge__dot.
+   The dot paints with `currentColor`, so tone variants simply
+   set `color:` — rings, pulses and hollow strokes follow along.
+   ============================================================ */
+
+.ep-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  color: var(--ep-blue-600);
+  background: currentColor;
+  vertical-align: middle;
+  position: relative;
+}
+
+/* --- Size variants ---------------------------------------- */
+.ep-dot--xs { width: 4px;  height: 4px; }
+.ep-dot--sm { width: 6px;  height: 6px; }
+.ep-dot--md { width: 8px;  height: 8px; }   /* default */
+.ep-dot--lg { width: 10px; height: 10px; }
+.ep-dot--xl { width: 12px; height: 12px; }
+
+/* --- Semantic tones --------------------------------------- */
+.ep-dot--neutral { color: var(--ep-slate-400); }
+.ep-dot--info    { color: var(--ep-blue-600); }
+.ep-dot--success { color: var(--ep-success); }
+.ep-dot--warning { color: var(--ep-warning-fg); }
+.ep-dot--danger  { color: var(--ep-danger); }
+.ep-dot--yolk    { color: var(--ep-yolk-500); }
+.ep-dot--ink     { color: var(--ep-ink-900); }
+.ep-dot--muted   { color: var(--ep-slate-300); }
+
+/* --- Halo (soft background ring) -------------------------- */
+.ep-dot--halo                 { box-shadow: 0 0 0 3px rgba(46, 91, 224, 0.16); }
+.ep-dot--halo.ep-dot--success { box-shadow: 0 0 0 3px rgba(47, 156, 106, 0.16); }
+.ep-dot--halo.ep-dot--warning { box-shadow: 0 0 0 3px rgba(212, 131, 26, 0.16); }
+.ep-dot--halo.ep-dot--danger  { box-shadow: 0 0 0 3px rgba(199, 56, 78, 0.16); }
+.ep-dot--halo.ep-dot--yolk    { box-shadow: 0 0 0 3px rgba(212, 172, 94, 0.20); }
+.ep-dot--halo.ep-dot--neutral,
+.ep-dot--halo.ep-dot--muted   { box-shadow: 0 0 0 3px rgba(131, 144, 168, 0.20); }
+.ep-dot--halo.ep-dot--ink     { box-shadow: 0 0 0 3px rgba(10, 18, 48, 0.10); }
+
+/* --- Ring (white gap + colored outer ring, for dense bg) -- */
+.ep-dot--ring {
+  box-shadow:
+    0 0 0 1.5px var(--ep-bg-elevated),
+    0 0 0 3px   currentColor;
+}
+
+/* --- Pulse (live / connecting) ---------------------------- */
+@keyframes ep-dot-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 8px transparent; opacity: 0; }
+  100% { box-shadow: 0 0 0 0 transparent;   opacity: 0; }
+}
+.ep-dot--pulse::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ep-dot-pulse 1.6s var(--ep-ease-out) infinite;
+  pointer-events: none;
+}
+
+/* --- Blink (slow, for "stale" / "warning") ---------------- */
+@keyframes ep-dot-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.ep-dot--blink { animation: ep-dot-blink 1.4s var(--ep-ease-in-out) infinite; }
+
+/* --- Hollow (disconnected / off) -------------------------- */
+.ep-dot--hollow {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ep-dot--pulse::before,
+  .ep-dot--blink { animation: none; }
+}
+
+/* ============================================================
+   Forced colors (Windows High Contrast): the currentColor fill collapses all
+   tones onto one system colour and every box-shadow (halo / ring / hollow) is
+   stripped — so a hollow dot would vanish entirely. Pin the dot to a system
+   colour, rebuild rings from system-coloured shadows, and give the hollow dot
+   a real border so it stays a visible outline marker. Tones do not fake a
+   per-tone meaning here; when a dot is informative its name lives on the
+   role="img"/aria-label (from Dot's `title`) or on adjacent text. System
+   colours only; no token/hex/rgb/hsl; no forced-color-adjust; no new motion
+   (the reduced-motion guard above is untouched). Live emulation not run —
+   source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .ep-dot {
+    background: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .ep-dot--neutral,
+  .ep-dot--muted {
+    background: GrayText;
+    border-color: GrayText;
+  }
+  .ep-dot--hollow {
+    background: Canvas;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+  .ep-dot--ring {
+    box-shadow: 0 0 0 1.5px Canvas, 0 0 0 3px CanvasText;
+  }
+  .ep-dot--halo {
+    box-shadow: 0 0 0 3px CanvasText;
+  }
+  .ep-dot--pulse::before {
+    background: CanvasText;
+  }
+}

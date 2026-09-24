@@ -1,0 +1,131 @@
+/* ============================================================
+   EggProject: FeedIndicator
+   Forrás: eggproject-design-components/components/feed-indicator/feed-indicator.css,
+   bájtra azonos a forrás két @import sora kivételével: a design-token
+   tokeneket a csomag globálisan tölti be, a `dot.css`-t pedig a `Dot`
+   komponens a saját importjával hozza be.
+   Átemelés dátuma: 2026-09-23. Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============================================================
+   FeedIndicator — live-feed connection state
+   Four canonical states for any WebSocket / SSE / polling source:
+     connecting   — dialling, expect data soon
+     streaming    — receiving live updates (green, pulsing)
+     stale        — connected but no recent data (yolk, blinking)
+     disconnected — no link (red, hollow)
+   Plus an "idle" off state for paused/never-started feeds.
+   ============================================================ */
+
+.ep-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 12px var(--ep-font-sans);
+  color: var(--ep-slate-500);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* The dot slot — every variant supplies its own .ep-dot.
+   We size it consistently so the label aligns regardless. */
+.ep-feed > .ep-dot { flex-shrink: 0; }
+
+.ep-feed__label {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+.ep-feed__meta {
+  font: 500 11px var(--ep-font-mono);
+  color: var(--ep-fg-faint);
+  margin-left: 2px;
+}
+
+/* --- State tones (label color follows the dot) ------------ */
+.ep-feed--connecting   { color: var(--ep-accent); }
+.ep-feed--streaming    { color: #1F6849; }                /* deep success */
+.ep-feed--stale        { color: #7A4D14; }                /* deep warning */
+.ep-feed--disconnected { color: #8A2230; }                /* deep danger  */
+.ep-feed--idle         { color: var(--ep-slate-500); }
+
+/* --- "Soft" variant: pill with a tinted background -------- */
+.ep-feed--soft {
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--ep-radius-pill);
+  background: transparent;
+}
+.ep-feed--soft.ep-feed--connecting   { background: var(--ep-blue-100); }
+.ep-feed--soft.ep-feed--streaming    { background: #E1F4EB; }
+.ep-feed--soft.ep-feed--stale        { background: #FBEED1; }
+.ep-feed--soft.ep-feed--disconnected { background: #FADEE2; }
+.ep-feed--soft.ep-feed--idle         { background: var(--ep-slate-100); }
+
+/* --- "Outline" variant: border + transparent bg ----------- */
+.ep-feed--outline {
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--ep-radius-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+/* --- "Compact" — dot-only with tooltip-style label -------- */
+.ep-feed--compact {
+  gap: 0;
+}
+.ep-feed--compact .ep-feed__label { display: none; }
+
+/* --- "Ink" surface variant -------------------------------- */
+.ep-feed--ink {
+  color: var(--ep-paper-100);
+}
+.ep-feed--ink.ep-feed--connecting   { color: var(--ep-blue-300); }
+.ep-feed--ink.ep-feed--streaming    { color: #8EE3B6; }
+.ep-feed--ink.ep-feed--stale        { color: var(--ep-yolk-400); }
+.ep-feed--ink.ep-feed--disconnected { color: #F09BA9; }
+.ep-feed--ink.ep-feed--idle         { color: var(--ep-slate-300); }
+.ep-feed--ink.ep-feed--soft {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* --- Size variants ---------------------------------------- */
+.ep-feed--sm { font-size: 11px; gap: 6px; }
+.ep-feed--md { font-size: 12px; }                  /* default */
+.ep-feed--lg { font-size: 13px; gap: 10px; padding-inline: 12px; }
+
+/* --- Stack: dot above tiny meta line --------------------- */
+.ep-feed--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.ep-feed--stack > .ep-dot { margin-bottom: 4px; }
+
+/* ============================================================
+   Forced colors (Windows High Contrast): the soft/outline tints and the ink
+   surface are stripped, and the outline's inset shadow is dropped — so the
+   pill shapes lose their edge. Pin the label/meta to system colours and give
+   the soft/outline/ink variants a real border. Plain inline feeds need no box:
+   their dot (see dot.css) and label are already system-coloured and legible.
+   The per-state colours are not rebuilt — meaning stays in the visible label
+   (or, in compact, the Dot's role="img"/aria-label). System colours only; no
+   token/hex/rgb/hsl; no forced-color-adjust; no motion. Live emulation not run
+   — source/CSSOM-verified.
+   ============================================================ */
+@media (forced-colors: active) {
+  .ep-feed { color: CanvasText; }
+  .ep-feed__label { color: CanvasText; }
+  .ep-feed__meta { color: GrayText; }
+  .ep-feed--soft {
+    background: ButtonFace;
+    border: 1px solid CanvasText;
+  }
+  .ep-feed--outline {
+    background: Canvas;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+  .ep-feed--ink { color: CanvasText; }
+  .ep-feed--ink.ep-feed--soft { background: ButtonFace; }
+}

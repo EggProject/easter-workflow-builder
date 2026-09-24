@@ -352,4 +352,10 @@ describe('GraphNodeCard', () => {
     });
     expect(openedRunIds).toEqual(['r-42']);
   });
+
+  it('a waiting_approval összesítés a kérés abszolút időpontját mutatja ("óta vár")', () => {
+    const requestedAtMs = new Date(2026, 8, 24, 10, 32, 5).getTime();
+    renderNodes([buildDecoratedFlowNode(WORKFLOW_NODES.human_approval, { kind: 'waiting_approval', requestedAtMs })]);
+    expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe('10:32:05 óta vár');
+  });
 });

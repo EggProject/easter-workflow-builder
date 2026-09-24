@@ -116,6 +116,7 @@ function instanceOf(runId: string): NodeExecutionInstance {
     iteration: 0,
     attempt: 1,
     providerId: 'minimax',
+    failureStopsRun: false,
   };
 }
 
@@ -143,8 +144,17 @@ const TERMINAL_MARKERS: Readonly<
   interrupted: (database, runId) => database.runs.markRunInterrupted(runId),
 };
 
+/**
+ * A leállított gyerek sora a léptetése lezárulásakor még `running`: a fa DB
+ * zárása csak a szülő lépés zárása után írja (`ChildWorkflowRunResult`).
+ */
+const CHILD_STATUS_MARKERS: Readonly<
+  Record<TerminalChildStatus | 'running', (database: DatabaseContext, runId: string) => Outcome<WorkflowRunRecord>>
+> = { ...TERMINAL_MARKERS, running: (database, runId) => database.runs.getRun(runId) };
+
 interface FakeRunnerOptions {
-  readonly childStatus?: TerminalChildStatus;
+  readonly childStatus?: TerminalChildStatus | 'running';
+  readonly stopTargetStatus?: 'cancelled' | 'interrupted';
   readonly output?: unknown;
   readonly startError?: string;
   readonly awaitError?: string;
@@ -195,9 +205,17 @@ function fakeRunner(
       if (options.awaitError !== undefined) {
         return { kind: 'error', message: options.awaitError };
       }
-      const run = okOrThrow(TERMINAL_MARKERS[options.childStatus ?? 'succeeded'](database, childRunId));
-      return { kind: 'ok', value: { run, output: options.output ?? { eredmeny: 'kesz' } } };
+      const run = okOrThrow(CHILD_STATUS_MARKERS[options.childStatus ?? 'succeeded'](database, childRunId));
+      return {
+        kind: 'ok',
+        value: {
+          run,
+          output: options.output ?? { eredmeny: 'kesz' },
+          ...(options.stopTargetStatus !== undefined && { stopTargetStatus: options.stopTargetStatus }),
+        },
+      };
     },
+    cancelChildRunTrees: notCalled,
   };
   return { runner, requests };
 }
@@ -287,6 +305,7 @@ describe('executeSubWorkflow', () => {
       depth: parentRun.depth,
       workflowAncestry: parentRun.workflowAncestry,
     });
+    expect(request.parentRunId).toBe(parentRun.id);
   });
 
   it('a gyerek a SAJÁT workflow provider felülírását kapja, a szülőé nem szivárog át', async () => {
@@ -412,6 +431,44 @@ describe('executeSubWorkflow', () => {
       expect(published[2]).toMatchObject({ kind: 'sub_workflow_finished', payload: { status: childStatus } });
     },
   );
+
+  it.each(['cancelled', 'interrupted'] as const)(
+    'a leállított, még running sorú gyereknél a(z) %s célállapot megy az eseménybe és az üzenetbe, a gyerek sora változatlan (SPEC-004 13. szekció, user döntés 2026-09-23)',
+    async (stopTargetStatus) => {
+      const database = openMemoryDatabase();
+      const parentWorkflowId = createWorkflow(database, 'szülő', 'minimax');
+      const targetWorkflowId = createWorkflow(database, 'gyerek', null);
+      const { runs } = seedRunChain(database, [parentWorkflowId]);
+      const parentRun = runs[0] ?? notCalled();
+      const published: unknown[] = [];
+      const ports = portsOf(database, published);
+      const { runner } = fakeRunner(database, { childStatus: 'running', stopTargetStatus });
+
+      const outcome = okOrThrow(await executeSubWorkflow(inputOf(parentRun.id, targetWorkflowId), ports, runner));
+
+      expect(outcome.kind === 'failed' ? outcome.errorKind : 'nincs-ilyen-ag').toBe('sub_workflow_failed');
+      expect(outcome.stepRun.errorMessage).toContain(`"${stopTargetStatus}" állapotban zárt`);
+      expect(published[2]).toMatchObject({ kind: 'sub_workflow_finished', payload: { status: stopTargetStatus } });
+      const childRunId = outcome.stepRun.subWorkflowRunId ?? notCalled();
+      expect(okOrThrow(database.runs.getRun(childRunId)).status).toBe('running');
+    },
+  );
+
+  it('a leállított, de már terminális sorú gyereknél a sor állapota dönt, mert a fa zárása azt nem írja át', async () => {
+    const database = openMemoryDatabase();
+    const parentWorkflowId = createWorkflow(database, 'szülő', 'minimax');
+    const targetWorkflowId = createWorkflow(database, 'gyerek', null);
+    const { runs } = seedRunChain(database, [parentWorkflowId]);
+    const parentRun = runs[0] ?? notCalled();
+    const published: unknown[] = [];
+    const ports = portsOf(database, published);
+    const { runner } = fakeRunner(database, { childStatus: 'succeeded', stopTargetStatus: 'cancelled' });
+
+    const outcome = okOrThrow(await executeSubWorkflow(inputOf(parentRun.id, targetWorkflowId), ports, runner));
+
+    expect(outcome.kind).toBe('succeeded');
+    expect(published[2]).toMatchObject({ kind: 'sub_workflow_finished', payload: { status: 'succeeded' } });
+  });
 
   it('az el sem induló gyerek futás is sub_workflow_failed, a futtató üzenetével', async () => {
     const database = openMemoryDatabase();
@@ -629,10 +686,16 @@ describe('executeSubWorkflow holtpont mentesség', () => {
     const { runner } = fakeRunner(database, {
       beforeAwaitResolves: async () => {
         await new Promise<void>((resolve) => {
-          gate.requestSlot('minimax', 'gyerek-lepes', () => {
-            grants.push('gyerek-lepes');
-            resolve();
-          });
+          gate.requestSlot(
+            'minimax',
+            'gyerek-futas',
+            'gyerek-lepes',
+            () => {
+              grants.push('gyerek-lepes');
+              resolve();
+            },
+            notCalled,
+          );
         });
         okOrThrow(gate.releaseSlot('gyerek-lepes'));
       },

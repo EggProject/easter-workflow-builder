@@ -29,6 +29,7 @@ export {
 // Komponensek.
 export { Accordion, type AccordionProperties } from './accordion/Accordion.tsx';
 export { AccordionItem, type AccordionItemProperties } from './accordion/AccordionItem.tsx';
+export { Alert, type AlertProperties, type AlertVariant } from './alert/Alert.tsx';
 export { Badge, type BadgeProperties, type BadgeVariant } from './badge/Badge.tsx';
 export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from './breadcrumb/Breadcrumb.tsx';
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
@@ -40,6 +41,16 @@ export {
   type DataTableColumn,
   type DataTableProperties,
 } from './data-table/DataTable.tsx';
+export { Dot, type DotProperties, type DotSize, type DotTone } from './dot/Dot.tsx';
+export {
+  FeedIndicator,
+  type FeedIndicatorProperties,
+  type FeedIndicatorSize,
+  type FeedIndicatorState,
+  type FeedIndicatorStateSpecification,
+  type FeedIndicatorSurface,
+  type FeedIndicatorVariant,
+} from './feed-indicator/FeedIndicator.tsx';
 export { Checkbox, type CheckboxProperties } from './form-control/Checkbox.tsx';
 export { ProgressBar, type ProgressBarProperties, type ProgressBarSize } from './loading-indicator/ProgressBar.tsx';
 export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties } from './menu/Menu.tsx';

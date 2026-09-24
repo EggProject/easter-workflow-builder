@@ -1,8 +1,10 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import {
   SettingsRecordSchema,
+  StartedRunResponseSchema,
   WorkflowDetailSchema,
   WorkflowGraphDocumentSchema,
+  type StartedRunResponse,
   type WorkflowEdgeInput,
   type WorkflowGraphDocument,
   type WorkflowNodeInput,
@@ -16,18 +18,21 @@ import {
   Resizable,
   ResizableHandle,
   ResizablePanel,
-  Skeleton,
   ToastViewport,
   joinClassNames,
   useToasts,
 } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
+import { StartRunModal } from '../run-control/StartRunModal.tsx';
+import { readStartInputFields } from '../run-control/read-start-input-fields.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
@@ -45,6 +50,11 @@ export interface GraphEditorScreenProperties {
    * `?workflowId=` mintájára, paraméteres útvonal szegmens nélkül).
    */
   readonly search: string;
+  /**
+   * A futás indítása a szerkesztőből az ÚJ futás nézetére navigál (SPEC-008
+   * 6.5, 9. szekció 5. async pont).
+   */
+  readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
 }
 
 function readWorkflowId(search: string): string | undefined {
@@ -95,11 +105,12 @@ function DropdownChevronIcon(): ReactElement {
  * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
 export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search } = properties;
+  const { apiOrigin, fetchFunction, search, navigate } = properties;
   const workflowId = readWorkflowId(search);
 
   const graphState = useRequestState<WorkflowGraphDocument>();
   const saveState = useRequestState<WorkflowGraphDocument>();
+  const startRunState = useRequestState<StartedRunResponse>();
   // A workflow rekord (a lépés szintű `providerId` felülírás örökölt
   // értékéhez, AC17) és a globális beállítás (`defaultProviderId`) - mindkét
   // végpont a SPEC-005 4.2 táblázatában él, a node-inspector panel enélkül
@@ -128,6 +139,9 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   // újraillesztése KIZÁRÓLAG az elrendezés gomb hatása - egy kézi node
   // húzáskor a nézet ugrálása hibás viselkedés lenne.
   const [autoLayoutRevision, setAutoLayoutRevision] = useState(0);
+  // Nyitva van-e a futás indítás modálisa. ÜRES `inputFields` lista esetén
+  // sosem vált igazra: a futás közvetlenül indul (SPEC-008 6.5, AC28).
+  const [isStartRunModalOpen, setIsStartRunModalOpen] = useState(false);
   // Külön jelző, nem a `graphState.state.status === 'success'` közvetlenül:
   // a `graphState.state` sikeresre váltása és a `currentNodes`/`currentEdges`
   // TÉNYLEGES feltöltése két külön render (az állapotfrissítés csak a
@@ -269,8 +283,43 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     });
   }
 
+  /**
+   * A futás indítása (SPEC-008 6.5, 9. szekció 5. async pont): a kérés
+   * `input` mezője a modálison összeállított objektum, üres `inputFields`
+   * lista esetén üres rekord. Siker után a szerkesztő az ÚJ futás nézetére
+   * navigál, tehát ez a képernyő leszerel; a modális bezárása ezért nem ebben
+   * az ágban, hanem a hibaágban sem kell (a hibát a modális maga írja ki).
+   */
+  function startRun(input: Readonly<Record<string, unknown>>): void {
+    void startRunState.run(async () => {
+      const outcome = await requestRoute({
+        routeId: 'startRun',
+        parameters: { workflowId: resolvedWorkflowId },
+        body: { input },
+        responseSchema: StartedRunResponseSchema,
+        fetchFunction,
+        apiOrigin,
+      });
+      if (outcome.kind === 'ok') {
+        navigate('runView', `runId=${outcome.value.runId}`);
+      }
+      return outcome;
+    });
+  }
+
+  const startInputFields = readStartInputFields(currentNodes);
+
+  function handleStartRunClick(): void {
+    if (startInputFields.length === 0) {
+      startRun({});
+      return;
+    }
+    setIsStartRunModalOpen(true);
+  }
+
   const isLoading = !isHydrated;
   const isSaving = saveState.state.status === 'pending';
+  const isStartingRun = startRunState.state.status === 'pending';
   const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
   const workflowProviderId =
@@ -285,7 +334,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
     <div className="graph-editor-screen">
       {isLoading ? (
         <div className="graph-editor-screen__loading">
-          <Skeleton shape="text" lines={4} />
+          <ThemedSkeleton shape="text" lines={4} />
         </div>
       ) : (
         <div
@@ -347,9 +396,35 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
             {isDirty && <span role="status">Mentetlen változtatások</span>}
             {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
             {graphState.state.status === 'failure' && <p role="alert">{graphState.state.message}</p>}
+            {/* Az indítás hibája a lábléc státuszában áll, ha NINCS nyitva a
+                modális (üres `inputFields` lista, tehát a futás modális nélkül
+                indult). Nyitott modálisnál az üzenet a modálisban látszik, a
+                lábléc fölé feszülő átlapoló mögött ugyanis olvashatatlan
+                lenne; ez a feltétel tehát nem duplikálja az üzenetet. */}
+            {startRunState.state.status === 'failure' && !isStartRunModalOpen && (
+              <p role="alert">{startRunState.state.message}</p>
+            )}
           </>
         }
       >
+        {/* A futás indítása akkor aktív, ha NINCS mentetlen változás és a gráf
+            nem üres (SPEC-008 6.5 táblázat): mentetlen gráfból indítani azt
+            jelentené, hogy a futás a szerveren tárolt, RÉGI gráfról készít
+            pillanatképet, amit a felhasználó a képernyőn nem is lát. */}
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          isLoading={isStartingRun}
+          disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0}
+          onClick={handleStartRunClick}
+        >
+          {/* A felirat SZÁNDÉKOSAN nem a puszta "Indítás": az a `start`
+              csomópont TÍPUSCÍMKÉJE a vásznon (`graph-node-catalog`), tehát
+              egy azonos feliratú gomb a felületen is, a
+              `getByRole`/`getByText` locatorokon is kétértelmű lenne. */}
+          Futás indítása
+        </Button>
         <ButtonGroup aria-label="Gráf műveletek">
           <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}
@@ -367,6 +442,16 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
           </Menu>
         </ButtonGroup>
       </PageFooter>
+      <StartRunModal
+        open={isStartRunModalOpen}
+        fields={startInputFields}
+        isSubmitting={isStartingRun}
+        errorMessage={startRunState.state.status === 'failure' ? startRunState.state.message : undefined}
+        onClose={() => {
+          setIsStartRunModalOpen(false);
+        }}
+        onSubmit={startRun}
+      />
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

@@ -578,15 +578,16 @@ flowchart TD
 
 ### 8.4 A `ProtocolErrorCode` és a felhasználónak szánt szöveg
 
-A `protocol` csomag öt kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli hatodik kód fordítási hibát ad (`switch-exhaustiveness-check`).
+A `protocol` csomag hat kódot ismer, és a `protocol-error-message` téma mindegyikhez egy magyar mondatot rendel. **A leképezés kimerítő `switch`**, tehát egy jövőbeli hetedik kód fordítási hibát ad (`switch-exhaustiveness-check`). A hatodik kód, a `service_unavailable`, 2026-09-23 óta létezik (SPEC-005 8.2).
 
-| Kód               | Mit lát a felhasználó                                          |
-| ----------------- | -------------------------------------------------------------- |
-| `invalid_request` | a kérés nem volt érvényes, a szerver által megnevezett mezővel |
-| `not_found`       | a keresett elem nem létezik, esetleg időközben törölték        |
-| `conflict`        | az elem állapota most nem engedi a műveletet                   |
-| `unprocessable`   | a kérés rendben volt, de a rendszer nem tudja végrehajtani     |
-| `internal`        | váratlan szerver hiba                                          |
+| Kód                   | Mit lát a felhasználó                                          |
+| --------------------- | -------------------------------------------------------------- |
+| `invalid_request`     | a kérés nem volt érvényes, a szerver által megnevezett mezővel |
+| `not_found`           | a keresett elem nem létezik, esetleg időközben törölték        |
+| `conflict`            | az elem állapota most nem engedi a műveletet                   |
+| `unprocessable`       | a kérés rendben volt, de a rendszer nem tudja végrehajtani     |
+| `internal`            | váratlan szerver hiba                                          |
+| `service_unavailable` | a szerver átmenetileg nem érhető el, például éppen leáll       |
 
 **A szerver `message` mezője megjelenik a felületen**, a fenti mondat mellett, mert az hordozza a hibaosztály nevét, ami a felhasználó számára is információ (SPEC-005 8.4). A felület ezt nem elemzi és nem próbálja lefordítani.
 
@@ -688,25 +689,43 @@ Egy nem illeszkedő útvonal a "nem található" képernyőre visz, ami egy `Car
 
 **A felhasználó követelménye: minden felületi ponton, ahol várni kell, látható jelzés van.** A táblázat a jelen spec **minden** async pontját felsorolja, és mindegyikhez rendel egy jelzést. **Jelzés nélküli async pont nem maradhat**, és ezt a 16. szekció 44. kritériuma köti.
 
-| #   | Async pont                                        | Jelzés                                                               | Miért ez                                           |
-| --- | ------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | az alkalmazás első betöltése                      | a `#root` elem `index.html` szintű "betöltés..." szövege             | a React fa még nem áll, más eszköz nincs           |
-| 2   | a workflow lista első betöltése                   | `Skeleton` sorok a táblában                                          | ismert a jövőbeli alak, tehát nem ugrik a layout   |
-| 3   | a workflow lista újratöltése művelet után         | `ProgressBar` a tábla fejléce alatt, a régi adat látszik alatta      | a felhasználó ne veszítse el a kontextust          |
-| 4   | a provider lista betöltése a létrehozó modálisban | a `Select` letiltott állapotban, "betöltés" felirattal               | a mező helye már látszik                           |
-| 5   | workflow létrehozás elküldése                     | a modális elsődleges gombja letiltva, benne spinner                  | a dupla küldés kizárása                            |
-| 6   | workflow átnevezés elküldése                      | ugyanaz                                                              | ugyanaz                                            |
-| 7   | a törlés összefoglaló betöltése                   | `Skeleton` a megerősítő modális törzsében                            | a szám még nem ismert, de a modális már nyitva van |
-| 8   | a törlés elküldése                                | a modális veszélyes gombja letiltva, benne spinner                   | a dupla küldés kizárása                            |
-| 9   | futás indítása                                    | a sor gombja letiltva, benne spinner, majd `Toast` a sikerről        | a sor helyben marad                                |
-| 10  | a futás lista első betöltése                      | `Skeleton` sorok                                                     | mint a 2. pont                                     |
-| 11  | a futás lista újratöltése vagy fülváltás          | `ProgressBar` a tábla fejléce alatt                                  | mint a 3. pont                                     |
-| 12  | futás megszakítása                                | a sor gombja letiltva, benne spinner, majd `Toast`                   | mint a 9. pont                                     |
-| 13  | futás újraindítása                                | ugyanaz                                                              | ugyanaz                                            |
-| 14  | a stream kapcsolat felépülése                     | a topnav `.app-tn__actions` sávjában státusz szöveg, "kapcsolódás"   | globális állapot, globális helyen                  |
-| 15  | a stream pótlási szakasza                         | ugyanott, "előzmények betöltése" szöveg, a `replay_complete` keretig | a felhasználó tudja, miért nem élő még a nézet     |
-| 16  | a stream újracsatlakozása szakadás után           | ugyanott, "újracsatlakozás" szöveg, a `readyState` alapján (M-16)    | a szakadás látható, nem néma                       |
-| 17  | a feliratkozás küldése                            | nincs önálló jelzés, a 14 ... 16. pont státusza fedi                 | a felhasználó számára ugyanaz a folyamat           |
+| #   | Async pont                                        | Jelzés                                                                                      | Miért ez                                           |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | az alkalmazás első betöltése                      | a `#root` elem `index.html` szintű "betöltés..." szövege                                    | a React fa még nem áll, más eszköz nincs           |
+| 2   | a workflow lista első betöltése                   | `Skeleton` sorok a táblában                                                                 | ismert a jövőbeli alak, tehát nem ugrik a layout   |
+| 3   | a workflow lista újratöltése művelet után         | `ProgressBar` a tábla fejléce alatt, a régi adat látszik alatta                             | a felhasználó ne veszítse el a kontextust          |
+| 4   | a provider lista betöltése a létrehozó modálisban | a `Select` letiltott állapotban, "betöltés" felirattal                                      | a mező helye már látszik                           |
+| 5   | workflow létrehozás elküldése                     | a modális elsődleges gombja letiltva, benne spinner                                         | a dupla küldés kizárása                            |
+| 6   | workflow átnevezés elküldése                      | ugyanaz                                                                                     | ugyanaz                                            |
+| 7   | a törlés összefoglaló betöltése                   | `Skeleton` a megerősítő modális törzsében                                                   | a szám még nem ismert, de a modális már nyitva van |
+| 8   | a törlés elküldése                                | a modális veszélyes gombja letiltva, benne spinner                                          | a dupla küldés kizárása                            |
+| 9   | futás indítása                                    | a sor gombja letiltva, benne spinner, majd `Toast` a sikerről                               | a sor helyben marad                                |
+| 10  | a futás lista első betöltése                      | `Skeleton` sorok                                                                            | mint a 2. pont                                     |
+| 11  | a futás lista újratöltése vagy fülváltás          | `ProgressBar` a tábla fejléce alatt                                                         | mint a 3. pont                                     |
+| 12  | futás megszakítása                                | a sor gombja letiltva, benne spinner, majd `Toast`                                          | mint a 9. pont                                     |
+| 13  | futás újraindítása                                | ugyanaz                                                                                     | ugyanaz                                            |
+| 14  | a stream kapcsolat felépülése                     | a topnav `.app-tn__actions` sávjában a `FeedIndicator` `connecting` állapota, "kapcsolódás" | globális állapot, globális helyen                  |
+| 15  | a stream pótlási szakasza                         | ugyanott, `connecting` állapot, "előzmények betöltése", a `replay_complete` keretig         | a felhasználó tudja, miért nem élő még a nézet     |
+| 16  | a stream újracsatlakozása szakadás után           | ugyanott, `disconnected` állapot, "újracsatlakozás", a `readyState` alapján (M-16)          | a szakadás látható, nem néma                       |
+| 17  | a feliratkozás küldése                            | nincs önálló jelzés, a 14 ... 16. pont státusza fedi                                        | a felhasználó számára ugyanaz a folyamat           |
+
+**A jelző 2026-09-23 óta a design system `FeedIndicator` komponense** (`packages/ui`
+`feed-indicator` téma), nem nyers `<span>`: a 14 ... 16. pont mellett az élő (`live`) fázist is
+kijelzi, a forrás `streaming` állapotával, "élő" felirattal. A leképezés a forrás taxonómiáján
+áll: `connecting` "tárcsáz, hamarosan jön adat" (a 14. és a 15. pont), `disconnected` "nincs
+kapcsolat" (a 16. pont; a forrás saját ink példája is ezt az állapotot adja egy újracsatlakozó
+forrásnak), `streaming` "élő frissítéseket kap". A forrás `stale` és `idle` állapotára nincs
+megfelelő fázis. A nem kompakt alak `role="status"` élő régió, a forrás angol `"<felirat> feed"`
+neve helyett `Stream kapcsolat: <felirat>` hozzáférhető névvel; sötét témában a forrás `ink`
+felülete, ugyanazzal a feloldással, mint a csontváz `ink` változata (`apps/web` `useIsDarkTheme`).
+Az `ink` felületen a pötty a forrás ink példái szerint gyűrűt kap (`dotProps`: `ring`, `halo`
+nélkül), világos témában változatlan (user döntés 2026-09-24,
+`docs/research/2026-09-24-feed-indicator-ink-gyuru.md`).
+A forrás "Ink surface" blokkja csak a `streaming`, `stale` és `disconnected` állapotra ad
+gyűrűs ink példát, a `connecting` fázisra nem, tehát ott a gyűrű a forrás `dot` szabályából
+következő analógia (`eggproject-design-components/components/dot/`: a `dot.html` "ring (on ink
+bg)" felirata és a `Dot.jsx` "hard ring outline (good on dense bg)" leírása).
+Regresszió: `apps/web/e2e/stream-status-indicator.spec.ts`.
 
 **Amit szándékosan nem csinálunk:** nincs teljes képernyős, blokkoló betöltő réteg. Egyik async pont sem indokol olyan jelzést, ami a felhasználót minden mástól elzárja.
 
@@ -834,6 +853,10 @@ egy SVG-t (`logo-mark.svg`) használja témától függetlenül, szín szerinti 
 döntést a design system saját példája hozta meg, nem ez a munkamenet - a mark saját színei
 (kék/arany/krém gyűrűk, sötét tintaszín nélkül) nem támaszkodnak világos hátérre úgy, ahogy a
 wordmark sötét szövege tenné.
+
+**Egy újabb téma mappa, 2026-09-23-i felületi kiegészítésben.** Az `alert` a design system `alert` komponensének bájtra azonosan átemelt alakja (`packages/ui` CLAUDE.md), a futás nézet (SPEC-008) átmeneti szerver hiba jelzésére szolgál, "Várakozás a szerverre" felirattal.
+
+**Két újabb téma mappa, 2026-09-23-i felületi kiegészítésben.** A `dot` és a `feed-indicator` a design system azonos nevű komponensének bájtra azonosan átemelt alakja (`packages/ui` CLAUDE.md), a React változat szerint, a forrás `.jsx` összes propjával; a `feed-indicator` belső pöttye a `dot`. A topnav stream állapot jelzője (11. szekció 14 ... 16. pont) használja.
 
 **Egy szint mély, tárgykör mappa nélkül.** A csomag egy tárgykörű: minden téma a design system átemeléséről szól. A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül, mert a fájlnevek már megnevezik a csoportot (a `Button.tsx` mellett álló `button.css` nem lehet másé), tehát a második feltétel egy szinttel lejjebb elbukik. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 

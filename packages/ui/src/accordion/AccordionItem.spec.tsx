@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -93,6 +96,59 @@ describe('AccordionItem', () => {
     expect(header().getAttribute('aria-controls')).toBe(body().id);
     expect(header().id.length).toBeGreaterThan(0);
     expect(body().id.length).toBeGreaterThan(0);
+  });
+
+  it('a cím csomópont is lehet: a gyerek elemei a cím szlotban állnak, és a gomb szövege a darabok sorrendje', () => {
+    act(() => {
+      root.render(
+        <AccordionItem
+          title={
+            <>
+              <span className="meta-darab">9:14:03</span> · szöveg
+            </>
+          }
+        >
+          tartalom
+        </AccordionItem>,
+      );
+    });
+    expect(container.querySelector(':scope .accordion__title > .meta-darab')?.textContent).toBe('9:14:03');
+    expect(header().textContent).toBe('9:14:03 · szöveg');
+    expect(body().getAttribute('aria-labelledby')).toBe(header().id);
+  });
+
+  it('icon és meta nélkül egyik szlot sem kerül a DOM-ba', () => {
+    act(() => {
+      root.render(<AccordionItem title="Futási korlátok">tartalom</AccordionItem>);
+    });
+    expect(container.querySelector('.accordion__icon')).toBeNull();
+    expect(container.querySelector('.accordion__meta')).toBeNull();
+  });
+
+  it('az icon a cím előtt, a meta a cím után és a chevron előtt áll, a forrás sorrendjében', () => {
+    act(() => {
+      root.render(
+        <AccordionItem title="Futási korlátok" icon={<svg aria-hidden="true" />} meta="3 mező">
+          tartalom
+        </AccordionItem>,
+      );
+    });
+    const slotClassNames = [...header().children].map((child) => child.getAttribute('class'));
+    expect(slotClassNames).toEqual(['accordion__icon', 'accordion__title', 'accordion__meta', 'accordion__chevron']);
+    expect(container.querySelector('.accordion__icon')?.querySelector('svg')).not.toBeNull();
+    expect(container.querySelector('.accordion__meta')?.textContent).toBe('3 mező');
+  });
+
+  it('az icon szlot állandó szélességű oszlop: a forrás CSS szerint 18x18-as és nem zsugorodik', () => {
+    // A happy-dom nem számol elrendezést, ezért a szélességet a bájtra
+    // átemelt `accordion.css` szabálya adja; ez a teszt azt őrzi, hogy a
+    // jelölő oszlopra építő hívók (pl. a transcript sor) alól ne tűnjön el.
+    const directory = path.dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(path.join(directory, 'accordion.css'), 'utf8');
+    const iconRule = /\.accordion__icon\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(iconRule).toMatch(/width:\s*18px/);
+    expect(iconRule).toMatch(/height:\s*18px/);
+    expect(iconRule).toMatch(/flex-shrink:\s*0/);
   });
 
   it('a chevron ikon a hozzáférhetőségi fából ki van zárva', () => {

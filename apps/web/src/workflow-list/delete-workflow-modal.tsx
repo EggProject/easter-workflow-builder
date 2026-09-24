@@ -1,10 +1,11 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { DeletionSummarySchema, type DeletionSummary, type WorkflowSummary } from '@easter-workflow-builder/protocol';
-import { Button, Checkbox, Modal, Skeleton } from '@easter-workflow-builder/ui';
+import { Button, Checkbox, Modal } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ChangeEvent, type ReactElement } from 'react';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 
 export interface DeleteWorkflowModalProperties {
   readonly workflow: WorkflowSummary | undefined;
@@ -97,7 +98,7 @@ export function DeleteWorkflowModal(properties: Readonly<DeleteWorkflowModalProp
         </>
       }
     >
-      {isSummaryLoading && <Skeleton shape="text" lines={3} />}
+      {isSummaryLoading && <ThemedSkeleton shape="text" lines={3} />}
       {summaryState.state.status === 'success' && (
         <div>
           <p>A törlés véglegesen elviszi:</p>

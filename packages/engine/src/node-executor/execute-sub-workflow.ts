@@ -158,7 +158,12 @@ function announceChildRun(
  *    `succeeded` állapota esetén a lépés `succeeded`, a kimenete a
  *    `ChildWorkflowRunResult.output`; minden más terminális állapotnál
  *    (`failed`, `cancelled`, `interrupted`) a lépés `failed`,
- *    `sub_workflow_failed` osztállyal.
+ *    `sub_workflow_failed` osztállyal. A leállított, még `running` sorú
+ *    gyerek terminális állapota a leállítás célállapota
+ *    (`ChildWorkflowRunResult.stopTargetStatus`): a sorát a fa DB zárása csak
+ *    az itteni olvasás után, pontosan erre az állapotra írja (SPEC-004 13.
+ *    szekció, user döntés 2026-09-23). A már terminális sorú gyereknél a sor
+ *    állapota dönt, mert a fa zárása azt nem írja át.
  *
  * **A gyerek workflow saját provider feloldása** (5.9 4. pont) ebben a
  * végrehajtóban nem jelenik meg kódként, és ez szándékos: a feloldás a 4.8
@@ -223,6 +228,7 @@ export async function executeSubWorkflow(
       depth: parentRun.value.depth,
       workflowAncestry: parentRun.value.workflowAncestry,
     },
+    parentRunId: runId,
   });
   if (childRun.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
@@ -246,7 +252,11 @@ export async function executeSubWorkflow(
     return failSubWorkflow(runId, stepRunId, startedAtMs, 'sub_workflow_failed', errorMessage, ports);
   }
 
-  const childStatus = finishedChild.value.run.status;
+  // A leállított gyerek sora itt még `running`, mert a fa DB zárása csak az
+  // olvasása után fut: az esemény és az üzenet a célállapotát mondja.
+  const { run: childRecord, stopTargetStatus } = finishedChild.value;
+  const childStatus =
+    stopTargetStatus !== undefined && childRecord.status === 'running' ? stopTargetStatus : childRecord.status;
   const finishEmitted = emitEngineEvent(
     {
       kind: 'sub_workflow_finished',

@@ -9,8 +9,10 @@ import type { ConcurrencyLimitLookup } from './concurrency-limit-lookup.ts';
  */
 interface WaitingRequest {
   readonly providerId: ProviderId;
+  readonly runId: string;
   readonly requestId: string;
   readonly onGranted: () => void;
+  readonly onDenied: () => void;
 }
 
 /**
@@ -47,6 +49,12 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
    * `requestId` -> a várakozó kérés, a térkép sorrendje az érkezési sorrend.
    */
   const waitingRequests = new Map<string, WaitingRequest>();
+  /**
+   * A `close` óta igaz. Csak a `requestSlot` olvassa: a lezáráskor a sor
+   * kiürül, és új bejegyzés nem kerülhet bele, tehát a `grantNextWaiting`
+   * lezárt szabályozón magától sem talál kiszolgálható kérést.
+   */
+  let isClosed = false;
 
   function occupiedSlotCount(providerId: ProviderId): number {
     return occupiedSlots
@@ -86,13 +94,47 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
     next.onGranted();
   }
 
-  function requestSlot(providerId: ProviderId, requestId: string, onGranted: () => void): void {
+  function requestSlot(
+    providerId: ProviderId,
+    runId: string,
+    requestId: string,
+    onGranted: () => void,
+    onDenied: () => void,
+  ): void {
+    if (isClosed) {
+      onDenied();
+      return;
+    }
     if (hasFreeSlot(providerId)) {
       occupiedSlots.set(requestId, providerId);
       onGranted();
       return;
     }
-    waitingRequests.set(requestId, { providerId, requestId, onGranted });
+    waitingRequests.set(requestId, { providerId, runId, requestId, onGranted, onDenied });
+  }
+
+  /**
+   * A kiválasztott várakozók kivétele a sorból és az elutasításuk. Előbb
+   * mindet kiveszi, csak utána hív visszahívást, hogy egy `onDenied` törzsében
+   * indított újabb kérés már a frissített sort lássa.
+   */
+  function denyWaiting(isAffected: (request: WaitingRequest) => boolean): void {
+    const denied = waitingRequests.values().filter(isAffected).toArray();
+    for (const request of denied) {
+      waitingRequests.delete(request.requestId);
+    }
+    for (const request of denied) {
+      request.onDenied();
+    }
+  }
+
+  function denyWaitingForRunIds(runIds: ReadonlySet<string>): void {
+    denyWaiting((request) => runIds.has(request.runId));
+  }
+
+  function close(): void {
+    isClosed = true;
+    denyWaiting(() => true);
   }
 
   function releaseSlot(requestId: string): Outcome<void> {
@@ -114,5 +156,5 @@ export function createConcurrencyGate(limitLookup: ConcurrencyLimitLookup): Conc
     };
   }
 
-  return { requestSlot, releaseSlot, occupiedSlotCount, waitingRequestCount };
+  return { requestSlot, releaseSlot, denyWaitingForRunIds, close, occupiedSlotCount, waitingRequestCount };
 }

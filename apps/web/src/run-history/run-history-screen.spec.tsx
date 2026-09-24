@@ -4,7 +4,72 @@ import type { StreamFrame } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
 import { RunHistoryScreen } from './run-history-screen.tsx';
+
+/**
+ * A veszteségmentes keret feliratkozás teszt duplikátuma: a feliratkozókat
+ * egy halmazban tartja, az `emitFrame` pedig mindegyiknek átadja a keretet,
+ * ugyanúgy, mint a `useStreamConnection` kezelője.
+ */
+const frameListeners = new Set<(frame: StreamFrame) => void>();
+
+const subscribeToFrames: SubscribeToStreamFrames = (listener) => {
+  frameListeners.add(listener);
+  return () => {
+    frameListeners.delete(listener);
+  };
+};
+
+/**
+ * A keretek EGYETLEN szinkron sorozatban, egy `act` blokkban (egy React
+ * render kötegben), majd a kiváltott kérések lefutása.
+ */
+async function emitFramesAndFlush(frames: readonly StreamFrame[]): Promise<void> {
+  act(() => {
+    for (const frame of frames) {
+      for (const listener of frameListeners) {
+        listener(frame);
+      }
+    }
+  });
+  await act(async () => {
+    for (let index = 0; index < 8; index += 1) {
+      await Promise.resolve();
+    }
+  });
+}
+
+/**
+ * Egy élő `run_event` keret a `run-1` futásra.
+ */
+function runEventFrame(id: number): StreamFrame {
+  return {
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: {
+      id,
+      runId: 'run-1',
+      stepRunId: null,
+      origin: 'engine',
+      kind: 'run_started',
+      occurredAtMs: id,
+      sdkMessageType: null,
+      sdkMessageSubtype: null,
+      sdkSessionId: null,
+      sdkUuid: null,
+      parentToolUseId: null,
+      toolName: null,
+      toolUseId: null,
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadInputTokens: null,
+      cacheCreationInputTokens: null,
+      numTurns: null,
+      payload: {},
+    },
+  };
+}
 
 const API_ORIGIN = 'https://api.example.test';
 
@@ -98,6 +163,7 @@ describe('RunHistoryScreen', () => {
   let root: Root;
 
   beforeEach(() => {
+    frameListeners.clear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -110,7 +176,7 @@ describe('RunHistoryScreen', () => {
     container.remove();
   });
 
-  function render(fetchFunction: FetchFunction, search = '', lastFrame?: StreamFrame, serverRestartCount = 0): void {
+  function render(fetchFunction: FetchFunction, search = '', serverRestartCount = 0): void {
     act(() => {
       root.render(
         <RunHistoryScreen
@@ -120,7 +186,7 @@ describe('RunHistoryScreen', () => {
           fetchFunction={fetchFunction}
           search={search}
           streamId="stream-1"
-          lastFrame={lastFrame}
+          subscribeToFrames={subscribeToFrames}
           serverRestartCount={serverRestartCount}
         />,
       );
@@ -358,72 +424,79 @@ describe('RunHistoryScreen', () => {
     expect(log.subscriptionBodies.at(-1)).toBe(JSON.stringify({ runs: [] }));
   });
 
-  it('run_event keretre újratölti a listát', async () => {
+  it('replay_complete keretre újratölti a listát', async () => {
     const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
-    const fetchFunction = createFetchFunction([RUN_PENDING], log);
-    render(fetchFunction);
-
+    render(createFetchFunction([RUN_PENDING], log));
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     const callCountBeforeFrame = log.runsCallCount;
 
-    act(() => {
-      root.render(
-        <RunHistoryScreen
-          apiOrigin={API_ORIGIN}
-          listLimit={25}
-          streamReplayLimit={50}
-          fetchFunction={fetchFunction}
-          search=""
-          streamId="stream-1"
-          lastFrame={{ event: 'replay_complete', runId: 'run-1', throughEventId: null }}
-          serverRestartCount={0}
-        />,
-      );
-    });
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await emitFramesAndFlush([{ event: 'replay_complete', runId: 'run-1', throughEventId: null }]);
 
-    expect(log.runsCallCount).toBeGreaterThan(callCountBeforeFrame);
+    expect(log.runsCallCount).toBe(callCountBeforeFrame + 1);
   });
 
   it('stream_ready keretre nem tölt újra', async () => {
     const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
-    const fetchFunction = createFetchFunction([RUN_PENDING], log);
-    render(fetchFunction);
-
+    render(createFetchFunction([RUN_PENDING], log));
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     const callCountBeforeFrame = log.runsCallCount;
 
-    act(() => {
-      root.render(
-        <RunHistoryScreen
-          apiOrigin={API_ORIGIN}
-          listLimit={25}
-          streamReplayLimit={50}
-          fetchFunction={fetchFunction}
-          search=""
-          streamId="stream-1"
-          lastFrame={{ event: 'stream_ready', streamId: 'stream-1', serverInstanceId: 'server-1', subscriptions: [] }}
-          serverRestartCount={0}
-        />,
-      );
-    });
+    await emitFramesAndFlush([
+      { event: 'stream_ready', streamId: 'stream-1', serverInstanceId: 'server-1', subscriptions: [] },
+    ]);
+
+    expect(log.runsCallCount).toBe(callCountBeforeFrame);
+  });
+
+  it('run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi (T-009-25a)', async () => {
+    const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
+    render(createFetchFunction([RUN_PENDING], log));
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    const callCountBeforeFrame = log.runsCallCount;
 
-    expect(log.runsCallCount).toBe(callCountBeforeFrame);
+    await emitFramesAndFlush([
+      runEventFrame(1),
+      { event: 'protocol_error', code: 'invalid_request', message: 'hibás fejléc', runId: null },
+    ]);
+
+    expect(log.runsCallCount).toBe(callCountBeforeFrame + 1);
+  });
+
+  it('egy löketben érkező ezer run_event keret összevont újratöltést ad, nem ezer kérést', async () => {
+    const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
+    render(createFetchFunction([RUN_PENDING], log));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const callCountBeforeFrame = log.runsCallCount;
+
+    await emitFramesAndFlush(Array.from({ length: 1000 }, (_, index) => runEventFrame(index + 1)));
+
+    // Egy futó és egy utólagos betöltés (`createCoalescedReload`).
+    expect(log.runsCallCount).toBe(callCountBeforeFrame + 2);
+  });
+
+  it('leszereléskor leiratkozik a keretekről', () => {
+    const log: RouteCallLog = { runsCallCount: 0, subscriptionBodies: [] };
+    render(createFetchFunction([RUN_PENDING], log));
+    expect(frameListeners.size).toBe(1);
+    act(() => {
+      root.unmount();
+    });
+    expect(frameListeners.size).toBe(0);
+    // Az `afterEach` újra leszerelné a gyökeret: egy friss, üres gyökér
+    // kerül a helyére, hogy a második `unmount` ne dobjon.
+    root = createRoot(container);
   });
 
   it('a serverRestartCount növekedésére újratölti a listát (szerver újraindulás)', async () => {
@@ -438,7 +511,7 @@ describe('RunHistoryScreen', () => {
 
     const callCountBeforeRestart = log.runsCallCount;
 
-    render(fetchFunction, '', undefined, 1);
+    render(fetchFunction, '', 1);
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

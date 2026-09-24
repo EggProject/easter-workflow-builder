@@ -10,7 +10,6 @@ import {
   Menu,
   MenuItem,
   ProgressBar,
-  Skeleton,
   ToastViewport,
   useToasts,
   type DataTableColumn,
@@ -21,6 +20,7 @@ import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { CreateWorkflowModal } from './create-workflow-modal.tsx';
 import { DeleteWorkflowModal } from './delete-workflow-modal.tsx';
 import { RenameWorkflowModal } from './rename-workflow-modal.tsx';
@@ -214,7 +214,7 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
       </div>
       {isReloading && <ProgressBar isLabelVisible={false} ariaLabel="a lista frissítése folyamatban" value={100} />}
       {isFirstLoad ? (
-        <Skeleton shape="text" lines={4} />
+        <ThemedSkeleton shape="text" lines={4} />
       ) : (
         <DataTable
           rows={rows}

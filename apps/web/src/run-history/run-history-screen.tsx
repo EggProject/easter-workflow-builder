@@ -15,17 +15,19 @@ import {
   Button,
   DataTable,
   ProgressBar,
-  Skeleton,
   Tabs,
   ToastViewport,
   useToasts,
   type DataTableColumn,
 } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { createCoalescedReload } from '../request-state/create-coalesced-reload.ts';
 import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
+import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { describeRunStatusBadge } from './run-status-badge.ts';
 
 /**
@@ -80,11 +82,15 @@ export interface RunHistoryScreenProperties {
    */
   readonly search: string;
   /**
-   * Az app szintű, egyetlen SSE kapcsolat azonosítója és utolsó kerete
-   * (SPEC-007 9.1): ez a képernyő az egyetlen fogyasztója.
+   * Az app szintű, egyetlen SSE kapcsolat azonosítója (SPEC-007 9.1).
    */
   readonly streamId: string;
-  readonly lastFrame: StreamFrame | undefined;
+  /**
+   * Az app szintű SSE kapcsolat veszteségmentes keret feliratkozása
+   * (T-009-25a): a lista minden jelző keretre újratölt, akkor is, ha a
+   * löketben más keret követi (`stream-client/subscribe-to-stream-frames.ts`).
+   */
+  readonly subscribeToFrames: SubscribeToStreamFrames;
   /**
    * Hányszor váltott a szerver példány azonosítója (`stream_ready` keret,
    * SPEC-007 9.2). Minden változása szerver újraindulást jelent, amire a
@@ -116,8 +122,16 @@ function readWorkflowIdFilter(search: string): string | undefined {
  * komponensben, mert mindegyik ugyanazt a listaadatot forgatja.
  */
 export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties>): ReactElement {
-  const { apiOrigin, listLimit, streamReplayLimit, fetchFunction, search, streamId, lastFrame, serverRestartCount } =
-    properties;
+  const {
+    apiOrigin,
+    listLimit,
+    streamReplayLimit,
+    fetchFunction,
+    search,
+    streamId,
+    subscribeToFrames,
+    serverRestartCount,
+  } = properties;
   const workflowIdFilter = readWorkflowIdFilter(search);
 
   const [activeTabId, setActiveTabId] = useState<string>(workflowIdFilter === undefined ? 'all' : 'workflow');
@@ -161,13 +175,16 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
   }, [loadRuns, serverRestartCount]);
 
   useEffect(() => {
-    if (lastFrame === undefined) {
-      return;
-    }
-    if (RELOAD_TRIGGERING_FRAME_EVENTS.has(lastFrame.event)) {
-      void loadRuns();
-    }
-  }, [lastFrame, loadRuns]);
+    // Összevont újratöltés (`createCoalescedReload`): a keretek egyenként
+    // érkeznek, tehát egy löketben érkező pótlás különben annyi kérést
+    // indítana, ahány jelző keret van benne.
+    const requestReload = createCoalescedReload(loadRuns);
+    return subscribeToFrames((frame) => {
+      if (RELOAD_TRIGGERING_FRAME_EVENTS.has(frame.event)) {
+        requestReload();
+      }
+    });
+  }, [subscribeToFrames, loadRuns]);
 
   useEffect(() => {
     void workflowsRequest.run(async () => {
@@ -353,7 +370,7 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
       <Tabs items={tabItems} active={activeTabId} onChange={setActiveTabId} aria-label="Futás lista fülek" />
       {isReloading && <ProgressBar isLabelVisible={false} ariaLabel="a lista frissítése folyamatban" value={100} />}
       {isFirstLoad ? (
-        <Skeleton shape="text" lines={4} />
+        <ThemedSkeleton shape="text" lines={4} />
       ) : (
         <DataTable
           rows={rows}

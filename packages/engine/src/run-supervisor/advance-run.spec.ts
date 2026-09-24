@@ -17,10 +17,12 @@ import type {
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
 import { collectSessionSourceNodes } from '../agent-step/collect-session-source-nodes.ts';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
+import type { ChildWorkflowRunner } from '../node-executor/child-workflow-runner.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
@@ -269,6 +271,152 @@ function retryDocument(handler: NodeConfig): GraphSnapshotDocument {
   };
 }
 
+// A `br` kifejezése hibát ad, `on_error` éle nincs, a politikája `fail_run`:
+// a futás a hurok végén `failed` állapotban zár.
+const FAIL_RUN_DOCUMENT: GraphSnapshotDocument = {
+  version: 1,
+  sdkVersionPin: INSTALLED,
+  workflow: { id: 'wf', name: 'teszt', description: null },
+  nodes: [node('start', START), node('br', FAILING_BRANCH)],
+  edges: [edge('e1', 'start', 'br')],
+};
+
+function agentStepNode(id: string): SnapshotNode {
+  return node(id, {
+    type: 'agent_step',
+    onUnhandledError: 'fail_run',
+    promptTemplate: id,
+    providerId: null,
+    modelId: 'modell-1',
+    effort: null,
+    thinking: null,
+    allowedTools: [],
+    disallowedTools: [],
+    permissionMode: null,
+    maxTurns: null,
+    maxBudgetUsd: null,
+    systemPrompt: null,
+    agents: {},
+    skills: null,
+    mcpServers: {},
+    enabledEngineHooks: [],
+    cwd: null,
+    additionalDirectories: [],
+    sandbox: null,
+    agentTools: [],
+    sessionMode: 'isolated',
+    structuredOutput: null,
+  });
+}
+
+// Két párhuzamos agent lépés és egy korlátlan várakozású jóváhagyás a `start`
+// után, mind `fail_run` politikával: a jóváhagyás elutasítása olyan bukás,
+// ami nem foglalt helyet, tehát a sorban álló testvért a léptető hurok veszi
+// ki (`advance-run.ts` `runSchedulingLoop`).
+const REJECTED_APPROVAL_DOCUMENT: GraphSnapshotDocument = {
+  version: 1,
+  sdkVersionPin: INSTALLED,
+  workflow: { id: 'wf', name: 'teszt', description: null },
+  nodes: [
+    node('start', START),
+    agentStepNode('a1'),
+    agentStepNode('a2'),
+    node('jov', {
+      type: 'human_approval',
+      title: 'döntés',
+      bodyTemplate: 'szöveg',
+      timeoutMs: null,
+      onUnhandledError: 'fail_run',
+    }),
+  ],
+  edges: [edge('e1', 'start', 'a1'), edge('e2', 'start', 'a2'), edge('e3', 'start', 'jov')],
+};
+
+function agentMessages(sessionId: string, held: Promise<undefined>): AsyncIterable<unknown> {
+  async function* generate(): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await held;
+    yield {
+      type: 'result',
+      subtype: 'success',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+  return generate();
+}
+
+/**
+ * Megvárja, amíg a futás egyik agent lépése fut (az `AgentQuery`-je már a
+ * regiszterben van, mert a futtató hívása megtörtént), a másik sorban áll, és
+ * a jóváhagyás döntésre vár; a jóváhagyás lépés futásának azonosítóját adja.
+ */
+async function waitForRunningQueuedAndApproval(
+  database: DatabaseContext,
+  runId: string,
+  runCalls: () => number,
+): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const agentSteps = okOrThrow(database.stepRuns.listStepRuns(runId)).filter(
+      (step) => step.nodeType === 'agent_step',
+    );
+    const runningCount = agentSteps.filter((step) => step.status === 'running').length;
+    const pendingCount = agentSteps.filter((step) => step.status === 'pending').length;
+    const approval = okOrThrow(database.approvals.listPendingApprovals()).find((pending) => pending.runId === runId);
+    if (runningCount === 1 && pendingCount === 1 && approval !== undefined && runCalls() === 1) {
+      return approval.stepRunId;
+    }
+    await Promise.resolve();
+  }
+  throw new Error('nem állt be egy futó, egy sorban álló agent lépés és egy várakozó jóváhagyás');
+}
+
+// A szabályozó sorából kivett agent lépés nyoma: a `createStepRun` utáni
+// `pending` sor, amit a lépés el sem indított (`agent-node-lifecycle.ts`).
+function insertPendingSibling(database: DatabaseContext, runId: string): string {
+  return okOrThrow(
+    database.stepRuns.createStepRun({
+      runId,
+      nodeId: 'testver',
+      nodeType: 'agent_step',
+      parentStepRunId: null,
+      iteration: 0,
+      attempt: 1,
+      providerId: 'minimax',
+      modelId: 'modell-1',
+      sessionMode: 'isolated',
+      structuredOutputStrategy: null,
+      subWorkflowRunId: null,
+    }),
+  ).id;
+}
+
+// Egy döntésre váró jóváhagyás sora (`waiting_approval`, `decision` NULL),
+// végrehajtó nélkül: a `fail_run` menete a várakozás lezárásával egy időben
+// zárja (`runSchedulingLoop`).
+function insertWaitingApproval(database: DatabaseContext, runId: string): string {
+  const stepRunId = okOrThrow(
+    database.stepRuns.createStepRun({
+      runId,
+      nodeId: 'jovahagyas',
+      nodeType: 'human_approval',
+      parentStepRunId: null,
+      iteration: 0,
+      attempt: 1,
+      providerId: 'minimax',
+      modelId: null,
+      sessionMode: null,
+      structuredOutputStrategy: null,
+      subWorkflowRunId: null,
+    }),
+  ).id;
+  okOrThrow(database.stepRuns.markStepRunning(stepRunId));
+  okOrThrow(database.approvals.requestApproval({ runId, stepRunId, title: 'döntés', body: 'szöveg', payload: {} }));
+  return stepRunId;
+}
+
 interface Fixture {
   readonly database: DatabaseContext;
   readonly execution: RunExecution;
@@ -283,6 +431,17 @@ interface FixtureOptions {
   readonly onNowMs?: () => void;
   readonly onSleep?: () => void;
   readonly evaluate?: (expression: string) => Outcome<unknown>;
+  // A motor portjára kerülő adatbázis: a fixture a valódi `:memory:`
+  // példányt készíti elő, a teszt ennek egy-egy műveletét cserélheti hibára.
+  readonly wrapDatabase?: (database: DatabaseContext) => DatabaseContext;
+  // Az agent lépéses tesztekhez: a hamis futtató, a (megfigyelt) szabályozó
+  // és az átengedő sablon renderelő. Megadás nélkül a port hívásra dob.
+  readonly agentQueryRunner?: AgentQueryRunner;
+  readonly concurrencyGate?: ConcurrencyGate;
+  readonly passThroughTemplates?: boolean;
+  // A `fail_run` a futás al-workflow futásainak lezárását kéri; megadás
+  // nélkül nincs lezárandó gyerek futás.
+  readonly cancelChildRunTrees?: ChildWorkflowRunner['cancelChildRunTrees'];
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -314,9 +473,9 @@ function openFixture(options: FixtureOptions = {}): Fixture {
       return Promise.resolve();
     },
   };
-  const runner: AgentQueryRunner = { run: notCalled };
+  const runner: AgentQueryRunner = options.agentQueryRunner ?? { run: notCalled };
   const ports: EngineDependencies = {
-    database,
+    database: options.wrapDatabase?.(database) ?? database,
     agentQueryRunner: runner,
     providerDescriptorLookup: descriptorOf,
     expressionEvaluator: {
@@ -325,7 +484,10 @@ function openFixture(options: FixtureOptions = {}): Fixture {
         ((expression) => ({ kind: 'error', message: `a(z) ${expression} kifejezés kiértékelése elhasalt` })),
       compile: notCalled,
     },
-    templateRenderer: { render: notCalled, compile: notCalled },
+    templateRenderer: {
+      render: options.passThroughTemplates === true ? (template) => ({ kind: 'ok', value: template }) : notCalled,
+      compile: notCalled,
+    },
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- a teszt nem a kimenő eseményeket vizsgálja, csak a port jelenlétét igényli
     eventPublisher: { publish: () => {} },
     clock,
@@ -334,9 +496,14 @@ function openFixture(options: FixtureOptions = {}): Fixture {
   };
   const dependencies: NodeExecutorDependencies = {
     ports,
-    concurrencyGate: createConcurrencyGate(() => null),
+    concurrencyGate: options.concurrencyGate ?? createConcurrencyGate(() => null),
     approvalRegistry: createApprovalWaitRegistry(),
-    childWorkflowRunner: { startChildRun: notCalled, awaitChildRun: notCalled },
+    childWorkflowRunner: {
+      startChildRun: notCalled,
+      awaitChildRun: notCalled,
+      cancelChildRunTrees:
+        options.cancelChildRunTrees ?? (() => Promise.resolve({ kind: 'ok', value: { cancelledRunIds: [] } })),
+    },
     agentQueryRegistry: createAgentQueryRegistry(),
   };
 
@@ -476,6 +643,223 @@ describe('advanceRun', () => {
     expect(steps.filter((step) => step.nodeId === 'br')).toHaveLength(1);
     expect(steps.filter((step) => step.nodeId === 'le')).toHaveLength(1);
     expect(steps.filter((step) => step.nodeId === 'jn')).toHaveLength(1);
+  });
+
+  describe('fail_run: a sorból kivett testvérek pending sora cancelled lesz (SPEC-004 8.3, SPEC-003 7.2)', () => {
+    it('a pending sor cancelled, a terminális sorok érintetlenek, a futás failed', async () => {
+      const fixture = openFixture({ document: FAIL_RUN_DOCUMENT });
+      const siblingId = insertPendingSibling(fixture.database, fixture.execution.runId);
+
+      const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+      expect(completion.status).toBe('failed');
+      const steps = okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId));
+      expect(steps.map((step) => [step.nodeId, step.status])).toStrictEqual([
+        ['testver', 'cancelled'],
+        ['start', 'succeeded'],
+        ['br', 'failed'],
+      ]);
+      expect(okOrThrow(fixture.database.stepRuns.getStepRun(siblingId)).status).toBe('cancelled');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('failed');
+    });
+
+    it('a záró menetben a lépés sorok olvasásának hibáját továbbadja, a futás sorát nem írja', async () => {
+      // Az első olvasás a `fail_run` menet jóváhagyás lezárásáé, a második a
+      // záró meneté: csak az utóbbi hibázik.
+      let listCalls = 0;
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            listStepRuns: (runId) => {
+              listCalls += 1;
+              return listCalls === 1
+                ? database.stepRuns.listStepRuns(runId)
+                : { kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' };
+            },
+          },
+        }),
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(listCalls).toBe(2);
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    });
+
+    it('a jóváhagyás sorok lezárásának hibáját továbbadja: a futás run_execution_failed, a futó testvér interrupt()-ja akkor is lefut', async () => {
+      const interrupted: string[] = [];
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            listStepRuns: () => ({ kind: 'error', message: 'teszt: a lépés sorok nem olvashatók' }),
+          },
+        }),
+      });
+      fixture.dependencies.agentQueryRegistry.register(fixture.execution.runId, 'futo-testver', {
+        messages: agentMessages('futo-testver', Promise.resolve(undefined)),
+        interrupt: () => {
+          interrupted.push('futo-testver');
+          return Promise.resolve();
+        },
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés sorok nem olvashatók');
+      expect(interrupted).toStrictEqual(['futo-testver']);
+      const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+      expect([run.status, run.errorKind]).toStrictEqual(['failed', 'run_execution_failed']);
+    });
+
+    it('a cancelled állapotváltás hibáját továbbadja, a futás sorát nem írja', async () => {
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        wrapDatabase: (database) => ({
+          ...database,
+          stepRuns: {
+            ...database.stepRuns,
+            markStepCancelled: () => ({ kind: 'error', message: 'teszt: a lépés nem zárható' }),
+          },
+        }),
+      });
+      insertPendingSibling(fixture.database, fixture.execution.runId);
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a lépés nem zárható');
+      expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    });
+
+    it('a várakozásában lezárt jóváhagyás waiting_approval sora is cancelled, a döntés NULL marad', async () => {
+      const fixture = openFixture({ document: FAIL_RUN_DOCUMENT });
+      const approvalStepRunId = insertWaitingApproval(fixture.database, fixture.execution.runId);
+
+      const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+      expect(completion.status).toBe('failed');
+      expect(okOrThrow(fixture.database.stepRuns.getStepRun(approvalStepRunId)).status).toBe('cancelled');
+      expect(okOrThrow(fixture.database.approvals.getApprovalForStep(approvalStepRunId)).decision).toBeNull();
+    });
+  });
+
+  describe('fail_run: a sorból kivétel megelőzi a futó testvérek interrupt() hívását (SPEC-004 8.3)', () => {
+    it('REGRESSZIÓ: ha az interrupt() nyugtája csak a megszakított lépés helyének felszabadítása után érkezik, a sorban álló testvér akkor sem kapja meg a helyet', async () => {
+      // Az `AgentQuery.interrupt()` szerződése nem köti ki, hogy a nyugta a
+      // folyam vége előtt érkezik. Ez a hamis futtató a legkésőbbi megengedett
+      // pillanatban nyugtáz: amikor a megszakított lépés már felszabadította a
+      // helyét, tehát a szabályozó azt szinkron továbbadta volna a sor
+      // következő elemének. Fordított sorrendben (előbb interrupt, utána a
+      // sorból kivétel) a kivétel ekkor már késő.
+      const { promise: slotReleased, resolve: markSlotReleased } = Promise.withResolvers<undefined>();
+      const { promise: interrupted, resolve: endInterruptedStream } = Promise.withResolvers<undefined>();
+      const innerGate = createConcurrencyGate(() => 1);
+      const observedGate: ConcurrencyGate = {
+        ...innerGate,
+        releaseSlot: (requestId) => {
+          const released = innerGate.releaseSlot(requestId);
+          markSlotReleased(undefined);
+          return released;
+        },
+      };
+      let runCalls = 0;
+      const runner: AgentQueryRunner = {
+        run: () => {
+          runCalls += 1;
+          const sessionId = `hivas-${String(runCalls)}`;
+          if (runCalls > 1) {
+            return {
+              kind: 'ok',
+              value: {
+                messages: agentMessages(sessionId, Promise.resolve(undefined)),
+                interrupt: () => Promise.resolve(),
+              },
+            };
+          }
+          return {
+            kind: 'ok',
+            value: {
+              messages: agentMessages(sessionId, interrupted),
+              interrupt: async () => {
+                endInterruptedStream(undefined);
+                await slotReleased;
+              },
+            },
+          };
+        },
+      };
+      const fixture = openFixture({
+        document: REJECTED_APPROVAL_DOCUMENT,
+        agentQueryRunner: runner,
+        concurrencyGate: observedGate,
+        passThroughTemplates: true,
+      });
+
+      const advancing = advanceRun(fixture.execution, fixture.dependencies);
+      const approvalStepRunId = await waitForRunningQueuedAndApproval(
+        fixture.database,
+        fixture.execution.runId,
+        () => runCalls,
+      );
+      okOrThrow(fixture.database.approvals.decideApproval({ stepRunId: approvalStepRunId, decision: 'rejected' }));
+      fixture.dependencies.approvalRegistry.notifyDecided(approvalStepRunId, 'rejected');
+      const completion = okOrThrow(await advancing);
+
+      expect(runCalls).toBe(1);
+      expect(completion.status).toBe('failed');
+      expect(completion.errorKind).toBe('approval_rejected');
+      // A megszakított, futó testvér a saját `result` üzenete szerint zár; a
+      // sorban álló el sem indult, a záró menet cancelled állapotba vitte.
+      const agentSteps = okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId)).filter(
+        (step) => step.nodeType === 'agent_step',
+      );
+      const countOf = (status: string): number => agentSteps.filter((step) => step.status === status).length;
+      expect([countOf('succeeded'), countOf('cancelled')]).toStrictEqual([1, 1]);
+    });
+  });
+
+  describe('fail_run: a futás al-workflow futásai cancelled állapotban zárnak (SPEC-004 8.3, user döntés 2026-09-23)', () => {
+    it('a lezárásukat pontosan egyszer, a saját runId-ra kéri, a futó testvérek interrupt() hívása ELŐTT', async () => {
+      const order: string[] = [];
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        cancelChildRunTrees: (parentRunId) => {
+          order.push(`gyerekek:${parentRunId}`);
+          return Promise.resolve({ kind: 'ok', value: { cancelledRunIds: [] } });
+        },
+      });
+      fixture.dependencies.agentQueryRegistry.register(fixture.execution.runId, 'futo-testver', {
+        messages: agentMessages('futo-testver', Promise.resolve(undefined)),
+        interrupt: () => {
+          order.push('interrupt');
+          return Promise.resolve();
+        },
+      });
+
+      const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+      expect(completion.status).toBe('failed');
+      expect(order).toStrictEqual([`gyerekek:${fixture.execution.runId}`, 'interrupt']);
+    });
+
+    it('a lezárásuk hibáját továbbadja: a futás run_execution_failed', async () => {
+      const fixture = openFixture({
+        document: FAIL_RUN_DOCUMENT,
+        cancelChildRunTrees: () => Promise.resolve({ kind: 'error', message: 'teszt: a gyerek futások nem zárhatók' }),
+      });
+
+      const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toBe('teszt: a gyerek futások nem zárhatók');
+      const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+      expect([run.status, run.errorKind]).toStrictEqual(['failed', 'run_execution_failed']);
+    });
   });
 
   it('a run_finished esemény írásának hibáját továbbadja', async () => {

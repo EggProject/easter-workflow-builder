@@ -13,12 +13,14 @@ import type {
   WorkflowNodeInput,
 } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type {
   Fact,
   ModelDescriptor,
   ProviderCapabilityDescriptor,
   ProviderId,
 } from '@easter-workflow-builder/provider-capability';
+import type { ConcurrencyGate } from '../concurrency-gate/concurrency-gate.ts';
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
@@ -289,6 +291,7 @@ interface Harness {
   readonly sleepCalls: SleepCall[];
   readonly approvalRegistry: ApprovalWaitRegistry;
   readonly agentQueryRegistry: AgentQueryRegistry;
+  readonly concurrencyGate: ConcurrencyGate;
   readonly interruptedPrompts: string[];
 }
 
@@ -331,9 +334,10 @@ function openHarness(options: HarnessOptions = {}): Harness {
     },
     processEnvironment: { read: () => null },
   };
+  const concurrencyGate = createConcurrencyGate(() => null);
   const supervisor = createRunSupervisor({
     ports,
-    concurrencyGate: createConcurrencyGate(() => null),
+    concurrencyGate,
     approvalRegistry,
     agentQueryRegistry,
     installedAgentSdkVersion: INSTALLED,
@@ -341,7 +345,16 @@ function openHarness(options: HarnessOptions = {}): Harness {
   if (options.withoutDefaultProvider !== true) {
     okOrThrow(database.settings.setDefaultProvider('minimax'));
   }
-  return { database, supervisor, published, sleepCalls, approvalRegistry, agentQueryRegistry, interruptedPrompts };
+  return {
+    database,
+    supervisor,
+    published,
+    sleepCalls,
+    approvalRegistry,
+    agentQueryRegistry,
+    concurrencyGate,
+    interruptedPrompts,
+  };
 }
 
 function agentStepConfig(promptTemplate: string): AgentStepConfig {
@@ -575,6 +588,32 @@ describe('createRunSupervisor', () => {
 
       expect(outcome.kind).toBe('error');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+    });
+
+    it('a stopAcceptingRuns után az isAcceptingRuns hamis, és érvényes workflow-ra is engine_shutting_down hibát ad, gyökér és al-workflow futásra is, és nem jön létre workflow_run sor (SPEC-004 10.2 1. pont)', async () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas',
+        [startNode('start'), agentNode('a1', 'sikeres')],
+        [edgeOf('e1', 'start', 'a1')],
+      );
+
+      expect(harness.supervisor.isAcceptingRuns()).toBe(true);
+      harness.supervisor.stopAcceptingRuns();
+      expect(harness.supervisor.isAcceptingRuns()).toBe(false);
+      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+      const child = await harness.supervisor.startChildRun({
+        targetWorkflowId: workflowId,
+        input: {},
+        parent: { rootRunId: 'szulo', depth: 0, workflowAncestry: [] },
+        parentRunId: 'szulo',
+      });
+
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
+      expect(child.kind === 'error' ? child.message : '').toContain('(engine_shutting_down)');
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
     });
 
     it('érvénytelen gráf (script node) esetén nem jön létre workflow_run sor', () => {
@@ -910,7 +949,13 @@ describe('createRunSupervisor', () => {
       const summary = okOrThrow(
         await interruptRun(started.run.id, {
           database: harness.database,
+          eventPublisher: {
+            publish: (event) => {
+              harness.published.push(event);
+            },
+          },
           runSupervisor: harness.supervisor,
+          concurrencyGate: harness.concurrencyGate,
           agentQueryRegistry: harness.agentQueryRegistry,
           approvalRegistry: harness.approvalRegistry,
         }),
@@ -921,6 +966,19 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.stepRuns.getStepRun(stepRunId)).status).toBe('cancelled');
       // A jóváhagyás utáni lépés sosem indult el.
       expect(stepRunsOf(harness.database, started.run.id).map((row) => row.nodeId)).toStrictEqual(['start', 'jov']);
+      // A lezáró esemény élőben is kiment, és pontosan egyszer: a léptető
+      // hurok a `stopRequested` ágon nem ír, a megszakító fél igen.
+      const finishedEvents = harness.published.filter(
+        (event) => isRecord(event) && event['runId'] === started.run.id && event['kind'] === 'run_finished',
+      );
+      expect(finishedEvents).toStrictEqual([
+        {
+          kind: 'run_finished',
+          runId: started.run.id,
+          stepRunId: null,
+          payload: { status: 'cancelled', errorKind: null, errorMessage: null, failedBranchCount: 0 },
+        },
+      ]);
     });
 
     it('elutasítás rejected él nélkül: a 8.3 politika dönt, approval_rejected osztállyal', async () => {
@@ -1034,7 +1092,7 @@ describe('createRunSupervisor', () => {
       expect(handle.rootRunId).toBe(started.run.id);
       expect(handle.workflowId).toBe(workflowId);
       expect(harness.supervisor.listActiveRuns()).toHaveLength(1);
-      expect(handle.isStopRequested()).toBe(false);
+      expect(handle.stopTargetStatus()).toBeUndefined();
 
       const stepRunId = await waitForPendingApproval(harness.database);
       okOrThrow(harness.database.approvals.decideApproval({ stepRunId, decision: 'approved' }));
@@ -1045,7 +1103,7 @@ describe('createRunSupervisor', () => {
       expect(harness.supervisor.listActiveRuns()).toStrictEqual([]);
     });
 
-    it('requestStop után nem indul új lépés, és a záró állapotot a leállítást kérő írja', async () => {
+    it('requestStop után nem indul új lépés, a záró állapotot a leállítást kérő írja, és az első célállapot marad meg', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -1057,12 +1115,15 @@ describe('createRunSupervisor', () => {
       const started = okOrThrow(harness.supervisor.startRun({ workflowId, input: {} }));
       const handle = handleOf(harness.supervisor, started.run.id);
       const stepRunId = await waitForPendingApproval(harness.database);
-      handle.requestStop();
+      handle.requestStop('cancelled');
+      // Egy második leállítás (például a megszakítás alatt érkező szabályos
+      // leállás) a célállapotot nem írja felül.
+      handle.requestStop('interrupted');
       okOrThrow(harness.database.approvals.decideApproval({ stepRunId, decision: 'approved' }));
       harness.approvalRegistry.notifyDecided(stepRunId, 'approved');
       okOrThrow(await handle.completion);
 
-      expect(handle.isStopRequested()).toBe(true);
+      expect(handle.stopTargetStatus()).toBe('cancelled');
       expect(statusOf(harness.database, started.run.id)).toBe('running');
       expect(stepRunsOf(harness.database, started.run.id).map((row) => row.nodeId)).toStrictEqual(['start', 'jov']);
     });

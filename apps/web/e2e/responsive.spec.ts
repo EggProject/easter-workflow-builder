@@ -14,8 +14,11 @@
 // egy `devices['Pixel 7']` preseten futó, valódi mobil emulációs teszt
 // fedi le, nem csak a `setViewportSize`-os asztali szimuláció.
 import type {
+  RunDetail,
+  RunSnapshotResponse,
   RunSummary,
   SettingsRecord,
+  StepRunRecord,
   WorkflowDetail,
   WorkflowGraphDocument,
   WorkflowSummary,
@@ -26,7 +29,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { mockIdleStream } from './sse-mock.ts';
+import { mockIdleStream, mockSseFrames } from './sse-mock.ts';
+import { longUrlToolResultRecord, makeRunEventRecord, replayFrames, sdkResultRecord } from './transcript-fixture.ts';
 
 const ALFA: WorkflowSummary = {
   id: 'w-alfa',
@@ -82,9 +86,84 @@ const EDITOR_WORKFLOW: WorkflowDetail = {
 
 const EDITOR_SETTINGS: SettingsRecord = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
 
+// A futás nézet fixture-jei (2026-09-15, T-009-22): a rajz és a transcript
+// panel a --ep-screen-lg fölött egy nem törő flex sor, a --ep-screen-md alatt
+// pedig fülekre esik. Egyik sáv sem okozhat vízszintes túllógást, ezt a lenti,
+// minden támogatott szélességen futó teszt őrzi.
+const RUN_DETAIL: RunDetail = {
+  id: 'run-resp',
+  workflowId: 'w-alfa',
+  status: 'running',
+  input: null,
+  providerId: 'claude-subscription',
+  rootRunId: 'run-resp',
+  depth: 0,
+  workflowAncestry: ['w-alfa'],
+  graphSnapshotHash: 'c'.repeat(64),
+  persistedStreamDeltas: false,
+  restartedFromRunId: null,
+  createdAtMs: 1,
+  startedAtMs: 2,
+  finishedAtMs: null,
+  errorKind: null,
+  errorMessage: null,
+};
+
+const RUN_SNAPSHOT: RunSnapshotResponse = {
+  version: 1,
+  sdkVersionPin: '0.1.13',
+  workflow: { id: 'w-alfa', name: 'Alfa workflow', description: null },
+  nodes: [
+    {
+      id: 'n1',
+      type: 'start',
+      label: 'Ügyfél kérés fogadása',
+      position: { x: 0, y: 0 },
+      config: { type: 'start', inputFields: [], onUnhandledError: null },
+      effectiveProviderId: 'claude-subscription',
+    },
+  ],
+  edges: [],
+};
+
+const RUN_STEP_RUNS: readonly StepRunRecord[] = [
+  {
+    id: 'sr-resp',
+    runId: 'run-resp',
+    nodeId: 'n1',
+    nodeType: 'start',
+    parentStepRunId: null,
+    iteration: 0,
+    attempt: 1,
+    status: 'succeeded',
+    providerId: 'claude-subscription',
+    modelId: null,
+    sessionMode: null,
+    sdkSessionId: null,
+    resumedFromSessionId: null,
+    forkedSession: false,
+    structuredOutputStrategy: null,
+    output: null,
+    resultSubtype: null,
+    numTurns: null,
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadInputTokens: null,
+    cacheCreationInputTokens: null,
+    subWorkflowRunId: null,
+    errorKind: null,
+    errorMessage: null,
+    startedAtMs: 2,
+    finishedAtMs: 3,
+    createdAtMs: 2,
+  },
+];
+
 /* eslint-enable unicorn/no-null */
 
 const EDITOR_URL = '/editor?workflowId=w-alfa';
+
+const RUN_VIEW_URL = '/run?runId=run-resp';
 
 test.beforeEach(async ({ page }) => {
   await mockIdleStream(page);
@@ -97,6 +176,10 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(EDITOR_GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(EDITOR_WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(EDITOR_SETTINGS))),
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(RUN_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
   ]);
 });
 
@@ -271,6 +354,71 @@ test('a gráf szerkesztő egyetlen támogatott viewport szélességen sem lóg t
       await expect
         .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
         .toBe(0);
+    });
+  }
+});
+
+test('a futás nézet egyetlen támogatott viewport szélességen sem lóg túl vízszintesen', async ({ page }) => {
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(RUN_VIEW_URL);
+      await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+      await expect
+        .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
+        .toBe(0);
+    });
+  }
+});
+
+test('a futás nézet transcriptje egy 400 karakteres, szóköz nélküli URL címmel sem lóg túl vízszintesen (T-009-25)', async ({
+  page,
+}) => {
+  // A független ellenőrzés mérése szerint csonkolás nélkül egy ilyen cím 3400
+  // pixel széles, és a dokumentum 1440 és 375 pixelen is vízszintesen
+  // görgetett. A két szélesség a támogatott halmazon felül is szerepel.
+  const records = [
+    makeRunEventRecord(1, RUN_DETAIL.id),
+    longUrlToolResultRecord(2, RUN_DETAIL.id, 'sr-resp'),
+    sdkResultRecord(3, RUN_DETAIL.id, 'sr-resp'),
+  ];
+  await mockSseFrames(page, replayFrames(RUN_DETAIL.id, records));
+  // A --ep-screen-md alatt a futás nézet fül sávra vált, és a transcript a
+  // második fülön áll; a token értéke a design system forrásából jön.
+  const mediumWidth = Number(/--ep-screen-md:\s*(\d+)px/.exec(readFileSync(BREAKPOINTS_CSS_PATH, 'utf8'))?.[1]);
+  expect(mediumWidth).toBeGreaterThan(0);
+
+  const widths = [...new Set([...SUPPORTED_VIEWPORT_WIDTHS, 375, 1440])].toSorted((a, b) => a - b);
+  for (const width of widths) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(RUN_VIEW_URL);
+      if (width < mediumWidth) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      const list = page.getByRole('list', { name: 'Futás eseményei' });
+      await expect(list.getByRole('listitem')).toHaveCount(records.length);
+
+      // A dokumentum törzse nem görget vízszintesen (szabálykönyv 11. szekció).
+      await expect
+        .poll(async () => horizontalOverflow(page), { message: `viewport szélesség: ${String(width)}px` })
+        .toBe(0);
+      // A lista SAJÁT görgető doboza sem: a `react-window` `overflow-y: auto`
+      // gyökere miatt egy kilógó cím nem a dokumentumot, hanem a listát
+      // görgetné vízszintesen, amit a dokumentum mérése önmagában nem fogna.
+      expect(await list.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+      // A hosszú cím valóban csonkolt: a tartalma szélesebb a dobozánál, a
+      // doboz pedig a listán belül marad.
+      const longTitle = list.getByRole('listitem').nth(1).locator('.accordion__title');
+      const titleOverflow = await longTitle.evaluate((element) => element.scrollWidth - element.clientWidth);
+      expect(titleOverflow).toBeGreaterThan(0);
+      const titleBox = await longTitle.boundingBox();
+      const listBox = await list.boundingBox();
+      if (titleBox === null || listBox === null) {
+        throw new Error('hiányzó befoglaló doboz');
+      }
+      expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(listBox.x + listBox.width);
     });
   }
 });

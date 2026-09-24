@@ -1,5 +1,15 @@
 import { act } from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Előtöltő import, szándékosan név nélkül: a `main.tsx` mögötti teljes
+// alkalmazás modulgráfot (`AppShell` és minden képernyő) a fájl gyűjtési
+// fázisában tölti be, amire a Vitest nem alkalmaz teszt időkorlátot. Nélküle
+// a teszt törzsében álló dinamikus `import('./main.tsx')` a gráf
+// transzformálását és kiértékelését is az 5000 ms-os korláton belül
+// végezte, ami a teljes suite terhelése alatt túllépte azt. Az előtöltés
+// után a dinamikus import csak a `main.tsx` saját mellékhatását futtatja,
+// ugyanazzal a `mountApp` példánnyal
+// (`docs/research/2026-09-23-teszt-idokorlat-bombak.md`).
+import './mount-app.tsx';
 
 class FakeEventSource {
   readyState = 0;

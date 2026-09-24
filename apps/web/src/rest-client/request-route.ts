@@ -1,6 +1,7 @@
-import type { FetchFunction, Outcome } from '@easter-workflow-builder/core';
+import type { FetchFunction } from '@easter-workflow-builder/core';
 import type { RouteId } from '@easter-workflow-builder/protocol';
 import { performRouteRequest } from './perform-route-request.ts';
+import type { RouteOutcome } from './route-outcome.ts';
 import type { SafeParsableSchema } from './safe-parsable-schema.ts';
 
 export interface RequestRouteInput<TValue> {
@@ -19,7 +20,7 @@ export interface RequestRouteInput<TValue> {
  * `POST`, `PUT` és `PATCH` végpontokhoz. A `fetchFunction` befecskendezett
  * port (8.3): valós hálózat nélkül tesztelhető minden hibaág.
  */
-export function requestRoute<TValue>(input: Readonly<RequestRouteInput<TValue>>): Promise<Outcome<TValue>> {
+export function requestRoute<TValue>(input: Readonly<RequestRouteInput<TValue>>): Promise<RouteOutcome<TValue>> {
   return performRouteRequest({
     routeId: input.routeId,
     parameters: input.parameters ?? {},
