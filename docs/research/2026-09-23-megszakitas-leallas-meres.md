@@ -328,7 +328,8 @@ az ablakot): a javítás előtt mindkettő bukott (`expected '' to contain
 '(illegal_status_transition)'`). Részenként visszavonva: a hurok oldali írás nélkül öt teszt bukik
 (a két `create-engine` jóváhagyásos `fail_run` teszt és három `advance-run` teszt), az
 `interruptRun` oldali nélkül három (a `create-engine` megszakításos teszt és két `interrupt-run`
-teszt). Plusz a `cancel-waiting-approval-step-runs.spec.ts` öt esete.
+teszt). Plusz a `close-waiting-approval-step-runs.spec.ts` öt esete (a nyolcadik körig, a `77683e8`
+átnevezéséig `cancel-waiting-approval-step-runs.spec.ts`).
 
 **Mellékes lelet, mérve: a már eldöntött jóváhagyás második döntése 404.** Ugyanezen a szerveren
 (`start -> human_approval`, jóváhagyás, majd egy második döntés ugyanarra az `approvalId`-ra): az
@@ -563,3 +564,58 @@ nem leállított, elutasított jóváhagyás miatt `failed` gyerek) előtte és 
 a már terminális sorú, leállított gyerek, ahol a sor állapota dönt), a `build-child-result.spec.ts`
 célállapot esete, és a `create-run-supervisor.spec.ts` bővítése: egy második `requestStop` a
 célállapotot nem írja felül.
+
+**A szabályos leállás közben beágyazott `fail_run`: mérve, javítva (2026-09-24, tizedik kör).**
+Egy független ellenőrzés a `dbffa68` commiton öt futásból ötször azt mérte, hogy ha előbb
+`SIGTERM` érkezik, és a leállás alatt egy testvér `sub_workflow` lépés bukása `fail_run`-t indít,
+a lassan leálló gyerek `sub_workflow_finished` eseménye és üzenete `interrupted`, a sora viszont
+`cancelled`. A mérés megerősítette. A kilencedik kör egyezése ezt az esetet nem fedte, mert ott
+egyetlen leállítás érte a fát.
+
+| Tétel     | Érték                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Futtató   | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `ab6e6b1` commitja a munkapéldányban (előtte; a motor és az `apps/server` forrása a `dbffa68`-éval azonos), illetve ugyanez a javítással (utána); a két állapot kizárólag a `create-run-supervisor.ts` fájlban tér el                                                                                                                       |
+| Szerver   | a 6. szekció felállása: a valódi `apps/server` modulok (a `registerShutdownSignalHandlers` leállási sorrendjével) és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő; az ellenőrző scriptjei (`race-server.ts`, `race-probe.mjs`), a gyerek lezáró eseményének kiolvasásával bővítve |
+| Hamis     | a `b` gyerek agent lépése az `interrupt()` nyugtáját 400 ms-mal később adja, és a folyama ekkor sikeres `result`-tal zár; a bukó lépés 300 ms után nem sikeres `result`-tal zár                                                                                                                                                                                                            |
+| Workflow  | leállás előbb: szülő `start` után `sub-a` (gyerek: `start -> a-jov`, `human_approval`, `timeoutMs: null`) és `sub-b` (gyerek: `start -> b-slow`, agent lépés); `fail_run` előbb: szülő `start` után egy bukó agent lépés (`fail_run`) és `sub-b` ugyanarra a gyerekre                                                                                                                      |
+| Menet     | leállás előbb: a gyerek jóváhagyása és a `b-slow` hívása után 50 ms múlva `SIGTERM`; `fail_run` előbb: a bukás és a gyerek `interrupt()`-ja után 100 ms múlva `SIGTERM`, a nyugtázás 400 ms-os ablakán belül                                                                                                                                                                               |
+| Kiolvasás | a kilépés után a fájlból a gyökér sora, a `sub` lépések végállapota, a `sub_workflow_finished` `status` mezője, a lépés üzenetében megnevezett állapot, a gyerek sora és a gyerek futás szintű lezáró eseménye (`run_finished`, illetve `run_interrupted`)                                                                                                                                 |
+
+| Sorrend (5 futás sorrendenként) | A gyökér      | `sub-b` lépés                   | Esemény és üzenet | A gyerek sora, előtte / utána | A gyerek lezáró eseménye, előtte / utána                | Egyezik, előtte / utána |
+| ------------------------------- | ------------- | ------------------------------- | ----------------- | ----------------------------- | ------------------------------------------------------- | ----------------------- |
+| leállás, közben `fail_run`      | `interrupted` | `failed`, `sub_workflow_failed` | `interrupted`     | `cancelled` / `interrupted`   | `run_finished` `cancelled` / `run_interrupted`          | 0/5 / 5/5               |
+| `fail_run`, közben leállás      | `interrupted` | `failed`, `sub_workflow_failed` | `cancelled`       | `cancelled` / `cancelled`     | `run_finished` `cancelled` / `run_finished` `cancelled` | 5/5 / 5/5               |
+
+A leállás előbb sorrendben a jóváhagyáson álló `a` gyerek sora, a `sub-a` lépés eseménye és
+üzenete előtte és utána is `interrupted` (5/5), a lépés `failed`, `sub_workflow_failed`. A gyökér
+mindkét sorrendben `interrupted`, előtte és utána is.
+
+**A gyökérok.** A `shutdownActiveRuns` minden kézikönyvre `requestStop('interrupted')`-et hív, és a
+leállás végén a `recoverInterruptedRuns` zár. A jóváhagyáson álló `a` gyerek leállása után a
+`sub-a` lépés bukik, és a gyökér `fail_run` politikája a `cancelChildRunTrees` útján a még leálló
+`b` gyereket is lezárja: a kézikönyv célállapota az első hívás szerint `interrupted` marad (ezt
+mondja az esemény), a `cancelRuns` viszont a gyerek léptetésének lezárulása után `cancelled`-et
+írt. Ez mindig a leállás zárása előtt fut, mert a leállás a gyökér `completion`-jét is megvárja, az
+pedig a `fail_run` gyerek fa zárását; a `recoverInterruptedRuns` a terminális sort nem írja át.
+
+**A spec olvasata.** A SPEC-004 9. szekció "A leállított al-workflow futás célállapota" bekezdése
+szerint a leállító fél célállapota ugyanaz, amit a saját DB zárása ír, és két leállításnál az
+első marad meg; a 10.2 3. pontja szerint a szabályos leállásnál minden érintett futás
+`interrupted`. A 8.3 "a bukott futás al-workflow futásai `cancelled` állapotban zárnak" mondata a
+leállás közben beágyazott esetre szó szerint mást adna, a kettőt a 9. szekció első hívás szabálya
+dönti el. A SPEC-003 7.1 a `running -> cancelled` és a `running -> interrupted` átmenetet is
+ismeri, az állapotgép tehát nem dönt. A gyerek lépései ebben a mérésben terminálisak (a `b-slow` a
+saját `result` üzenete szerint zár), a lépés szintű állapotgépet (7.2) a javítás nem érinti.
+
+**A javítás.** A `run-supervisor` `cancelChildRunTrees` DB zárása csak azokat a leszármazottakat
+adja a `cancelRuns`-nak, amelyeknek a kézikönyvén az első célállapot `cancelled`
+(`stopTargetStatus()`); a leállás által már `interrupted` célú gyereket a leállás saját zárása
+viszi `interrupted` állapotba, `run_interrupted` eseménnyel. Új út nincs: a meglévő célállapot és
+az első hívás szabály (`92f5e91`), a `cancelActiveRunTree` és a `recoverInterruptedRuns` marad.
+
+**A regresszió.** A `create-engine.spec.ts` két új tesztje. Az első (előbb a leállás, a gyerek
+leállását a teszt jele zárja, a második `interrupt()` a beágyazott `fail_run`-é) a javítás előtt
+bukott (`"childStatus": "cancelled"` a várt `"interrupted"` helyett), utána zöld; a gyerek élő
+`run_finished` eseményének hiányát is állítja. A második (előbb egy elutasított jóváhagyás miatti
+`fail_run`, közben a leállás) előtte és utána is zöld: a gyerek sora, eseménye és üzenete
+`cancelled`, a gyökér `interrupted`.

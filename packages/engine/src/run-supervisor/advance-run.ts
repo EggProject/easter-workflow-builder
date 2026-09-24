@@ -598,7 +598,10 @@ async function stopFailedRun(runId: string, dependencies: NodeExecutorDependenci
  * zárnak** (user döntés 2026-09-23), a felhasználói megszakítás fa
  * mechanizmusával (`ChildWorkflowRunner.cancelChildRunTrees`,
  * `run-interrupt/cancel-active-run-tree.ts`), a futás teljes alfájára
- * (gyerek, unoka, ...), de a futás maga és az ősei nélkül. A hívás szinkron
+ * (gyerek, unoka, ...), de a futás maga és az ősei nélkül. A szabályos
+ * leállás által már leállított gyerek kivétel: az első leállítás célállapota
+ * marad, `interrupted` (`create-run-supervisor.ts` `cancelChildRunTrees`,
+ * SPEC-004 9. szekció, 10.2). A hívás szinkron
  * része (a leszármazottak sorból kivétele, várakozásaik lezárása, `interrupt()`
  * a lépéseiken) a saját futás `interrupt()` hívása ELŐTT fut, ugyanazon okból,
  * mint a saját sor kivétele; a gyerekek lezárulásának megvárása utána. A

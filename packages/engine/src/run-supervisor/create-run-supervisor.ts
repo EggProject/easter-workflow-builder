@@ -356,12 +356,23 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
    * A leszármazottakat a kézikönyvek `parentRunId` lánca adja, nem az
    * adatbázis: a `step_run.sub_workflow_run_id` a gyerek indítása után egy
    * `await`-tel később íródik.
+   *
+   * A DB zárás csak azt a leszármazottat írja `cancelled` állapotba, aminek az
+   * első leállítása is ez volt (`ActiveRunHandle.requestStop`, az első hívás
+   * célállapota marad meg). A szabályos leállás közben beágyazott `fail_run`
+   * a leállás által már `interrupted` célú futást nem írja át: azt a leállás
+   * saját zárása (`recoverInterruptedRuns`) viszi `interrupted` állapotba,
+   * egyezően a szülő lépés `sub_workflow_finished` eseményével (SPEC-004 9.
+   * szekció, 10.2 3. pont).
    */
   function cancelChildRunTrees(parentRunId: string): Promise<Outcome<CancelRunTreeResult>> {
     const descendants = registry.listDescendants(parentRunId);
     return cancelActiveRunTree(
       descendants,
-      () => ports.database.recovery.cancelRuns(descendants.map((handle) => handle.runId)),
+      () =>
+        ports.database.recovery.cancelRuns(
+          descendants.filter((handle) => handle.stopTargetStatus() === 'cancelled').map((handle) => handle.runId),
+        ),
       {
         database: ports.database,
         eventPublisher: ports.eventPublisher,

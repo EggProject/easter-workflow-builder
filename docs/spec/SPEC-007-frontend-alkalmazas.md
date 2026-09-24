@@ -721,6 +721,10 @@ felülete, ugyanazzal a feloldással, mint a csontváz `ink` változata (`apps/w
 Az `ink` felületen a pötty a forrás ink példái szerint gyűrűt kap (`dotProps`: `ring`, `halo`
 nélkül), világos témában változatlan (user döntés 2026-09-24,
 `docs/research/2026-09-24-feed-indicator-ink-gyuru.md`).
+A forrás "Ink surface" blokkja csak a `streaming`, `stale` és `disconnected` állapotra ad
+gyűrűs ink példát, a `connecting` fázisra nem, tehát ott a gyűrű a forrás `dot` szabályából
+következő analógia (`eggproject-design-components/components/dot/`: a `dot.html` "ring (on ink
+bg)" felirata és a `Dot.jsx` "hard ring outline (good on dense bg)" leírása).
 Regresszió: `apps/web/e2e/stream-status-indicator.spec.ts`.
 
 **Amit szándékosan nem csinálunk:** nincs teljes képernyős, blokkoló betöltő réteg. Egyik async pont sem indokol olyan jelzést, ami a felhasználót minden mástól elzárja.

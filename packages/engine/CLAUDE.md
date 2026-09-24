@@ -197,6 +197,17 @@ gyereknél a sor állapota dönt, mert a fa zárása csak a nem terminális soro
 ami mind a 30 esetben egyezik a gyerek sorával a fa zárása után (research 7. szekció, kilencedik
 kör).
 
+**Két leállításnál az első célállapota zár a DB-ben is (SPEC-004 9. szekció, 10.2).** A szabályos
+leállás közben beágyazott `fail_run` (egy testvér `sub_workflow` lépés a leállás miatt bukik) a
+`cancelChildRunTrees` DB zárásában csak a `stopTargetStatus() === 'cancelled'` leszármazottakat adja
+a `cancelRuns`-nak. A leállás által már `interrupted` célú gyereket a `shutdownActiveRuns`
+`recoverInterruptedRuns` zárása viszi `interrupted` állapotba, egyezően a szülő lépés eseményével;
+fordított sorrendben (előbb `fail_run`, közben leállás) a gyerek `cancelled` marad. Mérve a valódi
+`apps/server` modulokon, hamis agenttel, sorrendenként 5 futással: a leállás előbb sorrendben előtte
+a gyerek sora `cancelled`, az eseménye `interrupted` (0/5 egyezés), utána mindkettő `interrupted`
+(5/5); a fordított sorrend előtte és utána is `cancelled` (5/5). Regresszió: a `create-engine.spec.ts`
+"az első leállítás célállapota" blokkja (research 7. szekció, tizedik kör).
+
 **A `NodeExecutionOutcome` és a `NodeExecutionResult` szétválasztása (T-005-31, AC-51).** A külső
 megszakítás miatt lezáratlanul maradó lépés NEM a `NodeExecutionOutcome` ága, hanem a szélesebb
 `NodeExecutionResult` külön ága. Az ok mérhető: a `NodeExecutionOutcome` minden ága hordoz

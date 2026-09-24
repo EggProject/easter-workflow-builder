@@ -34,7 +34,9 @@ export interface CancelActiveRunTreeDependencies {
  * - a `fail_run` hibapolitika a bukott futás al-workflow futásait adja (a
  *   `run-supervisor` `cancelChildRunTrees` művelete, `parentRunId` lánc), és a
  *   `cancelRuns` primitívvel zár, mert a bukott futás maga `failed`, nem
- *   `cancelled` (SPEC-004 8.3, 8.4, user döntés 2026-09-23).
+ *   `cancelled` (SPEC-004 8.3, 8.4, user döntés 2026-09-23). A szabályos
+ *   leállás által már `interrupted` célú futást a zárásból kihagyja, mert az
+ *   első leállítás célállapota marad (SPEC-004 9. szekció, 10.2).
  *
  * A menet, ebben a sorrendben:
  *

@@ -121,7 +121,9 @@ export interface ChildWorkflowRunner {
    * ...) megszakítása a felhasználói megszakítás fa mechanizmusával
    * (SPEC-004 9. szekció 2 ... 5. pont, `run-interrupt/cancel-active-run-tree.ts`):
    * a futások `cancelled` állapotban zárnak, a döntésre váró jóváhagyásaikkal
-   * együtt. A megnevezett futás maga nem változik. Nem a `sub_workflow`
+   * együtt, kivéve a szabályos leállás által már `interrupted` célú futást: ott
+   * az első leállítás célállapota marad (SPEC-004 9. szekció, 10.2). A
+   * megnevezett futás maga nem változik. Nem a `sub_workflow`
    * végrehajtó hívja, hanem a léptető hurok a `fail_run` hibapolitikában
    * (SPEC-004 8.3, user döntés 2026-09-23): a gyerek lezárulása után a futó
    * `sub_workflow` lépés a saját útján zár (5.9 6. pont).

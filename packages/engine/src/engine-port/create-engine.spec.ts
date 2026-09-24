@@ -669,6 +669,21 @@ function waitingChildWorkflow(database: DatabaseContext, name: string, prefix: s
 }
 
 /**
+ * Egy gyerek workflow, aminek egyetlen lépése egy agent lépés: a
+ * `scriptedRunner` `drains_until_released` hívásával a folyama az `interrupt()`
+ * után is a `releaseDrain()` hívásig nyitva marad, tehát a gyerek leállásának
+ * vége a teszt kezében van.
+ */
+function drainingChildWorkflow(database: DatabaseContext, name: string, prefix: string): string {
+  return createWorkflow(
+    database,
+    name,
+    [startNode(`${prefix}-start`), agentNode(`${prefix}-agent`, 'gyerek')],
+    [edgeOf(`${prefix}-e1`, `${prefix}-start`, `${prefix}-agent`)],
+  );
+}
+
+/**
  * Megvárja, amíg a futás `sub_workflow` lépésének sora megkapja a gyerek
  * futás azonosítóját (SPEC-004 5.9 3. pont), és visszaadja.
  */
@@ -1889,6 +1904,82 @@ describe('createEngine', () => {
 
       expect(await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES)).toBe('failed');
       expect(treeClosingOf(harness.database, started.run.id, childRunId)).toStrictEqual(closingFor('failed'));
+    });
+  });
+
+  // Két leállítás egy futáson: az első célállapota marad meg, a DB zárásban
+  // is (SPEC-004 9. szekció "A leállított al-workflow futás célállapota", 10.2
+  // 3. pont). A javítás előtt a szabályos leállás közben beágyazott `fail_run`
+  // a már `interrupted` célú gyerek sorát `cancelled` állapotba írta, az
+  // eseménye viszont `interrupted` volt
+  // (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció).
+  describe('szabályos leállás és beágyazott fail_run: az első leállítás célállapota (SPEC-004 9. szekció, 10.2)', () => {
+    it('REGRESSZIÓ: előbb a leállás, közben a testvér sub_workflow bukása fail_run-t indít: a lassan leálló gyerek sora és eseménye egyaránt interrupted, a gyökér interrupted', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const waitingChildWorkflowId = waitingChildWorkflow(harness.database, 'gyerek-a', 'a');
+      const drainingChildWorkflowId = drainingChildWorkflow(harness.database, 'gyerek-b', 'b');
+      const workflowId = createWorkflow(
+        harness.database,
+        'leallas-beagyazott-fail-run',
+        [
+          startNode('start'),
+          subWorkflowNode('sub-a', waitingChildWorkflowId),
+          subWorkflowNode('sub-b', drainingChildWorkflowId),
+        ],
+        [edgeOf('e-a', 'start', 'sub-a'), edgeOf('e-b', 'start', 'sub-b')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const waitingChildRunId = await waitForChildRunId(harness.database, started.run.id, 'sub-a');
+      const drainingChildRunId = await waitForChildRunId(harness.database, started.run.id, 'sub-b');
+      await waitForPendingApproval(harness.database, waitingChildRunId);
+      await waitForStepRunning(harness.database, drainingChildRunId, 'b-agent');
+
+      const shuttingDown = harness.engine.shutdown();
+      // Az első `interrupt()` a leállásé. A másodikat a beágyazott `fail_run`
+      // hívja: a jóváhagyáson álló gyerek leállása után a `sub-a` lépés bukik,
+      // és a gyökér gyerek fa zárása a még leálló `b` gyereket is eléri.
+      await waitForInterruptCalls(scripted.calls, 2);
+      scripted.releaseDrain();
+      okOrThrow(await shuttingDown);
+
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('interrupted');
+      expect({
+        a: subWorkflowClosingOf(harness.database, started.run.id, 'sub-a'),
+        b: subWorkflowClosingOf(harness.database, started.run.id, 'sub-b'),
+      }).toStrictEqual({ a: closingFor('interrupted').gyerek, b: closingFor('interrupted').gyerek });
+      expect(findRunFinishedStatus(harness.published, drainingChildRunId)).toBeUndefined();
+    });
+
+    it('HATÁR: előbb a fail_run, közben a leállás: a gyerek sora és eseménye cancelled marad, a gyökér interrupted', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const drainingChildWorkflowId = drainingChildWorkflow(harness.database, 'gyerek-b', 'b');
+      // A `jov` elutasítása `rejected` él nélkül a `fail_run` kiváltója (5.8, 8.3).
+      const workflowId = createWorkflow(
+        harness.database,
+        'fail-run-kozben-leallas',
+        [startNode('start'), approvalNode('jov', null), subWorkflowNode('sub-b', drainingChildWorkflowId)],
+        [edgeOf('e-jov', 'start', 'jov'), edgeOf('e-b', 'start', 'sub-b')],
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const approvalStepRunId = await waitForPendingApproval(harness.database, started.run.id);
+      const drainingChildRunId = await waitForChildRunId(harness.database, started.run.id, 'sub-b');
+      await waitForStepRunning(harness.database, drainingChildRunId, 'b-agent');
+
+      okOrThrow(await harness.engine.decideApproval({ stepRunId: approvalStepRunId, decision: 'rejected' }));
+      // A `fail_run` gyerek fa zárása `interrupt()`-ot hívott a gyereken, a
+      // gyerek célállapota tehát már `cancelled`, amikor a leállás érkezik.
+      await waitForInterruptCalls(scripted.calls, 1);
+      const shuttingDown = harness.engine.shutdown();
+      scripted.releaseDrain();
+      okOrThrow(await shuttingDown);
+
+      expect(okOrThrow(harness.database.runs.getRun(started.run.id)).status).toBe('interrupted');
+      expect(subWorkflowClosingOf(harness.database, started.run.id, 'sub-b')).toStrictEqual(
+        closingFor('cancelled').gyerek,
+      );
+      expect(findRunFinishedStatus(harness.published, drainingChildRunId)).toBe('cancelled');
     });
   });
 
