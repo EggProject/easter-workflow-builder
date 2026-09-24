@@ -7,6 +7,7 @@ const FOLLOWING: TranscriptAutoScrollState = {
   settledRowCount: 10,
   unseenCount: 0,
   lastStopIndex: 9,
+  isToggleUnmeasured: false,
 };
 
 describe('reduceTranscriptAutoScroll', () => {
@@ -18,6 +19,7 @@ describe('reduceTranscriptAutoScroll', () => {
         settledRowCount: 10,
         unseenCount: 0,
         lastStopIndex: 12,
+        isToggleUnmeasured: false,
       });
     });
 
@@ -42,33 +44,85 @@ describe('reduceTranscriptAutoScroll', () => {
 
   describe('rows_arrived', () => {
     it('változatlan sorszámra a kapott állapotot adja vissza', () => {
-      expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'rows_arrived', rowCount: 10 })).toBe(FOLLOWING);
+      expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'rows_arrived', rowCount: 10, isFollowed: true })).toBe(
+        FOLLOWING,
+      );
     });
 
-    it('követés közben nem számol', () => {
-      expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'rows_arrived', rowCount: 14 })).toEqual({
+    it('a követett érkezést nem számolja', () => {
+      expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'rows_arrived', rowCount: 14, isFollowed: true })).toEqual({
         ...FOLLOWING,
         settledRowCount: 14,
         unseenCount: 0,
       });
     });
 
-    it('felgörgetett állapotban az érkezett sorokat a nem látottakhoz adja', () => {
+    it('a nem követett érkezés sorait a nem látottakhoz adja', () => {
       const scrolledUp: TranscriptAutoScrollState = { ...FOLLOWING, isFollowing: false, unseenCount: 2 };
-      expect(reduceTranscriptAutoScroll(scrolledUp, { type: 'rows_arrived', rowCount: 13 })).toEqual({
-        ...scrolledUp,
-        settledRowCount: 13,
-        unseenCount: 5,
-      });
+      expect(reduceTranscriptAutoScroll(scrolledUp, { type: 'rows_arrived', rowCount: 13, isFollowed: false })).toEqual(
+        {
+          ...scrolledUp,
+          settledRowCount: 13,
+          unseenCount: 5,
+        },
+      );
     });
   });
 
-  it('jump_requested visszakapcsolja a követést és nullázza a nem látott sorokat', () => {
-    const scrolledUp: TranscriptAutoScrollState = { ...FOLLOWING, isFollowing: false, unseenCount: 4 };
-    expect(reduceTranscriptAutoScroll(scrolledUp, { type: 'jump_requested' })).toEqual({
-      ...scrolledUp,
+  it('jump_requested visszakapcsolja a követést, nullázza a nem látott sorokat, és lezárja a mérésre várakozást', () => {
+    const waiting: TranscriptAutoScrollState = {
+      ...FOLLOWING,
+      isFollowing: false,
+      unseenCount: 4,
+      isToggleUnmeasured: true,
+    };
+    expect(reduceTranscriptAutoScroll(waiting, { type: 'jump_requested' })).toEqual({
+      ...waiting,
       isFollowing: true,
       unseenCount: 0,
+      isToggleUnmeasured: false,
+    });
+  });
+
+  describe('sor kinyitása vagy becsukása', () => {
+    const TOGGLED: TranscriptAutoScrollState = { ...FOLLOWING, isFollowing: false, isToggleUnmeasured: true };
+
+    it('row_toggle_started kikapcsolja a követést a mérésig', () => {
+      expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'row_toggle_started' })).toEqual(TOGGLED);
+    });
+
+    it('a mérés előtti jelentés akkor sem kapcsolja vissza a követést, ha szerinte az utolsó sor látható', () => {
+      expect(reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_rendered', stopIndex: 9, rowCount: 10 })).toEqual(
+        TOGGLED,
+      );
+    });
+
+    it('a mérés előtti, felfelé mozdult tartományt jelző jelentést rögzíti', () => {
+      expect(reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_rendered', stopIndex: 6, rowCount: 10 })).toEqual({
+        ...TOGGLED,
+        lastStopIndex: 6,
+      });
+    });
+
+    it('row_toggle_settled visszakapcsolja a követést, ha az utolsó jelentés szerint az utolsó sor látható', () => {
+      expect(reduceTranscriptAutoScroll(TOGGLED, { type: 'row_toggle_settled' })).toEqual(FOLLOWING);
+    });
+
+    it('row_toggle_settled kikapcsolva hagyja a követést, ha az utolsó jelentés szerint az utolsó sor nem látható', () => {
+      const pushedOut: TranscriptAutoScrollState = { ...TOGGLED, lastStopIndex: 6 };
+      expect(reduceTranscriptAutoScroll(pushedOut, { type: 'row_toggle_settled' })).toEqual({
+        ...pushedOut,
+        isToggleUnmeasured: false,
+      });
+    });
+
+    it('row_toggle_settled a várakozás alatt érkezett, még nem látott sorokat nem nullázza', () => {
+      const arrived = reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_arrived', rowCount: 11, isFollowed: false });
+      expect(arrived.unseenCount).toBe(1);
+      expect(reduceTranscriptAutoScroll(arrived, { type: 'row_toggle_settled' })).toEqual({
+        ...arrived,
+        isToggleUnmeasured: false,
+      });
     });
   });
 });

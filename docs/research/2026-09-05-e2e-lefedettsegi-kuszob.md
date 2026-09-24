@@ -1264,3 +1264,34 @@ tehát a százalék három metrikán nő, a functions értéke változatlan. A k
 sincs a küszöb alatt). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0;
 ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (99.06 / 98.47 / 99.44 / 99.02) mind
 a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 31. Az egyforma sormagasság és a görgetés egyszerűsítése utáni ratchet (2026-09-24): két küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `use-transcript-auto-scroll.ts` újragörgető gépezete (`dfcaa38`) és a kinyitás
+utáni várakozása (`d598677`) kivezetve, helyette a kattintástól a mérésig tartó, mindig kilépő
+szünet (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció); az e2e bővült (a
+kinyitás négy útja a kattintással egy feladatban érkező sorral, két dupla kattintás teszt mindkét
+témában, a sormagasság teszt, a törzsbe kattintás).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**251 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, ugyanabba a nyers
+könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (30. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1569 / 1584     | **99.05** | 99.05                      | 15 -> **15**                   |
+| branches   | 714 / 725       | **98.48** | 98.46                      | 11 -> **11**                   |
+| functions  | 534 / 537       | **99.44** | 99.43                      | 3 -> **3**                     |
+| lines      | 1509 / 1524     | **99.01** | 99.01                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** Az első teljes futás után a kattintás kezelő két korai visszatérése
+(nem elem cél, fejlécen kívüli kattintás) fedetlen volt (17 / 13 / 3 / 17): a nem elem ág egy
+`&&` operandusába olvadt (valódi böngészőben kattintás célja mindig elem), a fejlécen kívüli
+kattintást az egér út e2e tesztje fedi (a kinyitott törzsbe kattintás nem vált sort). Utána a
+fedetlen darabszám mind a négy metrikán a 30. szekció értéke. A küszöb a mért értékre húzva
+(98.46 -> **98.48**, 99.43 -> **99.44**, a másik kettő marad), felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0530 / 98,4828 / 99,4413 / 99,0157). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.06 / 98.49 / 99.45 / 99.02) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).

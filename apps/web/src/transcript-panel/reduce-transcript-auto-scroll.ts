@@ -19,8 +19,17 @@ import type { TranscriptAutoScrollAction, TranscriptAutoScrollState } from './tr
  * görgetésétől (vagy a panel szűkülésétől, sor kinyitásától) tud a
  * tartomány, és ilyenkor az utolsó sor valóban nem látszik.
  *
- * **Az érkezés** követés közben nem számol, különben a nem látott sorok
- * számához adódik.
+ * **Az érkezés** nem számol, ha a panel követte, különben a nem látott
+ * sorok számához adódik.
+ *
+ * **Egy sor kinyitása vagy becsukása** a lista mérése előtt kikapcsolja a
+ * követést: a sor új magassága ekkor már a DOM-ban áll, de a lista még a
+ * régivel számol, tehát a jelentései a mérés előtti elrendezést írják le, és
+ * egy ekkor érkező sor követése a kinyitott sort elrántaná. Amíg a mérés
+ * nem jött meg, egy jelentés a követést nem kapcsolhatja vissza. A lezárás
+ * után a predikátum dönt, az utolsó jelentés szerint; a hook a lezárást a
+ * mérés utáni jelentés után adja ki (`use-transcript-auto-scroll.ts`). Az
+ * ugrás gomb a várakozást is lezárja.
  */
 export function reduceTranscriptAutoScroll(
   state: TranscriptAutoScrollState,
@@ -28,7 +37,7 @@ export function reduceTranscriptAutoScroll(
 ): TranscriptAutoScrollState {
   switch (action.type) {
     case 'rows_rendered': {
-      if (isLastRowVisible(action, action.rowCount)) {
+      if (isLastRowVisible(action, action.rowCount) && !state.isToggleUnmeasured) {
         return { ...state, isFollowing: true, unseenCount: 0, lastStopIndex: action.stopIndex };
       }
       const hasMovedUp = action.stopIndex < state.lastStopIndex;
@@ -42,11 +51,20 @@ export function reduceTranscriptAutoScroll(
       return {
         ...state,
         settledRowCount: action.rowCount,
-        unseenCount: state.isFollowing ? 0 : state.unseenCount + arrivedCount,
+        unseenCount: action.isFollowed ? 0 : state.unseenCount + arrivedCount,
       };
     }
     case 'jump_requested': {
-      return { ...state, isFollowing: true, unseenCount: 0 };
+      return { ...state, isFollowing: true, unseenCount: 0, isToggleUnmeasured: false };
+    }
+    case 'row_toggle_started': {
+      return { ...state, isFollowing: false, isToggleUnmeasured: true };
+    }
+    case 'row_toggle_settled': {
+      const settled = { ...state, isToggleUnmeasured: false };
+      return isLastRowVisible({ stopIndex: state.lastStopIndex }, state.settledRowCount)
+        ? { ...settled, isFollowing: true, unseenCount: 0 }
+        : settled;
     }
   }
 }

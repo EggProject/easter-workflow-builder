@@ -57,39 +57,16 @@ const INITIAL_STATE: TranscriptAutoScrollState = {
   settledRowCount: 0,
   unseenCount: 0,
   lastStopIndex: -1,
+  isToggleUnmeasured: false,
 };
 
 /**
- * A felhasználó saját beavatkozása a lista elemén, ami felfüggeszti az
- * igazítást: görgetés (kerék, érintés), a görgetősáv vagy egy sor
- * megnyomása, billentyű, és a `click`. Az első négy a `react-window` 2.3.2
- * görgetés javításának megszakító eseménylistája (upstream PR #914). A
- * `click` azért kell, mert egy sor kinyitása mindig `click` eseménnyel jár,
- * de a `pointerdown` és a `keydown` nem mindig ugyanabban a követési
- * ciklusban előzi meg: a `Space` a gombot a `keyup`-ra aktiválja, tehát a
- * `keydown` után érkező új sor újraélesítené az igazítást, az
- * `element.click()` pedig csak `click`-et ad, és a böngésző módú NVDA és
- * JAWS is billentyű esemény nélkül aktivál
- * (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. és 15.
- * szekció).
- */
-const USER_INTERACTION_EVENT_TYPES = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'click'] as const;
-
-/**
  * Egy kinyitható sor fejléce: a `packages/ui` `AccordionItem` fejléce
- * `aria-expanded` állapotú gomb, tehát a `click` pontosan akkor nyit ki vagy
- * csuk be egy sort, ha a célja ezen belül áll.
+ * `aria-expanded` állapotú gomb, aminek minden `click` eseménye pontosan
+ * egyszer váltja a sort (a `Space`, az `Enter` és a csak `click` út is
+ * `click` eseményt ad, research 15. szekció).
  */
 const DISCLOSURE_CONTROL_SELECTOR = '[aria-expanded]';
-
-/**
- * Egy sor kinyitása vagy becsukása utáni várakozás. `measurement`: a lista
- * még a sor régi magasságával számol. `report`: a mért magasság megérkezett,
- * de a lista a vele számolt látható tartományt még nem jelentette (a
- * `react-window` a tartományt egy layout effektben számolja újra, és a
- * következő renderben jelenti). `none`: nincs várakozás.
- */
-type TogglePhase = 'none' | 'measurement' | 'report';
 
 /**
  * A transcript automatikus görgetése (SPEC-008 7.4, AC40, AC41, T-009-25).
@@ -97,37 +74,28 @@ type TogglePhase = 'none' | 'measurement' | 'report';
  * Követés közben egy új sor érkezésekor a panel a
  * `scrollToRow({ index: rowCount - 1 })` hívással az aljára görget; ha a
  * felhasználó felgörgetett, nem görget, hanem számol. A gomb megnyomása
- * visszakapcsolja a követést, amire ugyanez az effekt az aljára görget. Az
+ * visszakapcsolja a követést, és ugyanez az effekt az aljára görget. Az
  * állapotgép a `reduceTranscriptAutoScroll` tiszta függvényben áll.
  *
  * A panel a csatoláskor is követ: az első renderkor már meglévő sorok (a
  * pótlás) ugyanúgy "érkeznek", tehát a lista az aljáról indul.
  *
- * **Igazítás a mért magassághoz.** A `scrollToRow` a még ki nem rajzolt
- * sorokat a `defaultRowHeight` becslésével számolja, és a telepített
- * `react-window@2.3.1` a görgetés után nem igazít, amikor a kirajzolt sor
- * mért magassága eltér a becsléstől (az átmeneti sor egy pixellel magasabb,
- * `collapsed-transcript-row-height.ts`). Ezért követés közben a lista
- * sormagasság gyorsítótárának (`rowHeight`) minden változása után a hook
- * újra az aljára görget, amíg a felhasználó a legutóbbi követő görgetés óta
- * nem nyúlt a listához (`USER_INTERACTION_EVENT_TYPES`). A beavatkozás
- * utáni változás (például egy kinyitott sor) nem görget: a sor ott marad,
- * ahol a felhasználó kinyitotta, és ha az utolsó sor kicsúszik, a követés a
- * `reduceTranscriptAutoScroll` szerint kikapcsol. Új sor, átméretezés vagy
- * az ugrás gomb újra élesíti az igazítást. Az upstream javítástól eltérően
- * az igazítás nem egyetlen görgetéshez kötött és nincs határideje: a
- * felfüggesztésig tart, mert a projekt időzítőt nem használ (research 13.
- * szekció).
+ * Az aljára görgetés azért pontos, mert minden összecsukott sor egyforma
+ * magas, tehát a lista becslése a még ki nem rajzolt sorokra is a valódi
+ * magasság (`collapsed-transcript-row-height.ts`, research 16. szekció).
  *
- * **Kinyitás élő stream közben.** Egy sor kinyitása és a lista mért
- * magassággal számolt jelentése között az `isFollowing` a kinyitás előtti
- * helyzetet írja le, tehát az ebben az ablakban érkező új sor követése a
- * kinyitott sort elrántaná. Ezért egy sor kinyitása vagy becsukása után a
- * görgető effekt kimarad, amíg a mérés utáni első jelentés meg nem érkezik
- * (`TogglePhase`), és utána, a friss állapottal fut le. Ha a kinyitás nem változtat a látható tartományon
- * (például az utolsó sor nyílik ki), a lista nem jelent, és a várakozást a
- * következő új sor jelentése zárja
- * (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció).
+ * **Sor kinyitása élő stream közben.** A kinyitott sor új magassága a DOM-ban
+ * azonnal áll, a lista viszont csak a következő mérés után számol vele, és
+ * addig a jelentései egy már nem létező elrendezést írnak le: egy ekkor
+ * érkező sor követése a kinyitott sort elrántaná. Ezért egy fejléc `click`
+ * eseménye a mérésig kikapcsolja a követést, és a mérés (a `rowHeight`
+ * gyorsítótár új identitása) utáni jelentés után a predikátum dönt. Egy
+ * képkockán belüli ki-be csukás (páros számú kattintás ugyanazon a
+ * fejlécen) nem változtat a soron, tehát mérés sem jön: ilyenkor a második
+ * kattintás maga zárja le a váltást. A várakozásnak mindig van kilépése: a
+ * mérés, a páros kattintás és az "ugrás az aljára" gomb; a nem látott sorok
+ * száma közben is nő
+ * (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció).
  */
 export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowHeight): TranscriptAutoScroll {
   const [state, dispatch] = useReducer(reduceTranscriptAutoScroll, INITIAL_STATE);
@@ -137,11 +105,25 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // eslint-disable-next-line unicorn/no-null -- a react-window ref állapotának dokumentált üres értéke
   const [list, setList] = useListCallbackRef(null);
 
-  const followToBottom = useCallback(() => {
-    if (list !== null && state.isFollowing && rowCount > 0) {
+  // A legutóbbi mérés óta páratlan számú kattintást kapott fejlécek: ezeknek
+  // a sora más magas, mint amivel a lista számol.
+  const unmeasuredTogglesReference = useRef(new Set<Element>());
+
+  // A görgetés a követés pillanatnyi állapotát olvassa, de csak a görgető
+  // effekt indítói futtatják: a lista csatolása, új sor, átméretezés és az
+  // ugrás. A követés visszakapcsolása önmagában nem görget, így egy
+  // kinyitott utolsó sor a következő új sorig a helyén marad. A még nem mért
+  // sor váltást a hivatkozásból is olvassa, mert a kattintás egy már
+  // kirajzolt, de effektjét még le nem futtatott érkezés ELÉ is eshet, és
+  // ilyenkor az állapot még a kattintás előtti. A visszatérési érték: az
+  // érkezést a panel követte-e (ha nem, a sor a nem látottak közé kerül).
+  const followToBottom = useEffectEvent((): boolean => {
+    const isFollowed = state.isFollowing && unmeasuredTogglesReference.current.size === 0;
+    if (isFollowed && list !== null && rowCount > 0) {
       list.scrollToRow({ index: rowCount - 1, align: 'end' });
     }
-  }, [list, rowCount, state.isFollowing]);
+    return isFollowed;
+  });
 
   // Az átméretezés jelzése: a számláló változása futtatja újra a görgető
   // effektet (lásd az `onResize` doksiját).
@@ -149,92 +131,86 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   const onResize = useCallback(() => {
     setResizeCount((count) => count + 1);
   }, []);
-
-  // Igaz, amíg a legutóbbi követő görgetés óta a felhasználó nem nyúlt a
-  // listához: ennyi ideig igazít a hook a mért sormagassághoz.
-  const isMeasurementFollowArmedReference = useRef(true);
-
-  // Egy sor kinyitása vagy becsukása utáni várakozás (`TogglePhase`). Amíg
-  // tart, a görgető effekt kimarad (`hasHeldFollowReference`), és a
-  // várakozás végén (`releaseCount`) a friss jelentéssel fut le.
-  const togglePhaseReference = useRef<TogglePhase>('none');
-  const hasHeldFollowReference = useRef(false);
-  const [releaseCount, setReleaseCount] = useState(0);
+  const [jumpCount, setJumpCount] = useState(0);
 
   useEffect(() => {
-    if (togglePhaseReference.current !== 'none') {
-      hasHeldFollowReference.current = true;
-      return;
-    }
-    isMeasurementFollowArmedReference.current = true;
-    followToBottom();
-    dispatch({ type: 'rows_arrived', rowCount });
-  }, [followToBottom, rowCount, resizeCount, releaseCount]);
-
-  // A `rowHeight` identitása pontosan akkor új, amikor egy kirajzolt sor
-  // mért magassága eltér a tárolttól: a telepített `useDynamicRowHeight`
-  // `setRowHeight` hívása azonos értékre az előző állapotot adja vissza, és
-  // a visszaadott objektum `useMemo` a gyorsítótár térképén. A kinyitás
-  // utáni első mérés nem görget, csak a várakozást lépteti.
-  const followAfterMeasurement = useEffectEvent(() => {
-    if (togglePhaseReference.current === 'measurement') {
-      togglePhaseReference.current = 'report';
-      return;
-    }
-    if (isMeasurementFollowArmedReference.current) {
-      followToBottom();
-    }
-  });
-  useEffect(() => {
-    followAfterMeasurement();
-  }, [rowHeight]);
+    const isFollowed = followToBottom();
+    dispatch({ type: 'rows_arrived', rowCount, isFollowed });
+  }, [list, rowCount, resizeCount, jumpCount]);
 
   useEffect(() => {
     const element = list?.element;
     if (element === undefined || element === null) {
       return;
     }
-    const disarm = (): void => {
-      isMeasurementFollowArmedReference.current = false;
-    };
-    const holdForToggle = (event: Event): void => {
+    const onClick = (event: Event): void => {
       const { target } = event;
-      if (isInstanceof(target, Element) && target.closest(DISCLOSURE_CONTROL_SELECTOR) !== null) {
-        togglePhaseReference.current = 'measurement';
+      const control = isInstanceof(target, Element) && target.closest(DISCLOSURE_CONTROL_SELECTOR);
+      if (control === false || control === null) {
+        return;
       }
+      const toggles = unmeasuredTogglesReference.current;
+      if (toggles.delete(control)) {
+        if (toggles.size === 0) {
+          dispatch({ type: 'row_toggle_settled' });
+        }
+        return;
+      }
+      toggles.add(control);
+      dispatch({ type: 'row_toggle_started' });
     };
-    for (const type of USER_INTERACTION_EVENT_TYPES) {
-      element.addEventListener(type, disarm, { passive: true });
-    }
-    element.addEventListener('click', holdForToggle, { passive: true });
+    element.addEventListener('click', onClick, { passive: true });
     return () => {
-      for (const type of USER_INTERACTION_EVENT_TYPES) {
-        element.removeEventListener(type, disarm);
-      }
-      element.removeEventListener('click', holdForToggle);
+      element.removeEventListener('click', onClick);
     };
   }, [list]);
+
+  // A `rowHeight` identitása pontosan akkor új, amikor egy kirajzolt sor
+  // mért magassága eltér a tárolttól: a telepített `useDynamicRowHeight`
+  // `setRowHeight` hívása azonos értékre az előző állapotot adja vissza, és
+  // a visszaadott objektum `useMemo` a gyorsítótár térképén (research 13.
+  // szekció). A mérés után a lista a látható tartományt ugyanebben a
+  // commitban, egy layout effektben számolja újra, és a változást csak a
+  // következő renderben jelenti. A lezárás ezért egy állapot frissítéssel
+  // egy későbbi renderre tolódik, aminek a passzív effektjei a lista
+  // jelentése UTÁN futnak (saját mérés, research 16. szekció).
+  const [settleRequestCount, setSettleRequestCount] = useState(0);
+  const requestSettle = useEffectEvent(() => {
+    const toggles = unmeasuredTogglesReference.current;
+    if (toggles.size > 0) {
+      toggles.clear();
+      setSettleRequestCount((count) => count + 1);
+    }
+  });
+  useEffect(() => {
+    requestSettle();
+  }, [rowHeight]);
+  // Egy azóta kattintott, még nem mért fejléc a lezárást elhalasztja a saját
+  // méréséig.
+  const settle = useEffectEvent(() => {
+    if (unmeasuredTogglesReference.current.size === 0) {
+      dispatch({ type: 'row_toggle_settled' });
+    }
+  });
+  useEffect(() => {
+    if (settleRequestCount > 0) {
+      settle();
+    }
+  }, [settleRequestCount]);
 
   const onRowsRendered = useCallback(
     (visibleRows: Readonly<{ startIndex: number; stopIndex: number }>) => {
       dispatch({ type: 'rows_rendered', stopIndex: visibleRows.stopIndex, rowCount });
-      // A mérés utáni első jelentés zárja a várakozást. A kimaradt görgető
-      // effektet a számláló UGYANABBA a renderbe teszi, amelyik ezt a
-      // jelentést a reducerben feldolgozza, tehát a követés a kinyitás
-      // utáni helyzetről dönt.
-      if (togglePhaseReference.current === 'report') {
-        togglePhaseReference.current = 'none';
-        if (hasHeldFollowReference.current) {
-          hasHeldFollowReference.current = false;
-          setReleaseCount((count) => count + 1);
-        }
-      }
     },
     [rowCount],
   );
 
+  // Az ugrás a még nem mért váltásokat is elengedi: egy a mérése előtt
+  // leszerelt sor (a kirajzolt tartományból kigörgetve) sosem kap mérést.
   const jumpToBottom = useCallback(() => {
+    unmeasuredTogglesReference.current.clear();
     dispatch({ type: 'jump_requested' });
+    setJumpCount((count) => count + 1);
   }, []);
 
   return { setList, onRowsRendered, onResize, unseenCount: state.unseenCount, jumpToBottom };

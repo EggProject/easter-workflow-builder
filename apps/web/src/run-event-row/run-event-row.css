@@ -17,8 +17,24 @@
    A fejléc szabály a forrás `.accordion__header` szabályát (600 16px/1.4,
    `font-family: inherit`) nagyobb specifitással írja felül, a bájtra azonos
    `accordion.css` érintése nélkül. A meta szlot saját `font` szabálya
-   (`.accordion__meta`) változatlan marad. */
+   (`.accordion__meta`) változatlan marad.
+
+   A fejléc tartalom doboza pontosan EGY szövegsor: a `1lh` a fejléc saját
+   számított `line-height` értéke (CSS Values 4, `lh` egység), tehát a
+   `--ep-text-small` sormagassága, a `16px` pedig az `accordion.css`
+   fejlécének függőleges belső margója; a böngésző a `button` elemnek
+   `border-box` értéket ad (HTML Living Standard, Rendering), ezért a
+   magasság a belső margót is tartalmazza. Ettől a sor magassága független
+   a meta szlot tartalmától: a "Nem tárolt" `Badge` (a design system
+   egyetlen mérete, 22 pixel) nem növeli a 21 pixeles szövegsort, hanem
+   középre igazítva fél-fél pixelt nyúlik a belső margóba, teljes egészében
+   látszva. Így az átmeneti és a tárolt sor egyformán magas, és a lista
+   becslése minden sorra pontos
+   (`transcript-panel/collapsed-transcript-row-height.ts`, ami a két számot
+   a forrás CSS-ből ellenőrzi). Mérés:
+   `docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció. */
 .run-event-row .accordion__header {
+  height: calc(1lh + 2 * 16px);
   font: var(--ep-text-small);
 }
 
@@ -33,12 +49,10 @@
 /* A cím és a költség meta EGY sorra csonkolt, ellipszissel, nem tördelt
    (T-009-25). Két ok:
    1. A virtualizált lista sormagassága így a tartalom hosszától és a panel
-      szélességétől független: minden összecsukott sor ugyanolyan magas (az
-      egyetlen mért kivétel az átmeneti sor, egy pixellel magasabb, lásd
-      `transcript-panel/collapsed-transcript-row-height.ts`), tehát a még nem
-      kirajzolt sorok becsült magassága legfeljebb soronként egy pixellel
-      tér el, és az automatikus követés ezt a mért magassághoz igazítja
-      (`transcript-panel/use-transcript-auto-scroll.ts`). Tördelt címnél
+      szélességétől független: minden összecsukott sor ugyanolyan magas
+      (lásd `transcript-panel/collapsed-transcript-row-height.ts`), tehát a
+      még nem kirajzolt sorok becsült magassága pontos, és az aljára
+      görgetés a becsült pozícióra is pontosan érkezik. Tördelt címnél
       a magasság a szövegtől ÉS a húzható panel szélességétől függene, tehát
       minden átméretezés minden sor magasságát megváltoztatná.
    2. A teljes szöveg nem vész el: a gomb hozzáférhető neve a teljes cím

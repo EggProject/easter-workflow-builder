@@ -44,6 +44,15 @@ describe('COLLAPSED_TRANSCRIPT_ROW_HEIGHT', () => {
     expect(COLLAPSED_TRANSCRIPT_ROW_HEIGHT).toBe(expected);
   });
 
+  it('a sor fejlécének magassága egy szövegsor plusz a forrás két függőleges belső margója, tehát a meta tartalma (a "Nem tárolt" jelvény) nem növeli', () => {
+    const padding = /padding:\s*(\d+)px\s+\d+px;/.exec(ruleBody(accordionCss, '.accordion__header'));
+    const height = /height:\s*calc\(1lh \+ 2 \* (\d+)px\);/.exec(
+      ruleBody(readFileSync(ROW_CSS_PATH, 'utf8'), '.run-event-row .accordion__header'),
+    );
+    expect(height?.[1]).toBeDefined();
+    expect(height?.[1]).toBe(padding?.[1]);
+  });
+
   it('az .accordion__item alsó szegélye a sor egyetlen, utolsó gyerek elemén nulla, tehát nem adódik hozzá', () => {
     expect(ruleBody(accordionCss, '.accordion__item:last-child')).toMatch(/border-bottom:\s*0/);
   });

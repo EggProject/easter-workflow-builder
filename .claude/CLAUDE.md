@@ -565,6 +565,13 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
 - **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
   hivatkozva. A SPEC-007 13.4 ezt megteszi.
+- **Egy keret egy felhasználói eseménnyel egy feladatban** a nyitott `node:http` kapcsolaton
+  sem küldhető: a hálózati keret a kattintás és a böngésző következő renderelési lépése közé
+  nem időzíthető megbízhatóan (mérve, `docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció). Ilyenkor a keret a lapon rögzített, valódi `EventSource` példányon, az esemény
+  capture fázisában kiváltott `MessageEvent`-ként érkezik, a hálózati kerettel azonos alakban
+  (`captureEventSources` az `apps/web/e2e/sse-real-server.spec.ts` fájlban); a kapcsolat
+  maga a teszt szerveren nyitott. Ez nem a hálózati út mockja, csak az időzítésé, ezért csak
+  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4).
 - **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
   `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
   a mérést meg kell ismételni azokra a motorokra is.
@@ -758,16 +765,28 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   figyelembe veszi. Védelem: `apps/web/e2e/sse-real-server.spec.ts` lista alja tesztjei
   (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
 - **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
-  kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, a tartományt pedig egy
-  layout effektben számolja újra, és csak a következő renderben jelenti; addig a hook `isFollowing`
-  értéke a kinyitás előtti helyzetet írja le. Egy ebben az ablakban érkező új sor követése ezért a
-  kinyitott sort az aljára rántotta, már a `dfcaa38` előtt is, és egy felfüggesztő eseménylista
-  (`pointerdown`, `keydown`) sem véd minden kinyitási utat (a `Space` a `keyup`-ra aktivál, az
-  `element.click()` csak `click`-et ad). A szabály: felhasználói layout változás után görgetési
-  döntés csak a mért magassággal számolt jelentés után születhet. Védelem: a
-  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` kinyitás
-  e2e tesztjei, három úton, mindkét témában
-  (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció).
+  kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
+  a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
+  kinyitott sort elrántotta, már a `dfcaa38` előtt is (40 ms-os streamnél véletlen fázisú
+  kinyitások harmadában). A szabály: felhasználói layout változás után görgetési döntés csak a
+  mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click` eseményétől a
+  mérésig kikapcsolja a követést, és a mérés előtti jelentés nem kapcsolhatja vissza. Védelem: a
+  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` négy
+  kinyitási út e2e tesztje mindkét témában, amelyekben egy sor a kattintással egy feladatban
+  érkezik (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. és 16. szekció).
+- **Egy "várj a következő X-ig" állapotnak mindig kell kilépés arra az esetre is, ha X sosem
+  jön.** A `d598677` a kinyitás után a mérésig visszatartotta a görgetést ÉS az érkezések
+  számlálását; egy képkockán belüli ki-be csukás (dupla kattintás) után a sor magassága nem
+  változott, mérés nem jött, és a lista végleg megállt: nem követett, gomb sem jelent meg, és a
+  kézi görgetés sem oldotta fel. A javított hook a váltásokat fejlécenként párosítja (páros számú
+  kattintás = nincs mérendő változás), a várakozás alatt is számol, és az ugrás gomb mindig lezárja.
+  Védelem: `sse-real-server.spec.ts` dupla kattintás tesztjei tárolt sorokkal (research 16.
+  szekció).
+- **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
+  pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
+  gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
+  magasra állításával minden összecsukott sor egyforma, és az eredeti követés 0 pixelre pontos
+  (research 16. szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 

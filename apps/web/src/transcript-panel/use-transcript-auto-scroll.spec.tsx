@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null -- a ListImperativeAPI `element` gettere a könyvtár szerződése szerint `null`-t ad, ha nincs csatolt elem */
-import { act } from 'react';
+import { act, useEffect, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { DynamicRowHeight, ListImperativeAPI } from 'react-window';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,16 @@ function createRowHeight(): DynamicRowHeight {
 const INITIAL_ROW_HEIGHT = createRowHeight();
 
 /**
+ * Egy buborékoló `click` esemény a célon, ahogy a böngésző a kattintást a
+ * fejléc gombon belüli elemre (vagy a lista elemére) adja.
+ */
+function click(target: EventTarget): void {
+  act(() => {
+    target.dispatchEvent(new Event('click', { bubbles: true }));
+  });
+}
+
+/**
  * A SPEC-008 7.4 szerint az automatikus görgetés predikátuma "unit tesztben
  * közvetlenül léptethető, mert az onRowsRendered callback szintetikusan
  * meghívható": ez a spec pontosan ezt teszi, egy valódi lista helyett a
@@ -40,9 +50,38 @@ describe('useTranscriptAutoScroll', () => {
     scrollToRow,
   };
 
-  function Harness({ rowCount, rowHeight }: { readonly rowCount: number; readonly rowHeight: DynamicRowHeight }): null {
-    latest = useTranscriptAutoScroll(rowCount, rowHeight);
+  /**
+   * Egy a hook effektjei ELŐTT futó lépés egy későbbi commitban: a gyerek
+   * komponens passzív effektje a szülőé előtt fut. A `skippedCommits` számú
+   * commit után egyszer fut le.
+   */
+  let probe: { skippedCommits: number; readonly run: () => void } | undefined;
+
+  function Probe(): null {
+    useEffect(() => {
+      if (probe === undefined) {
+        return;
+      }
+      if (probe.skippedCommits > 0) {
+        probe.skippedCommits -= 1;
+        return;
+      }
+      const { run } = probe;
+      probe = undefined;
+      run();
+    });
     return null;
+  }
+
+  function Harness({
+    rowCount,
+    rowHeight,
+  }: {
+    readonly rowCount: number;
+    readonly rowHeight: DynamicRowHeight;
+  }): ReactElement {
+    latest = useTranscriptAutoScroll(rowCount, rowHeight);
+    return <Probe />;
   }
 
   function current(): TranscriptAutoScroll {
@@ -76,6 +115,7 @@ describe('useTranscriptAutoScroll', () => {
   beforeEach(() => {
     scrollToRow.mockClear();
     latest = undefined;
+    probe = undefined;
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -199,7 +239,7 @@ describe('useTranscriptAutoScroll', () => {
 
   /**
    * A lista teszt duplikátuma valódi (happy-dom) elemmel, amin a felhasználó
-   * beavatkozásának eseményei kiválthatók.
+   * kattintása kiváltható.
    */
   function listWithElement(): { readonly list: ListImperativeAPI; readonly element: HTMLDivElement } {
     const element = document.createElement('div');
@@ -214,162 +254,198 @@ describe('useTranscriptAutoScroll', () => {
     };
   }
 
-  it('követés közben a sormagasság gyorsítótár változása után (egy kirajzolt sor mért magassága eltért a becsléstől) újra az utolsó sorra görget', () => {
-    mountAtBottom(10);
-
-    renderRows(10, createRowHeight());
-    expect(scrollToRow).toHaveBeenCalledTimes(1);
-    expect(scrollToRow).toHaveBeenCalledWith({ index: 9, align: 'end' });
-  });
-
-  it('változatlan sormagasság gyorsítótárral az újrarenderelés nem görget', () => {
-    mountAtBottom(10);
-
-    renderRows(10);
-    expect(scrollToRow).not.toHaveBeenCalled();
-  });
-
-  it('felgörgetett állapotban a sormagasság változás nem görget', () => {
-    mountAtBottom(10);
-    act(() => {
-      current().onRowsRendered({ startIndex: 0, stopIndex: 5 });
-    });
-    scrollToRow.mockClear();
-
-    renderRows(10, createRowHeight());
-    expect(scrollToRow).not.toHaveBeenCalled();
-  });
-
-  it.each(['wheel', 'touchstart', 'pointerdown', 'keydown', 'click'])(
-    'a lista elemén kiváltott %s után a sormagasság változás nem görget (egy kinyitott sor a helyén marad), és a következő új sor újra élesíti az igazítást',
-    (type) => {
-      const { list, element } = listWithElement();
-      mountAtBottom(10, list);
-
-      element.dispatchEvent(new Event(type));
-      const measured = createRowHeight();
-      renderRows(10, measured);
-      expect(scrollToRow).not.toHaveBeenCalled();
-
-      renderRows(11, measured);
-      expect(scrollToRow).toHaveBeenCalledTimes(1);
-      renderRows(11, createRowHeight());
-      expect(scrollToRow).toHaveBeenCalledTimes(2);
-      expect(scrollToRow).toHaveBeenLastCalledWith({ index: 10, align: 'end' });
-    },
-  );
-
   /**
-   * Egy sor fejlécének kattintása: a `click` célja egy `aria-expanded`
-   * gombon BELÜLI elem (a fejléc szövege), ahogy a valódi sorban.
+   * Egy sor fejléce: `aria-expanded` gomb, benne a cím, ahogy a valódi
+   * sorban. A kattintás célja a cím (a gombon BELÜLI elem).
    */
-  function clickDisclosure(element: HTMLDivElement): void {
+  function addDisclosure(element: HTMLDivElement): HTMLSpanElement {
     const header = document.createElement('button');
     header.setAttribute('aria-expanded', 'false');
     const title = document.createElement('span');
     header.append(title);
     element.append(header);
-    title.dispatchEvent(new Event('click', { bubbles: true }));
+    return title;
   }
 
+  it('a sormagasság gyorsítótár változása önmagában nem görget', () => {
+    mountAtBottom(10);
+
+    renderRows(10, createRowHeight());
+    expect(scrollToRow).not.toHaveBeenCalled();
+  });
+
   describe('sor kinyitása élő stream közben', () => {
-    it('a mérésig érkező új sor nem görget és nem számol; ha a mérés utáni jelentés szerint a lista felfelé mozdult, a követés kikapcsol, és a visszatartott sor a nem látott sorok közé kerül', () => {
+    it('a mérésig érkező új sor nem görget, és a nem látott sorok közé kerül', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      clickDisclosure(element);
+      click(addDisclosure(element));
       renderRows(11);
-      expect(scrollToRow).not.toHaveBeenCalled();
-      expect(current().unseenCount).toBe(0);
-
-      const measured = createRowHeight();
-      renderRows(11, measured);
-      expect(scrollToRow).not.toHaveBeenCalled();
-
-      act(() => {
-        current().onRowsRendered({ startIndex: 0, stopIndex: 5 });
-      });
       expect(scrollToRow).not.toHaveBeenCalled();
       expect(current().unseenCount).toBe(1);
     });
 
-    it('ha a kinyitás az utolsó sort nem tolja ki, a mérés utáni jelentés után a visszatartott sorra görget', () => {
+    it('a már kirajzolt, de effektjét még le nem futtatott érkezés elé eső kattintás után az érkezés sem görget, és a nem látottak közé kerül', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      clickDisclosure(element);
+      const title = addDisclosure(element);
+      probe = {
+        skippedCommits: 0,
+        run: () => {
+          title.dispatchEvent(new Event('click', { bubbles: true }));
+        },
+      };
       renderRows(11);
-      renderRows(11, createRowHeight());
+      expect(probe).toBeUndefined();
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('a mérés előtti jelentés, ami szerint az utolsó sor látható, nem kapcsolja vissza a követést', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
       act(() => {
         current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
       });
-      expect(scrollToRow).toHaveBeenCalledTimes(1);
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
+    it('ha a mérés utáni jelentés szerint a kinyitott sor kitolta az utolsót, a követés kikapcsolva marad', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 6 });
+      });
+      renderRows(10, createRowHeight());
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('ha a mérés után is látszik az utolsó sor (például az utolsó sor nyílt ki), a követés visszakapcsol: a következő új sor görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      renderRows(10, createRowHeight());
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      renderRows(11);
       expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
       expect(current().unseenCount).toBe(0);
     });
 
-    it('a mérés előtti jelentés nem zárja a várakozást', () => {
+    it('egy képkockán belüli ki-be csukás (két kattintás ugyanazon a fejlécen, mérés nélkül) nem függeszti fel a követést', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      clickDisclosure(element);
+      const title = addDisclosure(element);
+      click(title);
+      click(title);
       renderRows(11);
-      act(() => {
-        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
-      });
-      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
     });
 
-    it('új sor nélkül a kinyitás és a mérés utáni jelentés nem görget: a kinyitott sor a helyén marad', () => {
+    it('két különböző fejléc kattintása után az egyik visszacsukása nem zárja le a várakozást, a másik még nincs mérve', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      clickDisclosure(element);
-      renderRows(10, createRowHeight());
-      act(() => {
-        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
-      });
+      const first = addDisclosure(element);
+      click(first);
+      click(addDisclosure(element));
+      click(first);
+      renderRows(11);
       expect(scrollToRow).not.toHaveBeenCalled();
     });
 
-    it('ha a mérés után nem jön jelentés (a látható tartomány nem változott), a következő új sor jelentése zárja a várakozást, és a követés görget', () => {
+    it('a mérés és a lezárás közé eső új kattintás a lezárást a saját méréséig elhalasztja', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      clickDisclosure(element);
+      click(addDisclosure(element));
+      const second = addDisclosure(element);
+      // A mérés commitja után, a lezárás commitjában, a lezárás előtt.
+      probe = {
+        skippedCommits: 1,
+        run: () => {
+          second.dispatchEvent(new Event('click', { bubbles: true }));
+        },
+      };
       const measured = createRowHeight();
       renderRows(10, measured);
+      expect(probe).toBeUndefined();
       renderRows(11, measured);
       expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
 
+      // A második sor mérése után a jelentés újra visszakapcsolhatja a
+      // követést (a felhasználó az aljára görget).
+      renderRows(11, createRowHeight());
       act(() => {
-        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+        current().onRowsRendered({ startIndex: 4, stopIndex: 10 });
       });
-      expect(scrollToRow).toHaveBeenCalledTimes(1);
-      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+      renderRows(12);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
     });
 
-    it('a sor fejlécén kívüli kattintás nem tart vissza: az új sor görget', () => {
+    it('az ugrás az aljára a mérésre várakozást is lezárja', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      element.dispatchEvent(new Event('click', { bubbles: true }));
+      const title = addDisclosure(element);
+      click(title);
+      renderRows(11);
+      act(() => {
+        current().jumpToBottom();
+      });
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+
+      // A várakozás lezárult: a jelentés újra kapcsolhat, és ugyanennek a
+      // fejlécnek a következő kattintása új váltás, nem a régi párja.
+      click(title);
+      scrollToRow.mockClear();
+      renderRows(12);
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
+    it('a fejlécen kívüli kattintás nem függeszti fel a követést', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(element);
       renderRows(11);
       expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
     });
-  });
 
-  it('lista csere után a korábbi elem eseménye már nem függeszti fel az igazítást', () => {
-    const first = listWithElement();
-    const second = listWithElement();
-    mountAtBottom(10, first.list);
-    act(() => {
-      current().setList(second.list);
+    it('nem elem célú kattintás (szöveg csomópont) nem függeszti fel a követést', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      const text = document.createTextNode('szöveg');
+      element.append(text);
+      click(text);
+      renderRows(11);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
     });
-    scrollToRow.mockClear();
 
-    first.element.dispatchEvent(new Event('pointerdown'));
-    renderRows(10, createRowHeight());
-    expect(scrollToRow).toHaveBeenCalledWith({ index: 9, align: 'end' });
+    it('lista csere után a korábbi elem kattintása már nem függeszti fel a követést', () => {
+      const first = listWithElement();
+      const second = listWithElement();
+      mountAtBottom(10, first.list);
+      act(() => {
+        current().setList(second.list);
+      });
+      scrollToRow.mockClear();
+
+      click(addDisclosure(first.element));
+      renderRows(11);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+    });
   });
 });

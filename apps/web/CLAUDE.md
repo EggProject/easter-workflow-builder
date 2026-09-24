@@ -76,15 +76,15 @@ egy saját magyarázat. A sorokat a `transcript-panel` téma rajzolja.
 **A `transcript-panel` téma a futás nézet transcript oldala** (T-009-25, SPEC-008 7.3, 7.4,
 AC39, AC40, AC41). A lista a `react-window@2.3.1` `List` komponense; a `rowHeight` a könyvtár
 `useDynamicRowHeight` gyorsítótára, tehát a sor magassága a kirajzolt tartalomból számítódik (a
-kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat pedig a tárolt,
-összecsukott sor magasságával becsüli (`collapsed-transcript-row-height.ts`, a design system
-`accordion.css` fejléc szabályából és a sor fejlécének type tokenjéből, két regressziós
-teszttel); az átmeneti sor ennél egy pixellel magasabb, és a könyvtár a görgetés után nem igazít,
-ezért követés közben a `useTranscriptAutoScroll` a mért magasság változása után újra az aljára
-görget, amíg a felhasználó nem nyúlt a listához (research 13. szekció); egy sor kinyitása után pedig
-semmilyen görgetés nem fut, amíg a lista a mért magassággal ki nem számolt tartományt le nem
-jelentette, így a kinyitott sor egy közben érkező új sor mellett is a helyén marad (research 15.
-szekció). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
+kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat pedig az összecsukott
+sor magasságával becsüli (`collapsed-transcript-row-height.ts`, a design system `accordion.css`
+fejléc szabályából és a sor fejlécének type tokenjéből, két regressziós teszttel). A becslés
+minden összecsukott sorra pontos, mert a `run-event-row.css` a fejlécet pontosan egy szövegsor
+magasra állítja, így a "Nem tárolt" jelvény sem növeli az átmeneti sort; a könyvtár a görgetés
+után nem igazít a mért magassághoz, tehát egy eltérő sormagasság az aljára görgetést elrontaná
+(research 13. és 16. szekció). Egy sor kinyitása vagy becsukása a lista méréséig kikapcsolja a
+követést, a mérés után az utolsó jelentés dönt; egy képkockán belüli ki-be csukás nem kapcsolja
+ki, és az ugrás gomb a várakozást is lezárja (research 16. szekció). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
 (`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
 küszöb nélküli: `visibleRows.stopIndex === rowCount - 1` (`is-last-row-visible.ts`), az
 állapotgép a `reduce-transcript-auto-scroll.ts` tiszta függvénye, felgörgetve az "ugrás az

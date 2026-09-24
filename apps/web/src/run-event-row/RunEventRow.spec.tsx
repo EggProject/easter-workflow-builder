@@ -126,7 +126,11 @@ describe('RunEventRow', () => {
 
   it('a sor szövege a --ep-text-small, a meta a --ep-text-code tokennel áll, a sor gyökerén nincs mono betűcsalád', () => {
     const rowCss = readFileSync(ROW_CSS_PATH, 'utf8');
-    expect(ruleBody(rowCss, '.run-event-row .accordion__header')).toMatch(/^\s*font:\s*var\(--ep-text-small\);\s*$/);
+    // A fejléc szabályában a betű mellett csak az egy szövegsoros magasság áll
+    // (`collapsed-transcript-row-height.spec.ts` őrzi).
+    expect(ruleBody(rowCss, '.run-event-row .accordion__header')).toMatch(
+      /^\s*height:\s*calc\(1lh \+ 2 \* \d+px\);\s*font:\s*var\(--ep-text-small\);\s*$/,
+    );
     expect(ruleBody(rowCss, '.run-event-row__code')).toMatch(/^\s*font:\s*var\(--ep-text-code\);\s*$/);
     expect(rowCss).not.toContain('--ep-font-mono');
     // A két token ugyanazzal a mérettel és sormagassággal, más betűcsaláddal

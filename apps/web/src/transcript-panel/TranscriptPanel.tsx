@@ -92,15 +92,16 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * mérés (soronként eltérő magasság) szerint működik. Ez azért kell, mert a
  * sor kinyitható, és a kinyitott sor a teljes, tördelt payloadot mutatja,
  * aminek a magassága előre nem számítható. A még nem kirajzolt sorokat a
- * lista a tárolt összecsukott sor magasságával becsüli; az átmeneti sor ennél
- * egy pixellel magasabb. A sor React kulcsa a `rowKey` prop, a sor saját
- * `key` mezőjéből (`transcript-row-key.ts`).
+ * lista az összecsukott sor magasságával becsüli, ami minden sorra (a
+ * tárolt és az átmeneti sorra is) pontos. A sor React kulcsa a `rowKey`
+ * prop, a sor saját `key` mezőjéből (`transcript-row-key.ts`).
  *
  * **Automatikus görgetés.** A `useTranscriptAutoScroll` hook: pixel küszöb
  * nélkül, a `visibleRows.stopIndex === rowCount - 1` predikátummal dönt, és
  * felgörgetett állapotban az "ugrás az aljára" gomb megnevezi az új
- * események számát. A hook a `rowHeight` gyorsítótárat is megkapja: követés
- * közben a kirajzolt sorok mért magasságához igazítva görget újra az aljára.
+ * események számát. A hook a `rowHeight` gyorsítótárat is megkapja: egy sor
+ * kinyitása után ennek új identitása jelzi, hogy a lista már a mért
+ * magassággal számol.
  *
  * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
