@@ -163,6 +163,15 @@ interface FetchOverrides {
    * A `GET /api/runs/{runId}/snapshot` hívások naplója.
    */
   readonly snapshotUrls?: string[];
+  /**
+   * A `GET /api/approvals` válasza (T-009-27). Alapértelmezésben üres lista,
+   * hogy a többi teszt ne törődjön a jóváhagyás panellel.
+   */
+  readonly approvals?: unknown;
+  /**
+   * A `GET /api/approvals` hívások naplója.
+   */
+  readonly approvalUrls?: string[];
 }
 
 /**
@@ -200,6 +209,10 @@ function createFetchFunction(overrides: FetchOverrides = {}): FetchFunction {
     if (pathname.endsWith('/snapshot')) {
       overrides.snapshotUrls?.push(pathname);
       return respondWith(overrides.snapshotStatus ?? overrides.snapshot ?? SNAPSHOT);
+    }
+    if (pathname.endsWith('/approvals')) {
+      overrides.approvalUrls?.push(pathname);
+      return respondWith(overrides.approvals ?? []);
     }
     if (pathname.endsWith('/steps')) {
       overrides.stepRunUrls?.push(pathname);
@@ -994,5 +1007,125 @@ describe('RunViewScreen', () => {
 
     expect(container.querySelector('p[role="alert"]')?.textContent).toBe('A szerver hibás választ adott (HTTP 502).');
     expect(container.querySelector('.run-view-screen__header')).toBeNull();
+  });
+
+  const APPROVAL_NODE_SNAPSHOT = {
+    ...SNAPSHOT,
+    nodes: [
+      ...SNAPSHOT.nodes,
+      {
+        id: 'n-approval',
+        type: 'human_approval',
+        label: 'Jóváhagyás',
+        position: { x: 100, y: 0 },
+        config: {
+          type: 'human_approval',
+          title: 'Engedélyezed?',
+          bodyTemplate: 'Kérlek erősítsd meg',
+          timeoutMs: null,
+          onUnhandledError: null,
+        },
+        effectiveProviderId: 'minimax',
+      },
+    ],
+  };
+
+  const APPROVAL_STEP_RUN = {
+    ...BASE_STEP_RUN,
+    id: 's-approval',
+    nodeId: 'n-approval',
+    nodeType: 'human_approval',
+    status: 'waiting_approval',
+  };
+
+  const APPROVAL = {
+    id: 'a-1',
+    runId: 'r-3',
+    stepRunId: 's-approval',
+    title: 'Engedélyezed?',
+    body: 'Kérlek erősítsd meg',
+    payload: { amount: 5 },
+    decision: null,
+    requestedAtMs: 1000,
+    decidedAtMs: null,
+  };
+
+  it('a jóváhagyás panel a GET /api/approvals válaszából épül, a saját runId értékére szűrve', async () => {
+    const otherRunApproval = { ...APPROVAL, id: 'a-2', runId: 'r-9', stepRunId: 's-other' };
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({
+        snapshot: APPROVAL_NODE_SNAPSHOT,
+        stepRuns: [BASE_STEP_RUN, APPROVAL_STEP_RUN],
+        approvals: [APPROVAL, otherRunApproval],
+      }),
+    );
+
+    const cards = container.querySelectorAll('.approval-prompt-card');
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.textContent).toContain('Engedélyezed?');
+    expect(container.querySelector('.run-view-screen__approval-banner')?.textContent).toContain('jóváhagyásra vár');
+  });
+
+  it('nulla függő jóváhagyásra nincs kiemelt sáv és nincs jóváhagyás kártya', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({}));
+
+    expect(container.querySelector('.run-view-screen__approval-banner')).toBeNull();
+    expect(container.querySelector('.approval-prompt-card')).toBeNull();
+  });
+
+  it('a rajzon a human_approval csomópont a waiting_approval összesítést kapja a PendingApproval.requestedAtMs értékével', async () => {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({
+        snapshot: APPROVAL_NODE_SNAPSHOT,
+        stepRuns: [BASE_STEP_RUN, APPROVAL_STEP_RUN],
+        approvals: [APPROVAL],
+      }),
+    );
+
+    const approvalNode = lastCanvasProperties().nodes.find((node) => node.workflowNode.id === 'n-approval');
+    expect(approvalNode?.runDecoration?.summary).toEqual({ kind: 'waiting_approval', requestedAtMs: 1000 });
+  });
+
+  it('egy conflict döntés után a jóváhagyás lista frissül', async () => {
+    const decisionUrls: string[] = [];
+    const approvalUrls: string[] = [];
+    const baseFetchFunction = createFetchFunction({
+      snapshot: APPROVAL_NODE_SNAPSHOT,
+      stepRuns: [BASE_STEP_RUN, APPROVAL_STEP_RUN],
+      approvals: [APPROVAL],
+      approvalUrls,
+    });
+    const fetchFunction: FetchFunction = (input, init) => {
+      const { pathname } = new URL(input);
+      if (pathname.endsWith('/decision')) {
+        decisionUrls.push(typeof init.body === 'string' ? init.body : '{}');
+        return Promise.resolve(
+          Response.json({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, { status: 409 }),
+        );
+      }
+      return baseFetchFunction(input, init);
+    };
+    await renderScreen('?runId=r-3', fetchFunction);
+
+    const approveButton = [
+      ...container.querySelectorAll<HTMLButtonElement>(':scope .approval-prompt-card button.btn'),
+    ].find((button) => button.textContent === 'Jóváhagyás');
+    if (approveButton === undefined) {
+      throw new Error('a teszt nem talált Jóváhagyás gombot');
+    }
+    await act(async () => {
+      approveButton.click();
+      for (let index = 0; index < 8; index += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    expect(decisionUrls).toEqual([JSON.stringify({ decision: 'approved' })]);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Az elem állapota most nem engedi a műveletet.',
+    );
+    expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
   });
 });

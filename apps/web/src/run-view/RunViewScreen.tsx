@@ -8,6 +8,9 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
+import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
+import { pendingApprovalRequestedAtByStepRun } from '../approval-prompt/pending-approval-requested-at-by-step-run.ts';
+import { usePendingApprovals } from '../approval-prompt/use-pending-approvals.ts';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
@@ -228,6 +231,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const runId = readRunId(search);
   const transcript = useRunTranscript(runId, subscribeToFrames);
   const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount });
+  const pendingApprovals = usePendingApprovals({ runId, fetchFunction, apiOrigin });
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -373,6 +377,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     nodeStepRuns: merged.nodeStepRuns,
     stepRuns,
     onOpenSubWorkflowRun: navigateToRun,
+    pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(pendingApprovals.approvals),
   });
   // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
   // a fenti blokkoló ágon áll meg.
@@ -396,6 +401,22 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           hibája: {transientFailure.message}
         </Alert>
       )}
+      {pendingApprovals.approvals.length > 0 && (
+        // A "kiemelt sáv" (SPEC-008 8. szekció "a futás nézet fejlécénél"): a
+        // döntést kérő panel maga a `run-view-screen__body` fölött, ez az
+        // `Alert` csak a rövid, egy mondatos figyelmeztetés.
+        <Alert variant="warning" className="run-view-screen__approval-banner">
+          A futás legalább egy lépése jóváhagyásra vár.
+        </Alert>
+      )}
+      <ApprovalPromptPanel
+        approvals={pendingApprovals.approvals}
+        isLoading={pendingApprovals.isLoading}
+        failureMessage={pendingApprovals.failureMessage}
+        apiOrigin={apiOrigin}
+        fetchFunction={fetchFunction}
+        onDecided={pendingApprovals.reload}
+      />
       <div className="run-view-screen__body">
         <RunViewLayout
           band={layoutBand}

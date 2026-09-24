@@ -49,6 +49,20 @@
   margin-inline: var(--ep-layout-gutter);
 }
 
+/* A jóváhagyás kiemelt sávja (SPEC-008 8. szekció), ugyanazzal az oldalsó
+   térközzel, mint a szerverre várakozás jelzése fölötte. */
+.run-view-screen__approval-banner {
+  margin-inline: var(--ep-layout-gutter);
+}
+
+/* A jóváhagyás panel (T-009-27) a rajzon nem szereplő lépés futások
+   listájával azonos mintát követi: az `.app-content` nulla belső margója
+   miatt a screen nem-vászon elemei kapják meg a `--ep-layout-gutter`
+   térközt. */
+.run-view-screen > .approval-prompt-panel {
+  padding-inline: var(--ep-layout-gutter);
+}
+
 /* A kimondott figyelmeztetés, hogy a rajz pillanatkép (AC20). Nem hibaüzenet,
    tehát a halványabb, másodlagos szövegszín jár neki. */
 .run-view-screen__snapshot-note {

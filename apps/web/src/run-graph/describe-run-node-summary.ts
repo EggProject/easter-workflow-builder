@@ -63,19 +63,27 @@ function countScopedOutcomes(
 }
 
 /**
- * Egy csomópont futás nézeti összesítése (SPEC-008 6.3, AC22, AC24). Tiszta
- * függvény, DOM és `@xyflow/react` hivatkozás nélkül.
+ * Egy csomópont futás nézeti összesítése (SPEC-008 6.3, 8. szekció, AC22,
+ * AC24). Tiszta függvény, DOM és `@xyflow/react` hivatkozás nélkül.
  *
- * A három érintett típust a node `config.type` mezője dönti el, nem a
+ * A négy érintett típust a node `config.type` mezője dönti el, nem a
  * `node.type`: a `config` hordozza a `maxIterations` korlátot, és a drótszintű
  * séma szándékosan nem kapcsolja össze a két mezőt (SPEC-005), tehát a
- * `config` a mérvadó forrás arra, mit lehet összesíteni. A maradék hét
+ * `config` a mérvadó forrás arra, mit lehet összesíteni. A maradék hat
  * típusnak nincs mit, azokra `undefined` jár.
+ *
+ * A `human_approval` esetén az összesítés forrása NEM a lépés futás valamelyik
+ * időbélyege, hanem a `pendingApprovalRequestedAtByStepRunId` térkép (T-009-27,
+ * `approval-prompt/pending-approval-requested-at-by-step-run.ts`), amit a
+ * hívó (`RunViewScreen`) épít a `GET /api/approvals` válaszából. A `run-graph`
+ * téma emiatt nem importál semmit az `approval-prompt` témából, csak egy
+ * generikus térképet fogad.
  */
 export function describeRunNodeSummary(
   node: WorkflowNodeInput,
   nodeStepRuns: readonly StepRunRecord[],
   stepRuns: readonly StepRunRecord[],
+  pendingApprovalRequestedAtByStepRunId: ReadonlyMap<string, number>,
 ): RunNodeSummary | undefined {
   if (node.config.type === 'fan_out') {
     const branchCount = countFanOutBranches(nodeStepRuns);
@@ -100,6 +108,18 @@ export function describeRunNodeSummary(
       return undefined;
     }
     return { kind: 'sub_workflow', subWorkflowRunId };
+  }
+
+  if (node.config.type === 'human_approval') {
+    const displayed = pickDisplayedStepRun(nodeStepRuns);
+    if (displayed?.status !== 'waiting_approval') {
+      return undefined;
+    }
+    const requestedAtMs = pendingApprovalRequestedAtByStepRunId.get(displayed.id);
+    if (requestedAtMs === undefined) {
+      return undefined;
+    }
+    return { kind: 'waiting_approval', requestedAtMs };
   }
 
   return undefined;

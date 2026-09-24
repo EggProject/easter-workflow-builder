@@ -159,6 +159,7 @@ async function mockRunView(page: Page, options: RunViewMockOptions): Promise<voi
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(options.detail))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),

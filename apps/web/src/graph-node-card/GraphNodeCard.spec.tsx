@@ -4,7 +4,7 @@ import { StepRunStatusSchema } from '@easter-workflow-builder/protocol';
 import { ReactFlow } from '@xyflow/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphNodeCard } from './GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode, RunNodeSummary } from './graph-node-card-data.ts';
 
@@ -351,5 +351,17 @@ describe('GraphNodeCard', () => {
       button.click();
     });
     expect(openedRunIds).toEqual(['r-42']);
+  });
+
+  it('a waiting_approval összesítés a mióta vár feliratot mutatja', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(65_000);
+    try {
+      renderNodes([
+        buildDecoratedFlowNode(WORKFLOW_NODES.human_approval, { kind: 'waiting_approval', requestedAtMs: 5000 }),
+      ]);
+      expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe('1 perce vár');
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

@@ -12,6 +12,9 @@ import type { Node } from '@xyflow/react';
  * - `loop`: az aktuális iteráció és a `maxIterations` korlát.
  * - `sub_workflow`: az indult al-workflow futás azonosítója, amire a kártya
  *   navigálni tud.
+ * - `waiting_approval`: a `human_approval` lépés `PendingApproval.requestedAtMs`
+ *   mezője, amiből a kártya a "mióta vár" feliratot számolja (SPEC-008 8.
+ *   szekció, T-009-27).
  */
 export type RunNodeSummary =
   | {
@@ -21,7 +24,8 @@ export type RunNodeSummary =
       readonly failedCount: number;
     }
   | { readonly kind: 'loop'; readonly iteration: number; readonly maxIterations: number }
-  | { readonly kind: 'sub_workflow'; readonly subWorkflowRunId: string };
+  | { readonly kind: 'sub_workflow'; readonly subWorkflowRunId: string }
+  | { readonly kind: 'waiting_approval'; readonly requestedAtMs: number };
 
 /**
  * Az összesítés és a hozzá tartozó navigáció EGYETLEN mezőben áll, nem két

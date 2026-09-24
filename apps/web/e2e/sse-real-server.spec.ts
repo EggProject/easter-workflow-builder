@@ -374,6 +374,7 @@ test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finish
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(runStatusHolder.current)))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
@@ -518,6 +519,7 @@ async function mockRunView(page: Page, state: RunViewMockState): Promise<void> {
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(state.runStatus)))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(state.stepRuns))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
@@ -734,6 +736,7 @@ test('szerver újraindulás után a futás nézet újra feliratkozik, újratölt
       calls.listStepRuns += 1;
       await route.fulfill(jsonBody(state.stepRuns));
     }),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) => {
       calls.subscriptions += 1;
       await route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] }));
@@ -885,6 +888,7 @@ async function mockRunViewWithShutdown(page: Page, state: ShutdownMockState): Pr
     ),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(state.down ? BAD_GATEWAY : jsonBody(state.stepRuns))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(state.down ? BAD_GATEWAY : jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(state.down ? BAD_GATEWAY : jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),

@@ -1,0 +1,47 @@
+/* A jóváhagyás panel (SPEC-008 8. szekció, T-009-27). NINCS KÁRTYA: se
+   szegély, se lekerekítés, se saját háttér, mert a panel a futás nézet
+   törzsében áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció).
+   A térközök kizárólag a design system `--ep-space-*` tokenjeiből jönnek. */
+.approval-prompt-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+}
+
+.approval-prompt-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-4);
+}
+
+.approval-prompt-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+}
+
+.approval-prompt-card__title {
+  margin: 0;
+  font: var(--ep-text-h4);
+  color: var(--ep-fg);
+}
+
+.approval-prompt-card__body {
+  margin: 0;
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+}
+
+/* A formázott payload a `run-event-row` téma meglévő mintája
+   (`run-event-row.css` `.run-event-row__payload`), ugyanazokkal a
+   tulajdonságokkal. */
+.approval-prompt-card__payload {
+  font: var(--ep-text-code);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.approval-prompt-card__actions {
+  display: flex;
+  gap: var(--ep-space-2);
+}

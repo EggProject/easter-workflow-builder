@@ -80,6 +80,23 @@ const LOOP_NODE: WorkflowNodeInput = {
   config: { type: 'loop', maxIterations: 3, continueExpression: 'i < 3', onUnhandledError: null },
 };
 
+const APPROVAL_NODE: WorkflowNodeInput = {
+  id: 'n-approval',
+  type: 'human_approval',
+  label: 'Jóváhagyás',
+  positionX: 0,
+  positionY: 0,
+  config: {
+    type: 'human_approval',
+    title: 'Engedélyezed?',
+    bodyTemplate: 'Kérlek erősítsd meg',
+    timeoutMs: null,
+    onUnhandledError: null,
+  },
+};
+
+const NO_PENDING_APPROVALS: ReadonlyMap<string, number> = new Map();
+
 describe('buildRunGraphNodes', () => {
   it('lépés futás nélküli csomópontra nem tesz fel status és runDecoration kulcsot', () => {
     const built = buildRunGraphNodes({
@@ -87,6 +104,7 @@ describe('buildRunGraphNodes', () => {
       nodeStepRuns: new Map(),
       stepRuns: [],
       onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
     });
 
     expect(built).toHaveLength(1);
@@ -109,6 +127,7 @@ describe('buildRunGraphNodes', () => {
       ]),
       stepRuns: [],
       onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
     });
 
     expect(built[0]?.status).toBe('running');
@@ -121,9 +140,29 @@ describe('buildRunGraphNodes', () => {
       nodeStepRuns: new Map([['n-loop', [loopStepRun]]]),
       stepRuns: [loopStepRun],
       onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
     });
 
     expect(built[0]?.runDecoration?.summary).toEqual({ kind: 'loop', iteration: 1, maxIterations: 3 });
     expect(built[0]?.runDecoration?.onOpenSubWorkflowRun).toBe(onOpenSubWorkflowRun);
+  });
+
+  it('a waiting_approval összesítést a pendingApprovalRequestedAtByStepRunId térképből adja tovább', () => {
+    const approvalStepRun = {
+      ...BASE_STEP_RUN,
+      id: 's-approval',
+      nodeId: 'n-approval',
+      nodeType: 'human_approval',
+      status: 'waiting_approval',
+    } as const;
+    const built = buildRunGraphNodes({
+      nodes: [APPROVAL_NODE],
+      nodeStepRuns: new Map([['n-approval', [approvalStepRun]]]),
+      stepRuns: [approvalStepRun],
+      onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: new Map([['s-approval', 4000]]),
+    });
+
+    expect(built[0]?.runDecoration?.summary).toEqual({ kind: 'waiting_approval', requestedAtMs: 4000 });
   });
 });

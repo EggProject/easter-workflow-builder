@@ -179,6 +179,7 @@ test.beforeEach(async ({ page }) => {
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(RUN_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
   ]);
 });
 

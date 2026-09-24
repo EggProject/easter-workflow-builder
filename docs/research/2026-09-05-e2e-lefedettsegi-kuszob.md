@@ -1185,3 +1185,56 @@ statements, branches és lines értékre húzva (98.98 -> **99**, 98.37 -> **98.
 kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
 coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
 (99.01 / 98.39 / 99.42 / 98.97) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 29. Az `approval-prompt` téma utáni ratchet (2026-09-24, T-009-27): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `human_approval` jóváhagyás felülete (`apps/web/src/approval-prompt/`): a
+`usePendingApprovals` hook, az `ApprovalPromptCard` (döntés gombpár, `conflict`/`not_found`
+hibaüzenet), az `ApprovalPromptPanel`, a `pending-approval-requested-at-by-step-run.ts` híd a
+`run-graph` felé, és a `describeWaitingApprovalDuration` (`apps/web/src/graph-node-card/`) mind új
+kód. Négy új e2e teszt fedi (`apps/web/e2e/approval-prompt.spec.ts`): a várakozási idő mindhárom
+sávja plusz a `Math.max(0, ...)` szorítás ága, a Jóváhagyás gomb sikeres döntése (a lista
+kiürül), az Elutasítás gomb `conflict` hibaága (a lista újratöltődik, a kártya a helyén marad), és
+a jóváhagyás lista `GET /api/approvals` betöltési hibaága (`ApprovalPromptPanel.tsx` `failureMessage`
+ága).
+
+**Mérési buktató, ami az első mérést érvénytelenítette.** A `bun run screenshots` parancs (a
+`playwright.screenshots.config.ts` a `coverage-fixture.ts` ugyanazon `test` fixtúráját importálja,
+mint a `test:e2e`) ugyanabba az `apps/web/e2e/.nyc_output` mappába ír. A képernyőképezés futtatása a
+lefedettségi mérés ELŐTT tehát screenshot-futásból származó lefedettséggel szennyezi a `nyc report`
+bemenetét, miközben a CI `e2e` jobja (`.github/workflows/ci.yml` 232. sor) kizárólag `bun run
+test:e2e`-t futtat, screenshotot sohasem. Az első mérés (`99.08 / 98.54 / 99.45 / 99.02`, 237
+teszt) pontosan ilyen szennyezett állapotból jött, és nem egyezett azzal, amit a CI valaha
+kiszámolna. A helyes eljárás: `rm -rf apps/web/e2e/.nyc_output`, majd **kizárólag** `bun run
+test:e2e`, utána `bun run coverage:e2e:report` - ugyanaz a sorrend, amit a CI `e2e` jobja követ.
+
+**A tiszta mérés egy valódi, átmeneti regressziót fedett fel.** A szennyezés nélküli első
+lefutás a fedetlen branch darabszámot 11-ről 12-re emelte: az `ApprovalPromptPanel.tsx` `37`. sora
+(`{failureMessage !== undefined && <p role="alert">{failureMessage}</p>}`, a GET lista betöltési
+hibaága) egyetlen akkor létező teszt által sem volt lefedve, mert mind a három akkori
+`approval-prompt.spec.ts` teszt sikeres `listPendingApprovals` mockkal indult. A projekt szabálya
+szerint (8. szekció, "ha a fedetlen sorok száma nő, azt teszttel kell fedezni, nem a küszöböt
+csökkenteni") ez negyedik tesztet igényelt, nem küszöb-alkalmazkodást: a
+`'a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a panelen'` teszt egy `500`-as
+`listPendingApprovals` választ mockol, és a panelen megjelenő `role="alert"` elemet ellenőrzi (a
+`workflow-list.spec.ts` lista-betöltési-hiba mintájának megfelelően).
+
+**A végleges, tiszta mérés** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e` egy
+futásban, **238 teszt, mind zöld**, majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (28. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1543 / 1558     | **99.03** | 99                         | 15 -> **15**                   |
+| branches   | 697 / 708       | **98.44** | 98.38                      | 11 -> **11**                   |
+| functions  | 530 / 533       | **99.43** | 99.41                      | 3 -> **3**                     |
+| lines      | 1485 / 1500     | **99**    | 98.96                      | 15 -> **15**                   |
+
+**Nulla nettó új fedetlen tétel.** A negyedik teszt pontosan azt a branchet zárta le, amit a
+harmadikig maradt lyuk nyitva hagyott: a fedetlen darabszám mind a négy metrikán visszaállt a 28.
+szekció alapértékére (15/11/3/15), az átmeneti 12-es branch-érték a negyedik teszt után 11-re
+csökkent. A küszöb mind a négy mért értékre húzva (99 -> **99.03**, 98.38 -> **98.44**, 99.41 ->
+**99.43**, 98.96 -> **99**), felfelé kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a
+beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
+századdal magasabb küszöbbel
+(99.04 / 98.45 / 99.44 / 99.01) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

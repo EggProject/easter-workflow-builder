@@ -70,6 +70,23 @@ const JOIN_NODE: WorkflowNodeInput = {
   config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
 };
 
+const APPROVAL_NODE: WorkflowNodeInput = {
+  id: 'n-5',
+  type: 'human_approval',
+  label: 'Jóváhagyás',
+  positionX: 0,
+  positionY: 0,
+  config: {
+    type: 'human_approval',
+    title: 'Engedélyezed?',
+    bodyTemplate: 'Kérlek erősítsd meg',
+    timeoutMs: null,
+    onUnhandledError: null,
+  },
+};
+
+const NO_PENDING_APPROVALS: ReadonlyMap<string, number> = new Map();
+
 describe('describeRunNodeSummary', () => {
   it('a fan_out ág darabszámát a saját lépés futás kimeneti listájából adja, a hatókör sikeres és bukott soraival', () => {
     const fanOutStepRun: StepRunRecord = { ...BASE_STEP_RUN, id: 's-fan', output: ['a', 'b', 'c'] };
@@ -97,20 +114,23 @@ describe('describeRunNodeSummary', () => {
         },
         { ...BASE_STEP_RUN, id: 's-other', nodeId: 'n-kivul', nodeType: 'agent_step', parentStepRunId: 's-masik' },
       ],
+      NO_PENDING_APPROVALS,
     );
 
     expect(summary).toEqual({ kind: 'fan_out', branchCount: 3, succeededCount: 1, failedCount: 1 });
   });
 
   it('a nulla ág eset nulla darabszámot ad, nem undefined-et', () => {
-    const summary = describeRunNodeSummary(FAN_OUT_NODE, [{ ...BASE_STEP_RUN, output: [] }], []);
+    const summary = describeRunNodeSummary(FAN_OUT_NODE, [{ ...BASE_STEP_RUN, output: [] }], [], NO_PENDING_APPROVALS);
 
     expect(summary).toEqual({ kind: 'fan_out', branchCount: 0, succeededCount: 0, failedCount: 0 });
   });
 
   it('a fan_out összesítése undefined, amíg egyetlen saját sor kimenete sem lista', () => {
-    expect(describeRunNodeSummary(FAN_OUT_NODE, [], [])).toBeUndefined();
-    expect(describeRunNodeSummary(FAN_OUT_NODE, [{ ...BASE_STEP_RUN, output: null }], [])).toBeUndefined();
+    expect(describeRunNodeSummary(FAN_OUT_NODE, [], [], NO_PENDING_APPROVALS)).toBeUndefined();
+    expect(
+      describeRunNodeSummary(FAN_OUT_NODE, [{ ...BASE_STEP_RUN, output: null }], [], NO_PENDING_APPROVALS),
+    ).toBeUndefined();
   });
 
   it('a loop az aktuális iterációt és a maxIterations korlátot adja', () => {
@@ -121,13 +141,14 @@ describe('describeRunNodeSummary', () => {
         { ...BASE_STEP_RUN, id: 's-i2', nodeType: 'loop', iteration: 2, createdAtMs: 30 },
       ],
       [],
+      NO_PENDING_APPROVALS,
     );
 
     expect(summary).toEqual({ kind: 'loop', iteration: 2, maxIterations: 7 });
   });
 
   it('a loop összesítése undefined lépés futás nélkül', () => {
-    expect(describeRunNodeSummary(LOOP_NODE, [], [])).toBeUndefined();
+    expect(describeRunNodeSummary(LOOP_NODE, [], [], NO_PENDING_APPROVALS)).toBeUndefined();
   });
 
   it('a sub_workflow az indult al-workflow futás azonosítóját adja', () => {
@@ -135,19 +156,65 @@ describe('describeRunNodeSummary', () => {
       SUB_WORKFLOW_NODE,
       [{ ...BASE_STEP_RUN, nodeType: 'sub_workflow', subWorkflowRunId: 'r-9' }],
       [],
+      NO_PENDING_APPROVALS,
     );
 
     expect(summary).toEqual({ kind: 'sub_workflow', subWorkflowRunId: 'r-9' });
   });
 
   it('a sub_workflow összesítése undefined, ha még nem indult al-workflow futás', () => {
-    expect(describeRunNodeSummary(SUB_WORKFLOW_NODE, [], [])).toBeUndefined();
+    expect(describeRunNodeSummary(SUB_WORKFLOW_NODE, [], [], NO_PENDING_APPROVALS)).toBeUndefined();
     expect(
-      describeRunNodeSummary(SUB_WORKFLOW_NODE, [{ ...BASE_STEP_RUN, nodeType: 'sub_workflow' }], []),
+      describeRunNodeSummary(
+        SUB_WORKFLOW_NODE,
+        [{ ...BASE_STEP_RUN, nodeType: 'sub_workflow' }],
+        [],
+        NO_PENDING_APPROVALS,
+      ),
     ).toBeUndefined();
   });
 
+  it('a human_approval a waiting_approval lépéshez tartozó requestedAtMs értéket adja', () => {
+    const approvalStepRun = {
+      ...BASE_STEP_RUN,
+      id: 's-approval',
+      nodeType: 'human_approval',
+      status: 'waiting_approval',
+    } as const;
+    const summary = describeRunNodeSummary(APPROVAL_NODE, [approvalStepRun], [], new Map([['s-approval', 4000]]));
+
+    expect(summary).toEqual({ kind: 'waiting_approval', requestedAtMs: 4000 });
+  });
+
+  it('a human_approval összesítése undefined, ha a lépés nem waiting_approval állapotú', () => {
+    const approvalStepRun = {
+      ...BASE_STEP_RUN,
+      id: 's-approval',
+      nodeType: 'human_approval',
+      status: 'succeeded',
+    } as const;
+    expect(
+      describeRunNodeSummary(APPROVAL_NODE, [approvalStepRun], [], new Map([['s-approval', 4000]])),
+    ).toBeUndefined();
+  });
+
+  it('a human_approval összesítése undefined, ha nincs hozzá függő jóváhagyás a térképben', () => {
+    const approvalStepRun = {
+      ...BASE_STEP_RUN,
+      id: 's-approval',
+      nodeType: 'human_approval',
+      status: 'waiting_approval',
+    } as const;
+    expect(describeRunNodeSummary(APPROVAL_NODE, [approvalStepRun], [], NO_PENDING_APPROVALS)).toBeUndefined();
+  });
+
+  it('a human_approval összesítése undefined lépés futás nélkül', () => {
+    expect(describeRunNodeSummary(APPROVAL_NODE, [], [], NO_PENDING_APPROVALS)).toBeUndefined();
+  });
+
   it('a többi csomópont típusnak nincs összesítése', () => {
-    expect(describeRunNodeSummary(JOIN_NODE, [{ ...BASE_STEP_RUN, nodeType: 'join' }], [])).toBeUndefined();
+    expect(
+      describeRunNodeSummary(JOIN_NODE, [{ ...BASE_STEP_RUN, nodeType: 'join' }], [], NO_PENDING_APPROVALS),
+    ).toBeUndefined();
   });
 });

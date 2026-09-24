@@ -140,6 +140,7 @@ async function mockRunViewRoutes(page: Page, runDetail: RunDetail = RUN_DETAIL):
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetail))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),

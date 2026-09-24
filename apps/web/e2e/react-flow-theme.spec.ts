@@ -126,6 +126,7 @@ const CANVASES: readonly CanvasCase[] = [
         mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
         mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
         mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody([]))),
+        mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
         mockRoute('replaceStreamSubscriptions', async (route) =>
           route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
         ),

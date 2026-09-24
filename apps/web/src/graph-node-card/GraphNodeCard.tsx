@@ -4,6 +4,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { type GraphNodeOutputHandle, type GraphNodeOutputHandles } from '../graph-node-catalog/graph-node-catalog.ts';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
+import { describeWaitingApprovalDuration } from './describe-waiting-approval-duration.ts';
 import type { GraphNodeCardFlowNode, GraphNodeRunDecoration } from './graph-node-card-data.ts';
 import { describeStepRunStatusBadge } from './step-run-status-badge.ts';
 import './graph-node-card.css';
@@ -68,7 +69,11 @@ function renderOutputHandle(handle: GraphNodeOutputHandle, topPercent: number): 
  * A `fan_out` nulla ág esete KÜLÖN, kimondott feliratot kap, mert egy néma,
  * azonnal kész szétosztás egyébként hibának látszana (SPEC-008 6.3). A
  * `sub_workflow` navigációja valódi gomb, `sm` méretben (nem modális és nem
- * popup felület), hozzáférhető nevével a látható szövegéből.
+ * popup felület), hozzáférhető nevével a látható szövegéből. A
+ * `waiting_approval` felirata a `describeWaitingApprovalDuration` tiszta
+ * függvényét hívja a RENDER pillanatában olvasott `Date.now()` értékkel
+ * (T-009-27, SPEC-008 8. szekció): nincs `setInterval`, a szám a legutóbbi
+ * renderkor frissül (`describe-waiting-approval-duration.ts` fejléce).
  */
 function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
   const { summary, onOpenSubWorkflowRun } = decoration;
@@ -101,6 +106,11 @@ function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
         >
           Al-workflow futás megnyitása
         </Button>
+      );
+    }
+    case 'waiting_approval': {
+      return (
+        <p className="graph-node-card__summary">{describeWaitingApprovalDuration(summary.requestedAtMs, Date.now())}</p>
       );
     }
   }
