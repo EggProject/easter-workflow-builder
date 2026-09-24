@@ -208,6 +208,18 @@ a gyerek sora `cancelled`, az eseménye `interrupted` (0/5 egyezés), utána min
 (5/5); a fordított sorrend előtte és utána is `cancelled` (5/5). Regresszió: a `create-engine.spec.ts`
 "az első leállítás célállapota" blokkja (research 7. szekció, tizedik kör).
 
+**A szabályos leállás alatt érkező megszakítás nem fut le (user döntés 2026-09-24, SPEC-004 9.
+szekció).** Az `interruptRun` első lépése a `RunSupervisor.isAcceptingRuns()`, ugyanaz a jelzés,
+amin a futás indítás elutasítása áll: ha a `stopAcceptingRuns` már lefutott, `engine_shutting_down`
+hibával, olvasás és írás nélkül tér vissza (a szerveren `503`), és a fát a leállás zárja
+`interrupted` állapotba. A már folyamatban lévő megszakítást a később kezdődő leállás nem érinti, az
+`cancelled`-del zár. Mérve a valódi `apps/server` modulokon, hamis agenttel, esetenként 5 futással:
+előtte a válasz `socket hang up` (csak a fa aktív), illetve `200` és `cancelled` sor `interrupted`
+eseménnyel (egy másik futás tovább tartja a leállást, 0/5 egyezés); utána `503` és egyezően
+`interrupted` (5/5); a fordított sorrend előtte és utána is `cancelled` (5/5). Regresszió: a
+`create-engine.spec.ts` "szabályos leállás közben érkező megszakítás" blokkja (research 7. szekció,
+tizenegyedik kör).
+
 **A `NodeExecutionOutcome` és a `NodeExecutionResult` szétválasztása (T-005-31, AC-51).** A külső
 megszakítás miatt lezáratlanul maradó lépés NEM a `NodeExecutionOutcome` ága, hanem a szélesebb
 `NodeExecutionResult` külön ága. Az ok mérhető: a `NodeExecutionOutcome` minden ága hordoz

@@ -619,3 +619,67 @@ bukott (`"childStatus": "cancelled"` a várt `"interrupted"` helyett), utána z�
 `run_finished` eseményének hiányát is állítja. A második (előbb egy elutasított jóváhagyás miatti
 `fail_run`, közben a leállás) előtte és utána is zöld: a gyerek sora, eseménye és üzenete
 `cancelled`, a gyökér `interrupted`.
+
+**Felhasználói megszakítás a szabályos leállás alatt: mérve, javítva (2026-09-24, tizenegyedik
+kör).** Egy független ellenőrzés a `6dd8df9` commiton azt mérte, hogy a jel előtt fejléccel
+megkezdett, de csak a leállás alatt befejezett `POST /api/runs/{gyökér}/interrupt` kérés két
+hibás kimenetet ad, attól függően, van-e más aktív futás. A mérés megerősítette. A user döntése
+(2026-09-24): a leállás alatt érkező megszakítás `503 service_unavailable` választ kap
+`engine_shutting_down` hibaosztállyal, semmit nem ír, és a futást a leállás zárja `interrupted`
+állapotba; ugyanaz a mechanizmus, mint a leállás közbeni futás indításnál (6. szekció).
+
+| Tétel     | Érték                                                                                                                                                                                                                                                                                                                               |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Futtató   | Node v26.7.0, a `feat/spec-008-futas-nezet` ág `f03b885` commitja a munkapéldányban (előtte; a motor és az `apps/server` forrása a `6dd8df9`-éval azonos), illetve ugyanez a javítással (utána)                                                                                                                                     |
+| Szerver   | a tizedik kör felállása: a valódi `apps/server` modulok (a `registerShutdownSignalHandlers` leállási sorrendjével) és a valódi motor, fájl alapú SQLite a sandbox helyi `/tmp` alatt; **eltérés:** hamis agent futtató (valós API hívás nincs) és átengedő sablon renderelő; az ellenőrző scriptjei (`race-server.ts`, `probe.mjs`) |
+| Hamis     | a fa agent lépése az `interrupt()` nyugtáját 400 ms-mal később adja; a másik futás agent lépése 1500 ms-mal később                                                                                                                                                                                                                  |
+| Workflow  | gyerek szint: szülő `start -> sub` (gyerek: `start -> agent`); unoka szint: szülő `start -> sub`, gyerek `start -> sub`, unoka `start -> agent`; a másik futás: `start -> agent`                                                                                                                                                    |
+| Menet     | a fa agent hívása után (B2: a másik futás hívása után is) a megszakító kérés fejléce kimegy, a szerver kiszolgálja, `SIGTERM`, a leállás `interrupt()` hívása után a törzs. Fordított sorrend (C): a megszakító kérés teljes, a megszakítás `interrupt()` hívása után `SIGTERM`                                                     |
+| Kiolvasás | a kilépés után a fájlból a fa sorai és futás szintű lezáró eseményei, a `sub` lépések `sub_workflow_finished` `status` mezője és üzenete, a megszakító kérés válasza vagy hibája                                                                                                                                                    |
+
+| Eset (5 futás esetenként)                          | Válasz, előtte           | A fa sora, előtte | Esemény és üzenet, előtte | Egyezik, előtte | Válasz, utána                   | A fa sora és eseménye, utána | Egyezik, utána |
+| -------------------------------------------------- | ------------------------ | ----------------- | ------------------------- | --------------- | ------------------------------- | ---------------------------- | -------------- |
+| B1: csak a fa aktív, gyerek szint                  | `socket hang up`         | `interrupted`     | `interrupted`             | 5/5             | `503`, `(engine_shutting_down)` | `interrupted`                | 5/5            |
+| B1: csak a fa aktív, unoka szint                   | `socket hang up`         | `interrupted`     | `interrupted`             | 10/10           | `503`, `(engine_shutting_down)` | `interrupted`                | 10/10          |
+| B2: a másik futás tovább áll le, gyerek szint      | `200`, gyökér és gyerek  | `cancelled`       | `interrupted`             | 0/5             | `503`, `(engine_shutting_down)` | `interrupted`                | 5/5            |
+| B2: a másik futás tovább áll le, unoka szint       | `200`, a fa három futása | `cancelled`       | `interrupted`             | 0/10            | `503`, `(engine_shutting_down)` | `interrupted`                | 10/10          |
+| C1: előbb megszakítás, közben leállás              | `200`                    | `cancelled`       | `cancelled`               | 5/5             | `200`                           | `cancelled`                  | 5/5            |
+| C2: előbb megszakítás, közben leállás, másik futás | `200`                    | `cancelled`       | `cancelled`               | 5/5             | `200`                           | `cancelled`                  | 5/5            |
+
+Az unoka szinten az egyezés számlálója futásonként két lépés (a gyerek és az unoka futásáé). A
+lezáró esemény a javítás után minden fa futásra egyetlen `run_interrupted` (`graceful_shutdown`),
+`run_finished` nincs; a B2 másik futása előtte és utána is `interrupted`. Minden esetben a
+kilépési kód `0`, nem terminális futás és lépés nem marad, és az újraindítás helyreállítása nulla
+futást talál.
+
+**A gyökérok.** Az `interruptRun` nem nézte, hogy a leállás elkezdődött-e. A `requestStop` első
+hívás szabálya (`92f5e91`) miatt a fa kézikönyvein a leállás `interrupted` célállapota maradt
+meg, ezt mondta a szülő lépés eseménye; a megszakítás `cancelRunTree` zárása viszont a fa
+leállása után, a leállás `recoverInterruptedRuns` zárása ELŐTT írt `cancelled` sort, ha egy másik
+futás tovább tartotta a leállást (B2). Ha nem (B1), a leállás zárása és a `runShutdownSequence`
+kapcsolatzárása a megszakítás folytatása előtt futott le: a sorok egyeztek, a válasz viszont a
+lezárt kapcsolaton már nem ment ki. Ugyanez a hibaosztály volt a `fail_run` hívónál (tizedik kör).
+
+**A javítás.** A `RunSupervisor` új `isAcceptingRuns()` metódusa a `stopAcceptingRuns` meglévő
+jelzését adja ki; az `interruptRun` első lépése, ha hamis, `engine_shutting_down` hibával tér
+vissza, olvasás és írás nélkül. A szerver meglévő leképezése (`service_unavailable`, `503`) és a
+leállási sorrend nem változott. A válasz a B1 esetben a leállás közepén megy ki: egy részletes
+futásban a motor megszakító hívása 0 ms alatt tért vissza, a fa lépése a leállás `interrupt()`
+hívása után 403 ms-mal zárt, és a kapcsolatok zárása csak ezután jön. A
+fordított sorrend (C) nem érintett, mert a megszakítás a leállás kezdete előtt már átjutott az
+ellenőrzésen, és a saját `cancelled` zárásával fejeződik be.
+
+**A regresszió.** A `create-engine.spec.ts` két új tesztje. Az első (háromszintű fa, az unoka
+jóváhagyáson áll, egy másik futás agent lépése a teszt jeléig tartja a leállást; a megszakítás a
+leállás alatt) a javítás előtt bukott: a hívás sikeres volt, és a kérés előtti és utáni sorok
+eltértek (`cancelled` a várt `running` helyett); utána zöld, és a fa három futása egyezően
+`interrupted`, `run_interrupted` eseménnyel, élő `run_finished` nélkül. A második (előbb
+megszakítás, közben leállás, agent lépéses unokával) előtte és utána is zöld, a fa egyezően
+`cancelled`. A `run-shutdown-sequence.spec.ts` új tesztje valódi HTTP kapcsolaton, félbe küldött
+megszakító kéréssel a javítás előtt bukott (a megszakítás a leállás mellett másodszor is
+`interrupt()`-ot hívott, válasz nélkül), utána `503`, `service_unavailable`,
+`(engine_shutting_down)`, a futás sora a válasz pillanatában még `running`, a leállás után
+`interrupted`, egyetlen `run_interrupted` eseménnyel. Plusz az `interrupt-run.spec.ts` új esete (a
+leállás jelzése mellett nincs `requestStop`, nincs `interrupt()`, a sorok és az események
+változatlanok) és a `create-run-supervisor.spec.ts` bővítése (`isAcceptingRuns` a
+`stopAcceptingRuns` előtt igaz, utána hamis).

@@ -122,4 +122,13 @@ export interface RunSupervisor extends ChildWorkflowRunner {
    * leállás nem állít meg.
    */
   readonly stopAcceptingRuns: () => void;
+
+  /**
+   * Igaz, amíg a `stopAcceptingRuns` nem futott le. Az `interruptRun` ezzel
+   * utasítja el a leállás alatt érkező felhasználói megszakítást
+   * `engine_shutting_down` hibával, írás nélkül: ugyanaz a jelzés, amin a
+   * futás indítás elutasítása áll (SPEC-004 9. szekció, user döntés
+   * 2026-09-24).
+   */
+  readonly isAcceptingRuns: () => boolean;
 }

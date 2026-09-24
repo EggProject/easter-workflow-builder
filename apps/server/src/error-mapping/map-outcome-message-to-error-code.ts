@@ -50,7 +50,8 @@ const UNPROCESSABLE_ERROR_CLASSES: ReadonlySet<string> = new Set([
 
 /**
  * A `service_unavailable` kódra (HTTP 503) képződő egyetlen hibaosztály: a
- * leálló motor az új futást ezzel utasítja el (SPEC-004 10.2 1. pont). A
+ * leálló motor az új futást (SPEC-004 10.2 1. pont) és a felhasználói
+ * megszakítást (9. szekció, user döntés 2026-09-24) ezzel utasítja el. A
  * folyamat átmeneti állapota, nem a kérésé, ami pontosan a 503 jelentése
  * (RFC 9110 15.6.4). A `satisfies` a sodródás védelem típusszintű ága: ha a
  * motor átnevezi vagy elveszi a hibaosztályt, a `typecheck` kapu bukik,

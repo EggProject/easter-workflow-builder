@@ -393,5 +393,6 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     stopAcceptingRuns: () => {
       isAcceptingRuns = false;
     },
+    isAcceptingRuns: () => isAcceptingRuns,
   };
 }

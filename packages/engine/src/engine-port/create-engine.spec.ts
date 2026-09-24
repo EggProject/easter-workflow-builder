@@ -715,10 +715,14 @@ function findRunFinishedStatus(published: readonly unknown[], runId: string): un
  * Három szintű fa a `sub_workflow_finished` tesztekhez: a szülő `sub` lépése a
  * gyereket, a gyerek `c-sub` lépése az unokát indítja, az unoka korlátlan
  * várakozású jóváhagyáson áll, tehát a fa magától csak döntésre ér véget. A
- * `siblings` a szülő `start` utáni testvér lépései.
+ * `siblings` a szülő `start` utáni testvér lépései. A `grandchildWorkflowId`
+ * az unoka workflow-ja, ha a teszt nem a jóváhagyáson álló unokát kéri.
  */
-function subWorkflowTree(database: DatabaseContext, siblings: readonly WorkflowNodeInput[]): string {
-  const grandchildWorkflowId = waitingChildWorkflow(database, 'unoka', 'u');
+function subWorkflowTree(
+  database: DatabaseContext,
+  siblings: readonly WorkflowNodeInput[],
+  grandchildWorkflowId: string = waitingChildWorkflow(database, 'unoka', 'u'),
+): string {
   const childWorkflowId = createWorkflow(
     database,
     'gyerek',
@@ -792,6 +796,24 @@ function closingFor(status: string): ReturnType<typeof treeClosingOf> {
     childStatus: status,
   };
   return { gyerek: closing, unoka: closing };
+}
+
+/**
+ * A futások sora, ahogy a `db` őrzi: az állapot, a lépések állapota és a futás
+ * záró eseményeinek (`run_finished`, `run_interrupted`) `kind` értéke. Egy
+ * kérés előtt és után véve megmutatja, írt-e a kérés.
+ */
+function runRowsOf(
+  database: DatabaseContext,
+  runIds: readonly string[],
+): readonly { readonly status: string; readonly steps: readonly string[]; readonly closing: readonly string[] }[] {
+  return runIds.map((runId) => ({
+    status: okOrThrow(database.runs.getRun(runId)).status,
+    steps: okOrThrow(database.stepRuns.listStepRuns(runId)).map((step) => step.status),
+    closing: okOrThrow(database.events.readEventsSince(runId, 0, 1000))
+      .filter((event) => event.kind === 'run_finished' || event.kind === 'run_interrupted')
+      .map((event) => event.kind),
+  }));
 }
 
 describe('createEngine', () => {
@@ -1980,6 +2002,90 @@ describe('createEngine', () => {
         closingFor('cancelled').gyerek,
       );
       expect(findRunFinishedStatus(harness.published, drainingChildRunId)).toBe('cancelled');
+    });
+  });
+
+  // A szabályos leállás alatt érkező felhasználói megszakítás `engine_shutting_down`
+  // hibát kap, és semmit nem ír; a futást a leállás zárja (user döntés
+  // 2026-09-24). A javítás előtt a megszakítás a leállás által már `interrupted`
+  // célú fát `cancelled` állapotba írta, ha egy másik futás tovább tartotta a
+  // leállást, miközben a szülő lépések eseménye `interrupted` volt
+  // (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció).
+  describe('szabályos leállás közben érkező megszakítás (SPEC-004 9. szekció, 10.2, user döntés 2026-09-24)', () => {
+    it('REGRESSZIÓ: a leállás alatt, egy tovább leálló másik futás mellett érkező megszakítás engine_shutting_down hibát ad, semmit nem ír, és a fa (gyökér, gyerek, unoka) sora és eseménye egyezően interrupted', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = subWorkflowTree(harness.database, []);
+      const otherWorkflowId = drainingChildWorkflow(harness.database, 'masik', 'm');
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const childRunId = await waitForChildRunId(harness.database, started.run.id, 'sub');
+      const grandchildRunId = await waitForChildRunId(harness.database, childRunId, 'c-sub');
+      await waitForPendingApproval(harness.database, grandchildRunId);
+      const other = okOrThrow(await harness.engine.startRun({ workflowId: otherWorkflowId, input: {} }));
+      await waitForStepRunning(harness.database, other.run.id, 'm-agent');
+      const runIds = [started.run.id, childRunId, grandchildRunId, other.run.id];
+
+      const shuttingDown = harness.engine.shutdown();
+      // A leállás a másik futás lépésének leállására vár; a fa ezalatt a
+      // saját léptetésének végéig jut (a `sub` lépés a gyerek leállása miatt
+      // bukik), a sorai viszont még nem terminálisak.
+      await waitForInterruptCalls(scripted.calls, 1);
+      await waitForStepStatus(harness.database, started.run.id, 'sub', 'failed');
+      const rowsBeforeRequest = runRowsOf(harness.database, runIds);
+
+      const outcome = await harness.engine.interruptRun(started.run.id);
+      const rowsAfterRequest = runRowsOf(harness.database, runIds);
+      scripted.releaseDrain();
+      const summary = okOrThrow(await shuttingDown);
+
+      // A javítás előtt a hívás sikeres volt (`cancelledRunIds` a fa három
+      // futása), és a fa sorai `cancelled` állapotba kerültek `run_finished`
+      // eseménnyel, a `sub_workflow_finished` események viszont `interrupted`
+      // állapotot mondtak.
+      expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
+      expect(rowsAfterRequest).toStrictEqual(rowsBeforeRequest);
+      expect(summary.interruptedRunCount).toBe(4);
+      expect(runRowsOf(harness.database, runIds).map(({ status, closing }) => ({ status, closing }))).toStrictEqual(
+        runIds.map(() => ({ status: 'interrupted', closing: ['run_interrupted'] })),
+      );
+      expect(treeClosingOf(harness.database, started.run.id, childRunId)).toStrictEqual(closingFor('interrupted'));
+      for (const runId of runIds) {
+        expect(findRunFinishedStatus(harness.published, runId)).toBeUndefined();
+      }
+    });
+
+    it('HATÁR: előbb a megszakítás, közben a leállás: a fa (gyökér, gyerek, unoka) sora és eseménye egyezően cancelled, a megszakítás válasza a fa három futása', async () => {
+      const scripted = scriptedRunner(['drains_until_released']);
+      const harness = openHarness({ agentQueryRunner: scripted.runner });
+      const workflowId = subWorkflowTree(
+        harness.database,
+        [],
+        drainingChildWorkflow(harness.database, 'unoka-agent', 'u'),
+      );
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const childRunId = await waitForChildRunId(harness.database, started.run.id, 'sub');
+      const grandchildRunId = await waitForChildRunId(harness.database, childRunId, 'c-sub');
+      await waitForStepRunning(harness.database, grandchildRunId, 'u-agent');
+      const runIds = [started.run.id, childRunId, grandchildRunId];
+
+      const interrupting = harness.engine.interruptRun(started.run.id);
+      await waitForInterruptCalls(scripted.calls, 1);
+      const shuttingDown = harness.engine.shutdown();
+      // A második `interrupt()` a leállásé: a megszakítás a lépés
+      // folyamának kimerülésére vár, amikor a leállás elkezdődik.
+      await waitForInterruptCalls(scripted.calls, 2);
+      scripted.releaseDrain();
+      const summary = okOrThrow(await interrupting);
+      okOrThrow(await shuttingDown);
+
+      expect(new Set(summary.cancelledRunIds)).toStrictEqual(new Set(runIds));
+      expect(runRowsOf(harness.database, runIds).map(({ status, closing }) => ({ status, closing }))).toStrictEqual(
+        runIds.map(() => ({ status: 'cancelled', closing: ['run_finished'] })),
+      );
+      expect(treeClosingOf(harness.database, started.run.id, childRunId)).toStrictEqual(closingFor('cancelled'));
+      for (const runId of runIds) {
+        expect(findRunFinishedStatus(harness.published, runId)).toBe('cancelled');
+      }
     });
   });
 

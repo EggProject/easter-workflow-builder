@@ -1,13 +1,15 @@
 import type { Outcome } from '@easter-workflow-builder/core';
+import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { RunSupervisor } from '../run-supervisor/run-supervisor.ts';
 import type { CancelActiveRunTreeDependencies } from './cancel-active-run-tree.ts';
 import { cancelActiveRunTree } from './cancel-active-run-tree.ts';
 
 /**
  * Az `interruptRun` függősége. A `runSupervisor` szándékosan csak a
- * `listActiveRuns` metódust várja (`Pick`, nem a teljes `RunSupervisor`): ez
- * a téma nem indít futást és nem old fel providert, csak a MÁR futó
- * futásokat kérdezi le, ugyanaz az elv, mint az `agent-step` téma
+ * `listActiveRuns` és az `isAcceptingRuns` metódust várja (`Pick`, nem a
+ * teljes `RunSupervisor`): ez a téma nem indít futást és nem old fel
+ * providert, csak a MÁR futó futásokat kérdezi le, és azt, hogy a szabályos
+ * leállás elkezdődött-e, ugyanaz az elv, mint az `agent-step` téma
  * `EngineDependencies` újrahasználásánál (`.claude/CLAUDE.md` "Minimum kód").
  * A `createEngine` (T-005-28) a saját, teljes `RunSupervisor` példányát adja
  * majd ide, adapter nélkül, mert az triviálisan illeszkedik erre a
@@ -21,7 +23,7 @@ import { cancelActiveRunTree } from './cancel-active-run-tree.ts';
  * sorban álló agent lépései kiesnek a sorból.
  */
 export interface InterruptRunDependencies extends CancelActiveRunTreeDependencies {
-  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns'>;
+  readonly runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'isAcceptingRuns'>;
 }
 
 /**
@@ -43,6 +45,18 @@ export interface InterruptRunResult {
  * `rootRunId` szerint azonos gyökerű futásokon, az al-workflow futásokat is
  * beleértve) végzi el a hat pontot:
  *
+ * 0. **A szabályos leállás alatt nem fut le** (user döntés 2026-09-24): ha a
+ *    `runSupervisor.isAcceptingRuns()` hamis, a függvény `engine_shutting_down`
+ *    hibával, olvasás és írás nélkül tér vissza, és a futást a leállás zárja
+ *    `interrupted` állapotba (SPEC-004 9., 10.2). Ugyanaz a jelzés, amin a
+ *    futás indítás elutasítása áll. Enélkül a leállás alatt érkező
+ *    megszakítás a leállás által már `interrupted` célú fát `cancelled`
+ *    állapotba írta, miközben a szülő lépés eseménye `interrupted` volt, ha
+ *    egy másik futás tovább tartotta a leállást; ha nem, a válasz a
+ *    kapcsolatok zárása után készült el, és a kliens `socket hang up` hibát
+ *    kapott (mérve, `docs/research/2026-09-23-megszakitas-leallas-meres.md`
+ *    7. szekció). A már folyamatban lévő megszakítást a később kezdődő
+ *    leállás nem érinti: az a saját `cancelled` zárásával fejeződik be.
  * 1. **A cél futás beolvasása** (`database.runs.getRun`): innen jön a
  *    `rootRunId`, amivel a fa többi tagja azonosítható. Ismeretlen `runId`-ra
  *    a `not_found` hiba változatlanul, `Outcome` hibaágként megy tovább -
@@ -106,6 +120,16 @@ export async function interruptRun(
   runId: string,
   dependencies: InterruptRunDependencies,
 ): Promise<Outcome<InterruptRunResult>> {
+  if (!dependencies.runSupervisor.isAcceptingRuns()) {
+    return {
+      kind: 'error',
+      message: formatEngineErrorMessage(
+        'engine_shutting_down',
+        `A(z) "${runId}" futás megszakítása nem fut le, mert a motor szabályos leállása már elkezdődött, és a futást a leállás zárja`,
+      ),
+    };
+  }
+
   const target = dependencies.database.runs.getRun(runId);
   if (target.kind === 'error') {
     return target;

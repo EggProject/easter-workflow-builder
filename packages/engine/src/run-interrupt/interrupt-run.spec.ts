@@ -162,7 +162,10 @@ function dependenciesOf(
   published: unknown[] = [],
   concurrencyGate: ConcurrencyGate = createConcurrencyGate(() => null),
 ): InterruptRunDependencies {
-  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns'> = { listActiveRuns: () => handles };
+  const runSupervisor: Pick<RunSupervisor, 'listActiveRuns' | 'isAcceptingRuns'> = {
+    listActiveRuns: () => handles,
+    isAcceptingRuns: () => true,
+  };
   return {
     database,
     eventPublisher: {
@@ -186,6 +189,30 @@ describe('interruptRun', () => {
 
     expect(outcome.kind).toBe('error');
     expect(outcome.kind === 'error' ? outcome.message : '').toContain('not_found');
+
+    database.close();
+  });
+
+  it('a szabályos leállás kezdete után engine_shutting_down hibát ad, és a fán semmit nem csinál: nincs requestStop, nincs interrupt, a sorok és az események változatlanok (user döntés 2026-09-24)', async () => {
+    const database = openMemoryDatabase();
+    const registry = createAgentQueryRegistry();
+    const seeded = seedRootRun(database);
+    const { query, interruptSpy } = fakeQuery();
+    registry.register(seeded.run.id, seeded.step.id, query);
+    const handle = handleOf(seeded.run);
+    const eventsBefore = okOrThrow(database.events.readEventsSince(seeded.run.id, 0, 10));
+
+    const outcome = await interruptRun(seeded.run.id, {
+      ...dependenciesOf(database, [handle], registry),
+      runSupervisor: { listActiveRuns: () => [handle], isAcceptingRuns: () => false },
+    });
+
+    expect(outcome.kind === 'error' ? outcome.message : '').toContain('(engine_shutting_down)');
+    expect(handle.requestStop).not.toHaveBeenCalled();
+    expect(interruptSpy).not.toHaveBeenCalled();
+    expect(okOrThrow(database.runs.getRun(seeded.run.id)).status).toBe('running');
+    expect(okOrThrow(database.stepRuns.getStepRun(seeded.step.id)).status).toBe('running');
+    expect(okOrThrow(database.events.readEventsSince(seeded.run.id, 0, 10))).toStrictEqual(eventsBefore);
 
     database.close();
   });

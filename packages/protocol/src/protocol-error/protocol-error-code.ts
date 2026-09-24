@@ -7,7 +7,8 @@ import { z } from 'zod';
  * adja.
  *
  * A `service_unavailable` a folyamat átmeneti állapota, nem a kérésé: a leálló
- * szerver elutasítja az új futást (SPEC-004 10.2 1. pont). Ez a 503 jelentése
+ * szerver elutasítja az új futást (SPEC-004 10.2 1. pont) és a megszakítást
+ * (SPEC-004 9. szekció, user döntés 2026-09-24). Ez a 503 jelentése
  * (RFC 9110 15.6.4, https://www.rfc-editor.org/rfc/rfc9110.html#name-503-service-unavailable).
  */
 export const ProtocolErrorCodeSchema = z.enum([

@@ -38,7 +38,8 @@ export interface ShutdownActiveRunsDependencies {
  * `SIGINT`/`SIGTERM` esetén a hívó ezt hívja meg:
  *
  * 0. **Új futás és új lépés többé nem indul** (10.2 1. pont): a
- *    `runSupervisor.stopAcceptingRuns()` után minden futás indítás
+ *    `runSupervisor.stopAcceptingRuns()` után minden futás indítás és
+ *    felhasználói megszakítás (`interruptRun`, user döntés 2026-09-24)
  *    `engine_shutting_down` hibát ad, a `concurrencyGate.close()` után pedig
  *    egyetlen agent lépés sem kap helyet, a sorban állók sem. Mindkettő
  *    szinkron, és az 1. pont ELŐTT fut, tehát a lekérdezett lista a leállás

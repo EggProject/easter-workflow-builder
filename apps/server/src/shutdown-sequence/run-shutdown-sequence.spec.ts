@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { request as httpRequest, type IncomingMessage, type Server } from 'node:http';
+import { IncomingMessage, request as httpRequest, type Server } from 'node:http';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
@@ -187,18 +187,23 @@ function seedAgentStepWorkflow(database: DatabaseContext): string {
  * engedi, és az `interrupt()` NEM engedi el azonnal: így a leállás a futó
  * lépés leállítására várva "tart", ahogy a mért esetben. Minden további hívás
  * azonnal sikeres lépést ad, hogy egy javítás nélkül elinduló második futás
- * ne akassza el a tesztet, csak a hívásszám árulja el.
+ * ne akassza el a tesztet, csak a hívásszám árulja el. Az `interruptedAgain`
+ * a második `interrupt()` hívásra teljesül: a leállás utáni második leállítási
+ * kísérlet megfigyelhető jele.
  */
 function holdingAgentRunner(): {
   readonly runner: AgentQueryRunner;
   readonly runCalls: () => number;
   readonly firstStepStarted: Promise<undefined>;
   readonly interruptCalled: Promise<undefined>;
+  readonly interruptedAgain: Promise<undefined>;
   readonly release: () => void;
 } {
   let calls = 0;
+  let interruptCalls = 0;
   const started = Promise.withResolvers<undefined>();
   const interrupted = Promise.withResolvers<undefined>();
+  const interruptedTwice = Promise.withResolvers<undefined>();
   const released = Promise.withResolvers<undefined>();
   const result = {
     type: 'result',
@@ -229,7 +234,11 @@ function holdingAgentRunner(): {
           value: {
             messages: calls === 1 ? heldStream() : immediateStream(calls),
             interrupt: () => {
+              interruptCalls += 1;
               interrupted.resolve(undefined);
+              if (interruptCalls === 2) {
+                interruptedTwice.resolve(undefined);
+              }
               return Promise.resolve();
             },
           },
@@ -239,6 +248,7 @@ function holdingAgentRunner(): {
     runCalls: () => calls,
     firstStepStarted: started.promise,
     interruptCalled: interrupted.promise,
+    interruptedAgain: interruptedTwice.promise,
     release: () => {
       released.resolve(undefined);
     },
@@ -426,6 +436,99 @@ describe('runShutdownSequence', () => {
     expect(runIdsDuringShutdown).toHaveLength(1);
     expect(agent.runCalls()).toBe(1);
     expect(exitCode).toBe(0);
+  });
+
+  it('REGRESSZIÓ: a jel ELŐTT fejléccel megkezdett, de csak a leállás alatt befejezett megszakító kérés a kapcsolatok zárása előtt 503 service_unavailable választ kap engine_shutting_down hibaosztállyal, semmit nem ír, és a futás a leállás szerint interrupted (SPEC-004 9. szekció, SPEC-005 8.3, user döntés 2026-09-24)', async () => {
+    const database = openMemoryDatabase();
+    const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+    const clock = createSystemClock();
+    const agent = holdingAgentRunner();
+    // Ugyanaz a három, tesztelhetőségi eltérés, mint az indító kérés
+    // regressziós tesztjében.
+    const engine = createEngine({
+      ...buildEngineDependencies(database, streamRegistry, clock),
+      agentQueryRunner: agent.runner,
+      templateRenderer: PASS_THROUGH_TEMPLATE_RENDERER,
+      // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
+      processEnvironment: { read: () => null },
+    });
+    const server = createHttpServer({
+      handlers: buildRouteHandlers(database, engine, streamRegistry),
+      devOrigin: undefined,
+      streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+    });
+    await listen(server);
+    const { sink } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
+    const workflowId = seedAgentStepWorkflow(database);
+    const started = await fetch(`${baseUrlOf(server)}/api/workflows/${workflowId}/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input: {} }),
+    });
+    const startedBody: unknown = await started.json();
+    const runId = isRecord(startedBody) && isString(startedBody['runId']) ? startedBody['runId'] : '';
+    await agent.firstStepStarted;
+
+    // A fejléc a leállás ELŐTT megy ki és a szerver már kiszolgálja (a kezelő
+    // a törzsre vár), a törzs csak a leállás alatt jön.
+    const requestArrived = new Promise<void>((resolve) => {
+      server.once('request', () => {
+        resolve();
+      });
+    });
+    const body = '{}';
+    const halfSent = httpRequest(`${baseUrlOf(server)}/api/runs/${runId}/interrupt`, {
+      method: 'POST',
+      agent: false,
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+    });
+    const settled = new Promise<IncomingMessage | Error>((resolve) => {
+      halfSent.once('response', resolve);
+      halfSent.once('error', resolve);
+    });
+    halfSent.flushHeaders();
+    await requestArrived;
+
+    const databaseClosedByTest: DatabaseContext = {
+      ...database,
+      close: () => {
+        // A leállás végén a sorozat bezárná az adatbázist; a teszt maga zár, a
+        // végállapot beolvasása után.
+      },
+    };
+    const shutdown = runShutdownSequence({ server, engine, database: databaseClosedByTest, logger, streamRegistry });
+    await agent.interruptCalled;
+    halfSent.end(body);
+    // A javítás előtt a megszakítás a leállás mellett még egyszer leállította
+    // a lépést, és a folyam kimerüléséig nem válaszolt; a leállás a
+    // kapcsolatokat a válasz előtt zárta, a kliens `socket hang up` hibát kapott.
+    const first = await Promise.race([settled, agent.interruptedAgain]);
+    const responseBody: unknown = first instanceof IncomingMessage ? JSON.parse(await readResponseText(first)) : {};
+    const statusDuringShutdown = okOrThrow(database.runs.getRun(runId)).status;
+    const eventKindsDuringShutdown = okOrThrow(database.events.readEventsSince(runId, 0, 1000)).map(
+      (event) => event.kind,
+    );
+    agent.release();
+    const exitCode = await shutdown;
+    await settled;
+
+    expect(first).toBeInstanceOf(IncomingMessage);
+    expect(first instanceof IncomingMessage ? first.statusCode : 0).toBe(503);
+    expect(responseBody).toMatchObject({ code: 'service_unavailable' });
+    expect(isRecord(responseBody) && isString(responseBody['message']) ? responseBody['message'] : '').toContain(
+      '(engine_shutting_down)',
+    );
+    expect(statusDuringShutdown).toBe('running');
+    expect(eventKindsDuringShutdown).not.toContain('run_finished');
+    expect(okOrThrow(database.runs.getRun(runId)).status).toBe('interrupted');
+    expect(
+      okOrThrow(database.events.readEventsSince(runId, 0, 1000))
+        .map((event) => event.kind)
+        .filter((kind) => kind === 'run_finished' || kind === 'run_interrupted'),
+    ).toStrictEqual(['run_interrupted']);
+    expect(exitCode).toBe(0);
+    database.close();
   });
 
   it('a motor leállási hibaágán 1 kilépési kódot ad, az adatbázist mégis zárja', async () => {

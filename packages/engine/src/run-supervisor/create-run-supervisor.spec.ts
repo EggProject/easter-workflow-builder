@@ -590,7 +590,7 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
-    it('a stopAcceptingRuns után érvényes workflow-ra is engine_shutting_down hibát ad, gyökér és al-workflow futásra is, és nem jön létre workflow_run sor (SPEC-004 10.2 1. pont)', async () => {
+    it('a stopAcceptingRuns után az isAcceptingRuns hamis, és érvényes workflow-ra is engine_shutting_down hibát ad, gyökér és al-workflow futásra is, és nem jön létre workflow_run sor (SPEC-004 10.2 1. pont)', async () => {
       const harness = openHarness();
       const workflowId = createWorkflow(
         harness.database,
@@ -599,7 +599,9 @@ describe('createRunSupervisor', () => {
         [edgeOf('e1', 'start', 'a1')],
       );
 
+      expect(harness.supervisor.isAcceptingRuns()).toBe(true);
       harness.supervisor.stopAcceptingRuns();
+      expect(harness.supervisor.isAcceptingRuns()).toBe(false);
       const outcome = harness.supervisor.startRun({ workflowId, input: {} });
       const child = await harness.supervisor.startChildRun({
         targetWorkflowId: workflowId,
