@@ -28,14 +28,14 @@ export default defineConfig({
   retries: 0,
   // A Playwright CI utmutatoja a `workers: 1` erteket ajanlja CI-ben, hogy
   // a parhuzamos workerek ne versenyezzenek eroforrasokert egy tipikusan
-  // gyengebb CI gepen. Helyi futtatasnal az alapertelmezes (automatikus,
-  // CPU-magok fele) marad, ezert a kulcs CI-n kivul MARAD KI teljesen -
-  // az `exactOptionalPropertyTypes` (tooling/tsconfig/base.json) mellett
-  // egy explicit `undefined` ertek nem fogadhato el, mert a Playwright
-  // sajat `workers` tipusa (`string | number`) nem tartalmazza az
-  // `undefined`-ot.
-  // Forras: https://playwright.dev/docs/ci#workers
-  ...(Boolean(process.env['CI']) && { workers: 1 }),
+  // gyengebb CI gepen (https://playwright.dev/docs/ci#workers). Helyi
+  // futtatasnal a dokumentalt alapertelmezes (a logikai CPU magok fele,
+  // https://playwright.dev/docs/test-parallel) tobb magos gepen harom
+  // workernel tobbet inditana, ami megolheti a fejlesztoi gepet - ezert
+  // lokalisan legfeljebb HAROM worker futhat (user keres 2026-09-24,
+  // docs/research/2026-09-24-playwright-worker-korlat.md). A CI-agban a
+  // viselkedes valtozatlan marad, a szam kesobbi meres targya.
+  workers: Boolean(process.env['CI']) ? 1 : 3,
   reporter: 'list',
   use: {
     baseURL: PREVIEW_ORIGIN,

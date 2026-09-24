@@ -523,6 +523,23 @@ szabálylista" ott áll részletesen, itt csak a lényeg.
   érték, miközben a `toBeVisible()` mindkét esetben átment
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
 
+**A Playwright lokálisan legfeljebb HÁROM workert használhat** (user kérés 2026-09-24): "A
+Playwright teszteknél maximum három worker futhat. Több nem, lokál... mert megöli a gépet." A
+korlát a TELJES GÉPRE vonatkozik, nem konfigurációnként: lokálisan egyszerre csak egy Playwright
+folyamat futhat, az e2e shardok (`--shard=1/3` ... `3/3`) egymás UTÁN, sorban futnak, nem
+párhuzamosan, mert két egyidejű Playwright folyamat együttes worker száma is a korlát alá esik.
+A `apps/web/playwright.config.ts` és `playwright.screenshots.config.ts` `workers` mezője ezt
+kódolja (`docs/research/2026-09-24-playwright-worker-korlat.md`), a
+`apps/web/src/playwright-worker-limit/` regressziós tesztje őrzi a `test` kapun.
+**Nyitott pont a CI-ági workers érték méretezésére** (a 4. szekció 2. pontja szerinti
+jelöléssel): a user kifejezett kérése szerint "CI-ban futhat több is, mert az elviseli... ha
+elviseli, ott majd meg kell nézni" - tehát a tényleges CI worker szám felső korlátja jelenleg
+NEM MÉRT. Mi a viselkedés addig: a CI-ági érték változatlan marad azon, amit a config már eddig
+is használt (jelenleg `1`, a `docs/ci#workers` ajánlása szerint). Mi zárná le: a tényleges CI
+futtatókörnyezet terhelhetőségének mérése (hány worker fut le stabilan a GitHub Actions
+runneren), és a mérés eredményének átvezetése ebbe a szakaszba és a `playwright.config.ts`
+kommentjébe.
+
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
 
