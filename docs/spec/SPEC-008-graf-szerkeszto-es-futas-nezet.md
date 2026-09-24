@@ -522,7 +522,7 @@ A gráf a pillanatképből épül, a dekoráció pedig a `GET /api/runs/{runId}/
 
 ### 7.1 A huszonöt esemény típus megjelenítése
 
-Minden sor ugyanabból a szerkezetből épül: időbélyeg, eredet jelölés, típus címke, és a típusonként eltérő törzs. A `kind` szerinti elágazás **kimerítő `switch`**, tehát egy huszonhatodik érték a `protocol` csomagban fordítási hibát adna.
+Minden sor ugyanabból a szerkezetből épül: időbélyeg, eredet jelölés, típus címke, és a típusonként eltérő törzs. A `kind` szerinti elágazás **kimerítő `switch`**, tehát egy huszonhatodik érték a `protocol` csomagban fordítási hibát adna. **A szerkezet tipográfiája (user döntés, 2026-09-24):** az időbélyeg és a törzs meta darabjai (eszköznév, azonosító, az SDK gépi értékei, számok) a design system Code szerepével, az eredet, a címke és a törzs szövege a törzs betűjével jelenik meg (7.2 1. pont). A darabolás a sor szövegét nem változtatja: a darabok sorrendben összefűzve adják a teljes címet, ami a gomb hozzáférhető neve.
 
 | Csoport                                                                            | Mit mutat a törzs                                                                                                                       |
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -545,7 +545,7 @@ Minden sor ugyanabból a szerkezetből épül: időbélyeg, eredet jelölés, t�
 
 **A követelmény forrása a gyökér `CLAUDE.md`** ("egy Claude Code CLI szerű transcript panel mutatja, mit csinál az agent"). A jelen spec ezt kimondottan a következő olvasat szerint valósítja meg, hogy a követelmény ellenőrizhető legyen, és ha az olvasat téves, javítható:
 
-1. **Monospace betűkép**, a már átemelt `self-hosted-font` téma JetBrains Mono családjából; a sorok bal oldalán állandó szélességű jelölő oszlop.
+1. **Mono csak a meta (user döntés, 2026-09-24; a korábbi, az egész sorra monospace betűképet előíró olvasat helyett).** Az időbélyeg, az eszköznév, az azonosító (`toolUseId`, `parentToolUseId`, és az SDK gépi értékei: altípus, hook név, esemény típus, állapot) és a számok (token számok, költség, `numTurns`) a design system Code szerepével állnak (`--ep-text-code`: JetBrains Mono 500, 14px, a már átemelt `self-hosted-font` témából). A sor szövege (eredet, címke, összefoglaló) a törzs betűjével, a `--ep-text-small` tokennel (Roboto 400, 14px/1.5): a törzs betűs tokenek közül ez az egyetlen, aminek mérete és sormagassága a Code szereppel azonos. Forrás: a design system DESIGN.md 3. szekciója ("JetBrains Mono is reserved for code, tokens, timestamps and numeric meta", törzs szövegre nem) és a SKILL.md (szemantikus type token, "never ad-hoc `font-size`"). A sorok bal oldalán állandó szélességű jelölő oszlop. Mérés előtte és utána: `docs/research/2026-09-23-transcript-panel-meresek.md` 11. szekció.
 2. **Sor orientált, kronologikus** megjelenítés, csoportosítás és összecsukható fa nélkül; a lépésenkénti szűkítés a `stepRunId` szerinti lekérdezés dolga, nem a rajzolásé.
 3. **Az eszközhívások láthatók**, névvel és azonosítóval, mert az agent munkájának ez a legfontosabb, követhető nyoma.
 4. **A színek kizárólag a design system tokenjeiből** jönnek, saját érték nélkül; az `origin` (`sdk` vagy `engine`) a jelölő oszlopban, nem csak színnel jelenik meg.

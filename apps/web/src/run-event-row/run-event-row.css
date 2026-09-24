@@ -1,10 +1,29 @@
-/* Egy transcript sor (SPEC-008 7.2, PLAN-009 T-009-24). A "Claude Code CLI
-   szerű" megjelenés elemei: a monospace betűkép, és a bal oldali jelölő
-   oszlop, ami a design system `.accordion__icon` szlotja (18x18,
+/* Egy transcript sor (SPEC-008 7.2, PLAN-009 T-009-24). A bal oldali jelölő
+   oszlop a design system `.accordion__icon` szlotja (18x18,
    `flex-shrink: 0`). Az eredetet az ikon alakja jelöli; a szín csak
-   kiegészítés, kizárólag design system tokenből, saját szín érték nélkül. */
-.run-event-row {
-  font-family: var(--ep-font-mono);
+   kiegészítés, kizárólag design system tokenből, saját szín érték nélkül.
+
+   Tipográfia (user döntés 2026-09-24, SPEC-008 7.2 1. pont): mono csak a
+   meta. A design system DESIGN.md 3. szekciója szerint a JetBrains Mono "is
+   reserved for code, tokens, timestamps and numeric meta", törzs szövegre
+   nem, és a SKILL.md szerint szemantikus type token jár, "never ad-hoc
+   font-size".
+   - A sor szövege (eredet, címke, összefoglaló) a `--ep-text-small` (Small,
+     400 14px/1.5, Roboto). Nem a `--ep-text-body`: a sorban a meta a Code
+     szerep (500 14px/1.5), és a Small az egyetlen törzs betűs token
+     ugyanezzel a mérettel és sormagassággal, tehát a két betűcsalád egy
+     sorban azonos méretű marad.
+   - A meta (időbélyeg, eszköznév, azonosító, szám) a `--ep-text-code`.
+   A fejléc szabály a forrás `.accordion__header` szabályát (600 16px/1.4,
+   `font-family: inherit`) nagyobb specifitással írja felül, a bájtra azonos
+   `accordion.css` érintése nélkül. A meta szlot saját `font` szabálya
+   (`.accordion__meta`) változatlan marad. */
+.run-event-row .accordion__header {
+  font: var(--ep-text-small);
+}
+
+.run-event-row__code {
+  font: var(--ep-text-code);
 }
 
 .run-event-row--origin-sdk .accordion__icon {
@@ -14,7 +33,8 @@
 /* A cím és a költség meta EGY sorra csonkolt, ellipszissel, nem tördelt
    (T-009-25). Két ok:
    1. A virtualizált lista sormagassága így a tartalom hosszától és a panel
-      szélességétől független: minden összecsukott sor ugyanolyan magas,
+      szélességétől független: minden összecsukott sor ugyanolyan magas (az
+      egyetlen mért kivétel az átmeneti sor, lásd a konstans kommentjét),
       tehát a még nem kirajzolt sorok becsült magassága pontos, és az aljára
       görgetés a becsült pozícióra is pontosan érkezik (lásd
       `transcript-panel/collapsed-transcript-row-height.ts`). Tördelt címnél

@@ -9,6 +9,7 @@ import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-heig
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import type { TranscriptRow as TranscriptRowData } from './transcript-row.ts';
+import { transcriptRowKey } from './transcript-row-key.ts';
 import { useTranscriptAutoScroll } from './use-transcript-auto-scroll.ts';
 import './transcript-panel.css';
 
@@ -57,9 +58,12 @@ const TRANSIENT_DELTA_NOTE =
  * halott ág lenne (`.claude/CLAUDE.md` 5. szekció). A szelet mindig
  * pontosan egy elemű.
  *
- * A React kulcs a sor `key` mezője: átmeneti sornál a kliens oldali, monoton
- * számlálóból képződik, nem az esemény azonosítójából, mert az átmeneti
- * keretnek nincs ilyen (SPEC-008 7.5 3. szabály, `transcript-row.ts`).
+ * A lista elem React kulcsát a lista `rowKey` propja adja
+ * (`transcript-row-key.ts`): a sor saját `key` mezője, nem a sorszáma, így a
+ * lista elem (és benne a kinyitott állapot) a sorral együtt mozog. Az
+ * egyelemű `map` gyerekén álló `key` a `RunEventRow` kulcsa a lista elemen
+ * belül: ha a sorszámon másik sor áll, a `RunEventRow` újracsatolódik, tehát
+ * egy sor állapota sosem kerülhet át egy másikra.
  */
 function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): ReactElement {
   const { index, style, ariaAttributes, rows, stepRuns } = properties;
@@ -88,7 +92,8 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * mérés (soronként eltérő magasság) szerint működik. Ez azért kell, mert a
  * sor kinyitható, és a kinyitott sor a teljes, tördelt payloadot mutatja,
  * aminek a magassága előre nem számítható. A még nem kirajzolt sorokat a
- * lista az összecsukott sor pontos magasságával becsüli.
+ * lista az összecsukott sor pontos magasságával becsüli. A sor React kulcsa
+ * a `rowKey` prop, a sor saját `key` mezőjéből (`transcript-row-key.ts`).
  *
  * **Automatikus görgetés.** A `useTranscriptAutoScroll` hook: pixel küszöb
  * nélkül, a `visibleRows.stopIndex === rowCount - 1` predikátummal dönt, és
@@ -164,6 +169,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
             rowComponent={TranscriptRow}
             rowCount={rowCount}
             rowHeight={rowHeight}
+            rowKey={transcriptRowKey}
             rowProps={{ rows, stepRuns }}
           />
         </>

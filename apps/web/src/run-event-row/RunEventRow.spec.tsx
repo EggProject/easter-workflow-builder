@@ -1,5 +1,8 @@
 /* eslint-disable unicorn/no-null -- a szintetikus RunEventRecord fixture nullázható mezői a dróton ténylegesen `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import type { RunEventRecord } from '@easter-workflow-builder/protocol';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -26,6 +29,30 @@ const BASE_RECORD: RunEventRecord = {
   numTurns: null,
   payload: { type: 'assistant', message: { content: [] } },
 };
+
+const THIS_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const ROW_CSS_PATH = path.join(THIS_DIRECTORY, 'run-event-row.css');
+const TYPOGRAPHY_CSS_PATH = path.join(
+  THIS_DIRECTORY,
+  '..',
+  '..',
+  '..',
+  '..',
+  'packages',
+  'ui',
+  'src',
+  'design-token',
+  'typography.css',
+);
+
+/**
+ * Egy CSS szabály törzse a szelektora alapján (ugyanaz a minta, mint a
+ * `collapsed-transcript-row-height.spec.ts` fájlban).
+ */
+function ruleBody(css: string, selector: string): string {
+  const escaped = selector.replaceAll('.', String.raw`\.`);
+  return new RegExp(String.raw`(?:^|\n)${escaped}\s*\{([^}]*)\}`).exec(css)?.[1] ?? '';
+}
 
 describe('RunEventRow', () => {
   let container: HTMLDivElement;
@@ -68,6 +95,45 @@ describe('RunEventRow', () => {
     expect(header().textContent).toContain('Eszközhívás');
     expect(header().textContent).toContain('web_search');
     expect(header().textContent).toContain('tool-abc123');
+  });
+
+  // User döntés 2026-09-24 (SPEC-008 7.2 1. pont): mono csak a meta.
+  it('a meta (időbélyeg, eszköznév, azonosító, token számok) a Code szerepű elemben áll, az eredet és a címke nem', () => {
+    act(() => {
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
+    });
+    const title = container.querySelector('.accordion__title');
+    const codeTexts = [...(title?.querySelectorAll('.run-event-row__code') ?? [])].map(
+      (element) => element.textContent,
+    );
+    expect(codeTexts).toEqual([
+      new Date(BASE_RECORD.occurredAtMs).toLocaleTimeString('hu-HU'),
+      'web_search',
+      'tool-abc123',
+      '10',
+      '20',
+      '0',
+      '0',
+    ]);
+    // A darabolás a szöveget nem változtatja: a gomb neve ugyanaz a mondat.
+    expect(title?.textContent).toBe(
+      `${new Date(BASE_RECORD.occurredAtMs).toLocaleTimeString('hu-HU')} · SDK · Eszközhívás: web_search (tool-abc123), ` +
+        'tokenek: bemenet: 10, kimenet: 20, gyorsítótár olvasás: 0, gyorsítótár írás: 0',
+    );
+    expect(codeTexts.join(' ')).not.toContain('SDK');
+    expect(codeTexts.join(' ')).not.toContain('Eszközhívás');
+  });
+
+  it('a sor szövege a --ep-text-small, a meta a --ep-text-code tokennel áll, a sor gyökerén nincs mono betűcsalád', () => {
+    const rowCss = readFileSync(ROW_CSS_PATH, 'utf8');
+    expect(ruleBody(rowCss, '.run-event-row .accordion__header')).toMatch(/^\s*font:\s*var\(--ep-text-small\);\s*$/);
+    expect(ruleBody(rowCss, '.run-event-row__code')).toMatch(/^\s*font:\s*var\(--ep-text-code\);\s*$/);
+    expect(rowCss).not.toContain('--ep-font-mono');
+    // A két token ugyanazzal a mérettel és sormagassággal, más betűcsaláddal
+    // (a design system forrása, `typography.css`).
+    const typographyCss = readFileSync(TYPOGRAPHY_CSS_PATH, 'utf8');
+    expect(typographyCss).toMatch(/--ep-text-small:\s*400 14px\/1\.5\s+var\(--ep-font-sans\);/);
+    expect(typographyCss).toMatch(/--ep-text-code:\s*500 14px\/1\.5\s+var\(--ep-font-mono\);/);
   });
 
   it('alapértelmezésben zárva indul, aria-expanded="false" és a törzs rejtett', () => {
@@ -172,6 +238,7 @@ describe('RunEventRow', () => {
           root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" isTransient={false} />);
         });
         expect(container.querySelector('.accordion__meta')?.textContent).toBe('Költség (SDK becslés): $0.2131');
+        expect(container.querySelector(':scope .accordion__meta .run-event-row__code')?.textContent).toBe('$0.2131');
         expect(container.querySelector('.accordion__title')?.textContent).not.toContain('$0.2131');
       });
 
@@ -184,7 +251,7 @@ describe('RunEventRow', () => {
         });
         const costField = body().querySelector('.run-event-row__cost');
         expect(costField?.querySelector('strong')?.textContent).toBe('Költség (SDK becslés):');
-        expect(costField?.textContent).toContain('$0.2131');
+        expect(costField?.querySelector('.run-event-row__code')?.textContent).toBe('$0.2131');
         expect(costField?.textContent).toContain('becslés, nem számla');
         expect(costField?.textContent).toContain('Claude előfizetésnél');
         // A nyers payload továbbra is teljes egészében látszik a mező alatt.

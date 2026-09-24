@@ -715,7 +715,12 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy MÁSIK, nem JSX ternary
   mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
   megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
-  dokumentált és kezelt ott, külön jelenség, nem ez a kilenc fájl.
+  dokumentált és kezelt ott, külön jelenség, nem ez a kilenc fájl. **Újramérve 2026-09-24**
+  (a transcript sor tipográfiája után, a `test:e2e` `webServer` buildlogjából): nyolc fájl,
+  huszonhét előfordulás, az `app-shell.tsx` már nincs köztük. A `RunEventRow.tsx` egyik új
+  előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
+  számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
+  felhasznált, tehát a besorolás változatlan.
 
 **Frontend állapot és layout**
 

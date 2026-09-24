@@ -98,6 +98,25 @@ describe('AccordionItem', () => {
     expect(body().id.length).toBeGreaterThan(0);
   });
 
+  it('a cím csomópont is lehet: a gyerek elemei a cím szlotban állnak, és a gomb szövege a darabok sorrendje', () => {
+    act(() => {
+      root.render(
+        <AccordionItem
+          title={
+            <>
+              <span className="meta-darab">9:14:03</span> · szöveg
+            </>
+          }
+        >
+          tartalom
+        </AccordionItem>,
+      );
+    });
+    expect(container.querySelector(':scope .accordion__title > .meta-darab')?.textContent).toBe('9:14:03');
+    expect(header().textContent).toBe('9:14:03 · szöveg');
+    expect(body().getAttribute('aria-labelledby')).toBe(header().id);
+  });
+
   it('icon és meta nélkül egyik szlot sem kerül a DOM-ba', () => {
     act(() => {
       root.render(<AccordionItem title="Futási korlátok">tartalom</AccordionItem>);

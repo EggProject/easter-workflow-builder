@@ -4,10 +4,13 @@ import './accordion.css';
 
 export interface AccordionItemProperties {
   /**
-   * A panel fejlécének szövege; egyben a nyitott panel hozzáférhető neve
-   * (`role="region"` plusz `aria-labelledby`).
+   * A panel fejlécének tartalma; a szövege egyben a nyitott panel
+   * hozzáférhető neve (`role="region"` plusz `aria-labelledby`). A forrás
+   * `Accordion.jsx` a `title` értékét típus nélkül, csomópontként rajzolja,
+   * ezért nem csak szöveg lehet: a transcript sor a meta darabjait külön
+   * elemben adja át (`apps/web` `run-event-row`, user döntés 2026-09-24).
    */
-  readonly title: string;
+  readonly title: ReactNode;
   /**
    * Opcionális jelölő a fejléc bal szélén, a forrás `.accordion__icon`
    * szlotjában: 18x18-as, `flex-shrink: 0` doboz, tehát minden sorban

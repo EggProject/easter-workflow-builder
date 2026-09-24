@@ -63,7 +63,11 @@ leképezés a `kind` értéket kezeli, a teszt szintetikus rekorddal fedi, de va
 nem ad. **A cím és a költség meta egy sorra csonkolt, ellipszissel** (T-009-25,
 `run-event-row.css`): így az összecsukott sor magassága a szöveg hosszától és a panel
 szélességétől független, és egy 400 karakteres, szóköz nélküli URL sem feszíti szét a sort. A
-teljes szöveg a gomb hozzáférhető nevében és a kinyitott payloadban megmarad. **Ha a lépés
+teljes szöveg a gomb hozzáférhető nevében és a kinyitott payloadban megmarad. **Mono csak a meta**
+(user döntés 2026-09-24, SPEC-008 7.2 1. pont): az összegzés a törzset `text` és `code` darabokra
+bontja (`run-event-row-text-segment.ts`); az időbélyeg és a `code` darab (eszköznév, azonosító,
+szám) a `--ep-text-code`, a sor fejléce a `--ep-text-small` tokent kapja a `run-event-row.css`
+fájlban, az `accordion.css` érintése nélkül. **Ha a lépés
 providere nem oldható fel** (`providerId: undefined`, például a sor lépés futása nincs a betöltött
 listában), a sor egyik providerre sem tesz állítást: nincs költség és nincs MiniMax mondat, csak
 egy saját magyarázat. A sorokat a `transcript-panel` téma rajzolja.
@@ -73,7 +77,9 @@ AC39, AC40, AC41). A lista a `react-window@2.3.1` `List` komponense; a `rowHeigh
 `useDynamicRowHeight` gyorsítótára, tehát a sor magassága a kirajzolt tartalomból számítódik (a
 kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat pedig az összecsukott
 sor pontos magasságával becsüli (`collapsed-transcript-row-height.ts`, a design system
-`accordion.css` fejléc szabályából, két regressziós teszttel). Az automatikus görgetés pixel
+`accordion.css` fejléc szabályából és a sor fejlécének type tokenjéből, két regressziós
+teszttel). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
+(`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
 küszöb nélküli: `visibleRows.stopIndex === rowCount - 1` (`is-last-row-visible.ts`), az
 állapotgép a `reduce-transcript-auto-scroll.ts` tiszta függvénye, felgörgetve az "ugrás az
 aljára" gomb nevezi meg az új események számát. **A keretek a `stream-client`

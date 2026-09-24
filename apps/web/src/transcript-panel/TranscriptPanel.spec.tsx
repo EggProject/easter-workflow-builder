@@ -151,6 +151,15 @@ describe('TranscriptPanel', () => {
     return element;
   }
 
+  /**
+   * A kinyitott sorok sorszáma (`aria-posinset`), a kirajzolt sorok közül.
+   */
+  function expandedPositions(): readonly (string | null)[] {
+    return [...list().querySelectorAll('[role="listitem"]')]
+      .filter((item) => item.querySelector('.accordion__header')?.getAttribute('aria-expanded') === 'true')
+      .map((item) => item.getAttribute('aria-posinset'));
+  }
+
   function statusTexts(): readonly (string | null)[] {
     return [...container.querySelectorAll('[role="status"]')].map((element) => element.textContent);
   }
@@ -220,6 +229,31 @@ describe('TranscriptPanel', () => {
     for (const item of items) {
       expect(item.querySelector('.run-event-row')).not.toBeNull();
     }
+  });
+
+  it('a sor React kulcsa a sor key mezője, nem a sorszáma: a kinyitott állapot a sorral marad, más sor nem örökli', () => {
+    // Regresszió: `rowKey` nélkül a `react-window` a sorszámmal kulcsol, a
+    // lista elem nem követi a sort, és az elé beszúrt sor után a kinyitott sor
+    // újracsatolódva bezárul (a `rowKey` törlésével mérve: `[]` a `['3']`
+    // helyett). A virtualizált lista a kirajzolt tartományból kikerülő sort
+    // leszereli, tehát az állapot csak a kirajzolva maradó sorokra őrizhető
+    // meg; a teszt ilyen sorokon fut.
+    const rows = [makeRecord(2), makeRecord(3), makeRecord(4)];
+    renderPanel(transcriptOf(rows, true));
+    act(() => {
+      list().querySelector<HTMLButtonElement>(':scope [aria-posinset="2"] .accordion__header')?.click();
+    });
+    expect(expandedPositions()).toEqual(['2']);
+
+    // Egy sor a lista elejére kerül: a kinyitott sor a harmadik helyre csúszik,
+    // és ott is nyitva marad; a második helyre került sor zárva.
+    renderPanel(transcriptOf([makeRecord(1), ...rows], true));
+    expect(expandedPositions()).toEqual(['3']);
+
+    // Egy másik futás sorai ugyanazokon a sorszámokon: egyik sem örököl
+    // nyitott állapotot.
+    renderPanel(transcriptOf([makeRecord(10), makeRecord(11), makeRecord(12), makeRecord(13)], true));
+    expect(expandedPositions()).toEqual([]);
   });
 
   it('nagy eseménylistán sem rajzol ki minden sort (a valós böngészős mérést az e2e végzi)', () => {

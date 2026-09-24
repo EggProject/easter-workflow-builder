@@ -1132,3 +1132,29 @@ mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/web/package
 beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
 századdal magasabb küszöbbel (98.99 / 98.38 / 99.41 / 98.95) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`, exit 1).
+
+## 27. A transcript sor tipográfiája és a `rowKey` utáni ratchet (2026-09-24): a functions küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A transcript sor fejléce a meta darabokat külön, a design system Code szerepével
+rajzolja (`apps/web/src/run-event-row/RunEventRow.tsx`: a `CodeText` és a `SegmentedText`
+komponens, a `run-event-row-summary.ts` darabolása), a lista pedig `rowKey`-t kap
+(`apps/web/src/transcript-panel/transcript-row-key.ts`). Mind e2e-vel fedett új kód
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 11. és 12. szekció).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána `bun run test:e2e` egy futásban,
+**226 teszt, mind zöld**, majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (26. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1468 / 1483     | 98.98     | 98.98                      | 15 -> **15**                   |
+| branches   | 665 / 676       | 98.37     | 98.37                      | 11 -> **11**                   |
+| functions  | 507 / 510       | **99.41** | 99.4                       | 3 -> **3**                     |
+| lines      | 1412 / 1427     | 98.94     | 98.94                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+5, +1, +9, +3), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 26. szekcióéval. A küszöb a mért
+functions értékre húzva (99.4 -> **99.41**), a másik három a mért értékkel már egyezett, felfelé
+kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(98.99 / 98.38 / 99.42 / 98.95) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

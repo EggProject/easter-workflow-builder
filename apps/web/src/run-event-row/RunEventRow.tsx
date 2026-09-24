@@ -1,7 +1,8 @@
-import type { ReactElement } from 'react';
+import { Fragment, type ReactElement } from 'react';
 import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
 import { AccordionItem, Badge, joinClassNames } from '@easter-workflow-builder/ui';
 import { summarizeRunEventRow } from './run-event-row-summary.ts';
+import type { RunEventRowTextSegment } from './run-event-row-text-segment.ts';
 import './run-event-row.css';
 
 export interface RunEventRowProperties {
@@ -88,6 +89,34 @@ function formatOccurredAt(occurredAtMs: number): string {
 }
 
 /**
+ * Egy meta darab (időbélyeg, eszköznév, azonosító, szám) a design system
+ * Code szerepével (`run-event-row.css`, `--ep-text-code`).
+ */
+function CodeText(properties: Readonly<{ text: string }>): ReactElement {
+  return <span className="run-event-row__code">{properties.text}</span>;
+}
+
+/**
+ * A törzs darabjai sorrendben: a `code` darab meta szövegként, a `text` darab
+ * puszta szövegként, a törzs betűjével. A darablista minden rendernél
+ * ugyanabból a rekordból, ugyanabban a sorrendben képződik, tehát a sorszám
+ * stabil React kulcs.
+ */
+function SegmentedText(properties: Readonly<{ segments: readonly RunEventRowTextSegment[] }>): ReactElement {
+  return (
+    <>
+      {properties.segments.map((segment, index) =>
+        segment.kind === 'code' ? (
+          <CodeText key={index} text={segment.text} />
+        ) : (
+          <Fragment key={index}>{segment.text}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
  * Az eredet jelölője a jelölő oszlopban (SPEC-008 7.2 4. pont): `Bot` az
  * `sdk`, `Workflow` az `engine` eredetű sorhoz. A geometria a projekt által
  * vendorolt lucide 0.525.0 készlet valódi útvonal-adata (24x24 viewBox), a
@@ -154,13 +183,31 @@ function OriginMarkerIcon(properties: Readonly<{ origin: RunEventOrigin }>): Rea
  * a sor egyáltalán hordozna ilyet, ami ma nem fordul elő, mert a szerver
  * átmeneti keretként kizárólag `sdk_stream_event` sort küld) a kinyitott
  * nézetben változatlanul megjelenik.
+ *
+ * **Tipográfia** (user döntés 2026-09-24, SPEC-008 7.2 1. pont): a meta
+ * (időbélyeg, eszköznév, azonosító, szám) a design system Code szerepével, a
+ * sor szövege (eredet, címke, összefoglaló) a törzs betűjével
+ * (`run-event-row.css`). A meta darabok külön elemek, a szövegük sorrendben
+ * összefűzve adja a gomb hozzáférhető nevét, ugyanazt, mint korábban.
  */
 export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactElement {
   const { record, providerId, isTransient } = properties;
   const summary = summarizeRunEventRow(record, providerId);
-  const title = `${formatOccurredAt(record.occurredAtMs)} · ${summary.originLabel} · ${summary.kindLabel}: ${summary.bodyText}`;
+  const title = (
+    <>
+      <CodeText text={formatOccurredAt(record.occurredAtMs)} />
+      {` · ${summary.originLabel} · ${summary.kindLabel}: `}
+      <SegmentedText segments={summary.bodySegments} />
+    </>
+  );
+  const { costEstimateText } = summary;
   const costMeta =
-    summary.costEstimateText === undefined ? undefined : `${COST_FIELD_LABEL}: ${summary.costEstimateText}`;
+    costEstimateText === undefined ? undefined : (
+      <>
+        {`${COST_FIELD_LABEL}: `}
+        <CodeText text={costEstimateText} />
+      </>
+    );
   const meta = isTransient ? (
     <Badge variant="outline" title={TRANSIENT_MARK_TITLE}>
       {TRANSIENT_MARK_TEXT}
@@ -172,10 +219,10 @@ export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactE
   return (
     <div className={joinClassNames('run-event-row', `run-event-row--origin-${record.origin}`)}>
       <AccordionItem title={title} icon={<OriginMarkerIcon origin={record.origin} />} meta={meta}>
-        {costMeta === undefined ? undefined : (
+        {costEstimateText === undefined ? undefined : (
           <div className="run-event-row__cost">
             <p>
-              <strong>{COST_FIELD_LABEL}:</strong> {summary.costEstimateText}
+              <strong>{COST_FIELD_LABEL}:</strong> <CodeText text={costEstimateText} />
             </p>
             <p>{COST_FIELD_EXPLANATION}</p>
           </div>

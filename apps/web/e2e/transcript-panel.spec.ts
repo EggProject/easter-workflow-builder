@@ -300,6 +300,14 @@ test('az összecsukott sor magassága egy szövegsor: tartalomtól független, �
     await test.step(`viewport szélesség: ${String(width)}px`, async () => {
       await page.setViewportSize({ width, height: 900 });
       const list = await openTranscript(page, MIXED_RECORDS.length);
+      // A cím két betűcsaládú (a meta JetBrains Mono, a szöveg Roboto,
+      // user döntés 2026-09-24), tehát a sordoboz a betűtípusok metrikájától
+      // is függhet: a mérés a betöltött webfontokon fut, nem a tartalék
+      // betűn. A mért érték: a sordoboz pontosan a számított sormagasság
+      // (`docs/research/2026-09-23-transcript-panel-meresek.md` 11. szekció).
+      await page.evaluate(async () => {
+        await globalThis.document.fonts.ready;
+      });
 
       const rows = await list.getByRole('listitem').evaluateAll((items) =>
         items.map((item) => {
@@ -375,6 +383,54 @@ test('a jelölő oszlop: a renderelt ikon 18x18, és a cím minden sorban ugyano
       }
     });
   }
+});
+
+test('a sor szövege a design system Small, a meta a Code type tokenjével áll (user döntés 2026-09-24)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockTranscript(page, MIXED_RECORDS);
+  const list = await openTranscript(page, MIXED_RECORDS.length);
+  await page.evaluate(async () => {
+    await globalThis.document.fonts.ready;
+  });
+
+  // A várt értékek a design system saját `.ep-small` és `.ep-code` type
+  // osztályának számított betűjéből jönnek (`typography.css`), nem beírt
+  // számból: a sor a tokent használja, a próba elem ugyanazt a tokent.
+  const measured = await list.evaluate((element) => {
+    const probes = ['ep-small', 'ep-code'].map((className) => {
+      const span = globalThis.document.createElement('span');
+      span.className = className;
+      globalThis.document.body.append(span);
+      return span;
+    });
+    const titles = [...element.querySelectorAll('.accordion__title')];
+    const codes = [...element.querySelectorAll(':scope .accordion__title .run-event-row__code')];
+    const [small, code, ...rest] = [...probes, ...titles, ...codes].map((target) => {
+      const style = globalThis.getComputedStyle(target);
+      return `${style.fontFamily} | ${style.fontSize} | ${style.fontWeight} | ${style.lineHeight}`;
+    });
+    for (const probe of probes) {
+      probe.remove();
+    }
+    return {
+      small,
+      code,
+      titleFonts: rest.slice(0, titles.length),
+      codeFonts: rest.slice(titles.length),
+      codeTexts: codes.map((element_) => element_.textContent),
+    };
+  });
+
+  expect(measured.titleFonts).toHaveLength(MIXED_RECORDS.length);
+  expect(new Set(measured.titleFonts)).toEqual(new Set([measured.small]));
+  // Minden sor időbélyege meta, plusz az eszközhívás neve és azonosítója.
+  expect(measured.codeTexts).toEqual(expect.arrayContaining(['web_search', 'toolu_e2e']));
+  expect(measured.codeFonts.length).toBeGreaterThan(MIXED_RECORDS.length);
+  expect(new Set(measured.codeFonts)).toEqual(new Set([measured.code]));
+  expect(measured.code).toContain('JetBrains Mono');
+  expect(measured.small).not.toContain('JetBrains Mono');
 });
 
 for (const { persistedStreamDeltas, expectedNoteCount } of [

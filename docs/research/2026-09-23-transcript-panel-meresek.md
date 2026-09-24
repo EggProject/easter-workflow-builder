@@ -216,3 +216,99 @@ témában azonos eredmény). Előtte: `running` és `succeeded` futásnál is "A
 eseménye.", `role="status"` elem nélkül. Utána: `running` futásnál egyetlen `role="status"` elem,
 "Várakozás az első eseményre"; `succeeded` futásnál "A futásnak nincs eseménye.", státusz elem
 nélkül.
+
+## 11. A sor tipográfiája: mono csak a meta (2026-09-24)
+
+**A döntés (user, 2026-09-24).** Az időbélyeg, az eszköznév, az azonosító és a számok a design
+system Code szerepével (`--ep-text-code`), a sor szövege (eredet, címke, összefoglaló) a törzs
+betűjével. A választott törzs token a `--ep-text-small` (`400 14px/1.5`, Roboto): a
+`packages/ui/src/design-token/typography.css` törzs betűs tokenjei közül ez az egyetlen, aminek
+mérete és sormagassága a `--ep-text-code` (`500 14px/1.5`) tokenével azonos. Forrás: a design
+system DESIGN.md 3. szekciója ("JetBrains Mono is reserved for code, tokens, timestamps and
+numeric meta") és a SKILL.md (szemantikus type token, "never ad-hoc `font-size`").
+
+**A hiba gyökere előtte.** A `run-event-row.css` `.run-event-row { font-family: var(--ep-font-mono) }`
+szabálya a forrás `.accordion__header` `font-family: inherit` során át az egész fejlécre öröklődött.
+
+**Módszer.** Eldobható mérő script a repón kívül (`/private/tmp/transcript-tipografia/measure.cjs`,
+a screenshot-pipeline invariáns miatt), `vite build` a scratchpadbe az e2e `VITE_*` értékeivel,
+előtte a `6dd8df9` (az `apps/web` kódja az `ab6e6b1` óta változatlan), utána a munkafa állapotán.
+Valódi Chromium (`@playwright/test@1.62.1`), 1440x1500 ablak, `hu-HU` locale, `Europe/Budapest`
+időzóna, mindkét téma, mérés a `document.fonts.ready` után. A transcript valós alakú: 19 perzisztált
+esemény (a projekt MCP szerverének eszköznevei, `mcp__agent-tools__web_search` stb., valódi
+formátumú azonosítók: `toolu_01T1x1fJ34qAmk2tNTrN7Up6` a
+`2026-08-26-agent-sdk-minimax.md` fájlból, `call_a2fd4cce75a02c75` a
+`tools/wire-probe/artifacts/00002-1787918376206.json` MiniMax-M3 válaszából), plusz 3 átmeneti
+delta keret, `persistedStreamDeltas: false`. A transcript panel szélessége az alapértelmezett
+70/30 arányon 400 pixel, a cím szlot ebből 334 pixel. A két téma minden száma azonos.
+
+**Számított betű** (a `getComputedStyle` értéke):
+
+| Elem                         | Előtte                               | Utána                                                    |
+| ---------------------------- | ------------------------------------ | -------------------------------------------------------- |
+| a cím (eredet, címke, törzs) | JetBrains Mono, 16px, 600, `22.4px`  | Roboto, 14px, 400, `21px` (`--ep-text-small`)            |
+| a meta darabok               | nincs külön elem, a cím betűje       | JetBrains Mono, 14px, 500, `21px` (`--ep-text-code`)     |
+| a költség meta               | Roboto 500 12px (`.accordion__meta`) | a felirat változatlan, az összeg JetBrains Mono 500 14px |
+
+**Sormagasság.** Előtte mind a 22 sor 54,390625 pixel (a cím sordoboza 22,390625). Utána a 19
+perzisztált sor 53 pixel, a cím sordoboza pontosan 21 pixel; a 3 átmeneti sor 54 pixel.
+
+- **A levezetés:** `2 * 16 + 14 * 1,5 = 53`, az `accordion.css` fejléc belső margója és a
+  `--ep-text-small` egy szövegsora. A CSS 2.1 10.8.1 szerint egy sorban álló, eltérő ascent és
+  descent értékű betűcsaládok a sordobozt a `line-height` fölé is növelhetik
+  (<https://www.w3.org/TR/CSS21/visudet.html#line-height>); a mérés szerint ezzel a két
+  webfonttal, ezen a méreten a sordoboz nem nő, pontosan 21 pixel. Hogy ez melyik betűmetrikából
+  következik, azt nem vizsgáltuk (nem ellenőrzött), ezért a konstans mért érték, és az e2e
+  sormagasság teszt a betöltött webfontokon méri.
+- **Az átmeneti sor kivétele:** a "Nem tárolt" `Badge` 22 pixel magas (a `badge.css` saját
+  szabálya), ami a 21 pixeles címnél magasabb, tehát ez a sor 54 pixel. A `useDynamicRowHeight`
+  a kirajzolt sort méri, a becslés csak a még nem kirajzolt átmeneti sornál tér el 1 pixellel.
+  Előtte a 22,4 pixeles cím a `Badge`-nél magasabb volt, ezért ott nem jelentkezett.
+
+**Látható cím szélesség összecsukva, 400 pixeles panelen** (látható / teljes, pixel), és a SPEC-008
+7.1 szerkezet (időbélyeg, eredet, címke, törzs), illetve 7.2 3. pont (eszköz neve, azonosítója):
+
+| Sor                                              | Előtte     | Utána      | Láthatóság utána                                                                         |
+| ------------------------------------------------ | ---------- | ---------- | ---------------------------------------------------------------------------------------- |
+| motor, Futás indult                              | 334 / 480  | 334 / 334  | minden rész teljes                                                                       |
+| motor, Lépés elindult                            | 334 / 680  | 334 / 423  | időbélyeg, eredet, címke teljes, a törzs részben                                         |
+| eszközhívás, `mcp__agent-tools__web_search`      | 334 / 1720 | 334 / 1147 | időbélyeg, eredet, címke teljes; eszköznév 140/224 px (előtte 34/280); azonosító nem     |
+| eredmény, `claude-subscription`, költség metával | 153 / 1140 | 142 / 698  | címke részben, 31/62 px (előtte egyáltalán nem); a törzs nem; a meta 180 px (előtte 169) |
+| átmeneti sor, Streamelt részlet                  | 246 / 620  | 246 / 384  | a címke teljes (előtte 76/170 px), a törzs részben                                       |
+
+**Ami a 400 pixeles panelen nem fér ki, mérve.** (1) Az eszközhívás azonosítója: a teljes
+láthatósághoz a cím szlotnak 657 pixel kell (`web_search`, előtte 890), a MiniMax sorban 633
+(`understand_image`, előtte 860), az eszköz eredmény sorban 626 (előtte 910). (2) Az eszköznév
+teljes egészében: 409 pixel kell (`web_search`), illetve 457 (`understand_image`). (3) Az
+eredmény sor törzse: a költség meta 180 pixelt foglal, a cím szlotnak 142 marad, a címke teljes
+láthatóságához 164 kellene. A cím és a meta szerkezete a design system `accordion.css` szerinti,
+a belső margó és a meta mérete nem változott.
+
+**Képek:** `before-light.png`, `after-light.png`, `before-dark.png`, `after-dark.png`, ugyanezzel a
+scripttel, a futás nézet teljes ablakáról.
+
+## 12. A sor React kulcsa: `rowKey` (2026-09-24)
+
+**A telepített forrás.** A pinelt csomag a `react-window@2.3.1` (`2026-08-26-toolchain.md`). A
+`dist/react-window.d.ts` szerint a `List` propja
+`rowKey?: (index: number, data: RowProps) => React.Key`, a doksi kommentje: "Lists use the row
+index as a `key` by default", és "It is important to always `useCallback` for this prop; do not use
+an inline function". A `dist/react-window.js` `List` törzse `key: d ? d(w, h) : w` alakban
+kulcsol (`d` a `rowKey`, `w` a sorszám, `h` a memoizált `rowProps`).
+
+**Webes megerősítés** (Sonnet subagent, 2026-09-24): a hivatalos doksi List props oldala
+(<https://react-window.vercel.app/list/props>) ugyanezt a két mondatot hozza; a CHANGELOG
+(<https://github.com/bvaughn/react-window/blob/main/CHANGELOG.md>) szerint a `rowKey` a 2.3.0-ban
+érkezett ("Add optional `rowKey` prop to `List`"); a React doksi
+(<https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key>) az index kulcsról:
+"Index as a key often leads to subtle and confusing bugs."
+
+**A bekötés.** A `transcript-row-key.ts` modul szintű (tehát stabil) függvénye a sor saját `key`
+mezőjét adja. **Mérve, unit tesztben:** `rowKey` nélkül a lista elem a sorszámhoz kötődik; egy
+elé beszúrt sor után a kinyitott sor lista eleme nem követi a sort, a benne álló `RunEventRow` a sor
+saját (belső `map`) kulcsa miatt újracsatolódik, és a kinyitott állapot elvész: a teszt a `['3']`
+helyett `[]`-t kap. Az állapot másik sorra nem kerül át, ezt a belső kulcs megakadályozza, tehát
+a korábbi belső kulcs nem volt hatástalan, csak a lista elem azonosságát nem adta. **A
+virtualizáció korlátja:** a kirajzolt tartományból kikerülő sort a lista leszereli, tehát a
+kinyitott állapot csak a kirajzolva maradó sorra őrizhető meg (a debug futás szerint egy beszúrás
+utáni első render még a régi tartományt rajzolja, és az onnan kicsúszó sor újracsatolódik).

@@ -1,5 +1,6 @@
 import { isNonEmptyString, isNumber, isRecord } from '@easter-workflow-builder/typeguards';
 import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
+import type { RunEventRowTextSegment } from './run-event-row-text-segment.ts';
 
 /**
  * Egy transcript sor összegzett, magyar szövegű tartalma (SPEC-008 7.1,
@@ -10,7 +11,12 @@ import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflo
 export interface RunEventRowSummary {
   readonly originLabel: string;
   readonly kindLabel: string;
-  readonly bodyText: string;
+  /**
+   * A típusonként eltérő törzs, darabokra bontva: a meta (eszköznév,
+   * azonosító, szám) `code`, a többi `text` darab (user döntés 2026-09-24,
+   * `run-event-row-text-segment.ts`).
+   */
+  readonly bodySegments: readonly RunEventRowTextSegment[];
   /**
    * Kizárólag az `sdk_result` sornál és kizárólag `claude-subscription`
    * providernél van értéke: a `total_cost_usd` mező kijelzésre formázva,
@@ -40,7 +46,7 @@ export interface RunEventRowSummary {
 
 interface KindDescription {
   readonly kindLabel: string;
-  readonly bodyText: string;
+  readonly bodySegments: readonly RunEventRowTextSegment[];
   readonly costEstimateText?: string;
   readonly costHiddenForMinimax?: boolean;
   readonly costHiddenForUnknownProvider?: boolean;
@@ -57,6 +63,21 @@ const ORIGIN_LABEL: Readonly<Record<RunEventOrigin, string>> = {
   sdk: 'SDK',
   engine: 'Motor',
 };
+
+/**
+ * A sor szövegének egy darabja a törzs betűjével.
+ */
+function text(value: string): RunEventRowTextSegment {
+  return { kind: 'text', text: value };
+}
+
+/**
+ * A sor egy meta darabja (eszköznév, azonosító, szám) a design system Code
+ * szerepével.
+ */
+function code(value: string): RunEventRowTextSegment {
+  return { kind: 'code', text: value };
+}
 
 /**
  * A stream esemény `delta` objektumának szöveget hordozó mezői, a mért
@@ -116,23 +137,21 @@ function readPayloadArrayLength(payload: unknown, key: string): number | undefin
 
 /**
  * A négy token szám kompakt, magyar nyelvű összefoglalója (SPEC-008 7.1,
- * `sdk_assistant` és `sdk_result` sor).
+ * `sdk_assistant` és `sdk_result` sor): a megnevezés a törzs betűjével, a
+ * szám meta darabként.
  */
-function formatTokenCounts(record: RowRecord): string {
-  const parts: string[] = [];
-  if (record.inputTokens !== null) {
-    parts.push(`bemenet: ${String(record.inputTokens)}`);
+function formatTokenCounts(record: RowRecord): readonly RunEventRowTextSegment[] {
+  const counts: readonly (readonly [string, number | null])[] = [
+    ['bemenet', record.inputTokens],
+    ['kimenet', record.outputTokens],
+    ['gyorsítótár olvasás', record.cacheReadInputTokens],
+    ['gyorsítótár írás', record.cacheCreationInputTokens],
+  ];
+  const parts = counts.flatMap(([label, count]) => (count === null ? [] : [[text(`${label}: `), code(String(count))]]));
+  if (parts.length === 0) {
+    return [text('nincs token adat')];
   }
-  if (record.outputTokens !== null) {
-    parts.push(`kimenet: ${String(record.outputTokens)}`);
-  }
-  if (record.cacheReadInputTokens !== null) {
-    parts.push(`gyorsítótár olvasás: ${String(record.cacheReadInputTokens)}`);
-  }
-  if (record.cacheCreationInputTokens !== null) {
-    parts.push(`gyorsítótár írás: ${String(record.cacheCreationInputTokens)}`);
-  }
-  return parts.length > 0 ? parts.join(', ') : 'nincs token adat';
+  return parts.flatMap((part, index) => (index === 0 ? part : [text(', '), ...part]));
 }
 
 /**
@@ -174,10 +193,10 @@ function describeAssistant(record: RowRecord): KindDescription {
   if (record.toolName !== null && record.toolUseId !== null) {
     return {
       kindLabel: 'Eszközhívás',
-      bodyText: `${record.toolName} (${record.toolUseId}), tokenek: ${tokenSummary}`,
+      bodySegments: [code(record.toolName), text(' ('), code(record.toolUseId), text('), tokenek: '), ...tokenSummary],
     };
   }
-  return { kindLabel: 'Asszisztens üzenet', bodyText: `Válasz szöveg, tokenek: ${tokenSummary}` };
+  return { kindLabel: 'Asszisztens üzenet', bodySegments: [text('Válasz szöveg, tokenek: '), ...tokenSummary] };
 }
 
 /**
@@ -192,10 +211,10 @@ function describeUser(record: RowRecord): KindDescription {
   if (record.parentToolUseId !== null) {
     return {
       kindLabel: 'Felhasználói üzenet',
-      bodyText: `Eszköz eredmény (hívás: ${record.parentToolUseId}): ${turnDescription}`,
+      bodySegments: [text('Eszköz eredmény (hívás: '), code(record.parentToolUseId), text(`): ${turnDescription}`)],
     };
   }
-  return { kindLabel: 'Felhasználói üzenet', bodyText: turnDescription };
+  return { kindLabel: 'Felhasználói üzenet', bodySegments: [text(turnDescription)] };
 }
 
 /**
@@ -209,12 +228,12 @@ function describeStreamEvent(payload: unknown): KindDescription {
     (text) => text !== undefined,
   );
   if (partialText !== undefined) {
-    return { kindLabel: 'Streamelt részlet', bodyText: partialText };
+    return { kindLabel: 'Streamelt részlet', bodySegments: [text(partialText)] };
   }
   const eventType = readNestedPayloadString(payload, 'event', 'type');
   return {
     kindLabel: 'Streamelt részlet',
-    bodyText: eventType === undefined ? 'Stream esemény' : `Stream esemény: ${eventType}`,
+    bodySegments: eventType === undefined ? [text('Stream esemény')] : [text('Stream esemény: '), code(eventType)],
   };
 }
 
@@ -223,7 +242,10 @@ function describeStreamEvent(payload: unknown): KindDescription {
  */
 function describeHook(payload: unknown, kindLabel: string, fallbackBodyText: string): KindDescription {
   const hookName = readPayloadString(payload, 'hook_name');
-  return { kindLabel, bodyText: hookName === undefined ? fallbackBodyText : `Hook: ${hookName}` };
+  return {
+    kindLabel,
+    bodySegments: hookName === undefined ? [text(fallbackBodyText)] : [text('Hook: '), code(hookName)],
+  };
 }
 
 /**
@@ -247,23 +269,26 @@ function describeRunEventKind(record: RowRecord, providerId: ProviderId | undefi
       return describeStreamEvent(record.payload);
     }
     case 'sdk_result': {
-      const turnsLabel = record.numTurns === null ? 'ismeretlen' : String(record.numTurns);
-      const bodyText = `${formatTokenCounts(record)}, fordulók: ${turnsLabel}`;
+      const turns = record.numTurns === null ? text('ismeretlen') : code(String(record.numTurns));
+      const bodySegments = [...formatTokenCounts(record), text(', fordulók: '), turns];
       if (providerId === undefined) {
-        return { kindLabel: 'Eredmény', bodyText, costHiddenForUnknownProvider: true };
+        return { kindLabel: 'Eredmény', bodySegments, costHiddenForUnknownProvider: true };
       }
       if (providerId === 'minimax') {
-        return { kindLabel: 'Eredmény', bodyText, costHiddenForMinimax: true };
+        return { kindLabel: 'Eredmény', bodySegments, costHiddenForMinimax: true };
       }
       return {
         kindLabel: 'Eredmény',
-        bodyText,
+        bodySegments,
         costEstimateText: formatCostEstimate(readPayloadNumber(record.payload, 'total_cost_usd')),
       };
     }
     case 'sdk_system': {
       const subtype = record.sdkMessageSubtype;
-      return { kindLabel: 'Rendszerüzenet', bodyText: subtype === null ? 'Rendszerüzenet' : `Altípus: ${subtype}` };
+      return {
+        kindLabel: 'Rendszerüzenet',
+        bodySegments: subtype === null ? [text('Rendszerüzenet')] : [text('Altípus: '), code(subtype)],
+      };
     }
     case 'sdk_hook_started': {
       return describeHook(record.payload, 'Hook indult', 'Hook indult');
@@ -276,32 +301,35 @@ function describeRunEventKind(record: RowRecord, providerId: ProviderId | undefi
     }
     case 'sdk_informational': {
       const content = readPayloadString(record.payload, 'content');
-      return { kindLabel: 'Tájékoztatás', bodyText: content ?? 'Tájékoztató üzenet' };
+      return { kindLabel: 'Tájékoztatás', bodySegments: [text(content ?? 'Tájékoztató üzenet')] };
     }
     case 'sdk_commands_changed': {
       const commandCount = readPayloadArrayLength(record.payload, 'commands');
       return {
         kindLabel: 'Parancsok frissültek',
-        bodyText: commandCount === undefined ? 'A parancslista frissült' : `${String(commandCount)} parancs érhető el`,
+        bodySegments:
+          commandCount === undefined
+            ? [text('A parancslista frissült')]
+            : [code(String(commandCount)), text(' parancs érhető el')],
       };
     }
     case 'sdk_rate_limit': {
       const status = readNestedPayloadString(record.payload, 'rate_limit_info', 'status');
       return {
         kindLabel: 'Sebességkorlát',
-        bodyText: status === undefined ? 'Sebességkorlát esemény' : `Állapot: ${status}`,
+        bodySegments: status === undefined ? [text('Sebességkorlát esemény')] : [text('Állapot: '), code(status)],
       };
     }
     case 'sdk_context_usage': {
       // A pinelt SDK-ban nincs önálló üzenet erre (research 2. szekció); a
       // felület a `kind` értéket kezeli, de élő gyakorlatban nem kap sort.
-      return { kindLabel: 'Kontextushasználat', bodyText: 'Kontextushasználati esemény' };
+      return { kindLabel: 'Kontextushasználat', bodySegments: [text('Kontextushasználati esemény')] };
     }
     case 'run_started': {
-      return { kindLabel: 'Futás indult', bodyText: 'A futás elindult' };
+      return { kindLabel: 'Futás indult', bodySegments: [text('A futás elindult')] };
     }
     case 'run_finished': {
-      return { kindLabel: 'Futás befejeződött', bodyText: 'A futás véget ért' };
+      return { kindLabel: 'Futás befejeződött', bodySegments: [text('A futás véget ért')] };
     }
     case 'run_interrupted': {
       // Terminális állapot, nem folyamat: a szerver leállása (szabályos
@@ -309,37 +337,40 @@ function describeRunEventKind(record: RowRecord, providerId: ProviderId | undefi
       // `megszakítás` szó a felhasználó döntésének (`cancelled`) foglalt
       // (SPEC-004 9., 10.2 "Miért `interrupted` és nem `cancelled`"), ezért a
       // felirat a futás jelvényével azonos "félbeszakítva".
-      return { kindLabel: 'Futás félbeszakítva', bodyText: 'A futás a szerver leállása miatt félbeszakadt' };
+      return {
+        kindLabel: 'Futás félbeszakítva',
+        bodySegments: [text('A futás a szerver leállása miatt félbeszakadt')],
+      };
     }
     case 'step_started': {
-      return { kindLabel: 'Lépés elindult', bodyText: 'Egy lépés végrehajtása elkezdődött' };
+      return { kindLabel: 'Lépés elindult', bodySegments: [text('Egy lépés végrehajtása elkezdődött')] };
     }
     case 'step_finished': {
-      return { kindLabel: 'Lépés befejeződött', bodyText: 'Egy lépés végrehajtása lezárult' };
+      return { kindLabel: 'Lépés befejeződött', bodySegments: [text('Egy lépés végrehajtása lezárult')] };
     }
     case 'branch_taken': {
-      return { kindLabel: 'Elágazás', bodyText: 'A motor kiválasztott egy ágat' };
+      return { kindLabel: 'Elágazás', bodySegments: [text('A motor kiválasztott egy ágat')] };
     }
     case 'fan_out_expanded': {
-      return { kindLabel: 'Szétosztás', bodyText: 'A motor több ágra bontotta a végrehajtást' };
+      return { kindLabel: 'Szétosztás', bodySegments: [text('A motor több ágra bontotta a végrehajtást')] };
     }
     case 'join_resolved': {
-      return { kindLabel: 'Összefésülés', bodyText: 'A szétosztott ágak összefésülődtek' };
+      return { kindLabel: 'Összefésülés', bodySegments: [text('A szétosztott ágak összefésülődtek')] };
     }
     case 'loop_iteration_started': {
-      return { kindLabel: 'Ciklus iteráció', bodyText: 'Egy új ciklus iteráció kezdődött' };
+      return { kindLabel: 'Ciklus iteráció', bodySegments: [text('Egy új ciklus iteráció kezdődött')] };
     }
     case 'approval_requested': {
-      return { kindLabel: 'Jóváhagyás kérve', bodyText: 'A motor jóváhagyásra vár' };
+      return { kindLabel: 'Jóváhagyás kérve', bodySegments: [text('A motor jóváhagyásra vár')] };
     }
     case 'approval_decided': {
-      return { kindLabel: 'Jóváhagyási döntés', bodyText: 'A jóváhagyási döntés megszületett' };
+      return { kindLabel: 'Jóváhagyási döntés', bodySegments: [text('A jóváhagyási döntés megszületett')] };
     }
     case 'sub_workflow_started': {
-      return { kindLabel: 'Al-workflow indult', bodyText: 'Egy al-workflow futása elindult' };
+      return { kindLabel: 'Al-workflow indult', bodySegments: [text('Egy al-workflow futása elindult')] };
     }
     case 'sub_workflow_finished': {
-      return { kindLabel: 'Al-workflow befejeződött', bodyText: 'Egy al-workflow futása lezárult' };
+      return { kindLabel: 'Al-workflow befejeződött', bodySegments: [text('Egy al-workflow futása lezárult')] };
     }
   }
 }
@@ -359,7 +390,7 @@ export function summarizeRunEventRow(record: RowRecord, providerId: ProviderId |
   return {
     originLabel: ORIGIN_LABEL[record.origin],
     kindLabel: description.kindLabel,
-    bodyText: description.bodyText,
+    bodySegments: description.bodySegments,
     costEstimateText: description.costEstimateText,
     costHiddenForMinimax: description.costHiddenForMinimax ?? false,
     costHiddenForUnknownProvider: description.costHiddenForUnknownProvider ?? false,

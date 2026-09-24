@@ -6,7 +6,7 @@ import {
   type RunEventRecord,
 } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
-import { summarizeRunEventRow } from './run-event-row-summary.ts';
+import { summarizeRunEventRow, type RunEventRowSummary } from './run-event-row-summary.ts';
 
 function makeRecord(overrides: Partial<RunEventRecord> & { readonly kind: RunEventKind }): RunEventRecord {
   const origin: RunEventOrigin = overrides.kind.startsWith('sdk_') ? 'sdk' : 'engine';
@@ -33,16 +33,30 @@ function makeRecord(overrides: Partial<RunEventRecord> & { readonly kind: RunEve
   };
 }
 
+/**
+ * A törzs darabjai sorrendben összefűzve: a sor teljes törzs szövege.
+ */
+function bodyTextOf(summary: RunEventRowSummary): string {
+  return summary.bodySegments.map((segment) => segment.text).join('');
+}
+
+/**
+ * A törzs meta (`code`) darabjainak szövege, sorrendben.
+ */
+function codeTextsOf(summary: RunEventRowSummary): readonly string[] {
+  return summary.bodySegments.flatMap((segment) => (segment.kind === 'code' ? [segment.text] : []));
+}
+
 describe('summarizeRunEventRow', () => {
   // AC3 (PLAN-009 T-009-24): a tesztesetek listája magából a `RunEventKindSchema`
   // felsorolásból származik, nem egy itt kézzel írt, duplikált listából - így egy
   // huszonhatodik érték e teszt nélkül nem csúszhatna be észrevétlenül.
-  it('mind a huszonöt RunEventKind értékre nem üres kindLabel-t és bodyText-et ad', () => {
+  it('mind a huszonöt RunEventKind értékre nem üres kindLabel-t és törzs szöveget ad', () => {
     expect(RunEventKindSchema.options).toHaveLength(25);
     for (const kind of RunEventKindSchema.options) {
       const summary = summarizeRunEventRow(makeRecord({ kind }), 'claude-subscription');
       expect(summary.kindLabel.length).toBeGreaterThan(0);
-      expect(summary.bodyText.length).toBeGreaterThan(0);
+      expect(bodyTextOf(summary).length).toBeGreaterThan(0);
       expect(summary.originLabel.length).toBeGreaterThan(0);
       // Költség mezője kizárólag az `sdk_result` sornak és kizárólag
       // `claude-subscription` providernek van (user
@@ -66,7 +80,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind, toolName: 'web_search', toolUseId: 'tool-abc', parentToolUseId: 'tool-xyz' }),
         'claude-subscription',
       );
-      expect(`${summary.kindLabel} ${summary.bodyText}`).not.toContain('\u{2014}');
+      expect(`${summary.kindLabel} ${bodyTextOf(summary)}`).not.toContain('\u{2014}');
     }
   });
 
@@ -89,18 +103,18 @@ describe('summarizeRunEventRow', () => {
         }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toContain('web_search');
-      expect(summary.bodyText).toContain('tool-abc');
-      expect(summary.bodyText).toContain('bemenet: 10');
-      expect(summary.bodyText).toContain('kimenet: 20');
-      expect(summary.bodyText).toContain('gyorsítótár olvasás: 30');
-      expect(summary.bodyText).toContain('gyorsítótár írás: 40');
+      expect(bodyTextOf(summary)).toContain('web_search');
+      expect(bodyTextOf(summary)).toContain('tool-abc');
+      expect(bodyTextOf(summary)).toContain('bemenet: 10');
+      expect(bodyTextOf(summary)).toContain('kimenet: 20');
+      expect(bodyTextOf(summary)).toContain('gyorsítótár olvasás: 30');
+      expect(bodyTextOf(summary)).toContain('gyorsítótár írás: 40');
     });
 
     it('eszközhívás nélkül, token adat nélkül a nincs token adat szöveget adja', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_assistant' }), 'claude-subscription');
       expect(summary.kindLabel).toBe('Asszisztens üzenet');
-      expect(summary.bodyText).toContain('nincs token adat');
+      expect(bodyTextOf(summary)).toContain('nincs token adat');
     });
 
     it('csak toolName vagy csak toolUseId esetén nem eszközhívásként mutatja (mindkettő kell)', () => {
@@ -118,12 +132,12 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_user', parentToolUseId: 'tool-xyz' }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Eszköz eredmény (hívás: tool-xyz): Felhasználói bemenet');
+      expect(bodyTextOf(summary)).toBe('Eszköz eredmény (hívás: tool-xyz): Felhasználói bemenet');
     });
 
     it('parentToolUseId nélkül és szöveg nélkül általános felhasználói bemenet szöveget ad', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_user' }), 'claude-subscription');
-      expect(summary.bodyText).toBe('Felhasználói bemenet');
+      expect(bodyTextOf(summary)).toBe('Felhasználói bemenet');
     });
 
     it('a puszta szöveges content mezőt mutatja felhasználói fordulatként', () => {
@@ -131,7 +145,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_user', payload: { message: { role: 'user', content: 'Foglald össze a cikket' } } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Foglald össze a cikket');
+      expect(bodyTextOf(summary)).toBe('Foglald össze a cikket');
     });
 
     it('a text blokkok szövegét egymás után fűzi', () => {
@@ -149,7 +163,7 @@ describe('summarizeRunEventRow', () => {
         }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Első Második');
+      expect(bodyTextOf(summary)).toBe('Első Második');
     });
 
     it('a tool_result blokk szöveges és blokk listás content mezőjét is kiolvassa, a nem objektum elemet kihagyja', () => {
@@ -169,7 +183,7 @@ describe('summarizeRunEventRow', () => {
         }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Eszköz eredmény (hívás: tool-xyz): kész teszt');
+      expect(bodyTextOf(summary)).toBe('Eszköz eredmény (hívás: tool-xyz): kész teszt');
     });
   });
 
@@ -184,7 +198,7 @@ describe('summarizeRunEventRow', () => {
         'claude-subscription',
       );
       expect(summary.kindLabel).toBe('Streamelt részlet');
-      expect(summary.bodyText).toBe(expected);
+      expect(bodyTextOf(summary)).toBe(expected);
     });
 
     it('szöveg nélküli eseménynél az esemény típusát nevezi meg', () => {
@@ -192,12 +206,12 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_stream_event', payload: { event: { type: 'message_start' } } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Stream esemény: message_start');
+      expect(bodyTextOf(summary)).toBe('Stream esemény: message_start');
     });
 
     it('esemény nélküli payloadnál általános szöveget ad', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_stream_event' }), 'claude-subscription');
-      expect(summary.bodyText).toBe('Stream esemény');
+      expect(bodyTextOf(summary)).toBe('Stream esemény');
     });
   });
 
@@ -214,17 +228,17 @@ describe('summarizeRunEventRow', () => {
         }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toContain('bemenet: 1');
-      expect(summary.bodyText).toContain('kimenet: 2');
-      expect(summary.bodyText).toContain('gyorsítótár olvasás: 3');
-      expect(summary.bodyText).toContain('gyorsítótár írás: 4');
-      expect(summary.bodyText).toContain('fordulók: 5');
-      expect(summary.bodyText).not.toContain('$');
+      expect(bodyTextOf(summary)).toContain('bemenet: 1');
+      expect(bodyTextOf(summary)).toContain('kimenet: 2');
+      expect(bodyTextOf(summary)).toContain('gyorsítótár olvasás: 3');
+      expect(bodyTextOf(summary)).toContain('gyorsítótár írás: 4');
+      expect(bodyTextOf(summary)).toContain('fordulók: 5');
+      expect(bodyTextOf(summary)).not.toContain('$');
     });
 
     it('hiányzó token adat és numTurns esetén a nincs token adat és ismeretlen szöveget adja', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_result' }), 'claude-subscription');
-      expect(summary.bodyText).toBe('nincs token adat, fordulók: ismeretlen');
+      expect(bodyTextOf(summary)).toBe('nincs token adat, fordulók: ismeretlen');
     });
 
     // A kerekítés a pinelt CLI `/cost` kijelzésének szabálya (research
@@ -284,7 +298,7 @@ describe('summarizeRunEventRow', () => {
       expect(summary.costEstimateText).toBeUndefined();
       expect(summary.costHiddenForMinimax).toBe(false);
       expect(summary.costHiddenForUnknownProvider).toBe(true);
-      expect(summary.bodyText).toBe('nincs token adat, fordulók: ismeretlen');
+      expect(bodyTextOf(summary)).toBe('nincs token adat, fordulók: ismeretlen');
     });
 
     it('nem sdk_result sornál a fel nem oldott provider semmilyen költség jelzőt nem állít', () => {
@@ -297,7 +311,7 @@ describe('summarizeRunEventRow', () => {
   describe('sdk_system', () => {
     it('subtype nélkül általános Rendszerüzenet szöveget ad', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_system' }), 'claude-subscription');
-      expect(summary.bodyText).toBe('Rendszerüzenet');
+      expect(bodyTextOf(summary)).toBe('Rendszerüzenet');
     });
 
     it('subtype-pal az altípus nevét mutatja', () => {
@@ -305,7 +319,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_system', sdkMessageSubtype: 'init' }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Altípus: init');
+      expect(bodyTextOf(summary)).toBe('Altípus: init');
     });
   });
 
@@ -320,7 +334,7 @@ describe('summarizeRunEventRow', () => {
         'claude-subscription',
       );
       expect(summary.kindLabel).toBe(kindLabel);
-      expect(summary.bodyText).toBe('Hook: pre-commit');
+      expect(bodyTextOf(summary)).toBe('Hook: pre-commit');
     });
 
     it('hook_name nélkül, nem objektum payload esetén az alapértelmezett szöveget adja', () => {
@@ -328,7 +342,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_hook_started', payload: 'nem objektum' }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Hook indult');
+      expect(bodyTextOf(summary)).toBe('Hook indult');
     });
 
     it('hook_name nélkül, üres objektum payload esetén a válasz alapértelmezettje jelenik meg', () => {
@@ -336,7 +350,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_hook_response', payload: {} }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Hook lezárult');
+      expect(bodyTextOf(summary)).toBe('Hook lezárult');
     });
   });
 
@@ -346,7 +360,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_informational', payload: { content: 'Slash parancs lefutott' } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Slash parancs lefutott');
+      expect(bodyTextOf(summary)).toBe('Slash parancs lefutott');
     });
 
     it('content nélkül általános szöveget ad', () => {
@@ -354,7 +368,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_informational', payload: {} }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Tájékoztató üzenet');
+      expect(bodyTextOf(summary)).toBe('Tájékoztató üzenet');
     });
   });
 
@@ -364,7 +378,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_commands_changed', payload: { commands: [{}, {}, {}] } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('3 parancs érhető el');
+      expect(bodyTextOf(summary)).toBe('3 parancs érhető el');
     });
 
     it('commands tömb nélkül általános szöveget ad', () => {
@@ -372,7 +386,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_commands_changed', payload: { commands: 'nem tömb' } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('A parancslista frissült');
+      expect(bodyTextOf(summary)).toBe('A parancslista frissült');
     });
   });
 
@@ -382,7 +396,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_rate_limit', payload: { rate_limit_info: { status: 'allowed_warning' } } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Állapot: allowed_warning');
+      expect(bodyTextOf(summary)).toBe('Állapot: allowed_warning');
     });
 
     it('nem objektum payload esetén általános szöveget ad', () => {
@@ -390,7 +404,7 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_rate_limit', payload: 'nem objektum' }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Sebességkorlát esemény');
+      expect(bodyTextOf(summary)).toBe('Sebességkorlát esemény');
     });
 
     it('nem objektum rate_limit_info esetén is általános szöveget ad', () => {
@@ -398,13 +412,13 @@ describe('summarizeRunEventRow', () => {
         makeRecord({ kind: 'sdk_rate_limit', payload: { rate_limit_info: 'nem objektum' } }),
         'claude-subscription',
       );
-      expect(summary.bodyText).toBe('Sebességkorlát esemény');
+      expect(bodyTextOf(summary)).toBe('Sebességkorlát esemény');
     });
   });
 
   it('sdk_context_usage esetén általános szöveget ad, mert a pinelt SDK-ban nincs önálló üzenet erre', () => {
     const summary = summarizeRunEventRow(makeRecord({ kind: 'sdk_context_usage' }), 'claude-subscription');
-    expect(summary.bodyText).toBe('Kontextushasználati esemény');
+    expect(bodyTextOf(summary)).toBe('Kontextushasználati esemény');
   });
 
   it('run_interrupted esetén a lezárt, a szerver leállása miatt félbeszakadt futást nevezi meg, nem folyamatban lévő megszakítást', () => {
@@ -413,8 +427,8 @@ describe('summarizeRunEventRow', () => {
       'claude-subscription',
     );
     expect(summary.kindLabel).toBe('Futás félbeszakítva');
-    expect(summary.bodyText).toBe('A futás a szerver leállása miatt félbeszakadt');
-    expect(`${summary.kindLabel} ${summary.bodyText}`).not.toContain('megszakítás');
+    expect(bodyTextOf(summary)).toBe('A futás a szerver leállása miatt félbeszakadt');
+    expect(`${summary.kindLabel} ${bodyTextOf(summary)}`).not.toContain('megszakítás');
   });
 
   describe('a tizenhárom engine eredetű kind', () => {
@@ -436,6 +450,89 @@ describe('summarizeRunEventRow', () => {
       const summary = summarizeRunEventRow(makeRecord({ kind }), 'claude-subscription');
       expect(summary.kindLabel).toBe(kindLabel);
       expect(summary.originLabel).toBe('Motor');
+    });
+  });
+
+  // User döntés 2026-09-24 (SPEC-008 7.2 1. pont): a meta (eszköznév,
+  // azonosító, szám) `code` darab, a sor szövege `text` darab.
+  describe('a törzs darabjai: mono csak a meta', () => {
+    it('eszközhívás: az eszköznév, az azonosító és a négy token szám code darab, a megnevezések nem', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({
+          kind: 'sdk_assistant',
+          toolName: 'mcp__agent-tools__web_search',
+          toolUseId: 'toolu_01T1x1fJ34qAmk2tNTrN7Up6',
+          inputTokens: 5,
+          outputTokens: 87,
+          cacheReadInputTokens: 2803,
+          cacheCreationInputTokens: 0,
+        }),
+        'claude-subscription',
+      );
+      expect(codeTextsOf(summary)).toEqual([
+        'mcp__agent-tools__web_search',
+        'toolu_01T1x1fJ34qAmk2tNTrN7Up6',
+        '5',
+        '87',
+        '2803',
+        '0',
+      ]);
+      expect(summary.bodySegments[0]).toEqual({ kind: 'code', text: 'mcp__agent-tools__web_search' });
+      expect(bodyTextOf(summary)).toBe(
+        'mcp__agent-tools__web_search (toolu_01T1x1fJ34qAmk2tNTrN7Up6), tokenek: bemenet: 5, kimenet: 87, ' +
+          'gyorsítótár olvasás: 2803, gyorsítótár írás: 0',
+      );
+    });
+
+    it('eszköz eredmény: csak a hívás azonosítója code darab, a fordulat szövege nem', () => {
+      const summary = summarizeRunEventRow(
+        makeRecord({
+          kind: 'sdk_user',
+          parentToolUseId: 'call_a2fd4cce75a02c75',
+          payload: { message: { content: [{ type: 'tool_result', content: '42 találat' }] } },
+        }),
+        'claude-subscription',
+      );
+      expect(codeTextsOf(summary)).toEqual(['call_a2fd4cce75a02c75']);
+    });
+
+    it('eredmény: a token számok és a fordulók száma code darab; ismeretlen fordulószám szöveg', () => {
+      const known = summarizeRunEventRow(
+        makeRecord({ kind: 'sdk_result', inputTokens: 12, outputTokens: 569, numTurns: 4 }),
+        'minimax',
+      );
+      expect(codeTextsOf(known)).toEqual(['12', '569', '4']);
+      const unknown = summarizeRunEventRow(makeRecord({ kind: 'sdk_result' }), 'minimax');
+      expect(codeTextsOf(unknown)).toEqual([]);
+      expect(bodyTextOf(unknown)).toBe('nincs token adat, fordulók: ismeretlen');
+    });
+
+    it('az SDK gépi értékei (altípus, hook név, esemény típus, állapot) és a parancsok száma code darab', () => {
+      const cases: readonly (readonly [RunEventRecord, readonly string[]])[] = [
+        [makeRecord({ kind: 'sdk_system', sdkMessageSubtype: 'init' }), ['init']],
+        [makeRecord({ kind: 'sdk_hook_started', payload: { hook_name: 'PreToolUse' } }), ['PreToolUse']],
+        [makeRecord({ kind: 'sdk_stream_event', payload: { event: { type: 'message_start' } } }), ['message_start']],
+        [makeRecord({ kind: 'sdk_rate_limit', payload: { rate_limit_info: { status: 'allowed' } } }), ['allowed']],
+        [makeRecord({ kind: 'sdk_commands_changed', payload: { commands: [{}, {}] } }), ['2']],
+      ];
+      for (const [record, expected] of cases) {
+        expect(codeTextsOf(summarizeRunEventRow(record, 'claude-subscription'))).toEqual(expected);
+      }
+    });
+
+    it('a folyó szöveg (részleges szöveg, tájékoztatás, felhasználói fordulat) és az engine mondatai nem code darabok', () => {
+      const records = [
+        makeRecord({
+          kind: 'sdk_stream_event',
+          payload: { event: { delta: { type: 'text_delta', text: 'Összefoglalom 3 forrás alapján' } } },
+        }),
+        makeRecord({ kind: 'sdk_informational', payload: { content: 'Slash parancs lefutott' } }),
+        makeRecord({ kind: 'sdk_user', payload: { message: { content: 'Foglald össze a 2 cikket' } } }),
+        ...RunEventKindSchema.options.filter((kind) => !kind.startsWith('sdk_')).map((kind) => makeRecord({ kind })),
+      ];
+      for (const record of records) {
+        expect(codeTextsOf(summarizeRunEventRow(record, 'claude-subscription'))).toEqual([]);
+      }
     });
   });
 });
