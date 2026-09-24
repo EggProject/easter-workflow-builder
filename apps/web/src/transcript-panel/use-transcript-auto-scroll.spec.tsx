@@ -240,7 +240,7 @@ describe('useTranscriptAutoScroll', () => {
     expect(scrollToRow).not.toHaveBeenCalled();
   });
 
-  it.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
+  it.each(['wheel', 'touchstart', 'pointerdown', 'keydown', 'click'])(
     'a lista elemén kiváltott %s után a sormagasság változás nem görget (egy kinyitott sor a helyén marad), és a következő új sor újra élesíti az igazítást',
     (type) => {
       const { list, element } = listWithElement();
@@ -258,6 +258,106 @@ describe('useTranscriptAutoScroll', () => {
       expect(scrollToRow).toHaveBeenLastCalledWith({ index: 10, align: 'end' });
     },
   );
+
+  /**
+   * Egy sor fejlécének kattintása: a `click` célja egy `aria-expanded`
+   * gombon BELÜLI elem (a fejléc szövege), ahogy a valódi sorban.
+   */
+  function clickDisclosure(element: HTMLDivElement): void {
+    const header = document.createElement('button');
+    header.setAttribute('aria-expanded', 'false');
+    const title = document.createElement('span');
+    header.append(title);
+    element.append(header);
+    title.dispatchEvent(new Event('click', { bubbles: true }));
+  }
+
+  describe('sor kinyitása élő stream közben', () => {
+    it('a mérésig érkező új sor nem görget és nem számol; ha a mérés utáni jelentés szerint a lista felfelé mozdult, a követés kikapcsol, és a visszatartott sor a nem látott sorok közé kerül', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      clickDisclosure(element);
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(0);
+
+      const measured = createRowHeight();
+      renderRows(11, measured);
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 5 });
+      });
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('ha a kinyitás az utolsó sort nem tolja ki, a mérés utáni jelentés után a visszatartott sorra görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      clickDisclosure(element);
+      renderRows(11);
+      renderRows(11, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      expect(scrollToRow).toHaveBeenCalledTimes(1);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+      expect(current().unseenCount).toBe(0);
+    });
+
+    it('a mérés előtti jelentés nem zárja a várakozást', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      clickDisclosure(element);
+      renderRows(11);
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
+    it('új sor nélkül a kinyitás és a mérés utáni jelentés nem görget: a kinyitott sor a helyén marad', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      clickDisclosure(element);
+      renderRows(10, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
+    it('ha a mérés után nem jön jelentés (a látható tartomány nem változott), a következő új sor jelentése zárja a várakozást, és a követés görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      clickDisclosure(element);
+      const measured = createRowHeight();
+      renderRows(10, measured);
+      renderRows(11, measured);
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      expect(scrollToRow).toHaveBeenCalledTimes(1);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+    });
+
+    it('a sor fejlécén kívüli kattintás nem tart vissza: az új sor görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      element.dispatchEvent(new Event('click', { bubbles: true }));
+      renderRows(11);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+    });
+  });
 
   it('lista csere után a korábbi elem eseménye már nem függeszti fel az igazítást', () => {
     const first = listWithElement();

@@ -1270,3 +1270,132 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
+// ============================================================
+// A KINYITOTT SOR A HELYÉN MARAD ÉLŐ STREAM KÖZBEN (2026-09-24).
+//
+// A `dfcaa38` óta követés közben a hook a mért sormagasság minden változása
+// után újra az aljára görget, amíg a felhasználó nem nyúlt a listához. A
+// `Space` a gombot a `keyup`-ra aktiválja, tehát a `keydown` és a `keyup`
+// között érkező sor újraélesítette az igazítást, és a kinyitás mérése a
+// kinyitott sort az aljára rántotta; a csak `click` eseménnyel (pointer és
+// billentyű nélkül) kinyitott sor ugyanígy járt
+// (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció). A
+// három út mindegyikén a kinyitott sor fejléce a lista tetejéhez mérve nem
+// mozdulhat, és a kinyitás utáni új sorra az "Ugrás az aljára" gomb jelenik
+// meg (a követés kikapcsolt). A lista fölötti gomb sáv megjelenése az egész
+// listát lejjebb tolja, ezért a fejléc helye a lista eleméhez mért.
+//
+// Az egér út `page.mouse`, nem `locator.click()`: az utóbbi a kattintás
+// előtt maga is görgethet. A kinyitás utáni keret rögtön a nyitott állapot
+// megjelenése után megy ki, tehát a sor mérése előtt és után is érkezhet; a
+// javított hook mindkét sorrendben ugyanazt adja, a két sorrend
+// determinisztikus fedése a hook unit tesztjeiben áll.
+// ============================================================
+
+/**
+ * A kinyitás előtt érkező átmeneti sorok száma: a lista görgethető, és az
+ * alján átmeneti sor áll.
+ */
+const TRANSIENT_BEFORE_EXPAND = 10;
+
+/**
+ * A kinyitott sor fejlécének függőleges helye a lista elemének tetejéhez
+ * mérve, pixelben. `undefined`, amíg a sor nincs kirajzolva.
+ */
+async function headerOffsetInList(list: Locator, position: number): Promise<number | undefined> {
+  return list.evaluate((element, rowPosition) => {
+    const header = element.querySelector(
+      `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
+    );
+    if (header === null) {
+      return;
+    }
+    return header.getBoundingClientRect().top - element.getBoundingClientRect().top;
+  }, position);
+}
+
+/**
+ * A lista az alján áll, az utolsó előtti sor a kinyitás célja: a kinyitott
+ * törzs az utolsó sort a lista alja alá tolja.
+ */
+async function openExpandTarget(
+  page: Page,
+  theme: 'light' | 'dark',
+): Promise<{ readonly streamServer: OpenStreamServer; readonly list: Locator; readonly position: number }> {
+  const streamServer = await openFollowingTranscript(page, theme);
+  const list = transcriptList(page);
+  streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+  const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+  await expectLastRowFullyVisibleAtBottom(list, rowCount);
+  return { streamServer, list, position: rowCount - 1 };
+}
+
+/**
+ * A kinyitás utáni állítás: a sor nyitva, egy új sor érkezése után az
+ * "Ugrás az aljára" gomb egy új eseményt nevez meg, és a fejléc a lista
+ * tetejéhez mérve pontosan ott áll, ahol a kinyitás előtt.
+ */
+async function expectExpandedRowInPlace(
+  page: Page,
+  expanded: Readonly<{ streamServer: OpenStreamServer; list: Locator; position: number }>,
+  offsetBefore: number | undefined,
+): Promise<void> {
+  const { streamServer, list, position } = expanded;
+  expect(offsetBefore).toStrictEqual(expect.any(Number));
+  await expect(
+    list.locator(`[role="listitem"][aria-posinset="${String(position)}"]`).getByRole('button'),
+  ).toHaveAttribute('aria-expanded', 'true');
+  streamServer.push(textDeltaTransientFrame('Kinyitás után'));
+  await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+  expect(await headerOffsetInList(list, position)).toBe(offsetBefore);
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`követés közben egérrel kinyitott sor a helyén marad, és a követés kikapcsol (${theme} téma)`, async ({
+    page,
+  }) => {
+    const expanded = await openExpandTarget(page, theme);
+    const header = expanded.list
+      .locator(`[role="listitem"][aria-posinset="${String(expanded.position)}"]`)
+      .getByRole('button');
+    const offsetBefore = await headerOffsetInList(expanded.list, expanded.position);
+    const center = await header.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await page.mouse.click(center.x, center.y);
+    await expectExpandedRowInPlace(page, expanded, offsetBefore);
+  });
+
+  test(`követés közben Space-szel kinyitott sor a helyén marad akkor is, ha a keydown és a keyup között új sor érkezik (${theme} téma)`, async ({
+    page,
+  }) => {
+    const expanded = await openExpandTarget(page, theme);
+    const header = expanded.list
+      .locator(`[role="listitem"][aria-posinset="${String(expanded.position)}"]`)
+      .getByRole('button');
+    await header.focus();
+    await page.keyboard.down('Space');
+    // A `keydown` után, a `keyup` előtt érkező sort a lista még követi: a
+    // sor ekkor még nincs kinyitva.
+    expanded.streamServer.push(textDeltaTransientFrame('Space közben'));
+    await expectLastRowFullyVisibleAtBottom(expanded.list, REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND + 1);
+    const offsetBefore = await headerOffsetInList(expanded.list, expanded.position);
+    await page.keyboard.up('Space');
+    await expectExpandedRowInPlace(page, expanded, offsetBefore);
+  });
+
+  test(`követés közben csak click eseménnyel (pointer és billentyű nélkül) kinyitott sor a helyén marad (${theme} téma)`, async ({
+    page,
+  }) => {
+    const expanded = await openExpandTarget(page, theme);
+    const header = expanded.list
+      .locator(`[role="listitem"][aria-posinset="${String(expanded.position)}"]`)
+      .getByRole('button');
+    const offsetBefore = await headerOffsetInList(expanded.list, expanded.position);
+    // A Playwright doksi szerint ez az `element.click()` megfelelője.
+    await header.dispatchEvent('click');
+    await expectExpandedRowInPlace(page, expanded, offsetBefore);
+  });
+}

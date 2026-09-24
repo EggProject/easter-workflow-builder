@@ -81,7 +81,10 @@ kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat 
 `accordion.css` fejléc szabályából és a sor fejlécének type tokenjéből, két regressziós
 teszttel); az átmeneti sor ennél egy pixellel magasabb, és a könyvtár a görgetés után nem igazít,
 ezért követés közben a `useTranscriptAutoScroll` a mért magasság változása után újra az aljára
-görget, amíg a felhasználó nem nyúlt a listához (research 13. szekció). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
+görget, amíg a felhasználó nem nyúlt a listához (research 13. szekció); egy sor kinyitása után pedig
+semmilyen görgetés nem fut, amíg a lista a mért magassággal ki nem számolt tartományt le nem
+jelentette, így a kinyitott sor egy közben érkező új sor mellett is a helyén marad (research 15.
+szekció). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
 (`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
 küszöb nélküli: `visibleRows.stopIndex === rowCount - 1` (`is-last-row-visible.ts`), az
 állapotgép a `reduce-transcript-auto-scroll.ts` tiszta függvénye, felgörgetve az "ugrás az

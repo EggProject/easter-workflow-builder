@@ -382,11 +382,28 @@ isDynamicRowHeight ? undefined : bounds.size`), a kinyitott sor magassága pedig
 újra `scrollToRow({ index: rowCount - 1, align: 'end' })`. A telepített forrás szerint
 (`lib/components/list/useDynamicRowHeight.ts`) a gyorsítótár identitása pontosan akkor új, amikor
 egy mért magasság eltér a tárolttól: a `setRowHeight` azonos értéknél az előző állapotot adja
-vissza, a visszaadott objektum pedig `useMemo` a térképen. Az upstream 2.3.2 javítás mintájára a
-felhasználó beavatkozása a lista elemén (`wheel`, `touchstart`, `pointerdown`, `keydown`)
-felfüggeszti az igazítást a következő új sorig, átméretezésig vagy ugrásig. A `keydown` itt minden
-billentyűre szakít (upstream csak a görgető billentyűkre), mert a sor `Enter`-rel is kinyílik. A
-levágásra a burkoló `box-sizing: border-box` sora a javítás: a projekt a design system univerzális
+vissza, a visszaadott objektum pedig `useMemo` a térképen. A felhasználó beavatkozása a lista
+elemén (`wheel`, `touchstart`, `pointerdown`, `keydown`, 2026-09-24 óta a `click` is, 15. szekció)
+felfüggeszti az igazítást a következő új sorig, átméretezésig vagy ugrásig.
+
+**Pontosítás (2026-09-24): ez NEM az upstream 2.3.2 mechanizmusa, csak a megszakító
+eseménylistáját veszi át.** A korábbi "az upstream javítás mintájára" megfogalmazás pontatlan volt.
+Az upstream korrekció (`lib/components/list/useScrollToRow.ts` a 2.3.2 tagen) EGYETLEN
+`scrollToRow` híváshoz kötött és véges: a hívás egy `requestAnimationFrame` hurkot indít, ami
+legfeljebb 1000 ms-ig fut (`deadline: performance.now() + 1000`), 1 pixeles tűréssel újragörget,
+és leáll, ha két egymást követő kereten stabil (`++request.stableFrames >= 2`), a cél sor ki van
+rajzolva és a mért magasságok a lista modelljében vannak. Megszakítja a `wheel`, a `touchstart`, a
+`pointerdown`, és a `keydown`, de az utóbbi csak a görgető billentyűkre (`ArrowUp`, `ArrowDown`,
+`PageUp`, `PageDown`, `Home`, `End`, `Space`). Nálunk az élesítés nem egy görgetéshez kötött és
+nincs határideje: minden új sor, átméretezés és ugrás korlátlan ideig élesíti, amíg a felhasználó
+bele nem nyúl, mert a projekt időzítőt és pixel tűrést nem használ (PLAN-009 T-009-33 (6)). A
+`keydown` minden billentyűre szakít, mert a sor `Enter`-rel is kinyílik. Ennek a korlátlan
+élesítésnek a mellékhatása volt a 15. szekció hibája. Forrás, a telepített forrás olvasása
+mellett: <https://raw.githubusercontent.com/bvaughn/react-window/2.3.2/lib/components/list/useScrollToRow.ts>,
+<https://github.com/bvaughn/react-window/pull/914>,
+<https://raw.githubusercontent.com/bvaughn/react-window/2.3.2/CHANGELOG.md>.
+
+A levágásra a burkoló `box-sizing: border-box` sora a javítás: a projekt a design system univerzális
 resetjét szándékosan nem emeli át (`topnav-shell.css`), a hiányából eredő eseteket pontszerűen
 javítja (precedens: `node-inspector.css`).
 
@@ -396,12 +413,15 @@ görgetett, a kinyitott sor fejléce 277 pixelt ugrott felfelé, és a követés
 Felfüggesztéssel a fejléc és a `scrollTop` 0 pixelt mozdul, és a következő átmeneti sor után
 megjelenik az "Ugrás az aljára" gomb, pontosan úgy, mint előtte: a kinyitás viselkedése nem
 változott. Az utolsó sor kinyitásakor utána sem görget, és a következő sor után az alja pontosan a
-lista alján áll (előtte 1 pixel).
+lista alján áll (előtte 1 pixel). Ez a mérés egérkattintással készült; a `Space`-szel (közben
+érkező sorral) és a csak `click` eseménnyel kinyitott sort ez a felfüggesztés NEM védte, lásd 15.
+szekció.
 
 **Webes megerősítés** (Sonnet subagent, 2026-09-24, forrásonként három hivatkozás):
 
 - A 2.3.2 javítása (`lib/components/list/useScrollToRow.ts`) `requestAnimationFrame` hurokban
-  korrigál, és `wheel`, `touchstart`, `pointerdown`, `keydown` szakítja meg. Publikálás a registry
+  korrigál, és `wheel`, `touchstart`, `pointerdown`, `keydown` szakítja meg (a `keydown` csak a
+  görgető billentyűkre; a határidőt és a stabil kereteket lásd a fenti pontosításban). Publikálás a registry
   szerint: 2.3.1 2026-09-05, 2.3.2 és 2.3.3 2026-09-22
   (<https://github.com/bvaughn/react-window/blob/2.3.3/CHANGELOG.md>,
   <https://github.com/bvaughn/react-window/pull/914>, <https://registry.npmjs.org/react-window>).
@@ -456,3 +476,131 @@ téma minden száma azonos:
 | kinyitva, a törzs költsége | felirat, összeg, magyarázat              | változatlan                                  |
 
 A két provider ágát a `RunEventRow.spec.tsx` unit tesztjei őrzik.
+
+## 15. Sor kinyitása élő stream közben: a kinyitott sor a helyén marad (2026-09-24)
+
+**A hiba.** Egy független ellenőrzés a `dfcaa38` commiton, valódi Chromiumban, 150 ms-onként érkező
+sorokkal mérte, hogy a 13. szekció felfüggesztése két kinyitási utat nem véd: a `Space`-szel
+kinyitott sort, ha a `keydown` és a `keyup` között új sor érkezik, és a csak `click` eseménnyel
+(pointer és billentyű nélkül) kinyitott sort. Mindkét esetben a lista az aljára ugrott, a kinyitott
+sor fejléce felfelé kicsúszott, és a követés bekapcsolva maradt; ez a SPEC-008 7.4 két szabályát
+sérti ("ha hamis, nem görget", "a kinyitott sor a helyén marad"). Az ok: a `Space` a gombot a
+`keyup`-ra aktiválja, a `keyup` és a `click` pedig nem volt felfüggesztő esemény, tehát a közben
+érkező sor (13. szekció: minden új sor korlátlanul élesít) újraélesítette az igazítást, és a kinyitás
+mérése után a hook az elavult `isFollowing` értékkel görgetett.
+
+**Módszer.** Eldobható mérő script a repón kívül (`/private/tmp/transcript-kinyitas/measure.cjs`, a
+screenshot-pipeline invariáns miatt), `vite build` a scratchpadbe az e2e `VITE_*` értékeivel,
+`node:http` statikus kiszolgálás és NYITVA TARTOTT SSE kapcsolat, a REST hívások `page.route()`
+mockon. Valódi Chromium (`@playwright/test@1.62.1`), 1440x900, `hu-HU`, `Europe/Budapest`, mindkét
+téma. A pótlás 19 tárolt esemény, utána egy 120 soros átmeneti löket, majd folyamatos stream:
+150 ms-onként egy átmeneti sor. A cél a lista végétől ötödik sor. Mért érték a kinyitott sor
+fejlécének helye **a lista elemének tetejéhez mérve**: a `click` esemény pillanatában (capture
+figyelő, tehát a kinyitás előtt) és utána minden animációs kereten, amíg még három új sor meg nem
+érkezik. A lista tetejéhez mérés azért kell, mert a kinyitás utáni első új sorral megjelenő
+"Ugrás az aljára" gomb sáv az egész listát 36 pixellel lejjebb tolja (ez a gomb specifikált helye a
+lista fejlécében, nem a lista görgetése; előtte és utána egyformán). Előtte a `fb921db` (a
+`transcript-panel` és a `run-event-row` kódja a `dfcaa38` óta változatlan), utána a munkafa.
+
+**Kinyitás egy érkezés után, 4 ismétlés utanként, mindkét témában** (a fejléc elmozdulása pixelben,
+negatív: felfelé; a két téma minden száma azonos):
+
+| Út                                                     | Előtte                    | Utána                       |
+| ------------------------------------------------------ | ------------------------- | --------------------------- |
+| egér (`page.mouse.click`)                              | 0, gomb: 3 új esemény     | 0, gomb: 3 új esemény       |
+| `Enter`                                                | 0, gomb: 3 új esemény     | 0, gomb: 3 új esemény       |
+| `Space`, a `keydown` és a `keyup` között érkező sorral | -460, követés bekapcsolva | 0, gomb: 3 új esemény       |
+| csak `click` (`element.click()`)                       | -460, követés bekapcsolva | 0, gomb: 3 új esemény       |
+| egér lenyomva tartva, közben új sor, majd felengedés   | nem nyílik ki             | nem nyílik ki (változatlan) |
+
+Az utolsó sor: a követés közben érkező sor a lenyomott egér alatt elgörgeti a fejlécet, a `click` a
+közös ősre, a listára esik, tehát a sor nem nyílik ki. A független ellenőrzés más fixtúrán -331 és
+-277 pixelt mért; az eltérés okát nem vizsgáltuk.
+
+**Egy második, régebbi ok: a kinyitás és egy új sor versenyhelyzete.** A kinyitás után a lista a sor
+új magasságát a következő képkocka `ResizeObserver` mérésével kapja meg, és a látható tartományt a
+mért magassággal csak egy további, szinkron újrarenderelésben jelenti (`useVirtualizer`: a
+`setIndices` egy layout effektben fut). Ha ebben az ablakban új sor érkezik, a hook az új sort a
+kinyitás előtti `isFollowing` értékkel követi, és a kinyitott sort elrántja. Véletlen fázisú,
+csak `click` eseménnyel indított kinyitások, 30 vagy 40 ismétlés témánként:
+
+| Hook                                                       | 150 ms-os stream    | 40 ms-os stream |
+| ---------------------------------------------------------- | ------------------- | --------------- |
+| a `2eefddb` hookja (a `dfcaa38` előtti), a mai fán         | 4 / 60 (-54, -460)  | 12 / 40         |
+| csak a `click` felfüggesztő eseményként                    | 5 / 60 (-460, -514) | 10 / 40         |
+| várakozás, feloldás a mérés renderében (elvetett változat) | 4 / 60 (-460, -514) | nem mértük      |
+| a választott megoldás                                      | 0 / 80              | 0 / 60          |
+
+A versenyhelyzet tehát a `dfcaa38` előtt is megvolt (egy sornyi, -54 pixeles, vagy a teljes
+ugrás), a `dfcaa38` korlátlan élesítése a kisebbik változatot is teljes ugrássá tette. A csak `click`
+felfüggesztés a determinisztikus hibát javítja, a versenyhelyzetet nem.
+
+**Miért nem elég a feloldás a mérés renderében, mérve.** Naplózó buildben (a repóba nem került): a
+`click` 0,3 ms-kor, a közben érkező sor 7,2 ms-kor (a görgetés visszatartva), a mérés 11,4 ms-kor,
+a lista jelentése a mért magassággal 12,0 ms-kor (136. sor a 143-ból, tehát a lista felfelé
+mozdult), és a visszatartott görgetés UGYANABBAN a commitban, 12,0 ms-kor, még `isFollowing: true`
+értékkel futott le. A React a mérés passzív effektjében ütemezett frissítést a lista szinkron
+újrarenderelésével együtt dolgozta fel, a jelentés pedig csak annak a commitnak a passzív
+effektjében került a reducerbe. A feloldást ezért a jelentéshez kell kötni.
+
+**A választott megoldás** (`use-transcript-auto-scroll.ts`), pixel küszöb és időzítő nélkül:
+
+1. A `click` a felfüggesztő események közé kerül (a `Space` a `keyup`-ra, az `Enter` a `keydown`-ra
+   ad `click`-et, az `element.click()` csak `click`-et ad).
+2. Egy `aria-expanded` gombon belüli `click` (a sor fejléce) várakozást indít: `measurement`, amíg a
+   `rowHeight` gyorsítótár nem változik; `report`, amíg a lista `onRowsRendered` jelentése meg nem
+   érkezik. Közben a görgető effekt kimarad; ha kimaradt, a jelentést feldolgozó renderben fut le,
+   tehát a friss `isFollowing` értékkel. Ha a kinyitás nem változtat a látható tartományon (például
+   az utolsó sor nyílik ki), a lista nem jelent, és a várakozást a következő új sor jelentése
+   zárja: az a sor egy érkezéssel később görget.
+
+**Ami nem romlott, mérve, utána:**
+
+- A 13. szekció négy alsó helyzete (3 átmeneti sor, 120 soros löket, "Ugrás az aljára", egyenként)
+  mindkét témában 0 / 0 pixel 1440x900-on és a 375x812-es fül sávban is.
+- Nem kinyitó beavatkozás élő stream közben, látható görgetősávval (a Playwright alapértelmezett
+  `--hide-scrollbars` kapcsolója nélkül, 15 pixeles sáv): egérkerék -300 pixel, görgetősáv húzás
+  felfelé (-1322 és -2111 pixel), `PageUp` (összesen körülbelül -511 pixel): a lista egyik esetben
+  sem ugrik vissza az aljára, és megjelenik a gomb; 20 pixeles kerék után a következő sor
+  visszaviszi az aljára, az utolsó sor alja 0 pixelre. Előtte ugyanez.
+
+**Regresszió.** E2E: `apps/web/e2e/sse-real-server.spec.ts`, a kinyitás három útja (egér
+`page.mouse`-szal, `Space` a `keydown` és a `keyup` között érkező sorral, csak `click` a
+`locator.dispatchEvent('click')` hívással, ami a Playwright doksi szerint az `element.click()`
+megfelelője) mindkét témában: a fejléc a lista tetejéhez mérve pontosan a helyén marad, és a
+kinyitás utáni új sorra az "Ugrás az aljára (1 új esemény)" gomb jelenik meg. A kinyitás utáni
+keret rögtön a nyitott állapot megjelenése után megy ki, tehát a mérés előtt és után is érkezhet.
+Mérve: a választott megoldáson 6/6 zöld, `--repeat-each=3` mellett 18/18; a `dfcaa38` hookjával
+6/6 bukik (a `Space` út fejléce 222-ről -34-re, a `click` úté 276-ról 20-ra mozdul, az egér útnál a
+gomb nem jelenik meg, mert a keret a mérés elé esik); a "mindig görget" rontással (a mérés utáni
+igazítás feltétel nélkül) 6/6 bukik; a csak `click` felfüggesztéssel az egér út bukik. Unit:
+`use-transcript-auto-scroll.spec.tsx`, a `click` felfüggesztés és a várakozás öt esete; a `dfcaa38`
+hookjával 6, a csak `click` változattal 4 teszt bukik.
+
+**Webes megerősítés** (Sonnet subagent, 2026-09-24):
+
+- Az `HTMLElement.click()` egyetlen szintetikus `click` eseményt ad, `pointerdown`, `mousedown` és
+  `keydown` nélkül (<https://html.spec.whatwg.org/multipage/interaction.html#dom-click>,
+  <https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/click>,
+  <https://testing-library.com/docs/guide-events/>).
+- A `click` buborékol (<https://w3c.github.io/uievents/#event-type-click>,
+  <https://www.quirksmode.org/dom/events/click.html>,
+  <https://javascript.info/bubbling-and-capturing>).
+- A `locator.dispatchEvent('click')` a Playwright doksi szerint az `element.click()` megfelelője
+  (<https://playwright.dev/docs/api/class-locator#locator-dispatch-event>, saját olvasás).
+- Az NVDA és a JAWS böngésző módban `Enter`/`Space` aktiváláskor a lapnak `click`-et ad, `keydown`
+  nélkül (<https://webaim.org/discussion/mail_thread?thread=9092>,
+  <https://tink.uk/understanding-screen-reader-interaction-modes/>,
+  <https://www.tpgi.com/event-handling-in-jaws-and-nvda/>; az utóbbi ma átirányít, a tartalma csak
+  közvetve igazolt). **NEM ELLENŐRZÖTT:** a VoiceOver viselkedése, és hogy a képernyőolvasók
+  `pointerdown`/`mousedown` eseményt nem küldenek (egy forrás szerint egyes kombinációk küldenek). A
+  javítás egyikre sem épít: a `click` minden aktiválási úton megjelenik.
+
+**Ismert korlát, nem mért.** Ha ugyanaz a sor egyetlen képkockán belül kinyílik és be is csukódik,
+a `ResizeObserver` nem jelez változást, és a várakozás a következő sormagasság változásig tart; addig
+új sor nem görget. Emberi kattintással ezt nem állítottuk elő, és nem mértük.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit ellen nem futott mérés.
+
+**Képek** (a mérő script, a kinyitás után három sorral, a stream megállítva): előtte és utána, a négy
+út, mindkét téma, a munkamenet kimeneti mappájában (`transcript-kinyitas/`).

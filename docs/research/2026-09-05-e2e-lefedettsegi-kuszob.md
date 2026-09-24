@@ -1238,3 +1238,29 @@ csökkent. A küszöb mind a négy mért értékre húzva (99 -> **99.03**, 98.3
 beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
 századdal magasabb küszöbbel
 (99.04 / 98.45 / 99.44 / 99.01) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 30. A transcript sor kinyitása élő stream közben utáni ratchet (2026-09-24): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `use-transcript-auto-scroll.ts` kinyitás utáni várakozása (a `click` felfüggesztő
+eseményként, a `TogglePhase` három állapota, a visszatartott görgetés feloldása a mérés utáni
+jelentéskor) új kód; hat új e2e teszt fedi (`apps/web/e2e/sse-real-server.spec.ts`, a kinyitás
+három útja mindkét témában, `docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, utána kizárólag
+`bun run test:e2e` egy futásban (**244 teszt, mind zöld**), majd `bun run coverage:e2e:report`; a
+darabszámok a `nyc report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (29. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1565 / 1580     | **99.05** | 99.03                      | 15 -> **15**                   |
+| branches   | 704 / 715       | **98.46** | 98.44                      | 11 -> **11**                   |
+| functions  | 532 / 535       | **99.43** | 99.43                      | 3 -> **3**                     |
+| lines      | 1506 / 1521     | **99.01** | 99                         | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a fedetlen darabszám mind a négy metrikán változatlan, a nevező nőtt,
+tehát a százalék három metrikán nő, a functions értéke változatlan. A küszöb a mért értékre húzva
+(99.03 -> **99.05**, 98.44 -> **98.46**, 99.43 marad, 99 -> **99.01**), felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0506 / 98,4615 / 99,4393 / 99,0138, tehát egyik
+sincs a küszöb alatt). **Az igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0;
+ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel (99.06 / 98.47 / 99.44 / 99.02) mind
+a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

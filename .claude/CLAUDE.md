@@ -757,6 +757,17 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   az, hogy valami TELJESEN látszik, `toBeInViewport({ ratio: 1 })` kell, ami a levágó ősöket is
   figyelembe veszi. Védelem: `apps/web/e2e/sse-real-server.spec.ts` lista alja tesztjei
   (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
+- **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
+  kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, a tartományt pedig egy
+  layout effektben számolja újra, és csak a következő renderben jelenti; addig a hook `isFollowing`
+  értéke a kinyitás előtti helyzetet írja le. Egy ebben az ablakban érkező új sor követése ezért a
+  kinyitott sort az aljára rántotta, már a `dfcaa38` előtt is, és egy felfüggesztő eseménylista
+  (`pointerdown`, `keydown`) sem véd minden kinyitási utat (a `Space` a `keyup`-ra aktivál, az
+  `element.click()` csak `click`-et ad). A szabály: felhasználói layout változás után görgetési
+  döntés csak a mért magassággal számolt jelentés után születhet. Védelem: a
+  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` kinyitás
+  e2e tesztjei, három úton, mindkét témában
+  (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 
