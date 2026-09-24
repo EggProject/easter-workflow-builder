@@ -9,10 +9,10 @@
    nem, és a SKILL.md szerint szemantikus type token jár, "never ad-hoc
    font-size".
    - A sor szövege (eredet, címke, összefoglaló) a `--ep-text-small` (Small,
-     400 14px/1.5, Roboto). Nem a `--ep-text-body`: a sorban a meta a Code
-     szerep (500 14px/1.5), és a Small az egyetlen törzs betűs token
-     ugyanezzel a mérettel és sormagassággal, tehát a két betűcsalád egy
-     sorban azonos méretű marad.
+     400 14px/1.5, Roboto); hogy Small marad, az is user döntés
+     (2026-09-24). Indok: a sorban a meta a Code szerep (500 14px/1.5), és a
+     Small az egyetlen törzs betűs token ugyanezzel a mérettel és
+     sormagassággal, tehát a két betűcsalád egy sorban azonos méretű marad.
    - A meta (időbélyeg, eszköznév, azonosító, szám) a `--ep-text-code`.
    A fejléc szabály a forrás `.accordion__header` szabályát (600 16px/1.4,
    `font-family: inherit`) nagyobb specifitással írja felül, a bájtra azonos
@@ -34,10 +34,11 @@
    (T-009-25). Két ok:
    1. A virtualizált lista sormagassága így a tartalom hosszától és a panel
       szélességétől független: minden összecsukott sor ugyanolyan magas (az
-      egyetlen mért kivétel az átmeneti sor, lásd a konstans kommentjét),
-      tehát a még nem kirajzolt sorok becsült magassága pontos, és az aljára
-      görgetés a becsült pozícióra is pontosan érkezik (lásd
-      `transcript-panel/collapsed-transcript-row-height.ts`). Tördelt címnél
+      egyetlen mért kivétel az átmeneti sor, egy pixellel magasabb, lásd
+      `transcript-panel/collapsed-transcript-row-height.ts`), tehát a még nem
+      kirajzolt sorok becsült magassága legfeljebb soronként egy pixellel
+      tér el, és az automatikus követés ezt a mért magassághoz igazítja
+      (`transcript-panel/use-transcript-auto-scroll.ts`). Tördelt címnél
       a magasság a szövegtől ÉS a húzható panel szélességétől függene, tehát
       minden átméretezés minden sor magasságát megváltoztatná.
    2. A teljes szöveg nem vész el: a gomb hozzáférhető neve a teljes cím

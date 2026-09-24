@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useReducer, useState, type Dispatch, type SetStateAction } from 'react';
-import { useListCallbackRef, type ListImperativeAPI } from 'react-window';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import { useListCallbackRef, type DynamicRowHeight, type ListImperativeAPI } from 'react-window';
 import { reduceTranscriptAutoScroll } from './reduce-transcript-auto-scroll.ts';
 import type { TranscriptAutoScrollState } from './transcript-auto-scroll-state.ts';
 
@@ -50,6 +59,16 @@ const INITIAL_STATE: TranscriptAutoScrollState = {
 };
 
 /**
+ * A felhasználó saját beavatkozása a lista elemén: görgetés (kerék,
+ * érintés), kattintás és billentyű. Egy sor kinyitása kattintással vagy
+ * `Enter`/`Space` billentyűvel indul, tehát mindig megelőzi ezek egyike. A
+ * négy esemény a `react-window` 2.3.2 saját görgetés javításának
+ * megszakító eseménylistája (upstream PR #914,
+ * `docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
+ */
+const USER_INTERACTION_EVENT_TYPES = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+
+/**
  * A transcript automatikus görgetése (SPEC-008 7.4, AC40, AC41, T-009-25).
  *
  * Követés közben egy új sor érkezésekor a panel a
@@ -60,8 +79,21 @@ const INITIAL_STATE: TranscriptAutoScrollState = {
  *
  * A panel a csatoláskor is követ: az első renderkor már meglévő sorok (a
  * pótlás) ugyanúgy "érkeznek", tehát a lista az aljáról indul.
+ *
+ * **Igazítás a mért magassághoz.** A `scrollToRow` a még ki nem rajzolt
+ * sorokat a `defaultRowHeight` becslésével számolja, és a telepített
+ * `react-window@2.3.1` a görgetés után nem igazít, amikor a kirajzolt sor
+ * mért magassága eltér a becsléstől (az átmeneti sor egy pixellel magasabb,
+ * `collapsed-transcript-row-height.ts`). Ezért követés közben a lista
+ * sormagasság gyorsítótárának (`rowHeight`) minden változása után a hook
+ * újra az aljára görget, amíg a felhasználó a legutóbbi követő görgetés óta
+ * nem nyúlt a listához (`USER_INTERACTION_EVENT_TYPES`). A beavatkozás
+ * utáni változás (például egy kinyitott sor) nem görget: a sor ott marad,
+ * ahol a felhasználó kinyitotta, és ha az utolsó sor kicsúszik, a követés a
+ * `reduceTranscriptAutoScroll` szerint kikapcsol. Új sor, átméretezés vagy
+ * az ugrás gomb újra élesíti az igazítást.
  */
-export function useTranscriptAutoScroll(rowCount: number): TranscriptAutoScroll {
+export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowHeight): TranscriptAutoScroll {
   const [state, dispatch] = useReducer(reduceTranscriptAutoScroll, INITIAL_STATE);
   // A könyvtár saját hookja `typeof useState<ListImperativeAPI | null>`
   // szignatúrájú, és a React ref szerződése leválasztáskor `null`-t ad át,
@@ -82,10 +114,46 @@ export function useTranscriptAutoScroll(rowCount: number): TranscriptAutoScroll 
     setResizeCount((count) => count + 1);
   }, []);
 
+  // Igaz, amíg a legutóbbi követő görgetés óta a felhasználó nem nyúlt a
+  // listához: ennyi ideig igazít a hook a mért sormagassághoz.
+  const isMeasurementFollowArmedReference = useRef(true);
+
   useEffect(() => {
+    isMeasurementFollowArmedReference.current = true;
     followToBottom();
     dispatch({ type: 'rows_arrived', rowCount });
   }, [followToBottom, rowCount, resizeCount]);
+
+  // A `rowHeight` identitása pontosan akkor új, amikor egy kirajzolt sor
+  // mért magassága eltér a tárolttól: a telepített `useDynamicRowHeight`
+  // `setRowHeight` hívása azonos értékre az előző állapotot adja vissza, és
+  // a visszaadott objektum `useMemo` a gyorsítótár térképén.
+  const followAfterMeasurement = useEffectEvent(() => {
+    if (isMeasurementFollowArmedReference.current) {
+      followToBottom();
+    }
+  });
+  useEffect(() => {
+    followAfterMeasurement();
+  }, [rowHeight]);
+
+  useEffect(() => {
+    const element = list?.element;
+    if (element === undefined || element === null) {
+      return;
+    }
+    const disarm = (): void => {
+      isMeasurementFollowArmedReference.current = false;
+    };
+    for (const type of USER_INTERACTION_EVENT_TYPES) {
+      element.addEventListener(type, disarm, { passive: true });
+    }
+    return () => {
+      for (const type of USER_INTERACTION_EVENT_TYPES) {
+        element.removeEventListener(type, disarm);
+      }
+    };
+  }, [list]);
 
   const onRowsRendered = useCallback(
     (visibleRows: Readonly<{ startIndex: number; stopIndex: number }>) => {

@@ -547,7 +547,7 @@ describe('RunViewScreen', () => {
       });
 
       const meta = container.querySelector(':scope .transcript-panel .run-event-row .accordion__meta');
-      expect(meta?.textContent).toBe('Költség (SDK becslés): $0.2131');
+      expect(meta?.textContent).toBe('$0.2131');
     });
 
     it('a képernyő betöltése ALATT érkező keretek sem vesznek el: a feliratkozás a betöltési ágak előtt él', async () => {

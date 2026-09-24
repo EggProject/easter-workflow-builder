@@ -273,7 +273,7 @@ describe('TranscriptPanel', () => {
       payload: { type: 'result', total_cost_usd: 0.213108 },
     });
     renderPanel(transcriptOf([result], true), [CLAUDE_STEP_RUN]);
-    expect(container.querySelector('.accordion__meta')?.textContent).toBe('Költség (SDK becslés): $0.2131');
+    expect(container.querySelector('.accordion__meta')?.textContent).toBe('$0.2131');
 
     renderPanel(transcriptOf([result], true), [{ ...CLAUDE_STEP_RUN, providerId: 'minimax' }]);
     expect(container.querySelector('.accordion__meta')).toBeNull();

@@ -170,10 +170,12 @@ function OriginMarkerIcon(properties: Readonly<{ origin: RunEventOrigin }>): Rea
  * `icon` szlotja: a design system `.accordion__icon` doboza 18x18-as és
  * `flex-shrink: 0`, tehát minden sorban azonos szélességű bal oldali
  * oszlopot ad, és az eredetet ikon alakkal, nem csak színnel jelöli. Az
- * `sdk_result` sor költség mezője `claude-subscription` provider mellett a
- * `meta` szlotba kerül, a kinyitott nézetben pedig külön, megnevezett
- * mezőként is megjelenik; `minimax` provider mellett a mező sehol nem
- * jelenik meg, csak a kinyitott nézetben egy magyarázó mondat áll a helyén.
+ * `sdk_result` sor költség összege `claude-subscription` provider mellett
+ * összecsukva felirat nélkül a `meta` szlotba kerül (a Code szereppel), a
+ * kinyitott nézetben pedig külön, megnevezett mezőként, a magyarázattal
+ * együtt jelenik meg (user döntés 2026-09-24, SPEC-008 7.1); `minimax`
+ * provider mellett a mező sehol nem jelenik meg, csak a kinyitott nézetben
+ * egy magyarázó mondat áll a helyén.
  *
  * **Az átmeneti sor jelölése** (SPEC-008 7.5 1. szabály, T-009-26) a design
  * system `Badge` komponense, `outline` változatban, a `meta` szlotban: az
@@ -201,13 +203,9 @@ export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactE
     </>
   );
   const { costEstimateText } = summary;
-  const costMeta =
-    costEstimateText === undefined ? undefined : (
-      <>
-        {`${COST_FIELD_LABEL}: `}
-        <CodeText text={costEstimateText} />
-      </>
-    );
+  // Összecsukva a meta csak az összeg (user döntés 2026-09-24): a felirat és
+  // a magyarázat a kinyitott törzsben áll.
+  const costMeta = costEstimateText === undefined ? undefined : <CodeText text={costEstimateText} />;
   const meta = isTransient ? (
     <Badge variant="outline" title={TRANSIENT_MARK_TITLE}>
       {TRANSIENT_MARK_TEXT}

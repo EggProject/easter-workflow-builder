@@ -51,8 +51,9 @@ prop a forrás `Accordion.jsx` része, a korábbi átemelés hagyta ki, T-009-24
 szövegét (és eszköz eredménynél a `parentToolUseId`-t), az `sdk_stream_event` sor a részleges
 szöveget, az `sdk_result` sor mind a négy token számot és a `numTurns` értéket mutatja. **Az
 `sdk_result` költsége providerfüggő** (user döntés 2026-09-23, pontosítva: "MiniMaxnál ne
-látszódjon"): `claude-subscription` provider mellett az összesítő sor `meta` szlotjában és a
-kinyitott nézetben is külön, "Költség (SDK becslés)" nevű mezőként jelenik meg; `minimax`
+látszódjon"): `claude-subscription` provider mellett összecsukva a `meta` szlotban csak az
+összeg áll (user döntés 2026-09-24), a kinyitott nézetben pedig külön, "Költség (SDK becslés)"
+nevű mezőként, a magyarázattal; `minimax`
 provider mellett a mező sehol nem jelenik meg, csak a kinyitott nézetben egy mondat mondja ki,
 miért nem. A megkülönböztetés forrása a lépés feloldott `StepRunRecord.providerId` mezője, amit a
 `RunEventRow` külön propként kap, mert a `RunEventRecord` maga nem hordozza
@@ -75,10 +76,12 @@ egy saját magyarázat. A sorokat a `transcript-panel` téma rajzolja.
 **A `transcript-panel` téma a futás nézet transcript oldala** (T-009-25, SPEC-008 7.3, 7.4,
 AC39, AC40, AC41). A lista a `react-window@2.3.1` `List` komponense; a `rowHeight` a könyvtár
 `useDynamicRowHeight` gyorsítótára, tehát a sor magassága a kirajzolt tartalomból számítódik (a
-kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat pedig az összecsukott
-sor pontos magasságával becsüli (`collapsed-transcript-row-height.ts`, a design system
+kinyitott sor payloadja előre nem számítható), a még nem kirajzolt sorokat pedig a tárolt,
+összecsukott sor magasságával becsüli (`collapsed-transcript-row-height.ts`, a design system
 `accordion.css` fejléc szabályából és a sor fejlécének type tokenjéből, két regressziós
-teszttel). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
+teszttel); az átmeneti sor ennél egy pixellel magasabb, és a könyvtár a görgetés után nem igazít,
+ezért követés közben a `useTranscriptAutoScroll` a mért magasság változása után újra az aljára
+görget, amíg a felhasználó nem nyúlt a listához (research 13. szekció). A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
 (`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
 küszöb nélküli: `visibleRows.stopIndex === rowCount - 1` (`is-last-row-visible.ts`), az
 állapotgép a `reduce-transcript-auto-scroll.ts` tiszta függvénye, felgörgetve az "ugrás az

@@ -33,8 +33,15 @@ const HEADER_LINE_HEIGHT = 1.5;
  * `Badge` 22 pixel magas, tehát az a sor 54 pixel (ugyanott mérve).
  *
  * A `useDynamicRowHeight` `defaultRowHeight` értéke: ennyinek becsüli a
- * lista a még nem kirajzolt sorokat. Pontos becslés mellett az aljára
- * görgetés a becsült pozícióra is pontosan érkezik.
+ * lista a még nem kirajzolt sorokat. A tárolt, összecsukott sorra a becslés
+ * pontos, az átmeneti sorra egy pixellel kevesebb. A `react-window@2.3.1`
+ * a `scrollToRow` után nem igazít, amikor a kirajzolt sor mért magassága
+ * eltér a becsléstől, ezért az automatikus követés maga görget újra a mért
+ * magasság szerint (`use-transcript-auto-scroll.ts`); enélkül az utolsó sor
+ * alja soronként egy pixellel lemaradt a lista aljától
+ * (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció). A
+ * konstans 54-re emelése nem javítana: akkor a tárolt sorok becslése lenne
+ * hibás.
  */
 export const COLLAPSED_TRANSCRIPT_ROW_HEIGHT =
   2 * HEADER_VERTICAL_PADDING_PX + HEADER_FONT_SIZE_PX * HEADER_LINE_HEIGHT;

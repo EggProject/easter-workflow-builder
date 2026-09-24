@@ -221,9 +221,10 @@ nélkül.
 
 **A döntés (user, 2026-09-24).** Az időbélyeg, az eszköznév, az azonosító és a számok a design
 system Code szerepével (`--ep-text-code`), a sor szövege (eredet, címke, összefoglaló) a törzs
-betűjével. A választott törzs token a `--ep-text-small` (`400 14px/1.5`, Roboto): a
-`packages/ui/src/design-token/typography.css` törzs betűs tokenjei közül ez az egyetlen, aminek
-mérete és sormagassága a `--ep-text-code` (`500 14px/1.5`) tokenével azonos. Forrás: a design
+betűjével. A törzs token a `--ep-text-small` (`400 14px/1.5`, Roboto). **Hogy ez marad, azt a
+user 2026-09-24-én külön döntésként rögzítette** (addig a végrehajtó saját választása volt), ezzel
+az indokkal: a `packages/ui/src/design-token/typography.css` törzs betűs tokenjei közül ez az
+egyetlen, aminek mérete és sormagassága a `--ep-text-code` (`500 14px/1.5`) tokenével azonos. Forrás: a design
 system DESIGN.md 3. szekciója ("JetBrains Mono is reserved for code, tokens, timestamps and
 numeric meta") és a SKILL.md (szemantikus type token, "never ad-hoc `font-size`").
 
@@ -263,18 +264,21 @@ perzisztált sor 53 pixel, a cím sordoboza pontosan 21 pixel; a 3 átmeneti sor
 - **Az átmeneti sor kivétele:** a "Nem tárolt" `Badge` 22 pixel magas (a `badge.css` saját
   szabálya), ami a 21 pixeles címnél magasabb, tehát ez a sor 54 pixel. A `useDynamicRowHeight`
   a kirajzolt sort méri, a becslés csak a még nem kirajzolt átmeneti sornál tér el 1 pixellel.
-  Előtte a 22,4 pixeles cím a `Badge`-nél magasabb volt, ezért ott nem jelentkezett.
+  Előtte a 22,4 pixeles cím a `Badge`-nél magasabb volt, ezért ott nem jelentkezett. **Ennek a
+  következménye nem volt ártalmatlan**, és ez a bekezdés eredetileg ezt nem mondta ki: a
+  `react-window@2.3.1` a görgetés után nem igazít a mért magassághoz, tehát az utolsó sor alja
+  átmeneti soronként egy pixellel lemaradt a lista aljától. Mérés és javítás: 13. szekció.
 
 **Látható cím szélesség összecsukva, 400 pixeles panelen** (látható / teljes, pixel), és a SPEC-008
 7.1 szerkezet (időbélyeg, eredet, címke, törzs), illetve 7.2 3. pont (eszköz neve, azonosítója):
 
-| Sor                                              | Előtte     | Utána      | Láthatóság utána                                                                         |
-| ------------------------------------------------ | ---------- | ---------- | ---------------------------------------------------------------------------------------- |
-| motor, Futás indult                              | 334 / 480  | 334 / 334  | minden rész teljes                                                                       |
-| motor, Lépés elindult                            | 334 / 680  | 334 / 423  | időbélyeg, eredet, címke teljes, a törzs részben                                         |
-| eszközhívás, `mcp__agent-tools__web_search`      | 334 / 1720 | 334 / 1147 | időbélyeg, eredet, címke teljes; eszköznév 140/224 px (előtte 34/280); azonosító nem     |
-| eredmény, `claude-subscription`, költség metával | 153 / 1140 | 142 / 698  | címke részben, 31/62 px (előtte egyáltalán nem); a törzs nem; a meta 180 px (előtte 169) |
-| átmeneti sor, Streamelt részlet                  | 246 / 620  | 246 / 384  | a címke teljes (előtte 76/170 px), a törzs részben                                       |
+| Sor                                              | Előtte     | Utána      | Láthatóság utána                                                                                                                   |
+| ------------------------------------------------ | ---------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| motor, Futás indult                              | 334 / 480  | 334 / 334  | minden rész teljes                                                                                                                 |
+| motor, Lépés elindult                            | 334 / 680  | 334 / 423  | időbélyeg, eredet, címke teljes, a törzs részben                                                                                   |
+| eszközhívás, `mcp__agent-tools__web_search`      | 334 / 1720 | 334 / 1147 | időbélyeg, eredet, címke teljes; eszköznév 140/224 px (előtte 34/280); azonosító nem                                               |
+| eredmény, `claude-subscription`, költség metával | 153 / 1140 | 142 / 698  | címke részben, 31/62 px (előtte egyáltalán nem); a törzs nem; a meta 180 px (előtte 169); a meta azóta csak az összeg, 14. szekció |
+| átmeneti sor, Streamelt részlet                  | 246 / 620  | 246 / 384  | a címke teljes (előtte 76/170 px), a törzs részben                                                                                 |
 
 **Ami a 400 pixeles panelen nem fér ki, mérve.** (1) Az eszközhívás azonosítója: a teljes
 láthatósághoz a cím szlotnak 657 pixel kell (`web_search`, előtte 890), a MiniMax sorban 633
@@ -312,3 +316,143 @@ a korábbi belső kulcs nem volt hatástalan, csak a lista elem azonosságát ne
 virtualizáció korlátja:** a kirajzolt tartományból kikerülő sort a lista leszereli, tehát a
 kinyitott állapot csak a kirajzolva maradó sorra őrizhető meg (a debug futás szerint egy beszúrás
 utáni első render még a régi tartományt rajzolja, és az onnan kicsúszó sor újracsatolódik).
+
+## 13. A lista alja: az utolsó sor teljes egészében (2026-09-24)
+
+**A hiba.** Egy független ellenőrzés a `f03b885` commiton mérte, hogy az automatikus követés és
+az "Ugrás az aljára" gomb nem ér le az utolsó sor aljáig. A saját mérés megismételte, és egy
+második, független okot is talált.
+
+**Módszer.** Eldobható mérő script a repón kívül (`/private/tmp/transcript-alja/measure.cjs`, a
+screenshot-pipeline invariáns miatt), `vite build` a scratchpadbe az e2e `VITE_*` értékeivel,
+`node:http` statikus kiszolgálás és NYITVA TARTOTT SSE kapcsolat, a REST hívások `page.route()`
+mockon. Valódi Chromium (`@playwright/test@1.62.1`), 1440x900, `hu-HU`, `Europe/Budapest`, mindkét
+téma, három független futás. A pótlás a 11. szekció 19 tárolt eseménye, utána átmeneti delta
+keretek a nyitott kapcsolatba. Mért érték az utolsó sor alsó éle mínusz (a) a lista látható alsó
+éle, és (b) a ténylegesen látható alsó él: a lista, minden levágó (nem `visible` túlcsordulású) ős
+kliens doboza és az ablak alja közül a legkisebb. Az érték akkor számít stabilnak, ha 20 egymást
+követő animációs kereten át nem változik. Előtte a `2eefddb` (az `apps/web` kódja a `f03b885` óta
+változatlan), utána a munkafa állapota.
+
+| Helyzet                                          | Előtte, pixel (lista / látható) | Utána |
+| ------------------------------------------------ | ------------------------------- | ----- |
+| 3 átmeneti sor egy löketben                      | 3 / 19                          | 0 / 0 |
+| 120 átmeneti sor egy löketben                    | 18 / 34                         | 0 / 0 |
+| felgörgetve 120 sor, majd "Ugrás az aljára"      | 15 / 31                         | 0 / 0 |
+| 10 átmeneti sor egyenként, minden sor után mérve | 1 / 17 (mind a tízszer)         | 0 / 0 |
+
+A három futás és a két téma minden száma azonos.
+
+**Két független ok.**
+
+1. **Becslés.** A `useDynamicRowHeight` a még nem kirajzolt sort a `defaultRowHeight` (53) értékkel
+   becsüli, az átmeneti sor 54 (11. szekció). A telepített forrás (`dist/react-window.js`, a source
+   map szerint `lib/core/getOffsetForIndex.ts` és `lib/components/list/List.tsx`) szerint a
+   `scrollToRow({ align: 'end' })` a becsült határokból számol (`bounds.scrollOffset -
+containerSize + bounds.size`), és a görgetés után semmi nem igazít: a kirajzolt sor mérése
+   (`setRowHeight`) új gyorsítótárat ad, a sorok lejjebb csúsznak, a `scrollTop` marad.
+2. **Levágás.** A `.run-view-screen__transcript` `height: 100%` plusz `padding:
+var(--ep-space-4)`, `box-sizing` nélkül: a burkoló 32 pixellel magasabb a panelnél (1440x900-on
+   552 a 520 helyett), és a panel (`overflow: auto`) a lista alsó 16 pixelét levágja. A lista saját
+   dobozához mért eltérésben ez nem látszik, a látható alsó élhez mérve minden helyzetben 16 pixel,
+   a csak tárolt sorokat tartalmazó listán is. A független ellenőrzés számai ezt nem tartalmazták;
+   az új e2e teszt `toBeInViewport({ ratio: 1 })` állítása fogta meg (ratio 0,698 = 37/53).
+
+**Az elvetett irányok.**
+
+- **Kisebb `Badge`.** A design system forrása (`eggproject-design-components/components/badge/`
+  `badge.css`, `Badge.jsx`, `badge.html`) egyetlen méretet definiál (`padding: 4px 10px; font: 500
+12px`), méret változat nincs; kitalált méret nem jöhet.
+- **Soronkénti pontos magasság.** A `.d.ts` szerint a `rowHeight` elfogad `(index, rowProps) =>
+number` függvényt, de a függvény alak a sorra fix `height` stílust tesz (`List.tsx`: `height:
+isDynamicRowHeight ? undefined : bounds.size`), a kinyitott sor magassága pedig tartalom és
+  szélesség függő (3. szekció): rálógna a következő sorra. A `DynamicRowHeight` alak saját
+  megvalósítása saját `ResizeObserver`-t igényelne, amit a (7) greppes invariáns tilt, a könyvtár
+  `getRowHeight`-je pedig a mért és a becsült értéket nem különbözteti meg (hiánynál a becsültet
+  tárolja el). Az 54 pixel ráadásul nem tokenből jön, hanem a `Badge` `normal` sormagasságából,
+  tehát nem vezethető le determinisztikusan.
+- **A konstans 54-re emelése.** A független ellenőrzés szerint löketnél 65 pixel marad le: akkor a
+  tárolt sorok becslése hibás.
+- **Verzióemelés.** A `react-window` 2.3.2 CHANGELOG bejegyzése "Improve `scrollToRow` accuracy for
+  dynamic height rows" (PR #914, resolves #883); a független ellenőrzés szerint 2.3.3 mellett
+  0/0/1/0 pixel. A user tiltotta, ezért nem emeltük.
+
+**A választott megoldás.** Az automatikus követés maga igazít a mért magassághoz
+(`use-transcript-auto-scroll.ts`): követés közben a `rowHeight` gyorsítótár minden változása után
+újra `scrollToRow({ index: rowCount - 1, align: 'end' })`. A telepített forrás szerint
+(`lib/components/list/useDynamicRowHeight.ts`) a gyorsítótár identitása pontosan akkor új, amikor
+egy mért magasság eltér a tárolttól: a `setRowHeight` azonos értéknél az előző állapotot adja
+vissza, a visszaadott objektum pedig `useMemo` a térképen. Az upstream 2.3.2 javítás mintájára a
+felhasználó beavatkozása a lista elemén (`wheel`, `touchstart`, `pointerdown`, `keydown`)
+felfüggeszti az igazítást a következő új sorig, átméretezésig vagy ugrásig. A `keydown` itt minden
+billentyűre szakít (upstream csak a görgető billentyűkre), mert a sor `Enter`-rel is kinyílik. A
+levágásra a burkoló `box-sizing: border-box` sora a javítás: a projekt a design system univerzális
+resetjét szándékosan nem emeli át (`topnav-shell.css`), a hiányából eredő eseteket pontszerűen
+javítja (precedens: `node-inspector.css`).
+
+**Miért kell a felfüggesztés, mérve.** Szándékos rontással (a négy esemény helyett üres lista),
+ugyanazzal a scripttel: az alján állva a végétől ötödik sor kinyitásakor a lista 277 pixelt
+görgetett, a kinyitott sor fejléce 277 pixelt ugrott felfelé, és a követés bekapcsolva maradt.
+Felfüggesztéssel a fejléc és a `scrollTop` 0 pixelt mozdul, és a következő átmeneti sor után
+megjelenik az "Ugrás az aljára" gomb, pontosan úgy, mint előtte: a kinyitás viselkedése nem
+változott. Az utolsó sor kinyitásakor utána sem görget, és a következő sor után az alja pontosan a
+lista alján áll (előtte 1 pixel).
+
+**Webes megerősítés** (Sonnet subagent, 2026-09-24, forrásonként három hivatkozás):
+
+- A 2.3.2 javítása (`lib/components/list/useScrollToRow.ts`) `requestAnimationFrame` hurokban
+  korrigál, és `wheel`, `touchstart`, `pointerdown`, `keydown` szakítja meg. Publikálás a registry
+  szerint: 2.3.1 2026-09-05, 2.3.2 és 2.3.3 2026-09-22
+  (<https://github.com/bvaughn/react-window/blob/2.3.3/CHANGELOG.md>,
+  <https://github.com/bvaughn/react-window/pull/914>, <https://registry.npmjs.org/react-window>).
+- A `useEffectEvent` a React 19.2 óta stabil, effektből hívható, és nem kerül a függőségi listába
+  (<https://react.dev/reference/react/useEffectEvent>, <https://react.dev/blog/2025/10/01/react-19-2>,
+  <https://blog.logrocket.com/react-19-2-is-here/>).
+- A `pointerdown` egérre, tollra és érintésre is kiváltódik
+  (<https://w3c.github.io/pointerevents/#the-pointerdown-event>,
+  <https://developer.mozilla.org/en-US/docs/Web/API/Element/pointerdown_event>,
+  <https://developer.chrome.com/blog/pointer-events>).
+- A gombot az `Enter` a `keydown`-ra, a `Space` a `keyup`-ra aktiválja, tehát a `keydown` mindkettőt
+  megelőzi (<https://html.spec.whatwg.org/multipage/interaction.html#activation-triggering-input-event>,
+  <https://github.com/whatwg/html/issues/10301>,
+  <https://www.stefanjudis.com/today-i-learned/keyboard-button-clicks-with-space-and-enter-behave-differently/>).
+- A Playwright `toBeInViewport` `ratio` opciója: "The minimal ratio of the element to intersect
+  viewport ... Defaults to 0."; a megvalósítás gyökér nélküli `IntersectionObserver`, aminek a
+  metszete minden levágó ős szerint szűkül
+  (<https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>,
+  <https://github.com/microsoft/playwright/blob/main/packages/injected/src/injectedScript.ts>,
+  <https://w3c.github.io/IntersectionObserver/#calculate-intersection-rect-algo>).
+
+**Regresszió.** E2E: `apps/web/e2e/sse-real-server.spec.ts`, a négy helyzet mindkét témában,
+`toBeInViewport({ ratio: 1 })` plusz a lista aljához mért eltérés 0,5 pixel alatt (a user
+kritériuma), a Playwright alap 1280x720 ablakán. Bukás igazolva: a `f03b885` állapotán (régi hook,
+régi CSS) már a pótlás utáni első állítás bukik (ratio 0,698); csak a régi hookkal mind a nyolc teszt
+bukik (ratio 0,944, 0,741, 0,796 és 0,981, a négy helyzet sorrendjében); csak a régi CSS-sel 0,698.
+Unit: `use-transcript-auto-scroll.spec.tsx`; a négy esemény helyett üres listával négy, az igazító
+effekt törlésével hat teszt bukik.
+
+**A fül sáv** (375x812, a transcript a második fülön), ugyanazzal a scripttel, egy futás, mindkét
+témában azonos: előtte 3 / 19, 15 / 31, 12 / 28 és 1 / 17 pixel, utána mind a négy helyzetben
+0 / 0; a középső sor kinyitása ott sem görget.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit ellen nem futott mérés.
+
+## 14. Az eredmény sor metája: csak az összeg (user döntés, 2026-09-24)
+
+**A döntés.** Az `sdk_result` sor összecsukva a metában csak az összeget mutatja (a Code szereppel),
+a "Költség (SDK becslés)" felirat és a magyarázat a kinyitott törzsben áll. MiniMax providernél a
+költség továbbra sehol nem jelenik meg (SPEC-008 AC37).
+
+**Mérve** a 13. szekció scriptjével, a 400 pixeles alap panelen, pixelben (látható / teljes), a két
+téma minden száma azonos:
+
+| Elem                       | Előtte                                   | Utána                                        |
+| -------------------------- | ---------------------------------------- | -------------------------------------------- |
+| meta                       | `Költség (SDK becslés): $0.0873`, 180 px | `$0.0873`, 56 px, JetBrains Mono 500 14/21px |
+| cím szlot                  | 142                                      | 266                                          |
+| címke ("Eredmény")         | 31 / 62                                  | 62 / 62                                      |
+| törzs                      | 0 / 528                                  | 87 / 528                                     |
+| MiniMax eredmény sor       | nincs meta; címke 62 / 62, törzs 155/504 | változatlan                                  |
+| kinyitva, a törzs költsége | felirat, összeg, magyarázat              | változatlan                                  |
+
+A két provider ágát a `RunEventRow.spec.tsx` unit tesztjei őrzik.

@@ -92,13 +92,15 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * mérés (soronként eltérő magasság) szerint működik. Ez azért kell, mert a
  * sor kinyitható, és a kinyitott sor a teljes, tördelt payloadot mutatja,
  * aminek a magassága előre nem számítható. A még nem kirajzolt sorokat a
- * lista az összecsukott sor pontos magasságával becsüli. A sor React kulcsa
- * a `rowKey` prop, a sor saját `key` mezőjéből (`transcript-row-key.ts`).
+ * lista a tárolt összecsukott sor magasságával becsüli; az átmeneti sor ennél
+ * egy pixellel magasabb. A sor React kulcsa a `rowKey` prop, a sor saját
+ * `key` mezőjéből (`transcript-row-key.ts`).
  *
  * **Automatikus görgetés.** A `useTranscriptAutoScroll` hook: pixel küszöb
  * nélkül, a `visibleRows.stopIndex === rowCount - 1` predikátummal dönt, és
  * felgörgetett állapotban az "ugrás az aljára" gomb megnevezi az új
- * események számát.
+ * események számát. A hook a `rowHeight` gyorsítótárat is megkapja: követés
+ * közben a kirajzolt sorok mért magasságához igazítva görget újra az aljára.
  *
  * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
@@ -123,8 +125,8 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
   // terminális csoportja a `pending` és a `running`
   // (`run-control-availability.ts`, SPEC-004 9. és 10. szekció).
   const isRunInProgress = isRunInterruptible(runStatus);
-  const { setList, onRowsRendered, onResize, unseenCount, jumpToBottom } = useTranscriptAutoScroll(rowCount);
   const rowHeight = useDynamicRowHeight({ defaultRowHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT });
+  const { setList, onRowsRendered, onResize, unseenCount, jumpToBottom } = useTranscriptAutoScroll(rowCount, rowHeight);
 
   return (
     <div className="transcript-panel">

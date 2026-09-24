@@ -132,8 +132,16 @@
    belső térköz egyetlen szinten van, itt. A görgetést a transcript panel
    virtualizált listája maga végzi (T-009-25, `transcript-panel.css`), ezért
    ez a burkoló NEM görget: egy második görgetősáv itt a lista saját
-   görgetését és az aljára tapadást zavarná meg. */
+   görgetését és az aljára tapadást zavarná meg.
+
+   A `box-sizing: border-box` a `height: 100%` miatt kell: a projekt a design
+   system univerzális `box-sizing` resetjét szándékosan nem emeli át
+   (`topnav-shell.css`), tehát nélküle a belső térköz a panel magassága FÖLÉ
+   adódik, és a panel a lista alsó 16 pixelét levágja: az utolsó sor alja
+   akkor sem látszik, ha a lista pontosan az aljára görgetett (mérve,
+   `docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció). */
 .run-view-screen__transcript {
+  box-sizing: border-box;
   overflow: hidden;
   padding: var(--ep-space-4);
 }

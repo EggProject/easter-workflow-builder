@@ -1158,3 +1158,30 @@ functions értékre húzva (99.4 -> **99.41**), a másik három a mért értékk
 kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
 coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
 (98.99 / 98.38 / 99.42 / 98.95) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 28. A transcript lista alja és az eredmény sor metája utáni ratchet (2026-09-24): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az automatikus követés a mért sormagassághoz igazít, a felhasználó beavatkozása
+felfüggeszti (`apps/web/src/transcript-panel/use-transcript-auto-scroll.ts`), az `sdk_result` sor
+metája csak az összeg (`apps/web/src/run-event-row/RunEventRow.tsx`), és nyolc új e2e teszt méri
+az utolsó sor teljes láthatóságát (`apps/web/e2e/sse-real-server.spec.ts`,
+`docs/research/2026-09-23-transcript-panel-meresek.md` 13. és 14. szekció).
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet hat
+shardban, `playwright test --shard=i/6`, **234 teszt, mind zöld**, majd `bun run
+coverage:e2e:report`; a darabszámok a `nyc report --reporter=json-summary` kimenetéből):
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (27. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1487 / 1502     | **99.00** | 98.98                      | 15 -> **15**                   |
+| branches   | 669 / 680       | **98.38** | 98.37                      | 11 -> **11**                   |
+| functions  | 512 / 515       | 99.41     | 99.41                      | 3 -> **3**                     |
+| lines      | 1431 / 1446     | **98.96** | 98.94                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+19, +4, +5, +19), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 27. szekcióéval. A küszöb a mért
+statements, branches és lines értékre húzva (98.98 -> **99**, 98.37 -> **98.38**, 98.94 ->
+**98.96**; a statements pontos értéke 99,0013), a functions a mért értékkel már egyezett, felfelé
+kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(99.01 / 98.39 / 99.42 / 98.97) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

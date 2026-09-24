@@ -749,6 +749,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   egy kilógó transcript sor a LISTÁT görgeti vízszintesen, a dokumentumot nem: csonkolás nélkül
   mérve a dokumentum túllógása 0, a listáé 3719 pixel (375 pixelen). A vízszintes túllógás
   tesztje ezért a görgető dobozt is méri (`responsive.spec.ts`, T-009-25).
+- **A `toBeInViewport()` alapértéke a részleges láthatóságot is elfogadja** (a `ratio` alapértéke
+  0, <https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>).
+  A transcript görgetés tesztjei emiatt nem vették észre, hogy az utolsó sor alja lemarad: a
+  becslésnél egy pixellel magasabb átmeneti sor miatt, és mert a `height: 100%` plusz belső
+  térközű burkoló `box-sizing` nélkül a lista alsó 16 pixelét a panel levágta. Ha egy teszt tárgya
+  az, hogy valami TELJESEN látszik, `toBeInViewport({ ratio: 1 })` kell, ami a levágó ősöket is
+  figyelembe veszi. Védelem: `apps/web/e2e/sse-real-server.spec.ts` lista alja tesztjei
+  (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 

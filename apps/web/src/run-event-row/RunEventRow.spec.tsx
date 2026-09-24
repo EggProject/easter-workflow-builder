@@ -233,13 +233,17 @@ describe('RunEventRow', () => {
     };
 
     describe('claude-subscription provider mellett', () => {
-      it('az összesítő sorban külön, megnevezett meta mezőként jelenik meg, SDK becslésként', () => {
+      it('összecsukva a meta csak az összeg a Code szereppel, felirat nélkül; a felirat a kinyitott törzsben áll (user döntés 2026-09-24)', () => {
         act(() => {
           root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" isTransient={false} />);
         });
-        expect(container.querySelector('.accordion__meta')?.textContent).toBe('Költség (SDK becslés): $0.2131');
-        expect(container.querySelector(':scope .accordion__meta .run-event-row__code')?.textContent).toBe('$0.2131');
+        expect(container.querySelector('.accordion__meta')?.textContent).toBe('$0.2131');
+        expect(container.querySelector(':scope .accordion__meta > .run-event-row__code')?.textContent).toBe('$0.2131');
+        expect(header().textContent).not.toContain('Költség');
         expect(container.querySelector('.accordion__title')?.textContent).not.toContain('$0.2131');
+        // A felirat a (még rejtett) törzsben megvan, nem veszett el.
+        expect(body().hidden).toBe(true);
+        expect(body().querySelector(':scope .run-event-row__cost strong')?.textContent).toBe('Költség (SDK becslés):');
       });
 
       it('a kinyitott nézetben is külön mezőként áll, a jelentését kimondó magyarázattal', () => {

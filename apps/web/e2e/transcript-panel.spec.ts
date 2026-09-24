@@ -630,7 +630,7 @@ test('mind a huszonöt esemény típus és minden payload változat sort kap, a 
     ALL_BRANCH_OVERRIDES.findIndex((overrides) => overrides.stepRunId === UNKNOWN_STEP_RUN_ID) + 1;
   // A meta szlotnak nincs szerepe és hozzáférhető neve, ezért CSS
   // szelektor (a locator sorrend utolsó eleme, szabálykönyv 11. szekció).
-  await expect(resultRow(claudePosition).locator('.accordion__meta')).toHaveText('Költség (SDK becslés): $0.2131');
+  await expect(resultRow(claudePosition).locator('.accordion__meta')).toHaveText('$0.2131');
   await expect(resultRow(minimaxPosition).locator('.accordion__meta')).toHaveCount(0);
   await expect(resultRow(unknownPosition).locator('.accordion__meta')).toHaveCount(0);
 

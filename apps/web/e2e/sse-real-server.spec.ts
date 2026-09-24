@@ -1149,3 +1149,120 @@ test('átmeneti keretek után az újracsatlakozás kurzora az utolsó TÁROLT es
       .getByRole('button', { name: /Lépés befejeződött/ }),
   ).toBeVisible();
 });
+
+// ============================================================
+// A LISTA ALJA: AZ UTOLSÓ SOR TELJES EGÉSZÉBEN LÁTSZIK (2026-09-24).
+//
+// Két, egymástól független ok miatt nem látszott az utolsó sor alja
+// (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció):
+//   1. Az átmeneti sor egy pixellel magasabb a lista becslésénél
+//      (`collapsed-transcript-row-height.ts`), és a `react-window@2.3.1` a
+//      görgetés után nem igazít a mért magassághoz: az utolsó sor alja
+//      lemaradt a lista aljától. Ezt a négy helyzet teszt fogja.
+//   2. A transcript oldal burkolója a belső térközével a panelnél magasabb
+//      volt, és a panel a lista alsó 16 pixelét levágta: ezt már a pótlás
+//      utáni első állítás (`openFollowingTranscript`) fogja.
+// A korábbi görgetés tesztek `toBeInViewport()` állítása a részleges
+// láthatóságot is elfogadja (a `ratio` alapértéke 0), ezért ezek a tesztek
+// a TELJES láthatóságot mérik: `toBeInViewport({ ratio: 1 })`, plusz az
+// utolsó sor alsó éle és a lista látható alsó éle közti különbség.
+//
+// Az új sorok a pótlás után, a nyitva maradó kapcsolatba érkeznek: ez a fenti
+// 2. és 3. kivétel.
+// ============================================================
+
+/**
+ * A pótlás tárolt sorainak száma: elég ahhoz, hogy a lista görgethető legyen.
+ */
+const REPLAYED_ROW_COUNT = 20;
+
+/**
+ * Az utolsó sor alsó éle mínusz a lista látható alsó éle, pixelben:
+ * pozitív érték esetén ennyi lóg ki az utolsó sorból a lista alján.
+ * `undefined`, amíg a sor nincs kirajzolva.
+ */
+async function lastRowBottomOverflow(list: Locator, rowCount: number): Promise<number | undefined> {
+  return list.evaluate((element, position) => {
+    const row = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
+    if (row === null) {
+      return;
+    }
+    const visibleBottom = element.getBoundingClientRect().top + element.clientTop + element.clientHeight;
+    return row.getBoundingClientRect().bottom - visibleBottom;
+  }, rowCount);
+}
+
+/**
+ * Az utolsó sor teljes egészében látszik, és az alja a lista alján áll. A
+ * 0,5 pixeles tűrés a user elfogadási kritériuma (2026-09-24).
+ */
+async function expectLastRowFullyVisibleAtBottom(list: Locator, rowCount: number): Promise<void> {
+  const lastRow = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`);
+  await expect(lastRow).toBeInViewport({ ratio: 1 });
+  await expect.poll(async () => Math.abs((await lastRowBottomOverflow(list, rowCount)) ?? Infinity)).toBeLessThan(0.5);
+}
+
+/**
+ * A futás nézet megnyitása a pótlással; visszatér, amikor az utolsó tárolt
+ * sor kirajzolódott, és a lista az alján áll.
+ */
+async function openFollowingTranscript(page: Page, theme: 'light' | 'dark'): Promise<OpenStreamServer> {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  await page.addInitScript((mode) => {
+    globalThis.localStorage.setItem('eggTheme', mode);
+  }, theme);
+  await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
+  await page.goto('/run?runId=r-1');
+  streamServer.pushBatch([
+    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+  ]);
+  await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT);
+  return streamServer;
+}
+
+function transientFrames(count: number): readonly StreamFrame[] {
+  return Array.from({ length: count }, (_, index) => textDeltaTransientFrame(`Részlet ${String(index + 1)}`));
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`követés közben 3 átmeneti sor után az utolsó sor teljes egészében látszik, az alja a lista alján (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(page, theme);
+    streamServer.pushBatch(transientFrames(3));
+    await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT + 3);
+  });
+
+  test(`követés közben egy 120 soros löket után az utolsó sor teljes egészében látszik (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(page, theme);
+    streamServer.pushBatch(transientFrames(120));
+    await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT + 120);
+  });
+
+  test(`az ugrás az aljára gomb után az utolsó sor teljes egészében látszik (${theme} téma)`, async ({ page }) => {
+    const streamServer = await openFollowingTranscript(page, theme);
+    const list = transcriptList(page);
+    await list.evaluate((element) => {
+      element.scrollTo({ top: 0 });
+    });
+    await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+    streamServer.pushBatch(transientFrames(120));
+    await page.getByRole('button', { name: 'Ugrás az aljára (120 új esemény)' }).click();
+    await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 120);
+  });
+
+  test(`követés közben egyenként érkező átmeneti sorok után minden alkalommal az utolsó sor teljes egészében látszik (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(page, theme);
+    const list = transcriptList(page);
+    for (let arrived = 1; arrived <= 5; arrived += 1) {
+      streamServer.push(textDeltaTransientFrame(`Egyenként ${String(arrived)}`));
+      await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + arrived);
+    }
+  });
+}

@@ -1,9 +1,25 @@
 /* eslint-disable unicorn/no-null -- a ListImperativeAPI `element` gettere a könyvtár szerződése szerint `null`-t ad, ha nincs csatolt elem */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import type { ListImperativeAPI } from 'react-window';
+import type { DynamicRowHeight, ListImperativeAPI } from 'react-window';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTranscriptAutoScroll, type TranscriptAutoScroll } from './use-transcript-auto-scroll.ts';
+
+/**
+ * A `useDynamicRowHeight` gyorsítótár teszt duplikátuma. A hook csak az
+ * identitását figyeli: egy új példány egy kirajzolt sor megváltozott mért
+ * magasságát jelenti.
+ */
+function createRowHeight(): DynamicRowHeight {
+  return {
+    getAverageRowHeight: () => 53,
+    getRowHeight: () => 53,
+    setRowHeight: vi.fn(),
+    observeRowElements: vi.fn(() => vi.fn()),
+  };
+}
+
+const INITIAL_ROW_HEIGHT = createRowHeight();
 
 /**
  * A SPEC-008 7.4 szerint az automatikus görgetés predikátuma "unit tesztben
@@ -24,8 +40,8 @@ describe('useTranscriptAutoScroll', () => {
     scrollToRow,
   };
 
-  function Harness({ rowCount }: { readonly rowCount: number }): null {
-    latest = useTranscriptAutoScroll(rowCount);
+  function Harness({ rowCount, rowHeight }: { readonly rowCount: number; readonly rowHeight: DynamicRowHeight }): null {
+    latest = useTranscriptAutoScroll(rowCount, rowHeight);
     return null;
   }
 
@@ -36,9 +52,9 @@ describe('useTranscriptAutoScroll', () => {
     return latest;
   }
 
-  function renderRows(rowCount: number): void {
+  function renderRows(rowCount: number, rowHeight: DynamicRowHeight = INITIAL_ROW_HEIGHT): void {
     act(() => {
-      root.render(<Harness rowCount={rowCount} />);
+      root.render(<Harness rowCount={rowCount} rowHeight={rowHeight} />);
     });
   }
 
@@ -46,10 +62,10 @@ describe('useTranscriptAutoScroll', () => {
    * A lista csatolása és a csatolás utáni első jelentés: a lista az aljára
    * görgetett (a hook a csatoláskor is követ), tehát az utolsó sor látható.
    */
-  function mountAtBottom(rowCount: number): void {
+  function mountAtBottom(rowCount: number, list: ListImperativeAPI = fakeList): void {
     renderRows(rowCount);
     act(() => {
-      current().setList(fakeList);
+      current().setList(list);
     });
     act(() => {
       current().onRowsRendered({ startIndex: 0, stopIndex: rowCount - 1 });
@@ -179,5 +195,81 @@ describe('useTranscriptAutoScroll', () => {
 
     renderRows(12);
     expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+  });
+
+  /**
+   * A lista teszt duplikátuma valódi (happy-dom) elemmel, amin a felhasználó
+   * beavatkozásának eseményei kiválthatók.
+   */
+  function listWithElement(): { readonly list: ListImperativeAPI; readonly element: HTMLDivElement } {
+    const element = document.createElement('div');
+    return {
+      element,
+      list: {
+        get element() {
+          return element;
+        },
+        scrollToRow,
+      },
+    };
+  }
+
+  it('követés közben a sormagasság gyorsítótár változása után (egy kirajzolt sor mért magassága eltért a becsléstől) újra az utolsó sorra görget', () => {
+    mountAtBottom(10);
+
+    renderRows(10, createRowHeight());
+    expect(scrollToRow).toHaveBeenCalledTimes(1);
+    expect(scrollToRow).toHaveBeenCalledWith({ index: 9, align: 'end' });
+  });
+
+  it('változatlan sormagasság gyorsítótárral az újrarenderelés nem görget', () => {
+    mountAtBottom(10);
+
+    renderRows(10);
+    expect(scrollToRow).not.toHaveBeenCalled();
+  });
+
+  it('felgörgetett állapotban a sormagasság változás nem görget', () => {
+    mountAtBottom(10);
+    act(() => {
+      current().onRowsRendered({ startIndex: 0, stopIndex: 5 });
+    });
+    scrollToRow.mockClear();
+
+    renderRows(10, createRowHeight());
+    expect(scrollToRow).not.toHaveBeenCalled();
+  });
+
+  it.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
+    'a lista elemén kiváltott %s után a sormagasság változás nem görget (egy kinyitott sor a helyén marad), és a következő új sor újra élesíti az igazítást',
+    (type) => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      element.dispatchEvent(new Event(type));
+      const measured = createRowHeight();
+      renderRows(10, measured);
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      renderRows(11, measured);
+      expect(scrollToRow).toHaveBeenCalledTimes(1);
+      renderRows(11, createRowHeight());
+      expect(scrollToRow).toHaveBeenCalledTimes(2);
+      expect(scrollToRow).toHaveBeenLastCalledWith({ index: 10, align: 'end' });
+    },
+  );
+
+  it('lista csere után a korábbi elem eseménye már nem függeszti fel az igazítást', () => {
+    const first = listWithElement();
+    const second = listWithElement();
+    mountAtBottom(10, first.list);
+    act(() => {
+      current().setList(second.list);
+    });
+    scrollToRow.mockClear();
+
+    first.element.dispatchEvent(new Event('pointerdown'));
+    renderRows(10, createRowHeight());
+    expect(scrollToRow).toHaveBeenCalledWith({ index: 9, align: 'end' });
   });
 });
