@@ -593,6 +593,43 @@ describe('RunViewScreen', () => {
       expect(container.querySelectorAll(':scope .transcript-panel .run-event-row')).toHaveLength(2);
     });
 
+    it.each([
+      { persistedStreamDeltas: false, isNoteShown: true },
+      { persistedStreamDeltas: true, isNoteShown: false },
+    ])(
+      'a delta mondat a futás RunDetail.persistedStreamDeltas mezőjéből jön: $persistedStreamDeltas mellett látszik: $isNoteShown (T-009-26)',
+      async ({ persistedStreamDeltas, isNoteShown }) => {
+        await renderScreen('?runId=r-3', createFetchFunction({ runDetail: { ...RUN_DETAIL, persistedStreamDeltas } }));
+
+        const note = container.querySelector(':scope .transcript-panel .transcript-panel__delta-note');
+        expect(note !== null).toBe(isNoteShown);
+      },
+    );
+
+    it('az élő átmeneti keret megjelölt sort ad, és az utána érkező tárolt sort nem nyeli el (T-009-26)', async () => {
+      await renderScreen('?runId=r-3', createFetchFunction());
+      act(() => {
+        emitFrame(sdkResultFrame(1, 's-1'));
+        emitFrame({ event: 'replay_complete', runId: 'r-3', throughEventId: 1 });
+        emitFrame({
+          event: 'run_event_transient',
+          runId: 'r-3',
+          stepRunId: 's-1',
+          kind: 'sdk_stream_event',
+          occurredAtMs: 30,
+          payload: {
+            type: 'stream_event',
+            event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hel' } },
+          },
+        });
+        emitFrame(sdkResultFrame(2, 's-1'));
+      });
+
+      const rows = [...container.querySelectorAll(':scope .transcript-panel [role="listitem"] .run-event-row')];
+      expect(rows).toHaveLength(3);
+      expect(rows.map((row) => row.querySelector('.badge')?.textContent)).toEqual([undefined, 'Nem tárolt', undefined]);
+    });
+
     it('leszereléskor leiratkozik a keretekről', async () => {
       await renderScreen('?runId=r-3', createFetchFunction());
       // Három feliratkozó: a transcript, a csomópontok élő állapota és a

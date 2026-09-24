@@ -25,8 +25,11 @@
   gap: var(--ep-space-2);
 }
 
+/* A delta kapcsoló mondata (T-009-26) ugyanaz a halvány kis szöveg
+   minta, mint a várakozás jelzése: doboz nélkül, csak tokenből. */
 .transcript-panel__status,
-.transcript-panel__empty {
+.transcript-panel__empty,
+.transcript-panel__delta-note {
   margin: 0;
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);

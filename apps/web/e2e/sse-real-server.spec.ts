@@ -1019,3 +1019,133 @@ test('a futás előzmények listája run_event keretre akkor is újratölt, ha U
 
   await expect.poll(() => listRunsCalls.count).toBe(callCountBeforeBatch + 1);
 });
+
+// ============================================================
+// A DELTA KAPCSOLÓ KÖVETKEZMÉNYE: AZ ÁTMENETI SOROK (T-009-26, SPEC-008 7.5,
+// AC42, AC43).
+//
+// Az átmeneti (`run_event_transient`) keret definíció szerint mindig élő,
+// tehát a valóságban a pótlás UTÁN, egy nyitva maradó kapcsolatba menet
+// közben érkezik: ez a fenti 2. és 3. kivétel. A második teszt az 1.
+// kivétel alá tartozik: az újracsatlakozás `Last-Event-ID` fejlécét méri.
+// A futás rekordja `persistedStreamDeltas: false` (`runDetailWithStatus`).
+// ============================================================
+
+/**
+ * Egy élő szöveg delta átmeneti kerete, pontosan abban az alakban, ahogy a
+ * szerver a kikapcsolt delta kapcsolójú futásnál kiküldi
+ * (`apps/server/src/engine-assembly/classify-published-event.ts`).
+ */
+function textDeltaTransientFrame(text: string): StreamFrame {
+  return {
+    event: 'run_event_transient',
+    runId: 'r-1',
+    stepRunId: 's-1',
+    kind: 'sdk_stream_event',
+    occurredAtMs: 20,
+    payload: { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } },
+  };
+}
+
+/**
+ * A futás nézet transcript listája.
+ */
+function transcriptList(page: Page): Locator {
+  return page.getByRole('list', { name: 'Futás eseményei' });
+}
+
+test('élő átmeneti keretek: megjelölt, nem tárolt sorok, két azonos tartalmú keret két sor, és az utánuk érkező tárolt sor nem vész el', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
+
+  await page.goto('/run?runId=r-1');
+  const list = transcriptList(page);
+  streamServer.pushBatch([
+    stepEventFrame(1, 'step_started', 'replayed'),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: 1 },
+  ]);
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  // A fejléc mondata a futás `persistedStreamDeltas: false` értékéből.
+  await expect(page.getByText(/részleges szöveg csak élőben látszik/)).toBeVisible();
+
+  // MENET KÖZBEN, a nyitott kapcsolatba: két azonos tartalmú delta, majd egy
+  // TÁROLT sor. Egy, az átmeneti soroktól lépő kurzor ezt a 2-es azonosítójú
+  // sort csendben eldobná.
+  streamServer.push(textDeltaTransientFrame('Helló'));
+  streamServer.push(textDeltaTransientFrame('Helló'));
+  streamServer.push(stepEventFrame(2, 'step_finished', 'live'));
+
+  await expect(list.getByRole('listitem')).toHaveCount(4);
+  const transientRows = list.getByRole('button', { name: /Streamelt részlet: Helló/ });
+  await expect(transientRows).toHaveCount(2);
+  const marks = list.getByText('Nem tárolt', { exact: true });
+  await expect(marks).toHaveCount(2);
+  const markList = await marks.all();
+  for (const mark of markList) {
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveAttribute('title', /nem kerül tárolásra/);
+  }
+  const lastRow = list.getByRole('listitem').last();
+  await expect(lastRow).toHaveAttribute('aria-posinset', '4');
+  await expect(lastRow.getByRole('button', { name: /Lépés befejeződött/ })).toBeVisible();
+  await expect(lastRow.getByText('Nem tárolt', { exact: true })).toHaveCount(0);
+});
+
+/**
+ * `GET /events`, ami az első kapcsolaton a pótlást, két átmeneti keretet,
+ * majd lezárást küld; a második kapcsolaton rögzíti a `Last-Event-ID`
+ * fejlécet, és a tárolt sorok pótlását adja (az 1-es ismétlésként, a 2-es
+ * újként), nyitva hagyva a kapcsolatot.
+ */
+function startTransientReconnectServer(capturedLastEventId: { value: string | undefined }): Server {
+  let requestCount = 0;
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url?.startsWith('/events') !== true) {
+      response.writeHead(404).end();
+      return;
+    }
+    requestCount += 1;
+    response.writeHead(200, SSE_RESPONSE_HEADERS);
+    response.write(encodeStreamFrame(streamReadyFrame('s-1', [])));
+    if (requestCount === 1) {
+      response.write('retry: 50\n\n');
+      response.write(encodeStreamFrame(stepEventFrame(1, 'step_started', 'replayed')));
+      response.write(encodeStreamFrame({ event: 'replay_complete', runId: 'r-1', throughEventId: 1 }));
+      response.write(encodeStreamFrame(textDeltaTransientFrame('a')));
+      response.write(encodeStreamFrame(textDeltaTransientFrame('b')));
+      response.end();
+      return;
+    }
+    capturedLastEventId.value = readSingleHeaderValue(request.headers['last-event-id']);
+    response.write(encodeStreamFrame(stepEventFrame(1, 'step_started', 'replayed')));
+    response.write(encodeStreamFrame(stepEventFrame(2, 'step_finished', 'live')));
+  });
+  server.listen(REAL_SERVER_PORT);
+  return server;
+}
+
+test('átmeneti keretek után az újracsatlakozás kurzora az utolsó TÁROLT esemény: a Last-Event-ID 1, az ismétlés eldobódik, a 2-es sor megjelenik', async ({
+  page,
+}) => {
+  const capturedLastEventId: { value: string | undefined } = { value: undefined };
+  serverHolder.current = startTransientReconnectServer(capturedLastEventId);
+  await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
+
+  await page.goto('/run?runId=r-1');
+  await expect.poll(() => capturedLastEventId.value).toBe('1');
+
+  const list = transcriptList(page);
+  // 1 (tárolt), a, b (átmeneti), 2 (tárolt): az 1-es ismétlése nem duplázódik.
+  await expect(list.getByRole('listitem')).toHaveCount(4);
+  await expect(list.getByText('Nem tárolt', { exact: true })).toHaveCount(2);
+  await expect(list.getByRole('button', { name: /Lépés elindult/ })).toHaveCount(1);
+  await expect(
+    list
+      .getByRole('listitem')
+      .last()
+      .getByRole('button', { name: /Lépés befejeződött/ }),
+  ).toBeVisible();
+});

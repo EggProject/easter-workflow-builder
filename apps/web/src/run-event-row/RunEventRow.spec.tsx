@@ -62,7 +62,7 @@ describe('RunEventRow', () => {
 
   it('a fejléc tartalmazza az időbélyeget, az eredetet, a típuscímkét és a törzs szöveget', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     expect(header().textContent).toContain('SDK');
     expect(header().textContent).toContain('Eszközhívás');
@@ -72,7 +72,7 @@ describe('RunEventRow', () => {
 
   it('alapértelmezésben zárva indul, aria-expanded="false" és a törzs rejtett', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     expect(header().getAttribute('aria-expanded')).toBe('false');
     expect(body().hidden).toBe(true);
@@ -80,7 +80,7 @@ describe('RunEventRow', () => {
 
   it('kinyitható: a fejlécre kattintva aria-expanded="true" lesz, és a teljes payload megjelenik', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     act(() => {
       header().click();
@@ -92,7 +92,7 @@ describe('RunEventRow', () => {
 
   it('a fejléc natív <button> egy natív <h3>-ban, tehát billentyűzetről is nyitható', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     expect(header().tagName).toBe('BUTTON');
     expect(header().type).toBe('button');
@@ -101,7 +101,7 @@ describe('RunEventRow', () => {
 
   it('a fejléc szövege a típuscímkét kettősponttal választja el a törzstől, gondolatjel nélkül', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     expect(header().textContent).toContain('Eszközhívás: web_search (tool-abc123)');
     expect(header().textContent).not.toContain('\u{2014}');
@@ -109,7 +109,7 @@ describe('RunEventRow', () => {
 
   it('az sdk eredetű sor a run-event-row--origin-sdk osztályt és a Bot jelölőt kapja a jelölő oszlopban', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     expect(container.querySelector('.run-event-row')?.classList.contains('run-event-row--origin-sdk')).toBe(true);
     // A jelölő oszlop a fejléc ELSŐ gyereke, a cím előtt (SPEC-008 7.2 1. pont).
@@ -125,6 +125,7 @@ describe('RunEventRow', () => {
         <RunEventRow
           record={{ ...BASE_RECORD, origin: 'engine', kind: 'run_started', toolName: null, toolUseId: null }}
           providerId="claude-subscription"
+          isTransient={false}
         />,
       );
     });
@@ -137,7 +138,7 @@ describe('RunEventRow', () => {
 
   it('a két eredet jelölője eltérő alakú, tehát nem csak a szín különbözteti meg őket', () => {
     act(() => {
-      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+      root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
     });
     const sdkMarkup = header().firstElementChild?.getHTML();
     act(() => {
@@ -145,6 +146,7 @@ describe('RunEventRow', () => {
         <RunEventRow
           record={{ ...BASE_RECORD, origin: 'engine', kind: 'run_started', toolName: null, toolUseId: null }}
           providerId="claude-subscription"
+          isTransient={false}
         />,
       );
     });
@@ -167,7 +169,7 @@ describe('RunEventRow', () => {
     describe('claude-subscription provider mellett', () => {
       it('az összesítő sorban külön, megnevezett meta mezőként jelenik meg, SDK becslésként', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" isTransient={false} />);
         });
         expect(container.querySelector('.accordion__meta')?.textContent).toBe('Költség (SDK becslés): $0.2131');
         expect(container.querySelector('.accordion__title')?.textContent).not.toContain('$0.2131');
@@ -175,7 +177,7 @@ describe('RunEventRow', () => {
 
       it('a kinyitott nézetben is külön mezőként áll, a jelentését kimondó magyarázattal', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId="claude-subscription" isTransient={false} />);
         });
         act(() => {
           header().click();
@@ -193,7 +195,7 @@ describe('RunEventRow', () => {
     describe('minimax provider mellett', () => {
       it('az összesítő sorban nincs meta mező, és a fejléc szövege sem tartalmaz dollár összeget', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" isTransient={false} />);
         });
         expect(container.querySelector('.accordion__meta')).toBeNull();
         expect(header().textContent).not.toContain('$');
@@ -202,7 +204,7 @@ describe('RunEventRow', () => {
 
       it('a kinyitott nézetben sincs dollár összeg vagy "Költség" felirat, csak a magyarázó mondat', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" isTransient={false} />);
         });
         act(() => {
           header().click();
@@ -217,7 +219,7 @@ describe('RunEventRow', () => {
 
       it('a teljes kirajzolt DOM-ban sehol nem marad rejtett költség szöveg', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId="minimax" isTransient={false} />);
         });
         act(() => {
           header().click();
@@ -230,7 +232,7 @@ describe('RunEventRow', () => {
     describe('fel nem oldott provider mellett (T-009-25)', () => {
       it('nincs meta mező, a kinyitott nézetben pedig sem költség, sem MiniMax állítás, csak a saját magyarázat', () => {
         act(() => {
-          root.render(<RunEventRow record={RESULT_RECORD} providerId={undefined} />);
+          root.render(<RunEventRow record={RESULT_RECORD} providerId={undefined} isTransient={false} />);
         });
         expect(container.querySelector('.accordion__meta')).toBeNull();
         act(() => {
@@ -244,15 +246,56 @@ describe('RunEventRow', () => {
 
     it('nem sdk_result sorban nincs sem meta, sem költség mező, egyik provideren sem', () => {
       act(() => {
-        root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" />);
+        root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
       });
       expect(container.querySelector('.accordion__meta')).toBeNull();
       expect(container.querySelector('.run-event-row__cost')).toBeNull();
       act(() => {
-        root.render(<RunEventRow record={BASE_RECORD} providerId="minimax" />);
+        root.render(<RunEventRow record={BASE_RECORD} providerId="minimax" isTransient={false} />);
       });
       expect(container.querySelector('.accordion__meta')).toBeNull();
       expect(container.querySelector('.run-event-row__cost')).toBeNull();
+    });
+  });
+  describe('az átmeneti (run_event_transient) sor jelölése (SPEC-008 7.5 1. szabály, AC42)', () => {
+    it('isTransient mellett a meta szlotban a design system outline Badge-e áll, a nem tárolást kimondó szöveggel és title-lel', () => {
+      act(() => {
+        root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient />);
+      });
+      const badge = container.querySelector(':scope .accordion__meta .badge');
+      expect(badge?.className).toBe('badge badge--outline');
+      expect(badge?.textContent).toBe('Nem tárolt');
+      expect(badge?.getAttribute('title')).toBe(
+        'Átmeneti sor: ennél a futásnál nem kerül tárolásra, ezért oldal újratöltés vagy a futás későbbi megnyitása után nem jelenik meg.',
+      );
+      // A jelölés szövege a gomb hozzáférhető nevének része, tehát nem csak
+      // vizuális jel.
+      expect(header().textContent).toContain('Nem tárolt');
+    });
+
+    it('isTransient={false} mellett nincs jelölés', () => {
+      act(() => {
+        root.render(<RunEventRow record={BASE_RECORD} providerId="claude-subscription" isTransient={false} />);
+      });
+      expect(container.querySelector('.badge')).toBeNull();
+    });
+
+    it('átmeneti sdk_result sornál a meta a jelölésé, a költség mező a kinyitott nézetben megmarad', () => {
+      const transientResult: RunEventRecord = {
+        ...BASE_RECORD,
+        kind: 'sdk_result',
+        toolName: null,
+        toolUseId: null,
+        payload: { type: 'result', total_cost_usd: 0.213108 },
+      };
+      act(() => {
+        root.render(<RunEventRow record={transientResult} providerId="claude-subscription" isTransient />);
+      });
+      expect(container.querySelector('.accordion__meta')?.textContent).toBe('Nem tárolt');
+      act(() => {
+        header().click();
+      });
+      expect(body().querySelector('.run-event-row__cost')?.textContent).toContain('Költség (SDK becslés): $0.2131');
     });
   });
 });

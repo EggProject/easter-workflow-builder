@@ -377,6 +377,22 @@ test('a jelölő oszlop: a renderelt ikon 18x18, és a cím minden sorban ugyano
   }
 });
 
+for (const { persistedStreamDeltas, expectedNoteCount } of [
+  { persistedStreamDeltas: false, expectedNoteCount: 1 },
+  { persistedStreamDeltas: true, expectedNoteCount: 0 },
+]) {
+  test(`a fejléc delta mondata a futás persistedStreamDeltas értékét követi: ${String(persistedStreamDeltas)} mellett ${String(expectedNoteCount)} mondat (AC43)`, async ({
+    page,
+  }) => {
+    await mockTranscript(page, MIXED_RECORDS, { ...RUN_DETAIL, persistedStreamDeltas });
+    // Az utolsó sor kirajzolódása után a panel a teljes pótlást feldolgozta,
+    // tehát a hiány nem a betöltés pillanatnyi állapota.
+    await openTranscript(page, MIXED_RECORDS.length);
+
+    await expect(page.getByText(/részleges szöveg csak élőben látszik/)).toHaveCount(expectedNoteCount);
+  });
+}
+
 test('a kinyitott sor magassága a tartalomból számítódik, és a következő sor alatta kezdődik, takarás nélkül', async ({
   page,
 }) => {
@@ -593,16 +609,17 @@ async function mockTwoPhaseStream(page: Page): Promise<TwoPhaseStream> {
   const secondBatch = Array.from({ length: FIRST_BATCH_SIZE + NEW_EVENT_COUNT }, (_, index) =>
     makeRunEventRecord(index + 1, RUN_ID),
   ).slice(FIRST_BATCH_SIZE - 2);
-  // Egy MÁSIK futás kerete és pótlás zárása, plusz a nézett futás egy
-  // átmeneti (delta) kerete: a panel mindhármat figyelmen kívül hagyja, tehát
-  // az első válasz után pontosan `FIRST_BATCH_SIZE` sor áll. Az átmeneti
-  // sorok megjelenítése a PLAN-009 T-009-26 hatóköre.
+  // Egy MÁSIK futás kerete, pótlás zárása és átmeneti (delta) kerete: a
+  // panel mindhármat figyelmen kívül hagyja, tehát az első válasz után
+  // pontosan `FIRST_BATCH_SIZE` sor áll. A NÉZETT futás átmeneti kerete a
+  // T-009-26 óta saját, megjelölt sort ad; a tesztje a
+  // `sse-real-server.spec.ts` fájlban áll, nyitva maradó kapcsolaton.
   const ignoredFrames: readonly StreamFrame[] = [
     { event: 'run_event', delivery: 'replayed', runEvent: makeRunEventRecord(999, 'run-masik') },
     { event: 'replay_complete', runId: 'run-masik', throughEventId: 999 },
     {
       event: 'run_event_transient',
-      runId: RUN_ID,
+      runId: 'run-masik',
       // eslint-disable-next-line unicorn/no-null -- a keret nullázható mezője a dróton ténylegesen `null`
       stepRunId: null,
       kind: 'sdk_stream_event',

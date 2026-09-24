@@ -1,11 +1,15 @@
 import type { ReactElement } from 'react';
 import type { ProviderId, RunEventOrigin, RunEventRecord } from '@easter-workflow-builder/protocol';
-import { AccordionItem, joinClassNames } from '@easter-workflow-builder/ui';
+import { AccordionItem, Badge, joinClassNames } from '@easter-workflow-builder/ui';
 import { summarizeRunEventRow } from './run-event-row-summary.ts';
 import './run-event-row.css';
 
 export interface RunEventRowProperties {
-  readonly record: RunEventRecord;
+  /**
+   * A sor rekordja. Az `id` mező nem kell hozzá, mert az átmeneti
+   * (`run_event_transient`) sornak nincs azonosítója (SPEC-008 7.5, T-009-26).
+   */
+  readonly record: Omit<RunEventRecord, 'id'>;
   /**
    * A lépés ténylegesen feloldott providere. A forrás a `StepRunRecord.providerId`
    * mező (`record.stepRunId` alapján kikeresve), amit az engine a háromszintű
@@ -16,7 +20,29 @@ export interface RunEventRowProperties {
    * nem sikerült: ilyenkor a sor egyik providerre sem tesz állítást.
    */
   readonly providerId: ProviderId | undefined;
+  /**
+   * Átmeneti (`run_event_transient`) sor-e: élő keretből épült, aminek nincs
+   * perzisztált sora, tehát újratöltés után eltűnik (SPEC-008 7.5 1.
+   * szabály). Kötelező, alapérték nélkül: a hívó (a transcript panel) minden
+   * sorra tudja.
+   */
+  readonly isTransient: boolean;
 }
+
+/**
+ * Az átmeneti sor jelölésének látható szövege: a design system `Badge`
+ * komponense a jelentést a valódi DOM szövegben hordozza, nem színben
+ * (`eggproject-design` DESIGN.md "Badges & Chips"), ezért már a látható szöveg
+ * kimondja, hogy a sor nem kerül tárolásra (PLAN-009 T-009-26).
+ */
+const TRANSIENT_MARK_TEXT = 'Nem tárolt';
+
+/**
+ * Az átmeneti sor jelölésének `title` szövege (SPEC-008 7.5 1. szabály): a
+ * teljes magyarázat, hogy a sor ennél a futásnál nem kerül tárolásra.
+ */
+const TRANSIENT_MARK_TITLE =
+  'Átmeneti sor: ennél a futásnál nem kerül tárolásra, ezért oldal újratöltés vagy a futás későbbi megnyitása után nem jelenik meg.';
 
 /**
  * A költség mező megnevezése. Az `sdk_result` `total_cost_usd` értéke az
@@ -119,17 +145,33 @@ function OriginMarkerIcon(properties: Readonly<{ origin: RunEventOrigin }>): Rea
  * `meta` szlotba kerül, a kinyitott nézetben pedig külön, megnevezett
  * mezőként is megjelenik; `minimax` provider mellett a mező sehol nem
  * jelenik meg, csak a kinyitott nézetben egy magyarázó mondat áll a helyén.
+ *
+ * **Az átmeneti sor jelölése** (SPEC-008 7.5 1. szabály, T-009-26) a design
+ * system `Badge` komponense, `outline` változatban, a `meta` szlotban: az
+ * `outline` az egyetlen változat, aminek a színe téma tokenből jön
+ * (`--ep-fg-muted`, `--ep-border`), tehát mindkét témában a felülethez
+ * illeszkedik. Átmeneti sornál a `meta` szlot a jelölésé; a költség mező (ha
+ * a sor egyáltalán hordozna ilyet, ami ma nem fordul elő, mert a szerver
+ * átmeneti keretként kizárólag `sdk_stream_event` sort küld) a kinyitott
+ * nézetben változatlanul megjelenik.
  */
 export function RunEventRow(properties: Readonly<RunEventRowProperties>): ReactElement {
-  const { record, providerId } = properties;
+  const { record, providerId, isTransient } = properties;
   const summary = summarizeRunEventRow(record, providerId);
   const title = `${formatOccurredAt(record.occurredAtMs)} · ${summary.originLabel} · ${summary.kindLabel}: ${summary.bodyText}`;
   const costMeta =
     summary.costEstimateText === undefined ? undefined : `${COST_FIELD_LABEL}: ${summary.costEstimateText}`;
+  const meta = isTransient ? (
+    <Badge variant="outline" title={TRANSIENT_MARK_TITLE}>
+      {TRANSIENT_MARK_TEXT}
+    </Badge>
+  ) : (
+    costMeta
+  );
 
   return (
     <div className={joinClassNames('run-event-row', `run-event-row--origin-${record.origin}`)}>
-      <AccordionItem title={title} icon={<OriginMarkerIcon origin={record.origin} />} meta={costMeta}>
+      <AccordionItem title={title} icon={<OriginMarkerIcon origin={record.origin} />} meta={meta}>
         {costMeta === undefined ? undefined : (
           <div className="run-event-row__cost">
             <p>

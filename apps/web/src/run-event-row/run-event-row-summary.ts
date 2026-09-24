@@ -46,6 +46,13 @@ interface KindDescription {
   readonly costHiddenForUnknownProvider?: boolean;
 }
 
+/**
+ * A sor rekordja azonosító nélkül: az összegzés az `id` mezőt nem olvassa,
+ * és az átmeneti (`run_event_transient`) sornak nincs azonosítója (SPEC-008
+ * 7.5, T-009-26).
+ */
+type RowRecord = Omit<RunEventRecord, 'id'>;
+
 const ORIGIN_LABEL: Readonly<Record<RunEventOrigin, string>> = {
   sdk: 'SDK',
   engine: 'Motor',
@@ -111,7 +118,7 @@ function readPayloadArrayLength(payload: unknown, key: string): number | undefin
  * A négy token szám kompakt, magyar nyelvű összefoglalója (SPEC-008 7.1,
  * `sdk_assistant` és `sdk_result` sor).
  */
-function formatTokenCounts(record: RunEventRecord): string {
+function formatTokenCounts(record: RowRecord): string {
   const parts: string[] = [];
   if (record.inputTokens !== null) {
     parts.push(`bemenet: ${String(record.inputTokens)}`);
@@ -162,7 +169,7 @@ function collectContentTexts(content: unknown): readonly string[] {
 /**
  * Az `sdk_assistant` sor leírása: eszközhívás névvel és azonosítóval, ha van.
  */
-function describeAssistant(record: RunEventRecord): KindDescription {
+function describeAssistant(record: RowRecord): KindDescription {
   const tokenSummary = formatTokenCounts(record);
   if (record.toolName !== null && record.toolUseId !== null) {
     return {
@@ -177,7 +184,7 @@ function describeAssistant(record: RunEventRecord): KindDescription {
  * Az `sdk_user` sor leírása (SPEC-008 7.1): a felhasználói fordulat
  * szövege, és a `parentToolUseId`, ha eszköz eredmény.
  */
-function describeUser(record: RunEventRecord): KindDescription {
+function describeUser(record: RowRecord): KindDescription {
   const turnText = collectContentTexts(readPayloadField(readPayloadField(record.payload, 'message'), 'content')).join(
     ' ',
   );
@@ -228,7 +235,7 @@ function describeHook(payload: unknown, kindLabel: string, fallbackBodyText: str
  * egy huszonhatodik érték felvétele ott a `switch-exhaustiveness-check`
  * ESLint szabály és a TypeScript ellenőrzés miatt itt fordítási hibát ad.
  */
-function describeRunEventKind(record: RunEventRecord, providerId: ProviderId | undefined): KindDescription {
+function describeRunEventKind(record: RowRecord, providerId: ProviderId | undefined): KindDescription {
   switch (record.kind) {
     case 'sdk_assistant': {
       return describeAssistant(record);
@@ -338,7 +345,8 @@ function describeRunEventKind(record: RunEventRecord, providerId: ProviderId | u
 }
 
 /**
- * Egy `RunEventRecord` sor összegzése, a `RunEventRow` komponens bemenete.
+ * Egy `RunEventRecord` sor (vagy egy átmeneti sor azonosító nélküli rekordja)
+ * összegzése, a `RunEventRow` komponens bemenete.
  *
  * A `providerId` a lépés ténylegesen feloldott providere (a hívó a
  * `record.stepRunId`-hoz tartozó `StepRunRecord.providerId` mezőből
@@ -346,7 +354,7 @@ function describeRunEventKind(record: RunEventRecord, providerId: ProviderId | u
  * (T-009-25). Alapérték nincs: egy alapérték a sikertelen feloldást
  * csendben egy konkrét providerré változtatná.
  */
-export function summarizeRunEventRow(record: RunEventRecord, providerId: ProviderId | undefined): RunEventRowSummary {
+export function summarizeRunEventRow(record: RowRecord, providerId: ProviderId | undefined): RunEventRowSummary {
   const description = describeRunEventKind(record, providerId);
   return {
     originLabel: ORIGIN_LABEL[record.origin],

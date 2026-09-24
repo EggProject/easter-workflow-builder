@@ -1094,3 +1094,41 @@ futásban, három workerrel, **218 teszt, mind zöld**, majd `bun run coverage:e
 nélkül (`apps/web/package.json`). **Az igazolás:** a beállított küszöbbel `bun run
 coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
 (98.98 / 98.37 / 99.41 / 98.94) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 26. A delta kapcsoló átmeneti sorai utáni ratchet (2026-09-24, PLAN-009 T-009-26): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A transcript panel a `run_event_transient` kereteket megjelölt, átmeneti sorként
+rajzolja, és ha a futás `persistedStreamDeltas` értéke hamis, a panel tetején egy magyarázó mondat
+áll (`apps/web/src/transcript-panel/`: `reduce-run-transcript-frame.ts` új ága, az új
+`to-transient-row-record.ts`, a `TranscriptPanel.tsx` mondata; `apps/web/src/run-event-row/RunEventRow.tsx`
+jelölése). Az első mérés három új fedetlen tételt talált, mindhármat teszttel vagy egyszerűbb
+kóddal zártuk, nem a küszöb csökkentésével:
+
+| Tétel                                                               | Megoldás                                                                                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunEventRow.tsx` `isTransient = false` alapérték ága               | a prop kötelező lett, alapérték nélkül: az egyetlen hívó (a transcript panel) minden sorra megadja                                    |
+| `TranscriptPanel.tsx` a fejléc sávon belüli mondat `undefined` ága  | a mondat a fejléc sávból a panel tetejére került, önálló feltétellel; így az ág kombináció (fejléc látszik ÉS tárolt delták) megszűnt |
+| `reduce-run-transcript-frame.ts` másik futás átmeneti keretének ága | a `transcript-panel.spec.ts` két fázisú tesztje a figyelmen kívül hagyott keretek közé egy MÁSIK futás átmeneti keretét is felvette   |
+
+**A mért állapot** (`rm -rf apps/web/e2e/.nyc_output`, utána a teljes Playwright készlet három
+shardban, `--shard=1/3`, `2/3`, `3/3`, egyenként 75 teszt, **225 teszt, mind zöld**, majd
+`bun run coverage:e2e:report`). A shardolás oka a fejlesztői sandbox egy hívásra eső időkorlátja;
+a műszerezett adat tesztenként külön fájlba íródik (`coverage-fixture.ts`), tehát a három shard
+nyers adata ugyanaz a halmaz, mint egy egyben futtatott készleté:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (25. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1463 / 1478     | **98.98** | 98.97                      | 15 -> **15**                   |
+| branches   | 664 / 675       | **98.37** | 98.36                      | 11 -> **11**                   |
+| functions  | 498 / 501       | 99.40     | 99.4                       | 3 -> **3**                     |
+| lines      | 1409 / 1424     | **98.94** | 98.93                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** A nevező mind a négy metrikán nőtt (+12, +4, +1, +12), a fedetlen
+darabszám egyiken sem; a fedetlen fájlok listája azonos a 25. szekcióéval (`mount-app.tsx`,
+`read-frontend-config.ts`, `is-valid-connection.ts`, `browser-history-location-port.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`). A küszöb a mért statements, branches és
+lines értékre húzva (98.97 -> **98.98**, 98.36 -> **98.37**, 98.93 -> **98.94**), a functions a
+mért értékkel már egyezett, felfelé kerekítés nélkül (`apps/web/package.json`). **Az igazolás:** a
+beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen
+századdal magasabb küszöbbel (98.99 / 98.38 / 99.41 / 98.95) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`, exit 1).

@@ -3,7 +3,12 @@ import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stre
 import { reduceRunTranscriptFrame } from './reduce-run-transcript-frame.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 
-const EMPTY_RUN_TRANSCRIPT: RunTranscriptState = { records: [], afterEventId: 0, isReplayComplete: false };
+const EMPTY_RUN_TRANSCRIPT: RunTranscriptState = {
+  rows: [],
+  afterEventId: 0,
+  transientSequence: 0,
+  isReplayComplete: false,
+};
 
 /**
  * A nézett futás transcriptje, a stream kereteiből gyűjtve (T-009-25).

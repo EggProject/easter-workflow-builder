@@ -1,4 +1,4 @@
-import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
+import type { RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { Button } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
@@ -8,6 +8,7 @@ import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
+import type { TranscriptRow as TranscriptRowData } from './transcript-row.ts';
 import { useTranscriptAutoScroll } from './use-transcript-auto-scroll.ts';
 import './transcript-panel.css';
 
@@ -23,29 +24,54 @@ export interface TranscriptPanelProperties {
    * várakozás (a futás még tart) vagy végleges (a futás lezárult).
    */
   readonly runStatus: RunStatus;
+  /**
+   * A futás indításakor befagyasztott delta kapcsoló
+   * (`RunDetail.persistedStreamDeltas`, SPEC-003 6.6). A futás saját
+   * mezőjéből jön, nem a globális beállításból, mert a kapcsoló futásonként
+   * befagy (SPEC-008 7.5 2. szabály).
+   */
+  readonly persistedStreamDeltas: boolean;
 }
 
 interface TranscriptRowProperties {
-  readonly records: readonly RunEventRecord[];
+  readonly rows: readonly TranscriptRowData[];
   readonly stepRuns: readonly StepRunRecord[];
 }
+
+/**
+ * A panel tetején álló mondat, ha a futás a streamelt részleges szöveget nem tárolja
+ * (SPEC-008 7.5 2. szabály, AC43): megmondja, miért tűnik el a
+ * karakterenkénti szöveg újratöltés után.
+ */
+const TRANSIENT_DELTA_NOTE =
+  'Ennél a futásnál a streamelt részleges szöveg csak élőben látszik, nem kerül tárolásra: újratöltés vagy ' +
+  'későbbi megnyitás után csak az összeállt üzenetek maradnak meg.';
 
 /**
  * A lista egy sora: a `react-window` pozícionáló burkolója (`style`, és a
  * `role="listitem"` a sorszámmal), benne a `RunEventRow`.
  *
- * A rekord a `slice` plusz `map` párossal kerül elő, nem indexeléssel: az
+ * A sor a `slice` plusz `map` párossal kerül elő, nem indexeléssel: az
  * `index` a lista szerződése szerint mindig a `rowCount` alatt van, tehát
- * egy `records[index] === undefined` ág garantáltan sosem futna, ami tiltott
+ * egy `rows[index] === undefined` ág garantáltan sosem futna, ami tiltott
  * halott ág lenne (`.claude/CLAUDE.md` 5. szekció). A szelet mindig
  * pontosan egy elemű.
+ *
+ * A React kulcs a sor `key` mezője: átmeneti sornál a kliens oldali, monoton
+ * számlálóból képződik, nem az esemény azonosítójából, mert az átmeneti
+ * keretnek nincs ilyen (SPEC-008 7.5 3. szabály, `transcript-row.ts`).
  */
 function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): ReactElement {
-  const { index, style, ariaAttributes, records, stepRuns } = properties;
+  const { index, style, ariaAttributes, rows, stepRuns } = properties;
   return (
     <div style={style} {...ariaAttributes} className="transcript-panel__row">
-      {records.slice(index, index + 1).map((record) => (
-        <RunEventRow key={record.id} record={record} providerId={resolveStepProviderId(stepRuns, record.stepRunId)} />
+      {rows.slice(index, index + 1).map((row) => (
+        <RunEventRow
+          key={row.key}
+          record={row.record}
+          providerId={resolveStepProviderId(stepRuns, row.record.stepRunId)}
+          isTransient={row.source === 'transient'}
+        />
       ))}
     </div>
   );
@@ -75,11 +101,19 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * lista két különböző állapot: ha a futás még tart, az agent első eseményére
  * várunk, és ezt `role="status"` szöveg mondja ki; ha a futás lezárult, a
  * lista véglegesen üres, és ezt egy nem státusz mondat mondja ki.
+ *
+ * **A delta kapcsoló következménye** (SPEC-008 7.5, AC42, AC43, T-009-26):
+ * az élő, átmeneti (`run_event_transient`) sorok a `RunEventRow` jelölését
+ * kapják, és ha a futás a streamelt részleges szöveget nem tárolja
+ * (`persistedStreamDeltas` hamis), a panel tetején, a lista és a várakozás
+ * jelzése fölött egy mondat mondja ki, hogy az csak élőben látszik. A mondat
+ * a meglévő, halvány kis szöveg mintája (`transcript-panel__status`), doboz
+ * nélkül, és a futás teljes nézése alatt a helyén marad.
  */
 export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>): ReactElement {
-  const { transcript, stepRuns, runStatus } = properties;
-  const { records, isReplayComplete } = transcript;
-  const rowCount = records.length;
+  const { transcript, stepRuns, runStatus, persistedStreamDeltas } = properties;
+  const { rows, isReplayComplete } = transcript;
+  const rowCount = rows.length;
   // A futás pontosan akkor tart még, ha megszakítható: a hat állapot nem
   // terminális csoportja a `pending` és a `running`
   // (`run-control-availability.ts`, SPEC-004 9. és 10. szekció).
@@ -89,6 +123,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
 
   return (
     <div className="transcript-panel">
+      {persistedStreamDeltas ? undefined : <p className="transcript-panel__delta-note">{TRANSIENT_DELTA_NOTE}</p>}
       {(!isReplayComplete || unseenCount > 0) && (
         <div className="transcript-panel__header">
           {isReplayComplete ? undefined : (
@@ -129,7 +164,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
             rowComponent={TranscriptRow}
             rowCount={rowCount}
             rowHeight={rowHeight}
-            rowProps={{ records, stepRuns }}
+            rowProps={{ rows, stepRuns }}
           />
         </>
       )}

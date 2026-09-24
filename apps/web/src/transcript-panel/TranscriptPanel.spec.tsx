@@ -4,6 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RunTranscriptState } from './run-transcript-state.ts';
+import { toTransientRowRecord } from './to-transient-row-record.ts';
+import type { TranscriptRow } from './transcript-row.ts';
 import { TranscriptPanel } from './TranscriptPanel.tsx';
 
 function makeRecord(id: number, overrides: Partial<RunEventRecord> = {}): RunEventRecord {
@@ -62,9 +64,45 @@ const CLAUDE_STEP_RUN: StepRunRecord = {
   createdAtMs: 1,
 };
 
-function transcriptOf(records: readonly RunEventRecord[], isReplayComplete: boolean): RunTranscriptState {
-  return { records, afterEventId: records.at(-1)?.id ?? 0, isReplayComplete };
+function persistedRow(record: RunEventRecord): TranscriptRow {
+  return { source: 'persisted', key: `event-${String(record.id)}`, record };
 }
+
+/**
+ * Egy átmeneti sor, a szerver által kikapcsolt delta kapcsolónál küldött
+ * alakú keretből (`apps/server/src/engine-assembly/classify-published-event.ts`).
+ */
+function transientRow(sequence: number, text: string): TranscriptRow {
+  return {
+    source: 'transient',
+    key: `transient-${String(sequence)}`,
+    record: toTransientRowRecord({
+      event: 'run_event_transient',
+      runId: 'run-1',
+      stepRunId: 's-claude',
+      kind: 'sdk_stream_event',
+      occurredAtMs: 1,
+      payload: { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } },
+    }),
+  };
+}
+
+function rowsTranscript(rows: readonly TranscriptRow[], isReplayComplete: boolean): RunTranscriptState {
+  const persisted = rows.flatMap((row) => (row.source === 'persisted' ? [row.record.id] : []));
+  const transientCount = rows.filter((row) => row.source === 'transient').length;
+  return { rows, afterEventId: persisted.at(-1) ?? 0, transientSequence: transientCount, isReplayComplete };
+}
+
+function transcriptOf(records: readonly RunEventRecord[], isReplayComplete: boolean): RunTranscriptState {
+  return rowsTranscript(
+    records.map((record) => persistedRow(record)),
+    isReplayComplete,
+  );
+}
+
+const DELTA_NOTE =
+  'Ennél a futásnál a streamelt részleges szöveg csak élőben látszik, nem kerül tárolásra: újratöltés vagy ' +
+  'későbbi megnyitás után csak az összeállt üzenetek maradnak meg.';
 
 function manyRecords(count: number): readonly RunEventRecord[] {
   return Array.from({ length: count }, (_, index) => makeRecord(index + 1));
@@ -91,9 +129,17 @@ describe('TranscriptPanel', () => {
     transcript: RunTranscriptState,
     stepRuns: readonly StepRunRecord[] = [],
     runStatus: RunStatus = 'running',
+    hasPersistedStreamDeltas = true,
   ): void {
     act(() => {
-      root.render(<TranscriptPanel transcript={transcript} stepRuns={stepRuns} runStatus={runStatus} />);
+      root.render(
+        <TranscriptPanel
+          transcript={transcript}
+          stepRuns={stepRuns}
+          runStatus={runStatus}
+          persistedStreamDeltas={hasPersistedStreamDeltas}
+        />,
+      );
     });
   }
 
@@ -223,5 +269,54 @@ describe('TranscriptPanel', () => {
       button?.click();
     });
     expect(container.querySelector('.transcript-panel__header')).toBeNull();
+  });
+  it('ha a futás a részleges szöveget NEM tárolja, a fejlécben kimondja, hogy az csak élőben látszik (AC43)', () => {
+    renderPanel(transcriptOf(manyRecords(2), true), [], 'running', false);
+
+    const note = container.querySelector(':scope .transcript-panel > .transcript-panel__delta-note');
+    expect(note?.textContent).toBe(DELTA_NOTE);
+    // A lista FÖLÖTT áll, az első helyen.
+    expect(container.querySelector('.transcript-panel')?.firstElementChild).toBe(note);
+    expect(statusTexts()).toEqual([]);
+  });
+
+  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és fejléc sincs (AC43)', () => {
+    renderPanel(transcriptOf(manyRecords(2), true), [], 'running', true);
+
+    expect(container.querySelector('.transcript-panel__delta-note')).toBeNull();
+    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(container.textContent).not.toContain(DELTA_NOTE);
+  });
+
+  it('a delta mondat a pótlás alatti betöltés jelzés mellett is ott áll, a tárolt deltás futásnál nem', () => {
+    renderPanel(transcriptOf([], false), [], 'running', false);
+    expect(container.querySelector('.transcript-panel__delta-note')?.textContent).toBe(DELTA_NOTE);
+    expect(statusTexts()).toEqual(['Előzmények betöltése']);
+
+    renderPanel(transcriptOf([], false), [], 'running', true);
+    expect(container.querySelector('.transcript-panel__delta-note')).toBeNull();
+    expect(statusTexts()).toEqual(['Előzmények betöltése']);
+  });
+
+  it('az átmeneti sor a Nem tárolt jelölést kapja, a perzisztált sor nem (AC42)', () => {
+    const rows = [persistedRow(makeRecord(1)), transientRow(1, 'Helló')];
+    renderPanel(rowsTranscript(rows, true), [CLAUDE_STEP_RUN]);
+
+    const items = [...list().querySelectorAll('[role="listitem"]')];
+    expect(items).toHaveLength(2);
+    expect(items[0]?.querySelector('.badge')).toBeNull();
+    const badge = items[1]?.querySelector(':scope .accordion__meta .badge');
+    expect(badge?.textContent).toBe('Nem tárolt');
+    expect(badge?.getAttribute('title')).toContain('nem kerül tárolásra');
+    expect(items[1]?.querySelector('.accordion__title')?.textContent).toContain('Streamelt részlet: Helló');
+  });
+
+  it('két azonos tartalmú átmeneti sor két külön sorként jelenik meg (a kulcs a számláló, nem a tartalom)', () => {
+    renderPanel(rowsTranscript([transientRow(1, 'ugyanaz'), transientRow(2, 'ugyanaz')], true));
+
+    const titles = [...list().querySelectorAll('.accordion__title')].map((title) => title.textContent);
+    expect(titles).toHaveLength(2);
+    expect(titles[0]).toBe(titles[1]);
+    expect(list().querySelectorAll('.badge')).toHaveLength(2);
   });
 });

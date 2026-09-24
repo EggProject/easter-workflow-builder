@@ -403,7 +403,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           // A `key` a futás azonosítója: egy másik futásra navigálva a panel
           // (és a görgetés állapota) tiszta lappal indul.
           transcript={
-            <TranscriptPanel key={runId} transcript={transcript} stepRuns={stepRuns} runStatus={runDetail.status} />
+            <TranscriptPanel
+              key={runId}
+              transcript={transcript}
+              stepRuns={stepRuns}
+              runStatus={runDetail.status}
+              persistedStreamDeltas={runDetail.persistedStreamDeltas}
+            />
           }
           // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
           // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
