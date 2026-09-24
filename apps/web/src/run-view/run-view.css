@@ -49,20 +49,6 @@
   margin-inline: var(--ep-layout-gutter);
 }
 
-/* A jóváhagyás kiemelt sávja (SPEC-008 8. szekció), ugyanazzal az oldalsó
-   térközzel, mint a szerverre várakozás jelzése fölötte. */
-.run-view-screen__approval-banner {
-  margin-inline: var(--ep-layout-gutter);
-}
-
-/* A jóváhagyás panel (T-009-27) a rajzon nem szereplő lépés futások
-   listájával azonos mintát követi: az `.app-content` nulla belső margója
-   miatt a screen nem-vászon elemei kapják meg a `--ep-layout-gutter`
-   térközt. */
-.run-view-screen > .approval-prompt-panel {
-  padding-inline: var(--ep-layout-gutter);
-}
-
 /* A kimondott figyelmeztetés, hogy a rajz pillanatkép (AC20). Nem hibaüzenet,
    tehát a halványabb, másodlagos szövegszín jár neki. */
 .run-view-screen__snapshot-note {
@@ -158,4 +144,35 @@
   box-sizing: border-box;
   overflow: hidden;
   padding: var(--ep-space-4);
+}
+
+/* A jóváhagyás panel a transcript sávban, a transcript FÖLÖTT (T-009-27,
+   PLAN-009 5. szekció F6: "a transcript mellé"), így a vászon magassága nem
+   függ a jóváhagyások számától. A kettő a sávot egyenlő növekedéssel osztja
+   meg (`flex: 1 1 0`, ugyanaz, mint a `.transcript-panel` `flex: 1` értéke),
+   de a panel legfeljebb a saját tartalmának magasságát kapja
+   (`max-height: max-content`): kevés jóváhagyásnál csak annyit, amennyi kell,
+   a maradék a transcripté; sok jóváhagyásnál legfeljebb a sáv felét, és a
+   panel maga görget, a transcript pedig a másik felén látható marad. Kitalált
+   arány vagy pixel szám nincs: a felező pont a két egyenlő `flex-grow`
+   következménye. A flex algoritmus a `max-height` megsértésekor az elemet a
+   korlátra fagyasztja, és a maradék helyet a többi elem között osztja szét
+   (<https://www.w3.org/TR/css-flexbox-1/#resolve-flexible-lengths>); a
+   `max-content` a `max-height` dokumentált kulcsszava
+   (<https://developer.mozilla.org/en-US/docs/Web/CSS/max-height>); a mérés
+   a `docs/research/2026-09-24-jovahagyas-panel-helye.md` fájlban.
+
+   A panel és a transcript közti térköz csak akkor áll, ha a panelnek van
+   tartalma: az üres panel (`:empty`) nulla magas, és térközt sem hagy. A
+   térköz külső margó, nem belső: a görgető panel belső térköze a tartalommal
+   együtt kigördülne, és a panel alja közvetlenül a transcripthez tapadna. */
+.run-view-screen__transcript > .approval-prompt-panel {
+  flex: 1 1 0;
+  max-height: max-content;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.run-view-screen__transcript > .approval-prompt-panel:not(:empty) {
+  margin-block-end: var(--ep-space-4);
 }

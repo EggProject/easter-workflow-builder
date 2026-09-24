@@ -4,8 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApprovalPromptPanel } from './ApprovalPromptPanel.tsx';
-
-const API_ORIGIN = 'https://api.example.test';
+import type { DisplayedApproval } from './select-displayed-approvals.ts';
 
 const APPROVAL: PendingApproval = {
   id: 'a-1',
@@ -19,13 +18,15 @@ const APPROVAL: PendingApproval = {
   decidedAtMs: null,
 };
 
-const unreachableFetchFunction = () => Promise.reject(new Error('ebben a tesztben nincs REST hívás'));
-
 describe('ApprovalPromptPanel', () => {
   let container: HTMLDivElement;
   let root: Root;
+  const onDecide = vi.fn();
+  const onDismiss = vi.fn();
 
   beforeEach(() => {
+    onDecide.mockClear();
+    onDismiss.mockClear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -38,74 +39,72 @@ describe('ApprovalPromptPanel', () => {
     container.remove();
   });
 
-  it('betöltés alatt ProgressBar jelzést mutat', () => {
+  function renderPanel(
+    displayed: readonly DisplayedApproval[],
+    options: { readonly isFirstLoadPending?: boolean; readonly failureMessage?: string } = {},
+  ): void {
     act(() => {
       root.render(
         <ApprovalPromptPanel
-          approvals={[]}
-          isLoading={true}
-          failureMessage={undefined}
-          apiOrigin={API_ORIGIN}
-          fetchFunction={unreachableFetchFunction}
-          onDecided={vi.fn()}
+          isFirstLoadPending={options.isFirstLoadPending ?? false}
+          failureMessage={options.failureMessage}
+          displayed={displayed}
+          onDecide={onDecide}
+          onDismiss={onDismiss}
         />,
       );
     });
+  }
+
+  it('az első betöltés alatt ProgressBar jelzést mutat', () => {
+    renderPanel([], { isFirstLoadPending: true });
 
     expect(container.querySelector('.progress-bar')).not.toBeNull();
     expect(container.querySelector('.approval-prompt-panel__list')).toBeNull();
   });
 
-  it('nulla függő jóváhagyásra nem rajzol listát', () => {
-    act(() => {
-      root.render(
-        <ApprovalPromptPanel
-          approvals={[]}
-          isLoading={false}
-          failureMessage={undefined}
-          apiOrigin={API_ORIGIN}
-          fetchFunction={unreachableFetchFunction}
-          onDecided={vi.fn()}
-        />,
-      );
-    });
+  it('nulla kártyára nem rajzol semmit: a panel üres elem', () => {
+    renderPanel([]);
 
-    expect(container.querySelector('.progress-bar')).toBeNull();
-    expect(container.querySelector('.approval-prompt-panel__list')).toBeNull();
+    expect(container.querySelector('.approval-prompt-panel')?.childElementCount).toBe(0);
   });
 
   it('a hibaüzenetet role=alert szerepkörrel mutatja', () => {
-    act(() => {
-      root.render(
-        <ApprovalPromptPanel
-          approvals={[]}
-          isLoading={false}
-          failureMessage="A szerver nem érhető el."
-          apiOrigin={API_ORIGIN}
-          fetchFunction={unreachableFetchFunction}
-          onDecided={vi.fn()}
-        />,
-      );
-    });
+    renderPanel([], { failureMessage: 'A szerver nem érhető el.' });
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
-  it('minden függő jóváhagyáshoz egy ApprovalPromptCard tartozik', () => {
+  it('kártyák fölött kimondja, hogy a döntés visszavonhatatlan, a design system Alert blokkjával', () => {
+    renderPanel([{ approval: APPROVAL, progress: undefined }]);
+
+    const alert = container.querySelector(':scope .approval-prompt-panel__list > .alert.alert--warning');
+    expect(alert?.querySelector('.alert__title')?.textContent).toBe('A döntés visszavonhatatlan');
+    expect(alert?.querySelector('.alert__message')?.textContent).toBe(
+      'Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.',
+    );
+  });
+
+  it('minden megjelenített jóváhagyáshoz egy kártya tartozik, és a döntést és a nyugtázást a jóváhagyással adja tovább', () => {
+    const second: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2' };
+    renderPanel([
+      { approval: APPROVAL, progress: undefined },
+      { approval: second, progress: { status: 'decided', decision: 'rejected' } },
+    ]);
+
+    const cards = container.querySelectorAll('.approval-prompt-card');
+    expect(cards).toHaveLength(2);
+
+    const [firstApprove] = cards[0]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [];
+    const dismiss = [...(cards[1]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [])].find(
+      (candidate) => candidate.textContent === 'Rendben',
+    );
     act(() => {
-      root.render(
-        <ApprovalPromptPanel
-          approvals={[APPROVAL, { ...APPROVAL, id: 'a-2', stepRunId: 's-2' }]}
-          isLoading={false}
-          failureMessage={undefined}
-          apiOrigin={API_ORIGIN}
-          fetchFunction={unreachableFetchFunction}
-          onDecided={vi.fn()}
-        />,
-      );
+      firstApprove?.click();
+      dismiss?.click();
     });
 
-    expect(container.querySelectorAll('.approval-prompt-card')).toHaveLength(2);
-    expect(container.querySelector('[aria-label="Függő jóváhagyások"]')).not.toBeNull();
+    expect(onDecide).toHaveBeenCalledWith(APPROVAL, 'approved');
+    expect(onDismiss).toHaveBeenCalledWith('a-2');
   });
 });

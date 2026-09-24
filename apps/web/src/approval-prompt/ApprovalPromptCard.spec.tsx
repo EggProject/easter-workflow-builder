@@ -1,12 +1,10 @@
 /* eslint-disable unicorn/no-null -- a szintetikus drótszintű fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak (SPEC-005 protokoll alak) */
-import type { FetchFunction } from '@easter-workflow-builder/core';
 import type { PendingApproval } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApprovalPromptCard } from './ApprovalPromptCard.tsx';
-
-const API_ORIGIN = 'https://api.example.test';
+import type { ApprovalDecisionProgress } from './reduce-approval-decisions.ts';
 
 const APPROVAL: PendingApproval = {
   id: 'a-1',
@@ -20,44 +18,15 @@ const APPROVAL: PendingApproval = {
   decidedAtMs: null,
 };
 
-/**
- * Egy kézzel feloldható válasz: a teszt a `resolve` hívásáig figyelheti a
- * `pending` fázist, majd eldöntheti, mikor érkezzen a válasz (`nincs
- * időzítő`, csak Promise ütemezés, `.claude/CLAUDE.md` 11. szekció
- * Playwright szabálya ugyanezt a szemléletet várja el unit szinten is).
- */
-function createDeferredFetchFunction(): {
-  readonly fetchFunction: FetchFunction;
-  readonly resolve: (response: Response) => void;
-  readonly urls: string[];
-  readonly bodies: string[];
-} {
-  const urls: string[] = [];
-  const bodies: string[] = [];
-  const { promise, resolve } = Promise.withResolvers<Response>();
-  const fetchFunction: FetchFunction = (input, init) => {
-    urls.push(new URL(input).pathname);
-    bodies.push(typeof init.body === 'string' ? init.body : '{}');
-    return promise;
-  };
-  return { fetchFunction, resolve, urls, bodies };
-}
-
-async function flush(): Promise<void> {
-  await act(async () => {
-    for (let index = 0; index < 8; index += 1) {
-      await Promise.resolve();
-    }
-  });
-}
-
 describe('ApprovalPromptCard', () => {
   let container: HTMLDivElement;
   let root: Root;
-  const onDecided = vi.fn();
+  const onDecide = vi.fn();
+  const onDismiss = vi.fn();
 
   beforeEach(() => {
-    onDecided.mockClear();
+    onDecide.mockClear();
+    onDismiss.mockClear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -70,21 +39,23 @@ describe('ApprovalPromptCard', () => {
     container.remove();
   });
 
-  function renderCard(fetchFunction: FetchFunction): void {
+  function renderCard(progress: ApprovalDecisionProgress | undefined): void {
     act(() => {
       root.render(
-        <ApprovalPromptCard
-          approval={APPROVAL}
-          apiOrigin={API_ORIGIN}
-          fetchFunction={fetchFunction}
-          onDecided={onDecided}
-        />,
+        <ApprovalPromptCard approval={APPROVAL} progress={progress} onDecide={onDecide} onDismiss={onDismiss} />,
       );
     });
   }
 
-  function buttons(): { readonly approve: HTMLButtonElement; readonly reject: HTMLButtonElement } {
-    const [approve, reject] = [...container.querySelectorAll<HTMLButtonElement>('button.btn')];
+  function button(name: string): HTMLButtonElement | undefined {
+    return [...container.querySelectorAll<HTMLButtonElement>('button.btn')].find(
+      (candidate) => candidate.textContent === name,
+    );
+  }
+
+  function decisionButtons(): { readonly approve: HTMLButtonElement; readonly reject: HTMLButtonElement } {
+    const approve = button('Jóváhagyás');
+    const reject = button('Elutasítás');
     if (approve === undefined || reject === undefined) {
       throw new Error('a teszt nem talált két döntés gombot');
     }
@@ -92,87 +63,104 @@ describe('ApprovalPromptCard', () => {
   }
 
   it('a title, a body és a formázott payload megjelenik', () => {
-    renderCard(() => Promise.reject(new Error('nincs hívás ebben a tesztben')));
+    renderCard(undefined);
 
-    expect(container.textContent).toContain('Engedélyezed a fizetést?');
+    expect(container.querySelector('h3')?.textContent).toBe('Engedélyezed a fizetést?');
     expect(container.textContent).toContain('Kérlek erősítsd meg a tranzakciót');
     const payload = container.querySelector('pre');
     expect(payload?.textContent).toBe(JSON.stringify({ amount: 100, currency: 'EUR' }, undefined, 2));
   });
 
-  it('a Jóváhagyás gomb megnyomásától a válaszig mindkét gomb letiltva, csak a megnyomotton spinner', async () => {
-    const deferred = createDeferredFetchFunction();
-    renderCard(deferred.fetchFunction);
+  it('döntés előtt mindkét gomb engedélyezett és sm méretű, nyugtázó gomb és eredmény nincs; a gombok a döntést adják tovább', () => {
+    renderCard(undefined);
+    const { approve, reject } = decisionButtons();
+
+    expect(approve.disabled).toBe(false);
+    expect(reject.disabled).toBe(false);
+    expect(approve.className).toContain('btn--sm');
+    expect(reject.className).toContain('btn--sm');
+    expect(button('Rendben')).toBeUndefined();
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
 
     act(() => {
-      buttons().approve.click();
+      approve.click();
+      reject.click();
     });
-
-    expect(buttons().approve.disabled).toBe(true);
-    expect(buttons().reject.disabled).toBe(true);
-    expect(buttons().approve.classList.contains('is-loading')).toBe(true);
-    expect(buttons().reject.classList.contains('is-loading')).toBe(false);
-    expect(deferred.bodies).toEqual([JSON.stringify({ decision: 'approved' })]);
-
-    deferred.resolve(Response.json({ ...APPROVAL, decision: 'approved', decidedAtMs: 2000 }));
-    await flush();
-
-    expect(buttons().approve.disabled).toBe(false);
-    expect(buttons().reject.disabled).toBe(false);
-    expect(onDecided).toHaveBeenCalledTimes(1);
+    expect(onDecide.mock.calls).toEqual([['approved'], ['rejected']]);
   });
 
-  it('az Elutasítás gomb megnyomásától a válaszig mindkét gomb letiltva, csak a megnyomotton spinner', async () => {
-    const deferred = createDeferredFetchFunction();
-    renderCard(deferred.fetchFunction);
+  it.each([
+    ['approved', 'Jóváhagyás', 'Elutasítás'],
+    ['rejected', 'Elutasítás', 'Jóváhagyás'],
+  ] as const)('küldés közben (%s) mindkét gomb letiltva, csak a megnyomotton spinner', (decision, pressed, other) => {
+    renderCard({ status: 'sending', decision });
 
-    act(() => {
-      buttons().reject.click();
-    });
-
-    expect(buttons().approve.disabled).toBe(true);
-    expect(buttons().reject.disabled).toBe(true);
-    expect(buttons().reject.classList.contains('is-loading')).toBe(true);
-    expect(buttons().approve.classList.contains('is-loading')).toBe(false);
-    expect(deferred.bodies).toEqual([JSON.stringify({ decision: 'rejected' })]);
-
-    deferred.resolve(Response.json({ ...APPROVAL, decision: 'rejected', decidedAtMs: 2000 }));
-    await flush();
-
-    expect(buttons().approve.disabled).toBe(false);
-    expect(buttons().reject.disabled).toBe(false);
-    expect(onDecided).toHaveBeenCalledTimes(1);
+    expect(button(pressed)?.disabled).toBe(true);
+    expect(button(other)?.disabled).toBe(true);
+    expect(button(pressed)?.classList.contains('is-loading')).toBe(true);
+    expect(button(other)?.classList.contains('is-loading')).toBe(false);
+    expect(button('Rendben')).toBeUndefined();
   });
 
-  it('a conflict hibaágra magyar üzenetet mutat, és az onDecided ekkor is meghívódik', async () => {
-    const deferred = createDeferredFetchFunction();
-    renderCard(deferred.fetchFunction);
+  it.each([
+    ['approved', 'Döntés rögzítve: jóváhagyva.'],
+    ['rejected', 'Döntés rögzítve: elutasítva.'],
+  ] as const)(
+    'elfogadott döntés (%s) után a gombok letiltva maradnak, az eredmény látszik, és a Rendben nyugtáz',
+    (decision, result) => {
+      renderCard({ status: 'decided', decision });
+      const { approve, reject } = decisionButtons();
 
-    act(() => {
-      buttons().approve.click();
-    });
-    deferred.resolve(Response.json({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, { status: 409 }));
-    await flush();
+      expect(approve.disabled).toBe(true);
+      expect(reject.disabled).toBe(true);
+      expect(approve.classList.contains('is-loading')).toBe(false);
+      expect(container.querySelector('[role="status"]')?.textContent).toBe(result);
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-      'Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve',
-    );
-    expect(buttons().approve.disabled).toBe(false);
-    expect(onDecided).toHaveBeenCalledTimes(1);
+      act(() => {
+        button('Rendben')?.click();
+      });
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('végleges hiba (conflict) után a gombok letiltva maradnak, a hibaüzenet és a Rendben látszik', () => {
+    renderCard({ status: 'failed', message: 'a jóváhagyás már el lett döntve', isFinal: true });
+    const { approve, reject } = decisionButtons();
+
+    expect(approve.disabled).toBe(true);
+    expect(reject.disabled).toBe(true);
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('a jóváhagyás már el lett döntve');
+    expect(button('Rendben')).toBeDefined();
   });
 
-  it('a not_found hibaágra magyar üzenetet mutat', async () => {
-    const deferred = createDeferredFetchFunction();
-    renderCard(deferred.fetchFunction);
+  it('átmeneti hiba után a gombok újra engedélyezettek (újrapróbálás), a hibaüzenet és a Rendben látszik', () => {
+    renderCard({ status: 'failed', message: 'A szerver nem érhető el.', isFinal: false });
+    const { approve, reject } = decisionButtons();
 
-    act(() => {
-      buttons().approve.click();
-    });
-    deferred.resolve(Response.json({ code: 'not_found', message: 'nincs ilyen jóváhagyás' }, { status: 404 }));
-    await flush();
-
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-      'A keresett elem nem létezik, esetleg időközben törölték.: nincs ilyen jóváhagyás',
-    );
+    expect(approve.disabled).toBe(false);
+    expect(reject.disabled).toBe(false);
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(button('Rendben')).toBeDefined();
   });
+
+  it.each([
+    [{ status: 'decided', decision: 'approved' }, '[role="status"]'],
+    [{ status: 'failed', message: 'a jóváhagyás már el lett döntve', isFinal: true }, '[role="alert"]'],
+  ] as const)(
+    'a megjelenő eredmény (%o) a legkisebb görgetéssel a látható területre kerül',
+    (progress, resultSelector) => {
+      const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+      try {
+        renderCard({ status: 'sending', decision: 'approved' });
+        expect(scrollIntoView).not.toHaveBeenCalled();
+
+        renderCard(progress);
+        expect(scrollIntoView.mock.contexts).toEqual([container.querySelector(resultSelector)]);
+        expect(scrollIntoView.mock.calls).toEqual([[{ block: 'nearest' }]]);
+      } finally {
+        scrollIntoView.mockRestore();
+      }
+    },
+  );
 });

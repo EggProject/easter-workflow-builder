@@ -31,6 +31,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type {
+  PendingApproval,
   RunDetail,
   RunEventKind,
   RunEventRecord,
@@ -625,6 +626,72 @@ test('a run_finished keret a fejlécet akkor is lezárja, ha UGYANABBAN a löket
 
   await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeHidden();
+});
+
+// ============================================================
+// A FÜGGŐ JÓVÁHAGYÁSOK ÉLŐ LISTÁJA (T-009-27, SPEC-008 8. szekció).
+//
+// A fenti 2. kivétel alá tartozik: a jelző keretek egy MÁR MEGNYITOTT
+// kapcsolatba érkeznek menet közben. Az állapot forrása a `GET /api/approvals`
+// válasza, a keret csak jelzés (`approval-prompt/is-approval-list-change-frame.ts`),
+// ugyanúgy, mint a lépés futás listánál.
+// ============================================================
+
+/* eslint-disable unicorn/no-null -- lásd a fájl fejlécének eslint-disable indoklását */
+
+const LIVE_APPROVAL: PendingApproval = {
+  id: 'appr-live',
+  runId: 'r-1',
+  stepRunId: 's-1',
+  title: 'Élőben érkező jóváhagyás',
+  body: 'Kérlek erősítsd meg',
+  payload: { amount: 1 },
+  decision: null,
+  requestedAtMs: 5,
+  decidedAtMs: null,
+};
+
+/* eslint-enable unicorn/no-null */
+
+test('élő approval_requested keretre a jóváhagyás panel oldal újratöltés nélkül megjelenik, approval_decided keretre eltűnik', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
+  const approvalFetches = { count: 0 };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => {
+      approvalFetches.count += 1;
+      await route.fulfill(jsonBody(approvalsHolder.current));
+    }),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+  await expect.poll(() => approvalFetches.count).toBe(1);
+  const heading = page.getByRole('heading', { name: LIVE_APPROVAL.title });
+  const headerBadge = page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true });
+  await expect(heading).toHaveCount(0);
+  await setNoReloadMarker(page);
+
+  approvalsHolder.current = [LIVE_APPROVAL];
+  streamServer.push(stepEventFrame(1, 'approval_requested', 'live'));
+  await expect(heading).toBeVisible();
+  await expect(headerBadge).toBeVisible();
+
+  approvalsHolder.current = [];
+  streamServer.push(stepEventFrame(2, 'approval_decided', 'live'));
+  await expect(heading).toHaveCount(0);
+  await expect(headerBadge).toHaveCount(0);
+
+  expect(await readNoReloadMarker(page)).toBe(true);
 });
 
 // ============================================================

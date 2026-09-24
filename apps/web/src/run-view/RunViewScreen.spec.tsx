@@ -645,9 +645,10 @@ describe('RunViewScreen', () => {
 
     it('leszereléskor leiratkozik a keretekről', async () => {
       await renderScreen('?runId=r-3', createFetchFunction());
-      // Három feliratkozó: a transcript, a csomópontok élő állapota és a
-      // futás lezárásának felismerése (T-009-25, T-009-25a).
-      expect(frameListeners.size).toBe(3);
+      // Négy feliratkozó: a transcript, a csomópontok élő állapota, a futás
+      // lezárásának felismerése (T-009-25, T-009-25a) és a függő
+      // jóváhagyások élő listája (T-009-27).
+      expect(frameListeners.size).toBe(4);
       act(() => {
         root.unmount();
       });
@@ -1064,14 +1065,63 @@ describe('RunViewScreen', () => {
     const cards = container.querySelectorAll('.approval-prompt-card');
     expect(cards).toHaveLength(1);
     expect(cards[0]?.textContent).toContain('Engedélyezed?');
-    expect(container.querySelector('.run-view-screen__approval-banner')?.textContent).toContain('jóváhagyásra vár');
+    // A jelzés a fejléc vezérlő sávjában, a panel a transcript sávban, a
+    // transcript fölött áll (PLAN-009 5. szekció F6), nem a vászon fölött.
+    expect(container.querySelector(':scope .run-view-screen__header .run-control__bar')?.textContent).toContain(
+      'jóváhagyásra vár',
+    );
+    const transcriptSide = container.querySelector('.run-view-screen__transcript');
+    expect(transcriptSide?.firstElementChild?.className).toBe('approval-prompt-panel');
+    expect(transcriptSide?.querySelector(':scope > .approval-prompt-panel + .transcript-panel')).not.toBeNull();
+    expect(container.querySelector(':scope .run-view-screen > .approval-prompt-panel')).toBeNull();
   });
 
-  it('nulla függő jóváhagyásra nincs kiemelt sáv és nincs jóváhagyás kártya', async () => {
+  it('nulla függő jóváhagyásra nincs fejléc jelvény és nincs jóváhagyás kártya', async () => {
     await renderScreen('?runId=r-3', createFetchFunction({}));
 
-    expect(container.querySelector('.run-view-screen__approval-banner')).toBeNull();
+    expect(container.querySelector(':scope .run-view-screen__header .run-control__bar')?.textContent).not.toContain(
+      'jóváhagyásra vár',
+    );
     expect(container.querySelector('.approval-prompt-card')).toBeNull();
+  });
+
+  it('a jóváhagyás lista első betöltésének hibájára a panel a hibát mutatja, betöltés jelzés nélkül, a rajz pedig a helyén marad', async () => {
+    await renderScreen('?runId=r-3', createFetchFunction({ approvals: new HttpStatus(500) }));
+
+    const panel = container.querySelector(':scope .run-view-screen__transcript > .approval-prompt-panel');
+    expect(panel?.querySelector('[role="alert"]')).not.toBeNull();
+    expect(panel?.querySelector('[role="progressbar"]')).toBeNull();
+    expect(lastCanvasProperties().nodes).toHaveLength(1);
+  });
+
+  it('élő approval_requested keretre a jóváhagyás lista újratöltődik, és a kártya oldal újratöltés nélkül megjelenik', async () => {
+    const approvalUrls: string[] = [];
+    let approvals: readonly unknown[] = [];
+    const baseFetchFunction = createFetchFunction({
+      snapshot: APPROVAL_NODE_SNAPSHOT,
+      stepRuns: [BASE_STEP_RUN, APPROVAL_STEP_RUN],
+    });
+    const fetchFunction: FetchFunction = (input, init) => {
+      const { pathname } = new URL(input);
+      if (!pathname.endsWith('/approvals')) {
+        return baseFetchFunction(input, init);
+      }
+      approvalUrls.push(pathname);
+      return Promise.resolve(Response.json(approvals));
+    };
+    await renderScreen('?runId=r-3', fetchFunction);
+    expect(container.querySelector('.approval-prompt-card')).toBeNull();
+    expect(approvalUrls).toHaveLength(1);
+
+    approvals = [APPROVAL];
+    const requested = runFinishedFrame('r-3');
+    if (requested.event !== 'run_event') {
+      throw new Error('a teszt run_event keretet vár');
+    }
+    await emitFramesAndFlush([{ ...requested, runEvent: { ...requested.runEvent, kind: 'approval_requested' } }]);
+
+    expect(approvalUrls).toHaveLength(2);
+    expect(container.querySelectorAll('.approval-prompt-card')).toHaveLength(1);
   });
 
   it('a rajzon a human_approval csomópont a waiting_approval összesítést kapja a PendingApproval.requestedAtMs értékével', async () => {
@@ -1123,9 +1173,11 @@ describe('RunViewScreen', () => {
     });
 
     expect(decisionUrls).toEqual([JSON.stringify({ decision: 'approved' })]);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    expect(container.querySelector(':scope .approval-prompt-card [role="alert"]')?.textContent).toContain(
       'Az elem állapota most nem engedi a műveletet.',
     );
     expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
+    // A conflicttel lezárt kártya gombjai nem kapcsolnak vissza.
+    expect(approveButton.disabled).toBe(true);
   });
 });

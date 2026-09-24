@@ -80,7 +80,11 @@ describe('RunControlBar', () => {
     container.remove();
   });
 
-  async function renderBar(runDetail: RunDetail, fetchFunction: FetchFunction): Promise<void> {
+  async function renderBar(
+    runDetail: RunDetail,
+    fetchFunction: FetchFunction,
+    hasPendingApproval = false,
+  ): Promise<void> {
     await act(async () => {
       root.render(
         <RunControlBar
@@ -88,6 +92,7 @@ describe('RunControlBar', () => {
           apiOrigin={API_ORIGIN}
           fetchFunction={fetchFunction}
           onRestarted={onRestarted}
+          hasPendingApproval={hasPendingApproval}
         />,
       );
       await Promise.resolve();
@@ -116,6 +121,17 @@ describe('RunControlBar', () => {
 
     await renderBar(runWithStatus('succeeded'), pendingFetchFunction);
     expect(actionButton().textContent).toBe('Újraindítás');
+  });
+
+  it('függő jóváhagyásra a "jóváhagyásra vár" jelvény az állapot jelvény mellett, ugyanabban a sorban áll', async () => {
+    await renderBar(runWithStatus('running'), pendingFetchFunction, true);
+    const badges = [...container.querySelectorAll(':scope .run-control__bar > .badge')].map(
+      (badge) => badge.textContent,
+    );
+    expect(badges).toEqual(['fut', 'jóváhagyásra vár']);
+
+    await renderBar(runWithStatus('running'), pendingFetchFunction, false);
+    expect([...container.querySelectorAll(':scope .run-control__bar > .badge')]).toHaveLength(1);
   });
 
   it('a cancelled és az interrupted állapot ELTÉRŐ szóval jelenik meg', async () => {

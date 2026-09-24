@@ -1,94 +1,130 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { PendingApprovalSchema, type PendingApproval } from '@easter-workflow-builder/protocol';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createCoalescedReload } from '../request-state/create-coalesced-reload.ts';
 import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
-import { useRequestState } from '../request-state/use-request-state.ts';
+import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
+import { isApprovalListChangeFrame } from './is-approval-list-change-frame.ts';
 
 export interface UsePendingApprovalsInput {
   readonly runId: string | undefined;
+  readonly subscribeToFrames: SubscribeToStreamFrames;
   readonly fetchFunction: FetchFunction;
   readonly apiOrigin: string;
 }
 
-export interface UsePendingApprovals {
+export interface PendingApprovalsLoad {
   /**
-   * A nézett futás függő jóváhagyásai. Betöltés alatt az UTOLSÓ sikeres
-   * betöltés listája marad a helyén (a `run-history-screen.tsx`
-   * `lastRuns`/`isReloading` mintája), hogy a panel ne villogjon egy döntés
-   * utáni újratöltéskor.
+   * A nézett futás függő jóváhagyásai az utolsó SIKERES betöltésből,
+   * `undefined`, amíg egy sem sikerült. Az újratöltés alatt a korábbi lista a
+   * helyén marad, hogy a panel ne villogjon (a `useLiveStepRuns` mintája).
    */
-  readonly approvals: readonly PendingApproval[];
-  readonly isLoading: boolean;
-  readonly failureMessage: string | undefined;
+  readonly approvals: readonly PendingApproval[] | undefined;
   /**
-   * Új betöltést indít. A jóváhagyás panel minden döntés VÁLASZA UTÁN hívja,
-   * a válasz kimenetelétől függetlenül (SPEC-008 8. szekció: a `conflict`
-   * hibaágra a lista frissül; sikeres döntés után a szerver már nem adja
-   * vissza a lezárt jóváhagyást, SPEC-005 4.2, user döntés 2026-09-23).
+   * A legutóbbi betöltés hibájának üzenete; egy későbbi sikeres betöltés
+   * törli. Átmeneti hiba korábbi sikeres lista mellett nem ír ide.
+   */
+  readonly failureMessage: string | undefined;
+}
+
+export interface UsePendingApprovals extends PendingApprovalsLoad {
+  /**
+   * Újratöltést kér, ugyanazon az összevont úton, mint a jelző keretek. A
+   * jóváhagyás panel minden döntés VÁLASZA UTÁN hívja, a kimeneteltől
+   * függetlenül, hogy a lista akkor is frissüljön, ha a stream éppen nem él.
    */
   readonly reload: () => void;
 }
 
 const PENDING_APPROVAL_LIST_SCHEMA = arraySchema(PendingApprovalSchema);
+const EMPTY_LOAD: PendingApprovalsLoad = { approvals: undefined, failureMessage: undefined };
 
 /**
- * A `GET /api/approvals` válasza, a SAJÁT `runId` értékére szűrve (SPEC-008
- * 8. szekció, T-009-27). A végpont MINDEN futás függő jóváhagyását adja
- * vissza, a szűrést a kliens végzi (PLAN-009 T-009-27 leírása).
+ * A `GET /api/approvals` válasza, a SAJÁT `runId` értékére szűrve, élőben
+ * frissítve (SPEC-008 8. szekció, T-009-27). A végpont MINDEN futás függő
+ * jóváhagyását adja vissza, a szűrést a kliens végzi.
  *
- * **Nincs élő (SSE) frissítés.** A lista a csatoláskor egyszer töltődik be,
- * és a hívó (`ApprovalPromptCard`) minden döntés válasza UTÁN explicit
- * `reload()` hívással frissíti - ez fedi a megkövetelt esetet (a `conflict`
- * hibaágra frissül a lista), és nem igényel egy külön, a `run-view`
- * `is-step-run-list-change-frame.ts` fájlától független jelző keret
- * predikátumot. Ha egy jövőbeli lépés megköveteli, hogy egy MÁSIK kliens
- * döntése is élőben megjelenjen, ez a hook bővíthető `subscribeToFrames`
- * paraméterrel, a `useLiveStepRuns` mintája szerint.
+ * **Az állapot forrása a REST válasz, a keret csak jelzés**, pontosan úgy,
+ * mint a lépés futás listánál (`run-view/use-live-step-runs.ts`, T-009-25a):
+ * a lista a csatoláskor betöltődik, majd a veszteségmentes
+ * `subscribeToFrames` úton érkező jelző keretre
+ * (`is-approval-list-change-frame.ts`) újratöltődik, oldal újratöltés nélkül.
+ * Az újratöltés kérések összevonva futnak (`createCoalescedReload`):
+ * egyszerre legfeljebb egy kérés áll folyamatban, és a futása alatt érkező
+ * bármennyi jelzés (a döntés utáni `reload` hívással együtt) egyetlen
+ * utólagos kérést ad.
+ *
+ * Egy másik futásra váltáskor (vagy leszereléskor) a még folyamatban lévő
+ * kérés válasza eldobódik, és a régi futás listája azonnal törlődik, hogy a
+ * régi futás jóváhagyásai ne jelenjenek meg az új futás nézetében.
  */
 export function usePendingApprovals(input: Readonly<UsePendingApprovalsInput>): UsePendingApprovals {
-  const { runId, fetchFunction, apiOrigin } = input;
-  const request = useRequestState<readonly PendingApproval[]>();
-  const [lastApprovals, setLastApprovals] = useState<readonly PendingApproval[] | undefined>(undefined);
+  const { runId, subscribeToFrames, fetchFunction, apiOrigin } = input;
+  const [load, setLoad] = useState<PendingApprovalsLoad>(EMPTY_LOAD);
+  // Az aktuális futás összevont újratöltője; `undefined`, amíg nincs nézett
+  // futás. Ref, nem állapot: a cseréje nem igényel újrarenderelést.
+  const reloadReference = useRef<(() => void) | undefined>(undefined);
 
-  const load = useCallback((): Promise<void> => {
+  useEffect(() => {
+    setLoad(EMPTY_LOAD);
+  }, [runId]);
+
+  useEffect(() => {
     if (runId === undefined) {
-      return Promise.resolve();
+      return;
     }
-    return request.run(async () => {
+
+    let isDisposed = false;
+    const requestReload = createCoalescedReload(async () => {
       const outcome = await requestRouteWithoutBody({
         routeId: 'listPendingApprovals',
         responseSchema: PENDING_APPROVAL_LIST_SCHEMA,
         fetchFunction,
         apiOrigin,
       });
-      if (outcome.kind !== 'ok') {
-        return outcome;
+      if (isDisposed) {
+        return;
       }
-      const ownApprovals = outcome.value.filter((approval) => approval.runId === runId);
-      setLastApprovals(ownApprovals);
-      return { kind: 'ok', value: ownApprovals };
+      if (outcome.kind === 'ok') {
+        setLoad({
+          approvals: outcome.value.filter((approval) => approval.runId === runId),
+          failureMessage: undefined,
+        });
+        return;
+      }
+      // Átmeneti hiba (hálózati hiba, 502, 503; a szerver leállása) korábbi
+      // sikeres lista mellett nem hibaüzenet: a lista a helyén marad, a
+      // várakozást a futás nézet szerverre várakozás jelzése mondja ki, és a
+      // szerver újraindulása utáni pótlás (`replay_complete`) újratölt. Ugyanaz
+      // a szabály, mint a futás rekordjánál és a lépés futásoknál
+      // (`run-view/blocking-failure-message.ts`).
+      setLoad((previous) =>
+        outcome.isTransient && previous.approvals !== undefined
+          ? previous
+          : { ...previous, failureMessage: outcome.message },
+      );
     });
-    // A `request.run` a `useRequestState` stabil `useCallback`-je (a hívó
-    // oldali objektum nem az, de a projekt ESLint konfigurációja nem
-    // tartalmazza a `react-hooks/exhaustive-deps` szabályt, ugyanúgy, mint a
-    // `GraphEditorScreen` és a `RunViewScreen` más effektjeiben).
-  }, [runId, fetchFunction, apiOrigin]);
 
-  useEffect(() => {
-    setLastApprovals(undefined);
-  }, [runId]);
+    reloadReference.current = requestReload;
+    requestReload();
+    const unsubscribe = subscribeToFrames((frame) => {
+      if (isApprovalListChangeFrame(frame, runId)) {
+        requestReload();
+      }
+    });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+    return () => {
+      isDisposed = true;
+      reloadReference.current = undefined;
+      unsubscribe();
+    };
+  }, [runId, subscribeToFrames, fetchFunction, apiOrigin]);
 
   return {
-    approvals: request.state.status === 'success' ? request.state.value : (lastApprovals ?? []),
-    isLoading: request.state.status === 'pending',
-    failureMessage: request.state.status === 'failure' ? request.state.message : undefined,
+    ...load,
     reload: () => {
-      void load();
+      reloadReference.current?.();
     },
   };
 }

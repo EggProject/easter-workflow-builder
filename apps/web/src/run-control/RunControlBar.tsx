@@ -24,6 +24,13 @@ export interface RunControlBarProperties {
    * navigál (9. szekció 13. async pont).
    */
   readonly onRestarted: (newRunId: string) => void;
+  /**
+   * Van-e a futásnak függő jóváhagyása (SPEC-008 8. szekció: "a futás nézet
+   * fejlécénél" a jelzés, T-009-27). A jelvény az állapot jelvény mellett,
+   * UGYANABBAN a sorban áll, tehát a fejléc magassága nem függ tőle, és a
+   * vászon sem zsugorodik, amikor egy jóváhagyás megjelenik.
+   */
+  readonly hasPendingApproval: boolean;
 }
 
 const CANCELLED_RUNS_TITLE_DOM_ID = 'run-control-cancelled-runs-title';
@@ -52,7 +59,7 @@ const CANCELLED_RUNS_TITLE_DOM_ID = 'run-control-cancelled-runs-title';
  * várakozás mindkettőben tart (9. szekció 12. async pont).
  */
 export function RunControlBar(properties: Readonly<RunControlBarProperties>): ReactElement {
-  const { runDetail, apiOrigin, fetchFunction, onRestarted } = properties;
+  const { runDetail, apiOrigin, fetchFunction, onRestarted, hasPendingApproval } = properties;
 
   const interruptState = useRequestState<InterruptSummaryResponse>();
   const restartState = useRequestState<StartedRunResponse>();
@@ -106,6 +113,7 @@ export function RunControlBar(properties: Readonly<RunControlBarProperties>): Re
     <div className="run-control">
       <div className="run-control__bar">
         <Badge variant={badge.variant}>{badge.label}</Badge>
+        {hasPendingApproval && <Badge variant="warning">jóváhagyásra vár</Badge>}
         {isCancelling && (
           <span className="run-control__pending" role="status">
             Megszakítás folyamatban

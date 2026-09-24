@@ -1295,3 +1295,36 @@ fedetlen darabszám mind a négy metrikán a 30. szekció értéke. A küszöb a
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (99.06 / 98.49 / 99.45 / 99.02) mind a négy metrika `ERROR`
 sorral bukik (négy `ERROR`, exit 1).
+
+## 32. A jóváhagyás panel javítása utáni ratchet (2026-09-24, T-009-27 javítás): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Az `approval-prompt` téma javítása egy független ellenőrzés nyomán
+(`docs/research/2026-09-24-jovahagyas-panel-helye.md`): a panel a transcript sávba került, a lista
+élőben frissül (`is-approval-list-change-frame.ts`), a döntés állapota a képernyő szintjén él
+(`use-approval-decisions.ts`, `reduce-approval-decisions.ts`, `select-displayed-approvals.ts`), a
+csomóponton abszolút időpont áll (`describe-waiting-approval-since.ts`). Az `approval-prompt.spec.ts`
+tizenegy tesztre bővült (vászon magasság három viewporton, siker, újratöltési hiba, `conflict`,
+átmeneti hiba újrapróbálással, első betöltés jelzése, két futás váltás), a `sse-real-server.spec.ts`
+egy élő frissítés teszttel.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**257 teszt, mind zöld**; a sandboxban tíz `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (31. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1612 / 1627     | **99.07** | 99.05                      | 15 -> **15**                   |
+| branches   | 742 / 753       | **98.53** | 98.48                      | 11 -> **11**                   |
+| functions  | 552 / 555       | **99.45** | 99.44                      | 3 -> **3**                     |
+| lines      | 1552 / 1567     | **99.04** | 99.01                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel.** Az első teljes futás után az új kód négy pontja fedetlen volt: a panel
+első betöltésének `ProgressBar` ága, a futás váltása után érkező döntés válasz eldobása
+(`reduce-approval-decisions.ts`), az átmeneti hiba nyugtázása, és a futás váltása után érkező lista
+válasz eldobása (`use-pending-approvals.ts`). Mindegyiket egy új e2e teszt fedi, nem küszöb
+alkalmazkodás (8. szekció); a két futás váltás teszt a védő feltétel törlésére mérten bukik. A
+küszöb a mért értékre húzva, felfelé kerekítés nélkül (`apps/web/package.json`; a pontos arányok
+99,0781 / 98,5392 / 99,4595 / 99,0428). **Az igazolás:** a beállított küszöbbel `bun run
+coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
+(99.08 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).

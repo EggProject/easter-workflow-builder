@@ -10,6 +10,7 @@ import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-bui
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
 import { pendingApprovalRequestedAtByStepRun } from '../approval-prompt/pending-approval-requested-at-by-step-run.ts';
+import { useApprovalDecisions } from '../approval-prompt/use-approval-decisions.ts';
 import { usePendingApprovals } from '../approval-prompt/use-pending-approvals.ts';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -119,14 +120,15 @@ interface RunViewHeaderProperties {
   readonly apiOrigin: string;
   readonly fetchFunction: FetchFunction;
   readonly onRestarted: (newRunId: string) => void;
+  readonly hasPendingApproval: boolean;
 }
 
 /**
  * A futás nézet fejléce (SPEC-008 6.2, 6.3, 6.4, 6.5, AC20, AC24, AC25,
  * AC26, AC27): az al-workflow hierarchia morzsasora, a workflow neve, a
  * kimondott figyelmeztetés, hogy a rajz a futás PILLANATKÉPE (a hozzá tartozó
- * `sdkVersionPin` értékkel), és a futás vezérlő sávja (állapot jelvény,
- * megszakítás vagy újraindítás, a futás hibája).
+ * `sdkVersionPin` értékkel), és a futás vezérlő sávja (állapot jelvény, a
+ * függő jóváhagyás jelvénye, megszakítás vagy újraindítás, a futás hibája).
  *
  * A morzsasor saját, egyedi hozzáférhető nevet kap, mert a topnav alatt már
  * áll egy másik morzsasor (az útvonalé), és a W3C APG landmark mintája szerint
@@ -134,7 +136,7 @@ interface RunViewHeaderProperties {
  * (<https://www.w3.org/WAI/ARIA/apg/patterns/landmarks/examples/navigation.html>).
  */
 function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElement {
-  const { snapshot, runDetail, navigate, apiOrigin, fetchFunction, onRestarted } = properties;
+  const { snapshot, runDetail, navigate, apiOrigin, fetchFunction, onRestarted, hasPendingApproval } = properties;
 
   return (
     <header className="run-view-screen__header">
@@ -151,6 +153,7 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
         apiOrigin={apiOrigin}
         fetchFunction={fetchFunction}
         onRestarted={onRestarted}
+        hasPendingApproval={hasPendingApproval}
       />
     </header>
   );
@@ -196,6 +199,15 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * lépés futás lista a megnyitáskor betöltődik, majd minden jelző keretre
  * összevont újratöltéssel frissül, oldal újratöltés nélkül.
  *
+ * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
+ * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
+ * a transcript sávban, a transcript fölött a döntési panel. Egyik sem a
+ * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
+ * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
+ * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`
+ * hookban él; mindkettő itt, a képernyő szintjén, mert a transcript sáv a
+ * reszponzív sáv váltásakor újra felcsatolódik.
+ *
  * A futás rekordja saját `useState` értékben áll, nem `useRequestState`
  * állapotban: az újratöltés alatt egy `pending` állapot a csontvázat hozná
  * vissza, és az az egész rajzot villogtatná.
@@ -231,7 +243,15 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const runId = readRunId(search);
   const transcript = useRunTranscript(runId, subscribeToFrames);
   const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount });
-  const pendingApprovals = usePendingApprovals({ runId, fetchFunction, apiOrigin });
+  const pendingApprovals = usePendingApprovals({ runId, subscribeToFrames, fetchFunction, apiOrigin });
+  const listedApprovals = pendingApprovals.approvals ?? [];
+  const approvalDecisions = useApprovalDecisions({
+    runId,
+    approvals: listedApprovals,
+    fetchFunction,
+    apiOrigin,
+    onDecided: pendingApprovals.reload,
+  });
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -377,7 +397,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     nodeStepRuns: merged.nodeStepRuns,
     stepRuns,
     onOpenSubWorkflowRun: navigateToRun,
-    pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(pendingApprovals.approvals),
+    pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(listedApprovals),
   });
   // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
   // a fenti blokkoló ágon áll meg.
@@ -392,6 +412,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         apiOrigin={apiOrigin}
         fetchFunction={fetchFunction}
         onRestarted={navigateToRun}
+        hasPendingApproval={listedApprovals.length > 0}
       />
       {transientFailure !== undefined && (
         // Várakozás jelzése (`.claude/CLAUDE.md` 11. szekció): a design system
@@ -401,36 +422,34 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           hibája: {transientFailure.message}
         </Alert>
       )}
-      {pendingApprovals.approvals.length > 0 && (
-        // A "kiemelt sáv" (SPEC-008 8. szekció "a futás nézet fejlécénél"): a
-        // döntést kérő panel maga a `run-view-screen__body` fölött, ez az
-        // `Alert` csak a rövid, egy mondatos figyelmeztetés.
-        <Alert variant="warning" className="run-view-screen__approval-banner">
-          A futás legalább egy lépése jóváhagyásra vár.
-        </Alert>
-      )}
-      <ApprovalPromptPanel
-        approvals={pendingApprovals.approvals}
-        isLoading={pendingApprovals.isLoading}
-        failureMessage={pendingApprovals.failureMessage}
-        apiOrigin={apiOrigin}
-        fetchFunction={fetchFunction}
-        onDecided={pendingApprovals.reload}
-      />
       <div className="run-view-screen__body">
         <RunViewLayout
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
-          // A `key` a futás azonosítója: egy másik futásra navigálva a panel
-          // (és a görgetés állapota) tiszta lappal indul.
+          // A jóváhagyás panel a transcript sávban, a transcript FÖLÖTT áll
+          // (PLAN-009 5. szekció F6: "a transcript mellé"); a kettő a sávot
+          // a `run-view.css` szabálya szerint osztja meg. A `key` a futás
+          // azonosítója: egy másik futásra navigálva a transcript panel (és a
+          // görgetés állapota) tiszta lappal indul.
           transcript={
-            <TranscriptPanel
-              key={runId}
-              transcript={transcript}
-              stepRuns={stepRuns}
-              runStatus={runDetail.status}
-              persistedStreamDeltas={runDetail.persistedStreamDeltas}
-            />
+            <>
+              <ApprovalPromptPanel
+                isFirstLoadPending={
+                  pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
+                }
+                failureMessage={pendingApprovals.failureMessage}
+                displayed={approvalDecisions.displayed}
+                onDecide={approvalDecisions.decide}
+                onDismiss={approvalDecisions.dismiss}
+              />
+              <TranscriptPanel
+                key={runId}
+                transcript={transcript}
+                stepRuns={stepRuns}
+                runStatus={runDetail.status}
+                persistedStreamDeltas={runDetail.persistedStreamDeltas}
+              />
+            </>
           }
           // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
           // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és

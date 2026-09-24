@@ -1,49 +1,63 @@
-import type { FetchFunction } from '@easter-workflow-builder/core';
-import type { PendingApproval } from '@easter-workflow-builder/protocol';
-import { ProgressBar } from '@easter-workflow-builder/ui';
+import type { ApprovalDecision, PendingApproval } from '@easter-workflow-builder/protocol';
+import { Alert, ProgressBar } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { ApprovalPromptCard } from './ApprovalPromptCard.tsx';
+import type { DisplayedApproval } from './select-displayed-approvals.ts';
 import './approval-prompt.css';
 
 export interface ApprovalPromptPanelProperties {
-  readonly approvals: readonly PendingApproval[];
-  readonly isLoading: boolean;
+  /**
+   * Igaz, amíg az ELSŐ betöltés tart (`use-pending-approvals.ts`: még nincs
+   * sikeres lista és hiba sincs).
+   */
+  readonly isFirstLoadPending: boolean;
   readonly failureMessage: string | undefined;
-  readonly apiOrigin: string;
-  readonly fetchFunction: FetchFunction;
-  readonly onDecided: () => void;
+  readonly displayed: readonly DisplayedApproval[];
+  readonly onDecide: (approval: PendingApproval, decision: ApprovalDecision) => void;
+  readonly onDismiss: (approvalId: string) => void;
 }
 
 /**
- * A futás nézet jóváhagyás sávja (SPEC-008 8. szekció, 9. szekció 14. és 15.
- * async pont, T-009-27). A `RunViewScreen` mindig felcsatolja, mert a "sáv
- * helye már látszik": betöltés alatt a `ProgressBar` jelez, utána vagy a
- * kártyák, vagy - nulla függő jóváhagyásra - semmi (üres `<div>`, doboz
- * nélkül, tilos a card in card).
+ * A futás nézet jóváhagyás panelje, a transcript sávban, a transcript fölött
+ * (SPEC-008 8. szekció, PLAN-009 5. szekció F6 sora, T-009-27). A
+ * `RunViewScreen` mindig felcsatolja, mert a "sáv helye már látszik": az
+ * ELSŐ betöltés alatt a `ProgressBar` jelez (9. szekció 14. async pont); az
+ * élő újratöltések alatt nem, hogy a panel ne villogjon minden jelző keretre.
+ * Nulla kártyára semmi nem rajzolódik (üres `<div>`, doboz nélkül, tilos a
+ * card in card).
  *
- * A `usePendingApprovals` hook a hívó (`RunViewScreen`) szintjén fut, mert az
- * adatra a rajz csomópont dekorációja is rászorul
- * (`pending-approval-requested-at-by-step-run.ts`); ez a komponens csak
- * megjelenít, nem tölt be.
+ * Csak megjelenít: a lista a `usePendingApprovals`, a döntések állapota a
+ * `useApprovalDecisions` hookból jön, mindkettő a `RunViewScreen` szintjén.
+ *
+ * **A döntés visszavonhatatlan, és a felület ezt kimondja** (SPEC-008 8.
+ * szekció): a kártyák fölött a design system `Alert` blokkja áll, amíg van
+ * megjelenített kártya.
  */
 export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProperties>): ReactElement {
-  const { approvals, isLoading, failureMessage, apiOrigin, fetchFunction, onDecided } = properties;
+  const { isFirstLoadPending, failureMessage, displayed, onDecide, onDismiss } = properties;
 
   return (
     <div className="approval-prompt-panel">
-      {isLoading && (
+      {isFirstLoadPending && (
         <ProgressBar isLabelVisible={false} ariaLabel="a függő jóváhagyások betöltése folyamatban" value={100} />
       )}
       {failureMessage !== undefined && <p role="alert">{failureMessage}</p>}
-      {approvals.length > 0 && (
+      {displayed.length > 0 && (
         <section className="approval-prompt-panel__list" aria-label="Függő jóváhagyások">
-          {approvals.map((approval) => (
+          <Alert variant="warning" title="A döntés visszavonhatatlan">
+            Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.
+          </Alert>
+          {displayed.map(({ approval, progress }) => (
             <ApprovalPromptCard
               key={approval.id}
               approval={approval}
-              apiOrigin={apiOrigin}
-              fetchFunction={fetchFunction}
-              onDecided={onDecided}
+              progress={progress}
+              onDecide={(decision) => {
+                onDecide(approval, decision);
+              }}
+              onDismiss={() => {
+                onDismiss(approval.id);
+              }}
             />
           ))}
         </section>

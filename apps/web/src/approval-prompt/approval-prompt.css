@@ -1,7 +1,9 @@
 /* A jóváhagyás panel (SPEC-008 8. szekció, T-009-27). NINCS KÁRTYA: se
    szegély, se lekerekítés, se saját háttér, mert a panel a futás nézet
-   törzsében áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció).
-   A térközök kizárólag a design system `--ep-space-*` tokenjeiből jönnek. */
+   transcript sávjában áll, és a card in card tilos (`.claude/CLAUDE.md` 11.
+   szekció). A térközök kizárólag a design system `--ep-space-*` tokenjeiből
+   jönnek. A panel mérete és görgetése a helyétől függ, ezért az a
+   `run-view.css` fájlban áll. */
 .approval-prompt-panel {
   display: flex;
   flex-direction: column;
@@ -44,4 +46,13 @@
 .approval-prompt-card__actions {
   display: flex;
   gap: var(--ep-space-2);
+}
+
+/* A döntés eredménye (T-009-27): nem hibaüzenet, tehát a halványabb,
+   másodlagos kis szöveg, ugyanaz a minta, mint a `run-control.css`
+   "megszakítás folyamatban" felirata. */
+.approval-prompt-card__result {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
 }
