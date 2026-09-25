@@ -366,9 +366,15 @@ for (const theme of ['light', 'dark'] as const) {
       }
 
       // Kezdetben felén (user döntés 2026-09-25), vízszintes elválasztóval
-      // (egymás ALATTI panelpár, W3C Window Splitter).
+      // (egymás ALATTI panelpár, W3C Window Splitter). 1440x600-on a kérdés
+      // felén nem fér el, ezért saját arány nélkül az elválasztó a transcript
+      // rovására feljebb áll (user döntés 2026-09-25, "a rajz húzódjon
+      // össze"); a húzás onnan indul, és a mentett arány a felhasználóé.
       const separator = approvalSeparator(page);
-      await expect(separator).toHaveAttribute('aria-valuenow', '50');
+      const isQuestionTight = viewport.height === 600;
+      await (isQuestionTight
+        ? expect.poll(async () => Number(await separator.getAttribute('aria-valuenow'))).toBeLessThan(50)
+        : expect(separator).toHaveAttribute('aria-valuenow', '50'));
       await expect(separator).toHaveAttribute('aria-orientation', 'horizontal');
       await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
       await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
@@ -378,6 +384,7 @@ for (const theme of ['light', 'dark'] as const) {
       // (`measure-panel-geometry.ts`, `compute-drag-delta-percent.ts`), és a
       // kerekített értéket jelenti.
       const panelsHeight = await readApprovalPanelsHeight(page);
+      const transcriptHeight = await readTranscriptPanelHeight(page);
       const box = await separator.boundingBox();
       if (box === null) {
         throw new Error('az elválasztónak nincs befoglaló doboza');
@@ -388,7 +395,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.mouse.down();
       await page.mouse.move(centerX, centerY + 60, { steps: 5 });
       await page.mouse.up();
-      const dragged = Math.round(50 + (60 / panelsHeight) * 100);
+      const dragged = Math.round(((transcriptHeight + 60) / panelsHeight) * 100);
       await expect(separator).toHaveAttribute('aria-valuenow', String(dragged));
 
       // Billentyű: a nyíl lépésköze 5 (`ResizableHandle.tsx`).
@@ -423,6 +430,17 @@ async function readApprovalPanelsHeight(page: Page): Promise<number> {
   return page
     .locator('.run-view-screen__transcript > .resizable-group > .resizable-panel')
     .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().height, 0));
+}
+
+/**
+ * A húzható elválasztó elsődleges (felső) paneljének, a transcriptnek a
+ * magassága.
+ */
+async function readTranscriptPanelHeight(page: Page): Promise<number> {
+  return page
+    .locator('.run-view-screen__transcript > .resizable-group > .resizable-panel')
+    .first()
+    .evaluate((panel) => panel.getBoundingClientRect().height);
 }
 
 /**
@@ -656,7 +674,9 @@ for (const theme of ['light', 'dark'] as const) {
  */
 const APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalLayout';
 
-test('hibás alakú tárolt arányra az elválasztó felén áll, és a helyes alak íródik vissza', async ({ page }) => {
+test('hibás alakú tárolt arányra az elválasztó felén áll, és a tárolóba csak a felhasználó húzása ír', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript((key: string) => {
     globalThis.localStorage.setItem(key, JSON.stringify({ approval: 30 }));
@@ -664,10 +684,16 @@ test('hibás alakú tárolt arányra az elválasztó felén áll, és a helyes a
   await mockApprovalRun(page, [FIRST_APPROVAL]);
   await page.goto(APPROVAL_RUN_URL);
 
-  await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '50');
+  const separator = approvalSeparator(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', '50');
+  expect(await page.evaluate((key: string) => globalThis.localStorage.getItem(key), APPROVAL_LAYOUT_STORAGE_KEY)).toBe(
+    JSON.stringify({ approval: 30 }),
+  );
+  await separator.focus();
+  await separator.press('ArrowDown');
   await expect
     .poll(async () => page.evaluate((key: string) => globalThis.localStorage.getItem(key), APPROVAL_LAYOUT_STORAGE_KEY))
-    .toBe('[50,50]');
+    .toBe('[55,45]');
 });
 
 test('letiltott tárolás esetén az elválasztó felén áll, a felület nem tör el', async ({ page }) => {
@@ -691,6 +717,111 @@ test('letiltott tárolás esetén az elválasztó felén áll, a felület nem t�
   await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '50');
   await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
 });
+
+// ------------------------------------------------------------
+// A RAJZ ÖSSZEHÚZÓDIK (user döntés 2026-09-25): függő jóváhagyásnál, saját
+// arány nélkül, az elválasztók annyira mozdulnak, hogy a kérdés (a
+// "visszavonhatatlan" figyelmeztetés, a cím és a szöveg) és a két gomb
+// teljesen látsszon: az álló tableten (függőleges sáv) a rajz rovására, a
+// vízszintes sávban a transcript rovására. Saját aránnyal a tárolt arány
+// marad; jóváhagyás nélkül a nézet változatlan; az igazítás nem kerül a
+// tárolóba (SPEC-008 8. szekció 1. pont, research 12. szekció).
+// ------------------------------------------------------------
+const GRAPH_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+
+/**
+ * A kérdés részei és a két gomb: mindnek teljes egészében látszania kell.
+ */
+function questionParts(page: Page): readonly Locator[] {
+  const text = approvalText(page);
+  return [
+    text.getByText('A döntés visszavonhatatlan', { exact: true }),
+    text.getByText('Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.', { exact: true }),
+    text.getByRole('heading', { name: FIRST_APPROVAL.title }),
+    text.getByText(FIRST_APPROVAL.body, { exact: true }),
+    decisionButton(page, 'Jóváhagyás'),
+    decisionButton(page, 'Elutasítás'),
+  ];
+}
+
+async function readStoredLayouts(page: Page): Promise<readonly (string | undefined)[]> {
+  return page.evaluate(
+    (keys: readonly string[]) => keys.map((key) => globalThis.localStorage.getItem(key) ?? undefined),
+    [RUN_VIEW_LAYOUT_STORAGE_KEY, APPROVAL_LAYOUT_STORAGE_KEY],
+  );
+}
+
+const FIT_VIEWPORTS = [
+  { width: 768, height: 1024 },
+  { width: 900, height: 1000 },
+  { width: 1440, height: 600 },
+] as const;
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of FIT_VIEWPORTS) {
+    const size = `${String(viewport.width)}x${String(viewport.height)}`;
+
+    test(`${size}, függő jóváhagyás, saját arány nélkül: a figyelmeztetés, a cím, a szöveg és a gombok teljesen látszanak, és semmi nem kerül a tárolóba (${theme} téma)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+      await page.goto(APPROVAL_RUN_URL);
+
+      for (const part of questionParts(page)) {
+        await expect(part).toBeInViewport({ ratio: 1 });
+      }
+      // A függőleges sávban a rajz fizet (a külső elválasztó a 70-es
+      // alapértelmezés alatt áll), a vízszintesben a transcript (a belső
+      // elválasztó az 50-es alapértelmezés alatt).
+      const moved =
+        viewport.width < 1024 ? page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME }) : approvalSeparator(page);
+      await expect
+        .poll(async () => Number(await moved.getAttribute('aria-valuenow')))
+        .toBeLessThan(viewport.width < 1024 ? 70 : 50);
+      expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
+    });
+
+    test(`${size}, függő jóváhagyás, saját aránnyal: a két tárolt arány marad (${theme} téma)`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(
+        ({ mode, outerKey, innerKey }) => {
+          globalThis.localStorage.setItem('eggTheme', mode);
+          globalThis.localStorage.setItem(outerKey, JSON.stringify([60, 40]));
+          globalThis.localStorage.setItem(innerKey, JSON.stringify([70, 30]));
+        },
+        { mode: theme, outerKey: RUN_VIEW_LAYOUT_STORAGE_KEY, innerKey: APPROVAL_LAYOUT_STORAGE_KEY },
+      );
+      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+      await page.goto(APPROVAL_RUN_URL);
+
+      await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
+      await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '60');
+      await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      expect(await readStoredLayouts(page)).toEqual(['[60,40]', '[70,30]']);
+    });
+
+    test(`${size}, jóváhagyás nélkül a nézet változatlan: az alapértelmezés áll, a tároló üres (${theme} téma)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, []);
+      await page.goto(APPROVAL_RUN_URL);
+
+      await expect(page.getByRole('list', { name: 'Futás eseményei' }).getByRole('listitem').first()).toBeVisible();
+      await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '70');
+      await expect(approvalSeparator(page)).toHaveCount(0);
+      expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
+    });
+  }
+}
 
 test.describe('érintés', () => {
   test.use({ hasTouch: true });

@@ -2,7 +2,7 @@
 import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import { toTransientRowRecord } from './to-transient-row-record.ts';
@@ -107,6 +107,40 @@ const DELTA_NOTE =
 
 function manyRecords(count: number): readonly RunEventRecord[] {
   return Array.from({ length: count }, (_, index) => makeRecord(index + 1));
+}
+
+/**
+ * A lista `ResizeObserver` jelentése rögzített tartalom doboz magassággal: a
+ * `react-window` ebből adja az `onResize` méretét (a happy-dom nem végez
+ * layoutot). A megfigyelő a megfigyelés kezdetén azonnal jelent, és csak a
+ * lista elemére: a sorok magasságát ugyanez az API figyeli
+ * (`useDynamicRowHeight`), azok mérete itt nem tárgy.
+ */
+function stubListContentHeight(height: number): void {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      readonly #callback: (entries: readonly { target: Element; contentRect: DOMRectReadOnly }[]) => void;
+
+      constructor(callback: (entries: readonly { target: Element; contentRect: DOMRectReadOnly }[]) => void) {
+        this.#callback = callback;
+      }
+
+      observe(target: Element): void {
+        if (target.classList.contains('transcript-panel__list')) {
+          this.#callback([{ target, contentRect: new DOMRect(0, 0, 300, height) }]);
+        }
+      }
+
+      unobserve(): void {
+        // A rögzített jelentésnek nincs leiratkozása.
+      }
+
+      disconnect(): void {
+        // A rögzített jelentésnek nincs leiratkozása.
+      }
+    },
+  );
 }
 
 describe('TranscriptPanel', () => {
@@ -356,6 +390,46 @@ describe('TranscriptPanel', () => {
     expect(button.getAttribute('aria-hidden')).toBeNull();
     expect(button.tabIndex).toBe(0);
     expect(button.nextElementSibling).toBe(list());
+  });
+
+  function scrollUpAndReceive(count: number): void {
+    renderPanel(transcriptOf(manyRecords(20), true));
+    act(() => {
+      list().scrollTop = 10_000;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    act(() => {
+      list().scrollTop = 0;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    renderPanel(transcriptOf(manyRecords(20 + count), true));
+  }
+
+  it('szűk listán (a tartalom doboza egy sornál kisebb) a gomb nem lebeg: a keret sor irányú, a gomb a lista előtt, ugyanazzal a szöveggel (user döntés 2026-09-25)', () => {
+    stubListContentHeight(COLLAPSED_TRANSCRIPT_ROW_HEIGHT - 1);
+    try {
+      scrollUpAndReceive(2);
+      expect(listFrame().className).toBe('transcript-panel__list-frame transcript-panel__list-frame--compact');
+      expect(jumpButton().textContent).toBe('Ugrás az aljára (2 új esemény)');
+      expect(jumpButton().nextElementSibling).toBe(list());
+      act(() => {
+        jumpButton().click();
+      });
+      expect(queryJumpButton()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('pontosan egy sornyi tartalom dobozú listán a gomb a lebegő alakban áll', () => {
+    stubListContentHeight(COLLAPSED_TRANSCRIPT_ROW_HEIGHT);
+    try {
+      scrollUpAndReceive(1);
+      expect(listFrame().className).toBe('transcript-panel__list-frame');
+      expect(jumpButton().textContent).toBe('Ugrás az aljára (1 új esemény)');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('új esemény nélkül nincs gomb és nincs sáv: a lista kerete a panel első eleme, benne csak a lista (user döntés 2026-09-25)', () => {

@@ -644,9 +644,10 @@ A "szöveg és gombok közti sáv" a görgethető törzs alja és az akciósáv 
   arányban látszik (előtte is), a jelentett érték és a két határ változatlan (10/90, 21/79, 14/86;
   a 900x1000-es sávban 48/52), mert a két panel mérete a helycserével nem változott.
 - **Tab** az elválasztótól a "Jóváhagyás" gombig: előtte 1440x900-on 8 lépés (7 transcript sor),
-  1440x600-on 5 (4), 375x812-n 6 (5), 900x1000-en 5 (4); utána minden méreten 3 lépés (a görgethető
-  törzs (a mért első fókusz maga a görgethető `.drawer__body` elem), az aktuális oldal gombja, a
-  "Jóváhagyás"), transcript sor nélkül.
+  1440x600-on 5 (4), 375x812-n 6 (5), 900x1000-en 5 (4); utána minden méreten, egy jóváhagyással 3
+  lépés (a görgethető törzs (a mért első fókusz maga a görgethető `.drawer__body` elem), az
+  aktuális oldal gombja, a "Jóváhagyás"), transcript sor nélkül. Több jóváhagyásnál a lapozó
+  gombjai is a lépések közé kerülnek: négy jóváhagyásnál 7, 8, illetve 7 lépés (12.6 szekció).
 - Változatlan (1., 2. és 4-9. jelenet, két témában): a vászon 700, 400, 533 pixel, az
   `.app-content` túllógása 0, 0, 1, 4 és 10 jóváhagyással; a görgethető törzs kezdő arányon 293,
   143, 210 pixel; a "visszavonhatatlan" blokk kezdő arányon 1 arányban látszik; az akciósáv siker
@@ -743,3 +744,167 @@ A munkamenet `outputs/jovahagyas-cli-sorrend/` mappájában: kezdő, `Home` és 
 jóváhagyás nélkül, 1440x900, 1440x600, 375x812 (a "Transcript" fülön) és 900x1000 méreten, mindkét
 témában (a fájlnévben a jelentett érték). A képek egy repón kívüli, eldobott Playwright futásból
 származnak, ami a repó `approval-fixture.ts` fixtúráját importálta (a 10.7 szerinti okból).
+
+## 12. A rajz összehúzódik: függő jóváhagyásnál a kérdés kifér (2026-09-25)
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("a rajz húzódjon össze"): ha függő jóváhagyás van, és a
+felhasználó még nem állított saját arányt, az elválasztók annyira mozduljanak, hogy a kérdés
+szövege és a gombok kiférjenek (a rajz, illetve a transcript rovására); saját aránynál a tárolt
+arány marad. Egy független ellenőrzés a `2743b6b` állapoton mérte, hogy álló tableten a kérdésből
+semmi nem látszik (lásd lent, "előtte").
+
+### 12.1 Módszer
+
+`bun run measure:approval -g kerdes` (a mérő eszköz 12. jelenete, `measurement/approval-panel.ts`):
+egy jóváhagyással (a fixtúra rövid szövegével), hosszú szöveggel és 30 mezős `payload` értékkel,
+és jóváhagyás nélkül; a tárolt arány három állapotában (nincs, saját külső `[60, 40]`, saját belső
+`[70, 30]`); 768x1024, 900x1000, 1000x700, 1023x768 (függőleges sáv), 1440x600, 1440x900
+(vízszintes sáv) és 375x812 (fül sáv, a "Transcript" fülön) méreten, két témában. Mért: a
+"visszavonhatatlan" figyelmeztetés, a cím, a szöveg, a lapozó és a két gomb látható aránya (a
+befoglaló doboz metszve minden levágó ős kliens területével és a viewporttal), a vászon, a két
+`Resizable` panelei, a transcript lista magassága, a kérdés igénye (a szöveg alja a görgethető
+törzs tetejétől, a görgetéstől függetlenül), a két elválasztó jelentett értéke és a két
+`localStorage` kulcs értéke. A két téma minden számban egyezik. Előtte a `20d8620` kódján (a
+termékkód ideiglenesen visszaállítva), utána a mostanin.
+
+### 12.2 Előtte
+
+| Méret    | Figyelmeztetés / cím / szöveg | Gombok | Vászon | Törzs / igény |
+| -------- | ----------------------------- | ------ | ------ | ------------- |
+| 768x1024 | 0,66 / 0 / 0                  | 1 / 1  | 573    | 66 / 162      |
+| 900x1000 | 0,6 / 0 / 0                   | 1 / 1  | 557    | 62 / 162      |
+| 1000x700 | 0 / 0 / 0                     | 1 / 1  | 347    | 60 / 162      |
+| 1023x768 | 0 / 0 / 0                     | 1 / 1  | 394    | 60 / 162      |
+| 1440x600 | 1 / 0,79 / 0                  | 1 / 1  | 400    | 143 / 181     |
+| 1440x900 | 1 / 1 / 1                     | 1 / 1  | 700    | 293 / 181     |
+| 375x812  | 1 / 1 / 1                     | 1 / 1  | fül    | 210 / 181     |
+
+Két további mért tény a tárolóról, jóváhagyástól függetlenül: (a) a futás nézet első megnyitása
+után mindkét kulcs az alapértelmezéssel jelen van (`[70,30]`, `[50,50]`), felhasználói húzás
+nélkül is, mert a `Resizable` a kezdő renderen is értesített (`onSizesChange`), és a hívó
+tárolt; (b) egy kis csoportban a mért minimumhoz igazítás is a tárolóba íródott: 768x1024-en a
+tárolt `[70, 30]` belső arány `[54,44, 45,56]`-ra íródott felül, a felhasználó döntése elveszett.
+A kulcs megléte tehát a saját arányról nem mond semmit.
+
+### 12.3 A szabály és a megoldás
+
+**A szabály.** Saját arány nélkül az elválasztók annyira mozdulnak, hogy a látott jóváhagyás
+kérdése (a figyelmeztetés, a cím és a szöveg, a `payload` nélkül) a görgethető törzsben teljesen
+látsszon, a gombok közvetlenül alatta. A szükséges méret a tartalomból jön: a törzs panele
+akkora legyen, hogy a szöveg alja a törzs alja fölé kerüljön (`measureRevealRequirement`, felfelé
+egész pixelre kerekítve, mert a `flex-basis` százalék tört pixelt ad). Előbb a befoglaló
+elválasztó ad helyet, ha ugyanazon a tengelyen áll (a függőleges sávban a gráf és a transcript
+közti, a rajz rovására), a belső arányt megtartva (kezdetben felén); a maradékot a belső elválasztó
+fizeti, a transcript rovására; a vízszintes és a fül sávban csak a belső mozdul. Mindkettő a design
+system pixeles minimumáig mozdul (a panel 60 pixele), tovább nem. **A hosszú szövegre ugyanez a
+szabály**: ha a kérdés a határokon belül sem fér el, a határig mozdul, a figyelmeztetés, a cím és
+a szöveg első sorai látszanak, a többi a törzsben görgethető; a `payload` mindig a görgethető
+részben marad, mert az a kérdés részlete, nem maga a kérdés. Jóváhagyás nélkül semmi nem mozdul.
+
+**A mozdulás ideiglenes.** Nem kerül a tárolóba, és a jóváhagyás eltűnésekor a mozdulás előtti
+arány áll vissza; lapozáskor (másik jóváhagyás, más szöveg) a számítás a mozdulás előtti arányból
+újra fut, tehát egy rövidebb szövegre visszafelé is igazodik, az alapállás alá nem. Ha a
+felhasználó közben húzza az elválasztót, a méret az övé: onnan tárolódik, a felfedés vége nem írja
+felül, és az a csoport a leszereléséig nem igazodik.
+
+**A saját arány felismerése** (`is-own-layout-sizes.ts`): saját az a tárolt, érvényes pár, ami
+eltér az alapértelmezéstől. Ok: a (a) pont szerint a kulcs megléte nem bizonyít felhasználói
+döntést, az alapértelmezés viszont a korábbi automatikus írás értéke volt. A `Resizable`
+2026-09-25 óta **csak a felhasználó változtatására értesít** (húzás, nyíl, `Home`, `End`, `Enter`),
+a kezdő renderen, a minimumhoz igazításkor és a felfedéskor nem, tehát innentől a tárolóba csak a
+felhasználó döntése kerül, és a (b) pont hibája sem ismétlődhet. A kimondott következmény: egy
+pontosan az alapértelmezésre (billentyűvel, 5-ös lépésközzel elérhető `[50, 50]` vagy `[70, 30]`)
+visszahúzott arány nem számít sajátnak.
+
+**A megvalósítás** (`packages/ui` `resizable` téma, generikus): a `Resizable` két új propja a
+`reveal` (a felfedendő elem azonosítója és egy kulcs) és az `adjustsForReveal` (mozdulhat-e). A
+beágyazott csoport a befoglaló csoport kontextusán kér helyet (`resizeForReveal`,
+`plan-container-growth.ts`), a saját tervét a `plan-reveal.ts` tiszta függvénye adja. A csoport
+rendelkezésre álló méretét a csoport kliens területéből mérjük, nem a panelek összegéből
+(`measure-group-available.ts`): 1000x700-on a belső csoport 34,5 pixel, a két panel pedig a
+60-60 pixeles minimumán túllóg, és az összegből számolva a befoglaló csoport a szükségesnél
+kevesebbet adott (mérve: a szöveg 0 arányban látszott). A számítás a felfedés kezdetekor, a kulcs
+és a mozdíthatóság változásakor, egy panel csatolásakor, az ablak átméretezésekor és a befoglaló
+csoport tengelyváltásakor fut; a fül sávban csak a "Transcript" fülön (a rejtett fül nulla méretű,
+`run-view-transcript-visibility.ts`). `ResizeObserver` nincs (a `packages/ui` csomagban és az
+`apps/web` termékkódjában tiltott), pixel küszöb és időzítő sincs, a mérés a `packages/ui`
+csomagban áll (az `apps/web` termékkódja geometriát nem olvas, greppes invariánsok (15) és (17)).
+
+### 12.4 Utána
+
+| Méret    | Figyelmeztetés / cím / szöveg | Gombok | Vászon (előtte) | Belső panelek           | Tároló |
+| -------- | ----------------------------- | ------ | --------------- | ----------------------- | ------ |
+| 768x1024 | 1 / 1 / 1                     | 1 / 1  | 381 (573)       | 162 / 162               | üres   |
+| 900x1000 | 1 / 1 / 1                     | 1 / 1  | 358 (557)       | 162 / 162               | üres   |
+| 1000x700 | 1 / 1 / 1                     | 1 / 1  | 60 (347)        | 159 / 162               | üres   |
+| 1023x768 | 1 / 1 / 1                     | 1 / 1  | 125 (394)       | 162 / 162               | üres   |
+| 1440x600 | 1 / 1 / 1                     | 1 / 1  | 400 (400)       | 105 / 181               | üres   |
+| 1440x900 | 1 / 1 / 1                     | 1 / 1  | 700 (700)       | 293 / 293 (változatlan) | üres   |
+| 375x812  | 1 / 1 / 1                     | 1 / 1  | fül             | 210 / 210 (változatlan) | üres   |
+
+- A függőleges sávban a rajz fizet, a belső arány felén marad (1000x700-on a rajz a 60 pixeles
+  minimumán áll, és a maradék 3 pixelt a transcript fizeti). A vízszintes sávban a transcript
+  fizet. Ahol a kérdés elfért (1440x900, 375x812), semmi nem mozdul.
+- Hosszú szöveggel (igény 211-403 pixel): a függőleges sávban teljesen kifér (768x1024: vászon
+  233, törzs 236); 1440x600-on a transcript a 60 pixelén, a szöveg 0,24 arányban, 375x812-n a
+  transcript a 60 pixelén, a szöveg 0,8 arányban látszik, a figyelmeztetés és a cím mindenhol 1.
+- Saját aránnyal: a saját arányú elválasztó nem mozdul, a másik a szabály szerint igen (768x1024,
+  saját belső `[70, 30]`: a rajz fizet, a törzs 162 pixel; saját külső `[60, 40]`: a transcript a
+  minimumáig fizet, a szöveg 0,71 arányban). Mindkettő saját: nem mozdul semmi, a tárolt érték
+  változatlan (e2e).
+- Jóváhagyás nélkül minden méret változatlan (vászon 573, 557, 347, 394, 400, 700; lista 163, 156,
+  66, 86, 297, 597, 409), és a tároló üres marad.
+
+### 12.5 A kimondott következmény a vízszintes sávban
+
+1440x600-on a transcript panel 105 pixelre szűkül. A transcript tartalma (a 16-16 pixeles belső
+térköz, a delta kapcsoló háromsoros mondata, a hézag és a lista egy sornyi, 53 pixeles minimuma)
+ennél magasabb (143 pixel, pontosan a korábbi kezdő arány), tehát a transcript burkolója görget (a
+design system modellje, 10. szekció), és kezdő állásban a burkolóban csak a mondat látszik; a lista
+utolsó sora 0,34 arányban (mérő eszköz, `measure:transcript` 13. jelenet, research
+`2026-09-23-transcript-panel-meresek.md` 22. szekció; előtte 1). Ez a döntés szó szerinti
+következménye ("a transcript kárára"), nem hiba; hogy a transcript minimuma a tartalmához (a
+mondat plusz egy sor) igazodjon-e, user döntés (SPEC-008 14.2 O-16).
+
+### 12.6 A Tab lépések pontosítása (a 11.2 szekció "3 lépés" állítása)
+
+`bun run measure:approval -g tab-lepesek` (13. jelenet), négy méreten, két témában, a jóváhagyás
+elválasztójától a "Jóváhagyás" gombig, valódi `Tab` billentyűvel: **egy jóváhagyással 3 lépés**
+(a görgethető törzs, az egyetlen oldal gombja, a "Jóváhagyás"); **négy jóváhagyással az első
+oldalon 7** (a törzs, a négy oldal gomb, a "Következő", a "Jóváhagyás"), **a második oldalon 8**
+(előtte az "Előző" is), **az utolsó oldalon 7** (a törzs, az "Előző", a négy oldal gomb, a
+"Jóváhagyás"; a "Következő" letiltva, nincs a sorrendben); transcript sor egyik esetben sincs a
+lépések között. A 11.2 szekció "minden méreten 3
+lépés" mondata tehát csak egy jóváhagyásra igaz.
+
+### 12.7 Regressziók és szándékos rontások
+
+- `apps/web/e2e/approval-prompt.spec.ts`, "a rajz összehúzódik": 768x1024, 900x1000 és 1440x600
+  méreten, két témában (a) saját arány nélkül a figyelmeztetés, a cím, a szöveg és a két gomb
+  `toBeInViewport({ ratio: 1 })`, a mozgó elválasztó az alapértelmezés alatt áll, a tároló üres;
+  (b) saját aránnyal mindkét tárolt arány marad; (c) jóváhagyás nélkül az alapértelmezés áll, a
+  tároló üres. A `20d8620` kódján (a termékkód visszaállítva) az (a) 6/6 és a (c) 6/6 eset bukik
+  (a (c) a kezdő render tárolása miatt), a (b) 6/6 zöld.
+- `apps/web/e2e/sse-real-server.spec.ts`, "görgetés látható jóváhagyás mellett" (1440x900 és
+  900x1000, két témában): követés, a kinyitott utolsó sor a helyén marad, az ugrás gomb és a kézi
+  visszatérés, mindegyik után a kérdés is teljesen látszik; és az élőben érkező jóváhagyás: a lista
+  zsugorodik (1440x900-on 597-ről 190-re, 900x1000-en 156-ról 79-re), az utolsó sor alja a lista
+  alján marad, a jóváhagyás eltűnésekor a lista és a külső elválasztó visszaáll. A `20d8620`
+  kódján 900x1000-en az élő érkezés 2/2 esete bukik (a kérdés nem látszik). **Rontás:** a
+  transcript átméretezés követésének kivétele (`TranscriptPanel` `onResize` a hook hívása nélkül):
+  az élő érkezés 4/4 esete bukik (az utolsó sor alja nem a lista alján), a többi 12 zöld.
+- Unit: `Resizable` (felfedés: saját elválasztó, alapállás visszaállítása, mozdíthatatlan csoport,
+  kulcsváltás, ablak átméretezés, nem létező elem, rejtett csoport, felhasználói húzás után; a
+  befoglaló csoport ad helyet előbb, a minimumánál a belső fizet, más tengelyű és mozdíthatatlan
+  befoglaló nem ad, tengelyváltás, együtt csatolva sem vonja vissza; az értesítés csak
+  felhasználói változtatásra), `grow-panel`, `plan-reveal`, `plan-container-growth`,
+  `measure-reveal-requirement`, `measure-group-available`, `is-own-layout-sizes`, `RunViewLayout`
+  (a láthatóság kontextus és a fül sáv), `RunViewTranscriptSide`.
+
+### 12.8 Képek
+
+A munkamenet `outputs/rajz-osszehuzodik/` mappájában: `elotte-kerdes-*` és `utana-kerdes-*`
+768x1024, 900x1000, 1440x600, 1440x900 és 375x812 méreten (a "Transcript" fülön), és
+`elotte-ugras-gomb-*`, `utana-ugras-gomb-*` 900x1000 és 1440x900 méreten, mindkét témában. A képek
+egy repón kívüli, eldobott Playwright futásból származnak, ami a repó `approval-fixture.ts` és
+`run-view-stream.ts` fixtúráját importálta (a 10.7 szerinti okból).

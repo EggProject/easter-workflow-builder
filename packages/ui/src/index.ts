@@ -66,7 +66,7 @@ export {
   type PaginationProperties,
   type PaginationVariant,
 } from './pagination/Pagination.tsx';
-export { Resizable, type ResizableProperties } from './resizable/Resizable.tsx';
+export { Resizable, type ResizableProperties, type ResizableReveal } from './resizable/Resizable.tsx';
 export { ResizableHandle, type ResizableHandleProperties } from './resizable/ResizableHandle.tsx';
 export { ResizablePanel, type ResizablePanelProperties } from './resizable/ResizablePanel.tsx';
 export {

@@ -1561,4 +1561,68 @@ elválasztó `End` állásában), a 44 pixeles margó után 9 pixel marad a tart
 görgetve az utolsó sor teljesen látszik (a margó kigördül), a lista legtetején viszont az első
 sorból csak 9 pixel látszik, és a lista minden más állásában egy megjelenő gomb (a lista tetejétől
 8 és 36 pixel között) a látható sort takarja. A gombbal együtt ez nem mért, és hogy a gomb ebben az
-állásban hogyan viselkedjen, nyitott kérdés (SPEC-008 14.2 O-15).
+állásban hogyan viselkedjen, nyitott kérdés volt (SPEC-008 14.2 O-15); 2026-09-25-én lezárva: szűk
+listán a gomb a lista mellett, a folyásban áll (22. szekció).
+
+## 22. Szűk listán a gomb nem lebeg (2026-09-25, a 21. szekció ismert korlátjának és az O-15-nek a lezárása)
+
+**Kiváltó ok.** A user 2026-09-25-i döntése (O-15, "javítsuk"): ahol a lista annyira szűk, hogy a
+44 pixeles felső belső margó után egy sornál kevesebb marad, a gomb ne lebegjen, hanem más formában
+jelezze az új eseményeket, a design system meglévő elemeiből, kitalált küszöb nélkül.
+
+**A feltétel, mért értékből.** A lista akkor szűk, ha a látható magassága kisebb, mint a margó
+plusz egy összecsukott sor. A `react-window` a lista `onResize` hívásában a `ResizeObserver`
+`contentRect` méretét adja át (a telepített csomag forrástérképe szerint
+`lib/hooks/useResizeObserver.ts`: a megfigyelő `contentRect` értékét tárolja, és a lista ezt adja
+az `onResize` hívásnak), ami a belső
+margót NEM tartalmazza (MDN "contentRect": "the element's content box"). A feltétel ezért pontosan
+annyi, hogy a tartalom doboz kisebb egy sornál (`is-compact-transcript-list.ts`, a sor magassága a
+mért `COLLAPSED_TRANSCRIPT_ROW_HEIGHT` konstans, 53 pixel). A margó szűk listán is marad, mert a
+feltétel a margó nélküli tartalom dobozon áll; egy eltüntetett margó a tartalom dobozát 44
+pixellel növelné, és a feltétel a két alak között billegne.
+
+**A forma.** Ugyanaz a design system `Button` (`secondary`, `sm`), ugyanazzal a szöveggel ("Ugrás az
+aljára (N új esemény)"), de a lista bal oldalán, a lista tetejéhez igazítva, a folyásban áll, nem
+lebeg (`.transcript-panel__list-frame--compact`: a keret sor irányú, a gomb `position: static`,
+árnyék nélkül). A DOM-ban továbbra is a lista előtt áll, tehát a látás, a `Tab` sorrend és a
+képernyőolvasó sorrendje egyezik (balról jobbra előbb a gomb). A lista a keret teljes magasságát
+kapja, tehát a gomb megjelenése a lista magasságát és helyét nem változtatja, csak a szélességét
+(egysoros, csonkolt sorcímekkel a sorok magassága sem változik). A javasolt másik két forma
+elvetve: egy `Badge` nem interaktív elem, egy gombbá tett jelvény kitalált elem lenne; a transcript
+fejlécébe, a lista fölé tett szöveges jelzés a folyásban a listát lefelé tolná (a user 2026-09-25-i
+döntése éppen ezt tiltotta a normál listán), szűk listán pedig a transcript burkolóját görgetni
+kényszerítené.
+
+**Mérés** (`bun run measure:transcript -g szuk-lista`, a mérő eszköz 13. jelenete, a látott
+jóváhagyással, a lista közepére görgetve három új sor után, két témában, a két téma minden
+számban egyezik; előtte a `20d8620` kódján):
+
+| Méret    | Lista / tartalom doboz, előtte | Gomb helye, takart sor előtte | Lista / tartalom doboz, utána | Gomb helye, takart sor utána | Lista mozdulása |
+| -------- | ------------------------------ | ----------------------------- | ----------------------------- | ---------------------------- | --------------- |
+| 1440x900 | 190 / 146                      | lebeg, 8. és 9. sor           | 190 / 146 (változatlan)       | lebeg, 8. és 9. sor          | 0               |
+| 900x1000 | 53 / 9                         | lebeg, 10. sor                | 79 / 35                       | a lista mellett, nincs       | 0               |
+| 1440x600 | 53 / 9                         | lebeg, 10. sor                | 53 / 9                        | a lista mellett, nincs       | 0               |
+| 375x812  | 85 / 41                        | lebeg, 10. sor                | 85 / 41                       | a lista mellett, nincs       | 0               |
+
+A normál listán (1440x900) a lebegő gomb a lista közepén változatlanul sort takar, az a 21. szekció
+szerint a gomb alá görgethető (nem új viselkedés). A gomb megnyomása után az utolsó sor alja
+minden méreten a lista alján (0 pixel). **A 900x1000-es lista 79 pixel** a 2026-09-25-i
+"rajz összehúzódik" döntés miatt (research `2026-09-24-jovahagyas-panel-helye.md` 12. szekció),
+előtte 53. **1440x600-on** ugyanez a döntés a transcript panelt a tartalma minimuma alá szűkíti
+(105 pixel a 143 helyett), tehát a transcript burkolója görget, és az utolsó sor az ablakban 0,34
+arányban látszik (előtte 1); ez a jelzés formájától független, nyitott pont (SPEC-008 14.2 O-16).
+
+**Regresszió** (`apps/web/e2e/sse-real-server.spec.ts`, két témában): szűk listán (900x1000, a
+látott jóváhagyás mellett) a gomb `position: static`, teljesen látszik, egyetlen sort sem takar
+(`rowsUnderJumpButton`), a lista helye és magassága a megjelenésekor nem változik, és a gomb az
+aljára visz; normál listán (1440x900) a gomb `position: absolute`, a lista tetején, a felső
+margóban lebeg. A `20d8620` kódján a szűk lista 2/2 esete bukik. Unit: `TranscriptPanel.spec.tsx`
+(rögzített `ResizeObserver` jelentéssel: egy sornál kisebb tartalom dobozon a keret szűk alakja,
+pontosan egy sornyin a lebegő), `is-compact-transcript-list.spec.ts`. A "görgetés látható
+jóváhagyás mellett" e2e csoport (research `2026-09-24-jovahagyas-panel-helye.md` 12.7) 900x1000-en
+a szűk alakkal futja végig a követést, a kinyitás szünetét, az ugrás gombot és a kézi
+visszatérést.
+
+**Képek:** a munkamenet `outputs/rajz-osszehuzodik/` mappájában, `elotte-ugras-gomb-*` és
+`utana-ugras-gomb-*`, 900x1000 és 1440x900, két témában (a 12.8 szekció szerinti repón kívüli
+futásból).

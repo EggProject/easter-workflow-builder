@@ -56,6 +56,36 @@
   box-shadow: var(--ep-shadow-lg);
 }
 
+/* SZŰK LISTÁN A GOMB NEM LEBEG (user döntés 2026-09-25, SPEC-008 7.4, a 14.1
+   O-15 lezárása). Ha a lista látható magassága kisebb, mint a felső belső
+   margó plusz egy sor (`is-compact-transcript-list.ts`), a margó után egy
+   sornál kevesebb marad, és a lebegő gomb a látható sort takarná. Ilyenkor a
+   keret sor irányú: a gomb a lista BAL oldalán, a lista tetejéhez igazítva,
+   a folyásban áll (a DOM-ban továbbra is a lista előtt, tehát a látás és a
+   Tab sorrend egyezik), és egyetlen sort sem takar. A lista a keret teljes
+   magasságát kapja (a `stretch` igazítás), tehát a gomb megjelenése a lista
+   magasságát nem változtatja, csak a szélességét; a szűkség feltétele így
+   nem billeg a két alak között. A felső belső margó marad, mert a feltétel a
+   margó nélküli tartalom dobozon áll. Saját kiegészítés, mint a lebegő alak:
+   a gomb maga a design system `Button`-ja, a térköz token (`--ep-space-2`),
+   árnyék nincs, mert nem lebeg. */
+.transcript-panel__list-frame--compact {
+  flex-direction: row;
+  gap: var(--ep-space-2);
+}
+
+.transcript-panel__list-frame--compact > .transcript-panel__jump {
+  position: static;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-inline: 0;
+  box-shadow: none;
+}
+
+.transcript-panel__list-frame--compact > .transcript-panel__list {
+  min-width: 0;
+}
+
 /* A delta kapcsoló mondata (T-009-26) ugyanaz a halvány kis szöveg
    minta, mint a várakozás jelzése: doboz nélkül, csak tokenből. */
 .transcript-panel__status,

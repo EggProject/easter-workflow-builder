@@ -17,6 +17,11 @@ export interface PanelGeometry {
    * (`auto`, vagy a happy-dom üres kiszámított értéke) nullának számít.
    */
   readonly minSizePercents: readonly number[];
+  /**
+   * Panelenként a kirajzolt méret a csoport tengelyén, pixelben (a
+   * felfedés számításához, `plan-reveal.ts`).
+   */
+  readonly panelSizePixels: readonly number[];
 }
 
 /**
@@ -65,5 +70,6 @@ export function measurePanelGeometry(
   return {
     availableSizePixels,
     minSizePercents: minimums.map((minimum) => (minimum / availableSizePixels) * 100),
+    panelSizePixels: sizes,
   };
 }

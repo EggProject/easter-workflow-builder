@@ -15,6 +15,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Server as NetServer } from 'node:net';
 import type {
+  PendingApproval,
   RunDetail,
   RunEventKind,
   RunSnapshotResponse,
@@ -288,6 +289,11 @@ export function stepEventFrame(id: number, kind: RunEventKind, delivery: 'live' 
 export interface RunViewMockState {
   runStatus: RunDetail['status'];
   stepRuns: readonly StepRunRecord[];
+  /**
+   * A függő jóváhagyások listája (alapból üres); menet közben átírható, a
+   * következő újratöltés már az új listát kapja.
+   */
+  approvals?: readonly PendingApproval[];
 }
 
 /**
@@ -299,7 +305,7 @@ export async function mockRunView(page: Page, state: RunViewMockState): Promise<
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(state.runStatus)))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(state.stepRuns))),
-    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(state.approvals ?? []))),
     mockRoute('replaceStreamSubscriptions', async (route) =>
       route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
     ),
@@ -392,13 +398,14 @@ export async function openFollowingTranscript(
   serverHolder: { current: Server | undefined },
   layout?: TranscriptLayout,
   replayedRowCount = REPLAYED_ROW_COUNT,
+  mockState?: RunViewMockState,
 ): Promise<OpenStreamServer> {
   const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   await page.addInitScript((mode) => {
     globalThis.localStorage.setItem('eggTheme', mode);
   }, theme);
-  await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
+  await mockRunView(page, mockState ?? { runStatus: 'running', stepRuns: [stepRun('running')] });
   if (layout !== undefined) {
     await page.setViewportSize(layout.viewport);
   }

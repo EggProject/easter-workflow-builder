@@ -25,7 +25,7 @@ describe('measurePanelGeometry', () => {
       [panelWith(300, 100, { minHeight: '60px' }), panelWith(300, 300, { minHeight: '60px' })],
       true,
     );
-    expect(geometry).toEqual({ availableSizePixels: 400, minSizePercents: [15, 15] });
+    expect(geometry).toEqual({ availableSizePixels: 400, minSizePercents: [15, 15], panelSizePixels: [100, 300] });
   });
 
   it('vízszintes csoportban a szélességek összegét és a min-width minimumot méri', () => {
@@ -33,12 +33,12 @@ describe('measurePanelGeometry', () => {
       [panelWith(600, 50, { minWidth: '80px', minHeight: '60px' }), panelWith(200, 50, { minWidth: '80px' })],
       false,
     );
-    expect(geometry).toEqual({ availableSizePixels: 800, minSizePercents: [10, 10] });
+    expect(geometry).toEqual({ availableSizePixels: 800, minSizePercents: [10, 10], panelSizePixels: [600, 200] });
   });
 
   it('nem pixeles (üres vagy auto) minimum nullának számít', () => {
     const geometry = measurePanelGeometry([panelWith(100, 100), panelWith(100, 100, { minHeight: 'auto' })], true);
-    expect(geometry).toEqual({ availableSizePixels: 200, minSizePercents: [0, 0] });
+    expect(geometry).toEqual({ availableSizePixels: 200, minSizePercents: [0, 0], panelSizePixels: [100, 100] });
   });
 
   it('ha egy panel nincs kirajzolva, nincs mérés', () => {

@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Resizable } from './Resizable.tsx';
@@ -11,6 +11,15 @@ function pressKeyOn(element: Element, key: string, isShiftPressed = false): void
       new KeyboardEvent('keydown', { key, shiftKey: isShiftPressed, bubbles: true, cancelable: true }),
     );
   });
+}
+
+/**
+ * A csoport közvetlen paneljeinek `flex-basis` értéke.
+ */
+function sizesOf(group: Element | null | undefined): readonly string[] {
+  return [...(group?.querySelectorAll<HTMLDivElement>(':scope > .resizable-panel') ?? [])].map(
+    (panel) => panel.style.flexBasis,
+  );
 }
 
 describe('Resizable', () => {
@@ -48,6 +57,10 @@ describe('Resizable', () => {
       throw new Error('nincs kirajzolt elválasztó');
     }
     return element;
+  }
+
+  function groups(): readonly Element[] {
+    return [...container.querySelectorAll('.resizable-group')];
   }
 
   function panelSizes(): readonly string[] {
@@ -245,7 +258,7 @@ describe('Resizable', () => {
     }).not.toThrow();
   });
 
-  it('az onSizesChange a kezdő renderen a kezdőértéket, majd minden változást jelent (2026-09-09)', () => {
+  it('az onSizesChange csak a felhasználó változtatását jelenti: a kezdő renderen nem, a nyíl, a húzás és az Enter után igen (2026-09-25)', () => {
     const reported: (readonly number[])[] = [];
     act(() => {
       root.render(
@@ -261,10 +274,23 @@ describe('Resizable', () => {
         </Resizable>,
       );
     });
-    expect(reported).toEqual([[40, 60]]);
+    expect(reported).toEqual([]);
 
     pressKeyOn(handle(), 'ArrowRight');
-    expect(reported.at(-1)).toEqual([45, 55]);
+    expect(reported).toEqual([[45, 55]]);
+    act(() => {
+      handle().dispatchEvent(new PointerEvent('pointerdown', { clientX: 0, bubbles: true, cancelable: true }));
+    });
+    expect(reported).toHaveLength(1);
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointermove', { clientX: 0 }));
+    });
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointerup'));
+    });
+    expect(reported).toHaveLength(2);
+    pressKeyOn(handle(), 'Enter');
+    expect(reported.at(-1)).toEqual([5, 95]);
   });
 
   it('a panelek zsugorodhatnak (flex-shrink: 1), hogy a csoport az elválasztóval együtt se lógjon túl', () => {
@@ -290,7 +316,7 @@ describe('Resizable', () => {
     expect(panelSizes()).toEqual(['85%', '15%']);
   });
 
-  it('a minimum alatti tárolt méret az ablak átméretezésekor a mért minimumra igazodik, és ezt jelenti', () => {
+  it('a minimum alatti tárolt méret az ablak átméretezésekor a mért minimumra igazodik, és ezt NEM jelenti (nem a felhasználó döntése)', () => {
     const reported: (readonly number[])[] = [];
     act(() => {
       root.render(
@@ -312,7 +338,7 @@ describe('Resizable', () => {
       globalThis.dispatchEvent(new Event('resize'));
     });
     expect(panelSizes()).toEqual(['15%', '85%']);
-    expect(reported.at(-1)).toEqual([15, 85]);
+    expect(reported).toEqual([]);
   });
 
   it('egy leszerelt panel kiesik a mérésből: ilyenkor nincs mért minimum, a forrás [5, 95] határa marad', () => {
@@ -392,7 +418,8 @@ describe('Resizable', () => {
     act(() => {
       globalThis.dispatchEvent(new Event('resize'));
     });
-    expect(reported).toEqual([[40, 60]]);
+    expect(panelSizes()).toEqual(['40%', '60%']);
+    expect(reported).toEqual([]);
   });
 
   it('húzáskor az elmozdulás a panelek együttes méretének százaléka, a mért minimummal vágva', () => {
@@ -441,6 +468,342 @@ describe('Resizable', () => {
     expect(panelSizes()).toEqual(['15%', '85%']);
     pressKeyOn(handle(), 'Enter');
     expect(panelSizes()).toEqual(['40%', '60%']);
+  });
+
+  describe('felfedés (reveal, 2026-09-25)', () => {
+    let restore: (() => void) | undefined;
+
+    /**
+     * Valódi geometria a happy-dom nulla téglalapja helyett, már a csatolás
+     * előtt: a `.resizable-panel` elem mérete a legközelebbi
+     * `data-panel-sizes` burkoló listájából jön (a panel sorszáma szerint,
+     * `DOMRect(0, 0, méret, méret)`, tehát tengelytől független), minden más
+     * elemé a saját `data-rect` attribútumából ("x,y,szélesség,magasság"), a
+     * csoport kliens mérete a paneljei összege. A pixeles minimum a forrás
+     * CSS szabálya, stíluslapból.
+     */
+    function installGeometry(): void {
+      const style = document.createElement('style');
+      style.textContent = '.resizable-panel { min-width: 60px; min-height: 60px; }';
+      document.head.append(style);
+      const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ): DOMRect {
+        if (this.classList.contains('resizable-panel')) {
+          const sizes = (this.closest<HTMLElement>('[data-panel-sizes]')?.dataset['panelSizes'] ?? '').split(',');
+          const siblings = [...(this.parentElement?.children ?? [])].filter((child) =>
+            child.classList.contains('resizable-panel'),
+          );
+          const size = Number(sizes[siblings.indexOf(this)] ?? '0');
+          return new DOMRect(0, 0, size, size);
+        }
+        const [x = 0, y = 0, width = 0, height = 0] = (this.dataset['rect'] ?? '').split(',').map(Number);
+        return new DOMRect(x, y, width, height);
+      });
+      // A csoport kliens mérete a panelek összege (az elválasztó a happy-dom
+      // nulla téglalapja, tehát nem vesz el helyet).
+      const groupClientSize = function (this: HTMLElement): number {
+        if (!this.classList.contains('resizable-group')) {
+          return 0;
+        }
+        const sizes = (this.closest<HTMLElement>('[data-panel-sizes]')?.dataset['panelSizes'] ?? '').split(',');
+        let sum = 0;
+        for (const size of sizes) {
+          sum += Number(size);
+        }
+        return sum;
+      };
+      const heightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(groupClientSize);
+      const widthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(groupClientSize);
+      restore = () => {
+        spy.mockRestore();
+        heightSpy.mockRestore();
+        widthSpy.mockRestore();
+        style.remove();
+      };
+    }
+
+    afterEach(() => {
+      restore?.();
+      restore = undefined;
+    });
+
+    interface InnerOptions {
+      readonly reveal?: { readonly elementId: string; readonly key: string };
+      readonly adjustsForReveal?: boolean;
+      readonly onSizesChange?: (sizes: readonly number[]) => void;
+      readonly textRect?: string;
+    }
+
+    /**
+     * A futás nézet belső csoportjának mintája: felül a "transcript", alul a
+     * görgethető törzs (`overflow: auto`), benne a felfedendő szöveg. A két
+     * panel 100 és 100 pixel, a görgető doboz a második panel teljes
+     * dobozát kapja, a szöveg alja alapból 150 pixelen áll, tehát a
+     * második panelnek 150 pixel kell.
+     */
+    function innerGroup(options: Readonly<InnerOptions>): ReactElement {
+      return (
+        <div data-panel-sizes="100,100">
+          <Resizable
+            direction="vertical"
+            defaultSizes={[50, 50]}
+            {...(options.reveal === undefined ? {} : { reveal: options.reveal })}
+            {...(options.adjustsForReveal === undefined ? {} : { adjustsForReveal: options.adjustsForReveal })}
+            {...(options.onSizesChange === undefined ? {} : { onSizesChange: options.onSizesChange })}
+          >
+            <ResizablePanel index={0}>Transcript</ResizablePanel>
+            <ResizableHandle beforeIndex={0} />
+            <ResizablePanel index={1}>
+              <div data-rect="0,0,100,100" style={{ overflowY: 'auto' }}>
+                <p id="kerdes" data-rect={options.textRect ?? '0,50,100,100'}>
+                  Kérdés
+                </p>
+              </div>
+            </ResizablePanel>
+          </Resizable>
+        </div>
+      );
+    }
+
+    const REVEAL = { elementId: 'kerdes', key: 'elso' } as const;
+
+    it('a szöveg a saját elválasztó rovására kifér, értesítés nélkül, és a felfedés végén az alapállás visszaáll', () => {
+      installGeometry();
+      const reported: (readonly number[])[] = [];
+      const onSizesChange = (sizes: readonly number[]): void => {
+        reported.push(sizes);
+      };
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, onSizesChange }));
+      });
+      // 150 / 200 = 75 százalék, a felső panel minimuma 60 / 200 = 30.
+      expect(sizesOf(groups()[0])).toEqual(['30%', '70%']);
+      expect(reported).toEqual([]);
+      act(() => {
+        root.render(innerGroup({ adjustsForReveal: true, onSizesChange }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      expect(reported).toEqual([]);
+    });
+
+    it('ha a szöveg elfér, a méretek nem változnak', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, textRect: '0,20,100,40' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
+    it('saját aránnyal (adjustsForReveal hamis, az alapérték) a méret nem változik', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
+    it('a kulcs változására újra számol: egy rövidebb szövegre az alapállás felé igazodik', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, textRect: '0,20,100,110' }));
+      });
+      // 130 / 200 = 65 százalék.
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      act(() => {
+        root.render(
+          innerGroup({
+            reveal: { elementId: 'kerdes', key: 'masodik' },
+            adjustsForReveal: true,
+            textRect: '0,20,100,40',
+          }),
+        );
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
+    it('az ablak átméretezésekor újra számol', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, textRect: '0,20,100,40' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      container.querySelector('#kerdes')?.setAttribute('data-rect', '0,20,100,110');
+      act(() => {
+        globalThis.dispatchEvent(new Event('resize'));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+    });
+
+    it('rejtett, nulla méretű csoportban (például egy nem aktív fülön) nincs mit mérni, a méret nem változik', () => {
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
+    it('nem létező elemre és panelen kívüli elemre nincs változás', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: { elementId: 'nincs-ilyen', key: 'a' }, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      const outside = document.createElement('p');
+      outside.id = 'kivul';
+      outside.dataset['rect'] = '0,0,100,900';
+      document.body.append(outside);
+      act(() => {
+        root.render(innerGroup({ reveal: { elementId: 'kivul', key: 'b' }, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      outside.remove();
+    });
+
+    it('a felhasználó húzása után a felfedés vége nem írja felül, és új kulcsra sem igazodik', () => {
+      installGeometry();
+      const reported: (readonly number[])[] = [];
+      const onSizesChange = (sizes: readonly number[]): void => {
+        reported.push(sizes);
+      };
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, onSizesChange }));
+      });
+      pressKeyOn(handle(), 'ArrowDown');
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      expect(reported).toEqual([[35, 65]]);
+      act(() => {
+        root.render(innerGroup({ adjustsForReveal: true, onSizesChange }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      act(() => {
+        root.render(
+          innerGroup({ reveal: { elementId: 'kerdes', key: 'uj' }, adjustsForReveal: true, textRect: '0,50,100,140' }),
+        );
+      });
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+    });
+
+    interface NestedOptions extends InnerOptions {
+      readonly outerDirection?: 'horizontal' | 'vertical';
+      readonly outerAdjusts?: boolean;
+      readonly outerPanels?: string;
+      readonly outerSizes?: readonly number[];
+    }
+
+    /**
+     * A futás nézet függőleges sávjának mintája: a külső csoport második
+     * panelje tartja a belső csoportot.
+     */
+    function nested(options: Readonly<NestedOptions>): ReactElement {
+      return (
+        <div data-panel-sizes={options.outerPanels ?? '500,300'}>
+          <Resizable
+            direction={options.outerDirection ?? 'vertical'}
+            defaultSizes={options.outerSizes ?? [62.5, 37.5]}
+            adjustsForReveal={options.outerAdjusts ?? true}
+          >
+            <ResizablePanel index={0}>Gráf</ResizablePanel>
+            <ResizableHandle beforeIndex={0} aria-label="Külső" />
+            <ResizablePanel index={1}>{innerGroup(options)}</ResizablePanel>
+          </Resizable>
+        </div>
+      );
+    }
+
+    it('a befoglaló csoport ad helyet előbb, és a belső arány marad', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ adjustsForReveal: true }));
+      });
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      const [outer, inner] = groups();
+      // A belső csoportnak 150 / 0,5 = 300 pixel kell, 100-zal több: a
+      // külső második panel 300-ról 400 pixelre nő (800 pixelből 50 százalék).
+      expect(sizesOf(outer)).toEqual(['50%', '50%']);
+      expect(sizesOf(inner)).toEqual(['50%', '50%']);
+      act(() => {
+        root.render(nested({ adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['62.5%', '37.5%']);
+    });
+
+    it('együtt csatolva sem vonja vissza a befoglaló csoport a belső kérését', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
+    it('a befoglaló csoport minimumánál a maradékot a belső elválasztó fizeti', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true, outerPanels: '100,300', outerSizes: [25, 75] }));
+      });
+      const [outer, inner] = groups();
+      // A külső első panel minimuma 60 / 400 = 15 százalék: 40 pixel jön, a
+      // belső csoport 240 pixeléből 150 a törzsé (62,5 százalék).
+      expect(sizesOf(outer)).toEqual(['15%', '85%']);
+      expect(sizesOf(inner)).toEqual(['37.5%', '62.5%']);
+    });
+
+    it('más tengelyű vagy mozdíthatatlan befoglaló csoport nem ad helyet, a belső fizet', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true, outerDirection: 'horizontal' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['62.5%', '37.5%']);
+      expect(sizesOf(groups()[1])).toEqual(['30%', '70%']);
+      act(() => {
+        root.unmount();
+      });
+      root = createRoot(container);
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true, outerAdjusts: false }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['62.5%', '37.5%']);
+      expect(sizesOf(groups()[1])).toEqual(['30%', '70%']);
+    });
+
+    it('a befoglaló csoport tengelyváltásakor a befoglaló visszaáll, és a belső fizet', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true, outerDirection: 'horizontal' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['62.5%', '37.5%']);
+      expect(sizesOf(groups()[1])).toEqual(['30%', '70%']);
+    });
+
+    it('a befoglaló csoport a felhasználó húzása után nem ad helyet, és a felfedés végén nem áll vissza', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      const outerHandle = container.querySelector('[aria-label="Külső"]');
+      if (outerHandle === null) {
+        throw new Error('nincs külső elválasztó');
+      }
+      pressKeyOn(outerHandle, 'ArrowDown');
+      expect(sizesOf(groups()[0])).toEqual(['55%', '45%']);
+      // A rögzített geometria követi a kirajzolást: 800 pixelből 440 és 360.
+      act(() => {
+        root.render(nested({ adjustsForReveal: true, outerPanels: '440,360' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['55%', '45%']);
+      act(() => {
+        root.render(
+          nested({ reveal: { elementId: 'kerdes', key: 'uj' }, adjustsForReveal: true, outerPanels: '440,360' }),
+        );
+      });
+      expect(sizesOf(groups()[0])).toEqual(['55%', '45%']);
+      expect(sizesOf(groups()[1])).toEqual(['30%', '70%']);
+    });
   });
 
   it('a panelek gyerek tartalma megjelenik', () => {

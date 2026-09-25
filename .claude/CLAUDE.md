@@ -898,7 +898,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   Playwright csomagot importál; minden más commitolt kód (teszt, e2e, config, eszköz, shell
   script, GitHub Actions YAML, `package.json` script) vizsgált. Ha egyszer egy
   termékfunkció maga készít és ment böngésző képernyőképet (például weboldalt fényképező agent
-  eszköz), arra kifejezett, user által jóváhagyott kivétel kell. Amit fog: a
+  eszköz), arra kifejezett, user által jóváhagyott kivétel kell. **Szabály, és a gépi ellenőrzés
+  kimondott korlátja (user döntés 2026-09-25, egy független ellenőrzés mérése nyomán):
+  Playwright segédfájl (ami egy "lap" típusú paramétert kap, és képet készíthet vagy írhat)
+  kizárólag egy csomag `e2e/` vagy `measurement/` mappájában állhat**, a `packages/*/src` és az
+  `apps/*/src` alatt nem. Ok: a termékkód csak Playwright importtal vizsgált (a `1a83b02` hatókör
+  szűkítése óta), tehát egy oda tett, Playwright import nélküli segéd a lapon át képet készíthet
+  vagy írhat úgy, hogy a kapu nem látja. Ez rossz helyre tett fájl, nem szándékos hamisítás, ezért
+  a betartása code review kérdés, gépi kényszer nincs rá. Amit fog: a
   szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
   képernyőképet lemezre, a szentesített script nem tarthat saját gráf literált, `mockRoute` vagy
   `page.route` hívást, a `screenshots` npm scriptek és a Playwright config a szentesített fájlra

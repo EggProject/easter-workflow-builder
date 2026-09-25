@@ -13,7 +13,7 @@
     "screenshots": "playwright test --config playwright.screenshots.config.ts",
     "measure:transcript": "playwright test --config playwright.measurement.config.ts transcript-scroll.ts",
     "measure:approval": "playwright test --config playwright.measurement.config.ts approval-panel.ts",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.10 --branches 98.57 --functions 99.46 --lines 99.06"
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.11 --branches 98.58 --functions 99.46 --lines 99.07"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

@@ -31,6 +31,24 @@ export interface ResizableContextValue {
    * elválasztó fókuszakor, hogy a felolvasott érték friss legyen).
    */
   readonly refreshGeometry: () => void;
+  /**
+   * Egy beágyazott `Resizable` felfedési kérése (2026-09-25, `plan-reveal.ts`):
+   * a `requester` csoportot tartó panel nőjön `deltaPixels` pixellel a mai
+   * méretéhez képest. Visszaadja, mennyivel változott a panel ténylegesen;
+   * nulla, ha a csoport nem mozdulhat (saját arány, a felhasználó már húzta,
+   * vagy a kérő más tengelyen áll). Ideiglenes: nem értesít, és az `endReveal`
+   * visszaállítja.
+   */
+  readonly resizeForReveal: (
+    requester: Element,
+    deltaPixels: number,
+    requesterDirection: 'horizontal' | 'vertical',
+  ) => number;
+  /**
+   * A felfedés vége: a felfedés előtti méretek visszaállnak, ha a
+   * felhasználó közben nem húzta az elválasztót.
+   */
+  readonly endReveal: () => void;
 }
 
 /**
@@ -54,6 +72,10 @@ const NOOP_CONTEXT_VALUE: ResizableContextValue = {
   toggleCollapse: () => {},
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
   refreshGeometry: () => {},
+  // Befoglaló `Resizable` nélkül nincs, ami helyet adjon egy felfedésnek.
+  resizeForReveal: () => 0,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
+  endReveal: () => {},
 };
 
 export const ResizableContext = createContext<ResizableContextValue>(NOOP_CONTEXT_VALUE);

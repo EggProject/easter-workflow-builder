@@ -1,5 +1,6 @@
-import { Resizable, ResizableHandle, ResizablePanel } from '@easter-workflow-builder/ui';
-import type { ReactElement, ReactNode } from 'react';
+import { Resizable, ResizableHandle, ResizablePanel, type ResizableReveal } from '@easter-workflow-builder/ui';
+import { useContext, type ReactElement, type ReactNode } from 'react';
+import { RunViewTranscriptVisibility } from './run-view-transcript-visibility.ts';
 
 export interface RunViewTranscriptSideProperties {
   readonly transcriptPanel: ReactNode;
@@ -17,9 +18,17 @@ export interface RunViewTranscriptSideProperties {
    */
   readonly approvalPanel: ReactNode;
   /**
-   * Igaz, ha van látott jóváhagyás (`useApprovalSelection`).
+   * A látott jóváhagyás szövegének felfedése (`useApprovalSelection`): a
+   * szöveg eleme és a jóváhagyás azonosítója kulcsként; `undefined`, ha nincs
+   * látott jóváhagyás. Csak látott jóváhagyás mellett áll ki az elválasztó és
+   * a törzs.
    */
-  readonly isApprovalShown: boolean;
+  readonly approvalReveal: ResizableReveal | undefined;
+  /**
+   * Mozdulhat-e az elválasztó a felfedés kedvéért: nincs saját arány
+   * (`is-own-layout-sizes.ts`).
+   */
+  readonly adjustsForReveal: boolean;
   /**
    * A transcript és a jóváhagyás szövegének kezdő aránya százalékban, ebben a
    * sorrendben; a perzisztálás a hívó dolga (`run-view-approval-layout.ts`).
@@ -45,6 +54,16 @@ export interface RunViewTranscriptSideProperties {
  * "A transcript és a jóváhagyás aránya", és az `aria-valuenow` a transcript
  * százaléka.
  *
+ * **Függő jóváhagyásnál a kérdés kifér** (user döntés 2026-09-25, "a rajz
+ * húzódjon össze"): a `Resizable` felfedi a látott jóváhagyás szövegét
+ * (`reveal`), tehát a figyelmeztetés, a cím és a szöveg a görgethető
+ * törzsben teljesen látszik, a gombok alatta. Előbb a befoglaló, a gráf és a
+ * transcript közti elválasztó ad helyet (a függőleges sávban, a rajz
+ * rovására, ennek a csoportnak az arányát megtartva), a maradékot ez az
+ * elválasztó, a transcript rovására; mindkettő csak saját arány nélkül
+ * mozdul, és a mozdulás ideiglenes: nem tárolódik, és a jóváhagyás
+ * eltűnésekor az előző arány áll vissza (SPEC-008 8. szekció 1. pont).
+ *
  * **A jóváhagyás rész csak látott jóváhagyás mellett áll ki.** Jóváhagyás
  * nélkül (a legtöbb futás) a transcript a teljes oldalt kapja; a régióban
  * ilyenkor legfeljebb a lista betöltés jelzése vagy hibaüzenete áll, a saját
@@ -62,11 +81,29 @@ export interface RunViewTranscriptSideProperties {
  * `ResizablePanel` inline `flex-basis` értéke a tárolt arány.
  */
 export function RunViewTranscriptSide(properties: Readonly<RunViewTranscriptSideProperties>): ReactElement {
-  const { transcriptPanel, approvalBody, approvalPanel, isApprovalShown, defaultSizes, onSizesChange } = properties;
+  const {
+    transcriptPanel,
+    approvalBody,
+    approvalPanel,
+    approvalReveal,
+    adjustsForReveal,
+    defaultSizes,
+    onSizesChange,
+  } = properties;
+  const isApprovalShown = approvalReveal !== undefined;
+  // Rejtett fülön (a fül sáv "Gráf" fülén) nincs mit felfedni: a felfedés a
+  // "Transcript" fül megnyitásakor indul (`run-view-transcript-visibility.ts`).
+  const isVisible = useContext(RunViewTranscriptVisibility);
 
   return (
     <>
-      <Resizable direction="vertical" defaultSizes={defaultSizes} onSizesChange={onSizesChange}>
+      <Resizable
+        direction="vertical"
+        defaultSizes={defaultSizes}
+        onSizesChange={onSizesChange}
+        reveal={isVisible ? approvalReveal : undefined}
+        adjustsForReveal={adjustsForReveal}
+      >
         <ResizablePanel index={0}>
           <div className="run-view-screen__transcript-content">{transcriptPanel}</div>
         </ResizablePanel>

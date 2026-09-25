@@ -39,6 +39,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   APPROVAL_RUN_URL,
   APPROVAL_TRANSCRIPT_ROW_COUNT,
+  FIRST_APPROVAL,
   manyApprovals,
   mockApprovalRunWithTranscript,
 } from '../e2e/approval-fixture.ts';
@@ -52,7 +53,12 @@ import {
   lastRowBottomOverflow,
   openFollowingTranscript,
   REPLAYED_ROW_COUNT,
+  mockRunView,
   rowsUnderJumpButton,
+  startOpenStreamServer,
+  stepEventFrame,
+  stepRun,
+  streamReadyFrame,
   TABBED_LAYOUT,
   textDeltaTransientFrame,
   transcriptList,
@@ -1054,4 +1060,111 @@ for (const viewport of [
       lastRowBelowBox: round(geometry.lastRowBelowBox),
     });
   });
+}
+
+// ------------------------------------------------------------
+// 13. Szűk lista a látott jóváhagyás mellett (user döntés 2026-09-25,
+//     SPEC-008 7.4, a 14.1 O-15 lezárása): a lista közepére görgetve három
+//     új sor után a gomb helye (`position`, a keret szűk alakja), a gomb
+//     alatt álló sorok, a lista magassága és helye a gomb megjelenése előtt
+//     és után, a lista tartalom doboza (a felső belső margó nélkül), és a
+//     gomb megnyomása után az utolsó sor alja a lista alján. Négy méreten,
+//     két témában; a jóváhagyás a `r-1` futásé.
+// ------------------------------------------------------------
+const COMPACT_APPROVAL = { ...FIRST_APPROVAL, runId: 'r-1', stepRunId: 's-1' } as const;
+
+for (const { name, layout } of [
+  { name: '1440x900', layout: WIDE_LAYOUT },
+  { name: '900x1000', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+  { name: '1440x600', layout: { viewport: { width: 1440, height: 600 }, isTabbed: false } },
+  { name: '375x812', layout: TABBED_LAYOUT },
+] as const) {
+  for (const theme of THEMES) {
+    test(`szuk-lista ${name} ${theme}`, async ({ page }) => {
+      // A megnyitás az `openFollowingTranscript` lépései szerint, de az utolsó
+      // sor teljes láthatóságának állítása nélkül: ahol a transcript panel a
+      // tartalma minimumánál kisebb, a transcript burkolója görget, és az
+      // állítás elbukna (research 22. szekció).
+      const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+      serverHolder.current = streamServer.server;
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')], approvals: [COMPACT_APPROVAL] });
+      await page.setViewportSize(layout.viewport);
+      await page.goto('/run?runId=r-1');
+      if (layout.isTabbed) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      streamServer.pushBatch([
+        ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) =>
+          stepEventFrame(index + 1, 'step_started', 'replayed'),
+        ),
+        { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+      ]);
+      const list = transcriptList(page);
+      await expect(list.locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT)}"]`)).toBeAttached();
+      await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
+      // A lista közepére görgetve (nem a tetejére, ahol a gomb alatt a felső
+      // belső margó áll): itt dől el, hogy a gomb sort takar-e (O-15).
+      await list.evaluate((element) => {
+        element.scrollTo({ top: Math.round((element.scrollHeight - element.clientHeight) / 2) });
+      });
+      await animationFrames(page, 5);
+      const before = await list.boundingBox();
+      streamServer.pushBatch(transientFrames(3));
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' });
+      await expect(jump).toBeVisible();
+      await animationFrames(page, 5);
+      const after = await list.boundingBox();
+      const frame = await list.evaluate((element) => {
+        const style = element.computedStyleMap().get('padding-top');
+        return {
+          clientHeight: element.clientHeight,
+          paddingTop: style instanceof CSSUnitValue ? style.value : undefined,
+          isCompactFrame: element.parentElement?.classList.contains('transcript-panel__list-frame--compact') ?? false,
+        };
+      });
+      const covered = await rowsUnderJumpButton(list, jump);
+      const position = await jump.evaluate((element) => globalThis.getComputedStyle(element).position);
+      // Esemény küldése, nem a Playwright kattintása: az a gombot a
+      // kattintás előtt a nézetbe görgetné (a transcript burkolóját is), ami a
+      // mért arányt elrontaná.
+      await jump.dispatchEvent('click');
+      const rowCount = REPLAYED_ROW_COUNT + 3;
+      report('szuk-lista', {
+        layout: name,
+        theme,
+        listHeight: round(before?.height),
+        listContentHeight: frame.paddingTop === undefined ? undefined : frame.clientHeight - frame.paddingTop,
+        isCompactFrame: frame.isCompactFrame,
+        position,
+        coveredRows: covered.map((row) => row.position),
+        listMovedY: round((after?.y ?? 0) - (before?.y ?? 0)),
+        listHeightChange: round((after?.height ?? 0) - (before?.height ?? 0)),
+        lastRowOverflowAfterJump: await stableLastRowOverflow(page, list, rowCount),
+        // Az utolsó sor látható aránya az ablakban, minden levágó őssel
+        // metszve (a transcript burkolója is): kisebb egynél, ha a transcript
+        // panel a tartalma minimumánál kisebb.
+        lastRowVisibleRatio: await list.evaluate((element, position) => {
+          const row = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
+          if (row === null) {
+            return;
+          }
+          const rect = row.getBoundingClientRect();
+          let top = Math.max(rect.top, 0);
+          let bottom = Math.min(rect.bottom, globalThis.innerHeight);
+          for (let ancestor = row.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+            if (globalThis.getComputedStyle(ancestor).overflowY === 'visible') {
+              continue;
+            }
+            const box = ancestor.getBoundingClientRect();
+            top = Math.max(top, box.top + ancestor.clientTop);
+            bottom = Math.min(bottom, box.top + ancestor.clientTop + ancestor.clientHeight);
+          }
+          return Math.round((Math.max(0, bottom - top) / rect.height) * 100) / 100;
+        }, rowCount),
+      });
+    });
+  }
 }

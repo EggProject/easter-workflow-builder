@@ -2234,3 +2234,223 @@ test('a listán nincs böngésző görgetés rögzítés: a kiszámított overfl
   await openFollowingTranscript(page, 'light', serverHolder);
   expect(await transcriptList(page).evaluate((element) => getComputedStyle(element).overflowAnchor)).toBe('none');
 });
+
+// ============================================================
+// GÖRGETÉS LÁTHATÓ JÓVÁHAGYÁS MELLETT (a független ellenőrzés hiánylistája,
+// 2026-09-25).
+//
+// A követés, a kinyitás szünete, az ugrás gomb és a kézi visszatérés minden
+// más teszten üres jóváhagyás listával fut, tehát a transcript egyedül áll.
+// Itt a transcript a látott jóváhagyás mellett áll: 1440x900-on (vízszintes
+// sáv, a lista 190 pixel, a gomb a lista tetején lebeg) és 900x1000-en (álló
+// tablet: a rajz összehúzódik, hogy a kérdés kiférjen, a lista szűk, a gomb a
+// lista mellett áll, SPEC-008 7.4 és 8. szekció 1. pont), két témában. Minden
+// lépés után a kérdés és a gombok is teljesen látszanak. Az élőben érkező
+// jóváhagyás a listát zsugorítja, és az utolsó sor alja közben a lista alján
+// marad; a jóváhagyás eltűnésekor a lista és az elválasztók visszaállnak.
+// ============================================================
+
+const APPROVAL_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1440x900', layout: WIDE_LAYOUT },
+  { name: '900x1000', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+];
+
+function stateWithApproval(): RunViewMockState {
+  return { runStatus: 'running', stepRuns: [stepRun('running')], approvals: [LIVE_APPROVAL] };
+}
+
+/**
+ * A látott jóváhagyás kérdése (a cím és a szöveg) és a két gomb teljes
+ * egészében látszik.
+ */
+async function expectQuestionVisible(page: Page): Promise<void> {
+  const body = page.locator('.run-view-screen__transcript .approval-prompt-body');
+  await expect(body.getByRole('heading', { name: LIVE_APPROVAL.title })).toBeInViewport({ ratio: 1 });
+  await expect(body.getByText(LIVE_APPROVAL.body, { exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Jóváhagyás', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Elutasítás', exact: true })).toBeInViewport({ ratio: 1 });
+}
+
+/**
+ * Kézi görgetés a lista tetejére, és várakozás, amíg a lista az első sort
+ * kirajzolja (a görgetés feldolgozva, a lista nem követ). Részleges
+ * láthatóság elég: szűk listán a felső belső margó alatt az első sornak csak
+ * egy része fér el.
+ */
+async function scrollListToTop(page: Page, list: Locator): Promise<void> {
+  await wheelToTop(page, list);
+  await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport();
+}
+
+async function listHeight(list: Locator): Promise<number> {
+  return list.evaluate((element) => element.getBoundingClientRect().height);
+}
+
+for (const { name, layout } of APPROVAL_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`látható jóváhagyás mellett a lista követ: minden új sor után az utolsó sor és a kérdés is teljesen látszik (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      await expectQuestionVisible(page);
+      await expectFollowingAfterArrivals(page, streamServer, transcriptList(page), REPLAYED_ROW_COUNT);
+      await expectQuestionVisible(page);
+    });
+
+    test(`látható jóváhagyás mellett a kinyitott utolsó sor a helyén marad, az új sor a gomb számába kerül (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
+      const offsetBefore = await headerOffsetInList(list, rowCount);
+      await header.dispatchEvent('click');
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+      streamServer.push(textDeltaTransientFrame('Kinyitás után'));
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeInViewport({ ratio: 1 });
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+      await expectQuestionVisible(page);
+    });
+
+    test(`látható jóváhagyás mellett az ugrás gomb az aljára visz, és a kézi görgetés az aljára visszakapcsolja a követést (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      const list = transcriptList(page);
+      await scrollListToTop(page, list);
+      streamServer.pushBatch(transientFrames(5));
+      let count = REPLAYED_ROW_COUNT + 5;
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (5 új esemény)' });
+      await expect(jump).toBeInViewport({ ratio: 1 });
+      await jump.click();
+      await expectLastRowFullyVisibleAtBottom(list, count);
+      await expect(jumpButton(page)).toHaveCount(0);
+
+      await scrollListToTop(page, list);
+      streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+      count += 1;
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+      await wheelToBottom(page, list);
+      await expectLastRowFullyVisibleAtBottom(list, count);
+      await expect(jumpButton(page)).toHaveCount(0);
+      await expectFollowingAfterArrivals(page, streamServer, list, count);
+      await expectQuestionVisible(page);
+    });
+
+    test(`élőben érkező jóváhagyásnál a lista zsugorodik, az utolsó sor alja a lista alján marad, és a jóváhagyás eltűnésekor a lista és az elválasztó visszaáll (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, REPLAYED_ROW_COUNT, state);
+      const list = transcriptList(page);
+      const heightBefore = await listHeight(list);
+      const outerSeparator = page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+      await expect(outerSeparator).toHaveAttribute('aria-valuenow', '70');
+
+      state.approvals = [LIVE_APPROVAL];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'approval_requested', 'live'));
+      await expectQuestionVisible(page);
+      await expect.poll(async () => listHeight(list)).toBeLessThan(heightBefore);
+      await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 1);
+
+      state.approvals = [];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 2, 'approval_decided', 'live'));
+      await expect(page.getByRole('heading', { name: LIVE_APPROVAL.title })).toHaveCount(0);
+      await expect.poll(async () => listHeight(list)).toBe(heightBefore);
+      await expect(outerSeparator).toHaveAttribute('aria-valuenow', '70');
+      await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 2);
+    });
+  }
+}
+
+// ============================================================
+// SZŰK LISTÁN AZ UGRÁS GOMB NEM LEBEG (user döntés 2026-09-25, SPEC-008 7.4,
+// a 14.1 O-15 lezárása).
+//
+// 900x1000-en (álló tablet) a látott jóváhagyás mellett a lista látható
+// magassága kisebb, mint a felső belső margó plusz egy sor: a lebegő gomb a
+// látható sort takarná (a mai kódon a jóváhagyás nélkül is szűk, 53 pixeles
+// listán). Itt a gomb a lista mellett, a folyásban áll: teljesen látszik,
+// egyetlen sort sem takar, a lista magassága és helye a megjelenésekor nem
+// változik, és a gomb az aljára visz. Normál méretű listán (1440x900) a gomb
+// változatlanul a lista tetején lebeg. (1440x600-on a lista szintén szűk, de
+// ott a transcript panel a tartalma minimumánál kisebb, és a transcript
+// burkolója görget, research 12. szekció; a gomb alakja ugyanez.)
+// ============================================================
+
+const COMPACT_LIST_LAYOUT: TranscriptLayout = { viewport: { width: 900, height: 1000 }, isTabbed: false };
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`szűk listán (900x1000, látott jóváhagyás) az ugrás gomb nem lebeg: a lista mellett áll, sort nem takar, a lista nem mozdul, és az aljára visz (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(
+      page,
+      theme,
+      serverHolder,
+      COMPACT_LIST_LAYOUT,
+      REPLAYED_ROW_COUNT,
+      stateWithApproval(),
+    );
+    await expectQuestionVisible(page);
+    const list = transcriptList(page);
+    await scrollListToTop(page, list);
+    const boxBefore = await list.boundingBox();
+    streamServer.pushBatch(transientFrames(3));
+    const jump = page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' });
+    await expect(jump).toBeInViewport({ ratio: 1 });
+    expect(await jump.evaluate((element) => globalThis.getComputedStyle(element).position)).toBe('static');
+    expect(await rowsUnderJumpButton(list, jump)).toEqual([]);
+    const boxAfter = await list.boundingBox();
+    expect([boxAfter?.y, boxAfter?.height]).toEqual([boxBefore?.y, boxBefore?.height]);
+
+    await jump.click();
+    await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 3);
+    await expect(jumpButton(page)).toHaveCount(0);
+  });
+
+  test(`normál méretű listán (1440x900, látott jóváhagyás) az ugrás gomb változatlanul a lista tetején lebeg (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(
+      page,
+      theme,
+      serverHolder,
+      WIDE_LAYOUT,
+      REPLAYED_ROW_COUNT,
+      stateWithApproval(),
+    );
+    const list = transcriptList(page);
+    await scrollListToTop(page, list);
+    streamServer.pushBatch(transientFrames(3));
+    const jump = page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' });
+    await expect(jump).toBeInViewport({ ratio: 1 });
+    expect(await jump.evaluate((element) => globalThis.getComputedStyle(element).position)).toBe('absolute');
+    expect(await isJumpInTopBand(list, jump)).toBe(true);
+  });
+}

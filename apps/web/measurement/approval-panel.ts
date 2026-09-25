@@ -1103,3 +1103,205 @@ for (const theme of THEMES) {
     });
   }
 }
+
+// ------------------------------------------------------------
+// 12. A kérdés elfér-e (user döntés 2026-09-25, "a rajz húzódjon össze"):
+//     függő jóváhagyással, a tárolt arány három állapotában (nincs, saját
+//     külső, saját belső), jóváhagyás nélkül, és hosszú szöveggel és
+//     payloaddal, a két osztott sáv és a fül sáv méretein, két témában. A
+//     "Visszavonhatatlan" figyelmeztetés, a cím, a jóváhagyás szövege, a
+//     lapozó és a két gomb látható aránya, a vászon, a két `Resizable`
+//     paneljei, a transcript lista magassága, a kérdés igénye (a szöveg alja
+//     a görgethető törzs tetejétől, görgetéstől függetlenül) és a két
+//     elválasztó jelentett értéke. A fül sávban a "Transcript" fülön mér.
+// ------------------------------------------------------------
+const QUESTION_VIEWPORTS = [
+  { width: 768, height: 1024 },
+  { width: 900, height: 1000 },
+  { width: 1000, height: 700 },
+  { width: 1023, height: 768 },
+  { width: 1440, height: 600 },
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+] as const;
+
+const LONG_APPROVAL: PendingApproval = {
+  ...FIRST_APPROVAL,
+  id: 'appr-long',
+  title: 'Engedélyezed a hosszú leírású kifizetést a beszállító számára?',
+  body: Array.from({ length: 12 }, (_, index) => `A kifizetés ${String(index + 1)}. feltétele teljesült.`).join(' '),
+  payload: Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`mezo${String(index + 1)}`, index + 1])),
+};
+
+const QUESTION_STORAGE = {
+  nincs: undefined,
+  'sajat-kulso': ['eggRunViewLayout', [60, 40]],
+  'sajat-belso': ['eggRunViewTranscriptApprovalLayout', [70, 30]],
+} as const;
+
+async function readQuestionGeometry(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const { document } = globalThis;
+    const visibleRatio = (element: Element | null | undefined): number | undefined => {
+      if (element === null || element === undefined) {
+        return undefined;
+      }
+      const rect = element.getBoundingClientRect();
+      let left = Math.max(rect.left, 0);
+      let top = Math.max(rect.top, 0);
+      let right = Math.min(rect.right, globalThis.innerWidth);
+      let bottom = Math.min(rect.bottom, globalThis.innerHeight);
+      for (let ancestor = element.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+        const style = globalThis.getComputedStyle(ancestor);
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') {
+          continue;
+        }
+        const box = ancestor.getBoundingClientRect();
+        left = Math.max(left, box.left + ancestor.clientLeft);
+        top = Math.max(top, box.top + ancestor.clientTop);
+        right = Math.min(right, box.left + ancestor.clientLeft + ancestor.clientWidth);
+        bottom = Math.min(bottom, box.top + ancestor.clientTop + ancestor.clientHeight);
+      }
+      const area = rect.width * rect.height;
+      return area === 0 ? 0 : (Math.max(0, right - left) * Math.max(0, bottom - top)) / area;
+    };
+    const outerGroup = document.querySelector('.run-view-screen__body > .resizable-group');
+    const side = document.querySelector('.run-view-screen__transcript');
+    const innerGroup = side?.querySelector(':scope > .resizable-group') ?? undefined;
+    const body = side?.querySelector(':scope .drawer__body') ?? undefined;
+    const text = side?.querySelector(':scope .approval-prompt-card__body') ?? undefined;
+    const buttons = [...(side?.querySelectorAll(':scope .drawer__footer button') ?? [])];
+    const list = side?.querySelector(':scope .transcript-panel__list') ?? undefined;
+    const separator = (name: string): string | undefined =>
+      [...document.querySelectorAll('[role="separator"]')]
+        .find((element) => element.getAttribute('aria-label') === name)
+        ?.getAttribute('aria-valuenow') ?? undefined;
+    const need =
+      body === undefined || text === undefined
+        ? undefined
+        : text.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop;
+    return {
+      alert: visibleRatio(body?.querySelector(':scope .alert')),
+      title: visibleRatio(side?.querySelector(':scope .approval-prompt-card__title')),
+      text: visibleRatio(text),
+      payload: visibleRatio(side?.querySelector(':scope .approval-prompt-card__payload')),
+      pagination: visibleRatio(side?.querySelector(':scope nav.pagination .pagination__meta')),
+      approve: visibleRatio(buttons.find((button) => button.textContent === 'Jóváhagyás')),
+      reject: visibleRatio(buttons.find((button) => button.textContent === 'Elutasítás')),
+      canvas: document.querySelector('.run-graph-canvas')?.getBoundingClientRect().height ?? 0,
+      outerPanels:
+        outerGroup === null
+          ? undefined
+          : [...outerGroup.children]
+              .filter((child) => child.classList.contains('resizable-panel'))
+              .map((child) => child.getBoundingClientRect().height),
+      innerPanels:
+        innerGroup === undefined
+          ? undefined
+          : [...innerGroup.children]
+              .filter((child) => child.classList.contains('resizable-panel'))
+              .map((child) => child.getBoundingClientRect().height),
+      region: side?.querySelector(':scope .approval-prompt-panel')?.getBoundingClientRect().height ?? 0,
+      list: list === undefined ? undefined : list.getBoundingClientRect().height,
+      jumpButton: side?.querySelector(':scope .transcript-panel__jump') !== null,
+      need,
+      bodyHeight: body === undefined ? undefined : body.clientHeight,
+      outerValue: separator('A Gráf és a Transcript aránya'),
+      innerValue: separator('A transcript és a jóváhagyás aránya'),
+      storedOuter: globalThis.localStorage.getItem('eggRunViewLayout'),
+      storedInner: globalThis.localStorage.getItem('eggRunViewTranscriptApprovalLayout'),
+    };
+  });
+}
+
+/**
+ * A tárolt arány és a jóváhagyás lista párjai: saját arány nélkül mindhárom
+ * lista, saját aránnyal csak az egy jóváhagyásos.
+ */
+const QUESTION_CASES = Object.entries(QUESTION_STORAGE).flatMap(([storageName, stored]) =>
+  (
+    [
+      ['egy', [FIRST_APPROVAL]],
+      ['hosszu', [LONG_APPROVAL]],
+      ['nulla', []],
+    ] as const
+  )
+    .filter(([approvalName]) => storageName === 'nincs' || approvalName === 'egy')
+    .map(([approvalName, approvals]) => ({ storageName, stored, approvalName, approvals })),
+);
+
+for (const theme of THEMES) {
+  for (const viewport of QUESTION_VIEWPORTS) {
+    for (const { storageName, stored, approvalName, approvals } of QUESTION_CASES) {
+      const name = `kerdes ${theme} ${String(viewport.width)}x${String(viewport.height)} ${storageName} ${approvalName}`;
+      test(name, async ({ page }) => {
+        if (stored !== undefined) {
+          await page.addInitScript(
+            ([key, value]) => {
+              globalThis.localStorage.setItem(key, JSON.stringify(value));
+            },
+            [stored[0], stored[1]] as const,
+          );
+        }
+        await mockApprovalRunWithTranscript(page, approvals);
+        await openRun(page, theme, viewport);
+        if (viewport.width < TABBED_WIDTH_LIMIT) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
+        }
+        if (approvals.length > 0) {
+          await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
+        } else {
+          await expect(page.getByRole('list', { name: 'Futás eseményei' })).toBeAttached();
+        }
+        report('kerdes', {
+          theme,
+          viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+          storage: storageName,
+          approvals: approvalName,
+          ...(await readQuestionGeometry(page)),
+        });
+      });
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// 13. Tab lépések a jóváhagyás elválasztójától a "Jóváhagyás" gombig egy és
+//     négy jóváhagyással (a független ellenőrzés hiánylistája, 2026-09-25):
+//     több jóváhagyásnál a lapozó gombjai is a Tab sorrendbe kerülnek.
+// ------------------------------------------------------------
+for (const theme of THEMES) {
+  for (const viewport of [...VIEWPORTS, { width: 900, height: 1000 }] as const) {
+    for (const [count, shownPage] of [
+      [1, 1],
+      [4, 1],
+      [4, 2],
+      [4, 4],
+    ] as const) {
+      test(`tab-lepesek ${theme} ${String(viewport.width)}x${String(viewport.height)} ${String(count)}/${String(shownPage)}`, async ({
+        page,
+      }) => {
+        await mockApprovalRunWithTranscript(page, manyApprovals(count));
+        await openRun(page, theme, viewport);
+        if (viewport.width < TABBED_WIDTH_LIMIT) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
+        }
+        await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
+        if (shownPage > 1) {
+          await page
+            .getByRole('navigation', { name: 'Jóváhagyások lapozása' })
+            .getByRole('button', { name: String(shownPage), exact: true })
+            .click();
+        }
+        const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
+        report('tab-lepesek', {
+          theme,
+          viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+          approvals: count,
+          shownPage,
+          ...(await walkTabToApprove(page, separator)),
+        });
+      });
+    }
+  }
+}

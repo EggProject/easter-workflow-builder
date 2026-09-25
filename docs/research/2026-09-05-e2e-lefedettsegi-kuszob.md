@@ -1651,3 +1651,31 @@ ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
 `browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
 `transcript-panel` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb
 nem mozdul.
+
+## 43. A "rajz összehúzódik" és a szűk lista utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i két döntése: függő jóváhagyásnál, saját arány nélkül az
+elválasztók a kérdés kedvéért ideiglenesen elmozdulnak (a `packages/ui` `Resizable` felfedése, az
+`apps/web` `run-view` téma bekötése), és szűk listán az ugrás gomb nem lebeg
+(`transcript-panel`; research `2026-09-24-jovahagyas-panel-helye.md` 12. szekció,
+`2026-09-23-transcript-panel-meresek.md` 22. szekció). Az e2e készlet 353-ról **391** tesztre nő
+(a "rajz összehúzódik" 18, a "görgetés látható jóváhagyás mellett" 16, a szűk és a normál lista 4
+tesztje; két meglévő teszt a kezdő arány, kettő a tároló új szabálya szerint igazítva).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**391 teszt, mind zöld**; három `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba; az első shard két, a kezdő arányt még 50-re váró tesztje javítás után
+külön újrafutott), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (42.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1676 / 1691     | 99.11    | 99.10 -> **99.11**          | 15 -> 15                       |
+| branches   | 769 / 780       | 98.58    | 98.57 -> **98.58**          | 11 -> 11                       |
+| functions  | 561 / 564       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1615 / 1630     | 99.07    | 99.06 -> **99.07**          | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak; a
+`run-view` és a `transcript-panel` téma minden fájlja, az új `is-own-layout-sizes.ts`,
+`is-compact-transcript-list.ts` és `run-view-transcript-visibility.ts` is, mind a négy metrikán 100
+százalék. A fedett kód nőtt, ezért három küszöb a mért értékre emelkedik, felfelé kerekítés
+nélkül (`apps/web/package.json`).

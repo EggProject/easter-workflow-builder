@@ -2,6 +2,7 @@ import { act, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunViewTranscriptSide } from './RunViewTranscriptSide.tsx';
+import { RunViewTranscriptVisibility } from './run-view-transcript-visibility.ts';
 
 const APPROVAL_TEXT = 'jóváhagyás törzse';
 
@@ -44,7 +45,7 @@ describe('RunViewTranscriptSide', () => {
     container.remove();
   });
 
-  function renderSide(isApprovalShown: boolean): void {
+  function renderSide(isApprovalShown: boolean, isAdjustable = false): void {
     act(() => {
       root.render(
         <div className="side-root">
@@ -52,7 +53,8 @@ describe('RunViewTranscriptSide', () => {
             transcriptPanel={<StatefulTranscript />}
             approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
             approvalPanel={<section className="panel-placeholder">lapozó és gombok</section>}
-            isApprovalShown={isApprovalShown}
+            approvalReveal={isApprovalShown ? { elementId: 'approval-text', key: 'appr-1' } : undefined}
+            adjustsForReveal={isAdjustable}
             defaultSizes={[40, 60]}
             onSizesChange={onSizesChange}
           />
@@ -93,7 +95,8 @@ describe('RunViewTranscriptSide', () => {
     expect(separator()?.getAttribute('aria-label')).toBe('A transcript és a jóváhagyás aránya');
     expect(separator()?.getAttribute('aria-orientation')).toBe('horizontal');
     expect(separator()?.getAttribute('aria-valuenow')).toBe('40');
-    expect(onSizesChange).toHaveBeenLastCalledWith([40, 60]);
+    // A kezdő arány a felhasználó döntése nélkül nem kerül a tárolóba.
+    expect(onSizesChange).not.toHaveBeenCalled();
   });
 
   it('látott jóváhagyás nélkül nincs elválasztó és törzs, a transcript az egyetlen panel, alatta a régió', () => {
@@ -105,6 +108,28 @@ describe('RunViewTranscriptSide', () => {
     expect(group?.children).toHaveLength(1);
     const content = group?.querySelector(':scope > .resizable-panel > .run-view-screen__transcript-content');
     expect([...(content?.children ?? [])].map((child) => child.className)).toEqual(['stateful-transcript']);
+  });
+
+  it('rejtett transcript oldalon (a fül sáv Gráf fülén) is ugyanaz a szerkezet áll, csak a felfedés vár a fül megnyitására', () => {
+    act(() => {
+      root.render(
+        <RunViewTranscriptVisibility value={false}>
+          <div className="side-root">
+            <RunViewTranscriptSide
+              transcriptPanel={<StatefulTranscript />}
+              approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
+              approvalPanel={<section className="panel-placeholder">lapozó és gombok</section>}
+              approvalReveal={{ elementId: 'approval-text', key: 'appr-1' }}
+              adjustsForReveal
+              defaultSizes={[40, 60]}
+              onSizesChange={onSizesChange}
+            />
+          </div>
+        </RunViewTranscriptVisibility>,
+      );
+    });
+    expect(sideChildren()).toEqual(['resizable-group resizable-group--vertical', 'panel-placeholder']);
+    expect(separator()?.getAttribute('aria-valuenow')).toBe('40');
   });
 
   it('a jóváhagyás megjelenése és eltűnése nem szereli le a transcript panelt', () => {

@@ -34,8 +34,17 @@ import { RunViewLayout } from './RunViewLayout.tsx';
 import { RunViewTranscriptSide } from './RunViewTranscriptSide.tsx';
 import { blockingFailureMessage } from './blocking-failure-message.ts';
 import { isRunClosingFrame } from './is-run-closing-frame.ts';
-import { readStoredRunViewApprovalLayoutSizes, storeRunViewApprovalLayoutSizes } from './run-view-approval-layout.ts';
-import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
+import { isOwnLayoutSizes } from './is-own-layout-sizes.ts';
+import {
+  DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES,
+  readStoredRunViewApprovalLayoutSizes,
+  storeRunViewApprovalLayoutSizes,
+} from './run-view-approval-layout.ts';
+import {
+  DEFAULT_RUN_VIEW_LAYOUT_SIZES,
+  readStoredRunViewLayoutSizes,
+  storeRunViewLayoutSizes,
+} from './run-view-layout.ts';
 import { useLiveStepRuns } from './use-live-step-runs.ts';
 import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
 import './run-view.css';
@@ -212,7 +221,10 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * gombjai (user döntések 2026-09-25, `RunViewTranscriptSide`, az arány a
  * `run-view-approval-layout.ts` kulcsán perzisztálódik). Egyik sem a
  * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
- * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
+ * számától (PLAN-009 5. szekció F6 sora). Függő jóváhagyásnál, saját arány
+ * nélkül, a látott kérdés kifér: az elválasztók ideiglenesen elmozdulnak, a
+ * függőleges sávban előbb a rajz, a maradékot a transcript rovására (user
+ * döntés 2026-09-25, "a rajz húzódjon össze", `RunViewTranscriptSide`). A lista a `usePendingApprovals`
  * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`, a
  * látott jóváhagyás kiválasztása a `useApprovalSelection` hookban él;
  * mindhárom itt, a képernyő szintjén, mert a transcript sáv a reszponzív sáv
@@ -408,6 +420,18 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   }
 
   const shownApproval = approvalSelection.shown;
+  // A két tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
+  // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
+  // visszaváltáskor a `defaultSizes` propból épül újra a kezdő állapota. Egy
+  // csatoláskor beolvasott, `useState`-ben tartott érték ilyenkor a kézzel
+  // húzott arányt eldobná (a T-009-22 független ellenőrzésének él esete). A
+  // `localStorage` olvasás a saját `try`/`catch` ágán megy, és a képernyő nem
+  // renderel újra húzás közben, tehát az olvasás nem kerül forró útra. Ha a
+  // tárolt arány nem saját (`is-own-layout-sizes.ts`), az elválasztó egy függő
+  // jóváhagyás kedvéért ideiglenesen elmozdulhat (user döntés 2026-09-25, "a
+  // rajz húzódjon össze", SPEC-008 8. szekció 1. pont).
+  const layoutSizes = readStoredRunViewLayoutSizes();
+  const approvalLayoutSizes = readStoredRunViewApprovalLayoutSizes();
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,
@@ -451,8 +475,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           // gombjaival (user döntés 2026-09-25, `RunViewTranscriptSide.tsx`).
           // A `key` a futás azonosítója: egy másik futásra navigálva a
           // transcript panel (és a görgetés állapota) tiszta lappal indul. A
-          // két tárolt arány ugyanazon az okon olvasódik minden renderen,
-          // lásd a `defaultSizes` kommentjét.
+          // látott jóváhagyás szövegét a transcript oldal felfedi (a
+          // `Resizable` `reveal`), a kulcs a jóváhagyás azonosítója, tehát
+          // lapozáskor a számítás az új szövegre fut újra.
           transcript={
             <RunViewTranscriptSide
               transcriptPanel={
@@ -499,22 +524,17 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                   }
                 />
               }
-              isApprovalShown={shownApproval !== undefined}
-              defaultSizes={readStoredRunViewApprovalLayoutSizes()}
+              approvalReveal={
+                shownApproval === undefined ? undefined : { elementId: approvalTextId, key: shownApproval.approval.id }
+              }
+              adjustsForReveal={!isOwnLayoutSizes(approvalLayoutSizes, DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES)}
+              defaultSizes={approvalLayoutSizes}
               onSizesChange={storeRunViewApprovalLayoutSizes}
             />
           }
-          // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
-          // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és
-          // visszaváltáskor a `defaultSizes` propból épül újra a kezdő
-          // állapota. Egy csatoláskor beolvasott, `useState`-ben tartott érték
-          // ilyenkor a kézzel húzott arányt eldobná (a T-009-22 független
-          // ellenőrzésének él esete). A `localStorage` olvasás a
-          // `readStoredRunViewLayoutSizes` saját `try`/`catch` ágán megy, és a
-          // képernyő nem renderel újra húzás közben, tehát az olvasás nem
-          // kerül forró útra.
-          defaultSizes={readStoredRunViewLayoutSizes()}
+          defaultSizes={layoutSizes}
           onSizesChange={storeRunViewLayoutSizes}
+          adjustsForReveal={!isOwnLayoutSizes(layoutSizes, DEFAULT_RUN_VIEW_LAYOUT_SIZES)}
         />
       </div>
       {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}

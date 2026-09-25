@@ -1,11 +1,12 @@
 import type { RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { Button } from '@easter-workflow-builder/ui';
-import type { ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
 import { RunEventRow } from '../run-event-row/RunEventRow.tsx';
 import { isRunInterruptible } from '../run-control/run-control-availability.ts';
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
+import { isCompactTranscriptList } from './is-compact-transcript-list.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import type { TranscriptRow as TranscriptRowData } from './transcript-row.ts';
@@ -115,6 +116,15 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * sorrendben a lista előtt áll, így a Tab sorrend és a képernyőolvasó a sorok
  * előtt éri el.
  *
+ * **Szűk listán a gomb nem lebeg, hanem a lista mellett áll** (user döntés
+ * 2026-09-25, SPEC-008 7.4, a 14.1 O-15 lezárása): ha a lista látható
+ * magassága kisebb, mint a felső belső margó plusz egy sor
+ * (`is-compact-transcript-list.ts`, a lista `onResize` méretéből), a gomb a
+ * lista bal oldalán, a lista tetejéhez igazítva áll, a folyásban, tehát egyetlen
+ * sort sem takar, és a lista magassága sem változik, csak a szélessége. A
+ * gomb ugyanaz a design system `Button`, ugyanazzal a szöveggel, és a DOM-ban
+ * ugyanúgy a lista előtt áll.
+ *
  * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
  * egyetlen sor sincs, a lista helyén csontváz. A lezárult pótlás utáni üres
@@ -140,6 +150,17 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
   const isRunInProgress = isRunInterruptible(runStatus);
   const rowHeight = useDynamicRowHeight({ defaultRowHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT });
   const { setList, onRowsRendered, onResize, unseenCount, jumpToBottom } = useTranscriptAutoScroll(rowCount, rowHeight);
+  // A lista szűk-e a lebegő gombhoz. A gomb szűk listán a lista mellett, a
+  // folyásban áll: a lista magassága tőle nem változik, tehát a feltétel sem
+  // billeg a két alak között.
+  const [isCompact, setIsCompact] = useState(false);
+  const handleResize = useCallback(
+    (listContentSize: Readonly<{ height: number }>) => {
+      setIsCompact(isCompactTranscriptList(listContentSize));
+      onResize();
+    },
+    [onResize],
+  );
 
   return (
     <div className="transcript-panel">
@@ -167,7 +188,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
               <p className="transcript-panel__empty">A futásnak nincs eseménye.</p>
             ))}
           <div
-            className="transcript-panel__list-frame"
+            className={`transcript-panel__list-frame${isCompact ? ' transcript-panel__list-frame--compact' : ''}`}
             // A lista legalább egy összecsukott sornyi magas marad (2026-09-25):
             // a húzható elválasztó `End` állásában a transcript panel a design
             // system 60 pixeles minimumán áll, és a lista enélkül nulla magasra
@@ -194,7 +215,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
               // `round()` CSS függvény: MDN "CSS round()".
               style={{ maxHeight: 'round(down, 100%, 1px)' }}
               listRef={setList}
-              onResize={onResize}
+              onResize={handleResize}
               onRowsRendered={onRowsRendered}
               rowComponent={TranscriptRow}
               rowCount={rowCount}
