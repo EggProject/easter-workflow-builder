@@ -29,8 +29,10 @@ import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stre
 import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
 import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
 import { RunViewLayout } from './RunViewLayout.tsx';
+import { RunViewTranscriptSide } from './RunViewTranscriptSide.tsx';
 import { blockingFailureMessage } from './blocking-failure-message.ts';
 import { isRunClosingFrame } from './is-run-closing-frame.ts';
+import { readStoredRunViewApprovalLayoutSizes, storeRunViewApprovalLayoutSizes } from './run-view-approval-layout.ts';
 import { readStoredRunViewLayoutSizes, storeRunViewLayoutSizes } from './run-view-layout.ts';
 import { useLiveStepRuns } from './use-live-step-runs.ts';
 import { useRunViewLayoutBand } from './use-run-view-layout-band.ts';
@@ -202,7 +204,9 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  *
  * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
  * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
- * a transcript sávban, a transcript fölött a döntési panel. Egyik sem a
+ * a transcript sávban, a transcript fölött a döntési panel, a kettő között
+ * húzható elválasztóval (user döntés 2026-09-25, `RunViewTranscriptSide`, az
+ * arány a `run-view-approval-layout.ts` kulcsán perzisztálódik). Egyik sem a
  * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
  * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
  * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`, a
@@ -430,30 +434,39 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
           // A jóváhagyás panel a transcript sávban, a transcript FÖLÖTT áll
-          // (PLAN-009 5. szekció F6: "a transcript mellé"); a kettő a sávot
-          // a `run-view.css` szabálya szerint osztja meg. A `key` a futás
-          // azonosítója: egy másik futásra navigálva a transcript panel (és a
-          // görgetés állapota) tiszta lappal indul.
+          // (PLAN-009 5. szekció F6: "a transcript mellé"), látott jóváhagyás
+          // mellett közöttük húzható elválasztóval (user döntés 2026-09-25,
+          // `RunViewTranscriptSide.tsx`). A `key` a futás azonosítója: egy
+          // másik futásra navigálva a transcript panel (és a görgetés
+          // állapota) tiszta lappal indul. A két tárolt arány ugyanazon az
+          // okon olvasódik minden renderen, lásd a `defaultSizes` kommentjét.
           transcript={
-            <>
-              <ApprovalPromptPanel
-                isFirstLoadPending={
-                  pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
-                }
-                failureMessage={pendingApprovals.failureMessage}
-                approvalCount={approvalDecisions.displayed.length}
-                shown={approvalSelection.shown}
-                onSelectPage={approvalSelection.selectPage}
-                onDecide={approvalDecisions.decide}
-              />
-              <TranscriptPanel
-                key={runId}
-                transcript={transcript}
-                stepRuns={stepRuns}
-                runStatus={runDetail.status}
-                persistedStreamDeltas={runDetail.persistedStreamDeltas}
-              />
-            </>
+            <RunViewTranscriptSide
+              approvalPanel={
+                <ApprovalPromptPanel
+                  isFirstLoadPending={
+                    pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
+                  }
+                  failureMessage={pendingApprovals.failureMessage}
+                  approvalCount={approvalDecisions.displayed.length}
+                  shown={approvalSelection.shown}
+                  onSelectPage={approvalSelection.selectPage}
+                  onDecide={approvalDecisions.decide}
+                />
+              }
+              isApprovalShown={approvalSelection.shown !== undefined}
+              transcriptPanel={
+                <TranscriptPanel
+                  key={runId}
+                  transcript={transcript}
+                  stepRuns={stepRuns}
+                  runStatus={runDetail.status}
+                  persistedStreamDeltas={runDetail.persistedStreamDeltas}
+                />
+              }
+              defaultSizes={readStoredRunViewApprovalLayoutSizes()}
+              onSizesChange={storeRunViewApprovalLayoutSizes}
+            />
           }
           // A tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
           // csatoláskor: a `Resizable` a fül sávba váltáskor LESZEREL, és

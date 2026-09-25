@@ -1473,3 +1473,40 @@ pontos arányok 99,0909 / 98,5430 / 99,4595 / 99,0566). **Az igazolás:** a beá
 `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
 küszöbbel (99.10 / 98.55 / 99.46 / 99.06) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
 exit 1).
+
+## 37. A jóváhagyás panel húzható elválasztója utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntései: húzható elválasztó a jóváhagyás panel és a
+transcript között, egységes drawer felület, egy bal igazítási vonal
+(`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). Új a `RunViewTranscriptSide.tsx`
+és a `run-view-approval-layout.ts`. Az e2e készlet 319 tesztre bővült: az elválasztó három méreten
+két témában (6), a felület és a bal szél három méreten két témában (6, új fájl:
+`approval-surface.spec.ts`), az érintéses húzás (1), a hibás alakú és a dobó tárolás (2), és a
+lapozás nélkül látott jóváhagyás rögzítése élő frissítéskor (1, `sse-real-server.spec.ts`).
+
+**Egy közbenső mérés, új fedetlen tétellel.** Az első teljes futás után a `run-view-approval-layout.ts`
+olvasó függvényének `catch` ága és a rossz alakú érték ága fedetlen volt (a küszöb alatt, exit 1).
+A ratchet szabálya szerint (szabálykönyv 8. szekció: a fedetlen darabszám nőtt) a küszöb nem
+csökkenthető, ezért a `run-view.spec.ts` azonos mintájú tesztjeinek párja fedi: hibás alakú tárolt
+arányra az elválasztó felén áll és a helyes alak íródik vissza, letiltott tárolásra a felület nem tör
+el (`approval-prompt.spec.ts`).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**319 teszt, mind zöld**; a sandboxban három `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (36. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1647 / 1662     | **99.09** | 99.09                      | 15 -> **15**                   |
+| branches   | 753 / 764       | **98.56** | 98.54                      | 11 -> **11**                   |
+| functions  | 555 / 558       | **99.46** | 99.45                      | 3 -> **3**                     |
+| lines      | 1587 / 1602     | **99.06** | 99.05                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `run-view` és az `approval-prompt` téma minden fájlja mind a négy
+metrikán 100 százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a
+mért értékre húzva, felfelé kerekítés nélkül: 99.09 / **98.56** / **99.46** / **99.06**
+(`apps/web/package.json`; a pontos arányok 99,0975 / 98,5602 / 99,4624 / 99,0637). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.10 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).

@@ -289,3 +289,116 @@ nullával 7 elemet, a helyjelző mindhárom oldalon egy sorban marad. A szállí
 
 A munkamenet `outputs/jovahagyas-egyszerre-egy/` mappájában: 1, 4 és 10 jóváhagyás, a három méret,
 lapozás után, siker és conflict után, mindkét témában, a mért számokkal (`meresek-*.jsonl`).
+
+## 9. Húzható elválasztó, egységes felület, egy igazítási vonal (2026-09-25)
+
+Kiváltó ok: a user három döntése (2026-09-25) és egy független ellenőrzés a `da9fa70` commiton.
+(1) Húzható elválasztó a jóváhagyás panel és a transcript között, a design system `Resizable`
+elemével, kezdetben felén, perzisztált aránnyal; a 8. szekció egyenlő `flex-grow` felezését egy
+agent választotta, nem a user. (2) A jóváhagyás szakasz a forrás drawer felületét kapja
+(`--ep-bg-elevated`, a törzs és a lábléc együtt), és a lapozó is a 24 pixeles szélhez igazodik.
+(3) Döntés után a panel a helyén marad (a mai viselkedés, most user döntésként). Az ellenőrzés két
+hiányt is talált: a lapozás nélkül látott jóváhagyás azonnali rögzítését e2e nem őrizte, és a
+SPEC-008 8. szekció 4. pontjának "minden méreten látszik" állítása csak az `Alert` címére igaz.
+
+### 9.1 Módszer
+
+- **A mérő eszköz a repóban**, bővítve: `apps/web/measurement/approval-panel.ts`, futtatás
+  `cd apps/web && flock /tmp/playwright-gep.lock bun run measure:approval`. Képet nem ír. Az 1-3.
+  jelenet (elrendezés, döntés, lapozó) változatlan, új mezőkkel: az `Alert` blokk egészének látható
+  aránya, a lapozó (első gyereke), az `Alert` és a cím bal széle, a szakasz oldalsó belső térköze
+  látható alakjában, az elválasztó értéke. Három új jelenet: **4. felület** (a törzs és az akciósáv
+  KIFESTETT képpontja a belső térközükből, a lemezre nem írt, memóriában dekódolt képernyőképen);
+  **5. küszöb** (az elválasztó `Home` állásától, 5, `ArrowDown` lépésenként 95-ig, minden állásban a
+  két gomb görgetés nélküli látható aránya); **6. érintés** (375x812, a Chrome DevTools Protocol
+  `Input.dispatchTouchEvent` hívásával 100 pixeles lefelé húzás, és a lapon naplózott pointer
+  események).
+- **Előtte**: a `741f63e` fán (a jóváhagyás és a futás nézet kódja azonos a `da9fa70` állapottal,
+  `git diff --stat da9fa70 741f63e -- apps/web/src packages/ui/src` csak a transcript panel öt
+  fájlját mutatja). **Utána**: a munkafa. Mindkét témában a számok azonosak (a két téma sorai
+  gépi összevetéssel egyeznek, a kifestett színek kivételével).
+
+### 9.2 Előtte és utána, egy jóváhagyással, kezdő arányon
+
+| Viewport | Görgethető törzs (px), előtte -> utána | `Alert` blokk látható aránya | Bal szél: lapozó / `Alert` / cím (px), előtte -> utána | Törzs és akciósáv képpontja, világos (előtte -> utána)  | Ugyanez sötét                                  |
+| -------- | -------------------------------------- | ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------- |
+| 1440x900 | 233 -> **241**                         | 1 -> 1                       | 1029 / 1053 / 1053 -> **1037 / 1037 / 1037**           | 246,243,235 és 255,255,255 -> **255,255,255 mindkettő** | 11,13,18 és 27,30,36 -> **27,30,36 mindkettő** |
+| 1440x600 | 83 -> **91**                           | 0,7 -> **0,79**              | 1029 / 1053 / 1053 -> **1037 / 1037 / 1037**           | ugyanaz                                                 | ugyanaz                                        |
+| 375x812  | 150 -> **158**                         | 1 -> 1                       | 16 / 40 / 40 -> **24 / 24 / 24**                       | ugyanaz                                                 | ugyanaz                                        |
+
+- A "visszavonhatatlan" **cím** mindhárom méreten 1 arányban látszik, előtte és utána is; a blokk
+  egésze 1440x600-on nem (SPEC-008 8. szekció 4. pont ennek megfelelően pontosítva).
+- A vászon magassága (700, 400, 533 pixel) és az `.app-content` túllógása (0, 0) változatlan 0, 1,
+  4 és 10 jóváhagyással, mindkét témában. A gombok kezdő arányon 1, 4 és 10 jóváhagyásnál
+  mindenhol 1 arányban látszanak, és az akciósáv szélesebb lett (a transcript sáv 16 pixeles külső
+  térköze nélkül), ezért a döntés után az eredmény ritkábban tör több sorba: az akciósáv 1440
+  pixelen siker után 75 -> 61, `conflict` után 117 -> 96 pixel; 375 pixelen 75 és 138, változatlan.
+- **Oldalsó belső térköz** (utána): bal 24, jobb **19** pixel a vízszintes sávban (1440), 24 és 24 a
+  fül sávban (375). A jobb oldali 5 pixel hiány a design system `Resizable` geometriája: a panelek
+  inline `flex-basis` százaléka 100-at ad ki, az 5 pixeles elválasztó (`flex: 0 0 5px`) ezen felül
+  áll, a panelek `flex-shrink: 0`, tehát a csoport 5 pixellel túllóg, és az `overflow: hidden` a
+  transcript oldal jobb szélét levágja. Az elválasztó előtt ugyanez a transcript sáv 16 pixeles
+  külső térközébe esett (SPEC-008 14.2 O-10).
+
+### 9.3 A gombok az elválasztó teljes tartományán
+
+A két gomb görgetés nélkül, teljesen látszik (mindkét témában azonos):
+
+| Viewport | Legkisebb érték, ahonnan fölfelé mindig | A törzs a küszöbön és 50-en (px) |
+| -------- | --------------------------------------- | -------------------------------- |
+| 1440x900 | 20                                      | 36 (a belső térköze), 241        |
+| 1440x600 | 35                                      | 36, 91                           |
+| 375x812  | 25                                      | 36, 158                          |
+
+A küszöb alatt a panel kisebb a lapozó és az akciósáv együttes magasságánál, és a design system
+`.resizable-panel { overflow: auto }` szabálya görgeti. A `Resizable` (a forrás `Resizable.jsx`
+`resizeAt` függvénye és a port `resize-at.ts` fájlja) kizárólag százalékos, `[5, 95]` tartományú
+korlátot ismer, pixeles vagy tartalom szerinti minimumot nem, tehát a user kérése ("a panel
+minimális magasságát a gombok sávja szabja meg, ha a `Resizable` ezt engedi") a design system
+eleme módosítása nélkül nem teljesíthető (SPEC-008 14.2 O-12).
+
+### 9.4 Érintés a fül sávban
+
+375x812, 100 pixeles lefelé húzás CDP érintés eseményekkel, mindkét témában azonos:
+
+| Állapot                                             | Arány előtte -> utána | Pointer események a húzás alatt               |
+| --------------------------------------------------- | --------------------- | --------------------------------------------- |
+| a design system elválasztója (`touch-action: auto`) | 50 -> 54              | `pointerdown`, `pointermove`, `pointercancel` |
+| `touch-action: none` (`run-view.css`)               | 50 -> 69              | `pointerdown`, `pointermove`, `pointerup`     |
+
+A böngésző az érintéses mozdulatot alapból pásztázásnak veszi, és a pointer folyamot
+`pointercancel` zárja; a `touch-action` a dokumentált eszköz ennek kizárására
+(<https://www.w3.org/TR/pointerevents/>, <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action>,
+<https://developer.mozilla.org/en-US/docs/Web/API/Element/pointercancel_event>). A `touch-action:
+none` a belső elválasztón áll; a gráf és a transcript közti külső elválasztó ugyanebben a hiányban
+él (SPEC-008 14.2 O-11).
+
+### 9.5 Regressziók és szándékos rontások
+
+- `apps/web/e2e/approval-prompt.spec.ts`: az elválasztó három méreten, két témában (valódi egér
+  húzás, `ArrowUp`, `aria-valuenow`, újratöltés, a vászon és a túllógás változatlan, `Home`
+  állásban egérgörgővel elérhető gomb); érintéses húzás; hibás alakú és dobó tárolás.
+  `apps/web/e2e/approval-surface.spec.ts` (három méret, két téma): a két szakasz kifestett
+  képpontja a `--ep-bg-elevated` szondáéval egyezik, a három bal szél azonos. Külön fájlban, mert
+  képernyőképet készít, és a `screenshot-pipeline` invariánsa szerint ilyen fájl `path` kulcsot nem
+  tarthat, az `approval-prompt.spec.ts` viszont a döntés kérések útvonalát `path` mezőben rögzíti.
+  `apps/web/e2e/sse-real-server.spec.ts`: a lapozás nélkül látott jóváhagyás élő frissítéskor is a
+  helyén marad. Unit: `RunViewTranscriptSide.spec.tsx` (a transcript nem szerel le),
+  `run-view-approval-layout.spec.ts`, `RunViewScreen.spec.tsx`.
+- **Rontások, mind bukik:** a lapozás nélküli rögzítés elhagyása (`use-approval-selection.ts`, az új
+  `node:http` e2e bukik, a két régi élő frissítés teszt zöld marad, ez volt az ellenőrzés
+  kimutatott rése); a szakasz hátterének elhagyása (a képpont teszt); a lapozó belső térközének
+  elhagyása (a bal szél teszt); az arány mentésének elhagyása (az újratöltés); a külső gráf panel
+  `overflow: hidden` szabályának kiterjesztése a belső panelre (a görgő teszt); a `touch-action`
+  elhagyása (az érintés teszt); a transcript leszerelése jóváhagyás nélkül (két unit teszt).
+- Két meglévő e2e állítás a mérés szerint módosult: a lapozó láthatóságát a tartalma méri, nem a
+  `<nav>` doboza (a 24 pixeles belső térköz a jobb szélen a 9.2 szerinti 5 pixeles levágásba esik),
+  és a törzsben görgetett rész olvashatóságának tűrése egy képpont lett a 0,99-es szorzó helyett (a
+  panel magassága a sáv százaléka, a törzs teteje tört képponton áll, a görgetési pozíció egész:
+  375x812-n mérve 0,27 pixel kilógás egy 24 pixeles sorból).
+
+### 9.6 Képek
+
+A munkamenet `outputs/jovahagyas-elvalaszto/` mappájában: kezdő arány és áthúzott arány, 1440x900,
+1440x600 és 375x812, mindkét témában, a mért számokkal (`meresek-elotte-741f63e.jsonl`,
+`meresek-utana.jsonl`).

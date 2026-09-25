@@ -661,6 +661,51 @@ test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte ál
   expect(await readNoReloadMarker(page)).toBe(true);
 });
 
+/**
+ * A lapozás NÉLKÜL, alapból látott jóváhagyás is azonnal rögzül
+ * (`use-approval-selection.ts`): a user nem választott, mégis egy később
+ * listázott, de KORÁBBI időpontú jóváhagyás nem veheti át a helyét a keze
+ * alatt. A fenti teszt a lapozással választott jóváhagyást őrzi; ez a
+ * rögzítés nélküli ág (a `setSelectedApprovalId` feltételes hívása
+ * nélkül) kizárólag a legrégebbit mutatná, tehát a látott jóváhagyás itt
+ * kicserélődne (független ellenőrzés 2026-09-25: e2e nem őrizte).
+ */
+test('élő frissítéskor a lapozás nélkül látott jóváhagyás is rögzül: egy elé érkező, korábbi időpontú jóváhagyás nem veszi át a helyét', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const second = selectionApproval('B', 20);
+  const third = selectionApproval('C', 30);
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [second, third] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+  const region = page.getByRole('region', { name: 'Függő jóváhagyások' });
+  // A user nem lapoz: alapból a legrégebbi látszik.
+  await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
+  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await setNoReloadMarker(page);
+
+  const earlier = selectionApproval('Z', 5);
+  approvalsHolder.current = [earlier, second, third];
+  streamServer.push(stepEventFrame(1, 'approval_requested', 'live'));
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await expect(region.getByText('"branch": "Z"')).toHaveCount(0);
+
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
 // ============================================================
 // A FUTÁS LEZÁRÁSA SZABÁLYOS LEÁLLÁSKOR ÉS A SZERVER ÚJRAINDULÁS (SPEC-004
 // 10.1, 10.2, SPEC-005 5.2, SPEC-007 AC44).

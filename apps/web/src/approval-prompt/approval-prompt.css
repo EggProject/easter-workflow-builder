@@ -1,9 +1,11 @@
 /* A jóváhagyás panel (SPEC-008 8. szekció, T-009-27). NINCS KÁRTYA: se
-   szegély, se lekerekítés, se saját háttér, mert a panel a futás nézet
-   transcript sávjában áll, és a card in card tilos (`.claude/CLAUDE.md` 11.
-   szekció). A térközök kizárólag a design system `--ep-space-*` tokenjeiből
-   jönnek. A panel külső mérete (a transcripttel megosztott sáv) a helyétől
-   függ, ezért az a `run-view.css` fájlban áll; itt a belső elrendezés. */
+   szegély, se lekerekítés, mert a panel a futás nézet transcript sávjában
+   áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció). Az
+   egyetlen saját háttér a látott jóváhagyás szakaszáé, a design system
+   `drawer` felülete (lent). A térközök kizárólag a design system
+   `--ep-space-*` tokenjeiből jönnek. A panel külső mérete (a transcripttel
+   megosztott sáv) a helyétől függ, ezért az a `run-view.css` fájlban áll;
+   itt a belső elrendezés. */
 .approval-prompt-panel {
   display: flex;
   flex-direction: column;
@@ -21,12 +23,34 @@
    panelnél kisebbre menjen össze
    (<https://www.w3.org/TR/css-flexbox-1/#min-size-auto>): így a hely
    hiányát a görgethető törzs fizeti meg (a görgető tároló automatikus
-   minimum magassága nulla), a lapozó és az akciósáv nem. */
+   minimum magassága nulla), a lapozó és az akciósáv nem.
+
+   EGYSÉGES FELÜLET (user döntés 2026-09-25, SPEC-008 8. szekció 1. pont). A
+   forrásban a `.drawer` panel adja a `--ep-bg-elevated` hátteret, a törzs
+   ezért ugyanazon a felületen áll, mint a saját `--ep-bg-elevated` hátterű
+   akciósáv (`drawer.css`: `.drawer { background: var(--ep-bg-elevated) }`,
+   `.drawer__footer { background: var(--ep-bg-elevated) }`). A `.drawer`
+   szerepét itt ez a szakasz tölti be, tehát a háttér is az övé: a törzs és
+   az akciósáv egy felület, nem fehér doboz a bézs panelen. */
 .approval-prompt-panel__approval {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  background: var(--ep-bg-elevated);
+}
+
+/* EGY BAL IGAZÍTÁSI VONAL (user döntés 2026-09-25). A lapozó a forrás
+   `drawer` 24 pixeles vízszintes belső térközéhez igazodik
+   (`drawer.css`: `.drawer__body { padding: 18px 24px }`,
+   `.drawer__footer { padding: 16px 24px }`), a design system egyező
+   `--ep-space-6` (24px) tokenjével, tehát a lapozó, a "visszavonhatatlan"
+   `Alert` és a cím bal széle egy vonalban áll. A felső térköz az akciósáv
+   függőleges 16 pixelének párja (`--ep-space-4`): a lapozó a felület felső
+   sávja, ahogy az akciósáv az alsó. Mindkét egyezést az
+   `approval-prompt.spec.ts` e2e mérése őrzi. */
+.approval-prompt-panel__approval > .pagination {
+  padding: var(--ep-space-4) var(--ep-space-6) 0;
 }
 
 /* A `.drawer__footer` igazítása a keresztirányban: a forrás CSS nem ad
