@@ -252,17 +252,23 @@ export const APPROVAL_TRANSCRIPT_ROW_COUNT = 20;
 /**
  * A futás a megadott jóváhagyásokkal és egy lezárt pótlással
  * (`APPROVAL_TRANSCRIPT_ROW_COUNT` tárolt sor), hogy a transcript utolsó sora
- * mérhető legyen (research 10. szekció).
+ * mérhető legyen (research 10. szekció). Az `extraRoutes` további REST
+ * mockokat ad (például a döntés válaszát), mert egy második
+ * `installApiMocks` a többi útvonalat is elfogná.
  */
-export async function mockApprovalRunWithTranscript(page: Page, approvals: readonly PendingApproval[]): Promise<void> {
+export async function mockApprovalRunWithTranscript(
+  page: Page,
+  approvals: readonly PendingApproval[],
+  extraRoutes: readonly MockRoute[] = [],
+): Promise<void> {
   const records = Array.from({ length: APPROVAL_TRANSCRIPT_ROW_COUNT }, (_, index) =>
     makeRunEventRecord(index + 1, APPROVAL_RUN_DETAIL.id),
   );
   await mockSseFrames(page, replayFrames(APPROVAL_RUN_DETAIL.id, records));
-  await installApiMocks(
-    page,
-    approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),
-  );
+  await installApiMocks(page, [
+    ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),
+    ...extraRoutes,
+  ]);
 }
 
 /* eslint-enable unicorn/no-null */

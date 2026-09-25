@@ -8,6 +8,7 @@ const BASE = {
   availablePixels: 800,
   minSizePercents: [7.5, 7.5],
   canGrow: true,
+  requiresFullGrowth: false,
 } as const;
 
 describe('planContainerGrowth', () => {
@@ -35,6 +36,35 @@ describe('planContainerGrowth', () => {
     expect(planContainerGrowth({ ...BASE, panelIndex: 2, deltaPixels: 100 })).toEqual({
       sizes: BASE.baseSizes,
       growthPixels: -300,
+    });
+  });
+
+  it('mozdíthatatlan kérőnek (egésszel vagy semmivel) a teljesíthető kérés teljes egészében megy', () => {
+    expect(planContainerGrowth({ ...BASE, deltaPixels: 100, requiresFullGrowth: true })).toEqual({
+      sizes: [50, 50],
+      growthPixels: 100,
+    });
+  });
+
+  it('mozdíthatatlan kérőnek a szomszéd minimumáig sem teljesíthető kérésre az alapállás marad, részleges hely nincs', () => {
+    expect(planContainerGrowth({ ...BASE, deltaPixels: 1000, requiresFullGrowth: true })).toEqual({
+      sizes: BASE.baseSizes,
+      growthPixels: 0,
+    });
+    // Egy korábbi, teljesíthető kérés után (a panel 400 pixelen áll) egy
+    // teljesíthetetlen kérés visszaviszi az alapállásba.
+    expect(planContainerGrowth({ ...BASE, currentPixels: 400, deltaPixels: 1000, requiresFullGrowth: true })).toEqual({
+      sizes: BASE.baseSizes,
+      growthPixels: -100,
+    });
+  });
+
+  it('mozdíthatatlan kérőnek a pontosan a határig érő kérés még teljesíthető', () => {
+    // A szomszéd minimuma 7,5 százalék: a panel legfeljebb 92,5 százalék, azaz
+    // 740 pixel, 440 pixellel több a mainál.
+    expect(planContainerGrowth({ ...BASE, deltaPixels: 440, requiresFullGrowth: true })).toEqual({
+      sizes: [7.5, 92.5],
+      growthPixels: 440,
     });
   });
 });

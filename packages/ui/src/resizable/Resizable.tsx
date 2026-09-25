@@ -20,18 +20,26 @@ import { ResizableContext, type ResizableContextValue } from './resizable-contex
 import { resizeAt } from './resize-at.ts';
 
 /**
- * A felfedendő elem (`Resizable` `reveal`, 2026-09-25).
+ * A felfedendő elem leírása (`Resizable` `reveal`, 2026-09-25).
+ *
+ * **Minden új leírás (új objektum) újraszámolást vált ki** (2026-09-26): a
+ * hatás függősége maga az objektum, és a React a függőségeket `Object.is`
+ * szerint hasonlítja
+ * (<https://react.dev/reference/react/useLayoutEffect>). A hívó így jelzi,
+ * hogy az elem vagy a csoport környezete változhatott: aki minden
+ * renderelésekor új leírást ad (a futás nézet), annak a felfedése a
+ * renderelést kiváltó minden React állapotváltozást követ (egy döntés
+ * hibaüzenete a gombsorban, egy másik jóváhagyás, egy új sor a csoport
+ * fölött), `ResizeObserver` nélkül. Ha a hívó memoizálja, csak a leírás
+ * cseréjekor számol újra. A csoport saját és a befoglaló csoport
+ * újrarenderelése a leírást nem cseréli, tehát a felfedés a saját
+ * igazítására nem fut újra.
  */
 export interface ResizableReveal {
   /**
    * Az elem `id` értéke; a csoport egyik paneljében áll.
    */
   readonly elementId: string;
-  /**
-   * A felfedés kulcsa: ha változik (például egy másik jóváhagyás látszik), a
-   * számítás újra fut.
-   */
-  readonly key: string;
 }
 
 export interface ResizableProperties {
@@ -67,11 +75,14 @@ export interface ResizableProperties {
    * pont): a megadott elem teljes egészében látsszon. Előbb a befoglaló
    * `Resizable` ad helyet (ha ugyanazon a tengelyen áll és mozdulhat), a
    * csoport saját arányát megtartva, és csak a maradékot fizeti a saját
-   * elválasztó, ha az `adjustsForReveal` igaz (`plan-reveal.ts`). A számítás
-   * a felfedés kezdetekor, a kulcs változásakor, egy panel csatolásakor, az
-   * ablak átméretezésekor és a befoglaló csoport tengelyváltásakor fut; a
-   * felfedés végén (a prop `undefined`) a korábbi méretek visszaállnak, ha a
-   * felhasználó közben nem húzta az elválasztót.
+   * elválasztó, ha az `adjustsForReveal` igaz (`plan-reveal.ts`); ha nem, a
+   * befoglaló csoport csak akkor ad helyet, ha azzal az elem teljesen látszik
+   * (`plan-container-growth.ts`, 2026-09-26). A számítás a felfedés
+   * kezdetekor, minden új leírásra (`ResizableReveal`), egy panel
+   * csatolásakor, az ablak átméretezésekor, a befoglaló csoport
+   * tengelyváltásakor és a befoglaló csoport minden felhasználói
+   * méretváltoztatásakor fut; a felfedés végén (a prop `undefined`) a korábbi
+   * méretek visszaállnak, ha a felhasználó közben nem húzta az elválasztót.
    */
   readonly reveal?: ResizableReveal | undefined;
   /**
@@ -144,6 +155,14 @@ function isSameSizes(first: readonly number[], second: readonly number[]): boole
  * szemben a `Home`/`End`/`F6` hármassal; a döntés a T-009-11 kifejezett
  * kérése).
  *
+ * **Ideiglenes felfedés, eltérés a forrástól (2026-09-25, SPEC-008 8.
+ * szekció 1. pont):** a `reveal` és az `adjustsForReveal` prop, a befoglaló
+ * és a beágyazott csoport közti kérés (`resizeForReveal`) és a felhasználói
+ * méretváltoztatások számlálója a kontextusban nincs meg a design system
+ * `Resizable.jsx` forrásában; a futás nézet "a rajz húzódjon össze" döntése
+ * (user döntés 2026-09-25) miatt a port egészíti ki, a forrás API-ja (a
+ * `defaultSizes`, a panelek és az elválasztók összetétele) változatlan.
+ *
  * **Három további eltérés a forrástól (2026-09-25, SPEC-008 14.2 O-10 ...
  * O-12, `docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció):**
  *
@@ -198,6 +217,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // a felfedés innen kér helyet.
   const {
     direction: containerDirection,
+    userResizeCount: containerUserResizeCount,
     resizeForReveal: resizeContainerForReveal,
     endReveal: endContainerReveal,
   } = useContext(ResizableContext);
@@ -368,17 +388,27 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // kérőt tartó panel az alapállásából a kért méretre nő, vagy ha a csoport
   // nem mozdulhat, az alapállás áll vissza (`plan-container-growth.ts`). A
   // mai méret a kirajzolt, mért méret, mert egy korábbi kérés már
-  // növelhette.
+  // növelhette. Ha a csoport nem mozdulhat, és nincs korábbi kérés, amit
+  // vissza kellene vonni, a méret érintetlen marad: a kérést éppen ennek a
+  // csoportnak a felhasználói mozdítása is kiválthatja (`userResizeCount`),
+  // és egy ilyenkor írt "alapállás" a felhasználó méretével versenyezne. Az
+  // azonos értékű terv nem ír új állapotot, hogy az ismételt kérés (a hívó
+  // minden renderelése, `ResizableReveal`) ne rendereljen újra.
   const resizeForReveal = useCallback(
-    (requester: Element, deltaPixels: number, requesterDirection: 'horizontal' | 'vertical'): number => {
+    (
+      requester: Element,
+      deltaPixels: number,
+      requesterDirection: 'horizontal' | 'vertical',
+      requiresFullGrowth: boolean,
+    ): number => {
       const layout = measureRevealLayout();
       const panelIndex = layout?.panels.findIndex((panel) => panel.contains(requester)) ?? -1;
       const currentPixels = layout?.panelSizePixels[panelIndex];
-      if (layout === undefined || currentPixels === undefined) {
-        return 0;
-      }
       const canGrow =
         adjustsForRevealReference.current && !userResizedReference.current && requesterDirection === direction;
+      if (layout === undefined || currentPixels === undefined || (!canGrow && revealBase.current === undefined)) {
+        return 0;
+      }
       const baseSizes = revealBase.current ?? sizesReference.current;
       const growth = planContainerGrowth({
         baseSizes,
@@ -388,9 +418,10 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
         availablePixels: layout.availablePixels,
         minSizePercents: layout.minSizePercents,
         canGrow,
+        requiresFullGrowth,
       });
       revealBase.current = canGrow ? baseSizes : undefined;
-      setSizes(growth.sizes);
+      setSizes((previous) => (isSameSizes(previous, growth.sizes) ? previous : growth.sizes));
       return growth.growthPixels;
     },
     [measureRevealLayout, direction],
@@ -424,14 +455,14 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // arányt megtartva, és csak a maradékot fizeti a saját elválasztó. Az
   // alapállás a felfedés előtti méret; a számítás mindig abból indul, tehát
   // egy rövidebb elem (másik jóváhagyás) vagy egy nagyobb ablak után a
-  // csoport visszafelé is igazodik, de az alapállás alá nem. A kulcs, a
-  // mozdíthatóság, egy panel csatolása, a befoglaló csoport tengelye és az
-  // ablak átméretezése futtatja újra; a felfedés végén az alapállás áll
-  // vissza, a sajátban és a befoglaló csoportban is.
-  const revealElementId = reveal?.elementId;
-  const revealKey = reveal?.key;
+  // csoport visszafelé is igazodik, de az alapállás alá nem. Minden új
+  // leírás (`ResizableReveal`: a hívó minden renderelése), a mozdíthatóság,
+  // egy panel csatolása, a befoglaló csoport tengelye és felhasználói
+  // méretváltoztatása, és az ablak átméretezése futtatja újra; egy változatlan
+  // elrendezésre a terv ugyanaz, és nem ír új állapotot. A felfedés végén az
+  // alapállás áll vissza, a sajátban és a befoglaló csoportban is.
   useLayoutEffect(() => {
-    if (revealElementId === undefined) {
+    if (reveal === undefined) {
       // Csak egy valóban futó felfedés ér véget: egy csak befoglaló csoport
       // (a saját `reveal` nélkül) a beágyazott csoport kérését nem vonhatja
       // vissza, például amikor a kettő egyszerre csatolódik.
@@ -443,8 +474,9 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
       return;
     }
     revealActiveReference.current = true;
+    const { elementId } = reveal;
     const revealNow = (): void => {
-      const element = globalThis.document.querySelector(`#${CSS.escape(revealElementId)}`);
+      const element = globalThis.document.querySelector(`#${CSS.escape(elementId)}`);
       const layout = measureRevealLayout();
       const panelIndex = layout?.panels.findIndex((panel) => element !== null && panel.contains(element)) ?? -1;
       const panel = layout?.panels[panelIndex];
@@ -462,26 +494,27 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
           minSizePercents: layout.minSizePercents,
           canGrow,
         },
-        (deltaPixels) => resizeContainerForReveal(layout.group, deltaPixels, direction),
+        (deltaPixels, requiresFullGrowth) =>
+          resizeContainerForReveal(layout.group, deltaPixels, direction, requiresFullGrowth),
       );
       revealBase.current = canGrow ? base : undefined;
-      setSizes(next);
+      setSizes((previous) => (isSameSizes(previous, next) ? previous : next));
     };
     revealNow();
     globalThis.addEventListener('resize', revealNow);
     return (): void => {
       globalThis.removeEventListener('resize', revealNow);
     };
-    // A `revealKey`, az `adjustsForReveal`, a `panelMountCount` és a
-    // `containerDirection` szándékosan dependency, holott a törzs nem (vagy
-    // csak a hivatkozáson át) olvassa: mindegyik változása ugyanazt a
+    // Az `adjustsForReveal`, a `panelMountCount`, a `containerDirection` és a
+    // `containerUserResizeCount` szándékosan dependency, holott a törzs nem
+    // (vagy csak a hivatkozáson át) olvassa: mindegyik változása ugyanazt a
     // számítást váltja ki.
   }, [
-    revealElementId,
-    revealKey,
+    reveal,
     adjustsForReveal,
     panelMountCount,
     containerDirection,
+    containerUserResizeCount,
     isVertical,
     direction,
     measureRevealLayout,
@@ -543,6 +576,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
     resizeByDelta,
     toggleCollapse,
     refreshGeometry,
+    userResizeCount,
     resizeForReveal,
     endReveal,
   };

@@ -19,14 +19,15 @@ export interface RunViewTranscriptSideProperties {
   readonly approvalPanel: ReactNode;
   /**
    * A látott jóváhagyás szövegének felfedése (`useApprovalSelection`): a
-   * szöveg eleme és a jóváhagyás azonosítója kulcsként; `undefined`, ha nincs
-   * látott jóváhagyás. Csak látott jóváhagyás mellett áll ki az elválasztó és
-   * a törzs.
+   * szöveg elemének azonosítója; `undefined`, ha nincs látott jóváhagyás.
+   * Minden új leírás újraszámolást vált ki (`ResizableReveal`), a hívó ezért
+   * minden renderelésekor újat ad. Csak látott jóváhagyás mellett áll ki az
+   * elválasztó és a törzs.
    */
   readonly approvalReveal: ResizableReveal | undefined;
   /**
-   * Mozdulhat-e az elválasztó a felfedés kedvéért: nincs saját arány
-   * (`is-own-layout-sizes.ts`).
+   * Mozdulhat-e az elválasztó a felfedés kedvéért: nincs saját arány (nincs
+   * tárolt felhasználói arány, `run-view-approval-layout.ts`).
    */
   readonly adjustsForReveal: boolean;
   /**

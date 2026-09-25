@@ -1610,7 +1610,10 @@ minden méreten a lista alján (0 pixel). **A 900x1000-es lista 79 pixel** a 202
 "rajz összehúzódik" döntés miatt (research `2026-09-24-jovahagyas-panel-helye.md` 12. szekció),
 előtte 53. **1440x600-on** ugyanez a döntés a transcript panelt a tartalma minimuma alá szűkíti
 (105 pixel a 143 helyett), tehát a transcript burkolója görget, és az utolsó sor az ablakban 0,34
-arányban látszik (előtte 1); ez a jelzés formájától független, nyitott pont (SPEC-008 14.2 O-16).
+arányban látszik (előtte 1); ez a jelzés formájától független. **Lezárva** (user döntés
+2026-09-26, "a kérdés az első", SPEC-008 14.1 O-16): így marad, a testvér esettel együtt (375x667,
+"Transcript" fül: a transcript panel 93 pixel, 0 látható sor; research
+`2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
 
 **Regresszió** (`apps/web/e2e/sse-real-server.spec.ts`, két témában): szűk listán (900x1000, a
 látott jóváhagyás mellett) a gomb `position: static`, teljesen látszik, egyetlen sort sem takar

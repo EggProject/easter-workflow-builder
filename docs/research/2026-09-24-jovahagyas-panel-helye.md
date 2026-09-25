@@ -807,7 +807,8 @@ arány áll vissza; lapozáskor (másik jóváhagyás, más szöveg) a számít�
 felhasználó közben húzza az elválasztót, a méret az övé: onnan tárolódik, a felfedés vége nem írja
 felül, és az a csoport a leszereléséig nem igazodik.
 
-**A saját arány felismerése** (`is-own-layout-sizes.ts`): saját az a tárolt, érvényes pár, ami
+**A saját arány felismerése** (`is-own-layout-sizes.ts`; 2026-09-26 óta felülírva, a saját arány
+egy új, csak felhasználói írású kulcs megléte, 13. szekció): saját az a tárolt, érvényes pár, ami
 eltér az alapértelmezéstől. Ok: a (a) pont szerint a kulcs megléte nem bizonyít felhasználói
 döntést, az alapértelmezés viszont a korábbi automatikus írás értéke volt. A `Resizable`
 2026-09-25 óta **csak a felhasználó változtatására értesít** (húzás, nyíl, `Home`, `End`, `Enter`),
@@ -908,3 +909,151 @@ A munkamenet `outputs/rajz-osszehuzodik/` mappájában: `elotte-kerdes-*` és `u
 `elotte-ugras-gomb-*`, `utana-ugras-gomb-*` 900x1000 és 1440x900 méreten, mindkét témában. A képek
 egy repón kívüli, eldobott Playwright futásból származnak, ami a repó `approval-fixture.ts` és
 `run-view-stream.ts` fixtúráját importálta (a 10.7 szerinti okból).
+
+## 13. A felfedés javítása: csak belső saját arány, újraszámolás a méretváltozásra, saját arány új kulcson (2026-09-26)
+
+**Kiváltó ok.** Egy független ellenőrzés az `e3e952f` állapoton (valódi Chromium, két témában)
+három hibát mért: (1) csak belső saját aránnyal (`[70, 30]` a jóváhagyás belső kulcsán, a külső
+nincs állítva) a külső elválasztó a rajzot 60 pixelre nyomta, a kérdés mégsem látszott; (2) a
+felfedés nem futott újra a csoport méretváltozására: a döntés hibaüzenete megnövelte az
+akciósávot, és a külső elválasztó húzása újratördelte a szöveget; (3) a "saját arány" az
+alapértelmezéstől való eltérés volt, tehát egy pontosan az alapértelmezésre visszahúzott arány nem
+számított sajátnak. És a user döntése (2026-09-26, "a kérdés az első"): a 12.5 szekció vízszintes
+sávbeli következménye így marad (SPEC-008 14.1 O-16).
+
+### 13.1 Módszer
+
+`bun run measure:approval -g "kerdes|hibauzenet|kulso-huzas"` (a mérő eszköz 12., 14. és 15.
+jelenete, `measurement/approval-panel.ts`, képet nem ír): a 12. jelenet a 12.1 szerint, 375x667-tel
+bővítve és a látható listasorok számával; a 14. jelenet a `conflict` döntés hibaüzenete előtt és
+után (375x812 a "Transcript" fülön, 1440x600, 768x1024, 1000x700, 1440x900); a 15. jelenet a külső
+elválasztó mozdítása előtt és után, valódi egér húzással (a transcript oldal felé 200, a
+függőleges sávban 150 pixel) és billentyűvel (három nyíl lépés), 1440x900, 1440x600, 1024x768 és
+900x1000 méreten. Mind két témában, és a két téma minden mért számban egyezik (kivétel a látható
+listasorok száma két esetben, ami a mérés pillanatától függ). A saját arány jelenetei a régi és az
+új kulcsra is írnak, tehát ugyanaz a jelenet a kulcscsere előtti kódon (a régit olvassa) és utána
+(az újat) is ugyanazt az esetet méri. Előtte az `e3e952f` kódján, utána a mostanin. A nyers
+kimenet a munkamenet `outputs/felfedes-javitas/meres/` mappájában.
+
+### 13.2 Csak belső saját arány (`[70, 30]`), egy jóváhagyással
+
+| Méret    | Figyelmeztetés / cím / szöveg, előtte | Vászon, előtte | Figyelmeztetés / cím / szöveg, utána | Vászon, utána     | Belső elválasztó |
+| -------- | ------------------------------------- | -------------- | ------------------------------------ | ----------------- | ---------------- |
+| 768x1024 | 1 / 1 / 1                             | 165            | 1 / 1 / 1                            | 165               | 70 (marad)       |
+| 900x1000 | 1 / 1 / 1                             | 141            | 1 / 1 / 1                            | 141               | 70 (marad)       |
+| 1000x700 | 1 / 0 / 0                             | 60             | 0 / 0 / 0                            | 347 (változatlan) | 70 (marad)       |
+| 1023x768 | 1 / 0,5 / 0                           | 60             | 0 / 0 / 0                            | 394 (változatlan) | 70 (marad)       |
+| 1440x600 | 0,73 / 0 / 0                          | 400            | 0,73 / 0 / 0                         | 400               | 70 (marad)       |
+| 1440x900 | 1 / 1 / 0,8                           | 700            | 1 / 1 / 0,8                          | 700               | 70 (marad)       |
+| 375x812  | 1 / 0,05 / 0                          | fül            | 1 / 0,05 / 0                         | fül               | 70 (marad)       |
+
+**A szabály.** A saját belső arány marad (a user döntése). A külső elválasztó egésszel vagy
+semmivel mozdul: csak akkor, ha a kérdés a saját belső arányon, a külső határán belül teljesen
+kifér, és akkor pontosan annyit (768x1024, 900x1000); különben a külső sem mozdul (1000x700,
+1023x768). Indok: a külső minden átadott pixeléből a kérdés csak a belső arány szerinti részt kapja
+(itt 30 százalékot), a többi a transcripté; ha a teljes igény a külső határán belül sem teljesíthető,
+a mozdulás a kérdést nem hozza elő (előtte 1000x700-on és 1023x768-on a szöveg a 60 pixelre
+nyomott rajz mellett is 0 maradt), csak a rajzot nyomja össze. Saját arány nélkül a részleges hely
+is a kérdést szolgálja (a maradékot a belső elválasztó fizeti), ezért ott a 12.3 szerinti határig
+mozdulás marad. **Kimondott következmény:** 1000x700-on és 1023x768-on csak belső saját aránnyal a
+kérdésből semmi nem látszik (a figyelmeztetés sem, mert a belső csoport két panelje a saját arányán
+a 60 pixeles minimuma alá kerülne, és a csoport túllóg); a gombok és a lapozó látszanak (1 / 1), a
+felhasználó a belső elválasztóval a kérdést előhozhatja. Megvalósítás: `packages/ui`
+`plan-container-growth.ts` `requiresFullGrowth` (a kérő csoport maga nem mozdulhat), a
+`plan-reveal.ts` a saját mozdíthatatlanságát adja át.
+
+### 13.3 Újraszámolás a méretváltozásra
+
+| Eset                                  | Előtte (szöveg) | Utána (szöveg)  | Megjegyzés                                                      |
+| ------------------------------------- | --------------- | --------------- | --------------------------------------------------------------- |
+| hibaüzenet, 375x812, "Transcript" fül | 0,61            | 1               | a régió 109-ről 186 pixelre nő, a belső elválasztó 50-ről 47-re |
+| hibaüzenet, 1440x600                  | 0,12            | 1               | a régió 109-ről 144 pixelre nő, a transcript 105-ről 70 pixelre |
+| hibaüzenet, 768x1024, 1000x700        | 1               | 1               | a régió itt nem nő (109 pixel marad)                            |
+| külső, három nyíl, 1440x900 (85)      | 0,72            | 1               | a törzs 293-ról 308 pixelre nő                                  |
+| külső, egér 200 pixel, 1440x900 (84)  | 1               | 1               | az igény (288) a kezdő törzsbe (293) még belefért               |
+| külső, három nyíl, 900x1000 (60)      | 0               | 0,34            | a transcript a 60 pixeles minimumán, a határig                  |
+| külső, egér 150 pixel, 900x1000 (64)  | 0               | 0 (cím 0,38)    | a transcript a 60 pixeles minimumán, a határig                  |
+| külső, 1440x600, egér és billentyű    | 0               | 0               | a transcript a minimumán, a határig (cím 0,92, illetve 0,5)     |
+| külső, 1024x768, egér és billentyű    | 0               | 0, illetve 0,35 | a határig; a "Jóváhagyás" gomb vízszintesen kilóg (0 és 0,45)   |
+
+Az 1440x600-as, az 1024x768-as és a nagyobb elmozdítású 900x1000-es esetben a kérdés a belső
+elválasztó határán belül sem fér el; ott a 12.3 szerinti határig mozdulás történik. Az 1024x768-as
+esetben (a külső elválasztó 90, illetve 85 százalékán) a gombsor szélesebb a transcript oldalnál,
+az a fix rész szélessége, nem a felfedésé (a SPEC-008 14.2 O-13 tételének rokona).
+
+**A megoldás.** `ResizeObserver` nélkül (`packages/ui` `component-boundary-invariant`, `apps/web`
+greppes invariáns (7)): (a) a `Resizable` minden új felfedés leírásra (`ResizableReveal`, a hatás
+függősége maga az objektum, a React `Object.is` szerint hasonlít,
+<https://react.dev/reference/react/useLayoutEffect>) újra számol, és a `RunViewScreen` minden
+renderelésekor új leírást ad, tehát a képernyő minden React állapotváltozását követi (a döntés
+eredménye és hibája, a lista hibája, a lapozás, a fejléc); (b) a befoglaló `Resizable` kontextusa
+a felhasználói méretváltoztatások számát adja (`userResizeCount`: húzás, nyíl, `Home`, `End`,
+`Enter`), és a beágyazott csoport erre is újra számol. A csoport saját és a befoglaló csoport
+felfedés okozta újrarenderelése a leírást nem cseréli, tehát nem indít újabb számítást.
+
+**Egy változatlan elrendezésre a terv ugyanaz.** A csoport rendelkezésre álló mérete 2026-09-26 óta
+a befoglaló doboz tört pixeles magassága a két szegély nélkül (`measure-group-available.ts`,
+`read-pixels.ts`), nem a `clientHeight`: az egész számra kerekített (CSSOM View
+`readonly attribute long clientHeight`, <https://drafts.csswg.org/cssom-view/>; MDN: "An integer",
+<https://developer.mozilla.org/en-US/docs/Web/API/Element/clientHeight>; a
+`getBoundingClientRect()` tört értéket ad, MDN "Determining the dimensions of elements",
+<https://developer.mozilla.org/en-US/docs/Web/API/CSS_Object_Model/Determining_the_dimensions_of_elements>),
+és a kerekítés hibája a befoglaló csoport tervébe is bekerülne, amit most minden renderelés újra
+kiszámol. Az azonos értékű terv nem ír új állapotot. Mérve (e2e, `sse-real-server.spec.ts`
+"látható jóváhagyás mellett a lista követ"): 1440x900-on és 900x1000-en, két témában, élő
+keretek alatt a két csoport összes panelének `flex-basis` értéke változatlan.
+
+### 13.4 A saját arány: új kulcs, csak felhasználói írással
+
+A két arány új kulcson áll: `eggRunViewUserLayout` (a gráf és a transcript) és
+`eggRunViewTranscriptApprovalUserLayout` (a transcript és a jóváhagyás). A kulcsokra kizárólag a
+felhasználó változtatása ír (a `Resizable` `onSizesChange` 2026-09-25 óta csak arról értesít), tehát
+a saját arány a kulcs megléte, érvényes párral; egy pontosan az alapértelmezésre visszahúzott arány
+is saját, a 12.3 kivétele megszűnt. A régi kulcsok (`eggRunViewLayout`,
+`eggRunViewTranscriptApprovalLayout`, és a még régebbi `eggRunViewApprovalLayout`) nem olvasottak,
+mert a 12.2 (a) pontja szerint a kezdőértéket felhasználói húzás nélkül is tartalmazhatják.
+Regresszió: `run-view-layout.spec.ts`, `run-view-approval-layout.spec.ts` (a régi kulcs figyelmen
+kívül marad, az alapértelmezésre visszahúzott pár saját, a hibás és a rossz alakú érték nem saját);
+az `is-own-layout-sizes.ts` törölve.
+
+### 13.5 O-16 lezárva, és a testvér esete
+
+A user döntése (2026-09-26, "a kérdés az első"): a 12.5 szerinti vízszintes sávbeli következmény
+marad. Mérve (`kerdes` jelenet, két témában): 1440x600-on a transcript panel 105 pixel (a
+hibaüzenet után 70); 375x667-en a "Transcript" fülön a transcript panel 93 pixel, a jóváhagyás
+törzse 181, és a listából egyetlen sor sem látszik (0). Mindkettő a transcript burkolójának
+görgetésével elérhető.
+
+### 13.6 Regressziók és a bukás igazolása
+
+- `apps/web/e2e/approval-prompt.spec.ts`, két témában: (a) csak belső saját aránnyal 1000x700-on és
+  1023x768-on egyik elválasztó sem mozdul (mindkettő 70), a tároló változatlan; 768x1024-en a
+  kérdés és a gombok teljesen látszanak, a belső 70 marad, a külső a 70 alá mozdul; (b) a döntés
+  hibaüzenete után 375x812-n és 1440x600-on a kérdés, a gombok és a hibaüzenet teljesen látszanak;
+  (c) a külső elválasztó billentyűs mozdítása után (1440x900 három, 900x1000 egy nyíl lépés) és egér
+  húzása után (1440x900, 215 pixel, ugyanaz a hely, mint a három nyíl lépés) a kérdés és a gombok
+  teljesen látszanak, a belső arány nem tárolódik. **Bukás a `e3e952f` kódján** (a termékkód
+  ideiglenesen visszaállítva): mind a 16 új teszt bukik; a régi kulcsra írt saját aránnyal is 14
+  bukik, csak a 768x1024-es (a szabállyal egyező) eset zöld: a külső 70 helyett 12, illetve 11
+  (1000x700, 1023x768), a szöveg 0,61 és 0,12 (hibaüzenet), a három nyíl után 0,72.
+- `apps/web/e2e/sse-real-server.spec.ts`: a "látható jóváhagyás mellett a lista követ" tesztje az
+  élő keretek előtt és után a panelek `flex-basis` értékének egyezését is állítja.
+- Unit: `Resizable` (új leírásra újra számol, ugyanaz a leírás nem, egy változatlan elrendezésre
+  nincs újabb véglegesítés, React `Profiler`; saját belső aránnyal a befoglaló csak a teljes igényt
+  adja meg, különben semmit; a befoglaló felhasználói mozdítására a belső újra számol),
+  `plan-container-growth`, `plan-reveal`, `measure-group-available`, `read-pixels`,
+  `run-view-layout`, `run-view-approval-layout`. Szándékos rontással igazolva: a `requiresFullGrowth`
+  ág kivételére, az azonos értékű terv ellenőrzésének kivételére és a befoglaló számláló
+  függőségének kivételére egy-egy unit teszt bukik.
+- A korábbi e2e-k (a kérdés kifér hét méreten, saját arány marad, jóváhagyás nélkül változatlan,
+  mini lista, görgetés látható jóváhagyással) változatlanul zöldek; a teljes e2e készlet 407
+  teszt, mind zöld.
+
+### 13.7 Képek
+
+A munkamenet `outputs/felfedes-javitas/` mappájában, `elotte-*` (az `e3e952f` kódja) és `utana-*`,
+mindkét témában: `sajat-belso-1000x700`, `sajat-belso-1023x768`, `sajat-belso-768x1024`,
+`nincs-sajat-1000x700` (a rajz a 60 pixelén), `hibauzenet-375x812`, `hibauzenet-1440x600`,
+`kulso-huzas-1440x900` (három nyíl), `kulso-huzas-900x1000` (egy nyíl), `o16-1440x600`,
+`o16-375x667-transcript-ful`. A képek a 10.7 szerinti okból egy repón kívüli, eldobott Playwright
+futásból származnak, ami a repó `approval-fixture.ts` fixtúráját importálta.

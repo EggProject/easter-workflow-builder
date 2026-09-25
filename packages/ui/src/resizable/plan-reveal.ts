@@ -44,14 +44,20 @@ export interface RevealInput {
  * (`szükséges / arány - mai`). Ez negatív is lehet: ha a felfedendő elem
  * rövidebb lett (másik jóváhagyás), a befoglaló csoport az alapállása felé
  * zsugorodik, de az alá nem (`growPanel`).
+ *
+ * Ha a saját elválasztó nem mozdulhat (saját arány), a kérés "egésszel vagy
+ * semmivel" megy (`requiresFullGrowth`, 2026-09-26): a befoglaló csoport csak
+ * akkor ad helyet, ha a teljes igényt fedezi, mert a maradékot itt senki nem
+ * fizetné meg, és a részleges hely a felfedést nem hozná létre
+ * (`plan-container-growth.ts`).
  */
 export function planReveal(
   input: Readonly<RevealInput>,
-  growContainer: (deltaPixels: number) => number,
+  growContainer: (deltaPixels: number, requiresFullGrowth: boolean) => number,
 ): readonly number[] {
   const { sizes, panelIndex, requiredPixels, availablePixels, minSizePercents, canGrow } = input;
   const share = (sizes[panelIndex] ?? 0) / 100;
-  const grownAvailable = availablePixels + growContainer(requiredPixels / share - availablePixels);
+  const grownAvailable = availablePixels + growContainer(requiredPixels / share - availablePixels, !canGrow);
   const grownMinimums = minSizePercents.map((minimum) => (minimum * availablePixels) / grownAvailable);
   // Ha a panelek minimumai a megnőtt csoportban sem férnek el együtt, nincs
   // olyan arány, amit a kirajzolás követne (a panelek a minimumukon

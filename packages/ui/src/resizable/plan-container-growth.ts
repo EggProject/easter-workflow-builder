@@ -26,6 +26,12 @@ export interface ContainerGrowthInput {
    * nem húzta, és a kérő csoport ugyanazon a tengelyen áll.
    */
   readonly canGrow: boolean;
+  /**
+   * A kérő csoport maga nem mozdulhat (saját aránya van, vagy a felhasználó
+   * már húzta): a hely csak akkor ér valamit, ha a teljes kérést fedezi,
+   * mert a hiányzó részt a kérő nem fizetheti meg (2026-09-26).
+   */
+  readonly requiresFullGrowth: boolean;
 }
 
 export interface ContainerGrowth {
@@ -42,12 +48,24 @@ export interface ContainerGrowth {
  * méretre nő, de az alapállása alá nem megy, és a szomszédja a minimumánál
  * kisebb nem lesz (`growPanel`). Ha a csoport nem mozdulhat, az alapállás
  * áll vissza (egy korábbi kérés visszavonása, például más tengelyre váltáskor).
+ *
+ * **Egésszel vagy semmivel, ha a kérő nem mozdulhat** (2026-09-26, egy
+ * független ellenőrzés nyomán): ha a kérő csoportnak saját aránya van, a
+ * felfedendő elem a befoglaló csoport minden pixeléből csak a kérő
+ * saját arányának megfelelő részt kapja, a többi a kérő másik panelére megy.
+ * Ha a kérés a szomszéd minimumáig sem teljesíthető, a mozdulás a felfedést
+ * nem hozná létre, csak a szomszédot (a futás nézetben a rajzot) nyomná
+ * össze: ilyenkor az alapállás marad. Mozdítható kérőnél a részleges hely is
+ * a felfedést szolgálja (a maradékot a kérő saját elválasztója fizeti), ezért
+ * ott a csoport a határig ad.
  */
 export function planContainerGrowth(input: Readonly<ContainerGrowthInput>): ContainerGrowth {
   const { baseSizes, panelIndex, currentPixels, deltaPixels, availablePixels, minSizePercents, canGrow } = input;
-  const sizes = canGrow
-    ? growPanel(baseSizes, panelIndex, ((currentPixels + deltaPixels) / availablePixels) * 100, minSizePercents)
-    : baseSizes;
+  const targetPercent = ((currentPixels + deltaPixels) / availablePixels) * 100;
+  const largestPercent = growPanel(baseSizes, panelIndex, Infinity, minSizePercents)[panelIndex] ?? 0;
+  const isWorthGrowing = !input.requiresFullGrowth || targetPercent <= largestPercent;
+  const sizes =
+    canGrow && isWorthGrowing ? growPanel(baseSizes, panelIndex, targetPercent, minSizePercents) : baseSizes;
   return {
     sizes,
     growthPixels: ((sizes[panelIndex] ?? 0) / 100) * availablePixels - currentPixels,

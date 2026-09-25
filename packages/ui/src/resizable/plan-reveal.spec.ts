@@ -15,7 +15,7 @@ describe('planReveal', () => {
     const growContainer = vi.fn((deltaPixels: number) => deltaPixels);
     expect(planReveal(INPUT, growContainer)).toEqual([50, 50]);
     // 150 / 0,5 - 200 = 100 pixel.
-    expect(growContainer).toHaveBeenCalledWith(100);
+    expect(growContainer).toHaveBeenCalledWith(100, false);
   });
 
   it('a befoglaló csoport által meg nem adott maradékot a saját elválasztó fizeti, a mért minimummal vágva', () => {
@@ -28,16 +28,16 @@ describe('planReveal', () => {
     expect(planReveal({ ...INPUT, minSizePercents: [] }, () => 0)).toEqual([25, 75]);
   });
 
-  it('ha a saját elválasztó nem mozdulhat, az alapállás marad, de a befoglaló csoport kérése így is elmegy', () => {
+  it('ha a saját elválasztó nem mozdulhat, az alapállás marad, és a befoglaló csoport kérése egésszel vagy semmivel megy', () => {
     const growContainer = vi.fn(() => 0);
     expect(planReveal({ ...INPUT, canGrow: false }, growContainer)).toBe(INPUT.sizes);
-    expect(growContainer).toHaveBeenCalledWith(100);
+    expect(growContainer).toHaveBeenCalledWith(100, true);
   });
 
   it('ha a panel már elég nagy, a kérés negatív (a befoglaló csoport az alapállása felé mehet), és az alapállás marad', () => {
     const growContainer = vi.fn(() => 0);
     expect(planReveal({ ...INPUT, requiredPixels: 80 }, growContainer)).toBe(INPUT.sizes);
-    expect(growContainer).toHaveBeenCalledWith(-40);
+    expect(growContainer).toHaveBeenCalledWith(-40, false);
   });
 
   it('ha a minimumok a megnőtt csoportban sem férnek el együtt, az alapállás marad', () => {
@@ -48,6 +48,6 @@ describe('planReveal', () => {
   it('nem létező panelre a befoglaló csoport végtelen igényt kap, a saját méretek változatlanok', () => {
     const growContainer = vi.fn(() => 0);
     expect(planReveal({ ...INPUT, panelIndex: 2 }, growContainer)).toBe(INPUT.sizes);
-    expect(growContainer).toHaveBeenCalledWith(Infinity);
+    expect(growContainer).toHaveBeenCalledWith(Infinity, false);
   });
 });

@@ -16,7 +16,7 @@ export interface RunViewLayoutProperties {
   readonly onSizesChange: (sizes: readonly number[]) => void;
   /**
    * Mozdulhat-e a gráf és a transcript közti elválasztó egy függő jóváhagyás
-   * kedvéért (nincs saját arány, `is-own-layout-sizes.ts`). A függőleges
+   * kedvéért (nincs tárolt felhasználói arány, `run-view-layout.ts`). A függőleges
    * sávban a transcript oldal belső csoportja innen kér helyet, a rajz
    * rovására (`Resizable` `adjustsForReveal`, SPEC-008 8. szekció 1. pont); a
    * vízszintes sávban a kérés más tengelyű, ezért ez az elválasztó nem mozdul.

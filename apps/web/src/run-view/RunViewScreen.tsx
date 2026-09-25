@@ -34,7 +34,6 @@ import { RunViewLayout } from './RunViewLayout.tsx';
 import { RunViewTranscriptSide } from './RunViewTranscriptSide.tsx';
 import { blockingFailureMessage } from './blocking-failure-message.ts';
 import { isRunClosingFrame } from './is-run-closing-frame.ts';
-import { isOwnLayoutSizes } from './is-own-layout-sizes.ts';
 import {
   DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES,
   readStoredRunViewApprovalLayoutSizes,
@@ -426,12 +425,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // csatoláskor beolvasott, `useState`-ben tartott érték ilyenkor a kézzel
   // húzott arányt eldobná (a T-009-22 független ellenőrzésének él esete). A
   // `localStorage` olvasás a saját `try`/`catch` ágán megy, és a képernyő nem
-  // renderel újra húzás közben, tehát az olvasás nem kerül forró útra. Ha a
-  // tárolt arány nem saját (`is-own-layout-sizes.ts`), az elválasztó egy függő
-  // jóváhagyás kedvéért ideiglenesen elmozdulhat (user döntés 2026-09-25, "a
-  // rajz húzódjon össze", SPEC-008 8. szekció 1. pont).
-  const layoutSizes = readStoredRunViewLayoutSizes();
-  const approvalLayoutSizes = readStoredRunViewApprovalLayoutSizes();
+  // renderel újra húzás közben, tehát az olvasás nem kerül forró útra. Tárolt
+  // arány csak a felhasználó változtatásából van (a saját arány = a kulcs
+  // megléte, `run-view-layout.ts`); ha nincs, az alapértelmezés áll, és az
+  // elválasztó egy függő jóváhagyás kedvéért ideiglenesen elmozdulhat (user
+  // döntés 2026-09-25, "a rajz húzódjon össze", SPEC-008 8. szekció 1. pont).
+  const storedLayoutSizes = readStoredRunViewLayoutSizes();
+  const storedApprovalLayoutSizes = readStoredRunViewApprovalLayoutSizes();
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,
@@ -476,8 +476,11 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           // A `key` a futás azonosítója: egy másik futásra navigálva a
           // transcript panel (és a görgetés állapota) tiszta lappal indul. A
           // látott jóváhagyás szövegét a transcript oldal felfedi (a
-          // `Resizable` `reveal`), a kulcs a jóváhagyás azonosítója, tehát
-          // lapozáskor a számítás az új szövegre fut újra.
+          // `Resizable` `reveal`). A felfedés leírása minden renderen új
+          // objektum, és ez szándékos: minden új leírás újraszámolást vált
+          // ki (`ResizableReveal`), tehát a számítás a képernyő minden
+          // állapotváltozását követi, a lapozást, a döntés hibaüzenetét és a
+          // lista hibáját a gombsor régiójában, és a fejléc változását is.
           transcript={
             <RunViewTranscriptSide
               transcriptPanel={
@@ -524,17 +527,15 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                   }
                 />
               }
-              approvalReveal={
-                shownApproval === undefined ? undefined : { elementId: approvalTextId, key: shownApproval.approval.id }
-              }
-              adjustsForReveal={!isOwnLayoutSizes(approvalLayoutSizes, DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES)}
-              defaultSizes={approvalLayoutSizes}
+              approvalReveal={shownApproval === undefined ? undefined : { elementId: approvalTextId }}
+              adjustsForReveal={storedApprovalLayoutSizes === undefined}
+              defaultSizes={storedApprovalLayoutSizes ?? DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES}
               onSizesChange={storeRunViewApprovalLayoutSizes}
             />
           }
-          defaultSizes={layoutSizes}
+          defaultSizes={storedLayoutSizes ?? DEFAULT_RUN_VIEW_LAYOUT_SIZES}
           onSizesChange={storeRunViewLayoutSizes}
-          adjustsForReveal={!isOwnLayoutSizes(layoutSizes, DEFAULT_RUN_VIEW_LAYOUT_SIZES)}
+          adjustsForReveal={storedLayoutSizes === undefined}
         />
       </div>
       {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}

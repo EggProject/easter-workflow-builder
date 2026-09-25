@@ -668,11 +668,12 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 /**
- * A jóváhagyás és a transcript arányának `localStorage` kulcsa
- * (`run-view-approval-layout.ts`), a `run-view.spec.ts` azonos mintájú
- * tesztjeihez hasonlóan szó szerint: a teszt a tárolt ALAKOT is állítja.
+ * A jóváhagyás és a transcript felhasználói arányának `localStorage` kulcsa
+ * (`run-view-approval-layout.ts`, 2026-09-26 óta új kulcs), a
+ * `run-view.spec.ts` azonos mintájú tesztjeihez hasonlóan szó szerint: a
+ * teszt a tárolt ALAKOT is állítja.
  */
-const APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalLayout';
+const APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalUserLayout';
 
 test('hibás alakú tárolt arányra az elválasztó felén áll, és a tárolóba csak a felhasználó húzása ír', async ({
   page,
@@ -728,7 +729,7 @@ test('letiltott tárolás esetén az elválasztó felén áll, a felület nem t�
 // tárolóba (SPEC-008 8. szekció 1. pont, research 12. szekció).
 // ------------------------------------------------------------
 const GRAPH_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
-const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 /**
  * A kérdés részei és a két gomb: mindnek teljes egészében látszania kell.
@@ -821,6 +822,200 @@ for (const theme of ['light', 'dark'] as const) {
       expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
     });
   }
+}
+
+// ------------------------------------------------------------
+// CSAK A BELSŐ ARÁNY SAJÁT (független ellenőrzés, 2026-09-26): a jóváhagyás
+// és a transcript közti elválasztón a felhasználó arányt állított, a gráf és
+// a transcript közti külsőn nem. A belső arány marad (user döntés
+// 2026-09-25); a külső csak akkor mozdul, ha a kérdés a saját belső arányon a
+// külső határán belül teljesen kifér, különben a rajz a helyén marad, mert a
+// mozdulás a kérdést nem hozná elő, csak a rajzot nyomná össze (SPEC-008 8.
+// szekció 1. pont).
+// ------------------------------------------------------------
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 1000, height: 700 },
+    { width: 1023, height: 768 },
+  ] as const) {
+    const size = `${String(viewport.width)}x${String(viewport.height)}`;
+    test(`${size}, csak belső saját aránnyal, amin a kérdés nem fér ki: egyik elválasztó sem mozdul, a rajz nem húzódik össze (${theme} téma)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(
+        ({ mode, innerKey }) => {
+          globalThis.localStorage.setItem('eggTheme', mode);
+          globalThis.localStorage.setItem(innerKey, JSON.stringify([70, 30]));
+        },
+        { mode: theme, innerKey: APPROVAL_LAYOUT_STORAGE_KEY },
+      );
+      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+      await page.goto(APPROVAL_RUN_URL);
+
+      await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
+      await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '70');
+      expect(await readStoredLayouts(page)).toEqual([undefined, '[70,30]']);
+    });
+  }
+
+  test(`768x1024, csak belső saját aránnyal, amin a kérdés kifér: a külső annyit mozdul, hogy a kérdés és a gombok teljesen látsszanak, a belső arány marad (${theme} téma)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.addInitScript(
+      ({ mode, innerKey }) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+        globalThis.localStorage.setItem(innerKey, JSON.stringify([70, 30]));
+      },
+      { mode: theme, innerKey: APPROVAL_LAYOUT_STORAGE_KEY },
+    );
+    await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+    await page.goto(APPROVAL_RUN_URL);
+
+    for (const part of questionParts(page)) {
+      await expect(part).toBeInViewport({ ratio: 1 });
+    }
+    await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+    await expect
+      .poll(async () =>
+        Number(await page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME }).getAttribute('aria-valuenow')),
+      )
+      .toBeLessThan(70);
+    expect(await readStoredLayouts(page)).toEqual([undefined, '[70,30]']);
+  });
+}
+
+/**
+ * A külső elválasztó egér húzásának hossza pixelben (a jelenet paramétere,
+ * nem küszöb): 1440x900-on ennyivel keskenyebb transcript oldalon (a
+ * billentyűs jelenet három lépésével, 85 százalékkal egyező hely) a
+ * jóváhagyás szövege a kezdő törzsnél magasabbra tördel, tehát újraszámolás
+ * nélkül levágódik, a gombsor viszont még elfér a szélességben. Egy 240
+ * pixeles húzásnál már a "Jóváhagyás" gomb is vízszintesen kilóg (mérve 0,87
+ * arány): az a fix gombsor szélessége, nem a felfedés kérdése, a 14.2 O-13
+ * tételének rokona (`bun run measure:approval -g kulso-huzas`, research
+ * `2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
+ */
+const OUTER_DRAG_PIXELS = 215;
+
+// ------------------------------------------------------------
+// ÚJRASZÁMOLÁS A MÉRETVÁLTOZÁSRA (független ellenőrzés, 2026-09-26): a
+// felfedés nem csak a megnyitáskor, lapozáskor és ablak átméretezéskor
+// számol, hanem a képernyő minden állapotváltozásakor (a döntés hibaüzenete
+// megnöveli az akciósávot) és a külső elválasztó minden felhasználói
+// mozdításakor (a transcript oldal keskenyebb, a szöveg újratördel), saját
+// `ResizeObserver` nélkül (`packages/ui` `Resizable` `reveal`).
+// ------------------------------------------------------------
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 1440, height: 600 },
+  ] as const) {
+    const size = `${String(viewport.width)}x${String(viewport.height)}`;
+    test(`${size}, a döntés hibaüzenete után a kérdés, a gombok és a hibaüzenet is teljesen látszanak (${theme} téma)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(
+        page,
+        [FIRST_APPROVAL],
+        [
+          mockRoute('decideApproval', async (route) =>
+            route.fulfill(jsonBody({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, 409)),
+          ),
+        ],
+      );
+      await page.goto(APPROVAL_RUN_URL);
+      if (viewport.width < 768) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      for (const part of questionParts(page)) {
+        await expect(part).toBeInViewport({ ratio: 1 });
+      }
+
+      await decisionButton(page, 'Elutasítás').click();
+      const failure = decisionBar(page).getByRole('alert');
+      await expect(failure).toBeVisible();
+      await expect(failure).toBeInViewport({ ratio: 1 });
+      for (const part of questionParts(page)) {
+        await expect(part).toBeInViewport({ ratio: 1 });
+      }
+      expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
+    });
+  }
+
+  for (const { size, viewport, key, presses } of [
+    { size: '1440x900', viewport: { width: 1440, height: 900 }, key: 'ArrowRight', presses: 3 },
+    { size: '900x1000', viewport: { width: 900, height: 1000 }, key: 'ArrowDown', presses: 1 },
+  ] as const) {
+    test(`${size}, a külső elválasztó billentyűs mozdítása után a kérdés és a gombok újra teljesen látszanak, a belső arány nem tárolódik (${theme} téma)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+      await page.goto(APPROVAL_RUN_URL);
+      for (const part of questionParts(page)) {
+        await expect(part).toBeInViewport({ ratio: 1 });
+      }
+
+      const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
+      const valueBefore = (await outer.getAttribute('aria-valuenow')) ?? '';
+      await outer.focus();
+      for (let press = 0; press < presses; press += 1) {
+        await outer.press(key);
+      }
+      await expect(outer).not.toHaveAttribute('aria-valuenow', valueBefore);
+      for (const part of questionParts(page)) {
+        await expect(part).toBeInViewport({ ratio: 1 });
+      }
+      // A külső arány a felhasználóé lett és tárolódott, a belső igazítás
+      // ideiglenes, nem.
+      const [storedOuter, storedInner] = await readStoredLayouts(page);
+      expect(storedOuter).toBeDefined();
+      expect(storedInner).toBeUndefined();
+    });
+  }
+
+  test(`1440x900, a külső elválasztó egérrel húzva újratördeli a szöveget, és a húzás végén a kérdés és a gombok teljesen látszanak (${theme} téma)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript((mode) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+    }, theme);
+    await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+    await page.goto(APPROVAL_RUN_URL);
+    for (const part of questionParts(page)) {
+      await expect(part).toBeInViewport({ ratio: 1 });
+    }
+
+    const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
+    const box = await outer.boundingBox();
+    if (box === null) {
+      throw new Error('a külső elválasztó nem látszik');
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + OUTER_DRAG_PIXELS, startY, { steps: 10 });
+    await page.mouse.up();
+    await expect(outer).not.toHaveAttribute('aria-valuenow', '70');
+    for (const part of questionParts(page)) {
+      await expect(part).toBeInViewport({ ratio: 1 });
+    }
+    const [storedOuter, storedInner] = await readStoredLayouts(page);
+    expect(storedOuter).toBeDefined();
+    expect(storedInner).toBeUndefined();
+  });
 }
 
 test.describe('érintés', () => {

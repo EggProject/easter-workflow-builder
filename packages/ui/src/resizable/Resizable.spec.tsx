@@ -1,4 +1,4 @@
-import { act, type ReactElement } from 'react';
+import { act, Profiler, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Resizable } from './Resizable.tsx';
@@ -477,10 +477,12 @@ describe('Resizable', () => {
      * Valódi geometria a happy-dom nulla téglalapja helyett, már a csatolás
      * előtt: a `.resizable-panel` elem mérete a legközelebbi
      * `data-panel-sizes` burkoló listájából jön (a panel sorszáma szerint,
-     * `DOMRect(0, 0, méret, méret)`, tehát tengelytől független), minden más
-     * elemé a saját `data-rect` attribútumából ("x,y,szélesség,magasság"), a
-     * csoport kliens mérete a paneljei összege. A pixeles minimum a forrás
-     * CSS szabálya, stíluslapból.
+     * `DOMRect(0, 0, méret, méret)`, tehát tengelytől független), a
+     * `.resizable-group` csoporté a paneljei összege (az elválasztó a
+     * happy-dom nulla téglalapja, tehát nem vesz el helyet, és szegély
+     * nincs), minden más elemé a saját `data-rect` attribútumából
+     * ("x,y,szélesség,magasság"). A pixeles minimum a forrás CSS szabálya,
+     * stíluslapból.
      */
     function installGeometry(): void {
       const style = document.createElement('style');
@@ -489,36 +491,26 @@ describe('Resizable', () => {
       const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
         this: HTMLElement,
       ): DOMRect {
+        const sizes = (this.closest<HTMLElement>('[data-panel-sizes]')?.dataset['panelSizes'] ?? '').split(',');
         if (this.classList.contains('resizable-panel')) {
-          const sizes = (this.closest<HTMLElement>('[data-panel-sizes]')?.dataset['panelSizes'] ?? '').split(',');
           const siblings = [...(this.parentElement?.children ?? [])].filter((child) =>
             child.classList.contains('resizable-panel'),
           );
           const size = Number(sizes[siblings.indexOf(this)] ?? '0');
           return new DOMRect(0, 0, size, size);
         }
+        if (this.classList.contains('resizable-group')) {
+          let sum = 0;
+          for (const size of sizes) {
+            sum += Number(size);
+          }
+          return new DOMRect(0, 0, sum, sum);
+        }
         const [x = 0, y = 0, width = 0, height = 0] = (this.dataset['rect'] ?? '').split(',').map(Number);
         return new DOMRect(x, y, width, height);
       });
-      // A csoport kliens mérete a panelek összege (az elválasztó a happy-dom
-      // nulla téglalapja, tehát nem vesz el helyet).
-      const groupClientSize = function (this: HTMLElement): number {
-        if (!this.classList.contains('resizable-group')) {
-          return 0;
-        }
-        const sizes = (this.closest<HTMLElement>('[data-panel-sizes]')?.dataset['panelSizes'] ?? '').split(',');
-        let sum = 0;
-        for (const size of sizes) {
-          sum += Number(size);
-        }
-        return sum;
-      };
-      const heightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(groupClientSize);
-      const widthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(groupClientSize);
       restore = () => {
         spy.mockRestore();
-        heightSpy.mockRestore();
-        widthSpy.mockRestore();
         style.remove();
       };
     }
@@ -529,7 +521,7 @@ describe('Resizable', () => {
     });
 
     interface InnerOptions {
-      readonly reveal?: { readonly elementId: string; readonly key: string };
+      readonly reveal?: { readonly elementId: string };
       readonly adjustsForReveal?: boolean;
       readonly onSizesChange?: (sizes: readonly number[]) => void;
       readonly textRect?: string;
@@ -566,7 +558,7 @@ describe('Resizable', () => {
       );
     }
 
-    const REVEAL = { elementId: 'kerdes', key: 'elso' } as const;
+    const REVEAL = { elementId: 'kerdes' } as const;
 
     it('a szöveg a saját elválasztó rovására kifér, értesítés nélkül, és a felfedés végén az alapállás visszaáll', () => {
       installGeometry();
@@ -603,23 +595,56 @@ describe('Resizable', () => {
       expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
     });
 
-    it('a kulcs változására újra számol: egy rövidebb szövegre az alapállás felé igazodik', () => {
+    it('minden új leírásra újra számol: egy rövidebb szövegre az alapállás felé, egy hosszabbra tovább igazodik', () => {
       installGeometry();
       act(() => {
-        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true, textRect: '0,20,100,110' }));
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' }, adjustsForReveal: true, textRect: '0,20,100,110' }));
       });
       // 130 / 200 = 65 százalék.
       expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
       act(() => {
-        root.render(
-          innerGroup({
-            reveal: { elementId: 'kerdes', key: 'masodik' },
-            adjustsForReveal: true,
-            textRect: '0,20,100,40',
-          }),
-        );
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' }, adjustsForReveal: true, textRect: '0,20,100,40' }));
       });
       expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      // A hívó újrarenderelése (például egy hibaüzenet a csoport alatt) a
+      // szöveget hosszabbá teszi: az új leírás újraszámolást vált ki, kulcs
+      // és ablak átméretezés nélkül.
+      act(() => {
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' }, adjustsForReveal: true, textRect: '0,20,100,120' }));
+      });
+      // 140 / 200 = 70 százalék.
+      expect(sizesOf(groups()[0])).toEqual(['30%', '70%']);
+    });
+
+    it('ugyanaz a leírás a hívó újrarenderelésekor nem számol újra, egy változatlan elrendezésre az új leírás sem ír új állapotot', () => {
+      installGeometry();
+      const commits: string[] = [];
+      const render = (reveal: { readonly elementId: string }, textRect: string): void => {
+        act(() => {
+          root.render(
+            <Profiler
+              id="felfedes"
+              onRender={(_, phase) => {
+                commits.push(phase);
+              }}
+            >
+              {innerGroup({ reveal, adjustsForReveal: true, textRect })}
+            </Profiler>,
+          );
+        });
+      };
+      const reveal = { elementId: 'kerdes' };
+      render(reveal, '0,20,100,110');
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      // Ugyanaz a leírás, hosszabb szöveggel: nincs újraszámolás.
+      render(reveal, '0,20,100,120');
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      // Új leírás, de ugyanaz a szöveg, mint az első számításkor: a terv
+      // ugyanaz, tehát a renderelésen túl nincs újabb véglegesítés.
+      commits.length = 0;
+      render({ elementId: 'kerdes' }, '0,20,100,110');
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      expect(commits).toEqual(['update']);
     });
 
     it('az ablak átméretezésekor újra számol', () => {
@@ -645,7 +670,7 @@ describe('Resizable', () => {
     it('nem létező elemre és panelen kívüli elemre nincs változás', () => {
       installGeometry();
       act(() => {
-        root.render(innerGroup({ reveal: { elementId: 'nincs-ilyen', key: 'a' }, adjustsForReveal: true }));
+        root.render(innerGroup({ reveal: { elementId: 'nincs-ilyen' }, adjustsForReveal: true }));
       });
       expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
       const outside = document.createElement('p');
@@ -653,13 +678,13 @@ describe('Resizable', () => {
       outside.dataset['rect'] = '0,0,100,900';
       document.body.append(outside);
       act(() => {
-        root.render(innerGroup({ reveal: { elementId: 'kivul', key: 'b' }, adjustsForReveal: true }));
+        root.render(innerGroup({ reveal: { elementId: 'kivul' }, adjustsForReveal: true }));
       });
       expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
       outside.remove();
     });
 
-    it('a felhasználó húzása után a felfedés vége nem írja felül, és új kulcsra sem igazodik', () => {
+    it('a felhasználó húzása után a felfedés vége nem írja felül, és új leírásra sem igazodik', () => {
       installGeometry();
       const reported: (readonly number[])[] = [];
       const onSizesChange = (sizes: readonly number[]): void => {
@@ -676,9 +701,7 @@ describe('Resizable', () => {
       });
       expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
       act(() => {
-        root.render(
-          innerGroup({ reveal: { elementId: 'kerdes', key: 'uj' }, adjustsForReveal: true, textRect: '0,50,100,140' }),
-        );
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' }, adjustsForReveal: true, textRect: '0,50,100,140' }));
       });
       expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
     });
@@ -797,12 +820,59 @@ describe('Resizable', () => {
       });
       expect(sizesOf(groups()[0])).toEqual(['55%', '45%']);
       act(() => {
-        root.render(
-          nested({ reveal: { elementId: 'kerdes', key: 'uj' }, adjustsForReveal: true, outerPanels: '440,360' }),
-        );
+        root.render(nested({ reveal: { elementId: 'kerdes' }, adjustsForReveal: true, outerPanels: '440,360' }));
       });
       expect(sizesOf(groups()[0])).toEqual(['55%', '45%']);
       expect(sizesOf(groups()[1])).toEqual(['30%', '70%']);
+    });
+
+    it('saját belső aránnyal a befoglaló csoport csak a teljes igényt adja meg: ha teljesíthető, a belső arány mellett a szöveg kifér', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL }));
+      });
+      // A belső csoportnak a saját 50 százalékán 150 / 0,5 = 300 pixel kell:
+      // a külső második panel 300-ról 400 pixelre nő.
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      expect(sizesOf(groups()[1])).toEqual(['50%', '50%']);
+      // Egy új leírás ugyanarra az elrendezésre ugyanazt a tervet adja: a
+      // befoglaló csoport nem ír új állapotot, és nem vonja vissza a helyet.
+      act(() => {
+        root.render(nested({ reveal: { elementId: 'kerdes' } }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      expect(sizesOf(groups()[1])).toEqual(['50%', '50%']);
+    });
+
+    it('saját belső aránnyal, ha a befoglaló csoport a minimumáig sem adhatja meg a teljes igényt, egyik elválasztó sem mozdul', () => {
+      installGeometry();
+      act(() => {
+        root.render(nested({ reveal: REVEAL, outerPanels: '100,300', outerSizes: [25, 75] }));
+      });
+      // 400 pixelből a második panel legfeljebb 340 (az első minimuma 60):
+      // a 400 pixeles igény nem teljesíthető, a rajz nem húzódik össze.
+      expect(sizesOf(groups()[0])).toEqual(['25%', '75%']);
+      expect(sizesOf(groups()[1])).toEqual(['50%', '50%']);
+    });
+
+    it('a befoglaló csoport felhasználói méretváltoztatására a belső újra számol (a szöveg újratördelése után is kifér)', () => {
+      installGeometry();
+      act(() => {
+        root.render(
+          nested({ reveal: REVEAL, adjustsForReveal: true, outerDirection: 'horizontal', textRect: '0,20,100,40' }),
+        );
+      });
+      expect(sizesOf(groups()[1])).toEqual(['50%', '50%']);
+      // A külső elválasztó húzása keskenyebbé teszi a transcript oldalt, a
+      // szöveg magasabb lesz (a geometria ezt a kirajzolás helyett rögzíti).
+      container.querySelector('#kerdes')?.setAttribute('data-rect', '0,20,100,110');
+      const outerHandle = container.querySelector('[aria-label="Külső"]');
+      if (outerHandle === null) {
+        throw new Error('nincs külső elválasztó');
+      }
+      pressKeyOn(outerHandle, 'ArrowRight');
+      expect(sizesOf(groups()[0])).toEqual(['67.5%', '32.5%']);
+      expect(sizesOf(groups()[1])).toEqual(['35%', '65%']);
     });
   });
 

@@ -53,7 +53,7 @@ describe('RunViewTranscriptSide', () => {
             transcriptPanel={<StatefulTranscript />}
             approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
             approvalPanel={<section className="panel-placeholder">lapozó és gombok</section>}
-            approvalReveal={isApprovalShown ? { elementId: 'approval-text', key: 'appr-1' } : undefined}
+            approvalReveal={isApprovalShown ? { elementId: 'approval-text' } : undefined}
             adjustsForReveal={isAdjustable}
             defaultSizes={[40, 60]}
             onSizesChange={onSizesChange}
@@ -119,7 +119,7 @@ describe('RunViewTranscriptSide', () => {
               transcriptPanel={<StatefulTranscript />}
               approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
               approvalPanel={<section className="panel-placeholder">lapozó és gombok</section>}
-              approvalReveal={{ elementId: 'approval-text', key: 'appr-1' }}
+              approvalReveal={{ elementId: 'approval-text' }}
               adjustsForReveal
               defaultSizes={[40, 60]}
               onSizesChange={onSizesChange}

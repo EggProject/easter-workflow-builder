@@ -32,17 +32,28 @@ export interface ResizableContextValue {
    */
   readonly refreshGeometry: () => void;
   /**
+   * A felhasználó méretváltoztatásainak száma ebben a csoportban (húzás,
+   * nyíl, `Home`, `End`, `Enter`; 2026-09-26). Egy beágyazott csoport a
+   * változására újra számolja a felfedését, mert a befoglaló húzása a
+   * beágyazott csoport méretét, a vízszintes sávban a szöveg tördelését is
+   * megváltoztatja, és a `ResizeObserver` a csomagban tiltott.
+   */
+  readonly userResizeCount: number;
+  /**
    * Egy beágyazott `Resizable` felfedési kérése (2026-09-25, `plan-reveal.ts`):
    * a `requester` csoportot tartó panel nőjön `deltaPixels` pixellel a mai
    * méretéhez képest. Visszaadja, mennyivel változott a panel ténylegesen;
    * nulla, ha a csoport nem mozdulhat (saját arány, a felhasználó már húzta,
-   * vagy a kérő más tengelyen áll). Ideiglenes: nem értesít, és az `endReveal`
-   * visszaállítja.
+   * vagy a kérő más tengelyen áll). A `requiresFullGrowth` igaz, ha a kérő
+   * maga nem mozdulhat: ilyenkor a csoport csak a teljes kérést adja meg,
+   * vagy semmit (`plan-container-growth.ts`, 2026-09-26). Ideiglenes: nem
+   * értesít, és az `endReveal` visszaállítja.
    */
   readonly resizeForReveal: (
     requester: Element,
     deltaPixels: number,
     requesterDirection: 'horizontal' | 'vertical',
+    requiresFullGrowth: boolean,
   ) => number;
   /**
    * A felfedés vége: a felfedés előtti méretek visszaállnak, ha a
@@ -72,6 +83,7 @@ const NOOP_CONTEXT_VALUE: ResizableContextValue = {
   toggleCollapse: () => {},
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
   refreshGeometry: () => {},
+  userResizeCount: 0,
   // Befoglaló `Resizable` nélkül nincs, ami helyet adjon egy felfedésnek.
   resizeForReveal: () => 0,
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást

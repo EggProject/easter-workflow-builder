@@ -440,7 +440,12 @@ const LARGE_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-lg');
 const MEDIUM_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-md');
 const RUN_VIEW_VIEWPORT_HEIGHT = 900;
 
-const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+/**
+ * A felhasználó által beállított arány kulcsa (`run-view-layout.ts`,
+ * 2026-09-26 óta új kulcs; a régi `eggRunViewLayout` értékét senki nem
+ * olvassa).
+ */
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 function separatorLocator(page: Page): Locator {
   return page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
@@ -573,8 +578,8 @@ test('hibás alakú tárolt arányra az alapértelmezés áll be, és a tároló
   const separator = separatorLocator(page);
   await expect(separator).toHaveAttribute('aria-valuenow', '70');
   // A `Resizable` 2026-09-25 óta csak a felhasználó változtatását jelenti: a
-  // kezdő érték nem íródik a tárolóba (a saját arány felismerése ezen áll,
-  // `is-own-layout-sizes.ts`), a billentyű lépés igen.
+  // kezdő érték nem íródik a tárolóba (a saját arány a kulcs megléte,
+  // `run-view-layout.ts`), a billentyű lépés igen.
   expect(await page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY)).toBe(
     JSON.stringify({ graph: 45 }),
   );

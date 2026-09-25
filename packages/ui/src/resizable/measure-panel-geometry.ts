@@ -1,3 +1,5 @@
+import { readPixels } from './read-pixels.ts';
+
 /**
  * Egy `Resizable` csoport paneljeinek mért geometriája a csoport tengelyén.
  */
@@ -22,14 +24,6 @@ export interface PanelGeometry {
    * felfedés számításához, `plan-reveal.ts`).
    */
   readonly panelSizePixels: readonly number[];
-}
-
-/**
- * A kiszámított `min-width`/`min-height` pixel értéke. Hosszúság minimumra a
- * kiszámított érték mindig `px` végű; minden más (`auto`, üres) nulla.
- */
-function readPixels(value: string): number {
-  return value.endsWith('px') ? Number(value.slice(0, -'px'.length)) : 0;
 }
 
 /**

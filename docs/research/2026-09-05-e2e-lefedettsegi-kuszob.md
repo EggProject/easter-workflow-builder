@@ -1679,3 +1679,31 @@ külön újrafutott), majd `bun run coverage:e2e:report` (exit 0):
 `is-compact-transcript-list.ts` és `run-view-transcript-visibility.ts` is, mind a négy metrikán 100
 százalék. A fedett kód nőtt, ezért három küszöb a mért értékre emelkedik, felfelé kerekítés
 nélkül (`apps/web/package.json`).
+
+## 44. A felfedés javítása utáni ratchet (2026-09-26): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Egy független ellenőrzés és a user döntése nyomán a felfedés javítása (research
+`2026-09-24-jovahagyas-panel-helye.md` 13. szekció): csak belső saját aránnyal a külső elválasztó
+egésszel vagy semmivel mozdul, a felfedés minden új leírásra és a befoglaló csoport felhasználói
+mozdítására újra számol, és a saját arány új, csak felhasználói írású kulcson áll. Az e2e készlet
+391-ről **407** tesztre nő (16 új teszt az `approval-prompt.spec.ts` fájlban; három e2e fájl tároló kulcs
+konstansa az új névre igazítva, és a `sse-real-server.spec.ts` négy meglévő tesztje a panelek
+változatlanságával bővítve). Az `apps/web` termékkódjából az `is-own-layout-sizes.ts` törölve.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**407 teszt, mind zöld**; három `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (43.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1674 / 1689     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 773 / 784       | 98.59    | 98.58 -> **98.59**          | 11 -> 11                       |
+| functions  | 559 / 562       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1614 / 1629     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak, a
+`run-view` téma minden fájlja mind a négy metrikán 100 százalék. A statements, a functions és a
+lines összes darabszáma csökkent (1691 -> 1689, 564 -> 562, 1630 -> 1629), mert a fedett
+`is-own-layout-sizes.ts` törlődött, a fedetlen darab egyik metrikán sem nőtt, és a százalék
+ezeken változatlan. A branches összes darabszáma nőtt (780 -> 784), a fedetlen nem, tehát a
+küszöb a mért értékre emelkedik, felfelé kerekítés nélkül (`apps/web/package.json`).

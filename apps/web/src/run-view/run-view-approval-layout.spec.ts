@@ -47,23 +47,26 @@ describe('run-view-approval-layout', () => {
     globalThis.localStorage.clear();
   });
 
-  it('a kulcs eltér a gráf és a transcript arányáétól, az alapértelmezés fele-fele', () => {
-    expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).toBe('eggRunViewTranscriptApprovalLayout');
+  it('a kulcs új és eltér a gráf és a transcript arányáétól, az alapértelmezés fele-fele', () => {
+    expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).toBe('eggRunViewTranscriptApprovalUserLayout');
     expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).not.toBe(RUN_VIEW_LAYOUT_STORAGE_KEY);
     expect(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES).toEqual([50, 50]);
   });
 
-  it('a régi, sorrendjében eldönthetetlen kulcson tárolt arány figyelmen kívül marad: az alapértelmezés jön, nem egy fordított arány', () => {
+  it('a két régi kulcs értékét nem olvassa: az egyik a kezdőértéket felhasználói húzás nélkül is tartalmazhatja, a másik sorrendje eldönthetetlen', () => {
+    // Az `eggRunViewTranscriptApprovalLayout` kulcsra a `Resizable`
+    // 2026-09-25-ig minden megnyitáskor a kezdőértéket is írta.
+    globalThis.localStorage.setItem('eggRunViewTranscriptApprovalLayout', JSON.stringify([50, 50]));
     // A CLI sorrend (2743b6b) előtt ezen a kulcson a pár (jóváhagyás,
     // transcript) sorrendben állt: a [30, 70] egy 70 százalékos transcriptet
     // jelentett, a mostani sorrendben olvasva 30 százalékosat adna.
     globalThis.localStorage.setItem('eggRunViewApprovalLayout', JSON.stringify([30, 70]));
-    expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+    expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
   });
 
   describe('readStoredRunViewApprovalLayoutSizes', () => {
-    it('tárolt érték nélkül az alapértelmezést adja', () => {
-      expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+    it('tárolt érték nélkül nincs saját arány', () => {
+      expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
     });
 
     it('érvényes tárolt értéket ad vissza', () => {
@@ -71,25 +74,33 @@ describe('run-view-approval-layout', () => {
       expect(readStoredRunViewApprovalLayoutSizes()).toEqual([35, 65]);
     });
 
-    it('hibás JSON esetén az alapértelmezésre esik vissza', () => {
+    it('a pontosan az alapértelmezésre visszahúzott arány is saját: a tárolt pár jön vissza', () => {
+      globalThis.localStorage.setItem(
+        RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY,
+        JSON.stringify(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES),
+      );
+      expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+    });
+
+    it('hibás JSON esetén nincs saját arány', () => {
       globalThis.localStorage.setItem(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY, 'nem JSON');
-      expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+      expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
     });
 
-    it('érvényes JSON, de rossz alak esetén az alapértelmezésre esik vissza', () => {
+    it('érvényes JSON, de rossz alak esetén nincs saját arány', () => {
       globalThis.localStorage.setItem(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY, JSON.stringify({ approval: 35 }));
-      expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+      expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
     });
 
-    it('dobó localStorage esetén az alapértelmezésre esik vissza, nem tör el', () => {
+    it('dobó localStorage esetén nincs saját arány, nem tör el', () => {
       withThrowingLocalStorage(() => {
-        expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+        expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
       });
     });
 
     it('a gráf és a transcript kulcsára írt érték nem szivárog át', () => {
       globalThis.localStorage.setItem(RUN_VIEW_LAYOUT_STORAGE_KEY, JSON.stringify([20, 80]));
-      expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
+      expect(readStoredRunViewApprovalLayoutSizes()).toBeUndefined();
     });
   });
 

@@ -2286,9 +2286,19 @@ async function listHeight(list: Locator): Promise<number> {
   return list.evaluate((element) => element.getBoundingClientRect().height);
 }
 
+/**
+ * A futás nézet két `Resizable` csoportjának összes panelje, a kiírt
+ * `flex-basis` értékkel (a csoportok belső állapota, kerekítés nélkül).
+ */
+async function panelBases(page: Page): Promise<readonly string[]> {
+  return page
+    .locator('.run-view-screen .resizable-panel')
+    .evaluateAll((panels) => panels.map((panel) => (panel instanceof HTMLElement ? panel.style.flexBasis : '')));
+}
+
 for (const { name, layout } of APPROVAL_LAYOUTS) {
   for (const theme of ['light', 'dark'] as const) {
-    test(`látható jóváhagyás mellett a lista követ: minden új sor után az utolsó sor és a kérdés is teljesen látszik (${name}, ${theme} téma)`, async ({
+    test(`látható jóváhagyás mellett a lista követ: minden új sor után az utolsó sor és a kérdés is teljesen látszik, és az elválasztók nem mozdulnak (${name}, ${theme} téma)`, async ({
       page,
     }) => {
       const streamServer = await openFollowingTranscript(
@@ -2300,8 +2310,14 @@ for (const { name, layout } of APPROVAL_LAYOUTS) {
         stateWithApproval(),
       );
       await expectQuestionVisible(page);
+      // A felfedés a képernyő minden renderelésekor, tehát minden érkező
+      // keretre újra számol (`Resizable` `reveal`, 2026-09-26): egy
+      // változatlan elrendezésre ugyanazt a tervet kell adnia, különben az
+      // elválasztók keretről keretre elcsúsznának.
+      const basesBefore = await panelBases(page);
       await expectFollowingAfterArrivals(page, streamServer, transcriptList(page), REPLAYED_ROW_COUNT);
       await expectQuestionVisible(page);
+      expect(await panelBases(page)).toEqual(basesBefore);
     });
 
     test(`látható jóváhagyás mellett a kinyitott utolsó sor a helyén marad, az új sor a gomb számába kerül (${name}, ${theme} téma)`, async ({

@@ -27,7 +27,11 @@
 // közé eső transcript magassága, a Tab lépések az elválasztótól a
 // "Jóváhagyás" gombig, a régió és az ARIA kötés) és 11. a külső elválasztó
 // `End` állása mindkét osztott sávban (O-13), mindkettő a research 11.
-// szekciójához (a CLI sorrend, 2026-09-25).
+// szekciójához (a CLI sorrend, 2026-09-25). 12. a kérdés elfér-e és 13. a Tab
+// lépések (research 12. szekció). 14. a döntés hibaüzenete (az akciósáv
+// megnő) és 15. a külső elválasztó húzása (a transcript oldal mérete és a
+// szöveg tördelése változik), mindkettő a változás előtt és után, a research
+// 13. szekciójához (2026-09-26).
 //
 // NEM E2E TESZT, és nem kapu: állítás nincs benne, csak számlálás. A
 // kiválasztók szándékosan a panel több alakját is felismerik (a görgethető
@@ -1123,6 +1127,7 @@ const QUESTION_VIEWPORTS = [
   { width: 1440, height: 600 },
   { width: 1440, height: 900 },
   { width: 375, height: 812 },
+  { width: 375, height: 667 },
 ] as const;
 
 const LONG_APPROVAL: PendingApproval = {
@@ -1133,10 +1138,23 @@ const LONG_APPROVAL: PendingApproval = {
   payload: Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`mezo${String(index + 1)}`, index + 1])),
 };
 
+/**
+ * A tárolt saját arány. A jelenet a régi és az új kulcsra is ír (2026-09-26
+ * óta a saját arány új, csak felhasználói írású kulcson áll, és a régit
+ * senki nem olvassa, `run-view-layout.ts`): így ugyanaz a jelenet a kulcscsere
+ * előtti kódon (a régi kulcsot olvassa) és utána (az újat) is ugyanazt az
+ * esetet méri.
+ */
 const QUESTION_STORAGE = {
   nincs: undefined,
-  'sajat-kulso': ['eggRunViewLayout', [60, 40]],
-  'sajat-belso': ['eggRunViewTranscriptApprovalLayout', [70, 30]],
+  'sajat-kulso': [
+    ['eggRunViewLayout', 'eggRunViewUserLayout'],
+    [60, 40],
+  ],
+  'sajat-belso': [
+    ['eggRunViewTranscriptApprovalLayout', 'eggRunViewTranscriptApprovalUserLayout'],
+    [70, 30],
+  ],
 } as const;
 
 async function readQuestionGeometry(page: Page): Promise<Record<string, unknown>> {
@@ -1210,6 +1228,11 @@ async function readQuestionGeometry(page: Page): Promise<Record<string, unknown>
       innerValue: separator('A transcript és a jóváhagyás aránya'),
       storedOuter: globalThis.localStorage.getItem('eggRunViewLayout'),
       storedInner: globalThis.localStorage.getItem('eggRunViewTranscriptApprovalLayout'),
+      storedOuterUser: globalThis.localStorage.getItem('eggRunViewUserLayout'),
+      storedInnerUser: globalThis.localStorage.getItem('eggRunViewTranscriptApprovalUserLayout'),
+      visibleRows: [...(list?.querySelectorAll(':scope [role="listitem"]') ?? [])].filter(
+        (row) => (visibleRatio(row) ?? 0) > 0,
+      ).length,
     };
   });
 }
@@ -1237,8 +1260,10 @@ for (const theme of THEMES) {
       test(name, async ({ page }) => {
         if (stored !== undefined) {
           await page.addInitScript(
-            ([key, value]) => {
-              globalThis.localStorage.setItem(key, JSON.stringify(value));
+            ([keys, value]) => {
+              for (const key of keys) {
+                globalThis.localStorage.setItem(key, JSON.stringify(value));
+              }
             },
             [stored[0], stored[1]] as const,
           );
@@ -1300,6 +1325,117 @@ for (const theme of THEMES) {
           approvals: count,
           shownPage,
           ...(await walkTabToApprove(page, separator)),
+        });
+      });
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// 14. A döntés hibaüzenete (egy független ellenőrzés hiánylistája,
+//     2026-09-26): a `conflict` válasz üzenete az akciósávban jelenik meg, a
+//     régió megnő, és a belső csoport ennyivel kisebb lesz. A kérdés
+//     geometriája a kattintás előtt és a hibaüzenet megjelenése után, saját
+//     arány nélkül, két témában.
+// ------------------------------------------------------------
+const ERROR_VIEWPORTS = [
+  { width: 375, height: 812 },
+  { width: 1440, height: 600 },
+  { width: 768, height: 1024 },
+  { width: 1000, height: 700 },
+  { width: 1440, height: 900 },
+] as const;
+
+for (const theme of THEMES) {
+  for (const viewport of ERROR_VIEWPORTS) {
+    test(`hibauzenet ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
+      await mockApprovalRunWithTranscript(
+        page,
+        [FIRST_APPROVAL],
+        [
+          mockRoute('decideApproval', async (route) =>
+            route.fulfill(jsonBody({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, 409)),
+          ),
+        ],
+      );
+      await openRun(page, theme, viewport);
+      if (viewport.width < TABBED_WIDTH_LIMIT) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
+      const before = await readQuestionGeometry(page);
+      await page
+        .locator('.run-view-screen__transcript .drawer__footer')
+        .getByRole('button', { name: 'Elutasítás', exact: true })
+        .click();
+      await expect(page.locator('.run-view-screen__transcript .drawer__footer').getByRole('alert')).toBeAttached();
+      report('hibauzenet', {
+        theme,
+        viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+        before,
+        after: await readQuestionGeometry(page),
+      });
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// 15. A külső elválasztó húzása (egy független ellenőrzés hiánylistája,
+//     2026-09-26): a vízszintes sávban a transcript oldal keskenyebb lesz, a
+//     jóváhagyás szövege újratördel és magasabb lesz; a függőleges sávban a
+//     transcript oldal alacsonyabb lesz. Valódi egér húzással (a transcript
+//     oldal felé 200, illetve 150 pixel) és billentyűvel (három nyíl lépés
+//     ugyanarra), saját arány nélkül, két témában. A kérdés geometriája a
+//     húzás előtt és után.
+// ------------------------------------------------------------
+const DRAG_CASES = [
+  { width: 1440, height: 900, band: 'horizontal', distance: 200 },
+  { width: 1440, height: 600, band: 'horizontal', distance: 200 },
+  { width: 1024, height: 768, band: 'horizontal', distance: 200 },
+  { width: 900, height: 1000, band: 'vertical', distance: 150 },
+] as const;
+
+for (const theme of THEMES) {
+  for (const dragCase of DRAG_CASES) {
+    for (const input of ['eger', 'billentyu'] as const) {
+      const size = `${String(dragCase.width)}x${String(dragCase.height)}`;
+      test(`kulso-huzas ${theme} ${size} ${input}`, async ({ page }) => {
+        await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+        await openRun(page, theme, { width: dragCase.width, height: dragCase.height });
+        await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
+        const separator = page.getByRole('separator', { name: OUTER_SEPARATOR_NAME });
+        const valueBefore = (await separator.getAttribute('aria-valuenow')) ?? '';
+        const before = await readQuestionGeometry(page);
+        if (input === 'eger') {
+          const box = await separator.boundingBox();
+          if (box === null) {
+            throw new Error('a külső elválasztó nem látszik');
+          }
+          const startX = box.x + box.width / 2;
+          const startY = box.y + box.height / 2;
+          const isHorizontal = dragCase.band === 'horizontal';
+          await page.mouse.move(startX, startY);
+          await page.mouse.down();
+          await page.mouse.move(
+            isHorizontal ? startX + dragCase.distance : startX,
+            isHorizontal ? startY : startY + dragCase.distance,
+            { steps: 10 },
+          );
+          await page.mouse.up();
+        } else {
+          await separator.focus();
+          const key = dragCase.band === 'horizontal' ? 'ArrowRight' : 'ArrowDown';
+          for (let step = 0; step < 3; step += 1) {
+            await separator.press(key);
+          }
+        }
+        await expect(separator).not.toHaveAttribute('aria-valuenow', valueBefore);
+        report('kulso-huzas', {
+          theme,
+          viewport: size,
+          input,
+          before,
+          after: await readQuestionGeometry(page),
         });
       });
     }
