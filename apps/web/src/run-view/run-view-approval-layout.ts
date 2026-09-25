@@ -4,11 +4,8 @@ import { isLayoutSizePair } from '../graph-editor/graph-editor-layout.ts';
  * A futás nézet transcript oldalán a transcript és a jóváhagyás szövege közti
  * húzható elválasztó perzisztált aránya (user döntés 2026-09-25: "húzható
  * elválasztó ... kezdetben felén, és a beállítás megmarad"), a panelek
- * sorrendjében: 2026-09-25 óta (a CLI sorrend) az első érték a transcripté,
- * a második a jóváhagyás szövegéé. A kulcs nem változott, tehát egy korábban,
- * a fordított sorrendben tárolt arány az új sorrendben olvasódik vissza; az
- * alapértelmezés szimmetrikus, és a tárolt érték a következő húzással
- * felülíródik. Ugyanaz a minta,
+ * sorrendjében: az első érték a transcripté, a második a jóváhagyás
+ * szövegéé (a CLI sorrend, 2026-09-25). Ugyanaz a minta,
  * mint a két meglévő elosztásé (`graph-editor-layout.ts`,
  * `run-view-layout.ts`): `egg` előtagú, camelCase kulcs, a meglévő
  * `isLayoutSizePair` typeguard, és `try`/`catch` mindkét irányban.
@@ -16,8 +13,16 @@ import { isLayoutSizePair } from '../graph-editor/graph-editor-layout.ts';
  * A kulcs SZÁNDÉKOSAN külön a gráf és a transcript arányáétól
  * (`eggRunViewLayout`): a kettő két különböző elosztás, az egyiken beállított
  * arány a másikra nem értelmes.
+ *
+ * **A kulcs új, a régi (`eggRunViewApprovalLayout`) értéke figyelmen kívül
+ * marad** (2026-09-25). A régi kulcs alatt a CLI sorrend (`2743b6b`) előtt a
+ * pár fordított sorrendben (jóváhagyás, transcript) állt, utána ugyanazon a
+ * kulcson már a mostaniban, tehát a régi érték sorrendje nem dönthető el: egy
+ * egyszeri átfordítás a `2743b6b` után mentett arányt rontaná el. Az új kulcs
+ * a nevében is a sorrendet mondja; a régi kulcson maradt érték senkit nem
+ * olvas, a következő húzás az új kulcsra ír.
  */
-export const RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewApprovalLayout';
+export const RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalLayout';
 
 /**
  * A kezdő arány, amikor nincs tárolt érték: a transcript és a jóváhagyás

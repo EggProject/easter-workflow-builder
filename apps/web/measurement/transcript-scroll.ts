@@ -29,10 +29,11 @@
 // `anchoring` jelenet ismétléseinek száma beállításonként, alapból 20, illetve
 // 10), `MEASURE_OVERFLOW_ANCHOR` (ha `auto`, a lista `overflow-anchor`
 // értékét a mérés idejére visszaállítja, így a böngésző görgetés rögzítése
-// mérhető, research 17. és 18. szekció), `MEASURE_JUMP_PLACEMENT` (ha `top`,
-// a lebegő "Ugrás az aljára" gombot a mérés idejére a lista aljáról a
-// tetejére teszi, így a két hely takarása összevethető, research 20.
-// szekció).
+// mérhető, research 17. és 18. szekció), `MEASURE_JUMP_BAND` (ha `none`, a
+// lista felső belső margóját a mérés idejére nullára állítja, így a margó
+// nélküli, a lista tetején lebegő gomb takarása mérhető; research 21.
+// szekció, a research 20. szekció `MEASURE_JUMP_PLACEMENT=top` kapcsolójának
+// utódja, mióta a gomb a lista tetején áll).
 import type { Server } from 'node:http';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
@@ -119,10 +120,8 @@ async function open(
   if (process.env['MEASURE_OVERFLOW_ANCHOR'] === 'auto') {
     await page.addStyleTag({ content: '.transcript-panel__list { overflow-anchor: auto !important; }' });
   }
-  if (process.env['MEASURE_JUMP_PLACEMENT'] === 'top') {
-    await page.addStyleTag({
-      content: '.transcript-panel__jump { top: var(--ep-space-2) !important; bottom: auto !important; }',
-    });
+  if (process.env['MEASURE_JUMP_BAND'] === 'none') {
+    await page.addStyleTag({ content: '.transcript-panel__list { padding-top: 0 !important; }' });
   }
   return { streamServer, list: transcriptList(page) };
 }
@@ -156,6 +155,39 @@ async function stableLastRowOverflow(page: Page, list: Locator, rowCount: number
 async function jumpButtonText(page: Page): Promise<string | undefined> {
   const button = page.getByRole('button', { name: /Ugrás az aljára/ });
   return (await button.count()) > 0 ? ((await button.textContent()) ?? undefined) : undefined;
+}
+
+/**
+ * A lebegő gomb helye a lista látható területéhez képest, a lista felső
+ * belső margója (research 21. szekció), és az első sor teteje a gomb alja
+ * alatt (pozitív: a sor a gomb alatt kezdődik, nem takart; `undefined`, ha az
+ * első sor nincs kirajzolva).
+ */
+async function jumpPlacement(list: Locator, jump: Locator): Promise<Readonly<Record<string, number | undefined>>> {
+  const box = await jump.boundingBox();
+  if (box === null) {
+    return {};
+  }
+  const geometry = await list.evaluate((element, button) => {
+    const visibleTop = element.getBoundingClientRect().top + element.clientTop;
+    const firstRow = element.querySelector('[role="listitem"][aria-posinset="1"]');
+    const paddingTop = element.computedStyleMap().get('padding-top');
+    return {
+      buttonTopMinusListTop: button.y - visibleTop,
+      listBottomMinusButtonBottom: visibleTop + element.clientHeight - (button.y + button.height),
+      buttonHeight: button.height,
+      listPaddingTop: paddingTop instanceof CSSUnitValue ? paddingTop.value : undefined,
+      firstRowTopMinusButtonBottom:
+        firstRow === null ? undefined : firstRow.getBoundingClientRect().top - (button.y + button.height),
+    };
+  }, box);
+  return {
+    buttonTopMinusListTop: round(geometry.buttonTopMinusListTop),
+    listBottomMinusButtonBottom: round(geometry.listBottomMinusButtonBottom),
+    buttonHeight: round(geometry.buttonHeight),
+    listPaddingTop: geometry.listPaddingTop,
+    firstRowTopMinusButtonBottom: round(geometry.firstRowTopMinusButtonBottom),
+  };
 }
 
 // ------------------------------------------------------------
@@ -755,6 +787,20 @@ for (const { name, layout } of LAYOUTS) {
         (element) => element.getBoundingClientRect().top + element.clientTop + element.clientHeight,
       );
       const covered = await rowsUnderJumpButton(list, jump);
+      // A kinyitott sor fejlécének a gomb doboza alá eső magassága (0: a
+      // fejléc egyetlen képpontját sem takarja).
+      const headerBox = await list
+        .locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`)
+        .getByRole('button')
+        .boundingBox();
+      const jumpBox = await jump.boundingBox();
+      const headerUnderButton =
+        headerBox === null || jumpBox === null
+          ? undefined
+          : Math.max(
+              0,
+              Math.min(headerBox.y + headerBox.height, jumpBox.y + jumpBox.height) - Math.max(headerBox.y, jumpBox.y),
+            );
       report('gombsav', {
         layout: name,
         theme,
@@ -762,8 +808,10 @@ for (const { name, layout } of LAYOUTS) {
         headerTopDelta: round((after?.headerTop ?? NaN) - (before?.headerTop ?? NaN)),
         headerVisibleBefore: round(before?.headerVisible),
         headerVisibleAfter: round(after?.headerVisible),
+        headerUnderButton: round(headerUnderButton),
         listTopMinusButtonBottom: round((after?.listTop ?? NaN) - buttonBottom),
         listVisibleBottomMinusButtonBottom: round(listVisibleBottom - buttonBottom),
+        ...(await jumpPlacement(list, jump)),
         rowsUnderButton: covered.map((row) => row.position),
         unreachableRowsUnderButton: covered.filter((row) => !row.isReachableByScrolling).map((row) => row.position),
         button: await jumpButtonText(page),
@@ -817,7 +865,7 @@ for (const { name, layout } of LAYOUTS) {
           layout: name,
           theme,
           target: target.label,
-          placement: process.env['MEASURE_JUMP_PLACEMENT'] ?? 'bottom',
+          band: process.env['MEASURE_JUMP_BAND'] ?? 'default',
           deltas,
           buttons,
           rowsUnderButton: covered,
@@ -844,9 +892,11 @@ for (const { name, layout } of LAYOUTS) {
         const panel = element.closest('.transcript-panel');
         const listBox = element.getBoundingClientRect();
         const panelBox = panel?.getBoundingClientRect();
+        const paddingTop = element.computedStyleMap().get('padding-top');
         return {
           listHeight: listBox.height,
           listClientHeight: element.clientHeight,
+          listPaddingTop: paddingTop instanceof CSSUnitValue ? paddingTop.value : undefined,
           panelHeight: panelBox?.height,
           listTopMinusPanelTop: panelBox === undefined ? undefined : listBox.top - panelBox.top,
           listBottomMinusPanelBottom: panelBox === undefined ? undefined : listBox.bottom - panelBox.bottom,
@@ -857,6 +907,7 @@ for (const { name, layout } of LAYOUTS) {
         theme,
         listHeight: round(geometry.listHeight),
         listClientHeight: geometry.listClientHeight,
+        listPaddingTop: geometry.listPaddingTop,
         panelHeight: round(geometry.panelHeight),
         listTopMinusPanelTop: round(geometry.listTopMinusPanelTop),
         listBottomMinusPanelBottom: round(geometry.listBottomMinusPanelBottom),
@@ -867,13 +918,35 @@ for (const { name, layout } of LAYOUTS) {
 }
 
 // ------------------------------------------------------------
-// 11. A lebegő gomb takarása felgörgetett listán (research 20. szekció):
-//     20 + 10 sor, kézzel (egérkerékkel) a lista tetejére, majd egy új sor,
-//     és a gomb megjelenik. Mérve a gomb alatti sorok, és hogy görgetéssel
-//     kiszabadíthatók-e; utána a legfelső takart sor kiszabadítása
-//     egérkerékkel, és a sor helye a gombhoz és a lista látható területéhez
-//     képest (negatív `rowBottomMinusButtonTop`: a sor a gomb fölött áll).
+// 11. A lebegő gomb takarása felgörgetett listán (research 20. és 21.
+//     szekció): 20 + 10 sor, kézzel (egérkerékkel) a lista tetejére, majd egy
+//     új sor, és a gomb megjelenik. Mérve a lista tetején a gomb alatti sorok,
+//     és hogy görgetéssel kiszabadíthatók-e, a gomb helye és az első sor
+//     teteje a gomb alja alatt; utána a lista görgetési tartományának felénél
+//     ugyanez, és az ott legelső takart sor kiszabadítása egérkerékkel a gomb
+//     szabad oldalára (a lista tetején álló gombnál alá, az alján állónál
+//     fölé), a sor helyével a gombhoz és a lista látható területéhez képest.
 // ------------------------------------------------------------
+async function rowPlacement(
+  list: Locator,
+  jump: Locator,
+  position: number,
+): Promise<Readonly<Record<string, number | undefined>>> {
+  const buttonBox = await jump.boundingBox();
+  const row = await list.evaluate((element, rowPosition) => {
+    const item = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"]`);
+    const visibleTop = element.getBoundingClientRect().top + element.clientTop;
+    const box = item?.getBoundingClientRect();
+    return { top: box?.top, bottom: box?.bottom, visibleTop, visibleBottom: visibleTop + element.clientHeight };
+  }, position);
+  return {
+    rowTopMinusButtonBottom: round((row.top ?? NaN) - ((buttonBox?.y ?? NaN) + (buttonBox?.height ?? NaN))),
+    rowBottomMinusButtonTop: round((row.bottom ?? NaN) - (buttonBox?.y ?? NaN)),
+    rowTopMinusVisibleTop: round((row.top ?? NaN) - row.visibleTop),
+    rowBottomMinusVisibleBottom: round((row.bottom ?? NaN) - row.visibleBottom),
+  };
+}
+
 for (const { name, layout } of LAYOUTS) {
   for (const theme of THEMES) {
     test(`takaras ${name} ${theme}`, async ({ page }) => {
@@ -888,40 +961,46 @@ for (const { name, layout } of LAYOUTS) {
       const jump = page.getByRole('button', { name: /Ugrás az aljára/ });
       await expect(jump).toBeVisible();
       await animationFrames(page, 10);
-      const covered = await rowsUnderJumpButton(list, jump);
-      const [first] = covered;
+      const coveredAtTop = await rowsUnderJumpButton(list, jump);
+      const placementAtTop = await jumpPlacement(list, jump);
+      const scrollTopAtTop = await list.evaluate((element) => element.scrollTop);
+
+      await list.evaluate((element) => {
+        element.scrollTo({ top: Math.round((element.scrollHeight - element.clientHeight) / 2) });
+      });
+      await animationFrames(page, 10);
+      const coveredInMiddle = await rowsUnderJumpButton(list, jump);
+      const [first] = coveredInMiddle;
       let freed: Readonly<Record<string, unknown>> = {};
       if (first !== undefined) {
+        const isButtonAtTop =
+          (placementAtTop['buttonTopMinusListTop'] ?? NaN) < (placementAtTop['listBottomMinusButtonBottom'] ?? NaN);
         await list.hover();
-        await page.mouse.wheel(0, Math.ceil(first.shiftAbove));
+        await page.mouse.wheel(0, isButtonAtTop ? Math.floor(first.shiftBelow) : Math.ceil(first.shiftAbove));
         await animationFrames(page, 20);
-        const buttonBox = await jump.boundingBox();
-        const buttonTop = buttonBox?.y;
-        const row = await list.evaluate((element, position) => {
-          const item = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
-          const visibleTop = element.getBoundingClientRect().top + element.clientTop;
-          const box = item?.getBoundingClientRect();
-          return {
-            top: box?.top,
-            bottom: box?.bottom,
-            visibleTop,
-            visibleBottom: visibleTop + element.clientHeight,
-          };
-        }, first.position);
+        const coveredAfterWheel = await rowsUnderJumpButton(list, jump);
         freed = {
           freedRow: first.position,
-          rowBottomMinusButtonTop: round((row.bottom ?? NaN) - (buttonTop ?? NaN)),
-          rowTopMinusVisibleTop: round((row.top ?? NaN) - row.visibleTop),
-          rowBottomMinusVisibleBottom: round((row.bottom ?? NaN) - row.visibleBottom),
+          freedTo: isButtonAtTop ? 'below' : 'above',
+          ...(await rowPlacement(list, jump, first.position)),
+          stillUnderButton: coveredAfterWheel.some((row) => row.position === first.position),
           buttonAfterWheel: await jumpButtonText(page),
         };
       }
       report('takaras', {
         layout: name,
         theme,
-        placement: process.env['MEASURE_JUMP_PLACEMENT'] ?? 'bottom',
-        rowsUnderButton: covered.map((row) => row.position),
-        unreachableRowsUnderButton: covered.filter((row) => !row.isReachableByScrolling).map((row) => row.position),
+        band: process.env['MEASURE_JUMP_BAND'] ?? 'default',
+        scrollTopAtTop,
+        rowsUnderButtonAtTop: coveredAtTop.map((row) => row.position),
+        unreachableRowsUnderButtonAtTop: coveredAtTop
+          .filter((row) => !row.isReachableByScrolling)
+          .map((row) => row.position),
+        ...placementAtTop,
+        rowsUnderButtonInMiddle: coveredInMiddle.map((row) => row.position),
+        unreachableRowsUnderButtonInMiddle: coveredInMiddle
+          .filter((row) => !row.isReachableByScrolling)
+          .map((row) => row.position),
         ...freed,
       });
     });

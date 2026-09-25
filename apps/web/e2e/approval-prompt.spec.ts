@@ -654,7 +654,7 @@ for (const theme of ['light', 'dark'] as const) {
  * (`run-view-approval-layout.ts`), a `run-view.spec.ts` azonos mintájú
  * tesztjeihez hasonlóan szó szerint: a teszt a tárolt ALAKOT is állítja.
  */
-const APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewApprovalLayout';
+const APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalLayout';
 
 test('hibás alakú tárolt arányra az elválasztó felén áll, és a helyes alak íródik vissza', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });

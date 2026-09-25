@@ -93,16 +93,23 @@ szünetet lezárja, és ha a mérés elmarad (a sor a mérése előtt leszerelő
 fülváltáskor), az ugrás gomb és a kézi visszatérés az aljára is (research 16-18. szekció). Az
 érkezés utáni első, még a régi tartományt leíró `onRowsRendered` jelentés nem az alj elhagyása
 (`is-pre-arrival-range-report.ts`), különben nem teli listán a szünet egy hamis "elhagyás, majd
-visszatérés" párral lezárulna (research 19. szekció). **Az ugrás gomb a lista fölött lebeg**
-(user döntés 2026-09-25, "Lista fölé kerüljön"): a lista alján, középen, a tartalma fölé
-rétegezve, tehát a lista a teljes magasságot kapja, és a gomb megjelenése a listát nem
-mozdítja; új esemény nélkül a gomb nincs a DOM-ban, látható állapotban a DOM-ban a lista előtt
+visszatérés" párral lezárulna (research 19. szekció). **Az ugrás gomb a lista tetején lebeg, a
+lista felső belső margójában** (user döntés 2026-09-25, "Felül, belső margóval"): a lista
+`padding-top` értéke a gomb két `--ep-space-2` térköze plusz a design system `sm` gombjának 28
+pixele, a görgetett tartalom része, nem fix sáv; a lista a teljes magasságot kapja, a gomb
+megjelenése semmit nem mozdít, a lista legtetején az első sor a gomb alatt kezdődik, alul pedig a
+gomb semmit nem takar. A `react-window` a látható magasságot a `ResizeObserver` `contentRect`
+értékéből veszi (a margó nélkül), a sorok pedig a margó alól indulnak, ezért a lista alja, a
+predikátum és a `scrollToRow` a margóval is pontos (`transcript-panel.css`, research 21.
+szekció). Új esemény nélkül a gomb nincs a DOM-ban, látható állapotban a DOM-ban a lista előtt
 áll (Tab sorrend). **Saját kiegészítés, a design systemben nincs lista fölé lebegő gomb**: a
 gomb a design system `Button`-ja, csak az elhelyezése (`transcript-panel__list-frame`,
-`transcript-panel__jump`) és a toast árnyék tokenje saját. A hely (alja vagy teteje) a döntésből
-nem egyértelmű, nyitott pont (SPEC-008 7.4, 14.2 O-14, research 20. szekció). A lista magassága
-egész pixelre lefelé kerekített (`round(down, 100%, 1px)`), mert a görgetési tartomány egész
-pixel, és egy tört magasságú lista utolsó sorának törtje nem látszana (research 20. (H)). A
+`transcript-panel__jump`, a lista felső belső margója) és a toast árnyék tokenje saját (SPEC-008
+7.4, 14.1 O-14). Ahol a lista az egy sornyi minimumán áll, a margó után 9 pixel marad a
+tartalomnak, és a gomb ott a látható sort takarja: nyitott pont (SPEC-008 14.2 O-15). A lista
+magassága a margóval együtt (`box-sizing: border-box`) egész pixelre lefelé kerekített
+(`round(down, 100%, 1px)`), mert a görgetési tartomány egész pixel, és egy tört magasságú lista
+utolsó sorának törtje nem látszana (research 20. (H)). A
 listán a böngésző görgetés rögzítése ki van kapcsolva (`overflow-anchor: none`, research 17. és 18. szekció). A görgetés számait a `measurement/transcript-scroll.ts` mérő eszköz adja
 (`bun run measure:transcript`), képet nem ír. A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
 (`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
@@ -211,8 +218,10 @@ perzisztálódik, a szerkesztő már bevált mintája szerint, és a typeguard n
 `graph-editor-layout.ts` `isLayoutSizePair` guardját használja. A transcript oldalon egy MÁSODIK,
 függőleges `Resizable` áll a transcript (felül) és a jóváhagyás szövege (alul) között
 (`RunViewTranscriptSide.tsx`, user döntések 2026-09-25), kezdetben felén, az arány a
-`run-view-approval-layout.ts` `eggRunViewApprovalLayout` kulcsán perzisztálódik, ugyanezzel a
-mintával, a panelek sorrendjében (transcript, jóváhagyás). Csak látott jóváhagyás mellett áll, és
+`run-view-approval-layout.ts` `eggRunViewTranscriptApprovalLayout` kulcsán perzisztálódik,
+ugyanezzel a mintával, a panelek sorrendjében (transcript, jóváhagyás). A kulcs a CLI sorrend után
+új: a korábbi `eggRunViewApprovalLayout` alatt mindkét sorrend előfordulhat, tehát az értéke
+figyelmen kívül marad (egy átfordítás a CLI sorrend után mentett arányt rontaná el). Csak látott jóváhagyás mellett áll, és
 a két alak ugyanazt a fát rajzolja (a transcript az első gyerek), hogy a transcript panel ne
 szereljen le. A külső elrendezés `run-view.css` szabályai ezért a külső csoport KÖZVETLEN
 gyerekére szűkülnek (a gráf panel `overflow: hidden` szabálya különben a belső paneleket is
@@ -484,11 +493,12 @@ minden képre. A mért értékek táblázata:
 **A szentesített út GÉPI kényszer, nem csak szabály** (2026-09-15). A csővezeték minden futása
 bizonyítékot hagy az `e2e/screenshot-manifest.json` fájlban: a fixtúra és a szentesített script
 `sha256` lenyomatát, plusz képenként azoknak az éleknek az azonosítóját, amiknek a vonalát a pixel
-mérés ténylegesen kifestettnek találta. A `tooling/scripts/src/screenshot-pipeline/` téma hat
-invariánsa ezt őrzi a `bun run test` kapun: a szentesített fájlon kívül semmi nem írhat képernyőképet
-lemezre, a szentesített script nem tarthat saját gráfot vagy saját mockot, és ha a fixtúra vagy a
-script megváltozik, a lenyomat elavul, tehát a kapu bukik, amíg a `bun run screenshots` újra le nem
-fut. A manifeszt nyers mért számot NEM tartalmaz (`.claude/CLAUDE.md` 4. szekció 3. pont), ezért két
+mérés ténylegesen kifestettnek találta. A `tooling/scripts/src/screenshot-pipeline/` téma
+invariánsai (a számozott tesztjei; a listájuk és a hatókörük a `tooling/scripts` `CLAUDE.md`
+fájljában áll) ezt őrzik a `bun run test` kapun, többek között: a szentesített fájlon kívül
+egyetlen commitolt fájl sem írhat képernyőképet lemezre az ismert írási utakon, a szentesített
+script nem tarthat saját gráfot vagy saját mockot, és ha a fixtúra vagy a script megváltozik, a
+lenyomat elavul, tehát a kapu bukik, amíg a `bun run screenshots` újra le nem fut. A manifeszt nyers mért számot NEM tartalmaz (`.claude/CLAUDE.md` 4. szekció 3. pont), ezért két
 futás között bájtra azonos, ha semmi valódi nem változott.
 
 Ha a csomag valódi tartalmat kap, a `src/index.ts` `IS_WEB_PLACEHOLDER` konstansát törölni kell

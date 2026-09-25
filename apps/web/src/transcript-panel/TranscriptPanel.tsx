@@ -103,13 +103,15 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * kinyitása után ennek új identitása jelzi, hogy a lista már a mért
  * magassággal számol.
  *
- * **A gomb a lista fölött lebeg** (user döntés 2026-09-25: "Lista fölé
- * kerüljön", SPEC-008 7.4): a lista alján, középen, a lista tartalma fölé
- * rétegezve, tehát a lista a teljes magasságot kapja, és a gomb megjelenése a
- * listát nem mozdítja. A gomb maga a design system `Button`-ja, csak az
- * elhelyezése saját kiegészítés (`transcript-panel.css`), mert a design
- * systemben nincs lista fölé lebegő gomb. Új esemény nélkül a gomb nincs a
- * DOM-ban, tehát nem fókuszálható, és kimarad a hozzáférhetőségi fából. A DOM
+ * **A gomb a lista tetején lebeg, a lista felső belső margójában** (user
+ * döntés 2026-09-25: "Felül, belső margóval", SPEC-008 7.4): középen, a lista
+ * tartalma fölé rétegezve. A margó a görgetett tartalom része, nem fix sáv,
+ * tehát a lista a teljes magasságot kapja, a gomb megjelenése semmit nem
+ * mozdít, a lista legtetején az első sor a gomb alatt kezdődik, alul pedig a
+ * gomb semmit nem takar (`transcript-panel.css`). A gomb maga a design system
+ * `Button`-ja, csak az elhelyezése saját kiegészítés, mert a design systemben
+ * nincs lista fölé lebegő gomb. Új esemény nélkül a gomb nincs a DOM-ban,
+ * tehát nem fókuszálható, és kimarad a hozzáférhetőségi fából. A DOM
  * sorrendben a lista előtt áll, így a Tab sorrend és a képernyőolvasó a sorok
  * előtt éri el.
  *
@@ -183,7 +185,8 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
               aria-label="Futás eseményei"
               className="transcript-panel__list"
               // A lista magassága egész pixel (a keretnél legfeljebb egy
-              // pixellel kisebb): a húzható elválasztó százalékos felosztása
+              // pixellel kisebb, a felső belső margóval együtt, mert a lista
+              // `border-box`): a húzható elválasztó százalékos felosztása
               // tört magasságot ad (mérve 375x812-n 85,5 pixel), a böngésző
               // görgetési tartománya viszont egész pixelre kerekít (a legnagyobb
               // `scrollTop` 974 volt a szükséges 974,5 helyett), így az utolsó

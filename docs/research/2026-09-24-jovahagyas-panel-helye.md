@@ -680,7 +680,11 @@ Az elválasztó elsődleges panele a transcript lett (a W3C APG Window Splitter 
 értéke és neve az elsődleges panelé, <https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/>),
 ezért a neve "A transcript és a jóváhagyás aránya", és az `aria-valuenow` a transcript százaléka. A
 `localStorage` `eggRunViewApprovalLayout` kulcsa nem változott, a tárolt pár a panelek sorrendjében
-áll, tehát egy korábban tárolt arány az új sorrendben olvasódik vissza.
+áll, tehát egy korábban tárolt arány az új sorrendben olvasódik vissza. **Javítva (2026-09-25,
+később):** ez egy korábban mentett arányt fordítva töltött vissza, és a régi kulcs alatt azóta
+mindkét sorrend előfordulhat, tehát egy átfordítás sem egyértelmű; az arány új kulcson áll
+(`eggRunViewTranscriptApprovalLayout`), a régi kulcs értéke figyelmen kívül marad
+(`run-view-approval-layout.ts`, regressziós unit teszttel; SPEC-008 8. szekció 1. pont).
 
 ### 11.4 A külső elválasztó `End` állása (O-13), a teljes hatókörrel
 

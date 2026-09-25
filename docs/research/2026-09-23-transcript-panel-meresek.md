@@ -1134,7 +1134,9 @@ hely előre fenntartása: a `transcript-panel__header` sáv mindig a lista föl�
 system `Button` (`secondary`, `sm`) új esemény nélkül is, `visibility: hidden` alatt
 (`transcript-panel__jump--idle`): a doboz megmarad, a gomb nem fókuszálható, és kimarad a
 hozzáférhetőségi fából. A sáv magasságát a gomb maga adja, szám nélkül. Az ára egy állandó,
-gombnyi magas sáv a lista fölött.
+gombnyi magas sáv a lista fölött. **Felülírva (2026-09-25, 20. és 21. szekció):** a fenntartott
+sáv megszűnt; a gomb előbb a lista alján, majd a user "Felül, belső margóval" döntése óta a lista
+tetején, a lista felső belső margójában lebeg.
 
 `gombsav` jelenet: 20 + 10 sor, a lista alján a legutolsó sor kinyitva, majd egy új sor.
 
@@ -1299,7 +1301,8 @@ görgethető), mindkét kinyitott sorral, mindkét témában. A `takaras` jelene
 sor egérkerékkel a gomb fölé görgetve teljes egészében látszik (a sor alja pontosan a gomb
 tetején, 0 pixel), és a gomb a helyén marad, mert a lista még nem ért az aljára. A választott hely
 ezért a lista alja, középen; az ára, hogy a lista alján kinyitott utolsó sor fejlécét a megjelenő
-gomb takarja (B).
+gomb takarja (B). **Felülírva (2026-09-25, 21. szekció):** a user döntése a lista teteje, a lista
+tartalmának felső belső margójával, így a lista első sora sem takart, és alul sem takar semmit.
 
 **(D) A megvalósítás** (`TranscriptPanel.tsx`, `transcript-panel.css`): a lista egy
 `transcript-panel__list-frame` keretben áll (a lista inline `flex-grow: 1` és
@@ -1410,3 +1413,152 @@ repóbeli fixtúrával, mert képernyőképet lemezre kizárólag a szentesítet
 
 **NEM ELLENŐRZÖTT:** Firefox és WebKit; más ablakméret a két mértnél; hogy a `rovid-lista`
 átmeneti takarása a gomb megnyomására is feloldódik-e (nem mért).
+
+## 21. A lista tetején, belső margóban lebegő ugrás gomb (2026-09-25)
+
+**A kiindulás.** A 20. szekció a gombot a lista aljára tette, mert a lista tetején, margó nélkül a
+gomb alatt a lista első sora semmilyen görgetéssel nem szabadítható ki. Alul viszont éppen a lista
+alján kinyitott utolsó sor fejlécét takarta, amit a gomb sáv korábbi 36 pixeles lelökése miatt meg
+akartunk óvni (20. szekció (B)). A user döntése (2026-09-25, "Felül, belső margóval"): a gomb a
+lista tetején lebeg, és a lista tartalma felül egy gombnyi belső margót kap, ami a görgetéssel
+együtt eltűnik (a görgetett tartalom része, nem fix sáv), így a lista legelső sora is elérhető,
+alul pedig semmit nem takar; a virtualizáció a margót a mért magasságokkal összhangban kezelje.
+Minden szám a repóbeli mérő eszközből (`apps/web/measurement/transcript-scroll.ts`, a `gombsav` és
+a `takaras` jelenet bővítve, a `MEASURE_JUMP_PLACEMENT=top` kapcsoló helyett
+`MEASURE_JUMP_BAND=none`) vagy a Playwright futásokból jön, 1440x900-on és 375x812-n, két témában;
+a két téma minden sorban azonos értéket adott. "Előtte" a `2743b6b` (a gomb az `1bcface` óta a
+lista alján), "utána" a mostani kód, "margó nélkül" a mostani kód `MEASURE_JUMP_BAND=none` mellett.
+
+**(A) A megvalósítás** (`transcript-panel.css`): a gomb `top: var(--ep-space-2)`, a lista
+`padding-top: calc(2 * var(--ep-space-2) + 28px)` (44 pixel: a gomb két térköze és a design system
+`sm` gombja; a `.btn--icon.btn--sm` `block-size: 28px`, és a szöveges `.btn--sm` is ennyi: 2 x 7
+pixel belső margó, 12 pixeles betű 1-es sormagassággal, 2 x 1 pixel szegély,
+`packages/ui/src/button/button.css`; mérve a gomb 28 pixel magas) és `box-sizing: border-box`.
+Hogy a `react-window@2.3.1` a belső margóval miért pontos, azt a telepített forrás
+(`dist/react-window.js`) és a CSS specifikációk adják:
+
+- A sorok `position: absolute` elemek `transform: translateY(...)` eltolással, `top` érték nélkül
+  (a `List` sor `style` objektuma), tehát a `top` `auto`, és a sor a statikus helyéről indul, ami a
+  görgető doboz belső margója alatt van. Forrás: CSS 2.2 10.6.4 ("If all three of 'top', 'height',
+  and 'bottom' are auto, set 'top' to the static position",
+  <https://www.w3.org/TR/CSS22/visudet.html#abs-non-replaced-height>; megerősítés:
+  <https://www.w3.org/TR/CSS2/visudet.html>, <https://www.w3.org/TR/2008/REC-CSS2-20080411/visudet.html>).
+- A görgető doboz belső margója a görgethető terület része, tehát a görgetéssel együtt eltűnik.
+  Forrás: CSS Overflow 3, a "scrollable overflow area" része a doboz "own padding box"-a
+  (<https://www.w3.org/TR/css-overflow-3/>; megerősítés: <https://drafts.csswg.org/css-overflow-3/>,
+  <https://github.com/w3c/csswg-drafts/blob/main/css-overflow-3/Overview.bs>).
+- A könyvtár a látható magasságot egy `ResizeObserver` `contentRect.height` értékéből veszi (a
+  forrás `we` függvénye), ami a margót nem tartalmazza. Forrás: MDN, "the returned `contentRect` is
+  the element's content box" (<https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserverEntry/contentRect>;
+  megerősítés: <https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserverEntry>,
+  <https://web.dev/articles/resize-observer>). A `clientHeight` ezzel szemben tartalmazza a
+  margót (CSSOM View: "the unscaled height of the padding edge", <https://www.w3.org/TR/cssom-view-1/>;
+  megerősítés: <https://drafts.csswg.org/cssom-view/>,
+  <https://developer.mozilla.org/en-US/docs/Web/API/Element/clientHeight>), ezért a lista mérései
+  (`lastRowBottomOverflow`, `rowsUnderJumpButton`) változatlanul helyesek.
+- Következmény (a forrás `ee` és `Oe` függvénye): a sorok koordinátáiban a doboz valódi alsó éle
+  `scrollTop` plusz a tartalom magassága, pontosan az, amivel a könyvtár a látható tartományt és a
+  `scrollToRow({ align: 'end' })` célját számolja. A lista alja, a `stopIndex` predikátum és a
+  legnagyobb `scrollTop` (a méretező elem magassága mínusz a tartalom magassága) tehát a margóval is
+  pontos; a könyvtár "látható" tartományából éppen a margó sávja marad ki.
+- A `border-box` a `max-height: round(down, 100%, 1px)` értéket (20. szekció (H)) a margóval
+  együtt a dobozra teszi: CSS Box Sizing 3, a `box-sizing` "affects the interpretation of all sizing
+  properties" (<https://www.w3.org/TR/css-sizing-3/>; megerősítés:
+  <https://drafts.csswg.org/css-sizing-3/>,
+  <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/box-sizing>). Enélkül a
+  `max-height` a tartalom dobozára vonatkozna, ami a margóval kisebb a keretnél, tehát a kerekítés
+  hatástalan lenne.
+
+Egy első, üres "margó sor" a sorszámokat eltolná (a hook `stopIndex === rowCount - 1` predikátuma
+és az `aria-posinset` is), a becslése pedig az összecsukott sor 53 pixele lenne, tehát a mérésekor
+a lista elugrana (13. és 16. szekció). A `List` `children` propja a sorok UTÁN, a méretező előtt
+rajzolódik, és a forrás minden nem `aria-hidden` gyereket sorként mér (a `data-react-window-index`
+kiosztása), tehát a gomb sem állhat ott. Ez a két elvetett alternatíva a telepített forrásból
+következik, nem mértük.
+
+**(B) A lista magassága** (`lista-magassag`, követő lista, gomb nélkül): előtte és utána is 597
+(1440x900) és 409 (375x812) pixel, a `clientHeight` ugyanennyi, a lista teteje a panel tetejétől 71,
+illetve 92 pixelre; a felső belső margó előtte 0, utána 44 pixel. Fix sáv nincs.
+
+**(C) A gomb megjelenése** (`gombsav`: 20 + 10 sor, a lista alján a legutolsó sor kinyitva, majd
+egy új sor):
+
+| Állapot      | A lista és a fejléc elmozdulása | A fejlécből a gomb alatt | A gomb teteje a lista tetejétől | A gomb alatti sorok (1440 / 375) |
+| ------------ | ------------------------------- | ------------------------ | ------------------------------- | -------------------------------- |
+| előtte       | 0 / 0                           | 28 pixel                 | 561 / 373 (a lista alján)       | 30 / 30 (a kinyitott utolsó sor) |
+| utána        | 0 / 0                           | 0 pixel                  | 8 / 8                           | 19, 20 / 23 (a lista tetején)    |
+| margó nélkül | 0 / 0                           | 0 pixel                  | 8 / 8                           | 19, 20 / 23                      |
+
+Utána a lista tetején a gomb alatt álló sorok görgetéssel kiszabadíthatók (mindegyik
+`isReachableByScrolling`).
+
+**(D) A lista legteteje és a közepe** (`takaras`: 20 + 10 sor, egérkerékkel a lista tetejére, majd
+egy új sor; utána a görgetési tartomány felére, és az ott legelső takart sor kiszabadítása
+egérkerékkel):
+
+| Állapot      | A tetején a gomb alatti sorok (1440 / 375) | Az első sor teteje a gomb alja alatt | A közepén takart, kiszabadítva                           |
+| ------------ | ------------------------------------------ | ------------------------------------ | -------------------------------------------------------- |
+| előtte       | 11, 12 / 8 (a lista alján, görgethető)     | -589 / -401 (a gomb a lista alján)   | 21 / 19, a gomb fölé: a sor alja a gomb tetején, 0 pixel |
+| utána        | nincs / nincs                              | 8 / 8                                | 10 / 12, a gomb alá: a sor teteje a gomb alján, 0 pixel  |
+| margó nélkül | 1 / 1, görgetéssel sem kiszabadítható      | -36 / -36                            | 11 / 12, a gomb alá: a sor teteje a gomb alján, 0 pixel  |
+
+Utána a lista legtetején az első sor teteje ugyanannyival (8 pixel) áll a gomb alja alatt, mint a
+gomb teteje a lista teteje alatt: a gomb alatt a margó látszik, nem sor.
+
+**(E) A nem teli lista** (`rovid-lista`: 3 sor, az utolsó vagy az első kinyitva, egyenként 12 új
+sor; mindkét méret, mindkét téma, 96 érkezés): előtte 64 érkezés után takart a gomb sort, ebből 12
+után görgetéssel sem kiszabadíthatót (a 20. szekció (C) száma); utána 0 érkezés után; margó nélkül
+mind a 96 után az első sort, kiszabadíthatatlanul. A kinyitott fejléc elmozdulása és a gomb
+szövege ("1 ... 12 új esemény") előtte és utána azonos, 0 pixel.
+
+**(F) Változatlan viselkedés, utána** (a 13-20. szekció jelenetei): `alja` mind a négy helyzetben
+0; `kinyitas-ut` négy úton két témában 0 pixel, "2 új esemény"; `utolso-sor` 0 pixel, "1 új
+esemény", a következő sor alja 309 pixellel a lista látható alja alatt; `fulvaltas` a kerék után 0,
+0, 0, 0; `verseny` (`overflow-anchor: none`, 20 kísérlet beállításonként, 150 és 40 ms, két méret,
+két téma) 0/160; `anchoring` (hat érkezési mód, két téma, 10 ismétlés) 0/120; `tort-magassag` a
+lista 190, 53 és 85 pixel, az utolsó sor alja a doboz alján (0), a legnagyobb `scrollTop` a
+margóval nő (870 -> 914, 1007 -> 1051, 975 -> 1019). Az `alja`, `kinyitas-ut`, `utolso-sor` és
+`fulvaltas` előtte is ugyanezt adta.
+
+**(G) Az e2e** (`sse-real-server.spec.ts`): "AZ UGRÁS GOMB A LISTA TETEJÉN LEBEG, A MEGJELENÉSE
+SEMMIT NEM MOZDÍT, ÉS ALUL SEMMIT NEM TAKAR" (4 teszt: a lista és a kinyitott utolsó sor fejléce az
+ablakban pontosan a helyén, a gomb a lista felső belső margóján belül, a fejléc és a gomb doboza
+nem fedi egymást, a gomb alatti sorok között nincs a kinyitott sor, üres sáv nincs) és "A LISTA
+LEGTETEJÉN A GOMB ALATT A MARGÓ ÁLL, NEM SOR" (4 teszt: a lista legtetején a gomb egyetlen sort sem
+takar, az első sor `toBeInViewport({ ratio: 1 })`, a gomb alatti és fölötti térköz egyenlő; a
+billentyűzet: a gomb fókuszálható, a `Tab` a lista egy sorára visz, a `Shift+Tab` vissza; a
+görgetési tartomány felénél a gomb alatti sor egérkerékkel a gomb alá görgetve teljesen látszik;
+`Enter` az aljára, utána a gomb nincs a hozzáférhetőségi fában). `--repeat-each 3` mellett 24/24.
+Rontások a 8 teszten (a termék két fájlja kicserélve, a build újra):
+
+| Állapot                                              | Megjelenés (4)                          | Legteteje és billentyűzet (4)                     |
+| ---------------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
+| a választott megoldás                                | 4/4 zöld                                | 4/4 zöld                                          |
+| az `1bcface` panelje és CSS-e (a gomb a lista alján) | 4/4 bukik (a gomb nincs a felső sávban) | 4/4 bukik (a lista legtetején a gomb sort takar)  |
+| az `1c7dd13` előtti panel (a sáv lelöki a listát)    | 4/4 bukik (a lista teteje elmozdul)     | 4/4 bukik (a gomb alatti és fölötti térköz eltér) |
+| margó nélkül (`padding-top: 0`)                      | 4/4 bukik (a gomb nincs a felső sávban) | 4/4 bukik (a lista legtetején az első sor takart) |
+| a gomb a DOM-ban a lista után                        | 4/4 zöld (a hely nem tárgya)            | 4/4 bukik (a `Tab` nem a lista egy sorára visz)   |
+
+A teljes e2e készlet 353/353 zöld (négy `--shard` hívás, sorban, három workerrel), az e2e
+lefedettség ratchetje `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 42. szekció. Unit: a
+`TranscriptPanel.spec.tsx` a gomb hiányát, a látható gomb fókuszálhatóságát, `tabIndex`-ét és a
+lista előtti helyét változatlanul őrzi.
+
+**Képek** (a munkamenet kimeneti mappájában, `transcript-gomb-felul/`, 1440 és 375 pixel, két téma;
+`elotte-` előtaggal a `2743b6b` panelje és CSS-e): `*-1-kovet-gomb-nelkul`,
+`*-2-kinyitott-utolso-sor-gomb` (előtte a gomb a kinyitott utolsó sor fejlécén, utána a lista
+tetején), `*-3-tetejen-gomb-alatt-margo`, `*-4-kozepen-gomb-alatti-sor`,
+`*-5-takart-sor-gomb-ala-gorgetve`, `*-6-gomb-fokuszban` (billentyűvel), `*-7-rovid-lista-margo`
+(három sor, gomb nélkül: a margó a lista tetején), `*-8-rovid-lista-gomb` (előtte a gomb a lista
+alján, utána a margóban). Szemléltetők: egy repón kívüli, eldobott lépés készítette őket ugyanazzal
+a repóbeli fixtúrával, mert képernyőképet lemezre kizárólag a szentesített `capture-screenshots.ts`
+írhat; a számok a mérő eszközből és az e2e-ből jönnek.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit; más ablakméret a két mértnél; a görgetés rögzítés
+bekapcsolt (`auto`) értékkel a margó mellett. **Ismert korlát, mérve, de gomb nélkül:** ahol a lista az egy sornyi, 53 pixeles minimumán áll (a
+`tort-magassag` jelenet szerint 1440x600-on a jóváhagyás panel melletti kezdő állásban is, és az
+elválasztó `End` állásában), a 44 pixeles margó után 9 pixel marad a tartalomnak: a lista aljára
+görgetve az utolsó sor teljesen látszik (a margó kigördül), a lista legtetején viszont az első
+sorból csak 9 pixel látszik, és a lista minden más állásában egy megjelenő gomb (a lista tetejétől
+8 és 36 pixel között) a látható sort takarja. A gombbal együtt ez nem mért, és hogy a gomb ebben az
+állásban hogyan viselkedjen, nyitott kérdés (SPEC-008 14.2 O-15).

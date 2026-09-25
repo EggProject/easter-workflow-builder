@@ -1625,3 +1625,29 @@ report --reporter=json-summary` kimenetéből:
 `approval-prompt` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A pontos
 arányok (99,1029 / 98,5770 / 99,4643 / 99,0695) két tizedesre vágva a mostani küszöbök, tehát a
 küszöb nem mozdul.
+
+## 42. A lista tetején, belső margóban lebegő ugrás gomb utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Felül, belső margóval"): az "Ugrás az aljára" gomb a
+transcript lista tetején lebeg, a lista felső belső margójában (`transcript-panel.css`), és a
+jóváhagyás elválasztó tárolt aránya új `localStorage` kulcsra került
+(`run-view-approval-layout.ts`; `docs/research/2026-09-23-transcript-panel-meresek.md` 21.
+szekció). Az e2e készlet tesztszáma változatlan (353): a gomb két blokkjának 8 tesztje az új
+helyre igazítva.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**353 teszt, mind zöld**; négy `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1657 / 1672     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 762 / 773       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1597 / 1612     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`transcript-panel` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb
+nem mozdul.

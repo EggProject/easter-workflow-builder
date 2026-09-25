@@ -48,9 +48,17 @@ describe('run-view-approval-layout', () => {
   });
 
   it('a kulcs eltér a gráf és a transcript arányáétól, az alapértelmezés fele-fele', () => {
-    expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).toBe('eggRunViewApprovalLayout');
+    expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).toBe('eggRunViewTranscriptApprovalLayout');
     expect(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY).not.toBe(RUN_VIEW_LAYOUT_STORAGE_KEY);
     expect(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES).toEqual([50, 50]);
+  });
+
+  it('a régi, sorrendjében eldönthetetlen kulcson tárolt arány figyelmen kívül marad: az alapértelmezés jön, nem egy fordított arány', () => {
+    // A CLI sorrend (2743b6b) előtt ezen a kulcson a pár (jóváhagyás,
+    // transcript) sorrendben állt: a [30, 70] egy 70 százalékos transcriptet
+    // jelentett, a mostani sorrendben olvasva 30 százalékosat adna.
+    globalThis.localStorage.setItem('eggRunViewApprovalLayout', JSON.stringify([30, 70]));
+    expect(readStoredRunViewApprovalLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES);
   });
 
   describe('readStoredRunViewApprovalLayoutSizes', () => {
