@@ -2,18 +2,53 @@
    szegély, se lekerekítés, se saját háttér, mert a panel a futás nézet
    transcript sávjában áll, és a card in card tilos (`.claude/CLAUDE.md` 11.
    szekció). A térközök kizárólag a design system `--ep-space-*` tokenjeiből
-   jönnek. A panel mérete és görgetése a helyétől függ, ezért az a
-   `run-view.css` fájlban áll. */
+   jönnek. A panel külső mérete (a transcripttel megosztott sáv) a helyétől
+   függ, ezért az a `run-view.css` fájlban áll; itt a belső két rész. */
 .approval-prompt-panel {
   display: flex;
   flex-direction: column;
   gap: var(--ep-space-2);
 }
 
+/* A DÖNTÉS GOMBJAI MINDIG LÁTSZANAK (user döntés 2026-09-24, SPEC-008 8.
+   szekció 1. pont). A lista két részből áll: felül a görgethető tartalom
+   (`__content`: az `Alert` és a kártyák), alul a döntési sáv
+   (`__decisions`), ami nem görget el. A tartalom `flex: 1 1 auto` és
+   `min-height: 0`, tehát nulláig összemehet
+   (<https://www.w3.org/TR/css-flexbox-1/#min-size-auto>), a döntési sáv
+   `flex: none` (`0 0 auto`), tehát sosem megy össze
+   (<https://www.w3.org/TR/css-flexbox-1/#flex-common>): a hely hiányát
+   mindig a tartalom fizeti meg, a gombok nem. Ha a döntési sáv maga
+   magasabb, mint a panel (sok jóváhagyás; a mért küszöb méretenként a
+   `docs/research/2026-09-24-jovahagyas-panel-helye.md` 7. szekciójában), a
+   lista túlnyúlik, és a panel görget (`run-view.css`): ez az egyetlen eset,
+   amikor a gombokhoz görgetni kell. */
 .approval-prompt-panel__list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.approval-prompt-panel__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   gap: var(--ep-space-4);
+}
+
+/* Az elválasztó a design system ragadós sávjainak receptje
+   (`.app-tn__bar`, és a `packages/ui` `page-footer.css` belőle): egy
+   `--ep-divider` színű szegély a sáv tetején. */
+.approval-prompt-panel__decisions {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: var(--ep-space-2);
+  padding-block-start: var(--ep-space-2);
+  border-top: 1px solid var(--ep-divider);
 }
 
 .approval-prompt-card {
@@ -43,16 +78,54 @@
   word-break: break-word;
 }
 
-.approval-prompt-card__actions {
+/* Egy döntési sor: balra a jóváhagyás címe, jobbra a két gomb. A
+   szerkezet a design system `.modal__footer--split` receptje (`display:
+   flex`, `align-items: center`, `justify-content: space-between`), és a
+   `page-footer.css` szabálya: a cím oldal zsugorodhat (egy sorra csonkolva,
+   ellipszissel), a gomb oldal nem, hogy a gombok minden szélességen teljes
+   egészükben látsszanak. A teljes cím a görgethető tartalomban, a kártya
+   fejlécében áll. */
+.approval-decision-row {
   display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-1);
+}
+
+.approval-decision-row__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ep-space-3);
+}
+
+.approval-decision-row__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--ep-text-small);
+  color: var(--ep-fg);
+}
+
+.approval-decision-row__actions {
+  display: flex;
+  flex: none;
   gap: var(--ep-space-2);
 }
 
 /* A döntés eredménye (T-009-27): nem hibaüzenet, tehát a halványabb,
    másodlagos kis szöveg, ugyanaz a minta, mint a `run-control.css`
-   "megszakítás folyamatban" felirata. */
-.approval-prompt-card__result {
+   "megszakítás folyamatban" felirata. A hibaüzenet ugyanazt a kis betűt
+   kapja, a szöveg színén. */
+.approval-decision-row__result {
   margin: 0;
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
+}
+
+.approval-decision-row__failure {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg);
 }

@@ -30,10 +30,9 @@ describe('selectDisplayedApprovals', () => {
     ]);
   });
 
-  it('a listából kikerült, de még nem nyugtázott döntés kártyája a kérés időpontja szerinti helyén marad', () => {
+  it('a listából kikerült döntés kártyája a kérés időpontja szerinti helyén marad', () => {
     const decisions: ApprovalDecisionsState = {
       tracked: new Map([['a-1', { approval: FIRST, progress: { status: 'decided', decision: 'approved' } }]]),
-      hiddenIds: new Set(),
     };
 
     expect(selectDisplayedApprovals([SECOND, THIRD], decisions)).toEqual([
@@ -46,19 +45,12 @@ describe('selectDisplayedApprovals', () => {
   it('a listában is szereplő követett jóváhagyás egyszer jelenik meg, a döntés állapotával', () => {
     const decisions: ApprovalDecisionsState = {
       tracked: new Map([['a-2', { approval: SECOND, progress: { status: 'sending', decision: 'rejected' } }]]),
-      hiddenIds: new Set(),
     };
 
     expect(selectDisplayedApprovals([FIRST, SECOND], decisions)).toEqual([
       { approval: FIRST, progress: undefined },
       { approval: SECOND, progress: { status: 'sending', decision: 'rejected' } },
     ]);
-  });
-
-  it('a nyugtázott lezárt döntés akkor sem jelenik meg, ha az elavult lista még tartalmazza', () => {
-    const decisions: ApprovalDecisionsState = { tracked: new Map(), hiddenIds: new Set(['a-1']) };
-
-    expect(selectDisplayedApprovals([FIRST, SECOND], decisions)).toEqual([{ approval: SECOND, progress: undefined }]);
   });
 
   it('azonos kérés időpontnál a lista sorrendje marad', () => {

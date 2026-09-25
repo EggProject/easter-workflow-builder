@@ -22,11 +22,9 @@ describe('ApprovalPromptPanel', () => {
   let container: HTMLDivElement;
   let root: Root;
   const onDecide = vi.fn();
-  const onDismiss = vi.fn();
 
   beforeEach(() => {
     onDecide.mockClear();
-    onDismiss.mockClear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -50,7 +48,6 @@ describe('ApprovalPromptPanel', () => {
           failureMessage={options.failureMessage}
           displayed={displayed}
           onDecide={onDecide}
-          onDismiss={onDismiss}
         />,
       );
     });
@@ -75,36 +72,42 @@ describe('ApprovalPromptPanel', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
-  it('kártyák fölött kimondja, hogy a döntés visszavonhatatlan, a design system Alert blokkjával', () => {
+  it('kártyák fölött, a görgethető tartalomban kimondja, hogy a döntés visszavonhatatlan, a design system Alert blokkjával', () => {
     renderPanel([{ approval: APPROVAL, progress: undefined }]);
 
-    const alert = container.querySelector(':scope .approval-prompt-panel__list > .alert.alert--warning');
+    const alert = container.querySelector(':scope .approval-prompt-panel__content > .alert.alert--warning:first-child');
     expect(alert?.querySelector('.alert__title')?.textContent).toBe('A döntés visszavonhatatlan');
     expect(alert?.querySelector('.alert__message')?.textContent).toBe(
       'Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.',
     );
   });
 
-  it('minden megjelenített jóváhagyáshoz egy kártya tartozik, és a döntést és a nyugtázást a jóváhagyással adja tovább', () => {
-    const second: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2' };
+  it('minden megjelenített jóváhagyáshoz egy kártya a tartalomban és egy döntési sor a tartalom ALATT, azonos sorrendben; a sor a döntést a jóváhagyással adja tovább', () => {
+    const second: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2', title: 'Második?' };
     renderPanel([
       { approval: APPROVAL, progress: undefined },
       { approval: second, progress: { status: 'decided', decision: 'rejected' } },
     ]);
 
-    const cards = container.querySelectorAll('.approval-prompt-card');
-    expect(cards).toHaveLength(2);
+    const list = container.querySelector('.approval-prompt-panel__list');
+    expect([...(list?.children ?? [])].map((child) => child.className)).toEqual([
+      'approval-prompt-panel__content',
+      'approval-prompt-panel__decisions',
+    ]);
+    const cards = container.querySelectorAll(':scope .approval-prompt-panel__content > .approval-prompt-card');
+    expect([...cards].map((card) => card.querySelector('h3')?.textContent)).toEqual(['Engedélyezed?', 'Második?']);
+    const rows = container.querySelectorAll(':scope .approval-prompt-panel__decisions > .approval-decision-row');
+    expect([...rows].map((row) => row.querySelector('.approval-decision-row__label')?.textContent)).toEqual([
+      'Engedélyezed?',
+      'Második?',
+    ]);
+    expect(rows[1]?.querySelector('[role="status"]')?.textContent).toBe('Döntés rögzítve: elutasítva.');
 
-    const [firstApprove] = cards[0]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [];
-    const dismiss = [...(cards[1]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [])].find(
-      (candidate) => candidate.textContent === 'Rendben',
-    );
+    const [firstApprove] = rows[0]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [];
     act(() => {
       firstApprove?.click();
-      dismiss?.click();
     });
 
     expect(onDecide).toHaveBeenCalledWith(APPROVAL, 'approved');
-    expect(onDismiss).toHaveBeenCalledWith('a-2');
   });
 });

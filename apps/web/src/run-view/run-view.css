@@ -151,16 +151,24 @@
    függ a jóváhagyások számától. A kettő a sávot egyenlő növekedéssel osztja
    meg (`flex: 1 1 0`, ugyanaz, mint a `.transcript-panel` `flex: 1` értéke),
    de a panel legfeljebb a saját tartalmának magasságát kapja
-   (`max-height: max-content`): kevés jóváhagyásnál csak annyit, amennyi kell,
-   a maradék a transcripté; sok jóváhagyásnál legfeljebb a sáv felét, és a
-   panel maga görget, a transcript pedig a másik felén látható marad. Kitalált
-   arány vagy pixel szám nincs: a felező pont a két egyenlő `flex-grow`
-   következménye. A flex algoritmus a `max-height` megsértésekor az elemet a
-   korlátra fagyasztja, és a maradék helyet a többi elem között osztja szét
+   (`max-height: max-content`): ha a tartalma kisebb a sáv felénél, csak
+   annyit, a maradék a transcripté; ha nagyobb, pontosan a sáv felét. Mérve
+   már EGYETLEN jóváhagyás tartalma is nagyobb a sáv felénél mindhárom mért
+   méreten (1440x900, 1440x600, 375x812), tehát a gyakorlatban a panel a
+   sáv felét kapja. A panelen belül a tartalom görget, a döntési sáv nem
+   (`approval-prompt.css`), így a döntés gombjai a félbe vágott panelben is
+   görgetés nélkül látszanak. Kitalált arány vagy pixel szám nincs: a felező
+   pont a két egyenlő `flex-grow` következménye. A flex algoritmus a
+   `max-height` megsértésekor az elemet a korlátra fagyasztja, és a maradék
+   helyet a többi elem között osztja szét
    (<https://www.w3.org/TR/css-flexbox-1/#resolve-flexible-lengths>); a
    `max-content` a `max-height` dokumentált kulcsszava
    (<https://developer.mozilla.org/en-US/docs/Web/CSS/max-height>); a mérés
    a `docs/research/2026-09-24-jovahagyas-panel-helye.md` fájlban.
+
+   A panel `overflow-y: auto` értéke csak akkor lép életbe, ha a döntési sáv
+   maga sem fér el a sáv felében (sok jóváhagyás): ekkor a görgethető
+   tartalom már nulla magas, és a döntési sorokhoz a panelt kell görgetni.
 
    A panel és a transcript közti térköz csak akkor áll, ha a panelnek van
    tartalma: az üres panel (`:empty`) nulla magas, és térközt sem hagy. A

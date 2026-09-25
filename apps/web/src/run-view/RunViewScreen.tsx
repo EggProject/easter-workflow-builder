@@ -440,7 +440,6 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                 failureMessage={pendingApprovals.failureMessage}
                 displayed={approvalDecisions.displayed}
                 onDecide={approvalDecisions.decide}
-                onDismiss={approvalDecisions.dismiss}
               />
               <TranscriptPanel
                 key={runId}

@@ -86,6 +86,10 @@ mindkét témában, 1440x900-on és 1440x600-on is a panel doboza belsejében va
 Regresszió: `apps/web/e2e/approval-prompt.spec.ts` (`toBeInViewport({ ratio: 1 })`, 1440x600-on),
 és a hívás elhagyására mindkét döntés teszt elbukik.
 
+**Felülírva 2026-09-25-én (7. szekció).** A `scrollIntoView` hívás megszűnt: az eredmény a
+döntési sávban, a gombok alatt áll, ami nem görget el, tehát a látható területen van görgetés
+nélkül.
+
 A panel és a transcript közti `--ep-space-4` térköz külső margó: belső térközként a görgető panel
 tartalmával együtt kigördült, és a panel alja a transcript szövegéhez tapadt (képernyőképen
 látva).
@@ -95,11 +99,83 @@ látva).
 A "transcript mellé" két olvasatot enged: a panel a transcript sávon BELÜL áll (megvalósítva),
 vagy egy harmadik, önálló sávot kap. A megvalósítás a legkevésbé invazív olvasatot követi, ami a
 meglévő két sávos `Resizable` és a `--ep-screen-md` alatti `Tabs` elrendezést nem változtatja
-(SPEC-008 10. szekció). **Nyitott**: mi a viselkedés addig: a fenti; mi zárná le: a user döntése
-arról, kér-e önálló sávot.
+(SPEC-008 10. szekció). **Nyitott**, a SPEC-008 14.2 táblázatában O-9 azonosítóval: mi a
+viselkedés addig: a fenti; mi zárná le: a user döntése arról, kér-e önálló sávot.
 
 ## 6. Képek
 
 A 0, 1 és 4 jóváhagyásos, a siker és a `conflict` utáni állapot mindkét témában, plusz a telefon
 méret két füle: a munkamenet `outputs/t-009-27-javitas/` mappájában, a mérő script kimenetével
 (`meresek.json`) együtt.
+
+## 7. A döntés gombjainak láthatósága (2026-09-25)
+
+Kiváltó ok: egy független ellenőrzés a `9c44745` commiton mérte, hogy egy jóváhagyásnál a panel
+tartalma 346 pixel, a látható magasság 326/176/243 pixel, és a Jóváhagyás gombból 1440x900-on 30
+százalék látszik, a másik két méreten semmi; négy jóváhagyásnál a további kártyák gombjaiból
+semmi. A user döntése (2026-09-24): a döntés gombjai mindig látszanak, a tartalom felettük
+görgethető, és több jóváhagyásnál is minden függő döntés görgetés nélkül elérhető legyen.
+
+**Módszer.** Saját mérés valódi Chromiumban, a repón kívüli scripttel
+(`/private/tmp/jovahagyas-panel-2/measure.mjs`), `vite build --outDir` alakban két buildből: az
+"előtte" a `bffd75d` (a `main`, a `9c44745` tartalmával), az "utána" a javított munkafa. A REST és
+az SSE `page.route()` mockon, a fixtúra egy `start` és négy `human_approval` csomópont. A mért
+érték gombonként a görgetés NÉLKÜL látható arány: a gomb befoglaló doboza metszve minden levágó ős
+(`overflow` nem `visible`) kliens területével és a viewporttal, osztva a teljes dobozzal. A 375x812
+méreten a mérés a "Transcript" fülön történik. Mindkét témában mérve, a számok témától
+függetlenül azonosak.
+
+**Előtte (`bffd75d`)**, a Jóváhagyás gombok látható aránya jóváhagyásonként (az Elutasítás
+gomboké minden sorban ugyanaz):
+
+| Viewport | 1 jóváhagyás | 4 jóváhagyás    | Panel (px) | Panel tartalma (px, 1 / 4) |
+| -------- | ------------ | --------------- | ---------- | -------------------------- |
+| 1440x900 | 0,3          | 0,3 / 0 / 0 / 0 | 326        | 346 / 1105                 |
+| 1440x600 | 0            | 0 / 0 / 0 / 0   | 176        | 346 / 1105                 |
+| 375x812  | 0            | 0 / 0 / 0 / 0   | 242,5      | 346 / 1105                 |
+
+**A megoldás.** A panel két részre vált: felül a görgethető tartalom (a "visszavonhatatlan"
+`Alert` és a kártyák: cím, törzs, `payload`), alul egy nem görgető döntési sáv, ami MINDEN
+megjelenített jóváhagyásnak egy sort ad (a cím egy sorra csonkolva, mellette a két `sm` gomb,
+alatta az eredmény). A tartalom `flex: 1 1 auto` és `min-height: 0`, a döntési sáv `flex: none`,
+tehát a hely hiányát a tartalom fizeti meg
+(<https://www.w3.org/TR/css-flexbox-1/#min-size-auto>,
+<https://www.w3.org/TR/css-flexbox-1/#flex-common>).
+
+**Utána**, mindkét témában:
+
+| Viewport | Teljesen látható döntés (1 / 4) | Panel (px) | Görgethető tartalom (px, 1 / 4) | Vászon (px, 0 / 1 / 4) | `.app-content` túllógás |
+| -------- | ------------------------------- | ---------- | ------------------------------- | ---------------------- | ----------------------- |
+| 1440x900 | 1 / 4                           | 326        | 289 / 181                       | 700 / 700 / 700        | 0                       |
+| 1440x600 | 1 / 4                           | 176        | 139 / 31                        | 400 / 400 / 400        | 0                       |
+| 375x812  | 1 / 4                           | 242,5      | 205,5 / 97,5                    | 533 / 533 / 533        | 0                       |
+
+Egy jóváhagyás természetes tartalma utána 310 pixel (görgethető rész) plusz 37 pixel (döntési
+sáv), tehát a panel mindhárom méreten a sáv felét kapja: a `max-height: max-content` korlát a mért
+eseteken nem lép életbe.
+
+**A küszöb: hány jóváhagyásig fér el minden döntési sor görgetés nélkül.** Ugyanazzal a scripttel,
+1 ... 10 jóváhagyásra mérve (a döntési sáv jóváhagyásonként 36 pixellel nő):
+
+| Viewport | Utolsó teljesen látható darabszám | Görgethető tartalom ennél (px) |
+| -------- | --------------------------------- | ------------------------------ |
+| 1440x900 | 9                                 | 1                              |
+| 1440x600 | 4                                 | 31                             |
+| 375x812  | 6                                 | 25,5                           |
+
+E fölött a döntési sáv nem fér el a panelben: a görgethető tartalom nulla magas, és a panel maga
+görget, tehát a további sorokhoz görgetni kell. Ez a legkisebb következetes viselkedés, mert a
+panel "legfeljebb a sáv fele" szabálya (8. szekció 1. pont) változatlan marad. **A cél mérten
+teljesül 1 és 4 jóváhagyásra mindhárom méreten, de az ára a tartalom**: 1440x600-on négy
+jóváhagyásnál a görgethető tartalom 31 pixel, vagyis a kártyák szövege gyakorlatilag csak
+görgetve olvasható.
+
+**A döntés után.** Siker és `conflict` után mindhárom méreten mindkét témában: az eredmény
+(`role="status"`, illetve `role="alert"`) a viewportban, a gombok letiltva, "Rendben" gomb nincs
+(0 darab). A képek: a munkamenet `outputs/jovahagyas-panel-2/` mappájában (1 és 4 jóváhagyás, három
+méret, siker és conflict után, két téma), a mért számokkal (`meresek.json`).
+
+Regresszió: `apps/web/e2e/approval-prompt.spec.ts`, mindkét témában, három méreten, 1 és 4
+jóváhagyásra `toBeInViewport({ ratio: 1 })` minden döntés gombra; a tartalom zsugorodásának
+letiltására (`flex: none` a görgethető részen) mind a hat méret és téma teszt, plusz a siker és a
+`conflict` teszt elbukik.

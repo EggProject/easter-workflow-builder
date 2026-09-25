@@ -59,6 +59,11 @@ declare global {
    */
   var e2eStepRunFetchCounter: { count: number } | undefined;
   /**
+   * A lapon belül KIADOTT `GET /api/approvals` kérések száma, ugyanabból az
+   * okból a lapon belül számolva, mint az `e2eStepRunFetchCounter`.
+   */
+  var e2eApprovalFetchCounter: { count: number } | undefined;
+  /**
    * A lap betöltése UTÁN beállított jelző: ha a lap újratöltődne, eltűnne.
    */
   var e2eNoReloadMarker: boolean | undefined;
@@ -691,6 +696,86 @@ test('élő approval_requested keretre a jóváhagyás panel oldal újratöltés
   await expect(heading).toHaveCount(0);
   await expect(headerBadge).toHaveCount(0);
 
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+/**
+ * A kiadott `GET /api/approvals` kérések számlálója a lapon belül, a lap saját
+ * `fetch` hívásába kötve, a betöltés ELŐTT (`installStepRunFetchCounter`
+ * mintája). A számláló a kérés KIADÁSAKOR nő, szinkron: egy összevonás nélküli
+ * kódon egy löket minden jelző kerete ugyanabban a feladatban indítaná a
+ * kérését, tehát a számláló egyetlen lépésben ugrana a végértékre.
+ */
+async function installApprovalFetchCounter(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const counter = { count: 0 };
+    Object.defineProperties(globalThis, {
+      e2eApprovalFetchCounter: { configurable: true, value: counter },
+      fetch: {
+        configurable: true,
+        writable: true,
+        value: (...parameters: Parameters<typeof fetch>) => {
+          const [input] = parameters;
+          const url = input instanceof Request ? input.url : String(input);
+          if (new URL(url).pathname.endsWith('/approvals')) {
+            counter.count += 1;
+          }
+          return originalFetch(...parameters);
+        },
+      },
+    });
+  });
+}
+
+async function readApprovalFetchCount(page: Page): Promise<number | undefined> {
+  return page.evaluate(() => globalThis.e2eApprovalFetchCounter?.count);
+}
+
+const BURST_APPROVAL_COUNT = 20;
+
+test('egy löketben érkező 20 approval_requested keretre az újratöltés összevonva fut: a csatoláskori betöltésen felül egy folyamatban lévő és egy utólagos kérés, és a panel a végállapotot mutatja', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await installApprovalFetchCounter(page);
+
+  await page.goto('/run?runId=r-1');
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+  await expect.poll(async () => readApprovalFetchCount(page)).toBe(1);
+  await setNoReloadMarker(page);
+
+  // A szerver oldali állapot a löket UTÁN: húsz függő jóváhagyás, és a löket
+  // húsz élő `approval_requested` kerete, EGY `write` hívásban.
+  approvalsHolder.current = Array.from({ length: BURST_APPROVAL_COUNT }, (_, index) => ({
+    ...LIVE_APPROVAL,
+    id: `appr-burst-${String(index)}`,
+    title: `Löketben érkező jóváhagyás ${String(index + 1)}`,
+    requestedAtMs: LIVE_APPROVAL.requestedAtMs + index,
+  }));
+  streamServer.pushBatch(
+    Array.from({ length: BURST_APPROVAL_COUNT }, (_, index) => stepEventFrame(index + 1, 'approval_requested', 'live')),
+  );
+
+  await expect(page.locator('.approval-prompt-card')).toHaveCount(BURST_APPROVAL_COUNT);
+  await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toBeVisible();
+  // `createCoalescedReload`: az első keret indít egy kérést, a futása alatt
+  // érkező további tizenkilenc egyetlen utólagos kérésbe olvad. Összevonás
+  // nélkül a számláló egy lépésben 1-ről 21-re ugrana, tehát a 3 sosem állna
+  // elő.
+  await expect.poll(async () => readApprovalFetchCount(page)).toBe(3);
+  await expect(page.locator('.approval-prompt-card')).toHaveCount(BURST_APPROVAL_COUNT);
   expect(await readNoReloadMarker(page)).toBe(true);
 });
 

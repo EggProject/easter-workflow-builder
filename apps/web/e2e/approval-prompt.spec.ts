@@ -4,9 +4,10 @@
 // transcript sávban, nem a vászon fölött) és az, hogy a vászon magassága nem
 // függ a jóváhagyások számától, csak valódi layouttal mérhető: happy-dom nem
 // számol elrendezést. Ugyanígy csak valódi böngészőben igazolható, hogy a
-// döntés eredménye a görgetett, felezett panelben is LÁTHATÓ marad, és hogy a
-// gombok valódi `disabled` attribútuma a siker, a conflict és az újratöltési
-// hiba után sem kapcsol vissza. Minden REST hívás `page.route()` mockon megy,
+// döntés gombjai és az eredmény a felezett panelben GÖRGETÉS NÉLKÜL látszanak
+// (user döntés 2026-09-24, SPEC-008 8. szekció 1. pont), és hogy a gombok
+// valódi `disabled` attribútuma a siker, a conflict és az újratöltési hiba
+// után sem kapcsol vissza. Minden REST hívás `page.route()` mockon megy,
 // valós backend szervert egyetlen teszt sem szólít meg (`.claude/CLAUDE.md` 11.
 // szekció). Az élő (SSE keretre történő) frissítés e2e tesztje a nyitott
 // kapcsolatot igényli, ezért a `sse-real-server.spec.ts` fájlban áll.
@@ -99,6 +100,16 @@ const BASE_STEP_RUN: StepRunRecord = {
 const RUN_URL = `/run?runId=${RUN_DETAIL.id}`;
 
 /**
+ * A csomópontok vízszintes távolsága: a kártya mért szélessége
+ * (`GRAPH_NODE_CARD_WIDTH`, 358, `apps/web/src/graph-node-catalog/`) plusz a
+ * `@dagrejs/dagre` szállított `ranksep` alapértéke (50), ugyanaz, amit a
+ * `showcase-graph.ts` `COLUMN_X` sora is használ. A futás nézet a pillanatkép
+ * pozícióit használja (SPEC-008 5.7), tehát egy ennél kisebb távolság
+ * egymásra rajzolná a kártyákat; ezt az első teszt méri.
+ */
+const NODE_SPACING_X = 408;
+
+/**
  * Két függő `human_approval` csomópont, és egy harmadik, már ELDÖNTÖTT
  * (`succeeded`), ami nem szerepel a `GET /api/approvals` válaszában (a végpont
  * csak `waiting_approval` lépést listáz, user döntés 2026-09-23/24), tehát a
@@ -124,7 +135,7 @@ function buildSnapshot(): RunSnapshotResponse {
         id: 'n-second',
         type: 'human_approval',
         label: 'Második jóváhagyás',
-        position: { x: 300, y: 0 },
+        position: { x: NODE_SPACING_X, y: 0 },
         config: approvalConfig('Második jóváhagyás'),
         effectiveProviderId: 'claude-subscription',
       },
@@ -132,7 +143,7 @@ function buildSnapshot(): RunSnapshotResponse {
         id: 'n-done',
         type: 'human_approval',
         label: 'Már eldöntött jóváhagyás',
-        position: { x: 600, y: 0 },
+        position: { x: 2 * NODE_SPACING_X, y: 0 },
         config: approvalConfig('Már eldöntött jóváhagyás'),
         effectiveProviderId: 'claude-subscription',
       },
@@ -140,7 +151,7 @@ function buildSnapshot(): RunSnapshotResponse {
         id: 'n-sub',
         type: 'sub_workflow',
         label: 'Al-workflow',
-        position: { x: 900, y: 0 },
+        position: { x: 3 * NODE_SPACING_X, y: 0 },
         config: { type: 'sub_workflow', targetWorkflowId: 'w-child', inputMapping: {}, onUnhandledError: null },
         effectiveProviderId: 'claude-subscription',
       },
@@ -266,6 +277,39 @@ function approvalCard(page: Page, title: string): Locator {
   return page.locator('.approval-prompt-card').filter({ has: page.getByRole('heading', { name: title }) });
 }
 
+/**
+ * Egy jóváhagyás döntési sora a panel alján: `group` szerepkör, a neve a
+ * jóváhagyás címe (`ApprovalDecisionRow`).
+ */
+function decisionRow(page: Page, title: string): Locator {
+  return page.getByRole('group', { name: title, exact: true });
+}
+
+/**
+ * A lap összes csomópont kártyájának befoglaló doboza (viewport
+ * koordinátában; az átfedés a nagyítástól független).
+ */
+async function nodeBoxes(page: Page): Promise<readonly { x: number; y: number; width: number; height: number }[]> {
+  return page.locator('.react-flow__node').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    }),
+  );
+}
+
+function areBoxesIntersecting(
+  first: Readonly<{ x: number; y: number; width: number; height: number }>,
+  second: Readonly<{ x: number; y: number; width: number; height: number }>,
+): boolean {
+  return (
+    first.x < second.x + second.width &&
+    second.x < first.x + first.width &&
+    first.y < second.y + second.height &&
+    second.y < first.y + first.height
+  );
+}
+
 test('a csomópont a kérés abszolút időpontját mutatja, a fejlécben jelvény, a panel a transcript sávban kimondja a visszavonhatatlanságot', async ({
   page,
 }) => {
@@ -297,49 +341,77 @@ test('a csomópont a kérés abszolút időpontját mutatja, a fejlécben jelvé
   await expect(transcriptSide.locator('.approval-prompt-card')).toHaveCount(2);
   await expect(page.locator('.run-view-screen > .approval-prompt-panel')).toHaveCount(0);
   await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
+
+  // A fixtúra csomópontjai a pillanatkép pozícióin nem fedik egymást.
+  const boxes = await nodeBoxes(page);
+  expect(boxes).toHaveLength(buildSnapshot().nodes.length);
+  const overlapping = boxes.flatMap((box, index) =>
+    boxes.slice(index + 1).filter((other) => areBoxesIntersecting(box, other)),
+  );
+  expect(overlapping).toEqual([]);
 });
 
-for (const viewport of [
-  { width: 1440, height: 900 },
-  { width: 1440, height: 600 },
-  { width: 375, height: 812 },
-] as const) {
-  test(`${String(viewport.width)}x${String(viewport.height)}: a vászon magassága 0, 1 és 4 függő jóváhagyással azonos, és a tartalom terület nem görget`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(viewport);
-    const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
-    await mockIdleStream(page);
-    await installApiMocks(
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1440, height: 600 },
+    { width: 375, height: 812 },
+  ] as const) {
+    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: 1 és 4 függő jóváhagyásnál minden döntés gombja görgetés nélkül teljesen látszik, a vászon magassága 0, 1 és 4 jóváhagyással azonos, a tartalom terület nem görget`, async ({
       page,
-      baseMocks(async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
-    );
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
+      await mockIdleStream(page);
+      await installApiMocks(
+        page,
+        baseMocks(async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+      );
 
-    const canvasHeights: number[] = [];
-    for (const count of [0, 1, 4]) {
-      approvalsHolder.current = manyApprovals(count);
-      await page.goto(RUN_URL);
-      await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
-      // A kártyák a 375 pixeles fül sávban a (rejtett) Transcript fülön
-      // állnak: a DOM-ban vannak, de nem látszanak, ezért a darabszám a mérce.
-      await expect(page.locator('.approval-prompt-card')).toHaveCount(count);
-      const canvasBox = await page.locator('.run-graph-canvas').boundingBox();
-      canvasHeights.push(canvasBox?.height ?? -1);
-      expect(
-        await page.locator('.app-content').evaluate((element) => element.scrollHeight - element.clientHeight),
-      ).toBe(0);
-    }
+      const canvasHeights: number[] = [];
+      for (const count of [0, 1, 4]) {
+        approvalsHolder.current = manyApprovals(count);
+        await page.goto(RUN_URL);
+        await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+        // A kártyák a 375 pixeles fül sávban a (rejtett) Transcript fülön
+        // állnak: a DOM-ban vannak, de nem látszanak, ezért a darabszám a mérce.
+        await expect(page.locator('.approval-prompt-card')).toHaveCount(count);
+        const canvasBox = await page.locator('.run-graph-canvas').boundingBox();
+        canvasHeights.push(canvasBox?.height ?? -1);
+        expect(
+          await page.locator('.app-content').evaluate((element) => element.scrollHeight - element.clientHeight),
+        ).toBe(0);
 
-    expect(canvasHeights[0]).toBeGreaterThan(0);
-    expect(canvasHeights).toEqual([canvasHeights[0], canvasHeights[0], canvasHeights[0]]);
-  });
+        if (count === 0) {
+          continue;
+        }
+        if (viewport.width < 768) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
+        }
+        // Görgetés nélkül: a `toBeInViewport` nem görget, és a levágó ősöket
+        // (a görgethető tartalmat, a panelt, a transcript sávot) is figyelembe
+        // veszi, tehát a `ratio: 1` a TELJES gombot követeli meg.
+        for (const approval of approvalsHolder.current) {
+          const row = decisionRow(page, approval.title);
+          await expect(row.getByRole('button', { name: 'Jóváhagyás' })).toBeInViewport({ ratio: 1 });
+          await expect(row.getByRole('button', { name: 'Elutasítás' })).toBeInViewport({ ratio: 1 });
+        }
+      }
+
+      expect(canvasHeights[0]).toBeGreaterThan(0);
+      expect(canvasHeights).toEqual([canvasHeights[0], canvasHeights[0], canvasHeights[0]]);
+    });
+  }
 }
 
-test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény látszik, a Rendben viszi el', async ({
+test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény görgetés nélkül látszik, nyugtázó gomb nincs, és a futás váltása viszi el', async ({
   page,
 }) => {
-  // 1440x600: a panel a transcript sáv felét kapja, és maga görget; az
-  // eredménynek ekkor is a látható területen belül kell megjelennie.
+  // 1440x600: a panel a transcript sáv felét kapja, a tartalma görget; a
+  // gomboknak és az eredménynek ekkor is görgetés nélkül kell látszaniuk.
   await page.setViewportSize({ width: 1440, height: 600 });
   let isDecided = false;
   const decisionRequested = Promise.withResolvers<undefined>();
@@ -362,10 +434,11 @@ test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény
 
   await page.goto(RUN_URL);
   const card = approvalCard(page, FIRST_APPROVAL.title);
-  const approveButton = card.getByRole('button', { name: 'Jóváhagyás' });
-  const rejectButton = card.getByRole('button', { name: 'Elutasítás' });
-  await approveButton.scrollIntoViewIfNeeded();
+  const row = decisionRow(page, FIRST_APPROVAL.title);
+  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
+  const rejectButton = row.getByRole('button', { name: 'Elutasítás' });
   await expect(approveButton).toBeEnabled();
+  await expect(approveButton).toBeInViewport({ ratio: 1 });
 
   await approveButton.click();
   await decisionRequested.promise;
@@ -379,15 +452,22 @@ test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény
   // A friss lista már üres (a csomópont várakozás felirata eltűnik), a kártya
   // mégis a helyén marad, visszakapcsolás nélkül, az eredménnyel.
   await expect(page.getByTestId('rf__node-n-first').locator('.graph-node-card__summary')).toHaveCount(0);
-  const result = card.getByRole('status');
+  const result = row.getByRole('status');
   await expect(result).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(result).toBeInViewport({ ratio: 1 });
+  await expect(card).toHaveCount(1);
   await expect(approveButton).toBeDisabled();
   await expect(rejectButton).toBeDisabled();
   await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toHaveCount(0);
+  // Nyugtázás nincs (user döntés 2026-09-24): a panelen a két döntés gombon
+  // kívül nincs gomb.
+  await expect(page.locator('.approval-prompt-panel').getByRole('button')).toHaveCount(2);
 
-  await card.getByRole('button', { name: 'Rendben' }).click();
+  // Egy másik futásra váltva az eredmény eltűnik.
+  await openSubWorkflowRun(page);
+  await expect(page).toHaveURL(/\/run\?runId=run-child$/);
   await expect(card).toHaveCount(0);
+  await expect(row).toHaveCount(0);
   await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toHaveCount(0);
 });
 
@@ -411,16 +491,16 @@ test('siker után, ha a lista újratöltése elbukik, a kártya gombjai akkor se
   ]);
 
   await page.goto(RUN_URL);
-  const card = approvalCard(page, FIRST_APPROVAL.title);
-  const approveButton = card.getByRole('button', { name: 'Jóváhagyás' });
+  const row = decisionRow(page, FIRST_APPROVAL.title);
+  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
   await approveButton.click();
 
   // Az újratöltés hibája a panelen jelenik meg; a régi lista a helyén marad,
   // és a még mindig listázott, de már eldöntött kártya letiltva marad.
   await expect(page.locator('.approval-prompt-panel > [role="alert"]')).toBeVisible();
-  await expect(card.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(row.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(approveButton).toBeDisabled();
-  await expect(card.getByRole('button', { name: 'Elutasítás' })).toBeDisabled();
+  await expect(row.getByRole('button', { name: 'Elutasítás' })).toBeDisabled();
 });
 
 test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a hibaüzenet látszik, és a lista újratöltődik', async ({
@@ -443,22 +523,22 @@ test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a
   ]);
 
   await page.goto(RUN_URL);
-  const card = approvalCard(page, FIRST_APPROVAL.title);
-  const rejectButton = card.getByRole('button', { name: 'Elutasítás' });
-  await rejectButton.scrollIntoViewIfNeeded();
+  const row = decisionRow(page, FIRST_APPROVAL.title);
+  const rejectButton = row.getByRole('button', { name: 'Elutasítás' });
   await expect(rejectButton).toBeEnabled();
+  await expect(rejectButton).toBeInViewport({ ratio: 1 });
   const callsBeforeDecision = approvalCallCount;
 
   await rejectButton.click();
 
-  const alert = card.getByRole('alert');
+  const alert = row.getByRole('alert');
   await expect(alert).toHaveText('Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve');
   await expect(alert).toBeInViewport({ ratio: 1 });
   await expect.poll(() => approvalCallCount).toBeGreaterThan(callsBeforeDecision);
   // A lista a conflict után is tartalmazza a jóváhagyást, a gombok mégsem
   // kapcsolnak vissza: a döntés a szerver szerint már lezárt.
   await expect(rejectButton).toBeDisabled();
-  await expect(card.getByRole('button', { name: 'Jóváhagyás' })).toBeDisabled();
+  await expect(row.getByRole('button', { name: 'Jóváhagyás' })).toBeDisabled();
 });
 
 test('a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a panelen', async ({ page }) => {
@@ -474,7 +554,7 @@ test('a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a pane
   await expect(page.locator('.approval-prompt-panel').getByRole('alert')).toBeVisible();
 });
 
-test('átmeneti hibára (503) a gombok újrapróbálásra engedélyezettek, a Rendben csak az üzenetet törli, és az újrapróbálás rögzíti a döntést', async ({
+test('átmeneti hibára (503) a gombok újrapróbálásra engedélyezettek, és az újrapróbálás rögzíti a döntést', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -495,19 +575,17 @@ test('átmeneti hibára (503) a gombok újrapróbálásra engedélyezettek, a Re
   ]);
 
   await page.goto(RUN_URL);
-  const card = approvalCard(page, FIRST_APPROVAL.title);
-  const approveButton = card.getByRole('button', { name: 'Jóváhagyás' });
+  const row = decisionRow(page, FIRST_APPROVAL.title);
+  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
   await approveButton.click();
 
-  await expect(card.getByRole('alert')).toBeVisible();
+  await expect(row.getByRole('alert')).toBeVisible();
   await expect(approveButton).toBeEnabled();
-  await card.getByRole('button', { name: 'Rendben' }).click();
-  await expect(card.getByRole('alert')).toHaveCount(0);
-  await expect(card).toHaveCount(1);
-  await expect(approveButton).toBeEnabled();
+  await expect(page.locator('.approval-prompt-panel').getByRole('button')).toHaveCount(2);
 
   await approveButton.click();
-  await expect(card.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(row.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(row.getByRole('alert')).toHaveCount(0);
   await expect(approveButton).toBeDisabled();
 });
 
@@ -575,8 +653,7 @@ test('másik futásra váltva a régi futás késve érkező döntés válasza n
   await installApprovalListBodyReadCounter(page);
 
   await page.goto(RUN_URL);
-  const card = approvalCard(page, FIRST_APPROVAL.title);
-  await card.getByRole('button', { name: 'Jóváhagyás' }).click();
+  await decisionRow(page, FIRST_APPROVAL.title).getByRole('button', { name: 'Jóváhagyás' }).click();
   await decisionRequested.promise;
 
   await openSubWorkflowRun(page);

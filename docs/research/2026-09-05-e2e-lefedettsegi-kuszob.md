@@ -1328,3 +1328,54 @@ küszöb a mért értékre húzva, felfelé kerekítés nélkül (`apps/web/pack
 99,0781 / 98,5392 / 99,4595 / 99,0428). **Az igazolás:** a beállított küszöbbel `bun run
 coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
 (99.08 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 33. A jóváhagyás panel döntési sávja utáni ratchet (2026-09-25): két küszöb LEFELÉ mozdul, fedetlen tétel nélkül
+
+**Kiváltó ok.** A `9c44745` utómunkája (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 7.
+szekció): a döntés gombjai a kártyából egy nem görgető döntési sávba kerültek
+(`ApprovalDecisionRow.tsx`, új), a "Rendben" nyugtázás törölve (user döntés 2026-09-24), és vele a
+`reduce-approval-decisions.ts` `dismissed` ága, a `hiddenIds` halmaz, a
+`select-displayed-approvals.ts` rejtési szűrője, a `use-approval-decisions.ts` `dismiss` függvénye
+és az `ApprovalPromptCard.tsx` `revealResult` görgetése. Az e2e készlet 263 tesztre bővült
+(gomb láthatóság három méreten, két témában; az összevonás löket tesztje).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**263 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, sorban, ugyanabba a
+nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző (32. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1606 / 1621     | **99.07** | 1612 / 1627 = 99.07 | 15 -> **15**                   |
+| branches   | 734 / 745       | **98.52** | 742 / 753 = 98.53   | 11 -> **11**                   |
+| functions  | 550 / 553       | **99.45** | 552 / 555 = 99.45   | 3 -> **3**                     |
+| lines      | 1546 / 1561     | **99.03** | 1552 / 1567 = 99.04 | 15 -> **15**                   |
+
+**A csökkenés kizárólag fedett kód eltűnése** (a `.claude/CLAUDE.md` 8. szekció ratchet
+szabálya, a 15. szekció precedense szerint). A fedetlen tételek darabszáma mind a négy metrikán
+azonos (15 / 11 / 3 / 15), és a fedetlen helyek mind az `approval-prompt` témán kívül esnek (`mount-app.tsx`,
+`read-frontend-config.ts`, `is-valid-connection.ts`, `browser-history-location-port.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`); az `approval-prompt` téma minden fájlja
+mind a négy metrikán 100 százalék. A nevező fájlonként (statements / branches / functions / lines
+összes, előtte -> most; az "előtte" a `bffd75d` kódján, ugyanazzal a builddel és az
+`approval-prompt.spec.ts` futtatásával mérve, mert az összes tétel száma a műszerezésből jön, nem a
+tesztekből):
+
+| Fájl                            | Előtte           | Most           | Változás           |
+| ------------------------------- | ---------------- | -------------- | ------------------ |
+| `ApprovalPromptCard.tsx`        | 10 / 14 / 5 / 10 | 3 / 0 / 2 / 3  | -7 / -14 / -3 / -7 |
+| `ApprovalDecisionRow.tsx` (új)  | 0 / 0 / 0 / 0    | 8 / 11 / 3 / 8 | +8 / +11 / +3 / +8 |
+| `reduce-approval-decisions.ts`  | 14 / 11 / 2 / 14 | 9 / 6 / 2 / 9  | -5 / -5 / 0 / -5   |
+| `select-displayed-approvals.ts` | 9 / 0 / 7 / 8    | 8 / 0 / 6 / 7  | -1 / 0 / -1 / -1   |
+| `use-approval-decisions.ts`     | 10 / 0 / 5 / 10  | 9 / 0 / 4 / 9  | -1 / 0 / -1 / -1   |
+| összesen                        |                  |                | -6 / -8 / -2 / -6  |
+
+Az összeg pontosan a teljes nevező változása (1627 -> 1621, 753 -> 745, 555 -> 553,
+1567 -> 1561), tehát más fájlban nem változott a nevező. Az `ApprovalPromptPanel.tsx` és a
+`RunViewScreen.tsx` nevezője változatlan (4 / 5 / 4 / 4, illetve 63 / 29 / 16 / 61).
+
+**A küszöb** ezért a mért értékre került, felfelé kerekítés nélkül: 99.07 / **98.52** / 99.45 /
+**99.03** (`apps/web/package.json`; a pontos arányok 99,0746 / 98,5235 / 99,4575 / 99,0391). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.08 / 98.53 / 99.46 / 99.04) mind a négy metrika `ERROR`
+sorral bukik.

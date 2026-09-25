@@ -1,6 +1,7 @@
 import type { ApprovalDecision, PendingApproval } from '@easter-workflow-builder/protocol';
 import { Alert, ProgressBar } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
+import { ApprovalDecisionRow } from './ApprovalDecisionRow.tsx';
 import { ApprovalPromptCard } from './ApprovalPromptCard.tsx';
 import type { DisplayedApproval } from './select-displayed-approvals.ts';
 import './approval-prompt.css';
@@ -14,7 +15,6 @@ export interface ApprovalPromptPanelProperties {
   readonly failureMessage: string | undefined;
   readonly displayed: readonly DisplayedApproval[];
   readonly onDecide: (approval: PendingApproval, decision: ApprovalDecision) => void;
-  readonly onDismiss: (approvalId: string) => void;
 }
 
 /**
@@ -26,15 +26,18 @@ export interface ApprovalPromptPanelProperties {
  * Nulla kártyára semmi nem rajzolódik (üres `<div>`, doboz nélkül, tilos a
  * card in card).
  *
+ * **Két rész, és a döntés gombjai mindig látszanak** (user döntés
+ * 2026-09-24, SPEC-008 8. szekció 1. pont): felül a görgethető tartalom (a
+ * "visszavonhatatlan" `Alert` és a kártyák: cím, törzs, `payload`), alul a
+ * döntési sáv, ami nem görget el, és MINDEN megjelenített jóváhagyásnak egy
+ * sort ad (`ApprovalDecisionRow`). Így több jóváhagyásnál is minden függő
+ * döntés gombja görgetés nélkül elérhető; a helyet a tartalom adja át.
+ *
  * Csak megjelenít: a lista a `usePendingApprovals`, a döntések állapota a
  * `useApprovalDecisions` hookból jön, mindkettő a `RunViewScreen` szintjén.
- *
- * **A döntés visszavonhatatlan, és a felület ezt kimondja** (SPEC-008 8.
- * szekció): a kártyák fölött a design system `Alert` blokkja áll, amíg van
- * megjelenített kártya.
  */
 export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProperties>): ReactElement {
-  const { isFirstLoadPending, failureMessage, displayed, onDecide, onDismiss } = properties;
+  const { isFirstLoadPending, failureMessage, displayed, onDecide } = properties;
 
   return (
     <div className="approval-prompt-panel">
@@ -44,22 +47,26 @@ export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProp
       {failureMessage !== undefined && <p role="alert">{failureMessage}</p>}
       {displayed.length > 0 && (
         <section className="approval-prompt-panel__list" aria-label="Függő jóváhagyások">
-          <Alert variant="warning" title="A döntés visszavonhatatlan">
-            Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.
-          </Alert>
-          {displayed.map(({ approval, progress }) => (
-            <ApprovalPromptCard
-              key={approval.id}
-              approval={approval}
-              progress={progress}
-              onDecide={(decision) => {
-                onDecide(approval, decision);
-              }}
-              onDismiss={() => {
-                onDismiss(approval.id);
-              }}
-            />
-          ))}
+          <div className="approval-prompt-panel__content">
+            <Alert variant="warning" title="A döntés visszavonhatatlan">
+              Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.
+            </Alert>
+            {displayed.map(({ approval }) => (
+              <ApprovalPromptCard key={approval.id} approval={approval} />
+            ))}
+          </div>
+          <div className="approval-prompt-panel__decisions">
+            {displayed.map(({ approval, progress }) => (
+              <ApprovalDecisionRow
+                key={approval.id}
+                approval={approval}
+                progress={progress}
+                onDecide={(decision) => {
+                  onDecide(approval, decision);
+                }}
+              />
+            ))}
+          </div>
         </section>
       )}
     </div>
