@@ -25,6 +25,16 @@
   gap: var(--ep-space-2);
 }
 
+/* Az "ugrás az aljára" gomb helye előre fenntartva (user döntés 2026-09-25,
+   SPEC-008 7.4): új esemény nélkül a gomb a helyén marad, csak nem látszik.
+   A `visibility: hidden` a dobozt megtartja, tehát a gomb megjelenése nem
+   mozdítja a lista tartalmát; a rejtett elem nem fókuszálható, és kimarad a
+   hozzáférhetőségi fából. A sáv magassága a design system `.btn--sm`
+   gombjáé, kitalált szám nélkül. */
+.transcript-panel__jump--idle {
+  visibility: hidden;
+}
+
 /* A delta kapcsoló mondata (T-009-26) ugyanaz a halvány kis szöveg
    minta, mint a várakozás jelzése: doboz nélkül, csak tokenből. */
 .transcript-panel__status,

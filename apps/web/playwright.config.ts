@@ -9,9 +9,11 @@
 // legtobb teszt `page.route()`-tal fog el - nem kell, hogy ott tenylegesen
 // fusson barmi. A `docs/research/2026-08-30-sse-mockolas-meres.md` szerinti
 // EGYETLEN kivetel (Last-Event-ID ujracsatlakozas es kozbeni keret beszuras)
-// sajat, celra irt `node:http` teszt szervere UGYANERRE a 4174-es portra
-// kotodik, hogy a buildidoben rogzitett origin valodi halozati hivast
-// kapjon `page.route()` nelkul.
+// sajat, celra irt `node:http` teszt szervere az operacios rendszer altal
+// kiosztott szabad portra kotodik, es a buildidoben rogzitett origin fele
+// indulo `GET /events` kerest a `route.continue({ url })` erre a portra
+// iranyitja: a hivas valodi halozaton megy, mock nelkul, es a parhuzamos
+// workerek szerverei nem utkoznek (e2e/run-view-stream.ts).
 import { defineConfig, devices } from '@playwright/test';
 import { API_ORIGIN, PREVIEW_ORIGIN, STREAM_ORIGIN } from './e2e/api-origin.ts';
 

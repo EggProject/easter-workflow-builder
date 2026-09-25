@@ -579,7 +579,10 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
 - **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
   végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
   működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
-  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
+  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít. A
+  szerver az operációs rendszer által kiosztott szabad porton figyel, és a lap `GET /events`
+  kérését a `route.continue({ url })` irányítja rá (nem mock: a kérés valódi hálózaton megy), így a
+  párhuzamos workerek nem ütköznek (12. szekció, `apps/web/e2e/run-view-stream.ts`).
 - **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
   hivatkozva. A SPEC-007 13.4 ezt megteszi.
 - **Egy keret egy felhasználói eseménnyel egy feladatban** a nyitott `node:http` kapcsolaton
@@ -831,14 +834,34 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   állapotán bukik (research 17. szekció).
 - **A böngésző görgetés rögzítése (scroll anchoring) a virtualizált lista mellett saját
   görgetést csinál.** Bekapcsolt `overflow-anchor` mellett folyamatos streamnél a véletlen fázisú
-  kinyitások egy részében a lista a hook nélkül 36 pixelt görgetett (mérve 9/80, kikapcsolva 0/80,
-  minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött), és a kézi visszatérés
-  kilépéssel együtt egy teljes elrántást is okozott. A listán ezért `overflow-anchor: none` áll
+  kinyitások egy részében a lista a hook nélkül elmozdult (két saját mérésben 9/80 és 7/80, mind -36
+  pixel, kikapcsolva 0/80, minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött; egy
+  független ellenőrzés 5/80-at mért, köztük egy -574 pixeles teljes elrántást, tehát a "mind -36"
+  nem általános). A -36 a gomb sáv magassága volt: a sáv helyének fenntartása óta bekapcsolt
+  rögzítéssel is 0/80 (research 19. szekció). A listán ezért `overflow-anchor: none` áll
   (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A jelenség fázisfüggő, időzítő nélküli
   lépéssorral nem állítható elő (hat érkezési mód, 0/120); a védelem ezért KIZÁRÓLAG a
   konfigurációt őrzi: az e2e a lista kiszámított `overflow-anchor` értékét ellenőrzi. A korábbi,
   képkockánként mérő rész vak volt (a CSS nélkül is zöld), és kikerült (research 17. és 18.
   szekció).
+- **A `react-window` az érkezés utáni első renderben még a régi látható tartományt jelenti.** A
+  látható tartomány a könyvtárban állapot, amit egy layout effekt számol újra, tehát a sorszám
+  növekedése után előbb a régi utolsó sorra vágott jelentés jön (2 a 4 sorból), és csak utána az
+  új (3 a 4-ből). A szünet "alj elhagyása, majd visszatérés" kilépése ezt nem teli listán hamis
+  párnak vette: a szünet minden érkezésnél lezárult, gomb nem jelent meg, és a lista megtelése után
+  minden új sor a kinyitott sort 53 pixellel feljebb vitte. Az e2e addig csak teli listát (20 + 10
+  sor) vizsgált, és a "determinisztikus" állítás erre az esetre nem volt igaz. A tanulság: egy
+  állapotgép, ami egy könyvtár jelentéseinek SORRENDJÉBŐL következtet, a jelentés érvényességi
+  idejét is ellenőrizze, és a tesztje fedje a határesetet (itt a nem teli listát). Védelem:
+  `is-pre-arrival-range-report.ts` és a `sse-real-server.spec.ts` rövid lista e2e tesztjei két
+  méreten, két témában, az utolsó és egy korábbi sorra (research 19. szekció).
+- **Rögzített porton figyelő teszt szerver párhuzamos futtatásnál ütközik.** Az
+  `sse-real-server.spec.ts` szervere a build időben rögzített `VITE_STREAM_ORIGIN` portjára
+  kötődött, a fájl ezért soros volt, de `--repeat-each 3` mellett három worker egyszerre futtatta a
+  fájl három példányát, és `EADDRINUSE` jött. Ma minden teszt szervere az operációs rendszer által
+  kiosztott szabad porton figyel, és a lap kérését a `route.continue({ url })` irányítja rá (Node
+  `server.listen(0)`, Playwright `route.continue`); `--repeat-each 3` mellett három workerrel
+  231/231 zöld (research 19. szekció).
 - **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
   pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor

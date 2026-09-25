@@ -103,6 +103,13 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * kinyitása után ennek új identitása jelzi, hogy a lista már a mért
  * magassággal számol.
  *
+ * **A gomb helye előre fenntartva** (user döntés 2026-09-25, SPEC-008 7.4):
+ * a lista fölötti sáv mindig a helyén áll, benne a gomb akkor is, ha nincs új
+ * esemény, csak ilyenkor láthatatlan (`transcript-panel__jump--idle`,
+ * `visibility: hidden`: nem fókuszálható, és kimarad a hozzáférhetőségi
+ * fából). A gomb megjelenése így nem tolja lejjebb a listát, és nem takar ki
+ * sort. A sáv magasságát maga a design system gombja adja, szám nélkül.
+ *
  * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
  * egyetlen sor sincs, a lista helyén csontváz. A lezárult pótlás utáni üres
@@ -132,20 +139,21 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
   return (
     <div className="transcript-panel">
       {persistedStreamDeltas ? undefined : <p className="transcript-panel__delta-note">{TRANSIENT_DELTA_NOTE}</p>}
-      {(!isReplayComplete || unseenCount > 0) && (
-        <div className="transcript-panel__header">
-          {isReplayComplete ? undefined : (
-            <p className="transcript-panel__status" role="status">
-              Előzmények betöltése
-            </p>
-          )}
-          {unseenCount > 0 && (
-            <Button variant="secondary" size="sm" onClick={jumpToBottom}>
-              {`Ugrás az aljára (${String(unseenCount)} új esemény)`}
-            </Button>
-          )}
-        </div>
-      )}
+      <div className="transcript-panel__header">
+        {isReplayComplete ? undefined : (
+          <p className="transcript-panel__status" role="status">
+            Előzmények betöltése
+          </p>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          className={unseenCount > 0 ? undefined : 'transcript-panel__jump--idle'}
+          onClick={jumpToBottom}
+        >
+          {`Ugrás az aljára (${String(unseenCount)} új esemény)`}
+        </Button>
+      </div>
       {rowCount === 0 && !isReplayComplete ? (
         // A várakozás csontváza ugyanazzal a sorszámmal, mint a képernyő
         // saját betöltés jelzése (`RunViewScreen`), hogy a két egymást

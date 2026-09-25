@@ -6,11 +6,14 @@
 // (`.claude/CLAUDE.md` 12. szekció: minden bizonyíték előállító eszköz a
 // repóba tartozik).
 //
-// Egyszerre csak egy folyamat kötődhet a `STREAM_ORIGIN` portjára: az e2e
-// fájl ezért soros, a mérő eszköz pedig saját, egyetlen workeres configgal
-// fut, és a gépen egyszerre csak egy Playwright folyamat indulhat
-// (`.claude/CLAUDE.md` 11. szekció).
+// Minden teszt szervere az operációs rendszer által kiosztott szabad porton
+// figyel (`listenOnLoopback`), és a lap a build időben rögzített
+// `STREAM_ORIGIN` felé induló `GET /events` kérését erre a portra irányítja
+// (`routeStreamToPort`). Így a párhuzamos workerek szerverei nem ütköznek
+// (korábban mind a `STREAM_ORIGIN` 4174-es portjára kötődött, és
+// `--repeat-each 3` mellett három workerrel `EADDRINUSE` jött).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { Server as NetServer } from 'node:net';
 import type {
   RunDetail,
   RunEventKind,
@@ -44,15 +47,73 @@ declare global {
   var e2eDeliverFrameOnMeasuredCommit: ((position: number, type: string, data: string) => void) | undefined;
 }
 
-// A tényleges portszám a `STREAM_ORIGIN`-ből származik, nem külön literál:
-// a valódi teszt szervernek PONTOSAN arra a portra kell kötődnie, amit a
-// build időben rögzített `VITE_STREAM_ORIGIN` is hordoz.
-export const REAL_SERVER_PORT = Number(new URL(STREAM_ORIGIN).port);
+/**
+ * A teszt szerverek címe. Kifejezetten a loopback IPv4 cím, nem a `localhost`
+ * név: a szabad portot az operációs rendszer erre a címre osztja ki, és a lap
+ * kérése is pontosan ide megy, tehát egy másik címre kötött folyamat nem
+ * kaphatja meg.
+ */
+const LOOPBACK_HOST = '127.0.0.1';
 
 /**
- * A Vite preview szerver és ez a teszt szerver más origin (4173 kontra
- * `STREAM_ORIGIN` 4174), tehát az `EventSource` valódi, hitelesítő adatok
- * nélküli CORS kérést indít: `Access-Control-Allow-Origin` fejléc nélkül a
+ * A szerver indítása a loopback címen. A `port` alapértéke `0`: a Node doksi
+ * szerint ekkor az operációs rendszer egy tetszőleges, szabad portot oszt ki,
+ * ami a `listening` esemény után a `server.address().port` mezőből olvasható
+ * (<https://nodejs.org/api/net.html#serverlistenport-host-backlog-callback>).
+ * Konkrét port csak egy ugyanabban a tesztben korábban kiosztott port újra
+ * kötésére jár (a szerver leállás és újraindulás tesztjei). Visszatér a
+ * porttal, amikor a szerver már fogad kapcsolatot.
+ */
+export async function listenOnLoopback(server: NetServer, port = 0): Promise<number> {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, LOOPBACK_HOST, () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  // TCP porton figyelő szervernél az érték a Node doksi szerint mindig
+  // `AddressInfo`; a szöveges alak a pipe és a Unix socket esete.
+  if (address === null || typeof address === 'string') {
+    throw new TypeError('a teszt szerver nem TCP porton figyel');
+  }
+  return address.port;
+}
+
+/**
+ * A lap `STREAM_ORIGIN` felé induló `GET /events` kéréseinek átirányítása a
+ * teszt szerver portjára. A `route.continue({ url })` a Playwright doksi
+ * szerint a kérés URL-jét cseréli
+ * (<https://playwright.dev/docs/api/class-route#route-continue>), Chromiumban
+ * a lap számára nem megfigyelhető módon (CDP `Fetch.continueRequest` `url`,
+ * <https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueRequest>):
+ * a kérés a valódi hálózaton megy, a válasz streamelve érkezik, tehát ez nem
+ * mock, csak a cél port cseréje. Az `EventSource` újracsatlakozása is új
+ * kérés, és ugyanezen a routeon megy át.
+ */
+export async function routeStreamToPort(page: Page, port: number): Promise<void> {
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
+    const url = new URL(route.request().url());
+    url.host = `${LOOPBACK_HOST}:${String(port)}`;
+    await route.continue({ url: url.href });
+  });
+}
+
+/**
+ * A szerver indítása szabad porton, és a lap stream kéréseinek átirányítása
+ * rá. Visszatér a porttal.
+ */
+export async function attachStreamServer(page: Page, server: NetServer): Promise<number> {
+  const port = await listenOnLoopback(server);
+  await routeStreamToPort(page, port);
+  return port;
+}
+
+/**
+ * A Vite preview szerver és a `STREAM_ORIGIN` más origin (4173 kontra 4174),
+ * tehát az `EventSource` valódi, hitelesítő adatok nélküli CORS kérést indít
+ * (a port csere ezen nem változtat, a lap originje ugyanaz):`Access-Control-Allow-Origin` fejléc nélkül a
  * böngésző a választ nem adja át a JS rétegnek (a `readyState` sosem ér
  * OPEN-ig, a `page.route()`-mockolt esetekkel ellentétben, ahol a CDP által
  * teljesített válasz nem megy át ezen az ellenőrzésen).
@@ -95,9 +156,13 @@ export interface OpenStreamServer {
 /**
  * `GET /events` végpont, ami a megadott kereteket kiírja és a kapcsolatot
  * NYITVA HAGYJA. Enélkül a `readyState` kiesik `OPEN`-ből, és a
- * `computePhase` `replaying`/`live` ága nem figyelhető meg.
+ * `computePhase` `replaying`/`live` ága nem figyelhető meg. A szerver szabad
+ * porton indul, és a lap stream kérései rá mennek (`attachStreamServer`).
  */
-export function startOpenStreamServer(initialFrames: readonly StreamFrame[]): OpenStreamServer {
+export async function startOpenStreamServer(
+  page: Page,
+  initialFrames: readonly StreamFrame[],
+): Promise<OpenStreamServer> {
   const openResponses: ServerResponse[] = [];
   const pendingFrames: StreamFrame[] = [];
 
@@ -112,7 +177,7 @@ export function startOpenStreamServer(initialFrames: readonly StreamFrame[]): Op
       response.write(encodeStreamFrame(frame));
     }
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
 
   return {
     server,
@@ -316,16 +381,19 @@ export const TABBED_LAYOUT: TranscriptLayout = { viewport: { width: 375, height:
  * A futás nézet megnyitása a pótlással; visszatér, amikor az utolsó tárolt
  * sor kirajzolódott, és a lista az alján áll. A szerver a `goto` ELŐTT kerül
  * a hívó tartójába, hogy egy elbukó megnyitás után is a hívó zárja le, és a
- * következő futás `listen()` hívása ne ütközzön a porton. Elrendezés nélkül
- * a Playwright alap ablakán nyílik meg.
+ * szerver nyitva maradt kapcsolata ne tartsa életben a portot. Elrendezés
+ * nélkül a Playwright alap ablakán nyílik meg. A pótolt sorok száma alapból
+ * `REPLAYED_ROW_COUNT` (a lista görgethető); kevesebb sorral a lista nem telik
+ * meg.
  */
 export async function openFollowingTranscript(
   page: Page,
   theme: 'light' | 'dark',
   serverHolder: { current: Server | undefined },
   layout?: TranscriptLayout,
+  replayedRowCount = REPLAYED_ROW_COUNT,
 ): Promise<OpenStreamServer> {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   await page.addInitScript((mode) => {
     globalThis.localStorage.setItem('eggTheme', mode);
@@ -339,11 +407,33 @@ export async function openFollowingTranscript(
     await page.getByRole('tab', { name: 'Transcript' }).click();
   }
   streamServer.pushBatch([
-    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
-    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+    ...Array.from({ length: replayedRowCount }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: replayedRowCount },
   ]);
-  await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT);
+  const list = transcriptList(page);
+  // A rövid, nem teli lista utolsó sora nem a lista alján áll: ott a
+  // követés pontosan a sor teljes láthatóságát jelenti.
+  await (replayedRowCount < REPLAYED_ROW_COUNT
+    ? expect(list.locator(`[role="listitem"][aria-posinset="${String(replayedRowCount)}"]`)).toBeInViewport({
+        ratio: 1,
+      })
+    : expectLastRowFullyVisibleAtBottom(list, replayedRowCount));
   return streamServer;
+}
+
+/**
+ * A kinyitott sor fejlécének függőleges helye az ablakban, pixelben. A
+ * `headerOffsetInList`-tel ellentétben a lista elmozdulását is tartalmazza:
+ * ezen látszik, ha a lista fölött megjelenő elem a listát lejjebb tolja.
+ * `undefined`, amíg a sor nincs kirajzolva.
+ */
+export async function headerTopInViewport(list: Locator, position: number): Promise<number | undefined> {
+  return list.evaluate((element, rowPosition) => {
+    const header = element.querySelector(
+      `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
+    );
+    return header?.getBoundingClientRect().top;
+  }, position);
 }
 
 export function transientFrames(count: number): readonly StreamFrame[] {

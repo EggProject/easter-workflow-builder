@@ -1510,3 +1510,33 @@ mért értékre húzva, felfelé kerekítés nélkül: 99.09 / **98.56** / **99.
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (99.10 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR`
 sorral bukik (négy `ERROR`, exit 1).
+
+## 38. A transcript gomb sáv, a nem teli lista és a szabad port utáni ratchet (2026-09-25): egy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntése (az "ugrás az aljára" gomb megjelenése ne tolja le a
+listát) és egy független ellenőrzés hiánylistája: nem teli listán a kinyitás szünete nem állt, és
+az `sse-real-server.spec.ts` rögzített portja párhuzamos futásnál ütközött
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 19. szekció). Új a
+`transcript-panel/is-pre-arrival-range-report.ts`; a `TranscriptPanel.tsx` a gomb sávját mindig
+kirajzolja. Az e2e készlet 331 tesztre bővült: a gomb megjelenése két méreten két témában (4), a
+nem teli lista két méreten két témában, az utolsó és egy korábbi sorra (8).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**331 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, sorban, három
+workerrel, ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (37. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1652 / 1667     | **99.10** | 99.09                      | 15 -> **15**                   |
+| branches   | 754 / 765       | **98.56** | 98.56                      | 11 -> **11**                   |
+| functions  | 556 / 559       | **99.46** | 99.46                      | 3 -> **3**                     |
+| lines      | 1592 / 1607     | **99.06** | 99.06                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `transcript-panel` téma minden fájlja mind a négy metrikán 100
+százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a mért értékre
+húzva, felfelé kerekítés nélkül: **99.10** / 98.56 / 99.46 / 99.06 (`apps/web/package.json`; a
+pontos arányok 99,1002 / 98,5621 / 99,4633 / 99,0666). **Az igazolás:** a beállított küszöbbel
+`bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
+küszöbbel (99.11 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
+exit 1).

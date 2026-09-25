@@ -11,6 +11,7 @@ import {
 import { isInstanceof } from '@easter-workflow-builder/typeguards';
 import { useListCallbackRef, type DynamicRowHeight, type ListImperativeAPI } from 'react-window';
 import { isLastRowVisible } from './is-last-row-visible.ts';
+import { isPreArrivalRangeReport } from './is-pre-arrival-range-report.ts';
 import { reduceTranscriptAutoScroll } from './reduce-transcript-auto-scroll.ts';
 import type { TranscriptAutoScrollState } from './transcript-auto-scroll-state.ts';
 
@@ -129,6 +130,10 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // szekció) nem, és a kinyitott utolsó sor görgetése sem (research 18.
   // szekció).
   const hasLeftBottomWhilePausedReference = useRef(false);
+  // Az előző jelentés idején érvényes sorszám: ebből dől el, hogy egy
+  // jelentés még az érkezés előtti tartományt írja-e le
+  // (`isPreArrivalRangeReport`).
+  const lastReportedRowCountReference = useRef(0);
 
   // A görgetés a követés pillanatnyi állapotát olvassa, de csak a görgető
   // effekt indítói futtatják: a lista csatolása, új sor, átméretezés és az
@@ -235,16 +240,24 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // szünet kilépése akkor is, ha a mérés sosem jön: egy fülváltás a sort a
   // mérése előtt leszereli (a rejtett sor 0 magasságát a könyvtár nem
   // tárolja), és utána a gyorsítótár nem változik. A kinyitott utolsó sor
-  // után az alj elhagyása az első, nem követett új sor.
+  // után az alj elhagyása az első, nem követett új sor. Az érkezés utáni
+  // első, még a régi tartományt leíró jelentés nem elhagyás: nem teli listán
+  // az új sor a következő jelentésben már látszik, és a kettő együtt egy
+  // hamis "elhagyás, majd visszatérés" párt adna, ami a szünetet lezárná
+  // (research 19. szekció).
   const onRowsRendered = useCallback(
     (visibleRows: Readonly<{ startIndex: number; stopIndex: number }>) => {
       dispatch({ type: 'rows_rendered', stopIndex: visibleRows.stopIndex, rowCount });
+      const previousRowCount = lastReportedRowCountReference.current;
+      lastReportedRowCountReference.current = rowCount;
       const toggles = pausingTogglesReference.current;
       if (toggles.size === 0) {
         return;
       }
       if (!isLastRowVisible(visibleRows, rowCount)) {
-        hasLeftBottomWhilePausedReference.current = true;
+        if (!isPreArrivalRangeReport(visibleRows, rowCount, previousRowCount)) {
+          hasLeftBottomWhilePausedReference.current = true;
+        }
         return;
       }
       if (hasLeftBottomWhilePausedReference.current) {

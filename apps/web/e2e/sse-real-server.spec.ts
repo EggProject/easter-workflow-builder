@@ -23,11 +23,11 @@
 //      `computePhase` `reconnecting` ágára fut - a `replaying` felirat így
 //      csak egy meg nem figyelhető pillanatra jelenik meg.
 //
-// SOROS FUTÁS. A teszt szerver a `VITE_STREAM_ORIGIN` build időben rögzített
-// portjára kötődik (nem választható meg szabadon, mert az `EventSource` URL-je
-// abból épül), tehát egyszerre csak egy teszt tarthatja. A `fullyParallel`
-// beállítás a fájlon BELÜL is párhuzamosítana, ezért ez a fájl a dokumentált
-// `mode: 'serial'` beállítást kapja.
+// PÁRHUZAMOS FUTÁS. Minden teszt szervere az operációs rendszer által kiosztott
+// szabad porton figyel, és a lap a build időben rögzített `VITE_STREAM_ORIGIN`
+// felé induló `GET /events` kérését oda irányítja (`run-view-stream.ts`
+// `attachStreamServer`). A korábbi, a rögzített portra kötődő, soros fájl
+// `--repeat-each 3` mellett három workerrel `EADDRINUSE`-szal bukott.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type {
@@ -46,17 +46,21 @@ import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { makeRunEventRecord } from './transcript-fixture.ts';
 import {
+  attachStreamServer,
   captureEventSources,
   deliverFrameOnMeasuredCommit,
   deliverFrameWithNextClick,
   expectLastRowFullyVisibleAtBottom,
   headerOffsetInList,
+  headerTopInViewport,
   installMeasuredCommitDelivery,
+  lastRowBottomOverflow,
+  listenOnLoopback,
   mockRunView,
   NO_STEP_RUNS,
   openFollowingTranscript,
-  REAL_SERVER_PORT,
   REPLAYED_ROW_COUNT,
+  routeStreamToPort,
   RUN_SNAPSHOT,
   runDetailWithStatus,
   SSE_RESPONSE_HEADERS,
@@ -68,8 +72,10 @@ import {
   textDeltaTransientFrame,
   transcriptList,
   transientFrames,
+  WIDE_LAYOUT,
   type OpenStreamServer,
   type RunViewMockState,
+  type TranscriptLayout,
 } from './run-view-stream.ts';
 
 declare global {
@@ -92,8 +98,6 @@ declare global {
    */
   var e2eNoReloadMarker: boolean | undefined;
 }
-
-test.describe.configure({ mode: 'serial' });
 
 const RUN_PENDING: RunSummary = {
   id: 'r-1',
@@ -147,7 +151,7 @@ function readSingleHeaderValue(value: string | readonly string[] | undefined): s
  * második kérés meg nem érkezik. A teszt ezt web-first `expect.poll`-lal
  * várja meg, `page.waitForTimeout()` nélkül.
  */
-function startLastEventIdServer(capturedLastEventId: { value: string | undefined }): Server {
+async function startLastEventIdServer(page: Page, capturedLastEventId: { value: string | undefined }): Promise<Server> {
   let requestCount = 0;
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -179,7 +183,7 @@ function startLastEventIdServer(capturedLastEventId: { value: string | undefined
     // A kapcsolatot nyitva hagyja: a teszt csak azt igazolja, hogy a
     // második kérés megérkezett a helyes fejléccel, nem kell tovább zárni.
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
   return server;
 }
 
@@ -197,8 +201,8 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(() => {
   // A `closeAllConnections()` KELL a `close()` mellé: a nyitva hagyott SSE
-  // kapcsolat egyébként életben tartaná a szervert, és a soron következő
-  // teszt `listen()` hívása ugyanarra a portra `EADDRINUSE`-szal bukna.
+  // kapcsolat egyébként életben tartaná a szervert (és vele a portját) a
+  // worker folyamat végéig.
   serverHolder.current?.closeAllConnections();
   serverHolder.current?.close();
   serverHolder.current = undefined;
@@ -206,7 +210,7 @@ test.afterEach(() => {
 
 test('a második SSE kapcsolat Last-Event-ID fejlécet küld, a szerver onnan folytat', async ({ page }) => {
   const capturedLastEventId: { value: string | undefined } = { value: undefined };
-  serverHolder.current = startLastEventIdServer(capturedLastEventId);
+  serverHolder.current = await startLastEventIdServer(page, capturedLastEventId);
 
   await page.goto('/runs');
   await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
@@ -220,7 +224,7 @@ test('a második SSE kapcsolat Last-Event-ID fejlécet küld, a szerver onnan fo
 test('feliratkozással érkező stream_ready "előzmények betöltése" fázist mutat, a replay_complete leveszi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
 
   await page.goto('/runs');
@@ -236,7 +240,7 @@ test('feliratkozással érkező stream_ready "előzmények betöltése" fázist 
 });
 
 test('nem ismert runId-jű replay_complete nem változtat a pótlás alatti futásokon', async ({ page }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
 
   await page.goto('/runs');
@@ -261,7 +265,7 @@ test('nem ismert runId-jű replay_complete nem változtat a pótlás alatti fut�
 // ============================================================
 
 test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finished keret zárja le', async ({ page }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
 
   // A szerver oldali futás állapota a keret kiadása ELŐTT `running`, utána
@@ -362,7 +366,7 @@ for (const finished of [
   test(`élő step_started keretre "fut", step_finished keretre "${finished.label}" jelvény a csomóponton, oldal újratöltés nélkül`, async ({
     page,
   }) => {
-    const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+    const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
     serverHolder.current = streamServer.server;
     const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
     await mockRunView(page, state);
@@ -391,7 +395,7 @@ test('egy löketben érkező ezer keretes pótlás után a csomópont állapota 
 }) => {
   // A `stream_ready` a futást pótlás alatt állónak jelzi: a topnav az
   // "előzmények betöltése" fázist mutatja, amíg a `replay_complete` meg nem jön.
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunView(page, state);
@@ -431,7 +435,7 @@ test('egy löketben érkező ezer keretes pótlás után a csomópont állapota 
 test('a run_finished keret a fejlécet akkor is lezárja, ha UGYANABBAN a löketben replay_complete követi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
   await mockRunView(page, state);
@@ -479,7 +483,7 @@ const LIVE_APPROVAL: PendingApproval = {
 test('élő approval_requested keretre a jóváhagyás panel oldal újratöltés nélkül megjelenik, approval_decided keretre eltűnik', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
   const approvalFetches = { count: 0 };
@@ -555,7 +559,7 @@ const BURST_APPROVAL_COUNT = 20;
 test('egy löketben érkező 20 approval_requested keretre az újratöltés összevonva fut: a csatoláskori betöltésen felül egy folyamatban lévő és egy utólagos kérés, és a panel a végállapotot mutatja', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
   await installApiMocks(page, [
@@ -618,7 +622,7 @@ function selectionApproval(branch: string, requestedAtMs: number): PendingApprov
 test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte álló kikerülése és egy elé érkező új jóváhagyás után is ugyanaz látszik, csak a helye változik', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const first = selectionApproval('A', 10);
   const second = selectionApproval('B', 20);
@@ -673,7 +677,7 @@ test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte ál
 test('élő frissítéskor a lapozás nélkül látott jóváhagyás is rögzül: egy elé érkező, korábbi időpontú jóváhagyás nem veszi át a helyét', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const second = selectionApproval('B', 20);
   const third = selectionApproval('C', 30);
@@ -739,7 +743,7 @@ interface RestartableStreamServer {
  * újracsatlakozással gyorsan visszatérjen (SPEC-005 5.7), a
  * `startLastEventIdServer` mintájára.
  */
-function startRestartableStreamServer(): RestartableStreamServer {
+async function startRestartableStreamServer(page: Page): Promise<RestartableStreamServer> {
   const openResponses = new Set<ServerResponse>();
   const instance = { index: 1 };
 
@@ -754,7 +758,7 @@ function startRestartableStreamServer(): RestartableStreamServer {
     const readyFrame = streamReadyFrame(`s-${String(instance.index)}`, []);
     response.write(encodeStreamFrame(readyFrame));
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
 
   return {
     server,
@@ -776,7 +780,7 @@ function startRestartableStreamServer(): RestartableStreamServer {
 test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, és megjelenik az Újraindítás gomb', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunView(page, state);
@@ -806,7 +810,7 @@ test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, �
 test('szerver újraindulás után a futás nézet újra feliratkozik, újratölti a futást és a lépéseket, és az utána érkező élő keret frissíti a rajzot', async ({
   page,
 }) => {
-  const streamServer = startRestartableStreamServer();
+  const streamServer = await startRestartableStreamServer(page);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   const calls = { subscriptions: 0, getRun: 0, listStepRuns: 0 };
@@ -883,17 +887,22 @@ const BAD_GATEWAY = { status: 502, contentType: 'text/plain', body: '' };
  * Egy szerver példány `GET /events` végpontja: rövid `retry` (a böngésző a
  * megszakadás után gyorsan próbálkozzon újra, SPEC-005 5.7), a példány
  * `stream_ready` kerete, és nyitva hagyott kapcsolat, amibe menet közben
- * keret szúrható.
+ * keret szúrható. Alapból szabad porton indul; az újraindult példány a
+ * leállt példány portját kapja (`port`), ugyanúgy, mint a valódi szerver.
  */
-function startStreamServerInstance(serverInstanceId: string): {
+async function startStreamServerInstance(
+  serverInstanceId: string,
+  port = 0,
+): Promise<{
   readonly server: Server;
+  readonly port: number;
   readonly push: (frame: StreamFrame) => void;
   /**
    * Minden nyitott válasz szabályos lezárása: a már kiírt keretek kimennek,
    * a valódi szerver leállási sorrendje szerint (SPEC-006 8.2).
    */
   readonly endAll: () => void;
-} {
+}> {
   const openResponses = new Set<ServerResponse>();
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -905,9 +914,10 @@ function startStreamServerInstance(serverInstanceId: string): {
     response.write('retry: 50\n\n');
     response.write(encodeStreamFrame(streamReadyFrame(serverInstanceId, [])));
   });
-  server.listen(REAL_SERVER_PORT);
+  const boundPort = await listenOnLoopback(server, port);
   return {
     server,
+    port: boundPort,
     push: (frame) => {
       for (const response of openResponses) {
         response.write(encodeStreamFrame(frame));
@@ -923,17 +933,19 @@ function startStreamServerInstance(serverInstanceId: string): {
 }
 
 /**
- * A leállt szerver: a porton minden TCP kapcsolatot azonnal lezár, és
- * számolja a böngésző újracsatlakozási kísérleteit. A számláló a teszt
- * állapot alapú várakozásának jele (`expect.poll`), nem egy időzítő.
+ * A leállt szerver: a leállt példány portján minden TCP kapcsolatot azonnal
+ * lezár, és számolja a böngésző újracsatlakozási kísérleteit. A számláló a
+ * teszt állapot alapú várakozásának jele (`expect.poll`), nem egy időzítő.
  */
-function startDownServer(): { readonly server: NetServer; readonly attempts: { count: number } } {
+async function startDownServer(
+  port: number,
+): Promise<{ readonly server: NetServer; readonly attempts: { count: number } }> {
   const attempts = { count: 0 };
   const server = createNetServer((socket) => {
     attempts.count += 1;
     socket.destroy();
   });
-  server.listen(REAL_SERVER_PORT);
+  await listenOnLoopback(server, port);
   return { server, attempts };
 }
 
@@ -986,7 +998,7 @@ async function mockRunViewWithShutdown(page: Page, state: ShutdownMockState): Pr
  * sikertelenül próbált újracsatlakozni.
  */
 async function shutDownStreamServer(
-  instance: ReturnType<typeof startStreamServerInstance>,
+  instance: Awaited<ReturnType<typeof startStreamServerInstance>>,
   state: ShutdownMockState,
 ): Promise<{ readonly attempts: { count: number } }> {
   state.down = true;
@@ -998,7 +1010,7 @@ async function shutDownStreamServer(
   instance.endAll();
   await closeServer(instance.server);
   serverHolder.current = undefined;
-  const down = startDownServer();
+  const down = await startDownServer(instance.port);
   downServerHolder.current = down.server;
   await expect.poll(() => down.attempts.count).toBeGreaterThan(0);
   return down;
@@ -1007,8 +1019,9 @@ async function shutDownStreamServer(
 test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az utolsó állapotot mutatja várakozás jelzéssel, és az újraindulás után helyreáll', async ({
   page,
 }) => {
-  const first = startStreamServerInstance('s-1');
+  const first = await startStreamServerInstance('s-1');
   serverHolder.current = first.server;
+  await routeStreamToPort(page, first.port);
   const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunViewWithShutdown(page, state);
 
@@ -1040,7 +1053,8 @@ test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az uto
     await closeServer(downServerHolder.current);
     downServerHolder.current = undefined;
   }
-  serverHolder.current = startStreamServerInstance('s-2').server;
+  const restarted = await startStreamServerInstance('s-2', first.port);
+  serverHolder.current = restarted.server;
 
   await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
@@ -1052,8 +1066,9 @@ test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az uto
 test('ha a szerver nem jön vissza, a futás nézet több sikertelen újracsatlakozás után is kimondja a várakozást, nem válik csendessé', async ({
   page,
 }) => {
-  const first = startStreamServerInstance('s-1');
+  const first = await startStreamServerInstance('s-1');
   serverHolder.current = first.server;
+  await routeStreamToPort(page, first.port);
   const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunViewWithShutdown(page, state);
 
@@ -1081,7 +1096,7 @@ test('ha a szerver nem jön vissza, a futás nézet több sikertelen újracsatla
 test('a futás előzmények listája run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const listRunsCalls: { count: number } = { count: 0 };
   await installApiMocks(page, [
@@ -1122,7 +1137,7 @@ test('a futás előzmények listája run_event keretre akkor is újratölt, ha U
 test('élő átmeneti keretek: megjelölt, nem tárolt sorok, két azonos tartalmú keret két sor, és az utánuk érkező tárolt sor nem vész el', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
 
@@ -1165,7 +1180,10 @@ test('élő átmeneti keretek: megjelölt, nem tárolt sorok, két azonos tartal
  * fejlécet, és a tárolt sorok pótlását adja (az 1-es ismétlésként, a 2-es
  * újként), nyitva hagyva a kapcsolatot.
  */
-function startTransientReconnectServer(capturedLastEventId: { value: string | undefined }): Server {
+async function startTransientReconnectServer(
+  page: Page,
+  capturedLastEventId: { value: string | undefined },
+): Promise<Server> {
   let requestCount = 0;
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -1188,7 +1206,7 @@ function startTransientReconnectServer(capturedLastEventId: { value: string | un
     response.write(encodeStreamFrame(stepEventFrame(1, 'step_started', 'replayed')));
     response.write(encodeStreamFrame(stepEventFrame(2, 'step_finished', 'live')));
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
   return server;
 }
 
@@ -1196,7 +1214,7 @@ test('átmeneti keretek után az újracsatlakozás kurzora az utolsó TÁROLT es
   page,
 }) => {
   const capturedLastEventId: { value: string | undefined } = { value: undefined };
-  serverHolder.current = startTransientReconnectServer(capturedLastEventId);
+  serverHolder.current = await startTransientReconnectServer(page, capturedLastEventId);
   await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
 
   await page.goto('/run?runId=r-1');
@@ -1330,9 +1348,10 @@ test('az átmeneti sor ("Nem tárolt" jelvénnyel) pontosan olyan magas, mint a 
 // szekció). A négy kinyitási út (egér, `Space` a `keydown` és a `keyup` között
 // érkező sorral, `Enter`, csak `click`) mindegyikén a kinyitott sor fejléce
 // a lista tetejéhez mérve nem mozdulhat, és az "Ugrás az aljára" gomb a
-// kinyitás óta érkezett sorokat nevezi meg. A lista fölötti gomb sáv
-// megjelenése az egész listát lejjebb tolja, ezért a fejléc helye a lista
-// eleméhez mért.
+// kinyitás óta érkezett sorokat nevezi meg. A fejléc helye itt a lista
+// eleméhez mért; hogy maga a lista sem mozdul a gomb megjelenésekor (a gomb
+// helye előre fenntartva), azt "AZ UGRÁS GOMB MEGJELENÉSE" blokk méri az
+// ablakban.
 //
 // DETERMINISZTIKUS VERSENY. A hálózaton érkező keret a kattintás és a mérés
 // közé nem időzíthető megbízhatóan (research 16. szekció: a kinyitás utáni
@@ -1905,13 +1924,130 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+const TRANSCRIPT_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1440x900', layout: WIDE_LAYOUT },
+  { name: '375x812', layout: TABBED_LAYOUT },
+];
+
+// ============================================================
+// AZ UGRÁS GOMB MEGJELENÉSE NEM MOZDÍTJA A LISTÁT (user döntés 2026-09-25).
+//
+// A gomb sávja előre fenntartott hely a lista fölött: új esemény nélkül a
+// gomb láthatatlan, de a dobozát megtartja (`transcript-panel.css`,
+// `transcript-panel__jump--idle`). Korábban a sáv a gombbal együtt jelent
+// meg, és a listát 36 pixellel lejjebb tolta: a lista alján kinyitott utolsó
+// sor 53 pixeles fejlécéből 1440 és 375 pixelen is 17 pixel maradt a lista
+// látható területén, a szövege nélkül (research 19. szekció). A fejléc helye itt
+// az ABLAKBAN mért, nem a listához képest, és a gomb nem takarhat sort: a
+// lista fölött, teljes egészében az ablakban áll.
+// ============================================================
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`az ugrás gomb megjelenése a lista tartalmát nem mozdítja: a kinyitott utolsó sor fejléce az ablakban a helyén marad, és a gomb elérhető (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
+      await header.dispatchEvent('click');
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+      await expect(header).toBeInViewport({ ratio: 1 });
+      const listTopBefore = await list.evaluate((element) => element.getBoundingClientRect().top);
+      const headerTopBefore = await headerTopInViewport(list, rowCount);
+      expect(headerTopBefore).toStrictEqual(expect.any(Number));
+
+      streamServer.push(textDeltaTransientFrame('A gomb megjelenése'));
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' });
+      await expect(jump).toBeVisible();
+      expect(await list.evaluate((element) => element.getBoundingClientRect().top)).toBe(listTopBefore);
+      expect(await headerTopInViewport(list, rowCount)).toBe(headerTopBefore);
+      await expect(header).toBeInViewport({ ratio: 1 });
+      await expect(jump).toBeInViewport({ ratio: 1 });
+      expect(await jump.evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(
+        listTopBefore,
+      );
+
+      await jump.click();
+      await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+      await expect(jumpButton(page)).toHaveCount(0);
+    });
+  }
+}
+
+// ============================================================
+// NEM TELI LISTÁN IS ÁLL A KINYITÁS SZÜNETE (független ellenőrzés
+// 2026-09-25).
+//
+// Nem teli listán egy új sor után a `react-window` előbb még a régi látható
+// tartományt jelenti (a régi utolsó sorra vágva), majd az újat, amiben az új
+// sor már látszik. A hook a kettőt korábban "az alj elhagyása, majd visszatérés"
+// párnak vette, és a szünetet lezárta: gomb nem jelent meg, és amikor a lista
+// megtelt, minden új sor a kinyitott sort 53 pixellel feljebb vitte
+// (`is-pre-arrival-range-report.ts`, research 19. szekció). Az utolsó és egy
+// korábbi sor kinyitása után is minden új sorral nő a gomb száma, és a
+// kinyitott fejléc az ablakban a helyén marad, a lista megtelése után is.
+// ============================================================
+
+const SHORT_REPLAYED_ROW_COUNT = 3;
+
+/**
+ * Az egyenként érkező új sorok száma: mindkét elrendezésben elég ahhoz, hogy
+ * a kinyitott törzzsel együtt a lista megteljen (a független ellenőrzés
+ * szerint 1440 pixelen a 8., 375 pixelen a 4. új sornál).
+ */
+const SHORT_LIST_ARRIVALS = 12;
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const target of [
+      { label: 'az utolsó', position: SHORT_REPLAYED_ROW_COUNT },
+      { label: 'egy korábbi', position: 1 },
+    ] as const) {
+      test(`nem teli listán ${target.label} sor kinyitása után minden új sorral nő az ugrás gomb száma, és a lista megtelése után sem viszi el a sort (${name}, ${theme} téma)`, async ({
+        page,
+      }) => {
+        const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, SHORT_REPLAYED_ROW_COUNT);
+        const list = transcriptList(page);
+        const header = list
+          .locator(`[role="listitem"][aria-posinset="${String(target.position)}"]`)
+          .getByRole('button');
+        await header.dispatchEvent('click');
+        await expect(header).toHaveAttribute('aria-expanded', 'true');
+        await waitForRowMeasured(list, target.position);
+        const headerTopBefore = await headerTopInViewport(list, target.position);
+        expect(headerTopBefore).toStrictEqual(expect.any(Number));
+
+        let rowCount = SHORT_REPLAYED_ROW_COUNT;
+        for (let arrived = 1; arrived <= SHORT_LIST_ARRIVALS; arrived += 1) {
+          streamServer.push(textDeltaTransientFrame(`Rövid lista ${String(arrived)}`));
+          rowCount += 1;
+          await expect(
+            page.getByRole('button', { name: `Ugrás az aljára (${String(arrived)} új esemény)` }),
+          ).toBeVisible();
+          expect(await headerTopInViewport(list, target.position)).toBe(headerTopBefore);
+        }
+        // A lista közben megtelt: az utolsó sor a lista látható alja alatt áll
+        // (vagy ki sem rajzolt, mert a túlrajzolási sávon is túl van).
+        expect((await lastRowBottomOverflow(list, rowCount)) ?? Infinity).toBeGreaterThan(0);
+      });
+    }
+  }
+}
+
 // ============================================================
 // NINCS BÖNGÉSZŐ GÖRGETÉS RÖGZÍTÉS A LISTÁN (user döntés 2026-09-24).
 //
-// Bekapcsolt scroll anchoring mellett folyamatos streamnél a véletlen fázisú
-// kinyitások egy részében a lista a hook nélkül, a böngésző saját
-// igazításával 36 pixelt görgetett (mérve, research 17. és 18. szekció). A
-// teszt KIZÁRÓLAG A KONFIGURÁCIÓT őrzi: a lista kiszámított `overflow-anchor`
+// Bekapcsolt scroll anchoring mellett, a gomb helyének fenntartása előtt,
+// folyamatos streamnél a véletlen fázisú kinyitások egy részében a lista a
+// hook nélkül, a böngésző saját igazításával elmozdult (saját mérésekben
+// mind -36 pixel, egy független ellenőrzésben egy -574 pixeles teljes
+// elrántás is; research 17-19. szekció). A teszt KIZÁRÓLAG A KONFIGURÁCIÓT
+// őrzi: a lista kiszámított `overflow-anchor`
 // értéke `none` (a CSS Scroll Anchoring spec szerint ekkor a görgető dobozban
 // nincs horgony, tehát nincs igazítás). A jelenség maga determinisztikusan
 // nem állítható elő: hat, időzítő nélküli érkezési móddal (a kattintás

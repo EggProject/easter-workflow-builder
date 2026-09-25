@@ -859,9 +859,17 @@ horgony és melyik változás adta a 36 pixelt, NEM ELLENŐRZÖTT).
 "releváns" szűrővel készült, ami az aljára ugró kísérletet kidobta. Szűrő nélkül, minden kísérletet
 számolva, a 2026-09-25-i hookkal újramérve: `auto` 4/40 és 5/40 (mind -36), `none` 0/40 és 0/40.
 
+**Második pontosítás (2026-09-25, 19. szekció):** a "mind -36" csak a saját futásainkra igaz, nem
+általános. Egy független ellenőrzés ugyanezzel a jelenettel (`auto`, 150 ms, 1440x900) 5/80
+elmozdulást mért, köztük egy -574 pixeles teljes elrántást. A 19. szekció újramérése a `905ab7e`
+hookkal 4/40 és 3/40, mind -36; a -574 abban a futásban nem jelent meg, tehát ritka, de létező
+kimenetel. A gomb sáv helyének fenntartása után ugyanez a jelenet `auto` mellett 0/40 és 0/40.
+
 A -36 a lista `scrollTop` +36 pixeles változása a kattintás utáni első képkockákban, a hook
 görgetése nélkül, és a fejléc a helyén marad utána is (a 36 megegyezik a gomb sáv magasságával;
-az okát nem mértük). Feltáró futásban (a repóba nem került kód) egyszer egy teljes elrántás is
+az okát nem mértük). **Kiegészítés (2026-09-25, 19. szekció):** a gomb sáv helyének fenntartása
+után bekapcsolt rögzítéssel is 0/80, tehát a -36 a gomb sáv megjelenéséhez kötött; hogy pontosan
+melyik horgony mozdult, továbbra is nem ellenőrzött. Feltáró futásban (a repóba nem került kód) egyszer egy teljes elrántás is
 előfordult (-574 pixel) a rögzítés és a kézi visszatérés együttesével: a rögzítés görgetése után
 egy jelentés az utolsó sort láthatónak mutatta, és a várakozás lezárult. A `none` ezt is kizárja.
 Feltáró futásokban képkockához igazított kattintással, tétlen listán és a kattintással egy
@@ -996,7 +1004,10 @@ utána:
 | `fulvaltas`, 2 téma                                            | a kerék után 0, 0, 0, 0 | a kerék után 0, 0, 0, 0                   |
 
 Az utolsó sor után érkező új sor alja utána 345 pixellel a lista látható alja alatt áll: 256 (a
-törzs) + 53 (az új sor) + 36 (a gomb sáv).
+törzs) + 53 (az új sor) + 36 (a gomb sáv). **Pontosítás (19. szekció):** a táblázat csak teli
+listát (20 + 10 sor) mért; nem teli listán a szünet ekkor még nem állt, tehát a user döntés
+"determinisztikusan" feltétele erre az esetre nem teljesült. A gomb sáv helyének fenntartása óta
+a 345 helyett 309 (256 + 53).
 
 **Az e2e** (`apps/web/e2e/sse-real-server.spec.ts`, "AZ UTOLSÓ SOR KINYITÁSA IS MEGÁLLÍTJA A
 KÖVETÉST" blokk), mind a négy úton (egér, `Space`, `Enter`, csak `click`), mindkét témában, három
@@ -1071,6 +1082,9 @@ számolt, 17 kiszűrt).
 
 (Témánként: világos, sötét.) A választott hookkal `overflow-anchor: auto` mellett, 150 ms,
 1440x900: 4/40 és 5/40, mind -36; a 17. szekció 3/40 és 3/38 értéke szintén a hibás szűrőből jött.
+**Pontosítás (2026-09-25, 19. szekció):** a "mind -36" nem általános: egy független ellenőrzés
+ugyanitt 5/80 elmozdulást mért, köztük egy -574 pixeles teljes elrántást; a 19. szekció saját
+újramérése 4/40 és 3/40, mind -36.
 
 **(3) A görgetés rögzítés e2e.** A korábbi teszt a kiszámított `overflow-anchor` érték mellett az
 ugrás utáni első kinyitás képkockánkénti helyét is mérte. A képkockánkénti rész a CSS és a
@@ -1097,3 +1111,136 @@ repóbeli fixtúrával (`run-view-stream.ts`), mert képernyőképet lemezre kiz
 hogy létezik-e a hat kipróbáltnál ügyesebb, időzítő nélküli lépéssor, ami a rögzítést
 determinisztikusan előhozza; az ellenőrzés "mérés előtti visszakapcsolás" rontáson mért pontos
 időzítése.
+
+## 19. A gomb sáv helye, a nem teli lista szünete és a teszt szerver portja (2026-09-25)
+
+**A kiindulás.** A user döntése (2026-09-25): az "Ugrás az aljára" gomb megjelenése ne tolja le a
+listát, a design system szerint, kitalált elem nélkül, és a gomb maradjon elérhető, olvasandó
+tartalmat elérhetetlenül ne takarjon. Egy független ellenőrzés a `905ab7e`-n négy hiányt talált:
+(1) nem teli listán a kinyitás szünete nem áll, a gomb sosem jelenik meg, és a lista megtelése
+után a kinyitott sort soronként 53 pixellel elviszi; (2) emiatt a SPEC-008 7.4 "a rövid törzsű nem
+utolsó sorra is" mondata hamis volt; (3) a 17. és 18. szekció "mind -36" állítása nem általános
+(`auto` rögzítéssel 150 ms-on 5/80, köztük egy -574 pixeles teljes elrántás); (4) az
+`sse-real-server.spec.ts` rögzített portja `--repeat-each 3` mellett három workerrel `EADDRINUSE`
+hibát ad. Minden szám ebben a szekcióban a repóbeli mérő eszközből
+(`apps/web/measurement/transcript-scroll.ts`, új `gombsav` és `rovid-lista` jelenet) vagy a
+Playwright futásokból jön.
+
+**(A) A gomb sáv helye.** A design systemben (`eggproject-design-components`) nincs lebegő, a lista
+fölé kerülő gomb minta: sem "ugrás a legújabbhoz" komponens, sem lebegő akciógomb; a meglévő lebegő
+elemek (Popover, HoverCard, Toast, modálisok) más célúak. Egy fedő elhelyezés tehát kitalált
+pozíciót és árnyékot igényelne, és a lista szélén álló sorokat takarná. A választott megoldás a
+hely előre fenntartása: a `transcript-panel__header` sáv mindig a lista fölött áll, benne a design
+system `Button` (`secondary`, `sm`) új esemény nélkül is, `visibility: hidden` alatt
+(`transcript-panel__jump--idle`): a doboz megmarad, a gomb nem fókuszálható, és kimarad a
+hozzáférhetőségi fából. A sáv magasságát a gomb maga adja, szám nélkül. Az ára egy állandó,
+gombnyi magas sáv a lista fölött.
+
+`gombsav` jelenet: 20 + 10 sor, a lista alján a legutolsó sor kinyitva, majd egy új sor.
+
+| Állapot       | A lista teteje | A kinyitott fejléc | A fejlécből látható (a listán belül) | A gomb alja a lista teteje fölött |
+| ------------- | -------------- | ------------------ | ------------------------------------ | --------------------------------- |
+| előtte (HEAD) | +36            | +36                | 53 -> 17                             | 8                                 |
+| utána         | 0              | 0                  | 53 -> 53                             | 8                                 |
+
+Mindkét sor 1440x900-on és 375x812-n, két témában, azonos értékkel. Előtte a 17 pixel a fejléc
+felső belső margója: a fejléc szövege egyik méreten sem látszott (a képeken is).
+
+**(B) A nem teli lista.** A telepített `react-window@2.3.1` (`dist/react-window.js`, `useVirtualizer`)
+a látható tartományt állapotban tartja; egy render a `Math.min(itemCount - 1, stopIndexVisible)`
+vágással jelenti, és az újraszámolás egy layout effektben fut, aminek az eredményét a lista csak a
+következő renderben jelenti (`onRowsRendered` passzív effektben). A sorszám növekedése utáni első
+jelentés ezért még a régi utolsó sornál ér véget. Nem teli listán (3 sor) egy új sor után előbb
+(2, 4), majd (3, 4) jön (`stopIndex`, sorszám), és a hook ezt "az alj elhagyása, majd visszatérés"
+párnak vette: a szünet minden érkezésnél lezárult. A javítás (`is-pre-arrival-range-report.ts`): ha
+a sorszám az előző jelentés óta nőtt, és a `stopIndex` pontosan az előző jelentés utolsó sora, a
+jelentés nem az alj elhagyása. Ha a régi tartomány korábban véget ért, az újraszámolás ugyanott ér
+véget, tehát más jelentés nem lehet elavult; és ilyenkor a friss jelentés mindig megérkezik, mert a
+kirajzolt tartomány a túlrajzolási sávval az új sorig bővül (a forrás szerint az `overscanCount`
+alapértéke 3). Pixel küszöb, időzítő és saját `ResizeObserver` nincs.
+
+`rovid-lista` jelenet: 3 pótolt sor, a 3. (utolsó) vagy az 1. sor kinyitva, majd egyenként 12 új
+sor; a kinyitott fejléc elmozdulása az ablakban és a gomb szövege érkezésenként.
+
+| Állapot       | 1440x900 (mindkét sor, két téma)                             | 375x812 (mindkét sor, két téma)                              |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| előtte (HEAD) | 0 a 7. új sorig, utána -53, -106, ... -265; gomb egyszer sem | 0 a 3. új sorig, utána -29, -82, -135, ...; gomb egyszer sem |
+| utána         | 0 mind a 12 után; a gomb "1 ... 12 új esemény"               | 0 mind a 12 után; a gomb "1 ... 12 új esemény"               |
+
+Előtte a lista 1440x900-on a 8., 375x812-n a 4. új sornál telt meg, egyezően az ellenőrzéssel. A
+nem teli listán utána a gomb akkor is megjelenik, ha az új sor még látszik: a szünet a user döntése
+szerint áll, amíg a felhasználó vissza nem ér az aljára vagy meg nem nyomja a gombot.
+
+**Az e2e** (`sse-real-server.spec.ts`, "AZ UGRÁS GOMB MEGJELENÉSE NEM MOZDÍTJA A LISTÁT" és "NEM TELI
+LISTÁN IS ÁLL A KINYITÁS SZÜNETE" blokk): a gomb megjelenése két méreten két témában (a lista és a
+kinyitott fejléc helye az ablakban pontosan változatlan, a fejléc teljes egészében látszik, a gomb
+teljes egészében az ablakban és a lista fölött áll, és a megnyomása után az utolsó sor a lista
+alján); a nem teli lista két méreten két témában, az utolsó és az első sorra (minden új sor után a
+gomb száma nő, a fejléc az ablakban nem mozdul, és a végén a lista megtelt). Rontások, a 12 új
+teszten:
+
+| Állapot                             | A gomb megjelenése (4) | A nem teli lista (8) |
+| ----------------------------------- | ---------------------- | -------------------- |
+| a választott megoldás               | 4/4 zöld               | 8/8 zöld             |
+| a HEAD hookja, az új panellel       | 4/4 zöld               | 8/8 bukik            |
+| az új hook, a HEAD panelje és CSS-e | 4/4 bukik              | 8/8 bukik            |
+| a HEAD (a mai kód)                  | 4/4 bukik              | 8/8 bukik            |
+
+Unit: az elavult jelentés szűrése nélkül (`isPreArrivalRangeReport` hatástalanítva) a
+`use-transcript-auto-scroll.spec.tsx` új, nem teli listás tesztje bukik (1/29).
+
+**A többi jelenet a javítás után** (a 18. szekció táblázatához képest): `alja` mind 0; `kinyitas-ut`
+négy úton, két témában 0 pixel, "2 új esemény"; `utolso-sor` 0 pixel, "1 új esemény", és a
+következő sor alja 309 pixellel (256 + 53, a gomb sáv 36 pixele már nincs benne) a lista látható
+alja alatt; `fulvaltas` a kerék után 0, 0, 0, 0. `verseny` (`overflow-anchor: none`, 20 kísérlet
+beállításonként): 150 és 40 ms, 1440x900 és 375x812, két téma, 0/160.
+
+**(C) A görgetés rögzítés pontosítása.** A HEAD-en (`905ab7e` hook, a gomb sáv régi alakja)
+`MEASURE_OVERFLOW_ANCHOR=auto`, 150 ms, 1440x900, témánként 40 kísérlet: 4/40 és 3/40, mind -36.
+A független ellenőrzés ugyanitt 5/80-at mért, köztük egy -574 pixeles teljes elrántást; a mi
+futásunkban ez nem jelent meg, tehát ritka, de létező kimenetel, és a 17. és 18. szekció "mind -36"
+állítása nem általános (ott javítva). A gomb sáv helyének fenntartása után ugyanez a jelenet `auto`
+mellett 0/40 és 0/40: a -36 a gomb sáv megjelenéséhez kötött. Hogy pontosan melyik horgony mozdult,
+továbbra is NEM ELLENŐRZÖTT. A listán az `overflow-anchor: none` marad (user döntés 2026-09-24).
+
+**(D) A teszt szerver portja.** A fájl minden szervere az operációs rendszer által kiosztott szabad
+porton figyel a `127.0.0.1` címen (Node doksi: "If `port` is omitted or is 0, the operating system
+will assign an arbitrary unused port", <https://nodejs.org/api/net.html#serverlistenport-host-backlog-callback>;
+megerősítés: <https://github.com/nodejs/node/blob/main/doc/api/net.md>,
+<https://beta.docs.nodejs.org/net/Server>), és a lap a build időben rögzített `STREAM_ORIGIN` felé
+induló `GET /events` kérését a `route.continue({ url })` erre a portra irányítja (Playwright doksi:
+"If set changes the request URL. New URL must have same protocol as original one",
+<https://playwright.dev/docs/api/class-route#route-continue>; megerősítés:
+<https://github.com/microsoft/playwright/blob/main/docs/src/api/class-route.md>,
+<https://playwright.dev/python/docs/api/class-route>). Chromiumban ez a CDP `Fetch.continueRequest`
+`url` paramétere, "a lap számára nem megfigyelhető módon"
+(<https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueRequest>; megerősítés:
+<https://github.com/chromedp/cdproto/blob/main/fetch/fetch.go>). A kérés valódi hálózaton megy,
+nem mock; a `Last-Event-ID` újracsatlakozás tesztjei ezen az úton is zöldek. A leállás és
+újraindulás tesztjei a leállt és az újraindult példányt a korábban kiosztott portra kötik. A
+workerenkénti fix port (`testInfo.parallelIndex`, Playwright doksi: "It is guaranteed that workers
+running at the same time have a different `parallelIndex`",
+<https://playwright.dev/docs/api/class-workerinfo>) kitalált alap portszámot igényelne, ezért a
+szabad port a választás. A fájl `mode: 'serial'` beállítása ezzel kikerült.
+
+| Állapot       | `sse-real-server.spec.ts --repeat-each 3 --workers 3`                     |
+| ------------- | ------------------------------------------------------------------------- |
+| előtte (HEAD) | 77 zöld, 2 bukik (`EADDRINUSE`), 152 nem futott (soros fájl a bukás után) |
+| utána         | 231/231 zöld, nulla `EADDRINUSE`                                          |
+
+A teljes e2e készlet utána 331/331 zöld (hat `--shard` hívás, sorban, három workerrel), az e2e
+lefedettség ratchetje `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 38. szekció.
+
+**Képek** (a munkamenet kimeneti mappájában, `transcript-gombsav/`, 1440 és 375 pixel, két téma,
+előtte a HEAD panelével és hookjával, utána a választottal): `gombsav-*-1-kinyitva` (a lista alján
+kinyitott utolsó sor) és `gombsav-*-2-uj-sor-utan` (az új sor és a gomb megjelenése után: előtte a
+fejléc a lista alja alá csúszik, utána a helyén marad); `rovid-*-1-kinyitva` és
+`rovid-*-2-tiz-uj-sor-utan` (három sor, az utolsó kinyitva, majd tíz új sor: előtte gomb nincs, és
+a kinyitott sor kigördül, utána a sor a helyén, "Ugrás az aljára (10 új esemény)"). Szemléltetők:
+egy repón kívüli, eldobott lépés készítette őket ugyanazzal a repóbeli fixtúrával
+(`run-view-stream.ts`), mert képernyőképet lemezre kizárólag a szentesített `capture-screenshots.ts`
+írhat; a számok a mérő eszközből és az e2e-ből jönnek.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit; hogy a `react-window` más verziója ugyanígy jelenti-e a régi
+tartományt az érkezés utáni első renderben (a szűrés a pinelt `2.3.1` forrásán alapul); a -574
+pixeles elrántás pontos lépéssora; a görgetés rögzítés 36 pixeles igazításának pontos horgonya.

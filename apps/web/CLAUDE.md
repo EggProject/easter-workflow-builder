@@ -89,7 +89,12 @@ akkor is, ha az utolsó sor nyílt ki (user döntés 2026-09-25), a becsukásé 
 az utolsó jelentés dönt; a kettőt a fejléc kattintás előtti `aria-expanded` értéke különíti el.
 Ugyanannak a fejlécnek a páros számú kattintása (például egy képkockán belüli ki-be csukás) a
 szünetet lezárja, és ha a mérés elmarad (a sor a mérése előtt leszerelődik, például
-fülváltáskor), az ugrás gomb és a kézi visszatérés az aljára is (research 16-18. szekció). A
+fülváltáskor), az ugrás gomb és a kézi visszatérés az aljára is (research 16-18. szekció). Az
+érkezés utáni első, még a régi tartományt leíró `onRowsRendered` jelentés nem az alj elhagyása
+(`is-pre-arrival-range-report.ts`), különben nem teli listán a szünet egy hamis "elhagyás, majd
+visszatérés" párral lezárulna (research 19. szekció). Az ugrás gomb helye előre fenntartva: a
+sáv mindig a lista fölött áll, a gomb új esemény nélkül `visibility: hidden`, tehát a
+megjelenése nem tolja le a listát (user döntés 2026-09-25, research 19. szekció). A
 listán a böngésző görgetés rögzítése ki van kapcsolva (`overflow-anchor: none`, research 17. és 18. szekció). A görgetés számait a `measurement/transcript-scroll.ts` mérő eszköz adja
 (`bun run measure:transcript`), képet nem ír. A sor React kulcsa a `List` `rowKey` propja, a sor saját `key` mezőjéből
 (`transcript-row-key.ts`), mert a könyvtár alapból a sorszámmal kulcsol. Az automatikus görgetés pixel
@@ -522,10 +527,14 @@ már leszerelt happy-dom környezetben váltott ki React állapotfrissítést: a
 `src/unit-test-network-isolation/` regressziós tesztje őrzi.
 
 Az `e2e/sse-real-server.spec.ts` az **egyetlen** spec fájl, ami valódi hálózati szervert indít, és
-ez nem bővíthető második fájlra: a szerver a build időben rögzített `VITE_STREAM_ORIGIN` portjára
-kötődik, amit egyszerre csak egy teszt tarthat, ezért a fájl `test.describe.configure({ mode:
-'serial' })` beállítást kap, és a `server.close()` mellett `server.closeAllConnections()` hívást
-is (különben a nyitva hagyott SSE kapcsolat `EADDRINUSE` hibát okoz a következő tesztnél). Az
+ez nem bővíthető második fájlra. Minden teszt szervere az operációs rendszer által kiosztott
+szabad porton figyel a loopback címen, és a lap a build időben rögzített `VITE_STREAM_ORIGIN`
+felé induló `GET /events` kérését a `route.continue({ url })` erre a portra irányítja
+(`run-view-stream.ts` `attachStreamServer`): a hívás valódi hálózaton megy, és a párhuzamos
+workerek szerverei nem ütköznek. A fájl ezért nem soros (korábban a rögzített portra kötődött,
+soros volt, és `--repeat-each 3` mellett három workerrel `EADDRINUSE`-szal bukott). A
+`server.close()` mellett `server.closeAllConnections()` hívás is kell, különben a nyitva hagyott
+SSE kapcsolat a worker végéig életben tartja a szervert. Az
 `e2e/api-origin.ts` `API_ORIGIN` és `STREAM_ORIGIN` konstansa (SPEC-008 3.3) szándékosan azonos
 értékű: a `page.route()` mindkét csatornát ugyanazon az originen fogja el, a kettő külön neve a
 REST és az SSE mock segédfüggvények szemantikai pontossága miatt kell, nem eltérő port miatt.

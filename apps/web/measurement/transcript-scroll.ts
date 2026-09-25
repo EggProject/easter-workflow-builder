@@ -103,8 +103,9 @@ async function open(
   page: Page,
   theme: 'light' | 'dark',
   layout: TranscriptLayout,
+  replayedRowCount = REPLAYED_ROW_COUNT,
 ): Promise<{ readonly streamServer: OpenStreamServer; readonly list: Locator }> {
-  const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
+  const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, replayedRowCount);
   if (process.env['MEASURE_OVERFLOW_ANCHOR'] === 'auto') {
     await page.addStyleTag({ content: '.transcript-panel__list { overflow-anchor: auto !important; }' });
   }
@@ -666,5 +667,133 @@ for (const arrival of ANCHORING_ARRIVALS) {
         moved: movements.filter((movement) => movement.header !== 0 || movement.scrollTop !== 0),
       });
     });
+  }
+}
+
+// ------------------------------------------------------------
+// 8. Az "ugrás az aljára" gomb megjelenése és a lista helye az ablakban
+//    (research 19. szekció). A lista alján a legutolsó sor kinyitva, majd
+//    egy új sor: a gomb megjelenik. Mérve a lista és a kinyitott fejléc
+//    függőleges helye az ablakban a gomb előtt és után, a fejlécből a lista
+//    látható területén belül eső rész, és a gomb alsó éle a lista tetejéhez
+//    képest (pozitív: a gomb a lista fölött áll, nem takar sort).
+// ------------------------------------------------------------
+interface ListGeometry {
+  readonly listTop: number;
+  readonly headerTop: number;
+  readonly headerVisible: number;
+}
+
+function isListGeometry(value: unknown): value is ListGeometry {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'listTop' in value &&
+    typeof value.listTop === 'number' &&
+    'headerTop' in value &&
+    typeof value.headerTop === 'number' &&
+    'headerVisible' in value &&
+    typeof value.headerVisible === 'number'
+  );
+}
+
+async function listGeometry(list: Locator, position: number): Promise<ListGeometry | undefined> {
+  const geometry: unknown = await list.evaluate((element, rowPosition) => {
+    const header = element.querySelector(
+      `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
+    );
+    if (header === null) {
+      return;
+    }
+    const listBox = element.getBoundingClientRect();
+    const visibleBottom = listBox.top + element.clientTop + element.clientHeight;
+    const headerBox = header.getBoundingClientRect();
+    return {
+      listTop: listBox.top,
+      headerTop: headerBox.top,
+      headerVisible: Math.max(0, Math.min(headerBox.bottom, visibleBottom) - Math.max(headerBox.top, listBox.top)),
+    };
+  }, position);
+  return isListGeometry(geometry) ? geometry : undefined;
+}
+
+for (const { name, layout } of LAYOUTS) {
+  for (const theme of THEMES) {
+    test(`gombsav ${name} ${theme}`, async ({ page }) => {
+      const { streamServer, list } = await open(page, theme, layout);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      await list
+        .locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`)
+        .getByRole('button')
+        .dispatchEvent('click');
+      await animationFrames(page, 10);
+      const before = await listGeometry(list, rowCount);
+      streamServer.push(textDeltaTransientFrame('A gomb megjelenése'));
+      const jump = page.getByRole('button', { name: /Ugrás az aljára/ });
+      await expect(jump).toBeVisible();
+      await animationFrames(page, 10);
+      const after = await listGeometry(list, rowCount);
+      const buttonBottom = await jump.evaluate((element) => element.getBoundingClientRect().bottom);
+      report('gombsav', {
+        layout: name,
+        theme,
+        listTopDelta: round((after?.listTop ?? NaN) - (before?.listTop ?? NaN)),
+        headerTopDelta: round((after?.headerTop ?? NaN) - (before?.headerTop ?? NaN)),
+        headerVisibleBefore: round(before?.headerVisible),
+        headerVisibleAfter: round(after?.headerVisible),
+        listTopMinusButtonBottom: round((after?.listTop ?? NaN) - buttonBottom),
+        button: await jumpButtonText(page),
+      });
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// 9. Nem teli lista (research 19. szekció): három pótolt sor, az utolsó
+//    vagy az első kinyitva, majd egyenként tizenkét új sor. Érkezésenként
+//    mérve a kinyitott fejléc függőleges elmozdulása az ablakban a kinyitás
+//    utáni helyéhez képest, és a gomb szövege.
+// ------------------------------------------------------------
+const SHORT_REPLAYED_ROW_COUNT = 3;
+
+for (const { name, layout } of LAYOUTS) {
+  for (const theme of THEMES) {
+    for (const target of [
+      { label: 'utolso', position: SHORT_REPLAYED_ROW_COUNT },
+      { label: 'elso', position: 1 },
+    ] as const) {
+      test(`rovid-lista ${name} ${theme} ${target.label}`, async ({ page }) => {
+        const { streamServer, list } = await open(page, theme, layout, SHORT_REPLAYED_ROW_COUNT);
+        await list
+          .locator(`[role="listitem"][aria-posinset="${String(target.position)}"]`)
+          .getByRole('button')
+          .dispatchEvent('click');
+        await animationFrames(page, 10);
+        const expanded = await listGeometry(list, target.position);
+        const headerTopBefore = expanded?.headerTop;
+        const deltas: (number | undefined)[] = [];
+        const buttons: (string | undefined)[] = [];
+        let rowCount = SHORT_REPLAYED_ROW_COUNT;
+        for (let arrival = 1; arrival <= 12; arrival += 1) {
+          streamServer.push(textDeltaTransientFrame(`Rövid lista ${String(arrival)}`));
+          rowCount += 1;
+          await expect(list.getByRole('listitem').first()).toHaveAttribute('aria-setsize', String(rowCount));
+          await animationFrames(page, 6);
+          const geometry = await listGeometry(list, target.position);
+          deltas.push(round((geometry?.headerTop ?? NaN) - (headerTopBefore ?? NaN)));
+          buttons.push(await jumpButtonText(page));
+        }
+        report('rovid-lista', {
+          layout: name,
+          theme,
+          target: target.label,
+          deltas,
+          buttons,
+          lastRowOverflow: round(await lastRowBottomOverflow(list, rowCount)),
+        });
+      });
+    }
   }
 }

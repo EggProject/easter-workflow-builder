@@ -160,6 +160,22 @@ describe('TranscriptPanel', () => {
       .map((item) => item.getAttribute('aria-posinset'));
   }
 
+  /**
+   * Az "ugrás az aljára" gomb: a sávja mindig a helyén áll, a gomb új esemény
+   * nélkül rejtett (`transcript-panel__jump--idle`).
+   */
+  function jumpButton(): HTMLButtonElement {
+    const element = container.querySelector<HTMLButtonElement>(':scope .transcript-panel__header button');
+    if (element === null) {
+      throw new Error('a teszt nem talált ugrás gombot');
+    }
+    return element;
+  }
+
+  function isJumpButtonIdle(): boolean {
+    return jumpButton().classList.contains('transcript-panel__jump--idle');
+  }
+
   function statusTexts(): readonly (string | null)[] {
     return [...container.querySelectorAll('[role="status"]')].map((element) => element.textContent);
   }
@@ -184,7 +200,7 @@ describe('TranscriptPanel', () => {
       expect(statusTexts()).toEqual(['Várakozás az első eseményre']);
       expect(container.querySelector('.transcript-panel__empty')).toBeNull();
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(isJumpButtonIdle()).toBe(true);
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -197,7 +213,7 @@ describe('TranscriptPanel', () => {
       expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe('A futásnak nincs eseménye.');
       expect(statusTexts()).toEqual([]);
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(isJumpButtonIdle()).toBe(true);
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -292,17 +308,25 @@ describe('TranscriptPanel', () => {
       list().scrollTop = 0;
       list().dispatchEvent(new Event('scroll'));
     });
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(isJumpButtonIdle()).toBe(true);
 
     renderPanel(transcriptOf(manyRecords(23), true));
-    const button = container.querySelector<HTMLButtonElement>(':scope .transcript-panel__header button');
-    expect(button?.textContent).toBe('Ugrás az aljára (3 új esemény)');
-    expect(button?.className).toBe('btn btn--secondary btn--sm');
+    expect(jumpButton().textContent).toBe('Ugrás az aljára (3 új esemény)');
+    expect(jumpButton().className).toBe('btn btn--secondary btn--sm');
 
     act(() => {
-      button?.click();
+      jumpButton().click();
     });
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(isJumpButtonIdle()).toBe(true);
+  });
+
+  it('a gomb helye új esemény nélkül is fenntartva: a sáv a lista fölött áll, a gomb benne rejtett, tehát a megjelenése nem tolja el a listát (user döntés 2026-09-25)', () => {
+    renderPanel(transcriptOf(manyRecords(3), true));
+
+    const header = container.querySelector(':scope .transcript-panel > .transcript-panel__header');
+    expect(header?.nextElementSibling).toBe(list());
+    expect(jumpButton().className).toBe('btn btn--secondary btn--sm transcript-panel__jump--idle');
+    expect(jumpButton().textContent).toBe('Ugrás az aljára (0 új esemény)');
   });
   it('ha a futás a részleges szöveget NEM tárolja, a fejlécben kimondja, hogy az csak élőben látszik (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', false);
@@ -314,11 +338,11 @@ describe('TranscriptPanel', () => {
     expect(statusTexts()).toEqual([]);
   });
 
-  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és fejléc sincs (AC43)', () => {
+  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és a panel első eleme a gomb sávja (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', true);
 
     expect(container.querySelector('.transcript-panel__delta-note')).toBeNull();
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(container.querySelector('.transcript-panel')?.firstElementChild?.className).toBe('transcript-panel__header');
     expect(container.textContent).not.toContain(DELTA_NOTE);
   });
 

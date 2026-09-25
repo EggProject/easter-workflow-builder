@@ -358,8 +358,12 @@ describe('useTranscriptAutoScroll', () => {
       renderRows(11);
       expect(scrollToRow).not.toHaveBeenCalled();
 
-      // Az új sor nem látszik (a lista elhagyta az alját), majd a felhasználó
-      // odagörget.
+      // Az érkezés után a lista előbb még a régi tartományt jelenti (a régi
+      // utolsó sorra vágva), majd az újraszámoltat: az új sor nem látszik, a
+      // lista elhagyta az alját. Utána a felhasználó odagörget.
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
       act(() => {
         current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
       });
@@ -369,6 +373,32 @@ describe('useTranscriptAutoScroll', () => {
       expect(current().unseenCount).toBe(0);
       renderRows(12);
       expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+    });
+
+    it('nem teli listán az érkezés utáni, még a régi tartományt leíró jelentés nem az alj elhagyása: az új sort mutató jelentés után is tart a szünet', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(3, list);
+
+      click(addDisclosure(element));
+      renderRows(3, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 2 });
+      });
+      renderRows(4);
+      // A `react-window` az érkezés után előbb a régi tartományt jelenti (2 a
+      // 4 sorból), majd az újraszámoltat (3 a 4-ből): a lista végig az alján
+      // állt, tehát ez nem "elhagyás, majd visszatérés".
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 2 });
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 3 });
+      });
+      expect(current().unseenCount).toBe(1);
+
+      renderRows(5);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(2);
     });
 
     it('a becsukás szünete a mérésig tart: ha a mérés után is látszik az utolsó sor, a követés visszakapcsol, és a következő új sor görget', () => {
