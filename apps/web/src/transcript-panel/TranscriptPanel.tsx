@@ -174,6 +174,13 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
           <List
             aria-label="Futás eseményei"
             className="transcript-panel__list"
+            // A lista legalább egy összecsukott sornyi magas marad (2026-09-25):
+            // a húzható elválasztó `End` állásában a transcript panel a design
+            // system 60 pixeles minimumán áll, és a lista enélkül nulla magasra
+            // esne, tehát az utolsó sor sehogy sem látszana; így a panel
+            // görgethető burkolója (`run-view.css`) a teljes utolsó sort
+            // elérhetővé teszi.
+            style={{ minHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT }}
             listRef={setList}
             onResize={onResize}
             onRowsRendered={onRowsRendered}

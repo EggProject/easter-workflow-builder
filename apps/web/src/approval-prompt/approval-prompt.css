@@ -1,8 +1,8 @@
 /* A jóváhagyás panel (SPEC-008 8. szekció, T-009-27). NINCS KÁRTYA: se
    szegély, se lekerekítés, mert a panel a futás nézet transcript sávjában
-   áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció). Az
-   egyetlen saját háttér a látott jóváhagyás szakaszáé, a design system
-   `drawer` felülete (lent). A térközök kizárólag a design system
+   áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció). Saját
+   háttér csak a design system `drawer` felülete (lent). A térközök
+   kizárólag a design system
    `--ep-space-*` tokenjeiből jönnek. A panel külső mérete (a transcripttel
    megosztott sáv) a helyétől függ, ezért az a `run-view.css` fájlban áll;
    itt a belső elrendezés. */
@@ -12,55 +12,47 @@
   gap: var(--ep-space-2);
 }
 
-/* EGYSZERRE EGY JÓVÁHAGYÁS (user döntés 2026-09-25, SPEC-008 8. szekció 1.
-   pont). Felül a lapozó (`.pagination`), alatta a design system `drawer`
-   törzs és lábléc szerkezete (`DrawerSections`): a `.drawer__body` a
-   görgető terület (`flex: 1`, `overflow-y: auto`), a `.drawer__footer` a
-   tapadó akciósáv. A forrásban a kettő szülője a `.drawer` panel, ami
-   `display: flex; flex-direction: column` elrendezést ad; a modális
-   `.drawer` itt nem használható (`DrawerSections.tsx`), ezért ez a szakasz
-   adja ugyanazt a flex oszlopot. A `min-height: 0` engedi, hogy a szakasz a
-   panelnél kisebbre menjen össze
-   (<https://www.w3.org/TR/css-flexbox-1/#min-size-auto>): így a hely
-   hiányát a görgethető törzs fizeti meg (a görgető tároló automatikus
-   minimum magassága nulla), a lapozó és az akciósáv nem.
+/* EGYSZERRE EGY JÓVÁHAGYÁS, HÁROM RÉSZBEN (user döntések 2026-09-25,
+   SPEC-008 8. szekció 1. pont). A design system `drawer` szerkezete a
+   transcript oldal teljes magasságára feszül: felül a lapozó (a felület
+   feje), középen a húzható elválasztó fölött a görgethető törzs
+   (`.drawer__body`, `ApprovalPromptBody`), alul a tapadó akciósáv
+   (`.drawer__footer`, `ApprovalDecisionActions`). A lapozó és az akciósáv a
+   `Resizable` elemen kívül, fix helyen áll, tehát az elválasztó bármely
+   állásában látszik; a három rész helye a `run-view.css` fájlban áll, itt a
+   belső elrendezésük.
 
-   EGYSÉGES FELÜLET (user döntés 2026-09-25, SPEC-008 8. szekció 1. pont). A
-   forrásban a `.drawer` panel adja a `--ep-bg-elevated` hátteret, a törzs
-   ezért ugyanazon a felületen áll, mint a saját `--ep-bg-elevated` hátterű
-   akciósáv (`drawer.css`: `.drawer { background: var(--ep-bg-elevated) }`,
-   `.drawer__footer { background: var(--ep-bg-elevated) }`). A `.drawer`
-   szerepét itt ez a szakasz tölti be, tehát a háttér is az övé: a törzs és
-   az akciósáv egy felület, nem fehér doboz a bézs panelen. */
-.approval-prompt-panel__approval {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  background: var(--ep-bg-elevated);
-}
+   EGYSÉGES FELÜLET (user döntés 2026-09-25). A forrásban a `.drawer` panel
+   adja a `--ep-bg-elevated` hátteret, a törzs ezért ugyanazon a felületen
+   áll, mint a saját `--ep-bg-elevated` hátterű akciósáv (`drawer.css`:
+   `.drawer { background: var(--ep-bg-elevated) }`, `.drawer__footer {
+   background: var(--ep-bg-elevated) }`). Itt nincs egyetlen szülő, ami a
+   `.drawer` szerepét betöltené, mert a három rész a transcript oldalon
+   szétosztva áll, ezért a háttér a fej és a törzs saját szabálya: a lapozó,
+   a törzs és az akciósáv ugyanazon a tokenen áll.
 
-/* EGY BAL IGAZÍTÁSI VONAL (user döntés 2026-09-25). A lapozó a forrás
+   EGY BAL IGAZÍTÁSI VONAL (user döntés 2026-09-25). A lapozó a forrás
    `drawer` 24 pixeles vízszintes belső térközéhez igazodik
    (`drawer.css`: `.drawer__body { padding: 18px 24px }`,
    `.drawer__footer { padding: 16px 24px }`), a design system egyező
    `--ep-space-6` (24px) tokenjével, tehát a lapozó, a "visszavonhatatlan"
    `Alert` és a cím bal széle egy vonalban áll. A felső térköz az akciósáv
-   függőleges 16 pixelének párja (`--ep-space-4`): a lapozó a felület felső
-   sávja, ahogy az akciósáv az alsó. Mindkét egyezést az
-   `approval-prompt.spec.ts` e2e mérése őrzi. */
-.approval-prompt-panel__approval > .pagination {
+   függőleges 16 pixelének párja (`--ep-space-4`). Mindkét egyezést az
+   `approval-surface.spec.ts` e2e mérése őrzi. */
+.approval-prompt-panel > .pagination {
   padding: var(--ep-space-4) var(--ep-space-6) 0;
+  background: var(--ep-bg-elevated);
 }
 
-/* A `.drawer__footer` igazítása a keresztirányban: a forrás CSS nem ad
-   `align-items` értéket, tehát az alapérték (`stretch`) a gombokat a sáv
-   teljes magasságára nyújtaná, ha az eredmény szövege keskeny panelben több
-   sorba tör (375 pixelen a `conflict` üzenete). Fogyasztó oldali, erre a
-   panelre szűkített felülírás, ugyanaz a minta, mint a `run-view.css`
-   `.resizable-group` keret törlése; a `drawer.css` bájtra azonos marad. */
-.approval-prompt-panel__approval .drawer__footer {
-  align-items: center;
+/* A görgethető törzs szakasza: a forrásban a `.drawer` panel adja a
+   `display: flex; flex-direction: column` szülőt, amiben a `.drawer__body`
+   `flex: 1` és `overflow-y: auto` mellett görget; a modális `.drawer` itt
+   nem használható (`DrawerBody.tsx`), ezért ez a szakasz adja ugyanazt a
+   flex oszlopot, és a felület hátterét. */
+.approval-prompt-body {
+  display: flex;
+  flex-direction: column;
+  background: var(--ep-bg-elevated);
 }
 
 .approval-prompt-card {

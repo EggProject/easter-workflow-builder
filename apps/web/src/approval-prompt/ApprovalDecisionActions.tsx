@@ -1,5 +1,5 @@
 import type { ApprovalDecision } from '@easter-workflow-builder/protocol';
-import { Button } from '@easter-workflow-builder/ui';
+import { Button, DrawerFooter } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import type { ApprovalDecisionProgress } from './reduce-approval-decisions.ts';
 import './approval-prompt.css';
@@ -19,12 +19,13 @@ const DECISION_LABELS: Readonly<Record<ApprovalDecision, string>> = {
 };
 
 /**
- * A látott jóváhagyás tapadó akciósávjának tartalma (SPEC-008 8. szekció 1.
- * és 3. pont, user döntés 2026-09-25: "egyszerre egy"): a két `sm` döntés
- * gomb, és előttük a döntés eredménye. A sáv maga a design system
- * `.drawer__footer` eleme (`DrawerSections` `footer` szlotja), ez a
- * komponens a gyerekeit adja, burkoló nélkül, hogy a sáv saját térköze és
- * igazítása érvényesüljön.
+ * A látott jóváhagyás tapadó akciósávja (SPEC-008 8. szekció 1. és 3. pont,
+ * user döntés 2026-09-25: "egyszerre egy"): a design system `drawer`
+ * láblécében (`DrawerFooter`) a két `sm` döntés gomb, és előttük a döntés
+ * eredménye, további burkoló nélkül, hogy a sáv saját térköze és igazítása
+ * érvényesüljön. A sáv a transcript oldal alján, a húzható elválasztón kívül
+ * áll (user döntés 2026-09-25: "a lapozó és a döntés gombsora fix helyen
+ * áll"), tehát az elválasztó bármely állásában látszik.
  *
  * A két gomb a küldés pillanatától letiltva (9. szekció 15. async pont), a
  * megnyomotton spinnerrel, és **egy elfogadott vagy véglegesen elbukott
@@ -42,7 +43,7 @@ export function ApprovalDecisionActions(properties: Readonly<ApprovalDecisionAct
   const areDecisionsDisabled = progress !== undefined && !isRetryable;
 
   return (
-    <>
+    <DrawerFooter>
       {progress?.status === 'decided' && (
         <p className="approval-decision-actions__result" role="status">
           Döntés rögzítve: {DECISION_LABELS[progress.decision]}.
@@ -77,6 +78,6 @@ export function ApprovalDecisionActions(properties: Readonly<ApprovalDecisionAct
       >
         Elutasítás
       </Button>
-    </>
+    </DrawerFooter>
   );
 }

@@ -3,6 +3,7 @@ import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import { toTransientRowRecord } from './to-transient-row-record.ts';
 import type { TranscriptRow } from './transcript-row.ts';
@@ -245,6 +246,12 @@ describe('TranscriptPanel', () => {
     for (const item of items) {
       expect(item.querySelector('.run-event-row')).not.toBeNull();
     }
+  });
+
+  it('a lista legalább egy összecsukott sornyi magas, hogy az elválasztó End állásában is legyen hol látszania az utolsó sornak', () => {
+    renderPanel(transcriptOf(manyRecords(3), true));
+
+    expect(list().style.minHeight).toBe(`${String(COLLAPSED_TRANSCRIPT_ROW_HEIGHT)}px`);
   });
 
   it('a sor React kulcsa a sor key mezője, nem a sorszáma: a kinyitott állapot a sorral marad, más sor nem örökli', () => {

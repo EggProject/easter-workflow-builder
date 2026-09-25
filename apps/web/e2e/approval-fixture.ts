@@ -17,7 +17,8 @@ import type {
 } from '@easter-workflow-builder/protocol';
 import type { Page } from '@playwright/test';
 import { installApiMocks, jsonBody, mockRoute, type MockRoute } from './rest-mock.ts';
-import { mockIdleStream } from './sse-mock.ts';
+import { mockIdleStream, mockSseFrames } from './sse-mock.ts';
+import { makeRunEventRecord, replayFrames } from './transcript-fixture.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol), lásd `run-view.spec.ts` azonos megjegyzését */
 
@@ -235,6 +236,29 @@ export function approvalBaseMocks(listPendingApprovals: MockRoute['handle']): re
 
 export async function mockApprovalRun(page: Page, approvals: readonly PendingApproval[]): Promise<void> {
   await mockIdleStream(page);
+  await installApiMocks(
+    page,
+    approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),
+  );
+}
+
+/**
+ * A transcript pótlásának sorai a szélső állás méréséhez és e2e tesztjéhez:
+ * elég ahhoz, hogy a lista görgethető legyen (a `run-view-stream.ts`
+ * `REPLAYED_ROW_COUNT` értéke).
+ */
+export const APPROVAL_TRANSCRIPT_ROW_COUNT = 20;
+
+/**
+ * A futás a megadott jóváhagyásokkal és egy lezárt pótlással
+ * (`APPROVAL_TRANSCRIPT_ROW_COUNT` tárolt sor), hogy a transcript utolsó sora
+ * mérhető legyen (research 10. szekció).
+ */
+export async function mockApprovalRunWithTranscript(page: Page, approvals: readonly PendingApproval[]): Promise<void> {
+  const records = Array.from({ length: APPROVAL_TRANSCRIPT_ROW_COUNT }, (_, index) =>
+    makeRunEventRecord(index + 1, APPROVAL_RUN_DETAIL.id),
+  );
+  await mockSseFrames(page, replayFrames(APPROVAL_RUN_DETAIL.id, records));
   await installApiMocks(
     page,
     approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),

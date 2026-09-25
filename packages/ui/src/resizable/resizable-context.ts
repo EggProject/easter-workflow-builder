@@ -6,6 +6,11 @@ import { createContext } from 'react';
  */
 export interface ResizableContextValue {
   readonly sizes: readonly number[];
+  /**
+   * A panelek pixeles minimuma százalékban a legutóbbi mérés szerint
+   * (`measure-panel-geometry.ts`); üres, amíg nincs mérés.
+   */
+  readonly minSizePercents: readonly number[];
   readonly direction: 'horizontal' | 'vertical';
   /**
    * A jelenleg húzott (vagy fókuszált, húzás alatt lévő) elválasztó
@@ -13,9 +18,19 @@ export interface ResizableContextValue {
    */
   readonly activeHandleIndex: number;
   readonly panelDomId: (index: number) => string;
+  /**
+   * A `ResizablePanel` ezen jelenti a kirajzolt DOM elemét (és leszereléskor
+   * a `null` értéket), hogy a `Resizable` megmérhesse.
+   */
+  readonly registerPanel: (index: number, element: HTMLDivElement | null) => void;
   readonly beginDrag: (handleIndex: number, clientPos: number) => void;
   readonly resizeByDelta: (handleIndex: number, deltaPercent: number) => void;
   readonly toggleCollapse: (handleIndex: number) => void;
+  /**
+   * A panelek újramérése és a méretek igazítása a mért minimumhoz (az
+   * elválasztó fókuszakor, hogy a felolvasott érték friss legyen).
+   */
+  readonly refreshGeometry: () => void;
 }
 
 /**
@@ -25,15 +40,20 @@ export interface ResizableContextValue {
  */
 const NOOP_CONTEXT_VALUE: ResizableContextValue = {
   sizes: [],
+  minSizePercents: [],
   direction: 'horizontal',
   activeHandleIndex: -1,
   panelDomId: (index) => `resizable-panel-${String(index)}`,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
+  registerPanel: () => {},
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
   beginDrag: () => {},
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
   resizeByDelta: () => {},
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
   toggleCollapse: () => {},
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op alapérték, lásd a fenti indoklást
+  refreshGeometry: () => {},
 };
 
 export const ResizableContext = createContext<ResizableContextValue>(NOOP_CONTEXT_VALUE);

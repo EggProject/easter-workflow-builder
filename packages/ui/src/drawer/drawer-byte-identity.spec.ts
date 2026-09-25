@@ -3,7 +3,7 @@
 // forrásból 2026-09-25-én kiszámítva, ugyanaz az indok, mint a resizable
 // témában (`resizable-byte-identity.spec.ts`). A teljes forrás CSS átkerült,
 // a modális panel szabályaival együtt, akkor is, ha a felület csak a törzs
-// és a lábléc szerkezetét használja (`DrawerSections.tsx`).
+// és a lábléc szerkezetét használja (`DrawerBody.tsx`, `DrawerFooter.tsx`).
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';

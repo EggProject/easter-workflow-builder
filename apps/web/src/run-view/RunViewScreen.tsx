@@ -8,6 +8,8 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
+import { ApprovalDecisionActions } from '../approval-prompt/ApprovalDecisionActions.tsx';
+import { ApprovalPromptBody } from '../approval-prompt/ApprovalPromptBody.tsx';
 import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
 import { pendingApprovalRequestedAtByStepRun } from '../approval-prompt/pending-approval-requested-at-by-step-run.ts';
 import { useApprovalDecisions } from '../approval-prompt/use-approval-decisions.ts';
@@ -204,8 +206,9 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  *
  * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
  * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
- * a transcript sávban, a transcript fölött a döntési panel, a kettő között
- * húzható elválasztóval (user döntés 2026-09-25, `RunViewTranscriptSide`, az
+ * a transcript sávban a döntési felület: felül a lapozó, a transcript fölött
+ * a látott jóváhagyás törzse, a kettő között húzható elválasztóval, alul a
+ * döntés akciósávja (user döntések 2026-09-25, `RunViewTranscriptSide`, az
  * arány a `run-view-approval-layout.ts` kulcsán perzisztálódik). Egyik sem a
  * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
  * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
@@ -398,6 +401,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     return <p role="alert">{projected.message}</p>;
   }
 
+  const shownApproval = approvalSelection.shown;
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,
@@ -433,28 +437,46 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         <RunViewLayout
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
-          // A jóváhagyás panel a transcript sávban, a transcript FÖLÖTT áll
-          // (PLAN-009 5. szekció F6: "a transcript mellé"), látott jóváhagyás
-          // mellett közöttük húzható elválasztóval (user döntés 2026-09-25,
-          // `RunViewTranscriptSide.tsx`). A `key` a futás azonosítója: egy
-          // másik futásra navigálva a transcript panel (és a görgetés
-          // állapota) tiszta lappal indul. A két tárolt arány ugyanazon az
-          // okon olvasódik minden renderen, lásd a `defaultSizes` kommentjét.
+          // A jóváhagyás felület a transcript sávban áll (PLAN-009 5.
+          // szekció F6: "a transcript mellé"): a lapozó felül, a törzs a
+          // transcript FÖLÖTT, közöttük húzható elválasztóval, a döntés
+          // akciósávja alul, a lapozó és az akciósáv az elválasztón kívül
+          // (user döntések 2026-09-25, `RunViewTranscriptSide.tsx`). A `key`
+          // a futás azonosítója: egy másik futásra navigálva a transcript
+          // panel (és a görgetés állapota) tiszta lappal indul. A két tárolt
+          // arány ugyanazon az okon olvasódik minden renderen, lásd a
+          // `defaultSizes` kommentjét.
           transcript={
             <RunViewTranscriptSide
-              approvalPanel={
+              approvalHeader={
                 <ApprovalPromptPanel
                   isFirstLoadPending={
                     pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
                   }
                   failureMessage={pendingApprovals.failureMessage}
                   approvalCount={approvalDecisions.displayed.length}
-                  shown={approvalSelection.shown}
+                  shown={shownApproval}
                   onSelectPage={approvalSelection.selectPage}
-                  onDecide={approvalDecisions.decide}
                 />
               }
-              isApprovalShown={approvalSelection.shown !== undefined}
+              // A törzs kulcsa a jóváhagyás azonosítója: lapozáskor a törzs a
+              // tetejéről indul (`ApprovalPromptBody`).
+              approvalBody={
+                shownApproval && (
+                  <ApprovalPromptBody key={shownApproval.approval.id} approval={shownApproval.approval} />
+                )
+              }
+              approvalActions={
+                shownApproval && (
+                  <ApprovalDecisionActions
+                    progress={shownApproval.progress}
+                    onDecide={(decision) => {
+                      approvalDecisions.decide(shownApproval.approval, decision);
+                    }}
+                  />
+                )
+              }
+              isApprovalShown={shownApproval !== undefined}
               transcriptPanel={
                 <TranscriptPanel
                   key={runId}

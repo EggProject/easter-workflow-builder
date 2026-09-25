@@ -23,11 +23,9 @@ const SECOND: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2', titl
 describe('ApprovalPromptPanel', () => {
   let container: HTMLDivElement;
   let root: Root;
-  const onDecide = vi.fn();
   const onSelectPage = vi.fn();
 
   beforeEach(() => {
-    onDecide.mockClear();
     onSelectPage.mockClear();
     container = document.createElement('div');
     document.body.append(container);
@@ -57,7 +55,6 @@ describe('ApprovalPromptPanel', () => {
           approvalCount={options.approvalCount ?? (shown === undefined ? 0 : 1)}
           shown={shown}
           onSelectPage={onSelectPage}
-          onDecide={onDecide}
         />,
       );
     });
@@ -73,7 +70,7 @@ describe('ApprovalPromptPanel', () => {
     renderPanel(undefined, { isFirstLoadPending: true });
 
     expect(container.querySelector('.progress-bar')).not.toBeNull();
-    expect(container.querySelector('.approval-prompt-panel__approval')).toBeNull();
+    expect(container.querySelector('nav.pagination')).toBeNull();
   });
 
   it('látott jóváhagyás nélkül nem rajzol semmit: a panel üres elem', () => {
@@ -88,32 +85,13 @@ describe('ApprovalPromptPanel', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
-  it('a szakasz sorrendje: a lapozó, a görgethető drawer törzs, a tapadó drawer lábléc', () => {
+  it('látott jóváhagyásnál csak a lapozót rajzolja: a tartalom és a döntés gombjai nem a fej részei', () => {
     renderPanel({ approval: APPROVAL, progress: undefined, index: 0 });
 
-    const section = container.querySelector('section.approval-prompt-panel__approval');
-    expect(section?.getAttribute('aria-label')).toBe('Függő jóváhagyások');
-    expect([...(section?.children ?? [])].map((child) => child.className)).toEqual([
-      'pagination',
-      'drawer__body',
-      'drawer__footer',
-    ]);
-  });
-
-  it('a törzsben elöl kimondja a design system Alert blokkjával, hogy a döntés visszavonhatatlan, utána a látott jóváhagyás teljes tartalma', () => {
-    renderPanel({ approval: APPROVAL, progress: undefined, index: 0 });
-
-    const body = container.querySelector('.drawer__body');
-    const [alert, card] = body?.children ?? [];
-    expect(alert?.className).toBe('alert alert--warning');
-    expect(alert?.querySelector(':scope .alert__title')?.textContent).toBe('A döntés visszavonhatatlan');
-    expect(alert?.querySelector(':scope .alert__message')?.textContent).toBe(
-      'Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.',
-    );
-    expect(card?.tagName).toBe('ARTICLE');
-    expect(card?.querySelector(':scope h3')?.textContent).toBe('Engedélyezed?');
-    expect(card?.querySelector(':scope pre')?.textContent).toBe(JSON.stringify(APPROVAL.payload, undefined, 2));
-    expect(body?.querySelectorAll(':scope button')).toHaveLength(0);
+    const panel = container.querySelector('.approval-prompt-panel');
+    expect([...(panel?.children ?? [])].map((child) => child.className)).toEqual(['pagination']);
+    expect(panel?.querySelector('.drawer__body')).toBeNull();
+    expect(panel?.querySelector('.drawer__footer')).toBeNull();
   });
 
   it('a lapozó "k / n" alakban mutatja a helyet, magyar nevekkel, és az 1-től számozott oldalt adja tovább', () => {
@@ -138,38 +116,5 @@ describe('ApprovalPromptPanel', () => {
       (element) => element.textContent,
     );
     expect(slots).toEqual(['1', '…', '5', '…', '10']);
-  });
-
-  it('a lábléc sávban csak a látott jóváhagyás két gombja és az eredménye áll, és a döntést a LÁTOTT jóváhagyással adja tovább', () => {
-    renderPanel(
-      { approval: SECOND, progress: { status: 'decided', decision: 'rejected' }, index: 1 },
-      {
-        approvalCount: 2,
-      },
-    );
-
-    const footer = container.querySelector('.drawer__footer');
-    expect([...(footer?.children ?? [])].map((child) => child.textContent)).toEqual([
-      'Döntés rögzítve: elutasítva.',
-      'Jóváhagyás',
-      'Elutasítás',
-    ]);
-
-    renderPanel({ approval: SECOND, progress: undefined, index: 1 }, { approvalCount: 2 });
-    act(() => {
-      buttonNamed('Jóváhagyás')?.click();
-    });
-    expect(onDecide).toHaveBeenCalledWith(SECOND, 'approved');
-  });
-
-  it('lapozáskor a törzs új elem, tehát a görgetési helye a tetejéről indul', () => {
-    renderPanel({ approval: APPROVAL, progress: undefined, index: 0 }, { approvalCount: 2 });
-    const firstBody = container.querySelector('.drawer__body');
-
-    renderPanel({ approval: APPROVAL, progress: undefined, index: 0 }, { approvalCount: 3 });
-    expect(container.querySelector('.drawer__body')).toBe(firstBody);
-
-    renderPanel({ approval: SECOND, progress: undefined, index: 1 }, { approvalCount: 3 });
-    expect(container.querySelector('.drawer__body')).not.toBe(firstBody);
   });
 });

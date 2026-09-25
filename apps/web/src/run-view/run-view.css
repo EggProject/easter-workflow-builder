@@ -132,15 +132,19 @@
 
 /* A transcript oldal megnevezett, doboz nélküli terület: se szegély, se
    lekerekítés, se saját háttér, tehát nem kártya (tilos a card in card).
-   Belül a `RunViewTranscriptSide` második, függőleges `Resizable` eleme áll
-   (a jóváhagyás panel és a transcript, user döntés 2026-09-25). Az oldal
-   maga belső térköz nélküli: a jóváhagyás szakasz a design system `drawer`
-   felületét kapja faltól falig, a saját 24 pixeles belső térközével
+   Belül felülről lefelé a jóváhagyás feje (a lapozó), a `RunViewTranscriptSide`
+   második, függőleges `Resizable` eleme (a látott jóváhagyás törzse és a
+   transcript) és a döntés akciósávja (user döntések 2026-09-25). Az oldal
+   maga belső térköz nélküli: a jóváhagyás részei a design system `drawer`
+   felületét kapják faltól falig, a saját 24 pixeles belső térközükkel
    (`approval-prompt.css`), a transcript a saját 16 pixelesével (lent). Egy
-   közös külső térköz a kettő köré a jóváhagyás szakaszban dupla vízszintes
-   térközt adna (16 plusz 24 pixel, tilos, `.claude/CLAUDE.md` 11. szekció).
-   A görgetést a transcript panel virtualizált listája maga végzi (T-009-25,
-   `transcript-panel.css`), ezért ez a burkoló NEM görget. */
+   közös külső térköz köréjük dupla vízszintes térközt adna (16 plusz 24
+   pixel, tilos, `.claude/CLAUDE.md` 11. szekció). A görgetést a transcript
+   panel virtualizált listája maga végzi (T-009-25, `transcript-panel.css`),
+   ezért ez a burkoló NEM görget. A fej és az akciósáv flex eleme nem
+   zsugorodik a tartalma alá (az automatikus minimum a tartalma), a hely
+   hiányát a `Resizable` fizeti meg (`min-height: 0`, lent), tehát a lapozó
+   és a két gomb az elválasztó bármely állásában teljesen látszik. */
 .run-view-screen__transcript {
   overflow: hidden;
 }
@@ -172,9 +176,13 @@
    jön, vele 69-re, `pointerup` zárással
    (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). A
    szabály a fogyasztó oldalán, erre az egy elválasztóra szűkítve áll, mert a
-   `resizable.css` bájtazonossági teszt alatt van; a külső, gráf és
-   transcript közti elválasztó ugyanebben a hiányban él (SPEC-008 14.2,
-   O-11). */
+   `resizable.css` bájtazonossági teszt alatt van. A design system maga is
+   ezt teszi a saját oszlop méretező fogantyúján (`datatable.css`:
+   `.data-table__resizer { touch-action: none }`). A külső, gráf és
+   transcript közti elválasztó `touch-action` értéke nyitott pont (SPEC-008
+   14.2, O-11): érintéssel ma nem húzható, de a `Resizable` 2026-09-25 óta a
+   `pointercancel` eseményre is lezárja a húzást, tehát a félbeszakadt
+   érintés után a húzás állapota nem ragad bent. */
 .run-view-screen__transcript > .resizable-group > .resizable-handle {
   touch-action: none;
 }
@@ -200,43 +208,55 @@
    (`topnav-shell.css`), tehát nélküle a belső térköz a panel magassága FÖLÉ
    adódik, és a panel a lista alsó 16 pixelét levágja: az utolsó sor alja
    akkor sem látszik, ha a lista pontosan az aljára görgetett (mérve,
-   `docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció). */
+   `docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
+
+   Az `overflow: auto` (2026-09-25 óta, korábban `hidden`) a design system
+   saját modellje a minimumánál kisebb tartalomra: a `.resizable-panel`
+   forrás szabálya `min-height: 60px` és `overflow: auto`, tehát ami a panel
+   minimumán nem fér el, az görget, nem vágódik le. A transcript fix részei
+   (a delta kapcsoló mondata és az ugrás gomb sávja) és a lista egy sornyi
+   minimuma (`TranscriptPanel.tsx`) az elválasztó `End` állásában a 60 pixeles
+   panelnél magasabbak; itt görgetve a lista, benne az utolsó sor, teljesen
+   elérhető. Nagyobb panelben a tartalom kitölti, és nincs mit görgetni
+   (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció). */
 .run-view-screen__transcript-content {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   padding: var(--ep-space-4);
 }
 
-/* Látott jóváhagyás nélkül a jóváhagyás panel (a lista betöltés jelzése vagy
-   hibaüzenete) a transcript fölött, a saját magasságán áll. A térköz csak
-   akkor áll, ha a panelnek van tartalma: az üres panel (`:empty`) nulla
-   magas, és térközt sem hagy. */
-.run-view-screen__transcript-content > .approval-prompt-panel:not(:empty) {
-  margin-block-end: var(--ep-space-4);
+/* A jóváhagyás feje (`ApprovalPromptPanel`) a transcript oldal tetején. Az
+   első betöltés jelzése és a lista hibaüzenete a transcript oldal háttérén
+   áll, ezért a transcript 16 pixeles térközét kapja: jóváhagyás nélkül a
+   transcript belső térközével együtt ugyanaz a 16 pixel áll fölötte és
+   alatta, mint amikor a transcript fölött, a saját burkolójában állt. A
+   lapozó a saját `drawer` felületén, a saját belső térközével áll
+   (`approval-prompt.css`). */
+.run-view-screen__transcript > .approval-prompt-panel > .progress-bar,
+.run-view-screen__transcript > .approval-prompt-panel > [role='alert'] {
+  margin: var(--ep-space-4) var(--ep-space-4) 0;
 }
 
-/* Látott jóváhagyás mellett a panel az elválasztó fölötti `ResizablePanel`
-   teljes magasságát kapja. A panelen belül a látott jóváhagyás törzse
-   görget, a lapozó és a döntés akciósávja nem (`approval-prompt.css`), így a
-   gombok görgetés nélkül látszanak, amíg a panel legalább a lapozó és az
-   akciósáv együttes magasságát kapja. Ennél kisebb arányon (a `Resizable`
-   százalékos, `[5, 95]` tartományú korlátja pixeles minimumot nem ismer) a
-   design system `.resizable-panel { overflow: auto }` szabálya görgeti a
-   panelt, tehát a gombok görgetéssel elérhetők (mérve,
-   `docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). */
-.run-view-screen__transcript .resizable-panel > .approval-prompt-panel {
-  box-sizing: border-box;
+/* A látott jóváhagyás törzse az elválasztó fölötti `ResizablePanel` teljes
+   magasságát kapja, és azon belül a `.drawer__body` görget
+   (`approval-prompt.css`). A panel minimuma a design system 60 pixele; a
+   `Resizable` 2026-09-25 óta ezt a minimumot a jelentett értékben is tartja
+   (`packages/ui` `measure-panel-geometry.ts`). */
+.run-view-screen__transcript > .resizable-group > .resizable-panel > .approval-prompt-body {
   height: 100%;
 }
 
-/* A lista újratöltésének hibaüzenete látott jóváhagyás mellett a
-   `drawer` felület FÖLÖTT, a transcript oldal háttérén áll, ezért a
-   transcript 16 pixeles térközét kapja, hogy ne tapadjon az oldal szélére. */
-.run-view-screen__transcript .resizable-panel > .approval-prompt-panel > [role='alert'] {
-  margin: 0;
-  padding: var(--ep-space-4) var(--ep-space-4) 0;
+/* A döntés akciósávja (`ApprovalDecisionActions`, a design system
+   `.drawer__footer` eleme) a transcript oldal alján. A forrás CSS nem ad
+   `align-items` értéket, tehát az alapérték (`stretch`) a gombokat a sáv
+   teljes magasságára nyújtaná, ha az eredmény szövege keskeny panelben több
+   sorba tör (375 pixelen a `conflict` üzenete). Fogyasztó oldali, erre a
+   sávra szűkített felülírás, ugyanaz a minta, mint a `.resizable-group`
+   keret törlése; a `drawer.css` bájtra azonos marad. */
+.run-view-screen__transcript > .drawer__footer {
+  align-items: center;
 }

@@ -13,7 +13,10 @@
 // szekció): a tapadó akciósáv saját `--ep-bg-elevated` hátterű fehér doboz
 // volt a bézs panelen, a törzs háttér nélkül, és a lapozó a transcript sáv 16
 // pixeles szélén állt, a törzs tartalma a 24 pixeles drawer térközön, tehát két
-// bal igazítási vonal volt.
+// bal igazítási vonal volt. 2026-09-25 óta a jobb belső térközt is (a
+// `5093e67` állapotban 19 pixel volt a bal 24 helyett, mert a `Resizable`
+// csoport 5 pixellel túllógott, és a túllógást levágta; research 10.
+// szekció).
 import type { Page } from '@playwright/test';
 import { APPROVAL_RUN_URL, manyApprovals, mockApprovalRun } from './approval-fixture.ts';
 import { expect, test } from './coverage-fixture.ts';
@@ -46,8 +49,8 @@ async function readSurfacePixels(page: Page): Promise<Readonly<Record<'body' | '
       return { x: Math.ceil(rect.left) + 4, y: Math.ceil(rect.top) + 4 };
     };
     return {
-      body: cornerOf('.approval-prompt-panel .drawer__body'),
-      footer: cornerOf('.approval-prompt-panel .drawer__footer'),
+      body: cornerOf('.run-view-screen__transcript .drawer__body'),
+      footer: cornerOf('.run-view-screen__transcript .drawer__footer'),
       elevated: { x: 2, y: 2 },
     };
   });
@@ -92,10 +95,53 @@ async function readLeftEdges(page: Page): Promise<readonly (number | undefined)[
   return page.evaluate(() => {
     const { document } = globalThis;
     return [
-      document.querySelector('.approval-prompt-panel nav.pagination')?.firstElementChild,
-      document.querySelector('.approval-prompt-panel .alert'),
-      document.querySelector('.approval-prompt-panel .approval-prompt-card__title'),
+      document.querySelector('.run-view-screen__transcript nav.pagination')?.firstElementChild,
+      document.querySelector('.run-view-screen__transcript .drawer__body .alert'),
+      document.querySelector('.run-view-screen__transcript .approval-prompt-card__title'),
     ].map((element) => element?.getBoundingClientRect().left);
+  });
+}
+
+/**
+ * A felület két oldalsó belső térköze, ahogy LÁTSZIK: a törzsben az `Alert`
+ * bal és jobb széle a törzs bal, illetve LÁTHATÓ jobb széléhez mérve, az
+ * akciósávban az utolsó gomb jobb széle a sáv látható jobb széléhez mérve. A
+ * látható jobb szél a doboz jobb széle és minden levágó ős (`overflow` nem
+ * `visible`) kliens területének jobb széle közül a kisebb: pontosan ez vágta
+ * le a jobb térköz 5 pixelét.
+ */
+async function readInsets(page: Page): Promise<Readonly<Record<'bodyLeft' | 'bodyRight' | 'footerRight', number>>> {
+  return page.evaluate(() => {
+    const { document } = globalThis;
+    const visibleRight = (element: Element): number => {
+      let right = Math.min(element.getBoundingClientRect().right, globalThis.innerWidth);
+      for (let ancestor = element.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+        if (globalThis.getComputedStyle(ancestor).overflowX === 'visible') {
+          continue;
+        }
+        right = Math.min(right, ancestor.getBoundingClientRect().left + ancestor.clientLeft + ancestor.clientWidth);
+      }
+      return right;
+    };
+    const find = (selector: string): Element => {
+      const element = document.querySelector(selector);
+      if (element === null) {
+        throw new Error(`a mérés nem találta a ${selector} elemet`);
+      }
+      return element;
+    };
+    const body = find('.run-view-screen__transcript .drawer__body');
+    const alert = find('.run-view-screen__transcript .drawer__body .alert');
+    const footer = find('.run-view-screen__transcript > .drawer__footer');
+    const lastButton = [...footer.querySelectorAll('button')].at(-1);
+    if (lastButton === undefined) {
+      throw new Error('a mérés nem talált gombot az akciósávban');
+    }
+    return {
+      bodyLeft: alert.getBoundingClientRect().left - body.getBoundingClientRect().left,
+      bodyRight: visibleRight(body) - alert.getBoundingClientRect().right,
+      footerRight: visibleRight(footer) - lastButton.getBoundingClientRect().right,
+    };
   });
 }
 
@@ -105,7 +151,7 @@ for (const theme of ['light', 'dark'] as const) {
     { width: 1440, height: 600 },
     { width: 375, height: 812 },
   ] as const) {
-    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: a görgethető törzs és a tapadó akciósáv egy felület a --ep-bg-elevated tokenen, és a lapozó, az Alert és a cím bal széle egy vonalban áll`, async ({
+    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: a görgethető törzs és a tapadó akciósáv egy felület a --ep-bg-elevated tokenen, a lapozó, az Alert és a cím bal széle egy vonalban áll, és a jobb belső térköz a ballal azonos`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -128,6 +174,14 @@ for (const theme of ['light', 'dark'] as const) {
       expect(paginationLeft).toBeGreaterThan(0);
       expect(alertLeft).toBe(paginationLeft);
       expect(titleLeft).toBe(paginationLeft);
+
+      // A jobb belső térköz a ballal azonos, a törzsben és az akciósávban is
+      // (a forrás `drawer` 24 pixele); a `5093e67` állapotban a vízszintes
+      // sávban 19 volt.
+      const insets = await readInsets(page);
+      expect(insets.bodyLeft).toBe(24);
+      expect(insets.bodyRight).toBe(insets.bodyLeft);
+      expect(insets.footerRight).toBe(insets.bodyLeft);
     });
   }
 }

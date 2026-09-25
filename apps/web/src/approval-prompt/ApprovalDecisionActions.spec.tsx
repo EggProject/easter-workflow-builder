@@ -44,12 +44,15 @@ describe('ApprovalDecisionActions', () => {
     return { approve, reject };
   }
 
-  it('burkoló nélkül adja a gyerekeit: a sáv közvetlen gyerekei a két gomb, és ha van, előttük az eredmény', () => {
+  it('a design system drawer láblécét rajzolja: a sáv közvetlen gyerekei a két gomb, és ha van, előttük az eredmény', () => {
     renderActions(undefined);
-    expect([...container.children].map((child) => child.textContent)).toEqual(['Jóváhagyás', 'Elutasítás']);
+    const footer = (): Element | undefined => [...container.children][0];
+    expect(container.children).toHaveLength(1);
+    expect(footer()?.className).toBe('drawer__footer');
+    expect([...(footer()?.children ?? [])].map((child) => child.textContent)).toEqual(['Jóváhagyás', 'Elutasítás']);
 
     renderActions({ status: 'decided', decision: 'approved' });
-    expect([...container.children].map((child) => child.tagName)).toEqual(['P', 'BUTTON', 'BUTTON']);
+    expect([...(footer()?.children ?? [])].map((child) => child.tagName)).toEqual(['P', 'BUTTON', 'BUTTON']);
   });
 
   it('döntés előtt mindkét gomb engedélyezett és sm méretű, eredmény és nyugtázó gomb nincs; a gombok a döntést adják tovább', () => {

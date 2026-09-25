@@ -8,10 +8,24 @@ const MAX_PANEL_SIZE_PERCENT = 95;
  * tömböt ad vissza - kivéve, ha a két panel mérete hiányzik vagy nem véges
  * szám, ilyenkor a bemenet változatlanul tér vissza.
  *
+ * A `minSizePercents` a panelek pixeles minimuma százalékban
+ * (`measure-panel-geometry.ts`): ha egy panel minimuma az 5 százaléknál
+ * nagyobb, az a határ, tehát a bal/felső panel a saját minimuma alá, a
+ * jobb/alsó a sajátja alá nem kerülhet. Mérés nélkül (üres tömb) a forrás
+ * `[5, 95]` határa marad. Ez az egyetlen eltérés a forrástól
+ * (2026-09-25, SPEC-008 14.2 O-12): a forrás CSS pixeles minimuma
+ * (`min-height: 60px`) így a jelentett értékben is érvényesül, nem csak a
+ * kirajzolásban.
+ *
  * Forrás: eggproject-design-components/components/resizable/Resizable.jsx
  * `resizeAt` függvénye, TypeScriptre portolva (2026-09-05, PLAN-009 T-009-11).
  */
-export function resizeAt(sizes: readonly number[], handleIndex: number, deltaPercent: number): readonly number[] {
+export function resizeAt(
+  sizes: readonly number[],
+  handleIndex: number,
+  deltaPercent: number,
+  minSizePercents: readonly number[] = [],
+): readonly number[] {
   const sizeBefore = sizes[handleIndex];
   const sizeAfter = sizes[handleIndex + 1];
   if (
@@ -24,8 +38,10 @@ export function resizeAt(sizes: readonly number[], handleIndex: number, deltaPer
   }
 
   const pairTotal = sizeBefore + sizeAfter;
-  const maxBefore = Math.min(MAX_PANEL_SIZE_PERCENT, pairTotal - MIN_PANEL_SIZE_PERCENT);
-  const newSizeBefore = Math.max(MIN_PANEL_SIZE_PERCENT, Math.min(maxBefore, sizeBefore + deltaPercent));
+  const minBefore = Math.max(MIN_PANEL_SIZE_PERCENT, minSizePercents[handleIndex] ?? 0);
+  const minAfter = Math.max(MIN_PANEL_SIZE_PERCENT, minSizePercents[handleIndex + 1] ?? 0);
+  const maxBefore = Math.min(MAX_PANEL_SIZE_PERCENT, pairTotal - minAfter);
+  const newSizeBefore = Math.max(minBefore, Math.min(maxBefore, sizeBefore + deltaPercent));
 
   const next = [...sizes];
   next[handleIndex] = newSizeBefore;

@@ -1066,19 +1066,29 @@ describe('RunViewScreen', () => {
     const cards = container.querySelectorAll('.approval-prompt-card');
     expect(cards).toHaveLength(1);
     expect(cards[0]?.textContent).toContain('Engedélyezed?');
-    // A jelzés a fejléc vezérlő sávjában, a panel a transcript sávban, a
-    // transcript fölött áll (PLAN-009 5. szekció F6), nem a vászon fölött, és
-    // a kettő között húzható elválasztó áll (user döntés 2026-09-25).
+    // A jelzés a fejléc vezérlő sávjában, a döntési felület a transcript
+    // sávban áll (PLAN-009 5. szekció F6), nem a vászon fölött: a lapozó
+    // felül, a törzs a transcript fölött, a kettő között húzható elválasztó,
+    // a döntés akciósávja alul, a lapozó és az akciósáv a `Resizable` elemen
+    // kívül (user döntések 2026-09-25).
     expect(container.querySelector(':scope .run-view-screen__header .run-control__bar')?.textContent).toContain(
       'jóváhagyásra vár',
     );
+    const side = container.querySelector(':scope .run-view-screen__transcript');
+    expect([...(side?.children ?? [])].map((child) => child.className)).toEqual([
+      'approval-prompt-panel',
+      'resizable-group resizable-group--vertical',
+      'drawer__footer',
+    ]);
+    expect(side?.querySelector(':scope > .approval-prompt-panel > nav.pagination')).not.toBeNull();
     const group = container.querySelector(':scope .run-view-screen__transcript > .resizable-group--vertical');
     expect([...(group?.children ?? [])].map((child) => child.className)).toEqual([
       'resizable-panel',
       'resizable-handle',
       'resizable-panel',
     ]);
-    expect(group?.querySelector(':scope > .resizable-panel:first-child > .approval-prompt-panel')).not.toBeNull();
+    expect(group?.querySelector(':scope > .resizable-panel:first-child > .approval-prompt-body')).not.toBeNull();
+    expect(group?.querySelector(':scope > .resizable-panel:first-child')?.querySelectorAll('button')).toHaveLength(0);
     expect(
       group?.querySelector(
         ':scope > .resizable-panel:last-child .run-view-screen__transcript-content > .transcript-panel',
@@ -1119,9 +1129,9 @@ describe('RunViewScreen', () => {
   it('a jóváhagyás lista első betöltésének hibájára a panel a hibát mutatja, betöltés jelzés nélkül, a rajz pedig a helyén marad', async () => {
     await renderScreen('?runId=r-3', createFetchFunction({ approvals: new HttpStatus(500) }));
 
-    // Látott jóváhagyás nélkül nincs elválasztó: a panel a transcript fölött,
+    // Látott jóváhagyás nélkül nincs elválasztó: a fej a transcript fölött,
     // a saját magasságán áll.
-    const panel = container.querySelector(':scope .run-view-screen__transcript-content > .approval-prompt-panel');
+    const panel = container.querySelector(':scope .run-view-screen__transcript > .approval-prompt-panel');
     expect(panel?.querySelector('[role="alert"]')).not.toBeNull();
     expect(container.querySelector('[role="separator"][aria-label="A jóváhagyás és a transcript aránya"]')).toBeNull();
     expect(panel?.querySelector('[role="progressbar"]')).toBeNull();
@@ -1201,7 +1211,9 @@ describe('RunViewScreen', () => {
     await renderScreen('?runId=r-3', fetchFunction);
 
     const approveButton = [
-      ...container.querySelectorAll<HTMLButtonElement>(':scope .approval-prompt-panel .drawer__footer button.btn'),
+      ...container.querySelectorAll<HTMLButtonElement>(
+        ':scope .run-view-screen__transcript > .drawer__footer button.btn',
+      ),
     ].find((button) => button.textContent === 'Jóváhagyás');
     if (approveButton === undefined) {
       throw new Error('a teszt nem talált Jóváhagyás gombot');
@@ -1215,7 +1227,7 @@ describe('RunViewScreen', () => {
 
     expect(decisionUrls).toEqual([JSON.stringify({ decision: 'approved' })]);
     expect(
-      container.querySelector(':scope .approval-prompt-panel .drawer__footer [role="alert"]')?.textContent,
+      container.querySelector(':scope .run-view-screen__transcript > .drawer__footer [role="alert"]')?.textContent,
     ).toContain('Az elem állapota most nem engedi a műveletet.');
     expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
     // A conflicttel lezárt kártya gombjai nem kapcsolnak vissza.

@@ -1540,3 +1540,33 @@ pontos arányok 99,1002 / 98,5621 / 99,4633 / 99,0666). **Az igazolás:** a beá
 `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
 küszöbbel (99.11 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
 exit 1).
+
+## 39. A fix lapozó és gombsor, a `Resizable` szélső állásai és a `pointercancel` utáni ratchet (2026-09-25): egy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i két döntése (a lapozó és a döntés gombsora a `Resizable`
+elemen kívül; a 19 pixeles jobb belső térköz javítása) és egy független ellenőrzés a `5093e67`
+állapoton (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció). Új az
+`approval-prompt/ApprovalPromptBody.tsx`; a `packages/ui` `resizable` témájában a
+`measure-panel-geometry.ts`, a `drawer` témában a `DrawerBody.tsx` és a `DrawerFooter.tsx` (az e2e
+riport csak az `apps/web` forrását méri). Az e2e készlet 339 tesztre bővült: a szélső állások három
+méreten két témában (6) és a megszakított érintés a külső és a belső elválasztón (2).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**339 teszt, mind zöld**; a sandboxban három `--shard` hívásban, sorban, három
+workerrel, ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (38. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1655 / 1670     | **99.10** | 99.10                      | 15 -> **15**                   |
+| branches   | 759 / 770       | **98.57** | 98.56                      | 11 -> **11**                   |
+| functions  | 557 / 560       | **99.46** | 99.46                      | 3 -> **3**                     |
+| lines      | 1595 / 1610     | **99.06** | 99.06                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `run-view`, az `approval-prompt` és a `transcript-panel` téma minden
+fájlja mind a négy metrikán 100 százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban
+maradtak. A küszöb a mért értékre húzva, felfelé kerekítés nélkül: 99.10 / **98.57** / 99.46 /
+99.06 (`apps/web/package.json`; a pontos arányok 99,1018 / 98,5714 / 99,4643 / 99,0683). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.11 / 98.58 / 99.47 / 99.07) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).

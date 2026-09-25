@@ -17,7 +17,11 @@
 // kifestett képpontja, a bal szélek és az oldalsó belső térköz), 5. küszöb
 // (a gombok az elválasztó teljes tartományán), 6. érintés (CDP érintés
 // események a fül sávban). A 4-6. jelenet 2026-09-25 óta áll, a húzható
-// elválasztóhoz (research 9. szekció).
+// elválasztóhoz (research 9. szekció). 7. szélső állás (Home, kezdő arány,
+// End: a lapozó és a gombok, a transcript utolsó sora, a jelentett és a
+// valódi arány, a csoport túllógása, a két oldalsó belső térköz) és 8.
+// megszakított érintés (`pointercancel` a külső és a belső elválasztón),
+// mindkettő 2026-09-25 óta, a research 10. szekciójához.
 //
 // NEM E2E TESZT, és nem kapu: állítás nincs benne, csak számlálás. A
 // kiválasztók szándékosan a panel több alakját is felismerik (a görgethető
@@ -35,10 +39,12 @@ import type { PendingApproval } from '@easter-workflow-builder/protocol';
 import { expect, test, type Page } from '@playwright/test';
 import {
   APPROVAL_RUN_URL,
+  APPROVAL_TRANSCRIPT_ROW_COUNT,
   approvalBaseMocks,
   FIRST_APPROVAL,
   manyApprovals,
   mockApprovalRun,
+  mockApprovalRunWithTranscript,
 } from '../e2e/approval-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from '../e2e/rest-mock.ts';
 import { mockIdleStream } from '../e2e/sse-mock.ts';
@@ -132,16 +138,20 @@ async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
       return element === null ? undefined : round(element.getBoundingClientRect().height);
     };
     const panel = document.querySelector('.approval-prompt-panel');
+    // A 2026-09-25-i javítás óta a törzs és az akciósáv nem a panel alatt,
+    // hanem a transcript oldalon, a `Resizable` két oldalán áll; a transcript
+    // oldal minden mért alakban létezik, tehát a keresés ott megy.
+    const side = document.querySelector('.run-view-screen__transcript') ?? panel;
     const scrollArea =
-      document.querySelector('.approval-prompt-panel .drawer__body') ??
-      document.querySelector('.approval-prompt-panel__content') ??
-      panel;
-    const buttons = [...(panel?.querySelectorAll('button') ?? [])];
+      side?.querySelector('.drawer__body') ?? document.querySelector('.approval-prompt-panel__content') ?? panel;
+    const buttons = [
+      ...(side?.querySelectorAll(':scope .approval-prompt-panel button, :scope .drawer__footer button') ?? []),
+    ];
     const decisionRatios = (name: string): number[] =>
       buttons.filter((button) => button.textContent === name).map((button) => visibleRatio(button));
     const navigation = document.querySelector('.approval-prompt-panel nav.pagination');
     const appContent = document.querySelector('.app-content');
-    const warning = [...(panel?.querySelectorAll('.alert__title') ?? [])].find(
+    const warning = [...(side?.querySelectorAll('.alert__title') ?? [])].find(
       (element) => element.textContent === 'A döntés visszavonhatatlan',
     );
     const alert = warning?.closest('.alert') ?? undefined;
@@ -162,7 +172,7 @@ async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
       panelContent: panel === null ? undefined : panel.scrollHeight,
       scrollArea: scrollArea === null ? undefined : round(scrollArea.clientHeight),
       scrollAreaContent: scrollArea === null ? undefined : scrollArea.scrollHeight,
-      footer: height('.approval-prompt-panel .drawer__footer'),
+      footer: height('.run-view-screen__transcript .drawer__footer'),
       approve: decisionRatios('Jóváhagyás'),
       reject: decisionRatios('Elutasítás'),
       decisionFullyVisible:
@@ -185,37 +195,37 @@ async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
       leftEdges: {
         pagination: left(navigation?.firstElementChild),
         alert: left(alert),
-        title: left(panel?.querySelector('.approval-prompt-card__title')),
+        title: left(side?.querySelector('.approval-prompt-card__title')),
         transcript: left(document.querySelector('.transcript-panel')),
       },
       // A felület két oldalsó belső térköze, ahogy LÁTSZIK: bal oldalon az
-      // Alert és a szakasz bal széle között, jobb oldalon az utolsó döntés
-      // gomb és a szakasz látható jobb széle között (a szakasz doboza a
-      // futás nézet törzsének jobb szélén túl is folytatódhat, azt a külső
-      // `Resizable` levágja).
+      // Alert és a törzs bal széle között, jobb oldalon az utolsó döntés
+      // gomb és az akciósáv látható jobb széle között (a sáv doboza a futás
+      // nézet törzsének jobb szélén túl is folytatódhatott, azt a külső
+      // `Resizable` levágta; research 9. és 10. szekció).
       insets: {
         left: (() => {
-          const section = panel?.querySelector('.approval-prompt-panel__approval');
-          return alert === undefined || section === null || section === undefined
+          const body = side?.querySelector('.drawer__body');
+          return alert === undefined || body === null || body === undefined
             ? undefined
-            : round(alert.getBoundingClientRect().left - section.getBoundingClientRect().left);
+            : round(alert.getBoundingClientRect().left - body.getBoundingClientRect().left);
         })(),
         right: (() => {
-          const section = panel?.querySelector('.approval-prompt-panel__approval');
-          const body = document.querySelector('.run-view-screen__body');
+          const footer = side?.querySelector('.drawer__footer');
+          const screenBody = document.querySelector('.run-view-screen__body');
           const lastButton = buttons.at(-1);
-          return section === null || section === undefined || body === null || lastButton === undefined
+          return footer === null || footer === undefined || screenBody === null || lastButton === undefined
             ? undefined
             : round(
-                Math.min(section.getBoundingClientRect().right, body.getBoundingClientRect().right) -
+                Math.min(footer.getBoundingClientRect().right, screenBody.getBoundingClientRect().right) -
                   lastButton.getBoundingClientRect().right,
               );
         })(),
       },
       backgrounds: {
         section: background('.approval-prompt-panel__approval'),
-        body: background('.approval-prompt-panel .drawer__body'),
-        footer: background('.approval-prompt-panel .drawer__footer'),
+        body: background('.run-view-screen__transcript .drawer__body'),
+        footer: background('.run-view-screen__transcript .drawer__footer'),
       },
       paginationSlots:
         navigation === null ? undefined : navigation.querySelectorAll(':scope .pagination__pages > *').length,
@@ -281,7 +291,7 @@ for (const theme of THEMES) {
         if (viewport.width < TABBED_WIDTH_LIMIT) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
-        const panel = page.locator('.approval-prompt-panel');
+        const panel = page.locator('.run-view-screen__transcript');
         await panel.getByRole('button', { name: 'Jóváhagyás', exact: true }).first().click();
         // A "visszavonhatatlan" `Alert` is `status` szerepkörű, ezért a
         // siker eredménye a szövegével szűrve.
@@ -372,7 +382,7 @@ async function readSurfacePixels(page: Page): Promise<Record<string, string>> {
           return [name, { x: Math.ceil(rect.left) + 4, y: Math.ceil(rect.top) + 4 }];
         }),
       ),
-    { body: '.approval-prompt-panel .drawer__body', footer: '.approval-prompt-panel .drawer__footer' },
+    { body: '.run-view-screen__transcript .drawer__body', footer: '.run-view-screen__transcript .drawer__footer' },
   );
   const shot = await page.screenshot({ animations: 'disabled' });
   return page.evaluate(
@@ -431,9 +441,9 @@ for (const theme of THEMES) {
 
 // ------------------------------------------------------------
 // 5. A gombok láthatósága az elválasztó teljes tartományán: `Home` (a
-//    `Resizable` 5 százalékos minimuma), majd `ArrowDown` lépésenként (5
-//    százalék) a 95 százalékos maximumig; minden állásban a két gomb
-//    görgetés nélküli látható aránya és a törzs magassága. A küszöb a
+//    `Resizable` minimuma), majd `ArrowDown` lépésenként (5 százalék) a
+//    maximumig; minden állásban a két gomb görgetés nélküli látható aránya
+//    és a törzs magassága. A küszöb a
 //    legkisebb érték, ahonnan fölfelé minden állásban mindkét gomb teljesen
 //    látszik. Elválasztó nélküli buildben (`741f63e` és korábban) kihagyva.
 // ------------------------------------------------------------
@@ -453,9 +463,13 @@ for (const theme of THEMES) {
       const initial = await readPanelGeometry(page);
       await separator.focus();
       await separator.press('Home');
+      // A `Home` érkezési helye 2026-09-25 óta a mért pixeles minimum, nem
+      // feltétlenül 5 (research 10. szekció), tehát a lépések a jelentett
+      // értéket követik, a jelentett maximumig.
       const rows: Record<string, unknown>[] = [];
-      for (let value = 5; value <= 95; value += 5) {
-        await expect(separator).toHaveAttribute('aria-valuenow', String(value));
+      let value = Number(await separator.getAttribute('aria-valuenow'));
+      const maximum = Number(await separator.getAttribute('aria-valuemax'));
+      for (;;) {
         const geometry = await readPanelGeometry(page);
         rows.push({
           value,
@@ -463,9 +477,13 @@ for (const theme of THEMES) {
           scrollArea: geometry['scrollArea'],
           panel: geometry['panel'],
         });
-        if (value < 95) {
-          await separator.press('ArrowDown');
+        if (value >= maximum) {
+          break;
         }
+        await separator.press('ArrowDown');
+        const previous = value;
+        await expect(separator).not.toHaveAttribute('aria-valuenow', String(previous));
+        value = Number(await separator.getAttribute('aria-valuenow'));
       }
       const firstHidden = rows.findLast((row) => row['fullyVisible'] !== true);
       report('kuszob', {
@@ -473,7 +491,7 @@ for (const theme of THEMES) {
         viewport: `${String(viewport.width)}x${String(viewport.height)}`,
         initialValue: initial['separatorValue'],
         initialScrollArea: initial['scrollArea'],
-        threshold: firstHidden === undefined ? 5 : Number(firstHidden['value']) + 5,
+        threshold: firstHidden === undefined ? rows[0]?.['value'] : Number(firstHidden['value']) + 5,
         rows,
       });
     });
@@ -538,3 +556,315 @@ test.describe('erintes', () => {
     });
   }
 });
+
+/**
+ * A szélső állás mért értékei egyetlen `evaluate` hívásban. A "látható
+ * arány" ugyanaz a definíció, mint a `readPanelGeometry` függvényben (a
+ * befoglaló doboz metszve minden levágó ős kliens területével és a
+ * viewporttal). A kiválasztók a transcript oldal EGÉSZÉN keresnek, nem a
+ * `.approval-prompt-panel` alatt, mert a 2026-09-25-i javítás óta a lapozó és
+ * az akciósáv a `Resizable` elemen kívül áll.
+ */
+async function readExtremeGeometry(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(
+    (input: { readonly separatorName: string; readonly rowCount: number }) => {
+      const { document } = globalThis;
+      const clipRect = (element: Element): { left: number; top: number; right: number; bottom: number } => {
+        const rect = element.getBoundingClientRect();
+        let left = Math.max(rect.left, 0);
+        let top = Math.max(rect.top, 0);
+        let right = Math.min(rect.right, globalThis.innerWidth);
+        let bottom = Math.min(rect.bottom, globalThis.innerHeight);
+        for (let ancestor = element.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+          const style = globalThis.getComputedStyle(ancestor);
+          if (style.overflowX === 'visible' && style.overflowY === 'visible') {
+            continue;
+          }
+          const box = ancestor.getBoundingClientRect();
+          const clientLeft = box.left + ancestor.clientLeft;
+          const clientTop = box.top + ancestor.clientTop;
+          left = Math.max(left, clientLeft);
+          top = Math.max(top, clientTop);
+          right = Math.min(right, clientLeft + ancestor.clientWidth);
+          bottom = Math.min(bottom, clientTop + ancestor.clientHeight);
+        }
+        return { left, top, right, bottom };
+      };
+      const visibleRatio = (element: Element | null | undefined): number | undefined => {
+        if (element === null || element === undefined) {
+          return undefined;
+        }
+        const rect = element.getBoundingClientRect();
+        const clip = clipRect(element);
+        const area = rect.width * rect.height;
+        return area === 0
+          ? 0
+          : Math.round(((Math.max(0, clip.right - clip.left) * Math.max(0, clip.bottom - clip.top)) / area) * 100) /
+              100;
+      };
+      const side = document.querySelector('.run-view-screen__transcript');
+      const group = side?.querySelector(':scope > .resizable-group') ?? undefined;
+      const groupChildren = group === undefined ? [] : [...group.children];
+      const panels = groupChildren.filter((child) => child.classList.contains('resizable-panel'));
+      const panelSizes = panels.map((panel) => Math.round(panel.getBoundingClientRect().height * 100) / 100);
+      const [first, second] = panelSizes;
+      const separator = [...document.querySelectorAll('[role="separator"]')].find(
+        (element) => element.getAttribute('aria-label') === input.separatorName,
+      );
+      const buttons = [...(side?.querySelectorAll('button') ?? [])];
+      const buttonRatio = (name: string): number | undefined =>
+        visibleRatio(buttons.find((button) => button.textContent === name));
+      const navigation = side?.querySelector('nav.pagination') ?? undefined;
+      const body = side?.querySelector('.drawer__body') ?? undefined;
+      const alert = body?.querySelector('.alert') ?? undefined;
+      const bodyClip = body === undefined ? undefined : clipRect(body);
+      const bodyRect = body?.getBoundingClientRect();
+      const alertRect = alert?.getBoundingClientRect();
+      const lastRow = [...(side?.querySelectorAll('[role="listitem"]') ?? [])].find(
+        (row) => row.getAttribute('aria-posinset') === String(input.rowCount),
+      );
+      return {
+        valueNow: separator?.getAttribute('aria-valuenow') ?? undefined,
+        valueMin: separator?.getAttribute('aria-valuemin') ?? undefined,
+        valueMax: separator?.getAttribute('aria-valuemax') ?? undefined,
+        panelSizes,
+        realRatio:
+          first === undefined || second === undefined
+            ? undefined
+            : Math.round((first / (first + second)) * 10_000) / 100,
+        groupOverflow:
+          group === undefined
+            ? undefined
+            : Math.round(
+                (groupChildren.reduce((sum, child) => sum + child.getBoundingClientRect().height, 0) -
+                  group.clientHeight) *
+                  100,
+              ) / 100,
+        approve: buttonRatio('Jóváhagyás'),
+        reject: buttonRatio('Elutasítás'),
+        paginationMeta: visibleRatio(navigation?.querySelector('.pagination__meta')),
+        paginationNext: visibleRatio(
+          [...(navigation?.querySelectorAll('button') ?? [])].find(
+            (button) => button.getAttribute('aria-label') === 'Következő',
+          ),
+        ),
+        transcriptPanel: visibleRatio(side?.querySelector('.transcript-panel')),
+        lastRow: lastRow === undefined ? 0 : visibleRatio(lastRow),
+        insets:
+          bodyClip === undefined || bodyRect === undefined || alertRect === undefined
+            ? undefined
+            : {
+                left: Math.round((alertRect.left - bodyRect.left) * 100) / 100,
+                right: Math.round((bodyClip.right - alertRect.right) * 100) / 100,
+              },
+      };
+    },
+    { separatorName: APPROVAL_SEPARATOR_NAME, rowCount: APPROVAL_TRANSCRIPT_ROW_COUNT },
+  );
+}
+
+/**
+ * A user görgetése a transcripten: egérgörgő a transcript panel LÁTHATÓ
+ * részének közepén (nem `scrollIntoView`, ami egy `overflow: hidden` őst is
+ * görgetne). Két képkocka megvárása a görgetés és a virtualizált lista
+ * újrarajzolása után; időzítő nélkül. Ha a panelből semmi nem látszik, nincs
+ * hova görgetni.
+ */
+async function scrollTranscriptToBottom(page: Page): Promise<void> {
+  const target = await page.evaluate(() => {
+    const panel = globalThis.document.querySelector('.run-view-screen__transcript .transcript-panel');
+    if (panel === null) {
+      return;
+    }
+    const rect = panel.getBoundingClientRect();
+    let top = Math.max(rect.top, 0);
+    let bottom = Math.min(rect.bottom, globalThis.innerHeight);
+    for (let ancestor = panel.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
+      if (globalThis.getComputedStyle(ancestor).overflowY === 'visible') {
+        continue;
+      }
+      const box = ancestor.getBoundingClientRect();
+      top = Math.max(top, box.top + ancestor.clientTop);
+      bottom = Math.min(bottom, box.top + ancestor.clientTop + ancestor.clientHeight);
+    }
+    return bottom - top < 1 ? undefined : { x: rect.left + rect.width / 2, y: (top + bottom) / 2 };
+  });
+  if (target === undefined) {
+    return;
+  }
+  await page.mouse.move(target.x, target.y);
+  for (let turn = 0; turn < 3; turn += 1) {
+    await page.mouse.wheel(0, 3000);
+    await page.evaluate(
+      async () =>
+        new Promise<number>((resolve) => {
+          globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve));
+        }),
+    );
+  }
+}
+
+// ------------------------------------------------------------
+// 7. Szélső állások: `Home`, a kezdő arány és `End`, egy jóváhagyással és
+//    20 tárolt transcript sorral. Minden állásban: a jelentett érték és a két
+//    határ, a panelek valódi aránya, a csoport túllógása, a lapozó és a két
+//    gomb görgetés nélküli látható aránya, a transcript panel látható
+//    aránya, az utolsó sor látható aránya a user görgetése után, és a
+//    jóváhagyás törzs két oldalsó belső térköze (a `.drawer__body` bal és
+//    LÁTHATÓ jobb széle az `Alert` blokkhoz mérve).
+// ------------------------------------------------------------
+for (const theme of THEMES) {
+  for (const viewport of VIEWPORTS) {
+    test(`szelso ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
+      await mockApprovalRunWithTranscript(page, manyApprovals(1));
+      await openRun(page, theme, viewport);
+      if (viewport.width < TABBED_WIDTH_LIMIT) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
+      await expect(
+        page.getByRole('list', { name: 'Futás eseményei' }).locator('[role="listitem"]').first(),
+      ).toBeAttached();
+      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_NAME });
+      const positions: Record<string, unknown>[] = [];
+      for (const position of ['kezdo', 'Home', 'End'] as const) {
+        if (position !== 'kezdo') {
+          await separator.focus();
+          await separator.press(position);
+        }
+        const beforeScroll = await readExtremeGeometry(page);
+        await scrollTranscriptToBottom(page);
+        const afterScroll = await readExtremeGeometry(page);
+        positions.push({ position, ...beforeScroll, lastRow: afterScroll['lastRow'] });
+      }
+      report('szelso', { theme, viewport: `${String(viewport.width)}x${String(viewport.height)}`, positions });
+    });
+  }
+}
+
+/**
+ * A gráf és a transcript közti KÜLSŐ elválasztó hozzáférhető neve
+ * (`RunViewLayout.tsx`).
+ */
+const OUTER_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
+
+// ------------------------------------------------------------
+// 8. Megszakított érintéses húzás (`pointercancel`), 900x1000-en (a
+//    függőleges sáv, ahol mindkét elválasztó áll): a KÜLSŐ elválasztón egy
+//    valódi érintéses húzás (a design system eleme `touch-action` nélkül a
+//    böngésző pásztázásának adja át a mozdulatot, és `pointercancel` jön),
+//    a BELSŐN (`touch-action: none`) egy `touchCancel` CDP esemény zárja a
+//    húzást. Utána egy puszta egérmozgás a vásznon és egy görgetés a
+//    transcripten: ha a húzás állapota bent ragadt, ezek mozdítják az
+//    elválasztót.
+// ------------------------------------------------------------
+test.describe('megszakitas', () => {
+  test.use({ hasTouch: true });
+
+  for (const theme of THEMES) {
+    for (const which of ['kulso', 'belso'] as const) {
+      test(`megszakitas ${theme} 900x1000 ${which}`, async ({ page }) => {
+        await page.addInitScript(() => {
+          const log: string[] = [];
+          Object.defineProperty(globalThis, 'e2ePointerLog', { configurable: true, value: log });
+          for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+            globalThis.addEventListener(
+              type,
+              (event) => {
+                if (log.at(-1) !== event.type) {
+                  log.push(event.type);
+                }
+              },
+              { capture: true },
+            );
+          }
+        });
+        await mockApprovalRunWithTranscript(page, manyApprovals(1));
+        await openRun(page, theme, { width: 900, height: 1000 });
+        const separator = page.getByRole('separator', {
+          name: which === 'kulso' ? OUTER_SEPARATOR_NAME : APPROVAL_SEPARATOR_NAME,
+        });
+        const before = await separator.getAttribute('aria-valuenow');
+        const box = await separator.boundingBox();
+        if (box === null) {
+          throw new Error('az elválasztónak nincs befoglaló doboza');
+        }
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const session = await page.context().newCDPSession(page);
+        await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        const steps = which === 'kulso' ? 10 : 3;
+        for (let step = 1; step <= steps; step += 1) {
+          await session.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x, y: y + step * 10 }],
+          });
+        }
+        await session.send('Input.dispatchTouchEvent', {
+          type: which === 'kulso' ? 'touchEnd' : 'touchCancel',
+          touchPoints: [],
+        });
+        const afterTouch = await separator.getAttribute('aria-valuenow');
+        const isDraggingAfterTouch = ((await separator.getAttribute('class')) ?? '').includes('is-dragging');
+        const canvas = await page.locator('.run-graph-canvas').boundingBox();
+        if (canvas !== null) {
+          await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + 20);
+          await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + 40, { steps: 3 });
+        }
+        const afterMouseMove = await separator.getAttribute('aria-valuenow');
+        const list = await page.getByRole('list', { name: 'Futás eseményei' }).boundingBox();
+        if (list !== null) {
+          await page.mouse.move(list.x + list.width / 2, list.y + list.height / 2);
+          await page.mouse.wheel(0, -300);
+        }
+        const afterWheel = await separator.getAttribute('aria-valuenow');
+        report('megszakitas', {
+          theme,
+          viewport: '900x1000',
+          separator: which,
+          before,
+          afterTouch,
+          isDraggingAfterTouch,
+          afterMouseMove,
+          afterWheel,
+          isDraggingAtEnd: ((await separator.getAttribute('class')) ?? '').includes('is-dragging'),
+          pointerEvents: await page.evaluate(() => globalThis.e2ePointerLog),
+        });
+      });
+    }
+  }
+});
+
+// ------------------------------------------------------------
+// 9. A KÜLSŐ elválasztó szélső állásai a függőleges sávban (900x1000, a
+//    gráf felül, a transcript oldal alul): a transcript oldal a külső
+//    `Resizable` panelje, tehát a `End` állásban a design system 60 pixeles
+//    minimumára zsugorodik. Mérjük, hogy a lapozó és a két gomb ilyenkor is
+//    látszik-e (a belső elválasztó jelenetei ezt nem fedik).
+// ------------------------------------------------------------
+for (const theme of THEMES) {
+  test(`kulso-szelso ${theme} 900x1000`, async ({ page }) => {
+    await mockApprovalRunWithTranscript(page, manyApprovals(1));
+    await openRun(page, theme, { width: 900, height: 1000 });
+    const separator = page.getByRole('separator', { name: OUTER_SEPARATOR_NAME });
+    const positions: Record<string, unknown>[] = [];
+    for (const position of ['kezdo', 'Home', 'End'] as const) {
+      if (position !== 'kezdo') {
+        await separator.focus();
+        await separator.press(position);
+      }
+      const geometry = await readExtremeGeometry(page);
+      positions.push({
+        position,
+        outerValue: await separator.getAttribute('aria-valuenow'),
+        approve: geometry['approve'],
+        reject: geometry['reject'],
+        paginationMeta: geometry['paginationMeta'],
+        transcriptSide: await page
+          .locator('.run-view-screen__transcript')
+          .evaluate((element) => Math.round(element.getBoundingClientRect().height)),
+      });
+    }
+    report('kulso-szelso', { theme, viewport: '900x1000', positions });
+  });
+}

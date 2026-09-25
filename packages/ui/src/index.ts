@@ -42,7 +42,8 @@ export {
   type DataTableProperties,
 } from './data-table/DataTable.tsx';
 export { Dot, type DotProperties, type DotSize, type DotTone } from './dot/Dot.tsx';
-export { DrawerSections, type DrawerSectionsProperties } from './drawer/DrawerSections.tsx';
+export { DrawerBody, type DrawerBodyProperties } from './drawer/DrawerBody.tsx';
+export { DrawerFooter, type DrawerFooterProperties } from './drawer/DrawerFooter.tsx';
 export {
   FeedIndicator,
   type FeedIndicatorProperties,

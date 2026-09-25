@@ -402,3 +402,191 @@ none` a belső elválasztón áll; a gráf és a transcript közti külső elvá
 A munkamenet `outputs/jovahagyas-elvalaszto/` mappájában: kezdő arány és áthúzott arány, 1440x900,
 1440x600 és 375x812, mindkét témában, a mért számokkal (`meresek-elotte-741f63e.jsonl`,
 `meresek-utana.jsonl`).
+
+## 10. Fix lapozó és gombsor, a `Resizable` szélső állásai, `pointercancel` (2026-09-25)
+
+Kiváltó ok: egy független ellenőrzés a `5093e67` állapoton, és a user két döntése (2026-09-25).
+Mért hibák (a `decfa69` fán, ahol a jóváhagyás és a `Resizable` kódja a `5093e67` állapottal
+azonos): (1) a gombok a 9.3 szerinti küszöb alatt kicsúsztak; (2) a forrás CSS
+`.resizable-panel { min-height: 60px }` pixeles minimumáról a százalékos `[5, 95]` korlát nem tud,
+a panelek `flex-shrink: 0` mellett a csoport kilógott, és a kilógó rész (a transcript alja)
+eltűnt; (3) a jobb belső térköz 19 pixel volt a bal 24 helyett (O-10); (4) sem a forrás, sem a port
+nem kezelte a `pointercancel` eseményt, a húzás állapota bent ragadt (O-11). A user döntései: (A) a
+lapozó és a döntés gombsora fix helyen, a `Resizable` elemen kívül áll, csak a jóváhagyás szövege és
+a transcript osztozik a húzható területen; (B) a 19 pixeles jobb térköz hiba, a mi oldalunkon,
+ízlésesen javítandó, eltérésként jelölve.
+
+### 10.1 Módszer
+
+- **A mérő eszköz a repóban**, bővítve (`apps/web/measurement/approval-panel.ts`, `cd apps/web &&
+flock /tmp/playwright-gep.lock bun run measure:approval`), képet nem ír. Három új jelenet: **7.
+  szélső állás** (egy jóváhagyás, 20 tárolt transcript sor; a kezdő arányon, `Home` és `End`
+  állásban a jelentett érték és a két határ, a két panel kirajzolt magasságából számolt VALÓDI
+  arány, a csoport túllógása, a lapozó és a két gomb görgetés nélküli látható aránya, a transcript
+  utolsó sorának látható aránya a user görgetése után, és a törzs két oldalsó belső térköze); **8.
+  megszakított érintés** (900x1000, a függőleges sáv, ahol mindkét elválasztó áll: a külső
+  elválasztón valódi CDP érintéses húzás, a belsőn `touchCancel`, utána egérmozgás a vásznon és
+  görgetés a transcripten); **9. külső szélső állás** (900x1000, a külső elválasztó `Home` és `End`
+  állása). Az 5. jelenet (küszöb) 2026-09-25 óta a jelentett `Home` értéktől lép a jelentett
+  maximumig, mert a `Home` már nem mindig 5.
+- **Előtte**: a `decfa69` fán; **utána**: a munkafa. Mindkét témában a számok azonosak (a sorok
+  gépi összevetéssel egyeznek, a kifestett színek kivételével). A nyers sorok a munkamenet
+  `outputs/jovahagyas-fix-gombsor/` mappájában (`meresek-elotte-decfa69.jsonl`,
+  `meresek-utana.jsonl`).
+
+### 10.2 Szélső állások, előtte és utána
+
+Előtte (`decfa69`):
+
+| Viewport | Állás | `aria-valuenow` | Valódi arány | Csoport túllógás (px) | Gombok | Transcript utolsó sor, görgetve | Jobb térköz (px) |
+| -------- | ----- | --------------- | ------------ | --------------------- | ------ | ------------------------------- | ---------------- |
+| 1440x900 | kezdő | 50              | 50           | 5                     | 1      | 1                               | 19               |
+| 1440x900 | Home  | 5               | 8,28         | 30                    | 0      | 0,74                            | 19               |
+| 1440x900 | End   | 95              | 91,72        | 30                    | 1      | 0                               | 19               |
+| 1440x600 | kezdő | 50              | 50           | 5                     | 1      | 1                               | 19               |
+| 1440x600 | Home  | 5               | 13,64        | 45                    | 0      | 0,45                            | 19               |
+| 1440x600 | End   | 95              | 86,36        | 45                    | 1      | 0                               | 19               |
+| 375x812  | kezdő | 50              | 50           | 5                     | 1      | 1                               | 24               |
+| 375x812  | Home  | 5               | 10,59        | 38,34                 | 0      | 0,58                            | 24               |
+| 375x812  | End   | 95              | 89,41        | 38,34                 | 1      | 0                               | 24               |
+
+Utána (a munkafa):
+
+| Viewport | Állás | `aria-valuenow` / min / max | Valódi arány | Csoport túllógás (px) | Lapozó és gombok | Transcript utolsó sor, görgetve | Bal / jobb térköz (px) |
+| -------- | ----- | --------------------------- | ------------ | --------------------- | ---------------- | ------------------------------- | ---------------------- |
+| 1440x900 | kezdő | 50 / 10 / 90                | 50           | 0                     | 1                | 1                               | 24 / 24                |
+| 1440x900 | Home  | 10 / 10 / 90                | 10,24        | 0                     | 1                | 1                               | 24 / 24                |
+| 1440x900 | End   | 90 / 10 / 90                | 89,76        | 0                     | 1                | 1                               | 24 / 24                |
+| 1440x600 | kezdő | 50 / 21 / 79                | 50           | 0                     | 1                | 1                               | 24 / 24                |
+| 1440x600 | Home  | 21 / 21 / 79                | 20,98        | 0                     | 1                | 1                               | 24 / 24                |
+| 1440x600 | End   | 79 / 21 / 79                | 79,02        | 0                     | 1                | 1                               | 24 / 24                |
+| 375x812  | kezdő | 50 / 5 / 95                 | 50           | 0                     | 1                | 1                               | 24 / 24                |
+| 375x812  | Home  | 14 / 14 / 86                | 14,32        | 0                     | 1                | 1                               | 24 / 24                |
+| 375x812  | End   | 86 / 14 / 86                | 85,68        | 0                     | 1                | 1                               | 24 / 24                |
+
+- A **szélső állás a pixeles minimum**: mindkét panel a forrás 60 pixelén áll (1440x900-on 60 és
+  526, 1440x600-on 60 és 226, 375x812-n 60 és 359 pixel), és a jelentett érték ezt az arányt
+  mondja. 375x812-n a kezdő arányon a két határ még 5 és 95: a "Transcript" fül a csatoláskor rejtett,
+  tehát a panelek nulla méretűek, és a mérés elmarad; a fókusz, az első billentyű vagy húzás
+  újramér (10.4).
+- A **kezdő arányon** a görgethető törzs 1440x900-on 293, 1440x600-on 143, 375x812-n 210 pixel
+  (9.2 szerint előtte 241, 91, 158: a lapozó és az akciósáv már nem a húzható terület része), és a
+  "visszavonhatatlan" `Alert` blokk mindhárom méreten teljesen látszik (előtte 1440x600-on 0,79). A
+  vászon (700, 400, 533) és az `.app-content` túllógása (0, 0) változatlan 0, 1, 4 és 10
+  jóváhagyással, mindkét témában; az akciósáv siker után 61 (375-ön 75), `conflict` után 96 (375-ön 138) pixel.
+- **A gombok a teljes tartományon látszanak** (5. jelenet): a `Home` értéktől (10, 21, 14) a
+  maximumig minden 5 százalékos lépésben mindkét gomb 1 arányban.
+- **A bal szél** (lapozó, `Alert`, cím) egy vonalban maradt (1440 pixelen 1033,5, 375 pixelen 24), a
+  törzs és az akciósáv kifestett képpontja a `--ep-bg-elevated` tokenje (255,255,255 és 27,30,36).
+
+### 10.3 A megszakított érintés
+
+900x1000, mindkét témában azonos:
+
+| Elválasztó                     | Pointer események                             | Előtte (`decfa69`): érintés után / egérmozgás után / görgetés után / `is-dragging` | Utána                |
+| ------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
+| külső (gráf és transcript)     | `pointerdown`, `pointermove`, `pointercancel` | 70 -> 73 / **5** / **85** / bent ragad                                             | 73 / 73 / 73 / nincs |
+| belső (jóváhagyás, transcript) | ugyanez (`touchCancel`)                       | 50 -> 63 / **5** / **91** / bent ragad                                             | 52 / 52 / 52 / nincs |
+
+A belső elválasztón az érintés utáni érték a két futás között eltér (63, illetve 52), mert a CDP
+`touchCancel` a mozgás eseményekhez képest más képkockában érkezik; a mérés tárgya az, hogy a
+megszakítás UTÁN semmi nem mozdít. A megszakítás nélküli, `pointerup` zárású érintéses húzás a
+belső elválasztón 375x812-n 50-ről 74-re visz (6. jelenet, változatlanul működik).
+
+### 10.4 A megoldás és a forrásai
+
+- **A lapozó és a gombsor a `Resizable` elemen kívül** (user döntés A). A transcript oldal felülről
+  lefelé: a lapozó (`ApprovalPromptPanel`), a `Resizable` a jóváhagyás törzsével
+  (`ApprovalPromptBody`, `.drawer__body`) és a transcripttel, alul a döntés akciósávja
+  (`ApprovalDecisionActions`, `.drawer__footer`). A design system `drawer` szerkezete megmaradt: a
+  görgethető törzs fölött a fej, alatta a felső elválasztós tapadó akciósáv; a forrás egyetlen
+  `DrawerSections` portja ezért két komponensre vált (`DrawerBody`, `DrawerFooter`), a forrás JSX
+  osztályaival. **Mérlegelt és elvetett alak:** a gombsor a lapozó alatt, a transcript fölött. Ez a
+  forrás `drawer` sorrendjét (törzs, UTÁNA akciósáv) fordítaná meg, a `.drawer__footer` felső
+  elválasztója a lapozó és a gombok közé esne, és a felolvasási és fókusz sorrendben a döntés gombjai
+  a "visszavonhatatlan" figyelmeztetés ELÉ kerülnének. A választott alak a futás nézet alján ugyanaz
+  a felső elválasztós, emelt hátterű sáv, amit a gráf szerkesztő alsó akciósávja (`page-footer`) már
+  ad.
+- **A zsugorodó panelek** (user döntés B, `ResizablePanel`: `flex-shrink: 1` a forrás `0` értéke
+  helyett). A CSS Flexbox 9.7 szerint negatív szabad helynél a zsugorodási tényező a belső
+  `flex-basis` mérettel szorzódik ("scaled flex shrink factor"), tehát az 5 pixeles elválasztó helyét
+  a két panel a százalékuk arányában adja le, és az arányuk pontosan a százalék marad; a minimumába
+  ütköző panel befagy, és a másik zsugorodik tovább ("Fix min/max violations").
+  <https://drafts.csswg.org/css-flexbox-1/#resolve-flexible-lengths>,
+  <https://www.w3.org/TR/css-flexbox-1/>, a skálázás indoka a CSSWG levelezésében
+  (<https://lists.w3.org/Archives/Public/www-style/2014Oct/0495.html>), és egy kidolgozott példa a
+  minimumba ütköző elemre (<https://stackoverflow.com/questions/76291155/understanding-flex-shrink-when-the-value-is-less-than-1>).
+  A forrás saját demója is túllóg (`resizable.html`, 9.2: 4,98 pixel).
+- **A pixeles minimum a határban és a jelentett értékben** (`measure-panel-geometry.ts`,
+  `resize-at.ts`, `ResizableHandle.tsx`). A `Resizable` a panelek kiszámított `min-height`/`min-width`
+  értékét (a forrás 60 és 80 pixele) a panelek együttes méretének százalékára váltja, és ez a `Home`
+  és az `End` határa; az `aria-valuemin` és az `aria-valuemax` a `Home`, illetve az `End` érkezési
+  helye. Forrás: a W3C APG Window Splitter mintája szerint az érték az elsődleges panel mérete, az
+  `aria-valuemin` az a hely, ahol az elsődleges panel a legkisebb, az `aria-valuemax`, ahol a
+  legnagyobb (<https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/>); az MDN szerint fókuszálható
+  `separator` esetén az `aria-valuenow` az elválasztó TÉNYLEGES helye, és változáskor frissítendő
+  (<https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/separator_role>);
+  az APG szerint az `aria-valuenow` a két határ közé esik
+  (<https://www.w3.org/WAI/ARIA/apg/practices/range-related-properties/>); a WAI-ARIA 1.1 szöveget
+  bevezető változás (<https://github.com/w3c/aria/commit/8a67e6e8e5>). **A mérés ideje:** csatoláskor,
+  ablak átméretezéskor, az elválasztó fókuszakor, minden húzás és billentyű előtt. A csoport más okú
+  méretváltozását (rejtett fül megjelenése, egy szülő elrendezés húzása) a következő ilyen esemény
+  követi, mert a `ResizeObserver` a csomagban tiltott (SPEC-007 16. szekció 24. kritérium); a
+  kirajzolás ilyenkor is helyes (a zsugorodó panelek miatt nincs levágás), csak a jelentett érték
+  késik egy eseményt.
+- **A transcript alja a minimumon.** A forrás modellje: a panel minimuma 60 pixel, és ami nem fér
+  el, görget (`.resizable-panel { overflow: auto }`). A transcript burkolója ezért `overflow: auto`
+  (korábban `hidden`), és a lista legalább egy összecsukott sornyi magas (`TranscriptPanel.tsx`, a
+  `collapsed-transcript-row-height.ts` egyetlen forrásából): az `End` állásban a burkolót görgetve a
+  lista, benne az utolsó sor, teljesen elérhető. Nagyobb panelben nincs mit görgetni.
+- **`pointercancel`** (`Resizable.tsx`): a húzást a `pointerup` mellett a `pointercancel` is lezárja,
+  a már alkalmazott méret marad. A W3C Pointer Events szerint a böngésző `pointercancel` eseménnyel
+  zárja a pointer esemény folyamát, ha a mozdulatot maga veszi át (pásztázás, nagyítás) vagy a pointer
+  várhatóan nem ad több eseményt, és utána arra a pointerre `pointerup` sem jön
+  (<https://www.w3.org/TR/pointerevents3/>, "Suppressing a pointer event stream" és "The pointercancel
+  event"; <https://www.w3.org/TR/2019/SPSD-pointerevents1-20190404/>, 5.2.8;
+  <https://developer.mozilla.org/en-US/docs/Web/API/Element/pointercancel_event>). A külső elválasztó
+  `touch-action` értéke nem változott (O-11 nyitva a külső érintéses húzására); a belső elválasztó
+  `touch-action: none` szabálya helyes, a design system maga is ezt teszi a saját oszlop méretező
+  fogantyúján (`datatable.css`: `.data-table__resizer { touch-action: none }`), és a W3C Pointer
+  Events és az MDN `touch-action` oldala szerint ez a dokumentált eszköz (9.4).
+
+### 10.5 Ami nyitva maradt, méréssel
+
+**A külső elválasztó `End` állása a függőleges sávban** (9. jelenet, 900x1000, mindkét témában):
+a kezdő (70) és a `Home` (8) állásban a lapozó és a két gomb 1 arányban látszik, a transcript oldal
+239, illetve 735 pixel; az `End` (92) állásban a transcript oldal a külső panel 60 pixeles
+minimumán áll, a lapozó még látszik, a két gomb nem (0). Ez a külső `Resizable` minimuma, nem a
+belsőé; a SPEC-008 14.2 O-13 tétele (a user döntését kéri: a külső transcript panel minimuma a fej
+és az akciósáv magasságához igazodjon-e).
+
+### 10.6 Regressziók és szándékos rontások
+
+- `apps/web/e2e/approval-prompt.spec.ts`: a szélső állások három méreten két témában (a lapozó és a
+  két gomb `toBeInViewport({ ratio: 1 })`, a csoport túllógása 0, az `aria-valuenow` a kirajzolt
+  magasságokból számolt valódi arány, a `Home` az `aria-valuemin`, az `End` az `aria-valuemax`, a
+  transcript utolsó sora egérgörgővel teljesen látható, a vászon és a túllógás változatlan); a
+  megszakított érintés a külső és a belső elválasztón (`hasTouch`); az egér húzás és az érintés
+  elvárt értéke a két panel együttes magasságához mérve. `apps/web/e2e/approval-surface.spec.ts`: a
+  bal és a jobb belső térköz azonos (24), a törzsben és az akciósávban is. Unit: a `packages/ui`
+  `resizable` téma (a mért minimum a határban, az ablak átméretezés, a leszerelt panel, a húzás a
+  panelek együttes méretéhez, a `pointercancel`, az `Enter` a minimumra), `drawer` (`DrawerBody`,
+  `DrawerFooter`), `approval-prompt` (`ApprovalPromptBody`, a fej, az akciósáv), `run-view` (a három
+  rész sorrendje, a transcript nem szerel le).
+- **Rontások, mind bukik:** (a) a gombsor a `Resizable` panelébe téve: a szélső állás e2e mind a hat
+  esete bukik (a gomb látható aránya 0); (b) a `pointercancel` kezelés kivéve: a megszakított érintés
+  mindkét tesztje bukik (bent ragadt `is-dragging`); (c) a transcript levágásának visszahozása a
+  forrás `flex-shrink: 0` értékével: a szélső állás mind a hat esete bukik (túllógás 5), és a térköz
+  négy vízszintes sávbeli esete (19 a 24 helyett); (c2) a transcript burkolójának `overflow: hidden`
+  értéke: a szélső állás mind a hat esete bukik az `End` állás utolsó során; (d) a `decfa69` teljes
+  `resizable` témája a mai elrendezés alatt: 12 bukás a 14 érintett tesztből (a két zöld a 375
+  pixeles térköz teszt, ahol külső elválasztó nincs).
+
+### 10.7 Képek
+
+A munkamenet `outputs/jovahagyas-fix-gombsor/` mappájában: kezdő (köztes), `Home` és `End` állás,
+1440x900, 1440x600 és 375x812, mindkét témában (a fájlnévben a jelentett érték). A képek egy
+repón kívüli, eldobott Playwright futásból származnak, ami a repó `approval-fixture.ts` fixtúráját
+importálta (a `screenshot-pipeline` invariánsa szerint a szentesített `capture-screenshots.ts`
+kizárólag a bemutató gráfot fényképezheti, minden képén kifestett élekkel, a 375 pixeles
+"Transcript" fülön viszont nincs él).

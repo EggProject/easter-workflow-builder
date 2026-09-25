@@ -35,10 +35,13 @@ describe('ResizableHandle', () => {
       root.render(<ResizableHandle beforeIndex={0} />);
     });
     expect(separator().getAttribute('aria-valuenow')).toBeNull();
+    expect(separator().getAttribute('aria-valuemin')).toBeNull();
+    expect(separator().getAttribute('aria-valuemax')).toBeNull();
     expect(separator().getAttribute('aria-label')).toBe('Resize panels 1 and 2');
 
     expect(() => {
       act(() => {
+        separator().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
         separator().dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, bubbles: true, cancelable: true }));
       });
       for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', 'a']) {
@@ -74,6 +77,10 @@ describe('ResizableHandle', () => {
     });
     const separators = [...container.querySelectorAll('[role="separator"]')];
     expect(separators.map((element) => element.getAttribute('aria-valuenow'))).toEqual(['20', '30']);
+    // A két határ a `Home`, illetve az `End` érkezési helye: az első
+    // elválasztónál a párösszeg (50) mínusz a szomszéd 5 százaléka.
+    expect(separators.map((element) => element.getAttribute('aria-valuemin'))).toEqual(['5', '5']);
+    expect(separators.map((element) => element.getAttribute('aria-valuemax'))).toEqual(['45', '75']);
     expect(separators.map((element) => element.getAttribute('aria-label'))).toEqual([
       'Resize panels 1 and 2',
       'Resize panels 2 and 3',

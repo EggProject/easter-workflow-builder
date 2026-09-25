@@ -54,6 +54,21 @@ describe('Resizable', () => {
     return [...container.querySelectorAll<HTMLDivElement>('.resizable-panel')].map((panel) => panel.style.flexBasis);
   }
 
+  /**
+   * Valódi geometria a happy-dom nulla téglalapja helyett: a két panel a
+   * csoport tengelyén `pixels` méretű, és a forrás CSS pixeles minimumát
+   * inline `min-width`/`min-height` adja (a `getComputedStyle` ezt olvassa).
+   */
+  function stubPanelGeometry(pixels: readonly number[], minimum: string): void {
+    const panels = [...container.querySelectorAll<HTMLDivElement>('.resizable-panel')];
+    for (const [index, panel] of panels.entries()) {
+      const size = pixels[index] ?? 0;
+      panel.getBoundingClientRect = () => new DOMRect(0, 0, size, size);
+      panel.style.minWidth = minimum;
+      panel.style.minHeight = minimum;
+    }
+  }
+
   it('a csoport osztálya vízszintes irányban nem hordozza a --vertical módosítót', () => {
     renderTwoPane();
     expect(container.querySelector('.resizable-group')?.className).toBe('resizable-group');
@@ -250,6 +265,148 @@ describe('Resizable', () => {
 
     pressKeyOn(handle(), 'ArrowRight');
     expect(reported.at(-1)).toEqual([45, 55]);
+  });
+
+  it('a panelek zsugorodhatnak (flex-shrink: 1), hogy a csoport az elválasztóval együtt se lógjon túl', () => {
+    renderTwoPane();
+    const panels = [...container.querySelectorAll<HTMLDivElement>('.resizable-panel')];
+    expect(panels.map((panel) => panel.style.flexShrink)).toEqual(['1', '1']);
+  });
+
+  it('a mért pixeles minimum a Home és az End határa, és az aria-valuemin/valuemax is ezt jelenti', () => {
+    renderTwoPane('vertical');
+    stubPanelGeometry([160, 240], '60px');
+    // A fókusz méri újra a paneleket: 60 / 400 = 15 százalék.
+    act(() => {
+      handle().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    });
+    expect(handle().getAttribute('aria-valuemin')).toBe('15');
+    expect(handle().getAttribute('aria-valuemax')).toBe('85');
+    expect(handle().getAttribute('aria-valuenow')).toBe('40');
+    pressKeyOn(handle(), 'Home');
+    expect(panelSizes()).toEqual(['15%', '85%']);
+    expect(handle().getAttribute('aria-valuenow')).toBe('15');
+    pressKeyOn(handle(), 'End');
+    expect(panelSizes()).toEqual(['85%', '15%']);
+  });
+
+  it('a minimum alatti tárolt méret az ablak átméretezésekor a mért minimumra igazodik, és ezt jelenti', () => {
+    const reported: (readonly number[])[] = [];
+    act(() => {
+      root.render(
+        <Resizable
+          direction="vertical"
+          defaultSizes={[5, 95]}
+          onSizesChange={(sizes) => {
+            reported.push(sizes);
+          }}
+        >
+          <ResizablePanel index={0} />
+          <ResizableHandle beforeIndex={0} />
+          <ResizablePanel index={1} />
+        </Resizable>,
+      );
+    });
+    stubPanelGeometry([20, 380], '60px');
+    act(() => {
+      globalThis.dispatchEvent(new Event('resize'));
+    });
+    expect(panelSizes()).toEqual(['15%', '85%']);
+    expect(reported.at(-1)).toEqual([15, 85]);
+  });
+
+  it('egy leszerelt panel kiesik a mérésből: ilyenkor nincs mért minimum, a forrás [5, 95] határa marad', () => {
+    renderTwoPane('vertical');
+    stubPanelGeometry([160, 240], '60px');
+    act(() => {
+      globalThis.dispatchEvent(new Event('resize'));
+    });
+    expect(handle().getAttribute('aria-valuemin')).toBe('15');
+
+    act(() => {
+      root.render(
+        <Resizable direction="vertical" defaultSizes={[40, 60]}>
+          <ResizableHandle beforeIndex={0} />
+          <ResizablePanel index={1}>Main</ResizablePanel>
+        </Resizable>,
+      );
+    });
+    act(() => {
+      globalThis.dispatchEvent(new Event('resize'));
+    });
+    expect(handle().getAttribute('aria-valuemin')).toBe('5');
+    expect(handle().getAttribute('aria-valuemax')).toBe('95');
+  });
+
+  it('a mérés nem ír új méretet, ha a méret a minimum fölött áll', () => {
+    const reported: (readonly number[])[] = [];
+    act(() => {
+      root.render(
+        <Resizable
+          defaultSizes={[40, 60]}
+          onSizesChange={(sizes) => {
+            reported.push(sizes);
+          }}
+        >
+          <ResizablePanel index={0} />
+          <ResizableHandle beforeIndex={0} />
+          <ResizablePanel index={1} />
+        </Resizable>,
+      );
+    });
+    stubPanelGeometry([400, 600], '80px');
+    act(() => {
+      globalThis.dispatchEvent(new Event('resize'));
+    });
+    expect(reported).toEqual([[40, 60]]);
+  });
+
+  it('húzáskor az elmozdulás a panelek együttes méretének százaléka, a mért minimummal vágva', () => {
+    renderTwoPane();
+    stubPanelGeometry([400, 600], '80px');
+    act(() => {
+      handle().dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, bubbles: true, cancelable: true }));
+    });
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointermove', { clientX: 200 }));
+    });
+    expect(panelSizes()).toEqual(['50%', '50%']);
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointermove', { clientX: -1000 }));
+    });
+    expect(panelSizes()).toEqual(['8%', '92%']);
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointerup'));
+    });
+  });
+
+  it('a pointercancel lezárja a húzást: az is-dragging osztály eltűnik, és egy utána jövő pointermove nem mozdít', () => {
+    renderTwoPane();
+    stubPanelGeometry([400, 600], '80px');
+    act(() => {
+      handle().dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, bubbles: true, cancelable: true }));
+    });
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointermove', { clientX: 130 }));
+    });
+    expect(panelSizes()).toEqual(['43%', '57%']);
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointercancel'));
+    });
+    expect(handle().className).toBe('resizable-handle');
+    act(() => {
+      globalThis.dispatchEvent(new PointerEvent('pointermove', { clientX: 900 }));
+    });
+    expect(panelSizes()).toEqual(['43%', '57%']);
+  });
+
+  it('Enter a mért minimumra csomagol, és onnan a legutóbbi méretre nyit vissza', () => {
+    renderTwoPane('vertical');
+    stubPanelGeometry([160, 240], '60px');
+    pressKeyOn(handle(), 'Enter');
+    expect(panelSizes()).toEqual(['15%', '85%']);
+    pressKeyOn(handle(), 'Enter');
+    expect(panelSizes()).toEqual(['40%', '60%']);
   });
 
   it('a panelek gyerek tartalma megjelenik', () => {
