@@ -13,7 +13,7 @@
 // volt: egy mondat a `.claude/CLAUDE.md` 12. szekciójában és az `apps/web`
 // CLAUDE.md fájljában. Semmi nem buktatta el azt a munkamenetet, ami megint
 // saját, eldobható scriptet ír saját, éltelen fixtúrával. Ez a fájl az a
-// gépi kényszer: kilenc invariáns, mindegyik nem nulla kilépési kódú bukást ad a
+// gépi kényszer: hét invariáns, mindegyik nem nulla kilépési kódú bukást ad a
 // `bun run test` kapun, ami tagja a kilenc kapunak és szerepel a CI
 // összesítő `ci` job `needs` listájában.
 //
@@ -21,13 +21,16 @@
 // forráskódot olvassa, és csak a böngésző képernyőkép, a videó és a trace kép
 // lemezre írását tiltja a saját teszt- és segédkódunkban. A termék futását, az
 // agentek futásidejű fájlírását (az Agent SDK eszközeivel) és a termékkód egyéb
-// fájlírását nem érinti. A szándékos megkerülés (átnevezés, `call`/`bind`,
-// összerakott kulcs vagy modulnév, SQLite, JSON becsempészés) elfogadott
-// korlát (`.claude/CLAUDE.md` 12. szekció).
+// fájlírását nem érinti: a termékkód (a `packages/*/src` és az `apps/*/src`
+// nem teszt fájlja) csak akkor vizsgált, ha Playwright csomagot importál
+// (`isUnscannedProductFile`). A szándékos megkerülés (átnevezés, `call`/`bind`,
+// összerakott kulcs vagy modulnév, SQLite, JSON becsempészés) és e fájl saját
+// gyengítése elfogadott korlát, az utóbbi code review kérdése
+// (`.claude/CLAUDE.md` 12. szekció).
 //
 // A VÉDELEM KÉT RÉTEGE:
 //
-//   1. A COMMITOLT FA alakja (1 ... 5., 7., 8. és 9. invariáns). A git INDEXET
+//   1. A COMMITOLT FA alakja (1 ... 5. és 7. invariáns). A git INDEXET
 //      olvassa vissza nyers szövegként, statikus elemzés helyett - ugyanaz a minta,
 //      mint a `no-em-dash` és a `no-preserve-symlinks` témáé. Ez fogja meg
 //      azt az esetet, amikor egy munkamenet MÁSIK fájlba ír képernyőkép
@@ -78,12 +81,6 @@ const MANIFEST_FILE = 'apps/web/e2e/screenshot-manifest.json';
 const SCREENSHOTS_CONFIG_FILE = 'apps/web/playwright.screenshots.config.ts';
 
 /**
- * Ez a fájl: a (8) és a (9) invariáns a saját forrásából ellenőrzi, hogy az
- * őrző blokkok szövege nem változott.
- */
-const SELF_FILE = 'tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts';
-
-/**
  * Minden JavaScript és TypeScript kiterjesztés, amit a telepített Playwright a
  * saját betöltőjén átenged (a `.d.*` deklarációs fájlok is ide esnek), és amit
  * a TypeScript modul referencia is ismer
@@ -96,9 +93,29 @@ const SELF_FILE = 'tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.s
 const CODE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 
 /**
- * A shell scriptek kiterjesztése. A `.bash` 2026-09-25 óta (user döntés).
+ * A shell parancsot futtató fájlok kiterjesztése. A `.bash` 2026-09-25 óta
+ * (user döntés), a YAML ugyanazon a napon egy független ellenőrzés nyomán: a
+ * GitHub Actions workflow és composite action `run` lépései shell parancsok, és
+ * egy `playwright test --trace on` lépés a workflow fájlban átcsúszott.
  */
-const SHELL_EXTENSIONS = ['.sh', '.bash'];
+const SHELL_EXTENSIONS = ['.sh', '.bash', '.yml', '.yaml'];
+
+/**
+ * A termékkód: a workspace csomagok és alkalmazások `src` mappája. A nem teszt
+ * fájljai csak akkor vizsgáltak, ha Playwright csomagot importálnak (user
+ * döntés 2026-09-25): enélkül a termékkód egy naplózási szint kulcsa (`trace`),
+ * egy MIME térkép kulcsa (`video`) vagy egy kommentben álló képernyőkép hívás
+ * ártatlan termékfájlokat jelölt meg (független ellenőrzés).
+ */
+const PRODUCT_SOURCE_PATTERN = /^(?:packages|apps)\/[^/]+\/src\//;
+
+const TEST_FILE_PATTERN = /\.(?:spec|test)\.[^/]+$/;
+
+/**
+ * A Playwright csomagjai import hivatkozásként: `@playwright/*`, `playwright`,
+ * `playwright-core` és ezek alútvonalai.
+ */
+const PLAYWRIGHT_SPECIFIER_PATTERN = /^(?:@playwright\/|playwright(?:-core)?(?:\/|$))/;
 
 /**
  * A `package.json` fájlok scriptjei 2026-09-25 óta a shell scriptekkel azonos
@@ -212,20 +229,23 @@ const CAPTURE_CALL_PATTERN = new RegExp(
 );
 
 /**
- * A Playwright CLI a shell scriptben és a `package.json` scriptben: a
- * `playwright` szó, és vele együtt a `screenshot` alparancs vagy egy nem `off`
- * értékű `--trace` kapcsoló. Az alparancs a képet mindig a megadott fájlba írja
+ * A Playwright CLI a shell parancsban és a `package.json` scriptben: a
+ * `playwright` szó a `screenshot` alparanccsal, vagy egy nem `off` értékű
+ * `--trace` kapcsoló. Az alparancs a képet mindig a megadott fájlba írja
  * (<https://playwright.dev/docs/cli>); a `--trace` kapcsoló a config trace
  * opcióját írja felül (<https://playwright.dev/docs/test-cli>, research 4.
  * szekció), tehát ugyanaz a zárt lista vonatkozik rá, mint a config trace
- * opciójára.
+ * opciójára. A kapcsoló 2026-09-25 óta a `playwright` szó nélkül is tiltott: egy
+ * `bun run test:e2e -- --trace=on` alakú script a Playwrightnak adja tovább, a
+ * szót mégsem tartalmazza (független ellenőrzés). Más eszköz pontosan
+ * `--trace` nevű kapcsolója is ide esik; a commitolt fán mérten nincs ilyen.
  */
 const PLAYWRIGHT_CLI_PATTERN = /\bplaywright\b/;
 const SHELL_SCREENSHOT_PATTERN = new RegExp(String.raw`\b${SCREENSHOT_WORD}\b`);
 const TRACE_FLAG_PATTERN = new RegExp(String.raw`--${TRACE_WORD}(?![\w-])(?!(?:=|\s+)['"]?off\b)`);
 
 function isShellCapture(text: string): boolean {
-  return PLAYWRIGHT_CLI_PATTERN.test(text) && (SHELL_SCREENSHOT_PATTERN.test(text) || TRACE_FLAG_PATTERN.test(text));
+  return TRACE_FLAG_PATTERN.test(text) || (PLAYWRIGHT_CLI_PATTERN.test(text) && SHELL_SCREENSHOT_PATTERN.test(text));
 }
 
 /**
@@ -298,7 +318,13 @@ const SCREENSHOTS_OPTION_PATTERN = new RegExp(
  * tesztcsatolmány, amit a futó a lemezre ment ("used as the prefix of file name
  * when saving to disk",
  * <https://playwright.dev/docs/api/class-testinfo#test-info-attach>), és a
- * letöltés mentése (<https://playwright.dev/docs/api/class-download#download-save-as>).
+ * letöltés mentése (<https://playwright.dev/docs/api/class-download#download-save-as>),
+ * valamint a pillanatkép assertion, ami a kapott adatot referencia fájlként
+ * lemezre írja ("compare text or arbitrary binary data",
+ * <https://playwright.dev/docs/test-snapshots>). Az utóbbi 2026-09-25 óta író,
+ * nem közvetlen minta: a Vitest azonos nevű, szöveges pillanatképe egy unit
+ * tesztben nem böngésző kép, és hamis jelzést adott (független ellenőrzés); a
+ * képernyőkép körben viszont a kép a hívóig ugyanúgy eljut.
  * Ami ezen a listán kívül ír (más író csomag, SQLite, sablon literállal vagy
  * futásidőben összerakott modulnév), azt a minta nem látja: szándékos
  * megkerülésként elfogadott korlát (user döntés 2026-09-25). A 2026-09-25-ig
@@ -307,7 +333,7 @@ const SCREENSHOTS_OPTION_PATTERN = new RegExp(
  * átment (mérve, egy független ellenőrzés és saját injekció).
  */
 const DISK_WRITER_PATTERN = new RegExp(
-  String.raw`['"](?:node:)?(?:fs|fs/promises|child_process)['"]|\bBun\.write\b|\.attach\(|\bsaveAs\(`,
+  String.raw`['"](?:node:)?(?:fs|fs/promises|child_process)['"]|\bBun\.write\b|\.attach\(|\bsaveAs\(|toMatch${SNAPSHOT_WORD}\(`,
 );
 
 /**
@@ -327,14 +353,13 @@ const ALLOWED_WRITER_FILES: ReadonlySet<string> = new Set(['apps/web/e2e/coverag
 const IMPORT_SPECIFIER_PATTERN = /\b(?:from|import|require)[\s(]*['"]([^'"]+)['"]/g;
 
 /**
- * A Playwright saját, lemezre író képösszehasonlító assertionjei. A repo nem
- * használja őket (a vizuális bizonyíték útja a pixel mérés), és nem is
- * szabad: lemezre írt referencia képet hoznának be, amiről a fejléc
- * indoklása szól.
+ * A Playwright saját, képernyőképet készítő és lemezre író képösszehasonlító
+ * assertionje. A repo nem használja (a vizuális bizonyíték útja a pixel
+ * mérés), és nem is szabad: lemezre írt referencia képet hozna be, amiről a
+ * fejléc indoklása szól. A pillanatkép assertion író, lásd
+ * `DISK_WRITER_PATTERN`.
  */
-const SNAPSHOT_ASSERTION_PATTERN = new RegExp(
-  String.raw`toHave${CAPITALIZED_SCREENSHOT_WORD}\(|toMatch${SNAPSHOT_WORD}\(`,
-);
+const SCREENSHOT_ASSERTION_CALL = `toHave${CAPITALIZED_SCREENSHOT_WORD}(`;
 
 /**
  * Bármilyen képernyőkép hívás, `path` opció nélkül is. Önmagában nem hiba (a
@@ -350,33 +375,6 @@ const ANY_SCREENSHOT_CALL = `${SCREENSHOT_WORD}(`;
  * jelez.
  */
 const PNG_FILE_NAME_PATTERN = new RegExp(String.raw`\.${PNG_EXTENSION}\b`);
-
-/**
- * Az őrző blokkok határai ebben a fájlban: a leírás blokk fejléce és az (1),
- * (2), (7), (8), (9) invariáns teljes szövege. A (8) és a (9) két független
- * kóddal ugyanazt a lenyomatot számolja belőlük, és a `GUARD_BLOCKS_SHA256`
- * értékkel veti össze. Így bármelyik blokk egyetlen helyen végzett gyengítése
- * (az állítás elhagyása vagy szűrése, egy blokk kihagyása `skip` vagy opció
- * objektum útján, a leírás blokk kihagyása, a (7) egy esetének törlése) bukik:
- * a (8) kihagyását a leírás blokkon kívül álló (9) fogja, a (9) kihagyását a
- * (8). A kezdő jel valódi sortöréssel indul, ezért a lenti string literálok
- * (amikben `\n` escape áll) nem illeszkednek rá.
- */
-const GUARD_BLOCK_MARKERS: readonly (readonly [string, string])[] = [
-  ["\ndescribe('a képernyőkép készítés egyetlen szentesített útja (gépi kényszer)'", '{\n'],
-  ["\n  it('(1) ", '\n  });\n'],
-  ["\n  it('(2) ", '\n  });\n'],
-  ["\n  it('(7) ", '\n  });\n'],
-  ["\n  it('(8) ", '\n  });\n'],
-  ["\nit('(9) ", '\n});\n'],
-];
-
-/**
- * Az őrző blokkok rögzített lenyomata. Ha egy blokk szándékosan változik, az új
- * értéket a bukó (8) vagy (9) invariáns üzenete adja; az átírás tudatos lépés,
- * ugyanúgy, mint a manifeszt két lenyomatáé (`.claude/CLAUDE.md` 12. szekció).
- */
-const GUARD_BLOCKS_SHA256 = 'a1d00455dd3d77e8f39e57cf3b6b46ad72d5045162da8aef2e79186c8636ac96';
 
 function repoRoot(): string {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- a git a fejlesztoi/CI PATH resze, ugyanugy mint a tobbi wrapper scriptben
@@ -416,17 +414,37 @@ function isPackageManifestPath(trackedPath: string): boolean {
   return path.posix.basename(trackedPath) === PACKAGE_MANIFEST_NAME;
 }
 
+function importSpecifiers(content: string): readonly string[] {
+  return content
+    .matchAll(IMPORT_SPECIFIER_PATTERN)
+    .map((match) => match[1] ?? '')
+    .toArray();
+}
+
 /**
- * A vizsgált forrásfájlok (JavaScript, TypeScript, shell) a commitolt fájlok
- * közül. A git index a bemenet, nem a lemez: egy nem commitolt, eldobható
- * script amúgy sem kerülhet be a repóba, és a CI is a commitolt fát látja. A
- * kiterjesztés szűrő ITT áll, a (7) által igazolt függvényen belül, hogy egy
- * kiterjesztés kivétele a listából a (7) esetén bukjon.
+ * A hatókörön kívüli termékfájl: a termékkód nem teszt fájlja, ami Playwright
+ * csomagot nem importál (lásd `PRODUCT_SOURCE_PATTERN`).
+ */
+function isUnscannedProductFile(file: CodeFile): boolean {
+  return (
+    PRODUCT_SOURCE_PATTERN.test(file.trackedPath) &&
+    !TEST_FILE_PATTERN.test(file.trackedPath) &&
+    importSpecifiers(file.content).every((specifier) => !PLAYWRIGHT_SPECIFIER_PATTERN.test(specifier))
+  );
+}
+
+/**
+ * A vizsgált forrásfájlok (JavaScript, TypeScript, shell parancs) a commitolt
+ * fájlok közül, a hatókörön kívüli termékfájlok nélkül. A git index a bemenet,
+ * nem a lemez: egy nem commitolt, eldobható script amúgy sem kerülhet be a
+ * repóba, és a CI is a commitolt fát látja. A kiterjesztés és a hatókör szűrő
+ * ITT áll, a (7) által igazolt függvényen belül.
  */
 function readScannedFiles(trackedPaths: readonly string[], read: ReadTrackedFile): readonly CodeFile[] {
   return trackedPaths
     .filter((trackedPath) => isCodePath(trackedPath) || isShellPath(trackedPath))
-    .map((trackedPath) => ({ trackedPath, content: read(trackedPath) }));
+    .map((trackedPath) => ({ trackedPath, content: read(trackedPath) }))
+    .filter((file) => !isUnscannedProductFile(file));
 }
 
 function isObjectRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -458,9 +476,24 @@ function readPackageManifests(trackedPaths: readonly string[], read: ReadTracked
 }
 
 /**
+ * A JavaScript kiterjesztésű relatív import TypeScript párjai, a telepített
+ * Playwright betöltő sorrendjében: a `./save.js` hivatkozás a `save.ts` fájlt
+ * is betölti (research 7. szekció). 2026-09-25-ig a feloldás csak a pontos
+ * fájlnevet és a kiterjesztés nélküli alakot ismerte, és egy `.js` végű import
+ * egy `.ts` író fájlra átcsúszott (független ellenőrzés).
+ */
+const JAVASCRIPT_EXTENSION_SUBSTITUTES: ReadonlyMap<string, readonly string[]> = new Map([
+  ['.js', ['.jsx', '.ts', '.tsx']],
+  ['.jsx', ['.tsx']],
+  ['.cjs', ['.cts']],
+  ['.mjs', ['.mts']],
+]);
+
+/**
  * Egy fájl importjai a commitolt kódfájlok közül: relatív útvonal (pontos
- * fájlnévvel, vagy a vizsgált kiterjesztések egyikével kiegészítve) és
- * workspace csomag (a belépési pontja).
+ * fájlnévvel, a vizsgált kiterjesztések egyikével kiegészítve, vagy a
+ * JavaScript kiterjesztés TypeScript párjával) és workspace csomag (a belépési
+ * pontja).
  */
 function resolveImports(
   file: CodeFile,
@@ -468,8 +501,7 @@ function resolveImports(
   packageEntries: ReadonlyMap<string, string>,
 ): readonly string[] {
   const imported: string[] = [];
-  for (const match of file.content.matchAll(IMPORT_SPECIFIER_PATTERN)) {
-    const specifier = match[1] ?? '';
+  for (const specifier of importSpecifiers(file.content)) {
     const packageEntry = packageEntries.get(specifier);
     if (packageEntry !== undefined) {
       imported.push(packageEntry);
@@ -479,7 +511,13 @@ function resolveImports(
       continue;
     }
     const base = path.posix.normalize(path.posix.join(path.posix.dirname(file.trackedPath), specifier));
-    const candidates = [base, ...CODE_EXTENSIONS.map((extension) => `${base}${extension}`)];
+    const specifierExtension = path.posix.extname(base);
+    const stem = base.slice(0, base.length - specifierExtension.length);
+    const candidates = [
+      base,
+      ...CODE_EXTENSIONS.map((extension) => `${base}${extension}`),
+      ...(JAVASCRIPT_EXTENSION_SUBSTITUTES.get(specifierExtension) ?? []).map((extension) => `${stem}${extension}`),
+    ];
     imported.push(...candidates.filter((candidate) => knownPaths.has(candidate)));
   }
   return imported.filter((candidate) => knownPaths.has(candidate));
@@ -508,9 +546,9 @@ function reachable(start: Iterable<string>, edges: ReadonlyMap<string, readonly 
  * `.claude/CLAUDE.md` 12. szekció).
  *
  * - Közvetlen író: a Playwright `use` képernyőkép és videó opciója, a
- *   kontextus videó felvétele, a trace képernyőképei, a CLI a shell vagy a
- *   `package.json` scriptből (`isShellCapture`), vagy a lemezre író
- *   képösszehasonlító assertion.
+ *   kontextus videó felvétele, a trace képernyőképei, a CLI a shell parancsból
+ *   vagy a `package.json` scriptből (`isShellCapture`), vagy a képernyőképet
+ *   készítő képösszehasonlító assertion.
  * - A KÉPERNYŐKÉP KÖR: a képernyőképet készítő fájlok, és minden fájl, ami
  *   ezeket (közvetve is) importálja. Ezek egyike sem hivatkozhat lemezre
  *   írni képes modulra vagy hívásra, és a `path` opciót sem használhatja:
@@ -548,7 +586,7 @@ function findScreenshotDiskWriters(trackedPaths: readonly string[], read: ReadTr
       CONTEXT_VIDEO_PATTERN.test(file.content) ||
       TRACE_OPTION_PATTERN.test(file.content) ||
       SCREENSHOTS_OPTION_PATTERN.test(file.content) ||
-      SNAPSHOT_ASSERTION_PATTERN.test(file.content) ||
+      file.content.includes(SCREENSHOT_ASSERTION_CALL) ||
       (isShellPath(file.trackedPath) && isShellCapture(file.content)),
   );
   const directManifests = manifests.filter((manifest) => manifest.scriptValues.some((value) => isShellCapture(value)));
@@ -773,6 +811,7 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
     // listától független literállal: egy kiterjesztés kivétele bármelyik
     // listából ezen a ponton bukik (független ellenőrzés, 2026-09-25).
     const everyCodeExtension = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+    const everyShellExtension = ['.sh', '.bash', '.yml', '.yaml'];
     const cases: readonly {
       readonly name: string;
       readonly files: readonly CodeFile[];
@@ -821,17 +860,112 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
         offenders: ['e2e/save.ts'],
       },
       {
-        name: 'író segédfüggvény workspace csomagban',
+        name: 'író segédfüggvény eszköz workspace csomagban',
         files: [
-          { trackedPath: 'packages/io/package.json', content: JSON.stringify({ name: '@x/io' }) },
-          { trackedPath: 'packages/io/src/index.ts', content: `export { save } from './save/save.ts';` },
+          { trackedPath: 'tooling/io/package.json', content: JSON.stringify({ name: '@x/io' }) },
+          { trackedPath: 'tooling/io/src/index.ts', content: `export { save } from './save/save.ts';` },
           {
-            trackedPath: 'packages/io/src/save/save.ts',
+            trackedPath: 'tooling/io/src/save/save.ts',
             content: `${fsImport('writeFileSync')}export const save = writeFileSync;`,
           },
           { trackedPath: 'e2e/a.ts', content: `import { save } from '@x/io';\nsave('x.jpg', ${call});` },
         ],
-        offenders: ['packages/io/src/save/save.ts'],
+        offenders: ['tooling/io/src/save/save.ts'],
+      },
+      // 2026-09-25: a független ellenőrzés három jóhiszemű rése (a JavaScript
+      // kiterjesztésű import TypeScript párja, a GitHub Actions YAML, a
+      // `playwright` szó nélküli trace kapcsoló), és a hatókör: a termékkód
+      // csak Playwright importtal vizsgált, a teszt fájlja mindig.
+      {
+        name: 'író segédfüggvény .js és .mjs végű importtal a TypeScript párjára',
+        files: [
+          { trackedPath: 'e2e/save.ts', content: `${fsImport('writeFileSync')}export const save = writeFileSync;` },
+          { trackedPath: 'e2e/a.ts', content: `import { save } from './save.js';\nsave('x.jpg', ${call});` },
+          { trackedPath: 'e2e/b-save.mts', content: `${fsImport('writeFileSync')}export const save = writeFileSync;` },
+          { trackedPath: 'e2e/b.mts', content: `import { save } from './b-save.mjs';\nsave('x.jpg', ${call});` },
+        ],
+        offenders: ['e2e/b-save.mts', 'e2e/save.ts'],
+      },
+      {
+        name: 'a CLI trace kapcsolója GitHub Actions workflow és composite action lépésben',
+        files: [
+          {
+            trackedPath: '.github/workflows/e2e.yml',
+            content: `      - run: bun x playwright test --${TRACE_WORD} on`,
+          },
+          {
+            trackedPath: '.github/actions/e2e/action.yaml',
+            content: `    - run: bun run test:e2e -- --${TRACE_WORD}=retain-on-failure\n      shell: bash`,
+          },
+        ],
+        offenders: ['.github/actions/e2e/action.yaml', '.github/workflows/e2e.yml'],
+      },
+      {
+        name: 'a trace kapcsoló egy script továbbadásában, a playwright szó nélkül',
+        files: [
+          {
+            trackedPath: 'apps/web/package.json',
+            content: JSON.stringify({ scripts: { e2eTrace: `bun run test:e2e -- --${TRACE_WORD}=on` } }),
+          },
+          { trackedPath: 'tools/e2e.sh', content: `bun run test:e2e -- --${TRACE_WORD} on` },
+        ],
+        offenders: ['apps/web/package.json', 'tools/e2e.sh'],
+      },
+      {
+        name: 'a termékkód teszt fájlja és Playwrightot importáló fájlja vizsgált',
+        files: [
+          writerCase('packages/x/src/a/a.spec.ts'),
+          writerCase('apps/web/src/b/b.spec.tsx'),
+          {
+            trackedPath: 'packages/x/src/shot/shot.ts',
+            content: `import { chromium } from 'playwright';\n${fsImport('writeFileSync')}writeFileSync('x.jpg', ${call});`,
+          },
+          {
+            trackedPath: 'apps/server/src/video/video.ts',
+            content: `import { test } from '@playwright/test';\ntest.use({ ${VIDEO_WORD}: 'on' });`,
+          },
+        ],
+        offenders: [
+          'apps/server/src/video/video.ts',
+          'apps/web/src/b/b.spec.tsx',
+          'packages/x/src/a/a.spec.ts',
+          'packages/x/src/shot/shot.ts',
+        ],
+      },
+      {
+        name: 'jogos: a termékkód kulcsai, képernyőkép említése és fájlírása Playwright import nélkül, szöveges pillanatkép unit tesztben',
+        files: [
+          {
+            trackedPath: 'packages/logger/src/level/level.ts',
+            content: `export const levels = { ${TRACE_WORD}: 10 };`,
+          },
+          {
+            trackedPath: 'packages/core/src/media/media.ts',
+            content: `export const media = { ${VIDEO_WORD}: ['${VIDEO_WORD}/mp4'], image: ['image/${PNG_EXTENSION}'] };`,
+          },
+          {
+            trackedPath: 'packages/core/src/index.ts',
+            content: `// a page.${SCREENSHOT_WORD}() képe nem ide tartozik\nexport { media } from './media/media.ts';`,
+          },
+          {
+            trackedPath: 'packages/tool/src/kind/kind.ts',
+            content: `import { media } from '@x/core';\nexport const kind = { name: '${SCREENSHOT_WORD}', path: '/x' };`,
+          },
+          {
+            trackedPath: 'packages/db/src/open/open.ts',
+            content: `${fsImport('writeFileSync')}import { kind } from '../../../tool/src/kind/kind.ts';\nexpect(kind).toMatch${SNAPSHOT_WORD}();`,
+          },
+          { trackedPath: 'packages/core/package.json', content: JSON.stringify({ name: '@x/core' }) },
+          {
+            trackedPath: 'packages/core/src/media/media.spec.ts',
+            content: `import { media } from './media.ts';\nexpect(media).toMatch${SNAPSHOT_WORD}();`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/pixel.spec.ts',
+            content: `import { kind } from '../../../packages/tool/src/kind/kind.ts';\nconst buffer = ${call};`,
+          },
+        ],
+        offenders: [],
       },
       {
         name: 'a képet visszaadó függvény importálója ír',
@@ -1224,36 +1358,15 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
     const pngCall = `await page.${SCREENSHOT_WORD}();\nconst name = 'x.${PNG_EXTENSION}';`;
     expect(
       checkSyntheticFiles(findPngScreenshotFiles, [
-        ...[...everyCodeExtension, '.sh', '.bash'].map((extension) => ({
+        ...[...everyCodeExtension, ...everyShellExtension].map((extension) => ({
           trackedPath: `e2e/a${extension}`,
           content: pngCall,
         })),
         { trackedPath: SANCTIONED_CAPTURE_FILE, content: pngCall },
         { trackedPath: 'e2e/only-call.ts', content: `await page.${SCREENSHOT_WORD}();` },
         { trackedPath: 'e2e/only-name.ts', content: `const name = 'x.${PNG_EXTENSION}';` },
+        { trackedPath: 'packages/core/src/media/media.ts', content: pngCall },
       ]),
-    ).toEqual([...everyCodeExtension, '.sh', '.bash'].map((extension) => `e2e/a${extension}`));
+    ).toEqual([...everyCodeExtension, ...everyShellExtension].map((extension) => `e2e/a${extension}`));
   });
-
-  it('(8) az őrző blokkok szövege a rögzített lenyomatú (a leírás blokkon belüli ellenőrzés)', () => {
-    const source = readTrackedFile(repoRoot(), SELF_FILE);
-    const hash = createHash('sha256');
-    for (const [startMarker, endMarker] of GUARD_BLOCK_MARKERS) {
-      const start = source.indexOf(startMarker);
-      expect(start, startMarker).toBeGreaterThanOrEqual(0);
-      expect(source.lastIndexOf(startMarker), startMarker).toBe(start);
-      hash.update(source.slice(start, source.indexOf(endMarker, start) + endMarker.length));
-    }
-    expect(hash.digest('hex')).toBe(GUARD_BLOCKS_SHA256);
-  });
-});
-
-it('(9) az őrző blokkok szövege a rögzített lenyomatú (a leírás blokkon kívüli, a (8)-tól független ellenőrzés)', () => {
-  const source = readTrackedFile(repoRoot(), SELF_FILE);
-  const blocks = GUARD_BLOCK_MARKERS.map(([startMarker, endMarker]) => {
-    const [, block = '', ...rest] = source.split(startMarker);
-    expect(rest, startMarker).toEqual([]);
-    return `${startMarker}${block.slice(0, block.indexOf(endMarker) + endMarker.length)}`;
-  });
-  expect(createHash('sha256').update(blocks.join('')).digest('hex')).toBe(GUARD_BLOCKS_SHA256);
 });

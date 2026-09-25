@@ -837,8 +837,10 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kinyitások egy részében a lista a hook nélkül elmozdult (két saját mérésben 9/80 és 7/80, mind -36
   pixel, kikapcsolva 0/80, minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött; egy
   független ellenőrzés 5/80-at mért, köztük egy -574 pixeles teljes elrántást, tehát a "mind -36"
-  nem általános). A -36 a gomb sáv magassága volt: a sáv helyének fenntartása óta bekapcsolt
-  rögzítéssel is 0/80 (research 19. szekció). A listán ezért `overflow-anchor: none` áll
+  nem általános). A -36 a gomb akkori sávjának magassága volt: a sáv helyének fenntartásával
+  (`1c7dd13`) bekapcsolt rögzítéssel is 0/80 lett (research 19. szekció). Az ugrás gomb azóta
+  saját sáv nélkül, a lista fölött lebeg, és a megjelenése a listát nem mozdítja (research 20.
+  szekció). Az elmozdulás miatt a listán `overflow-anchor: none` áll
   (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A jelenség fázisfüggő, időzítő nélküli
   lépéssorral nem állítható elő (hat érkezési mód, 0/120); a védelem ezért KIZÁRÓLAG a
   konfigurációt őrzi: az e2e a lista kiszámított `overflow-anchor` értékét ellenőrzi. A korábbi,
@@ -860,8 +862,8 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kötődött, a fájl ezért soros volt, de `--repeat-each 3` mellett három worker egyszerre futtatta a
   fájl három példányát, és `EADDRINUSE` jött. Ma minden teszt szervere az operációs rendszer által
   kiosztott szabad porton figyel, és a lap kérését a `route.continue({ url })` irányítja rá (Node
-  `server.listen(0)`, Playwright `route.continue`); `--repeat-each 3` mellett három workerrel
-  231/231 zöld (research 19. szekció).
+  `server.listen(0)`, Playwright `route.continue`); `--repeat-each 3` mellett három workerrel a
+  fájl minden tesztje zöld, nulla `EADDRINUSE` (legutóbb 279/279, 93 teszt, research 20. szekció).
 - **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
   pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
@@ -886,12 +888,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A fenti védelem 2026-09-15-ig KIZÁRÓLAG SZÖVEGES volt**, és egy független ellenőrzés jogosan
   mondta ki, hogy semmi nem buktatja el azt a munkamenetet, ami megint saját, eldobható scriptet ír
   saját, éltelen fixtúrával. A **gépi** védelem neve
-  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: kilenc invariáns a
+  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hét invariáns a
   `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
   **Hatókör (user döntés 2026-09-25):** a védelem kizárólag a repóba commitolt forráskódot
   olvassa a `test` kapun, és csak a böngésző képernyőkép, a videó és a trace kép lemezre írását
   tiltja a saját teszt- és segédkódunkban; a termék futását, az agentek fájlírását (az Agent SDK
-  eszközeivel, futásidőben) és a termékkód egyéb fájlírását nem érinti. Ha egyszer egy
+  eszközeivel, futásidőben) és a termékkód egyéb fájlírását nem érinti. A megvalósításban: a
+  termékkód (a `packages/*/src` és az `apps/*/src` nem teszt fájlja) csak akkor vizsgált, ha
+  Playwright csomagot importál; minden más commitolt kód (teszt, e2e, config, eszköz, shell
+  script, GitHub Actions YAML, `package.json` script) vizsgált. Ha egyszer egy
   termékfunkció maga készít és ment böngésző képernyőképet (például weboldalt fényképező agent
   eszköz), arra kifejezett, user által jóváhagyott kivétel kell. Amit fog: a
   szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
@@ -907,7 +912,9 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `/tmp` alatti script kimenetét egyetlen repón belüli kapu sem látja; a védelem azt zárja ki, hogy
   a hiba ÉSZREVÉTLENÜL visszatérjen, nem azt, hogy valaki szándékosan hamisítson. Ez a két tétel
   a védelem ELVI korlátja, felhasználói döntés szerint elfogadva (2026-09-15): gépi kényszert nem
-  építünk rájuk.
+  építünk rájuk. **Harmadik elvi korlát (2026-09-25, ugyanerre a mintára):** a védelmet adó teszt
+  saját gyengítése (a fájllista szűrése, egy invariáns kihagyása, egy segédfüggvény megrontása)
+  code review kérdés; gépi önvédelmet nem építünk rá, lásd a hetedik bejegyzést.
   Forrás: felhasználói kérés 2026-09-15, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
 - **A gépi kényszer első alakjának három MÉRT rése, mind javítva (2026-09-15).** Egy független
   ellenőrzés a fenti hat invariánson át tudott vinni egy rontó scriptet, három okból: a vizsgált
@@ -963,7 +970,8 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   maradt zöld (`{ mode: 'on-first-retry', screenshots: false }`; `retries: 0` mellett nem is
   rögzített; 2026-09-25 óta `'off'`, lásd a hatodik bejegyzést). A hetedik invariáns akkor
   harmincnégy esetet futtatott, és egy új, nyolcadik invariáns a saját forrásából ellenőrizte,
-  hogy az (1) törzse a hetedik által igazolt függvényt futtatja a commitolt fán. Igazolva: mind az
+  hogy az (1) törzse a hetedik által igazolt függvényt futtatja a commitolt fán (2026-09-25 óta
+  törölve, lásd a hetedik bejegyzést). Igazolva: mind az
   öt kerülő út (a trace két alakkal, hat injekció) egyenként a `test` kapun bukott (1/8), a régi
   alakon mind zöld volt (7/7); harminchárom gyengítés (a független ellenőrzés öt nem fogott
   gyengítésével és az akkori lezárások gyengítéseivel együtt) mind bukott a hetedik invariánson,
@@ -985,10 +993,12 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   állítás elhagyása vagy szűrése (a (8) csak részsztringet keresett), a (2) és a (8)
   semlegesítése, egy kiterjesztés kivétele a listából, a `require` import-él törlése és a
   kivétel lista bővítése. A javítás: az (1), (2), (7), (8) invariáns és a leírás blokk fejlécének
-  szövege lenyomattal rögzített, amit a (8) a leírás blokkon belül, egy új, kilencedik invariáns
-  azon kívül, független kóddal számol, így egyik kihagyása sem marad észrevétlen; a
-  kiterjesztés listák, az import-él minta és a kivétel lista gyengítése a hetedik invariáns
-  esetein bukik. Mérve: a harmincöt egy pontú gyengítés mind bukik, AST elemzés egyikhez sem
+  szövege lenyomattal rögzített lett, amit a (8) a leírás blokkon belül, egy új, kilencedik
+  invariáns azon kívül, független kóddal számolt; a kiterjesztés listák, az import-él minta és a
+  kivétel lista gyengítése a hetedik invariáns esetein bukik. **Pontosítás (2026-09-25):** az
+  akkori "egyik kihagyása sem marad észrevétlen" állítás hamis volt: a lenyomat csak a rögzített
+  blokkokat fedte, tehát például a (6) kihagyása és a segédfüggvényeken át végzett gyengítés
+  észrevétlen maradt; a (8) és a (9) azóta törölve, lásd a hetedik bejegyzést. Mérve: a harmincöt egy pontú gyengítés mind bukik, AST elemzés egyikhez sem
   kellett; a kilenc injekció az (1)-en bukik, a régi alakon közülük hét zöld volt, kettőt azon nem
   futtattunk (`docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 6. szekció). **Pontosítás:**
   a `741f63e` óta használt "a formátumtól és az írás módjától függetlenül" megfogalmazás túlzó volt;
@@ -1002,9 +1012,31 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   (`Object.fromEntries`, számított kulcs), a modulnév összerakása vagy sablon literálja
   (``import(`node:fs`)``, ``process.getBuiltinModule(`fs`)``), a Node beépített moduljain kívüli
   író csomag, az SQLite BLOB mező, és a kép becsempészése a lefedettségi fixtúra JSON kimenetébe.
-  Ezek elkapásához AST vagy adatfolyam elemzés kellene. A (8) és (9) lenyomatának kézi átírása egy
-  blokk gyengítésével együtt ugyanolyan tudatos lépés, mint a manifeszt két lenyomatáé. Forrás:
-  `tooling/scripts` CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce és a (7) esetei.
+  Ezek elkapásához AST vagy adatfolyam elemzés kellene. Forrás: `tooling/scripts` CLAUDE.md
+  `## Fájlok` táblázat, a spec fájl fejléce és a (7) esetei.
+- **A hetedik rendezés: a hatókör a megvalósításban, a lenyomat törlése, három jóhiszemű rés
+  (2026-09-25).** Egy független ellenőrzés a `0bf5685` után mérte, hogy a hatókör mondata hű, a
+  megvalósítás nem: a kapu minden commitolt kódfájlt olvasott, a termékkódot is, és ártatlan
+  termékbeli alakok bukást adtak (egy naplózási szint `trace` kulcsa, egy MIME térkép `video`
+  kulcsa, egy Vitest pillanatkép assertion, egy `'screenshot'` literál, egy kommentben álló
+  képernyőkép hívás; az utolsó a mérésünkben 31 fájlt jelölt meg). A javítás: a termékkód csak
+  Playwright importtal vizsgált (a pontos határ a második bejegyzésben), és a pillanatkép
+  assertion (`toMatchSnapshot`) író minta lett, nem közvetlen: egy unit teszt szöveges
+  pillanatképe nem jelez, a képernyőkép körben viszont bukik. **Kimondott következmény:** egy
+  termékcsomag író függvénye, amit egy teszt a képével hív, nem látszik, mert a termékkód
+  fájlírása a hatókörön kívül esik. Három jóhiszemű rés bezárva: a GitHub Actions YAML (`.yml`,
+  `.yaml`) shell parancsként vizsgált (egy `playwright test --trace on` workflow lépés
+  átcsúszott); a nem `off` értékű `--trace` kapcsoló a `playwright` szó nélkül is tiltott (egy
+  `bun run test:e2e -- --trace=on` script átcsúszott); a `.js` végű relatív import a TypeScript
+  párjára is feloldódik, a telepített Playwright betöltő sorrendjében. **A (8) és a (9)
+  törölve:** egy komment, egy átnevezés vagy egy új jogos (7) eset is bukást adott, az üzenet
+  csak egy lenyomat volt teendő nélkül, a jogos javítás és a gyengítés ugyanaz a lépés volt (a
+  lenyomat bemásolása), és a segédfüggvényeken át nem is védett (öt saját gyengítés zöld
+  maradt). A (7) marad a viselkedés önellenőrzése; a teszt saját gyengítése code review kérdés
+  (harmadik elvi korlát, a második bejegyzésben). Mérve: a hat hamis pozitív injekció a régi
+  alakon mind bukott, az újon mind zöld; a korábbi tizennyolc kerülő út és a három új rés az (1)
+  invariánson bukik, a három új rés a régi alakon zöld volt; az új kód nyolc egy pontú
+  gyengítése a (7)-en bukik. Forrás: `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 7. szekció, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
