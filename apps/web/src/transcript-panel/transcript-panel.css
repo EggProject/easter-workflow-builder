@@ -18,21 +18,45 @@
   gap: var(--ep-space-2);
 }
 
-.transcript-panel__header {
+/* A lista kerete: a lebegő "ugrás az aljára" gomb pozicionálási doboza. A
+   lista (`react-window` `List`, inline `flex-grow: 1`) kitölti, egész pixelre
+   lefelé kerekítve (`TranscriptPanel.tsx`), tehát a keret doboza a lista
+   doboza, legfeljebb egy pixel eltéréssel: a gomb a lista aljához igazodik
+   akkor is, ha a transcript panel az elválasztó `End` állásában a
+   tartalmánál kisebb, és a keret az egy sornyi minimumán túllóg rajta. */
+.transcript-panel__list-frame {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ep-space-2);
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
-/* Az "ugrás az aljára" gomb helye előre fenntartva (user döntés 2026-09-25,
-   SPEC-008 7.4): új esemény nélkül a gomb a helyén marad, csak nem látszik.
-   A `visibility: hidden` a dobozt megtartja, tehát a gomb megjelenése nem
-   mozdítja a lista tartalmát; a rejtett elem nem fókuszálható, és kimarad a
-   hozzáférhetőségi fából. A sáv magassága a design system `.btn--sm`
-   gombjáé, kitalált szám nélkül. */
-.transcript-panel__jump--idle {
-  visibility: hidden;
+/* Az "ugrás az aljára" gomb a lista fölött lebeg (user döntés 2026-09-25,
+   SPEC-008 7.4). SAJÁT KIEGÉSZÍTÉS: a design systemben nincs lista fölé
+   lebegő gomb, a gomb maga a design system `Button`-ja (`secondary`, `sm`),
+   csak az elhelyezése saját. A lista ALJÁN, középen áll, a keret belső
+   térközével (`--ep-space-2`): az új sorok alul érkeznek, a gomb oda visz, és
+   az alatta álló sor lefelé görgetve a gomb fölé kerül, a lista aljára érve
+   pedig a gomb eltűnik; a lista tetején a gomb alatti sort semmilyen görgetés
+   nem szabadítaná ki (mérés: research 20. szekció). Középre `inset-inline` és
+   `margin-inline: auto` igazít, nem `transform`, mert a design system
+   `.btn:active` szabálya a `transform` értéket lenyomáskor felülírja. A
+   `z-index: 1` a lista `position: relative` gyökere és az abszolút
+   pozicionált sorai fölé emeli: a CSS 2 E. függeléke szerint az `auto`
+   rétegű pozicionált elemek fa sorrendben, a pozitív rétegűek utánuk
+   festődnek (<https://www.w3.org/TR/CSS2/zindex.html>), a gomb pedig a DOM-ban
+   a lista előtt áll. Az árnyék a design system saját lebegő elemének, a
+   toastnak a tokenje (`toast.css`: `--ep-shadow-lg`); a gomb háttere és
+   szövege a `.btn--secondary` tokenjei, mindkét témában. */
+.transcript-panel__jump {
+  position: absolute;
+  bottom: var(--ep-space-2);
+  inset-inline: 0;
+  z-index: 1;
+  width: max-content;
+  margin-inline: auto;
+  box-shadow: var(--ep-shadow-lg);
 }
 
 /* A delta kapcsoló mondata (T-009-26) ugyanaz a halvány kis szöveg
@@ -52,7 +76,7 @@
    pozíción; bekapcsolva az "ugrás az aljára" utáni első kinyitásnál a kinyitott
    sor 1-3 képkockára elugrott (mérés és forrás:
    `docs/research/2026-09-23-transcript-panel-meresek.md` 17. szekció). A
-   lista minimuma egy összecsukott sor, inline stílusként a
+   lista kereten át a minimuma egy összecsukott sor, inline stílusként a
    `TranscriptPanel.tsx` fájlban, a sormagasság egyetlen forrásából
    (`collapsed-transcript-row-height.ts`). */
 .transcript-panel__list {

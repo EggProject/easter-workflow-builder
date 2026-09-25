@@ -213,10 +213,10 @@
    Az `overflow: auto` (2026-09-25 óta, korábban `hidden`) a design system
    saját modellje a minimumánál kisebb tartalomra: a `.resizable-panel`
    forrás szabálya `min-height: 60px` és `overflow: auto`, tehát ami a panel
-   minimumán nem fér el, az görget, nem vágódik le. A transcript fix részei
-   (a delta kapcsoló mondata és az ugrás gomb sávja) és a lista egy sornyi
-   minimuma (`TranscriptPanel.tsx`) az elválasztó `End` állásában a 60 pixeles
-   panelnél magasabbak; itt görgetve a lista, benne az utolsó sor, teljesen
+   minimumán nem fér el, az görget, nem vágódik le. A transcript fix része
+   (a delta kapcsoló mondata; az ugrás gomb a lista fölött lebeg) és a lista
+   egy sornyi minimuma (`TranscriptPanel.tsx`) az elválasztó `End` állásában a
+   60 pixeles panelnél magasabbak; itt görgetve a lista, benne az utolsó sor, teljesen
    elérhető. Nagyobb panelben a tartalom kitölti, és nincs mit görgetni
    (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció). */
 .run-view-screen__transcript-content {

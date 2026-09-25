@@ -29,9 +29,18 @@
 // `anchoring` jelenet ismétléseinek száma beállításonként, alapból 20, illetve
 // 10), `MEASURE_OVERFLOW_ANCHOR` (ha `auto`, a lista `overflow-anchor`
 // értékét a mérés idejére visszaállítja, így a böngésző görgetés rögzítése
-// mérhető, research 17. és 18. szekció).
+// mérhető, research 17. és 18. szekció), `MEASURE_JUMP_PLACEMENT` (ha `top`,
+// a lebegő "Ugrás az aljára" gombot a mérés idejére a lista aljáról a
+// tetejére teszi, így a két hely takarása összevethető, research 20.
+// szekció).
 import type { Server } from 'node:http';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import {
+  APPROVAL_RUN_URL,
+  APPROVAL_TRANSCRIPT_ROW_COUNT,
+  manyApprovals,
+  mockApprovalRunWithTranscript,
+} from '../e2e/approval-fixture.ts';
 import {
   captureEventSources,
   deliverFrameOnMeasuredCommit,
@@ -42,6 +51,7 @@ import {
   lastRowBottomOverflow,
   openFollowingTranscript,
   REPLAYED_ROW_COUNT,
+  rowsUnderJumpButton,
   TABBED_LAYOUT,
   textDeltaTransientFrame,
   transcriptList,
@@ -108,6 +118,11 @@ async function open(
   const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, replayedRowCount);
   if (process.env['MEASURE_OVERFLOW_ANCHOR'] === 'auto') {
     await page.addStyleTag({ content: '.transcript-panel__list { overflow-anchor: auto !important; }' });
+  }
+  if (process.env['MEASURE_JUMP_PLACEMENT'] === 'top') {
+    await page.addStyleTag({
+      content: '.transcript-panel__jump { top: var(--ep-space-2) !important; bottom: auto !important; }',
+    });
   }
   return { streamServer, list: transcriptList(page) };
 }
@@ -736,6 +751,10 @@ for (const { name, layout } of LAYOUTS) {
       await animationFrames(page, 10);
       const after = await listGeometry(list, rowCount);
       const buttonBottom = await jump.evaluate((element) => element.getBoundingClientRect().bottom);
+      const listVisibleBottom = await list.evaluate(
+        (element) => element.getBoundingClientRect().top + element.clientTop + element.clientHeight,
+      );
+      const covered = await rowsUnderJumpButton(list, jump);
       report('gombsav', {
         layout: name,
         theme,
@@ -744,6 +763,9 @@ for (const { name, layout } of LAYOUTS) {
         headerVisibleBefore: round(before?.headerVisible),
         headerVisibleAfter: round(after?.headerVisible),
         listTopMinusButtonBottom: round((after?.listTop ?? NaN) - buttonBottom),
+        listVisibleBottomMinusButtonBottom: round(listVisibleBottom - buttonBottom),
+        rowsUnderButton: covered.map((row) => row.position),
+        unreachableRowsUnderButton: covered.filter((row) => !row.isReachableByScrolling).map((row) => row.position),
         button: await jumpButtonText(page),
       });
     });
@@ -775,6 +797,9 @@ for (const { name, layout } of LAYOUTS) {
         const headerTopBefore = expanded?.headerTop;
         const deltas: (number | undefined)[] = [];
         const buttons: (string | undefined)[] = [];
+        const covered: (readonly number[])[] = [];
+        const unreachable: (readonly number[])[] = [];
+        const jump = page.getByRole('button', { name: /Ugrás az aljára/ });
         let rowCount = SHORT_REPLAYED_ROW_COUNT;
         for (let arrival = 1; arrival <= 12; arrival += 1) {
           streamServer.push(textDeltaTransientFrame(`Rövid lista ${String(arrival)}`));
@@ -784,16 +809,170 @@ for (const { name, layout } of LAYOUTS) {
           const geometry = await listGeometry(list, target.position);
           deltas.push(round((geometry?.headerTop ?? NaN) - (headerTopBefore ?? NaN)));
           buttons.push(await jumpButtonText(page));
+          const rows = (await jump.count()) > 0 ? await rowsUnderJumpButton(list, jump) : [];
+          covered.push(rows.map((row) => row.position));
+          unreachable.push(rows.filter((row) => !row.isReachableByScrolling).map((row) => row.position));
         }
         report('rovid-lista', {
           layout: name,
           theme,
           target: target.label,
+          placement: process.env['MEASURE_JUMP_PLACEMENT'] ?? 'bottom',
           deltas,
           buttons,
+          rowsUnderButton: covered,
+          unreachableRowsUnderButton: unreachable,
           lastRowOverflow: round(await lastRowBottomOverflow(list, rowCount)),
         });
       });
     }
   }
+}
+
+// ------------------------------------------------------------
+// 10. A lista magassága új esemény nélkül (research 20. szekció): a lista
+//     doboza és a transcript panelé az ablakban, a követő (az alján álló)
+//     listán. A gomb sáv fenntartása (`1c7dd13`) ezt a lista fölötti
+//     sávval csökkentette.
+// ------------------------------------------------------------
+for (const { name, layout } of LAYOUTS) {
+  for (const theme of THEMES) {
+    test(`lista-magassag ${name} ${theme}`, async ({ page }) => {
+      const { list } = await open(page, theme, layout);
+      await animationFrames(page, 10);
+      const geometry = await list.evaluate((element) => {
+        const panel = element.closest('.transcript-panel');
+        const listBox = element.getBoundingClientRect();
+        const panelBox = panel?.getBoundingClientRect();
+        return {
+          listHeight: listBox.height,
+          listClientHeight: element.clientHeight,
+          panelHeight: panelBox?.height,
+          listTopMinusPanelTop: panelBox === undefined ? undefined : listBox.top - panelBox.top,
+          listBottomMinusPanelBottom: panelBox === undefined ? undefined : listBox.bottom - panelBox.bottom,
+        };
+      });
+      report('lista-magassag', {
+        layout: name,
+        theme,
+        listHeight: round(geometry.listHeight),
+        listClientHeight: geometry.listClientHeight,
+        panelHeight: round(geometry.panelHeight),
+        listTopMinusPanelTop: round(geometry.listTopMinusPanelTop),
+        listBottomMinusPanelBottom: round(geometry.listBottomMinusPanelBottom),
+        button: await jumpButtonText(page),
+      });
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// 11. A lebegő gomb takarása felgörgetett listán (research 20. szekció):
+//     20 + 10 sor, kézzel (egérkerékkel) a lista tetejére, majd egy új sor,
+//     és a gomb megjelenik. Mérve a gomb alatti sorok, és hogy görgetéssel
+//     kiszabadíthatók-e; utána a legfelső takart sor kiszabadítása
+//     egérkerékkel, és a sor helye a gombhoz és a lista látható területéhez
+//     képest (negatív `rowBottomMinusButtonTop`: a sor a gomb fölött áll).
+// ------------------------------------------------------------
+for (const { name, layout } of LAYOUTS) {
+  for (const theme of THEMES) {
+    test(`takaras ${name} ${theme}`, async ({ page }) => {
+      const { streamServer, list } = await open(page, theme, layout);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      await list.hover();
+      await page.mouse.wheel(0, -100_000);
+      await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+      streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+      const jump = page.getByRole('button', { name: /Ugrás az aljára/ });
+      await expect(jump).toBeVisible();
+      await animationFrames(page, 10);
+      const covered = await rowsUnderJumpButton(list, jump);
+      const [first] = covered;
+      let freed: Readonly<Record<string, unknown>> = {};
+      if (first !== undefined) {
+        await list.hover();
+        await page.mouse.wheel(0, Math.ceil(first.shiftAbove));
+        await animationFrames(page, 20);
+        const buttonBox = await jump.boundingBox();
+        const buttonTop = buttonBox?.y;
+        const row = await list.evaluate((element, position) => {
+          const item = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
+          const visibleTop = element.getBoundingClientRect().top + element.clientTop;
+          const box = item?.getBoundingClientRect();
+          return {
+            top: box?.top,
+            bottom: box?.bottom,
+            visibleTop,
+            visibleBottom: visibleTop + element.clientHeight,
+          };
+        }, first.position);
+        freed = {
+          freedRow: first.position,
+          rowBottomMinusButtonTop: round((row.bottom ?? NaN) - (buttonTop ?? NaN)),
+          rowTopMinusVisibleTop: round((row.top ?? NaN) - row.visibleTop),
+          rowBottomMinusVisibleBottom: round((row.bottom ?? NaN) - row.visibleBottom),
+          buttonAfterWheel: await jumpButtonText(page),
+        };
+      }
+      report('takaras', {
+        layout: name,
+        theme,
+        placement: process.env['MEASURE_JUMP_PLACEMENT'] ?? 'bottom',
+        rowsUnderButton: covered.map((row) => row.position),
+        unreachableRowsUnderButton: covered.filter((row) => !row.isReachableByScrolling).map((row) => row.position),
+        ...freed,
+      });
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// 12. Tört listamagasság a jóváhagyás panel mellett (research 20. szekció):
+//     a húzható elválasztó százalékos felosztása tört magasságot adhat a
+//     listának, a böngésző görgetési tartománya viszont egész pixelre
+//     kerekít. Mérve a lista doboza, a `clientHeight`, a legnagyobb
+//     `scrollTop`, és a lista végére görgetve az utolsó sor alja a lista
+//     dobozának alja alatt (pozitív: ennyi nem látszik belőle), a kezdő
+//     állásban, három méreten.
+// ------------------------------------------------------------
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1440, height: 600 },
+  { width: 375, height: 812 },
+] as const) {
+  test(`tort-magassag ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mockApprovalRunWithTranscript(page, manyApprovals(1));
+    await page.goto(APPROVAL_RUN_URL);
+    if (viewport.width < 768) {
+      await page.getByRole('tab', { name: 'Transcript' }).click();
+    }
+    const list = transcriptList(page);
+    await expect(list.getByRole('listitem').first()).toBeVisible();
+    await list.evaluate((element) => {
+      element.scrollTo({ top: element.scrollHeight });
+    });
+    await animationFrames(page, 10);
+    // Az utolsó sor alja a lista DOBOZÁNAK aljához mérve: a `clientHeight`
+    // egész pixelre kerekített, tehát a tört magasság fél pixelét nem mutatja.
+    const geometry = await list.evaluate((element, position) => {
+      const row = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
+      const box = element.getBoundingClientRect();
+      return {
+        height: box.height,
+        clientHeight: element.clientHeight,
+        maxScrollTop: element.scrollTop,
+        lastRowBelowBox: row === null ? undefined : row.getBoundingClientRect().bottom - box.bottom,
+      };
+    }, APPROVAL_TRANSCRIPT_ROW_COUNT);
+    report('tort-magassag', {
+      viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+      listHeight: round(geometry.height),
+      clientHeight: geometry.clientHeight,
+      maxScrollTop: geometry.maxScrollTop,
+      lastRowBelowBox: round(geometry.lastRowBelowBox),
+    });
+  });
 }

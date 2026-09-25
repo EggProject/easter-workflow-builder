@@ -162,19 +162,27 @@ describe('TranscriptPanel', () => {
   }
 
   /**
-   * Az "ugrás az aljára" gomb: a sávja mindig a helyén áll, a gomb új esemény
-   * nélkül rejtett (`transcript-panel__jump--idle`).
+   * Az "ugrás az aljára" gomb, ha a DOM-ban van: a lista keretében, a lista
+   * előtt áll, és új esemény nélkül nincs kirajzolva.
    */
+  function queryJumpButton(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(':scope .transcript-panel__list-frame > button');
+  }
+
   function jumpButton(): HTMLButtonElement {
-    const element = container.querySelector<HTMLButtonElement>(':scope .transcript-panel__header button');
+    const element = queryJumpButton();
     if (element === null) {
       throw new Error('a teszt nem talált ugrás gombot');
     }
     return element;
   }
 
-  function isJumpButtonIdle(): boolean {
-    return jumpButton().classList.contains('transcript-panel__jump--idle');
+  function listFrame(): HTMLElement {
+    const element = container.querySelector<HTMLElement>(':scope .transcript-panel__list-frame');
+    if (element === null) {
+      throw new Error('a teszt nem talált lista keretet');
+    }
+    return element;
   }
 
   function statusTexts(): readonly (string | null)[] {
@@ -201,7 +209,7 @@ describe('TranscriptPanel', () => {
       expect(statusTexts()).toEqual(['Várakozás az első eseményre']);
       expect(container.querySelector('.transcript-panel__empty')).toBeNull();
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(isJumpButtonIdle()).toBe(true);
+      expect(queryJumpButton()).toBeNull();
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -214,7 +222,7 @@ describe('TranscriptPanel', () => {
       expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe('A futásnak nincs eseménye.');
       expect(statusTexts()).toEqual([]);
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(isJumpButtonIdle()).toBe(true);
+      expect(queryJumpButton()).toBeNull();
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -248,10 +256,11 @@ describe('TranscriptPanel', () => {
     }
   });
 
-  it('a lista legalább egy összecsukott sornyi magas, hogy az elválasztó End állásában is legyen hol látszania az utolsó sornak', () => {
+  it('a lista kerete legalább egy összecsukott sornyi magas, és a lista kitölti, hogy az elválasztó End állásában is legyen hol látszania az utolsó sornak', () => {
     renderPanel(transcriptOf(manyRecords(3), true));
 
-    expect(list().style.minHeight).toBe(`${String(COLLAPSED_TRANSCRIPT_ROW_HEIGHT)}px`);
+    expect(listFrame().style.minHeight).toBe(`${String(COLLAPSED_TRANSCRIPT_ROW_HEIGHT)}px`);
+    expect(list().parentElement).toBe(listFrame());
   });
 
   it('a sor React kulcsa a sor key mezője, nem a sorszáma: a kinyitott állapot a sorral marad, más sor nem örökli', () => {
@@ -315,25 +324,46 @@ describe('TranscriptPanel', () => {
       list().scrollTop = 0;
       list().dispatchEvent(new Event('scroll'));
     });
-    expect(isJumpButtonIdle()).toBe(true);
+    expect(queryJumpButton()).toBeNull();
 
     renderPanel(transcriptOf(manyRecords(23), true));
     expect(jumpButton().textContent).toBe('Ugrás az aljára (3 új esemény)');
-    expect(jumpButton().className).toBe('btn btn--secondary btn--sm');
+    expect(jumpButton().className).toBe('btn btn--secondary btn--sm transcript-panel__jump');
 
     act(() => {
       jumpButton().click();
     });
-    expect(isJumpButtonIdle()).toBe(true);
+    expect(queryJumpButton()).toBeNull();
   });
 
-  it('a gomb helye új esemény nélkül is fenntartva: a sáv a lista fölött áll, a gomb benne rejtett, tehát a megjelenése nem tolja el a listát (user döntés 2026-09-25)', () => {
+  it('a látható gomb fókuszálható, a hozzáférhetőségi fában a nevével áll, és a DOM-ban a lista előtt, tehát a Tab sorrendben a sorok előtt van', () => {
+    renderPanel(transcriptOf(manyRecords(20), true));
+    act(() => {
+      list().scrollTop = 10_000;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    act(() => {
+      list().scrollTop = 0;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    renderPanel(transcriptOf(manyRecords(21), true));
+
+    const button = jumpButton();
+    act(() => {
+      button.focus();
+    });
+    expect(document.activeElement).toBe(button);
+    expect(button.getAttribute('aria-hidden')).toBeNull();
+    expect(button.tabIndex).toBe(0);
+    expect(button.nextElementSibling).toBe(list());
+  });
+
+  it('új esemény nélkül nincs gomb és nincs sáv: a lista kerete a panel első eleme, benne csak a lista (user döntés 2026-09-25)', () => {
     renderPanel(transcriptOf(manyRecords(3), true));
 
-    const header = container.querySelector(':scope .transcript-panel > .transcript-panel__header');
-    expect(header?.nextElementSibling).toBe(list());
-    expect(jumpButton().className).toBe('btn btn--secondary btn--sm transcript-panel__jump--idle');
-    expect(jumpButton().textContent).toBe('Ugrás az aljára (0 új esemény)');
+    expect(container.querySelector('.transcript-panel')?.firstElementChild).toBe(listFrame());
+    expect([...listFrame().children]).toEqual([list()]);
+    expect(container.textContent).not.toContain('Ugrás az aljára');
   });
   it('ha a futás a részleges szöveget NEM tárolja, a fejlécben kimondja, hogy az csak élőben látszik (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', false);
@@ -345,11 +375,11 @@ describe('TranscriptPanel', () => {
     expect(statusTexts()).toEqual([]);
   });
 
-  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és a panel első eleme a gomb sávja (AC43)', () => {
+  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és a panel első eleme a lista kerete (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', true);
 
     expect(container.querySelector('.transcript-panel__delta-note')).toBeNull();
-    expect(container.querySelector('.transcript-panel')?.firstElementChild?.className).toBe('transcript-panel__header');
+    expect(container.querySelector('.transcript-panel')?.firstElementChild).toBe(listFrame());
     expect(container.textContent).not.toContain(DELTA_NOTE);
   });
 

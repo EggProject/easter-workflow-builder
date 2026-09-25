@@ -1570,3 +1570,29 @@ maradtak. A küszöb a mért értékre húzva, felfelé kerekítés nélkül: 99
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (99.11 / 98.58 / 99.47 / 99.07) mind a négy metrika `ERROR`
 sorral bukik (négy `ERROR`, exit 1).
+
+## 40. A lista fölött lebegő ugrás gomb utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Lista fölé kerüljön"): az "Ugrás az aljára" gomb a
+transcript lista alján, a tartalma fölött lebeg, a fenntartott sáv megszűnt
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 20. szekció). A `TranscriptPanel.tsx`
+feltételes osztálynév ága helyett a gomb feltételes kirajzolása áll (egy ág pár helyett egy ág
+pár). Az e2e készlet 343 tesztre bővült: a lebegő gomb alatti sor elérhetősége és a gomb
+billentyűzetes elérése két méreten két témában (4).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**343 teszt, mind zöld**; nyolc `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0); a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1655 / 1670     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 759 / 770       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1595 / 1610     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`transcript-panel` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb nem mozdul.

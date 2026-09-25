@@ -61,6 +61,7 @@ import {
   openFollowingTranscript,
   REPLAYED_ROW_COUNT,
   routeStreamToPort,
+  rowsUnderJumpButton,
   RUN_SNAPSHOT,
   runDetailWithStatus,
   SSE_RESPONSE_HEADERS,
@@ -1350,7 +1351,7 @@ test('az átmeneti sor ("Nem tárolt" jelvénnyel) pontosan olyan magas, mint a 
 // a lista tetejéhez mérve nem mozdulhat, és az "Ugrás az aljára" gomb a
 // kinyitás óta érkezett sorokat nevezi meg. A fejléc helye itt a lista
 // eleméhez mért; hogy maga a lista sem mozdul a gomb megjelenésekor (a gomb
-// helye előre fenntartva), azt "AZ UGRÁS GOMB MEGJELENÉSE" blokk méri az
+// a lista fölött lebeg), azt "AZ UGRÁS GOMB MEGJELENÉSE" blokk méri az
 // ablakban.
 //
 // DETERMINISZTIKUS VERSENY. A hálózaton érkező keret a kattintás és a mérés
@@ -1930,21 +1931,57 @@ const TRANSCRIPT_LAYOUTS: readonly { readonly name: string; readonly layout: Tra
 ];
 
 // ============================================================
-// AZ UGRÁS GOMB MEGJELENÉSE NEM MOZDÍTJA A LISTÁT (user döntés 2026-09-25).
+// AZ UGRÁS GOMB MEGJELENÉSE NEM MOZDÍTJA A LISTÁT, ÉS NINCS ÜRES SÁV
+// (user döntések 2026-09-25: a gomb ne tolja le a listát, és "Lista fölé
+// kerüljön").
 //
-// A gomb sávja előre fenntartott hely a lista fölött: új esemény nélkül a
-// gomb láthatatlan, de a dobozát megtartja (`transcript-panel.css`,
-// `transcript-panel__jump--idle`). Korábban a sáv a gombbal együtt jelent
-// meg, és a listát 36 pixellel lejjebb tolta: a lista alján kinyitott utolsó
-// sor 53 pixeles fejlécéből 1440 és 375 pixelen is 17 pixel maradt a lista
-// látható területén, a szövege nélkül (research 19. szekció). A fejléc helye itt
-// az ABLAKBAN mért, nem a listához képest, és a gomb nem takarhat sort: a
-// lista fölött, teljes egészében az ablakban áll.
+// A gomb a lista fölött lebeg, a lista alján (`transcript-panel.css`,
+// `transcript-panel__jump`), tehát a lista a teljes magasságot kapja. Két
+// korábbi alak bukik itt: az `1c7dd13` előtti, ahol a sáv a gombbal együtt
+// jelent meg, és a listát 36 pixellel lejjebb tolta (a lista alján kinyitott
+// utolsó sor 53 pixeles fejlécéből 17 pixel maradt), és az `1c7dd13` óta
+// állandóan fenntartott, üres sáv a lista fölött (research 19. és 20.
+// szekció). A fejléc helye itt az ABLAKBAN mért, nem a listához képest.
 // ============================================================
+
+/**
+ * A lista teteje mínusz a fölötte álló delta mondat alja, mínusz a panel
+ * sortávolsága: nulla, ha a mondat és a lista között nincs üres sáv.
+ */
+async function bandAboveList(page: Page, list: Locator): Promise<number> {
+  const note = page.getByText('Ennél a futásnál a streamelt részleges szöveg csak élőben látszik');
+  const noteBottom = await note.evaluate((element) => element.getBoundingClientRect().bottom);
+  return list.evaluate((element, bottom) => {
+    // A panel sortávolsága a CSS Typed OM számértékeként (pixelben), a
+    // szöveges `rowGap` érték feldolgozása nélkül.
+    const gap = element.closest('.transcript-panel')?.computedStyleMap().get('row-gap');
+    return element.getBoundingClientRect().top - bottom - (gap instanceof CSSUnitValue ? gap.value : NaN);
+  }, noteBottom);
+}
+
+/**
+ * A gomb doboza a lista látható területén belül áll: a lista fölött lebeg.
+ */
+async function isJumpOverList(list: Locator, jump: Locator): Promise<boolean> {
+  const box = await jump.boundingBox();
+  if (box === null) {
+    return false;
+  }
+  return list.evaluate((element, button) => {
+    const listBox = element.getBoundingClientRect();
+    const visibleTop = listBox.top + element.clientTop;
+    return (
+      button.y >= visibleTop &&
+      button.y + button.height <= visibleTop + element.clientHeight &&
+      button.x >= listBox.left &&
+      button.x + button.width <= listBox.right
+    );
+  }, box);
+}
 
 for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
   for (const theme of ['light', 'dark'] as const) {
-    test(`az ugrás gomb megjelenése a lista tartalmát nem mozdítja: a kinyitott utolsó sor fejléce az ablakban a helyén marad, és a gomb elérhető (${name}, ${theme} téma)`, async ({
+    test(`az ugrás gomb megjelenése a lista tartalmát nem mozdítja: a kinyitott utolsó sor fejléce az ablakban a helyén marad, a gomb a lista fölött lebeg, és üres sáv nincs (${name}, ${theme} téma)`, async ({
       page,
     }) => {
       const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
@@ -1952,6 +1989,7 @@ for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
       streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
       const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
       await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      expect(await bandAboveList(page, list)).toBe(0);
       const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
       await header.dispatchEvent('click');
       await expect(header).toHaveAttribute('aria-expanded', 'true');
@@ -1968,11 +2006,73 @@ for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
       expect(await headerTopInViewport(list, rowCount)).toBe(headerTopBefore);
       await expect(header).toBeInViewport({ ratio: 1 });
       await expect(jump).toBeInViewport({ ratio: 1 });
-      expect(await jump.evaluate((element) => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(
-        listTopBefore,
-      );
+      expect(await isJumpOverList(list, jump)).toBe(true);
+      expect(await bandAboveList(page, list)).toBe(0);
 
       await jump.click();
+      await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+      await expect(jumpButton(page)).toHaveCount(0);
+    });
+  }
+}
+
+// ============================================================
+// A LEBEGŐ GOMB ALATTI SOR GÖRGETÉSSEL ELÉRHETŐ, A GOMB PEDIG A
+// BILLENTYŰZETTEL IS (user döntés 2026-09-25, SPEC-008 7.4).
+//
+// A lista tetejére görgetve egy új sor után a gomb megjelenik, és a lista
+// alján sort takar. A `toBeInViewport` a Playwright doksi szerint az
+// intersection observer API-val dönt, ami a más tartalom általi takarást nem
+// nézi (research 20. szekció), ezért a takarás a sor és a gomb dobozából
+// számolt (`rowsUnderJumpButton`). A takart sor egérkerékkel a gomb fölé
+// görgethető, és utána teljes egészében látszik. Látható állapotban a gomb
+// fókuszálható, a Tab sorrendben a lista sorai előtt áll, és `Enter`-rel
+// működik; rejtett állapotban nincs a hozzáférhetőségi fában.
+// ============================================================
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`a lebegő ugrás gomb alatti sor görgetéssel teljesen elérhető, és a gomb fókuszálható, a Tab sorrendben a sorok előtt áll (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      await wheelToTop(page, list);
+      await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+      await expect(jumpButton(page)).toHaveCount(0);
+
+      streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' });
+      await expect(jump).toBeVisible();
+      const [covered] = await rowsUnderJumpButton(list, jump);
+      if (covered === undefined) {
+        throw new Error('a lebegő gomb egyetlen sort sem takar');
+      }
+      expect(covered.isReachableByScrolling).toBe(true);
+
+      await list.hover();
+      await page.mouse.wheel(0, Math.ceil(covered.shiftAbove));
+      await expect
+        .poll(async () => {
+          const rows = await rowsUnderJumpButton(list, jump);
+          return rows.map((row) => row.position);
+        })
+        .not.toContain(covered.position);
+      await expect(list.locator(`[role="listitem"][aria-posinset="${String(covered.position)}"]`)).toBeInViewport({
+        ratio: 1,
+      });
+      await expect(jump).toBeVisible();
+
+      await jump.focus();
+      await expect(jump).toBeFocused();
+      await page.keyboard.press('Tab');
+      expect(await list.evaluate((element) => element.contains(globalThis.document.activeElement))).toBe(true);
+      await page.keyboard.press('Shift+Tab');
+      await expect(jump).toBeFocused();
+      await page.keyboard.press('Enter');
       await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
       await expect(jumpButton(page)).toHaveCount(0);
     });

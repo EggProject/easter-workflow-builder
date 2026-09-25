@@ -436,6 +436,77 @@ export async function headerTopInViewport(list: Locator, position: number): Prom
   }, position);
 }
 
+/**
+ * Egy sor, amit a lista fölött lebegő "Ugrás az aljára" gomb (részben) takar.
+ */
+export interface RowUnderJumpButton {
+  readonly position: number;
+  /**
+   * Ennyi pixellel kell a lista tartalmát feljebb görgetni, hogy a sor alsó
+   * éle a gomb felső élére kerüljön (a sor a gomb fölé).
+   */
+  readonly shiftAbove: number;
+  /**
+   * Ugyanez a gomb alá: negatív érték lefelé görgetést jelent.
+   */
+  readonly shiftBelow: number;
+  /**
+   * A két eltolás közül legalább egy a lista görgetési tartományán belül
+   * van, és utána a sor teljes egészében a lista látható területén, a gomb
+   * nélkül áll: a sor görgetéssel elérhető.
+   */
+  readonly isReachableByScrolling: boolean;
+}
+
+/**
+ * A lista kirajzolt sorai közül azok, amiket a gomb doboza a lista látható
+ * területén belül takar, és hogy görgetéssel kiszabadíthatók-e. A gomb doboza
+ * az ablakban mért (`boundingBox`), ugyanabban a koordináta rendszerben, mint
+ * a sorok `getBoundingClientRect` értéke. A 0,5 pixeles tűrés ugyanaz, mint az
+ * `expectLastRowFullyVisibleAtBottom` állításáé.
+ */
+export async function rowsUnderJumpButton(list: Locator, jump: Locator): Promise<readonly RowUnderJumpButton[]> {
+  const box = await jump.boundingBox();
+  if (box === null) {
+    return [];
+  }
+  return list.evaluate((element, button) => {
+    const tolerance = 0.5;
+    const buttonBottom = button.y + button.height;
+    const buttonRight = button.x + button.width;
+    const visibleTop = element.getBoundingClientRect().top + element.clientTop;
+    const visibleBottom = visibleTop + element.clientHeight;
+    const minShift = -element.scrollTop;
+    const maxShift = element.scrollHeight - element.clientHeight - element.scrollTop;
+    return [...element.querySelectorAll('[role="listitem"]')].flatMap((item) => {
+      const row = item.getBoundingClientRect();
+      const top = Math.max(row.top, visibleTop);
+      const bottom = Math.min(row.bottom, visibleBottom);
+      const isOverlapping =
+        Math.min(row.right, buttonRight) > Math.max(row.left, button.x) &&
+        Math.min(bottom, buttonBottom) > Math.max(top, button.y);
+      if (!isOverlapping) {
+        return [];
+      }
+      const shiftAbove = row.bottom - button.y;
+      const shiftBelow = row.top - buttonBottom;
+      const isFreeAfter = (shift: number): boolean =>
+        shift >= minShift - tolerance &&
+        shift <= maxShift + tolerance &&
+        row.top - shift >= visibleTop - tolerance &&
+        row.bottom - shift <= visibleBottom + tolerance;
+      return [
+        {
+          position: Number(item.getAttribute('aria-posinset')),
+          shiftAbove,
+          shiftBelow,
+          isReachableByScrolling: isFreeAfter(shiftAbove) || isFreeAfter(shiftBelow),
+        },
+      ];
+    });
+  }, box);
+}
+
 export function transientFrames(count: number): readonly StreamFrame[] {
   return Array.from({ length: count }, (_, index) => textDeltaTransientFrame(`Részlet ${String(index + 1)}`));
 }

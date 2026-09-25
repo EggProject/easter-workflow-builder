@@ -1226,9 +1226,10 @@ szabad port a választás. A fájl `mode: 'serial'` beállítása ezzel kikerül
 | Állapot       | `sse-real-server.spec.ts --repeat-each 3 --workers 3`                     |
 | ------------- | ------------------------------------------------------------------------- |
 | előtte (HEAD) | 77 zöld, 2 bukik (`EADDRINUSE`), 152 nem futott (soros fájl a bukás után) |
-| utána         | 231/231 zöld, nulla `EADDRINUSE`                                          |
+| utána         | 267/267 zöld (89 teszt háromszor), nulla `EADDRINUSE`                     |
 
-A teljes e2e készlet utána 331/331 zöld (hat `--shard` hívás, sorban, három workerrel), az e2e
+A "utána" sor 2026-09-25-én újramérve (20. szekció (G)): a korábbi 231/231 a 12 új teszt
+előtti, 77 tesztes fájlra szólt, a commitolt fájl 89 tesztje háromszor 267. A teljes e2e készlet utána 331/331 zöld (hat `--shard` hívás, sorban, három workerrel), az e2e
 lefedettség ratchetje `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 38. szekció.
 
 **Képek** (a munkamenet kimeneti mappájában, `transcript-gombsav/`, 1440 és 375 pixel, két téma,
@@ -1244,3 +1245,168 @@ egy repón kívüli, eldobott lépés készítette őket ugyanazzal a repóbeli 
 **NEM ELLENŐRZÖTT:** Firefox és WebKit; hogy a `react-window` más verziója ugyanígy jelenti-e a régi
 tartományt az érkezés utáni első renderben (a szűrés a pinelt `2.3.1` forrásán alapul); a -574
 pixeles elrántás pontos lépéssora; a görgetés rögzítés 36 pixeles igazításának pontos horgonya.
+
+## 20. A lista fölött lebegő ugrás gomb és a szabad port regressziós tesztje (2026-09-25)
+
+**A kiindulás.** A 19. szekció fenntartott gomb sávjának ára egy állandó, 36 pixeles üres sáv a
+lista fölött (a 28 pixeles `sm` gomb és a 8 pixeles `--ep-space-2` térköz), a lista
+magasságának 6 (1440x900), illetve 9 (375x812) százaléka. A user döntése (2026-09-25): "Lista
+fölé kerüljön", tehát a gomb a lista fölött lebegjen, üres sáv nélkül. Egy független ellenőrzés
+szerint a design systemben nincs lista fölé lebegő gomb (viewporthoz rögzített toast, a
+triggerhez igazodó popover és hover-card, sticky csak a DataTable fejlécében és a drawer
+láblécében van), ezért az elhelyezés saját kiegészítés, a gomb maga a design system `Button`-ja.
+Minden szám a repóbeli mérő eszközből (`apps/web/measurement/transcript-scroll.ts`, új
+`lista-magassag` és `takaras` jelenet, a `gombsav` és a `rovid-lista` jelenet bővítve, új
+`MEASURE_JUMP_PLACEMENT` kapcsoló) vagy a Playwright futásokból jön, 1440x900-on és 375x812-n,
+két témában; a két téma minden sorban azonos értéket adott.
+
+**(A) A lista magassága** (`lista-magassag`, követő lista, gomb nélkül):
+
+| Állapot                                                | A lista magassága (1440 / 375) | A lista teteje a panel tetejétől |
+| ------------------------------------------------------ | ------------------------------ | -------------------------------- |
+| az `1c7dd13` előtti panel (a sáv a gombbal jelent meg) | 597 / 409                      | 71 / 92                          |
+| `1c7dd13` (fenntartott sáv)                            | 561 / 373                      | 107 / 128                        |
+| utána (lebegő gomb)                                    | 597 / 409                      | 71 / 92                          |
+
+A panel magassága mindhárom állapotban 668 / 501, a lista alja a panel alján áll.
+
+**(B) A gomb megjelenése** (`gombsav`: 20 + 10 sor, a lista alján a legutolsó sor kinyitva,
+majd egy új sor):
+
+| Állapot             | A lista és a fejléc elmozdulása | A fejlécből a listán belül | A gomb helye                                             |
+| ------------------- | ------------------------------- | -------------------------- | -------------------------------------------------------- |
+| az `1c7dd13` előtti | +36 / +36                       | 53 -> 17                   | a lista fölött, az alja 8 pixellel a lista teteje fölött |
+| `1c7dd13`           | 0 / 0                           | 53 -> 53                   | ugyanott, a fenntartott sávban                           |
+| utána               | 0 / 0                           | 53 -> 53                   | a listán belül, az alja 8 pixellel a lista alja fölött   |
+
+Utána a gomb a kinyitott utolsó sort (a 30.) takarja; a sor görgetéssel kiszabadítható.
+
+**(C) A hely: a lista alja vagy teteje.** A döntés szövege a helyet nem nevezi meg (SPEC-008
+14.2 O-14). A mérő eszköz a takart sorokat a sor és a gomb dobozából számolja
+(`rowsUnderJumpButton`, `e2e/run-view-stream.ts`), és azt is, hogy a sor a lista görgetési
+tartományán belül a gomb fölé vagy alá vihető-e úgy, hogy teljes egészében a lista látható
+területén álljon. A tető változatot a `MEASURE_JUMP_PLACEMENT=top` kapcsoló méri (a gomb
+`top: var(--ep-space-2)` helyen).
+
+| Jelenet                                                  | Alul lebegő gomb                                                              | Tetején lebegő gomb                                    |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `takaras`: 30 sor, a lista tetejére görgetve, egy új sor | takart sor 1440-en a 11. és a 12., 375-ön a 8.; mind görgethető (4/4)         | takart az 1. sor, nem görgethető (4/4)                 |
+| `rovid-lista`: 3 sor, egy kinyitva, 12 érkezés           | 96 érkezésből 12 után egy sor alsó része takart és a lista még nem görgethető | 96 érkezésből 96 után az 1. sor takart, nem görgethető |
+
+A `rovid-lista` alul lebegő eseteinek részletei: 1440x900-on a 7. érkezés után a 10. sor
+(a 8.-nál már görgethető), 375x812-n a 3. érkezés után a 6., a 4. után a 7. sor (az 5.-nél már
+görgethető), mindkét kinyitott sorral, mindkét témában. A `takaras` jelenetben a legfelső takart
+sor egérkerékkel a gomb fölé görgetve teljes egészében látszik (a sor alja pontosan a gomb
+tetején, 0 pixel), és a gomb a helyén marad, mert a lista még nem ért az aljára. A választott hely
+ezért a lista alja, középen; az ára, hogy a lista alján kinyitott utolsó sor fejlécét a megjelenő
+gomb takarja (B).
+
+**(D) A megvalósítás** (`TranscriptPanel.tsx`, `transcript-panel.css`): a lista egy
+`transcript-panel__list-frame` keretben áll (a lista inline `flex-grow: 1` és
+`max-height: 100%` stílusával kitölti), a keret a gomb pozicionálási doboza, és az egy sornyi
+minimum a keretre került. A gomb csak `unseenCount > 0` mellett van a DOM-ban, a keretben a lista
+előtt. Középre `inset-inline: 0` és `margin-inline: auto` igazít, nem `transform`, mert a design
+system `.btn:active` szabálya (`packages/ui/src/button/button.css`) lenyomáskor a `transform`
+értéket `translateY(1px)`-re állítja. A lista gyökere a telepített `react-window@2.3.1` forrása
+szerint `position: relative`, a sorai `position: absolute` (`dist/react-window.js`), a gomb pedig
+a DOM-ban előttük áll, ezért kap `z-index: 1`-et. A CSS 2 E. függeléke szerint egy rétegkörnyezeten
+belül "All positioned descendants with 'z-index: auto' or 'z-index: 0', in tree order", utána
+"Stacking contexts formed by positioned descendants with z-indices greater than or equal to 1"
+festődnek (<https://www.w3.org/TR/CSS2/zindex.html>; megerősítés:
+<https://www.w3.org/TR/CSS22/zindex.html>, <https://www.w3.org/TR/CSS2/visuren.html> 9.9.1,
+<https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_positioned_layout/Stacking_without_z-index>).
+Az árnyék a design system saját lebegő elemének, a toastnak a tokenje (`toast.css`:
+`--ep-shadow-lg`).
+
+**(E) Takarás és `toBeInViewport`.** A Playwright doksi szerint a `toBeInViewport` "Ensures the
+Locator points to an element that intersects viewport, according to the intersection observer
+API" (<https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>;
+megerősítés: <https://github.com/microsoft/playwright/blob/main/docs/src/api/class-locatorassertions.md>,
+<https://playwright.dev/python/docs/api/class-locatorassertions>), az intersection observer első
+változata pedig a más tartalom általi takarást nem nézi: "it doesn't tell you whether the Element
+is covered by any other page content" (<https://github.com/w3c/IntersectionObserver/blob/v2/explainer.md>;
+megerősítés: <https://web.dev/articles/intersectionobserver-v2>,
+<https://www.afasterweb.com/2019/02/28/proposed-updates-for-intersection-observer>). Ezért az e2e
+a takarást a sor és a gomb dobozából számolja, a `toBeInViewport({ ratio: 1 })` mellett.
+
+**(F) Az e2e** (`sse-real-server.spec.ts`): "AZ UGRÁS GOMB MEGJELENÉSE NEM MOZDÍTJA A LISTÁT, ÉS
+NINCS ÜRES SÁV" (4 teszt: a lista és a kinyitott fejléc helye az ablakban változatlan, a gomb a
+lista látható területén belül áll, a delta mondat és a lista között csak a panel sortávolsága van,
+a gomb és a fejléc teljes egészében az ablakban), és "A LEBEGŐ GOMB ALATTI SOR GÖRGETÉSSEL ELÉRHETŐ"
+(4 teszt: a gomb alatti sor görgethető, egérkerékkel a gomb fölé görgetve nem takart és
+`toBeInViewport({ ratio: 1 })`; a gomb fókuszálható, a `Tab` a lista egy sorára visz, a
+`Shift+Tab` vissza a gombra, az `Enter` az aljára ugrik, utána a gomb nincs a hozzáférhetőségi
+fában). Rontások a 8 teszten:
+
+| Állapot                                | Megjelenés (4)                | Takart sor és billentyűzet (4)                  |
+| -------------------------------------- | ----------------------------- | ----------------------------------------------- |
+| a választott megoldás                  | 4/4 zöld                      | 4/4 zöld                                        |
+| az `1c7dd13` panelje (fenntartott sáv) | 4/4 bukik (üres sáv: 36)      | 4/4 bukik (a gomb egyetlen sort sem takar)      |
+| az `1c7dd13` előtti panel              | 4/4 bukik (a lista +36 pixel) | 4/4 bukik                                       |
+| a gomb a lista tetején (`top`)         | 4/4 zöld (a hely nem tárgya)  | 4/4 bukik (a takart sor nem görgethető)         |
+| a gomb a DOM-ban a lista után          | nem futott                    | 4/4 bukik (a `Tab` nem a lista egy sorára visz) |
+
+A teljes `sse-real-server.spec.ts` (93 teszt) és a `transcript-panel.spec.ts` (14 teszt)
+107/107 zöld; `--repeat-each 3` mellett három workerrel 279/279, nulla `EADDRINUSE`. Unit: a
+`TranscriptPanel.spec.tsx` a gomb hiányát új esemény nélkül, a látható gomb fókuszálhatóságát,
+`tabIndex`-ét, `aria-hidden` hiányát és a lista előtti helyét, és a sáv hiányát őrzi.
+
+**(G) A szabad port regressziós tesztje** (`apps/web/src/e2e-stream-server-free-port/`,
+megvalósítás nélküli téma). A 19. szekció (D) szabad portja a CI egy workerén fix porton is zöld
+lenne (független ellenőrzés: 89/89), tehát a visszaállítást egyetlen futó e2e sem fogná meg. A
+teszt az `apps/web/e2e` és az `apps/web/measurement` minden `.ts` fájljának szövegén négy
+szabályt őriz: a `listen` szó pontosan egyszer áll, a közös fixtúra `listenOnLoopback`
+függvényében; a `listenOnLoopback` port paraméterének alapértéke `0`, és a `listen` hívás ezt
+kapja; a `listenOnLoopback` hívásai portként nem adnak át szám, szöveg vagy origin literált; minden
+`port` nevű függvény paraméter alapértéke `0`. Igazolás, egy-egy injekcióval (a teszt az eredeti
+fán 5/5 zöld):
+
+| Injekció                                                        | Eredmény      |
+| --------------------------------------------------------------- | ------------- |
+| a `listenOnLoopback` alapértéke `4174`                          | 2 teszt bukik |
+| közvetlen `server.listen(4174)` egy spec fájlban                | 1 teszt bukik |
+| `listenOnLoopback(server, 4174)`                                | 1 teszt bukik |
+| `listenOnLoopback(server, Number(new URL(STREAM_ORIGIN).port))` | 1 teszt bukik |
+| egy helper `port = 4174` alapértéke                             | 1 teszt bukik |
+| a két fájl `1c7dd13^` állapota (a tényleges visszaállítás)      | 3 teszt bukik |
+
+A korlát kimondva: egy nevesített konstansban álló szám, amit egy helper paramétereként adnak
+tovább, egyik szabályon sem akad fenn.
+
+A 19. szekció (D) táblázatának "utána" sora újramérve: a commitolt, 89 tesztes fájl
+`--repeat-each 3` mellett három workerrel 267/267 zöld, nulla `EADDRINUSE` (a commitolt panellel és fixtúrával).
+
+**(H) Tört listamagasság a jóváhagyás panel mellett.** A sáv megszűnésével a lista a jóváhagyás
+panel melletti kezdő állásban is a teljes maradék helyet kapja, és ez a húzható elválasztó
+százalékos felosztásából tört szám lehet. A teljes e2e első futásán az
+`approval-prompt.spec.ts` 375x812-es szélső állás tesztje (két téma) bukott: a lista utolsó sora
+görgetve 0,9906 arányban látszott. A mérő eszköz `tort-magassag` jelenete (kezdő állás, a lista
+végére görgetve, az utolsó sor alja a lista dobozának alja alatt):
+
+| Állapot                              | 375x812: doboz / `clientHeight` / legnagyobb `scrollTop` / az utolsó sorból nem látszik | 1440x900 és 1440x600 |
+| ------------------------------------ | --------------------------------------------------------------------------------------- | -------------------- |
+| a lebegő gomb, kerekítés nélkül      | 85,5 / 86 / 974 / 0,5 pixel                                                             | egész magasság, 0    |
+| a lebegő gomb, egész magasságú lista | 85 / 85 / 975 / 0                                                                       | egész magasság, 0    |
+
+A görgetési tartomány egész pixelre kerekít (a 974,5 helyett 974 a legnagyobb `scrollTop`), a
+`clientHeight` pedig 86-ra, tehát a lista `clientHeight` alapú mérései (`lastRowBottomOverflow`)
+ezt a fél pixelt nem látják; a jelenet ezért a lista dobozához mér. A javítás: a lista
+`max-height` értéke `round(down, 100%, 1px)` (a `react-window` `List` `style` propján, ami a
+könyvtár saját `maxHeight: 100%` értékét felülírja), tehát a lista egész pixel magas, a keretnél
+legfeljebb egy pixellel kisebb. A CSS `round()` függvény a `down` stratégiával a
+`Math.floor()` megfelelője (<https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/round>;
+megerősítés: <https://web.dev/blog/css-stepped-value-functions>, Chrome 125 kiadási jegyzet:
+<https://developer.chrome.google.cn/release-notes/125>). Utána a két bukott e2e zöld, a teljes
+készlet 343/343. A korábbi, sávos alakban ugyanez a teszt zöld volt; hogy ott a lista az egy
+sornyi minimumán állt-e, NEM ELLENŐRZÖTT.
+
+**Képek** (a munkamenet kimeneti mappájában, `transcript-lebego-gomb/`, 1440 és 375 pixel, két
+téma): `*-1-kovet-gomb-nelkul` (követő lista, gomb és sáv nélkül), `*-2-kinyitott-utolso-sor-gomb`
+(a kinyitott utolsó sor és a megjelent gomb), `*-3-felgorgetve-gomb` (a lista tetején, a gomb
+alul), `*-4-takart-sor-gorgetve` (a korábban takart sor a gomb fölé görgetve),
+`*-5-gomb-fokuszban`. Szemléltetők: egy repón kívüli, eldobott lépés készítette őket ugyanazzal a
+repóbeli fixtúrával, mert képernyőképet lemezre kizárólag a szentesített `capture-screenshots.ts`
+írhat; a számok a mérő eszközből és az e2e-ből jönnek.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit; más ablakméret a két mértnél; hogy a `rovid-lista`
+átmeneti takarása a gomb megnyomására is feloldódik-e (nem mért).
