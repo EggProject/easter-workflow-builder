@@ -25,17 +25,20 @@
 //   cd apps/web && flock /tmp/playwright-gep.lock bun run measure:transcript
 //   cd apps/web && flock /tmp/playwright-gep.lock bun run measure:transcript -g verseny
 //
-// Környezeti változók: `MEASURE_TRIALS` (a verseny kísérleteinek száma
-// beállításonként, alapból 20), `MEASURE_OVERFLOW_ANCHOR` (ha `auto`, a
-// lista `overflow-anchor` értékét a mérés idejére visszaállítja, így a
-// böngésző görgetés rögzítése mérhető, research 17. szekció).
+// Környezeti változók: `MEASURE_TRIALS` (a verseny kísérleteinek, illetve az
+// `anchoring` jelenet ismétléseinek száma beállításonként, alapból 20, illetve
+// 10), `MEASURE_OVERFLOW_ANCHOR` (ha `auto`, a lista `overflow-anchor`
+// értékét a mérés idejére visszaállítja, így a böngésző görgetés rögzítése
+// mérhető, research 17. és 18. szekció).
 import type { Server } from 'node:http';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   captureEventSources,
+  deliverFrameOnMeasuredCommit,
   deliverFrameWithNextClick,
   expectLastRowFullyVisibleAtBottom,
   headerOffsetInList,
+  installMeasuredCommitDelivery,
   lastRowBottomOverflow,
   openFollowingTranscript,
   REPLAYED_ROW_COUNT,
@@ -440,15 +443,17 @@ for (const path of ['mouse', 'space', 'enter', 'click'] as const) {
 
 // ------------------------------------------------------------
 // 6. Verseny: folyamatos stream, véletlen fázisú, csak `click` eseménnyel
-//    indított kinyitás a végétől ötödik soron (research 15., 16. és 17.
-//    szekció). Egy kísérlet ELRÁNTÁS, ha a kinyitott sor fejléce a listához
-//    mérve bármely képkockán elmozdul, és a mérés utáni harmadik képkockán az
-//    utolsó sor nem látszik (ha látszik, a predikátum szerint a követés
-//    folytatódik, és a fejléc elmozdulása szándékos).
+//    indított kinyitás a végétől ötödik soron (research 15-18. szekció). Egy
+//    kísérlet ELRÁNTÁS, ha a kinyitott sor fejléce a listához mérve bármely
+//    képkockán elmozdul. Minden kísérlet számít: a kinyitott törzs a lista
+//    alján állva az utolsó sort mindig kitolja a látható tartományból, tehát
+//    a követésnek mindegyik hook szerint le kell állnia. A korábbi szűrő
+//    (csak az a kísérlet számított, amelyikben a kinyitás utáni harmadik
+//    képkockán az utolsó sor NEM látszott) pontosan a teljes elrántást dobta
+//    ki, mert az a listát az aljára viszi (research 18. szekció).
 // ------------------------------------------------------------
 interface RaceTrial {
   readonly maxDelta: number;
-  readonly lastRowVisibleAfterMeasurement: boolean;
 }
 
 function isRaceTrial(value: unknown): value is RaceTrial {
@@ -512,26 +517,15 @@ for (const { name, layout } of LAYOUTS) {
               const offsetBefore = offset();
               header.click();
               let maxDelta = 0;
-              let isLastRowVisibleAfterMeasurement = false;
               const start = performance.now();
-              let frames = 0;
               while (performance.now() - start < streamPeriod * 4 + 250) {
                 await frame();
-                frames += 1;
                 const delta = offset() - offsetBefore;
                 if (Math.abs(delta) > Math.abs(maxDelta)) {
                   maxDelta = delta;
                 }
-                if (frames === 3) {
-                  const last = lastRow();
-                  isLastRowVisibleAfterMeasurement =
-                    last !== null && last.getBoundingClientRect().top < visibleBottom();
-                }
               }
-              return {
-                maxDelta: Math.round(maxDelta),
-                lastRowVisibleAfterMeasurement: isLastRowVisibleAfterMeasurement,
-              };
+              return { maxDelta: Math.round(maxDelta) };
             }, period);
             if (isRaceTrial(result)) {
               trials.push(result);
@@ -540,19 +534,137 @@ for (const { name, layout } of LAYOUTS) {
         } finally {
           clearInterval(stream);
         }
-        const relevant = trials.filter((trial) => !trial.lastRowVisibleAfterMeasurement);
-        const yanks = relevant.filter((trial) => trial.maxDelta !== 0);
+        const yanks = trials.filter((trial) => trial.maxDelta !== 0);
         report('verseny', {
           layout: name,
           theme,
           period,
           overflowAnchor: process.env['MEASURE_OVERFLOW_ANCHOR'] ?? 'none',
           trials: trials.length,
-          relevant: relevant.length,
           yanks: yanks.length,
           yankDeltas: yanks.map((trial) => trial.maxDelta),
         });
       });
     }
+  }
+}
+
+// ------------------------------------------------------------
+// 7. A görgetés rögzítés determinisztikus előállíthatósága (research 18.
+//    szekció). Ugyanaz a lépéssor ismételve, időzítő nélkül: felgörgetés,
+//    három sor, "ugrás az aljára", majd a végétől ötödik sor kinyitása
+//    `element.click()` hívással, és új sor az érkezési mód szerint: a
+//    kattintás feladatában, a mérés commitjában, a negyedik képkockán,
+//    sehogy, vagy egy követett sor a kattintással egy feladatban, illetve egy
+//    képkockával előtte (mindkettő után a negyedik képkockán még egy). A
+//    kinyitott fejléc és a `scrollTop` képkockánként mérve; a hook a kinyitás
+//    után nem görget, tehát minden elmozdulás a böngészőé.
+//    `MEASURE_OVERFLOW_ANCHOR=auto` mellett mér a rögzítésre.
+// ------------------------------------------------------------
+const ANCHORING_ARRIVALS = [
+  'click-task',
+  'measured-commit',
+  'after-measurement',
+  'none',
+  'followed-same-task',
+  'followed-frame-before',
+] as const;
+
+/**
+ * A kinyitás előtt, követés közben érkező sor helye: `task` a kattintással egy
+ * feladatban, `frame` egy képkockával előtte, `no` nincs ilyen sor.
+ */
+const FOLLOWED_BEFORE: Readonly<Record<(typeof ANCHORING_ARRIVALS)[number], 'no' | 'task' | 'frame'>> = {
+  'click-task': 'no',
+  'measured-commit': 'no',
+  'after-measurement': 'no',
+  none: 'no',
+  'followed-same-task': 'task',
+  'followed-frame-before': 'frame',
+};
+
+for (const arrival of ANCHORING_ARRIVALS) {
+  for (const theme of THEMES) {
+    test(`anchoring ${arrival} ${theme}`, async ({ page }) => {
+      await captureEventSources(page);
+      await installMeasuredCommitDelivery(page);
+      const { streamServer, list } = await open(page, theme, WIDE_LAYOUT);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      let rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      const movements: { readonly header: number; readonly scrollTop: number }[] = [];
+      for (let repetition = 0; repetition < Number(process.env['MEASURE_TRIALS'] ?? '10'); repetition += 1) {
+        await list.hover();
+        await page.mouse.wheel(0, -100_000);
+        await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+        streamServer.pushBatch(transientFrames(3));
+        rowCount += 3;
+        await page.getByRole('button', { name: /Ugrás az aljára/ }).click();
+        await expectLastRowFullyVisibleAtBottom(list, rowCount);
+        const position = rowCount - 4;
+        const frame = textDeltaTransientFrame(`Rögzítés ${String(repetition)}`);
+        if (arrival === 'click-task') {
+          await deliverFrameWithNextClick(page, frame);
+        } else if (arrival === 'measured-commit') {
+          await deliverFrameOnMeasuredCommit(page, position, frame);
+        }
+        const movement = await list.evaluate(
+          async (element, { rowPosition, deliverAfterMeasurement, followedBefore, data }) => {
+            const header = element.querySelector(
+              `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
+            );
+            if (!(header instanceof HTMLElement)) {
+              throw new TypeError('a fejléc nem található');
+            }
+            const offset = (): number => header.getBoundingClientRect().top - element.getBoundingClientRect().top;
+            if (followedBefore !== 'no') {
+              globalThis.e2eDeliverFrame?.('run_event_transient', data);
+            }
+            if (followedBefore === 'frame') {
+              await new Promise((resolve) => {
+                requestAnimationFrame(resolve);
+              });
+            }
+            const offsetBefore = offset();
+            const scrollTopBefore = element.scrollTop;
+            header.click();
+            let maxHeader = 0;
+            let maxScrollTop = 0;
+            for (let index = 0; index < 20; index += 1) {
+              await new Promise((resolve) => {
+                requestAnimationFrame(resolve);
+              });
+              if (index === 4 && (deliverAfterMeasurement || followedBefore !== 'no')) {
+                globalThis.e2eDeliverFrame?.('run_event_transient', data);
+              }
+              const headerDelta = offset() - offsetBefore;
+              const scrollTopDelta = element.scrollTop - scrollTopBefore;
+              maxHeader = Math.abs(headerDelta) > Math.abs(maxHeader) ? headerDelta : maxHeader;
+              maxScrollTop = Math.abs(scrollTopDelta) > Math.abs(maxScrollTop) ? scrollTopDelta : maxScrollTop;
+            }
+            return { header: Math.round(maxHeader), scrollTop: Math.round(maxScrollTop) };
+          },
+          {
+            rowPosition: position,
+            deliverAfterMeasurement: arrival === 'after-measurement',
+            followedBefore: FOLLOWED_BEFORE[arrival],
+            data: JSON.stringify(frame),
+          },
+        );
+        if (FOLLOWED_BEFORE[arrival] !== 'no') {
+          rowCount += 2;
+        } else if (arrival !== 'none') {
+          rowCount += 1;
+        }
+        movements.push(movement);
+      }
+      report('anchoring', {
+        arrival,
+        theme,
+        overflowAnchor: process.env['MEASURE_OVERFLOW_ANCHOR'] ?? 'none',
+        repetitions: movements.length,
+        moved: movements.filter((movement) => movement.header !== 0 || movement.scrollTop !== 0),
+      });
+    });
   }
 }

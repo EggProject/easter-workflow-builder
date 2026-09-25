@@ -32,6 +32,16 @@ declare global {
    * `EventSource` példányain kézbesíti (`captureEventSources`).
    */
   var e2eDeliverFrameWithNextClick: ((type: string, data: string) => void) | undefined;
+  /**
+   * A keret azonnali kézbesítése a lap nyitott `EventSource` példányain
+   * (`captureEventSources`).
+   */
+  var e2eDeliverFrame: ((type: string, data: string) => void) | undefined;
+  /**
+   * A keret kézbesítése abban a React commitban, amelyikben a lista a
+   * kinyitott sor MÉRT magasságával számol (`installMeasuredCommitDelivery`).
+   */
+  var e2eDeliverFrameOnMeasuredCommit: ((position: number, type: string, data: string) => void) | undefined;
 }
 
 // A tényleges portszám a `STREAM_ORIGIN`-ből származik, nem külön literál:
@@ -358,24 +368,100 @@ export async function captureEventSources(page: Page): Promise<void> {
         sources.push(this);
       }
     }
+    const deliverFrame = (type: string, data: string): void => {
+      for (const source of sources) {
+        if (source.readyState === source.OPEN) {
+          source.dispatchEvent(new MessageEvent(type, { data }));
+        }
+      }
+    };
     const deliverFrameWithNextClick = (type: string, data: string): void => {
       document.addEventListener(
         'click',
         () => {
-          for (const source of sources) {
-            if (source.readyState === source.OPEN) {
-              source.dispatchEvent(new MessageEvent(type, { data }));
-            }
-          }
+          deliverFrame(type, data);
         },
         { capture: true, once: true },
       );
     };
     Object.defineProperties(globalThis, {
+      e2eDeliverFrame: { configurable: true, value: deliverFrame },
       e2eDeliverFrameWithNextClick: { configurable: true, value: deliverFrameWithNextClick },
       EventSource: { configurable: true, writable: true, value: CapturedEventSource },
     });
   });
+}
+
+/**
+ * A React DevTools csatlakozási pontjának (`__REACT_DEVTOOLS_GLOBAL_HOOK__`)
+ * telepítése a betöltés ELŐTT, és a kézbesítő függvény
+ * (`e2eDeliverFrameOnMeasuredCommit`): a keret PONTOSAN abban a commitban megy
+ * ki, amelyikben a lista a kinyitott sor mért magasságával pozicionál (a
+ * következő sor, az utolsó sornál a méretező elem, a sor alsó élénél áll), a
+ * commit passzív effektjei ELŐTT. A React éles buildje minden commit után
+ * hívja az `onCommitFiberRoot` függvényt, a passzív effektek előtt
+ * (`react-dom-client.production.js`, `flushSpawnedWork`); a mérő eszköz
+ * (`measurement/transcript-scroll.ts`) ugyanezt a pontot használja. Időzítő
+ * nincs: a commit sorrend adja a helyét. A kézbesítés a `captureEventSources`
+ * rögzített példányain megy, tehát azt is telepíteni kell.
+ */
+export async function installMeasuredCommitDelivery(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    let deliverIfMeasured: (() => boolean) | undefined;
+    const isExpandedRowMeasured = (position: number): boolean => {
+      const list = globalThis.document.querySelector('[aria-label="Futás eseményei"]');
+      if (list === null) {
+        return false;
+      }
+      const row = list.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
+      const sizer = list.querySelector(':scope > [aria-hidden="true"]');
+      if (row === null || sizer === null || row.querySelector('[aria-expanded="true"]') === null) {
+        return false;
+      }
+      const next = list.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position + 1))}"]`);
+      const followingTop = next === null ? sizer.getBoundingClientRect().bottom : next.getBoundingClientRect().top;
+      return Math.abs(followingTop - row.getBoundingClientRect().bottom) < 0.5;
+    };
+    Object.defineProperties(globalThis, {
+      e2eDeliverFrameOnMeasuredCommit: {
+        configurable: true,
+        value: (position: number, type: string, data: string) => {
+          deliverIfMeasured = () => {
+            if (!isExpandedRowMeasured(position)) {
+              return false;
+            }
+            globalThis.e2eDeliverFrame?.(type, data);
+            return true;
+          };
+        },
+      },
+      __REACT_DEVTOOLS_GLOBAL_HOOK__: {
+        configurable: true,
+        value: {
+          supportsFiber: true,
+          inject: () => 1,
+          onCommitFiberRoot: () => {
+            if (deliverIfMeasured?.() === true) {
+              deliverIfMeasured = undefined;
+            }
+          },
+        },
+      },
+    });
+  });
+}
+
+/**
+ * A következő olyan commitban kézbesíti a keretet, amelyikben a `position`
+ * sorszámú, kinyitott sor mért magasságú (`installMeasuredCommitDelivery`).
+ */
+export async function deliverFrameOnMeasuredCommit(page: Page, position: number, frame: StreamFrame): Promise<void> {
+  await page.evaluate(
+    ({ rowPosition, type, data }) => {
+      globalThis.e2eDeliverFrameOnMeasuredCommit?.(rowPosition, type, data);
+    },
+    { rowPosition: position, type: frame.event, data: JSON.stringify(frame) },
+  );
 }
 
 export async function deliverFrameWithNextClick(page: Page, frame: StreamFrame): Promise<void> {

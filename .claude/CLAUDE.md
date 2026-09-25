@@ -791,15 +791,26 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
   a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
   kinyitott sort elrántotta, már a `dfcaa38` előtt is: 40 ms-os streamnél a véletlen fázisú, csak
-  `click` eseménnyel indított kinyitások mintegy hatodában (a `dfcaa38` előtti hookkal 34/205,
-  bekapcsolt görgetés rögzítéssel, saját mérés 2026-09-25 a repóbeli mérő eszközzel; a korábbi,
-  repón kívüli mérések 12/40 és 23/80, egy független ellenőrzés 13/52 arányt adott, az arány
-  futásonként és gépenként szór, research 17. szekció). A szabály: felhasználói layout változás után görgetési döntés csak a
-  mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click` eseményétől a
-  mérésig kikapcsolja a követést, és a mérés előtti jelentés nem kapcsolhatja vissza. Védelem: a
-  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` négy
-  kinyitási út e2e tesztje mindkét témában, amelyekben egy sor a kattintással egy feladatban
-  érkezik (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. és 16. szekció).
+  `click` eseménnyel indított kinyitások mintegy harmadában (a `dfcaa38` előtti hookkal 60/200,
+  ebből 40 egy soros és 20 teljes elrántás, saját mérés 2026-09-25 a repóbeli mérő eszközzel,
+  minden kísérletet számolva; a korábbi 34/205 és "mintegy hatod" egy hibás szűrőből jött, lásd
+  lent; a repón kívüli mérések 12/40 és 23/80, egy független ellenőrzés 38/100 arányt adott,
+  research 17. és 18. szekció). A szabály: felhasználói layout változás után görgetési döntés
+  csak a mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click`
+  eseményétől szünetelteti a követést, a szünet alatti jelentés nem kapcsolhatja vissza, és egy
+  kinyitás szünete a mérés után is tart, amíg a felhasználó vissza nem ér az aljára vagy meg nem
+  nyomja az ugrás gombot (user döntés 2026-09-25: az utolsó sor kinyitása is megállítja a
+  követést). Védelem: a `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az
+  `sse-real-server.spec.ts` négy kinyitási út e2e tesztjei mindkét témában, az utolsó soréi három
+  időzítéssel (`docs/research/2026-09-23-transcript-panel-meresek.md` 15., 16. és 18. szekció).
+- **Egy mérés szűrője nem dobhatja ki azt, amit mér.** A mérő eszköz verseny jelenete egy
+  kísérletet csak akkor számolt, ha a kinyitás utáni harmadik képkockán az utolsó sor nem látszott;
+  a teljes elrántás viszont a listát az aljára viszi, tehát pontosan azt a kísérletet dobta ki. A
+  hamis szám (34/205, "minden elrántás -53 pixel") két dokumentumba is bekerült, és egy független
+  ellenőrzés találta meg: ugyanazzal a hookkal a szűrővel 33/170, szűrő nélkül 60/200. Ha egy
+  szűrő a kimenetel alapján dönt arról, mi számít, előbb meg kell nézni, hogy a keresett hiba maga
+  nem változtatja-e meg a szűrő bemenetét. Védelem: a jelenet ma minden kísérletet számol
+  (`apps/web/measurement/transcript-scroll.ts`, research 18. szekció).
 - **Egy "várj a következő X-ig" állapotnak mindig kell kilépés arra az esetre is, ha X sosem
   jön.** A `d598677` a kinyitás után a mérésig visszatartotta a görgetést ÉS az érkezések
   számlálását; egy képkockán belüli ki-be csukás (dupla kattintás) után a sor magassága nem
@@ -819,13 +830,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kilépés. Védelem: `sse-real-server.spec.ts` fülváltás és ugrás gomb tesztjei, a `bffd75d`
   állapotán bukik (research 17. szekció).
 - **A böngésző görgetés rögzítése (scroll anchoring) a virtualizált lista mellett saját
-  görgetést csinál.** Bekapcsolt `overflow-anchor` mellett az "ugrás az aljára" utáni első
-  kinyitásoknál a lista a hook nélkül 36 pixelt görgetett (mérve 6/78, kikapcsolva 0/80), és a
-  kézi visszatérés kilépéssel együtt egy teljes elrántást is okozott. A listán ezért
-  `overflow-anchor: none` áll (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A
-  jelenség fázisfüggő, determinisztikusan nem állítható elő; a védelem az e2e teszt, ami a lista
-  kiszámított `overflow-anchor` értékét és az ugrás utáni első kinyitás képkockánkénti helyét is
-  ellenőrzi (research 17. szekció).
+  görgetést csinál.** Bekapcsolt `overflow-anchor` mellett folyamatos streamnél a véletlen fázisú
+  kinyitások egy részében a lista a hook nélkül 36 pixelt görgetett (mérve 9/80, kikapcsolva 0/80,
+  minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött), és a kézi visszatérés
+  kilépéssel együtt egy teljes elrántást is okozott. A listán ezért `overflow-anchor: none` áll
+  (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A jelenség fázisfüggő, időzítő nélküli
+  lépéssorral nem állítható elő (hat érkezési mód, 0/120); a védelem ezért KIZÁRÓLAG a
+  konfigurációt őrzi: az e2e a lista kiszámított `overflow-anchor` értékét ellenőrzi. A korábbi,
+  képkockánként mérő rész vak volt (a CSS nélkül is zöld), és kikerült (research 17. és 18.
+  szekció).
 - **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
   pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor

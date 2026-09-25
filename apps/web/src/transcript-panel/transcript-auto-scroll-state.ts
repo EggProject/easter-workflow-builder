@@ -23,11 +23,13 @@ export interface TranscriptAutoScrollState {
    */
   readonly lastStopIndex: number;
   /**
-   * Van-e kinyitott vagy becsukott sor, aminek az új magasságát a lista még
-   * nem mérte meg. Amíg igaz, a jelentések a mérés előtti elrendezést írják
-   * le, ezért nem kapcsolhatják vissza a követést.
+   * Szünetelteti-e a követést egy sor váltása: egy becsukás, aminek az új
+   * magasságát a lista még nem mérte meg, vagy egy kinyitás, amiből a
+   * felhasználó még nem tért vissza az aljára, és az ugrás gombot sem nyomta
+   * meg (user döntés 2026-09-25). Amíg igaz, egy jelentés nem kapcsolhatja
+   * vissza a követést.
    */
-  readonly isToggleUnmeasured: boolean;
+  readonly isPausedByToggle: boolean;
 }
 
 /**
@@ -40,14 +42,14 @@ export interface TranscriptAutoScrollState {
  *   még nincs csatolva, és a csatoláskor fog), különben a sorok a nem
  *   látottak közé kerülnek.
  * - `jump_requested`: a felhasználó megnyomta az "ugrás az aljára" gombot.
- * - `row_toggle_started`: a felhasználó kinyitott vagy becsukott egy sort,
- *   és a lista a sor új magasságát még nem mérte meg.
- * - `row_toggle_settled`: a kinyitás vagy becsukás lezárult: a lista megmérte
- *   a sort és jelentett, vagy a sor a mérés előtt visszaállt (egy képkockán
- *   belüli ki-be csukás).
- * - `bottom_reached_while_unmeasured`: a még nem mért váltás alatt a lista
- *   előbb elhagyta az alját, majd egy jelentés szerint újra az utolsó sort
- *   mutatja (a felhasználó visszagörgetett az aljára).
+ * - `row_toggle_started`: a felhasználó kinyitott vagy becsukott egy sort, és
+ *   a követés szünetel.
+ * - `row_toggle_settled`: a szünet az utolsó jelentés szerint zárul: a
+ *   becsukott sorok mérése megjött, vagy minden váltás visszaállt (páros
+ *   számú kattintás ugyanazon a fejlécen).
+ * - `bottom_reached_while_paused`: a szünet alatt a lista előbb elhagyta az
+ *   alját, majd egy jelentés szerint újra az utolsó sort mutatja (a
+ *   felhasználó visszagörgetett az aljára).
  */
 export type TranscriptAutoScrollAction =
   | { readonly type: 'rows_rendered'; readonly stopIndex: number; readonly rowCount: number }
@@ -55,4 +57,4 @@ export type TranscriptAutoScrollAction =
   | { readonly type: 'jump_requested' }
   | { readonly type: 'row_toggle_started' }
   | { readonly type: 'row_toggle_settled' }
-  | { readonly type: 'bottom_reached_while_unmeasured' };
+  | { readonly type: 'bottom_reached_while_paused' };

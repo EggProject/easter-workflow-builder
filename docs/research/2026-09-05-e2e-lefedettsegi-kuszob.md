@@ -1435,3 +1435,41 @@ küszöb a mért értékre húzva, felfelé kerekítés nélkül: 99.08 / 98.53 
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (99.09 / 98.54 / 99.46 / 99.06) mind a négy metrika `ERROR`
 sorral bukik (négy `ERROR`, exit 1).
+
+## 36. Az utolsó sor kinyitása is megállítja a követést, utáni ratchet (2026-09-25): két küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntése: egy sor kinyitása a mérés után is szünetelteti a
+követést, akkor is, ha az utolsó sor nyílt ki (`docs/research/2026-09-23-transcript-panel-meresek.md` 18. szekció). Az e2e készlet 303 tesztre bővült: az utolsó sor kinyitása négy úton, három
+időzítéssel, két témában (24), a becsukás két tesztje (4), a görgetés rögzítés teszt pedig egyetlen,
+csak a konfigurációt őrző tesztté szűkült (2 helyett 1), a kinyitott utolsó sor régi tesztje (2)
+megszűnt.
+
+**Egy közbenső mérés, új fedetlen tétellel.** Az első teljes futás (301 teszt, mind zöld) után a
+branches 741/753 lett (98,41, a küszöb 98.53 alatt, exit 1): az új fedetlen ág a
+`reduce-transcript-auto-scroll.ts` `row_toggle_settled` ágának az a fele, amikor a lezáráskor az
+utolsó sor nem látszik. Korábban a nem utolsó sor kinyitásának mérése futtatta; az új szabályban a
+kinyitást a mérés már nem zárja, tehát csak a becsukás és a párosított kattintás juthat ide. A
+ratchet szabálya szerint (szabálykönyv 8. szekció: a fedetlen darabszám nőtt) a küszöb nem
+csökkenthető, ezért új e2e teszt fedi: felgörgetett listán egy sor kinyitása, majd a mérése után a
+becsukása; az új sor után a gomb "2 új esemény", és a lista nem görget (`sse-real-server.spec.ts`,
+mindkét témában).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**303 teszt, mind zöld**; a sandboxban négy `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (35. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1635 / 1650     | **99.09** | 99.08                      | 15 -> **15**                   |
+| branches   | 744 / 755       | **98.54** | 98.53                      | 11 -> **11**                   |
+| functions  | 552 / 555       | **99.45** | 99.45                      | 3 -> **3**                     |
+| lines      | 1575 / 1590     | **99.05** | 99.05                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `transcript-panel` téma minden fájlja mind a négy metrikán 100
+százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a mért értékre
+húzva, felfelé kerekítés nélkül: **99.09** / **98.54** / 99.45 / 99.05 (`apps/web/package.json`; a
+pontos arányok 99,0909 / 98,5430 / 99,4595 / 99,0566). **Az igazolás:** a beállított küszöbbel
+`bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
+küszöbbel (99.10 / 98.55 / 99.46 / 99.06) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
+exit 1).

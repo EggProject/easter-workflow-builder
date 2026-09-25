@@ -7,7 +7,7 @@ const FOLLOWING: TranscriptAutoScrollState = {
   settledRowCount: 10,
   unseenCount: 0,
   lastStopIndex: 9,
-  isToggleUnmeasured: false,
+  isPausedByToggle: false,
 };
 
 describe('reduceTranscriptAutoScroll', () => {
@@ -19,7 +19,7 @@ describe('reduceTranscriptAutoScroll', () => {
         settledRowCount: 10,
         unseenCount: 0,
         lastStopIndex: 12,
-        isToggleUnmeasured: false,
+        isPausedByToggle: false,
       });
     });
 
@@ -69,35 +69,35 @@ describe('reduceTranscriptAutoScroll', () => {
     });
   });
 
-  it('jump_requested visszakapcsolja a követést, nullázza a nem látott sorokat, és lezárja a mérésre várakozást', () => {
+  it('jump_requested visszakapcsolja a követést, nullázza a nem látott sorokat, és lezárja a sor váltás szünetét', () => {
     const waiting: TranscriptAutoScrollState = {
       ...FOLLOWING,
       isFollowing: false,
       unseenCount: 4,
-      isToggleUnmeasured: true,
+      isPausedByToggle: true,
     };
     expect(reduceTranscriptAutoScroll(waiting, { type: 'jump_requested' })).toEqual({
       ...waiting,
       isFollowing: true,
       unseenCount: 0,
-      isToggleUnmeasured: false,
+      isPausedByToggle: false,
     });
   });
 
   describe('sor kinyitása vagy becsukása', () => {
-    const TOGGLED: TranscriptAutoScrollState = { ...FOLLOWING, isFollowing: false, isToggleUnmeasured: true };
+    const TOGGLED: TranscriptAutoScrollState = { ...FOLLOWING, isFollowing: false, isPausedByToggle: true };
 
-    it('row_toggle_started kikapcsolja a követést a mérésig', () => {
+    it('row_toggle_started kikapcsolja a követést, és szünetet indít', () => {
       expect(reduceTranscriptAutoScroll(FOLLOWING, { type: 'row_toggle_started' })).toEqual(TOGGLED);
     });
 
-    it('a mérés előtti jelentés akkor sem kapcsolja vissza a követést, ha szerinte az utolsó sor látható', () => {
+    it('a szünet alatti jelentés akkor sem kapcsolja vissza a követést, ha szerinte az utolsó sor látható', () => {
       expect(reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_rendered', stopIndex: 9, rowCount: 10 })).toEqual(
         TOGGLED,
       );
     });
 
-    it('a mérés előtti, felfelé mozdult tartományt jelző jelentést rögzíti', () => {
+    it('a szünet alatti, felfelé mozdult tartományt jelző jelentést rögzíti', () => {
       expect(reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_rendered', stopIndex: 6, rowCount: 10 })).toEqual({
         ...TOGGLED,
         lastStopIndex: 6,
@@ -112,26 +112,26 @@ describe('reduceTranscriptAutoScroll', () => {
       const pushedOut: TranscriptAutoScrollState = { ...TOGGLED, lastStopIndex: 6 };
       expect(reduceTranscriptAutoScroll(pushedOut, { type: 'row_toggle_settled' })).toEqual({
         ...pushedOut,
-        isToggleUnmeasured: false,
+        isPausedByToggle: false,
       });
     });
 
-    it('bottom_reached_while_unmeasured lezárja a várakozást, visszakapcsolja a követést és nullázza a nem látott sorokat', () => {
+    it('bottom_reached_while_paused lezárja a szünetet, visszakapcsolja a követést és nullázza a nem látott sorokat', () => {
       const waiting: TranscriptAutoScrollState = { ...TOGGLED, unseenCount: 3, lastStopIndex: 12, settledRowCount: 13 };
-      expect(reduceTranscriptAutoScroll(waiting, { type: 'bottom_reached_while_unmeasured' })).toEqual({
+      expect(reduceTranscriptAutoScroll(waiting, { type: 'bottom_reached_while_paused' })).toEqual({
         ...waiting,
         isFollowing: true,
         unseenCount: 0,
-        isToggleUnmeasured: false,
+        isPausedByToggle: false,
       });
     });
 
-    it('row_toggle_settled a várakozás alatt érkezett, még nem látott sorokat nem nullázza', () => {
+    it('row_toggle_settled a szünet alatt érkezett, még nem látott sorokat nem nullázza', () => {
       const arrived = reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_arrived', rowCount: 11, isFollowed: false });
       expect(arrived.unseenCount).toBe(1);
       expect(reduceTranscriptAutoScroll(arrived, { type: 'row_toggle_settled' })).toEqual({
         ...arrived,
-        isToggleUnmeasured: false,
+        isPausedByToggle: false,
       });
     });
   });

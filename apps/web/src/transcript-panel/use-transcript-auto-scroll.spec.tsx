@@ -256,11 +256,13 @@ describe('useTranscriptAutoScroll', () => {
 
   /**
    * Egy sor fejléce: `aria-expanded` gomb, benne a cím, ahogy a valódi
-   * sorban. A kattintás célja a cím (a gombon BELÜLI elem).
+   * sorban. A kattintás célja a cím (a gombon BELÜLI elem). A gomb itt nem
+   * vált: az `isExpanded` a kattintás előtti állapot, tehát a kattintás
+   * `false` mellett kinyitás, `true` mellett becsukás.
    */
-  function addDisclosure(element: HTMLDivElement): HTMLSpanElement {
+  function addDisclosure(element: HTMLDivElement, isExpanded = false): HTMLSpanElement {
     const header = document.createElement('button');
-    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('aria-expanded', String(isExpanded));
     const title = document.createElement('span');
     header.append(title);
     element.append(header);
@@ -328,14 +330,68 @@ describe('useTranscriptAutoScroll', () => {
       expect(current().unseenCount).toBe(1);
     });
 
-    it('ha a mérés után is látszik az utolsó sor (például az utolsó sor nyílt ki), a követés visszakapcsol: a következő új sor görget', () => {
+    it('a kinyitás szünete a mérés után is tart, akkor is, ha az utolsó sor látszik (az utolsó sor nyílt ki): a következő új sor nem görget (user döntés 2026-09-25)', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
       click(addDisclosure(element));
       renderRows(10, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('a kinyitott utolsó sor görgetése az alj elhagyása nélkül nem visszatérés; a következő, nem követett sor után a kézi visszatérés az aljára igen', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      renderRows(10, createRowHeight());
+      // A felhasználó a kinyitott törzset olvassa: a tartomány eleje mozdul,
+      // az utolsó sor végig látszik.
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+      renderRows(11);
       expect(scrollToRow).not.toHaveBeenCalled();
 
+      // Az új sor nem látszik (a lista elhagyta az alját), majd a felhasználó
+      // odagörget.
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 4, stopIndex: 10 });
+      });
+      expect(current().unseenCount).toBe(0);
+      renderRows(12);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+    });
+
+    it('a becsukás szünete a mérésig tart: ha a mérés után is látszik az utolsó sor, a követés visszakapcsol, és a következő új sor görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element, true));
+      renderRows(10, createRowHeight());
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      renderRows(11);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+      expect(current().unseenCount).toBe(0);
+    });
+
+    it('a kinyitott sor becsukása ugyanazon a fejlécen a mérés után is lezárja a szünetet: a predikátum dönt', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      const title = addDisclosure(element);
+      click(title);
+      renderRows(10, createRowHeight());
+      click(title);
       renderRows(11);
       expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
       expect(current().unseenCount).toBe(0);
@@ -364,12 +420,12 @@ describe('useTranscriptAutoScroll', () => {
       expect(scrollToRow).not.toHaveBeenCalled();
     });
 
-    it('a mérés és a lezárás közé eső új kattintás a lezárást a saját méréséig elhalasztja', () => {
+    it('a mérés és a lezárás közé eső új becsukás a lezárást a saját méréséig elhalasztja', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      click(addDisclosure(element));
-      const second = addDisclosure(element);
+      click(addDisclosure(element, true));
+      const second = addDisclosure(element, true);
       // A mérés commitja után, a lezárás commitjában, a lezárás előtt.
       probe = {
         skippedCommits: 1,

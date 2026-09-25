@@ -22,21 +22,22 @@ import type { TranscriptAutoScrollAction, TranscriptAutoScrollState } from './tr
  * **Az érkezés** nem számol, ha a panel követte, különben a nem látott
  * sorok számához adódik.
  *
- * **Egy sor kinyitása vagy becsukása** a lista mérése előtt kikapcsolja a
- * követést: a sor új magassága ekkor már a DOM-ban áll, de a lista még a
- * régivel számol, tehát a jelentései a mérés előtti elrendezést írják le, és
- * egy ekkor érkező sor követése a kinyitott sort elrántaná. Amíg a mérés
- * nem jött meg, egy jelentés a követést nem kapcsolhatja vissza. A lezárás
- * után a predikátum dönt, az utolsó jelentés szerint; a hook a lezárást a
- * mérés utáni jelentés után adja ki (`use-transcript-auto-scroll.ts`). Az
- * ugrás gomb a várakozást is lezárja.
+ * **Egy sor kinyitása vagy becsukása** szünetelteti a követést, és amíg a
+ * szünet tart, egy jelentés a követést nem kapcsolhatja vissza. A becsukás
+ * szünete a lista méréséig tart (addig a jelentések a mérés előtti
+ * elrendezést írják le), utána a predikátum dönt, az utolsó jelentés
+ * szerint. A kinyitás szünete a mérés után is megmarad (user döntés
+ * 2026-09-25): a kinyitott sor akkor is a helyén marad, ha maga az utolsó
+ * sor, és a mérés utáni jelentés szerint látszik. A szünetet az ugrás gomb,
+ * a kézi visszatérés az aljára és a váltások visszaállása (páros számú
+ * kattintás ugyanazon a fejlécen) zárja; hogy melyik váltás mikor zárul, a
+ * hook tartja nyilván (`use-transcript-auto-scroll.ts`).
  *
- * **A kézi visszatérés az aljára** (user döntés 2026-09-24) szintén lezárja a
- * várakozást, és visszakapcsolja a követést: ha a mérés elmarad (a sor a
- * mérése előtt leszerelődik, például fülváltáskor), enélkül csak az ugrás gomb
- * oldaná fel. Hogy a jelentés valóban visszatérés-e, nem pedig a kattintás
- * előtti elrendezés késve érkező jelentése, azt a hook dönti el
- * (`use-transcript-auto-scroll.ts`).
+ * **A kézi visszatérés az aljára** (user döntés 2026-09-24) visszakapcsolja
+ * a követést. Hogy a jelentés valóban visszatérés-e, nem pedig a kattintás
+ * előtti elrendezés késve érkező jelentése, vagy egy kinyitott utolsó sor
+ * görgetése, azt a hook dönti el: a szünet alatt a listának előbb el kell
+ * hagynia az alját.
  */
 export function reduceTranscriptAutoScroll(
   state: TranscriptAutoScrollState,
@@ -44,7 +45,7 @@ export function reduceTranscriptAutoScroll(
 ): TranscriptAutoScrollState {
   switch (action.type) {
     case 'rows_rendered': {
-      if (isLastRowVisible(action, action.rowCount) && !state.isToggleUnmeasured) {
+      if (isLastRowVisible(action, action.rowCount) && !state.isPausedByToggle) {
         return { ...state, isFollowing: true, unseenCount: 0, lastStopIndex: action.stopIndex };
       }
       const hasMovedUp = action.stopIndex < state.lastStopIndex;
@@ -62,14 +63,14 @@ export function reduceTranscriptAutoScroll(
       };
     }
     case 'jump_requested':
-    case 'bottom_reached_while_unmeasured': {
-      return { ...state, isFollowing: true, unseenCount: 0, isToggleUnmeasured: false };
+    case 'bottom_reached_while_paused': {
+      return { ...state, isFollowing: true, unseenCount: 0, isPausedByToggle: false };
     }
     case 'row_toggle_started': {
-      return { ...state, isFollowing: false, isToggleUnmeasured: true };
+      return { ...state, isFollowing: false, isPausedByToggle: true };
     }
     case 'row_toggle_settled': {
-      const settled = { ...state, isToggleUnmeasured: false };
+      const settled = { ...state, isPausedByToggle: false };
       return isLastRowVisible({ stopIndex: state.lastStopIndex }, state.settledRowCount)
         ? { ...settled, isFollowing: true, unseenCount: 0 }
         : settled;
