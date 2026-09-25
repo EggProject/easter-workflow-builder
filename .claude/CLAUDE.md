@@ -863,7 +863,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A fenti védelem 2026-09-15-ig KIZÁRÓLAG SZÖVEGES volt**, és egy független ellenőrzés jogosan
   mondta ki, hogy semmi nem buktatja el azt a munkamenetet, ami megint saját, eldobható scriptet ír
   saját, éltelen fixtúrával. A **gépi** védelem neve
-  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hat invariáns a
+  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hét invariáns a
   `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
   Amit fog: a
   szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
@@ -892,6 +892,27 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   a futás nézet két új képét is beleértve. **A karakterosztályos ablak általános tanulsága:** egy
   greppes invariánsban a tiltott karakterosztály mindig hagy kerülő utat egy másik karakterrel, a
   puszta együttes jelenlét vizsgálata nem.
+- **A negyedik mért rés: a kép formátuma és az írás módja (2026-09-25, javítva).** Az első
+  invariáns csak a `path` opciót, a második csak a PNG fájlnevet nézte, ezért egy JPEG formátumú,
+  memóriába kért képernyőkép plusz egy `writeFileSync('x.jpg')` hívás bármely commitolt fájlban
+  mind a hat invariánson átment (egy független ellenőrzés mérte, és saját injekcióval is: 6/6
+  zöld, egy stream alapú és egy két fájlra bontott, író segédfüggvényes változattal együtt). A
+  javítás a puszta együttes jelenlétre épül, a formátumtól és az írás módjától függetlenül: egy
+  képernyőképet készítő fájl (Playwright API hívás, vagy a CLI `screenshot` alparancsa), és minden
+  fájl, ami azt közvetve is importálja, nem hivatkozhat a Node fájlrendszer vagy folyamatindító
+  moduljára, a `Bun.write`-ra, a Playwright tesztcsatolmányára vagy letöltés mentésére, és a `path`
+  opciót sem használhatja; mindaz, amit ez a kör importál (workspace csomagon át is), szintén nem
+  hivatkozhat lemezre író modulra, a lefedettségi fixtúra (`coverage-fixture.ts`) kimondott
+  kivételével; a Playwright `use` képernyőkép opciója `off`-tól eltérő értékkel, és a CLI
+  alparancsa shell scriptből önmagában tilos. A három injekció utána a `test` kapun bukik (1/7), a
+  jogos, memóriában mérő pixel tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét tizenegy
+  szintetikus eseten futtatja (a kerülő utak és a jogos alak), tehát egy gyengítése maga is bukik.
+  **Nyitott pont (4. szekció 2. pont):** a Node beépített moduljain kívüli író csomag (például egy
+  új függőség) és a szándékos elrejtés (a hívás vagy a modul nevének futásidejű összerakása) nem
+  látszik. Mi a viselkedés addig: ezekre gépi kényszer nincs, a természetük a 2026-09-15-i két elvi
+  korláté (szándékos megkerülés, nem észrevétlen visszatérés), de a user ezeket külön nem fogadta
+  el. Mi zárná le: a user döntése, hogy az elvi korlátok közé tartoznak-e. Forrás: `tooling/scripts`
+  CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN

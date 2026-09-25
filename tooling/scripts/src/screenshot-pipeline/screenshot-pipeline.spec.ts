@@ -13,13 +13,13 @@
 // volt: egy mondat a `.claude/CLAUDE.md` 12. szekciójában és az `apps/web`
 // CLAUDE.md fájljában. Semmi nem buktatta el azt a munkamenetet, ami megint
 // saját, eldobható scriptet ír saját, éltelen fixtúrával. Ez a fájl az a
-// gépi kényszer: hat invariáns, mindegyik nem nulla kilépési kódú bukást ad a
+// gépi kényszer: hét invariáns, mindegyik nem nulla kilépési kódú bukást ad a
 // `bun run test` kapun, ami tagja a kilenc kapunak és szerepel a CI
 // összesítő `ci` job `needs` listájában.
 //
 // A VÉDELEM KÉT RÉTEGE:
 //
-//   1. A COMMITOLT FA alakja (1 ... 5. invariáns). A git INDEXET olvassa
+//   1. A COMMITOLT FA alakja (1 ... 5. és 7. invariáns). A git INDEXET olvassa
 //      vissza nyers szövegként, statikus elemzés helyett - ugyanaz a minta,
 //      mint a `no-em-dash` és a `no-preserve-symlinks` témáé. Ez fogja meg
 //      azt az esetet, amikor egy munkamenet MÁSIK fájlba ír képernyőkép
@@ -141,11 +141,69 @@ const PNG_EXTENSION = ['p', 'ng'].join('');
  * védelmet, 2026-09-15). Bármilyen tiltott karakterosztállyal ugyanez a kerülő
  * út nyílna újra egy másik karakterrel, ezért az ablak teljesen megszűnt: a
  * fájlnak egyszerűen nem lehet EGYSZERRE képernyőkép hívása és `path`
- * opciója. Mérve a commitolt fán: erre a két minta EGYÜTT pontosan egyetlen
- * fájlra illeszkedik, a szentesített `capture-screenshots.ts`-re, tehát a
- * szigorítás ma nulla hamis jelzést ad.
+ * opciója (2026-09-25 óta a képernyőkép kör egyetlen fájljának sem,
+ * `findScreenshotDiskWriters`). Mérve a commitolt fán: erre a két minta
+ * EGYÜTT pontosan egyetlen fájlra illeszkedik, a szentesített
+ * `capture-screenshots.ts`-re, tehát a szigorítás ma nulla hamis jelzést ad.
  */
 const PATH_OPTION_PATTERN = /\bpath\s*:/;
+
+/**
+ * Képernyőképet készítő hívás: a Playwright API hívása, vagy a CLI
+ * `screenshot` alparancsa programból indítva (a parancs argumentum listájában
+ * álló szó mint string literál).
+ */
+const CAPTURE_CALL_PATTERN = new RegExp(String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]`);
+
+/**
+ * A CLI `screenshot` alparancsa shell scriptből: a `playwright` és a
+ * `screenshot` szó egyazon `.sh` fájlban. Az alparancs a képet mindig a
+ * megadott fájlba írja (<https://playwright.dev/docs/cli>), tehát ez önmagában
+ * lemezre írás.
+ */
+const SHELL_CAPTURE_PATTERNS = [/\bplaywright\b/, new RegExp(String.raw`\b${SCREENSHOT_WORD}\b`)] as const;
+
+/**
+ * A Playwright `use` beállításának képernyőkép opciója bármely, `off`-tól
+ * eltérő értékkel: a Playwright ilyenkor a tesztek képernyőképét maga írja a
+ * teszt kimeneti könyvtárába ("Trace files, screenshots and videos will appear
+ * in the test output directory", <https://playwright.dev/docs/test-use-options>).
+ */
+const SCREENSHOT_OPTION_PATTERN = new RegExp(String.raw`\b${SCREENSHOT_WORD}\s*:\s*(?:\{|['"](?!off['"]))`);
+
+/**
+ * Lemezre írni képes hivatkozás, a kép formátumától és az írás módjától
+ * függetlenül: a Node beépített fájlrendszer és folyamatindító moduljának
+ * megnevezése (statikus és dinamikus import, `require`, tehát a `writeFile*`,
+ * a stream, a fájlleíró és egy külső parancs is ide fut), a `Bun.write`, és a
+ * Playwright két saját író hívása: a tesztcsatolmány, amit a futó a
+ * lemezre ment ("used as the prefix of file name when saving to disk",
+ * <https://playwright.dev/docs/api/class-testinfo#test-info-attach>), és a
+ * letöltés mentése (<https://playwright.dev/docs/api/class-download#download-save-as>).
+ * A 2026-09-25-ig élő alak csak a `path` opciót és a PNG fájlnevet nézte, és
+ * egy JPEG formátumú képernyőkép hívás plusz `writeFileSync('x.jpg')` pár
+ * mind a hat invariánson átment (mérve, egy független ellenőrzés és saját
+ * injekció).
+ */
+const DISK_WRITER_PATTERN = new RegExp(
+  String.raw`['"](?:node:)?(?:fs|fs/promises|child_process)['"]|\bBun\.write\b|\.attach\(|\bsaveAs\(`,
+);
+
+/**
+ * Fájlok, amik a képernyőkép körben (lásd `findScreenshotDiskWriters`)
+ * jogosan írnak lemezre, a saját fájlukon kívül érvényes kivétellel: a
+ * `coverage-fixture.ts` minden teszt után az istanbul lefedettségi adatot
+ * menti a `.nyc_output/` alá, és szinte minden e2e teszt importálja, a
+ * képernyőképet memóriában mérő pixel tesztek is. Saját fájlán belül a
+ * képernyőkép hívás és a lemezre írás együttes tilalma rá is áll.
+ */
+const ALLOWED_WRITER_FILES: ReadonlySet<string> = new Set(['apps/web/e2e/coverage-fixture.ts']);
+
+/**
+ * Az import hivatkozás: statikus és dinamikus import, újraexportálás és
+ * `require`. A fájlnév a string literál tartalma.
+ */
+const IMPORT_SPECIFIER_PATTERN = /\b(?:from|import|require)[\s(]*['"]([^'"]+)['"]/g;
 
 /**
  * A Playwright saját, lemezre író képösszehasonlító assertionjei. A repo nem
@@ -159,10 +217,8 @@ const SNAPSHOT_ASSERTION_PATTERN = new RegExp(
 
 /**
  * Bármilyen képernyőkép hívás, `path` opció nélkül is. Önmagában nem hiba (a
- * pixel mérés is ilyet hív), de mindkét invariáns ebből indul: a `path`
- * opcióval együtt a szállított kép közvetlen kiírását jelenti (1. invariáns),
- * a PNG fájlnévvel együtt pedig azt a kerülő utat, ami a buffert a hívástól
- * elválasztva, `writeFileSync` hívással írja lemezre (2. invariáns).
+ * pixel mérés is ilyet hív); a PNG fájlnévvel együtt a 2. invariáns tiltja.
+ * Az 1. invariáns bővebb mintából indul (`CAPTURE_CALL_PATTERN`).
  */
 const ANY_SCREENSHOT_CALL = `${SCREENSHOT_WORD}(`;
 
@@ -191,18 +247,138 @@ interface CodeFile {
 }
 
 /**
- * Minden commitolt kódfájl a szentesített fájlon KÍVÜL. A git index a
+ * Minden commitolt kódfájl, a szentesített fájllal együtt. A git index a
  * bemenet, nem a lemez: egy nem commitolt, eldobható script amúgy sem
  * kerülhet be a repóba, és a CI is a commitolt fát látja.
  */
-function listOtherCodeFiles(root: string): readonly CodeFile[] {
+function listCodeFiles(root: string): readonly CodeFile[] {
   return listTrackedFiles(root)
-    .filter(
-      (trackedPath) =>
-        trackedPath !== SANCTIONED_CAPTURE_FILE &&
-        CHECKED_EXTENSIONS.some((extension) => trackedPath.endsWith(extension)),
-    )
+    .filter((trackedPath) => CHECKED_EXTENSIONS.some((extension) => trackedPath.endsWith(extension)))
     .map((trackedPath) => ({ trackedPath, content: readFileSync(path.join(root, trackedPath), 'utf8') }));
+}
+
+/**
+ * Minden commitolt kódfájl a szentesített fájlon KÍVÜL.
+ */
+function listOtherCodeFiles(root: string): readonly CodeFile[] {
+  return listCodeFiles(root).filter((file) => file.trackedPath !== SANCTIONED_CAPTURE_FILE);
+}
+
+/**
+ * A workspace csomagok neve és a belépési pontjuk (`src/index.ts`), a
+ * commitolt `package.json` fájlokból.
+ */
+function readPackageEntries(root: string): ReadonlyMap<string, string> {
+  const entries = new Map<string, string>();
+  const manifests = listTrackedFiles(root).filter((file) => file.endsWith('package.json'));
+  for (const trackedPath of manifests) {
+    const parsed: unknown = JSON.parse(readTrackedFile(root, trackedPath));
+    if (typeof parsed === 'object' && parsed !== null && 'name' in parsed && typeof parsed.name === 'string') {
+      entries.set(parsed.name, path.posix.join(path.posix.dirname(trackedPath), 'src', 'index.ts'));
+    }
+  }
+  return entries;
+}
+
+/**
+ * Egy fájl importjai a commitolt kódfájlok közül: relatív útvonal (pontos
+ * fájlnévvel, vagy a vizsgált kiterjesztések egyikével kiegészítve) és
+ * workspace csomag (a belépési pontja).
+ */
+function resolveImports(
+  file: CodeFile,
+  knownPaths: ReadonlySet<string>,
+  packageEntries: ReadonlyMap<string, string>,
+): readonly string[] {
+  const imported: string[] = [];
+  for (const match of file.content.matchAll(IMPORT_SPECIFIER_PATTERN)) {
+    const specifier = match[1] ?? '';
+    const packageEntry = packageEntries.get(specifier);
+    if (packageEntry !== undefined) {
+      imported.push(packageEntry);
+      continue;
+    }
+    if (!specifier.startsWith('.')) {
+      continue;
+    }
+    const base = path.posix.normalize(path.posix.join(path.posix.dirname(file.trackedPath), specifier));
+    const candidates = [base, ...CHECKED_EXTENSIONS.map((extension) => `${base}${extension}`)];
+    imported.push(...candidates.filter((candidate) => knownPaths.has(candidate)));
+  }
+  return imported.filter((candidate) => knownPaths.has(candidate));
+}
+
+/**
+ * Az irányított gráfban a kezdő halmazból elérhető csúcsok, a kezdőkkel együtt.
+ */
+function reachable(start: Iterable<string>, edges: ReadonlyMap<string, readonly string[]>): ReadonlySet<string> {
+  const seen = new Set(start);
+  const queue = [...seen];
+  for (let next = queue.pop(); next !== undefined; next = queue.pop()) {
+    const unseen = (edges.get(next) ?? []).filter((neighbour) => !seen.has(neighbour));
+    for (const neighbour of unseen) {
+      seen.add(neighbour);
+      queue.push(neighbour);
+    }
+  }
+  return seen;
+}
+
+/**
+ * A képernyőképet lemezre író fájlok a szentesített fájlon kívül, a kép
+ * formátumától és az írás módjától függetlenül, PUSZTA EGYÜTTES JELENLÉT
+ * alapján (karakterosztályos ablak nélkül, `.claude/CLAUDE.md` 12. szekció).
+ *
+ * - Közvetlen író: a Playwright `use` képernyőkép opciója, a CLI alparancsa
+ *   shell scriptből, vagy a lemezre író képösszehasonlító assertion.
+ * - A KÉPERNYŐKÉP KÖR: a képernyőképet készítő fájlok, és minden fájl, ami
+ *   ezeket (közvetve is) importálja. Ezek egyike sem hivatkozhat lemezre
+ *   írni képes modulra vagy hívásra, és a `path` opciót sem használhatja:
+ *   a kép a hívótól a hívóig ugyanabban a körben halad.
+ * - A KÖR FÜGGŐSÉGEI: mindaz, amit a kör (közvetve is) importál. Ezek nem
+ *   hivatkozhatnak lemezre írni képes modulra (a `path` kulcs itt szabad,
+ *   mert egy függőség adatszerkezetében más jelentésű), az
+ *   `ALLOWED_WRITER_FILES` kivételével. Enélkül egy saját író segédfüggvény
+ *   egy másik fájlban (`saveImage(név, await képernyőkép())`) átcsúszna.
+ */
+function findScreenshotDiskWriters(
+  files: readonly CodeFile[],
+  packageEntries: ReadonlyMap<string, string>,
+): readonly string[] {
+  const knownPaths = new Set(files.map((file) => file.trackedPath));
+  const contentOf = new Map(files.map((file) => [file.trackedPath, file.content]));
+  const importsOf = new Map(files.map((file) => [file.trackedPath, resolveImports(file, knownPaths, packageEntries)]));
+  const importersOf = new Map<string, string[]>();
+  for (const [importer, imported] of importsOf) {
+    for (const target of imported) {
+      importersOf.set(target, [...(importersOf.get(target) ?? []), importer]);
+    }
+  }
+
+  const direct = files.filter(
+    (file) =>
+      SCREENSHOT_OPTION_PATTERN.test(file.content) ||
+      SNAPSHOT_ASSERTION_PATTERN.test(file.content) ||
+      (file.trackedPath.endsWith('.sh') && SHELL_CAPTURE_PATTERNS.every((pattern) => pattern.test(file.content))),
+  );
+  const capturing = files
+    .filter((file) => file.trackedPath !== SANCTIONED_CAPTURE_FILE && CAPTURE_CALL_PATTERN.test(file.content))
+    .map((file) => file.trackedPath);
+  const circle = reachable(capturing, importersOf);
+  const dependencies = reachable(circle, importsOf);
+
+  const offenders = new Set(direct.map((file) => file.trackedPath));
+  for (const trackedPath of dependencies) {
+    const content = contentOf.get(trackedPath) ?? '';
+    const isOffender = circle.has(trackedPath)
+      ? DISK_WRITER_PATTERN.test(content) || PATH_OPTION_PATTERN.test(content)
+      : DISK_WRITER_PATTERN.test(content) && !ALLOWED_WRITER_FILES.has(trackedPath);
+    if (isOffender) {
+      offenders.add(trackedPath);
+    }
+  }
+  offenders.delete(SANCTIONED_CAPTURE_FILE);
+  return [...offenders].toSorted((left, right) => (left < right ? -1 : Number(left > right)));
 }
 
 function readTrackedFile(root: string, trackedPath: string): string {
@@ -284,15 +460,17 @@ function readScripts(root: string, trackedPath: string): Readonly<Record<string,
   return parsed.scripts;
 }
 
+/**
+ * A (7) invariáns eseteinek import sora a Node fájlrendszer moduljából.
+ */
+function fsImport(names: string): string {
+  return `import { ${names} } from 'node:fs';\n`;
+}
+
 describe('a képernyőkép készítés egyetlen szentesített útja (gépi kényszer)', () => {
-  it('(1) a szentesített fájlon kívül egyetlen commitolt fájl sem ír képernyőképet lemezre', () => {
+  it('(1) a szentesített fájlon kívül egyetlen commitolt fájl sem ír képernyőképet lemezre, a formátumtól és az írás módjától függetlenül, az import gráfon át sem', () => {
     const root = repoRoot();
-    const offenders = listOtherCodeFiles(root).filter(
-      (file) =>
-        (file.content.includes(ANY_SCREENSHOT_CALL) && PATH_OPTION_PATTERN.test(file.content)) ||
-        SNAPSHOT_ASSERTION_PATTERN.test(file.content),
-    );
-    expect(offenders.map((file) => file.trackedPath)).toEqual([]);
+    expect(findScreenshotDiskWriters(listCodeFiles(root), readPackageEntries(root))).toEqual([]);
   });
 
   it('(2) a szentesített fájlon kívül egyetlen commitolt fájl sem tart együtt képernyőkép hívást és PNG fájlnevet', () => {
@@ -360,6 +538,129 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
       for (const screenName of REQUIRED_SCREEN_NAMES) {
         expect(imageNames.filter((name) => name.startsWith(screenName) && name.includes(themeName))).not.toEqual([]);
       }
+    }
+  });
+
+  it('(7) az (1) ellenőrzés elkapja az ismert kerülő utakat, és a memóriában mérő, jogos alakot átengedi', () => {
+    // A minták darabokból állnak össze, hogy ez a fájl ne tartalmazza őket
+    // szó szerint (lásd a `SCREENSHOT_WORD` doksiját).
+    const call = `await page.${SCREENSHOT_WORD}({ type: 'jpeg' })`;
+    const cases: readonly {
+      readonly name: string;
+      readonly files: readonly CodeFile[];
+      readonly packageEntries?: ReadonlyMap<string, string>;
+      readonly offenders: readonly string[];
+    }[] = [
+      {
+        name: 'JPEG kép és writeFileSync egy fájlban',
+        files: [{ trackedPath: 'e2e/a.ts', content: `${fsImport('writeFileSync')}writeFileSync('x.jpg', ${call});` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'stream',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `${fsImport('createWriteStream')}createWriteStream('x.jpg').end(${call});`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'író segédfüggvény egy másik fájlban',
+        files: [
+          { trackedPath: 'e2e/save.ts', content: `${fsImport('writeFileSync')}export const save = writeFileSync;` },
+          { trackedPath: 'e2e/a.ts', content: `import { save } from './save.ts';\nsave('x.jpg', ${call});` },
+        ],
+        offenders: ['e2e/save.ts'],
+      },
+      {
+        name: 'író segédfüggvény workspace csomagban',
+        files: [
+          { trackedPath: 'packages/io/src/index.ts', content: `export { save } from './save/save.ts';` },
+          {
+            trackedPath: 'packages/io/src/save/save.ts',
+            content: `${fsImport('writeFileSync')}export const save = writeFileSync;`,
+          },
+          { trackedPath: 'e2e/a.ts', content: `import { save } from '@x/io';\nsave('x.jpg', ${call});` },
+        ],
+        packageEntries: new Map([['@x/io', 'packages/io/src/index.ts']]),
+        offenders: ['packages/io/src/save/save.ts'],
+      },
+      {
+        name: 'a képet visszaadó függvény importálója ír',
+        files: [
+          { trackedPath: 'e2e/shot.ts', content: `export const shoot = async (page) => ${call};` },
+          {
+            trackedPath: 'e2e/b.ts',
+            content: `${fsImport('writeFileSync')}import { shoot } from './shot.ts';\nwriteFileSync('x.jpg', await shoot(page));`,
+          },
+        ],
+        offenders: ['e2e/b.ts'],
+      },
+      {
+        name: 'a path opció a hívónál',
+        files: [
+          {
+            trackedPath: 'e2e/shot.ts',
+            content: `export const shoot = async (page, options) => page.${SCREENSHOT_WORD}(options);`,
+          },
+          {
+            trackedPath: 'e2e/b.ts',
+            content: `import { shoot } from './shot.ts';\nawait shoot(page, { path: 'x.jpg' });`,
+          },
+        ],
+        offenders: ['e2e/b.ts'],
+      },
+      {
+        name: 'tesztcsatolmány',
+        files: [{ trackedPath: 'e2e/a.ts', content: `await testInfo.attach('kép', { body: ${call} });` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'a CLI alparancsa programból',
+        files: [
+          {
+            trackedPath: 'tools/a.ts',
+            content: `import { execFileSync } from 'node:child_process';\nexecFileSync('playwright', ['${SCREENSHOT_WORD}', url, 'x.jpg']);`,
+          },
+        ],
+        offenders: ['tools/a.ts'],
+      },
+      {
+        name: 'a CLI alparancsa shell scriptből',
+        files: [{ trackedPath: 'tools/a.sh', content: `bun x playwright --device=x ${SCREENSHOT_WORD} url x.jpg` }],
+        offenders: ['tools/a.sh'],
+      },
+      {
+        name: 'a use képernyőkép opciója',
+        files: [{ trackedPath: 'a.config.ts', content: `export default { use: { ${SCREENSHOT_WORD}: 'on' } };` }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'jogos: memóriában mért kép a lefedettségi fixtúrán át, olvasó teszt, kikapcsolt opció',
+        files: [
+          {
+            trackedPath: 'apps/web/e2e/coverage-fixture.ts',
+            content: `${fsImport('writeFileSync')}export const test = 1;`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/pixel.spec.ts',
+            content: `import { test } from './coverage-fixture.ts';\nconst buffer = ${call};`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/reader.spec.ts',
+            content: `${fsImport('readFileSync')}import { test } from './coverage-fixture.ts';`,
+          },
+          { trackedPath: 'b.config.ts', content: `export default { use: { ${SCREENSHOT_WORD}: 'off' } };` },
+        ],
+        offenders: [],
+      },
+    ];
+    for (const testCase of cases) {
+      expect(findScreenshotDiskWriters(testCase.files, testCase.packageEntries ?? new Map()), testCase.name).toEqual(
+        testCase.offenders,
+      );
     }
   });
 });
