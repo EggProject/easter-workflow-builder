@@ -586,9 +586,15 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   sem küldhető: a hálózati keret a kattintás és a böngésző következő renderelési lépése közé
   nem időzíthető megbízhatóan (mérve, `docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció). Ilyenkor a keret a lapon rögzített, valódi `EventSource` példányon, az esemény
   capture fázisában kiváltott `MessageEvent`-ként érkezik, a hálózati kerettel azonos alakban
-  (`captureEventSources` az `apps/web/e2e/sse-real-server.spec.ts` fájlban); a kapcsolat
+  (`captureEventSources` az `apps/web/e2e/run-view-stream.ts` fájlban); a kapcsolat
   maga a teszt szerveren nyitott. Ez nem a hálózati út mockja, csak az időzítésé, ezért csak
-  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4).
+  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4). A keret mindig a mérés
+  előtt kerül commitba, de nem minden úton ugyanabba, mint a kinyitás: a csak `click` úton
+  (szkriptből kiváltott esemény, amin belül nincs mikrofeladat pont) egyetlen commitba kerül a
+  kinyitással; egér, `Space` és `Enter` úton (valódi bemenet, a figyelők között mikrofeladat
+  pont) a hook kattintás figyelője utáni első commitba, a kinyitás commitja ELŐTT (mérve a React
+  DevTools csatlakozási pontján, `apps/web/measurement/transcript-scroll.ts` `render-sorrend`
+  jelenete, research 17. szekció).
 - **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
   `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
   a mérést meg kell ismételni azokra a motorokra is.
@@ -784,8 +790,11 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
   kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
   a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
-  kinyitott sort elrántotta, már a `dfcaa38` előtt is (40 ms-os streamnél véletlen fázisú
-  kinyitások harmadában). A szabály: felhasználói layout változás után görgetési döntés csak a
+  kinyitott sort elrántotta, már a `dfcaa38` előtt is: 40 ms-os streamnél a véletlen fázisú, csak
+  `click` eseménnyel indított kinyitások mintegy hatodában (a `dfcaa38` előtti hookkal 34/205,
+  bekapcsolt görgetés rögzítéssel, saját mérés 2026-09-25 a repóbeli mérő eszközzel; a korábbi,
+  repón kívüli mérések 12/40 és 23/80, egy független ellenőrzés 13/52 arányt adott, az arány
+  futásonként és gépenként szór, research 17. szekció). A szabály: felhasználói layout változás után görgetési döntés csak a
   mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click` eseményétől a
   mérésig kikapcsolja a követést, és a mérés előtti jelentés nem kapcsolhatja vissza. Védelem: a
   `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` négy
@@ -799,6 +808,24 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kattintás = nincs mérendő változás), a várakozás alatt is számol, és az ugrás gomb mindig lezárja.
   Védelem: `sse-real-server.spec.ts` dupla kattintás tesztjei tárolt sorokkal (research 16.
   szekció).
+- **A mérés kilépése maga is elmaradhat: egy rejtett fülön leszerelt sor sosem kap mérést.** A
+  `c7b2e35` három kilépése (mérés, páros kattintás, ugrás gomb) mellett 375 pixelen a kinyitás és
+  a fülváltás egy feladatban a lista követését végleg leállította: a rejtett sor 0 magasságát a
+  `useDynamicRowHeight` nem tárolja, a sor a szűkült kirajzolt tartományból leszerelődik, a
+  gyorsítótár nem változik, és a kézi görgetés az aljára sem oldotta fel (mérve: a három új sor
+  után 53, 106, 159 pixel lemaradás, "6 új esemény"). A negyedik kilépés a kézi visszatérés az
+  aljára (user döntés 2026-09-24), az alj előzetes elhagyásának feltételével. A tanulság: egy
+  külső jelre (itt a mérésre) váró állapotnál a felhasználó saját, egyértelmű szándéka is legyen
+  kilépés. Védelem: `sse-real-server.spec.ts` fülváltás és ugrás gomb tesztjei, a `bffd75d`
+  állapotán bukik (research 17. szekció).
+- **A böngésző görgetés rögzítése (scroll anchoring) a virtualizált lista mellett saját
+  görgetést csinál.** Bekapcsolt `overflow-anchor` mellett az "ugrás az aljára" utáni első
+  kinyitásoknál a lista a hook nélkül 36 pixelt görgetett (mérve 6/78, kikapcsolva 0/80), és a
+  kézi visszatérés kilépéssel együtt egy teljes elrántást is okozott. A listán ezért
+  `overflow-anchor: none` áll (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A
+  jelenség fázisfüggő, determinisztikusan nem állítható elő; a védelem az e2e teszt, ami a lista
+  kiszámított `overflow-anchor` értékét és az ugrás utáni első kinyitás képkockánkénti helyét is
+  ellenőrzi (research 17. szekció).
 - **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
   pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
@@ -872,6 +899,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   mért szám lehet. `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
   elmozdíthatná az éleket a két felvétel között
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
+- **A számokat előállító mérő eszköz is a repóba tartozik, nem csak a képkészítő.** A
+  transcript görgetés research 16. szekciójának táblái repón kívüli, azóta elveszett scriptből
+  jöttek, tehát a számok nem voltak újra előállíthatók. Azóta a mérő eszköz
+  `apps/web/measurement/transcript-scroll.ts` (`bun run measure:transcript`), ugyanazzal a
+  fixtúrával, mint az e2e (`apps/web/e2e/run-view-stream.ts`). A mérő eszköz csak számot ír
+  (`MEASUREMENT <json>` sorok), képet nem: képernyőképet lemezre kizárólag a szentesített
+  `capture-screenshots.ts` írhat, ezt a `screenshot-pipeline` invariánsai őrzik. Nem `.spec.ts`
+  és nem kapu, mert a verseny jelenete a mért változó miatt időzítőt használ (research 17.
+  szekció, user kérés 2026-09-24).
 
 **Adatbázis és Drizzle**
 

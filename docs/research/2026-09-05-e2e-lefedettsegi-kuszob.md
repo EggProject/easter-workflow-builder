@@ -1379,3 +1379,30 @@ Az összeg pontosan a teljes nevező változása (1627 -> 1621, 753 -> 745, 555 
 igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
 egyetlen századdal magasabb küszöbbel (99.08 / 98.53 / 99.46 / 99.04) mind a négy metrika `ERROR`
 sorral bukik.
+
+## 34. A transcript várakozás kilépései utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `c7b2e35` utómunkája (`docs/research/2026-09-23-transcript-panel-meresek.md` 17.
+szekció): a kinyitás utáni várakozás negyedik kilépése, a kézi visszatérés az aljára
+(`use-transcript-auto-scroll.ts`, `bottom_reached_while_unmeasured`), és a listán
+`overflow-anchor: none`. Az e2e készlet 275 tesztre bővült (a `sse-real-server.spec.ts` "A
+VÁRAKOZÁS KILÉPÉSEI" és "NINCS BÖNGÉSZŐ GÖRGETÉS RÖGZÍTÉS" blokkja, mindkét témában).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**275 teszt, mind zöld**; a sandboxban öt `--shard` hívásban, sorban, ugyanabba a
+nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (33. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1618 / 1633     | **99.08** | 99.07                      | 15 -> **15**                   |
+| branches   | 739 / 750       | **98.53** | 98.52                      | 11 -> **11**                   |
+| functions  | 550 / 553       | **99.45** | 99.45                      | 3 -> **3**                     |
+| lines      | 1558 / 1573     | **99.04** | 99.03                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: az új hook ágait (a várakozás alatti jelentés, az alj elhagyása, a
+visszatérés) az új e2e tesztek fedik. A küszöb a mért értékre húzva, felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0814 / 98,5333 / 99,4575 / 99,0464). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.09 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).

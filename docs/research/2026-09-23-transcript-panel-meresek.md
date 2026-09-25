@@ -536,7 +536,10 @@ csak `click` eseménnyel indított kinyitások, 30 vagy 40 ismétlés témánké
 | a választott megoldás                                      | 0 / 80              | 0 / 60          |
 
 A versenyhelyzet tehát a `dfcaa38` előtt is megvolt (egy sornyi, -54 pixeles, vagy a teljes
-ugrás), a `dfcaa38` korlátlan élesítése a kisebbik változatot is teljes ugrássá tette. A csak `click`
+ugrás), a `dfcaa38` korlátlan élesítése a kisebbik változatot is teljes ugrássá tette.
+A táblát adó script elveszett; a repóbeli mérő eszközzel a `dfcaa38` előtti hookot 2026-09-25-én
+újramérve (egyforma sormagasság mellett) 40 ms-on 34/205 az arány, a korábbi 12/40-nél kisebb
+(17. szekció). A csak `click`
 felfüggesztés a determinisztikus hibát javítja, a versenyhelyzetet nem.
 
 **Miért nem elég a feloldás a mérés renderében, mérve.** Naplózó buildben (a repóba nem került): a
@@ -629,6 +632,18 @@ a 15. szekció scriptjének bővítése), `vite build` a scratchpadbe az e2e `VI
 valódi Chromium (`@playwright/test@1.62.1`), `hu-HU`, `Europe/Budapest`, mindkét téma. A régi
 hookok az egyforma magasságot a lapra injektált CSS szabállyal kapták, a kóddal azonos alakban.
 
+**Pontosítás (2026-09-25): a script elveszett, a mérés azóta a repóban él.** A fenti script a
+munkamenet végén megszűnt, tehát az alábbi táblák számai nem állíthatók elő újra; ez a
+szabálykönyv 12. szekciójával ütközött. A mérések repóbeli, verziókövetett eszköze
+`apps/web/measurement/transcript-scroll.ts` (`bun run measure:transcript`, 17. szekció), ugyanazzal
+a fixtúrával, mint az e2e. Az eszközzel 2026-09-25-én újramérve, a 2026-09-25-i hookon: a négy alsó
+helyzet 1440x900-on és 375x812-en, mindkét témában mind 0 pixel (`alja`); a kinyitás négy útja
+1440x900-on, mindkét témában 0 pixel elmozdulás a kinyitás és a következő sor után is, a gomb
+"2 új esemény" (`kinyitas-ut`, a kattintással egy feladatban érkező sorral, ahogy az e2e);
+a verseny 0 elrántás minden beállításban (a számok a 17. szekcióban); az utolsó sor kinyitása
+-309 pixel (lásd lent). A régi hookok soraihoz az eszköz a hook fájlok ideiglenes cseréjével fut;
+ezt a 17. szekció a `dfcaa38` előtti hookra el is végzi.
+
 **Az egyforma magasság.** A sor fejléce pontosan egy szövegsor: `height: calc(1lh + 2 * 16px)`
 (`run-event-row.css`). A `lh` egység az elem saját számított `line-height` értéke
 (<https://www.w3.org/TR/css-values-4/#font-relative-lengths>; Chrome 109 óta:
@@ -717,6 +732,11 @@ webes megerősítésén áll (a `Space`, az `Enter` és az `element.click()` is 
   érkező sor: a sor nem nyílik ki, -159 pixel (a 15. szekció óta változatlan).
 - Az utolsó sor kinyitása: a következő sorig 0 pixel, utána -351 pixel, gomb nélkül (a követés
   megmarad, SPEC-008 7.4); a `f03b885^` hookkal ugyanígy -351, a `d598677` hookkal -352.
+  **Pontosítás (2026-09-25):** az elmozdulás a törzs PLUSZ az új sor magassága, nem a törzsé. A
+  repóbeli eszközzel (`utolso-sor`) 1440x900-on és 375x812-en, mindkét témában: összecsukva 53, a
+  törzs 256, a következő sor után -309 = -(256 + 53) pixel, az utolsó sor alja 0, gomb nincs; a
+  `bffd75d` hookjával 1440x900-on ugyanígy -309. A -351 egy másik, a repón kívüli script payloadjának törzsére
+  szólt, és ma nem állítható elő.
 - Nem kinyitó beavatkozás látható görgetősávval (2 ismétlés, mindkét téma): 300 pixeles kerék és
   `PageUp` után megjelenik a gomb; 20 pixeles kerék után a követés megmarad, az utolsó sor alja 0;
   a görgetősáv húzása -1797 ... -2330 pixel, gomb.
@@ -748,12 +768,178 @@ Unit szándékos rontások (`use-transcript-auto-scroll.spec.tsx`, `reduce-trans
 a mérés előtti jelentés visszakapcsol: 1 teszt bukik; párosítás nélkül: 1; a hivatkozás
 ellenőrzése nélkül: 1; az ugrás nem zárja a várakozást: 1; a mérés nem zár: 2.
 
-**NEM ELLENŐRZÖTT:** Firefox és WebKit; a kinyitás közbeni verseny a 375 pixeles fül sávban (ott
-csak az alsó igazítás mért); emberi dupla kattintás foglalt fő szál alatt (csak a két szintetikus
-út). A W3C Resize Observer `isActive()` lépése szerint a megfigyelés csak a legutóbb jelentett
+**NEM ELLENŐRZÖTT:** Firefox és WebKit; emberi dupla kattintás foglalt fő szál alatt (csak a két
+szintetikus út). A kinyitás közbeni verseny a 375 pixeles fül sávban azóta mérve (17. szekció,
+0/120 és 0/80). A W3C Resize Observer `isActive()` lépése szerint a megfigyelés csak a legutóbb jelentett
 mérettől eltérő méretre aktív (<https://www.w3.org/TR/resize-observer/>); hogy egy képkockán belüli
 ki-be csukás ezért nem ad értesítést, az ebből levezetett, és a `d598677` beragadása méri.
 
 **Képek** (a mérő script, a munkamenet kimeneti mappájában, `transcript-gorgetes/`): a sorok előtte
 és utána (a jelvény nagyítva), a beragadás előtte és utána dupla kattintás plusz öt sor után, a
 kinyitás négy útja három sor után, és a kinyitott utolsó sor a következő sor után, mindkét témában.
+A képeket előállító script is elveszett; a 17. szekció képei szemléltetők, a számok a repóbeli
+eszközből jönnek.
+
+## 17. A várakozás kilépései, a görgetés rögzítés és a repóbeli mérő eszköz (2026-09-25)
+
+**A kiindulás.** Egy független ellenőrzés a `c7b2e35` állapotát (a `main`-en a `bffd75d`) elfogadta,
+de négy hiányt talált: (1) 375 pixelen, ha a sor kinyitása és a fülváltás egy feladatba esik, a
+lista beragad, és a kézi görgetés az aljára sem oldja fel; (2) bekapcsolt böngésző görgetés
+rögzítés mellett az "ugrás az aljára" utáni első kinyitásnál a kinyitott sor 36 pixelt ugrik; (3) a
+várakozás kilépéseit és a `rowHeight` identitására épülő lezárást egyetlen e2e sem védi; (4) a 16.
+szekció számai repón kívüli, elveszett scriptből jöttek. A user két döntése (2026-09-24): a kézi
+görgetés az aljára is oldja fel a várakozást, és a listán a görgetés rögzítés legyen kikapcsolva.
+
+**A mérő eszköz.** `apps/web/measurement/transcript-scroll.ts`, saját configgal
+(`apps/web/playwright.measurement.config.ts`: egyetlen worker, instrumentálatlan build, mert az
+istanbul számlálók lassítják az időzítés érzékeny versenyt), futtatás:
+`cd apps/web && flock /tmp/playwright-gep.lock bun run measure:transcript [-g <jelenet>]`. A fixtúra
+(a `node:http` SSE szerver, a keretek, a REST mockok, a lista mérései) az e2e-vel közös
+`apps/web/e2e/run-view-stream.ts`. Minden jelenet egy `MEASUREMENT <json>` sort ír; képet nem ír
+(`screenshot-pipeline` invariánsok). Jelenetek: `alja` (13. és 16. szekció négy alsó helyzete),
+`kinyitas-ut` (a kinyitás négy útja a kattintással egy feladatban érkező sorral), `utolso-sor`,
+`fulvaltas`, `render-sorrend` (a React DevTools csatlakozási pontján: `onCommitFiberRoot` minden
+commit után, `onPostCommitFiberRoot` a passzív effektek után; mindkét hívás a telepített
+`react-dom` éles buildjében is megvan, a bundle-ben mérve), `verseny` (folyamatos stream 150 és 40
+ms-os időközzel, véletlen fázisú, csak `click` kinyitás a végétől ötödik soron;
+`MEASURE_TRIALS`, és `MEASURE_OVERFLOW_ANCHOR=auto` a rögzítés visszakapcsolására). A régi
+hookokat a hook fájlok ideiglenes cseréjével méri. Minden szám ebben a szekcióban ebből az
+eszközből jön, a kifejezetten "feltáró" jelölésűek kivételével.
+
+**(1) A fülváltás, előtte és utána** (`fulvaltas`, 375x812, mindkét témában azonos): a lista az
+alján, a végétől második sor kinyitása és a "Gráf" fül EGY szkript futásban, a rejtett fül alatt
+három új sor, vissza a transcript fülre, egérkerék a lista aljára, majd három új sor.
+
+| Állapot                 | Visszatérés után             | Kerék után | A három új sor után (az utolsó sor alja, px) | Gomb a végén   |
+| ----------------------- | ---------------------------- | ---------- | -------------------------------------------- | -------------- |
+| `bffd75d`               | "Ugrás az aljára (3 új ...)" | 0          | 53, 106, 159                                 | "6 új esemény" |
+| a kézi visszatérés után | "Ugrás az aljára (3 új ...)" | 0          | 0, 0, 0                                      | nincs          |
+
+Az ok a telepített forrás szerint (`react-window@2.3.1`, `dist/react-window.js`, a
+`useDynamicRowHeight` `ResizeObserver` visszahívása): a mért blokkméret csak akkor kerül a
+gyorsítótárba, ha nem nulla (`u && f(z, u)`), a rejtett (`hidden`) fülön minden sor 0 magas, a
+lista tárolója is 0 magas, a kirajzolt tartomány a túlrajzolási sávra szűkül, és a kinyitott sor
+leszerelődik, mielőtt nem nulla méretet kapna. Mérés nem jön, a `rowHeight` identitása nem
+változik, a várakozás a `bffd75d`-n csak az ugrás gombbal zárult. A görgetési hely a
+visszatéréskor megmarad (feltáró mérés: `scrollTop` 1181 előtte és utána).
+
+**A javítás** (`use-transcript-auto-scroll.ts`): a várakozás alatt a hook figyeli a lista
+jelentéseit; ha egy jelentés szerint az utolsó sor nem látszik, a lista "elhagyta az alját", és ha
+ezután egy jelentés szerint a predikátum igaz, a várakozás lezárul
+(`bottom_reached_while_unmeasured`: követés be, nem látott sorok nulla). Az alj elhagyásának
+feltétele azért kell, mert a 16. szekció (1) elrontott változatában a kattintás ELŐTTI görgetés
+késve érkező jelentése (a mérés előtti gyorsítótárral) kapcsolta vissza a követést. Pixel küszöb,
+időzítő és saját `ResizeObserver` a termékkódban nincs.
+
+**(2) A görgetés rögzítés.** A CSS Scroll Anchoring spec szerint ha a görgető dobozt adó elem
+`overflow-anchor` értéke `none`, a böngésző az adott görgető dobozban nem választ horgonyt
+(<https://www.w3.org/TR/css-scroll-anchoring-1/> 2.1, "do not select an anchor node for S";
+megerősítés: <https://github.com/w3c/csswg-drafts/blob/main/css-scroll-anchoring-1/Overview.bs>,
+<https://github.com/WICG/ScrollAnchoring/blob/master/explainer.md>). Az MDN szerint a kezdőérték
+`auto`, a `none` érték a horgonyként választást zárja ki
+(<https://developer.mozilla.org/en-US/docs/Web/CSS/overflow-anchor>; megerősítés:
+<https://drafts.csswg.org/css-scroll-anchoring-1/>, a propdef táblázat). A Chrome 56 óta támogatja
+(<https://caniuse.com/css-overflow-anchor>,
+<https://web-platform-dx.github.io/web-features-explorer/features/overflow-anchor/>,
+<https://blog.chromium.org/2017/04/scroll-anchoring-for-web-developers.html>). A spec szerint az
+abszolút pozicionált elem csak akkor zárt ki a horgony jelöltek közül, ha a tartalmazó blokkja a
+görgető dobozon kívül esik; a `react-window` sorai a listán belül abszolút pozicionáltak, tehát
+jelöltek lehetnek (webes forrás: a spec "excluded subtree" definíciója; hogy PONTOSAN melyik
+horgony és melyik változás adta a 36 pixelt, NEM ELLENŐRZÖTT).
+
+`verseny`, 1440x900, 150 ms, a mai hookkal, témánként 40 kísérlet:
+
+| `overflow-anchor`          | világos | sötét  | elmozdulások |
+| -------------------------- | ------- | ------ | ------------ |
+| `auto` (a `bffd75d` CSS-e) | 3 / 40  | 3 / 38 | mind -36     |
+| `none` (a javítás)         | 0 / 40  | 0 / 40 | nincs        |
+
+A -36 a lista `scrollTop` +36 pixeles változása a kattintás utáni első képkockákban, a hook
+görgetése nélkül, és a fejléc a helyén marad utána is (a 36 megegyezik a gomb sáv magasságával;
+az okát nem mértük). Feltáró futásban (a repóba nem került kód) egyszer egy teljes elrántás is
+előfordult (-574 pixel) a rögzítés és a kézi visszatérés együttesével: a rögzítés görgetése után
+egy jelentés az utolsó sort láthatónak mutatta, és a várakozás lezárult. A `none` ezt is kizárja.
+Feltáró futásokban képkockához igazított kattintással, tétlen listán és a kattintással egy
+feladatban érkező sorral a jelenség nem jelent meg (a fázistól és az előző ugrástól függ), ezért
+nincs rá determinisztikus e2e: az e2e a lista kiszámított `overflow-anchor` értékét és az ugrás
+utáni első kinyitás képkockánkénti helyét ellenőrzi.
+
+**Az utolsó sor kinyitása** (`utolso-sor`, 1440x900 és 375x812, mindkét témában): összecsukva 53,
+törzs 256, a kinyitás után 0, a következő sor után -309 = -(256 + 53) pixel, az új sor alja 0,
+gomb nincs. A SPEC-008 7.4 "a törzse magasságával" mondata ennek megfelelően javítva.
+
+**A verseny a mai hookkal** (`verseny`, `overflow-anchor: none`), elrántás / releváns kísérlet
+(releváns: a mérés utáni harmadik képkockán az utolsó sor nem látszik):
+
+| Elrendezés | 40 ms, világos | 40 ms, sötét | 150 ms, világos | 150 ms, sötét |
+| ---------- | -------------- | ------------ | --------------- | ------------- |
+| 1440x900   | 0 / 60         | 0 / 60       | 0 / 40          | 0 / 40        |
+| 375x812    | 0 / 60         | 0 / 60       | 0 / 40          | 0 / 40        |
+
+**A `dfcaa38` előtti hook aránya** (a szabálykönyv 12. szekció "harmadában" mondatának javítása):
+az `eede38b` hook fájljaival, a mai CSS-sel és egyforma sormagassággal, 1440x900, 40 ms:
+
+| `overflow-anchor` | futás | világos | sötét   |
+| ----------------- | ----- | ------- | ------- |
+| `auto`            | 1.    | 8 / 48  | 11 / 52 |
+| `auto`            | 2.    | 8 / 50  | 7 / 55  |
+| `none`            | 1.    | 5 / 35  | 5 / 38  |
+
+Összesen bekapcsolt rögzítéssel 34/205 (mintegy hatod), kikapcsolttal 10/73, minden elrántás -53
+pixel (egy sor). A korábbi, repón kívüli mérések 12/40 (15. szekció) és 23/80 (16. szekció), a
+független ellenőrzés 13/52; az arány futásonként és gépenként szór, a "harmadában" túlzás volt.
+
+**A commitok sorrendje** (`render-sorrend`, 1440x900, világos téma, a kattintással egy feladatban
+érkező sorral): egér, `Space` és `Enter` úton a kattintás után három commit a mérés előtt, az első
+már az új sort tartalmazza a kinyitás nélkül, a harmadik a kinyitást. A mérés saját, a hook
+figyelője UTÁN regisztrált kattintás figyelője az első két commit után fut, és a lista `scrollTop`
+értéke végig változatlan: az érkezés nem görgetett, tehát az effektje már a várakozást látta.
+Csak `click` úton (szkriptből kiváltott esemény) a figyelők a commitok előtt futnak, és már az
+első commit tartalmazza a kinyitást és az új sort is (két vagy három commit a mérés előtt,
+futásonként). Az "EGY renderbe" állítás tehát csak a csak `click` útra igaz; a többi úton az új
+sor a kinyitás előtti commitba kerül, de mindig a mérés előtt.
+
+**Az e2e és a szándékos rontások** (`apps/web/e2e/sse-real-server.spec.ts`, "A VÁRAKOZÁS
+KILÉPÉSEI" és "NINCS BÖNGÉSZŐ GÖRGETÉS RÖGZÍTÉS" blokk, mindkét témában: a 375 pixeles fülváltás
+kézi görgetéssel, a mérés nélkül maradt várakozás ugrás gombbal és utána kézi görgetéssel, az
+utolsó sor kinyitása és a következő sor (-(törzs + új sor)), a mérés utáni kézi görgetés, a
+kattintás utáni, a mérés előtti ÜZENET feladatban érkező sor, és az ugrás utáni első kinyitás). A
+mai kódon a fájl 50/50 zöld, az új tesztek `--repeat-each 4` mellett 40/40. A rontásokat a fájl
+nem soros másolatán futtattuk, hogy egy bukás ne hagyja ki a többit:
+
+| Rontás                                                       | Bukó e2e                                                                   |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| a `bffd75d` hookja, reducere és CSS-e                        | fülváltás (2), ugrás utáni első kinyitás (2)                               |
+| `overflow-anchor: none` nélkül                               | ugrás utáni első kinyitás (2)                                              |
+| a mérés utáni lezárás kiesése (a `rowHeight` effekt törölve) | utolsó sor kinyitása (2)                                                   |
+| az ugrás nem üríti a még nem mért váltásokat                 | mérés nélküli várakozás ugrás gombbal (2)                                  |
+| az ugrás a reducerben nem zárja a várakozást                 | mérés nélküli várakozás ugrás gombbal (2)                                  |
+| a kézi visszatérés kilépése törölve                          | fülváltás (2)                                                              |
+| a `rowHeight` identitása sosem változik                      | utolsó sor kinyitása (2)                                                   |
+| a `rowHeight` identitása minden renderben új                 | a mérés előtti üzenet feladat (2; ismételve 6/6), fülváltás (1), ugrás (2) |
+| a hivatkozás-ellenőrzés kivétele a görgetésből               | nincs (35 releváns teszt zöld)                                             |
+| a mérés előtti jelentés visszakapcsolhat                     | nincs (35 releváns teszt zöld)                                             |
+
+A mérés előtti üzenet feladat tesztjében az új sor a kattintás után nyolc `MessageChannel`
+ugrással érkezik (a feladat sorrend adja a helyét, időzítő nincs): egyetlen ugrással a minden
+renderben új identitású rontás mellett is zöld volt.
+
+**A két nem bukó rontás.** A verseny 40 ms-on, 1440x900-on, témánként 60 kísérlettel mindkét
+rontás mellett 0/120 elrántás. A hivatkozás-ellenőrzés azt az esetet védi, amikor a kattintás egy
+már commitolt érkezés passzív effektje elé esik; a `render-sorrend` mérésben egyik úton sem futott
+a görgető effekt a kattintás előtti állapottal (az érkezés vagy a várakozást is tartalmazó
+commitba került, vagy utána). A mérés előtti visszakapcsolás tiltása nélkül a kód
+szerint a görgetést a hivatkozás a mérésig visszatartja, és a mérés utáni jelentés (a tartomány
+felfelé mozdul) a követést újra kikapcsolja. A két ág a telepített React és `react-window` mellett megfigyelhető hatás nélküli;
+unit teszt mindkettőt őrzi (1-1 bukó teszt). **Javaslat, nem döntés:** a két védelem egyszerűsítése
+mérlegelhető, de más React vagy `react-window` verzió más sorrendet adhat, ezért marad.
+
+**Képek** (a munkamenet kimeneti mappájában, `transcript-utomunka/`): a fülváltás utáni állapot a
+kerék és három új sor után, előtte (`bffd75d`, beragadt, "6 új esemény") és utána, a kinyitott
+utolsó sor és a következő sor utáni állapot, a mérés utáni kézi görgetés előtt és után, mindkét
+témában. Szemléltetők: egy repón kívüli, eldobott lépés készítette őket ugyanazzal a repóbeli
+fixtúrával (`run-view-stream.ts`); a számok a mérő eszközből jönnek.
+
+**NEM ELLENŐRZÖTT:** Firefox és WebKit; a görgetés rögzítés 36 pixeles igazításának pontos oka
+(melyik horgony, melyik változás); a görgetés rögzítés 375 pixelen és 40 ms-on; a két nem bukó
+rontás más React és `react-window` verzióval.

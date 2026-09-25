@@ -31,7 +31,7 @@ export interface TranscriptAutoScrollState {
 }
 
 /**
- * Az öt esemény, ami az állapotot mozgatja.
+ * A hat esemény, ami az állapotot mozgatja.
  *
  * - `rows_rendered`: a `react-window` `onRowsRendered` jelentése, a jelentés
  *   pillanatában érvényes sorszámmal.
@@ -45,10 +45,14 @@ export interface TranscriptAutoScrollState {
  * - `row_toggle_settled`: a kinyitás vagy becsukás lezárult: a lista megmérte
  *   a sort és jelentett, vagy a sor a mérés előtt visszaállt (egy képkockán
  *   belüli ki-be csukás).
+ * - `bottom_reached_while_unmeasured`: a még nem mért váltás alatt a lista
+ *   előbb elhagyta az alját, majd egy jelentés szerint újra az utolsó sort
+ *   mutatja (a felhasználó visszagörgetett az aljára).
  */
 export type TranscriptAutoScrollAction =
   | { readonly type: 'rows_rendered'; readonly stopIndex: number; readonly rowCount: number }
   | { readonly type: 'rows_arrived'; readonly rowCount: number; readonly isFollowed: boolean }
   | { readonly type: 'jump_requested' }
   | { readonly type: 'row_toggle_started' }
-  | { readonly type: 'row_toggle_settled' };
+  | { readonly type: 'row_toggle_settled' }
+  | { readonly type: 'bottom_reached_while_unmeasured' };

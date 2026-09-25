@@ -116,6 +116,16 @@ describe('reduceTranscriptAutoScroll', () => {
       });
     });
 
+    it('bottom_reached_while_unmeasured lezárja a várakozást, visszakapcsolja a követést és nullázza a nem látott sorokat', () => {
+      const waiting: TranscriptAutoScrollState = { ...TOGGLED, unseenCount: 3, lastStopIndex: 12, settledRowCount: 13 };
+      expect(reduceTranscriptAutoScroll(waiting, { type: 'bottom_reached_while_unmeasured' })).toEqual({
+        ...waiting,
+        isFollowing: true,
+        unseenCount: 0,
+        isToggleUnmeasured: false,
+      });
+    });
+
     it('row_toggle_settled a várakozás alatt érkezett, még nem látott sorokat nem nullázza', () => {
       const arrived = reduceTranscriptAutoScroll(TOGGLED, { type: 'rows_arrived', rowCount: 11, isFollowed: false });
       expect(arrived.unseenCount).toBe(1);

@@ -414,6 +414,68 @@ describe('useTranscriptAutoScroll', () => {
       expect(scrollToRow).not.toHaveBeenCalled();
     });
 
+    it('ha a mérés elmarad, a kézi visszatérés az aljára lezárja a várakozást: a követés visszakapcsol', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      // A kinyitott sor a mérése előtt leszerelődik (fülváltás): a
+      // gyorsítótár nem változik, a lista pedig elhagyja az alját.
+      click(addDisclosure(element));
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 0 });
+      });
+      renderRows(11);
+      expect(current().unseenCount).toBe(1);
+
+      act(() => {
+        current().onRowsRendered({ startIndex: 4, stopIndex: 10 });
+      });
+      expect(current().unseenCount).toBe(0);
+      renderRows(12);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+    });
+
+    it('a várakozás alatt az utolsó sort mutató jelentés az alj elhagyása NÉLKÜL nem visszatérés: a követés kikapcsolva marad', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      act(() => {
+        current().onRowsRendered({ startIndex: 1, stopIndex: 9 });
+      });
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('egy korábbi várakozásban elhagyott alj nem számít a következő várakozásban', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      const title = addDisclosure(element);
+      click(title);
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 6 });
+      });
+      act(() => {
+        current().jumpToBottom();
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+
+      // Új várakozás az alján: az ELŐZŐ várakozás "elhagyta az alját"
+      // jelzése nem vihet át, tehát a kattintás előtti elrendezés késve
+      // érkező, az utolsó sort mutató jelentése nem kapcsol vissza.
+      click(title);
+      act(() => {
+        current().onRowsRendered({ startIndex: 2, stopIndex: 9 });
+      });
+      scrollToRow.mockClear();
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
     it('a fejlécen kívüli kattintás nem függeszti fel a követést', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);

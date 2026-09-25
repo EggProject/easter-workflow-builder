@@ -30,6 +30,13 @@ import type { TranscriptAutoScrollAction, TranscriptAutoScrollState } from './tr
  * után a predikátum dönt, az utolsó jelentés szerint; a hook a lezárást a
  * mérés utáni jelentés után adja ki (`use-transcript-auto-scroll.ts`). Az
  * ugrás gomb a várakozást is lezárja.
+ *
+ * **A kézi visszatérés az aljára** (user döntés 2026-09-24) szintén lezárja a
+ * várakozást, és visszakapcsolja a követést: ha a mérés elmarad (a sor a
+ * mérése előtt leszerelődik, például fülváltáskor), enélkül csak az ugrás gomb
+ * oldaná fel. Hogy a jelentés valóban visszatérés-e, nem pedig a kattintás
+ * előtti elrendezés késve érkező jelentése, azt a hook dönti el
+ * (`use-transcript-auto-scroll.ts`).
  */
 export function reduceTranscriptAutoScroll(
   state: TranscriptAutoScrollState,
@@ -54,7 +61,8 @@ export function reduceTranscriptAutoScroll(
         unseenCount: action.isFollowed ? 0 : state.unseenCount + arrivedCount,
       };
     }
-    case 'jump_requested': {
+    case 'jump_requested':
+    case 'bottom_reached_while_unmeasured': {
       return { ...state, isFollowing: true, unseenCount: 0, isToggleUnmeasured: false };
     }
     case 'row_toggle_started': {

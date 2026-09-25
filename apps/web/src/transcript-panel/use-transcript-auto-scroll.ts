@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { isInstanceof } from '@easter-workflow-builder/typeguards';
 import { useListCallbackRef, type DynamicRowHeight, type ListImperativeAPI } from 'react-window';
+import { isLastRowVisible } from './is-last-row-visible.ts';
 import { reduceTranscriptAutoScroll } from './reduce-transcript-auto-scroll.ts';
 import type { TranscriptAutoScrollState } from './transcript-auto-scroll-state.ts';
 
@@ -93,9 +94,10 @@ const DISCLOSURE_CONTROL_SELECTOR = '[aria-expanded]';
  * képkockán belüli ki-be csukás (páros számú kattintás ugyanazon a
  * fejlécen) nem változtat a soron, tehát mérés sem jön: ilyenkor a második
  * kattintás maga zárja le a váltást. A várakozásnak mindig van kilépése: a
- * mérés, a páros kattintás és az "ugrás az aljára" gomb; a nem látott sorok
- * száma közben is nő
- * (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció).
+ * mérés, a páros kattintás, az "ugrás az aljára" gomb és a kézi visszatérés
+ * az aljára; a nem látott sorok száma közben is nő
+ * (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. és 17.
+ * szekció).
  */
 export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowHeight): TranscriptAutoScroll {
   const [state, dispatch] = useReducer(reduceTranscriptAutoScroll, INITIAL_STATE);
@@ -108,6 +110,12 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // A legutóbbi mérés óta páratlan számú kattintást kapott fejlécek: ezeknek
   // a sora más magas, mint amivel a lista számol.
   const unmeasuredTogglesReference = useRef(new Set<Element>());
+  // Jelentett-e a lista a még nem mért váltás kezdete óta olyan elrendezést,
+  // amiben az utolsó sor nem látszik. Csak az ezután érkező, az utolsó sort
+  // mutató jelentés számít visszatérésnek az aljára: a kattintás előtti
+  // görgetés késve érkező jelentése (a mérés előtti gyorsítótárral, research
+  // 16. szekció) nem.
+  const hasLeftBottomWhileUnmeasuredReference = useRef(false);
 
   // A görgetés a követés pillanatnyi állapotát olvassa, de csak a görgető
   // effekt indítói futtatják: a lista csatolása, új sor, átméretezés és az
@@ -156,6 +164,9 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
         }
         return;
       }
+      if (toggles.size === 0) {
+        hasLeftBottomWhileUnmeasuredReference.current = false;
+      }
       toggles.add(control);
       dispatch({ type: 'row_toggle_started' });
     };
@@ -198,9 +209,26 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
     }
   }, [settleRequestCount]);
 
+  // A még nem mért váltás alatt a lista elhagyta az alját, majd újra az utolsó
+  // sort mutatja: a felhasználó visszaért az aljára (user döntés 2026-09-24).
+  // Ez a várakozás negyedik kilépése, és akkor is lezár, ha a mérés sosem jön:
+  // egy fülváltás a sort a mérése előtt leszereli (a rejtett sor 0 magasságát
+  // a könyvtár nem tárolja), és utána a gyorsítótár nem változik.
   const onRowsRendered = useCallback(
     (visibleRows: Readonly<{ startIndex: number; stopIndex: number }>) => {
       dispatch({ type: 'rows_rendered', stopIndex: visibleRows.stopIndex, rowCount });
+      const toggles = unmeasuredTogglesReference.current;
+      if (toggles.size === 0) {
+        return;
+      }
+      if (!isLastRowVisible(visibleRows, rowCount)) {
+        hasLeftBottomWhileUnmeasuredReference.current = true;
+        return;
+      }
+      if (hasLeftBottomWhileUnmeasuredReference.current) {
+        toggles.clear();
+        dispatch({ type: 'bottom_reached_while_unmeasured' });
+      }
     },
     [rowCount],
   );
