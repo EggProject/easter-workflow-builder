@@ -4,24 +4,32 @@
 // transcript sávban, nem a vászon fölött) és az, hogy a vászon magassága nem
 // függ a jóváhagyások számától, csak valódi layouttal mérhető: happy-dom nem
 // számol elrendezést. Ugyanígy csak valódi böngészőben igazolható, hogy a
-// döntés gombjai és az eredmény a felezett panelben GÖRGETÉS NÉLKÜL látszanak
-// (user döntés 2026-09-24, SPEC-008 8. szekció 1. pont), és hogy a gombok
-// valódi `disabled` attribútuma a siker, a conflict és az újratöltési hiba
-// után sem kapcsol vissza. Minden REST hívás `page.route()` mockon megy,
-// valós backend szervert egyetlen teszt sem szólít meg (`.claude/CLAUDE.md` 11.
-// szekció). Az élő (SSE keretre történő) frissítés e2e tesztje a nyitott
-// kapcsolatot igényli, ezért a `sse-real-server.spec.ts` fájlban áll.
-import type {
-  ApprovalDecisionRequest,
-  NodeConfig,
-  PendingApproval,
-  RunDetail,
-  RunSnapshotResponse,
-  StepRunRecord,
-} from '@easter-workflow-builder/protocol';
+// látott jóváhagyás két döntés gombja GÖRGETÉS NÉLKÜL látszik, a tartalma a
+// törzsben legalább görgetve olvasható (user döntés 2026-09-25: "egyszerre
+// egy", SPEC-008 8. szekció 1. pont), és hogy a gombok valódi `disabled`
+// attribútuma a siker, a conflict és az újratöltési hiba után sem kapcsol
+// vissza. Minden REST hívás `page.route()` mockon megy, valós backend szervert
+// egyetlen teszt sem szólít meg (`.claude/CLAUDE.md` 11. szekció). Az élő (SSE
+// keretre történő) frissítés e2e tesztjei a nyitott kapcsolatot igénylik,
+// ezért a `sse-real-server.spec.ts` fájlban állnak. A fixtúra a mérő
+// eszközzel közös (`approval-fixture.ts`).
+import type { ApprovalDecisionRequest, PendingApproval } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import {
+  APPROVAL_RUN_URL,
+  approvalBaseMocks,
+  buildApprovalSnapshot,
+  FAN_OUT_APPROVAL_TITLE,
+  fanOutApprovals,
+  FIRST_APPROVAL,
+  FIRST_REQUESTED_AT_MS,
+  manyApprovals,
+  mockApprovalRun,
+  SECOND_APPROVAL,
+  SECOND_REQUESTED_AT_MS,
+} from './approval-fixture.ts';
 import { expect, test } from './coverage-fixture.ts';
-import { installApiMocks, jsonBody, mockRoute, type MockRoute } from './rest-mock.ts';
+import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
 declare global {
@@ -33,206 +41,6 @@ declare global {
    * nélkül (a `run-view.spec.ts` `e2eLateStepRunBodyRead` mintája).
    */
   var e2eApprovalListBodyReads: number | undefined;
-}
-
-/* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol), lásd `run-view.spec.ts` azonos megjegyzését */
-
-function approvalConfig(title: string): NodeConfig {
-  return {
-    type: 'human_approval',
-    title,
-    bodyTemplate: 'Kérlek erősítsd meg',
-    timeoutMs: null,
-    onUnhandledError: null,
-  };
-}
-
-const RUN_DETAIL: RunDetail = {
-  id: 'run-approval',
-  workflowId: 'w-approval',
-  status: 'running',
-  input: null,
-  providerId: 'claude-subscription',
-  rootRunId: 'run-approval',
-  depth: 1,
-  workflowAncestry: ['w-approval'],
-  graphSnapshotHash: 'c'.repeat(64),
-  persistedStreamDeltas: false,
-  restartedFromRunId: null,
-  createdAtMs: 1,
-  startedAtMs: 2,
-  finishedAtMs: null,
-  errorKind: null,
-  errorMessage: null,
-};
-
-const BASE_STEP_RUN: StepRunRecord = {
-  id: 'sr-1',
-  runId: RUN_DETAIL.id,
-  nodeId: 'n-1',
-  nodeType: 'human_approval',
-  parentStepRunId: null,
-  iteration: 0,
-  attempt: 1,
-  status: 'waiting_approval',
-  providerId: 'claude-subscription',
-  modelId: null,
-  sessionMode: null,
-  sdkSessionId: null,
-  resumedFromSessionId: null,
-  forkedSession: false,
-  structuredOutputStrategy: null,
-  output: null,
-  resultSubtype: null,
-  numTurns: null,
-  inputTokens: null,
-  outputTokens: null,
-  cacheReadInputTokens: null,
-  cacheCreationInputTokens: null,
-  subWorkflowRunId: null,
-  errorKind: null,
-  errorMessage: null,
-  startedAtMs: 2,
-  finishedAtMs: null,
-  createdAtMs: 2,
-};
-
-const RUN_URL = `/run?runId=${RUN_DETAIL.id}`;
-
-/**
- * A csomópontok vízszintes távolsága: a kártya mért szélessége
- * (`GRAPH_NODE_CARD_WIDTH`, 358, `apps/web/src/graph-node-catalog/`) plusz a
- * `@dagrejs/dagre` szállított `ranksep` alapértéke (50), ugyanaz, amit a
- * `showcase-graph.ts` `COLUMN_X` sora is használ. A futás nézet a pillanatkép
- * pozícióit használja (SPEC-008 5.7), tehát egy ennél kisebb távolság
- * egymásra rajzolná a kártyákat; ezt az első teszt méri.
- */
-const NODE_SPACING_X = 408;
-
-/**
- * Két függő `human_approval` csomópont, és egy harmadik, már ELDÖNTÖTT
- * (`succeeded`), ami nem szerepel a `GET /api/approvals` válaszában (a végpont
- * csak `waiting_approval` lépést listáz, user döntés 2026-09-23/24), tehát a
- * kártyáján sincs várakozás felirat. A `sub_workflow` csomópont gombja
- * UGYANERRE a képernyőre navigál, másik `?runId=` értékkel: ezen át mérhető,
- * hogy a futás váltása előtt indított kérés késve érkező válasza eldobódik.
- */
-function buildSnapshot(): RunSnapshotResponse {
-  return {
-    version: 1,
-    sdkVersionPin: '0.1.13',
-    workflow: { id: RUN_DETAIL.workflowId, name: 'Jóváhagyás teszt workflow', description: null },
-    nodes: [
-      {
-        id: 'n-first',
-        type: 'human_approval',
-        label: 'Első jóváhagyás',
-        position: { x: 0, y: 0 },
-        config: approvalConfig('Első jóváhagyás'),
-        effectiveProviderId: 'claude-subscription',
-      },
-      {
-        id: 'n-second',
-        type: 'human_approval',
-        label: 'Második jóváhagyás',
-        position: { x: NODE_SPACING_X, y: 0 },
-        config: approvalConfig('Második jóváhagyás'),
-        effectiveProviderId: 'claude-subscription',
-      },
-      {
-        id: 'n-done',
-        type: 'human_approval',
-        label: 'Már eldöntött jóváhagyás',
-        position: { x: 2 * NODE_SPACING_X, y: 0 },
-        config: approvalConfig('Már eldöntött jóváhagyás'),
-        effectiveProviderId: 'claude-subscription',
-      },
-      {
-        id: 'n-sub',
-        type: 'sub_workflow',
-        label: 'Al-workflow',
-        position: { x: 3 * NODE_SPACING_X, y: 0 },
-        config: { type: 'sub_workflow', targetWorkflowId: 'w-child', inputMapping: {}, onUnhandledError: null },
-        effectiveProviderId: 'claude-subscription',
-      },
-    ],
-    edges: [],
-  };
-}
-
-const STEP_RUNS: readonly StepRunRecord[] = [
-  { ...BASE_STEP_RUN, id: 'sr-first', nodeId: 'n-first' },
-  { ...BASE_STEP_RUN, id: 'sr-second', nodeId: 'n-second' },
-  { ...BASE_STEP_RUN, id: 'sr-done', nodeId: 'n-done', status: 'succeeded', finishedAtMs: 3 },
-  {
-    ...BASE_STEP_RUN,
-    id: 'sr-sub',
-    nodeId: 'n-sub',
-    nodeType: 'sub_workflow',
-    status: 'running',
-    subWorkflowRunId: 'run-child',
-  },
-];
-
-// Két rögzített, eltérő kérés időpont (helyi idő szerint 10:32:05 és
-// 11:47:30): a felirat abszolút időpont, tehát a futás pillanatától nem függ.
-const FIRST_REQUESTED_AT_MS = new Date(2026, 8, 24, 10, 32, 5).getTime();
-const SECOND_REQUESTED_AT_MS = new Date(2026, 8, 24, 11, 47, 30).getTime();
-
-const FIRST_APPROVAL: PendingApproval = {
-  id: 'appr-first',
-  runId: RUN_DETAIL.id,
-  stepRunId: 'sr-first',
-  title: 'Engedélyezed a fizetést?',
-  body: 'Kérlek erősítsd meg a tranzakciót',
-  payload: { amount: 100, currency: 'EUR' },
-  decision: null,
-  requestedAtMs: FIRST_REQUESTED_AT_MS,
-  decidedAtMs: null,
-};
-
-const SECOND_APPROVAL: PendingApproval = {
-  ...FIRST_APPROVAL,
-  id: 'appr-second',
-  stepRunId: 'sr-second',
-  title: 'Engedélyezed a szállítást?',
-  requestedAtMs: SECOND_REQUESTED_AT_MS,
-};
-
-/**
- * `n` darab függő jóváhagyás, eltérő címmel és kérés időponttal, a vászon
- * magasság méréséhez. A lépés futás azonosítók a rajzon nem szereplő
- * lépésekre mutatnak, tehát a csomópontok dekorációja minden `n` mellett
- * azonos: a mérés kizárólag a panel hatását látja.
- */
-function manyApprovals(count: number): readonly PendingApproval[] {
-  return Array.from({ length: count }, (_, index) => ({
-    ...FIRST_APPROVAL,
-    id: `appr-many-${String(index)}`,
-    stepRunId: `sr-many-${String(index)}`,
-    title: `Tömeges jóváhagyás ${String(index + 1)}`,
-    requestedAtMs: FIRST_REQUESTED_AT_MS + index * 60_000,
-  }));
-}
-
-function baseMocks(listPendingApprovals: MockRoute['handle']): readonly MockRoute[] {
-  return [
-    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
-    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(buildSnapshot()))),
-    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
-    mockRoute('listPendingApprovals', listPendingApprovals),
-    mockRoute('replaceStreamSubscriptions', async (route) =>
-      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
-    ),
-  ];
-}
-
-async function mockApprovalRun(page: Page, approvals: readonly PendingApproval[]): Promise<void> {
-  await mockIdleStream(page);
-  await installApiMocks(
-    page,
-    baseMocks(async (route) => route.fulfill(jsonBody(approvals))),
-  );
 }
 
 /**
@@ -273,16 +81,30 @@ function openSubWorkflowRun(page: Page): Promise<void> {
   return page.getByTestId('rf__node-n-sub').getByRole('button', { name: 'Al-workflow futás megnyitása' }).click();
 }
 
-function approvalCard(page: Page, title: string): Locator {
-  return page.locator('.approval-prompt-card').filter({ has: page.getByRole('heading', { name: title }) });
+/**
+ * A jóváhagyás panel szakasza (`region` szerepkör a `<section>` nevével).
+ */
+function approvalRegion(page: Page): Locator {
+  return page.getByRole('region', { name: 'Függő jóváhagyások' });
 }
 
 /**
- * Egy jóváhagyás döntési sora a panel alján: `group` szerepkör, a neve a
- * jóváhagyás címe (`ApprovalDecisionRow`).
+ * A látott jóváhagyás egyik döntés gombja. A név pontos egyezéssel, mert a
+ * lapozó gombjai is a szakaszban állnak.
  */
-function decisionRow(page: Page, title: string): Locator {
-  return page.getByRole('group', { name: title, exact: true });
+function decisionButton(page: Page, name: 'Jóváhagyás' | 'Elutasítás'): Locator {
+  return approvalRegion(page).getByRole('button', { name, exact: true });
+}
+
+function pagination(page: Page): Locator {
+  return page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+}
+
+/**
+ * A lapozó "k / n" alakú helyjelzője (nem interaktív szöveg).
+ */
+function paginationPosition(page: Page, position: string): Locator {
+  return pagination(page).getByText(position, { exact: true });
 }
 
 /**
@@ -310,12 +132,44 @@ function areBoxesIntersecting(
   );
 }
 
+/**
+ * A látott jóváhagyás döntésének eredménye (`role="status"`). A szűrés a
+ * szövegre kell, mert a "visszavonhatatlan" `Alert` is `status` szerepkörű.
+ */
+function decisionResult(page: Page): Locator {
+  return approvalRegion(page)
+    .getByRole('status')
+    .filter({ hasText: /^Döntés rögzítve/ });
+}
+
+/**
+ * A rész a görgethető törzsben legalább görgetéssel olvasható: a törzs
+ * görgetése után a lehető legnagyobb hányada látszik. Ha a rész magasabb a
+ * törzs látható magasságánál (a `payload` 1440x600-on), a teljes rész
+ * egyszerre nem férhet el, ezért ilyenkor a törzs látható magassága szabja a
+ * várt arányt; a 0,99-es szorzó a képpont kerekítésé.
+ */
+async function expectReadableByScrolling(page: Page, part: Locator): Promise<void> {
+  await part.scrollIntoViewIfNeeded();
+  const partBox = await part.boundingBox();
+  const partHeight = partBox?.height ?? 0;
+  const scrollAreaHeight = await approvalRegion(page)
+    .locator('.drawer__body')
+    .evaluate((element) => element.clientHeight);
+  expect(partHeight).toBeGreaterThan(0);
+  await expect(part).toBeInViewport({ ratio: Math.min(1, scrollAreaHeight / partHeight) * 0.99 });
+}
+
+function decidedResponse(approval: PendingApproval): { status: number; contentType: string; body: string } {
+  return jsonBody({ ...approval, decision: 'approved', decidedAtMs: Date.now() } satisfies PendingApproval);
+}
+
 test('a csomópont a kérés abszolút időpontját mutatja, a fejlécben jelvény, a panel a transcript sávban kimondja a visszavonhatatlanságot', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1800, height: 1000 });
   await mockApprovalRun(page, [FIRST_APPROVAL, SECOND_APPROVAL]);
-  await page.goto(RUN_URL);
+  await page.goto(APPROVAL_RUN_URL);
 
   // A `.graph-node-card__summary` a `waiting_approval` felirat saját osztálya
   // (`GraphNodeCard.tsx`): a `waiting_approval` ÁLLAPOT jelvényének felirata
@@ -336,15 +190,18 @@ test('a csomópont a kérés abszolút időpontját mutatja, a fejlécben jelvé
   // A jelzés a fejléc vezérlő sávjában, az állapot jelvény mellett áll.
   await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toBeVisible();
 
-  // A panel a transcript sávban, a transcript fölött áll, nem a vászon fölött.
+  // A panel a transcript sávban, a transcript fölött áll, nem a vászon
+  // fölött, és egyszerre egy jóváhagyást mutat: a legrégebbit.
   const transcriptSide = page.locator('.run-view-screen__transcript');
-  await expect(transcriptSide.locator('.approval-prompt-card')).toHaveCount(2);
+  await expect(transcriptSide.getByRole('region', { name: 'Függő jóváhagyások' })).toBeVisible();
   await expect(page.locator('.run-view-screen > .approval-prompt-panel')).toHaveCount(0);
+  await expect(approvalRegion(page).getByRole('heading')).toHaveText([FIRST_APPROVAL.title]);
+  await expect(paginationPosition(page, '1 / 2')).toBeVisible();
   await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
 
   // A fixtúra csomópontjai a pillanatkép pozícióin nem fedik egymást.
   const boxes = await nodeBoxes(page);
-  expect(boxes).toHaveLength(buildSnapshot().nodes.length);
+  expect(boxes).toHaveLength(buildApprovalSnapshot().nodes.length);
   const overlapping = boxes.flatMap((box, index) =>
     boxes.slice(index + 1).filter((other) => areBoxesIntersecting(box, other)),
   );
@@ -357,7 +214,7 @@ for (const theme of ['light', 'dark'] as const) {
     { width: 1440, height: 600 },
     { width: 375, height: 812 },
   ] as const) {
-    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: 1 és 4 függő jóváhagyásnál minden döntés gombja görgetés nélkül teljesen látszik, a vászon magassága 0, 1 és 4 jóváhagyással azonos, a tartalom terület nem görget`, async ({
+    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: 1, 4 és 10 jóváhagyásnál a lapozó "k / n" alakú, a látott jóváhagyás két gombja görgetés nélkül teljesen látszik, a tartalma a törzsben görgetve olvasható, a vászon magassága 0, 1, 4 és 10 jóváhagyással azonos, a tartalom terület nem görget`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -368,49 +225,122 @@ for (const theme of ['light', 'dark'] as const) {
       await mockIdleStream(page);
       await installApiMocks(
         page,
-        baseMocks(async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+        approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
       );
 
       const canvasHeights: number[] = [];
-      for (const count of [0, 1, 4]) {
+      for (const count of [0, 1, 4, 10]) {
         approvalsHolder.current = manyApprovals(count);
-        await page.goto(RUN_URL);
+        await page.goto(APPROVAL_RUN_URL);
         await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
-        // A kártyák a 375 pixeles fül sávban a (rejtett) Transcript fülön
-        // állnak: a DOM-ban vannak, de nem látszanak, ezért a darabszám a mérce.
-        await expect(page.locator('.approval-prompt-card')).toHaveCount(count);
+        // A 375 pixeles fül sávban a panel a (rejtett) Transcript fülön áll:
+        // a DOM-ban van, de nem látszik, ezért a darabszám a mérce.
+        await expect(page.locator('.approval-prompt-card')).toHaveCount(count === 0 ? 0 : 1);
         const canvasBox = await page.locator('.run-graph-canvas').boundingBox();
         canvasHeights.push(canvasBox?.height ?? -1);
-        expect(
-          await page.locator('.app-content').evaluate((element) => element.scrollHeight - element.clientHeight),
-        ).toBe(0);
+        const appContentOverflow = await page
+          .locator('.app-content')
+          .evaluate((element) => [
+            element.scrollHeight - element.clientHeight,
+            element.scrollWidth - element.clientWidth,
+          ]);
+        expect(appContentOverflow).toEqual([0, 0]);
 
-        if (count === 0) {
+        const [shown] = approvalsHolder.current;
+        if (shown === undefined) {
           continue;
         }
         if (viewport.width < 768) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
+        await expect(paginationPosition(page, `1 / ${String(count)}`)).toBeVisible();
         // Görgetés nélkül: a `toBeInViewport` nem görget, és a levágó ősöket
-        // (a görgethető tartalmat, a panelt, a transcript sávot) is figyelembe
+        // (a görgethető törzset, a panelt, a transcript sávot) is figyelembe
         // veszi, tehát a `ratio: 1` a TELJES gombot követeli meg.
-        for (const approval of approvalsHolder.current) {
-          const row = decisionRow(page, approval.title);
-          await expect(row.getByRole('button', { name: 'Jóváhagyás' })).toBeInViewport({ ratio: 1 });
-          await expect(row.getByRole('button', { name: 'Elutasítás' })).toBeInViewport({ ratio: 1 });
+        await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+        await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
+        await expect(pagination(page)).toBeInViewport({ ratio: 1 });
+
+        // A látott jóváhagyás minden része a törzsben legalább görgetve
+        // teljesen olvasható, és a gombok a törzs görgetése után is a helyükön
+        // maradnak (nem a törzs részei).
+        const readableParts = [
+          approvalRegion(page).getByText('A döntés visszavonhatatlan', { exact: true }),
+          approvalRegion(page).getByRole('heading', { name: shown.title, exact: true }),
+          approvalRegion(page).getByText(shown.body, { exact: true }),
+          approvalRegion(page).getByText('"currency": "EUR"'),
+        ];
+        for (const part of readableParts) {
+          await expectReadableByScrolling(page, part);
         }
+        await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+        await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
       }
 
       expect(canvasHeights[0]).toBeGreaterThan(0);
-      expect(canvasHeights).toEqual([canvasHeights[0], canvasHeights[0], canvasHeights[0]]);
+      expect(canvasHeights).toEqual([canvasHeights[0], canvasHeights[0], canvasHeights[0], canvasHeights[0]]);
     });
   }
 }
 
-test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény görgetés nélkül látszik, nyugtázó gomb nincs, és a futás váltása viszi el', async ({
+test('fan_out ágak azonos címmel: lapozás után a döntés a LÁTOTT jóváhagyás azonosítójára megy, és az eredmény a saját lapján marad', async ({
   page,
 }) => {
-  // 1440x600: a panel a transcript sáv felét kapja, a tartalma görget; a
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const approvals = fanOutApprovals(3);
+  const decisions: { readonly path: string; readonly body: unknown }[] = [];
+  await mockIdleStream(page);
+  await installApiMocks(page, [
+    ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),
+    mockRoute('decideApproval', async (route) => {
+      const request = route.request();
+      const body: unknown = request.postDataJSON();
+      decisions.push({ path: new URL(request.url()).pathname, body });
+      const decided = approvals.find((approval) => request.url().includes(`/${approval.id}/`)) ?? FIRST_APPROVAL;
+      await route.fulfill(decidedResponse(decided));
+    }),
+  ]);
+
+  await page.goto(APPROVAL_RUN_URL);
+  await expect(approvalRegion(page).getByRole('heading', { name: FAN_OUT_APPROVAL_TITLE, exact: true })).toBeVisible();
+  await expect(paginationPosition(page, '1 / 3')).toBeVisible();
+  await expect(approvalRegion(page).getByText('"branch": 0')).toBeVisible();
+
+  await pagination(page).getByRole('button', { name: 'Következő' }).click();
+  await expect(paginationPosition(page, '2 / 3')).toBeVisible();
+  await expect(approvalRegion(page).getByText('"branch": 1')).toBeVisible();
+  await decisionButton(page, 'Jóváhagyás').click();
+  await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
+
+  await pagination(page).getByRole('button', { name: '3', exact: true }).click();
+  await expect(paginationPosition(page, '3 / 3')).toBeVisible();
+  await expect(approvalRegion(page).getByText('"branch": 2')).toBeVisible();
+  await expect(decisionButton(page, 'Elutasítás')).toBeEnabled();
+  await decisionButton(page, 'Elutasítás').click();
+  await expect(decisionResult(page)).toHaveText('Döntés rögzítve: elutasítva.');
+
+  expect(decisions).toEqual([
+    { path: '/api/approvals/appr-branch-1/decision', body: { decision: 'approved' } },
+    { path: '/api/approvals/appr-branch-2/decision', body: { decision: 'rejected' } },
+  ]);
+
+  // Az első ágra még nem ment döntés: a gombjai engedélyezettek, eredmény
+  // nincs; a második ág eredménye a saját lapján a helyén maradt.
+  await pagination(page).getByRole('button', { name: '1', exact: true }).click();
+  await expect(approvalRegion(page).getByText('"branch": 0')).toBeVisible();
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeEnabled();
+  await expect(decisionResult(page)).toHaveCount(0);
+  await pagination(page).getByRole('button', { name: '2', exact: true }).click();
+  await expect(approvalRegion(page).getByText('"branch": 1')).toBeVisible();
+  await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeDisabled();
+  expect(decisions).toHaveLength(2);
+});
+
+test('siker után a látott jóváhagyás megmarad: mindkét gomb letiltva marad, az eredmény görgetés nélkül látszik, nyugtázó gomb nincs, és a futás váltása viszi el', async ({
+  page,
+}) => {
+  // 1440x600: a panel a transcript sáv felét kapja, a törzse görget; a
   // gomboknak és az eredménynek ekkor is görgetés nélkül kell látszaniuk.
   await page.setViewportSize({ width: 1440, height: 600 });
   let isDecided = false;
@@ -419,24 +349,21 @@ test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény
 
   await mockIdleStream(page);
   await installApiMocks(page, [
-    ...baseMocks(async (route) => route.fulfill(jsonBody(isDecided ? [] : [FIRST_APPROVAL]))),
+    ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(isDecided ? [] : [FIRST_APPROVAL]))),
     mockRoute('decideApproval', async (route) => {
       const body: unknown = route.request().postDataJSON();
       expect(body).toEqual({ decision: 'approved' } satisfies ApprovalDecisionRequest);
       decisionRequested.resolve(undefined);
       await releaseDecision.promise;
       isDecided = true;
-      await route.fulfill(
-        jsonBody({ ...FIRST_APPROVAL, decision: 'approved', decidedAtMs: Date.now() } satisfies PendingApproval),
-      );
+      await route.fulfill(decidedResponse(FIRST_APPROVAL));
     }),
   ]);
 
-  await page.goto(RUN_URL);
-  const card = approvalCard(page, FIRST_APPROVAL.title);
-  const row = decisionRow(page, FIRST_APPROVAL.title);
-  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
-  const rejectButton = row.getByRole('button', { name: 'Elutasítás' });
+  await page.goto(APPROVAL_RUN_URL);
+  const heading = approvalRegion(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true });
+  const approveButton = decisionButton(page, 'Jóváhagyás');
+  const rejectButton = decisionButton(page, 'Elutasítás');
   await expect(approveButton).toBeEnabled();
   await expect(approveButton).toBeInViewport({ ratio: 1 });
 
@@ -449,61 +376,93 @@ test('siker után a kártya megmarad: mindkét gomb letiltva marad, az eredmény
 
   releaseDecision.resolve(undefined);
 
-  // A friss lista már üres (a csomópont várakozás felirata eltűnik), a kártya
-  // mégis a helyén marad, visszakapcsolás nélkül, az eredménnyel.
+  // A friss lista már üres (a csomópont várakozás felirata eltűnik), a
+  // jóváhagyás mégis a helyén marad, visszakapcsolás nélkül, az eredménnyel.
   await expect(page.getByTestId('rf__node-n-first').locator('.graph-node-card__summary')).toHaveCount(0);
-  const result = row.getByRole('status');
+  const result = decisionResult(page);
   await expect(result).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(result).toBeInViewport({ ratio: 1 });
-  await expect(card).toHaveCount(1);
+  await expect(heading).toHaveCount(1);
+  await expect(paginationPosition(page, '1 / 1')).toBeVisible();
   await expect(approveButton).toBeDisabled();
   await expect(rejectButton).toBeDisabled();
   await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toHaveCount(0);
-  // Nyugtázás nincs (user döntés 2026-09-24): a panelen a két döntés gombon
-  // kívül nincs gomb.
-  await expect(page.locator('.approval-prompt-panel').getByRole('button')).toHaveCount(2);
+  // Nyugtázás nincs (user döntés 2026-09-24).
+  await expect(page.getByRole('button', { name: 'Rendben' })).toHaveCount(0);
 
   // Egy másik futásra váltva az eredmény eltűnik.
   await openSubWorkflowRun(page);
   await expect(page).toHaveURL(/\/run\?runId=run-child$/);
-  await expect(card).toHaveCount(0);
-  await expect(row).toHaveCount(0);
+  await expect(heading).toHaveCount(0);
+  await expect(approvalRegion(page)).toHaveCount(0);
   await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toHaveCount(0);
 });
 
-test('siker után, ha a lista újratöltése elbukik, a kártya gombjai akkor sem kapcsolnak vissza', async ({ page }) => {
+test('az eredmény magától nem tűnik el: a döntés után egy perc lefuttatott idő (Clock API) után is látszik, a gombok letiltva', async ({
+  page,
+}) => {
+  // A Clock API a lap betöltése ELŐTT települ (a dokumentáció szerint minden
+  // más órával kapcsolatos hívás előtt,
+  // <https://playwright.dev/docs/clock>), és a `runFor` az eltelt idő minden
+  // időzítőjét lefuttatja (<https://playwright.dev/docs/api/class-clock#clock-run-for>).
+  // Egy 3 másodperc után eltüntető időzítő így a teszt alatt biztosan
+  // lefutna.
+  await page.clock.install();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  let isDecided = false;
+  await mockIdleStream(page);
+  await installApiMocks(page, [
+    ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(isDecided ? [] : [FIRST_APPROVAL]))),
+    mockRoute('decideApproval', async (route) => {
+      isDecided = true;
+      await route.fulfill(decidedResponse(FIRST_APPROVAL));
+    }),
+  ]);
+
+  await page.goto(APPROVAL_RUN_URL);
+  await decisionButton(page, 'Jóváhagyás').click();
+  const result = decisionResult(page);
+  await expect(result).toHaveText('Döntés rögzítve: jóváhagyva.');
+
+  await page.clock.runFor('01:00');
+
+  await expect(result).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(result).toBeInViewport({ ratio: 1 });
+  await expect(approvalRegion(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true })).toBeVisible();
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeDisabled();
+  await expect(decisionButton(page, 'Elutasítás')).toBeDisabled();
+});
+
+test('siker után, ha a lista újratöltése elbukik, a gombok akkor sem kapcsolnak vissza', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   let isDecided = false;
 
   await mockIdleStream(page);
   await installApiMocks(page, [
-    ...baseMocks(async (route) =>
+    ...approvalBaseMocks(async (route) =>
       route.fulfill(
         isDecided ? jsonBody({ code: 'internal', message: 'A szerver hibát adott.' }, 500) : jsonBody([FIRST_APPROVAL]),
       ),
     ),
     mockRoute('decideApproval', async (route) => {
       isDecided = true;
-      await route.fulfill(
-        jsonBody({ ...FIRST_APPROVAL, decision: 'approved', decidedAtMs: Date.now() } satisfies PendingApproval),
-      );
+      await route.fulfill(decidedResponse(FIRST_APPROVAL));
     }),
   ]);
 
-  await page.goto(RUN_URL);
-  const row = decisionRow(page, FIRST_APPROVAL.title);
-  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
+  await page.goto(APPROVAL_RUN_URL);
+  const approveButton = decisionButton(page, 'Jóváhagyás');
   await approveButton.click();
 
   // Az újratöltés hibája a panelen jelenik meg; a régi lista a helyén marad,
-  // és a még mindig listázott, de már eldöntött kártya letiltva marad.
+  // és a még mindig listázott, de már eldöntött jóváhagyás letiltva marad.
   await expect(page.locator('.approval-prompt-panel > [role="alert"]')).toBeVisible();
-  await expect(row.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(approveButton).toBeDisabled();
-  await expect(row.getByRole('button', { name: 'Elutasítás' })).toBeDisabled();
+  await expect(decisionButton(page, 'Elutasítás')).toBeDisabled();
 });
 
-test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a hibaüzenet látszik, és a lista újratöltődik', async ({
+test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a hibaüzenet görgetés nélkül látszik, és a lista újratöltődik', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 600 });
@@ -511,7 +470,7 @@ test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a
 
   await mockIdleStream(page);
   await installApiMocks(page, [
-    ...baseMocks(async (route) => {
+    ...approvalBaseMocks(async (route) => {
       approvalCallCount += 1;
       await route.fulfill(jsonBody([FIRST_APPROVAL]));
     }),
@@ -522,23 +481,22 @@ test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a
     }),
   ]);
 
-  await page.goto(RUN_URL);
-  const row = decisionRow(page, FIRST_APPROVAL.title);
-  const rejectButton = row.getByRole('button', { name: 'Elutasítás' });
+  await page.goto(APPROVAL_RUN_URL);
+  const rejectButton = decisionButton(page, 'Elutasítás');
   await expect(rejectButton).toBeEnabled();
   await expect(rejectButton).toBeInViewport({ ratio: 1 });
   const callsBeforeDecision = approvalCallCount;
 
   await rejectButton.click();
 
-  const alert = row.getByRole('alert');
+  const alert = approvalRegion(page).getByRole('alert');
   await expect(alert).toHaveText('Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve');
   await expect(alert).toBeInViewport({ ratio: 1 });
   await expect.poll(() => approvalCallCount).toBeGreaterThan(callsBeforeDecision);
   // A lista a conflict után is tartalmazza a jóváhagyást, a gombok mégsem
   // kapcsolnak vissza: a döntés a szerver szerint már lezárt.
   await expect(rejectButton).toBeDisabled();
-  await expect(row.getByRole('button', { name: 'Jóváhagyás' })).toBeDisabled();
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeDisabled();
 });
 
 test('a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a panelen', async ({ page }) => {
@@ -546,10 +504,12 @@ test('a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a pane
   await mockIdleStream(page);
   await installApiMocks(
     page,
-    baseMocks(async (route) => route.fulfill(jsonBody({ code: 'internal', message: 'A szerver hibát adott.' }, 500))),
+    approvalBaseMocks(async (route) =>
+      route.fulfill(jsonBody({ code: 'internal', message: 'A szerver hibát adott.' }, 500)),
+    ),
   );
 
-  await page.goto(RUN_URL);
+  await page.goto(APPROVAL_RUN_URL);
 
   await expect(page.locator('.approval-prompt-panel').getByRole('alert')).toBeVisible();
 });
@@ -561,31 +521,27 @@ test('átmeneti hibára (503) a gombok újrapróbálásra engedélyezettek, és 
   let decisionCallCount = 0;
   await mockIdleStream(page);
   await installApiMocks(page, [
-    ...baseMocks(async (route) => route.fulfill(jsonBody(decisionCallCount >= 2 ? [] : [FIRST_APPROVAL]))),
+    ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(decisionCallCount >= 2 ? [] : [FIRST_APPROVAL]))),
     mockRoute('decideApproval', async (route) => {
       decisionCallCount += 1;
       if (decisionCallCount === 1) {
         await route.fulfill({ status: 503, contentType: 'text/plain', body: '' });
         return;
       }
-      await route.fulfill(
-        jsonBody({ ...FIRST_APPROVAL, decision: 'approved', decidedAtMs: Date.now() } satisfies PendingApproval),
-      );
+      await route.fulfill(decidedResponse(FIRST_APPROVAL));
     }),
   ]);
 
-  await page.goto(RUN_URL);
-  const row = decisionRow(page, FIRST_APPROVAL.title);
-  const approveButton = row.getByRole('button', { name: 'Jóváhagyás' });
+  await page.goto(APPROVAL_RUN_URL);
+  const approveButton = decisionButton(page, 'Jóváhagyás');
   await approveButton.click();
 
-  await expect(row.getByRole('alert')).toBeVisible();
+  await expect(approvalRegion(page).getByRole('alert')).toBeVisible();
   await expect(approveButton).toBeEnabled();
-  await expect(page.locator('.approval-prompt-panel').getByRole('button')).toHaveCount(2);
 
   await approveButton.click();
-  await expect(row.getByRole('status')).toHaveText('Döntés rögzítve: jóváhagyva.');
-  await expect(row.getByRole('alert')).toHaveCount(0);
+  await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
+  await expect(approvalRegion(page).getByRole('alert')).toHaveCount(0);
   await expect(approveButton).toBeDisabled();
 });
 
@@ -599,7 +555,7 @@ test('az első betöltés alatt a panel betöltés jelzést mutat, és másik fu
   await mockIdleStream(page);
   await installApiMocks(
     page,
-    baseMocks(async (route) => {
+    approvalBaseMocks(async (route) => {
       listCallCount += 1;
       if (listCallCount === 1) {
         firstListRequested.resolve(undefined);
@@ -612,7 +568,7 @@ test('az első betöltés alatt a panel betöltés jelzést mutat, és másik fu
   );
   await installApprovalListBodyReadCounter(page);
 
-  await page.goto(RUN_URL);
+  await page.goto(APPROVAL_RUN_URL);
   await firstListRequested.promise;
   const loading = page.getByRole('progressbar', { name: 'a függő jóváhagyások betöltése folyamatban' });
   await expect(loading).toBeVisible();
@@ -622,14 +578,14 @@ test('az első betöltés alatt a panel betöltés jelzést mutat, és másik fu
   await expect(loading).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => globalThis.e2eApprovalListBodyReads)).toBe(1);
 
-  // A régi futás listája csak MOST érkezik meg: a kártyája nem jelenhet meg
-  // az új futás nézetében.
+  // A régi futás listája csak MOST érkezik meg: a jóváhagyása nem jelenhet
+  // meg az új futás nézetében.
   releaseFirstList.resolve(undefined);
   await expect.poll(() => page.evaluate(() => globalThis.e2eApprovalListBodyReads)).toBe(2);
   await expect(page.locator('.approval-prompt-card')).toHaveCount(0);
 });
 
-test('másik futásra váltva a régi futás késve érkező döntés válasza nem hoz létre kártyát az új nézetben', async ({
+test('másik futásra váltva a régi futás késve érkező döntés válasza nem hoz létre jóváhagyást az új nézetben', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1800, height: 1000 });
@@ -638,22 +594,20 @@ test('másik futásra váltva a régi futás késve érkező döntés válasza n
   await mockIdleStream(page);
   await installApiMocks(page, [
     // A lista a nézett futás szerint: a gyerek futás nézetében üres.
-    ...baseMocks(async (route) => {
+    ...approvalBaseMocks(async (route) => {
       const isChildView = new URL(page.url()).search.includes('run-child');
       await route.fulfill(jsonBody(isChildView ? [] : [FIRST_APPROVAL]));
     }),
     mockRoute('decideApproval', async (route) => {
       decisionRequested.resolve(undefined);
       await releaseDecision.promise;
-      await route.fulfill(
-        jsonBody({ ...FIRST_APPROVAL, decision: 'approved', decidedAtMs: Date.now() } satisfies PendingApproval),
-      );
+      await route.fulfill(decidedResponse(FIRST_APPROVAL));
     }),
   ]);
   await installApprovalListBodyReadCounter(page);
 
-  await page.goto(RUN_URL);
-  await decisionRow(page, FIRST_APPROVAL.title).getByRole('button', { name: 'Jóváhagyás' }).click();
+  await page.goto(APPROVAL_RUN_URL);
+  await decisionButton(page, 'Jóváhagyás').click();
   await decisionRequested.promise;
 
   await openSubWorkflowRun(page);
@@ -670,5 +624,3 @@ test('másik futásra váltva a régi futás késve érkező döntés válasza n
   await expect(page.locator('.approval-prompt-card')).toHaveCount(0);
   await expect(page.getByText('Döntés rögzítve', { exact: false })).toHaveCount(0);
 });
-
-/* eslint-enable unicorn/no-null */

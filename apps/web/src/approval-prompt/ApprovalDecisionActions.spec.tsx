@@ -1,24 +1,10 @@
-/* eslint-disable unicorn/no-null -- a szintetikus drótszintű fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak (SPEC-005 protokoll alak) */
-import type { PendingApproval } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApprovalDecisionRow } from './ApprovalDecisionRow.tsx';
+import { ApprovalDecisionActions } from './ApprovalDecisionActions.tsx';
 import type { ApprovalDecisionProgress } from './reduce-approval-decisions.ts';
 
-const APPROVAL: PendingApproval = {
-  id: 'a-1',
-  runId: 'r-1',
-  stepRunId: 's-1',
-  title: 'Engedélyezed a fizetést?',
-  body: 'Kérlek erősítsd meg a tranzakciót',
-  payload: { amount: 100, currency: 'EUR' },
-  decision: null,
-  requestedAtMs: 1000,
-  decidedAtMs: null,
-};
-
-describe('ApprovalDecisionRow', () => {
+describe('ApprovalDecisionActions', () => {
   let container: HTMLDivElement;
   let root: Root;
   const onDecide = vi.fn();
@@ -37,9 +23,9 @@ describe('ApprovalDecisionRow', () => {
     container.remove();
   });
 
-  function renderRow(progress: ApprovalDecisionProgress | undefined): void {
+  function renderActions(progress: ApprovalDecisionProgress | undefined): void {
     act(() => {
-      root.render(<ApprovalDecisionRow approval={APPROVAL} progress={progress} onDecide={onDecide} />);
+      root.render(<ApprovalDecisionActions progress={progress} onDecide={onDecide} />);
     });
   }
 
@@ -58,17 +44,16 @@ describe('ApprovalDecisionRow', () => {
     return { approve, reject };
   }
 
-  it('a sor group szerepkörű csoport, a neve a látható jóváhagyás cím', () => {
-    renderRow(undefined);
+  it('burkoló nélkül adja a gyerekeit: a sáv közvetlen gyerekei a két gomb, és ha van, előttük az eredmény', () => {
+    renderActions(undefined);
+    expect([...container.children].map((child) => child.textContent)).toEqual(['Jóváhagyás', 'Elutasítás']);
 
-    const group = container.querySelector('[role="group"]');
-    const labelId = group?.getAttribute('aria-labelledby');
-    expect(labelId).toBeTruthy();
-    expect(container.querySelector(`#${CSS.escape(labelId ?? '')}`)?.textContent).toBe('Engedélyezed a fizetést?');
+    renderActions({ status: 'decided', decision: 'approved' });
+    expect([...container.children].map((child) => child.tagName)).toEqual(['P', 'BUTTON', 'BUTTON']);
   });
 
   it('döntés előtt mindkét gomb engedélyezett és sm méretű, eredmény és nyugtázó gomb nincs; a gombok a döntést adják tovább', () => {
-    renderRow(undefined);
+    renderActions(undefined);
     const { approve, reject } = decisionButtons();
 
     expect(approve.disabled).toBe(false);
@@ -90,7 +75,7 @@ describe('ApprovalDecisionRow', () => {
     ['approved', 'Jóváhagyás', 'Elutasítás'],
     ['rejected', 'Elutasítás', 'Jóváhagyás'],
   ] as const)('küldés közben (%s) mindkét gomb letiltva, csak a megnyomotton spinner', (decision, pressed, other) => {
-    renderRow({ status: 'sending', decision });
+    renderActions({ status: 'sending', decision });
 
     expect(button(pressed)?.disabled).toBe(true);
     expect(button(other)?.disabled).toBe(true);
@@ -104,7 +89,7 @@ describe('ApprovalDecisionRow', () => {
   ] as const)(
     'elfogadott döntés (%s) után a gombok letiltva maradnak, az eredmény látszik, nyugtázó gomb nélkül',
     (decision, result) => {
-      renderRow({ status: 'decided', decision });
+      renderActions({ status: 'decided', decision });
       const { approve, reject } = decisionButtons();
 
       expect(approve.disabled).toBe(true);
@@ -116,7 +101,7 @@ describe('ApprovalDecisionRow', () => {
   );
 
   it('végleges hiba (conflict) után a gombok letiltva maradnak, a hibaüzenet látszik, nyugtázó gomb nélkül', () => {
-    renderRow({ status: 'failed', message: 'a jóváhagyás már el lett döntve', isFinal: true });
+    renderActions({ status: 'failed', message: 'a jóváhagyás már el lett döntve', isFinal: true });
     const { approve, reject } = decisionButtons();
 
     expect(approve.disabled).toBe(true);
@@ -126,7 +111,7 @@ describe('ApprovalDecisionRow', () => {
   });
 
   it('átmeneti hiba után a gombok újra engedélyezettek (újrapróbálás), a hibaüzenet látszik', () => {
-    renderRow({ status: 'failed', message: 'A szerver nem érhető el.', isFinal: false });
+    renderActions({ status: 'failed', message: 'A szerver nem érhető el.', isFinal: false });
     const { approve, reject } = decisionButtons();
 
     expect(approve.disabled).toBe(false);

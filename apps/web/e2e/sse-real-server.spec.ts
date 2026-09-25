@@ -584,14 +584,78 @@ test('egy löketben érkező 20 approval_requested keretre az újratöltés öss
     Array.from({ length: BURST_APPROVAL_COUNT }, (_, index) => stepEventFrame(index + 1, 'approval_requested', 'live')),
   );
 
-  await expect(page.locator('.approval-prompt-card')).toHaveCount(BURST_APPROVAL_COUNT);
+  const lastPosition = page
+    .getByRole('navigation', { name: 'Jóváhagyások lapozása' })
+    .getByText(`1 / ${String(BURST_APPROVAL_COUNT)}`, { exact: true });
+  await expect(lastPosition).toBeVisible();
   await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toBeVisible();
   // `createCoalescedReload`: az első keret indít egy kérést, a futása alatt
   // érkező további tizenkilenc egyetlen utólagos kérésbe olvad. Összevonás
   // nélkül a számláló egy lépésben 1-ről 21-re ugrana, tehát a 3 sosem állna
   // elő.
   await expect.poll(async () => readApprovalFetchCount(page)).toBe(3);
-  await expect(page.locator('.approval-prompt-card')).toHaveCount(BURST_APPROVAL_COUNT);
+  await expect(lastPosition).toBeVisible();
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+/**
+ * Három függő jóváhagyás, AZONOS címmel (egy `fan_out` csomópont ágai), a
+ * `payload` szerint megkülönböztetve: a látott jóváhagyás kizárólag a
+ * tartalmáról ismerhető fel.
+ */
+function selectionApproval(branch: string, requestedAtMs: number): PendingApproval {
+  return {
+    ...LIVE_APPROVAL,
+    id: `appr-selection-${branch}`,
+    title: 'Ág jóváhagyása',
+    payload: { branch },
+    requestedAtMs,
+  };
+}
+
+test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte álló kikerülése és egy elé érkező új jóváhagyás után is ugyanaz látszik, csak a helye változik', async ({
+  page,
+}) => {
+  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const first = selectionApproval('A', 10);
+  const second = selectionApproval('B', 20);
+  const third = selectionApproval('C', 30);
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [first, second, third] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+  const region = page.getByRole('region', { name: 'Függő jóváhagyások' });
+  await expect(navigation.getByText('1 / 3', { exact: true })).toBeVisible();
+  await navigation.getByRole('button', { name: '2', exact: true }).click();
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await setNoReloadMarker(page);
+
+  // Az előtte álló jóváhagyás döntés nélkül lezárul (például egy másik lapon
+  // hozott döntés): a lista szűkül, a látott jóváhagyás marad.
+  approvalsHolder.current = [second, third];
+  streamServer.push(stepEventFrame(1, 'approval_decided', 'live'));
+  await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
+  await expect(region.getByText('"branch": "B"')).toBeVisible();
+
+  // Egy korábbi időpontú jóváhagyás érkezik: a lista elé bővül, a látott
+  // jóváhagyás marad, a helye nő.
+  const earlier = selectionApproval('Z', 5);
+  approvalsHolder.current = [earlier, second, third];
+  streamServer.push(stepEventFrame(2, 'approval_requested', 'live'));
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(region.getByText('"branch": "B"')).toBeVisible();
+
   expect(await readNoReloadMarker(page)).toBe(true);
 });
 

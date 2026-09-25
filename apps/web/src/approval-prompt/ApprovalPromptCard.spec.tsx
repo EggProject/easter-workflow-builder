@@ -48,7 +48,7 @@ describe('ApprovalPromptCard', () => {
     expect(payload?.textContent).toBe(JSON.stringify({ amount: 100, currency: 'EUR' }, undefined, 2));
   });
 
-  it('a kártyán nincs gomb: a döntés a panel alján álló döntési sávban van', () => {
+  it('a kártyán nincs gomb: a döntés a panel tapadó akciósávjában van', () => {
     act(() => {
       root.render(<ApprovalPromptCard approval={APPROVAL} />);
     });

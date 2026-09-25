@@ -1160,7 +1160,7 @@ describe('RunViewScreen', () => {
     await renderScreen('?runId=r-3', fetchFunction);
 
     const approveButton = [
-      ...container.querySelectorAll<HTMLButtonElement>(':scope .approval-decision-row button.btn'),
+      ...container.querySelectorAll<HTMLButtonElement>(':scope .approval-prompt-panel .drawer__footer button.btn'),
     ].find((button) => button.textContent === 'Jóváhagyás');
     if (approveButton === undefined) {
       throw new Error('a teszt nem talált Jóváhagyás gombot');
@@ -1173,9 +1173,9 @@ describe('RunViewScreen', () => {
     });
 
     expect(decisionUrls).toEqual([JSON.stringify({ decision: 'approved' })]);
-    expect(container.querySelector(':scope .approval-decision-row [role="alert"]')?.textContent).toContain(
-      'Az elem állapota most nem engedi a műveletet.',
-    );
+    expect(
+      container.querySelector(':scope .approval-prompt-panel .drawer__footer [role="alert"]')?.textContent,
+    ).toContain('Az elem állapota most nem engedi a műveletet.');
     expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
     // A conflicttel lezárt kártya gombjai nem kapcsolnak vissza.
     expect(approveButton.disabled).toBe(true);

@@ -11,8 +11,9 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "screenshots": "playwright test --config playwright.screenshots.config.ts",
-    "measure:transcript": "playwright test --config playwright.measurement.config.ts",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.08 --branches 98.53 --functions 99.45 --lines 99.04"
+    "measure:transcript": "playwright test --config playwright.measurement.config.ts transcript-scroll.ts",
+    "measure:approval": "playwright test --config playwright.measurement.config.ts approval-panel.ts",
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.08 --branches 98.53 --functions 99.45 --lines 99.05"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

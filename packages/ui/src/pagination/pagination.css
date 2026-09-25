@@ -1,0 +1,119 @@
+/* ============================================================
+   EggProject: Pagination
+   Forrás: eggproject-design-components/components/pagination/pagination.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-25.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Pagination ============
+   .pagination       — flex container
+   .pagination__meta — left-side "Showing 1-10 of 42"
+   .pagination__page — number/chevron button
+   .pagination__page--active
+   .pagination__ellipsis
+============================================ */
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}
+
+.pagination__meta {
+  font: 500 13px var(--ep-font-sans);
+  color: var(--ep-fg-muted);
+}
+.pagination__meta strong { color: var(--ep-fg); font-weight: 500; }
+
+.pagination__pages {
+  display: inline-flex; align-items: center; gap: 2px;
+}
+
+.pagination__page {
+  min-width: 32px; height: 32px;
+  padding: 0 10px;
+  border-radius: var(--ep-radius-sm);
+  background: transparent;
+  border: 0;
+  color: var(--ep-fg-muted);
+  font: 500 13px var(--ep-font-sans);
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background-color var(--ep-dur-fast) var(--ep-ease-out),
+              color var(--ep-dur-fast) var(--ep-ease-out),
+              border-color var(--ep-dur-fast) var(--ep-ease-out),
+              box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+}
+.pagination__page:hover:not(:disabled) {
+  background: var(--ep-bg-hover);
+  color: var(--ep-fg);
+}
+.pagination__page--active {
+  background: var(--ep-ink-900);
+  color: var(--ep-paper-50);
+}
+.pagination__page--active:hover { background: var(--ep-ink-900); color: var(--ep-paper-50); }
+.pagination__page:disabled { color: var(--ep-fg-faint); cursor: not-allowed; }
+.pagination__page:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+.pagination__page svg { width: 14px; height: 14px; }
+
+.pagination__ellipsis {
+  min-width: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ep-fg-subtle);
+  font: 500 13px var(--ep-font-sans);
+  user-select: none;
+}
+
+/* ---- Outlined variant: each page in a card box ---- */
+.pagination--outlined .pagination__page {
+  border: 1px solid var(--ep-border);
+  background: var(--ep-bg-elevated);
+}
+.pagination--outlined .pagination__page:hover:not(:disabled) {
+  border-color: var(--ep-fg);
+  background: var(--ep-bg-elevated);
+}
+.pagination--outlined .pagination__page--active {
+  border-color: var(--ep-fg);
+  background: var(--ep-ink-900);
+}
+
+/* ---- Compact variant: only prev/next + label ---- */
+.pagination--compact { gap: 8px; }
+.pagination--compact .pagination__page { padding: 0 12px; gap: 6px; }
+
+/* Reduced motion: the hover/active/focus fade is cosmetic — drop it when the
+   user prefers reduced motion. No animation exists; transition stays off "all". */
+@media (prefers-reduced-motion: reduce) {
+  .pagination__page { transition: none; }
+}
+
+/* Forced colors (Windows High Contrast): keep meta text, page buttons, the
+   current-page state, disabled state, prev/next and the focus ring visible
+   with system colors only. No token/hex/rgb/hsl; no forced-color-adjust.
+   Live emulation not run — source/CSSOM-verified. */
+@media (forced-colors: active) {
+  .pagination { color: CanvasText; }
+  .pagination__meta { color: CanvasText; }
+  .pagination__meta strong { color: CanvasText; }
+  .pagination__page { color: CanvasText; }
+  .pagination__page:hover:not(:disabled) { color: CanvasText; }
+  .pagination__page--active {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .pagination__page:disabled { color: GrayText; }
+  .pagination__page:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+    box-shadow: none;
+  }
+  .pagination__ellipsis { color: CanvasText; }
+  .pagination--outlined .pagination__page { border: 1px solid CanvasText; }
+}

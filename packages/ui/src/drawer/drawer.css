@@ -1,0 +1,222 @@
+/* ============================================================
+   EggProject: Drawer
+   Forrás: eggproject-design-components/components/drawer/drawer.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-09-25.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Drawer / Sheet ============
+   Side-anchored panel. Slides in from right (default), left, top, or bottom.
+
+   .drawer-overlay   — backdrop
+   .drawer           — panel
+   .drawer--<side>   — right (default) | left | top | bottom
+   .drawer__header     — title bar with close button
+   .drawer__body     — scroll region
+   .drawer__footer     — sticky action bar
+   Sizes: sm (320), md (420, default), lg (560), xl (720)
+============================================ */
+.drawer-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10, 18, 48, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 1000;
+  animation: drawer-overlay-in var(--ep-dur-base) var(--ep-ease-out);
+}
+
+.drawer {
+  position: fixed;
+  background: var(--ep-bg-elevated);
+  box-shadow: var(--ep-shadow-xl);
+  display: flex; flex-direction: column;
+  z-index: 1001;
+}
+
+/* Sides */
+.drawer--right {
+  top: 0; right: 0; bottom: 0;
+  width: 420px; max-width: 100vw;
+  animation: drawer-in-right var(--ep-dur-base) var(--ep-ease-out);
+}
+.drawer--left {
+  top: 0; left: 0; bottom: 0;
+  width: 420px; max-width: 100vw;
+  animation: drawer-in-left var(--ep-dur-base) var(--ep-ease-out);
+}
+.drawer--top {
+  top: 0; left: 0; right: 0;
+  height: 50vh; max-height: 100vh;
+  animation: drawer-in-top var(--ep-dur-base) var(--ep-ease-out);
+}
+.drawer--bottom {
+  bottom: 0; left: 0; right: 0;
+  height: 50vh; max-height: 100vh;
+  border-top-left-radius: var(--ep-radius-xl);
+  border-top-right-radius: var(--ep-radius-xl);
+  animation: drawer-in-bottom var(--ep-dur-base) var(--ep-ease-out);
+}
+
+/* Sizes — apply to right/left */
+.drawer--sm.drawer--right, .drawer--sm.drawer--left { width: 320px; }
+.drawer--lg.drawer--right, .drawer--lg.drawer--left { width: 560px; }
+.drawer--xl.drawer--right, .drawer--xl.drawer--left { width: 720px; }
+
+.drawer__header {
+  display: flex; align-items: flex-start;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--ep-divider);
+}
+.drawer__header-text {
+  flex: 1;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.drawer__eyebrow {
+  font: var(--ep-text-overline);
+  letter-spacing: var(--ep-track-overline);
+  text-transform: uppercase;
+  color: var(--ep-fg-subtle);
+}
+.drawer__title {
+  font: 400 26px/1.2 var(--ep-font-display);
+  letter-spacing: var(--ep-track-tight);
+  color: var(--ep-fg);
+}
+.drawer__title em { font-weight: 700; }
+.drawer__subtitle { font: var(--ep-text-small); color: var(--ep-fg-muted); }
+
+.drawer__close {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--ep-radius-md);
+  background: transparent; border: 0;
+  color: var(--ep-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--ep-dur-fast) var(--ep-ease-out),
+              background-color var(--ep-dur-fast) var(--ep-ease-out),
+              box-shadow var(--ep-dur-fast) var(--ep-ease-out);
+}
+.drawer__close:hover { background: var(--ep-bg-hover); color: var(--ep-fg); }
+/* Keyboard focus only: design-system gold ring, no layout shift. Outline removed only
+   because the box-shadow ring replaces it; the ring survives hover (no box-shadow there). */
+.drawer__close:focus-visible { outline: none; box-shadow: var(--ep-shadow-focus); }
+.drawer__close svg { width: 16px; height: 16px; }
+
+.drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px;
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+}
+.drawer__body > * + * { margin-top: 14px; }
+
+.drawer__footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid var(--ep-divider);
+  background: var(--ep-bg-elevated);
+}
+.drawer__footer--split { justify-content: space-between; }
+
+@keyframes drawer-overlay-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes drawer-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes drawer-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes drawer-in-top {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes drawer-in-bottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* ============ Safe-area insets (notch / home indicator) ============
+   Each side clears only the edge it anchors to. env() is 0 on desktop / non-notched
+   screens, so calc() collapses to the existing padding — no desktop change. The inset is
+   added to existing padding only; borders/dividers sit on the full-width element box, so
+   padding insets content without shrinking them. For right/left (full-height) every row
+   independently clears the shared vertical edge once — not stacked on nested elements.
+   For top/bottom the inset lands on the single element at that edge (header at top, footer
+   at bottom), falling back to the always-present body when that optional element is absent,
+   so the inset is never applied twice for the same gap. */
+.drawer--right .drawer__header,
+.drawer--right .drawer__body,
+.drawer--right .drawer__footer { padding-right: calc(24px + env(safe-area-inset-right)); }
+
+.drawer--left .drawer__header,
+.drawer--left .drawer__body,
+.drawer--left .drawer__footer { padding-left: calc(24px + env(safe-area-inset-left)); }
+
+.drawer--top .drawer__header { padding-top: calc(22px + env(safe-area-inset-top)); }
+.drawer--top:not(:has(.drawer__header)) .drawer__body { padding-top: calc(18px + env(safe-area-inset-top)); }
+
+.drawer--bottom .drawer__footer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.drawer--bottom:not(:has(.drawer__footer)) .drawer__body { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+
+/* ============ Reduced motion ============
+   Drop the backdrop fade, the per-side slide entrance, and the close-button transitions.
+   The keyframe end states equal the natural anchored position, so the drawer appears
+   instantly at its final position; the focus ring shows at once and nothing waits on
+   animation, so the focus manager needs no timing coordination. */
+@media (prefers-reduced-motion: reduce) {
+  .drawer-overlay,
+  .drawer--right,
+  .drawer--left,
+  .drawer--top,
+  .drawer--bottom { animation: none; }
+  .drawer__close { transition: none; }
+}
+
+/* ============ Forced colors (Windows High Contrast etc.) ============
+   Shadows and rgba tints drop out here, so map panel, backdrop, text, dividers and close
+   button onto explicit system colors and give the panel a real border for separation.
+   System colors are honoured without forced-color-adjust, so none is used (no global override). */
+@media (forced-colors: active) {
+  /* Backdrop: solid system fill, no blur — the panel stays primary via its border. */
+  .drawer-overlay {
+    background: Canvas;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Panel: Canvas fill + CanvasText hairline. border-box (global reset) → no layout shift. */
+  .drawer {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .drawer__title,
+  .drawer__body { color: CanvasText; }
+  .drawer__eyebrow,
+  .drawer__subtitle { color: GrayText; }
+  /* Header/footer dividers and footer fill stay visible as system separators. */
+  .drawer__header { border-bottom-color: GrayText; }
+  .drawer__footer {
+    background: Canvas;
+    border-top-color: GrayText;
+  }
+  /* Close button: recognizable shape; system outline replaces the box-shadow focus ring. */
+  .drawer__close {
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+  .drawer__close:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .drawer__close:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

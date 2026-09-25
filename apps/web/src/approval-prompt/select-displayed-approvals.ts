@@ -10,16 +10,17 @@ export interface DisplayedApproval {
 }
 
 /**
- * A panelen megjelenő kártyák: a friss lista, kiegészítve azokkal az
+ * A panel lapozható jóváhagyásai: a friss lista, kiegészítve azokkal az
  * elküldött döntésekkel, amiket a lista már nem tartalmaz
  * (`reduce-approval-decisions.ts`), hogy az eredményük a futás váltásáig
  * látsszon.
  *
  * **A sorrend a kérés időpontja** (`requestedAtMs`, növekvő), ugyanaz, amit a
  * `GET /api/approvals` is ad (`packages/db` `human-approval-repository.ts`
- * `listPendingApprovals`). Enélkül a listából kikerült, de még látható kártya
- * és a döntési sora a lista végére ugrana. A `toSorted` stabil, tehát azonos
- * időpontnál a lista sorrendje marad.
+ * `listPendingApprovals`). Enélkül a listából kikerült, de még látható
+ * jóváhagyás a lapozó végére ugrana. A `toSorted` stabil, tehát azonos
+ * időpontnál a lista sorrendje marad. A látott jóváhagyást nem a hely, hanem
+ * az azonosító választja ki (`select-shown-approval.ts`).
  */
 export function selectDisplayedApprovals(
   listed: readonly PendingApproval[],

@@ -858,6 +858,8 @@ wordmark sötét szövege tenné.
 
 **Két újabb téma mappa, 2026-09-23-i felületi kiegészítésben.** A `dot` és a `feed-indicator` a design system azonos nevű komponensének bájtra azonosan átemelt alakja (`packages/ui` CLAUDE.md), a React változat szerint, a forrás `.jsx` összes propjával; a `feed-indicator` belső pöttye a `dot`. A topnav stream állapot jelzője (11. szekció 14 ... 16. pont) használja.
 
+**Két újabb téma mappa, 2026-09-25-i felületi kiegészítésben.** A `pagination` a design system `pagination` komponensének bájtra azonos CSS-sel, a React változat összes propjával átemelt alakja, egy `labels` kiegészítéssel a forrás angol szövegeihez; a `drawer` a `drawer.css` bájtra azonos átemelése és a törzs plusz lábléc szerkezete (`DrawerSections`), a modális `Drawer` egésze nélkül (`packages/ui` CLAUDE.md). A futás nézet jóváhagyás panelje használja mindkettőt (SPEC-008 8. szekció 1. pont).
+
 **Egy szint mély, tárgykör mappa nélkül.** A csomag egy tárgykörű: minden téma a design system átemeléséről szól. A PLAN-004 3. szekció bontási kritériuma mélyebb szintre nem teljesül, mert a fájlnevek már megnevezik a csoportot (a `Button.tsx` mellett álló `button.css` nem lehet másé), tehát a második feltétel egy szinttel lejjebb elbukik. **A repó kétszintű csomagjainak száma marad három** (`core`, `provider-capability`, `db`).
 
 **Amit szándékosan nem csináltunk:** nincs `components/`, `styles/`, `assets/`, `hooks/` vagy `types/` mappa. Az utolsó a SPEC-002 tiltott név listáján áll, a többi technikai réteg, nem domain fogalom.

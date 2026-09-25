@@ -18,9 +18,9 @@ function FormattedPayload(properties: Readonly<{ payload: unknown }>): ReactElem
 /**
  * Egy függő jóváhagyás TARTALMA: a `title`, a `body` és a formázott
  * `payload` (SPEC-008 8. szekció, T-009-27, AC35). A döntés gombjai nem itt
- * állnak, hanem a panel alján, a görgetett tartalom alatt
- * (`ApprovalDecisionRow`), hogy görgetés nélkül is elérhetők legyenek (user
- * döntés 2026-09-24, SPEC-008 8. szekció 1. pont).
+ * állnak, hanem a panel tapadó akciósávjában, a görgethető törzs alatt
+ * (`ApprovalDecisionActions`), hogy görgetés nélkül is elérhetők legyenek
+ * (user döntés 2026-09-24 és 2026-09-25, SPEC-008 8. szekció 1. pont).
  */
 export function ApprovalPromptCard(properties: Readonly<ApprovalPromptCardProperties>): ReactElement {
   const { approval } = properties;

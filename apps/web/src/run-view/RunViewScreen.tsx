@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } 
 import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
 import { pendingApprovalRequestedAtByStepRun } from '../approval-prompt/pending-approval-requested-at-by-step-run.ts';
 import { useApprovalDecisions } from '../approval-prompt/use-approval-decisions.ts';
+import { useApprovalSelection } from '../approval-prompt/use-approval-selection.ts';
 import { usePendingApprovals } from '../approval-prompt/use-pending-approvals.ts';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -204,9 +205,10 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * a transcript sávban, a transcript fölött a döntési panel. Egyik sem a
  * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
  * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
- * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`
- * hookban él; mindkettő itt, a képernyő szintjén, mert a transcript sáv a
- * reszponzív sáv váltásakor újra felcsatolódik.
+ * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`, a
+ * látott jóváhagyás kiválasztása a `useApprovalSelection` hookban él;
+ * mindhárom itt, a képernyő szintjén, mert a transcript sáv a reszponzív sáv
+ * váltásakor újra felcsatolódik.
  *
  * A futás rekordja saját `useState` értékben áll, nem `useRequestState`
  * állapotban: az újratöltés alatt egy `pending` állapot a csontvázat hozná
@@ -252,6 +254,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     apiOrigin,
     onDecided: pendingApprovals.reload,
   });
+  const approvalSelection = useApprovalSelection(approvalDecisions.displayed);
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -438,7 +441,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                   pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
                 }
                 failureMessage={pendingApprovals.failureMessage}
-                displayed={approvalDecisions.displayed}
+                approvalCount={approvalDecisions.displayed.length}
+                shown={approvalSelection.shown}
+                onSelectPage={approvalSelection.selectPage}
                 onDecide={approvalDecisions.decide}
               />
               <TranscriptPanel

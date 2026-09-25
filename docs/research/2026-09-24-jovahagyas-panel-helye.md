@@ -116,6 +116,14 @@ százalék látszik, a másik két méreten semmi; négy jóváhagyásnál a tov
 semmi. A user döntése (2026-09-24): a döntés gombjai mindig látszanak, a tartalom felettük
 görgethető, és több jóváhagyásnál is minden függő döntés görgetés nélkül elérhető legyen.
 
+**Felülírva 2026-09-25-én (8. szekció).** A döntési sáv helyére az "egyszerre egy" alak lépett
+(user döntés 2026-09-25). **Az alábbi számokat repón kívüli, azóta elveszett script adta**, ami a
+`.claude/CLAUDE.md` 12. szekciójával ütközött; a mérés azóta a repóban áll
+(`apps/web/measurement/approval-panel.ts`, `bun run measure:approval`), és ugyanezt a két buildet
+(`bffd75d`, `05b6818`) újramérte: a számok a 8.2 szekcióban állnak. Ahol eltérnek az alábbiaktól, az
+a két fixtúra különbsége (az elveszett script jóváhagyásonként 346 pixel magas tartalmat adott, a
+repó fixtúrája 321-et), nem a mért jelenségé.
+
 **Módszer.** Saját mérés valódi Chromiumban, a repón kívüli scripttel
 (`/private/tmp/jovahagyas-panel-2/measure.mjs`), `vite build --outDir` alakban két buildből: az
 "előtte" a `bffd75d` (a `main`, a `9c44745` tartalmával), az "utána" a javított munkafa. A REST és
@@ -179,3 +187,105 @@ Regresszió: `apps/web/e2e/approval-prompt.spec.ts`, mindkét témában, három 
 jóváhagyásra `toBeInViewport({ ratio: 1 })` minden döntés gombra; a tartalom zsugorodásának
 letiltására (`flex: none` a görgethető részen) mind a hat méret és téma teszt, plusz a siker és a
 `conflict` teszt elbukik.
+
+## 8. Egyszerre egy jóváhagyás (2026-09-25)
+
+Kiváltó ok: egy független ellenőrzés a `05b6818` commiton mérte, hogy a döntési sáv sorai nem
+köthetők a jóváhagyásukhoz (375 pixelen a cím 155 pixel széles és csonkolt, `fan_out` ágakon a cím
+minden ágon azonos, `execute-human-approval.ts` `title: config.title`), 1440x600-on négy
+jóváhagyásnál a tartalomból 31 pixel látszik, öt vagy több jóváhagyásnál semmi, és a
+"visszavonhatatlan" figyelmeztetés eltűnik. A user döntése (2026-09-25): a panel egyszerre egy
+jóváhagyást mutat, teljes szöveggel és `payload` értékkel, alatta tapadó sávban csak az ő két
+gombja; a minta a design system `drawer` törzs plusz lábléc szerkezete, a jóváhagyások között a
+design system `pagination` lapozója vált.
+
+### 8.1 Módszer
+
+- **A mérő eszköz a repóban**: `apps/web/measurement/approval-panel.ts`, futtatás
+  `cd apps/web && flock /tmp/playwright-gep.lock bun run measure:approval`. Képet nem ír, csak
+  `MEASUREMENT <json>` sorokat; a fixtúra az e2e tesztekkel közös (`apps/web/e2e/approval-fixture.ts`,
+  `manyApprovals`: eltérő cím, azonos törzs és kétmezős `payload`). A build nem instrumentált
+  (`playwright.measurement.config.ts`, `VITE_COVERAGE=false`).
+- A mért értékek: a vászon magassága (`.run-graph-canvas`), az `.app-content` függőleges és
+  vízszintes túllógása, a panel magassága, a görgethető rész látható és teljes magassága (a mai
+  alakban `.drawer__body`, a `05b6818` alakban `.approval-prompt-panel__content`, a `bffd75d`
+  alakban maga a panel), a "Jóváhagyás" és "Elutasítás" gombok görgetés NÉLKÜLI látható aránya (a 7. szekció definíciója: a gomb doboza metszve minden levágó ős kliens területével és a
+  viewporttal), a "visszavonhatatlan" cím látható aránya, és a lapozó "k / n" helyjelzője. Viewport
+  1440x900, 1440x600, 375x812 (a "Transcript" fülön); 0, 1, 4 és 10 jóváhagyás; mindkét téma.
+- **Az "előtte" oszlop** ugyanezzel az eszközzel és fixtúrával, a `05b6818` és a `bffd75d` fáján
+  (`git archive`, a mai `node_modules` csatolásával; a `packages/` fa a két commit óta nem változott,
+  `git diff --stat 05b6818 HEAD -- packages/` üres).
+- **Mindkét témában a számok azonosak** (a három build minden sorában, gépi összevetéssel).
+
+### 8.2 Előtte
+
+**`05b6818` (döntési sáv).** Görgethető tartalom (látható / teljes, px), a Jóváhagyás gombok
+látható aránya jóváhagyásonként, a "visszavonhatatlan" cím látható aránya:
+
+| Viewport | 1 jóváhagyás | 4 jóváhagyás         | 10 jóváhagyás                 |
+| -------- | ------------ | -------------------- | ----------------------------- |
+| 1440x900 | 285 / 285; 1 | 181 / 861; 1 x4; 1   | 0 / 2014; 1 x9, 0; 0          |
+| 1440x600 | 139 / 285; 1 | 31 / 861; 1 x4; 0,82 | 0 / 2014; 1 x4, 0,82, 0 x5; 0 |
+| 375x812  | 206 / 285; 1 | 98 / 861; 1 x4; 1    | 0 / 2014; 1 x6, 0,64, 0 x3; 0 |
+
+Ez a független ellenőrzés számait adja vissza: 1440x600-on négy jóváhagyásnál 31 pixel tartalom,
+tíznél nulla, a figyelmeztetés nem látszik, és a sorok egy része a panel görgetése nélkül
+elérhetetlen.
+
+**`bffd75d` (a döntési sáv előtt, a gombok a kártyákban):** 1440x900-on 1 jóváhagyásnál a gomb
+látszik (1), 4 és 10 jóváhagyásnál csak az első kártyáé (1, a többi 0); 1440x600-on és 375x812-n
+egyetlen gomb sem látszik görgetés nélkül (0). A 7. szekció "előtte" táblája 1440x900-on 1
+jóváhagyásnál 0,3-at mért: a különbség a fixtúráé (7. szekció eleje).
+
+### 8.3 Utána
+
+| Viewport | Vászon (px, 0 / 1 / 4 / 10) | Panel (px) | Görgethető törzs (látható / teljes, px) | Akciósáv (px) | Gombok | Figyelmeztetés | `.app-content` túllógás |
+| -------- | --------------------------- | ---------- | --------------------------------------- | ------------- | ------ | -------------- | ----------------------- |
+| 1440x900 | 700 / 700 / 700 / 700       | 326        | 233 / 319                               | 61            | 1 / 1  | 1              | 0 / 0                   |
+| 1440x600 | 400 / 400 / 400 / 400       | 176        | 83 / 319                                | 61            | 1 / 1  | 1              | 0 / 0                   |
+| 375x812  | 533 / 533 / 533 / 533       | 242,5      | 150 / 319                               | 61            | 1 / 1  | 1              | 0 / 0                   |
+
+**A számok 1, 4 és 10 jóváhagyásnál azonosak**, mert egyszerre egy látszik; a lapozó helyjelzője
+"1 / 1", "1 / 4", "1 / 10", és a lapozó egyik esetben sem lóg túl a panelen (0 pixel). A
+görgethető törzs 1440x600-on 83 pixel: a tartalom (319 pixel) görgetve olvasható, a `payload`
+(84 pixel) egyszerre nem fér el teljesen, ezért az e2e a törzs magasságával arányos láthatóságot
+követel (`approval-prompt.spec.ts` `expectReadableByScrolling`).
+
+**A döntés után**, négy jóváhagyásnál az első eldöntve (mindkét témában azonos):
+
+| Viewport | Siker: eredmény arány, akciósáv, törzs (px) | Conflict: eredmény arány, akciósáv, törzs (px) |
+| -------- | ------------------------------------------- | ---------------------------------------------- |
+| 1440x900 | 1; 75; 219                                  | 1; 117; 177                                    |
+| 1440x600 | 1; 75; 69                                   | 1; 117; 36                                     |
+| 375x812  | 1; 75; 136                                  | 1; 138; 73                                     |
+
+Az eredmény mindenhol teljesen látszik görgetés nélkül; az ára, hogy a több sorba törő szöveg
+(a `conflict` üzenete 375 pixelen öt sor) ennyivel kisebbé teszi a törzset. A gombok letiltva
+maradnak.
+
+**A lapozó szomszéd oldalszámai** (375x812, tíz jóváhagyás, az 1., 5. és 10. oldal; a `siblings`
+értékét ideiglenesen átírva mérve): a forrás alapértékével (1) a lapozó 9 elemet rajzol, túllógás
+nincs, de az 1. és a 10. oldalon a "k / n" helyjelző két sorba törik (30 pixel magas, 15 helyett);
+nullával 7 elemet, a helyjelző mindhárom oldalon egy sorban marad. A szállított érték ezért 0
+(`ApprovalPromptPanel.tsx` `PAGINATION_SIBLINGS`).
+
+### 8.4 A kiválasztás szabályai és a regressziók
+
+- Alapból a legrégebbi kérés látszik; a kiválasztás a jóváhagyás azonosítója, és a látott
+  jóváhagyás azonnal rögzül, tehát élő frissítéskor csak a "k" szám változik; ha a látott kerül ki,
+  a legrégebbi látszik; döntés után a kiválasztás nem lép tovább (SPEC-008 8. szekció 1. pont).
+- Regresszió: `apps/web/e2e/approval-prompt.spec.ts` (három méret, két téma, 1, 4, 10 jóváhagyás;
+  `fan_out` útvonal a `POST /api/approvals/{id}/decision` hívásán; az eredmény megmaradása a
+  Playwright Clock API-val lefuttatott egy perc után, <https://playwright.dev/docs/clock>,
+  <https://playwright.dev/docs/api/class-clock>), `apps/web/e2e/sse-real-server.spec.ts` (élő
+  frissítés), és a `select-shown-approval.spec.ts`, `use-approval-selection.spec.tsx` unit tesztek.
+- **Szándékos rontások, mind bukik:** a gombok a görgetett törzsbe kerülnek (8 e2e teszt bukik, a
+  hat méret és téma teszt, a siker és a conflict teszt); a döntés a lista első jóváhagyására megy a
+  látott helyett (a `fan_out` teszt bukik); a kiválasztás a hely szerint (a
+  `sse-real-server.spec.ts` kiválasztás tesztje és négy unit teszt bukik); az eredmény 3 másodperc
+  után eltűnik (a Clock API teszt bukik, a lefuttatott perc után).
+
+### 8.5 Képek
+
+A munkamenet `outputs/jovahagyas-egyszerre-egy/` mappájában: 1, 4 és 10 jóváhagyás, a három méret,
+lapozás után, siker és conflict után, mindkét témában, a mért számokkal (`meresek-*.jsonl`).
