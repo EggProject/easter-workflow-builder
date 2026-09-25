@@ -41,13 +41,15 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: PREVIEW_ORIGIN,
-    // A trace a korabbi `on-first-retry` modban marad, de kepernyokep nelkul:
-    // a trace zip a teszt kimeneti konyvtaraba, lemezre kerul, es a telepitett
-    // Playwright a trace kepernyokepeit alapbol bekapcsolja. Lemezre kepet
-    // kizarolag a szentesitett `e2e/capture-screenshots.ts` irhat
+    // A trace es a video kikapcsolva (user dontes 2026-09-25): a trace zip
+    // kepernyokepei es a video kepkockai is lemezre irt kepek, lemezre kepet
+    // pedig kizarolag a szentesitett `e2e/capture-screenshots.ts` irhat
     // (tooling/scripts `screenshot-pipeline`, .claude/CLAUDE.md 12. szekcio).
-    // A `retries: 0` mellett ez a mod ma nem is rogzit trace-t.
-    trace: { mode: 'on-first-retry', screenshots: false },
+    // A korabbi `on-first-retry` trace mod a `retries: 0` mellett halott volt:
+    // a dokumentacio szerint csak az elso ujraprobalkozast rogziti
+    // (https://playwright.dev/docs/test-use-options#trace-modes).
+    trace: 'off',
+    video: 'off',
   },
   projects: [
     {
