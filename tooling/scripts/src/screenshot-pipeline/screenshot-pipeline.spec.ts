@@ -13,13 +13,13 @@
 // volt: egy mondat a `.claude/CLAUDE.md` 12. szekciójában és az `apps/web`
 // CLAUDE.md fájljában. Semmi nem buktatta el azt a munkamenetet, ami megint
 // saját, eldobható scriptet ír saját, éltelen fixtúrával. Ez a fájl az a
-// gépi kényszer: hét invariáns, mindegyik nem nulla kilépési kódú bukást ad a
+// gépi kényszer: nyolc invariáns, mindegyik nem nulla kilépési kódú bukást ad a
 // `bun run test` kapun, ami tagja a kilenc kapunak és szerepel a CI
 // összesítő `ci` job `needs` listájában.
 //
 // A VÉDELEM KÉT RÉTEGE:
 //
-//   1. A COMMITOLT FA alakja (1 ... 5. és 7. invariáns). A git INDEXET olvassa
+//   1. A COMMITOLT FA alakja (1 ... 5., 7. és 8. invariáns). A git INDEXET olvassa
 //      vissza nyers szövegként, statikus elemzés helyett - ugyanaz a minta,
 //      mint a `no-em-dash` és a `no-preserve-symlinks` témáé. Ez fogja meg
 //      azt az esetet, amikor egy munkamenet MÁSIK fájlba ír képernyőkép
@@ -68,6 +68,18 @@ const FIXTURE_FILE = 'apps/web/e2e/showcase-graph.ts';
 const MANIFEST_FILE = 'apps/web/e2e/screenshot-manifest.json';
 
 const SCREENSHOTS_CONFIG_FILE = 'apps/web/playwright.screenshots.config.ts';
+
+/**
+ * Ez a fájl: a (8) invariáns a saját forrásából ellenőrzi, hogy az (1) a (7)
+ * által igazolt ellenőrzést futtatja.
+ */
+const SELF_FILE = 'tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts';
+
+/**
+ * Az (1) invariáns törzsének kötelező hívása: a commitolt fán pontosan az a
+ * függvény fut, amit a (7) a kerülő utakon igazol.
+ */
+const TREE_CHECK_CALL = 'findScreenshotDiskWriters(listCodeFiles(root), readPackageEntries(root))';
 
 /**
  * Minden kiterjesztés, amiben egy képernyőkép készítő lépés megjelenhet:
@@ -125,6 +137,10 @@ const SCREENSHOT_WORD = ['screen', 'shot'].join('');
 const CAPITALIZED_SCREENSHOT_WORD = ['Screen', 'shot'].join('');
 const SNAPSHOT_WORD = ['Snap', 'shot'].join('');
 const PNG_EXTENSION = ['p', 'ng'].join('');
+const SCREENSHOTS_WORD = `${SCREENSHOT_WORD}s`;
+const TRACE_WORD = ['tra', 'ce'].join('');
+const CDP_CAPTURE_WORD = ['capture', CAPITALIZED_SCREENSHOT_WORD].join('');
+const CDP_SCREENCAST_WORD = ['start', 'Screen', 'cast'].join('');
 
 /**
  * A `path` OPCIÓ mintája. Ez a pontos, mérhető választóvonal a szentesített
@@ -136,24 +152,49 @@ const PNG_EXTENSION = ['p', 'ng'].join('');
  * MIÉRT NEM EGY ABLAKOS REGEX, ami a hívástól a `path` mezőig ér. Az első
  * alak a hívás után egy `[^)]{0,400}?` ablakban kereste a mezőt, és a tiltott
  * záró zárójel miatt BÁRMELY függvényhívás az opció objektumban, a `path` mező
- * ELŐTT hatástalanította: mérve, egy kivágat számító hívást és utána a mezőt
- * tartalmazó opció objektum elkerülte (egy független ellenőrzés így vitte át a
- * védelmet, 2026-09-15). Bármilyen tiltott karakterosztállyal ugyanez a kerülő
- * út nyílna újra egy másik karakterrel, ezért az ablak teljesen megszűnt: a
- * fájlnak egyszerűen nem lehet EGYSZERRE képernyőkép hívása és `path`
- * opciója (2026-09-25 óta a képernyőkép kör egyetlen fájljának sem,
- * `findScreenshotDiskWriters`). Mérve a commitolt fán: erre a két minta
- * EGYÜTT pontosan egyetlen fájlra illeszkedik, a szentesített
- * `capture-screenshots.ts`-re, tehát a szigorítás ma nulla hamis jelzést ad.
+ * ELŐTT hatástalanította (független ellenőrzés, 2026-09-15). Ezért az ablak
+ * teljesen megszűnt: a képernyőkép kör és a függőségei egyetlen fájljának sem
+ * lehet `path` kulcsa (`findScreenshotDiskWriters`).
+ *
+ * A kulcs minden alakja számít: a sima (`path:`), az idézőjeles (`'path':`) és
+ * a rövidített (`{ path }`, `{ path, ... }`, `..., path }`, 2026-09-25 óta: a
+ * `{ path, type: 'jpeg' }` opció objektum a csak kettőspontos alakot kereső
+ * mintán átcsúszott), és a képernyőkép kör FÜGGŐSÉGEIBEN is
+ * (2026-09-25 óta): enélkül egy másik fájlban álló opció objektum
+ * (`export const opciók = { path: ..., type: 'jpeg' }`, a hívó fájlban
+ * `képernyőkép(opciók)`) átcsúszott (független ellenőrzés). Egy változó
+ * típusannotációja (`let path: string`) nem objektum kulcs, ezért kivétel;
+ * mérve a commitolt fán a képernyőkép kör függőségeiben pontosan ez az egy
+ * alak fordul elő (`packages/protocol` `build-route-path.ts`), tehát a
+ * szigorítás ma nulla hamis jelzést ad.
  */
-const PATH_OPTION_PATTERN = /\bpath\s*:/;
+const PATH_OPTION_PATTERNS = [
+  // sima kulcs, a változó típusannotációja nélkül
+  /\bpath(?<!\b(?:let|const|var)\s+path)\s*:/,
+  // idézőjeles kulcs
+  /['"]path['"]\s*:/,
+  // rövidített kulcs
+  /[{,]\s*path\s*[,}]/,
+] as const;
+
+function hasPathOptionKey(content: string): boolean {
+  return PATH_OPTION_PATTERNS.some((pattern) => pattern.test(content));
+}
 
 /**
- * Képernyőképet készítő hívás: a Playwright API hívása, vagy a CLI
- * `screenshot` alparancsa programból indítva (a parancs argumentum listájában
- * álló szó mint string literál).
+ * Képernyőképet készítő hívás: a Playwright API hívása, a CLI `screenshot`
+ * alparancsa programból indítva (a parancs argumentum listájában álló szó
+ * mint string literál), vagy a Chrome DevTools Protocol `Page` doménjének két
+ * képet adó metódusa (a képernyőkép és a screencast indítása,
+ * `CDP_CAPTURE_WORD` és `CDP_SCREENCAST_WORD`,
+ * <https://chromedevtools.github.io/devtools-protocol/tot/Page/>): ezek a
+ * képet base64 adatként adják vissza, ami egy fájlba írással ér lemezre
+ * (2026-09-25 óta, független ellenőrzés). A két metódus neve darabokból áll
+ * össze, mert ez a fájl maga is a vizsgált halmazban van.
  */
-const CAPTURE_CALL_PATTERN = new RegExp(String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]`);
+const CAPTURE_CALL_PATTERN = new RegExp(
+  String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]|\b${CDP_CAPTURE_WORD}\b|\b${CDP_SCREENCAST_WORD}\b`,
+);
 
 /**
  * A CLI `screenshot` alparancsa shell scriptből: a `playwright` és a
@@ -164,12 +205,48 @@ const CAPTURE_CALL_PATTERN = new RegExp(String.raw`${SCREENSHOT_WORD}\(|['"]${SC
 const SHELL_CAPTURE_PATTERNS = [/\bplaywright\b/, new RegExp(String.raw`\b${SCREENSHOT_WORD}\b`)] as const;
 
 /**
- * A Playwright `use` beállításának képernyőkép opciója bármely, `off`-tól
- * eltérő értékkel: a Playwright ilyenkor a tesztek képernyőképét maga írja a
- * teszt kimeneti könyvtárába ("Trace files, screenshots and videos will appear
- * in the test output directory", <https://playwright.dev/docs/test-use-options>).
+ * A Playwright `use` beállításának képernyőkép opciója bármely olyan értékkel,
+ * ami nem a szó szerinti `'off'`: a Playwright ilyenkor a tesztek
+ * képernyőképét maga írja a teszt kimeneti könyvtárába ("Trace files,
+ * screenshots and videos will appear in the test output directory",
+ * <https://playwright.dev/docs/test-use-options>). ZÁRT LISTA: 2026-09-25-ig a
+ * minta csak az objektumot és a nem `off` string literált tiltotta, tehát egy
+ * nem literál érték (feltételes kifejezés, változó) átcsúszott (független
+ * ellenőrzés); ma minden alak tiltott, ami nem pontosan `'off'`, a rövidített
+ * kulcs is.
  */
-const SCREENSHOT_OPTION_PATTERN = new RegExp(String.raw`\b${SCREENSHOT_WORD}\s*:\s*(?:\{|['"](?!off['"]))`);
+const SCREENSHOT_OPTION_PATTERN = new RegExp(
+  String.raw`(?:\b${SCREENSHOT_WORD}|['"]${SCREENSHOT_WORD}['"])\s*:(?!\s*['"]off['"])|[{,]\s*${SCREENSHOT_WORD}\s*[,}]`,
+);
+
+/**
+ * A Playwright trace képernyőképei. A trace a teszt kimeneti könyvtárába
+ * egy zip fájlba kerül, és alapból képernyőképeket is tartalmaz: a telepített
+ * `playwright@1.62.1` (`lib/worker/workerProcessEntry.js`, `startIfNeeded`) a
+ * trace opció képernyőkép kapcsolóját alapból bekapcsolja, a szöveges módnál
+ * és a kapcsoló nélküli objektumnál is. A zipben lemezre kerülő kép is
+ * lemezre írt kép (2026-09-25 óta tiltva, szabálykönyv 12. szekció).
+ *
+ * ZÁRT LISTA a `use` trace opciójára: kizárólag a szó szerinti `'off'`, vagy a
+ * `{ mode: '<mód>', screenshots: false }` objektum engedett (a
+ * `apps/web/playwright.config.ts` ezt használja, a korábbi szöveges
+ * `on-first-retry` módot megtartva, képernyőkép nélkül), minden más alak
+ * tiltott.
+ */
+const TRACE_OPTION_PATTERN = new RegExp(
+  String.raw`(?:\b${TRACE_WORD}|['"]${TRACE_WORD}['"])\s*:(?!\s*['"]off['"]|\s*\{\s*mode\s*:\s*['"][a-z-]+['"]\s*,\s*${SCREENSHOTS_WORD}\s*:\s*false\s*\})|[{,]\s*${TRACE_WORD}\s*[,}]`,
+);
+
+/**
+ * A trace képernyőkép kapcsolója bármely olyan értékkel, ami nem a szó
+ * szerinti `false`: a `use` trace objektumában és a `tracing.start()`
+ * opciójában ("captures screenshots in the trace", a telepített
+ * `playwright-core` típusai) egyaránt. A `tracing.stop()` a zipet lemezre
+ * írja.
+ */
+const SCREENSHOTS_OPTION_PATTERN = new RegExp(
+  String.raw`(?:\b${SCREENSHOTS_WORD}|['"]${SCREENSHOTS_WORD}['"])\s*:(?!\s*false\b)|[{,]\s*${SCREENSHOTS_WORD}\s*[,}]`,
+);
 
 /**
  * Lemezre írni képes hivatkozás, a kép formátumától és az írás módjától
@@ -329,17 +406,19 @@ function reachable(start: Iterable<string>, edges: ReadonlyMap<string, readonly 
  * formátumától és az írás módjától függetlenül, PUSZTA EGYÜTTES JELENLÉT
  * alapján (karakterosztályos ablak nélkül, `.claude/CLAUDE.md` 12. szekció).
  *
- * - Közvetlen író: a Playwright `use` képernyőkép opciója, a CLI alparancsa
- *   shell scriptből, vagy a lemezre író képösszehasonlító assertion.
+ * - Közvetlen író: a Playwright `use` képernyőkép opciója, a trace
+ *   képernyőképei, a CLI alparancsa shell scriptből, vagy a lemezre író
+ *   képösszehasonlító assertion.
  * - A KÉPERNYŐKÉP KÖR: a képernyőképet készítő fájlok, és minden fájl, ami
  *   ezeket (közvetve is) importálja. Ezek egyike sem hivatkozhat lemezre
  *   írni képes modulra vagy hívásra, és a `path` opciót sem használhatja:
  *   a kép a hívótól a hívóig ugyanabban a körben halad.
  * - A KÖR FÜGGŐSÉGEI: mindaz, amit a kör (közvetve is) importál. Ezek nem
- *   hivatkozhatnak lemezre írni képes modulra (a `path` kulcs itt szabad,
- *   mert egy függőség adatszerkezetében más jelentésű), az
- *   `ALLOWED_WRITER_FILES` kivételével. Enélkül egy saját író segédfüggvény
- *   egy másik fájlban (`saveImage(név, await képernyőkép())`) átcsúszna.
+ *   hivatkozhatnak lemezre írni képes modulra, az `ALLOWED_WRITER_FILES`
+ *   kivételével, és `path` kulcsuk sem lehet (2026-09-25 óta: egy másik
+ *   fájlban álló opció objektum a kör felé haladva a hívás opciója lesz).
+ *   Enélkül egy saját író segédfüggvény egy másik fájlban
+ *   (`saveImage(név, await képernyőkép())`) átcsúszna.
  */
 function findScreenshotDiskWriters(
   files: readonly CodeFile[],
@@ -358,6 +437,8 @@ function findScreenshotDiskWriters(
   const direct = files.filter(
     (file) =>
       SCREENSHOT_OPTION_PATTERN.test(file.content) ||
+      TRACE_OPTION_PATTERN.test(file.content) ||
+      SCREENSHOTS_OPTION_PATTERN.test(file.content) ||
       SNAPSHOT_ASSERTION_PATTERN.test(file.content) ||
       (file.trackedPath.endsWith('.sh') && SHELL_CAPTURE_PATTERNS.every((pattern) => pattern.test(file.content))),
   );
@@ -370,9 +451,8 @@ function findScreenshotDiskWriters(
   const offenders = new Set(direct.map((file) => file.trackedPath));
   for (const trackedPath of dependencies) {
     const content = contentOf.get(trackedPath) ?? '';
-    const isOffender = circle.has(trackedPath)
-      ? DISK_WRITER_PATTERN.test(content) || PATH_OPTION_PATTERN.test(content)
-      : DISK_WRITER_PATTERN.test(content) && !ALLOWED_WRITER_FILES.has(trackedPath);
+    const isAllowedWriter = !circle.has(trackedPath) && ALLOWED_WRITER_FILES.has(trackedPath);
+    const isOffender = (DISK_WRITER_PATTERN.test(content) && !isAllowedWriter) || hasPathOptionKey(content);
     if (isOffender) {
       offenders.add(trackedPath);
     }
@@ -465,6 +545,13 @@ function readScripts(root: string, trackedPath: string): Readonly<Record<string,
  */
 function fsImport(names: string): string {
   return `import { ${names} } from 'node:fs';\n`;
+}
+
+/**
+ * A (7) invariáns eseteinek Playwright config forrása egyetlen `use` opcióval.
+ */
+function useOption(name: string, value: string): string {
+  return `export default { use: { ${name}: ${value} } };`;
 }
 
 describe('a képernyőkép készítés egyetlen szentesített útja (gépi kényszer)', () => {
@@ -637,6 +724,172 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
         files: [{ trackedPath: 'a.config.ts', content: `export default { use: { ${SCREENSHOT_WORD}: 'on' } };` }],
         offenders: ['a.config.ts'],
       },
+      // 2026-09-25: a független ellenőrzés öt gyengítést talált, amit a fenti
+      // esetek nem fogtak (Bun.write, saveAs, fs/promises, a képösszehasonlító
+      // assertion minta, az opció értékének 'on'-ra szűkítése), és öt kerülő
+      // utat (rövidített path, path a függőségben, nem literál opció érték, CDP,
+      // trace képernyőkép). Az alábbi esetek ezeket zárják.
+      {
+        name: 'fs/promises, node: előtag nélkül',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `import { writeFile } from 'fs/promises';\nawait writeFile('x.jpg', ${call});`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'Bun.write',
+        files: [{ trackedPath: 'e2e/a.ts', content: `await Bun.write('x.jpg', ${call});` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'letöltés mentése a képernyőkép mellett',
+        files: [{ trackedPath: 'e2e/a.ts', content: `const kép = ${call};\nawait download.saveAs('x.jpg');` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'lemezre író képösszehasonlító assertion (képernyőkép)',
+        files: [{ trackedPath: 'e2e/a.ts', content: `await expect(page).toHave${CAPITALIZED_SCREENSHOT_WORD}();` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'lemezre író képösszehasonlító assertion (pillanatkép)',
+        files: [{ trackedPath: 'e2e/a.ts', content: `expect(${call}).toMatch${SNAPSHOT_WORD}();` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'a use képernyőkép opciója only-on-failure értékkel',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(SCREENSHOT_WORD, `'only-on-failure'`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'a use képernyőkép opciója nem literál értékkel',
+        files: [
+          {
+            trackedPath: 'a.config.ts',
+            content: useOption(SCREENSHOT_WORD, `process.env['CI'] ? 'only-on-failure' : 'off'`),
+          },
+        ],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'a use képernyőkép opciója objektummal',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(SCREENSHOT_WORD, `{ mode: 'on', fullPage: true }`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'a use képernyőkép opciója rövidített kulccsal',
+        files: [
+          {
+            trackedPath: 'a.config.ts',
+            content: `const ${SCREENSHOT_WORD} = 'on';\nexport default { use: { ${SCREENSHOT_WORD} } };`,
+          },
+        ],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'rövidített path kulcs a hívásban',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `const path = testInfo.outputPath('x.jpeg');\nawait page.${SCREENSHOT_WORD}({ path, type: 'jpeg' });`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'idézőjeles path kulcs a hívásban',
+        files: [{ trackedPath: 'e2e/a.ts', content: `await page.${SCREENSHOT_WORD}({ 'path': 'x.jpg' });` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'a use képernyőkép opciója idézőjeles kulccsal',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(`'${SCREENSHOT_WORD}'`, `'on'`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'trace idézőjeles kulccsal',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(`'${TRACE_WORD}'`, `'on'`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'trace rövidített kulccsal',
+        files: [
+          {
+            trackedPath: 'a.config.ts',
+            content: `const ${TRACE_WORD} = 'on';\nexport default { use: { ${TRACE_WORD} } };`,
+          },
+        ],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'trace rögzítés képernyőképpel, idézőjeles kulccsal',
+        files: [{ trackedPath: 'e2e/a.ts', content: `await context.tracing.start({ '${SCREENSHOTS_WORD}': true });` }],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'trace rögzítés képernyőképpel, rövidített kulccsal',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `const ${SCREENSHOTS_WORD} = true;\nawait context.tracing.start({ ${SCREENSHOTS_WORD} });`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'az opció objektum a path kulccsal egy másik fájlban',
+        files: [
+          { trackedPath: 'e2e/options.ts', content: `export const shotOptions = { type: 'jpeg', path: 'x.jpg' };` },
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `import { shotOptions } from './options.ts';\nawait page.${SCREENSHOT_WORD}(shotOptions);`,
+          },
+        ],
+        offenders: ['e2e/options.ts'],
+      },
+      {
+        name: 'CDP képernyőkép és writeFileSync',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `${fsImport('writeFileSync')}const { data } = await cdp.send('Page.${CDP_CAPTURE_WORD}');\nwriteFileSync('x.jpg', Buffer.from(data, 'base64'));`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'CDP screencast és writeFileSync',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `${fsImport('writeFileSync')}await cdp.send('Page.${CDP_SCREENCAST_WORD}');`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
+      {
+        name: 'trace szöveges móddal (alapból képernyőképpel)',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(TRACE_WORD, `'on'`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'trace objektum a képernyőkép kikapcsolása nélkül',
+        files: [{ trackedPath: 'a.config.ts', content: useOption(TRACE_WORD, `{ mode: 'on' }`) }],
+        offenders: ['a.config.ts'],
+      },
+      {
+        name: 'trace rögzítés képernyőképpel',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `await context.tracing.start({ ${SCREENSHOTS_WORD}: true });\nawait context.tracing.stop({ path: 'trace.zip' });`,
+          },
+        ],
+        offenders: ['e2e/a.ts'],
+      },
       {
         name: 'jogos: memóriában mért kép a lefedettségi fixtúrán át, olvasó teszt, kikapcsolt opció',
         files: [
@@ -656,11 +909,46 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
         ],
         offenders: [],
       },
+      {
+        name: 'jogos: kikapcsolt trace, képernyőkép nélküli trace mód, DOM pillanatképes trace rögzítés, változó típusannotációja a függőségben',
+        files: [
+          { trackedPath: 'c.config.ts', content: useOption(TRACE_WORD, `'off'`) },
+          {
+            trackedPath: 'd.config.ts',
+            content: useOption(TRACE_WORD, `{ mode: 'on-first-retry', ${SCREENSHOTS_WORD}: false }`),
+          },
+          { trackedPath: 'e2e/trace.ts', content: `await context.tracing.start({ snapshots: true });` },
+          {
+            trackedPath: 'e2e/route.ts',
+            content: `export const route = (template: string) => { let path: string = template; return path; };`,
+          },
+          {
+            trackedPath: 'e2e/pixel.spec.ts',
+            content: `import { route } from './route.ts';\nconst buffer = ${call};`,
+          },
+        ],
+        offenders: [],
+      },
     ];
     for (const testCase of cases) {
       expect(findScreenshotDiskWriters(testCase.files, testCase.packageEntries ?? new Map()), testCase.name).toEqual(
         testCase.offenders,
       );
     }
+  });
+
+  it('(8) az (1) invariáns a (7) által igazolt ellenőrzést futtatja a commitolt fán', () => {
+    // A (7) a függvényt igazolja, nem az (1) törzsét: ha az (1) visszaállna a
+    // 2026-09-25 előtti alakjára (a képernyőkép hívás és a path opció együttes
+    // jelenléte egy fájlban), a (7) zöld maradna, és a három ismert injekció
+    // (JPEG plusz writeFileSync, stream, író segédfüggvény) átmenne a kapun
+    // (független ellenőrzés). Ezért ez a fájl a saját forrásából ellenőrzi,
+    // hogy az (1) törzse pontosan ezt a függvényt futtatja a commitolt fán.
+    const source = readTrackedFile(repoRoot(), SELF_FILE);
+    const start = source.indexOf("it('(1)");
+    const end = source.indexOf("it('(2)");
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(source.slice(start, end)).toContain(TREE_CHECK_CALL);
   });
 });

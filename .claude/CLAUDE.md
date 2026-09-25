@@ -886,7 +886,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A fenti védelem 2026-09-15-ig KIZÁRÓLAG SZÖVEGES volt**, és egy független ellenőrzés jogosan
   mondta ki, hogy semmi nem buktatja el azt a munkamenetet, ami megint saját, eldobható scriptet ír
   saját, éltelen fixtúrával. A **gépi** védelem neve
-  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hét invariáns a
+  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: nyolc invariáns a
   `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
   Amit fog: a
   szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
@@ -929,13 +929,45 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kivételével; a Playwright `use` képernyőkép opciója `off`-tól eltérő értékkel, és a CLI
   alparancsa shell scriptből önmagában tilos. A három injekció utána a `test` kapun bukik (1/7), a
   jogos, memóriában mérő pixel tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét tizenegy
-  szintetikus eseten futtatja (a kerülő utak és a jogos alak), tehát egy gyengítése maga is bukik.
+  szintetikus eseten futtatta. **Pontosítás (2026-09-25):** az eredeti "egy gyengítése maga is
+  bukik" mondat túlzó volt: egy független ellenőrzés tizennégy gyengítéséből ötöt a tizenegy eset
+  nem fogott (a `Bun.write`, a `saveAs` és az `fs/promises` törlése, a képösszehasonlító assertion
+  minta törlése, és az opció értékének `'on'`-ra szűkítése), és az (1) invariáns régi alakjára
+  állítása a három injekcióval zöld maradt. Mindkettő javítva, lásd a következő bejegyzést.
   **Nyitott pont (4. szekció 2. pont):** a Node beépített moduljain kívüli író csomag (például egy
   új függőség) és a szándékos elrejtés (a hívás vagy a modul nevének futásidejű összerakása) nem
   látszik. Mi a viselkedés addig: ezekre gépi kényszer nincs, a természetük a 2026-09-15-i két elvi
   korláté (szándékos megkerülés, nem észrevétlen visszatérés), de a user ezeket külön nem fogadta
   el. Mi zárná le: a user döntése, hogy az elvi korlátok közé tartoznak-e. Forrás: `tooling/scripts`
   CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce.
+- **Az ötödik mért réscsoport: jóhiszemű alakok, amik minden invariánson átmentek (2026-09-25,
+  javítva).** Egy független ellenőrzés a `741f63e` után öt kerülő utat mért, mindegyik jóhiszemű
+  kódként is írható: a rövidített `{ path }` opció (a `path:` minta nem látta); az opció objektum
+  egy másik fájlban (a kör függőségeiben a `path` kulcs szabad volt); a `use` képernyőkép opciója
+  nem literál értékkel (feltételes kifejezés); a CDP `Page` domén képernyőkép metódusa plusz
+  `writeFileSync`; és a trace képernyőképei (a trace zip a teszt kimeneti könyvtárába kerül, és a
+  telepített Playwright a trace képernyőképet alapból bekapcsolja). A javítás: a `path` kulcs
+  minden alakja (sima, idézőjeles, rövidített) tiltott a képernyőkép körben ÉS a függőségeiben (a
+  változó típusannotációja, `let path: string`, nem kulcs; mérve ez az egyetlen alak a
+  függőségekben); a képernyőkép, a trace és a trace képernyőkép kapcsoló opciója ZÁRT LISTÁS: csak a
+  szó szerinti `'off'`, a trace objektumnál a `{ mode: '<mód>', screenshots: false }`, a kapcsolónál
+  a szó szerinti `false` engedett, minden más alak (nem literál, rövidített kulcs, objektum) tiltott;
+  és a CDP két képet adó metódusa (képernyőkép, screencast) képernyőkép hívásnak számít. **A trace
+  döntés:** a zipben lemezre kerülő kép is lemezre írt kép, tehát tiltott; a meglévő
+  `apps/web/playwright.config.ts` a korábbi `on-first-retry` módot megtartva, képernyőkép nélkül
+  maradt zöld (`{ mode: 'on-first-retry', screenshots: false }`; `retries: 0` mellett ma nem is
+  rögzít). A hetedik invariáns ma harmincnégy esetet futtat, és egy új, nyolcadik invariáns a
+  saját forrásából ellenőrzi, hogy az (1) törzse pontosan a hetedik által igazolt függvényt futtatja
+  a commitolt fán. Igazolva: mind az öt kerülő út (a trace két alakkal, hat injekció) egyenként a
+  `test` kapun bukik (1/8), a régi alakon mind zöld volt (7/7); harminchárom gyengítés (a független
+  ellenőrzés öt nem fogott gyengítésével és a mostani lezárások gyengítéseivel együtt) mind bukik a
+  hetedik invariánson, és az (1) régi alakra állítása a három injekcióval a nyolcadikon bukik; a
+  commitolt fán 8/8 zöld. Ami továbbra sem látszik: a fenti nyitott pont két tétele (nem dolgoztunk
+  rajtuk), és a Playwright videó felvétele (`video` opció, `recordVideo`), aminek a képkockáit a kapu
+  nem nézi. Ez utóbbi is nyitott (4. szekció 2. pont): mi a viselkedés addig: nincs rá gépi kényszer,
+  a repóban ma nincs videó felvétel; mi zárná le: a user döntése, hogy a videó képernyőképnek
+  számít-e. Forrás: `tooling/scripts` CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce és a (7)
+  esetei.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN

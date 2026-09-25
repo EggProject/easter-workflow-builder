@@ -41,7 +41,13 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: PREVIEW_ORIGIN,
-    trace: 'on-first-retry',
+    // A trace a korabbi `on-first-retry` modban marad, de kepernyokep nelkul:
+    // a trace zip a teszt kimeneti konyvtaraba, lemezre kerul, es a telepitett
+    // Playwright a trace kepernyokepeit alapbol bekapcsolja. Lemezre kepet
+    // kizarolag a szentesitett `e2e/capture-screenshots.ts` irhat
+    // (tooling/scripts `screenshot-pipeline`, .claude/CLAUDE.md 12. szekcio).
+    // A `retries: 0` mellett ez a mod ma nem is rogzit trace-t.
+    trace: { mode: 'on-first-retry', screenshots: false },
   },
   projects: [
     {
