@@ -21,7 +21,13 @@
 // End: a lapozó és a gombok, a transcript utolsó sora, a jelentett és a
 // valódi arány, a csoport túllógása, a két oldalsó belső térköz) és 8.
 // megszakított érintés (`pointercancel` a külső és a belső elválasztón),
-// mindkettő 2026-09-25 óta, a research 10. szekciójához.
+// mindkettő 2026-09-25 óta, a research 10. szekciójához. 9. külső szélső
+// állás (900x1000). 10. sorrend (a transcript, az elválasztó, a jóváhagyás
+// szövege, a lapozó és a gombok függőleges sorrendje, a szöveg és a gombok
+// közé eső transcript magassága, a Tab lépések az elválasztótól a
+// "Jóváhagyás" gombig, a régió és az ARIA kötés) és 11. a külső elválasztó
+// `End` állása mindkét osztott sávban (O-13), mindkettő a research 11.
+// szekciójához (a CLI sorrend, 2026-09-25).
 //
 // NEM E2E TESZT, és nem kapu: állítás nincs benne, csak számlálás. A
 // kiválasztók szándékosan a panel több alakját is felismerik (a görgethető
@@ -77,12 +83,19 @@ const APPROVAL_COUNTS = [0, 1, 4, 10] as const;
 const TABBED_WIDTH_LIMIT = 768;
 
 /**
- * A jóváhagyás panel és a transcript közti húzható elválasztó hozzáférhető
- * neve (`RunViewTranscriptSide.tsx`, 2026-09-25). A `da9fa70` és a `741f63e`
+ * A jóváhagyás és a transcript közti húzható elválasztó hozzáférhető neve
+ * (`RunViewTranscriptSide.tsx`), mindkét mért alakban: a CLI sorrend
+ * (2026-09-25, a transcript felül, tehát az elsődleges panel) és az előtte
+ * álló sorrend (a jóváhagyás szövege felül). A `da9fa70` és a `741f63e`
  * állapotban nincs ilyen elválasztó: az eszköz ott `separator: false` értéket
  * ír, és a küszöb jelenetet kihagyja.
  */
-const APPROVAL_SEPARATOR_NAME = 'A jóváhagyás és a transcript aránya';
+const APPROVAL_SEPARATOR_NAMES: readonly string[] = [
+  'A transcript és a jóváhagyás aránya',
+  'A jóváhagyás és a transcript aránya',
+];
+
+const APPROVAL_SEPARATOR_PATTERN = /^A (?:transcript és a jóváhagyás|jóváhagyás és a transcript) aránya$/;
 
 function report(scenario: string, values: Readonly<Record<string, unknown>>): void {
   console.log(`MEASUREMENT ${JSON.stringify({ scenario, ...values })}`);
@@ -108,7 +121,7 @@ async function openRun(
  * ugyanaz a definíció, mint a research 7. szekciójában.
  */
 async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
-  return page.evaluate((separatorName) => {
+  return page.evaluate((separatorNames) => {
     const { document } = globalThis;
     const round = (value: number): number => Math.round(value * 100) / 100;
     const visibleRatio = (element: Element): number => {
@@ -161,8 +174,8 @@ async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
       const element = document.querySelector(selector);
       return element === null ? undefined : globalThis.getComputedStyle(element).backgroundColor;
     };
-    const separator = [...document.querySelectorAll('[role="separator"]')].find(
-      (element) => element.getAttribute('aria-label') === separatorName,
+    const separator = [...document.querySelectorAll('[role="separator"]')].find((element) =>
+      separatorNames.includes(element.getAttribute('aria-label') ?? ''),
     );
     return {
       canvas: height('.run-graph-canvas'),
@@ -233,7 +246,7 @@ async function readPanelGeometry(page: Page): Promise<Record<string, unknown>> {
       paginationMetaHeight:
         navigation === null ? undefined : height('.approval-prompt-panel nav.pagination .pagination__meta'),
     };
-  }, APPROVAL_SEPARATOR_NAME);
+  }, APPROVAL_SEPARATOR_NAMES);
 }
 
 // ------------------------------------------------------------
@@ -455,7 +468,7 @@ for (const theme of THEMES) {
       if (viewport.width < TABBED_WIDTH_LIMIT) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
-      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_NAME });
+      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
       if ((await separator.count()) === 0) {
         report('kuszob', { theme, viewport: `${String(viewport.width)}x${String(viewport.height)}`, separator: false });
         return;
@@ -528,7 +541,7 @@ test.describe('erintes', () => {
       await mockApprovalRun(page, manyApprovals(1));
       await openRun(page, theme, { width: 375, height: 812 });
       await page.getByRole('tab', { name: 'Transcript' }).click();
-      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_NAME });
+      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
       if ((await separator.count()) === 0) {
         report('erintes', { theme, viewport: '375x812', separator: false });
         return;
@@ -567,7 +580,7 @@ test.describe('erintes', () => {
  */
 async function readExtremeGeometry(page: Page): Promise<Record<string, unknown>> {
   return page.evaluate(
-    (input: { readonly separatorName: string; readonly rowCount: number }) => {
+    (input: { readonly separatorNames: readonly string[]; readonly rowCount: number }) => {
       const { document } = globalThis;
       const clipRect = (element: Element): { left: number; top: number; right: number; bottom: number } => {
         const rect = element.getBoundingClientRect();
@@ -608,8 +621,8 @@ async function readExtremeGeometry(page: Page): Promise<Record<string, unknown>>
       const panels = groupChildren.filter((child) => child.classList.contains('resizable-panel'));
       const panelSizes = panels.map((panel) => Math.round(panel.getBoundingClientRect().height * 100) / 100);
       const [first, second] = panelSizes;
-      const separator = [...document.querySelectorAll('[role="separator"]')].find(
-        (element) => element.getAttribute('aria-label') === input.separatorName,
+      const separator = [...document.querySelectorAll('[role="separator"]')].find((element) =>
+        input.separatorNames.includes(element.getAttribute('aria-label') ?? ''),
       );
       const buttons = [...(side?.querySelectorAll('button') ?? [])];
       const buttonRatio = (name: string): number | undefined =>
@@ -659,7 +672,7 @@ async function readExtremeGeometry(page: Page): Promise<Record<string, unknown>>
               },
       };
     },
-    { separatorName: APPROVAL_SEPARATOR_NAME, rowCount: APPROVAL_TRANSCRIPT_ROW_COUNT },
+    { separatorNames: APPROVAL_SEPARATOR_NAMES, rowCount: APPROVAL_TRANSCRIPT_ROW_COUNT },
   );
 }
 
@@ -725,7 +738,7 @@ for (const theme of THEMES) {
       await expect(
         page.getByRole('list', { name: 'Futás eseményei' }).locator('[role="listitem"]').first(),
       ).toBeAttached();
-      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_NAME });
+      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
       const positions: Record<string, unknown>[] = [];
       for (const position of ['kezdo', 'Home', 'End'] as const) {
         if (position !== 'kezdo') {
@@ -782,7 +795,7 @@ test.describe('megszakitas', () => {
         await mockApprovalRunWithTranscript(page, manyApprovals(1));
         await openRun(page, theme, { width: 900, height: 1000 });
         const separator = page.getByRole('separator', {
-          name: which === 'kulso' ? OUTER_SEPARATOR_NAME : APPROVAL_SEPARATOR_NAME,
+          name: which === 'kulso' ? OUTER_SEPARATOR_NAME : APPROVAL_SEPARATOR_PATTERN,
         });
         const before = await separator.getAttribute('aria-valuenow');
         const box = await separator.boundingBox();
@@ -867,4 +880,226 @@ for (const theme of THEMES) {
     }
     report('kulso-szelso', { theme, viewport: '900x1000', positions });
   });
+}
+
+/**
+ * A futás nézet függőleges sorrendje a transcript oldalon, egyetlen
+ * `evaluate` hívásban: a transcript burkolója, a jóváhagyás és a transcript
+ * közti elválasztó, a jóváhagyás szövege (a görgethető törzs), a lapozó és a
+ * döntés akciósávja, a tetejük szerint rendezve; a szöveg és a gombok közti
+ * sáv magassága, és ebből a transcript burkolóra eső rész. A régió és az ARIA
+ * kötés: melyik `section` régióban áll a "Jóváhagyás" gomb és a lapozó, és a
+ * gombok `group` szerepkörű szülőjének neve és leírása (az `aria-labelledby`
+ * és az `aria-describedby` hivatkozott szövege).
+ */
+async function readOrderGeometry(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate((separatorNames: readonly string[]) => {
+    const { document } = globalThis;
+    const side = document.querySelector('.run-view-screen__transcript');
+    const separator = [...document.querySelectorAll('[role="separator"]')].find((element) =>
+      separatorNames.includes(element.getAttribute('aria-label') ?? ''),
+    );
+    const parts: Readonly<Record<string, Element | null | undefined>> = {
+      transcript: side?.querySelector('.run-view-screen__transcript-content'),
+      separator,
+      text: side?.querySelector('.drawer__body'),
+      pagination: side?.querySelector('nav.pagination'),
+      buttons: side?.querySelector('.drawer__footer'),
+    };
+    const boxes = Object.fromEntries(
+      Object.entries(parts).flatMap(([name, element]) => {
+        if (element === null || element === undefined) {
+          return [];
+        }
+        const rect = element.getBoundingClientRect();
+        return [[name, { top: Math.round(rect.top * 100) / 100, bottom: Math.round(rect.bottom * 100) / 100 }]];
+      }),
+    );
+    const order = Object.entries(boxes)
+      .toSorted(([, first], [, second]) => first.top - second.top)
+      .map(([name]) => name);
+    const { text, buttons, transcript } = boxes;
+    const between = (() => {
+      if (text === undefined || buttons === undefined) {
+        return;
+      }
+      const [upper, lower] = text.top <= buttons.top ? [text, buttons] : [buttons, text];
+      const gap = Math.round((lower.top - upper.bottom) * 100) / 100;
+      const transcriptInGap =
+        transcript === undefined
+          ? 0
+          : Math.round(
+              Math.max(0, Math.min(lower.top, transcript.bottom) - Math.max(upper.bottom, transcript.top)) * 100,
+            ) / 100;
+      return { gap, transcriptInGap };
+    })();
+    const textById = new Map(
+      [...document.querySelectorAll('[id]')].map((element) => [element.id, element.textContent]),
+    );
+    const referencedText = (ids: string | null | undefined): string | undefined =>
+      ids === null || ids === undefined
+        ? undefined
+        : ids
+            .split(' ')
+            .map((id) => textById.get(id) ?? '')
+            .join(' ');
+    const approve = [...(side?.querySelectorAll('button') ?? [])].find((button) => button.textContent === 'Jóváhagyás');
+    const region = approve?.closest('section') ?? undefined;
+    const group = approve?.closest('[role="group"]') ?? undefined;
+    const navigation = side?.querySelector('nav.pagination') ?? undefined;
+    return {
+      order,
+      boxes,
+      between,
+      region: region?.getAttribute('aria-label') ?? referencedText(region?.getAttribute('aria-labelledby')),
+      paginationInRegion: region !== undefined && navigation !== undefined && region.contains(navigation),
+      title: side?.querySelector('.approval-prompt-card__title')?.textContent ?? undefined,
+      groupName: referencedText(group?.getAttribute('aria-labelledby')),
+      groupDescription: referencedText(group?.getAttribute('aria-describedby')),
+    };
+  }, APPROVAL_SEPARATOR_NAMES);
+}
+
+/**
+ * Tab lépések a `start` elemtől a "Jóváhagyás" gombig (legfeljebb 80), és a
+ * közben fókuszt kapott elemek: hány állt a transcript burkolójában. Valódi
+ * billentyű, nem programozott fókusz: a fókusz sorrend és a fókuszra görgetés
+ * így a felhasználóé.
+ */
+async function walkTabToApprove(
+  page: Page,
+  start: ReturnType<Page['getByRole']>,
+): Promise<{ readonly tabs: number; readonly transcriptStops: number; readonly stops: readonly string[] }> {
+  await start.focus();
+  const stops: string[] = [];
+  let transcriptStops = 0;
+  for (let tab = 1; tab <= 80; tab += 1) {
+    await page.keyboard.press('Tab');
+    const stop = await page.evaluate(() => {
+      const active = globalThis.document.activeElement;
+      if (active === null) {
+        return { label: 'nincs', isInTranscript: false, isApprove: false };
+      }
+      const name = active.getAttribute('aria-label') ?? active.textContent.trim().slice(0, 40);
+      const role = active.getAttribute('role');
+      const roleLabel = role === null ? '' : '[' + role + ']';
+      return {
+        label: `${active.tagName.toLowerCase()}${roleLabel}: ${name}`,
+        isInTranscript: active.closest('.run-view-screen__transcript-content') !== null,
+        isApprove: active.tagName === 'BUTTON' && active.textContent === 'Jóváhagyás',
+      };
+    });
+    stops.push(stop.label);
+    if (stop.isInTranscript) {
+      transcriptStops += 1;
+    }
+    if (stop.isApprove) {
+      return { tabs: tab, transcriptStops, stops };
+    }
+  }
+  return { tabs: -1, transcriptStops, stops };
+}
+
+// ------------------------------------------------------------
+// 10. A sorrend (a CLI sorrend, 2026-09-25): egy jóváhagyással és 20 tárolt
+//     transcript sorral, három méreten és a függőleges sávban (900x1000),
+//     két témában, a belső elválasztó kezdő, `Home` és `End` állásában. A
+//     kezdő állásban a Tab lépések az elválasztótól a "Jóváhagyás" gombig.
+// ------------------------------------------------------------
+for (const theme of THEMES) {
+  for (const viewport of [...VIEWPORTS, { width: 900, height: 1000 }] as const) {
+    test(`sorrend ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
+      await mockApprovalRunWithTranscript(page, manyApprovals(1));
+      await openRun(page, theme, viewport);
+      if (viewport.width < TABBED_WIDTH_LIMIT) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
+      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
+      const tabWalk = await walkTabToApprove(page, separator);
+      const positions: Record<string, unknown>[] = [];
+      for (const position of ['kezdo', 'Home', 'End'] as const) {
+        if (position !== 'kezdo') {
+          await separator.focus();
+          await separator.press(position);
+        }
+        const geometry = await readExtremeGeometry(page);
+        positions.push({
+          position,
+          valueNow: geometry['valueNow'],
+          approve: geometry['approve'],
+          reject: geometry['reject'],
+          paginationMeta: geometry['paginationMeta'],
+          ...(await readOrderGeometry(page)),
+        });
+      }
+      report('sorrend', {
+        theme,
+        viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+        tabWalk,
+        positions,
+      });
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// 11. A KÜLSŐ elválasztó `End` állása mindkét osztott sávban (SPEC-008 14.2
+//     O-13): a függőleges sávban (768 és 1023 pixel között) a transcript
+//     oldal a külső panel 60 pixeles, a vízszintesben (1024 pixeltől) a 80
+//     pixeles minimumán áll. Mérjük a lapozó és a két gomb látható arányát
+//     görgetés nélkül, majd valódi Tab lépésekkel a külső elválasztótól a
+//     "Jóváhagyás" gombig és még egy lépéssel az "Elutasítás" gombig (a
+//     fókuszra görgetés előhozza-e őket).
+// ------------------------------------------------------------
+/**
+ * A lapozó és a két gomb látható aránya a `readExtremeGeometry` méréséből.
+ */
+function pickVisibility(geometry: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return {
+    paginationMeta: geometry['paginationMeta'],
+    paginationNext: geometry['paginationNext'],
+    approve: geometry['approve'],
+    reject: geometry['reject'],
+  };
+}
+
+const OUTER_END_VIEWPORTS = [
+  { width: 768, height: 1024 },
+  { width: 820, height: 1180 },
+  { width: 900, height: 1000 },
+  { width: 1000, height: 700 },
+  { width: 1023, height: 768 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 900 },
+] as const;
+
+for (const theme of THEMES) {
+  for (const viewport of OUTER_END_VIEWPORTS) {
+    test(`kulso-end ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
+      await mockApprovalRunWithTranscript(page, manyApprovals(1));
+      await openRun(page, theme, viewport);
+      const outer = page.getByRole('separator', { name: OUTER_SEPARATOR_NAME });
+      await outer.focus();
+      await outer.press('End');
+      const side = page.locator('.run-view-screen__transcript');
+      const sideBox = await side.boundingBox();
+      const unfocused = await readExtremeGeometry(page);
+      const tabWalk = await walkTabToApprove(page, outer);
+      const approveFocused = await readExtremeGeometry(page);
+      await page.keyboard.press('Tab');
+      const rejectFocused = await readExtremeGeometry(page);
+      report('kulso-end', {
+        theme,
+        viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+        band: viewport.width >= 1024 ? 'vizszintes' : 'fuggoleges',
+        outerValue: await outer.getAttribute('aria-valuenow'),
+        side: sideBox === null ? undefined : { width: Math.round(sideBox.width), height: Math.round(sideBox.height) },
+        unfocused: pickVisibility(unfocused),
+        tabs: tabWalk.tabs,
+        approveFocused: pickVisibility(approveFocused),
+        rejectFocused: pickVisibility(rejectFocused),
+      });
+    });
+  }
 }

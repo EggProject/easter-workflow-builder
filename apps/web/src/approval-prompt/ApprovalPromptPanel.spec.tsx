@@ -55,6 +55,7 @@ describe('ApprovalPromptPanel', () => {
           approvalCount={options.approvalCount ?? (shown === undefined ? 0 : 1)}
           shown={shown}
           onSelectPage={onSelectPage}
+          decisionActions={<div className="actions-placeholder">gombok</div>}
         />,
       );
     });
@@ -66,32 +67,40 @@ describe('ApprovalPromptPanel', () => {
     );
   }
 
-  it('az első betöltés alatt ProgressBar jelzést mutat', () => {
+  function regionName(): string | null | undefined {
+    return container.querySelector('section.approval-prompt-panel')?.getAttribute('aria-label');
+  }
+
+  it('az első betöltés alatt ProgressBar jelzést mutat, a "Függő jóváhagyások" régióban', () => {
     renderPanel(undefined, { isFirstLoadPending: true });
 
     expect(container.querySelector('.progress-bar')).not.toBeNull();
     expect(container.querySelector('nav.pagination')).toBeNull();
+    expect(container.querySelector('.actions-placeholder')).toBeNull();
+    expect(regionName()).toBe('Függő jóváhagyások');
   });
 
-  it('látott jóváhagyás nélkül nem rajzol semmit: a panel üres elem', () => {
+  it('látott jóváhagyás, betöltés és hiba nélkül nem rajzol semmit: üres, név nélküli szakasz, tehát nem régió', () => {
     renderPanel(undefined);
 
-    expect(container.querySelector('.approval-prompt-panel')?.childElementCount).toBe(0);
+    expect(container.querySelector('section.approval-prompt-panel')?.childElementCount).toBe(0);
+    expect(regionName()).toBeNull();
   });
 
-  it('a hibaüzenetet role=alert szerepkörrel mutatja', () => {
+  it('a hibaüzenetet role=alert szerepkörrel mutatja, a "Függő jóváhagyások" régióban', () => {
     renderPanel(undefined, { failureMessage: 'A szerver nem érhető el.' });
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(regionName()).toBe('Függő jóváhagyások');
   });
 
-  it('látott jóváhagyásnál csak a lapozót rajzolja: a tartalom és a döntés gombjai nem a fej részei', () => {
+  it('látott jóváhagyásnál a "Függő jóváhagyások" régióban a lapozó, alatta a döntés akciósávja áll; a jóváhagyás szövege nem a régió része', () => {
     renderPanel({ approval: APPROVAL, progress: undefined, index: 0 });
 
-    const panel = container.querySelector('.approval-prompt-panel');
-    expect([...(panel?.children ?? [])].map((child) => child.className)).toEqual(['pagination']);
+    const panel = container.querySelector('section.approval-prompt-panel');
+    expect(regionName()).toBe('Függő jóváhagyások');
+    expect([...(panel?.children ?? [])].map((child) => child.className)).toEqual(['pagination', 'actions-placeholder']);
     expect(panel?.querySelector('.drawer__body')).toBeNull();
-    expect(panel?.querySelector('.drawer__footer')).toBeNull();
   });
 
   it('a lapozó "k / n" alakban mutatja a helyet, magyar nevekkel, és az 1-től számozott oldalt adja tovább', () => {

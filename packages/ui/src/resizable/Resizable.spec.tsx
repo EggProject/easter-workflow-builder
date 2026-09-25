@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Resizable } from './Resizable.tsx';
 import { ResizableHandle } from './ResizableHandle.tsx';
 import { ResizablePanel } from './ResizablePanel.tsx';
@@ -336,6 +336,40 @@ describe('Resizable', () => {
     });
     expect(handle().getAttribute('aria-valuemin')).toBe('5');
     expect(handle().getAttribute('aria-valuemax')).toBe('95');
+  });
+
+  it('egy később felcsatolt panel a csatolásakor mérődik: az aria-valuemin/valuemax fókusz nélkül is a mért minimum', () => {
+    // A két panel együtt 400 pixel, a pixeles minimum a forrás CSS szabálya
+    // (a happy-dom a stíluslapot is kiértékeli a `getComputedStyle` hívásban).
+    const style = document.createElement('style');
+    style.textContent = '.resizable-panel { min-width: 60px; min-height: 60px; }';
+    document.head.append(style);
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 200));
+    try {
+      act(() => {
+        root.render(
+          <Resizable direction="vertical" defaultSizes={[40, 60]}>
+            <ResizablePanel index={0}>Transcript</ResizablePanel>
+          </Resizable>,
+        );
+      });
+      act(() => {
+        root.render(
+          <Resizable direction="vertical" defaultSizes={[40, 60]}>
+            <ResizablePanel index={0}>Transcript</ResizablePanel>
+            <ResizableHandle beforeIndex={0} />
+            <ResizablePanel index={1}>Jóváhagyás</ResizablePanel>
+          </Resizable>,
+        );
+      });
+      // 60 / 400 = 15 százalék, a fókusz, az átméretezés és a billentyű
+      // előtt.
+      expect(handle().getAttribute('aria-valuemin')).toBe('15');
+      expect(handle().getAttribute('aria-valuemax')).toBe('85');
+    } finally {
+      rect.mockRestore();
+      style.remove();
+    }
   });
 
   it('a mérés nem ír új méretet, ha a méret a minimum fölött áll', () => {

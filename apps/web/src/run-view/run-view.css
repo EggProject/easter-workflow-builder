@@ -94,8 +94,8 @@
 /* A gráf panelje nem görög: a React Flow saját pásztázása viszi a tartalmat,
    egy külső görgősáv csak elrontaná. A szelektor a KÜLSŐ osztott elrendezés
    gyerekére szűkül, mert a transcript oldalon egy második `Resizable` áll
-   (`RunViewTranscriptSide`), aminek az első panelje a jóváhagyás panel: annak
-   a design system `overflow: auto` értéke kell (lásd lent). */
+   (`RunViewTranscriptSide`), aminek a panelei (a transcript és a jóváhagyás
+   szövege) a design system `overflow: auto` értékét kapják (lásd lent). */
 .run-view-screen__body > .resizable-group > .resizable-panel:first-child {
   overflow: hidden;
 }
@@ -132,19 +132,23 @@
 
 /* A transcript oldal megnevezett, doboz nélküli terület: se szegély, se
    lekerekítés, se saját háttér, tehát nem kártya (tilos a card in card).
-   Belül felülről lefelé a jóváhagyás feje (a lapozó), a `RunViewTranscriptSide`
-   második, függőleges `Resizable` eleme (a látott jóváhagyás törzse és a
-   transcript) és a döntés akciósávja (user döntések 2026-09-25). Az oldal
+   Belül felülről lefelé, egy CLI engedélykérés sorrendjében (user döntés
+   2026-09-25, "transcript felül, kérdés alul"): a `RunViewTranscriptSide`
+   második, függőleges `Resizable` eleme (a transcript, a húzható elválasztó
+   és a látott jóváhagyás törzse), közvetlenül alatta a "Függő jóváhagyások"
+   régió (`ApprovalPromptPanel`: a lapozó és a döntés akciósávja). Az oldal
    maga belső térköz nélküli: a jóváhagyás részei a design system `drawer`
    felületét kapják faltól falig, a saját 24 pixeles belső térközükkel
    (`approval-prompt.css`), a transcript a saját 16 pixelesével (lent). Egy
    közös külső térköz köréjük dupla vízszintes térközt adna (16 plusz 24
    pixel, tilos, `.claude/CLAUDE.md` 11. szekció). A görgetést a transcript
    panel virtualizált listája maga végzi (T-009-25, `transcript-panel.css`),
-   ezért ez a burkoló NEM görget. A fej és az akciósáv flex eleme nem
-   zsugorodik a tartalma alá (az automatikus minimum a tartalma), a hely
-   hiányát a `Resizable` fizeti meg (`min-height: 0`, lent), tehát a lapozó
-   és a két gomb az elválasztó bármely állásában teljesen látszik. */
+   ezért ez a burkoló NEM görget. A régió flex eleme nem zsugorodik a
+   tartalma alá (az automatikus minimum a tartalma), a hely hiányát a
+   `Resizable` fizeti meg (`min-height: 0`, lent), tehát a lapozó és a két
+   gomb a belső elválasztó bármely állásában teljesen látszik. A KÜLSŐ
+   elválasztó szélső állásában a transcript oldal maga a külső panel
+   minimumára zsugorodik, és ott a régió nem fér el (SPEC-008 14.2 O-13). */
 .run-view-screen__transcript {
   overflow: hidden;
 }
@@ -163,7 +167,7 @@
   background: transparent;
 }
 
-/* ÉRINTÉSES HÚZÁS a jóváhagyás és a transcript elválasztóján (a fül sáv
+/* ÉRINTÉSES HÚZÁS a transcript és a jóváhagyás elválasztóján (a fül sáv
    telefonos méretén is, SPEC-008 10. szekció). A `Resizable` kizárólag
    pointer eseményekre hallgat, a design system `.resizable-handle` szabálya
    pedig nem állít `touch-action` értéket, tehát az alapértelmezett `auto`
@@ -188,15 +192,15 @@
 }
 
 /* Látott jóváhagyás nélkül a belső `Resizable` egyetlen panelje a
-   transcript (`RunViewTranscriptSide`: a jóváhagyás panel és az elválasztó
-   helye üres, hogy a transcript ne szereljen le). A `ResizablePanel` inline
-   `flex-basis` értéke a tárolt arány, és a `flex-grow` nulla, tehát a panel
-   magától csak a tárolt százalékot kapná. A `min-height: 100%` a flex
-   algoritmusban a feltételezett méretet a minimumra emeli
-   (<https://www.w3.org/TR/css-flexbox-1/#algo-main-item>, "hypothetical main
-   size ... clamped according to its used min and max main sizes"), így az
-   egyedül álló transcript a teljes magasságot kapja; két panel mellett a
-   szelektor nem illeszkedik. */
+   transcript (`RunViewTranscriptSide`: az elválasztó és a jóváhagyás
+   törzsének helye üres, hogy a transcript ne szereljen le). A
+   `ResizablePanel` inline `flex-basis` értéke a tárolt arány, és a
+   `flex-grow` nulla, tehát a panel magától csak a tárolt százalékot kapná. A
+   `min-height: 100%` a flex algoritmusban a feltételezett méretet a
+   minimumra emeli (<https://www.w3.org/TR/css-flexbox-1/#algo-main-item>,
+   "hypothetical main size ... clamped according to its used min and max main
+   sizes"), így az egyedül álló transcript a teljes magasságot kapja; két
+   panel mellett a szelektor nem illeszkedik. */
 .run-view-screen__transcript > .resizable-group > .resizable-panel:only-child {
   min-height: 100%;
 }
@@ -229,19 +233,18 @@
   padding: var(--ep-space-4);
 }
 
-/* A jóváhagyás feje (`ApprovalPromptPanel`) a transcript oldal tetején. Az
-   első betöltés jelzése és a lista hibaüzenete a transcript oldal háttérén
-   áll, ezért a transcript 16 pixeles térközét kapja: jóváhagyás nélkül a
-   transcript belső térközével együtt ugyanaz a 16 pixel áll fölötte és
-   alatta, mint amikor a transcript fölött, a saját burkolójában állt. A
-   lapozó a saját `drawer` felületén, a saját belső térközével áll
-   (`approval-prompt.css`). */
+/* A "Függő jóváhagyások" régió (`ApprovalPromptPanel`) a transcript oldal
+   alján. Az első betöltés jelzése és a lista hibaüzenete a transcript oldal
+   hátterén áll, ezért a transcript 16 pixeles térközét kapja: jóváhagyás
+   nélkül a transcript belső térközével együtt ugyanaz a 16 pixel áll fölötte
+   és alatta. A lapozó a saját `drawer` felületén, a saját belső térközével
+   áll (`approval-prompt.css`). */
 .run-view-screen__transcript > .approval-prompt-panel > .progress-bar,
 .run-view-screen__transcript > .approval-prompt-panel > [role='alert'] {
-  margin: var(--ep-space-4) var(--ep-space-4) 0;
+  margin: 0 var(--ep-space-4) var(--ep-space-4);
 }
 
-/* A látott jóváhagyás törzse az elválasztó fölötti `ResizablePanel` teljes
+/* A látott jóváhagyás törzse az elválasztó alatti `ResizablePanel` teljes
    magasságát kapja, és azon belül a `.drawer__body` görget
    (`approval-prompt.css`). A panel minimuma a design system 60 pixele; a
    `Resizable` 2026-09-25 óta ezt a minimumot a jelentett értékben is tartja
@@ -251,12 +254,12 @@
 }
 
 /* A döntés akciósávja (`ApprovalDecisionActions`, a design system
-   `.drawer__footer` eleme) a transcript oldal alján. A forrás CSS nem ad
+   `.drawer__footer` eleme) a régióban, a lapozó alatt. A forrás CSS nem ad
    `align-items` értéket, tehát az alapérték (`stretch`) a gombokat a sáv
    teljes magasságára nyújtaná, ha az eredmény szövege keskeny panelben több
    sorba tör (375 pixelen a `conflict` üzenete). Fogyasztó oldali, erre a
    sávra szűkített felülírás, ugyanaz a minta, mint a `.resizable-group`
    keret törlése; a `drawer.css` bájtra azonos marad. */
-.run-view-screen__transcript > .drawer__footer {
+.run-view-screen__transcript > .approval-prompt-panel > .drawer__footer {
   align-items: center;
 }

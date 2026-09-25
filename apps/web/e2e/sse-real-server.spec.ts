@@ -641,11 +641,15 @@ test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte ál
 
   await page.goto('/run?runId=r-1');
   const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
-  const region = page.getByRole('region', { name: 'Függő jóváhagyások' });
+  // A látott jóváhagyás szövege (a címe, a szövege és a `payload`) a
+  // kártya `article` elemében, a címe a neve; a "Függő jóváhagyások" régió
+  // 2026-09-25 óta a lapozót és a gombokat fogja össze, a szöveg a húzható
+  // panelben, azon kívül áll.
+  const shownApproval = page.getByRole('article', { name: 'Ág jóváhagyása' });
   await expect(navigation.getByText('1 / 3', { exact: true })).toBeVisible();
   await navigation.getByRole('button', { name: '2', exact: true }).click();
   await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
-  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
   await setNoReloadMarker(page);
 
   // Az előtte álló jóváhagyás döntés nélkül lezárul (például egy másik lapon
@@ -653,7 +657,7 @@ test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte ál
   approvalsHolder.current = [second, third];
   streamServer.push(stepEventFrame(1, 'approval_decided', 'live'));
   await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
-  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
 
   // Egy korábbi időpontú jóváhagyás érkezik: a lista elé bővül, a látott
   // jóváhagyás marad, a helye nő.
@@ -661,7 +665,7 @@ test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte ál
   approvalsHolder.current = [earlier, second, third];
   streamServer.push(stepEventFrame(2, 'approval_requested', 'live'));
   await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
-  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
 
   expect(await readNoReloadMarker(page)).toBe(true);
 });
@@ -695,18 +699,22 @@ test('élő frissítéskor a lapozás nélkül látott jóváhagyás is rögzül
 
   await page.goto('/run?runId=r-1');
   const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
-  const region = page.getByRole('region', { name: 'Függő jóváhagyások' });
+  // A látott jóváhagyás szövege (a címe, a szövege és a `payload`) a
+  // kártya `article` elemében, a címe a neve; a "Függő jóváhagyások" régió
+  // 2026-09-25 óta a lapozót és a gombokat fogja össze, a szöveg a húzható
+  // panelben, azon kívül áll.
+  const shownApproval = page.getByRole('article', { name: 'Ág jóváhagyása' });
   // A user nem lapoz: alapból a legrégebbi látszik.
   await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
-  await expect(region.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
   await setNoReloadMarker(page);
 
   const earlier = selectionApproval('Z', 5);
   approvalsHolder.current = [earlier, second, third];
   streamServer.push(stepEventFrame(1, 'approval_requested', 'live'));
   await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
-  await expect(region.getByText('"branch": "B"')).toBeVisible();
-  await expect(region.getByText('"branch": "Z"')).toHaveCount(0);
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "Z"')).toHaveCount(0);
 
   expect(await readNoReloadMarker(page)).toBe(true);
 });

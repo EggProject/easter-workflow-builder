@@ -5,42 +5,48 @@
    kizárólag a design system
    `--ep-space-*` tokenjeiből jönnek. A panel külső mérete (a transcripttel
    megosztott sáv) a helyétől függ, ezért az a `run-view.css` fájlban áll;
-   itt a belső elrendezés. */
+   itt a belső elrendezés.
+
+   A "Függő jóváhagyások" régió (`ApprovalPromptPanel`) gyerekei közvetlenül
+   egymás alatt állnak, közbülső hézag nélkül: a lapozó és az akciósáv egy
+   felület, egy hézag a kettő között a transcript oldal hátterét mutatná. Az
+   első betöltés jelzésének és a hibaüzenetnek a térköze a `run-view.css`
+   fájlban áll. */
 .approval-prompt-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--ep-space-2);
 }
 
-/* EGYSZERRE EGY JÓVÁHAGYÁS, HÁROM RÉSZBEN (user döntések 2026-09-25,
-   SPEC-008 8. szekció 1. pont). A design system `drawer` szerkezete a
-   transcript oldal teljes magasságára feszül: felül a lapozó (a felület
-   feje), középen a húzható elválasztó fölött a görgethető törzs
-   (`.drawer__body`, `ApprovalPromptBody`), alul a tapadó akciósáv
-   (`.drawer__footer`, `ApprovalDecisionActions`). A lapozó és az akciósáv a
-   `Resizable` elemen kívül, fix helyen áll, tehát az elválasztó bármely
-   állásában látszik; a három rész helye a `run-view.css` fájlban áll, itt a
-   belső elrendezésük.
+/* EGYSZERRE EGY JÓVÁHAGYÁS, EGY CLI ENGEDÉLYKÉRÉS SORRENDJÉBEN (user döntések
+   2026-09-25, "transcript felül, kérdés alul", SPEC-008 8. szekció 1. pont).
+   A transcript oldalon felül a transcript, a húzható elválasztó alatt a
+   látott jóváhagyás görgethető törzse (`.drawer__body`, `ApprovalPromptBody`),
+   közvetlenül alatta, a `Resizable` elemen kívül, fix helyen a lapozó és a
+   tapadó akciósáv (`.drawer__footer`, `ApprovalDecisionActions`), tehát a
+   gombok a kérdés alatt állnak, az elválasztó bármely állásában; a részek
+   helye a `run-view.css` fájlban áll, itt a belső elrendezésük.
 
    EGYSÉGES FELÜLET (user döntés 2026-09-25). A forrásban a `.drawer` panel
    adja a `--ep-bg-elevated` hátteret, a törzs ezért ugyanazon a felületen
    áll, mint a saját `--ep-bg-elevated` hátterű akciósáv (`drawer.css`:
    `.drawer { background: var(--ep-bg-elevated) }`, `.drawer__footer {
    background: var(--ep-bg-elevated) }`). Itt nincs egyetlen szülő, ami a
-   `.drawer` szerepét betöltené, mert a három rész a transcript oldalon
-   szétosztva áll, ezért a háttér a fej és a törzs saját szabálya: a lapozó,
-   a törzs és az akciósáv ugyanazon a tokenen áll.
+   `.drawer` szerepét betöltené, mert a törzs a húzható panelben, a lapozó és
+   az akciósáv azon kívül áll, ezért a háttér a törzs és a lapozó saját
+   szabálya: a törzs, a lapozó és az akciósáv ugyanazon a tokenen áll.
 
    EGY BAL IGAZÍTÁSI VONAL (user döntés 2026-09-25). A lapozó a forrás
    `drawer` 24 pixeles vízszintes belső térközéhez igazodik
    (`drawer.css`: `.drawer__body { padding: 18px 24px }`,
    `.drawer__footer { padding: 16px 24px }`), a design system egyező
-   `--ep-space-6` (24px) tokenjével, tehát a lapozó, a "visszavonhatatlan"
-   `Alert` és a cím bal széle egy vonalban áll. A felső térköz az akciósáv
-   függőleges 16 pixelének párja (`--ep-space-4`). Mindkét egyezést az
-   `approval-surface.spec.ts` e2e mérése őrzi. */
+   `--ep-space-6` (24px) tokenjével, tehát a "visszavonhatatlan" `Alert`, a
+   cím és a lapozó bal széle egy vonalban áll. A felső térköz nulla, mert
+   fölötte a törzs 18 pixeles alsó belső térköze áll; az alsó térköz az
+   akciósáv függőleges 16 pixelének párja (`--ep-space-4`), az akciósáv felső
+   elválasztója előtt. Mindkét egyezést az `approval-surface.spec.ts` e2e
+   mérése őrzi. */
 .approval-prompt-panel > .pagination {
-  padding: var(--ep-space-4) var(--ep-space-6) 0;
+  padding: 0 var(--ep-space-6) var(--ep-space-4);
   background: var(--ep-bg-elevated);
 }
 

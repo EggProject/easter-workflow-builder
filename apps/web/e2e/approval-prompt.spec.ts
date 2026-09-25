@@ -84,19 +84,33 @@ function openSubWorkflowRun(page: Page): Promise<void> {
 }
 
 /**
- * A jóváhagyás panel szakasza (`region` szerepkör a `<section>` nevével).
+ * A "Függő jóváhagyások" régió (`region` szerepkör a `<section>` nevével): a
+ * lapozó és a döntés akciósávja, a transcript oldal alján, a húzható
+ * elválasztón kívül (user döntés 2026-09-25, "transcript felül, kérdés
+ * alul").
  */
 function approvalRegion(page: Page): Locator {
   return page.getByRole('region', { name: 'Függő jóváhagyások' });
 }
 
 /**
- * A döntés akciósávja a transcript oldalon (user döntés 2026-09-25: a
- * transcript alján, a húzható elválasztón kívül). A design system
- * `.drawer__footer` eleme sima `div`, szerepköre és neve nincs, ezért a
- * hatókör CSS kiválasztó. Szándékosan leszármazott, nem közvetlen gyerek
- * kiválasztó: ha a sáv a `Resizable` panelébe kerülne, a gombokat a
- * láthatósági állítások találják meg és buktatják el, nem egy hiányzó elem.
+ * A látott jóváhagyás szövege: a görgethető törzs a húzható panelben
+ * (`ApprovalPromptBody`: a "visszavonhatatlan" figyelmeztetés, a cím, a
+ * szöveg és a `payload`). Nem régió, mert a régió a húzható panelen kívül
+ * áll, és szerepköre sincs, ezért a hatókör CSS kiválasztó.
+ */
+function approvalText(page: Page): Locator {
+  return page.locator('.run-view-screen__transcript .approval-prompt-body');
+}
+
+/**
+ * A döntés akciósávja a transcript oldalon, a jóváhagyás szövege alatt. A
+ * hatókör CSS kiválasztó, és szándékosan nem a csoport szerepköre és neve: az
+ * ARIA kötést külön teszt őrzi, a láthatósági és a döntés tesztek pedig a
+ * kötés nélküli sávon is a gombokat találják meg. Szándékosan leszármazott,
+ * nem közvetlen gyerek kiválasztó: ha a sáv a `Resizable` panelébe kerülne, a
+ * gombokat a láthatósági állítások találják meg és buktatják el, nem egy
+ * hiányzó elem.
  */
 function decisionBar(page: Page): Locator {
   return page.locator('.run-view-screen__transcript .drawer__footer');
@@ -169,7 +183,7 @@ async function expectReadableByScrolling(page: Page, part: Locator): Promise<voi
   await part.scrollIntoViewIfNeeded();
   const partBox = await part.boundingBox();
   const partHeight = partBox?.height ?? 0;
-  const scrollAreaHeight = await approvalRegion(page)
+  const scrollAreaHeight = await approvalText(page)
     .locator('.drawer__body')
     .evaluate((element) => element.clientHeight);
   expect(partHeight).toBeGreaterThan(0);
@@ -206,12 +220,12 @@ test('a csomópont a kérés abszolút időpontját mutatja, a fejlécben jelvé
   // A jelzés a fejléc vezérlő sávjában, az állapot jelvény mellett áll.
   await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toBeVisible();
 
-  // A panel a transcript sávban, a transcript fölött áll, nem a vászon
+  // A panel a transcript sávban, a transcript alatt áll, nem a vászon
   // fölött, és egyszerre egy jóváhagyást mutat: a legrégebbit.
   const transcriptSide = page.locator('.run-view-screen__transcript');
   await expect(transcriptSide.getByRole('region', { name: 'Függő jóváhagyások' })).toBeVisible();
   await expect(page.locator('.run-view-screen > .approval-prompt-panel')).toHaveCount(0);
-  await expect(approvalRegion(page).getByRole('heading')).toHaveText([FIRST_APPROVAL.title]);
+  await expect(approvalText(page).getByRole('heading')).toHaveText([FIRST_APPROVAL.title]);
   await expect(paginationPosition(page, '1 / 2')).toBeVisible();
   await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
 
@@ -286,10 +300,10 @@ for (const theme of ['light', 'dark'] as const) {
         // teljesen olvasható, és a gombok a törzs görgetése után is a helyükön
         // maradnak (nem a törzs részei).
         const readableParts = [
-          approvalRegion(page).getByText('A döntés visszavonhatatlan', { exact: true }),
-          approvalRegion(page).getByRole('heading', { name: shown.title, exact: true }),
-          approvalRegion(page).getByText(shown.body, { exact: true }),
-          approvalRegion(page).getByText('"currency": "EUR"'),
+          approvalText(page).getByText('A döntés visszavonhatatlan', { exact: true }),
+          approvalText(page).getByRole('heading', { name: shown.title, exact: true }),
+          approvalText(page).getByText(shown.body, { exact: true }),
+          approvalText(page).getByText('"currency": "EUR"'),
         ];
         for (const part of readableParts) {
           await expectReadableByScrolling(page, part);
@@ -305,11 +319,12 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 /**
- * A jóváhagyás panel és a transcript közti húzható elválasztó
- * (`RunViewTranscriptSide.tsx`, user döntés 2026-09-25).
+ * A transcript és a jóváhagyás szövege közti húzható elválasztó
+ * (`RunViewTranscriptSide.tsx`, user döntés 2026-09-25); az elsődleges
+ * panele a transcript, tehát az `aria-valuenow` a transcript százaléka.
  */
 function approvalSeparator(page: Page): Locator {
-  return page.getByRole('separator', { name: 'A jóváhagyás és a transcript aránya' });
+  return page.getByRole('separator', { name: 'A transcript és a jóváhagyás aránya' });
 }
 
 async function readLayoutState(page: Page): Promise<{ readonly canvas: number; readonly overflow: readonly number[] }> {
@@ -514,6 +529,127 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 /**
+ * A transcript oldal részeinek függőleges doboza (viewport koordinátában): a
+ * transcript burkolója, az elválasztó, a jóváhagyás szövege (a görgethető
+ * törzs), a lapozó és a döntés akciósávja.
+ */
+async function readSideBoxes(
+  page: Page,
+): Promise<Readonly<Record<'transcript' | 'separator' | 'text' | 'pagination' | 'buttons', DomBox>>> {
+  const box = async (locator: Locator): Promise<DomBox> => {
+    const rect = await locator.boundingBox();
+    if (rect === null) {
+      throw new Error('a mért résznek nincs befoglaló doboza');
+    }
+    return { top: rect.y, bottom: rect.y + rect.height };
+  };
+  return {
+    transcript: await box(page.locator('.run-view-screen__transcript-content')),
+    separator: await box(approvalSeparator(page)),
+    text: await box(approvalText(page).locator('.drawer__body')),
+    pagination: await box(pagination(page)),
+    buttons: await box(decisionBar(page)),
+  };
+}
+
+interface DomBox {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/**
+ * Tab lépések az elválasztótól a "Jóváhagyás" gombig: a lépések száma, és
+ * hány fókuszt kapott elem állt közben a transcript burkolójában.
+ */
+async function tabFromSeparatorToApprove(
+  page: Page,
+): Promise<{ readonly tabs: number; readonly inTranscript: number }> {
+  await approvalSeparator(page).focus();
+  let inTranscript = 0;
+  for (let tabs = 1; tabs <= 30; tabs += 1) {
+    await page.keyboard.press('Tab');
+    const focused = await page.evaluate(() => {
+      const active = globalThis.document.activeElement;
+      return {
+        isInTranscript: active?.closest('.run-view-screen__transcript-content') !== null,
+        isApprove: active?.tagName === 'BUTTON' && active.textContent === 'Jóváhagyás',
+      };
+    });
+    if (focused.isInTranscript) {
+      inTranscript += 1;
+    }
+    if (focused.isApprove) {
+      return { tabs, inTranscript };
+    }
+  }
+  throw new Error('a Tab sorrend 30 lépésen belül nem érte el a Jóváhagyás gombot');
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1440, height: 600 },
+    { width: 375, height: 812 },
+    { width: 900, height: 1000 },
+  ] as const) {
+    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: CLI sorrend: felül a transcript, alatta az elválasztó, a jóváhagyás szövege, közvetlenül alatta a lapozó és a gombok, minden elválasztó állásban teljesen látszva; a Tab a szövegtől a gombokig nem megy át transcript soron; a gombok a régióban, a jóváhagyáshoz kötve`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, manyApprovals(4));
+      await page.goto(APPROVAL_RUN_URL);
+      await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+      if (viewport.width < 768) {
+        await page.getByRole('tab', { name: 'Transcript' }).click();
+      }
+      await expect(page.getByRole('list', { name: 'Futás eseményei' }).getByRole('listitem').first()).toBeVisible();
+      const [shown] = manyApprovals(4);
+      if (shown === undefined) {
+        throw new Error('a fixtúra nem adott jóváhagyást');
+      }
+
+      // A régió a lapozót és a gombokat fogja össze, és a gombok csoportja a
+      // látott jóváhagyáshoz kötött: a neve a címe, a leírása a szövege (W3C
+      // WCAG ARIA17, APG "Providing Accessible Names and Descriptions").
+      const region = approvalRegion(page);
+      await expect(region.getByRole('navigation', { name: 'Jóváhagyások lapozása' })).toBeVisible();
+      const group = region.getByRole('group', { name: shown.title, exact: true });
+      await expect(group).toHaveAccessibleDescription(shown.body);
+      await expect(group.getByRole('button', { name: 'Jóváhagyás', exact: true })).toBeVisible();
+      await expect(group.getByRole('button', { name: 'Elutasítás', exact: true })).toBeVisible();
+
+      // A Tab sorrend az elválasztótól (közvetlenül a szöveg fölött) a
+      // "Jóváhagyás" gombig egyetlen transcript soron sem megy át (a
+      // `1bcface` állapotban 1440x900-on 7 soron át, 8 lépésben).
+      const walk = await tabFromSeparatorToApprove(page);
+      expect(walk.inTranscript).toBe(0);
+
+      const separator = approvalSeparator(page);
+      for (const position of ['kezdő', 'Home', 'End'] as const) {
+        if (position !== 'kezdő') {
+          await separator.focus();
+          await separator.press(position);
+        }
+        const boxes = await readSideBoxes(page);
+        // Felülről lefelé: transcript, elválasztó, szöveg, lapozó, gombok;
+        // a szöveg, a lapozó és a gombok között nincs rés (egy pixel tűrés a
+        // százalékos panelméret tört képpontja miatt).
+        expect(boxes.transcript.bottom).toBeLessThanOrEqual(boxes.separator.top + 1);
+        expect(boxes.separator.bottom).toBeLessThanOrEqual(boxes.text.top + 1);
+        expect(Math.abs(boxes.pagination.top - boxes.text.bottom)).toBeLessThanOrEqual(1);
+        expect(Math.abs(boxes.buttons.top - boxes.pagination.bottom)).toBeLessThanOrEqual(1);
+        await expect(pagination(page)).toBeInViewport({ ratio: 1 });
+        await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+        await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
+      }
+    });
+  }
+}
+
+/**
  * A jóváhagyás és a transcript arányának `localStorage` kulcsa
  * (`run-view-approval-layout.ts`), a `run-view.spec.ts` azonos mintájú
  * tesztjeihez hasonlóan szó szerint: a teszt a tárolt ALAKOT is állítja.
@@ -670,19 +806,19 @@ test('fan_out ágak azonos címmel: lapozás után a döntés a LÁTOTT jóváha
   ]);
 
   await page.goto(APPROVAL_RUN_URL);
-  await expect(approvalRegion(page).getByRole('heading', { name: FAN_OUT_APPROVAL_TITLE, exact: true })).toBeVisible();
+  await expect(approvalText(page).getByRole('heading', { name: FAN_OUT_APPROVAL_TITLE, exact: true })).toBeVisible();
   await expect(paginationPosition(page, '1 / 3')).toBeVisible();
-  await expect(approvalRegion(page).getByText('"branch": 0')).toBeVisible();
+  await expect(approvalText(page).getByText('"branch": 0')).toBeVisible();
 
   await pagination(page).getByRole('button', { name: 'Következő' }).click();
   await expect(paginationPosition(page, '2 / 3')).toBeVisible();
-  await expect(approvalRegion(page).getByText('"branch": 1')).toBeVisible();
+  await expect(approvalText(page).getByText('"branch": 1')).toBeVisible();
   await decisionButton(page, 'Jóváhagyás').click();
   await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
 
   await pagination(page).getByRole('button', { name: '3', exact: true }).click();
   await expect(paginationPosition(page, '3 / 3')).toBeVisible();
-  await expect(approvalRegion(page).getByText('"branch": 2')).toBeVisible();
+  await expect(approvalText(page).getByText('"branch": 2')).toBeVisible();
   await expect(decisionButton(page, 'Elutasítás')).toBeEnabled();
   await decisionButton(page, 'Elutasítás').click();
   await expect(decisionResult(page)).toHaveText('Döntés rögzítve: elutasítva.');
@@ -695,11 +831,11 @@ test('fan_out ágak azonos címmel: lapozás után a döntés a LÁTOTT jóváha
   // Az első ágra még nem ment döntés: a gombjai engedélyezettek, eredmény
   // nincs; a második ág eredménye a saját lapján a helyén maradt.
   await pagination(page).getByRole('button', { name: '1', exact: true }).click();
-  await expect(approvalRegion(page).getByText('"branch": 0')).toBeVisible();
+  await expect(approvalText(page).getByText('"branch": 0')).toBeVisible();
   await expect(decisionButton(page, 'Jóváhagyás')).toBeEnabled();
   await expect(decisionResult(page)).toHaveCount(0);
   await pagination(page).getByRole('button', { name: '2', exact: true }).click();
-  await expect(approvalRegion(page).getByText('"branch": 1')).toBeVisible();
+  await expect(approvalText(page).getByText('"branch": 1')).toBeVisible();
   await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(decisionButton(page, 'Jóváhagyás')).toBeDisabled();
   expect(decisions).toHaveLength(2);
@@ -729,7 +865,7 @@ test('siker után a látott jóváhagyás megmarad: mindkét gomb letiltva marad
   ]);
 
   await page.goto(APPROVAL_RUN_URL);
-  const heading = approvalRegion(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true });
+  const heading = approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true });
   const approveButton = decisionButton(page, 'Jóváhagyás');
   const rejectButton = decisionButton(page, 'Elutasítás');
   await expect(approveButton).toBeEnabled();
@@ -796,7 +932,7 @@ test('az eredmény magától nem tűnik el: a döntés után egy perc lefuttatot
 
   await expect(result).toHaveText('Döntés rögzítve: jóváhagyva.');
   await expect(result).toBeInViewport({ ratio: 1 });
-  await expect(approvalRegion(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true })).toBeVisible();
+  await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title, exact: true })).toBeVisible();
   await expect(decisionButton(page, 'Jóváhagyás')).toBeDisabled();
   await expect(decisionButton(page, 'Elutasítás')).toBeDisabled();
 });

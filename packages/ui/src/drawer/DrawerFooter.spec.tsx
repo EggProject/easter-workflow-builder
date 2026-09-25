@@ -30,4 +30,18 @@ describe('DrawerFooter', () => {
     });
     expect(container.getHTML()).toBe('<div class="drawer__footer"><button type="button">Mentés</button></div>');
   });
+
+  it('a megadott role, aria-labelledby és aria-describedby értéket a .drawer__footer elemre teszi', () => {
+    act(() => {
+      root.render(
+        <DrawerFooter role="group" aria-labelledby="cim" aria-describedby="leiras">
+          <button type="button">Mentés</button>
+        </DrawerFooter>,
+      );
+    });
+    const footer = container.querySelector('.drawer__footer');
+    expect(footer?.getAttribute('role')).toBe('group');
+    expect(footer?.getAttribute('aria-labelledby')).toBe('cim');
+    expect(footer?.getAttribute('aria-describedby')).toBe('leiras');
+  });
 });

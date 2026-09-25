@@ -114,8 +114,9 @@ function isSameSizes(first: readonly number[], second: readonly number[]): boole
  *   `aria-valuenow` értéke az elválasztó TÉNYLEGES helye, az
  *   `aria-valuemin`/`aria-valuemax` pedig az a hely, ahol az elsődleges panel
  *   a legkisebb, illetve a legnagyobb (APG Window Splitter Pattern). A mérés
- *   a csatoláskor, az ablak átméretezésekor, az elválasztó fókuszakor, és
- *   minden húzás és billentyű lépés előtt fut; a csoport más okú
+ *   a csatoláskor, egy panel későbbi csatolásakor, az ablak átméretezésekor,
+ *   az elválasztó fókuszakor, és minden húzás és billentyű lépés előtt fut; a
+ *   csoport más okú
  *   méretváltozását (például egy szülő elrendezés húzását) a következő ilyen
  *   esemény követi, mert a `ResizeObserver` a csomagban tiltott (SPEC-007 16.
  *   szekció 24. kritérium).
@@ -144,6 +145,13 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   const [minSizePercents, setMinSizePercents] = useState<readonly number[]>([]);
   const [activeHandleIndex, setActiveHandleIndex] = useState(-1);
   const [dragState, setDragState] = useState<DragState | undefined>(undefined);
+  // A panelek csatolásának száma: egy később felcsatolt panel (a gráf
+  // szerkesztő beállítás panelje a csomópont kijelölésekor, a futás nézet
+  // jóváhagyás törzse egy élőben érkező jóváhagyáskor) újramérést vált ki,
+  // különben a határ és az `aria-valuemin`/`aria-valuemax` a következő
+  // fókuszig a csatolás előtti, egy panelos mérésen (a forrás [5, 95]
+  // tartományán) maradna.
+  const [panelMountCount, setPanelMountCount] = useState(0);
   const collapseMemory = useRef(new Map<number, number>());
   const panelElements = useRef(new Map<number, HTMLDivElement>());
   const idBase = useId();
@@ -157,6 +165,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
       return;
     }
     panelElements.current.set(index, element);
+    setPanelMountCount((count) => count + 1);
   }, []);
 
   // A panelek mérése és a méretek igazítása a mért minimumhoz. A mért
@@ -221,7 +230,10 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
 
   // A kezdő méret a csatoláskor, a kirajzolás előtt igazodik a mért
   // minimumhoz (egy tárolt 5 százalék egy kis ablakban a minimumra vált), és
-  // minden ablak átméretezéskor újra.
+  // minden ablak átméretezéskor és panel csatoláskor újra. A
+  // `panelMountCount` szándékosan dependency, holott a törzs nem olvassa: egy
+  // később felcsatolt panel ugyanazt a mérést váltja ki, mint a csoport
+  // csatolása.
   useLayoutEffect(() => {
     const handleResize = (): void => {
       refreshGeometry();
@@ -231,7 +243,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
     return (): void => {
       globalThis.removeEventListener('resize', handleResize);
     };
-  }, [refreshGeometry]);
+  }, [refreshGeometry, panelMountCount]);
 
   // Amíg nincs aktív húzás (a kezdő renderen is), nincs mit feliratkoztatni.
   // Húzás alatt a window szintű pointermove/pointerup/pointercancel a forrás

@@ -25,7 +25,14 @@ describe('ApprovalDecisionActions', () => {
 
   function renderActions(progress: ApprovalDecisionProgress | undefined): void {
     act(() => {
-      root.render(<ApprovalDecisionActions progress={progress} onDecide={onDecide} />);
+      root.render(
+        <ApprovalDecisionActions
+          progress={progress}
+          onDecide={onDecide}
+          approvalTitleId="cim-1"
+          approvalTextId="szoveg-1"
+        />,
+      );
     });
   }
 
@@ -53,6 +60,14 @@ describe('ApprovalDecisionActions', () => {
 
     renderActions({ status: 'decided', decision: 'approved' });
     expect([...(footer()?.children ?? [])].map((child) => child.tagName)).toEqual(['P', 'BUTTON', 'BUTTON']);
+  });
+
+  it('a sáv a látott jóváhagyáshoz kötött csoport: a neve a cím, a leírása a szöveg azonosítójára mutat', () => {
+    renderActions(undefined);
+    const footer = container.querySelector('.drawer__footer');
+    expect(footer?.getAttribute('role')).toBe('group');
+    expect(footer?.getAttribute('aria-labelledby')).toBe('cim-1');
+    expect(footer?.getAttribute('aria-describedby')).toBe('szoveg-1');
   });
 
   it('döntés előtt mindkét gomb engedélyezett és sm méretű, eredmény és nyugtázó gomb nincs; a gombok a döntést adják tovább', () => {

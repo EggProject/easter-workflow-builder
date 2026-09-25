@@ -590,3 +590,152 @@ repón kívüli, eldobott Playwright futásból származnak, ami a repó `approv
 importálta (a `screenshot-pipeline` invariánsa szerint a szentesített `capture-screenshots.ts`
 kizárólag a bemutató gráfot fényképezheti, minden képén kifestett élekkel, a 375 pixeles
 "Transcript" fülön viszont nincs él).
+
+## 11. Transcript felül, kérdés alul: a CLI sorrend (2026-09-25)
+
+Kiváltó ok: egy független ellenőrzés a `09fd514` állapoton, és a user döntése (2026-09-25,
+"Transcript felül, kérdés alul"). Mért hibák az előtte alakban: a szöveg és a gombok között a
+teljes transcript állt, Tabbal az elválasztótól a "Jóváhagyás" gombig transcript sorokon át vitt az
+út, a gombsor nem volt a "Függő jóváhagyások" régióban, és semmilyen ARIA hivatkozás nem kötötte a
+jóváhagyáshoz. A döntés: felül a transcript, alatta a jóváhagyás szövege, közvetlenül alatta a
+lapozó és a döntés gombjai, mint egy CLI engedélykérés; a húzható elválasztó a transcript és a
+szöveg között, a lapozó és a gombsor továbbra is a `Resizable` elemen kívül, fix helyen.
+
+### 11.1 Módszer
+
+- **A mérő eszköz a repóban**, két új jelenettel (`apps/web/measurement/approval-panel.ts`, `cd
+apps/web && flock /tmp/playwright-gep.lock bun run measure:approval`), képet nem ír: **10.
+  sorrend** (egy jóváhagyás, 20 tárolt transcript sor, 1440x900, 1440x600, 375x812 a "Transcript"
+  fülön és 900x1000 a függőleges sávban, két témában; a belső elválasztó kezdő, `Home` és `End`
+  állásában a transcript burkoló, az elválasztó, a görgethető törzs, a lapozó és az akciósáv
+  függőleges doboza, a szöveg és a gombok közti sáv, és abból a transcript burkolóra eső rész, a
+  régió neve, a csoport neve és leírása; a kezdő állásban valódi Tab lépések az elválasztótól a
+  "Jóváhagyás" gombig) és **11. külső `End`** (a gráf és a transcript közti elválasztó `End` állása
+  a függőleges sáv öt és a vízszintes sáv két méretén: a lapozó és a két gomb látható aránya
+  görgetés nélkül, majd valódi Tab lépésekkel a külső elválasztótól a "Jóváhagyás" gombig és még
+  egy lépéssel az "Elutasítás" gombig). Az elválasztó nevét az eszköz mindkét alakban felismeri.
+- **Előtte**: a `1bcface` `apps/web` fája (`git archive`) a munkafa csomagjaival (a `packages/ui`
+  egyetlen eltérése a `DrawerFooter` új, a régi fán nem használt attribútumai). **Utána**: a
+  munkafa. A két téma számai azonosak. A nyers sorok a munkamenet `outputs/jovahagyas-cli-sorrend/`
+  mappájában (`meresek-elotte-1bcface.jsonl`, `meresek-utana.jsonl`).
+
+### 11.2 A sorrend, előtte és utána
+
+A "szöveg és gombok közti sáv" a görgethető törzs alja és az akciósáv teteje közti távolság, a
+"benne transcript" ennek a transcript burkolóra eső része.
+
+| Viewport | Állás | Előtte: sorrend felülről                       | Előtte: sáv / benne transcript (px) | Utána: sorrend felülről                        | Utána: sáv / benne transcript (px) |
+| -------- | ----- | ---------------------------------------------- | ----------------------------------- | ---------------------------------------------- | ---------------------------------- |
+| 1440x900 | kezdő | lapozó, szöveg, elválasztó, transcript, gombok | 298 / 293                           | transcript, elválasztó, szöveg, lapozó, gombok | 48 / 0                             |
+| 1440x900 | Home  | ugyanez                                        | 531 / 526                           | ugyanez                                        | 48 / 0                             |
+| 1440x900 | End   | ugyanez                                        | 65 / 60                             | ugyanez                                        | 48 / 0                             |
+| 1440x600 | kezdő | ugyanez                                        | 148 / 143                           | ugyanez                                        | 48 / 0                             |
+| 1440x600 | Home  | ugyanez                                        | 231 / 226                           | ugyanez                                        | 48 / 0                             |
+| 1440x600 | End   | ugyanez                                        | 65 / 60                             | ugyanez                                        | 48 / 0                             |
+| 375x812  | kezdő | ugyanez                                        | 214,5 / 209,5                       | ugyanez                                        | 48 / 0                             |
+| 375x812  | Home  | ugyanez                                        | 364 / 359                           | ugyanez                                        | 48 / 0                             |
+| 375x812  | End   | ugyanez                                        | 65 / 60                             | ugyanez                                        | 48 / 0                             |
+| 900x1000 | kezdő | ugyanez                                        | 67,25 / 62,25                       | ugyanez                                        | 48 / 0                             |
+| 900x1000 | Home  | ugyanez                                        | 69,5 / 64,5                         | ugyanez                                        | 48 / 0                             |
+| 900x1000 | End   | ugyanez                                        | 65 / 60                             | ugyanez                                        | 48 / 0                             |
+
+- Utána a sávban kizárólag a lapozó áll (48 pixel), a lapozó a törzs aljához, az akciósáv a lapozó
+  aljához pontosan illeszkedik. A lapozó és a két gomb minden állásban, mindhárom méreten 1
+  arányban látszik (előtte is), a jelentett érték és a két határ változatlan (10/90, 21/79, 14/86;
+  a 900x1000-es sávban 48/52), mert a két panel mérete a helycserével nem változott.
+- **Tab** az elválasztótól a "Jóváhagyás" gombig: előtte 1440x900-on 8 lépés (7 transcript sor),
+  1440x600-on 5 (4), 375x812-n 6 (5), 900x1000-en 5 (4); utána minden méreten 3 lépés (a görgethető
+  törzs (a mért első fókusz maga a görgethető `.drawer__body` elem), az aktuális oldal gombja, a
+  "Jóváhagyás"), transcript sor nélkül.
+- Változatlan (1., 2. és 4-9. jelenet, két témában): a vászon 700, 400, 533 pixel, az
+  `.app-content` túllógása 0, 0, 1, 4 és 10 jóváhagyással; a görgethető törzs kezdő arányon 293,
+  143, 210 pixel; a "visszavonhatatlan" blokk kezdő arányon 1 arányban látszik; az akciósáv siker
+  után 61 (375-ön 75), `conflict` után 96 (375-ön 138) pixel; a bal és a jobb belső térköz 24 és 24;
+  a lapozó, az `Alert` és a cím bal széle 1033,5 (375-ön 24); a törzs és az akciósáv kifestett
+  képpontja a `--ep-bg-elevated` tokenje; az érintéses húzás 50-ről 74-re visz; a megszakított
+  érintés után semmi nem mozdít. Jóváhagyás nélkül a transcript a teljes oldalt kapja (a régió
+  üres, név nélküli szakasz).
+
+### 11.3 A régió és az ARIA kötés
+
+A lapozó és a gombsor a "Függő jóváhagyások" régióban áll (`ApprovalPromptPanel`, `<section>` a
+hozzáférhető nevével). A szöveg a húzható panelben áll, a régió azon kívül, tehát egyetlen DOM elem
+nem foghatja össze őket, és egy második, azonos nevű régió a W3C APG szerint tilos (minden régiónak
+egyedi név kell, <https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/>). Ezért a gombsor a
+jóváhagyáshoz kötött csoport: `role="group"`, `aria-labelledby` a cím, `aria-describedby` a szöveg
+azonosítójára (mérve utána: a csoport neve "Tömeges jóváhagyás 1", a leírása a jóváhagyás szövege,
+a régió neve "Függő jóváhagyások", a lapozó a régióban; előtte a gomb nem állt régióban, csoportja
+nem volt). Források: a W3C WCAG ARIA17 technika szerint a `group` csoport címkéje a csoport minden
+vezérlőjének közös címkéje, és a segítő technológia a csoportba lépéskor és kilépéskor jelzi
+(<https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA17>); az MDN `group` szerepkör leírása
+ugyanezt a jelzést írja le (<https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/group_role>);
+az APG "Providing Accessible Names and Descriptions" szerint az `aria-labelledby` és az
+`aria-describedby` a lap bármely elemére hivatkozhat, a leírást a képernyőolvasó a név és a
+szerepkör után mondja (<https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/>); a
+WAI-ARIA 1.2 `group` szerepkör (<https://www.w3.org/TR/wai-aria-1.2/#group>). **Nem ellenőrzött**,
+tehát nem állítjuk: hogy egy adott képernyőolvasó a csoport leírását a gomb fókuszakor
+felolvassa-e; az e2e a Chromium hozzáférhetőségi fáját méri (`toHaveAccessibleDescription`).
+
+Az elválasztó elsődleges panele a transcript lett (a W3C APG Window Splitter szerint az elválasztó
+értéke és neve az elsődleges panelé, <https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/>),
+ezért a neve "A transcript és a jóváhagyás aránya", és az `aria-valuenow` a transcript százaléka. A
+`localStorage` `eggRunViewApprovalLayout` kulcsa nem változott, a tárolt pár a panelek sorrendjében
+áll, tehát egy korábban tárolt arány az új sorrendben olvasódik vissza.
+
+### 11.4 A külső elválasztó `End` állása (O-13), a teljes hatókörrel
+
+11\. jelenet, előtte és utána azonos számokkal, két témában:
+
+| Sáv        | Viewport | Külső `End` | Transcript oldal | Görgetés nélkül: lapozó / Következő / Jóváhagyás / Elutasítás | Tab után a Jóváhagyás gombra: ugyanez |
+| ---------- | -------- | ----------- | ---------------- | ------------------------------------------------------------- | ------------------------------------- |
+| függőleges | 768x1024 | 93          | 768 x 60         | 1 / 1 / 0 / 0                                                 | 0 / 0 / 1 / 1                         |
+| függőleges | 820x1180 | 94          | 820 x 60         | 1 / 1 / 0 / 0                                                 | 0 / 0 / 1 / 1                         |
+| függőleges | 900x1000 | 92          | 900 x 60         | 1 / 1 / 0 / 0                                                 | 0 / 0 / 1 / 1                         |
+| függőleges | 1000x700 | 88          | 1000 x 60        | 1 / 1 / 0 / 0                                                 | 0 / 0 / 1 / 1                         |
+| függőleges | 1023x768 | 89          | 1023 x 60        | 1 / 1 / 0 / 0                                                 | 0 / 0 / 1 / 1                         |
+| vízszintes | 1024x768 | 92          | 80 x 568         | 1 / 0 / 0 / 0,72                                              | 1 / 0 / 0 / 0,72                      |
+| vízszintes | 1440x900 | 94          | 80 x 700         | 1 / 0 / 0 / 0,72                                              | 1 / 0 / 0 / 0,72                      |
+
+A "lapozó" oszlop a "k / n" helyjelző. A függőleges sávban a fókusz a gombokat előgörgeti (a
+lapozó közben kicsúszik), a vízszintesben semmi nem hozza elő őket. A CLI sorrend ezt nem oldja
+meg: a fix rész (a 48 pixeles lapozó és a 61 pixeles akciósáv) nagyobb a külső panel 60 pixeles
+magasságánál, és szélesebb a 80 pixeles szélességénél. A SPEC-008 14.2 O-13 tétele ezért a
+teljes hatókörrel nyitva marad (a user döntését kéri).
+
+### 11.5 A gráf szerkesztő elválasztójának elavult határa
+
+A független ellenőrzés szerint a gráf szerkesztőben a csomópont kijelölése után az elválasztó
+`aria-valuemin`/`aria-valuemax` értéke a fókuszig 5/95 volt. Ok: a beállítás panel a kijelöléskor
+csatolódik, a `Resizable` viszont csak a saját csatolásakor, ablak átméretezéskor, fókuszkor és
+húzás vagy billentyű előtt mért, tehát addig az egy panelos mérésen (a forrás [5, 95] tartományán)
+maradt. Javítás (`packages/ui` `Resizable.tsx`): egy panel csatolása is mérést vált ki. Mérve
+(e2e, `graph-editor-layout.spec.ts`): a kijelölés után, fókusz nélkül 1440x900-on 6/94,
+1024x768-on 8/92, ugyanaz, mint a fókusz utáni újramérés; a javítás nélkül 5/95 (mindkét teszt
+bukik). Ugyanez a futás nézetben az élőben érkező jóváhagyás törzsére is igaz. A fül sávban a
+csatoláskor rejtett "Transcript" fül továbbra is a következő eseményig vár (SPEC-008 8. szekció 1.
+pont).
+
+### 11.6 Regressziók és szándékos rontások
+
+- `apps/web/e2e/approval-prompt.spec.ts`, "CLI sorrend", négy méreten, két témában: a régióban a
+  lapozó és a jóváhagyás címével nevezett csoport, a csoport leírása a szöveg; Tab az
+  elválasztótól a "Jóváhagyás" gombig transcript sor nélkül; a kezdő, `Home` és `End` állásban a
+  sorrend transcript, elválasztó, szöveg, lapozó, gombok, rés nélkül (egy pixel tűrés), a lapozó
+  és a két gomb `toBeInViewport({ ratio: 1 })`. `approval-surface.spec.ts`: a lapozó kifestett
+  képpontja is a `--ep-bg-elevated` tokenje. Unit: `RunViewTranscriptSide` (sorrend, a transcript
+  nem szerel le), `ApprovalPromptPanel` (régió csak tartalommal), `ApprovalDecisionActions` és
+  `RunViewScreen` (a csoport a cím és a szöveg azonosítójára mutat), `DrawerFooter`, `Resizable` (a
+  később csatolt panel mérése).
+- **Rontások, mind bukik:** (a) a gombsor a transcript alatt (a törzs panel az első, a transcript
+  a második gyerek): a "CLI sorrend" e2e 8/8 esete bukik (Tab 7, illetve 4 transcript soron át), és
+  a `RunViewTranscriptSide` unit tesztje; (b) az ARIA kötés kivétele (`DrawerFooter` szerepkör és
+  hivatkozás nélkül): a "CLI sorrend" e2e 8/8 esete bukik (a csoport nem található), és két unit
+  teszt (`ApprovalDecisionActions`, `RunViewScreen`); (c) a panel csatolásakori mérés kivétele: a
+  gráf szerkesztő két e2e esete (5/95 a 6/94 és 8/92 helyett) és a `Resizable` unit tesztje.
+
+### 11.7 Képek
+
+A munkamenet `outputs/jovahagyas-cli-sorrend/` mappájában: kezdő, `Home` és `End` állás, valamint
+jóváhagyás nélkül, 1440x900, 1440x600, 375x812 (a "Transcript" fülön) és 900x1000 méreten, mindkét
+témában (a fájlnévben a jelentett érték). A képek egy repón kívüli, eldobott Playwright futásból
+származnak, ami a repó `approval-fixture.ts` fixtúráját importálta (a 10.7 szerinti okból).

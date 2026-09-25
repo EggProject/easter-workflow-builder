@@ -49,11 +49,10 @@ describe('RunViewTranscriptSide', () => {
       root.render(
         <div className="side-root">
           <RunViewTranscriptSide
-            approvalHeader={<div className="header-placeholder">fej</div>}
-            approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
-            approvalActions={<div className="actions-placeholder">gombok</div>}
-            isApprovalShown={isApprovalShown}
             transcriptPanel={<StatefulTranscript />}
+            approvalBody={<div className="body-placeholder">{APPROVAL_TEXT}</div>}
+            approvalPanel={<section className="panel-placeholder">lapozó és gombok</section>}
+            isApprovalShown={isApprovalShown}
             defaultSizes={[40, 60]}
             onSizesChange={onSizesChange}
           />
@@ -74,14 +73,10 @@ describe('RunViewTranscriptSide', () => {
     return [...(container.querySelector('.side-root')?.children ?? [])].map((child) => child.className);
   }
 
-  it('látott jóváhagyás mellett a fej felül, a törzs és a transcript a húzható elválasztó két oldalán, az akciósáv alul, a Resizable elemen kívül', () => {
+  it('látott jóváhagyás mellett felül a transcript, a húzható elválasztó alatt a jóváhagyás szövege, közvetlenül alatta, a Resizable elemen kívül a lapozó és a gombok régiója', () => {
     renderSide(true);
 
-    expect(sideChildren()).toEqual([
-      'header-placeholder',
-      'resizable-group resizable-group--vertical',
-      'actions-placeholder',
-    ]);
+    expect(sideChildren()).toEqual(['resizable-group resizable-group--vertical', 'panel-placeholder']);
 
     const group = container.querySelector('.resizable-group');
     expect(group?.classList.contains('resizable-group--vertical')).toBe(true);
@@ -90,20 +85,22 @@ describe('RunViewTranscriptSide', () => {
       'resizable-handle',
       'resizable-panel',
     ]);
-    expect(group?.firstElementChild?.textContent).toBe(APPROVAL_TEXT);
-    expect(group?.lastElementChild?.querySelector(':scope > .run-view-screen__transcript-content')).not.toBeNull();
+    expect(group?.firstElementChild?.querySelector(':scope > .run-view-screen__transcript-content')).not.toBeNull();
+    expect(group?.lastElementChild?.textContent).toBe(APPROVAL_TEXT);
 
-    expect(separator()?.getAttribute('aria-label')).toBe('A jóváhagyás és a transcript aránya');
+    // Az elsődleges (az elválasztó előtti) panel a transcript: a név és az
+    // érték az övé (W3C APG Window Splitter).
+    expect(separator()?.getAttribute('aria-label')).toBe('A transcript és a jóváhagyás aránya');
     expect(separator()?.getAttribute('aria-orientation')).toBe('horizontal');
     expect(separator()?.getAttribute('aria-valuenow')).toBe('40');
     expect(onSizesChange).toHaveBeenLastCalledWith([40, 60]);
   });
 
-  it('látott jóváhagyás nélkül nincs elválasztó, törzs és akciósáv, a fej a transcript fölött áll', () => {
+  it('látott jóváhagyás nélkül nincs elválasztó és törzs, a transcript az egyetlen panel, alatta a régió', () => {
     renderSide(false);
 
     expect(separator()).toBeNull();
-    expect(sideChildren()).toEqual(['header-placeholder', 'resizable-group resizable-group--vertical']);
+    expect(sideChildren()).toEqual(['resizable-group resizable-group--vertical', 'panel-placeholder']);
     const group = container.querySelector('.resizable-group');
     expect(group?.children).toHaveLength(1);
     const content = group?.querySelector(':scope > .resizable-panel > .run-view-screen__transcript-content');

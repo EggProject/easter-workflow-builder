@@ -1067,38 +1067,51 @@ describe('RunViewScreen', () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.textContent).toContain('Engedélyezed?');
     // A jelzés a fejléc vezérlő sávjában, a döntési felület a transcript
-    // sávban áll (PLAN-009 5. szekció F6), nem a vászon fölött: a lapozó
-    // felül, a törzs a transcript fölött, a kettő között húzható elválasztó,
-    // a döntés akciósávja alul, a lapozó és az akciósáv a `Resizable` elemen
-    // kívül (user döntések 2026-09-25).
+    // sávban áll (PLAN-009 5. szekció F6), nem a vászon fölött, egy CLI
+    // engedélykérés sorrendjében: felül a transcript, a húzható elválasztó
+    // alatt a jóváhagyás szövege, közvetlenül alatta, a `Resizable` elemen
+    // kívül a "Függő jóváhagyások" régió a lapozóval és a döntés gombjaival
+    // (user döntések 2026-09-25).
     expect(container.querySelector(':scope .run-view-screen__header .run-control__bar')?.textContent).toContain(
       'jóváhagyásra vár',
     );
     const side = container.querySelector(':scope .run-view-screen__transcript');
     expect([...(side?.children ?? [])].map((child) => child.className)).toEqual([
-      'approval-prompt-panel',
       'resizable-group resizable-group--vertical',
-      'drawer__footer',
+      'approval-prompt-panel',
     ]);
-    expect(side?.querySelector(':scope > .approval-prompt-panel > nav.pagination')).not.toBeNull();
+    const region = side?.querySelector(':scope > section.approval-prompt-panel');
+    expect(region?.getAttribute('aria-label')).toBe('Függő jóváhagyások');
+    expect([...(region?.children ?? [])].map((child) => child.className)).toEqual(['pagination', 'drawer__footer']);
     const group = container.querySelector(':scope .run-view-screen__transcript > .resizable-group--vertical');
     expect([...(group?.children ?? [])].map((child) => child.className)).toEqual([
       'resizable-panel',
       'resizable-handle',
       'resizable-panel',
     ]);
-    expect(group?.querySelector(':scope > .resizable-panel:first-child > .approval-prompt-body')).not.toBeNull();
-    expect(group?.querySelector(':scope > .resizable-panel:first-child')?.querySelectorAll('button')).toHaveLength(0);
     expect(
       group?.querySelector(
-        ':scope > .resizable-panel:last-child .run-view-screen__transcript-content > .transcript-panel',
+        ':scope > .resizable-panel:first-child .run-view-screen__transcript-content > .transcript-panel',
       ),
     ).not.toBeNull();
+    expect(group?.querySelector(':scope > .resizable-panel:last-child > .approval-prompt-body')).not.toBeNull();
+    expect(group?.querySelector(':scope > .resizable-panel:last-child')?.querySelectorAll('button')).toHaveLength(0);
     const separator = group?.querySelector('[role="separator"]');
-    expect(separator?.getAttribute('aria-label')).toBe('A jóváhagyás és a transcript aránya');
+    expect(separator?.getAttribute('aria-label')).toBe('A transcript és a jóváhagyás aránya');
     expect(separator?.getAttribute('aria-orientation')).toBe('horizontal');
     expect(separator?.getAttribute('aria-valuenow')).toBe('50');
     expect(container.querySelector(':scope .run-view-screen > .approval-prompt-panel')).toBeNull();
+
+    // A döntés gombjainak csoportja a látott jóváhagyás címével és
+    // szövegével kötött, a két külön helyen álló rész azonosítóin át.
+    const decisionGroup = region?.querySelector(':scope > .drawer__footer[role="group"]');
+    const titleId = decisionGroup?.getAttribute('aria-labelledby') ?? '';
+    const textId = decisionGroup?.getAttribute('aria-describedby') ?? '';
+    const titleElement = [...container.querySelectorAll('[id]')].find((element) => element.id === titleId);
+    const textElement = [...container.querySelectorAll('[id]')].find((element) => element.id === textId);
+    expect(titleElement?.textContent).toBe('Engedélyezed?');
+    expect(textElement?.textContent).toBe(APPROVAL.body);
+    expect(group?.contains(titleElement ?? null)).toBe(true);
   });
 
   it('az elválasztó a tárolt arányról indul, és a kezdő értesítése a tárolóba ír', async () => {
@@ -1112,7 +1125,7 @@ describe('RunViewScreen', () => {
       }),
     );
 
-    const separator = container.querySelector('[aria-label="A jóváhagyás és a transcript aránya"]');
+    const separator = container.querySelector('[aria-label="A transcript és a jóváhagyás aránya"]');
     expect(separator?.getAttribute('aria-valuenow')).toBe('30');
     expect(globalThis.localStorage.getItem(RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY)).toBe('[30,70]');
   });
@@ -1129,11 +1142,11 @@ describe('RunViewScreen', () => {
   it('a jóváhagyás lista első betöltésének hibájára a panel a hibát mutatja, betöltés jelzés nélkül, a rajz pedig a helyén marad', async () => {
     await renderScreen('?runId=r-3', createFetchFunction({ approvals: new HttpStatus(500) }));
 
-    // Látott jóváhagyás nélkül nincs elválasztó: a fej a transcript fölött,
+    // Látott jóváhagyás nélkül nincs elválasztó: a régió a transcript alatt,
     // a saját magasságán áll.
     const panel = container.querySelector(':scope .run-view-screen__transcript > .approval-prompt-panel');
     expect(panel?.querySelector('[role="alert"]')).not.toBeNull();
-    expect(container.querySelector('[role="separator"][aria-label="A jóváhagyás és a transcript aránya"]')).toBeNull();
+    expect(container.querySelector('[role="separator"][aria-label="A transcript és a jóváhagyás aránya"]')).toBeNull();
     expect(panel?.querySelector('[role="progressbar"]')).toBeNull();
     expect(lastCanvasProperties().nodes).toHaveLength(1);
   });
@@ -1171,7 +1184,7 @@ describe('RunViewScreen', () => {
     // Az elválasztó megjelenése nem szereli le a transcript panelt: UGYANAZ a
     // DOM elem áll a helyén, tehát a görgetése és a kinyitott sorai megmaradnak
     // (`RunViewTranscriptSide.tsx`).
-    expect(container.querySelector('[aria-label="A jóváhagyás és a transcript aránya"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="A transcript és a jóváhagyás aránya"]')).not.toBeNull();
     expect(container.querySelector('.transcript-panel')).toBe(transcriptPanelBefore);
   });
 
@@ -1212,7 +1225,7 @@ describe('RunViewScreen', () => {
 
     const approveButton = [
       ...container.querySelectorAll<HTMLButtonElement>(
-        ':scope .run-view-screen__transcript > .drawer__footer button.btn',
+        ':scope .run-view-screen__transcript > .approval-prompt-panel > .drawer__footer button.btn',
       ),
     ].find((button) => button.textContent === 'Jóváhagyás');
     if (approveButton === undefined) {
@@ -1227,7 +1240,9 @@ describe('RunViewScreen', () => {
 
     expect(decisionUrls).toEqual([JSON.stringify({ decision: 'approved' })]);
     expect(
-      container.querySelector(':scope .run-view-screen__transcript > .drawer__footer [role="alert"]')?.textContent,
+      container.querySelector(
+        ':scope .run-view-screen__transcript > .approval-prompt-panel > .drawer__footer [role="alert"]',
+      )?.textContent,
     ).toContain('Az elem állapota most nem engedi a műveletet.');
     expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
     // A conflicttel lezárt kártya gombjai nem kapcsolnak vissza.

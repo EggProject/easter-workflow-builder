@@ -30,7 +30,9 @@ import { expect, test } from './coverage-fixture.ts';
  * 9. szekció). A kép memóriában készül és a lap saját `canvas` elemén
  * dekódolódik, lemezre nem íródik (a `react-flow-theme.spec.ts` mintája).
  */
-async function readSurfacePixels(page: Page): Promise<Readonly<Record<'body' | 'footer' | 'elevated', string>>> {
+async function readSurfacePixels(
+  page: Page,
+): Promise<Readonly<Record<'body' | 'pagination' | 'footer' | 'elevated', string>>> {
   const points = await page.evaluate(() => {
     const { document } = globalThis;
     const probe = document.createElement('div');
@@ -45,11 +47,13 @@ async function readSurfacePixels(page: Page): Promise<Readonly<Record<'body' | '
       }
       // A szakasz belső térközéből, a bal felső saroktól 4 pixelre: ott
       // tartalom nem áll (a törzs belső térköze 18 és 24, az akciósávé 16 és
-      // 24 pixel, `drawer.css`).
+      // 24 pixel, `drawer.css`; a lapozó bal belső térköze 24 pixel,
+      // `approval-prompt.css`).
       return { x: Math.ceil(rect.left) + 4, y: Math.ceil(rect.top) + 4 };
     };
     return {
       body: cornerOf('.run-view-screen__transcript .drawer__body'),
+      pagination: cornerOf('.run-view-screen__transcript nav.pagination'),
       footer: cornerOf('.run-view-screen__transcript .drawer__footer'),
       elevated: { x: 2, y: 2 },
     };
@@ -61,7 +65,9 @@ async function readSurfacePixels(page: Page): Promise<Readonly<Record<'body' | '
   return page.evaluate(
     async (input: {
       readonly image: string;
-      readonly points: Readonly<Record<'body' | 'footer' | 'elevated', { readonly x: number; readonly y: number }>>;
+      readonly points: Readonly<
+        Record<'body' | 'pagination' | 'footer' | 'elevated', { readonly x: number; readonly y: number }>
+      >;
     }) => {
       const image = new globalThis.Image();
       image.src = `data:image/png;base64,${input.image}`;
@@ -78,6 +84,7 @@ async function readSurfacePixels(page: Page): Promise<Readonly<Record<'body' | '
         [...context.getImageData(point.x, point.y, 1, 1).data.slice(0, 3)].join(',');
       return {
         body: colorAt(input.points.body),
+        pagination: colorAt(input.points.pagination),
         footer: colorAt(input.points.footer),
         elevated: colorAt(input.points.elevated),
       };
@@ -132,7 +139,7 @@ async function readInsets(page: Page): Promise<Readonly<Record<'bodyLeft' | 'bod
     };
     const body = find('.run-view-screen__transcript .drawer__body');
     const alert = find('.run-view-screen__transcript .drawer__body .alert');
-    const footer = find('.run-view-screen__transcript > .drawer__footer');
+    const footer = find('.run-view-screen__transcript .drawer__footer');
     const lastButton = [...footer.querySelectorAll('button')].at(-1);
     if (lastButton === undefined) {
       throw new Error('a mérés nem talált gombot az akciósávban');
@@ -151,7 +158,7 @@ for (const theme of ['light', 'dark'] as const) {
     { width: 1440, height: 600 },
     { width: 375, height: 812 },
   ] as const) {
-    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: a görgethető törzs és a tapadó akciósáv egy felület a --ep-bg-elevated tokenen, a lapozó, az Alert és a cím bal széle egy vonalban áll, és a jobb belső térköz a ballal azonos`, async ({
+    test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: a görgethető törzs, a lapozó és a tapadó akciósáv egy felület a --ep-bg-elevated tokenen, a lapozó, az Alert és a cím bal széle egy vonalban áll, és a jobb belső térköz a ballal azonos`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -168,6 +175,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       const pixels = await readSurfacePixels(page);
       expect(pixels.body).toBe(pixels.elevated);
+      expect(pixels.pagination).toBe(pixels.elevated);
       expect(pixels.footer).toBe(pixels.elevated);
 
       const [paginationLeft, alertLeft, titleLeft] = await readLeftEdges(page);

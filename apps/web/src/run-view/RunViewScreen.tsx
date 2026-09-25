@@ -7,7 +7,7 @@ import {
   type RunSnapshotResponse,
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
-import { useCallback, useEffect, useState, type MouseEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useId, useState, type MouseEvent, type ReactElement } from 'react';
 import { ApprovalDecisionActions } from '../approval-prompt/ApprovalDecisionActions.tsx';
 import { ApprovalPromptBody } from '../approval-prompt/ApprovalPromptBody.tsx';
 import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
@@ -206,10 +206,11 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  *
  * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
  * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
- * a transcript sávban a döntési felület: felül a lapozó, a transcript fölött
- * a látott jóváhagyás törzse, a kettő között húzható elválasztóval, alul a
- * döntés akciósávja (user döntések 2026-09-25, `RunViewTranscriptSide`, az
- * arány a `run-view-approval-layout.ts` kulcsán perzisztálódik). Egyik sem a
+ * a transcript sávban a döntési felület, egy CLI engedélykérés sorrendjében:
+ * felül a transcript, alatta húzható elválasztóval a látott jóváhagyás
+ * szövege, közvetlenül alatta, az elválasztón kívül a lapozó és a döntés
+ * gombjai (user döntések 2026-09-25, `RunViewTranscriptSide`, az arány a
+ * `run-view-approval-layout.ts` kulcsán perzisztálódik). Egyik sem a
  * vászon fölött áll, tehát a vászon magassága nem függ a jóváhagyások
  * számától (PLAN-009 5. szekció F6 sora). A lista a `usePendingApprovals`
  * hookból élőben frissül, a döntések állapota a `useApprovalDecisions`, a
@@ -262,6 +263,11 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     onDecided: pendingApprovals.reload,
   });
   const approvalSelection = useApprovalSelection(approvalDecisions.displayed);
+  // A látott jóváhagyás címének és szövegének azonosítója: a törzs a húzható
+  // panelben, a döntés gombjainak csoportja azon kívül áll, és a kettőt ez a
+  // két azonosító köti össze (`ApprovalDecisionActions`).
+  const approvalTitleId = useId();
+  const approvalTextId = useId();
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -438,45 +444,17 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           band={layoutBand}
           graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
           // A jóváhagyás felület a transcript sávban áll (PLAN-009 5.
-          // szekció F6: "a transcript mellé"): a lapozó felül, a törzs a
-          // transcript FÖLÖTT, közöttük húzható elválasztóval, a döntés
-          // akciósávja alul, a lapozó és az akciósáv az elválasztón kívül
-          // (user döntések 2026-09-25, `RunViewTranscriptSide.tsx`). A `key`
-          // a futás azonosítója: egy másik futásra navigálva a transcript
-          // panel (és a görgetés állapota) tiszta lappal indul. A két tárolt
-          // arány ugyanazon az okon olvasódik minden renderen, lásd a
-          // `defaultSizes` kommentjét.
+          // szekció F6: "a transcript mellé"), egy CLI engedélykérés
+          // sorrendjében: felül a transcript, alatta húzható elválasztóval a
+          // látott jóváhagyás szövege, közvetlenül alatta, az elválasztón
+          // kívül a "Függő jóváhagyások" régió a lapozóval és a döntés
+          // gombjaival (user döntés 2026-09-25, `RunViewTranscriptSide.tsx`).
+          // A `key` a futás azonosítója: egy másik futásra navigálva a
+          // transcript panel (és a görgetés állapota) tiszta lappal indul. A
+          // két tárolt arány ugyanazon az okon olvasódik minden renderen,
+          // lásd a `defaultSizes` kommentjét.
           transcript={
             <RunViewTranscriptSide
-              approvalHeader={
-                <ApprovalPromptPanel
-                  isFirstLoadPending={
-                    pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
-                  }
-                  failureMessage={pendingApprovals.failureMessage}
-                  approvalCount={approvalDecisions.displayed.length}
-                  shown={shownApproval}
-                  onSelectPage={approvalSelection.selectPage}
-                />
-              }
-              // A törzs kulcsa a jóváhagyás azonosítója: lapozáskor a törzs a
-              // tetejéről indul (`ApprovalPromptBody`).
-              approvalBody={
-                shownApproval && (
-                  <ApprovalPromptBody key={shownApproval.approval.id} approval={shownApproval.approval} />
-                )
-              }
-              approvalActions={
-                shownApproval && (
-                  <ApprovalDecisionActions
-                    progress={shownApproval.progress}
-                    onDecide={(decision) => {
-                      approvalDecisions.decide(shownApproval.approval, decision);
-                    }}
-                  />
-                )
-              }
-              isApprovalShown={shownApproval !== undefined}
               transcriptPanel={
                 <TranscriptPanel
                   key={runId}
@@ -486,6 +464,42 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                   persistedStreamDeltas={runDetail.persistedStreamDeltas}
                 />
               }
+              // A törzs kulcsa a jóváhagyás azonosítója: lapozáskor a törzs a
+              // tetejéről indul (`ApprovalPromptBody`).
+              approvalBody={
+                shownApproval && (
+                  <ApprovalPromptBody
+                    key={shownApproval.approval.id}
+                    approval={shownApproval.approval}
+                    titleId={approvalTitleId}
+                    textId={approvalTextId}
+                  />
+                )
+              }
+              approvalPanel={
+                <ApprovalPromptPanel
+                  isFirstLoadPending={
+                    pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
+                  }
+                  failureMessage={pendingApprovals.failureMessage}
+                  approvalCount={approvalDecisions.displayed.length}
+                  shown={shownApproval}
+                  onSelectPage={approvalSelection.selectPage}
+                  decisionActions={
+                    shownApproval && (
+                      <ApprovalDecisionActions
+                        progress={shownApproval.progress}
+                        onDecide={(decision) => {
+                          approvalDecisions.decide(shownApproval.approval, decision);
+                        }}
+                        approvalTitleId={approvalTitleId}
+                        approvalTextId={approvalTextId}
+                      />
+                    )
+                  }
+                />
+              }
+              isApprovalShown={shownApproval !== undefined}
               defaultSizes={readStoredRunViewApprovalLayoutSizes()}
               onSizesChange={storeRunViewApprovalLayoutSizes}
             />

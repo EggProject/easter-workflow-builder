@@ -34,23 +34,24 @@ describe('ApprovalPromptCard', () => {
     container.remove();
   });
 
-  it('a title, a body és a formázott payload megjelenik, a kártya neve a cím', () => {
+  it('a title, a body és a formázott payload megjelenik, a kártya neve a cím, a cím és a szöveg a hívó azonosítóját viseli', () => {
     act(() => {
-      root.render(<ApprovalPromptCard approval={APPROVAL} />);
+      root.render(<ApprovalPromptCard approval={APPROVAL} titleId="cim-1" textId="szoveg-1" />);
     });
 
     const article = container.querySelector('article.approval-prompt-card');
     const heading = container.querySelector('h3');
     expect(heading?.textContent).toBe('Engedélyezed a fizetést?');
-    expect(article?.getAttribute('aria-labelledby')).toBe(heading?.id);
-    expect(container.textContent).toContain('Kérlek erősítsd meg a tranzakciót');
+    expect(heading?.id).toBe('cim-1');
+    expect(article?.getAttribute('aria-labelledby')).toBe('cim-1');
+    expect(container.querySelector('#szoveg-1')?.textContent).toBe('Kérlek erősítsd meg a tranzakciót');
     const payload = container.querySelector('pre');
     expect(payload?.textContent).toBe(JSON.stringify({ amount: 100, currency: 'EUR' }, undefined, 2));
   });
 
-  it('a kártyán nincs gomb: a döntés a panel tapadó akciósávjában van', () => {
+  it('a kártyán nincs gomb: a döntés a törzs alatti akciósávban van', () => {
     act(() => {
-      root.render(<ApprovalPromptCard approval={APPROVAL} />);
+      root.render(<ApprovalPromptCard approval={APPROVAL} titleId="cim-1" textId="szoveg-1" />);
     });
 
     expect(container.querySelectorAll('button')).toHaveLength(0);

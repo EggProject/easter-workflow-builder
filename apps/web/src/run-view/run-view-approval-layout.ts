@@ -1,9 +1,14 @@
 import { isLayoutSizePair } from '../graph-editor/graph-editor-layout.ts';
 
 /**
- * A futás nézet transcript oldalán a jóváhagyás panel és a transcript közti
+ * A futás nézet transcript oldalán a transcript és a jóváhagyás szövege közti
  * húzható elválasztó perzisztált aránya (user döntés 2026-09-25: "húzható
- * elválasztó ... kezdetben felén, és a beállítás megmarad"). Ugyanaz a minta,
+ * elválasztó ... kezdetben felén, és a beállítás megmarad"), a panelek
+ * sorrendjében: 2026-09-25 óta (a CLI sorrend) az első érték a transcripté,
+ * a második a jóváhagyás szövegéé. A kulcs nem változott, tehát egy korábban,
+ * a fordított sorrendben tárolt arány az új sorrendben olvasódik vissza; az
+ * alapértelmezés szimmetrikus, és a tárolt érték a következő húzással
+ * felülíródik. Ugyanaz a minta,
  * mint a két meglévő elosztásé (`graph-editor-layout.ts`,
  * `run-view-layout.ts`): `egg` előtagú, camelCase kulcs, a meglévő
  * `isLayoutSizePair` typeguard, és `try`/`catch` mindkét irányban.
@@ -15,8 +20,8 @@ import { isLayoutSizePair } from '../graph-editor/graph-editor-layout.ts';
 export const RUN_VIEW_APPROVAL_LAYOUT_STORAGE_KEY = 'eggRunViewApprovalLayout';
 
 /**
- * A kezdő arány, amikor nincs tárolt érték: a jóváhagyás panel és a
- * transcript fele-fele (user döntés 2026-09-25: "kezdetben felén").
+ * A kezdő arány, amikor nincs tárolt érték: a transcript és a jóváhagyás
+ * szövege fele-fele (user döntés 2026-09-25: "kezdetben felén").
  */
 export const DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES: readonly number[] = [50, 50];
 

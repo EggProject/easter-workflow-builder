@@ -1596,3 +1596,32 @@ report --reporter=json-summary` kimenetéből:
 (`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
 `browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
 `transcript-panel` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb nem mozdul.
+
+## 41. A CLI sorrend utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Transcript felül, kérdés alul"): a futás nézet
+transcript oldalán felül a transcript, a húzható elválasztó alatt a jóváhagyás szövege,
+közvetlenül alatta a "Függő jóváhagyások" régió a lapozóval és a döntés gombjaival, a gombsor a
+jóváhagyáshoz kötött csoport (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 11. szekció).
+Az `ApprovalPromptPanel` új régió név ága és a `decisionActions` szlot, a `Resizable` panel
+csatolásakori mérése. Az e2e készlet 353 tesztre bővült: a CLI sorrend négy méreten két témában
+(8), a gráf szerkesztő elválasztójának határa kijelölés után, fókusz nélkül (2).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**353 teszt, mind zöld**; hat `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0); a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1657 / 1672     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 762 / 773       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1597 / 1612     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), az
+`approval-prompt` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A pontos
+arányok (99,1029 / 98,5770 / 99,4643 / 99,0695) két tizedesre vágva a mostani küszöbök, tehát a
+küszöb nem mozdul.

@@ -38,17 +38,26 @@ describe('ApprovalPromptBody', () => {
 
   function renderBody(approval: PendingApproval): void {
     act(() => {
-      root.render(<ApprovalPromptBody key={approval.id} approval={approval} />);
+      root.render(<ApprovalPromptBody key={approval.id} approval={approval} titleId="cim-1" textId="szoveg-1" />);
     });
   }
 
-  it('a "Függő jóváhagyások" szakasz egyetlen gyereke a design system drawer törzse, gomb nélkül', () => {
+  it('a törzs szakasz egyetlen gyereke a design system drawer törzse, gomb nélkül, és nem régió: a "Függő jóváhagyások" régió a lapozót és a gombokat fogja össze', () => {
     renderBody(APPROVAL);
 
-    const section = container.querySelector('section.approval-prompt-body');
-    expect(section?.getAttribute('aria-label')).toBe('Függő jóváhagyások');
-    expect([...(section?.children ?? [])].map((child) => child.className)).toEqual(['drawer__body']);
-    expect(section?.querySelectorAll('button')).toHaveLength(0);
+    const wrapper = container.querySelector('.approval-prompt-body');
+    expect(wrapper?.tagName).toBe('DIV');
+    expect(wrapper?.hasAttribute('aria-label')).toBe(false);
+    expect(container.querySelector('section')).toBeNull();
+    expect([...(wrapper?.children ?? [])].map((child) => child.className)).toEqual(['drawer__body']);
+    expect(wrapper?.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('a cím és a szöveg a hívó azonosítóját viseli, hogy a döntés gombjainak csoportja rájuk hivatkozhasson', () => {
+    renderBody(APPROVAL);
+
+    expect(container.querySelector('#cim-1')?.textContent).toBe('Engedélyezed?');
+    expect(container.querySelector('#szoveg-1')?.textContent).toBe('Kérlek erősítsd meg');
   });
 
   it('a törzsben elöl kimondja a design system Alert blokkjával, hogy a döntés visszavonhatatlan, utána a látott jóváhagyás teljes tartalma', () => {

@@ -1,9 +1,20 @@
 import type { PendingApproval } from '@easter-workflow-builder/protocol';
-import { useId, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import './approval-prompt.css';
 
 export interface ApprovalPromptCardProperties {
   readonly approval: PendingApproval;
+  /**
+   * A cím elemének azonosítója. A hívó adja, mert a döntés gombjainak
+   * csoportja is erre hivatkozik (`ApprovalDecisionActions`,
+   * `aria-labelledby`), és a két komponens a futás nézetben külön helyen áll.
+   */
+  readonly titleId: string;
+  /**
+   * A jóváhagyás szövegének (`body`) azonosítója, ugyanezért: a döntés
+   * gombjainak csoportja erre hivatkozik (`aria-describedby`).
+   */
+  readonly textId: string;
 }
 
 /**
@@ -18,20 +29,22 @@ function FormattedPayload(properties: Readonly<{ payload: unknown }>): ReactElem
 /**
  * Egy függő jóváhagyás TARTALMA: a `title`, a `body` és a formázott
  * `payload` (SPEC-008 8. szekció, T-009-27, AC35). A döntés gombjai nem itt
- * állnak, hanem a panel tapadó akciósávjában, a görgethető törzs alatt
- * (`ApprovalDecisionActions`), hogy görgetés nélkül is elérhetők legyenek
- * (user döntés 2026-09-24 és 2026-09-25, SPEC-008 8. szekció 1. pont).
+ * állnak, hanem közvetlenül a görgethető törzs alatt, a "Függő jóváhagyások"
+ * régióban (`ApprovalDecisionActions`), hogy görgetés nélkül is elérhetők
+ * legyenek (user döntés 2026-09-25, SPEC-008 8. szekció 1. pont); a
+ * csoportjuk a cím és a szöveg azonosítójával kötődik ide.
  */
 export function ApprovalPromptCard(properties: Readonly<ApprovalPromptCardProperties>): ReactElement {
-  const { approval } = properties;
-  const titleId = useId();
+  const { approval, titleId, textId } = properties;
 
   return (
     <article className="approval-prompt-card" aria-labelledby={titleId}>
       <h3 id={titleId} className="approval-prompt-card__title">
         {approval.title}
       </h3>
-      <p className="approval-prompt-card__body">{approval.body}</p>
+      <p id={textId} className="approval-prompt-card__body">
+        {approval.body}
+      </p>
       <FormattedPayload payload={approval.payload} />
     </article>
   );
