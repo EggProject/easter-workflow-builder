@@ -216,7 +216,7 @@ describe('RunHistoryScreen', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
   it('üres listára az emptyLabel szöveget mutatja', async () => {

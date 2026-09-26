@@ -256,11 +256,13 @@ describe('useTranscriptAutoScroll', () => {
 
   /**
    * Egy sor fejléce: `aria-expanded` gomb, benne a cím, ahogy a valódi
-   * sorban. A kattintás célja a cím (a gombon BELÜLI elem).
+   * sorban. A kattintás célja a cím (a gombon BELÜLI elem). A gomb itt nem
+   * vált: az `isExpanded` a kattintás előtti állapot, tehát a kattintás
+   * `false` mellett kinyitás, `true` mellett becsukás.
    */
-  function addDisclosure(element: HTMLDivElement): HTMLSpanElement {
+  function addDisclosure(element: HTMLDivElement, isExpanded = false): HTMLSpanElement {
     const header = document.createElement('button');
-    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('aria-expanded', String(isExpanded));
     const title = document.createElement('span');
     header.append(title);
     element.append(header);
@@ -328,14 +330,98 @@ describe('useTranscriptAutoScroll', () => {
       expect(current().unseenCount).toBe(1);
     });
 
-    it('ha a mérés után is látszik az utolsó sor (például az utolsó sor nyílt ki), a követés visszakapcsol: a következő új sor görget', () => {
+    it('a kinyitás szünete a mérés után is tart, akkor is, ha az utolsó sor látszik (az utolsó sor nyílt ki): a következő új sor nem görget (user döntés 2026-09-25)', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
       click(addDisclosure(element));
       renderRows(10, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 9 });
+      });
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('a kinyitott utolsó sor görgetése az alj elhagyása nélkül nem visszatérés; a következő, nem követett sor után a kézi visszatérés az aljára igen', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      renderRows(10, createRowHeight());
+      // A felhasználó a kinyitott törzset olvassa: a tartomány eleje mozdul,
+      // az utolsó sor végig látszik.
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+      renderRows(11);
       expect(scrollToRow).not.toHaveBeenCalled();
 
+      // Az érkezés után a lista előbb még a régi tartományt jelenti (a régi
+      // utolsó sorra vágva), majd az újraszámoltat: az új sor nem látszik, a
+      // lista elhagyta az alját. Utána a felhasználó odagörget.
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 4, stopIndex: 10 });
+      });
+      expect(current().unseenCount).toBe(0);
+      renderRows(12);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+    });
+
+    it('nem teli listán az érkezés utáni, még a régi tartományt leíró jelentés nem az alj elhagyása: az új sort mutató jelentés után is tart a szünet', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(3, list);
+
+      click(addDisclosure(element));
+      renderRows(3, createRowHeight());
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 2 });
+      });
+      renderRows(4);
+      // A `react-window` az érkezés után előbb a régi tartományt jelenti (2 a
+      // 4 sorból), majd az újraszámoltat (3 a 4-ből): a lista végig az alján
+      // állt, tehát ez nem "elhagyás, majd visszatérés".
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 2 });
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 3 });
+      });
+      expect(current().unseenCount).toBe(1);
+
+      renderRows(5);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(2);
+    });
+
+    it('a becsukás szünete a mérésig tart: ha a mérés után is látszik az utolsó sor, a követés visszakapcsol, és a következő új sor görget', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element, true));
+      renderRows(10, createRowHeight());
+      expect(scrollToRow).not.toHaveBeenCalled();
+
+      renderRows(11);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
+      expect(current().unseenCount).toBe(0);
+    });
+
+    it('a kinyitott sor becsukása ugyanazon a fejlécen a mérés után is lezárja a szünetet: a predikátum dönt', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      const title = addDisclosure(element);
+      click(title);
+      renderRows(10, createRowHeight());
+      click(title);
       renderRows(11);
       expect(scrollToRow).toHaveBeenCalledWith({ index: 10, align: 'end' });
       expect(current().unseenCount).toBe(0);
@@ -364,12 +450,12 @@ describe('useTranscriptAutoScroll', () => {
       expect(scrollToRow).not.toHaveBeenCalled();
     });
 
-    it('a mérés és a lezárás közé eső új kattintás a lezárást a saját méréséig elhalasztja', () => {
+    it('a mérés és a lezárás közé eső új becsukás a lezárást a saját méréséig elhalasztja', () => {
       const { list, element } = listWithElement();
       mountAtBottom(10, list);
 
-      click(addDisclosure(element));
-      const second = addDisclosure(element);
+      click(addDisclosure(element, true));
+      const second = addDisclosure(element, true);
       // A mérés commitja után, a lezárás commitjában, a lezárás előtt.
       probe = {
         skippedCommits: 1,
@@ -411,6 +497,68 @@ describe('useTranscriptAutoScroll', () => {
       click(title);
       scrollToRow.mockClear();
       renderRows(12);
+      expect(scrollToRow).not.toHaveBeenCalled();
+    });
+
+    it('ha a mérés elmarad, a kézi visszatérés az aljára lezárja a várakozást: a követés visszakapcsol', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      // A kinyitott sor a mérése előtt leszerelődik (fülváltás): a
+      // gyorsítótár nem változik, a lista pedig elhagyja az alját.
+      click(addDisclosure(element));
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 0 });
+      });
+      renderRows(11);
+      expect(current().unseenCount).toBe(1);
+
+      act(() => {
+        current().onRowsRendered({ startIndex: 4, stopIndex: 10 });
+      });
+      expect(current().unseenCount).toBe(0);
+      renderRows(12);
+      expect(scrollToRow).toHaveBeenCalledWith({ index: 11, align: 'end' });
+    });
+
+    it('a várakozás alatt az utolsó sort mutató jelentés az alj elhagyása NÉLKÜL nem visszatérés: a követés kikapcsolva marad', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      click(addDisclosure(element));
+      act(() => {
+        current().onRowsRendered({ startIndex: 1, stopIndex: 9 });
+      });
+      renderRows(11);
+      expect(scrollToRow).not.toHaveBeenCalled();
+      expect(current().unseenCount).toBe(1);
+    });
+
+    it('egy korábbi várakozásban elhagyott alj nem számít a következő várakozásban', () => {
+      const { list, element } = listWithElement();
+      mountAtBottom(10, list);
+
+      const title = addDisclosure(element);
+      click(title);
+      act(() => {
+        current().onRowsRendered({ startIndex: 0, stopIndex: 6 });
+      });
+      act(() => {
+        current().jumpToBottom();
+      });
+      act(() => {
+        current().onRowsRendered({ startIndex: 3, stopIndex: 9 });
+      });
+
+      // Új várakozás az alján: az ELŐZŐ várakozás "elhagyta az alját"
+      // jelzése nem vihet át, tehát a kattintás előtti elrendezés késve
+      // érkező, az utolsó sort mutató jelentése nem kapcsol vissza.
+      click(title);
+      act(() => {
+        current().onRowsRendered({ startIndex: 2, stopIndex: 9 });
+      });
+      scrollToRow.mockClear();
+      renderRows(11);
       expect(scrollToRow).not.toHaveBeenCalled();
     });
 

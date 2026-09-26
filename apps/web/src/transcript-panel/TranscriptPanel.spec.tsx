@@ -2,7 +2,8 @@
 import type { RunEventRecord, RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import { toTransientRowRecord } from './to-transient-row-record.ts';
 import type { TranscriptRow } from './transcript-row.ts';
@@ -108,6 +109,40 @@ function manyRecords(count: number): readonly RunEventRecord[] {
   return Array.from({ length: count }, (_, index) => makeRecord(index + 1));
 }
 
+/**
+ * A lista `ResizeObserver` jelentése rögzített tartalom doboz magassággal: a
+ * `react-window` ebből adja az `onResize` méretét (a happy-dom nem végez
+ * layoutot). A megfigyelő a megfigyelés kezdetén azonnal jelent, és csak a
+ * lista elemére: a sorok magasságát ugyanez az API figyeli
+ * (`useDynamicRowHeight`), azok mérete itt nem tárgy.
+ */
+function stubListContentHeight(height: number): void {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      readonly #callback: (entries: readonly { target: Element; contentRect: DOMRectReadOnly }[]) => void;
+
+      constructor(callback: (entries: readonly { target: Element; contentRect: DOMRectReadOnly }[]) => void) {
+        this.#callback = callback;
+      }
+
+      observe(target: Element): void {
+        if (target.classList.contains('transcript-panel__list')) {
+          this.#callback([{ target, contentRect: new DOMRect(0, 0, 300, height) }]);
+        }
+      }
+
+      unobserve(): void {
+        // A rögzített jelentésnek nincs leiratkozása.
+      }
+
+      disconnect(): void {
+        // A rögzített jelentésnek nincs leiratkozása.
+      }
+    },
+  );
+}
+
 describe('TranscriptPanel', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -160,6 +195,30 @@ describe('TranscriptPanel', () => {
       .map((item) => item.getAttribute('aria-posinset'));
   }
 
+  /**
+   * Az "ugrás az aljára" gomb, ha a DOM-ban van: a lista keretében, a lista
+   * előtt áll, és új esemény nélkül nincs kirajzolva.
+   */
+  function queryJumpButton(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(':scope .transcript-panel__list-frame > button');
+  }
+
+  function jumpButton(): HTMLButtonElement {
+    const element = queryJumpButton();
+    if (element === null) {
+      throw new Error('a teszt nem talált ugrás gombot');
+    }
+    return element;
+  }
+
+  function listFrame(): HTMLElement {
+    const element = container.querySelector<HTMLElement>(':scope .transcript-panel__list-frame');
+    if (element === null) {
+      throw new Error('a teszt nem talált lista keretet');
+    }
+    return element;
+  }
+
   function statusTexts(): readonly (string | null)[] {
     return [...container.querySelectorAll('[role="status"]')].map((element) => element.textContent);
   }
@@ -184,7 +243,7 @@ describe('TranscriptPanel', () => {
       expect(statusTexts()).toEqual(['Várakozás az első eseményre']);
       expect(container.querySelector('.transcript-panel__empty')).toBeNull();
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(queryJumpButton()).toBeNull();
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -197,7 +256,7 @@ describe('TranscriptPanel', () => {
       expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe('A futásnak nincs eseménye.');
       expect(statusTexts()).toEqual([]);
       expect(container.querySelector('.transcript-panel__loading')).toBeNull();
-      expect(container.querySelector('.transcript-panel__header')).toBeNull();
+      expect(queryJumpButton()).toBeNull();
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
@@ -229,6 +288,13 @@ describe('TranscriptPanel', () => {
     for (const item of items) {
       expect(item.querySelector('.run-event-row')).not.toBeNull();
     }
+  });
+
+  it('a lista kerete legalább egy összecsukott sornyi magas, és a lista kitölti, hogy az elválasztó End állásában is legyen hol látszania az utolsó sornak', () => {
+    renderPanel(transcriptOf(manyRecords(3), true));
+
+    expect(listFrame().style.minHeight).toBe(`${String(COLLAPSED_TRANSCRIPT_ROW_HEIGHT)}px`);
+    expect(list().parentElement).toBe(listFrame());
   });
 
   it('a sor React kulcsa a sor key mezője, nem a sorszáma: a kinyitott állapot a sorral marad, más sor nem örökli', () => {
@@ -292,17 +358,86 @@ describe('TranscriptPanel', () => {
       list().scrollTop = 0;
       list().dispatchEvent(new Event('scroll'));
     });
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(queryJumpButton()).toBeNull();
 
     renderPanel(transcriptOf(manyRecords(23), true));
-    const button = container.querySelector<HTMLButtonElement>(':scope .transcript-panel__header button');
-    expect(button?.textContent).toBe('Ugrás az aljára (3 új esemény)');
-    expect(button?.className).toBe('btn btn--secondary btn--sm');
+    expect(jumpButton().textContent).toBe('Ugrás az aljára (3 új esemény)');
+    expect(jumpButton().className).toBe('btn btn--secondary btn--sm transcript-panel__jump');
 
     act(() => {
-      button?.click();
+      jumpButton().click();
     });
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(queryJumpButton()).toBeNull();
+  });
+
+  it('a látható gomb fókuszálható, a hozzáférhetőségi fában a nevével áll, és a DOM-ban a lista előtt, tehát a Tab sorrendben a sorok előtt van', () => {
+    renderPanel(transcriptOf(manyRecords(20), true));
+    act(() => {
+      list().scrollTop = 10_000;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    act(() => {
+      list().scrollTop = 0;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    renderPanel(transcriptOf(manyRecords(21), true));
+
+    const button = jumpButton();
+    act(() => {
+      button.focus();
+    });
+    expect(document.activeElement).toBe(button);
+    expect(button.getAttribute('aria-hidden')).toBeNull();
+    expect(button.tabIndex).toBe(0);
+    expect(button.nextElementSibling).toBe(list());
+  });
+
+  function scrollUpAndReceive(count: number): void {
+    renderPanel(transcriptOf(manyRecords(20), true));
+    act(() => {
+      list().scrollTop = 10_000;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    act(() => {
+      list().scrollTop = 0;
+      list().dispatchEvent(new Event('scroll'));
+    });
+    renderPanel(transcriptOf(manyRecords(20 + count), true));
+  }
+
+  it('szűk listán (a tartalom doboza egy sornál kisebb) a gomb nem lebeg: a keret sor irányú, a gomb a lista előtt, ugyanazzal a szöveggel (user döntés 2026-09-25)', () => {
+    stubListContentHeight(COLLAPSED_TRANSCRIPT_ROW_HEIGHT - 1);
+    try {
+      scrollUpAndReceive(2);
+      expect(listFrame().className).toBe('transcript-panel__list-frame transcript-panel__list-frame--compact');
+      expect(jumpButton().textContent).toBe('Ugrás az aljára (2 új esemény)');
+      expect(jumpButton().nextElementSibling).toBe(list());
+      act(() => {
+        jumpButton().click();
+      });
+      expect(queryJumpButton()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('pontosan egy sornyi tartalom dobozú listán a gomb a lebegő alakban áll', () => {
+    stubListContentHeight(COLLAPSED_TRANSCRIPT_ROW_HEIGHT);
+    try {
+      scrollUpAndReceive(1);
+      expect(listFrame().className).toBe('transcript-panel__list-frame');
+      expect(jumpButton().textContent).toBe('Ugrás az aljára (1 új esemény)');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('új esemény nélkül nincs gomb és nincs sáv: a lista kerete a panel első eleme, benne csak a lista (user döntés 2026-09-25)', () => {
+    renderPanel(transcriptOf(manyRecords(3), true));
+
+    expect(container.querySelector('.transcript-panel')?.firstElementChild).toBe(listFrame());
+    expect([...listFrame().children]).toEqual([list()]);
+    expect(container.textContent).not.toContain('Ugrás az aljára');
   });
   it('ha a futás a részleges szöveget NEM tárolja, a fejlécben kimondja, hogy az csak élőben látszik (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', false);
@@ -314,11 +449,11 @@ describe('TranscriptPanel', () => {
     expect(statusTexts()).toEqual([]);
   });
 
-  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és fejléc sincs (AC43)', () => {
+  it('ha a futás a részleges szöveget tárolja, nincs delta mondat, és a panel első eleme a lista kerete (AC43)', () => {
     renderPanel(transcriptOf(manyRecords(2), true), [], 'running', true);
 
     expect(container.querySelector('.transcript-panel__delta-note')).toBeNull();
-    expect(container.querySelector('.transcript-panel__header')).toBeNull();
+    expect(container.querySelector('.transcript-panel')?.firstElementChild).toBe(listFrame());
     expect(container.textContent).not.toContain(DELTA_NOTE);
   });
 

@@ -42,6 +42,8 @@ export {
   type DataTableProperties,
 } from './data-table/DataTable.tsx';
 export { Dot, type DotProperties, type DotSize, type DotTone } from './dot/Dot.tsx';
+export { DrawerBody, type DrawerBodyProperties } from './drawer/DrawerBody.tsx';
+export { DrawerFooter, type DrawerFooterProperties } from './drawer/DrawerFooter.tsx';
 export {
   FeedIndicator,
   type FeedIndicatorProperties,
@@ -57,7 +59,14 @@ export { Menu, type MenuAlign, type MenuProperties, type MenuTriggerProperties }
 export { MenuItem, type MenuItemProperties } from './menu/MenuItem.tsx';
 export { Modal, type ModalIconVariant, type ModalProperties, type ModalSize } from './modal/Modal.tsx';
 export { PageFooter, type PageFooterProperties } from './page-footer/PageFooter.tsx';
-export { Resizable, type ResizableProperties } from './resizable/Resizable.tsx';
+export {
+  Pagination,
+  PAGINATION_SOURCE_LABELS,
+  type PaginationLabels,
+  type PaginationProperties,
+  type PaginationVariant,
+} from './pagination/Pagination.tsx';
+export { Resizable, type ResizableProperties, type ResizableReveal } from './resizable/Resizable.tsx';
 export { ResizableHandle, type ResizableHandleProperties } from './resizable/ResizableHandle.tsx';
 export { ResizablePanel, type ResizablePanelProperties } from './resizable/ResizablePanel.tsx';
 export {

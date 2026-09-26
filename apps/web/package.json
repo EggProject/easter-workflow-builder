@@ -4,14 +4,16 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e && tsc --noEmit -p measurement",
     "lint": "eslint .",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "screenshots": "playwright test --config playwright.screenshots.config.ts",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.07 --branches 98.53 --functions 99.45 --lines 99.04"
+    "measure:transcript": "playwright test --config playwright.measurement.config.ts transcript-scroll.ts",
+    "measure:approval": "playwright test --config playwright.measurement.config.ts approval-panel.ts",
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.11 --branches 98.6 --functions 99.46 --lines 99.07"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

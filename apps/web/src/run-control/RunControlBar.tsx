@@ -6,7 +6,7 @@ import {
   type RunDetail,
   type StartedRunResponse,
 } from '@easter-workflow-builder/protocol';
-import { Badge, Button } from '@easter-workflow-builder/ui';
+import { Alert, Badge, Button } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { describeRunStatusBadge } from '../run-history/run-status-badge.ts';
@@ -157,8 +157,8 @@ export function RunControlBar(properties: Readonly<RunControlBarProperties>): Re
           </ul>
         </section>
       )}
-      {interruptState.state.status === 'failure' && <p role="alert">{interruptState.state.message}</p>}
-      {restartState.state.status === 'failure' && <p role="alert">{restartState.state.message}</p>}
+      {interruptState.state.status === 'failure' && <Alert variant="danger">{interruptState.state.message}</Alert>}
+      {restartState.state.status === 'failure' && <Alert variant="danger">{restartState.state.message}</Alert>}
       {/* A futás hibája a fejléc ALATT, teljes szélességben (SPEC-008 6.4). A
           `errorKind` és a `errorMessage` két, egymástól független nullázható
           mező a drótszintű alakban, ezért két külön ág. */}

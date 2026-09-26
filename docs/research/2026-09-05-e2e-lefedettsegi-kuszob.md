@@ -1328,3 +1328,437 @@ küszöb a mért értékre húzva, felfelé kerekítés nélkül (`apps/web/pack
 99,0781 / 98,5392 / 99,4595 / 99,0428). **Az igazolás:** a beállított küszöbbel `bun run
 coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb küszöbbel
 (99.08 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`, exit 1).
+
+## 33. A jóváhagyás panel döntési sávja utáni ratchet (2026-09-25): két küszöb LEFELÉ mozdul, fedetlen tétel nélkül
+
+**Kiváltó ok.** A `9c44745` utómunkája (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 7.
+szekció): a döntés gombjai a kártyából egy nem görgető döntési sávba kerültek
+(`ApprovalDecisionRow.tsx`, új), a "Rendben" nyugtázás törölve (user döntés 2026-09-24), és vele a
+`reduce-approval-decisions.ts` `dismissed` ága, a `hiddenIds` halmaz, a
+`select-displayed-approvals.ts` rejtési szűrője, a `use-approval-decisions.ts` `dismiss` függvénye
+és az `ApprovalPromptCard.tsx` `revealResult` görgetése. Az e2e készlet 263 tesztre bővült
+(gomb láthatóság három méreten, két témában; az összevonás löket tesztje).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**263 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, sorban, ugyanabba a
+nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző (32. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | ------------------- | ------------------------------ |
+| statements | 1606 / 1621     | **99.07** | 1612 / 1627 = 99.07 | 15 -> **15**                   |
+| branches   | 734 / 745       | **98.52** | 742 / 753 = 98.53   | 11 -> **11**                   |
+| functions  | 550 / 553       | **99.45** | 552 / 555 = 99.45   | 3 -> **3**                     |
+| lines      | 1546 / 1561     | **99.03** | 1552 / 1567 = 99.04 | 15 -> **15**                   |
+
+**A csökkenés kizárólag fedett kód eltűnése** (a `.claude/CLAUDE.md` 8. szekció ratchet
+szabálya, a 15. szekció precedense szerint). A fedetlen tételek darabszáma mind a négy metrikán
+azonos (15 / 11 / 3 / 15), és a fedetlen helyek mind az `approval-prompt` témán kívül esnek (`mount-app.tsx`,
+`read-frontend-config.ts`, `is-valid-connection.ts`, `browser-history-location-port.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`); az `approval-prompt` téma minden fájlja
+mind a négy metrikán 100 százalék. A nevező fájlonként (statements / branches / functions / lines
+összes, előtte -> most; az "előtte" a `bffd75d` kódján, ugyanazzal a builddel és az
+`approval-prompt.spec.ts` futtatásával mérve, mert az összes tétel száma a műszerezésből jön, nem a
+tesztekből):
+
+| Fájl                            | Előtte           | Most           | Változás           |
+| ------------------------------- | ---------------- | -------------- | ------------------ |
+| `ApprovalPromptCard.tsx`        | 10 / 14 / 5 / 10 | 3 / 0 / 2 / 3  | -7 / -14 / -3 / -7 |
+| `ApprovalDecisionRow.tsx` (új)  | 0 / 0 / 0 / 0    | 8 / 11 / 3 / 8 | +8 / +11 / +3 / +8 |
+| `reduce-approval-decisions.ts`  | 14 / 11 / 2 / 14 | 9 / 6 / 2 / 9  | -5 / -5 / 0 / -5   |
+| `select-displayed-approvals.ts` | 9 / 0 / 7 / 8    | 8 / 0 / 6 / 7  | -1 / 0 / -1 / -1   |
+| `use-approval-decisions.ts`     | 10 / 0 / 5 / 10  | 9 / 0 / 4 / 9  | -1 / 0 / -1 / -1   |
+| összesen                        |                  |                | -6 / -8 / -2 / -6  |
+
+Az összeg pontosan a teljes nevező változása (1627 -> 1621, 753 -> 745, 555 -> 553,
+1567 -> 1561), tehát más fájlban nem változott a nevező. Az `ApprovalPromptPanel.tsx` és a
+`RunViewScreen.tsx` nevezője változatlan (4 / 5 / 4 / 4, illetve 63 / 29 / 16 / 61).
+
+**A küszöb** ezért a mért értékre került, felfelé kerekítés nélkül: 99.07 / **98.52** / 99.45 /
+**99.03** (`apps/web/package.json`; a pontos arányok 99,0746 / 98,5235 / 99,4575 / 99,0391). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.08 / 98.53 / 99.46 / 99.04) mind a négy metrika `ERROR`
+sorral bukik.
+
+## 34. A transcript várakozás kilépései utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `c7b2e35` utómunkája (`docs/research/2026-09-23-transcript-panel-meresek.md` 17.
+szekció): a kinyitás utáni várakozás negyedik kilépése, a kézi visszatérés az aljára
+(`use-transcript-auto-scroll.ts`, `bottom_reached_while_unmeasured`), és a listán
+`overflow-anchor: none`. Az e2e készlet 275 tesztre bővült (a `sse-real-server.spec.ts` "A
+VÁRAKOZÁS KILÉPÉSEI" és "NINCS BÖNGÉSZŐ GÖRGETÉS RÖGZÍTÉS" blokkja, mindkét témában).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**275 teszt, mind zöld**; a sandboxban öt `--shard` hívásban, sorban, ugyanabba a
+nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (33. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1618 / 1633     | **99.08** | 99.07                      | 15 -> **15**                   |
+| branches   | 739 / 750       | **98.53** | 98.52                      | 11 -> **11**                   |
+| functions  | 550 / 553       | **99.45** | 99.45                      | 3 -> **3**                     |
+| lines      | 1558 / 1573     | **99.04** | 99.03                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: az új hook ágait (a várakozás alatti jelentés, az alj elhagyása, a
+visszatérés) az új e2e tesztek fedik. A küszöb a mért értékre húzva, felfelé kerekítés nélkül
+(`apps/web/package.json`; a pontos arányok 99,0814 / 98,5333 / 99,4575 / 99,0464). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.09 / 98.54 / 99.46 / 99.05) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 35. A jóváhagyás panel "egyszerre egy" alakja utáni ratchet (2026-09-25): egy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("egyszerre egy"): a jóváhagyás panel egyszerre egy
+jóváhagyást mutat, a design system lapozójával és a drawer törzs plusz lábléc szerkezetével
+(`docs/research/2026-09-24-jovahagyas-panel-helye.md` 8. szekció). Az `ApprovalDecisionRow.tsx`
+helyén az `ApprovalDecisionActions.tsx` áll (`git mv`), új a `select-shown-approval.ts` és a
+`use-approval-selection.ts`. Az e2e készlet 278 tesztre bővült (1, 4 és 10 jóváhagyás három
+méreten két témában, a `fan_out` útvonal teszt, a Clock API megmaradás teszt, az élő frissítés
+kiválasztás teszt a `sse-real-server.spec.ts` fájlban).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**278 teszt, mind zöld**; a sandboxban három `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (34. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1630 / 1645     | **99.08** | 99.08                      | 15 -> **15**                   |
+| branches   | 742 / 753       | **98.53** | 98.53                      | 11 -> **11**                   |
+| functions  | 552 / 555       | **99.45** | 99.45                      | 3 -> **3**                     |
+| lines      | 1570 / 1585     | **99.05** | 99.04                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: az `approval-prompt` téma minden fájlja, az új kettővel együtt, mind a
+négy metrikán 100 százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A
+küszöb a mért értékre húzva, felfelé kerekítés nélkül: 99.08 / 98.53 / 99.45 / **99.05**
+(`apps/web/package.json`; a pontos arányok 99,0881 / 98,5392 / 99,4595 / 99,0536). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.09 / 98.54 / 99.46 / 99.06) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 36. Az utolsó sor kinyitása is megállítja a követést, utáni ratchet (2026-09-25): két küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntése: egy sor kinyitása a mérés után is szünetelteti a
+követést, akkor is, ha az utolsó sor nyílt ki (`docs/research/2026-09-23-transcript-panel-meresek.md` 18. szekció). Az e2e készlet 303 tesztre bővült: az utolsó sor kinyitása négy úton, három
+időzítéssel, két témában (24), a becsukás két tesztje (4), a görgetés rögzítés teszt pedig egyetlen,
+csak a konfigurációt őrző tesztté szűkült (2 helyett 1), a kinyitott utolsó sor régi tesztje (2)
+megszűnt.
+
+**Egy közbenső mérés, új fedetlen tétellel.** Az első teljes futás (301 teszt, mind zöld) után a
+branches 741/753 lett (98,41, a küszöb 98.53 alatt, exit 1): az új fedetlen ág a
+`reduce-transcript-auto-scroll.ts` `row_toggle_settled` ágának az a fele, amikor a lezáráskor az
+utolsó sor nem látszik. Korábban a nem utolsó sor kinyitásának mérése futtatta; az új szabályban a
+kinyitást a mérés már nem zárja, tehát csak a becsukás és a párosított kattintás juthat ide. A
+ratchet szabálya szerint (szabálykönyv 8. szekció: a fedetlen darabszám nőtt) a küszöb nem
+csökkenthető, ezért új e2e teszt fedi: felgörgetett listán egy sor kinyitása, majd a mérése után a
+becsukása; az új sor után a gomb "2 új esemény", és a lista nem görget (`sse-real-server.spec.ts`,
+mindkét témában).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**303 teszt, mind zöld**; a sandboxban négy `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (35. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1635 / 1650     | **99.09** | 99.08                      | 15 -> **15**                   |
+| branches   | 744 / 755       | **98.54** | 98.53                      | 11 -> **11**                   |
+| functions  | 552 / 555       | **99.45** | 99.45                      | 3 -> **3**                     |
+| lines      | 1575 / 1590     | **99.05** | 99.05                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `transcript-panel` téma minden fájlja mind a négy metrikán 100
+százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a mért értékre
+húzva, felfelé kerekítés nélkül: **99.09** / **98.54** / 99.45 / 99.05 (`apps/web/package.json`; a
+pontos arányok 99,0909 / 98,5430 / 99,4595 / 99,0566). **Az igazolás:** a beállított küszöbbel
+`bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
+küszöbbel (99.10 / 98.55 / 99.46 / 99.06) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
+exit 1).
+
+## 37. A jóváhagyás panel húzható elválasztója utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntései: húzható elválasztó a jóváhagyás panel és a
+transcript között, egységes drawer felület, egy bal igazítási vonal
+(`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). Új a `RunViewTranscriptSide.tsx`
+és a `run-view-approval-layout.ts`. Az e2e készlet 319 tesztre bővült: az elválasztó három méreten
+két témában (6), a felület és a bal szél három méreten két témában (6, új fájl:
+`approval-surface.spec.ts`), az érintéses húzás (1), a hibás alakú és a dobó tárolás (2), és a
+lapozás nélkül látott jóváhagyás rögzítése élő frissítéskor (1, `sse-real-server.spec.ts`).
+
+**Egy közbenső mérés, új fedetlen tétellel.** Az első teljes futás után a `run-view-approval-layout.ts`
+olvasó függvényének `catch` ága és a rossz alakú érték ága fedetlen volt (a küszöb alatt, exit 1).
+A ratchet szabálya szerint (szabálykönyv 8. szekció: a fedetlen darabszám nőtt) a küszöb nem
+csökkenthető, ezért a `run-view.spec.ts` azonos mintájú tesztjeinek párja fedi: hibás alakú tárolt
+arányra az elválasztó felén áll és a helyes alak íródik vissza, letiltott tárolásra a felület nem tör
+el (`approval-prompt.spec.ts`).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**319 teszt, mind zöld**; a sandboxban három `--shard` hívásban, sorban, ugyanabba
+a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (36. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1647 / 1662     | **99.09** | 99.09                      | 15 -> **15**                   |
+| branches   | 753 / 764       | **98.56** | 98.54                      | 11 -> **11**                   |
+| functions  | 555 / 558       | **99.46** | 99.45                      | 3 -> **3**                     |
+| lines      | 1587 / 1602     | **99.06** | 99.05                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `run-view` és az `approval-prompt` téma minden fájlja mind a négy
+metrikán 100 százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a
+mért értékre húzva, felfelé kerekítés nélkül: 99.09 / **98.56** / **99.46** / **99.06**
+(`apps/web/package.json`; a pontos arányok 99,0975 / 98,5602 / 99,4624 / 99,0637). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.10 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 38. A transcript gomb sáv, a nem teli lista és a szabad port utáni ratchet (2026-09-25): egy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i döntése (az "ugrás az aljára" gomb megjelenése ne tolja le a
+listát) és egy független ellenőrzés hiánylistája: nem teli listán a kinyitás szünete nem állt, és
+az `sse-real-server.spec.ts` rögzített portja párhuzamos futásnál ütközött
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 19. szekció). Új a
+`transcript-panel/is-pre-arrival-range-report.ts`; a `TranscriptPanel.tsx` a gomb sávját mindig
+kirajzolja. Az e2e készlet 331 tesztre bővült: a gomb megjelenése két méreten két témában (4), a
+nem teli lista két méreten két témában, az utolsó és egy korábbi sorra (8).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**331 teszt, mind zöld**; a sandboxban hat `--shard` hívásban, sorban, három
+workerrel, ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (37. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1652 / 1667     | **99.10** | 99.09                      | 15 -> **15**                   |
+| branches   | 754 / 765       | **98.56** | 98.56                      | 11 -> **11**                   |
+| functions  | 556 / 559       | **99.46** | 99.46                      | 3 -> **3**                     |
+| lines      | 1592 / 1607     | **99.06** | 99.06                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `transcript-panel` téma minden fájlja mind a négy metrikán 100
+százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban maradtak. A küszöb a mért értékre
+húzva, felfelé kerekítés nélkül: **99.10** / 98.56 / 99.46 / 99.06 (`apps/web/package.json`; a
+pontos arányok 99,1002 / 98,5621 / 99,4633 / 99,0666). **Az igazolás:** a beállított küszöbbel
+`bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton egyetlen századdal magasabb
+küszöbbel (99.11 / 98.57 / 99.47 / 99.07) mind a négy metrika `ERROR` sorral bukik (négy `ERROR`,
+exit 1).
+
+## 39. A fix lapozó és gombsor, a `Resizable` szélső állásai és a `pointercancel` utáni ratchet (2026-09-25): egy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i két döntése (a lapozó és a döntés gombsora a `Resizable`
+elemen kívül; a 19 pixeles jobb belső térköz javítása) és egy független ellenőrzés a `5093e67`
+állapoton (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció). Új az
+`approval-prompt/ApprovalPromptBody.tsx`; a `packages/ui` `resizable` témájában a
+`measure-panel-geometry.ts`, a `drawer` témában a `DrawerBody.tsx` és a `DrawerFooter.tsx` (az e2e
+riport csak az `apps/web` forrását méri). Az e2e készlet 339 tesztre bővült: a szélső állások három
+méreten két témában (6) és a megszakított érintés a külső és a belső elválasztón (2).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**339 teszt, mind zöld**; a sandboxban három `--shard` hívásban, sorban, három
+workerrel, ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report`; a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék  | Előző küszöb (38. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | --------- | -------------------------- | ------------------------------ |
+| statements | 1655 / 1670     | **99.10** | 99.10                      | 15 -> **15**                   |
+| branches   | 759 / 770       | **98.57** | 98.56                      | 11 -> **11**                   |
+| functions  | 557 / 560       | **99.46** | 99.46                      | 3 -> **3**                     |
+| lines      | 1595 / 1610     | **99.06** | 99.06                      | 15 -> **15**                   |
+
+**Nulla új fedetlen tétel**: a `run-view`, az `approval-prompt` és a `transcript-panel` téma minden
+fájlja mind a négy metrikán 100 százalék; a fedetlen helyek a 33. szekcióban felsorolt fájlokban
+maradtak. A küszöb a mért értékre húzva, felfelé kerekítés nélkül: 99.10 / **98.57** / 99.46 /
+99.06 (`apps/web/package.json`; a pontos arányok 99,1018 / 98,5714 / 99,4643 / 99,0683). **Az
+igazolás:** a beállított küszöbbel `bun run coverage:e2e:report` exit 0; ugyanazon a nyers adaton
+egyetlen századdal magasabb küszöbbel (99.11 / 98.58 / 99.47 / 99.07) mind a négy metrika `ERROR`
+sorral bukik (négy `ERROR`, exit 1).
+
+## 40. A lista fölött lebegő ugrás gomb utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Lista fölé kerüljön"): az "Ugrás az aljára" gomb a
+transcript lista alján, a tartalma fölött lebeg, a fenntartott sáv megszűnt
+(`docs/research/2026-09-23-transcript-panel-meresek.md` 20. szekció). A `TranscriptPanel.tsx`
+feltételes osztálynév ága helyett a gomb feltételes kirajzolása áll (egy ág pár helyett egy ág
+pár). Az e2e készlet 343 tesztre bővült: a lebegő gomb alatti sor elérhetősége és a gomb
+billentyűzetes elérése két méreten két témában (4).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**343 teszt, mind zöld**; nyolc `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0); a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1655 / 1670     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 759 / 770       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1595 / 1610     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`transcript-panel` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb nem mozdul.
+
+## 41. A CLI sorrend utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Transcript felül, kérdés alul"): a futás nézet
+transcript oldalán felül a transcript, a húzható elválasztó alatt a jóváhagyás szövege,
+közvetlenül alatta a "Függő jóváhagyások" régió a lapozóval és a döntés gombjaival, a gombsor a
+jóváhagyáshoz kötött csoport (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 11. szekció).
+Az `ApprovalPromptPanel` új régió név ága és a `decisionActions` szlot, a `Resizable` panel
+csatolásakori mérése. Az e2e készlet 353 tesztre bővült: a CLI sorrend négy méreten két témában
+(8), a gráf szerkesztő elválasztójának határa kijelölés után, fókusz nélkül (2).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**353 teszt, mind zöld**; hat `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0); a darabszámok a `nyc
+report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1657 / 1672     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 762 / 773       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1597 / 1612     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), az
+`approval-prompt` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A pontos
+arányok (99,1029 / 98,5770 / 99,4643 / 99,0695) két tizedesre vágva a mostani küszöbök, tehát a
+küszöb nem mozdul.
+
+## 42. A lista tetején, belső margóban lebegő ugrás gomb utáni mérés (2026-09-25): a küszöb változatlan
+
+**Kiváltó ok.** A user 2026-09-25-i döntése ("Felül, belső margóval"): az "Ugrás az aljára" gomb a
+transcript lista tetején lebeg, a lista felső belső margójában (`transcript-panel.css`), és a
+jóváhagyás elválasztó tárolt aránya új `localStorage` kulcsra került
+(`run-view-approval-layout.ts`; `docs/research/2026-09-23-transcript-panel-meresek.md` 21.
+szekció). Az e2e készlet tesztszáma változatlan (353): a gomb két blokkjának 8 tesztje az új
+helyre igazítva.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**353 teszt, mind zöld**; négy `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (39. szekció) | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | -------------------- | ------------------------------ |
+| statements | 1657 / 1672     | 99.10    | 99.10                | 15 -> 15                       |
+| branches   | 762 / 773       | 98.57    | 98.57                | 11 -> 11                       |
+| functions  | 557 / 560       | 99.46    | 99.46                | 3 -> 3                         |
+| lines      | 1597 / 1612     | 99.06    | 99.06                | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`transcript-panel` és a `run-view` téma minden fájlja mind a négy metrikán 100 százalék. A küszöb
+nem mozdul.
+
+## 43. A "rajz összehúzódik" és a szűk lista utáni ratchet (2026-09-25): három küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user 2026-09-25-i két döntése: függő jóváhagyásnál, saját arány nélkül az
+elválasztók a kérdés kedvéért ideiglenesen elmozdulnak (a `packages/ui` `Resizable` felfedése, az
+`apps/web` `run-view` téma bekötése), és szűk listán az ugrás gomb nem lebeg
+(`transcript-panel`; research `2026-09-24-jovahagyas-panel-helye.md` 12. szekció,
+`2026-09-23-transcript-panel-meresek.md` 22. szekció). Az e2e készlet 353-ról **391** tesztre nő
+(a "rajz összehúzódik" 18, a "görgetés látható jóváhagyás mellett" 16, a szűk és a normál lista 4
+tesztje; két meglévő teszt a kezdő arány, kettő a tároló új szabálya szerint igazítva).
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**391 teszt, mind zöld**; három `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba; az első shard két, a kezdő arányt még 50-re váró tesztje javítás után
+külön újrafutott), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (42.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1676 / 1691     | 99.11    | 99.10 -> **99.11**          | 15 -> 15                       |
+| branches   | 769 / 780       | 98.58    | 98.57 -> **98.58**          | 11 -> 11                       |
+| functions  | 561 / 564       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1615 / 1630     | 99.07    | 99.06 -> **99.07**          | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak; a
+`run-view` és a `transcript-panel` téma minden fájlja, az új `is-own-layout-sizes.ts`,
+`is-compact-transcript-list.ts` és `run-view-transcript-visibility.ts` is, mind a négy metrikán 100
+százalék. A fedett kód nőtt, ezért három küszöb a mért értékre emelkedik, felfelé kerekítés
+nélkül (`apps/web/package.json`).
+
+## 44. A felfedés javítása utáni ratchet (2026-09-26): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** Egy független ellenőrzés és a user döntése nyomán a felfedés javítása (research
+`2026-09-24-jovahagyas-panel-helye.md` 13. szekció): csak belső saját aránnyal a külső elválasztó
+egésszel vagy semmivel mozdul, a felfedés minden új leírásra és a befoglaló csoport felhasználói
+mozdítására újra számol, és a saját arány új, csak felhasználói írású kulcson áll. Az e2e készlet
+391-ről **407** tesztre nő (16 új teszt az `approval-prompt.spec.ts` fájlban; három e2e fájl tároló kulcs
+konstansa az új névre igazítva, és a `sse-real-server.spec.ts` négy meglévő tesztje a panelek
+változatlanságával bővítve). Az `apps/web` termékkódjából az `is-own-layout-sizes.ts` törölve.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**407 teszt, mind zöld**; három `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (43.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1674 / 1689     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 773 / 784       | 98.59    | 98.58 -> **98.59**          | 11 -> 11                       |
+| functions  | 559 / 562       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1614 / 1629     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak, a
+`run-view` téma minden fájlja mind a négy metrikán 100 százalék. A statements, a functions és a
+lines összes darabszáma csökkent (1691 -> 1689, 564 -> 562, 1630 -> 1629), mert a fedett
+`is-own-layout-sizes.ts` törlődött, a fedetlen darab egyik metrikán sem nőtt, és a százalék
+ezeken változatlan. A branches összes darabszáma nőtt (780 -> 784), a fedetlen nem, tehát a
+küszöb a mért értékre emelkedik, felfelé kerekítés nélkül (`apps/web/package.json`).
+
+## 45. A REST hibaüzenetek utáni ratchet (2026-09-26): a küszöb nem mozdul
+
+**Kiváltó ok.** A user 2026-09-24-i döntése a REST hibákról (SPEC-007 8.4): a hibaág üzenete
+kizárólag a kód magyar mondata (a `perform-route-request.ts` a szerver `message` mezőjét eldobja), és
+minden REST hibaág a design system `danger` `Alert` blokkjában jelenik meg. Új e2e teszt nincs, a
+meglévők a mondatra, a `danger` osztályra és a szerver szövegének hiányára állítanak; az e2e
+készlet **407** teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**407 teszt, mind zöld**; négy `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (44.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1671 / 1686     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 773 / 784       | 98.59    | 98.59 (marad)               | 11 -> 11                       |
+| functions  | 559 / 562       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1611 / 1626     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak (a
+`perform-route-request.ts` egyetlen fedetlen sora az útvonal építés hibaága, a sorszáma a
+hozzáadott doksi komment miatt csúszott). A statements és a lines összes darabszáma hárommal
+csökkent (1689 -> 1686, 1629 -> 1626), a fedetlen darab egyik metrikán sem nőtt, és a százalék két
+tizedesre egyik metrikán sem változott, tehát a küszöb marad (`apps/web/package.json`).
+
+## 46. Az "Ideiglenesen engedjen" utáni ratchet (2026-09-26): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user döntése (2026-09-26, "Ideiglenesen engedjen", SPEC-008 8. szekció 1. pont):
+ha csak a belső arány saját, a rajz és szükség esetén a belső arány is ideiglenesen enged. Az
+`apps/web` termékkódjában egy új logikai ág áll (`RunViewScreen.tsx`: a belső `adjustsForReveal`
+a belső VAGY a külső kulcs hiányára igaz). Új e2e: a `sse-real-server.spec.ts` tíz "csak belső
+saját aránnyal" tesztje; törölve: az `approval-prompt.spec.ts` két "nem fér ki, egyik sem mozdul"
+tesztje (négy futás). A mérés a `9daf62f` commit (a párhuzamos REST hiba
+munka, `rest-client`, `protocol-error-message`, új `rest-error-class.spec.ts`) és e változás
+együttesét méri, mert a futás idején a munkafában mindkettő állt; az e2e készlet **418** teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**418 teszt, mind zöld**; tíz `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (45.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1675 / 1690     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 777 / 788       | 98.60    | 98.59 -> **98.6**           | 11 -> 11                       |
+| functions  | 560 / 563       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1615 / 1630     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`run-view` téma minden fájlja mind a négy metrikán 100 százalék. Az összes darabszám minden
+metrikán nőtt (1686 -> 1690, 784 -> 788, 562 -> 563, 1626 -> 1630), a fedetlen egyiken sem, tehát
+a branches küszöb a mért értékre emelkedik (az `nyc` két tizedesre lefelé kerekített értéke,
+777 / 788 = 98,604), a többi marad (`apps/web/package.json`).

@@ -35,7 +35,6 @@ describe('reduceApprovalDecisions', () => {
       approval: APPROVAL,
       progress: { status: 'sending', decision: 'approved' },
     });
-    expect(SENT.hiddenIds.size).toBe(0);
   });
 
   it('a sikeres válasz decided állapotba visz', () => {
@@ -80,48 +79,7 @@ describe('reduceApprovalDecisions', () => {
     expect(state).toBe(INITIAL_APPROVAL_DECISIONS_STATE);
   });
 
-  it('a lezárt döntés nyugtázása törli a követést és véglegesen elrejti a jóváhagyást', () => {
-    const decided = answered({
-      kind: 'answered',
-      approval: APPROVAL,
-      decision: 'approved',
-      outcome: { kind: 'ok', value: APPROVAL },
-    });
-    const conflict = answered({
-      kind: 'answered',
-      approval: APPROVAL,
-      decision: 'approved',
-      outcome: { kind: 'error', message: 'ütközés', isTransient: false },
-    });
-
-    for (const state of [decided, conflict]) {
-      const dismissed = reduceApprovalDecisions(state, { kind: 'dismissed', approvalId: 'a-1' });
-      expect(dismissed.tracked.has('a-1')).toBe(false);
-      expect(dismissed.hiddenIds.has('a-1')).toBe(true);
-    }
-  });
-
-  it('az átmeneti hiba nyugtázása csak a követést törli, a jóváhagyás újra döntésre kínálható', () => {
-    const network = answered({
-      kind: 'answered',
-      approval: APPROVAL,
-      decision: 'approved',
-      outcome: { kind: 'error', message: 'A szerver nem érhető el.', isTransient: true },
-    });
-
-    const dismissed = reduceApprovalDecisions(network, { kind: 'dismissed', approvalId: 'a-1' });
-    expect(dismissed.tracked.has('a-1')).toBe(false);
-    expect(dismissed.hiddenIds.has('a-1')).toBe(false);
-  });
-
-  it('nem követett azonosító nyugtázása elrejti az azonosítót, a követést nem érinti', () => {
-    const dismissed = reduceApprovalDecisions(SENT, { kind: 'dismissed', approvalId: 'ismeretlen' });
-    expect(dismissed.tracked.get('a-1')?.progress.status).toBe('sending');
-    expect(dismissed.hiddenIds.has('ismeretlen')).toBe(true);
-  });
-
   it('a reset mindent töröl', () => {
-    const hidden = reduceApprovalDecisions(SENT, { kind: 'dismissed', approvalId: 'a-2' });
-    expect(reduceApprovalDecisions(hidden, { kind: 'reset' })).toBe(INITIAL_APPROVAL_DECISIONS_STATE);
+    expect(reduceApprovalDecisions(SENT, { kind: 'reset' })).toBe(INITIAL_APPROVAL_DECISIONS_STATE);
   });
 });

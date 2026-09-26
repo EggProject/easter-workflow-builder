@@ -116,7 +116,7 @@ describe('useApprovalDecisions', () => {
     expect(onDecided).toHaveBeenCalledTimes(1);
   });
 
-  it('a sikeres döntés kártyája az eredménnyel együtt megmarad, amikor a friss lista már nem tartalmazza, és csak a nyugtázás viszi el', async () => {
+  it('a sikeres döntés kártyája az eredménnyel együtt megmarad, amikor a friss lista már nem tartalmazza, nyugtázás nélkül, a futás váltásáig', async () => {
     const deferred = createDeferredFetchFunction();
     render('r-1', [APPROVAL], deferred.fetchFunction);
     decide('rejected');
@@ -125,14 +125,14 @@ describe('useApprovalDecisions', () => {
 
     render('r-1', [], deferred.fetchFunction);
     expect(latest?.displayed).toEqual([{ approval: APPROVAL, progress: { status: 'decided', decision: 'rejected' } }]);
+    render('r-1', [], deferred.fetchFunction);
+    expect(latest?.displayed).toEqual([{ approval: APPROVAL, progress: { status: 'decided', decision: 'rejected' } }]);
 
-    act(() => {
-      latest?.dismiss('a-1');
-    });
+    render('r-2', [], deferred.fetchFunction);
     expect(latest?.displayed).toEqual([]);
   });
 
-  it('ha az újratöltés elbukik és a lista a régi, a sikeres döntés kártyája akkor sem kapcsol vissza, és a nyugtázás után sem tér vissza', async () => {
+  it('ha az újratöltés elbukik és a lista a régi, a sikeres döntés kártyája akkor sem kapcsol vissza', async () => {
     const deferred = createDeferredFetchFunction();
     render('r-1', [APPROVAL], deferred.fetchFunction);
     decide('approved');
@@ -141,12 +141,7 @@ describe('useApprovalDecisions', () => {
 
     // A lista nem frissült (elbukott újratöltés): a jóváhagyás még benne van.
     render('r-1', [APPROVAL], deferred.fetchFunction);
-    expect(latest?.displayed[0]?.progress).toEqual({ status: 'decided', decision: 'approved' });
-
-    act(() => {
-      latest?.dismiss('a-1');
-    });
-    expect(latest?.displayed).toEqual([]);
+    expect(latest?.displayed).toEqual([{ approval: APPROVAL, progress: { status: 'decided', decision: 'approved' } }]);
   });
 
   it('a conflict után a hibaüzenet a kártyán marad, amikor a friss lista már nem tartalmazza, és a hiba végleges', async () => {
@@ -162,7 +157,7 @@ describe('useApprovalDecisions', () => {
         approval: APPROVAL,
         progress: {
           status: 'failed',
-          message: 'Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve',
+          message: 'Az elem állapota most nem engedi a műveletet.',
           isFinal: true,
         },
       },

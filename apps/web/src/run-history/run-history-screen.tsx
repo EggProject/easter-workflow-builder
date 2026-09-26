@@ -11,6 +11,7 @@ import {
   type WorkflowSummary,
 } from '@easter-workflow-builder/protocol';
 import {
+  Alert,
   Badge,
   Button,
   DataTable,
@@ -380,7 +381,7 @@ export function RunHistoryScreen(properties: Readonly<RunHistoryScreenProperties
           emptyLabel="Még nincs futás."
         />
       )}
-      {runsRequest.state.status === 'failure' && <p role="alert">{runsRequest.state.message}</p>}
+      {runsRequest.state.status === 'failure' && <Alert variant="danger">{runsRequest.state.message}</Alert>}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

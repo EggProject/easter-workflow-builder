@@ -1,8 +1,16 @@
-import { act } from 'react';
+import { act, useContext, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunViewLayout } from './RunViewLayout.tsx';
 import type { RunViewLayoutBand } from './run-view-layout-band.ts';
+import { RunViewTranscriptVisibility } from './run-view-transcript-visibility.ts';
+
+/**
+ * A transcript oldal láthatóságának kiírója (`RunViewTranscriptVisibility`).
+ */
+function VisibilityProbe(): ReactElement {
+  return <span className="visibility-probe">{String(useContext(RunViewTranscriptVisibility))}</span>;
+}
 
 const GRAPH_TEXT = 'gráf helye';
 const TRANSCRIPT_TEXT = 'transcript helye';
@@ -35,6 +43,7 @@ describe('RunViewLayout', () => {
           transcript={<span>{TRANSCRIPT_TEXT}</span>}
           defaultSizes={[70, 30]}
           onSizesChange={onSizesChange}
+          adjustsForReveal
         />,
       );
     });
@@ -65,8 +74,13 @@ describe('RunViewLayout', () => {
     expect(container.textContent).toContain(TRANSCRIPT_TEXT);
     // Fül nincs ebben a sávban.
     expect(container.querySelector('[role="tablist"]')).toBeNull();
-    // A kezdő méret értesítése megérkezik, ebből lesz a perzisztálás.
-    expect(onSizesChange).toHaveBeenCalledWith([70, 30]);
+    // A kezdő méret nem kerül a tárolóba (2026-09-25): csak a felhasználó
+    // változtatása, a billentyűé is.
+    expect(onSizesChange).not.toHaveBeenCalled();
+    act(() => {
+      handle?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    });
+    expect(onSizesChange).toHaveBeenCalledWith([65, 35]);
   });
 
   it('a függőleges sávban egymás alatt állnak, VÍZSZINTES húzható elválasztóval', () => {
@@ -115,5 +129,40 @@ describe('RunViewLayout', () => {
     const panels = [...container.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
     expect(panels.map((panel) => panel.hidden)).toEqual([true, false]);
     expect(container.textContent).toContain(GRAPH_TEXT);
+  });
+
+  it('a transcript oldal láthatósága: az osztott sávban mindig, a fül sávban csak a Transcript fülön, és sávváltás után a Gráf fülről indul', () => {
+    const renderWithProbe = (band: RunViewLayoutBand): void => {
+      act(() => {
+        root.render(
+          <RunViewLayout
+            band={band}
+            graph={<span>{GRAPH_TEXT}</span>}
+            transcript={<VisibilityProbe />}
+            defaultSizes={[70, 30]}
+            onSizesChange={onSizesChange}
+            adjustsForReveal
+          />,
+        );
+      });
+    };
+    const probe = (): string | null | undefined => container.querySelector('.visibility-probe')?.textContent;
+
+    renderWithProbe('vertical');
+    expect(probe()).toBe('true');
+    renderWithProbe('tabs');
+    expect(probe()).toBe('false');
+    act(() => {
+      container.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    });
+    expect(probe()).toBe('true');
+    renderWithProbe('horizontal');
+    expect(probe()).toBe('true');
+    renderWithProbe('tabs');
+    expect([...container.querySelectorAll('[role="tab"]')].map((tab) => tab.getAttribute('aria-selected'))).toEqual([
+      'true',
+      'false',
+    ]);
+    expect(probe()).toBe('false');
   });
 });

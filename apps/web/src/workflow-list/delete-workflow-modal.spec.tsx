@@ -179,7 +179,7 @@ describe('DeleteWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
   it('a törlés küldési hibáját megjeleníti', async () => {
@@ -214,7 +214,7 @@ describe('DeleteWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    const alerts = [...container.querySelectorAll('[role="alert"]')];
+    const alerts = [...container.querySelectorAll('.alert--danger[role="alert"]')];
     expect(alerts.at(-1)?.textContent).toBe('A szerver nem érhető el.');
   });
 });

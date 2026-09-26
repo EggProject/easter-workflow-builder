@@ -18,11 +18,72 @@
   gap: var(--ep-space-2);
 }
 
-.transcript-panel__header {
+/* A lista kerete: a lebegő "ugrás az aljára" gomb pozicionálási doboza. A
+   lista (`react-window` `List`, inline `flex-grow: 1`) kitölti, egész pixelre
+   lefelé kerekítve (`TranscriptPanel.tsx`), tehát a keret teteje a lista
+   teteje: a gomb a lista tetejéhez igazodik. */
+.transcript-panel__list-frame {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Az "ugrás az aljára" gomb a lista TETEJÉN lebeg, a lista tartalma fölé
+   rétegezve (user döntés 2026-09-25: "Felül, belső margóval", SPEC-008 7.4).
+   SAJÁT KIEGÉSZÍTÉS: a design systemben nincs lista fölé lebegő gomb, a gomb
+   maga a design system `Button`-ja (`secondary`, `sm`), csak az elhelyezése
+   saját. A lista tetejétől `--ep-space-2` távolságra, középen áll, a lista
+   felső belső margójában (`.transcript-panel__list`), tehát a lista
+   legtetejére görgetve a gomb alatt a margó látszik, nem sor. Középre
+   `inset-inline` és `margin-inline: auto` igazít, nem `transform`, mert a
+   design system `.btn:active` szabálya a `transform` értéket lenyomáskor
+   felülírja. A `z-index: 1` a lista `position: relative` gyökere és az
+   abszolút pozicionált sorai fölé emeli: a CSS 2 E. függeléke szerint az
+   `auto` rétegű pozicionált elemek fa sorrendben, a pozitív rétegűek utánuk
+   festődnek (<https://www.w3.org/TR/CSS2/zindex.html>), a gomb pedig a DOM-ban
+   a lista előtt áll. Az árnyék a design system saját lebegő elemének, a
+   toastnak a tokenje (`toast.css`: `--ep-shadow-lg`); a gomb háttere és
+   szövege a `.btn--secondary` tokenjei, mindkét témában. */
+.transcript-panel__jump {
+  position: absolute;
+  top: var(--ep-space-2);
+  inset-inline: 0;
+  z-index: 1;
+  width: max-content;
+  margin-inline: auto;
+  box-shadow: var(--ep-shadow-lg);
+}
+
+/* SZŰK LISTÁN A GOMB NEM LEBEG (user döntés 2026-09-25, SPEC-008 7.4, a 14.1
+   O-15 lezárása). Ha a lista látható magassága kisebb, mint a felső belső
+   margó plusz egy sor (`is-compact-transcript-list.ts`), a margó után egy
+   sornál kevesebb marad, és a lebegő gomb a látható sort takarná. Ilyenkor a
+   keret sor irányú: a gomb a lista BAL oldalán, a lista tetejéhez igazítva,
+   a folyásban áll (a DOM-ban továbbra is a lista előtt, tehát a látás és a
+   Tab sorrend egyezik), és egyetlen sort sem takar. A lista a keret teljes
+   magasságát kapja (a `stretch` igazítás), tehát a gomb megjelenése a lista
+   magasságát nem változtatja, csak a szélességét; a szűkség feltétele így
+   nem billeg a két alak között. A felső belső margó marad, mert a feltétel a
+   margó nélküli tartalom dobozon áll. Saját kiegészítés, mint a lebegő alak:
+   a gomb maga a design system `Button`-ja, a térköz token (`--ep-space-2`),
+   árnyék nincs, mert nem lebeg. */
+.transcript-panel__list-frame--compact {
+  flex-direction: row;
   gap: var(--ep-space-2);
+}
+
+.transcript-panel__list-frame--compact > .transcript-panel__jump {
+  position: static;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-inline: 0;
+  box-shadow: none;
+}
+
+.transcript-panel__list-frame--compact > .transcript-panel__list {
+  min-width: 0;
 }
 
 /* A delta kapcsoló mondata (T-009-26) ugyanaz a halvány kis szöveg
@@ -35,6 +96,46 @@
   color: var(--ep-fg-muted);
 }
 
+/* A böngésző görgetés rögzítése (scroll anchoring) a listán kikapcsolva (user
+   döntés 2026-09-24): a görgetést kizárólag a `useTranscriptAutoScroll` hook
+   végzi. A CSS Scroll Anchoring spec szerint a `none` érték mellett a görgető
+   dobozban nem választódik horgony, tehát a böngésző nem igazít a görgetési
+   pozíción; bekapcsolva az "ugrás az aljára" utáni első kinyitásnál a kinyitott
+   sor 1-3 képkockára elugrott (mérés és forrás:
+   `docs/research/2026-09-23-transcript-panel-meresek.md` 17. szekció). A
+   lista kereten át a minimuma egy összecsukott sor, inline stílusként a
+   `TranscriptPanel.tsx` fájlban, a sormagasság egyetlen forrásából
+   (`collapsed-transcript-row-height.ts`).
+
+   A lista felső belső margója a lebegő gomb helye (user döntés 2026-09-25,
+   "Felül, belső margóval"): a görgetett tartalom része, nem fix sáv, tehát a
+   lista magassága nem csökken, a gomb megjelenése semmit nem mozdít, és a
+   lista legtetején az első sor a margó alatt, a gomb alatt kezdődik. A margó
+   a gomb két `--ep-space-2` térköze (fölötte és alatta) plusz a design system
+   `sm` gombjának magassága: a `.btn--icon.btn--sm` `block-size: 28px`
+   értéke, és a szöveges `.btn--sm` is ennyi (2 x 7px belső margó, a
+   `.btn` 1-es sormagassága 12px betűmérettel, 2 x 1px szegély;
+   `packages/ui/src/button/button.css`). Az e2e a kirajzolt gombon méri: a
+   lista legtetején a gomb alatti és fölötti térköz egyenlő
+   (`sse-real-server.spec.ts`).
+
+   Miért `padding-top`, és miért pontos vele a virtualizáció (research 21.
+   szekció). A görgető doboz belső margója a görgethető terület része (CSS
+   Overflow 3, "scrollable overflow area": "Its own padding box"), a sorok
+   `top: auto` abszolút elemek, tehát a statikus helyükről, a margó alól
+   indulnak (CSS 2.2 10.6.4), és a méretező elem is a margó alatt áll. A
+   `react-window` a látható magasságot a `ResizeObserver` `contentRect`
+   értékéből veszi, ami a margót NEM tartalmazza (MDN "contentRect": "the
+   element's content box"), és a sorok helyét a margó alól méri. A sorok
+   koordinátáiban így a doboz valódi alsó éle `scrollTop` plusz ez a
+   magasság, pontosan az, amivel a könyvtár számol: a lista alja, a
+   `stopIndex` predikátum és a `scrollToRow({ align: 'end' })` a margóval is
+   pontos, a könyvtár "látható" tartományából pedig éppen a margó sávja marad
+   ki. A `border-box` a `TranscriptPanel.tsx` egész pixeles `max-height`
+   értékét a margóval együtt a dobozra teszi (CSS Box Sizing 3), különben a
+   tartalom doboza újra tört magasságú lehetne. */
 .transcript-panel__list {
-  min-height: 0;
+  overflow-anchor: none;
+  box-sizing: border-box;
+  padding-top: calc(2 * var(--ep-space-2) + 28px);
 }

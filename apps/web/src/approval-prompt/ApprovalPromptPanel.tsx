@@ -1,8 +1,6 @@
-import type { ApprovalDecision, PendingApproval } from '@easter-workflow-builder/protocol';
-import { Alert, ProgressBar } from '@easter-workflow-builder/ui';
-import type { ReactElement } from 'react';
-import { ApprovalPromptCard } from './ApprovalPromptCard.tsx';
-import type { DisplayedApproval } from './select-displayed-approvals.ts';
+import { Alert, Pagination, ProgressBar, type PaginationLabels } from '@easter-workflow-builder/ui';
+import type { ReactElement, ReactNode } from 'react';
+import type { ShownApproval } from './select-shown-approval.ts';
 import './approval-prompt.css';
 
 export interface ApprovalPromptPanelProperties {
@@ -12,56 +10,92 @@ export interface ApprovalPromptPanelProperties {
    */
   readonly isFirstLoadPending: boolean;
   readonly failureMessage: string | undefined;
-  readonly displayed: readonly DisplayedApproval[];
-  readonly onDecide: (approval: PendingApproval, decision: ApprovalDecision) => void;
-  readonly onDismiss: (approvalId: string) => void;
+  /**
+   * A megjelenített jóváhagyások száma: a lapozó "k / n" alakjának `n`
+   * értéke (`select-displayed-approvals.ts`).
+   */
+  readonly approvalCount: number;
+  /**
+   * A látott jóváhagyás (`use-approval-selection.ts`), `undefined`, ha
+   * nincs megjelenített jóváhagyás.
+   */
+  readonly shown: ShownApproval | undefined;
+  /**
+   * A lapozó választása, 1-től számozott oldallal.
+   */
+  readonly onSelectPage: (page: number) => void;
+  /**
+   * A látott jóváhagyás döntés akciósávja (`ApprovalDecisionActions`), a
+   * lapozó alatt; csak látott jóváhagyás mellett rajzolódik ki.
+   */
+  readonly decisionActions: ReactNode;
 }
 
 /**
- * A futás nézet jóváhagyás panelje, a transcript sávban, a transcript fölött
- * (SPEC-008 8. szekció, PLAN-009 5. szekció F6 sora, T-009-27). A
- * `RunViewScreen` mindig felcsatolja, mert a "sáv helye már látszik": az
- * ELSŐ betöltés alatt a `ProgressBar` jelez (9. szekció 14. async pont); az
- * élő újratöltések alatt nem, hogy a panel ne villogjon minden jelző keretre.
- * Nulla kártyára semmi nem rajzolódik (üres `<div>`, doboz nélkül, tilos a
- * card in card).
+ * A lapozó magyar szövegei; a meta "k / n" alakú (user döntés 2026-09-25).
+ */
+const APPROVAL_PAGINATION_LABELS: PaginationLabels = {
+  navigation: 'Jóváhagyások lapozása',
+  previous: 'Előző',
+  next: 'Következő',
+  pageMetaPrefix: '',
+  pageMetaSeparator: ' / ',
+  rangeMetaSeparator: ' / ',
+};
+
+/**
+ * A lapozó szomszéd oldalszámainak száma. A forrás alapértéke (1) mellett
+ * 375 pixelen, tíz jóváhagyásnál az első és az utolsó oldalon a "k / n"
+ * helyjelző két sorba törik, mert az oldalszámok kiszorítják; nullával egy
+ * sorban marad (mérve, `docs/research/2026-09-24-jovahagyas-panel-helye.md`
+ * 8. szekció).
+ */
+const PAGINATION_SIBLINGS = 0;
+
+/**
+ * A futás nézet "Függő jóváhagyások" régiója a transcript oldal ALJÁN, a
+ * húzható elválasztón kívül, közvetlenül a látott jóváhagyás szövege alatt
+ * (SPEC-008 8. szekció 1. pont, T-009-27, user döntés 2026-09-25: "transcript
+ * felül, kérdés alul", mint egy CLI engedélykérés). Benne felülről lefelé: az
+ * ELSŐ betöltés alatt a `ProgressBar` (9. szekció 14. async pont; az élő
+ * újratöltések alatt nem, hogy a panel ne villogjon minden jelző keretre), a
+ * lista hibaüzenete, és látott jóváhagyás mellett a design system lapozója
+ * ("k / n") és a döntés akciósávja (`decisionActions`).
  *
- * Csak megjelenít: a lista a `usePendingApprovals`, a döntések állapota a
- * `useApprovalDecisions` hookból jön, mindkettő a `RunViewScreen` szintjén.
+ * **Régió, és csak tartalommal.** A `<section>` a hozzáférhető nevétől régió
+ * (W3C APG Landmark Regions); a név csak akkor áll, ha van mit mutatni, mert
+ * egy üres régió a képernyőolvasó régió listájában tartalom nélküli találat
+ * lenne. A látott jóváhagyás szövege a húzható panelben áll
+ * (`ApprovalPromptBody`), tehát nem lehet ennek a régiónak a gyereke; a
+ * döntés gombjainak csoportja azonosítóval kötődik hozzá
+ * (`ApprovalDecisionActions`).
  *
- * **A döntés visszavonhatatlan, és a felület ezt kimondja** (SPEC-008 8.
- * szekció): a kártyák fölött a design system `Alert` blokkja áll, amíg van
- * megjelenített kártya.
+ * **Egyszerre egy jóváhagyás** (user döntés 2026-09-25). Csak megjelenít: a
+ * lista a `usePendingApprovals`, a kiválasztás a `useApprovalSelection`
+ * hookból jön, a `RunViewScreen` szintjén.
  */
 export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProperties>): ReactElement {
-  const { isFirstLoadPending, failureMessage, displayed, onDecide, onDismiss } = properties;
+  const { isFirstLoadPending, failureMessage, approvalCount, shown, onSelectPage, decisionActions } = properties;
+  const hasContent = isFirstLoadPending || failureMessage !== undefined || shown !== undefined;
 
   return (
-    <div className="approval-prompt-panel">
+    <section className="approval-prompt-panel" aria-label={hasContent ? 'Függő jóváhagyások' : undefined}>
       {isFirstLoadPending && (
         <ProgressBar isLabelVisible={false} ariaLabel="a függő jóváhagyások betöltése folyamatban" value={100} />
       )}
-      {failureMessage !== undefined && <p role="alert">{failureMessage}</p>}
-      {displayed.length > 0 && (
-        <section className="approval-prompt-panel__list" aria-label="Függő jóváhagyások">
-          <Alert variant="warning" title="A döntés visszavonhatatlan">
-            Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.
-          </Alert>
-          {displayed.map(({ approval, progress }) => (
-            <ApprovalPromptCard
-              key={approval.id}
-              approval={approval}
-              progress={progress}
-              onDecide={(decision) => {
-                onDecide(approval, decision);
-              }}
-              onDismiss={() => {
-                onDismiss(approval.id);
-              }}
-            />
-          ))}
-        </section>
+      {failureMessage !== undefined && <Alert variant="danger">{failureMessage}</Alert>}
+      {shown !== undefined && (
+        <>
+          <Pagination
+            page={shown.index + 1}
+            pageCount={approvalCount}
+            siblings={PAGINATION_SIBLINGS}
+            onChange={onSelectPage}
+            labels={APPROVAL_PAGINATION_LABELS}
+          />
+          {decisionActions}
+        </>
       )}
-    </div>
+    </section>
   );
 }

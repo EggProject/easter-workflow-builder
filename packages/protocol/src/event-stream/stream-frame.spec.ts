@@ -164,7 +164,9 @@ describe('ProtocolErrorFrameSchema', () => {
   });
 
   it('a code és message mezője pontosan a ProtocolErrorBody alakját hordozza, két külön hiba alak nélkül (38. kritérium)', () => {
-    expectTypeOf<Pick<ProtocolErrorFrame, 'code' | 'message'>>().toEqualTypeOf<ProtocolErrorBody>();
+    // Az `errorClass` csak a REST törzsben áll (SPEC-005 8.5): a keret egyetlen
+    // előidéző oka (5.6 2. pont) kapcsolat szintű, a szótáron kívüli hiba.
+    expectTypeOf<Pick<ProtocolErrorFrame, 'code' | 'message'>>().toEqualTypeOf<Omit<ProtocolErrorBody, 'errorClass'>>();
   });
 });
 

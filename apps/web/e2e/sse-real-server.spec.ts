@@ -23,11 +23,11 @@
 //      `computePhase` `reconnecting` ágára fut - a `replaying` felirat így
 //      csak egy meg nem figyelhető pillanatra jelenik meg.
 //
-// SOROS FUTÁS. A teszt szerver a `VITE_STREAM_ORIGIN` build időben rögzített
-// portjára kötődik (nem választható meg szabadon, mert az `EventSource` URL-je
-// abból épül), tehát egyszerre csak egy teszt tarthatja. A `fullyParallel`
-// beállítás a fájlon BELÜL is párhuzamosítana, ezért ez a fájl a dokumentált
-// `mode: 'serial'` beállítást kapja.
+// PÁRHUZAMOS FUTÁS. Minden teszt szervere az operációs rendszer által kiosztott
+// szabad porton figyel, és a lap a build időben rögzített `VITE_STREAM_ORIGIN`
+// felé induló `GET /events` kérését oda irányítja (`run-view-stream.ts`
+// `attachStreamServer`). A korábbi, a rögzített portra kötődő, soros fájl
+// `--repeat-each 3` mellett három workerrel `EADDRINUSE`-szal bukott.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type {
@@ -35,7 +35,6 @@ import type {
   RunDetail,
   RunEventKind,
   RunEventRecord,
-  RunSnapshotResponse,
   RunSummary,
   StepRunRecord,
   StreamFrame,
@@ -45,8 +44,40 @@ import { encodeStreamFrame } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { PREVIEW_ORIGIN, STREAM_ORIGIN } from './api-origin.ts';
 import { makeRunEventRecord } from './transcript-fixture.ts';
+import {
+  attachStreamServer,
+  captureEventSources,
+  deliverFrameOnMeasuredCommit,
+  deliverFrameWithNextClick,
+  expectLastRowFullyVisibleAtBottom,
+  headerOffsetInList,
+  headerTopInViewport,
+  installMeasuredCommitDelivery,
+  lastRowBottomOverflow,
+  listenOnLoopback,
+  mockRunView,
+  NO_STEP_RUNS,
+  openFollowingTranscript,
+  REPLAYED_ROW_COUNT,
+  routeStreamToPort,
+  rowsUnderJumpButton,
+  RUN_SNAPSHOT,
+  runDetailWithStatus,
+  SSE_RESPONSE_HEADERS,
+  startOpenStreamServer,
+  stepEventFrame,
+  stepRun,
+  streamReadyFrame,
+  TABBED_LAYOUT,
+  textDeltaTransientFrame,
+  transcriptList,
+  transientFrames,
+  WIDE_LAYOUT,
+  type OpenStreamServer,
+  type RunViewMockState,
+  type TranscriptLayout,
+} from './run-view-stream.ts';
 
 declare global {
   // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
@@ -59,35 +90,15 @@ declare global {
    */
   var e2eStepRunFetchCounter: { count: number } | undefined;
   /**
+   * A lapon belül KIADOTT `GET /api/approvals` kérések száma, ugyanabból az
+   * okból a lapon belül számolva, mint az `e2eStepRunFetchCounter`.
+   */
+  var e2eApprovalFetchCounter: { count: number } | undefined;
+  /**
    * A lap betöltése UTÁN beállított jelző: ha a lap újratöltődne, eltűnne.
    */
   var e2eNoReloadMarker: boolean | undefined;
-  /**
-   * A következő `click` esemény capture fázisában a keretet a lap nyitott
-   * `EventSource` példányain kézbesíti (`captureEventSources`).
-   */
-  var e2eDeliverFrameWithNextClick: ((type: string, data: string) => void) | undefined;
 }
-
-test.describe.configure({ mode: 'serial' });
-
-// A tényleges portszám a `STREAM_ORIGIN`-ből származik, nem külön literál:
-// a valódi teszt szervernek PONTOSAN arra a portra kell kötődnie, amit a
-// build időben rögzített `VITE_STREAM_ORIGIN` is hordoz.
-const REAL_SERVER_PORT = Number(new URL(STREAM_ORIGIN).port);
-
-/**
- * A Vite preview szerver és ez a teszt szerver más origin (4173 kontra
- * `STREAM_ORIGIN` 4174), tehát az `EventSource` valódi, hitelesítő adatok
- * nélküli CORS kérést indít: `Access-Control-Allow-Origin` fejléc nélkül a
- * böngésző a választ nem adja át a JS rétegnek (a `readyState` sosem ér
- * OPEN-ig, a `page.route()`-mockolt esetekkel ellentétben, ahol a CDP által
- * teljesített válasz nem megy át ezen az ellenőrzésen).
- */
-const SSE_RESPONSE_HEADERS = {
-  'Content-Type': 'text/event-stream',
-  'Access-Control-Allow-Origin': PREVIEW_ORIGIN,
-};
 
 const RUN_PENDING: RunSummary = {
   id: 'r-1',
@@ -132,20 +143,6 @@ const RUN_EVENT_RECORD: RunEventRecord = {
   payload: {},
 };
 
-/**
- * Egy `stream_ready` keret a megadott szerver példány azonosítóval, és
- * annyi feliratkozással, ahány futás pótlás alatt áll. A `subscriptions`
- * alakja azonos a `PUT` válaszáéval (`stream-subscription.ts`).
- */
-function streamReadyFrame(serverInstanceId: string, replayingRunIds: readonly string[]): StreamFrame {
-  return {
-    event: 'stream_ready',
-    streamId: 'e2e-stream',
-    serverInstanceId,
-    subscriptions: replayingRunIds.map((runId) => ({ runId, fromEventId: 0, replayLimit: 100 })),
-  };
-}
-
 function readSingleHeaderValue(value: string | readonly string[] | undefined): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
@@ -155,7 +152,7 @@ function readSingleHeaderValue(value: string | readonly string[] | undefined): s
  * második kérés meg nem érkezik. A teszt ezt web-first `expect.poll`-lal
  * várja meg, `page.waitForTimeout()` nélkül.
  */
-function startLastEventIdServer(capturedLastEventId: { value: string | undefined }): Server {
+async function startLastEventIdServer(page: Page, capturedLastEventId: { value: string | undefined }): Promise<Server> {
   let requestCount = 0;
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -187,64 +184,8 @@ function startLastEventIdServer(capturedLastEventId: { value: string | undefined
     // A kapcsolatot nyitva hagyja: a teszt csak azt igazolja, hogy a
     // második kérés megérkezett a helyes fejléccel, nem kell tovább zárni.
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
   return server;
-}
-
-interface OpenStreamServer {
-  readonly server: Server;
-  /**
-   * Új keret beszúrása a MÁR MEGNYITOTT kapcsolatba. Ha a böngésző még nem
-   * csatlakozott, a keret a sorban vár, és a csatlakozáskor megy ki.
-   */
-  readonly push: (frame: StreamFrame) => void;
-  /**
-   * Több keret beszúrása EGYETLEN `write` hívással, tehát egy hálózati
-   * darabban, egy löketben: pontosan így érkezik a szerver pótlása
-   * (`apps/server` `handle-stream-connection.ts` `replayRun`), és a végén
-   * szinkron kiírt `replay_complete` (T-009-25a).
-   */
-  readonly pushBatch: (frames: readonly StreamFrame[]) => void;
-}
-
-/**
- * `GET /events` végpont, ami a megadott kereteket kiírja és a kapcsolatot
- * NYITVA HAGYJA. Enélkül a `readyState` kiesik `OPEN`-ből, és a
- * `computePhase` `replaying`/`live` ága nem figyelhető meg.
- */
-function startOpenStreamServer(initialFrames: readonly StreamFrame[]): OpenStreamServer {
-  const openResponses: ServerResponse[] = [];
-  const pendingFrames: StreamFrame[] = [];
-
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    if (request.url?.startsWith('/events') !== true) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, SSE_RESPONSE_HEADERS);
-    openResponses.push(response);
-    for (const frame of [...initialFrames, ...pendingFrames]) {
-      response.write(encodeStreamFrame(frame));
-    }
-  });
-  server.listen(REAL_SERVER_PORT);
-
-  return {
-    server,
-    push: (frame) => {
-      pendingFrames.push(frame);
-      for (const response of openResponses) {
-        response.write(encodeStreamFrame(frame));
-      }
-    },
-    pushBatch: (frames) => {
-      pendingFrames.push(...frames);
-      const chunk = frames.map((frame) => encodeStreamFrame(frame)).join('');
-      for (const response of openResponses) {
-        response.write(chunk);
-      }
-    },
-  };
 }
 
 const serverHolder: { current: Server | undefined } = { current: undefined };
@@ -261,8 +202,8 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(() => {
   // A `closeAllConnections()` KELL a `close()` mellé: a nyitva hagyott SSE
-  // kapcsolat egyébként életben tartaná a szervert, és a soron következő
-  // teszt `listen()` hívása ugyanarra a portra `EADDRINUSE`-szal bukna.
+  // kapcsolat egyébként életben tartaná a szervert (és vele a portját) a
+  // worker folyamat végéig.
   serverHolder.current?.closeAllConnections();
   serverHolder.current?.close();
   serverHolder.current = undefined;
@@ -270,7 +211,7 @@ test.afterEach(() => {
 
 test('a második SSE kapcsolat Last-Event-ID fejlécet küld, a szerver onnan folytat', async ({ page }) => {
   const capturedLastEventId: { value: string | undefined } = { value: undefined };
-  serverHolder.current = startLastEventIdServer(capturedLastEventId);
+  serverHolder.current = await startLastEventIdServer(page, capturedLastEventId);
 
   await page.goto('/runs');
   await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
@@ -284,7 +225,7 @@ test('a második SSE kapcsolat Last-Event-ID fejlécet küld, a szerver onnan fo
 test('feliratkozással érkező stream_ready "előzmények betöltése" fázist mutat, a replay_complete leveszi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
 
   await page.goto('/runs');
@@ -300,7 +241,7 @@ test('feliratkozással érkező stream_ready "előzmények betöltése" fázist 
 });
 
 test('nem ismert runId-jű replay_complete nem változtat a pótlás alatti futásokon', async ({ page }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
 
   await page.goto('/runs');
@@ -324,52 +265,8 @@ test('nem ismert runId-jű replay_complete nem változtat a pótlás alatti fut�
 // kapcsolaton.
 // ============================================================
 
-/* eslint-disable unicorn/no-null -- lásd a fájl fejlécének eslint-disable indoklását */
-
-const RUN_SNAPSHOT: RunSnapshotResponse = {
-  version: 1,
-  sdkVersionPin: '0.1.13',
-  workflow: { id: 'w-alfa', name: 'Alfa workflow', description: null },
-  nodes: [
-    {
-      id: 'n1',
-      type: 'start',
-      label: 'Kérés fogadása',
-      position: { x: 0, y: 0 },
-      config: { type: 'start', inputFields: [], onUnhandledError: null },
-      effectiveProviderId: 'claude-subscription',
-    },
-  ],
-  edges: [],
-};
-
-const NO_STEP_RUNS: readonly StepRunRecord[] = [];
-
-function runDetailWithStatus(status: RunDetail['status']): RunDetail {
-  return {
-    id: 'r-1',
-    workflowId: 'w-alfa',
-    status,
-    input: null,
-    providerId: 'claude-subscription',
-    rootRunId: 'r-1',
-    depth: 0,
-    workflowAncestry: ['w-alfa'],
-    graphSnapshotHash: 'd'.repeat(64),
-    persistedStreamDeltas: false,
-    restartedFromRunId: null,
-    createdAtMs: 1,
-    startedAtMs: 2,
-    finishedAtMs: status === 'running' ? null : 9,
-    errorKind: null,
-    errorMessage: null,
-  };
-}
-
-/* eslint-enable unicorn/no-null */
-
 test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finished keret zárja le', async ({ page }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
 
   // A szerver oldali futás állapota a keret kiadása ELŐTT `running`, utána
@@ -410,54 +307,6 @@ test('a megszakítás folyamatban állapotot a MENET KÖZBEN érkező run_finish
 // pótlást és a végén a `replay_complete` keretet: egy "legutolsó keret"
 // alakú állapot egy ilyen löketből csak az utolsót adná át.
 // ============================================================
-
-/* eslint-disable unicorn/no-null -- lásd a fájl fejlécének eslint-disable indoklását */
-
-function stepRun(status: StepRunRecord['status']): StepRunRecord {
-  return {
-    id: 's-1',
-    runId: 'r-1',
-    nodeId: 'n1',
-    nodeType: 'start',
-    parentStepRunId: null,
-    iteration: 0,
-    attempt: 1,
-    status,
-    providerId: 'claude-subscription',
-    modelId: null,
-    sessionMode: null,
-    sdkSessionId: null,
-    resumedFromSessionId: null,
-    forkedSession: false,
-    structuredOutputStrategy: null,
-    output: null,
-    resultSubtype: null,
-    numTurns: null,
-    inputTokens: null,
-    outputTokens: null,
-    cacheReadInputTokens: null,
-    cacheCreationInputTokens: null,
-    subWorkflowRunId: null,
-    errorKind: null,
-    errorMessage: null,
-    startedAtMs: 2,
-    finishedAtMs: null,
-    createdAtMs: 2,
-  };
-}
-
-/* eslint-enable unicorn/no-null */
-
-/**
- * Egy lépés szintű motor esemény kerete az `r-1` futás `s-1` lépés futására.
- */
-function stepEventFrame(id: number, kind: RunEventKind, delivery: 'live' | 'replayed'): StreamFrame {
-  return {
-    event: 'run_event',
-    delivery,
-    runEvent: makeRunEventRecord(id, 'r-1', { stepRunId: 's-1', kind }),
-  };
-}
 
 /**
  * A kiadott `listStepRuns` kérések számlálója a lapon belül, a lap saját
@@ -511,27 +360,6 @@ function nodeLocator(page: Page, nodeId: string): Locator {
   return page.getByTestId(`rf__node-${nodeId}`);
 }
 
-interface RunViewMockState {
-  runStatus: RunDetail['status'];
-  stepRuns: readonly StepRunRecord[];
-}
-
-/**
- * A futás nézet REST mockjai: a futás rekordja és a lépés futások a teszt
- * által menet közben átírható `state` objektumból jönnek.
- */
-async function mockRunView(page: Page, state: RunViewMockState): Promise<void> {
-  await installApiMocks(page, [
-    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus(state.runStatus)))),
-    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
-    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(state.stepRuns))),
-    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
-    mockRoute('replaceStreamSubscriptions', async (route) =>
-      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
-    ),
-  ]);
-}
-
 for (const finished of [
   { status: 'succeeded', label: 'sikeres' },
   { status: 'failed', label: 'sikertelen' },
@@ -539,7 +367,7 @@ for (const finished of [
   test(`élő step_started keretre "fut", step_finished keretre "${finished.label}" jelvény a csomóponton, oldal újratöltés nélkül`, async ({
     page,
   }) => {
-    const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+    const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
     serverHolder.current = streamServer.server;
     const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
     await mockRunView(page, state);
@@ -568,7 +396,7 @@ test('egy löketben érkező ezer keretes pótlás után a csomópont állapota 
 }) => {
   // A `stream_ready` a futást pótlás alatt állónak jelzi: a topnav az
   // "előzmények betöltése" fázist mutatja, amíg a `replay_complete` meg nem jön.
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', ['r-1'])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', ['r-1'])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunView(page, state);
@@ -608,7 +436,7 @@ test('egy löketben érkező ezer keretes pótlás után a csomópont állapota 
 test('a run_finished keret a fejlécet akkor is lezárja, ha UGYANABBAN a löketben replay_complete követi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
   await mockRunView(page, state);
@@ -656,7 +484,7 @@ const LIVE_APPROVAL: PendingApproval = {
 test('élő approval_requested keretre a jóváhagyás panel oldal újratöltés nélkül megjelenik, approval_decided keretre eltűnik', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
   const approvalFetches = { count: 0 };
@@ -694,6 +522,203 @@ test('élő approval_requested keretre a jóváhagyás panel oldal újratöltés
   expect(await readNoReloadMarker(page)).toBe(true);
 });
 
+/**
+ * A kiadott `GET /api/approvals` kérések számlálója a lapon belül, a lap saját
+ * `fetch` hívásába kötve, a betöltés ELŐTT (`installStepRunFetchCounter`
+ * mintája). A számláló a kérés KIADÁSAKOR nő, szinkron: egy összevonás nélküli
+ * kódon egy löket minden jelző kerete ugyanabban a feladatban indítaná a
+ * kérését, tehát a számláló egyetlen lépésben ugrana a végértékre.
+ */
+async function installApprovalFetchCounter(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const counter = { count: 0 };
+    Object.defineProperties(globalThis, {
+      e2eApprovalFetchCounter: { configurable: true, value: counter },
+      fetch: {
+        configurable: true,
+        writable: true,
+        value: (...parameters: Parameters<typeof fetch>) => {
+          const [input] = parameters;
+          const url = input instanceof Request ? input.url : String(input);
+          if (new URL(url).pathname.endsWith('/approvals')) {
+            counter.count += 1;
+          }
+          return originalFetch(...parameters);
+        },
+      },
+    });
+  });
+}
+
+async function readApprovalFetchCount(page: Page): Promise<number | undefined> {
+  return page.evaluate(() => globalThis.e2eApprovalFetchCounter?.count);
+}
+
+const BURST_APPROVAL_COUNT = 20;
+
+test('egy löketben érkező 20 approval_requested keretre az újratöltés összevonva fut: a csatoláskori betöltésen felül egy folyamatban lévő és egy utólagos kérés, és a panel a végállapotot mutatja', async ({
+  page,
+}) => {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+  await installApprovalFetchCounter(page);
+
+  await page.goto('/run?runId=r-1');
+  await expect(page.getByRole('button', { name: 'Megszakítás' })).toBeVisible();
+  await expect.poll(async () => readApprovalFetchCount(page)).toBe(1);
+  await setNoReloadMarker(page);
+
+  // A szerver oldali állapot a löket UTÁN: húsz függő jóváhagyás, és a löket
+  // húsz élő `approval_requested` kerete, EGY `write` hívásban.
+  approvalsHolder.current = Array.from({ length: BURST_APPROVAL_COUNT }, (_, index) => ({
+    ...LIVE_APPROVAL,
+    id: `appr-burst-${String(index)}`,
+    title: `Löketben érkező jóváhagyás ${String(index + 1)}`,
+    requestedAtMs: LIVE_APPROVAL.requestedAtMs + index,
+  }));
+  streamServer.pushBatch(
+    Array.from({ length: BURST_APPROVAL_COUNT }, (_, index) => stepEventFrame(index + 1, 'approval_requested', 'live')),
+  );
+
+  const lastPosition = page
+    .getByRole('navigation', { name: 'Jóváhagyások lapozása' })
+    .getByText(`1 / ${String(BURST_APPROVAL_COUNT)}`, { exact: true });
+  await expect(lastPosition).toBeVisible();
+  await expect(page.locator('.run-control__bar').getByText('jóváhagyásra vár', { exact: true })).toBeVisible();
+  // `createCoalescedReload`: az első keret indít egy kérést, a futása alatt
+  // érkező további tizenkilenc egyetlen utólagos kérésbe olvad. Összevonás
+  // nélkül a számláló egy lépésben 1-ről 21-re ugrana, tehát a 3 sosem állna
+  // elő.
+  await expect.poll(async () => readApprovalFetchCount(page)).toBe(3);
+  await expect(lastPosition).toBeVisible();
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+/**
+ * Három függő jóváhagyás, AZONOS címmel (egy `fan_out` csomópont ágai), a
+ * `payload` szerint megkülönböztetve: a látott jóváhagyás kizárólag a
+ * tartalmáról ismerhető fel.
+ */
+function selectionApproval(branch: string, requestedAtMs: number): PendingApproval {
+  return {
+    ...LIVE_APPROVAL,
+    id: `appr-selection-${branch}`,
+    title: 'Ág jóváhagyása',
+    payload: { branch },
+    requestedAtMs,
+  };
+}
+
+test('élő frissítéskor a látott jóváhagyás nem ugrik el: egy előtte álló kikerülése és egy elé érkező új jóváhagyás után is ugyanaz látszik, csak a helye változik', async ({
+  page,
+}) => {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const first = selectionApproval('A', 10);
+  const second = selectionApproval('B', 20);
+  const third = selectionApproval('C', 30);
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [first, second, third] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+  // A látott jóváhagyás szövege (a címe, a szövege és a `payload`) a
+  // kártya `article` elemében, a címe a neve; a "Függő jóváhagyások" régió
+  // 2026-09-25 óta a lapozót és a gombokat fogja össze, a szöveg a húzható
+  // panelben, azon kívül áll.
+  const shownApproval = page.getByRole('article', { name: 'Ág jóváhagyása' });
+  await expect(navigation.getByText('1 / 3', { exact: true })).toBeVisible();
+  await navigation.getByRole('button', { name: '2', exact: true }).click();
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+  await setNoReloadMarker(page);
+
+  // Az előtte álló jóváhagyás döntés nélkül lezárul (például egy másik lapon
+  // hozott döntés): a lista szűkül, a látott jóváhagyás marad.
+  approvalsHolder.current = [second, third];
+  streamServer.push(stepEventFrame(1, 'approval_decided', 'live'));
+  await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+
+  // Egy korábbi időpontú jóváhagyás érkezik: a lista elé bővül, a látott
+  // jóváhagyás marad, a helye nő.
+  const earlier = selectionApproval('Z', 5);
+  approvalsHolder.current = [earlier, second, third];
+  streamServer.push(stepEventFrame(2, 'approval_requested', 'live'));
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
+/**
+ * A lapozás NÉLKÜL, alapból látott jóváhagyás is azonnal rögzül
+ * (`use-approval-selection.ts`): a user nem választott, mégis egy később
+ * listázott, de KORÁBBI időpontú jóváhagyás nem veheti át a helyét a keze
+ * alatt. A fenti teszt a lapozással választott jóváhagyást őrzi; ez a
+ * rögzítés nélküli ág (a `setSelectedApprovalId` feltételes hívása
+ * nélkül) kizárólag a legrégebbit mutatná, tehát a látott jóváhagyás itt
+ * kicserélődne (független ellenőrzés 2026-09-25: e2e nem őrizte).
+ */
+test('élő frissítéskor a lapozás nélkül látott jóváhagyás is rögzül: egy elé érkező, korábbi időpontú jóváhagyás nem veszi át a helyét', async ({
+  page,
+}) => {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  const second = selectionApproval('B', 20);
+  const third = selectionApproval('C', 30);
+  const approvalsHolder: { current: readonly PendingApproval[] } = { current: [second, third] };
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetailWithStatus('running')))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(RUN_SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(NO_STEP_RUNS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalsHolder.current))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+
+  await page.goto('/run?runId=r-1');
+  const navigation = page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+  // A látott jóváhagyás szövege (a címe, a szövege és a `payload`) a
+  // kártya `article` elemében, a címe a neve; a "Függő jóváhagyások" régió
+  // 2026-09-25 óta a lapozót és a gombokat fogja össze, a szöveg a húzható
+  // panelben, azon kívül áll.
+  const shownApproval = page.getByRole('article', { name: 'Ág jóváhagyása' });
+  // A user nem lapoz: alapból a legrégebbi látszik.
+  await expect(navigation.getByText('1 / 2', { exact: true })).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+  await setNoReloadMarker(page);
+
+  const earlier = selectionApproval('Z', 5);
+  approvalsHolder.current = [earlier, second, third];
+  streamServer.push(stepEventFrame(1, 'approval_requested', 'live'));
+  await expect(navigation.getByText('2 / 3', { exact: true })).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "B"')).toBeVisible();
+  await expect(shownApproval.getByText('"branch": "Z"')).toHaveCount(0);
+
+  expect(await readNoReloadMarker(page)).toBe(true);
+});
+
 // ============================================================
 // A FUTÁS LEZÁRÁSA SZABÁLYOS LEÁLLÁSKOR ÉS A SZERVER ÚJRAINDULÁS (SPEC-004
 // 10.1, 10.2, SPEC-005 5.2, SPEC-007 AC44).
@@ -727,7 +752,7 @@ interface RestartableStreamServer {
  * újracsatlakozással gyorsan visszatérjen (SPEC-005 5.7), a
  * `startLastEventIdServer` mintájára.
  */
-function startRestartableStreamServer(): RestartableStreamServer {
+async function startRestartableStreamServer(page: Page): Promise<RestartableStreamServer> {
   const openResponses = new Set<ServerResponse>();
   const instance = { index: 1 };
 
@@ -742,7 +767,7 @@ function startRestartableStreamServer(): RestartableStreamServer {
     const readyFrame = streamReadyFrame(`s-${String(instance.index)}`, []);
     response.write(encodeStreamFrame(readyFrame));
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
 
   return {
     server,
@@ -764,7 +789,7 @@ function startRestartableStreamServer(): RestartableStreamServer {
 test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, és megjelenik az Újraindítás gomb', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunView(page, state);
@@ -794,7 +819,7 @@ test('élő run_interrupted keretre (szabályos leállás) a fejléc átvált, �
 test('szerver újraindulás után a futás nézet újra feliratkozik, újratölti a futást és a lépéseket, és az utána érkező élő keret frissíti a rajzot', async ({
   page,
 }) => {
-  const streamServer = startRestartableStreamServer();
+  const streamServer = await startRestartableStreamServer(page);
   serverHolder.current = streamServer.server;
   const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
   const calls = { subscriptions: 0, getRun: 0, listStepRuns: 0 };
@@ -871,17 +896,22 @@ const BAD_GATEWAY = { status: 502, contentType: 'text/plain', body: '' };
  * Egy szerver példány `GET /events` végpontja: rövid `retry` (a böngésző a
  * megszakadás után gyorsan próbálkozzon újra, SPEC-005 5.7), a példány
  * `stream_ready` kerete, és nyitva hagyott kapcsolat, amibe menet közben
- * keret szúrható.
+ * keret szúrható. Alapból szabad porton indul; az újraindult példány a
+ * leállt példány portját kapja (`port`), ugyanúgy, mint a valódi szerver.
  */
-function startStreamServerInstance(serverInstanceId: string): {
+async function startStreamServerInstance(
+  serverInstanceId: string,
+  port = 0,
+): Promise<{
   readonly server: Server;
+  readonly port: number;
   readonly push: (frame: StreamFrame) => void;
   /**
    * Minden nyitott válasz szabályos lezárása: a már kiírt keretek kimennek,
    * a valódi szerver leállási sorrendje szerint (SPEC-006 8.2).
    */
   readonly endAll: () => void;
-} {
+}> {
   const openResponses = new Set<ServerResponse>();
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -893,9 +923,10 @@ function startStreamServerInstance(serverInstanceId: string): {
     response.write('retry: 50\n\n');
     response.write(encodeStreamFrame(streamReadyFrame(serverInstanceId, [])));
   });
-  server.listen(REAL_SERVER_PORT);
+  const boundPort = await listenOnLoopback(server, port);
   return {
     server,
+    port: boundPort,
     push: (frame) => {
       for (const response of openResponses) {
         response.write(encodeStreamFrame(frame));
@@ -911,17 +942,19 @@ function startStreamServerInstance(serverInstanceId: string): {
 }
 
 /**
- * A leállt szerver: a porton minden TCP kapcsolatot azonnal lezár, és
- * számolja a böngésző újracsatlakozási kísérleteit. A számláló a teszt
- * állapot alapú várakozásának jele (`expect.poll`), nem egy időzítő.
+ * A leállt szerver: a leállt példány portján minden TCP kapcsolatot azonnal
+ * lezár, és számolja a böngésző újracsatlakozási kísérleteit. A számláló a
+ * teszt állapot alapú várakozásának jele (`expect.poll`), nem egy időzítő.
  */
-function startDownServer(): { readonly server: NetServer; readonly attempts: { count: number } } {
+async function startDownServer(
+  port: number,
+): Promise<{ readonly server: NetServer; readonly attempts: { count: number } }> {
   const attempts = { count: 0 };
   const server = createNetServer((socket) => {
     attempts.count += 1;
     socket.destroy();
   });
-  server.listen(REAL_SERVER_PORT);
+  await listenOnLoopback(server, port);
   return { server, attempts };
 }
 
@@ -974,7 +1007,7 @@ async function mockRunViewWithShutdown(page: Page, state: ShutdownMockState): Pr
  * sikertelenül próbált újracsatlakozni.
  */
 async function shutDownStreamServer(
-  instance: ReturnType<typeof startStreamServerInstance>,
+  instance: Awaited<ReturnType<typeof startStreamServerInstance>>,
   state: ShutdownMockState,
 ): Promise<{ readonly attempts: { count: number } }> {
   state.down = true;
@@ -986,7 +1019,7 @@ async function shutDownStreamServer(
   instance.endAll();
   await closeServer(instance.server);
   serverHolder.current = undefined;
-  const down = startDownServer();
+  const down = await startDownServer(instance.port);
   downServerHolder.current = down.server;
   await expect.poll(() => down.attempts.count).toBeGreaterThan(0);
   return down;
@@ -995,8 +1028,9 @@ async function shutDownStreamServer(
 test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az utolsó állapotot mutatja várakozás jelzéssel, és az újraindulás után helyreáll', async ({
   page,
 }) => {
-  const first = startStreamServerInstance('s-1');
+  const first = await startStreamServerInstance('s-1');
   serverHolder.current = first.server;
+  await routeStreamToPort(page, first.port);
   const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunViewWithShutdown(page, state);
 
@@ -1028,7 +1062,8 @@ test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az uto
     await closeServer(downServerHolder.current);
     downServerHolder.current = undefined;
   }
-  serverHolder.current = startStreamServerInstance('s-2').server;
+  const restarted = await startStreamServerInstance('s-2', first.port);
+  serverHolder.current = restarted.server;
 
   await expect(node.getByText('félbeszakítva', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Újraindítás' })).toBeVisible();
@@ -1040,8 +1075,9 @@ test('a szerver leállása alatt (502 az újratöltésre) a futás nézet az uto
 test('ha a szerver nem jön vissza, a futás nézet több sikertelen újracsatlakozás után is kimondja a várakozást, nem válik csendessé', async ({
   page,
 }) => {
-  const first = startStreamServerInstance('s-1');
+  const first = await startStreamServerInstance('s-1');
   serverHolder.current = first.server;
+  await routeStreamToPort(page, first.port);
   const state: ShutdownMockState = { down: false, runStatus: 'running', stepRuns: [stepRun('running')] };
   await mockRunViewWithShutdown(page, state);
 
@@ -1069,7 +1105,7 @@ test('ha a szerver nem jön vissza, a futás nézet több sikertelen újracsatla
 test('a futás előzmények listája run_event keretre akkor is újratölt, ha UGYANABBAN a löketben protocol_error követi', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   const listRunsCalls: { count: number } = { count: 0 };
   await installApiMocks(page, [
@@ -1107,33 +1143,10 @@ test('a futás előzmények listája run_event keretre akkor is újratölt, ha U
 // A futás rekordja `persistedStreamDeltas: false` (`runDetailWithStatus`).
 // ============================================================
 
-/**
- * Egy élő szöveg delta átmeneti kerete, pontosan abban az alakban, ahogy a
- * szerver a kikapcsolt delta kapcsolójú futásnál kiküldi
- * (`apps/server/src/engine-assembly/classify-published-event.ts`).
- */
-function textDeltaTransientFrame(text: string): StreamFrame {
-  return {
-    event: 'run_event_transient',
-    runId: 'r-1',
-    stepRunId: 's-1',
-    kind: 'sdk_stream_event',
-    occurredAtMs: 20,
-    payload: { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } },
-  };
-}
-
-/**
- * A futás nézet transcript listája.
- */
-function transcriptList(page: Page): Locator {
-  return page.getByRole('list', { name: 'Futás eseményei' });
-}
-
 test('élő átmeneti keretek: megjelölt, nem tárolt sorok, két azonos tartalmú keret két sor, és az utánuk érkező tárolt sor nem vész el', async ({
   page,
 }) => {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
   serverHolder.current = streamServer.server;
   await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
 
@@ -1176,7 +1189,10 @@ test('élő átmeneti keretek: megjelölt, nem tárolt sorok, két azonos tartal
  * fejlécet, és a tárolt sorok pótlását adja (az 1-es ismétlésként, a 2-es
  * újként), nyitva hagyva a kapcsolatot.
  */
-function startTransientReconnectServer(capturedLastEventId: { value: string | undefined }): Server {
+async function startTransientReconnectServer(
+  page: Page,
+  capturedLastEventId: { value: string | undefined },
+): Promise<Server> {
   let requestCount = 0;
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url?.startsWith('/events') !== true) {
@@ -1199,7 +1215,7 @@ function startTransientReconnectServer(capturedLastEventId: { value: string | un
     response.write(encodeStreamFrame(stepEventFrame(1, 'step_started', 'replayed')));
     response.write(encodeStreamFrame(stepEventFrame(2, 'step_finished', 'live')));
   });
-  server.listen(REAL_SERVER_PORT);
+  await attachStreamServer(page, server);
   return server;
 }
 
@@ -1207,7 +1223,7 @@ test('átmeneti keretek után az újracsatlakozás kurzora az utolsó TÁROLT es
   page,
 }) => {
   const capturedLastEventId: { value: string | undefined } = { value: undefined };
-  serverHolder.current = startTransientReconnectServer(capturedLastEventId);
+  serverHolder.current = await startTransientReconnectServer(page, capturedLastEventId);
   await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
 
   await page.goto('/run?runId=r-1');
@@ -1249,66 +1265,11 @@ test('átmeneti keretek után az újracsatlakozás kurzora az utolsó TÁROLT es
 // 2. és 3. kivétel.
 // ============================================================
 
-/**
- * A pótlás tárolt sorainak száma: elég ahhoz, hogy a lista görgethető legyen.
- */
-const REPLAYED_ROW_COUNT = 20;
-
-/**
- * Az utolsó sor alsó éle mínusz a lista látható alsó éle, pixelben:
- * pozitív érték esetén ennyi lóg ki az utolsó sorból a lista alján.
- * `undefined`, amíg a sor nincs kirajzolva.
- */
-async function lastRowBottomOverflow(list: Locator, rowCount: number): Promise<number | undefined> {
-  return list.evaluate((element, position) => {
-    const row = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(position))}"]`);
-    if (row === null) {
-      return;
-    }
-    const visibleBottom = element.getBoundingClientRect().top + element.clientTop + element.clientHeight;
-    return row.getBoundingClientRect().bottom - visibleBottom;
-  }, rowCount);
-}
-
-/**
- * Az utolsó sor teljes egészében látszik, és az alja a lista alján áll. A
- * 0,5 pixeles tűrés a user elfogadási kritériuma (2026-09-24).
- */
-async function expectLastRowFullyVisibleAtBottom(list: Locator, rowCount: number): Promise<void> {
-  const lastRow = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`);
-  await expect(lastRow).toBeInViewport({ ratio: 1 });
-  await expect.poll(async () => Math.abs((await lastRowBottomOverflow(list, rowCount)) ?? Infinity)).toBeLessThan(0.5);
-}
-
-/**
- * A futás nézet megnyitása a pótlással; visszatér, amikor az utolsó tárolt
- * sor kirajzolódott, és a lista az alján áll.
- */
-async function openFollowingTranscript(page: Page, theme: 'light' | 'dark'): Promise<OpenStreamServer> {
-  const streamServer = startOpenStreamServer([streamReadyFrame('s-1', [])]);
-  serverHolder.current = streamServer.server;
-  await page.addInitScript((mode) => {
-    globalThis.localStorage.setItem('eggTheme', mode);
-  }, theme);
-  await mockRunView(page, { runStatus: 'running', stepRuns: [stepRun('running')] });
-  await page.goto('/run?runId=r-1');
-  streamServer.pushBatch([
-    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
-    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
-  ]);
-  await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT);
-  return streamServer;
-}
-
-function transientFrames(count: number): readonly StreamFrame[] {
-  return Array.from({ length: count }, (_, index) => textDeltaTransientFrame(`Részlet ${String(index + 1)}`));
-}
-
 for (const theme of ['light', 'dark'] as const) {
   test(`követés közben 3 átmeneti sor után az utolsó sor teljes egészében látszik, az alja a lista alján (${theme} téma)`, async ({
     page,
   }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     streamServer.pushBatch(transientFrames(3));
     await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT + 3);
   });
@@ -1316,13 +1277,13 @@ for (const theme of ['light', 'dark'] as const) {
   test(`követés közben egy 120 soros löket után az utolsó sor teljes egészében látszik (${theme} téma)`, async ({
     page,
   }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     streamServer.pushBatch(transientFrames(120));
     await expectLastRowFullyVisibleAtBottom(transcriptList(page), REPLAYED_ROW_COUNT + 120);
   });
 
   test(`az ugrás az aljára gomb után az utolsó sor teljes egészében látszik (${theme} téma)`, async ({ page }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     const list = transcriptList(page);
     await list.evaluate((element) => {
       element.scrollTo({ top: 0 });
@@ -1336,7 +1297,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`követés közben egyenként érkező átmeneti sorok után minden alkalommal az utolsó sor teljes egészében látszik (${theme} téma)`, async ({
     page,
   }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     const list = transcriptList(page);
     for (let arrived = 1; arrived <= 5; arrived += 1) {
       streamServer.push(textDeltaTransientFrame(`Egyenként ${String(arrived)}`));
@@ -1358,7 +1319,7 @@ for (const theme of ['light', 'dark'] as const) {
 test('az átmeneti sor ("Nem tárolt" jelvénnyel) pontosan olyan magas, mint a tárolt sor, és a jelvény teljes egészében a sorban áll', async ({
   page,
 }) => {
-  const streamServer = await openFollowingTranscript(page, 'light');
+  const streamServer = await openFollowingTranscript(page, 'light', serverHolder);
   streamServer.pushBatch(transientFrames(3));
   const list = transcriptList(page);
   await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 3);
@@ -1396,17 +1357,21 @@ test('az átmeneti sor ("Nem tárolt" jelvénnyel) pontosan olyan magas, mint a 
 // szekció). A négy kinyitási út (egér, `Space` a `keydown` és a `keyup` között
 // érkező sorral, `Enter`, csak `click`) mindegyikén a kinyitott sor fejléce
 // a lista tetejéhez mérve nem mozdulhat, és az "Ugrás az aljára" gomb a
-// kinyitás óta érkezett sorokat nevezi meg. A lista fölötti gomb sáv
-// megjelenése az egész listát lejjebb tolja, ezért a fejléc helye a lista
-// eleméhez mért.
+// kinyitás óta érkezett sorokat nevezi meg. A fejléc helye itt a lista
+// eleméhez mért; hogy maga a lista sem mozdul a gomb megjelenésekor (a gomb
+// a lista fölött lebeg), azt "AZ UGRÁS GOMB MEGJELENÉSE" blokk méri az
+// ablakban.
 //
 // DETERMINISZTIKUS VERSENY. A hálózaton érkező keret a kattintás és a mérés
 // közé nem időzíthető megbízhatóan (research 16. szekció: a kinyitás utáni
 // azonnali küldésre a követés kikapcsolása NÉLKÜL is csak a futások egy része
 // bukott). Ezért az egyik új sor a kattintás capture fázisában, a valódi
 // `EventSource` példányon kiváltott üzenetként érkezik: ugyanazon a
-// feldolgozó úton megy, mint a hálózati keret, és a kinyitással EGY
-// renderbe kerül, tehát garantáltan a mérés előtt. A kapcsolat maga a
+// feldolgozó úton megy, mint a hálózati keret, és garantáltan a mérés előtt
+// kerül commitba. A csak `click` úton a kinyitással EGY commitba; egér,
+// `Space` és `Enter` úton a hook kattintás figyelője utáni első commitba, a
+// kinyitás commitja ELŐTT (mérve, `apps/web/measurement/transcript-scroll.ts`
+// `render-sorrend` jelenete, research 17. szekció). A kapcsolat maga a
 // `node:http` teszt szerveren nyitott.
 //
 // Az egér út `page.mouse`, nem `locator.click()`: az utóbbi a kattintás
@@ -1414,73 +1379,10 @@ test('az átmeneti sor ("Nem tárolt" jelvénnyel) pontosan olyan magas, mint a 
 // ============================================================
 
 /**
- * A lapon létrejövő `EventSource` példányok rögzítése a betöltés ELŐTT, az
- * `installStepRunFetchCounter` mintájára, és a kézbesítő függvény
- * (`e2eDeliverFrameWithNextClick`) telepítése. A példány a natív osztály
- * leszármazottja, tehát minden viselkedése a natívé; a kézbesített keret
- * alakja a hálózatié (`encodeStreamFrame`: az `event` név és a `data` a keret
- * JSON-ja), és csak a nyitott példányokra megy.
- */
-async function captureEventSources(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const sources: EventSource[] = [];
-    const NativeEventSource = EventSource;
-    class CapturedEventSource extends NativeEventSource {
-      constructor(...parameters: ConstructorParameters<typeof EventSource>) {
-        super(...parameters);
-        sources.push(this);
-      }
-    }
-    const deliverFrameWithNextClick = (type: string, data: string): void => {
-      document.addEventListener(
-        'click',
-        () => {
-          for (const source of sources) {
-            if (source.readyState === source.OPEN) {
-              source.dispatchEvent(new MessageEvent(type, { data }));
-            }
-          }
-        },
-        { capture: true, once: true },
-      );
-    };
-    Object.defineProperties(globalThis, {
-      e2eDeliverFrameWithNextClick: { configurable: true, value: deliverFrameWithNextClick },
-      EventSource: { configurable: true, writable: true, value: CapturedEventSource },
-    });
-  });
-}
-
-async function deliverFrameWithNextClick(page: Page, frame: StreamFrame): Promise<void> {
-  await page.evaluate(
-    ({ type, data }) => {
-      globalThis.e2eDeliverFrameWithNextClick?.(type, data);
-    },
-    { type: frame.event, data: JSON.stringify(frame) },
-  );
-}
-
-/**
  * A kinyitás előtt érkező átmeneti sorok száma: a lista görgethető, és az
  * alján átmeneti sor áll.
  */
 const TRANSIENT_BEFORE_EXPAND = 10;
-
-/**
- * A kinyitott sor fejlécének függőleges helye a lista elemének tetejéhez
- * mérve, pixelben. `undefined`, amíg a sor nincs kirajzolva.
- */
-async function headerOffsetInList(list: Locator, position: number): Promise<number | undefined> {
-  return list.evaluate((element, rowPosition) => {
-    const header = element.querySelector(
-      `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
-    );
-    if (header === null) {
-      return;
-    }
-    return header.getBoundingClientRect().top - element.getBoundingClientRect().top;
-  }, position);
-}
 
 /**
  * A lista az alján áll, az utolsó előtti sor a kinyitás célja: a kinyitott
@@ -1492,7 +1394,7 @@ async function openExpandTarget(
   theme: 'light' | 'dark',
 ): Promise<{ readonly streamServer: OpenStreamServer; readonly list: Locator; readonly position: number }> {
   await captureEventSources(page);
-  const streamServer = await openFollowingTranscript(page, theme);
+  const streamServer = await openFollowingTranscript(page, theme, serverHolder);
   const list = transcriptList(page);
   streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
   const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
@@ -1626,7 +1528,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`dupla kattintás (dblclick) egy tárolt sor fejlécén után a követés folytatódik (${theme} téma)`, async ({
     page,
   }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     await storedRowHeader(page).dblclick();
     await expectFollowingAfterStoredArrivals(page, streamServer);
   });
@@ -1634,12 +1536,1106 @@ for (const theme of ['light', 'dark'] as const) {
   test(`két click egy képkockán belül egy tárolt sor fejlécén után a követés folytatódik (${theme} téma)`, async ({
     page,
   }) => {
-    const streamServer = await openFollowingTranscript(page, theme);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
     // Egyetlen szkript futásban, tehát a kettő között nincs renderelés.
     await storedRowHeader(page).evaluate((element: HTMLElement) => {
       element.click();
       element.click();
     });
     await expectFollowingAfterStoredArrivals(page, streamServer);
+  });
+}
+
+// ============================================================
+// A VÁRAKOZÁS KILÉPÉSEI (2026-09-25).
+//
+// Egy sor kinyitása szünetelteti a követést (`use-transcript-auto-scroll.ts`).
+// A szünetnek négy kilépése van: a mérés (csak becsukásnál, user döntés
+// 2026-09-25), a páros kattintás, az "ugrás az aljára" gomb és a kézi
+// visszatérés az aljára (user döntés 2026-09-24). A fenti tesztek a kinyitott
+// sor helyét védik, ezek a kilépéseket: egy kilépés nélkül maradt szünet után
+// a lista végleg nem követ. A mérés hiányát a fülváltás állítja elő: a rejtett
+// sor 0 magasságát a `react-window` nem tárolja, és a sor a mérése előtt
+// leszerelődik (`docs/research/2026-09-23-transcript-panel-meresek.md` 17.
+// szekció).
+// ============================================================
+
+/**
+ * Megvárja, hogy a lista a sor MÉRT magasságával számoljon: a következő sor
+ * teteje (az utolsó sornál a `react-window` méretező eleme, a lista utolsó,
+ * `aria-hidden` gyereke) a sor alsó élénél áll. A mérés előtt a lista még a
+ * becsült magassággal pozicionál, tehát a kinyitott sor rálóg a következőre.
+ */
+async function waitForRowMeasured(list: Locator, position: number): Promise<void> {
+  await expect
+    .poll(async () =>
+      list.evaluate((element, rowPosition) => {
+        const row = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"]`);
+        const next = element.querySelector(`[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition + 1))}"]`);
+        const sizer = element.querySelector(':scope > [aria-hidden="true"]');
+        if (row === null || sizer === null) {
+          return Infinity;
+        }
+        const rowBottom = row.getBoundingClientRect().bottom;
+        const followingTop = next === null ? sizer.getBoundingClientRect().bottom : next.getBoundingClientRect().top;
+        return Math.abs(followingTop - rowBottom);
+      }, position),
+    )
+    .toBeLessThan(0.5);
+}
+
+function jumpButton(page: Page): Locator {
+  return page.getByRole('button', { name: /Ugrás az aljára/ });
+}
+
+/**
+ * Kézi görgetés a lista aljára egérkerékkel, a lista fölött.
+ */
+async function wheelToBottom(page: Page, list: Locator): Promise<void> {
+  await list.hover();
+  await page.mouse.wheel(0, 100_000);
+}
+
+async function wheelToTop(page: Page, list: Locator): Promise<void> {
+  await list.hover();
+  await page.mouse.wheel(0, -100_000);
+}
+
+/**
+ * Minden új sor után az utolsó sor teljes egészében a lista alján áll, és
+ * nincs "ugrás az aljára" gomb: a lista követ.
+ */
+async function expectFollowingAfterArrivals(
+  page: Page,
+  streamServer: OpenStreamServer,
+  list: Locator,
+  rowCount: number,
+): Promise<number> {
+  let count = rowCount;
+  for (let arrived = 1; arrived <= 3; arrived += 1) {
+    streamServer.push(textDeltaTransientFrame(`Követés ${String(arrived)}`));
+    count += 1;
+    await expectLastRowFullyVisibleAtBottom(list, count);
+  }
+  await expect(jumpButton(page)).toHaveCount(0);
+  return count;
+}
+
+/**
+ * 375 pixelen, az alján állva: a végétől második sor kinyitása és a "Gráf"
+ * fülre váltás EGY feladatban (egy szkript futásban), majd a rejtett fül
+ * alatt három új sor, végül vissza a transcript fülre. A kinyitott sor a
+ * mérése előtt leszerelődik, tehát a mérés sosem jön: a várakozás csak a
+ * másik két kilépéssel zárulhat.
+ */
+async function pauseWithoutMeasurement(
+  page: Page,
+  theme: 'light' | 'dark',
+): Promise<{ readonly streamServer: OpenStreamServer; readonly list: Locator; readonly rowCount: number }> {
+  const streamServer = await openFollowingTranscript(page, theme, serverHolder, TABBED_LAYOUT);
+  const list = transcriptList(page);
+  streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+  const bottomCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+  await expectLastRowFullyVisibleAtBottom(list, bottomCount);
+  await list.evaluate((element, position) => {
+    const header = element.querySelector(
+      `[role="listitem"][aria-posinset="${CSS.escape(String(position))}"] [aria-expanded]`,
+    );
+    const graphTab = [...globalThis.document.querySelectorAll('[role="tab"]')].find(
+      (tab) => tab.textContent === 'Gráf',
+    );
+    if (!(header instanceof HTMLElement) || !(graphTab instanceof HTMLElement)) {
+      throw new TypeError('a fejléc vagy a Gráf fül nem található');
+    }
+    header.click();
+    graphTab.click();
+  }, bottomCount - 1);
+  await expect(page.getByRole('tab', { name: 'Gráf' })).toHaveAttribute('aria-selected', 'true');
+  streamServer.pushBatch(transientFrames(3));
+  const rowCount = bottomCount + 3;
+  await page.getByRole('tab', { name: 'Transcript' }).click();
+  await expect(page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' })).toBeVisible();
+  return { streamServer, list, rowCount };
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`375 pixelen a kinyitással egy feladatban váltott fül után a kézi görgetés az aljára visszakapcsolja a követést (${theme} téma)`, async ({
+    page,
+  }) => {
+    const { streamServer, list, rowCount } = await pauseWithoutMeasurement(page, theme);
+    await wheelToBottom(page, list);
+    await expectLastRowFullyVisibleAtBottom(list, rowCount);
+    await expect(jumpButton(page)).toHaveCount(0);
+    await expectFollowingAfterArrivals(page, streamServer, list, rowCount);
+  });
+
+  test(`a mérés nélkül maradt várakozást az ugrás gomb lezárja, és utána a kézi görgetés is visszakapcsol (${theme} téma)`, async ({
+    page,
+  }) => {
+    const { streamServer, list, rowCount } = await pauseWithoutMeasurement(page, theme);
+    await page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' }).click();
+    await expectLastRowFullyVisibleAtBottom(list, rowCount);
+    let count = await expectFollowingAfterArrivals(page, streamServer, list, rowCount);
+
+    // Az ugrás után a várakozás lezárult: felgörgetés, új sor, majd kézzel
+    // vissza az aljára, és a lista újra követ.
+    await wheelToTop(page, list);
+    await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+    streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+    count += 1;
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+    await wheelToBottom(page, list);
+    await expectLastRowFullyVisibleAtBottom(list, count);
+    await expect(jumpButton(page)).toHaveCount(0);
+    await expectFollowingAfterArrivals(page, streamServer, list, count);
+  });
+
+  test(`a mérés után a kinyitott sor a helyén marad, és a kézi görgetés az aljára visszakapcsolja a követést (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
+    const list = transcriptList(page);
+    streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+    const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+    await expectLastRowFullyVisibleAtBottom(list, rowCount);
+    const position = rowCount - 1;
+    const header = list.locator(`[role="listitem"][aria-posinset="${String(position)}"]`).getByRole('button');
+    const offsetBefore = await headerOffsetInList(list, position);
+
+    await header.dispatchEvent('click');
+    await expect(header).toHaveAttribute('aria-expanded', 'true');
+    await waitForRowMeasured(list, position);
+    streamServer.push(textDeltaTransientFrame('A mérés után'));
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+    expect(await headerOffsetInList(list, position)).toBe(offsetBefore);
+
+    await wheelToBottom(page, list);
+    await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+    await expect(jumpButton(page)).toHaveCount(0);
+    await expectFollowingAfterArrivals(page, streamServer, list, rowCount + 1);
+  });
+
+  test(`a kattintás utáni, a mérés előtti feladatban érkező sor nem görget (${theme} téma)`, async ({ page }) => {
+    await captureEventSources(page);
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
+    const list = transcriptList(page);
+    streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+    const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+    await expectLastRowFullyVisibleAtBottom(list, rowCount);
+    const position = rowCount - 1;
+    const offsetBefore = await headerOffsetInList(list, position);
+
+    // A kattintás egy szkript futásban, az érkezés a következő ÜZENET
+    // feladatban (`MessageChannel`): a kattintás renderje és annak effektjei
+    // után, de a mérés (a következő képkocka `ResizeObserver` jelentése)
+    // előtt. Nem időzítő: a feladat sorrend adja a helyét.
+    await list.evaluate(
+      (element, { rowPosition, data }) => {
+        const header = element.querySelector(
+          `[role="listitem"][aria-posinset="${CSS.escape(String(rowPosition))}"] [aria-expanded]`,
+        );
+        if (!(header instanceof HTMLElement)) {
+          throw new TypeError('a fejléc nem található');
+        }
+        header.click();
+        const channel = new MessageChannel();
+        let hops = 0;
+        channel.port1.addEventListener('message', () => {
+          hops += 1;
+          if (hops < 8) {
+            channel.port2.postMessage(undefined);
+            return;
+          }
+          globalThis.e2eDeliverFrameWithNextClick?.('run_event_transient', data);
+          globalThis.document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+        channel.port1.start();
+        channel.port2.postMessage(undefined);
+      },
+      { rowPosition: position, data: JSON.stringify(textDeltaTransientFrame('A mérés előtt')) },
+    );
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+    await waitForRowMeasured(list, position);
+    streamServer.push(textDeltaTransientFrame('A mérés után'));
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (2 új esemény)' })).toBeVisible();
+    expect(await headerOffsetInList(list, position)).toBe(offsetBefore);
+  });
+}
+
+// ============================================================
+// AZ UTOLSÓ SOR KINYITÁSA IS MEGÁLLÍTJA A KÖVETÉST (user döntés 2026-09-25).
+//
+// Egy sor kinyitása a követést addig szünetelteti, amíg a felhasználó vissza
+// nem ér az aljára vagy meg nem nyomja az "ugrás az aljára" gombot. A kinyitott
+// UTOLSÓ sor a kinyitás után is látszik, tehát a mérés utáni jelentés szerint
+// a lista "az alján áll": a mérés ezért nem kapcsolja vissza a követést, és a
+// következő sor nem viszi el a kinyitott sort (a `bffd75d`-től a `da9fa70`-ig
+// a törzs plusz az új sor magasságával vitte feljebb, research 17. és 18.
+// szekció). Mind a négy kinyitási úton, két időzítésben: az új sor a mérés
+// UTÁN, a lezárását is megvárva érkezik, illetve PONTOSAN a mérés commitjában,
+// a passzív effektjei előtt (a React DevTools csatlakozási pontján,
+// `installMeasuredCommitDelivery`; időzítő nincs, a commit sorrend adja a
+// helyét).
+// ============================================================
+
+type ExpandPath = 'mouse' | 'space' | 'enter' | 'click';
+
+const EXPAND_PATHS: readonly { readonly path: ExpandPath; readonly label: string }[] = [
+  { path: 'mouse', label: 'egérrel' },
+  { path: 'space', label: 'Space-szel' },
+  { path: 'enter', label: 'Enterrel' },
+  { path: 'click', label: 'csak click eseménnyel' },
+];
+
+async function expandWith(page: Page, header: Locator, path: ExpandPath): Promise<void> {
+  switch (path) {
+    case 'mouse': {
+      const center = await header.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      });
+      await page.mouse.click(center.x, center.y);
+      return;
+    }
+    case 'space': {
+      await header.focus();
+      await page.keyboard.press('Space');
+      return;
+    }
+    case 'enter': {
+      await header.focus();
+      await page.keyboard.press('Enter');
+      return;
+    }
+    case 'click': {
+      // A Playwright doksi szerint ez az `element.click()` megfelelője.
+      await header.dispatchEvent('click');
+      return;
+    }
+  }
+}
+
+/**
+ * A lista az alján áll, és az utolsó sor a kinyitás célja.
+ */
+async function openLastRowTarget(
+  page: Page,
+  theme: 'light' | 'dark',
+): Promise<{
+  readonly streamServer: OpenStreamServer;
+  readonly list: Locator;
+  readonly rowCount: number;
+  readonly header: Locator;
+}> {
+  const streamServer = await openFollowingTranscript(page, theme, serverHolder);
+  const list = transcriptList(page);
+  streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+  const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+  await expectLastRowFullyVisibleAtBottom(list, rowCount);
+  const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
+  return { streamServer, list, rowCount, header };
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const { path, label } of EXPAND_PATHS) {
+    test(`követés közben ${label} kinyitott UTOLSÓ sor a mérése után érkező sorra is a helyén marad, és megjelenik az ugrás gomb (${theme} téma)`, async ({
+      page,
+    }) => {
+      const { streamServer, list, rowCount, header } = await openLastRowTarget(page, theme);
+      const offsetBefore = await headerOffsetInList(list, rowCount);
+
+      await expandWith(page, header, path);
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+      streamServer.push(textDeltaTransientFrame('A mérés után'));
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+      expect(offsetBefore).toStrictEqual(expect.any(Number));
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+    });
+
+    test(`követés közben ${label} kinyitott UTOLSÓ sor törzsének végiggörgetése nem visszatérés az aljára: a következő sor nem viszi el (${theme} téma)`, async ({
+      page,
+    }) => {
+      const { streamServer, list, rowCount, header } = await openLastRowTarget(page, theme);
+      await expandWith(page, header, path);
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+
+      // A felhasználó a kinyitott törzset olvassa: a lista aljáig görget, a
+      // látható tartomány eleje elmozdul, és az utolsó sor végig látszik.
+      await wheelToBottom(page, list);
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      const offsetBefore = await headerOffsetInList(list, rowCount);
+      streamServer.push(textDeltaTransientFrame('A törzs végiggörgetése után'));
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+      expect(offsetBefore).toStrictEqual(expect.any(Number));
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+    });
+
+    test(`követés közben ${label} kinyitott UTOLSÓ sor a mérés commitjában érkező sorra is a helyén marad, és megjelenik az ugrás gomb (${theme} téma)`, async ({
+      page,
+    }) => {
+      await captureEventSources(page);
+      await installMeasuredCommitDelivery(page);
+      const { streamServer, list, rowCount, header } = await openLastRowTarget(page, theme);
+      const offsetBefore = await headerOffsetInList(list, rowCount);
+
+      await deliverFrameOnMeasuredCommit(page, rowCount, textDeltaTransientFrame('A mérés commitjában'));
+      await expandWith(page, header, path);
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+      expect(offsetBefore).toStrictEqual(expect.any(Number));
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+      streamServer.push(textDeltaTransientFrame('A mérés commitja után'));
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (2 új esemény)' })).toBeVisible();
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+    });
+  }
+}
+
+// A BECSUKÁS változatlan: a szünete a mérésig tart, utána a predikátum dönt.
+// A hook a kattintás előtti `aria-expanded` értékből tudja, kinyitás vagy
+// becsukás történik; a lista figyelője a React saját kezelője előtt fut.
+for (const theme of ['light', 'dark'] as const) {
+  test(`követés közben az alján becsukott sor után a követés folytatódik (${theme} téma)`, async ({ page }) => {
+    const { streamServer, list, rowCount, header } = await openLastRowTarget(page, theme);
+    await header.dispatchEvent('click');
+    await waitForRowMeasured(list, rowCount);
+    streamServer.push(textDeltaTransientFrame('A kinyitás után'));
+    await page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' }).click();
+    await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+
+    await header.dispatchEvent('click');
+    await expect(header).toHaveAttribute('aria-expanded', 'false');
+    await waitForRowMeasured(list, rowCount);
+    await expectFollowingAfterArrivals(page, streamServer, list, rowCount + 1);
+  });
+
+  test(`felgörgetve a kinyitott sor becsukása után a követés kikapcsolva marad (${theme} téma)`, async ({ page }) => {
+    const streamServer = await openFollowingTranscript(page, theme, serverHolder);
+    const list = transcriptList(page);
+    await wheelToTop(page, list);
+    const firstRow = list.locator('[role="listitem"][aria-posinset="1"]');
+    await expect(firstRow).toBeInViewport({ ratio: 1 });
+    streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+
+    // A becsukás a kinyitás párja: a szünet a predikátum szerint zárul, és
+    // az utolsó sor nem látszik.
+    const header = list.locator('[role="listitem"][aria-posinset="2"]').getByRole('button');
+    await header.dispatchEvent('click');
+    await waitForRowMeasured(list, 2);
+    await header.dispatchEvent('click');
+    await expect(header).toHaveAttribute('aria-expanded', 'false');
+    await waitForRowMeasured(list, 2);
+    streamServer.push(textDeltaTransientFrame('A becsukás után'));
+    await expect(page.getByRole('button', { name: 'Ugrás az aljára (2 új esemény)' })).toBeVisible();
+    await expect(firstRow).toBeInViewport({ ratio: 1 });
+  });
+}
+
+const TRANSCRIPT_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1440x900', layout: WIDE_LAYOUT },
+  { name: '375x812', layout: TABBED_LAYOUT },
+];
+
+// ============================================================
+// AZ UGRÁS GOMB A LISTA TETEJÉN LEBEG, A MEGJELENÉSE SEMMIT NEM MOZDÍT, ÉS
+// ALUL SEMMIT NEM TAKAR (user döntések 2026-09-25: a gomb ne tolja le a
+// listát, és "Felül, belső margóval").
+//
+// A gomb a lista felső belső margójában lebeg (`transcript-panel.css`,
+// `transcript-panel__jump`, `transcript-panel__list`), a margó a görgetett
+// tartalom része, tehát a lista a teljes magasságot kapja. Három korábbi alak
+// bukik itt: az `1c7dd13` előtti, ahol a sáv a gombbal együtt jelent meg, és a
+// listát 36 pixellel lejjebb tolta; az `1c7dd13` óta állandóan fenntartott,
+// üres sáv a lista fölött; és az `1bcface` óta a lista ALJÁN lebegő gomb, ami
+// a lista alján kinyitott utolsó sor fejlécét takarta (research 19-21.
+// szekció). A fejléc helye itt az ABLAKBAN mért, nem a listához képest.
+// ============================================================
+
+/**
+ * A lista teteje mínusz a fölötte álló delta mondat alja, mínusz a panel
+ * sortávolsága: nulla, ha a mondat és a lista között nincs üres sáv.
+ */
+async function bandAboveList(page: Page, list: Locator): Promise<number> {
+  const note = page.getByText('Ennél a futásnál a streamelt részleges szöveg csak élőben látszik');
+  const noteBottom = await note.evaluate((element) => element.getBoundingClientRect().bottom);
+  return list.evaluate((element, bottom) => {
+    // A panel sortávolsága a CSS Typed OM számértékeként (pixelben), a
+    // szöveges `rowGap` érték feldolgozása nélkül.
+    const gap = element.closest('.transcript-panel')?.computedStyleMap().get('row-gap');
+    return element.getBoundingClientRect().top - bottom - (gap instanceof CSSUnitValue ? gap.value : NaN);
+  }, noteBottom);
+}
+
+/**
+ * A gomb doboza a lista felső belső margóján belül áll: a lista tetején lebeg,
+ * és a lista legtetejére görgetve alatta a margó van, nem sor. Hamis, ha a
+ * gomb a lista alján áll (`1bcface`), vagy ha a listának nincs felső belső
+ * margója.
+ */
+async function isJumpInTopBand(list: Locator, jump: Locator): Promise<boolean> {
+  const box = await jump.boundingBox();
+  if (box === null) {
+    return false;
+  }
+  return list.evaluate((element, button) => {
+    const listBox = element.getBoundingClientRect();
+    const visibleTop = listBox.top + element.clientTop;
+    const paddingTop = element.computedStyleMap().get('padding-top');
+    const band = paddingTop instanceof CSSUnitValue ? paddingTop.value : NaN;
+    return (
+      button.y >= visibleTop &&
+      button.y + button.height <= visibleTop + band &&
+      button.x >= listBox.left &&
+      button.x + button.width <= listBox.right
+    );
+  }, box);
+}
+
+/**
+ * A két doboz függőleges átfedése pixelben (0: egymás fölött vagy alatt
+ * állnak, egyetlen közös képpontsoruk sincs).
+ */
+async function verticalOverlap(first: Locator, second: Locator): Promise<number> {
+  const [a, b] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  if (a === null || b === null) {
+    return NaN;
+  }
+  return Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+}
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`az ugrás gomb a lista tetején lebeg, a megjelenése a lista tartalmát nem mozdítja, és a lista alján kinyitott utolsó sor fejlécét nem takarja; üres sáv nincs (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      expect(await bandAboveList(page, list)).toBe(0);
+      const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
+      await header.dispatchEvent('click');
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+      await expect(header).toBeInViewport({ ratio: 1 });
+      const listTopBefore = await list.evaluate((element) => element.getBoundingClientRect().top);
+      const headerTopBefore = await headerTopInViewport(list, rowCount);
+      expect(headerTopBefore).toStrictEqual(expect.any(Number));
+
+      streamServer.push(textDeltaTransientFrame('A gomb megjelenése'));
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' });
+      await expect(jump).toBeVisible();
+      expect(await list.evaluate((element) => element.getBoundingClientRect().top)).toBe(listTopBefore);
+      expect(await headerTopInViewport(list, rowCount)).toBe(headerTopBefore);
+      await expect(jump).toBeInViewport({ ratio: 1 });
+      expect(await isJumpInTopBand(list, jump)).toBe(true);
+      // A `toBeInViewport` a takarást nem nézi (research 20. szekció (E)): a
+      // fejléc és a gomb dobozának átfedése dönt.
+      await expect(header).toBeInViewport({ ratio: 1 });
+      expect(await verticalOverlap(header, jump)).toBe(0);
+      const coveredRows = await rowsUnderJumpButton(list, jump);
+      expect(coveredRows.map((row) => row.position)).not.toContain(rowCount);
+      expect(await bandAboveList(page, list)).toBe(0);
+
+      await jump.click();
+      await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+      await expect(jumpButton(page)).toHaveCount(0);
+    });
+  }
+}
+
+// ============================================================
+// A LISTA LEGTETEJÉN A GOMB ALATT A MARGÓ ÁLL, NEM SOR; A GOMB ALATTI SOR
+// GÖRGETÉSSEL ELÉRHETŐ, A GOMB PEDIG A BILLENTYŰZETTEL IS (user döntés
+// 2026-09-25, SPEC-008 7.4).
+//
+// A lista tetejére görgetve egy új sor után a gomb megjelenik, és egyetlen
+// sort sem takar: az első sor teljes egészében látszik, a teteje és a gomb
+// alja között ugyanannyi margó áll, mint a gomb fölött. A `toBeInViewport` a
+// Playwright doksi szerint az intersection observer API-val dönt, ami a más
+// tartalom általi takarást nem nézi (research 20. szekció), ezért a takarás a
+// sor és a gomb dobozából számolt (`rowsUnderJumpButton`). A görgetési
+// tartomány felénél a gomb alatti sor egérkerékkel a gomb alá görgethető, és
+// utána teljes egészében látszik. Látható állapotban a gomb fókuszálható, a
+// Tab sorrendben a lista sorai előtt áll, és `Enter`-rel működik; rejtett
+// állapotban nincs a hozzáférhetőségi fában.
+// ============================================================
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`a lista legtetején a lebegő ugrás gomb alatt a margó áll, az első sor teljesen látszik; a gomb alatti sor görgetéssel elérhető, és a gomb fókuszálható, a Tab sorrendben a sorok előtt áll (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout);
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      await wheelToTop(page, list);
+      const firstRow = list.locator('[role="listitem"][aria-posinset="1"]');
+      await expect(firstRow).toBeInViewport({ ratio: 1 });
+      await expect(jumpButton(page)).toHaveCount(0);
+
+      streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' });
+      await expect(jump).toBeVisible();
+      expect(await list.evaluate((element) => element.scrollTop)).toBe(0);
+      await expect(firstRow).toBeInViewport({ ratio: 1 });
+      expect(await rowsUnderJumpButton(list, jump)).toEqual([]);
+      // A gomb alatt a margó: az első sor teteje ugyanannyival áll a gomb
+      // alja alatt, mint a gomb teteje a lista teteje alatt.
+      const box = await jump.boundingBox();
+      if (box === null) {
+        throw new Error('a gombnak nincs doboza');
+      }
+      const gaps = await list.evaluate((element, button) => {
+        const row = element.querySelector('[role="listitem"][aria-posinset="1"]');
+        return {
+          above: button.y - (element.getBoundingClientRect().top + element.clientTop),
+          below: (row?.getBoundingClientRect().top ?? NaN) - (button.y + button.height),
+        };
+      }, box);
+      expect(gaps.below).toBeGreaterThan(0);
+      expect(gaps.below).toBe(gaps.above);
+
+      // A billentyűzet a lista legtetején: a gomb fókuszálható, a Tab a lista
+      // egy sorára visz, a Shift+Tab vissza a gombra. A lista közepén ez nem
+      // determinisztikus: a Tab az első KIRAJZOLT sorra visz, ami a
+      // túlrajzolási sáv miatt a látható rész fölött állhat, a fókusz oda
+      // görget, és a görgetés után elé újabb sorok rajzolódhatnak ki, tehát a
+      // Shift+Tab egy sorra is léphet. A gomb a DOM-ban ettől még a sorok
+      // előtt áll.
+      await jump.focus();
+      await expect(jump).toBeFocused();
+      await page.keyboard.press('Tab');
+      expect(await list.evaluate((element) => element.contains(globalThis.document.activeElement))).toBe(true);
+      await page.keyboard.press('Shift+Tab');
+      await expect(jump).toBeFocused();
+
+      // A görgetési tartomány felénél a gomb egy sort takar, és az
+      // egérkerékkel a gomb alá görgethető.
+      await list.evaluate((element) => {
+        element.scrollTo({ top: Math.round((element.scrollHeight - element.clientHeight) / 2) });
+      });
+      await expect
+        .poll(async () => {
+          const rows = await rowsUnderJumpButton(list, jump);
+          return rows.length;
+        })
+        .toBeGreaterThan(0);
+      const [covered] = await rowsUnderJumpButton(list, jump);
+      if (covered === undefined) {
+        throw new Error('a lebegő gomb egyetlen sort sem takar');
+      }
+      expect(covered.isReachableByScrolling).toBe(true);
+      await list.hover();
+      await page.mouse.wheel(0, Math.floor(covered.shiftBelow));
+      await expect
+        .poll(async () => {
+          const rows = await rowsUnderJumpButton(list, jump);
+          return rows.map((row) => row.position);
+        })
+        .not.toContain(covered.position);
+      await expect(list.locator(`[role="listitem"][aria-posinset="${String(covered.position)}"]`)).toBeInViewport({
+        ratio: 1,
+      });
+      await expect(jump).toBeVisible();
+
+      await jump.focus();
+      await page.keyboard.press('Enter');
+      await expectLastRowFullyVisibleAtBottom(list, rowCount + 1);
+      await expect(jumpButton(page)).toHaveCount(0);
+    });
+  }
+}
+
+// ============================================================
+// NEM TELI LISTÁN IS ÁLL A KINYITÁS SZÜNETE (független ellenőrzés
+// 2026-09-25).
+//
+// Nem teli listán egy új sor után a `react-window` előbb még a régi látható
+// tartományt jelenti (a régi utolsó sorra vágva), majd az újat, amiben az új
+// sor már látszik. A hook a kettőt korábban "az alj elhagyása, majd visszatérés"
+// párnak vette, és a szünetet lezárta: gomb nem jelent meg, és amikor a lista
+// megtelt, minden új sor a kinyitott sort 53 pixellel feljebb vitte
+// (`is-pre-arrival-range-report.ts`, research 19. szekció). Az utolsó és egy
+// korábbi sor kinyitása után is minden új sorral nő a gomb száma, és a
+// kinyitott fejléc az ablakban a helyén marad, a lista megtelése után is.
+// ============================================================
+
+const SHORT_REPLAYED_ROW_COUNT = 3;
+
+/**
+ * Az egyenként érkező új sorok száma: mindkét elrendezésben elég ahhoz, hogy
+ * a kinyitott törzzsel együtt a lista megteljen (a független ellenőrzés
+ * szerint 1440 pixelen a 8., 375 pixelen a 4. új sornál).
+ */
+const SHORT_LIST_ARRIVALS = 12;
+
+for (const { name, layout } of TRANSCRIPT_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const target of [
+      { label: 'az utolsó', position: SHORT_REPLAYED_ROW_COUNT },
+      { label: 'egy korábbi', position: 1 },
+    ] as const) {
+      test(`nem teli listán ${target.label} sor kinyitása után minden új sorral nő az ugrás gomb száma, és a lista megtelése után sem viszi el a sort (${name}, ${theme} téma)`, async ({
+        page,
+      }) => {
+        const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, SHORT_REPLAYED_ROW_COUNT);
+        const list = transcriptList(page);
+        const header = list
+          .locator(`[role="listitem"][aria-posinset="${String(target.position)}"]`)
+          .getByRole('button');
+        await header.dispatchEvent('click');
+        await expect(header).toHaveAttribute('aria-expanded', 'true');
+        await waitForRowMeasured(list, target.position);
+        const headerTopBefore = await headerTopInViewport(list, target.position);
+        expect(headerTopBefore).toStrictEqual(expect.any(Number));
+
+        let rowCount = SHORT_REPLAYED_ROW_COUNT;
+        for (let arrived = 1; arrived <= SHORT_LIST_ARRIVALS; arrived += 1) {
+          streamServer.push(textDeltaTransientFrame(`Rövid lista ${String(arrived)}`));
+          rowCount += 1;
+          await expect(
+            page.getByRole('button', { name: `Ugrás az aljára (${String(arrived)} új esemény)` }),
+          ).toBeVisible();
+          expect(await headerTopInViewport(list, target.position)).toBe(headerTopBefore);
+        }
+        // A lista közben megtelt: az utolsó sor a lista látható alja alatt áll
+        // (vagy ki sem rajzolt, mert a túlrajzolási sávon is túl van).
+        expect((await lastRowBottomOverflow(list, rowCount)) ?? Infinity).toBeGreaterThan(0);
+      });
+    }
+  }
+}
+
+// ============================================================
+// NINCS BÖNGÉSZŐ GÖRGETÉS RÖGZÍTÉS A LISTÁN (user döntés 2026-09-24).
+//
+// Bekapcsolt scroll anchoring mellett, a gomb helyének fenntartása előtt,
+// folyamatos streamnél a véletlen fázisú kinyitások egy részében a lista a
+// hook nélkül, a böngésző saját igazításával elmozdult (saját mérésekben
+// mind -36 pixel, egy független ellenőrzésben egy -574 pixeles teljes
+// elrántás is; research 17-19. szekció). A teszt KIZÁRÓLAG A KONFIGURÁCIÓT
+// őrzi: a lista kiszámított `overflow-anchor`
+// értéke `none` (a CSS Scroll Anchoring spec szerint ekkor a görgető dobozban
+// nincs horgony, tehát nincs igazítás). A jelenség maga determinisztikusan
+// nem állítható elő: hat, időzítő nélküli érkezési móddal (a kattintás
+// feladatában, a mérés commitjában, a mérés után, érkezés nélkül, és a
+// kinyitás előtt követett sorral két fázisban) bekapcsolt rögzítéssel sem
+// mozdult a lista (mérő eszköz, `anchoring` jelenet). A korábbi, képkockánként
+// mérő rész ezért vak volt (a CSS nélkül is zöld), és kikerült.
+// ============================================================
+
+test('a listán nincs böngésző görgetés rögzítés: a kiszámított overflow-anchor értéke none', async ({ page }) => {
+  await openFollowingTranscript(page, 'light', serverHolder);
+  expect(await transcriptList(page).evaluate((element) => getComputedStyle(element).overflowAnchor)).toBe('none');
+});
+
+// ============================================================
+// GÖRGETÉS LÁTHATÓ JÓVÁHAGYÁS MELLETT (a független ellenőrzés hiánylistája,
+// 2026-09-25).
+//
+// A követés, a kinyitás szünete, az ugrás gomb és a kézi visszatérés minden
+// más teszten üres jóváhagyás listával fut, tehát a transcript egyedül áll.
+// Itt a transcript a látott jóváhagyás mellett áll: 1440x900-on (vízszintes
+// sáv, a lista 190 pixel, a gomb a lista tetején lebeg) és 900x1000-en (álló
+// tablet: a rajz összehúzódik, hogy a kérdés kiférjen, a lista szűk, a gomb a
+// lista mellett áll, SPEC-008 7.4 és 8. szekció 1. pont), két témában. Minden
+// lépés után a kérdés és a gombok is teljesen látszanak. Az élőben érkező
+// jóváhagyás a listát zsugorítja, és az utolsó sor alja közben a lista alján
+// marad; a jóváhagyás eltűnésekor a lista és az elválasztók visszaállnak.
+// ============================================================
+
+const APPROVAL_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1440x900', layout: WIDE_LAYOUT },
+  { name: '900x1000', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+];
+
+function stateWithApproval(): RunViewMockState {
+  return { runStatus: 'running', stepRuns: [stepRun('running')], approvals: [LIVE_APPROVAL] };
+}
+
+/**
+ * A látott jóváhagyás kérdése (a cím és a szöveg) és a két gomb teljes
+ * egészében látszik.
+ */
+async function expectQuestionVisible(page: Page): Promise<void> {
+  const body = page.locator('.run-view-screen__transcript .approval-prompt-body');
+  await expect(body.getByRole('heading', { name: LIVE_APPROVAL.title })).toBeInViewport({ ratio: 1 });
+  await expect(body.getByText(LIVE_APPROVAL.body, { exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Jóváhagyás', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Elutasítás', exact: true })).toBeInViewport({ ratio: 1 });
+}
+
+/**
+ * Kézi görgetés a lista tetejére, és várakozás, amíg a lista az első sort
+ * kirajzolja (a görgetés feldolgozva, a lista nem követ). Részleges
+ * láthatóság elég: szűk listán a felső belső margó alatt az első sornak csak
+ * egy része fér el.
+ */
+async function scrollListToTop(page: Page, list: Locator): Promise<void> {
+  await wheelToTop(page, list);
+  await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport();
+}
+
+async function listHeight(list: Locator): Promise<number> {
+  return list.evaluate((element) => element.getBoundingClientRect().height);
+}
+
+/**
+ * A futás nézet két `Resizable` csoportjának összes panelje, a kiírt
+ * `flex-basis` értékkel (a csoportok belső állapota, kerekítés nélkül).
+ */
+async function panelBases(page: Page): Promise<readonly string[]> {
+  return page
+    .locator('.run-view-screen .resizable-panel')
+    .evaluateAll((panels) => panels.map((panel) => (panel instanceof HTMLElement ? panel.style.flexBasis : '')));
+}
+
+for (const { name, layout } of APPROVAL_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`látható jóváhagyás mellett a lista követ: minden új sor után az utolsó sor és a kérdés is teljesen látszik, és az elválasztók nem mozdulnak (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      await expectQuestionVisible(page);
+      // A felfedés a képernyő minden renderelésekor, tehát minden érkező
+      // keretre újra számol (`Resizable` `reveal`, 2026-09-26): egy
+      // változatlan elrendezésre ugyanazt a tervet kell adnia, különben az
+      // elválasztók keretről keretre elcsúsznának.
+      const basesBefore = await panelBases(page);
+      await expectFollowingAfterArrivals(page, streamServer, transcriptList(page), REPLAYED_ROW_COUNT);
+      await expectQuestionVisible(page);
+      expect(await panelBases(page)).toEqual(basesBefore);
+    });
+
+    test(`látható jóváhagyás mellett a kinyitott utolsó sor a helyén marad, az új sor a gomb számába kerül (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      const list = transcriptList(page);
+      streamServer.pushBatch(transientFrames(TRANSIENT_BEFORE_EXPAND));
+      const rowCount = REPLAYED_ROW_COUNT + TRANSIENT_BEFORE_EXPAND;
+      await expectLastRowFullyVisibleAtBottom(list, rowCount);
+      const header = list.locator(`[role="listitem"][aria-posinset="${String(rowCount)}"]`).getByRole('button');
+      const offsetBefore = await headerOffsetInList(list, rowCount);
+      await header.dispatchEvent('click');
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+      await waitForRowMeasured(list, rowCount);
+      streamServer.push(textDeltaTransientFrame('Kinyitás után'));
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeInViewport({ ratio: 1 });
+      expect(await headerOffsetInList(list, rowCount)).toBe(offsetBefore);
+      await expectQuestionVisible(page);
+    });
+
+    test(`látható jóváhagyás mellett az ugrás gomb az aljára visz, és a kézi görgetés az aljára visszakapcsolja a követést (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const streamServer = await openFollowingTranscript(
+        page,
+        theme,
+        serverHolder,
+        layout,
+        REPLAYED_ROW_COUNT,
+        stateWithApproval(),
+      );
+      const list = transcriptList(page);
+      await scrollListToTop(page, list);
+      streamServer.pushBatch(transientFrames(5));
+      let count = REPLAYED_ROW_COUNT + 5;
+      const jump = page.getByRole('button', { name: 'Ugrás az aljára (5 új esemény)' });
+      await expect(jump).toBeInViewport({ ratio: 1 });
+      await jump.click();
+      await expectLastRowFullyVisibleAtBottom(list, count);
+      await expect(jumpButton(page)).toHaveCount(0);
+
+      await scrollListToTop(page, list);
+      streamServer.push(textDeltaTransientFrame('Felgörgetve'));
+      count += 1;
+      await expect(page.getByRole('button', { name: 'Ugrás az aljára (1 új esemény)' })).toBeVisible();
+      await wheelToBottom(page, list);
+      await expectLastRowFullyVisibleAtBottom(list, count);
+      await expect(jumpButton(page)).toHaveCount(0);
+      await expectFollowingAfterArrivals(page, streamServer, list, count);
+      await expectQuestionVisible(page);
+    });
+
+    test(`élőben érkező jóváhagyásnál a lista zsugorodik, az utolsó sor alja a lista alján marad, és a jóváhagyás eltűnésekor a lista és az elválasztó visszaáll (${name}, ${theme} téma)`, async ({
+      page,
+    }) => {
+      const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+      const streamServer = await openFollowingTranscript(page, theme, serverHolder, layout, REPLAYED_ROW_COUNT, state);
+      const list = transcriptList(page);
+      const heightBefore = await listHeight(list);
+      const outerSeparator = page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+      await expect(outerSeparator).toHaveAttribute('aria-valuenow', '70');
+
+      state.approvals = [LIVE_APPROVAL];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'approval_requested', 'live'));
+      await expectQuestionVisible(page);
+      await expect.poll(async () => listHeight(list)).toBeLessThan(heightBefore);
+      await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 1);
+
+      state.approvals = [];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 2, 'approval_decided', 'live'));
+      await expect(page.getByRole('heading', { name: LIVE_APPROVAL.title })).toHaveCount(0);
+      await expect.poll(async () => listHeight(list)).toBe(heightBefore);
+      await expect(outerSeparator).toHaveAttribute('aria-valuenow', '70');
+      await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 2);
+    });
+  }
+}
+
+// ============================================================
+// SZŰK LISTÁN AZ UGRÁS GOMB NEM LEBEG (user döntés 2026-09-25, SPEC-008 7.4,
+// a 14.1 O-15 lezárása).
+//
+// 900x1000-en (álló tablet) a látott jóváhagyás mellett a lista látható
+// magassága kisebb, mint a felső belső margó plusz egy sor: a lebegő gomb a
+// látható sort takarná (a mai kódon a jóváhagyás nélkül is szűk, 53 pixeles
+// listán). Itt a gomb a lista mellett, a folyásban áll: teljesen látszik,
+// egyetlen sort sem takar, a lista magassága és helye a megjelenésekor nem
+// változik, és a gomb az aljára visz. Normál méretű listán (1440x900) a gomb
+// változatlanul a lista tetején lebeg. (1440x600-on a lista szintén szűk, de
+// ott a transcript panel a tartalma minimumánál kisebb, és a transcript
+// burkolója görget, research 12. szekció; a gomb alakja ugyanez.)
+// ============================================================
+
+const COMPACT_LIST_LAYOUT: TranscriptLayout = { viewport: { width: 900, height: 1000 }, isTabbed: false };
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`szűk listán (900x1000, látott jóváhagyás) az ugrás gomb nem lebeg: a lista mellett áll, sort nem takar, a lista nem mozdul, és az aljára visz (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(
+      page,
+      theme,
+      serverHolder,
+      COMPACT_LIST_LAYOUT,
+      REPLAYED_ROW_COUNT,
+      stateWithApproval(),
+    );
+    await expectQuestionVisible(page);
+    const list = transcriptList(page);
+    await scrollListToTop(page, list);
+    const boxBefore = await list.boundingBox();
+    streamServer.pushBatch(transientFrames(3));
+    const jump = page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' });
+    await expect(jump).toBeInViewport({ ratio: 1 });
+    expect(await jump.evaluate((element) => globalThis.getComputedStyle(element).position)).toBe('static');
+    expect(await rowsUnderJumpButton(list, jump)).toEqual([]);
+    const boxAfter = await list.boundingBox();
+    expect([boxAfter?.y, boxAfter?.height]).toEqual([boxBefore?.y, boxBefore?.height]);
+
+    await jump.click();
+    await expectLastRowFullyVisibleAtBottom(list, REPLAYED_ROW_COUNT + 3);
+    await expect(jumpButton(page)).toHaveCount(0);
+  });
+
+  test(`normál méretű listán (1440x900, látott jóváhagyás) az ugrás gomb változatlanul a lista tetején lebeg (${theme} téma)`, async ({
+    page,
+  }) => {
+    const streamServer = await openFollowingTranscript(
+      page,
+      theme,
+      serverHolder,
+      WIDE_LAYOUT,
+      REPLAYED_ROW_COUNT,
+      stateWithApproval(),
+    );
+    const list = transcriptList(page);
+    await scrollListToTop(page, list);
+    streamServer.pushBatch(transientFrames(3));
+    const jump = page.getByRole('button', { name: 'Ugrás az aljára (3 új esemény)' });
+    await expect(jump).toBeInViewport({ ratio: 1 });
+    expect(await jump.evaluate((element) => globalThis.getComputedStyle(element).position)).toBe('absolute');
+    expect(await isJumpInTopBand(list, jump)).toBe(true);
+  });
+}
+
+// ============================================================
+// CSAK A BELSŐ ARÁNY SAJÁT: IDEIGLENESEN ENGED (user döntés 2026-09-26,
+// "Ideiglenesen engedjen", SPEC-008 8. szekció 1. pont).
+//
+// A felhasználó a transcript és a jóváhagyás közti belső arányt állította
+// (`[70, 30]`), a gráf és a transcript közti külsőt nem. Függő jóváhagyásnál
+// előbb a rajz ad helyet, és ha az nem elég, a belső arány is ideiglenesen
+// enged, amíg a kérdés kifér; a belső elválasztó közben is látható és
+// egérrel elérhető, a tárolt arány nem íródik felül, és a jóváhagyás
+// eltűnésekor visszaáll. A jóváhagyás eltűnése élő keret (`approval_decided`)
+// a nyitott kapcsolaton, ezért áll ebben a fájlban. A `b0708b2` kódján
+// 1000x700-on és 1023x768-on a kérdésből semmi nem látszott, és a belső
+// elválasztó a fölé lógó panel alatt nem volt elérhető (research 15. szekció).
+// ============================================================
+
+/**
+ * Az álló tablet alacsony ablaka: itt a rajz egymaga nem ad elég helyet, a
+ * belső arány is enged (research 15. szekció).
+ */
+const LOW_TABLET_LAYOUT: TranscriptLayout = { viewport: { width: 1000, height: 700 }, isTabbed: false };
+
+const INNER_OWN_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1000x700', layout: LOW_TABLET_LAYOUT },
+  { name: '1023x768', layout: { viewport: { width: 1023, height: 768 }, isTabbed: false } },
+  { name: '768x1024', layout: { viewport: { width: 768, height: 1024 }, isTabbed: false } },
+  { name: '900x1000', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+];
+
+const INNER_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalUserLayout';
+const OUTER_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
+const INNER_OWN_SIZES = '[70,30]';
+
+function innerSeparator(page: Page): Locator {
+  return page.getByRole('separator', { name: 'A transcript és a jóváhagyás aránya' });
+}
+
+function outerSeparator(page: Page): Locator {
+  return page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+}
+
+/**
+ * Az elválasztó egérrel elérhető: a középpontjában a legfelső elem maga az
+ * elválasztó (vagy a leszármazottja), nem egy fölé lógó panel.
+ */
+async function isReachableAtCenter(locator: Locator): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return element.contains(
+      globalThis.document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+    );
+  });
+}
+
+async function readLayoutStorage(page: Page): Promise<readonly (string | undefined)[]> {
+  return page.evaluate(
+    (keys: readonly string[]) => keys.map((key) => globalThis.localStorage.getItem(key) ?? undefined),
+    [OUTER_LAYOUT_STORAGE_KEY, INNER_LAYOUT_STORAGE_KEY],
+  );
+}
+
+/**
+ * A futás nézet megnyitása a saját belső aránnyal és a pótlással. Nem vár a
+ * lista aljára: a belső transcript panel itt a minimumáig szűkülhet, és a
+ * burkolója görget.
+ */
+async function openWithOwnInnerLayout(
+  page: Page,
+  theme: 'light' | 'dark',
+  layout: TranscriptLayout,
+  state: RunViewMockState,
+): Promise<OpenStreamServer> {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  await page.addInitScript(
+    ({ mode, key, sizes }) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+      globalThis.localStorage.setItem(key, sizes);
+    },
+    { mode: theme, key: INNER_LAYOUT_STORAGE_KEY, sizes: INNER_OWN_SIZES },
+  );
+  await mockRunView(page, state);
+  await page.setViewportSize(layout.viewport);
+  await page.goto('/run?runId=r-1');
+  streamServer.pushBatch([
+    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+  ]);
+  await expect(
+    transcriptList(page).locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT)}"]`),
+  ).toBeAttached();
+  return streamServer;
+}
+
+/**
+ * A kérdés (a "visszavonhatatlan" figyelmeztetés, a cím, a szöveg) és a két
+ * gomb teljesen látszik, a belső elválasztó látható és egérrel elérhető.
+ */
+async function expectQuestionAndInnerSeparator(page: Page): Promise<void> {
+  const body = page.locator('.run-view-screen__transcript .approval-prompt-body');
+  await expect(body.getByText('A döntés visszavonhatatlan', { exact: true })).toBeInViewport({ ratio: 1 });
+  await expectQuestionVisible(page);
+  await expect(innerSeparator(page)).toBeInViewport({ ratio: 1 });
+  await expect.poll(async () => isReachableAtCenter(innerSeparator(page))).toBe(true);
+}
+
+for (const { name, layout } of INNER_OWN_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`csak belső saját aránnyal (${name}): a kérdés és a gombok teljesen látszanak, a belső elválasztó látható és egérrel elérhető, előbb a rajz enged, a tárolt arány változatlan, és a jóváhagyás eltűnése után visszaáll (${theme} téma)`, async ({
+      page,
+    }) => {
+      const state = stateWithApproval();
+      const streamServer = await openWithOwnInnerLayout(page, theme, layout, state);
+      await expectQuestionAndInnerSeparator(page);
+
+      // A sorrend: ha a belső arány engedett, a rajz már a határán áll (a
+      // külső elválasztó a legkisebb helyén, W3C APG Window Splitter
+      // `aria-valuemin`).
+      const innerValue = Number(await innerSeparator(page).getAttribute('aria-valuenow'));
+      expect(innerValue).toBeLessThanOrEqual(70);
+      if (innerValue < 70) {
+        await expect(outerSeparator(page)).toHaveAttribute(
+          'aria-valuenow',
+          (await outerSeparator(page).getAttribute('aria-valuemin')) ?? '',
+        );
+      }
+      expect(await readLayoutStorage(page)).toEqual([undefined, INNER_OWN_SIZES]);
+
+      state.approvals = [];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'approval_decided', 'live'));
+      await expect(page.getByRole('heading', { name: LIVE_APPROVAL.title })).toHaveCount(0);
+      await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      // A két külső panel és az egyedül maradt transcript panel: a külső az
+      // alapállásán, a belső a tárolt saját arányán.
+      expect(await panelBases(page)).toEqual(['70%', '30%', '70%']);
+      expect(await readLayoutStorage(page)).toEqual([undefined, INNER_OWN_SIZES]);
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`csak belső saját aránnyal (1000x700): a külső elválasztó felfedés közbeni mozdítása után a belső a felfedés végéig tovább enged, egy újrarenderelés sem ugrasztja vissza (${theme} téma)`, async ({
+    page,
+  }) => {
+    const state = stateWithApproval();
+    const streamServer = await openWithOwnInnerLayout(page, theme, LOW_TABLET_LAYOUT, state);
+    await expectQuestionAndInnerSeparator(page);
+
+    // A külső arány ezzel a felhasználóé (tárolódik), tehát mindkét arány
+    // saját: a futás nézet a következő renderelésétől a belsőnek már nem
+    // engedné az igazítást. A futó felfedés ettől nem áll le.
+    const outer = outerSeparator(page);
+    const valueBefore = (await outer.getAttribute('aria-valuenow')) ?? '';
+    await outer.focus();
+    await outer.press('ArrowDown');
+    await expect(outer).not.toHaveAttribute('aria-valuenow', valueBefore);
+    await expectQuestionAndInnerSeparator(page);
+    const [storedOuter, storedInner] = await readLayoutStorage(page);
+    expect(storedOuter).toBeDefined();
+    expect(storedInner).toBe(INNER_OWN_SIZES);
+
+    // Egy élő sor újrarendereli a képernyőt (a transcript állapota).
+    streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'step_started', 'live'));
+    await expect(
+      transcriptList(page).locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT + 1)}"]`),
+    ).toBeAttached();
+    await expectQuestionAndInnerSeparator(page);
   });
 }
