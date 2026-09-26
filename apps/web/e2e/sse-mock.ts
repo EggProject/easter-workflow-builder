@@ -21,6 +21,34 @@ export async function mockSseFrames(page: Page, frames: readonly StreamFrame[]):
 }
 
 /**
+ * Mint a `mockSseFrames`, de csak az ELSŐ kapcsolatot szolgálja ki
+ * (2026-09-26). A lezárt válasz után a böngésző újracsatlakozik (HTML
+ * Standard 9.2.2: a törzs végén "reestablish the connection",
+ * <https://html.spec.whatwg.org/multipage/server-sent-events.html>), és a
+ * `mockSseFrames` ugyanazt a pótlást adná újra, aminek a `replay_complete`
+ * kerete a lépés futások és a jóváhagyások újratöltését, tehát a képernyő
+ * újrarenderelését váltja ki. Ez az újrarenderelés elfedi azt a hibát, amikor
+ * egy számítás a renderelésen kívüli jelre nem futna le (a külső elválasztó
+ * húzása és a `userResizeCount`, `docs/research/2026-09-24-jovahagyas-panel-helye.md`
+ * 15. szekció). A második és minden további kérés függőben marad: a kezelő
+ * egyiket sem hívja a `fulfill`, `continue`, `abort` közül, és a Playwright
+ * dokumentációja szerint "every request matching the url pattern will stall
+ * unless it's continued, fulfilled or aborted"
+ * (<https://playwright.dev/docs/api/class-page#page-route>). Időzítő nincs.
+ */
+export async function mockSseFramesWithoutReconnect(page: Page, frames: readonly StreamFrame[]): Promise<void> {
+  let isServed = false;
+  await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {
+    if (isServed) {
+      return;
+    }
+    isServed = true;
+    const body = frames.map((frame) => encodeStreamFrame(frame)).join('');
+    await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
+  });
+}
+
+/**
  * A legtöbb, SSE-t nem célzottan vizsgáló teszthez (workflow-list,
  * run-history alapfolyam): egyetlen `stream_ready` keret, üres feliratkozás
  * listával, hogy az `AppShell` mindig nyitott stream kapcsolata ne fusson

@@ -32,7 +32,7 @@ import {
 } from './approval-fixture.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { mockIdleStream } from './sse-mock.ts';
+import { mockIdleStream, mockSseFramesWithoutReconnect } from './sse-mock.ts';
 
 declare global {
   // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
@@ -411,13 +411,28 @@ for (const theme of ['light', 'dark'] as const) {
       }
       expect(await readLayoutState(page)).toEqual(initialLayout);
 
-      // Az arány megmarad újratöltés után.
+      // Az arány megmarad újratöltés után, a tárolóban. Mivel most csak a
+      // belső arány saját, a megjelenített arány a kérdés kedvéért
+      // ideiglenesen engedhet (user döntés 2026-09-26, "Ideiglenesen
+      // engedjen"): 1440x600-on és a fül sávban a kérdés a tárolt arányon nem
+      // fér ki, ott a transcript a tárolt aránya alatt áll; 1440x900-on
+      // kifér, ott pontosan a tárolt arányon.
       await page.reload();
       await expect(page.getByTestId('rf__node-n-first')).toBeAttached();
       if (isTabbed) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
-      await expect(separator).toHaveAttribute('aria-valuenow', final);
+      await (isQuestionTight || isTabbed
+        ? expect.poll(async () => Number(await separator.getAttribute('aria-valuenow'))).toBeLessThan(Number(final))
+        : expect(separator).toHaveAttribute('aria-valuenow', final));
+      await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+      const storedText = await page.evaluate(
+        (key: string) => globalThis.localStorage.getItem(key) ?? '',
+        APPROVAL_LAYOUT_STORAGE_KEY,
+      );
+      const storedValue: unknown = JSON.parse(storedText);
+      const storedTranscript: unknown = Array.isArray(storedValue) ? storedValue[0] : undefined;
+      expect(typeof storedTranscript === 'number' ? String(Math.round(storedTranscript)) : undefined).toBe(final);
     });
   }
 }
@@ -732,8 +747,8 @@ const GRAPH_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
 const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 /**
- * A kérdés szövege. Külön is elérhető, mert a SPEC-008 14.2 O-17 esetben ez
- * az egyetlen rész, ami levágódik.
+ * A kérdés szövege. Külön is elérhető, mert a SPEC-008 14.1 O-17 esetben
+ * (elfogadva) ez az egyetlen rész, ami levágódik.
  */
 function questionText(page: Page): Locator {
   return approvalText(page).getByText(FIRST_APPROVAL.body, { exact: true });
@@ -839,41 +854,15 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 // ------------------------------------------------------------
-// CSAK A BELSŐ ARÁNY SAJÁT (független ellenőrzés, 2026-09-26): a jóváhagyás
-// és a transcript közti elválasztón a felhasználó arányt állított, a gráf és
-// a transcript közti külsőn nem. A belső arány marad (user döntés
-// 2026-09-25); a külső csak akkor mozdul, ha a kérdés a saját belső arányon a
-// külső határán belül teljesen kifér, különben a rajz a helyén marad, mert a
-// mozdulás a kérdést nem hozná elő, csak a rajzot nyomná össze (SPEC-008 8.
+// CSAK A BELSŐ ARÁNY SAJÁT: a jóváhagyás és a transcript közti elválasztón a
+// felhasználó arányt állított, a gráf és a transcript közti külsőn nem. Ahol
+// a rajz egymaga elég helyet ad, a belső arány marad. Ahol nem, a belső is
+// ideiglenesen enged (user döntés 2026-09-26, "Ideiglenesen engedjen"): az a
+// `sse-real-server.spec.ts` "csak belső saját aránnyal" tesztjeiben áll, mert
+// a jóváhagyás eltűnése utáni visszaállás élő keretet kíván (SPEC-008 8.
 // szekció 1. pont).
 // ------------------------------------------------------------
 for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of [
-    { width: 1000, height: 700 },
-    { width: 1023, height: 768 },
-  ] as const) {
-    const size = `${String(viewport.width)}x${String(viewport.height)}`;
-    test(`${size}, csak belső saját aránnyal, amin a kérdés nem fér ki: egyik elválasztó sem mozdul, a rajz nem húzódik össze (${theme} téma)`, async ({
-      page,
-    }) => {
-      await page.setViewportSize(viewport);
-      await page.addInitScript(
-        ({ mode, innerKey }) => {
-          globalThis.localStorage.setItem('eggTheme', mode);
-          globalThis.localStorage.setItem(innerKey, JSON.stringify([70, 30]));
-        },
-        { mode: theme, innerKey: APPROVAL_LAYOUT_STORAGE_KEY },
-      );
-      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
-      await page.goto(APPROVAL_RUN_URL);
-
-      await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
-      await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
-      await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '70');
-      expect(await readStoredLayouts(page)).toEqual([undefined, '[70,30]']);
-    });
-  }
-
   test(`768x1024, csak belső saját aránnyal, amin a kérdés kifér: a külső annyit mozdul, hogy a kérdés és a gombok teljesen látsszanak, a belső arány marad (${theme} téma)`, async ({
     page,
   }) => {
@@ -928,7 +917,7 @@ for (const theme of ['light', 'dark'] as const) {
     { width: 1440, height: 600 },
   ] as const) {
     const size = `${String(viewport.width)}x${String(viewport.height)}`;
-    test(`${size}, a döntés hibaüzenete után a kérdés, a gombok és a hibaüzenet is teljesen látszanak, 1440x600-on a kérdés szövege kivételével (SPEC-008 O-17) (${theme} téma)`, async ({
+    test(`${size}, a döntés hibaüzenete után a kérdés, a gombok és a hibaüzenet is teljesen látszanak, 1440x600-on a kérdés szövege görgetve olvasható (SPEC-008 O-17, elfogadva) (${theme} téma)`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -956,22 +945,19 @@ for (const theme of ['light', 'dark'] as const) {
       const failure = decisionBar(page).getByRole('alert');
       await expect(failure).toBeVisible();
       await expect(failure).toBeInViewport({ ratio: 1 });
-      // NYITOTT PONT, SPEC-008 14.2 O-17: a hibaüzenet 2026-09-24 óta a design
-      // system `danger` `Alert` blokkja (user döntés), ami az akciósávot
-      // megnöveli; 1440x600-on a transcript pixeles minimuma mellett is kevés
-      // a hely, és a kérdés SZÖVEGÉNEK alja levágódik, a többi rész, a gombok
-      // és a hibaüzenet teljesen látszik (mérve, `docs/research/
-      // 2026-09-24-jovahagyas-panel-helye.md` 14. szekció). Ez az eset a
-      // döntésig kimondott, nem rejtett állapot: ha a konfliktus megszűnik, az
-      // utolsó ág bukik, és a tételt le kell zárni.
+      // SPEC-008 14.1 O-17, ELFOGADVA (user döntés 2026-09-26): a hibaüzenet a
+      // design system `danger` `Alert` blokkja, ami az akciósávot megnöveli;
+      // 1440x600-on a transcript pixeles minimuma mellett is kevés a hely, és
+      // a kérdés SZÖVEGÉNEK alja levágódik (mérve 14 pixel, `docs/research/
+      // 2026-09-24-jovahagyas-panel-helye.md` 14. szekció). A szöveg a
+      // görgethető törzsben görgetve olvasható; a többi rész, a gombok és a
+      // hibaüzenet teljesen látszik.
       for (const part of questionPartsWithoutText(page)) {
         await expect(part).toBeInViewport({ ratio: 1 });
       }
-      if (viewport.height === 600) {
-        await expect(questionText(page)).not.toBeInViewport({ ratio: 1 });
-      } else {
-        await expect(questionText(page)).toBeInViewport({ ratio: 1 });
-      }
+      await (viewport.height === 600
+        ? expectReadableByScrolling(page, questionText(page))
+        : expect(questionText(page)).toBeInViewport({ ratio: 1 }));
       expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
     });
   }
@@ -987,7 +973,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.addInitScript((mode) => {
         globalThis.localStorage.setItem('eggTheme', mode);
       }, theme);
-      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+      // A stream nem pótol újra (`mockSseFramesWithoutReconnect`): az
+      // újracsatlakozás újratöltése a képernyőt újrarenderelné, és elfedné, ha
+      // a felfedés a külső elválasztó jelére (`userResizeCount`) nem futna.
+      await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL], [], mockSseFramesWithoutReconnect);
       await page.goto(APPROVAL_RUN_URL);
       for (const part of questionParts(page)) {
         await expect(part).toBeInViewport({ ratio: 1 });
@@ -1018,7 +1007,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((mode) => {
       globalThis.localStorage.setItem('eggTheme', mode);
     }, theme);
-    await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL]);
+    // Újrapótlás nélkül, ugyanabból az okból, mint a billentyűs tesztben.
+    await mockApprovalRunWithTranscript(page, [FIRST_APPROVAL], [], mockSseFramesWithoutReconnect);
     await page.goto(APPROVAL_RUN_URL);
     for (const part of questionParts(page)) {
       await expect(part).toBeInViewport({ ratio: 1 });

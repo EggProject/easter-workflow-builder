@@ -31,7 +31,9 @@
 // lépések (research 12. szekció). 14. a döntés hibaüzenete (az akciósáv
 // megnő) és 15. a külső elválasztó húzása (a transcript oldal mérete és a
 // szöveg tördelése változik), mindkettő a változás előtt és után, a research
-// 13. szekciójához (2026-09-26).
+// 13. szekciójához (2026-09-26). A 12. jelenet 2026-09-26 óta a belső csoport
+// magasságát és a belső elválasztó egérrel elérhetőségét is méri, és a teljes
+// (külső és belső) saját arányt is (research 15. szekció).
 //
 // NEM E2E TESZT, és nem kapu: állítás nincs benne, csak számlálás. A
 // kiválasztók szándékosan a panel több alakját is felismerik (a görgethető
@@ -1145,16 +1147,24 @@ const LONG_APPROVAL: PendingApproval = {
  * előtti kódon (a régi kulcsot olvassa) és utána (az újat) is ugyanazt az
  * esetet méri.
  */
+const OUTER_OWN_STORAGE = [
+  ['eggRunViewLayout', 'eggRunViewUserLayout'],
+  [60, 40],
+] as const;
+const INNER_OWN_STORAGE = [
+  ['eggRunViewTranscriptApprovalLayout', 'eggRunViewTranscriptApprovalUserLayout'],
+  [70, 30],
+] as const;
+
+/**
+ * A `sajat-mindketto` eset 2026-09-26 óta áll (a teljes saját arány, a
+ * "Ideiglenesen engedjen" döntés hatókörén kívül, research 15. szekció).
+ */
 const QUESTION_STORAGE = {
-  nincs: undefined,
-  'sajat-kulso': [
-    ['eggRunViewLayout', 'eggRunViewUserLayout'],
-    [60, 40],
-  ],
-  'sajat-belso': [
-    ['eggRunViewTranscriptApprovalLayout', 'eggRunViewTranscriptApprovalUserLayout'],
-    [70, 30],
-  ],
+  nincs: [],
+  'sajat-kulso': [OUTER_OWN_STORAGE],
+  'sajat-belso': [INNER_OWN_STORAGE],
+  'sajat-mindketto': [OUTER_OWN_STORAGE, INNER_OWN_STORAGE],
 } as const;
 
 async function readQuestionGeometry(page: Page): Promise<Record<string, unknown>> {
@@ -1198,7 +1208,26 @@ async function readQuestionGeometry(page: Page): Promise<Record<string, unknown>
       body === undefined || text === undefined
         ? undefined
         : text.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop;
+    // A belső elválasztó egérrel elérhető-e (2026-09-26): a középpontjában
+    // álló legfelső elem maga az elválasztó (vagy a leszármazottja), nem egy
+    // fölé lógó panel.
+    const innerSeparator = [...document.querySelectorAll('[role="separator"]')].find(
+      (element) => element.getAttribute('aria-label') === 'A transcript és a jóváhagyás aránya',
+    );
+    const innerSeparatorRect = innerSeparator?.getBoundingClientRect();
+    const innerSeparatorHit =
+      innerSeparator === undefined || innerSeparatorRect === undefined
+        ? undefined
+        : innerSeparator.contains(
+            document.elementFromPoint(
+              innerSeparatorRect.left + innerSeparatorRect.width / 2,
+              innerSeparatorRect.top + innerSeparatorRect.height / 2,
+            ),
+          );
     return {
+      innerGroup: innerGroup?.getBoundingClientRect().height,
+      innerSeparator: visibleRatio(innerSeparator),
+      innerSeparatorHit,
       alert: visibleRatio(body?.querySelector(':scope .alert')),
       title: visibleRatio(side?.querySelector(':scope .approval-prompt-card__title')),
       text: visibleRatio(text),
@@ -1258,16 +1287,13 @@ for (const theme of THEMES) {
     for (const { storageName, stored, approvalName, approvals } of QUESTION_CASES) {
       const name = `kerdes ${theme} ${String(viewport.width)}x${String(viewport.height)} ${storageName} ${approvalName}`;
       test(name, async ({ page }) => {
-        if (stored !== undefined) {
-          await page.addInitScript(
-            ([keys, value]) => {
-              for (const key of keys) {
-                globalThis.localStorage.setItem(key, JSON.stringify(value));
-              }
-            },
-            [stored[0], stored[1]] as const,
-          );
-        }
+        await page.addInitScript((pairs) => {
+          for (const [keys, value] of pairs) {
+            for (const key of keys) {
+              globalThis.localStorage.setItem(key, JSON.stringify(value));
+            }
+          }
+        }, stored);
         await mockApprovalRunWithTranscript(page, approvals);
         await openRun(page, theme, viewport);
         if (viewport.width < TABBED_WIDTH_LIMIT) {

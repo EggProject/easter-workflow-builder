@@ -1732,3 +1732,33 @@ ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
 hozzáadott doksi komment miatt csúszott). A statements és a lines összes darabszáma hárommal
 csökkent (1689 -> 1686, 1629 -> 1626), a fedetlen darab egyik metrikán sem nőtt, és a százalék két
 tizedesre egyik metrikán sem változott, tehát a küszöb marad (`apps/web/package.json`).
+
+## 46. Az "Ideiglenesen engedjen" utáni ratchet (2026-09-26): a branches küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A user döntése (2026-09-26, "Ideiglenesen engedjen", SPEC-008 8. szekció 1. pont):
+ha csak a belső arány saját, a rajz és szükség esetén a belső arány is ideiglenesen enged. Az
+`apps/web` termékkódjában egy új logikai ág áll (`RunViewScreen.tsx`: a belső `adjustsForReveal`
+a belső VAGY a külső kulcs hiányára igaz). Új e2e: a `sse-real-server.spec.ts` tíz "csak belső
+saját aránnyal" tesztje; törölve: az `approval-prompt.spec.ts` két "nem fér ki, egyik sem mozdul"
+tesztje (négy futás). A mérés a `9daf62f` commit (a párhuzamos REST hiba
+munka, `rest-client`, `protocol-error-message`, új `rest-error-class.spec.ts`) és e változás
+együttesét méri, mert a futás idején a munkafában mindkettő állt; az e2e készlet **418** teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**418 teszt, mind zöld**; tíz `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (45.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1675 / 1690     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 777 / 788       | 98.60    | 98.59 -> **98.6**           | 11 -> 11                       |
+| functions  | 560 / 563       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1615 / 1630     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`), a
+`run-view` téma minden fájlja mind a négy metrikán 100 százalék. Az összes darabszám minden
+metrikán nőtt (1686 -> 1690, 784 -> 788, 562 -> 563, 1626 -> 1630), a fedetlen egyiken sem, tehát
+a branches küszöb a mért értékre emelkedik (az `nyc` két tizedesre lefelé kerekített értéke,
+777 / 788 = 98,604), a többi marad (`apps/web/package.json`).

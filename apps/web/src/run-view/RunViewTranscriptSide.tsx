@@ -26,8 +26,11 @@ export interface RunViewTranscriptSideProperties {
    */
   readonly approvalReveal: ResizableReveal | undefined;
   /**
-   * Mozdulhat-e az elválasztó a felfedés kedvéért: nincs saját arány (nincs
-   * tárolt felhasználói arány, `run-view-approval-layout.ts`).
+   * Mozdulhat-e az elválasztó a felfedés kedvéért: nincs saját belső arány
+   * (nincs tárolt felhasználói arány, `run-view-approval-layout.ts`), vagy a
+   * saját belső arány mellett a külső nem saját (user döntés 2026-09-26,
+   * "Ideiglenesen engedjen"). A mozdulás ideiglenes, a tárolt arányt nem írja
+   * felül.
    */
   readonly adjustsForReveal: boolean;
   /**
@@ -61,9 +64,12 @@ export interface RunViewTranscriptSideProperties {
  * törzsben teljesen látszik, a gombok alatta. Előbb a befoglaló, a gráf és a
  * transcript közti elválasztó ad helyet (a függőleges sávban, a rajz
  * rovására, ennek a csoportnak az arányát megtartva), a maradékot ez az
- * elválasztó, a transcript rovására; mindkettő csak saját arány nélkül
- * mozdul, és a mozdulás ideiglenes: nem tárolódik, és a jóváhagyás
- * eltűnésekor az előző arány áll vissza (SPEC-008 8. szekció 1. pont).
+ * elválasztó, a transcript rovására. A külső csak saját külső arány nélkül
+ * mozdul; ez az elválasztó saját arány nélkül, és 2026-09-26 óta akkor is, ha
+ * csak a belső arány saját (user döntés, "Ideiglenesen engedjen"); ha mindkét
+ * arány saját, egyik sem. A mozdulás ideiglenes: nem tárolódik, és a
+ * jóváhagyás eltűnésekor az előző (a tárolt saját) arány áll vissza (SPEC-008
+ * 8. szekció 1. pont).
  *
  * **A jóváhagyás rész csak látott jóváhagyás mellett áll ki.** Jóváhagyás
  * nélkül (a legtöbb futás) a transcript a teljes oldalt kapja; a régióban

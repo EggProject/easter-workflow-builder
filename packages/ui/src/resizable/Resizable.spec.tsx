@@ -706,6 +706,29 @@ describe('Resizable', () => {
       expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
     });
 
+    it('egy már igazodó felfedést az adjustsForReveal hamisra váltása nem állít meg: a felfedés végéig igazodik, a végén visszaáll, és a következő felfedés már az új értékkel indul (2026-09-26)', () => {
+      installGeometry();
+      act(() => {
+        root.render(innerGroup({ reveal: REVEAL, adjustsForReveal: true }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['30%', '70%']);
+      // A hívó a felfedés közben hamisra vált (a futás nézetben a külső
+      // elválasztó húzása után), és egy új leírással rövidebb szöveget ad: a
+      // csoport tovább igazodik, 130 / 200 = 65 százalék.
+      act(() => {
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' }, textRect: '0,20,100,110' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['35%', '65%']);
+      act(() => {
+        root.render(innerGroup({}));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      act(() => {
+        root.render(innerGroup({ reveal: { elementId: 'kerdes' } }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+    });
+
     interface NestedOptions extends InnerOptions {
       readonly outerDirection?: 'horizontal' | 'vertical';
       readonly outerAdjusts?: boolean;

@@ -528,7 +528,12 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                 />
               }
               approvalReveal={shownApproval === undefined ? undefined : { elementId: approvalTextId }}
-              adjustsForReveal={storedApprovalLayoutSizes === undefined}
+              // A belső elválasztó akkor is ideiglenesen enged, ha csak a
+              // belső arány saját (user döntés 2026-09-26, "Ideiglenesen
+              // engedjen"): előbb a rajz ad helyet, a maradékot a belső
+              // fizeti, a tárolt arány nem íródik felül, és a felfedés végén
+              // visszaáll. Csak ha mindkét arány saját, egyik sem mozdul.
+              adjustsForReveal={storedApprovalLayoutSizes === undefined || storedLayoutSizes === undefined}
               defaultSizes={storedApprovalLayoutSizes ?? DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES}
               onSizesChange={storeRunViewApprovalLayoutSizes}
             />

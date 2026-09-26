@@ -947,8 +947,8 @@ kimenet a munkamenet `outputs/felfedes-javitas/meres/` mappájában.
 | 1440x900 | 1 / 1 / 0,8                           | 700            | 1 / 1 / 0,8                          | 700               | 70 (marad)       |
 | 375x812  | 1 / 0,05 / 0                          | fül            | 1 / 0,05 / 0                         | fül               | 70 (marad)       |
 
-**A szabály.** A saját belső arány marad (a user döntése). A külső elválasztó egésszel vagy
-semmivel mozdul: csak akkor, ha a kérdés a saját belső arányon, a külső határán belül teljesen
+**A szabály (2026-09-26 óta felülírva, lásd a 15. szekciót: "Ideiglenesen engedjen").** A saját
+belső arány marad (a user döntése). A külső elválasztó egésszel vagy semmivel mozdul: csak akkor, ha a kérdés a saját belső arányon, a külső határán belül teljesen
 kifér, és akkor pontosan annyit (768x1024, 900x1000); különben a külső sem mozdul (1000x700,
 1023x768). Indok: a külső minden átadott pixeléből a kérdés csak a belső arány szerinti részt kapja
 (itt 30 százalékot), a többi a transcripté; ha a teljes igény a külső határán belül sem teljesíthető,
@@ -1108,9 +1108,9 @@ a szöveg aránya 0,42).
 
 A forrás `Alert` elemének nincs kisebb változata (a `tone`, a `banner` és az `icon` sem csökkenti
 érdemben a magasságot), tehát 1440x600-on a hibaüzenet, a gombok és a teljes kérdés együtt nem fér
-el a "kérdés az első" szabály (O-16) mellett sem. Ez két user döntés ütközése, a SPEC-008 14.2
-O-17 nyitott pontja. Addig a blokk a gombok fölötti saját sorban áll, és az `approval-prompt.spec.ts`
-1440x600-on kimondottan állítja, hogy a kérdés szövege nem látszik teljesen, a többi rész igen.
+el a "kérdés az első" szabály (O-16) mellett sem. Ez két user döntés ütközése volt, a SPEC-008
+O-17 pontja; a user 2026-09-26-án elfogadta (15.5 szekció): a blokk a gombok fölötti saját sorban
+áll, 1440x600-on a kérdés szövegének alja levágódik, és a szöveg a görgethető törzsben olvasható.
 
 ### 14.5 Képek
 
@@ -1120,3 +1120,128 @@ A munkamenet `outputs/rest-hibauzenet/` mappájában, mindkét témában: `jovah
 `futas-inditas-hiba-modalis-1440x900`, `futas-inditas-hiba-lablec-1440x900`,
 `futas-elozmenyek-betoltesi-hiba-1440x900`. A képek a 13.7 szerinti okból egy repón kívüli,
 eldobott Playwright futásból származnak, ami a repó fixtúráit és `page.route()` mockjait használta.
+
+## 15. A saját belső arány ideiglenesen enged, O-17 elfogadva, a külső húzás e2e (2026-09-26)
+
+**Kiváltó ok.** Egy független ellenőrzés a `b0708b2` állapoton mérte: ha a felhasználó csak a
+belső (transcript és jóváhagyás közti) arányt állította be, a külsőt nem, és ezen az arányon a
+kérdés nem fér ki (1000x700, 1023x768), a 13.2 "egésszel vagy semmivel" szabálya miatt semmi nem
+mozdul: a kérdésből semmi, csak a lapozó és a két gomb látszik, a belső csoport 39,5, illetve 59,9
+pixel, a két panel túllóg a 60 pixeles minimumán, és a belső elválasztó nem érhető el (az
+`elementFromPoint` nem találja). A user döntése (2026-09-26, "Ideiglenesen engedjen"): a rajz és
+szükség esetén a belső arány is ideiglenesen enged, amíg a kérdés kifér; a tárolt saját arány nem
+íródik felül, és a felfedés végén visszaáll; a felfedés közbeni húzás a felhasználó új aránya; a
+belső elválasztó mindig látható és elérhető; a 60 pixeles minimumok érvényesek. Ugyanez az
+ellenőrzés mérte, hogy a külső húzás e2e tesztje a `userResizeCount` jel kivételére nem bukik.
+
+### 15.1 Módszer
+
+`bun run measure:approval -g "kerdes|kulso-huzas"` (a 12. és a 15. jelenet, `measurement/approval-panel.ts`,
+képet nem ír, instrumentálatlan build), két témában. A 12. jelenet 2026-09-26 óta a belső csoport
+magasságát, a belső elválasztó látható arányát és egérrel elérhetőségét (a középpontjában álló
+legfelső elem az elválasztó vagy a leszármazottja, `elementFromPoint`) is méri, és egy negyedik
+tárolási esetet (`sajat-mindketto`: a külső `[60, 40]`, a belső `[70, 30]`). Előtte a `c566213`
+(HEAD) termékkódján (a `Resizable.tsx` és a `RunViewScreen.tsx` ideiglenesen visszaállítva),
+utána a mostanin. A két téma minden mért számban egyezik. A nyers kimenet és a táblázatok a
+munkamenet `outputs/felfedes-ideiglenes/meres/` mappájában (`elotte.log`, `utana.log`,
+`*-tabla.txt`).
+
+### 15.2 Csak belső saját arány (`[70, 30]`), egy jóváhagyással
+
+| Méret    | Figyelmeztetés / cím / szöveg, előtte | Belső csoport, elválasztó elérhető, előtte | Figyelmeztetés / cím / szöveg, utána | Belső csoport, elválasztó elérhető, utána | Vászon, utána | Külső / belső, utána |
+| -------- | ------------------------------------- | ------------------------------------------ | ------------------------------------ | ----------------------------------------- | ------------- | -------------------- |
+| 768x1024 | 1 / 1 / 1                             | 545, igen                                  | 1 / 1 / 1                            | 545, igen                                 | 165           | 20 / 70              |
+| 900x1000 | 1 / 1 / 1                             | 545, igen                                  | 1 / 1 / 1                            | 545, igen                                 | 141           | 18 / 70              |
+| 1000x700 | 0 / 0 / 0                             | 39,5, nem                                  | 1 / 1 / 1                            | 326, igen                                 | 60            | 12 / 50              |
+| 1023x768 | 0 / 0 / 0                             | 59,9, nem                                  | 1 / 1 / 1                            | 394, igen                                 | 60            | 11 / 58              |
+| 1440x600 | 0,73 / 0 / 0                          | 291, igen                                  | 1 / 1 / 1                            | 291, igen                                 | 400           | 70 / 37              |
+| 1440x900 | 1 / 1 / 0,8                           | 591, igen                                  | 1 / 1 / 1                            | 591, igen                                 | 700           | 70 / 69              |
+| 375x812  | 1 / 0,05 / 0                          | 424, igen                                  | 1 / 1 / 1                            | 424, igen                                 | fül           | fül / 57             |
+| 375x667  | 0,69 / 0 / 0                          | 279, igen                                  | 1 / 1 / 1                            | 279, igen                                 | fül           | fül / 34             |
+
+A két gomb minden sorban, előtte és utána is 1 arányban látszik. A tárolt belső arány minden
+esetben `[70,30]` marad, a külső kulcs üres. A saját arány nélküli (`nincs`, egy, hosszú és nulla
+jóváhagyással), a csak külső saját arányú és a teljes saját arányú (`sajat-mindketto`) eset minden
+mért száma bájtra azonos előtte és utána (80 sor), és a 15. jelenet (a külső elválasztó húzása
+saját arány nélkül, 16 mérés) is.
+
+### 15.3 A szabály és a megvalósítás
+
+- **A sorrend** ugyanaz, mint saját arány nélkül (12.3), csak a belső kiinduló aránya a tárolt
+  saját arány: előbb a külső ad helyet a belső arányt megtartva, és ha a külső határa sem elég, a
+  maradékot a belső fizeti. 768x1024-en és 900x1000-en a rajz egymaga elég, a belső 70 marad;
+  1000x700-on és 1023x768-on a rajz a 60 pixeles minimumára húzódik, és a belső 50-re, illetve
+  58-ra enged. A vízszintes és a fül sávban a külső nem ad helyet, ott csak a belső enged.
+- **A bekötés:** a belső `Resizable` `adjustsForReveal` értéke igaz, ha a belső vagy a külső
+  arány nem saját (`RunViewScreen.tsx`); ha mindkettő saját, hamis, és egyik sem mozdul. A
+  `Resizable` algoritmusa ehhez nem változott: a tárolt arány a `defaultSizes`, a felfedés előtti
+  méret (`revealBase`), és a felfedés vége ezt állítja vissza; a tárolóba továbbra is csak a
+  felhasználó változtatása ír (`onSizesChange`).
+- **Egy futó felfedést a mozdíthatóság megszűnése nem állít meg** (`packages/ui` `Resizable`): ha
+  a felhasználó a felfedés közben a külső elválasztót mozdítja, mindkét arány sajáttá válik, és a
+  futás nézet a következő renderelésétől a belső `adjustsForReveal` értékét hamisra adja. E nélkül
+  a belső egy tetszőleges későbbi renderelésnél (egy élő sor, a döntés) visszaugrana a tárolt
+  arányára, és a kérdés levágódna; mérve (e2e, 1000x700, két témában, a javítás nélkül) egy élő
+  sor után a kérdés már nem látszott teljesen. A csoport ezért a felfedés végéig igazodik, ha már
+  igazodott; a következő felfedés az új értékkel indul.
+- **Az "egésszel vagy semmivel" ág** (`plan-container-growth.ts` `requiresFullGrowth`) arra az
+  esetre marad, amikor a felhasználó a felfedés közben a belső elválasztót húzta (az az ő aránya,
+  a belső onnan nem igazodik), változatlanul.
+
+### 15.4 A külső húzás e2e a `userResizeCount` jelre
+
+Az `approval-prompt.spec.ts` külső elválasztó tesztjei (1440x900 és 900x1000 billentyűvel,
+1440x900 egér húzással, két témában) a `mockSseFrames` lezárt válaszát használták: a böngésző a
+válasz végén újracsatlakozik (HTML Standard 9.2.2, "reestablish the connection",
+<https://html.spec.whatwg.org/multipage/server-sent-events.html>), és a mock ugyanazt a pótlást
+adja újra, aminek a `replay_complete` kerete a lépés futások és a jóváhagyások újratöltését, tehát
+a képernyő újrarenderelését váltja ki (a független ellenőrzés mérése szerint 3113 és 6120 ms-nál).
+Az újrarenderelés új felfedés leírást ad, tehát a felfedés a `userResizeCount` jel nélkül is újra
+számol, és a teszt a várakozási idején belül zöld lesz. A javítás: a két teszt a
+`mockSseFramesWithoutReconnect` mockot használja (`e2e/sse-mock.ts`), ami csak az első kapcsolatot
+szolgálja ki; a második kérés függőben marad, mert a Playwright dokumentációja szerint egy
+útvonalra illeszkedő kérés "will stall unless it's continued, fulfilled or aborted"
+(<https://playwright.dev/docs/api/class-page#page-route>; megerősítve:
+<https://qaskills.sh/blog/playwright-network-interception-route-guide>,
+<https://runebook.dev/en/docs/playwright/api/class-route/route-continue>). Időzítő nincs.
+
+**Igazolva** (a `Resizable` hatásának függőségei közül a `containerUserResizeCount` ideiglenesen
+kivéve): az új alakú hat teszt mind bukik (a szöveg aránya 0,716, 900x1000-en 0,227), a HEAD alakú
+ugyanez a hat teszt ugyanazon a kódon mind zöld (az újrapótlás elfedi).
+
+### 15.5 O-17 elfogadva
+
+A user döntése (2026-09-26): 1440x600-on, ha egy jóváhagyási döntés hibára fut, a `danger`
+`Alert` blokk a kérdés szövegének alját levágja (a 14. szekció szerint 14 pixel), és a szöveg a
+görgethető törzsben görgetve olvasható. Az `approval-prompt.spec.ts` 1440x600-on ezt állítja (a
+görgetve olvashatóság a meglévő `expectReadableByScrolling` segédfüggvénnyel), a korábbi "nem
+látszik teljesen" állítás helyett.
+
+### 15.6 Regressziók és a bukás igazolása
+
+- `apps/web/e2e/sse-real-server.spec.ts`, két témában: (a) csak belső saját aránnyal 1000x700,
+  1023x768, 768x1024 és 900x1000 méreten a figyelmeztetés, a cím, a szöveg és a két gomb
+  `toBeInViewport({ ratio: 1 })`, a belső elválasztó `toBeInViewport({ ratio: 1 })` és a
+  középpontjában egérrel elérhető, ha a belső engedett, a külső a legkisebb helyén áll
+  (`aria-valuenow` egyenlő az `aria-valuemin` értékkel), a tárolt arány `[70,30]`, és egy élő
+  `approval_decided` keret utáni eltűnéskor a külső 70-re, a transcript panel `flex-basis`
+  értéke 70 százalékra áll vissza, a tároló változatlan; (b) 1000x700-on a külső elválasztó
+  felfedés közbeni mozdítása után egy élő sor sem ugrasztja vissza a belsőt.
+- **Bukás a `c566213` (HEAD, a `b0708b2` szabálya) termékkódján:** az (a) 1000x700-as és
+  1023x768-as négy tesztje és a (b) két tesztje bukik (a figyelmeztetés nem látszik); a 768x1024-es
+  és a 900x1000-es négy teszt zöld, mert ott a viselkedés nem változott (a rajz egymaga elég).
+  **A felfedés végi visszaállítás kivételére** (`endReveal` nem állítja vissza a méretet) az (a)
+  bukik (a külső 12 marad 70 helyett). **Az új rögzítés kivételére** a (b) két tesztje bukik.
+- `apps/web/e2e/approval-prompt.spec.ts`: a 13.6 (a) két "nem fér ki, egyik sem mozdul" tesztje
+  törölve (a döntés felülírta); a 768x1024-es "a rajz egymaga elég" teszt marad; a külső húzás
+  tesztjei újrapótlás nélkül (15.4); az O-17 teszt a görgetve olvashatóságot állítja (15.5).
+- Unit: `Resizable` (egy már igazodó felfedést az `adjustsForReveal` hamisra váltása nem állít
+  meg, a végén visszaáll, a következő felfedés az új értékkel indul); a rögzítés kivételére bukik.
+
+### 15.7 Képek
+
+A munkamenet `outputs/felfedes-ideiglenes/` mappájában, mindkét témában: `utana-sajat-belso-*`
+(1000x700, 1023x768, 768x1024, 900x1000, 1440x600, 375x812 a "Transcript" fülön),
+`elotte-sajat-belso-*` (1000x700, 1023x768, 1440x600, 375x812, a `c566213` termékkódján) és
+`utana-o17-hibauzenet-1440x600`. A képek a 13.7 szerinti okból egy repón kívüli, eldobott
+Playwright futásból származnak, ami a repó `approval-fixture.ts` fixtúráját importálta.

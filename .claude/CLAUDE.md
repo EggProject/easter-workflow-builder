@@ -684,7 +684,8 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   lezárva): a SPEC-005 8.5 zárt szótárába eső hibaosztályt a szerver a törzs `errorClass`
   mezőjében adja, a kliens ehhez saját magyar mondatot rendel, és a `message` szövegét nem elemzi;
   hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
-  akciósáv magassága 1440x600-on a kérdés szövegét levágja (SPEC-008 14.2 O-17). Védelem:
+  akciósáv magassága 1440x600-on a kérdés szövegét levágja, a szöveg a törzsben görgethető
+  (SPEC-008 14.1 O-17, user döntés 2026-09-26: elfogadva). Védelem:
   `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts`, a
   `protocol-error-class-message.spec.ts`, a `rest-error-paths.spec.ts` és a
   `rest-error-class.spec.ts`.
@@ -891,6 +892,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
   magasra állításával minden összecsukott sor egyforma, és az eredeti követés 0 pixelre pontos
   (research 16. szekció).
+- **A lezárt `page.route()` SSE mock újracsatlakozáskor újrapótol, és az újrarenderelés elfedi a
+  renderelésen kívüli jelre futó számítás hibáját.** A böngésző a lezárt válasz végén
+  újracsatlakozik, a `mockSseFrames` ugyanazt a pótlást adja újra, és a `replay_complete` kerete
+  újratöltést, tehát újrarenderelést vált ki; egy csak a renderelésre (és nem a saját jelére)
+  futó számítás így is helyes képet ad, és a teszt zöld. A külső elválasztó húzásának e2e tesztje
+  emiatt a `userResizeCount` jel kivételére sem bukott. Védelem: az ilyen teszt a
+  `mockSseFramesWithoutReconnect` mockot használja (`apps/web/e2e/sse-mock.ts`), ami csak az első
+  kapcsolatot szolgálja ki, időzítő nélkül (`docs/research/2026-09-24-jovahagyas-panel-helye.md`
+  15.4 szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 

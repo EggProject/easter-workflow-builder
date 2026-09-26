@@ -87,9 +87,18 @@ export interface ResizableProperties {
   readonly reveal?: ResizableReveal | undefined;
   /**
    * Mozdulhat-e az elválasztó egy felfedés kedvéért (a saját `reveal`, vagy
-   * egy beágyazott `Resizable` kérése). Alapból hamis. A hívó akkor adja
-   * igaznak, ha a felhasználónak nincs saját aránya; egy felhasználói
-   * méretváltoztatás után a csoport a leszereléséig nem igazodik.
+   * egy beágyazott `Resizable` kérése). Alapból hamis. A hívó dönti el, mikor
+   * igaz (a futás nézet: ha a felhasználónak nincs saját aránya, vagy a
+   * belsőnél csak a belső arány saját, SPEC-008 8. szekció 1. pont); egy
+   * felhasználói méretváltoztatás után a csoport a leszereléséig nem igazodik.
+   *
+   * **Egy már igazodó saját felfedést a hamisra váltás nem állít meg**
+   * (2026-09-26): a csoport a felfedés végéig igazodik, és akkor áll vissza a
+   * felfedés előtti méretre. A hívó egy MÁSIK csoport felhasználói döntése
+   * nyomán is válthat (a futás nézetben a külső elválasztó húzása után a belső
+   * saját arány már nem enged); a váltás a hívó következő renderelésekor
+   * érkezik, tehát egy futó felfedés közepén a csoport egy tetszőleges
+   * pillanatban ugrana vissza. A következő felfedés már az új értékkel indul.
    */
   readonly adjustsForReveal?: boolean;
 }
@@ -483,7 +492,11 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
       if (layout === undefined || element === null || panel === undefined) {
         return;
       }
-      const canGrow = adjustsForRevealReference.current && !userResizedReference.current;
+      // Egy már igazodó felfedés (van felfedés előtti méret) a felfedés
+      // végéig igazodik, akkor is, ha közben az `adjustsForReveal` hamisra
+      // vált; csak a felhasználó húzása állítja meg.
+      const canGrow =
+        (adjustsForRevealReference.current || revealBase.current !== undefined) && !userResizedReference.current;
       const base = revealBase.current ?? sizesReference.current;
       const next = planReveal(
         {

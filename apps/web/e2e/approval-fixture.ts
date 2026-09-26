@@ -14,6 +14,7 @@ import type {
   RunDetail,
   RunSnapshotResponse,
   StepRunRecord,
+  StreamFrame,
 } from '@easter-workflow-builder/protocol';
 import type { Page } from '@playwright/test';
 import { installApiMocks, jsonBody, mockRoute, type MockRoute } from './rest-mock.ts';
@@ -254,17 +255,21 @@ export const APPROVAL_TRANSCRIPT_ROW_COUNT = 20;
  * (`APPROVAL_TRANSCRIPT_ROW_COUNT` tárolt sor), hogy a transcript utolsó sora
  * mérhető legyen (research 10. szekció). Az `extraRoutes` további REST
  * mockokat ad (például a döntés válaszát), mert egy második
- * `installApiMocks` a többi útvonalat is elfogná.
+ * `installApiMocks` a többi útvonalat is elfogná. A `mockStream` a stream
+ * mockja: alapból minden újracsatlakozáskor újra pótol (`mockSseFrames`); a
+ * `mockSseFramesWithoutReconnect` csak egyszer, hogy az újracsatlakozás
+ * újratöltése ne renderelje újra a képernyőt (2026-09-26).
  */
 export async function mockApprovalRunWithTranscript(
   page: Page,
   approvals: readonly PendingApproval[],
   extraRoutes: readonly MockRoute[] = [],
+  mockStream: (page: Page, frames: readonly StreamFrame[]) => Promise<void> = mockSseFrames,
 ): Promise<void> {
   const records = Array.from({ length: APPROVAL_TRANSCRIPT_ROW_COUNT }, (_, index) =>
     makeRunEventRecord(index + 1, APPROVAL_RUN_DETAIL.id),
   );
-  await mockSseFrames(page, replayFrames(APPROVAL_RUN_DETAIL.id, records));
+  await mockStream(page, replayFrames(APPROVAL_RUN_DETAIL.id, records));
   await installApiMocks(page, [
     ...approvalBaseMocks(async (route) => route.fulfill(jsonBody(approvals))),
     ...extraRoutes,

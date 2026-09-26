@@ -2470,3 +2470,172 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await isJumpInTopBand(list, jump)).toBe(true);
   });
 }
+
+// ============================================================
+// CSAK A BELSŐ ARÁNY SAJÁT: IDEIGLENESEN ENGED (user döntés 2026-09-26,
+// "Ideiglenesen engedjen", SPEC-008 8. szekció 1. pont).
+//
+// A felhasználó a transcript és a jóváhagyás közti belső arányt állította
+// (`[70, 30]`), a gráf és a transcript közti külsőt nem. Függő jóváhagyásnál
+// előbb a rajz ad helyet, és ha az nem elég, a belső arány is ideiglenesen
+// enged, amíg a kérdés kifér; a belső elválasztó közben is látható és
+// egérrel elérhető, a tárolt arány nem íródik felül, és a jóváhagyás
+// eltűnésekor visszaáll. A jóváhagyás eltűnése élő keret (`approval_decided`)
+// a nyitott kapcsolaton, ezért áll ebben a fájlban. A `b0708b2` kódján
+// 1000x700-on és 1023x768-on a kérdésből semmi nem látszott, és a belső
+// elválasztó a fölé lógó panel alatt nem volt elérhető (research 15. szekció).
+// ============================================================
+
+/**
+ * Az álló tablet alacsony ablaka: itt a rajz egymaga nem ad elég helyet, a
+ * belső arány is enged (research 15. szekció).
+ */
+const LOW_TABLET_LAYOUT: TranscriptLayout = { viewport: { width: 1000, height: 700 }, isTabbed: false };
+
+const INNER_OWN_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1000x700', layout: LOW_TABLET_LAYOUT },
+  { name: '1023x768', layout: { viewport: { width: 1023, height: 768 }, isTabbed: false } },
+  { name: '768x1024', layout: { viewport: { width: 768, height: 1024 }, isTabbed: false } },
+  { name: '900x1000', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+];
+
+const INNER_LAYOUT_STORAGE_KEY = 'eggRunViewTranscriptApprovalUserLayout';
+const OUTER_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
+const INNER_OWN_SIZES = '[70,30]';
+
+function innerSeparator(page: Page): Locator {
+  return page.getByRole('separator', { name: 'A transcript és a jóváhagyás aránya' });
+}
+
+function outerSeparator(page: Page): Locator {
+  return page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+}
+
+/**
+ * Az elválasztó egérrel elérhető: a középpontjában a legfelső elem maga az
+ * elválasztó (vagy a leszármazottja), nem egy fölé lógó panel.
+ */
+async function isReachableAtCenter(locator: Locator): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return element.contains(
+      globalThis.document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+    );
+  });
+}
+
+async function readLayoutStorage(page: Page): Promise<readonly (string | undefined)[]> {
+  return page.evaluate(
+    (keys: readonly string[]) => keys.map((key) => globalThis.localStorage.getItem(key) ?? undefined),
+    [OUTER_LAYOUT_STORAGE_KEY, INNER_LAYOUT_STORAGE_KEY],
+  );
+}
+
+/**
+ * A futás nézet megnyitása a saját belső aránnyal és a pótlással. Nem vár a
+ * lista aljára: a belső transcript panel itt a minimumáig szűkülhet, és a
+ * burkolója görget.
+ */
+async function openWithOwnInnerLayout(
+  page: Page,
+  theme: 'light' | 'dark',
+  layout: TranscriptLayout,
+  state: RunViewMockState,
+): Promise<OpenStreamServer> {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  await page.addInitScript(
+    ({ mode, key, sizes }) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+      globalThis.localStorage.setItem(key, sizes);
+    },
+    { mode: theme, key: INNER_LAYOUT_STORAGE_KEY, sizes: INNER_OWN_SIZES },
+  );
+  await mockRunView(page, state);
+  await page.setViewportSize(layout.viewport);
+  await page.goto('/run?runId=r-1');
+  streamServer.pushBatch([
+    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+  ]);
+  await expect(
+    transcriptList(page).locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT)}"]`),
+  ).toBeAttached();
+  return streamServer;
+}
+
+/**
+ * A kérdés (a "visszavonhatatlan" figyelmeztetés, a cím, a szöveg) és a két
+ * gomb teljesen látszik, a belső elválasztó látható és egérrel elérhető.
+ */
+async function expectQuestionAndInnerSeparator(page: Page): Promise<void> {
+  const body = page.locator('.run-view-screen__transcript .approval-prompt-body');
+  await expect(body.getByText('A döntés visszavonhatatlan', { exact: true })).toBeInViewport({ ratio: 1 });
+  await expectQuestionVisible(page);
+  await expect(innerSeparator(page)).toBeInViewport({ ratio: 1 });
+  await expect.poll(async () => isReachableAtCenter(innerSeparator(page))).toBe(true);
+}
+
+for (const { name, layout } of INNER_OWN_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`csak belső saját aránnyal (${name}): a kérdés és a gombok teljesen látszanak, a belső elválasztó látható és egérrel elérhető, előbb a rajz enged, a tárolt arány változatlan, és a jóváhagyás eltűnése után visszaáll (${theme} téma)`, async ({
+      page,
+    }) => {
+      const state = stateWithApproval();
+      const streamServer = await openWithOwnInnerLayout(page, theme, layout, state);
+      await expectQuestionAndInnerSeparator(page);
+
+      // A sorrend: ha a belső arány engedett, a rajz már a határán áll (a
+      // külső elválasztó a legkisebb helyén, W3C APG Window Splitter
+      // `aria-valuemin`).
+      const innerValue = Number(await innerSeparator(page).getAttribute('aria-valuenow'));
+      expect(innerValue).toBeLessThanOrEqual(70);
+      if (innerValue < 70) {
+        await expect(outerSeparator(page)).toHaveAttribute(
+          'aria-valuenow',
+          (await outerSeparator(page).getAttribute('aria-valuemin')) ?? '',
+        );
+      }
+      expect(await readLayoutStorage(page)).toEqual([undefined, INNER_OWN_SIZES]);
+
+      state.approvals = [];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'approval_decided', 'live'));
+      await expect(page.getByRole('heading', { name: LIVE_APPROVAL.title })).toHaveCount(0);
+      await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      // A két külső panel és az egyedül maradt transcript panel: a külső az
+      // alapállásán, a belső a tárolt saját arányán.
+      expect(await panelBases(page)).toEqual(['70%', '30%', '70%']);
+      expect(await readLayoutStorage(page)).toEqual([undefined, INNER_OWN_SIZES]);
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`csak belső saját aránnyal (1000x700): a külső elválasztó felfedés közbeni mozdítása után a belső a felfedés végéig tovább enged, egy újrarenderelés sem ugrasztja vissza (${theme} téma)`, async ({
+    page,
+  }) => {
+    const state = stateWithApproval();
+    const streamServer = await openWithOwnInnerLayout(page, theme, LOW_TABLET_LAYOUT, state);
+    await expectQuestionAndInnerSeparator(page);
+
+    // A külső arány ezzel a felhasználóé (tárolódik), tehát mindkét arány
+    // saját: a futás nézet a következő renderelésétől a belsőnek már nem
+    // engedné az igazítást. A futó felfedés ettől nem áll le.
+    const outer = outerSeparator(page);
+    const valueBefore = (await outer.getAttribute('aria-valuenow')) ?? '';
+    await outer.focus();
+    await outer.press('ArrowDown');
+    await expect(outer).not.toHaveAttribute('aria-valuenow', valueBefore);
+    await expectQuestionAndInnerSeparator(page);
+    const [storedOuter, storedInner] = await readLayoutStorage(page);
+    expect(storedOuter).toBeDefined();
+    expect(storedInner).toBe(INNER_OWN_SIZES);
+
+    // Egy élő sor újrarendereli a képernyőt (a transcript állapota).
+    streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'step_started', 'live'));
+    await expect(
+      transcriptList(page).locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT + 1)}"]`),
+    ).toBeAttached();
+    await expectQuestionAndInnerSeparator(page);
+  });
+}
