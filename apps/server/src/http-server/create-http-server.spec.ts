@@ -206,6 +206,38 @@ describe('createHttpServer', () => {
     });
   });
 
+  it('a szótárban álló hibaosztályt errorClass mezőben is kiírja, 422-vel (SPEC-005 8.5)', async () => {
+    const message = 'Nincs alapértelmezett provider beállítva (no_default_provider).';
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ startRun: () => Promise.resolve({ kind: 'error', message }) }, undefined),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows/wf-1/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toStrictEqual({ code: 'unprocessable', message, errorClass: 'no_default_provider' });
+  });
+
+  it('a kezelő invalid_request hibaágát 400-ra képezi, nem 500-ra (regresszió, 2026-09-26)', async () => {
+    const message = 'A kérés törzse érvénytelen, hibás mező(k): name (invalid_request).';
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ createWorkflow: () => Promise.resolve({ kind: 'error', message }) }, undefined),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toStrictEqual({ code: 'invalid_request', message });
+  });
+
   it('204 státusznál nincs válasz törzs', async () => {
     const { baseUrl, close } = await startTestServer(
       buildOptions(

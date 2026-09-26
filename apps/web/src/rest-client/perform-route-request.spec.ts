@@ -122,7 +122,9 @@ describe('performRouteRequest', () => {
   // A szerver valódi `already_decided` üzenetének alakja: azonosító és
   // zárójeles hibaosztály (SPEC-005 8.3, 8.4). Egyik sem juthat a felületre,
   // és a mondat pontja után nem állhat kettőspont (user döntés 2026-09-24).
-  it('409 already_decided hibára a mondatot adja, azonosító, hibaosztály és ".:" nélkül', async () => {
+  // Az `errorClass` mező nélküli törzs (a mező előtti szerver válasz) a kód
+  // mondatát kapja: a kliens a `message` szövegét nem elemzi.
+  it('409 already_decided hibára errorClass nélkül a kód mondatát adja, azonosító, hibaosztály és ".:" nélkül', async () => {
     const serverMessage = 'A(z) "step-run-7f3a" jóváhagyás már el lett döntve (already_decided).';
     const outcome = await performRouteRequest({
       routeId: 'decideApproval',
@@ -145,6 +147,61 @@ describe('performRouteRequest', () => {
     expect(message).not.toContain('.:');
     expect(message).not.toContain('step-run-7f3a');
     expect(message).not.toContain('already_decided');
+  });
+
+  // User döntés 2026-09-26, "Ismert okokra saját mondat": a törzs `errorClass`
+  // mezője dönt, a nyers `message` továbbra sem jut a felületre.
+  it.each([
+    [409, 'conflict', 'already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
+    [422, 'unprocessable', 'no_default_provider', 'Nincs alapértelmezett provider beállítva.'],
+    [422, 'unprocessable', 'graph_cycle_detected', 'A gráf Ciklus csomópont nélküli kört tartalmaz.'],
+  ] as const)(
+    'HTTP %i %s hibára az errorClass (%s) saját mondatát adja, a szerver üzenete nélkül',
+    async (status, code, errorClass, expected) => {
+      const serverMessage = `A(z) "run-7f3a" belső részlet (${errorClass}).`;
+      const outcome = await performRouteRequest({
+        routeId: 'startRun',
+        parameters: { workflowId: 'workflow-1' },
+        query: undefined,
+        hasBody: true,
+        body: { input: {} },
+        responseSchema: demoValueSchema,
+        fetchFunction: () => Promise.resolve(jsonResponse(status, { code, message: serverMessage, errorClass })),
+        apiOrigin: API_ORIGIN,
+        signal: undefined,
+      });
+
+      expect(outcome).toEqual({ kind: 'error', message: expected, isTransient: false });
+      const message = outcome.kind === 'error' ? outcome.message : '';
+      expect(message).not.toContain('run-7f3a');
+      expect(message).not.toContain(errorClass);
+    },
+  );
+
+  // A szótáron kívüli `errorClass` a szerződés megsértése: a kliens és a
+  // szerver egy repóban, egyszerre élesedik (SPEC-005 8.5), tehát ez csak
+  // hibás szerver válaszként fordulhat elő, és a kliens annak is kezeli.
+  it('a szótáron kívüli errorClass értékű törzset hibás válaszként kezeli, HTTP státusszal', async () => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () =>
+        Promise.resolve(
+          jsonResponse(500, { code: 'internal', message: 'x (database_closed).', errorClass: 'database_closed' }),
+        ),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A szerver hibás választ adott (HTTP 500).',
+      isTransient: false,
+    });
   });
 
   it.each([

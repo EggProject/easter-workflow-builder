@@ -17,11 +17,24 @@ describe('mapOutcomeMessageToErrorCode', () => {
     expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');
   });
 
+  it.each(['malformed_graph_document', 'unknown_graph_document_version', 'non_canonicalizable_value'])(
+    'a(z) %s hibaosztályt unprocessable kódra képezi',
+    (errorClass) => {
+      expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('unprocessable');
+    },
+  );
+
+  // A motor saját formázójával előállított üzenet: a `kind` paraméter típusa
+  // `EngineErrorKind`, tehát egy átnevezett hibaosztály itt fordítási hibát ad.
+  // A 4.2, 4.5, 4.6, 4.8, 8.2 és 11.3 osztályai 2026-09-26-ig `internal`
+  // kódot kaptak (regresszió).
   it.each([
     'no_default_provider',
-    'malformed_graph_document',
-    'unknown_graph_document_version',
-    'non_canonicalizable_value',
+    'graph_cycle_detected',
+    'loop_back_edge_outside_body',
+    'loop_missing_branch_edge',
+    'reserved_branch_key_misuse',
+    'unbalanced_fan_out_scope',
     'invalid_start_node',
     'dangling_edge',
     'unreachable_node',
@@ -31,9 +44,25 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'malformed_node_config',
     'unhandled_error_policy_missing',
     'unsupported_join_merge_setting',
+    'insufficient_backoff_list',
+    'missing_required_input',
+    'structured_output_strategy_unsupported',
+    'insufficient_max_turns',
+    'forced_tool_choice_silently_dropped',
+    'model_not_selected',
+    'unknown_model_id',
+    'thinking_mode_unsupported',
+    'effort_unsupported',
+    'provider_descriptor_sdk_mismatch',
     'expression_evaluator_unavailable',
-  ])('a(z) %s hibaosztályt unprocessable kódra képezi', (errorClass) => {
-    expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('unprocessable');
+  ] as const)('a motor %s validációs hibaosztályát unprocessable kódra képezi', (kind) => {
+    expect(mapOutcomeMessageToErrorCode(formatEngineErrorMessage(kind, 'A futás nem indítható'))).toBe('unprocessable');
+  });
+
+  it('a végpont kezelő invalid_request hibaosztályát invalid_request kódra képezi (2026-09-26-ig internal volt)', () => {
+    expect(mapOutcomeMessageToErrorCode('A kérés törzse érvénytelen, hibás mező(k): name (invalid_request).')).toBe(
+      'invalid_request',
+    );
   });
 
   it('a motor valódi engine_shutting_down üzenetét service_unavailable kódra képezi (SPEC-005 8.3, sodródás védelem futásidejű ága)', () => {

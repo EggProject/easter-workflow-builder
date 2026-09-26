@@ -1,5 +1,6 @@
 import type { FetchFunction, Outcome } from '@easter-workflow-builder/core';
 import { buildRoutePath, ProtocolErrorBodySchema, ROUTE_TABLE, type RouteId } from '@easter-workflow-builder/protocol';
+import { protocolErrorClassMessage } from '../protocol-error-message/protocol-error-class-message.ts';
 import { protocolErrorMessage } from '../protocol-error-message/protocol-error-message.ts';
 import type { RouteOutcome } from './route-outcome.ts';
 import type { SafeParsableSchema } from './safe-parsable-schema.ts';
@@ -58,10 +59,13 @@ async function decodeResponseBody(response: Response): Promise<Outcome<unknown>>
 const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([502, 503]);
 
 /**
- * A protokoll hiba üzenete KIZÁRÓLAG a kódhoz rendelt magyar mondat (SPEC-007
- * 8.4, user döntés 2026-09-24): a szerver `message` mezője (azonosító,
- * zárójeles hibaosztály) a felületre nem jut, és a mondat záró pontja után
- * sem áll semmi. A törzs alakját a séma ettől még teljes egészében ellenőrzi.
+ * A protokoll hiba üzenete KIZÁRÓLAG a kliens saját magyar mondata (SPEC-007
+ * 8.4): ha a törzs `errorClass` mezője a zárt szótár egy tagját hordozza, a
+ * hibaosztály mondata (user döntés 2026-09-26, "Ismert okokra saját mondat"),
+ * különben a kódé (user döntés 2026-09-24). A szerver `message` mezője
+ * (azonosító, zárójeles hibaosztály) a felületre nem jut, és a mondat záró
+ * pontja után sem áll semmi. A törzs alakját a séma ettől még teljes
+ * egészében ellenőrzi.
  */
 async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<RouteOutcome<TValue>> {
   const isTransient = TRANSIENT_HTTP_STATUSES.has(response.status);
@@ -70,7 +74,9 @@ async function buildProtocolErrorOutcome<TValue>(response: Response): Promise<Ro
   if (!parsed?.success) {
     return { kind: 'error', message: `A szerver hibás választ adott (HTTP ${String(response.status)}).`, isTransient };
   }
-  return { kind: 'error', message: protocolErrorMessage(parsed.data.code), isTransient };
+  const { code, errorClass } = parsed.data;
+  const message = errorClass === undefined ? protocolErrorMessage(code) : protocolErrorClassMessage(errorClass);
+  return { kind: 'error', message, isTransient };
 }
 
 export async function performRouteRequest<TValue>(

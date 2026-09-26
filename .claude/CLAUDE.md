@@ -126,6 +126,13 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
   megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
   SPEC-008 5.3, user döntés 2026-09-05).
+- **A `protocol` a motor hibaosztályainak részhalmazát is duplikálhatja, ugyanezzel a
+  védelemmel.** A `ProtocolErrorClass` zárt szótár (SPEC-005 8.5) a motor `EngineErrorKind`
+  uniójának szándékos részhalmaza, plusz a `db` `already_decided` ága; mivel részhalmaz, a
+  típusszintű ág egyirányú (`Exclude<ProtocolErrorClass, EngineErrorKind>` pontosan
+  `'already_decided'`), a futásidejű ág a motor `isEngineErrorKind` guardja. Helye az
+  `apps/server` `error-class-drift-protection` témája (user döntés 2026-09-26, "Ismert okokra
+  saját mondat").
 
 **Fájlok és tesztek**
 
@@ -673,10 +680,14 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   hanem a `packages/ui` `Alert` eleme (`variant="danger"`, a szerepet a komponens adja, a forrás
   szerint). A mező alatti űrlap hiba (előző pont), a futás nézet "Várakozás a szerverre"
   `warning` jelzése és a soronkénti műveletek `Toast` értesítése nem tartozik ide. Részletek és
-  határok: SPEC-007 8.4; a teendőt hordozó részlet sorsa nyitott (SPEC-007 15. szekció O-10), az
+  határok: SPEC-007 8.4. **Ismert okokra saját mondat** (user döntés 2026-09-26, SPEC-007 O-10
+  lezárva): a SPEC-005 8.5 zárt szótárába eső hibaosztályt a szerver a törzs `errorClass`
+  mezőjében adja, a kliens ehhez saját magyar mondatot rendel, és a `message` szövegét nem elemzi;
+  hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
   akciósáv magassága 1440x600-on a kérdés szövegét levágja (SPEC-008 14.2 O-17). Védelem:
-  `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts` és a
-  `rest-error-paths.spec.ts`.
+  `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts`, a
+  `protocol-error-class-message.spec.ts`, a `rest-error-paths.spec.ts` és a
+  `rest-error-class.spec.ts`.
 
 ---
 
