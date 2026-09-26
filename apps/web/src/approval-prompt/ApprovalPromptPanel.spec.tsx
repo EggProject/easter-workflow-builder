@@ -87,10 +87,12 @@ describe('ApprovalPromptPanel', () => {
     expect(regionName()).toBeNull();
   });
 
-  it('a hibaüzenetet role=alert szerepkörrel mutatja, a "Függő jóváhagyások" régióban', () => {
+  it('a hibaüzenetet a design system danger Alert blokkjában (role=alert) mutatja, a "Függő jóváhagyások" régióban', () => {
     renderPanel(undefined, { failureMessage: 'A szerver nem érhető el.' });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(
+      container.querySelector(':scope section.approval-prompt-panel > .alert--danger[role="alert"]')?.textContent,
+    ).toBe('A szerver nem érhető el.');
     expect(regionName()).toBe('Függő jóváhagyások');
   });
 

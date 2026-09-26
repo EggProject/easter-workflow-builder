@@ -351,7 +351,7 @@ describe('CreateWorkflowModal', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
     expect(closeCallCount).toBe(0);
   });
 

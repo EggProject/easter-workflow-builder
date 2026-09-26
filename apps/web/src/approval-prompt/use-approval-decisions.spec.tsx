@@ -157,7 +157,7 @@ describe('useApprovalDecisions', () => {
         approval: APPROVAL,
         progress: {
           status: 'failed',
-          message: 'Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve',
+          message: 'Az elem állapota most nem engedi a műveletet.',
           isFinal: true,
         },
       },

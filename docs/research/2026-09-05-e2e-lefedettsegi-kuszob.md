@@ -1707,3 +1707,28 @@ lines összes darabszáma csökkent (1691 -> 1689, 564 -> 562, 1630 -> 1629), me
 `is-own-layout-sizes.ts` törlődött, a fedetlen darab egyik metrikán sem nőtt, és a százalék
 ezeken változatlan. A branches összes darabszáma nőtt (780 -> 784), a fedetlen nem, tehát a
 küszöb a mért értékre emelkedik, felfelé kerekítés nélkül (`apps/web/package.json`).
+
+## 45. A REST hibaüzenetek utáni ratchet (2026-09-26): a küszöb nem mozdul
+
+**Kiváltó ok.** A user 2026-09-24-i döntése a REST hibákról (SPEC-007 8.4): a hibaág üzenete
+kizárólag a kód magyar mondata (a `perform-route-request.ts` a szerver `message` mezőjét eldobja), és
+minden REST hibaág a design system `danger` `Alert` blokkjában jelenik meg. Új e2e teszt nincs, a
+meglévők a mondatra, a `danger` osztályra és a szerver szövegének hiányára állítanak; az e2e
+készlet **407** teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output`, a teljes
+Playwright futás (**407 teszt, mind zöld**; négy `--shard` hívásban, sorban, három workerrel,
+ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (44.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1671 / 1686     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 773 / 784       | 98.59    | 98.59 (marad)               | 11 -> 11                       |
+| functions  | 559 / 562       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1611 / 1626     | 99.07    | 99.07 (marad)               | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek a 33. szekcióban felsorolt hat fájlban maradtak (a
+`perform-route-request.ts` egyetlen fedetlen sora az útvonal építés hibaága, a sorszáma a
+hozzáadott doksi komment miatt csúszott). A statements és a lines összes darabszáma hárommal
+csökkent (1689 -> 1686, 1629 -> 1626), a fedetlen darab egyik metrikán sem nőtt, és a százalék két
+tizedesre egyik metrikán sem változott, tehát a küszöb marad (`apps/web/package.json`).

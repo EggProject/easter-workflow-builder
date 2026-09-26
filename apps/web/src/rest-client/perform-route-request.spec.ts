@@ -1,5 +1,6 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { describe, expect, it, vi } from 'vitest';
+import { protocolErrorMessage } from '../protocol-error-message/protocol-error-message.ts';
 import { performRouteRequest } from './perform-route-request.ts';
 import type { SafeParsableSchema, SafeParseOutcome } from './safe-parsable-schema.ts';
 
@@ -98,7 +99,7 @@ describe('performRouteRequest', () => {
     expect(outcome.kind).toBe('error');
   });
 
-  it('protokoll hiba esetén a kód szerinti mondatot és a szerver üzenetét adja', async () => {
+  it('404 protokoll hibára kizárólag a kód szerinti mondatot adja, a szerver üzenete nélkül', async () => {
     const outcome = await performRouteRequest({
       routeId: 'getWorkflow',
       parameters: { workflowId: 'workflow-1' },
@@ -113,9 +114,60 @@ describe('performRouteRequest', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'A keresett elem nem létezik, esetleg időközben törölték.: workflow-1 nem található',
+      message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: false,
     });
+  });
+
+  // A szerver valódi `already_decided` üzenetének alakja: azonosító és
+  // zárójeles hibaosztály (SPEC-005 8.3, 8.4). Egyik sem juthat a felületre,
+  // és a mondat pontja után nem állhat kettőspont (user döntés 2026-09-24).
+  it('409 already_decided hibára a mondatot adja, azonosító, hibaosztály és ".:" nélkül', async () => {
+    const serverMessage = 'A(z) "step-run-7f3a" jóváhagyás már el lett döntve (already_decided).';
+    const outcome = await performRouteRequest({
+      routeId: 'decideApproval',
+      parameters: { approvalId: 'approval-1' },
+      query: undefined,
+      hasBody: true,
+      body: { decision: 'approved' },
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(jsonResponse(409, { code: 'conflict', message: serverMessage })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'Az elem állapota most nem engedi a műveletet.',
+      isTransient: false,
+    });
+    const message = outcome.kind === 'error' ? outcome.message : '';
+    expect(message).not.toContain('.:');
+    expect(message).not.toContain('step-run-7f3a');
+    expect(message).not.toContain('already_decided');
+  });
+
+  it.each([
+    ['invalid_request', 400],
+    ['not_found', 404],
+    ['conflict', 409],
+    ['unprocessable', 422],
+    ['internal', 500],
+    ['service_unavailable', 503],
+  ] as const)('a(z) "%s" kód üzenete pontosan a leképezett mondat (HTTP %i)', async (code, status) => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(jsonResponse(status, { code, message: 'belső szöveg (hiba_osztaly)' })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toMatchObject({ kind: 'error', message: protocolErrorMessage(code) });
   });
 
   it('nem 2xx válaszra, ha a törzs nem illeszkedik a ProtocolErrorBodySchema-ra, HTTP státuszos üzenetet ad', async () => {
@@ -176,7 +228,7 @@ describe('performRouteRequest', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'A keresett elem nem létezik, esetleg időközben törölték.: leállás',
+      message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: true,
     });
   });

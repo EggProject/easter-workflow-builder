@@ -1057,3 +1057,66 @@ mindkét témában: `sajat-belso-1000x700`, `sajat-belso-1023x768`, `sajat-belso
 `kulso-huzas-1440x900` (három nyíl), `kulso-huzas-900x1000` (egy nyíl), `o16-1440x600`,
 `o16-375x667-transcript-ful`. A képek a 10.7 szerinti okból egy repón kívüli, eldobott Playwright
 futásból származnak, ami a repó `approval-fixture.ts` fixtúráját importálta.
+
+## 14. A döntés hibája a design system `danger` `Alert` blokkjában (2026-09-26)
+
+**Kiváltó ok.** A user 2026-09-24-i döntése ("Mindhárom javítás", SPEC-007 8.4): a REST hibák a
+design system `danger` `Alert` blokkjában jelennek meg, a szerver `message` mezője nélkül, ".:"
+dupla írásjel nélkül. A jóváhagyás akciósávjában eddig egy kis betűs `<p role="alert">` állt a
+gombok előtt, a mondattal és a szerver szövegével (`Az elem állapota most nem engedi a
+műveletet.: a jóváhagyás már el lett döntve`). A kérdés: hová kerül a blokk, és mit csinál a
+felfedéssel (13. szekció).
+
+### 14.1 Módszer
+
+`bun run measure:approval -g hibauzenet` (a mérő eszköz 14. jelenete, `measurement/approval-panel.ts`,
+képet nem ír, instrumentálatlan build), a `conflict` döntés előtt és után, öt méreten, két témában.
+Előtte a `b0708b2` kódján (a régi `<p>`), utána a mostanin. A két téma minden mért számban egyezik.
+A nyers kimenet a munkamenet `outputs/rest-hibauzenet/meres/` mappájában (`elotte-hibauzenet.log`,
+`utana-hibauzenet.log`). A blokk két elhelyezési változatát és a `box-sizing` hatását egy repón
+kívüli, eldobott Playwright futás mérte a `approval-fixture.ts` fixtúrával (`getBoundingClientRect`,
+instrumentált build), a 13.7 szerinti okból.
+
+### 14.2 A döntés után (a mondat, `conflict`)
+
+| Méret    | Szöveg, előtte | Belső panelek, előtte | Régió, előtte | Szöveg, utána | Belső panelek, utána | Régió, utána |
+| -------- | -------------- | --------------------- | ------------- | ------------- | -------------------- | ------------ |
+| 375x812  | 1              | 161 / 181             | 186           | 1             | 159 / 181            | 188          |
+| 1440x600 | 1              | 70 / 181              | 144           | 0,44          | 60 / 166,5           | 168,5        |
+| 768x1024 | 1              | 162 / 162             | 109           | 1             | 162 / 162            | 168,5        |
+| 1000x700 | 1              | 159 / 162             | 109           | 1             | 99,5 / 162           | 168,5        |
+| 1440x900 | 1              | 275,5 / 275,5         | 144           | 1             | 263,25 / 263,25      | 168,5        |
+
+A "Belső panelek" a transcript és a jóváhagyás törzse, a "Régió" a lapozó plusz az akciósáv. A
+hibaüzenet (`alert`), a cím, a két gomb és a lapozó minden méreten 1 arányban látszik, előtte és
+utána is. **1440x600-on a kérdés szövege 0,44 arányban látszik**: a törzsnek 180,8 pixel kell, a
+transcript a 60 pixeles minimumán áll, és a törzs 166,5 pixelt kap (az instrumentált buildben 167,
+a szöveg aránya 0,42).
+
+### 14.3 Az elhelyezés és a `box-sizing`
+
+- **A gombok fölötti saját sor** (a választott): 1440 pixelen az akciósáv 61-ről 121 pixelre nő,
+  375 pixelen 140-re.
+- **A gombok mellett** (`flex: 1 1 auto`): a mondat 1440 pixelen is három sorba törik, a sáv 122
+  pixel, 375 pixelen 161. Egyik méreten sem alacsonyabb, tehát 1440x600-on ez sem fér el.
+- **`box-sizing` nélkül** a saját sorú blokk szélessége 416,5 pixel a sáv 382,5 pixeles tartalma
+  helyett (a `.alert` 32 pixeles vízszintes belső térköze és 2 pixeles szegélye a 100 százalékos
+  alap fölött), és a `flex-end` igazítás miatt 10 pixellel a panel bal széle alá lóg; a hibaüzenet
+  1440x600-on 0,976 arányban látszott. `border-box` mellett a blokk pontosan a tartalom széles.
+
+### 14.4 Következmény
+
+A forrás `Alert` elemének nincs kisebb változata (a `tone`, a `banner` és az `icon` sem csökkenti
+érdemben a magasságot), tehát 1440x600-on a hibaüzenet, a gombok és a teljes kérdés együtt nem fér
+el a "kérdés az első" szabály (O-16) mellett sem. Ez két user döntés ütközése, a SPEC-008 14.2
+O-17 nyitott pontja. Addig a blokk a gombok fölötti saját sorban áll, és az `approval-prompt.spec.ts`
+1440x600-on kimondottan állítja, hogy a kérdés szövege nem látszik teljesen, a többi rész igen.
+
+### 14.5 Képek
+
+A munkamenet `outputs/rest-hibauzenet/` mappájában, mindkét témában: `jovahagyas-conflict-1440x900`,
+`jovahagyas-conflict-375x812`, `jovahagyas-conflict-1440x600` (az O-17 levágás),
+`workflow-torles-hiba-1440x900`, `workflow-letrehozas-hiba-1440x900`,
+`futas-inditas-hiba-modalis-1440x900`, `futas-inditas-hiba-lablec-1440x900`,
+`futas-elozmenyek-betoltesi-hiba-1440x900`. A képek a 13.7 szerinti okból egy repón kívüli,
+eldobott Playwright futásból származnak, ami a repó fixtúráit és `page.route()` mockjait használta.

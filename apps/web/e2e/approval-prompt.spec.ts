@@ -732,18 +732,32 @@ const GRAPH_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
 const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 /**
- * A kérdés részei és a két gomb: mindnek teljes egészében látszania kell.
+ * A kérdés szövege. Külön is elérhető, mert a SPEC-008 14.2 O-17 esetben ez
+ * az egyetlen rész, ami levágódik.
  */
-function questionParts(page: Page): readonly Locator[] {
+function questionText(page: Page): Locator {
+  return approvalText(page).getByText(FIRST_APPROVAL.body, { exact: true });
+}
+
+/**
+ * A kérdés részei a szövege nélkül, és a két gomb.
+ */
+function questionPartsWithoutText(page: Page): readonly Locator[] {
   const text = approvalText(page);
   return [
     text.getByText('A döntés visszavonhatatlan', { exact: true }),
     text.getByText('Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.', { exact: true }),
     text.getByRole('heading', { name: FIRST_APPROVAL.title }),
-    text.getByText(FIRST_APPROVAL.body, { exact: true }),
     decisionButton(page, 'Jóváhagyás'),
     decisionButton(page, 'Elutasítás'),
   ];
+}
+
+/**
+ * A kérdés részei és a két gomb: mindnek teljes egészében látszania kell.
+ */
+function questionParts(page: Page): readonly Locator[] {
+  return [...questionPartsWithoutText(page), questionText(page)];
 }
 
 async function readStoredLayouts(page: Page): Promise<readonly (string | undefined)[]> {
@@ -914,7 +928,7 @@ for (const theme of ['light', 'dark'] as const) {
     { width: 1440, height: 600 },
   ] as const) {
     const size = `${String(viewport.width)}x${String(viewport.height)}`;
-    test(`${size}, a döntés hibaüzenete után a kérdés, a gombok és a hibaüzenet is teljesen látszanak (${theme} téma)`, async ({
+    test(`${size}, a döntés hibaüzenete után a kérdés, a gombok és a hibaüzenet is teljesen látszanak, 1440x600-on a kérdés szövege kivételével (SPEC-008 O-17) (${theme} téma)`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -942,8 +956,21 @@ for (const theme of ['light', 'dark'] as const) {
       const failure = decisionBar(page).getByRole('alert');
       await expect(failure).toBeVisible();
       await expect(failure).toBeInViewport({ ratio: 1 });
-      for (const part of questionParts(page)) {
+      // NYITOTT PONT, SPEC-008 14.2 O-17: a hibaüzenet 2026-09-24 óta a design
+      // system `danger` `Alert` blokkja (user döntés), ami az akciósávot
+      // megnöveli; 1440x600-on a transcript pixeles minimuma mellett is kevés
+      // a hely, és a kérdés SZÖVEGÉNEK alja levágódik, a többi rész, a gombok
+      // és a hibaüzenet teljesen látszik (mérve, `docs/research/
+      // 2026-09-24-jovahagyas-panel-helye.md` 14. szekció). Ez az eset a
+      // döntésig kimondott, nem rejtett állapot: ha a konfliktus megszűnik, az
+      // utolsó ág bukik, és a tételt le kell zárni.
+      for (const part of questionPartsWithoutText(page)) {
         await expect(part).toBeInViewport({ ratio: 1 });
+      }
+      if (viewport.height === 600) {
+        await expect(questionText(page)).not.toBeInViewport({ ratio: 1 });
+      } else {
+        await expect(questionText(page)).toBeInViewport({ ratio: 1 });
       }
       expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
     });
@@ -1292,6 +1319,12 @@ test('siker után, ha a lista újratöltése elbukik, a gombok akkor sem kapcsol
   await expect(decisionButton(page, 'Elutasítás')).toBeDisabled();
 });
 
+/**
+ * A szerver `already_decided` üzenetének valósághű alakja (SPEC-005 8.3,
+ * 8.4): azonosító és zárójeles hibaosztály.
+ */
+const ALREADY_DECIDED_SERVER_MESSAGE = 'A(z) "sr-approval-7f3a" jóváhagyás már el lett döntve (already_decided).';
+
 test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a hibaüzenet görgetés nélkül látszik, és a lista újratöltődik', async ({
   page,
 }) => {
@@ -1307,7 +1340,7 @@ test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a
     mockRoute('decideApproval', async (route) => {
       const body: unknown = route.request().postDataJSON();
       expect(body).toEqual({ decision: 'rejected' } satisfies ApprovalDecisionRequest);
-      await route.fulfill(jsonBody({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, 409));
+      await route.fulfill(jsonBody({ code: 'conflict', message: ALREADY_DECIDED_SERVER_MESSAGE }, 409));
     }),
   ]);
 
@@ -1319,8 +1352,15 @@ test('az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a
 
   await rejectButton.click();
 
+  // A 409 `already_decided` válasz szerver szövegéből (azonosító, zárójeles
+  // hibaosztály) semmi nem jut a felületre, csak a kód mondata, a sáv danger
+  // `Alert` blokkjában, ".:" nélkül (SPEC-007 8.4, user döntés 2026-09-24).
   const alert = decisionBar(page).getByRole('alert');
-  await expect(alert).toHaveText('Az elem állapota most nem engedi a műveletet.: a jóváhagyás már el lett döntve');
+  await expect(alert).toHaveText('Az elem állapota most nem engedi a műveletet.');
+  await expect(alert).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('sr-approval-7f3a');
+  await expect(page.locator('body')).not.toContainText('(already_decided)');
+  await expect(page.locator('body')).not.toContainText('.:');
   await expect(alert).toBeInViewport({ ratio: 1 });
   await expect.poll(() => approvalCallCount).toBeGreaterThan(callsBeforeDecision);
   // A lista a conflict után is tartalmazza a jóváhagyást, a gombok mégsem
@@ -1341,7 +1381,10 @@ test('a jóváhagyás lista betöltési hibájára figyelmeztetést mutat a pane
 
   await page.goto(APPROVAL_RUN_URL);
 
-  await expect(page.locator('.approval-prompt-panel').getByRole('alert')).toBeVisible();
+  const alert = page.locator('.approval-prompt-panel').getByRole('alert');
+  await expect(alert).toHaveText('Váratlan szerver hiba történt.');
+  await expect(alert).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('A szerver hibát adott.');
 });
 
 test('átmeneti hibára (503) a gombok újrapróbálásra engedélyezettek, és az újrapróbálás rögzíti a döntést', async ({

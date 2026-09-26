@@ -90,16 +90,30 @@
 
 /* A döntés eredménye az akciósávban, a gombok előtt (T-009-27): nem
    hibaüzenet, tehát a halványabb, másodlagos kis szöveg, ugyanaz a minta,
-   mint a `run-control.css` "megszakítás folyamatban" felirata. A hibaüzenet
-   ugyanazt a kis betűt kapja, a szöveg színén. */
+   mint a `run-control.css` "megszakítás folyamatban" felirata. */
 .approval-decision-actions__result {
   margin: 0;
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
 }
 
+/* A döntés hibája a design system `danger` `Alert` blokkja (SPEC-007 8.4,
+   user döntés 2026-09-24), a gombok FÖLÖTT, saját, teljes szélességű sorban:
+   a gombok mellett a blokk keskeny, a mondat több sorba törik, és a sáv
+   magasabb lesz, mint külön sorban (mérve, `docs/research/
+   2026-09-24-jovahagyas-panel-helye.md` 14. szekció). A tördelés csak hiba
+   mellett kapcsol be, tehát a sáv hiba nélküli alakja (a `drawer.css` bájtra
+   azonos szabálya) nem változik. A `border-box` azért kell, mert a projekt
+   nem veszi át a forrás univerzális `box-sizing` resetjét (`topnav-shell.css`):
+   nélküle a 100 százalékos alap a `.alert` belső térközével és szegélyével a
+   sáv tartalmánál szélesebb, és a `flex-end` igazítás miatt balra, a panel
+   széle alá lóg (research 14. szekció). A magasabb sáv alacsony ablakban a
+   kérdés szövegét levágja: SPEC-008 14.2 O-17. */
+.drawer__footer:has(> .approval-decision-actions__failure) {
+  flex-wrap: wrap;
+}
+
 .approval-decision-actions__failure {
-  margin: 0;
-  font: var(--ep-text-small);
-  color: var(--ep-fg);
+  flex: 1 0 100%;
+  box-sizing: border-box;
 }

@@ -489,7 +489,7 @@ Az `Outcome` hibaága kizárólag szöveget hordoz, és a hibaosztály neve zár
 
 ### 8.4 Mi szivárog ki, és mi nem
 
-**Kiszivárog, szándékosan**: a hibaosztály neve, ahogy az `Outcome` üzenetében áll. Ez nem belső részlet, hanem a rendszer szótára: a felhasználó ebből érti meg, hogy a futása azért nem indult el, mert a gráfban kör van, nem azért, mert a szerver elromlott.
+**Kiszivárog, szándékosan**: a hibaosztály neve, ahogy az `Outcome` üzenetében áll. Ez nem belső részlet, hanem a rendszer szótára: a felhasználó ebből érti meg, hogy a futása azért nem indult el, mert a gráfban kör van, nem azért, mert a szerver elromlott. **A drótszintű szerződés változatlan, a webes felület viszont 2026-09-24 óta (user döntés) nem jeleníti meg a `message` mezőt**, csak a `code` szerinti magyar mondatot (SPEC-007 8.4); a részlet sorsa a SPEC-007 15. szekció O-10 nyitott pontja.
 
 **Soha nem szivárog ki**: verem nyomkövetés, SQL utasítás vagy annak töredéke, fájl útvonal, env változó **értéke**, API kulcs, és a kliens által küldött, elutasított érték. Az utolsó azért, mert egy elutasított kérés törzsében ott lehet olyan adat, amit a felhasználó nem akar visszakapni egy hibaüzenetben; a séma hiba ezért a mező **útvonalát** nevezi meg, nem az értékét (7.5).
 

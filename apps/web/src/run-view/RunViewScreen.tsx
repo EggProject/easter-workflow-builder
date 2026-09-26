@@ -399,7 +399,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     (snapshotState.state.status === 'failure' ? snapshotState.state.message : undefined) ??
     blockingFailureMessage(stepRunsFailure, stepRuns !== undefined);
   if (blockingMessage !== undefined) {
-    return <p role="alert">{blockingMessage}</p>;
+    return <Alert variant="danger">{blockingMessage}</Alert>;
   }
 
   if (runDetail === undefined || stepRuns === undefined || snapshotState.state.status !== 'success') {

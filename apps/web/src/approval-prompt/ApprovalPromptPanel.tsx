@@ -1,4 +1,4 @@
-import { Pagination, ProgressBar, type PaginationLabels } from '@easter-workflow-builder/ui';
+import { Alert, Pagination, ProgressBar, type PaginationLabels } from '@easter-workflow-builder/ui';
 import type { ReactElement, ReactNode } from 'react';
 import type { ShownApproval } from './select-shown-approval.ts';
 import './approval-prompt.css';
@@ -83,7 +83,7 @@ export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProp
       {isFirstLoadPending && (
         <ProgressBar isLabelVisible={false} ariaLabel="a függő jóváhagyások betöltése folyamatban" value={100} />
       )}
-      {failureMessage !== undefined && <p role="alert">{failureMessage}</p>}
+      {failureMessage !== undefined && <Alert variant="danger">{failureMessage}</Alert>}
       {shown !== undefined && (
         <>
           <Pagination

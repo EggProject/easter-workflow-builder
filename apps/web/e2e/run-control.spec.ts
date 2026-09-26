@@ -152,6 +152,12 @@ interface RunViewMockOptions {
 }
 
 const CONFLICT_ERROR_BODY = { code: 'conflict', message: 'A futás állapota közben megváltozott.' };
+/**
+ * A felületen KIZÁRÓLAG a kódhoz rendelt mondat áll, a design system danger
+ * `Alert` blokkjában; a szerver `message` mezője nem (SPEC-007 8.4, user
+ * döntés 2026-09-24).
+ */
+const CONFLICT_SENTENCE = 'Az elem állapota most nem engedi a műveletet.';
 
 async function mockRunView(page: Page, options: RunViewMockOptions): Promise<void> {
   await mockIdleStream(page);
@@ -345,7 +351,9 @@ test('a megszakítás hibáját riasztásként írja ki, és a gomb újra haszn�
   const interruptButton = page.getByRole('button', { name: 'Megszakítás' });
   await interruptButton.click();
 
-  await expect(page.getByRole('alert')).toContainText('megváltozott');
+  await expect(page.getByRole('alert')).toHaveText(CONFLICT_SENTENCE);
+  await expect(page.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('megváltozott');
   await expect(interruptButton).toBeEnabled();
   await expect(page.getByText('Megszakítás folyamatban')).toHaveCount(0);
 });
@@ -356,11 +364,13 @@ test('az újraindítás hibáját riasztásként írja ki, navigáció nélkül'
 
   await page.getByRole('button', { name: 'Újraindítás' }).click();
 
-  await expect(page.getByRole('alert')).toContainText('megváltozott');
+  await expect(page.getByRole('alert')).toHaveText(CONFLICT_SENTENCE);
+  await expect(page.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('megváltozott');
   await expect(page).toHaveURL(/\/run\?runId=run-1$/);
 });
 
-test('a modális indítás hibáját az űrlapban írja ki, a modális nyitva marad', async ({ page }) => {
+test('a modális indítás hibáját a modálisban írja ki, a modális nyitva marad', async ({ page }) => {
   const recording: StartRunRecording = { bodies: [] };
   await mockIdleStream(page);
   await installApiMocks(page, [
@@ -379,7 +389,9 @@ test('a modális indítás hibáját az űrlapban írja ki, a modális nyitva ma
   await dialog.getByRole('textbox', { name: 'Téma' }).fill('AI hírek');
   await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('megváltozott');
+  await expect(dialog.getByRole('alert')).toHaveText(CONFLICT_SENTENCE);
+  await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(dialog).not.toContainText('megváltozott');
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(new RegExp(String.raw`/editor\?workflowId=w-alfa$`));
   expect(recording.bodies).toHaveLength(1);
@@ -405,7 +417,9 @@ test('modális nélküli indítás hibáját a lábléc státusza írja ki', asy
 
   // Modális nincs, tehát az üzenetnek a láblécben kell megjelennie, különben a
   // felhasználó néma hibát látna.
-  await expect(page.locator('.page-footer').getByRole('alert')).toContainText('megváltozott');
+  await expect(page.locator('.page-footer').getByRole('alert')).toHaveText(CONFLICT_SENTENCE);
+  await expect(page.locator('.page-footer').getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('megváltozott');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(String.raw`/editor\?workflowId=w-alfa$`));
 });

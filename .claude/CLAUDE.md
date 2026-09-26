@@ -666,6 +666,17 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   criterion does not mandate any particular way in which errors should be displayed"
   (<https://www.w3.org/WAI/WCAG22/Understanding/error-identification>), tehát a fenti szabály
   felhasználói termékdöntés (user kérés 2026-09-09).
+- **A REST hívás hibája a design system `danger` `Alert` blokkjában jelenik meg, a szerver belső
+  szövege nélkül** (user döntés 2026-09-24, "Mindhárom javítás"). A felületen kizárólag a
+  hibakódhoz rendelt magyar mondat áll, utána semmi (nincs ".:"), és a szerver `message` mezője
+  (azonosító, zárójeles hibaosztály) nem jut a felületre; a hibaág nem nyers `<p role="alert">`,
+  hanem a `packages/ui` `Alert` eleme (`variant="danger"`, a szerepet a komponens adja, a forrás
+  szerint). A mező alatti űrlap hiba (előző pont), a futás nézet "Várakozás a szerverre"
+  `warning` jelzése és a soronkénti műveletek `Toast` értesítése nem tartozik ide. Részletek és
+  határok: SPEC-007 8.4; a teendőt hordozó részlet sorsa nyitott (SPEC-007 15. szekció O-10), az
+  akciósáv magassága 1440x600-on a kérdés szövegét levágja (SPEC-008 14.2 O-17). Védelem:
+  `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts` és a
+  `rest-error-paths.spec.ts`.
 
 ---
 

@@ -158,8 +158,11 @@ test('az újraindítás hibájára toast jelenik meg', async ({ page }) => {
   const row = page.getByRole('table', { name: 'Futások' }).getByRole('row', { name: /r-succeeded/ });
   await row.getByRole('button', { name: 'Újraindítás' }).click();
 
+  // A toast szövege is csak a kód mondata, a szerver `message` mezője nélkül
+  // (SPEC-007 8.4, user döntés 2026-09-24).
   await expect(page.getByText('Az újraindítás sikertelen')).toBeVisible();
-  await expect(page.getByText('A futás nem indítható újra.')).toBeVisible();
+  await expect(page.getByText('Az elem állapota most nem engedi a műveletet.')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('A futás nem indítható újra.');
 });
 
 test('a futás lista betöltési hibájára riasztás jelenik meg', async ({ page }) => {
@@ -172,7 +175,11 @@ test('a futás lista betöltési hibájára riasztás jelenik meg', async ({ pag
 
   await page.goto('/runs');
 
-  await expect(page.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.: A futásokat nem sikerült lekérni.');
+  // A kódhoz rendelt mondat a design system danger `Alert` blokkjában, a
+  // szerver `message` mezője nélkül (SPEC-007 8.4, user döntés 2026-09-24).
+  await expect(page.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.');
+  await expect(page.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('A futásokat nem sikerült lekérni.');
 });
 
 test('az Állapot fejlécre kattintva a tábla az állapot felirata szerint rendez', async ({ page }) => {

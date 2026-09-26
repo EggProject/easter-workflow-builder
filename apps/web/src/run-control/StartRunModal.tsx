@@ -1,5 +1,5 @@
 import type { StartInputField } from '@easter-workflow-builder/protocol';
-import { Button, FieldErrorVisibilityContext, Modal, TextField } from '@easter-workflow-builder/ui';
+import { Alert, Button, FieldErrorVisibilityContext, Modal, TextField } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
 import {
   buildInitialStartRunValues,
@@ -42,7 +42,8 @@ const FORM_DOM_ID = 'start-run-form';
  * egy sikertelen beküldési kísérlet és érvénytelen. A "volt már kísérlet"
  * tényt a `FieldErrorVisibilityContext` viszi le a mezőkhöz. A szerver oldali
  * hiba ezzel szemben NEM mezőszintű (a `StartRunRequest` alakját a szerver
- * ellenőrzi), ezért az a láb fölött, `role="alert"` szerepben áll.
+ * ellenőrzi), ezért az a láb fölött, a design system `danger` `Alert`
+ * blokkjában áll (`role="alert"`, SPEC-007 8.4, user döntés 2026-09-24).
  *
  * A mezők `TextField` elemek, mert a `StartInputField.valueKind`
  * értékkészletét egyetlen forrás sem sorolja fel (lásd a `start-run-values.ts`
@@ -116,9 +117,11 @@ export function StartRunModal(properties: Readonly<StartRunModalProperties>): Re
               }}
             />
           ))}
-          {errorMessage !== undefined && <p role="alert">{errorMessage}</p>}
         </form>
       </FieldErrorVisibilityContext.Provider>
+      {/* A `<form>` elemen kívül, a modális törzs közvetlen gyerekeként, hogy
+          a forrás `.modal__body > * + *` térköze elválassza a mezőktől. */}
+      {errorMessage !== undefined && <Alert variant="danger">{errorMessage}</Alert>}
     </Modal>
   );
 }

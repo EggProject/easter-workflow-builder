@@ -1,6 +1,6 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { WorkflowSummarySchema, type WorkflowSummary } from '@easter-workflow-builder/protocol';
-import { Button, Modal, TextField } from '@easter-workflow-builder/ui';
+import { Alert, Button, Modal, TextField } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ChangeEvent, type ReactElement, type SubmitEvent } from 'react';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -102,8 +102,12 @@ export function RenameWorkflowModal(properties: Readonly<RenameWorkflowModalProp
             setDescription(event.target.value);
           }}
         />
-        {submitState.state.status === 'failure' && <p role="alert">{submitState.state.message}</p>}
       </form>
+      {/* A REST hiba a design system `danger` `Alert` blokkja, a `<form>`
+          elemen kívül, a modális törzs közvetlen gyerekeként, hogy a forrás
+          `.modal__body > * + *` térköze elválassza a mezőktől (SPEC-007
+          8.4, user döntés 2026-09-24). */}
+      {submitState.state.status === 'failure' && <Alert variant="danger">{submitState.state.message}</Alert>}
     </Modal>
   );
 }

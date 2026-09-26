@@ -118,13 +118,16 @@ describe('ApprovalDecisionActions', () => {
     },
   );
 
-  it('végleges hiba (conflict) után a gombok letiltva maradnak, a hibaüzenet látszik, nyugtázó gomb nélkül', () => {
-    renderActions({ status: 'failed', message: 'a jóváhagyás már el lett döntve', isFinal: true });
+  it('végleges hiba (conflict) után a gombok letiltva maradnak, a hibaüzenet a sáv danger Alert blokkjában látszik, nyugtázó gomb nélkül', () => {
+    renderActions({ status: 'failed', message: 'Az elem állapota most nem engedi a műveletet.', isFinal: true });
     const { approve, reject } = decisionButtons();
 
     expect(approve.disabled).toBe(true);
     expect(reject.disabled).toBe(true);
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('a jóváhagyás már el lett döntve');
+    const failure = container.querySelector(':scope .drawer__footer > .alert--danger[role="alert"]');
+    expect(failure?.textContent).toBe('Az elem állapota most nem engedi a műveletet.');
+    // A saját, teljes szélességű sor osztálya (`approval-prompt.css`).
+    expect(failure?.classList.contains('approval-decision-actions__failure')).toBe(true);
     expect(container.querySelectorAll('button')).toHaveLength(2);
   });
 
@@ -134,6 +137,6 @@ describe('ApprovalDecisionActions', () => {
 
     expect(approve.disabled).toBe(false);
     expect(reject.disabled).toBe(false);
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 });

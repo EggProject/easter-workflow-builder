@@ -1,5 +1,5 @@
 import type { ApprovalDecision } from '@easter-workflow-builder/protocol';
-import { Button, DrawerFooter } from '@easter-workflow-builder/ui';
+import { Alert, Button, DrawerFooter } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import type { ApprovalDecisionProgress } from './reduce-approval-decisions.ts';
 import './approval-prompt.css';
@@ -52,7 +52,8 @@ const DECISION_LABELS: Readonly<Record<ApprovalDecision, string>> = {
  * hiba, 502, 503) engedi az újrapróbálást. Az eredmény (siker vagy a
  * hibaüzenet) külön nyugtázás nélkül látszik, amíg a nézet ugyanazon a
  * futáson áll (user döntés 2026-09-24); a sáv nem görget, tehát görgetés
- * nélkül.
+ * nélkül. A hiba a design system `danger` `Alert` blokkja, a gombok fölötti
+ * saját sorban (SPEC-007 8.4, user döntés 2026-09-24).
  */
 export function ApprovalDecisionActions(properties: Readonly<ApprovalDecisionActionsProperties>): ReactElement {
   const { progress, onDecide, approvalTitleId, approvalTextId } = properties;
@@ -69,9 +70,9 @@ export function ApprovalDecisionActions(properties: Readonly<ApprovalDecisionAct
         </p>
       )}
       {progress?.status === 'failed' && (
-        <p className="approval-decision-actions__failure" role="alert">
+        <Alert variant="danger" className="approval-decision-actions__failure">
           {progress.message}
-        </p>
+        </Alert>
       )}
       <Button
         type="button"
