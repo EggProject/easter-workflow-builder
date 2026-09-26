@@ -1,4 +1,4 @@
-// Tizenhét, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Tizennyolc, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -7,7 +7,8 @@
 // nem jelenhet meg költség mező, SPEC-008 AC37) TÖRÖLVE: a user 2026-09-23-i
 // döntése ("Költség külön mezőként is látszódjon") a tiltást visszavonta, a
 // költség SDK becslésként jelenik meg (`run-event-row` téma). A mai (16) és
-// (17) a T-009-25 lépéssel érkezett (SPEC-008 AC39, AC40).
+// (17) a T-009-25 lépéssel érkezett (SPEC-008 AC39, AC40), a (18) a REST
+// hibaüzenetekről szóló user döntéssel (2026-09-24, SPEC-007 8.4).
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -240,5 +241,31 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
     const predicateSource = readFileSync(path.join(WEB_SRC, 'transcript-panel', 'is-last-row-visible.ts'), 'utf8');
     expect(predicateSource).toContain('visibleRows.stopIndex === rowCount - 1');
+  });
+
+  it('(18) REST hibaág üzenete nem áll nyers role="alert" elemben: a maradék literál mind felsorolt, nem REST eredetű hely (SPEC-007 8.4, user döntés 2026-09-24)', () => {
+    // A REST hívás `Outcome` hibaága a design system `danger` `Alert`
+    // blokkjában jelenik meg, a szerepet a komponens adja, nem a hívó
+    // literálja. A lista a NEM REST eredetű riasztásokat nevezi meg,
+    // fájlonként a darabszámmal: egy új nyers riasztás itt bukik, és csak
+    // kimondott döntéssel vehető fel. A doksi sorok kiszűrve, mint a (17)-nél.
+    const nonRestAlertCounts: Readonly<Record<string, number>> = {
+      // a hiányzó `workflowId` query paraméter és a mentés előtti helyi séma ellenőrzés összesítője
+      [path.join('graph-editor', 'GraphEditorScreen.tsx')]: 2,
+      // a hiányzó `runId` query paraméter és a pillanatkép helyi vetítésének hibája
+      [path.join('run-view', 'RunViewScreen.tsx')]: 2,
+      // a futás saját hibája (a `RunDetail` mezői, nem hibaág)
+      [path.join('run-control', 'RunControlBar.tsx')]: 1,
+      // a szerkesztő panel két statikus figyelmeztetése
+      [path.join('node-inspector', 'AgentDefinitionEntryFields.tsx')]: 1,
+      [path.join('node-inspector', 'ScriptNodeFields.tsx')]: 1,
+    };
+    const alertCounts = Object.fromEntries(
+      PRODUCT_FILES.map(
+        (file) =>
+          [file.relativePath, stripCommentLines(file.content).match(/role=["']alert["']/gu)?.length ?? 0] as const,
+      ).filter(([, count]) => count > 0),
+    );
+    expect(alertCounts).toEqual(nonRestAlertCounts);
   });
 });

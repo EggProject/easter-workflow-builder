@@ -699,7 +699,21 @@ A `continue-on-error: true` **eltávolítva**. Eredetileg azért kellett, mert a
 | ----------- | --------------------------------------------------------------------- | -------------------------- |
 | Mindig      | a `test` job coverage riportja (`lcov`, `html`) és a komment töredéke | nem állítjuk be, lásd lent |
 | Mindig      | az `e2e` job coverage riportja (`lcov`, `html`) és a komment töredéke | nem állítjuk be, lásd lent |
-| Hiba esetén | az `e2e` job Playwright riportja és trace fájljai                     | nem állítjuk be, lásd lent |
+| Hiba esetén | az `e2e` job hibás tesztjeinek `error-context.md` fájljai             | nem állítjuk be, lásd lent |
+
+A hiba esetén feltöltött artefaktum tartalma (2026-09-25, saját mérés és a telepített
+`playwright@1.62.1` forrása): a `ci.yml` "Upload Playwright report" lépése a `**/playwright-report/**`
+és a `**/test-results/**` mintát tölti fel. A `playwright-report` mappa nem keletkezik, mert a
+`playwright.config.ts` a `list` reportert használja, és ez a mappa a HTML reporter kimenete
+([reporters](https://playwright.dev/docs/test-reporters)). Trace, videó és képernyőkép sem
+keletkezik: a `trace` és a `video` `'off'`, a képernyőkép opció alapértéke ki van kapcsolva
+([use options](https://playwright.dev/docs/test-use-options)), és a képernyőkép védelem
+(`.claude/CLAUDE.md` 12. szekció) tiltja a bekapcsolásukat. A `test-results` mappába hibás
+tesztenként egy `error-context.md` kerül (a hibaüzenet és az oldal akadálymentességi
+pillanatképe, szöveg), plusz a rejtett `.last-run.json`, amit az `actions/upload-artifact` a v4.4
+óta alapból kihagy ([README](https://github.com/actions/upload-artifact#uploading-hidden-files)).
+A lépés tehát nem halott, de a neve és a `playwright-report` mintája igen; a `ci.yml` javítása külön
+lépés, mert workflow fájlt a munkamenet tokenje nem pusholhat.
 
 Retenciós napszámot **nem** rögzítünk, mert nincs rá projekt szintű forrásunk (V-17 nyitva). Az `actions/upload-artifact` v7.0.1 saját `action.yml` fájlja sem ad `default` értéket a `retention-days` bemenetre, tehát a repo beállítása érvényesül.
 

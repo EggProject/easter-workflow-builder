@@ -15,9 +15,10 @@ export const API_ORIGIN = 'http://localhost:4174';
  * és az SSE csatorna a fejlesztői proxy döntés után két külön origin mezőt
  * kap). Az e2e felállásban SZÁNDÉKOSAN ugyanaz az érték, mint az
  * `API_ORIGIN`: a `page.route()` mindkét csatornát ugyanazon az originen
- * fogja el, és a `sse-reconnect.spec.ts` (illetve `sse-real-server.spec.ts`)
- * egyetlen kivétele is erre a portra köt egy valódi `node:http` szervert
- * (`docs/research/2026-08-30-sse-mockolas-meres.md` 3. szekció 2. pontja).
+ * fogja el, és a `sse-real-server.spec.ts` egyetlen kivétele is ennek az
+ * originnek a `GET /events` kérését irányítja egy valódi, szabad porton
+ * figyelő `node:http` szerverre (`run-view-stream.ts` `routeStreamToPort`,
+ * `docs/research/2026-08-30-sse-mockolas-meres.md` 3. szekció 2. pontja).
  * A két konstans külön deklarációja azért kell, hogy a REST és az SSE mock
  * segédfüggvények a saját, szemantikailag helyes nevükön importálják az
  * origint, nem pedig azért, mert az e2e alatt ténylegesen eltérő portra

@@ -159,10 +159,12 @@ describe('StartRunModal', () => {
     expect(container.querySelector(':scope .modal__footer .btn.is-loading')?.textContent).toContain('Indítás');
   });
 
-  it('a szerver oldali hibát az űrlapban, riasztásként írja ki', () => {
+  it('a szerver oldali hibát a modális törzsében, az űrlap alatt, a danger Alert blokkban írja ki', () => {
     renderModal({ errorMessage: 'A szerver nem érhető el.' });
 
-    expect(container.querySelector(':scope form [role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector(':scope .modal__body > .alert--danger[role="alert"]')?.textContent).toBe(
+      'A szerver nem érhető el.',
+    );
   });
 
   it('újranyitáskor az előző értékek és a beküldési kísérlet nyoma eltűnik', () => {

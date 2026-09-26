@@ -7,7 +7,7 @@ import {
 } from '@easter-workflow-builder/protocol';
 import { matchRoute } from '../route-dispatch/match-route.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
-import { mapOutcomeMessageToErrorCode } from '../error-mapping/map-outcome-message-to-error-code.ts';
+import { buildProtocolErrorBody } from '../error-mapping/build-protocol-error-body.ts';
 import {
   handleStreamConnection,
   type StreamConnectionDependencies,
@@ -73,9 +73,8 @@ async function serveMatchedRoute(
   const result = await handler({ parameters, query, body: bodyOutcome.value });
 
   if (result.kind === 'error') {
-    const code = mapOutcomeMessageToErrorCode(result.message);
-    const body = { code, message: result.message } satisfies ProtocolErrorBody;
-    writeJson(response, httpStatusForErrorCode(code), body, corsHeaders);
+    const body = buildProtocolErrorBody(result.message);
+    writeJson(response, httpStatusForErrorCode(body.code), body, corsHeaders);
     return;
   }
 

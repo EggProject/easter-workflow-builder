@@ -7,6 +7,29 @@ describe('ProtocolErrorBodySchema', () => {
     expect(outcome.success).toBe(true);
   });
 
+  it('elfogadja a szótárban álló errorClass mezőt (8.5)', () => {
+    const outcome = ProtocolErrorBodySchema.safeParse({
+      code: 'unprocessable',
+      message: 'Nincs alapértelmezett provider (no_default_provider).',
+      errorClass: 'no_default_provider',
+    });
+    expect(outcome.success && outcome.data.errorClass).toBe('no_default_provider');
+  });
+
+  it('a mező nélküli törzsben az errorClass hiányzik (a mező előtti szerver válasz is érvényes)', () => {
+    const outcome = ProtocolErrorBodySchema.safeParse({ code: 'unprocessable', message: 'hiba' });
+    expect(outcome.success && Object.hasOwn(outcome.data, 'errorClass')).toBe(false);
+  });
+
+  it('a szótáron kívüli errorClass értéket elutasítja', () => {
+    const outcome = ProtocolErrorBodySchema.safeParse({
+      code: 'internal',
+      message: 'hiba (database_closed).',
+      errorClass: 'database_closed',
+    });
+    expect(outcome.success).toBe(false);
+  });
+
   it('elutasítja az ismeretlen kulcsot (40. kritérium: nincs szabad details mező)', () => {
     const outcome = ProtocolErrorBodySchema.safeParse({
       code: 'not_found',

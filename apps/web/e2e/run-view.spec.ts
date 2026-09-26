@@ -440,7 +440,12 @@ const LARGE_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-lg');
 const MEDIUM_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-md');
 const RUN_VIEW_VIEWPORT_HEIGHT = 900;
 
-const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+/**
+ * A felhasználó által beállított arány kulcsa (`run-view-layout.ts`,
+ * 2026-09-26 óta új kulcs; a régi `eggRunViewLayout` értékét senki nem
+ * olvassa).
+ */
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 function separatorLocator(page: Page): Locator {
   return page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
@@ -562,17 +567,27 @@ test('az elrendezés aránya a localStorage-ből töltődik vissza', async ({ pa
   await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '45');
 });
 
-test('hibás alakú tárolt arányra az alapértelmezés áll be, és az íródik vissza', async ({ page }) => {
+test('hibás alakú tárolt arányra az alapértelmezés áll be, és a tárolóba csak a felhasználó húzása ír', async ({
+  page,
+}) => {
   await mockRun(page);
   await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
   await seedStoredLayout(page, JSON.stringify({ graph: 45 }));
 
   await page.goto(RUN_URL);
-  await expect(separatorLocator(page)).toHaveAttribute('aria-valuenow', '70');
-  // A `Resizable` kezdő értesítése a helyes alakot írja vissza a tárolóba.
+  const separator = separatorLocator(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', '70');
+  // A `Resizable` 2026-09-25 óta csak a felhasználó változtatását jelenti: a
+  // kezdő érték nem íródik a tárolóba (a saját arány a kulcs megléte,
+  // `run-view-layout.ts`), a billentyű lépés igen.
+  expect(await page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY)).toBe(
+    JSON.stringify({ graph: 45 }),
+  );
+  await separator.focus();
+  await separator.press('ArrowLeft');
   await expect
     .poll(async () => page.evaluate((key: string) => globalThis.localStorage.getItem(key), RUN_VIEW_LAYOUT_STORAGE_KEY))
-    .toBe('[70,30]');
+    .toBe('[65,35]');
 });
 
 test('letiltott tárolás esetén az alapértelmezés áll be, a felület nem tör el', async ({ page }) => {

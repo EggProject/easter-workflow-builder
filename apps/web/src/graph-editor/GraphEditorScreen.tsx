@@ -10,6 +10,7 @@ import {
   type WorkflowNodeInput,
 } from '@easter-workflow-builder/protocol';
 import {
+  Alert,
   Button,
   ButtonGroup,
   Menu,
@@ -395,14 +396,14 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
           <>
             {isDirty && <span role="status">Mentetlen változtatások</span>}
             {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
-            {graphState.state.status === 'failure' && <p role="alert">{graphState.state.message}</p>}
+            {graphState.state.status === 'failure' && <Alert variant="danger">{graphState.state.message}</Alert>}
             {/* Az indítás hibája a lábléc státuszában áll, ha NINCS nyitva a
                 modális (üres `inputFields` lista, tehát a futás modális nélkül
                 indult). Nyitott modálisnál az üzenet a modálisban látszik, a
                 lábléc fölé feszülő átlapoló mögött ugyanis olvashatatlan
                 lenne; ez a feltétel tehát nem duplikálja az üzenetet. */}
             {startRunState.state.status === 'failure' && !isStartRunModalOpen && (
-              <p role="alert">{startRunState.state.message}</p>
+              <Alert variant="danger">{startRunState.state.message}</Alert>
             )}
           </>
         }

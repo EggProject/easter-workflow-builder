@@ -109,7 +109,7 @@ const STEP_RUNS: readonly StepRunRecord[] = [
 /* eslint-enable unicorn/no-null */
 
 const RUN_URL = `/run?runId=${RUN_ID}`;
-const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewLayout';
+const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 
 /**
  * A jelölő oszlop és a sormagasság méréséhez használt, egymástól eltérő

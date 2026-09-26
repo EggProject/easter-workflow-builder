@@ -1,5 +1,6 @@
 import { useContext, type KeyboardEvent, type PointerEvent, type ReactElement } from 'react';
 import { ResizableContext } from './resizable-context.ts';
+import { resizeAt } from './resize-at.ts';
 
 export interface ResizableHandleProperties {
   /**
@@ -22,13 +23,31 @@ const END_DELTA_PERCENT = 100;
  * az ÚJ `Enter` (lásd `Resizable.tsx` fejléc dokumentációja). A hat ARIA
  * attribútum: `aria-orientation`, `aria-label`, `aria-controls`,
  * `aria-valuemin`, `aria-valuemax`, `aria-valuenow`.
+ *
+ * Az `aria-valuemin` és az `aria-valuemax` a `Home`, illetve az `End`
+ * érkezési helye (ugyanaz a `resizeAt` számítás, a mért pixeles minimummal),
+ * nem a forrás rögzített 5 és 95 értéke: a W3C APG Window Splitter mintája
+ * szerint a kettő az a hely, ahol az elsődleges panel a legkisebb, illetve a
+ * legnagyobb (2026-09-25, `Resizable.tsx` fejléc). A fókusz újraméri a
+ * paneleket, hogy a felolvasott érték friss legyen.
  */
 export function ResizableHandle(properties: Readonly<ResizableHandleProperties>): ReactElement {
   const { beforeIndex, 'aria-label': ariaLabelOverride } = properties;
-  const { sizes, direction, activeHandleIndex, panelDomId, beginDrag, resizeByDelta, toggleCollapse } =
-    useContext(ResizableContext);
+  const {
+    sizes,
+    minSizePercents,
+    direction,
+    activeHandleIndex,
+    panelDomId,
+    beginDrag,
+    resizeByDelta,
+    toggleCollapse,
+    refreshGeometry,
+  } = useContext(ResizableContext);
   const isVertical = direction === 'vertical';
   const sizeBefore = sizes[beforeIndex];
+  const lowestSize = resizeAt(sizes, beforeIndex, HOME_DELTA_PERCENT, minSizePercents)[beforeIndex];
+  const highestSize = resizeAt(sizes, beforeIndex, END_DELTA_PERCENT, minSizePercents)[beforeIndex];
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
     event.preventDefault();
@@ -98,10 +117,11 @@ export function ResizableHandle(properties: Readonly<ResizableHandleProperties>)
       aria-orientation={isVertical ? 'horizontal' : 'vertical'}
       aria-label={ariaLabelOverride ?? `Resize panels ${String(beforeIndex + 1)} and ${String(beforeIndex + 2)}`}
       aria-controls={`${panelDomId(beforeIndex)} ${panelDomId(beforeIndex + 1)}`}
-      aria-valuemin={5}
-      aria-valuemax={95}
+      aria-valuemin={lowestSize === undefined ? undefined : Math.round(lowestSize)}
+      aria-valuemax={highestSize === undefined ? undefined : Math.round(highestSize)}
       aria-valuenow={sizeBefore === undefined ? undefined : Math.round(sizeBefore)}
       tabIndex={0}
+      onFocus={refreshGeometry}
       onPointerDown={handlePointerDown}
       onKeyDown={handleKeyDown}
     />

@@ -18,6 +18,7 @@
 // visszatérni.
 import type {
   NodeConfig,
+  PendingApproval,
   RunDetail,
   RunSnapshotResponse,
   SettingsRecord,
@@ -97,10 +98,17 @@ const LOOP_CONFIG: NodeConfig = {
   onUnhandledError: null,
 };
 
+/**
+ * A `human_approval` csomópont címe és törzse: egyetlen forrás a csomópont
+ * `config` mezőjének és a függő jóváhagyásnak (`SHOWCASE_PENDING_APPROVALS`).
+ */
+const SHOWCASE_APPROVAL_TITLE = 'Jóváhagyás szükséges';
+const SHOWCASE_APPROVAL_BODY = 'Kérlek hagyd jóvá a lépést.';
+
 const HUMAN_APPROVAL_CONFIG: NodeConfig = {
   type: 'human_approval',
-  title: 'Jóváhagyás szükséges',
-  bodyTemplate: 'Kérlek hagyd jóvá a lépést.',
+  title: SHOWCASE_APPROVAL_TITLE,
+  bodyTemplate: SHOWCASE_APPROVAL_BODY,
   timeoutMs: null,
   onUnhandledError: null,
 };
@@ -492,6 +500,31 @@ export const SHOWCASE_RUN_STEP_RUNS: readonly StepRunRecord[] = [
   },
 ];
 
+/**
+ * A `n-approval` csomópont függő jóváhagyása, KÖVETKEZETESEN a várakozó
+ * lépés futással (`sr-approval`, `waiting_approval`): a `GET /api/approvals`
+ * pontosan a `waiting_approval` lépések jóváhagyásait adja (SPEC-008 8.
+ * szekció), tehát a bemutató futás nézetén a jóváhagyás panel is látszik. A
+ * cím és a törzs ugyanaz, mint a csomópont `config` mezőjében (a
+ * `bodyTemplate` itt változó nélküli, tehát a renderelt törzs önmaga); a
+ * `payload` a motor szerint a futás kontextusa
+ * (`packages/engine/src/node-executor/execute-human-approval.ts`), ebből a
+ * bemutató a `start` csomópont bemenetét mutatja.
+ */
+export const SHOWCASE_PENDING_APPROVALS: readonly PendingApproval[] = [
+  {
+    id: 'appr-bemutato',
+    runId: SHOWCASE_RUN_ID,
+    stepRunId: 'sr-approval',
+    title: SHOWCASE_APPROVAL_TITLE,
+    body: SHOWCASE_APPROVAL_BODY,
+    payload: { input: { topic: 'Workflow tervezés' } },
+    decision: null,
+    requestedAtMs: new Date(2026, 8, 24, 10, 32, 5).getTime(),
+    decidedAtMs: null,
+  },
+];
+
 /* eslint-enable unicorn/no-null */
 
 export const SHOWCASE_EDITOR_URL = `/editor?workflowId=${SHOWCASE_WORKFLOW.id}`;
@@ -519,8 +552,9 @@ export async function installShowcaseMocks(page: Page): Promise<void> {
 }
 
 /**
- * Ugyanez a FUTÁS nézet három végpontjára (`getRun`, `readRunSnapshot`,
- * `listStepRuns`), a származtatott pillanatképpel. A `readSettings` azért
+ * Ugyanez a FUTÁS nézet végpontjaira (`getRun`, `readRunSnapshot`,
+ * `listStepRuns`, `listPendingApprovals`), a származtatott pillanatképpel és a
+ * várakozó csomópont függő jóváhagyásával. A `readSettings` azért
  * szerepel, mert a topnav shell is kérdezi: a hiányzó mock az
  * `installApiMocks` szerint 404-et adna, ami hibaüzenetet tenne a
  * képernyőképre.
@@ -531,7 +565,7 @@ export async function installShowcaseRunMocks(page: Page): Promise<void> {
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_STEP_RUNS))),
-    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(SHOWCASE_PENDING_APPROVALS))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SHOWCASE_SETTINGS))),
   ]);
 }

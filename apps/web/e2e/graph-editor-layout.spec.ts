@@ -267,6 +267,36 @@ test('a jobb oldali panel csak kiválasztásra jelenik meg, és az arány a loca
   expect(restoredSizes).toEqual(['65%', '35%']);
 });
 
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1024, height: 768 },
+] as const) {
+  test(`${String(viewport.width)}x${String(viewport.height)}: a kijelöléskor megjelenő panel elválasztója fókusz nélkül is a mért határt jelenti (aria-valuemin, aria-valuemax), ugyanazt, amit a fókusz utáni újramérés`, async ({
+    page,
+  }) => {
+    // A beállítás panel a csomópont kijelölésekor csatolódik: a `Resizable`
+    // addig egy panellel mért (a forrás [5, 95] tartománya), és a
+    // 2026-09-25-i javítás előtt a fókuszig ezen maradt (független
+    // ellenőrzés: 5/95 a valódi 6/94 helyett). A panel csatolása óta a
+    // `Resizable` újramér (`packages/ui` `Resizable.tsx`).
+    await page.setViewportSize(viewport);
+    await page.goto(EDITOR_URL);
+    await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+    await page.getByTestId('rf__node-n1').click();
+    const separator = page.getByRole('separator');
+    await expect(separator).toBeVisible();
+
+    const beforeFocus = [await separator.getAttribute('aria-valuemin'), await separator.getAttribute('aria-valuemax')];
+    await separator.focus();
+    await expect(separator).toBeFocused();
+    const afterFocus = [await separator.getAttribute('aria-valuemin'), await separator.getAttribute('aria-valuemax')];
+    expect(beforeFocus).toEqual(afterFocus);
+    // A mért határ a panelek 80 pixeles CSS minimumából jön, ezen a méreten
+    // nem a forrás 5 százaléka.
+    expect(afterFocus).not.toEqual(['5', '95']);
+  });
+}
+
 test('dobó localStorage (szimulált privát böngészés) esetén az alapértelmezett arányra esik vissza, és a szerkesztő használható marad', async ({
   page,
 }) => {

@@ -32,12 +32,6 @@ export interface ApprovalDecisionsState {
    * Az elküldött döntések, a jóváhagyás azonosítója szerint.
    */
   readonly tracked: ReadonlyMap<string, TrackedApprovalDecision>;
-  /**
-   * A user által nyugtázott, lezárt döntések jóváhagyás azonosítói: ezek a
-   * kártyák a nézet élete alatt többé nem jelennek meg, akkor sem, ha egy
-   * elbukott újratöltés miatt a lista még a régi állapotot mutatja.
-   */
-  readonly hiddenIds: ReadonlySet<string>;
 }
 
 export type ApprovalDecisionsAction =
@@ -48,12 +42,10 @@ export type ApprovalDecisionsAction =
       readonly decision: ApprovalDecision;
       readonly outcome: RouteOutcome<unknown>;
     }
-  | { readonly kind: 'dismissed'; readonly approvalId: string }
   | { readonly kind: 'reset' };
 
 export const INITIAL_APPROVAL_DECISIONS_STATE: ApprovalDecisionsState = {
   tracked: new Map(),
-  hiddenIds: new Set(),
 };
 
 function withTracked(
@@ -61,23 +53,21 @@ function withTracked(
   approval: PendingApproval,
   progress: ApprovalDecisionProgress,
 ): ApprovalDecisionsState {
-  return { ...state, tracked: new Map(state.tracked).set(approval.id, { approval, progress }) };
+  return { tracked: new Map(state.tracked).set(approval.id, { approval, progress }) };
 }
 
 /**
  * A jóváhagyás panel döntés állapotának átmenetei (T-009-27 javítás, egy
  * független ellenőrzés nyomán).
  *
- * **Egy eldöntött vagy véglegesen elbukott kártya gombjai soha nem
- * kapcsolnak vissza**, és az eredmény üzenet addig látszik, amíg a user
- * nyugtázza (`dismissed`). A döntés állapota ezért NEM a kártya saját
- * állapota: a kártya leszerelődik, amikor a friss lista már nem tartalmazza a
- * jóváhagyást (ez pont a sikeres döntés és a `conflict` után történik), és
- * vele az eredmény is elveszne.
- *
- * A nyugtázás a lezárt döntést (`decided`, végleges `failed`) elrejti a nézet
- * élete alatt; az átmeneti hibát viszont csak törli, hogy ha a jóváhagyás a
- * szerver szerint még függ, a kártya újra döntésre kínálja.
+ * **Egy eldöntött vagy véglegesen elbukott döntés gombjai soha nem
+ * kapcsolnak vissza**, és az eredmény üzenet külön nyugtázás nélkül látszik,
+ * amíg a nézet a futáson áll: a futás nézet elhagyása leszereli az
+ * állapotot, egy másik futásra váltás pedig `reset` (user döntés
+ * 2026-09-24, a korábbi "Rendben" nyugtázás helyett). A döntés állapota ezért
+ * NEM a kártya saját állapota: a kártya leszerelődik, amikor a friss lista már
+ * nem tartalmazza a jóváhagyást (ez pont a sikeres döntés és a `conflict`
+ * után történik), és vele az eredmény is elveszne.
  *
  * A `reset` egy másik futásra váltáskor mindent töröl, és egy olyan
  * jóváhagyásra érkező válasz, amit az állapot nem követ (a váltás előtt
@@ -104,16 +94,6 @@ export function reduceApprovalDecisions(
           ? { status: 'decided', decision: action.decision }
           : { status: 'failed', message: outcome.message, isFinal: !outcome.isTransient },
       );
-    }
-    case 'dismissed': {
-      const progress = state.tracked.get(action.approvalId)?.progress;
-      const tracked = new Map(state.tracked);
-      tracked.delete(action.approvalId);
-      const isRetryable = progress?.status === 'failed' && !progress.isFinal;
-      return {
-        tracked,
-        hiddenIds: isRetryable ? state.hiddenIds : new Set(state.hiddenIds).add(action.approvalId),
-      };
     }
     case 'reset': {
       return INITIAL_APPROVAL_DECISIONS_STATE;

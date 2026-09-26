@@ -33,6 +33,23 @@ describe('resizeAt', () => {
     expect(resizeAt(sizes, 0, 10)).toBe(sizes);
   });
 
+  it('a mért pixeles minimum százaléka a bal/felső panel határa, ha nagyobb az 5 százaléknál', () => {
+    expect(resizeAt([50, 50], 0, -100, [15.5, 15.5])).toEqual([15.5, 84.5]);
+  });
+
+  it('a jobb/alsó panel mért minimuma a bal/felső panel felső határát szabja', () => {
+    expect(resizeAt([50, 50], 0, 100, [15.5, 20])).toEqual([80, 20]);
+  });
+
+  it('az 5 százaléknál kisebb mért minimum mellett a forrás [5, 95] határa marad', () => {
+    expect(resizeAt([50, 50], 0, -100, [2, 2])).toEqual([5, 95]);
+    expect(resizeAt([50, 50], 0, 100, [2, 2])).toEqual([95, 5]);
+  });
+
+  it('nulla eltolással a minimum alatti méretet a minimumra vágja', () => {
+    expect(resizeAt([5, 95], 0, 0, [15, 15])).toEqual([15, 85]);
+  });
+
   it('nem módosítja a bemeneti tömböt', () => {
     const sizes = [40, 60];
     resizeAt(sizes, 0, 10);

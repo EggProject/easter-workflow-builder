@@ -56,7 +56,11 @@ test('lista betöltési hibára riasztás jelenik meg', async ({ page }) => {
 
   await page.goto('/');
 
-  await expect(page.getByRole('alert')).toBeVisible();
+  // A kódhoz rendelt mondat a design system danger `Alert` blokkjában, a
+  // szerver `message` mezője nélkül (SPEC-007 8.4, user döntés 2026-09-24).
+  await expect(page.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.');
+  await expect(page.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(page.locator('body')).not.toContainText('A szerver hibát adott.');
 });
 
 test('új workflow létrehozása a modálison keresztül', async ({ page }) => {
@@ -169,7 +173,8 @@ test('a létrehozás hibájára a modálison belül riasztás jelenik meg, a mod
   await dialog.getByLabel('Név').fill('Ütköző név');
   await dialog.getByRole('button', { name: 'Létrehozás' }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('Ilyen nevű workflow már van.');
+  await expect(dialog.getByRole('alert')).toHaveText('Az elem állapota most nem engedi a műveletet.');
+  await expect(dialog).not.toContainText('Ilyen nevű workflow már van.');
   await expect(dialog).toBeVisible();
 });
 
@@ -276,7 +281,7 @@ test('az átnevezés hibájára a modálison belül riasztás jelenik meg', asyn
   await installApiMocks(page, [
     mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([ALFA]))),
     mockRoute('updateWorkflow', async (route) =>
-      route.fulfill(jsonBody({ code: 'not_found', message: 'Időközben törölték.' }, 404)),
+      route.fulfill(jsonBody({ code: 'not_found', message: 'A(z) "w-alfa" workflow nem található (not_found).' }, 404)),
     ),
   ]);
 
@@ -288,7 +293,12 @@ test('az átnevezés hibájára a modálison belül riasztás jelenik meg', asyn
   const dialog = page.getByRole('dialog', { name: 'Workflow átnevezése' });
   await dialog.getByRole('button', { name: 'Mentés' }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('Időközben törölték.');
+  // 404: csak a mondat, az azonosító és a zárójeles hibaosztály nem jut a
+  // felületre (SPEC-007 8.4, user döntés 2026-09-24).
+  await expect(dialog.getByRole('alert')).toHaveText('A keresett elem nem létezik, esetleg időközben törölték.');
+  await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(dialog).not.toContainText('(not_found)');
+  await expect(dialog).not.toContainText('"w-alfa"');
 });
 
 test('a törlési összegzés hibájára riasztás jelenik meg, és a törlés gomb tiltott marad', async ({ page }) => {
@@ -305,7 +315,8 @@ test('a törlési összegzés hibájára riasztás jelenik meg, és a törlés g
   await page.getByRole('menuitem', { name: 'Törlés' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Workflow törlése' });
-  await expect(dialog.getByRole('alert')).toContainText('Nem sikerült összeszámolni.');
+  await expect(dialog.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.');
+  await expect(dialog).not.toContainText('Nem sikerült összeszámolni.');
   // Összegzés nélkül nincs mit megerősíteni, tehát a gomb tiltott marad.
   await expect(dialog.getByRole('button', { name: 'Törlés' })).toBeDisabled();
 });
@@ -330,7 +341,9 @@ test('a törlés hibájára a modálison belül riasztás jelenik meg', async ({
   await dialog.getByText('Tudomásul veszem, hogy a törlés nem vonható vissza').click();
   await dialog.getByRole('button', { name: 'Törlés' }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('Fut még egy futás.');
+  await expect(dialog.getByRole('alert')).toHaveText('Az elem állapota most nem engedi a műveletet.');
+  await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+  await expect(dialog).not.toContainText('Fut még egy futás.');
   await expect(dialog).toBeVisible();
 });
 
@@ -430,5 +443,7 @@ test('a futás indítás hibájára toast jelenik meg, és a lista marad a hely�
   await page.getByRole('menuitem', { name: 'Indítás' }).click();
 
   await expect(page.getByText('A futás indítása sikertelen')).toBeVisible();
+  await expect(page.getByText('A kérés rendben volt, de a rendszer nem tudja végrehajtani.')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('Nincs gráf a workflow-hoz.');
   await expect(page.getByRole('navigation', { name: 'Morzsamenü' }).getByText('Workflow-k')).toBeVisible();
 });

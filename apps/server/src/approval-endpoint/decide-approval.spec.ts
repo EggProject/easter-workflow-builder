@@ -4,6 +4,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import type { Engine } from '@easter-workflow-builder/engine';
 import { httpStatusForErrorCode } from '@easter-workflow-builder/protocol';
+import { buildProtocolErrorBody } from '../error-mapping/build-protocol-error-body.ts';
 import { mapOutcomeMessageToErrorCode } from '../error-mapping/map-outcome-message-to-error-code.ts';
 import { createDecideApprovalHandler } from './decide-approval.ts';
 
@@ -165,6 +166,10 @@ describe('createDecideApprovalHandler', () => {
 
     expect(result.kind === 'error' && result.message).toContain('(already_decided)');
     expect(result.kind === 'error' && httpStatusOf(result.message)).toBe(409);
+    // A `db` saját üzenetéből a törzs `errorClass` mezője: ez a protokoll
+    // szótár `already_decided` tagjának futásidejű sodródás védelme
+    // (`error-class-drift-protection` téma, SPEC-005 8.5).
+    expect(result.kind === 'error' && buildProtocolErrorBody(result.message).errorClass).toBe('already_decided');
     expect(okOrThrow(database.approvals.getApproval(approval.id)).decision).toBe('approved');
   });
 

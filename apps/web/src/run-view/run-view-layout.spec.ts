@@ -50,14 +50,14 @@ describe('run-view-layout', () => {
     globalThis.localStorage.clear();
   });
 
-  it('a kulcs eltér a gráf szerkesztőétől, az alapértelmezés viszont ugyanaz az arány', () => {
-    expect(RUN_VIEW_LAYOUT_STORAGE_KEY).toBe('eggRunViewLayout');
+  it('a kulcs új és eltér a gráf szerkesztőétől, az alapértelmezés viszont ugyanaz az arány', () => {
+    expect(RUN_VIEW_LAYOUT_STORAGE_KEY).toBe('eggRunViewUserLayout');
     expect(DEFAULT_RUN_VIEW_LAYOUT_SIZES).toEqual(DEFAULT_GRAPH_EDITOR_LAYOUT_SIZES);
   });
 
   describe('readStoredRunViewLayoutSizes', () => {
-    it('tárolt érték nélkül az alapértelmezést adja', () => {
-      expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+    it('tárolt érték nélkül nincs saját arány', () => {
+      expect(readStoredRunViewLayoutSizes()).toBeUndefined();
     });
 
     it('érvényes tárolt értéket ad vissza', () => {
@@ -65,25 +65,35 @@ describe('run-view-layout', () => {
       expect(readStoredRunViewLayoutSizes()).toEqual([45, 55]);
     });
 
-    it('hibás JSON esetén az alapértelmezésre esik vissza', () => {
+    it('a pontosan az alapértelmezésre visszahúzott arány is saját: a tárolt pár jön vissza', () => {
+      globalThis.localStorage.setItem(RUN_VIEW_LAYOUT_STORAGE_KEY, JSON.stringify(DEFAULT_RUN_VIEW_LAYOUT_SIZES));
+      expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+    });
+
+    it('a régi kulcs (eggRunViewLayout) értékét nem olvassa: az a kezdőértéket felhasználói húzás nélkül is tartalmazhatja', () => {
+      globalThis.localStorage.setItem('eggRunViewLayout', JSON.stringify([45, 55]));
+      expect(readStoredRunViewLayoutSizes()).toBeUndefined();
+    });
+
+    it('hibás JSON esetén nincs saját arány', () => {
       globalThis.localStorage.setItem(RUN_VIEW_LAYOUT_STORAGE_KEY, 'nem JSON');
-      expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+      expect(readStoredRunViewLayoutSizes()).toBeUndefined();
     });
 
-    it('érvényes JSON, de rossz alak esetén az alapértelmezésre esik vissza', () => {
+    it('érvényes JSON, de rossz alak esetén nincs saját arány', () => {
       globalThis.localStorage.setItem(RUN_VIEW_LAYOUT_STORAGE_KEY, JSON.stringify([100]));
-      expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+      expect(readStoredRunViewLayoutSizes()).toBeUndefined();
     });
 
-    it('dobó localStorage esetén az alapértelmezésre esik vissza, nem tör el', () => {
+    it('dobó localStorage esetén nincs saját arány, nem tör el', () => {
       withThrowingLocalStorage(() => {
-        expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+        expect(readStoredRunViewLayoutSizes()).toBeUndefined();
       });
     });
 
     it('a szerkesztő kulcsára írt érték nem szivárog át', () => {
       globalThis.localStorage.setItem('eggGraphEditorLayout', JSON.stringify([20, 80]));
-      expect(readStoredRunViewLayoutSizes()).toEqual(DEFAULT_RUN_VIEW_LAYOUT_SIZES);
+      expect(readStoredRunViewLayoutSizes()).toBeUndefined();
     });
   });
 

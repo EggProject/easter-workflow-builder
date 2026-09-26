@@ -5,6 +5,7 @@ import {
   type WorkflowSummary,
 } from '@easter-workflow-builder/protocol';
 import {
+  Alert,
   Button,
   DataTable,
   Menu,
@@ -224,7 +225,7 @@ export function WorkflowListScreen(properties: Readonly<WorkflowListScreenProper
           emptyLabel="Még nincs workflow."
         />
       )}
-      {workflowsRequest.state.status === 'failure' && <p role="alert">{workflowsRequest.state.message}</p>}
+      {workflowsRequest.state.status === 'failure' && <Alert variant="danger">{workflowsRequest.state.message}</Alert>}
 
       <CreateWorkflowModal
         open={isCreateModalOpen}

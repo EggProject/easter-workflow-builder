@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApprovalPromptPanel } from './ApprovalPromptPanel.tsx';
-import type { DisplayedApproval } from './select-displayed-approvals.ts';
+import type { ShownApproval } from './select-shown-approval.ts';
 
 const APPROVAL: PendingApproval = {
   id: 'a-1',
@@ -18,15 +18,15 @@ const APPROVAL: PendingApproval = {
   decidedAtMs: null,
 };
 
+const SECOND: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2', title: 'Második?' };
+
 describe('ApprovalPromptPanel', () => {
   let container: HTMLDivElement;
   let root: Root;
-  const onDecide = vi.fn();
-  const onDismiss = vi.fn();
+  const onSelectPage = vi.fn();
 
   beforeEach(() => {
-    onDecide.mockClear();
-    onDismiss.mockClear();
+    onSelectPage.mockClear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -40,71 +40,92 @@ describe('ApprovalPromptPanel', () => {
   });
 
   function renderPanel(
-    displayed: readonly DisplayedApproval[],
-    options: { readonly isFirstLoadPending?: boolean; readonly failureMessage?: string } = {},
+    shown: ShownApproval | undefined,
+    options: {
+      readonly isFirstLoadPending?: boolean;
+      readonly failureMessage?: string;
+      readonly approvalCount?: number;
+    } = {},
   ): void {
     act(() => {
       root.render(
         <ApprovalPromptPanel
           isFirstLoadPending={options.isFirstLoadPending ?? false}
           failureMessage={options.failureMessage}
-          displayed={displayed}
-          onDecide={onDecide}
-          onDismiss={onDismiss}
+          approvalCount={options.approvalCount ?? (shown === undefined ? 0 : 1)}
+          shown={shown}
+          onSelectPage={onSelectPage}
+          decisionActions={<div className="actions-placeholder">gombok</div>}
         />,
       );
     });
   }
 
-  it('az első betöltés alatt ProgressBar jelzést mutat', () => {
-    renderPanel([], { isFirstLoadPending: true });
+  function buttonNamed(name: string): HTMLButtonElement | undefined {
+    return [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.textContent === name || candidate.getAttribute('aria-label') === name,
+    );
+  }
+
+  function regionName(): string | null | undefined {
+    return container.querySelector('section.approval-prompt-panel')?.getAttribute('aria-label');
+  }
+
+  it('az első betöltés alatt ProgressBar jelzést mutat, a "Függő jóváhagyások" régióban', () => {
+    renderPanel(undefined, { isFirstLoadPending: true });
 
     expect(container.querySelector('.progress-bar')).not.toBeNull();
-    expect(container.querySelector('.approval-prompt-panel__list')).toBeNull();
+    expect(container.querySelector('nav.pagination')).toBeNull();
+    expect(container.querySelector('.actions-placeholder')).toBeNull();
+    expect(regionName()).toBe('Függő jóváhagyások');
   });
 
-  it('nulla kártyára nem rajzol semmit: a panel üres elem', () => {
-    renderPanel([]);
+  it('látott jóváhagyás, betöltés és hiba nélkül nem rajzol semmit: üres, név nélküli szakasz, tehát nem régió', () => {
+    renderPanel(undefined);
 
-    expect(container.querySelector('.approval-prompt-panel')?.childElementCount).toBe(0);
+    expect(container.querySelector('section.approval-prompt-panel')?.childElementCount).toBe(0);
+    expect(regionName()).toBeNull();
   });
 
-  it('a hibaüzenetet role=alert szerepkörrel mutatja', () => {
-    renderPanel([], { failureMessage: 'A szerver nem érhető el.' });
+  it('a hibaüzenetet a design system danger Alert blokkjában (role=alert) mutatja, a "Függő jóváhagyások" régióban', () => {
+    renderPanel(undefined, { failureMessage: 'A szerver nem érhető el.' });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(
+      container.querySelector(':scope section.approval-prompt-panel > .alert--danger[role="alert"]')?.textContent,
+    ).toBe('A szerver nem érhető el.');
+    expect(regionName()).toBe('Függő jóváhagyások');
   });
 
-  it('kártyák fölött kimondja, hogy a döntés visszavonhatatlan, a design system Alert blokkjával', () => {
-    renderPanel([{ approval: APPROVAL, progress: undefined }]);
+  it('látott jóváhagyásnál a "Függő jóváhagyások" régióban a lapozó, alatta a döntés akciósávja áll; a jóváhagyás szövege nem a régió része', () => {
+    renderPanel({ approval: APPROVAL, progress: undefined, index: 0 });
 
-    const alert = container.querySelector(':scope .approval-prompt-panel__list > .alert.alert--warning');
-    expect(alert?.querySelector('.alert__title')?.textContent).toBe('A döntés visszavonhatatlan');
-    expect(alert?.querySelector('.alert__message')?.textContent).toBe(
-      'Elküldés után sem a jóváhagyás, sem az elutasítás nem módosítható.',
-    );
+    const panel = container.querySelector('section.approval-prompt-panel');
+    expect(regionName()).toBe('Függő jóváhagyások');
+    expect([...(panel?.children ?? [])].map((child) => child.className)).toEqual(['pagination', 'actions-placeholder']);
+    expect(panel?.querySelector('.drawer__body')).toBeNull();
   });
 
-  it('minden megjelenített jóváhagyáshoz egy kártya tartozik, és a döntést és a nyugtázást a jóváhagyással adja tovább', () => {
-    const second: PendingApproval = { ...APPROVAL, id: 'a-2', stepRunId: 's-2' };
-    renderPanel([
-      { approval: APPROVAL, progress: undefined },
-      { approval: second, progress: { status: 'decided', decision: 'rejected' } },
-    ]);
+  it('a lapozó "k / n" alakban mutatja a helyet, magyar nevekkel, és az 1-től számozott oldalt adja tovább', () => {
+    renderPanel({ approval: SECOND, progress: undefined, index: 1 }, { approvalCount: 4 });
 
-    const cards = container.querySelectorAll('.approval-prompt-card');
-    expect(cards).toHaveLength(2);
+    const navigation = container.querySelector('nav.pagination');
+    expect(navigation?.getAttribute('aria-label')).toBe('Jóváhagyások lapozása');
+    expect(navigation?.querySelector(':scope .pagination__meta')?.textContent).toBe('2 / 4');
+    expect(buttonNamed('2')?.getAttribute('aria-current')).toBe('page');
 
-    const [firstApprove] = cards[0]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [];
-    const dismiss = [...(cards[1]?.querySelectorAll<HTMLButtonElement>('button.btn') ?? [])].find(
-      (candidate) => candidate.textContent === 'Rendben',
-    );
     act(() => {
-      firstApprove?.click();
-      dismiss?.click();
+      buttonNamed('Következő')?.click();
+      buttonNamed('Előző')?.click();
     });
+    expect(onSelectPage.mock.calls).toEqual([[3], [1]]);
+  });
 
-    expect(onDecide).toHaveBeenCalledWith(APPROVAL, 'approved');
-    expect(onDismiss).toHaveBeenCalledWith('a-2');
+  it('a lapozó a szomszéd oldalszámok nélkül rajzol, hogy keskeny panelben is elférjen', () => {
+    renderPanel({ approval: SECOND, progress: undefined, index: 4 }, { approvalCount: 10 });
+
+    const slots = [...container.querySelectorAll(':scope .pagination__pages > :not([aria-label])')].map(
+      (element) => element.textContent,
+    );
+    expect(slots).toEqual(['1', '…', '5', '…', '10']);
   });
 });

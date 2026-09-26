@@ -207,7 +207,7 @@ describe('GraphEditorScreen', () => {
 
   it('a betöltés sikertelenségére hibaüzenetet mutat', async () => {
     await renderScreen('?workflowId=wf-1', unreachableFetchFunction);
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
+    expect(container.querySelector('.alert--danger[role="alert"]')?.textContent).toBe('A szerver nem érhető el.');
   });
 
   it('kiválasztás nélkül NINCS jobb oldali panel és nincs elválasztó (2026-09-09)', async () => {
@@ -756,7 +756,9 @@ describe('GraphEditorScreen', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector(':scope .page-footer [role="alert"]')?.textContent).not.toBe('');
+    expect(container.querySelector(':scope .page-footer .alert--danger[role="alert"]')?.textContent).toBe(
+      'A szerver hibás választ adott (HTTP 500).',
+    );
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -778,7 +780,9 @@ describe('GraphEditorScreen', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector(':scope [role="dialog"] form [role="alert"]')).not.toBeNull();
-    expect(container.querySelector(':scope .page-footer [role="alert"]')).toBeNull();
+    expect(
+      container.querySelector(':scope [role="dialog"] .modal__body > .alert--danger[role="alert"]'),
+    ).not.toBeNull();
+    expect(container.querySelector(':scope .page-footer .alert--danger[role="alert"]')).toBeNull();
   });
 });

@@ -31,19 +31,19 @@ export interface ApprovalDecisions {
    */
   readonly displayed: readonly DisplayedApproval[];
   readonly decide: (approval: PendingApproval, decision: ApprovalDecision) => void;
-  readonly dismiss: (approvalId: string) => void;
 }
 
 /**
  * A jóváhagyás döntések kérése és állapota (SPEC-008 8. szekció, T-009-27):
- * `POST /api/approvals/{id}/decision`, és az eredmény megőrzése a user
- * nyugtázásáig (`reduce-approval-decisions.ts`).
+ * `POST /api/approvals/{id}/decision`, és az eredmény megőrzése a futás
+ * váltásáig vagy a nézet elhagyásáig, külön nyugtázás nélkül
+ * (`reduce-approval-decisions.ts`).
  *
  * **Miért a képernyő szintjén fut, nem a panelben.** A panel a transcript
  * sávban áll (`RunViewLayout`), és a sáv a `--ep-screen-md` határon a
  * `Resizable` és a `Tabs` alak között vált, ami a panelt leszereli és újra
- * felcsatolja; egy panel szintű állapot ilyenkor a még nem nyugtázott
- * eredményt eldobná. Ugyanezért él a transcript állapota is a
+ * felcsatolja; egy panel szintű állapot ilyenkor a döntés eredményét
+ * eldobná. Ugyanezért él a transcript állapota is a
  * `RunViewScreen` szintjén (`use-run-transcript.ts`).
  *
  * Egy másik futásra váltáskor az állapot törlődik.
@@ -71,9 +71,6 @@ export function useApprovalDecisions(input: Readonly<UseApprovalDecisionsInput>)
         dispatch({ kind: 'answered', approval, decision, outcome });
         onDecided();
       });
-    },
-    dismiss: (approvalId) => {
-      dispatch({ kind: 'dismissed', approvalId });
     },
   };
 }

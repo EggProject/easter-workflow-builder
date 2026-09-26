@@ -1,27 +1,21 @@
-import type { ApprovalDecision, PendingApproval } from '@easter-workflow-builder/protocol';
-import { Button } from '@easter-workflow-builder/ui';
-import { useId, type ReactElement } from 'react';
-import type { ApprovalDecisionProgress } from './reduce-approval-decisions.ts';
+import type { PendingApproval } from '@easter-workflow-builder/protocol';
+import type { ReactElement } from 'react';
 import './approval-prompt.css';
 
 export interface ApprovalPromptCardProperties {
   readonly approval: PendingApproval;
   /**
-   * Az erre a jóváhagyásra elküldött döntés állapota, `undefined`, ha még
-   * nem ment döntés (`reduce-approval-decisions.ts`).
+   * A cím elemének azonosítója. A hívó adja, mert a döntés gombjainak
+   * csoportja is erre hivatkozik (`ApprovalDecisionActions`,
+   * `aria-labelledby`), és a két komponens a futás nézetben külön helyen áll.
    */
-  readonly progress: ApprovalDecisionProgress | undefined;
-  readonly onDecide: (decision: ApprovalDecision) => void;
+  readonly titleId: string;
   /**
-   * A lezárt döntés eredményének nyugtázása ("Rendben" gomb).
+   * A jóváhagyás szövegének (`body`) azonosítója, ugyanezért: a döntés
+   * gombjainak csoportja erre hivatkozik (`aria-describedby`).
    */
-  readonly onDismiss: () => void;
+  readonly textId: string;
 }
-
-const DECISION_LABELS: Readonly<Record<ApprovalDecision, string>> = {
-  approved: 'jóváhagyva',
-  rejected: 'elutasítva',
-};
 
 /**
  * A formázott `payload` mező, a `run-event-row` téma meglévő JSON
@@ -33,92 +27,25 @@ function FormattedPayload(properties: Readonly<{ payload: unknown }>): ReactElem
 }
 
 /**
- * A megjelenő döntés eredményt a panel görgetett területén láthatóvá görgeti.
- * A panel a transcript sávban legfeljebb a sáv felét kapja, és maga görget
- * (`run-view.css`), tehát a gombok alatt megjelenő eredmény a látható
- * területen kívülre eshetne (mérve, `docs/research/2026-09-24-jovahagyas-panel-helye.md`).
- * A `block: 'nearest'` a lehető legkisebb görgetéssel hozza be a sort
- * (<https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView>,
- * <https://www.w3.org/TR/cssom-view-1/#dom-element-scrollintoview>); a
- * `packages/ui` `use-scroll-active-option-into-view.ts` ugyanezt a hívást
- * használja. Csatoláskor fut egyszer: a modul szintű függvény azonossága
- * stabil, tehát a React nem hívja újra minden renderen.
- */
-function revealResult(element: HTMLParagraphElement | null): void {
-  element?.scrollIntoView({ block: 'nearest' });
-}
-
-/**
- * Egy függő jóváhagyás kártyája: a `title`, a `body`, a formázott `payload`,
- * és a két döntés gombja (SPEC-008 8. szekció, T-009-27, AC35). Csak
- * megjelenít: a döntés kérése és az eredménye a képernyő szintjén él
- * (`use-approval-decisions.ts`, `reduce-approval-decisions.ts`), mert a
- * kártya leszerelődik, amint a friss lista már nem tartalmazza a
- * jóváhagyást, vagy amikor a transcript sáv a reszponzív sáv váltásakor újra
- * felcsatolódik.
- *
- * A két gomb a küldés pillanatától letiltva (9. szekció 15. async pont), a
- * megnyomotton spinnerrel, és **egy elfogadott vagy véglegesen elbukott
- * döntés után többé nem kapcsol vissza**; csak az átmeneti hiba (hálózati
- * hiba, 502, 503) engedi az újrapróbálást. A döntés eredménye (siker vagy a
- * hibaüzenet) a "Rendben" gombbal való nyugtázásig látszik.
+ * Egy függő jóváhagyás TARTALMA: a `title`, a `body` és a formázott
+ * `payload` (SPEC-008 8. szekció, T-009-27, AC35). A döntés gombjai nem itt
+ * állnak, hanem közvetlenül a görgethető törzs alatt, a "Függő jóváhagyások"
+ * régióban (`ApprovalDecisionActions`), hogy görgetés nélkül is elérhetők
+ * legyenek (user döntés 2026-09-25, SPEC-008 8. szekció 1. pont); a
+ * csoportjuk a cím és a szöveg azonosítójával kötődik ide.
  */
 export function ApprovalPromptCard(properties: Readonly<ApprovalPromptCardProperties>): ReactElement {
-  const { approval, progress, onDecide, onDismiss } = properties;
-  const titleId = useId();
-
-  const isSending = progress?.status === 'sending';
-  const isRetryable = progress?.status === 'failed' && !progress.isFinal;
-  const areDecisionsDisabled = progress !== undefined && !isRetryable;
+  const { approval, titleId, textId } = properties;
 
   return (
     <article className="approval-prompt-card" aria-labelledby={titleId}>
       <h3 id={titleId} className="approval-prompt-card__title">
         {approval.title}
       </h3>
-      <p className="approval-prompt-card__body">{approval.body}</p>
+      <p id={textId} className="approval-prompt-card__body">
+        {approval.body}
+      </p>
       <FormattedPayload payload={approval.payload} />
-      <div className="approval-prompt-card__actions">
-        <Button
-          type="button"
-          size="sm"
-          variant="primary"
-          isLoading={isSending && progress.decision === 'approved'}
-          disabled={areDecisionsDisabled}
-          onClick={() => {
-            onDecide('approved');
-          }}
-        >
-          Jóváhagyás
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          isLoading={isSending && progress.decision === 'rejected'}
-          disabled={areDecisionsDisabled}
-          onClick={() => {
-            onDecide('rejected');
-          }}
-        >
-          Elutasítás
-        </Button>
-        {progress !== undefined && !isSending && (
-          <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
-            Rendben
-          </Button>
-        )}
-      </div>
-      {progress?.status === 'decided' && (
-        <p ref={revealResult} className="approval-prompt-card__result" role="status">
-          Döntés rögzítve: {DECISION_LABELS[progress.decision]}.
-        </p>
-      )}
-      {progress?.status === 'failed' && (
-        <p ref={revealResult} role="alert">
-          {progress.message}
-        </p>
-      )}
     </article>
   );
 }

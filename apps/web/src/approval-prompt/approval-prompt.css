@@ -1,19 +1,64 @@
 /* A jóváhagyás panel (SPEC-008 8. szekció, T-009-27). NINCS KÁRTYA: se
-   szegély, se lekerekítés, se saját háttér, mert a panel a futás nézet
-   transcript sávjában áll, és a card in card tilos (`.claude/CLAUDE.md` 11.
-   szekció). A térközök kizárólag a design system `--ep-space-*` tokenjeiből
-   jönnek. A panel mérete és görgetése a helyétől függ, ezért az a
-   `run-view.css` fájlban áll. */
+   szegély, se lekerekítés, mert a panel a futás nézet transcript sávjában
+   áll, és a card in card tilos (`.claude/CLAUDE.md` 11. szekció). Saját
+   háttér csak a design system `drawer` felülete (lent). A térközök
+   kizárólag a design system
+   `--ep-space-*` tokenjeiből jönnek. A panel külső mérete (a transcripttel
+   megosztott sáv) a helyétől függ, ezért az a `run-view.css` fájlban áll;
+   itt a belső elrendezés.
+
+   A "Függő jóváhagyások" régió (`ApprovalPromptPanel`) gyerekei közvetlenül
+   egymás alatt állnak, közbülső hézag nélkül: a lapozó és az akciósáv egy
+   felület, egy hézag a kettő között a transcript oldal hátterét mutatná. Az
+   első betöltés jelzésének és a hibaüzenetnek a térköze a `run-view.css`
+   fájlban áll. */
 .approval-prompt-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--ep-space-2);
 }
 
-.approval-prompt-panel__list {
+/* EGYSZERRE EGY JÓVÁHAGYÁS, EGY CLI ENGEDÉLYKÉRÉS SORRENDJÉBEN (user döntések
+   2026-09-25, "transcript felül, kérdés alul", SPEC-008 8. szekció 1. pont).
+   A transcript oldalon felül a transcript, a húzható elválasztó alatt a
+   látott jóváhagyás görgethető törzse (`.drawer__body`, `ApprovalPromptBody`),
+   közvetlenül alatta, a `Resizable` elemen kívül, fix helyen a lapozó és a
+   tapadó akciósáv (`.drawer__footer`, `ApprovalDecisionActions`), tehát a
+   gombok a kérdés alatt állnak, az elválasztó bármely állásában; a részek
+   helye a `run-view.css` fájlban áll, itt a belső elrendezésük.
+
+   EGYSÉGES FELÜLET (user döntés 2026-09-25). A forrásban a `.drawer` panel
+   adja a `--ep-bg-elevated` hátteret, a törzs ezért ugyanazon a felületen
+   áll, mint a saját `--ep-bg-elevated` hátterű akciósáv (`drawer.css`:
+   `.drawer { background: var(--ep-bg-elevated) }`, `.drawer__footer {
+   background: var(--ep-bg-elevated) }`). Itt nincs egyetlen szülő, ami a
+   `.drawer` szerepét betöltené, mert a törzs a húzható panelben, a lapozó és
+   az akciósáv azon kívül áll, ezért a háttér a törzs és a lapozó saját
+   szabálya: a törzs, a lapozó és az akciósáv ugyanazon a tokenen áll.
+
+   EGY BAL IGAZÍTÁSI VONAL (user döntés 2026-09-25). A lapozó a forrás
+   `drawer` 24 pixeles vízszintes belső térközéhez igazodik
+   (`drawer.css`: `.drawer__body { padding: 18px 24px }`,
+   `.drawer__footer { padding: 16px 24px }`), a design system egyező
+   `--ep-space-6` (24px) tokenjével, tehát a "visszavonhatatlan" `Alert`, a
+   cím és a lapozó bal széle egy vonalban áll. A felső térköz nulla, mert
+   fölötte a törzs 18 pixeles alsó belső térköze áll; az alsó térköz az
+   akciósáv függőleges 16 pixelének párja (`--ep-space-4`), az akciósáv felső
+   elválasztója előtt. Mindkét egyezést az `approval-surface.spec.ts` e2e
+   mérése őrzi. */
+.approval-prompt-panel > .pagination {
+  padding: 0 var(--ep-space-6) var(--ep-space-4);
+  background: var(--ep-bg-elevated);
+}
+
+/* A görgethető törzs szakasza: a forrásban a `.drawer` panel adja a
+   `display: flex; flex-direction: column` szülőt, amiben a `.drawer__body`
+   `flex: 1` és `overflow-y: auto` mellett görget; a modális `.drawer` itt
+   nem használható (`DrawerBody.tsx`), ezért ez a szakasz adja ugyanazt a
+   flex oszlopot, és a felület hátterét. */
+.approval-prompt-body {
   display: flex;
   flex-direction: column;
-  gap: var(--ep-space-4);
+  background: var(--ep-bg-elevated);
 }
 
 .approval-prompt-card {
@@ -43,16 +88,32 @@
   word-break: break-word;
 }
 
-.approval-prompt-card__actions {
-  display: flex;
-  gap: var(--ep-space-2);
-}
-
-/* A döntés eredménye (T-009-27): nem hibaüzenet, tehát a halványabb,
-   másodlagos kis szöveg, ugyanaz a minta, mint a `run-control.css`
-   "megszakítás folyamatban" felirata. */
-.approval-prompt-card__result {
+/* A döntés eredménye az akciósávban, a gombok előtt (T-009-27): nem
+   hibaüzenet, tehát a halványabb, másodlagos kis szöveg, ugyanaz a minta,
+   mint a `run-control.css` "megszakítás folyamatban" felirata. */
+.approval-decision-actions__result {
   margin: 0;
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
+}
+
+/* A döntés hibája a design system `danger` `Alert` blokkja (SPEC-007 8.4,
+   user döntés 2026-09-24), a gombok FÖLÖTT, saját, teljes szélességű sorban:
+   a gombok mellett a blokk keskeny, a mondat több sorba törik, és a sáv
+   magasabb lesz, mint külön sorban (mérve, `docs/research/
+   2026-09-24-jovahagyas-panel-helye.md` 14. szekció). A tördelés csak hiba
+   mellett kapcsol be, tehát a sáv hiba nélküli alakja (a `drawer.css` bájtra
+   azonos szabálya) nem változik. A `border-box` azért kell, mert a projekt
+   nem veszi át a forrás univerzális `box-sizing` resetjét (`topnav-shell.css`):
+   nélküle a 100 százalékos alap a `.alert` belső térközével és szegélyével a
+   sáv tartalmánál szélesebb, és a `flex-end` igazítás miatt balra, a panel
+   széle alá lóg (research 14. szekció). A magasabb sáv alacsony ablakban a
+   kérdés szövegét levágja: SPEC-008 14.2 O-17. */
+.drawer__footer:has(> .approval-decision-actions__failure) {
+  flex-wrap: wrap;
+}
+
+.approval-decision-actions__failure {
+  flex: 1 0 100%;
+  box-sizing: border-box;
 }

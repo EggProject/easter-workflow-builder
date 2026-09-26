@@ -126,6 +126,13 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
   megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
   SPEC-008 5.3, user döntés 2026-09-05).
+- **A `protocol` a motor hibaosztályainak részhalmazát is duplikálhatja, ugyanezzel a
+  védelemmel.** A `ProtocolErrorClass` zárt szótár (SPEC-005 8.5) a motor `EngineErrorKind`
+  uniójának szándékos részhalmaza, plusz a `db` `already_decided` ága; mivel részhalmaz, a
+  típusszintű ág egyirányú (`Exclude<ProtocolErrorClass, EngineErrorKind>` pontosan
+  `'already_decided'`), a futásidejű ág a motor `isEngineErrorKind` guardja. Helye az
+  `apps/server` `error-class-drift-protection` témája (user döntés 2026-09-26, "Ismert okokra
+  saját mondat").
 
 **Fájlok és tesztek**
 
@@ -579,16 +586,25 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
 - **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
   végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
   működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
-  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít.
+  `page.route()` mockon mennek; a teszt szerver adatbázist nem nyit és motort nem indít. A
+  szerver az operációs rendszer által kiosztott szabad porton figyel, és a lap `GET /events`
+  kérését a `route.continue({ url })` irányítja rá (nem mock: a kérés valódi hálózaton megy), így a
+  párhuzamos workerek nem ütköznek (12. szekció, `apps/web/e2e/run-view-stream.ts`).
 - **A kivételt a frontend specnek explicit ki kell mondania**, indoklással és a mérési fájlra
   hivatkozva. A SPEC-007 13.4 ezt megteszi.
 - **Egy keret egy felhasználói eseménnyel egy feladatban** a nyitott `node:http` kapcsolaton
   sem küldhető: a hálózati keret a kattintás és a böngésző következő renderelési lépése közé
   nem időzíthető megbízhatóan (mérve, `docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció). Ilyenkor a keret a lapon rögzített, valódi `EventSource` példányon, az esemény
   capture fázisában kiváltott `MessageEvent`-ként érkezik, a hálózati kerettel azonos alakban
-  (`captureEventSources` az `apps/web/e2e/sse-real-server.spec.ts` fájlban); a kapcsolat
+  (`captureEventSources` az `apps/web/e2e/run-view-stream.ts` fájlban); a kapcsolat
   maga a teszt szerveren nyitott. Ez nem a hálózati út mockja, csak az időzítésé, ezért csak
-  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4).
+  a kattintással egy feladatban érkező sorra használható (SPEC-008 7.4). A keret mindig a mérés
+  előtt kerül commitba, de nem minden úton ugyanabba, mint a kinyitás: a csak `click` úton
+  (szkriptből kiváltott esemény, amin belül nincs mikrofeladat pont) egyetlen commitba kerül a
+  kinyitással; egér, `Space` és `Enter` úton (valódi bemenet, a figyelők között mikrofeladat
+  pont) a hook kattintás figyelője utáni első commitba, a kinyitás commitja ELŐTT (mérve a React
+  DevTools csatlakozási pontján, `apps/web/measurement/transcript-scroll.ts` `render-sorrend`
+  jelenete, research 17. szekció).
 - **Ami NEM MEGERŐSÍTETT**: Firefox és WebKit ellen nem futott mérés, mert az
   `apps/web/playwright.config.ts` ma kizárólag chromiumot definiál. Ha a projektlista bővül,
   a mérést meg kell ismételni azokra a motorokra is.
@@ -657,6 +673,22 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   criterion does not mandate any particular way in which errors should be displayed"
   (<https://www.w3.org/WAI/WCAG22/Understanding/error-identification>), tehát a fenti szabály
   felhasználói termékdöntés (user kérés 2026-09-09).
+- **A REST hívás hibája a design system `danger` `Alert` blokkjában jelenik meg, a szerver belső
+  szövege nélkül** (user döntés 2026-09-24, "Mindhárom javítás"). A felületen kizárólag a
+  hibakódhoz rendelt magyar mondat áll, utána semmi (nincs ".:"), és a szerver `message` mezője
+  (azonosító, zárójeles hibaosztály) nem jut a felületre; a hibaág nem nyers `<p role="alert">`,
+  hanem a `packages/ui` `Alert` eleme (`variant="danger"`, a szerepet a komponens adja, a forrás
+  szerint). A mező alatti űrlap hiba (előző pont), a futás nézet "Várakozás a szerverre"
+  `warning` jelzése és a soronkénti műveletek `Toast` értesítése nem tartozik ide. Részletek és
+  határok: SPEC-007 8.4. **Ismert okokra saját mondat** (user döntés 2026-09-26, SPEC-007 O-10
+  lezárva): a SPEC-005 8.5 zárt szótárába eső hibaosztályt a szerver a törzs `errorClass`
+  mezőjében adja, a kliens ehhez saját magyar mondatot rendel, és a `message` szövegét nem elemzi;
+  hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
+  akciósáv magassága 1440x600-on a kérdés szövegét levágja, a szöveg a törzsben görgethető
+  (SPEC-008 14.1 O-17, user döntés 2026-09-26: elfogadva). Védelem:
+  `apps/web/src/greppable-invariants/` (18), a `perform-route-request.spec.ts`, a
+  `protocol-error-class-message.spec.ts`, a `rest-error-paths.spec.ts` és a
+  `rest-error-class.spec.ts`.
 
 ---
 
@@ -784,13 +816,27 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
   kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
   a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
-  kinyitott sort elrántotta, már a `dfcaa38` előtt is (40 ms-os streamnél véletlen fázisú
-  kinyitások harmadában). A szabály: felhasználói layout változás után görgetési döntés csak a
-  mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click` eseményétől a
-  mérésig kikapcsolja a követést, és a mérés előtti jelentés nem kapcsolhatja vissza. Védelem: a
-  `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az `sse-real-server.spec.ts` négy
-  kinyitási út e2e tesztje mindkét témában, amelyekben egy sor a kattintással egy feladatban
-  érkezik (`docs/research/2026-09-23-transcript-panel-meresek.md` 15. és 16. szekció).
+  kinyitott sort elrántotta, már a `dfcaa38` előtt is: 40 ms-os streamnél a véletlen fázisú, csak
+  `click` eseménnyel indított kinyitások mintegy harmadában (a `dfcaa38` előtti hookkal 60/200,
+  ebből 40 egy soros és 20 teljes elrántás, saját mérés 2026-09-25 a repóbeli mérő eszközzel,
+  minden kísérletet számolva; a korábbi 34/205 és "mintegy hatod" egy hibás szűrőből jött, lásd
+  lent; a repón kívüli mérések 12/40 és 23/80, egy független ellenőrzés 38/100 arányt adott,
+  research 17. és 18. szekció). A szabály: felhasználói layout változás után görgetési döntés
+  csak a mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click`
+  eseményétől szünetelteti a követést, a szünet alatti jelentés nem kapcsolhatja vissza, és egy
+  kinyitás szünete a mérés után is tart, amíg a felhasználó vissza nem ér az aljára vagy meg nem
+  nyomja az ugrás gombot (user döntés 2026-09-25: az utolsó sor kinyitása is megállítja a
+  követést). Védelem: a `use-transcript-auto-scroll.spec.tsx` kinyitás tesztjei és az
+  `sse-real-server.spec.ts` négy kinyitási út e2e tesztjei mindkét témában, az utolsó soréi három
+  időzítéssel (`docs/research/2026-09-23-transcript-panel-meresek.md` 15., 16. és 18. szekció).
+- **Egy mérés szűrője nem dobhatja ki azt, amit mér.** A mérő eszköz verseny jelenete egy
+  kísérletet csak akkor számolt, ha a kinyitás utáni harmadik képkockán az utolsó sor nem látszott;
+  a teljes elrántás viszont a listát az aljára viszi, tehát pontosan azt a kísérletet dobta ki. A
+  hamis szám (34/205, "minden elrántás -53 pixel") két dokumentumba is bekerült, és egy független
+  ellenőrzés találta meg: ugyanazzal a hookkal a szűrővel 33/170, szűrő nélkül 60/200. Ha egy
+  szűrő a kimenetel alapján dönt arról, mi számít, előbb meg kell nézni, hogy a keresett hiba maga
+  nem változtatja-e meg a szűrő bemenetét. Védelem: a jelenet ma minden kísérletet számol
+  (`apps/web/measurement/transcript-scroll.ts`, research 18. szekció).
 - **Egy "várj a következő X-ig" állapotnak mindig kell kilépés arra az esetre is, ha X sosem
   jön.** A `d598677` a kinyitás után a mérésig visszatartotta a görgetést ÉS az érkezések
   számlálását; egy képkockán belüli ki-be csukás (dupla kattintás) után a sor magassága nem
@@ -799,11 +845,62 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kattintás = nincs mérendő változás), a várakozás alatt is számol, és az ugrás gomb mindig lezárja.
   Védelem: `sse-real-server.spec.ts` dupla kattintás tesztjei tárolt sorokkal (research 16.
   szekció).
+- **A mérés kilépése maga is elmaradhat: egy rejtett fülön leszerelt sor sosem kap mérést.** A
+  `c7b2e35` három kilépése (mérés, páros kattintás, ugrás gomb) mellett 375 pixelen a kinyitás és
+  a fülváltás egy feladatban a lista követését végleg leállította: a rejtett sor 0 magasságát a
+  `useDynamicRowHeight` nem tárolja, a sor a szűkült kirajzolt tartományból leszerelődik, a
+  gyorsítótár nem változik, és a kézi görgetés az aljára sem oldotta fel (mérve: a három új sor
+  után 53, 106, 159 pixel lemaradás, "6 új esemény"). A negyedik kilépés a kézi visszatérés az
+  aljára (user döntés 2026-09-24), az alj előzetes elhagyásának feltételével. A tanulság: egy
+  külső jelre (itt a mérésre) váró állapotnál a felhasználó saját, egyértelmű szándéka is legyen
+  kilépés. Védelem: `sse-real-server.spec.ts` fülváltás és ugrás gomb tesztjei, a `bffd75d`
+  állapotán bukik (research 17. szekció).
+- **A böngésző görgetés rögzítése (scroll anchoring) a virtualizált lista mellett saját
+  görgetést csinál.** Bekapcsolt `overflow-anchor` mellett folyamatos streamnél a véletlen fázisú
+  kinyitások egy részében a lista a hook nélkül elmozdult (két saját mérésben 9/80 és 7/80, mind -36
+  pixel, kikapcsolva 0/80, minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött; egy
+  független ellenőrzés 5/80-at mért, köztük egy -574 pixeles teljes elrántást, tehát a "mind -36"
+  nem általános). A -36 a gomb akkori sávjának magassága volt: a sáv helyének fenntartásával
+  (`1c7dd13`) bekapcsolt rögzítéssel is 0/80 lett (research 19. szekció). Az ugrás gomb azóta
+  saját sáv nélkül, a lista fölött lebeg, és a megjelenése a listát nem mozdítja (research 20.
+  szekció). Az elmozdulás miatt a listán `overflow-anchor: none` áll
+  (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A jelenség fázisfüggő, időzítő nélküli
+  lépéssorral nem állítható elő (hat érkezési mód, 0/120); a védelem ezért KIZÁRÓLAG a
+  konfigurációt őrzi: az e2e a lista kiszámított `overflow-anchor` értékét ellenőrzi. A korábbi,
+  képkockánként mérő rész vak volt (a CSS nélkül is zöld), és kikerült (research 17. és 18.
+  szekció).
+- **A `react-window` az érkezés utáni első renderben még a régi látható tartományt jelenti.** A
+  látható tartomány a könyvtárban állapot, amit egy layout effekt számol újra, tehát a sorszám
+  növekedése után előbb a régi utolsó sorra vágott jelentés jön (2 a 4 sorból), és csak utána az
+  új (3 a 4-ből). A szünet "alj elhagyása, majd visszatérés" kilépése ezt nem teli listán hamis
+  párnak vette: a szünet minden érkezésnél lezárult, gomb nem jelent meg, és a lista megtelése után
+  minden új sor a kinyitott sort 53 pixellel feljebb vitte. Az e2e addig csak teli listát (20 + 10
+  sor) vizsgált, és a "determinisztikus" állítás erre az esetre nem volt igaz. A tanulság: egy
+  állapotgép, ami egy könyvtár jelentéseinek SORRENDJÉBŐL következtet, a jelentés érvényességi
+  idejét is ellenőrizze, és a tesztje fedje a határesetet (itt a nem teli listát). Védelem:
+  `is-pre-arrival-range-report.ts` és a `sse-real-server.spec.ts` rövid lista e2e tesztjei két
+  méreten, két témában, az utolsó és egy korábbi sorra (research 19. szekció).
+- **Rögzített porton figyelő teszt szerver párhuzamos futtatásnál ütközik.** Az
+  `sse-real-server.spec.ts` szervere a build időben rögzített `VITE_STREAM_ORIGIN` portjára
+  kötődött, a fájl ezért soros volt, de `--repeat-each 3` mellett három worker egyszerre futtatta a
+  fájl három példányát, és `EADDRINUSE` jött. Ma minden teszt szervere az operációs rendszer által
+  kiosztott szabad porton figyel, és a lap kérését a `route.continue({ url })` irányítja rá (Node
+  `server.listen(0)`, Playwright `route.continue`); `--repeat-each 3` mellett három workerrel a
+  fájl minden tesztje zöld, nulla `EADDRINUSE` (legutóbb 279/279, 93 teszt, research 20. szekció).
 - **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
   pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
   magasra állításával minden összecsukott sor egyforma, és az eredeti követés 0 pixelre pontos
   (research 16. szekció).
+- **A lezárt `page.route()` SSE mock újracsatlakozáskor újrapótol, és az újrarenderelés elfedi a
+  renderelésen kívüli jelre futó számítás hibáját.** A böngésző a lezárt válasz végén
+  újracsatlakozik, a `mockSseFrames` ugyanazt a pótlást adja újra, és a `replay_complete` kerete
+  újratöltést, tehát újrarenderelést vált ki; egy csak a renderelésre (és nem a saját jelére)
+  futó számítás így is helyes képet ad, és a teszt zöld. A külső elválasztó húzásának e2e tesztje
+  emiatt a `userResizeCount` jel kivételére sem bukott. Védelem: az ilyen teszt a
+  `mockSseFramesWithoutReconnect` mockot használja (`apps/web/e2e/sse-mock.ts`), ami csak az első
+  kapcsolatot szolgálja ki, időzítő nélkül (`docs/research/2026-09-24-jovahagyas-panel-helye.md`
+  15.4 szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 
@@ -823,9 +920,24 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A fenti védelem 2026-09-15-ig KIZÁRÓLAG SZÖVEGES volt**, és egy független ellenőrzés jogosan
   mondta ki, hogy semmi nem buktatja el azt a munkamenetet, ami megint saját, eldobható scriptet ír
   saját, éltelen fixtúrával. A **gépi** védelem neve
-  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hat invariáns a
+  `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hét invariáns a
   `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
-  Amit fog: a
+  **Hatókör (user döntés 2026-09-25):** a védelem kizárólag a repóba commitolt forráskódot
+  olvassa a `test` kapun, és csak a böngésző képernyőkép, a videó és a trace kép lemezre írását
+  tiltja a saját teszt- és segédkódunkban; a termék futását, az agentek fájlírását (az Agent SDK
+  eszközeivel, futásidőben) és a termékkód egyéb fájlírását nem érinti. A megvalósításban: a
+  termékkód (a `packages/*/src` és az `apps/*/src` nem teszt fájlja) csak akkor vizsgált, ha
+  Playwright csomagot importál; minden más commitolt kód (teszt, e2e, config, eszköz, shell
+  script, GitHub Actions YAML, `package.json` script) vizsgált. Ha egyszer egy
+  termékfunkció maga készít és ment böngésző képernyőképet (például weboldalt fényképező agent
+  eszköz), arra kifejezett, user által jóváhagyott kivétel kell. **Szabály, és a gépi ellenőrzés
+  kimondott korlátja (user döntés 2026-09-25, egy független ellenőrzés mérése nyomán):
+  Playwright segédfájl (ami egy "lap" típusú paramétert kap, és képet készíthet vagy írhat)
+  kizárólag egy csomag `e2e/` vagy `measurement/` mappájában állhat**, a `packages/*/src` és az
+  `apps/*/src` alatt nem. Ok: a termékkód csak Playwright importtal vizsgált (a `1a83b02` hatókör
+  szűkítése óta), tehát egy oda tett, Playwright import nélküli segéd a lapon át képet készíthet
+  vagy írhat úgy, hogy a kapu nem látja. Ez rossz helyre tett fájl, nem szándékos hamisítás, ezért
+  a betartása code review kérdés, gépi kényszer nincs rá. Amit fog: a
   szentesített `apps/web/e2e/capture-screenshots.ts` fájlon kívül egyetlen commitolt fájl sem írhat
   képernyőképet lemezre, a szentesített script nem tarthat saját gráf literált, `mockRoute` vagy
   `page.route` hívást, a `screenshots` npm scriptek és a Playwright config a szentesített fájlra
@@ -839,7 +951,9 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `/tmp` alatti script kimenetét egyetlen repón belüli kapu sem látja; a védelem azt zárja ki, hogy
   a hiba ÉSZREVÉTLENÜL visszatérjen, nem azt, hogy valaki szándékosan hamisítson. Ez a két tétel
   a védelem ELVI korlátja, felhasználói döntés szerint elfogadva (2026-09-15): gépi kényszert nem
-  építünk rájuk.
+  építünk rájuk. **Harmadik elvi korlát (2026-09-25, ugyanerre a mintára):** a védelmet adó teszt
+  saját gyengítése (a fájllista szűrése, egy invariáns kihagyása, egy segédfüggvény megrontása)
+  code review kérdés; gépi önvédelmet nem építünk rá, lásd a hetedik bejegyzést.
   Forrás: felhasználói kérés 2026-09-15, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
 - **A gépi kényszer első alakjának három MÉRT rése, mind javítva (2026-09-15).** Egy független
   ellenőrzés a fenti hat invariánson át tudott vinni egy rontó scriptet, három okból: a vizsgált
@@ -852,6 +966,116 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   a futás nézet két új képét is beleértve. **A karakterosztályos ablak általános tanulsága:** egy
   greppes invariánsban a tiltott karakterosztály mindig hagy kerülő utat egy másik karakterrel, a
   puszta együttes jelenlét vizsgálata nem.
+- **A negyedik mért rés: a kép formátuma és az írás módja (2026-09-25, javítva).** Az első
+  invariáns csak a `path` opciót, a második csak a PNG fájlnevet nézte, ezért egy JPEG formátumú,
+  memóriába kért képernyőkép plusz egy `writeFileSync('x.jpg')` hívás bármely commitolt fájlban
+  mind a hat invariánson átment (egy független ellenőrzés mérte, és saját injekcióval is: 6/6
+  zöld, egy stream alapú és egy két fájlra bontott, író segédfüggvényes változattal együtt). A
+  javítás a puszta együttes jelenlétre épül, a kép formátumától függetlenül, az alább felsorolt
+  írási utakon (az "írás módjától függetlenül" megfogalmazás túlzó volt, lásd a hatodik
+  bejegyzést): egy
+  képernyőképet készítő fájl (Playwright API hívás, vagy a CLI `screenshot` alparancsa), és minden
+  fájl, ami azt közvetve is importálja, nem hivatkozhat a Node fájlrendszer vagy folyamatindító
+  moduljára, a `Bun.write`-ra, a Playwright tesztcsatolmányára vagy letöltés mentésére, és a `path`
+  opciót sem használhatja; mindaz, amit ez a kör importál (workspace csomagon át is), szintén nem
+  hivatkozhat lemezre író modulra, a lefedettségi fixtúra (`coverage-fixture.ts`) kimondott
+  kivételével; a Playwright `use` képernyőkép opciója `off`-tól eltérő értékkel, és a CLI
+  alparancsa shell scriptből önmagában tilos. A három injekció utána a `test` kapun bukik (1/7), a
+  jogos, memóriában mérő pixel tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét tizenegy
+  szintetikus eseten futtatta. **Pontosítás (2026-09-25):** az eredeti "egy gyengítése maga is
+  bukik" mondat túlzó volt: egy független ellenőrzés tizennégy gyengítéséből ötöt a tizenegy eset
+  nem fogott (a `Bun.write`, a `saveAs` és az `fs/promises` törlése, a képösszehasonlító assertion
+  minta törlése, és az opció értékének `'on'`-ra szűkítése), és az (1) invariáns régi alakjára
+  állítása a három injekcióval zöld maradt. Mindkettő javítva, lásd a következő bejegyzést.
+  **A bejegyzés nyitott pontja lezárva (user döntés 2026-09-25):** a Node beépített moduljain
+  kívüli író csomag (például egy új függőség) és a szándékos elrejtés (a hívás vagy a modul nevének
+  futásidejű összerakása) szándékos megkerülés, elfogadott korlát; a lista a hatodik bejegyzésben.
+  Forrás: `tooling/scripts` CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce.
+- **Az ötödik mért réscsoport: jóhiszemű alakok, amik minden invariánson átmentek (2026-09-25,
+  javítva).** Egy független ellenőrzés a `741f63e` után öt kerülő utat mért, mindegyik jóhiszemű
+  kódként is írható: a rövidített `{ path }` opció (a `path:` minta nem látta); az opció objektum
+  egy másik fájlban (a kör függőségeiben a `path` kulcs szabad volt); a `use` képernyőkép opciója
+  nem literál értékkel (feltételes kifejezés); a CDP `Page` domén képernyőkép metódusa plusz
+  `writeFileSync`; és a trace képernyőképei (a trace zip a teszt kimeneti könyvtárába kerül, és a
+  telepített Playwright a trace képernyőképet alapból bekapcsolja). A javítás: a `path` kulcs
+  minden alakja (sima, idézőjeles, rövidített) tiltott a képernyőkép körben ÉS a függőségeiben (a
+  változó típusannotációja, `let path: string`, nem kulcs; mérve ez az egyetlen alak a
+  függőségekben); a képernyőkép, a trace és a trace képernyőkép kapcsoló opciója ZÁRT LISTÁS: csak a
+  szó szerinti `'off'`, a trace objektumnál a `{ mode: '<mód>', screenshots: false }`, a kapcsolónál
+  a szó szerinti `false` engedett, minden más alak (nem literál, rövidített kulcs, objektum) tiltott;
+  és a CDP két képet adó metódusa (képernyőkép, screencast) képernyőkép hívásnak számít. **A trace
+  döntés:** a zipben lemezre kerülő kép is lemezre írt kép, tehát tiltott; a meglévő
+  `apps/web/playwright.config.ts` a korábbi `on-first-retry` módot megtartva, képernyőkép nélkül
+  maradt zöld (`{ mode: 'on-first-retry', screenshots: false }`; `retries: 0` mellett nem is
+  rögzített; 2026-09-25 óta `'off'`, lásd a hatodik bejegyzést). A hetedik invariáns akkor
+  harmincnégy esetet futtatott, és egy új, nyolcadik invariáns a saját forrásából ellenőrizte,
+  hogy az (1) törzse a hetedik által igazolt függvényt futtatja a commitolt fán (2026-09-25 óta
+  törölve, lásd a hetedik bejegyzést). Igazolva: mind az
+  öt kerülő út (a trace két alakkal, hat injekció) egyenként a `test` kapun bukott (1/8), a régi
+  alakon mind zöld volt (7/7); harminchárom gyengítés (a független ellenőrzés öt nem fogott
+  gyengítésével és az akkori lezárások gyengítéseivel együtt) mind bukott a hetedik invariánson,
+  és az (1) régi alakra állítása a három injekcióval a nyolcadikon bukott. A bejegyzés idején
+  nyitva maradt a fenti nyitott pont két tétele és a Playwright videó felvétele; mindhármat a
+  2026-09-25-i user döntés zárta le, lásd a hatodik bejegyzést. Forrás: `tooling/scripts`
+  CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce és a (7) esetei.
+- **A hatodik réscsoport és a hatókör rendezése (2026-09-25, user döntések).** Egy független
+  ellenőrzés a `decfa69` után további, a kapun átmenő utakat mért. Ami jóhiszemű kódban is
+  előfordulhat, az bezárva: a `.jsx` kiterjesztés (a vizsgált lista ma a Playwright betöltő
+  nyolc kiterjesztése), a `.bash` shell script, és a `package.json` scriptek (a CLI `screenshot`
+  alparancsa, valamint a nem `off` értékű `--trace` kapcsoló, a config trace opciójával azonos
+  zárt lista szerint); a kiterjesztés szűrő a hetedik invariáns által igazolt függvényen belül
+  áll. **A videó felvétel is kép:** a `use` videó opciója zárt listás (kizárólag a szó szerinti
+  `'off'`, az objektum alak `off` módban sem), a böngésző kontextus videó felvétele bármely
+  alakban tilos, és az oldal screencast objektuma képernyőkép hívásnak számít. Az
+  `apps/web/playwright.config.ts` trace és videó opciója `'off'` (a korábbi `on-first-retry` trace
+  mód a `retries: 0` mellett halott volt). A (7) és (8) gyengítései közül nem bukott az (1)
+  állítás elhagyása vagy szűrése (a (8) csak részsztringet keresett), a (2) és a (8)
+  semlegesítése, egy kiterjesztés kivétele a listából, a `require` import-él törlése és a
+  kivétel lista bővítése. A javítás: az (1), (2), (7), (8) invariáns és a leírás blokk fejlécének
+  szövege lenyomattal rögzített lett, amit a (8) a leírás blokkon belül, egy új, kilencedik
+  invariáns azon kívül, független kóddal számolt; a kiterjesztés listák, az import-él minta és a
+  kivétel lista gyengítése a hetedik invariáns esetein bukik. **Pontosítás (2026-09-25):** az
+  akkori "egyik kihagyása sem marad észrevétlen" állítás hamis volt: a lenyomat csak a rögzített
+  blokkokat fedte, tehát például a (6) kihagyása és a segédfüggvényeken át végzett gyengítés
+  észrevétlen maradt; a (8) és a (9) azóta törölve, lásd a hetedik bejegyzést. Mérve: a harmincöt egy pontú gyengítés mind bukik, AST elemzés egyikhez sem
+  kellett; a kilenc injekció az (1)-en bukik, a régi alakon közülük hét zöld volt, kettőt azon nem
+  futtattunk (`docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 6. szekció). **Pontosítás:**
+  a `741f63e` óta használt "a formátumtól és az írás módjától függetlenül" megfogalmazás túlzó volt;
+  a védelem a kép formátumától független, az írás módjától csak a felsorolt utakon (a Node
+  `fs`, `fs/promises` és `child_process` modulja string literálként megnevezve, `Bun.write`,
+  tesztcsatolmány, letöltés mentése, a CLI a shell és a `package.json` scriptből, a Playwright
+  képernyőkép, videó és trace opciói). **Elfogadott korlátok (user döntés 2026-09-25), a
+  2026-09-15-i két elvi korlát mintájára:** a szándékos megkerülést a szöveg alapú ellenőrzés nem
+  látja, és gépi kényszert nem építünk rá. Ide tartozik a hívás átnevezett vagy álnéven tárolt
+  hivatkozáson át (`call`, `bind`, destrukturálás), a `path` kulcs összerakása
+  (`Object.fromEntries`, számított kulcs), a modulnév összerakása vagy sablon literálja
+  (``import(`node:fs`)``, ``process.getBuiltinModule(`fs`)``), a Node beépített moduljain kívüli
+  író csomag, az SQLite BLOB mező, és a kép becsempészése a lefedettségi fixtúra JSON kimenetébe.
+  Ezek elkapásához AST vagy adatfolyam elemzés kellene. Forrás: `tooling/scripts` CLAUDE.md
+  `## Fájlok` táblázat, a spec fájl fejléce és a (7) esetei.
+- **A hetedik rendezés: a hatókör a megvalósításban, a lenyomat törlése, három jóhiszemű rés
+  (2026-09-25).** Egy független ellenőrzés a `0bf5685` után mérte, hogy a hatókör mondata hű, a
+  megvalósítás nem: a kapu minden commitolt kódfájlt olvasott, a termékkódot is, és ártatlan
+  termékbeli alakok bukást adtak (egy naplózási szint `trace` kulcsa, egy MIME térkép `video`
+  kulcsa, egy Vitest pillanatkép assertion, egy `'screenshot'` literál, egy kommentben álló
+  képernyőkép hívás; az utolsó a mérésünkben 31 fájlt jelölt meg). A javítás: a termékkód csak
+  Playwright importtal vizsgált (a pontos határ a második bejegyzésben), és a pillanatkép
+  assertion (`toMatchSnapshot`) író minta lett, nem közvetlen: egy unit teszt szöveges
+  pillanatképe nem jelez, a képernyőkép körben viszont bukik. **Kimondott következmény:** egy
+  termékcsomag író függvénye, amit egy teszt a képével hív, nem látszik, mert a termékkód
+  fájlírása a hatókörön kívül esik. Három jóhiszemű rés bezárva: a GitHub Actions YAML (`.yml`,
+  `.yaml`) shell parancsként vizsgált (egy `playwright test --trace on` workflow lépés
+  átcsúszott); a nem `off` értékű `--trace` kapcsoló a `playwright` szó nélkül is tiltott (egy
+  `bun run test:e2e -- --trace=on` script átcsúszott); a `.js` végű relatív import a TypeScript
+  párjára is feloldódik, a telepített Playwright betöltő sorrendjében. **A (8) és a (9)
+  törölve:** egy komment, egy átnevezés vagy egy új jogos (7) eset is bukást adott, az üzenet
+  csak egy lenyomat volt teendő nélkül, a jogos javítás és a gyengítés ugyanaz a lépés volt (a
+  lenyomat bemásolása), és a segédfüggvényeken át nem is védett (öt saját gyengítés zöld
+  maradt). A (7) marad a viselkedés önellenőrzése; a teszt saját gyengítése code review kérdés
+  (harmadik elvi korlát, a második bejegyzésben). Mérve: a hat hamis pozitív injekció a régi
+  alakon mind bukott, az újon mind zöld; a korábbi tizennyolc kerülő út és a három új rés az (1)
+  invariánson bukik, a három új rés a régi alakon zöld volt; az új kód nyolc egy pontú
+  gyengítése a (7)-en bukik. Forrás: `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 7. szekció, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
@@ -872,6 +1096,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   mért szám lehet. `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
   elmozdíthatná az éleket a két felvétel között
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
+- **A számokat előállító mérő eszköz is a repóba tartozik, nem csak a képkészítő.** A
+  transcript görgetés research 16. szekciójának táblái repón kívüli, azóta elveszett scriptből
+  jöttek, tehát a számok nem voltak újra előállíthatók. Azóta a mérő eszköz
+  `apps/web/measurement/transcript-scroll.ts` (`bun run measure:transcript`), ugyanazzal a
+  fixtúrával, mint az e2e (`apps/web/e2e/run-view-stream.ts`). A mérő eszköz csak számot ír
+  (`MEASUREMENT <json>` sorok), képet nem: képernyőképet lemezre kizárólag a szentesített
+  `capture-screenshots.ts` írhat, ezt a `screenshot-pipeline` invariánsai őrzik. Nem `.spec.ts`
+  és nem kapu, mert a verseny jelenete a mért változó miatt időzítőt használ (research 17.
+  szekció, user kérés 2026-09-24).
 
 **Adatbázis és Drizzle**
 

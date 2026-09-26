@@ -1,5 +1,6 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { describe, expect, it, vi } from 'vitest';
+import { protocolErrorMessage } from '../protocol-error-message/protocol-error-message.ts';
 import { performRouteRequest } from './perform-route-request.ts';
 import type { SafeParsableSchema, SafeParseOutcome } from './safe-parsable-schema.ts';
 
@@ -98,7 +99,7 @@ describe('performRouteRequest', () => {
     expect(outcome.kind).toBe('error');
   });
 
-  it('protokoll hiba esetén a kód szerinti mondatot és a szerver üzenetét adja', async () => {
+  it('404 protokoll hibára kizárólag a kód szerinti mondatot adja, a szerver üzenete nélkül', async () => {
     const outcome = await performRouteRequest({
       routeId: 'getWorkflow',
       parameters: { workflowId: 'workflow-1' },
@@ -113,9 +114,117 @@ describe('performRouteRequest', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'A keresett elem nem létezik, esetleg időközben törölték.: workflow-1 nem található',
+      message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: false,
     });
+  });
+
+  // A szerver valódi `already_decided` üzenetének alakja: azonosító és
+  // zárójeles hibaosztály (SPEC-005 8.3, 8.4). Egyik sem juthat a felületre,
+  // és a mondat pontja után nem állhat kettőspont (user döntés 2026-09-24).
+  // Az `errorClass` mező nélküli törzs (a mező előtti szerver válasz) a kód
+  // mondatát kapja: a kliens a `message` szövegét nem elemzi.
+  it('409 already_decided hibára errorClass nélkül a kód mondatát adja, azonosító, hibaosztály és ".:" nélkül', async () => {
+    const serverMessage = 'A(z) "step-run-7f3a" jóváhagyás már el lett döntve (already_decided).';
+    const outcome = await performRouteRequest({
+      routeId: 'decideApproval',
+      parameters: { approvalId: 'approval-1' },
+      query: undefined,
+      hasBody: true,
+      body: { decision: 'approved' },
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(jsonResponse(409, { code: 'conflict', message: serverMessage })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'Az elem állapota most nem engedi a műveletet.',
+      isTransient: false,
+    });
+    const message = outcome.kind === 'error' ? outcome.message : '';
+    expect(message).not.toContain('.:');
+    expect(message).not.toContain('step-run-7f3a');
+    expect(message).not.toContain('already_decided');
+  });
+
+  // User döntés 2026-09-26, "Ismert okokra saját mondat": a törzs `errorClass`
+  // mezője dönt, a nyers `message` továbbra sem jut a felületre.
+  it.each([
+    [409, 'conflict', 'already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
+    [422, 'unprocessable', 'no_default_provider', 'Nincs alapértelmezett provider beállítva.'],
+    [422, 'unprocessable', 'graph_cycle_detected', 'A gráf Ciklus csomópont nélküli kört tartalmaz.'],
+  ] as const)(
+    'HTTP %i %s hibára az errorClass (%s) saját mondatát adja, a szerver üzenete nélkül',
+    async (status, code, errorClass, expected) => {
+      const serverMessage = `A(z) "run-7f3a" belső részlet (${errorClass}).`;
+      const outcome = await performRouteRequest({
+        routeId: 'startRun',
+        parameters: { workflowId: 'workflow-1' },
+        query: undefined,
+        hasBody: true,
+        body: { input: {} },
+        responseSchema: demoValueSchema,
+        fetchFunction: () => Promise.resolve(jsonResponse(status, { code, message: serverMessage, errorClass })),
+        apiOrigin: API_ORIGIN,
+        signal: undefined,
+      });
+
+      expect(outcome).toEqual({ kind: 'error', message: expected, isTransient: false });
+      const message = outcome.kind === 'error' ? outcome.message : '';
+      expect(message).not.toContain('run-7f3a');
+      expect(message).not.toContain(errorClass);
+    },
+  );
+
+  // A szótáron kívüli `errorClass` a szerződés megsértése: a kliens és a
+  // szerver egy repóban, egyszerre élesedik (SPEC-005 8.5), tehát ez csak
+  // hibás szerver válaszként fordulhat elő, és a kliens annak is kezeli.
+  it('a szótáron kívüli errorClass értékű törzset hibás válaszként kezeli, HTTP státusszal', async () => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () =>
+        Promise.resolve(
+          jsonResponse(500, { code: 'internal', message: 'x (database_closed).', errorClass: 'database_closed' }),
+        ),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A szerver hibás választ adott (HTTP 500).',
+      isTransient: false,
+    });
+  });
+
+  it.each([
+    ['invalid_request', 400],
+    ['not_found', 404],
+    ['conflict', 409],
+    ['unprocessable', 422],
+    ['internal', 500],
+    ['service_unavailable', 503],
+  ] as const)('a(z) "%s" kód üzenete pontosan a leképezett mondat (HTTP %i)', async (code, status) => {
+    const outcome = await performRouteRequest({
+      routeId: 'getRun',
+      parameters: { runId: 'run-1' },
+      query: undefined,
+      hasBody: false,
+      body: undefined,
+      responseSchema: demoValueSchema,
+      fetchFunction: () => Promise.resolve(jsonResponse(status, { code, message: 'belső szöveg (hiba_osztaly)' })),
+      apiOrigin: API_ORIGIN,
+      signal: undefined,
+    });
+
+    expect(outcome).toMatchObject({ kind: 'error', message: protocolErrorMessage(code) });
   });
 
   it('nem 2xx válaszra, ha a törzs nem illeszkedik a ProtocolErrorBodySchema-ra, HTTP státuszos üzenetet ad', async () => {
@@ -176,7 +285,7 @@ describe('performRouteRequest', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'A keresett elem nem létezik, esetleg időközben törölték.: leállás',
+      message: 'A keresett elem nem létezik, esetleg időközben törölték.',
       isTransient: true,
     });
   });

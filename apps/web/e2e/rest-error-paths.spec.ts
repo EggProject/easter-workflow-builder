@@ -148,16 +148,37 @@ const PROTOCOL_ERROR_CASES = [
   },
 ] as const satisfies readonly { code: ProtocolErrorCode; status: number; sentence: string }[];
 
+/**
+ * A szerver `message` mezőjének valósághű alakja (SPEC-005 8.3, 8.4):
+ * azonosító és zárójeles hibaosztály. A user 2026-09-24-i döntése szerint
+ * egyik sem jut a felületre, csak a kódhoz rendelt magyar mondat, ".:"
+ * dupla írásjel nélkül (SPEC-007 8.4).
+ */
+const INTERNAL_ID = 'belso-azonosito-7f3a';
+const INTERNAL_CLASS = '(hiba_osztaly)';
+
 for (const errorCase of PROTOCOL_ERROR_CASES) {
-  test(`a ${errorCase.code} protokoll hibakód magyar mondata jelenik meg`, async ({ page }) => {
+  test(`a ${errorCase.code} protokoll hibakód magyar mondata a danger Alert blokkban jelenik meg, a szerver szövege nélkül`, async ({
+    page,
+  }) => {
     await installApiMocks(page, [
       mockRoute('listWorkflows', async (route) =>
-        route.fulfill(jsonBody({ code: errorCase.code, message: 'szerver részlet' }, errorCase.status)),
+        route.fulfill(
+          jsonBody(
+            { code: errorCase.code, message: `A(z) "${INTERNAL_ID}" elem hibája ${INTERNAL_CLASS}.` },
+            errorCase.status,
+          ),
+        ),
       ),
     ]);
 
     await page.goto('/');
 
-    await expect(page.getByRole('alert')).toHaveText(`${errorCase.sentence}: szerver részlet`);
+    const alert = page.getByRole('alert');
+    await expect(alert).toHaveText(errorCase.sentence);
+    await expect(alert).toHaveClass(/\balert--danger\b/);
+    await expect(page.locator('body')).not.toContainText(INTERNAL_ID);
+    await expect(page.locator('body')).not.toContainText(INTERNAL_CLASS);
+    await expect(page.locator('body')).not.toContainText('.:');
   });
 }

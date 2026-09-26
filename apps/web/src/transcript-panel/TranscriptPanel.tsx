@@ -1,11 +1,12 @@
 import type { RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
 import { Button } from '@easter-workflow-builder/ui';
-import type { ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
 import { RunEventRow } from '../run-event-row/RunEventRow.tsx';
 import { isRunInterruptible } from '../run-control/run-control-availability.ts';
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
+import { isCompactTranscriptList } from './is-compact-transcript-list.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
 import type { TranscriptRow as TranscriptRowData } from './transcript-row.ts';
@@ -103,6 +104,27 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * kinyitása után ennek új identitása jelzi, hogy a lista már a mért
  * magassággal számol.
  *
+ * **A gomb a lista tetején lebeg, a lista felső belső margójában** (user
+ * döntés 2026-09-25: "Felül, belső margóval", SPEC-008 7.4): középen, a lista
+ * tartalma fölé rétegezve. A margó a görgetett tartalom része, nem fix sáv,
+ * tehát a lista a teljes magasságot kapja, a gomb megjelenése semmit nem
+ * mozdít, a lista legtetején az első sor a gomb alatt kezdődik, alul pedig a
+ * gomb semmit nem takar (`transcript-panel.css`). A gomb maga a design system
+ * `Button`-ja, csak az elhelyezése saját kiegészítés, mert a design systemben
+ * nincs lista fölé lebegő gomb. Új esemény nélkül a gomb nincs a DOM-ban,
+ * tehát nem fókuszálható, és kimarad a hozzáférhetőségi fából. A DOM
+ * sorrendben a lista előtt áll, így a Tab sorrend és a képernyőolvasó a sorok
+ * előtt éri el.
+ *
+ * **Szűk listán a gomb nem lebeg, hanem a lista mellett áll** (user döntés
+ * 2026-09-25, SPEC-008 7.4, a 14.1 O-15 lezárása): ha a lista látható
+ * magassága kisebb, mint a felső belső margó plusz egy sor
+ * (`is-compact-transcript-list.ts`, a lista `onResize` méretéből), a gomb a
+ * lista bal oldalán, a lista tetejéhez igazítva áll, a folyásban, tehát egyetlen
+ * sort sem takar, és a lista magassága sem változik, csak a szélessége. A
+ * gomb ugyanaz a design system `Button`, ugyanazzal a szöveggel, és a DOM-ban
+ * ugyanúgy a lista előtt áll.
+ *
  * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
  * egyetlen sor sincs, a lista helyén csontváz. A lezárult pótlás utáni üres
@@ -128,23 +150,25 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
   const isRunInProgress = isRunInterruptible(runStatus);
   const rowHeight = useDynamicRowHeight({ defaultRowHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT });
   const { setList, onRowsRendered, onResize, unseenCount, jumpToBottom } = useTranscriptAutoScroll(rowCount, rowHeight);
+  // A lista szűk-e a lebegő gombhoz. A gomb szűk listán a lista mellett, a
+  // folyásban áll: a lista magassága tőle nem változik, tehát a feltétel sem
+  // billeg a két alak között.
+  const [isCompact, setIsCompact] = useState(false);
+  const handleResize = useCallback(
+    (listContentSize: Readonly<{ height: number }>) => {
+      setIsCompact(isCompactTranscriptList(listContentSize));
+      onResize();
+    },
+    [onResize],
+  );
 
   return (
     <div className="transcript-panel">
       {persistedStreamDeltas ? undefined : <p className="transcript-panel__delta-note">{TRANSIENT_DELTA_NOTE}</p>}
-      {(!isReplayComplete || unseenCount > 0) && (
-        <div className="transcript-panel__header">
-          {isReplayComplete ? undefined : (
-            <p className="transcript-panel__status" role="status">
-              Előzmények betöltése
-            </p>
-          )}
-          {unseenCount > 0 && (
-            <Button variant="secondary" size="sm" onClick={jumpToBottom}>
-              {`Ugrás az aljára (${String(unseenCount)} új esemény)`}
-            </Button>
-          )}
-        </div>
+      {isReplayComplete ? undefined : (
+        <p className="transcript-panel__status" role="status">
+          Előzmények betöltése
+        </p>
       )}
       {rowCount === 0 && !isReplayComplete ? (
         // A várakozás csontváza ugyanazzal a sorszámmal, mint a képernyő
@@ -163,18 +187,43 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
             ) : (
               <p className="transcript-panel__empty">A futásnak nincs eseménye.</p>
             ))}
-          <List
-            aria-label="Futás eseményei"
-            className="transcript-panel__list"
-            listRef={setList}
-            onResize={onResize}
-            onRowsRendered={onRowsRendered}
-            rowComponent={TranscriptRow}
-            rowCount={rowCount}
-            rowHeight={rowHeight}
-            rowKey={transcriptRowKey}
-            rowProps={{ rows, stepRuns }}
-          />
+          <div
+            className={`transcript-panel__list-frame${isCompact ? ' transcript-panel__list-frame--compact' : ''}`}
+            // A lista legalább egy összecsukott sornyi magas marad (2026-09-25):
+            // a húzható elválasztó `End` állásában a transcript panel a design
+            // system 60 pixeles minimumán áll, és a lista enélkül nulla magasra
+            // esne, tehát az utolsó sor sehogy sem látszana; így a panel
+            // görgethető burkolója (`run-view.css`) a teljes utolsó sort
+            // elérhetővé teszi. A keret a lista doboza, a lista kitölti.
+            style={{ minHeight: COLLAPSED_TRANSCRIPT_ROW_HEIGHT }}
+          >
+            {unseenCount > 0 && (
+              <Button variant="secondary" size="sm" className="transcript-panel__jump" onClick={jumpToBottom}>
+                {`Ugrás az aljára (${String(unseenCount)} új esemény)`}
+              </Button>
+            )}
+            <List
+              aria-label="Futás eseményei"
+              className="transcript-panel__list"
+              // A lista magassága egész pixel (a keretnél legfeljebb egy
+              // pixellel kisebb, a felső belső margóval együtt, mert a lista
+              // `border-box`): a húzható elválasztó százalékos felosztása
+              // tört magasságot ad (mérve 375x812-n 85,5 pixel), a böngésző
+              // görgetési tartománya viszont egész pixelre kerekít (a legnagyobb
+              // `scrollTop` 974 volt a szükséges 974,5 helyett), így az utolsó
+              // sor fél pixele sehogy sem látszott (research 20. szekció). A
+              // `round()` CSS függvény: MDN "CSS round()".
+              style={{ maxHeight: 'round(down, 100%, 1px)' }}
+              listRef={setList}
+              onResize={handleResize}
+              onRowsRendered={onRowsRendered}
+              rowComponent={TranscriptRow}
+              rowCount={rowCount}
+              rowHeight={rowHeight}
+              rowKey={transcriptRowKey}
+              rowProps={{ rows, stepRuns }}
+            />
+          </div>
         </>
       )}
     </div>

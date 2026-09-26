@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { isInstanceof } from '@easter-workflow-builder/typeguards';
 import { useListCallbackRef, type DynamicRowHeight, type ListImperativeAPI } from 'react-window';
+import { isLastRowVisible } from './is-last-row-visible.ts';
+import { isPreArrivalRangeReport } from './is-pre-arrival-range-report.ts';
 import { reduceTranscriptAutoScroll } from './reduce-transcript-auto-scroll.ts';
 import type { TranscriptAutoScrollState } from './transcript-auto-scroll-state.ts';
 
@@ -57,7 +59,7 @@ const INITIAL_STATE: TranscriptAutoScrollState = {
   settledRowCount: 0,
   unseenCount: 0,
   lastStopIndex: -1,
-  isToggleUnmeasured: false,
+  isPausedByToggle: false,
 };
 
 /**
@@ -67,6 +69,14 @@ const INITIAL_STATE: TranscriptAutoScrollState = {
  * `click` eseményt ad, research 15. szekció).
  */
 const DISCLOSURE_CONTROL_SELECTOR = '[aria-expanded]';
+
+/**
+ * A fejléc `aria-expanded` értéke a kattintás előtt, ha a kattintás a sort
+ * kinyitja. A lista kattintás figyelője a React saját kezelője ELŐTT fut: a
+ * telepített `react-dom` a gyökér tárolón figyel (`listenToAllSupportedEvents`),
+ * a lista annak leszármazottja, és a `click` buborékol.
+ */
+const COLLAPSED_ARIA_EXPANDED = 'false';
 
 /**
  * A transcript automatikus görgetése (SPEC-008 7.4, AC40, AC41, T-009-25).
@@ -84,18 +94,21 @@ const DISCLOSURE_CONTROL_SELECTOR = '[aria-expanded]';
  * magas, tehát a lista becslése a még ki nem rajzolt sorokra is a valódi
  * magasság (`collapsed-transcript-row-height.ts`, research 16. szekció).
  *
- * **Sor kinyitása élő stream közben.** A kinyitott sor új magassága a DOM-ban
- * azonnal áll, a lista viszont csak a következő mérés után számol vele, és
- * addig a jelentései egy már nem létező elrendezést írnak le: egy ekkor
- * érkező sor követése a kinyitott sort elrántaná. Ezért egy fejléc `click`
- * eseménye a mérésig kikapcsolja a követést, és a mérés (a `rowHeight`
- * gyorsítótár új identitása) utáni jelentés után a predikátum dönt. Egy
- * képkockán belüli ki-be csukás (páros számú kattintás ugyanazon a
- * fejlécen) nem változtat a soron, tehát mérés sem jön: ilyenkor a második
- * kattintás maga zárja le a váltást. A várakozásnak mindig van kilépése: a
- * mérés, a páros kattintás és az "ugrás az aljára" gomb; a nem látott sorok
- * száma közben is nő
- * (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció).
+ * **Sor kinyitása élő stream közben.** Egy fejléc `click` eseménye
+ * szünetelteti a követést. A kinyitás szünete addig tart, amíg a felhasználó
+ * vissza nem ér az aljára vagy meg nem nyomja az "ugrás az aljára" gombot
+ * (user döntés 2026-09-25): a kinyitott sor akkor is a helyén marad, ha maga
+ * az utolsó sor. A becsukás szünete a mérésig tart (a `rowHeight`
+ * gyorsítótár új identitása), mert addig a lista jelentései egy már nem
+ * létező elrendezést írnak le; a mérés utáni jelentés után a predikátum dönt.
+ * A váltások fejlécenként párosodnak: ha egy fejléc a szünet alatt páros
+ * számú kattintást kap (például egy képkockán belüli ki-be csukás, ami után
+ * mérés sem jön), a sor ugyanaz, mint előtte, és ha minden váltás
+ * visszaállt, a szünet a predikátum szerint zárul. A szünetnek mindig van
+ * kilépése: a mérés (becsukásnál), a páros kattintás, az "ugrás az aljára"
+ * gomb és a kézi visszatérés az aljára; a nem látott sorok száma közben is
+ * nő (`docs/research/2026-09-23-transcript-panel-meresek.md` 16-18.
+ * szekció).
  */
 export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowHeight): TranscriptAutoScroll {
   const [state, dispatch] = useReducer(reduceTranscriptAutoScroll, INITIAL_STATE);
@@ -105,20 +118,32 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // eslint-disable-next-line unicorn/no-null -- a react-window ref állapotának dokumentált üres értéke
   const [list, setList] = useListCallbackRef(null);
 
-  // A legutóbbi mérés óta páratlan számú kattintást kapott fejlécek: ezeknek
-  // a sora más magas, mint amivel a lista számol.
-  const unmeasuredTogglesReference = useRef(new Set<Element>());
+  // A követést szüneteltető váltások fejlécenként: a szünet kezdete óta
+  // páratlan számú kattintást kapott fejlécek. Az érték igaz, ha a váltás
+  // kinyitás volt: annak a szünete a mérés után is tart, a becsukásé a
+  // mérésig.
+  const pausingTogglesReference = useRef(new Map<Element, boolean>());
+  // Jelentett-e a lista a szünet kezdete óta olyan elrendezést, amiben az
+  // utolsó sor nem látszik. Csak az ezután érkező, az utolsó sort mutató
+  // jelentés számít visszatérésnek az aljára: a kattintás előtti görgetés
+  // késve érkező jelentése (a mérés előtti gyorsítótárral, research 16.
+  // szekció) nem, és a kinyitott utolsó sor görgetése sem (research 18.
+  // szekció).
+  const hasLeftBottomWhilePausedReference = useRef(false);
+  // Az előző jelentés idején érvényes sorszám: ebből dől el, hogy egy
+  // jelentés még az érkezés előtti tartományt írja-e le
+  // (`isPreArrivalRangeReport`).
+  const lastReportedRowCountReference = useRef(0);
 
   // A görgetés a követés pillanatnyi állapotát olvassa, de csak a görgető
   // effekt indítói futtatják: a lista csatolása, új sor, átméretezés és az
-  // ugrás. A követés visszakapcsolása önmagában nem görget, így egy
-  // kinyitott utolsó sor a következő új sorig a helyén marad. A még nem mért
-  // sor váltást a hivatkozásból is olvassa, mert a kattintás egy már
-  // kirajzolt, de effektjét még le nem futtatott érkezés ELÉ is eshet, és
-  // ilyenkor az állapot még a kattintás előtti. A visszatérési érték: az
-  // érkezést a panel követte-e (ha nem, a sor a nem látottak közé kerül).
+  // ugrás. A követés visszakapcsolása önmagában nem görget. A szüneteltető
+  // váltást a hivatkozásból is olvassa, mert a kattintás egy már kirajzolt,
+  // de effektjét még le nem futtatott érkezés ELÉ is eshet, és ilyenkor az
+  // állapot még a kattintás előtti. A visszatérési érték: az érkezést a
+  // panel követte-e (ha nem, a sor a nem látottak közé kerül).
   const followToBottom = useEffectEvent((): boolean => {
-    const isFollowed = state.isFollowing && unmeasuredTogglesReference.current.size === 0;
+    const isFollowed = state.isFollowing && pausingTogglesReference.current.size === 0;
     if (isFollowed && list !== null && rowCount > 0) {
       list.scrollToRow({ index: rowCount - 1, align: 'end' });
     }
@@ -149,14 +174,17 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
       if (control === false || control === null) {
         return;
       }
-      const toggles = unmeasuredTogglesReference.current;
+      const toggles = pausingTogglesReference.current;
       if (toggles.delete(control)) {
         if (toggles.size === 0) {
           dispatch({ type: 'row_toggle_settled' });
         }
         return;
       }
-      toggles.add(control);
+      if (toggles.size === 0) {
+        hasLeftBottomWhilePausedReference.current = false;
+      }
+      toggles.set(control, control.getAttribute('aria-expanded') === COLLAPSED_ARIA_EXPANDED);
       dispatch({ type: 'row_toggle_started' });
     };
     element.addEventListener('click', onClick, { passive: true });
@@ -173,22 +201,31 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
   // commitban, egy layout effektben számolja újra, és a változást csak a
   // következő renderben jelenti. A lezárás ezért egy állapot frissítéssel
   // egy későbbi renderre tolódik, aminek a passzív effektjei a lista
-  // jelentése UTÁN futnak (saját mérés, research 16. szekció).
+  // jelentése UTÁN futnak (saját mérés, research 16. szekció). A mérés csak a
+  // becsukásokat zárja: egy kinyitott sor, akár az utolsó, a mérés után is a
+  // helyén marad (user döntés 2026-09-25, research 18. szekció).
   const [settleRequestCount, setSettleRequestCount] = useState(0);
   const requestSettle = useEffectEvent(() => {
-    const toggles = unmeasuredTogglesReference.current;
-    if (toggles.size > 0) {
-      toggles.clear();
+    const toggles = pausingTogglesReference.current;
+    if (toggles.size === 0) {
+      return;
+    }
+    for (const [control, isExpansion] of toggles) {
+      if (!isExpansion) {
+        toggles.delete(control);
+      }
+    }
+    if (toggles.size === 0) {
       setSettleRequestCount((count) => count + 1);
     }
   });
   useEffect(() => {
     requestSettle();
   }, [rowHeight]);
-  // Egy azóta kattintott, még nem mért fejléc a lezárást elhalasztja a saját
-  // méréséig.
+  // Egy azóta kattintott fejléc a lezárást elhalasztja: egy becsukás a saját
+  // méréséig, egy kinyitás a szünet valamelyik kilépéséig.
   const settle = useEffectEvent(() => {
-    if (unmeasuredTogglesReference.current.size === 0) {
+    if (pausingTogglesReference.current.size === 0) {
       dispatch({ type: 'row_toggle_settled' });
     }
   });
@@ -198,17 +235,43 @@ export function useTranscriptAutoScroll(rowCount: number, rowHeight: DynamicRowH
     }
   }, [settleRequestCount]);
 
+  // A szünet alatt a lista elhagyta az alját, majd újra az utolsó sort
+  // mutatja: a felhasználó visszaért az aljára (user döntés 2026-09-24). Ez a
+  // szünet kilépése akkor is, ha a mérés sosem jön: egy fülváltás a sort a
+  // mérése előtt leszereli (a rejtett sor 0 magasságát a könyvtár nem
+  // tárolja), és utána a gyorsítótár nem változik. A kinyitott utolsó sor
+  // után az alj elhagyása az első, nem követett új sor. Az érkezés utáni
+  // első, még a régi tartományt leíró jelentés nem elhagyás: nem teli listán
+  // az új sor a következő jelentésben már látszik, és a kettő együtt egy
+  // hamis "elhagyás, majd visszatérés" párt adna, ami a szünetet lezárná
+  // (research 19. szekció).
   const onRowsRendered = useCallback(
     (visibleRows: Readonly<{ startIndex: number; stopIndex: number }>) => {
       dispatch({ type: 'rows_rendered', stopIndex: visibleRows.stopIndex, rowCount });
+      const previousRowCount = lastReportedRowCountReference.current;
+      lastReportedRowCountReference.current = rowCount;
+      const toggles = pausingTogglesReference.current;
+      if (toggles.size === 0) {
+        return;
+      }
+      if (!isLastRowVisible(visibleRows, rowCount)) {
+        if (!isPreArrivalRangeReport(visibleRows, rowCount, previousRowCount)) {
+          hasLeftBottomWhilePausedReference.current = true;
+        }
+        return;
+      }
+      if (hasLeftBottomWhilePausedReference.current) {
+        toggles.clear();
+        dispatch({ type: 'bottom_reached_while_paused' });
+      }
     },
     [rowCount],
   );
 
-  // Az ugrás a még nem mért váltásokat is elengedi: egy a mérése előtt
+  // Az ugrás a szüneteltető váltásokat is elengedi: egy a mérése előtt
   // leszerelt sor (a kirajzolt tartományból kigörgetve) sosem kap mérést.
   const jumpToBottom = useCallback(() => {
-    unmeasuredTogglesReference.current.clear();
+    pausingTogglesReference.current.clear();
     dispatch({ type: 'jump_requested' });
     setJumpCount((count) => count + 1);
   }, []);

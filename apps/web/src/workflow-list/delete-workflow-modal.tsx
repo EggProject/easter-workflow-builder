@@ -1,6 +1,6 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { DeletionSummarySchema, type DeletionSummary, type WorkflowSummary } from '@easter-workflow-builder/protocol';
-import { Button, Checkbox, Modal } from '@easter-workflow-builder/ui';
+import { Alert, Button, Checkbox, Modal } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type ChangeEvent, type ReactElement } from 'react';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
@@ -116,8 +116,8 @@ export function DeleteWorkflowModal(properties: Readonly<DeleteWorkflowModalProp
           />
         </div>
       )}
-      {summaryState.state.status === 'failure' && <p role="alert">{summaryState.state.message}</p>}
-      {submitState.state.status === 'failure' && <p role="alert">{submitState.state.message}</p>}
+      {summaryState.state.status === 'failure' && <Alert variant="danger">{summaryState.state.message}</Alert>}
+      {submitState.state.status === 'failure' && <Alert variant="danger">{submitState.state.message}</Alert>}
     </Modal>
   );
 }
