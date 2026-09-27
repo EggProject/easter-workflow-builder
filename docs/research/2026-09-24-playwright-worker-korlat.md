@@ -122,3 +122,79 @@ A CI-ági workers érték (`1`) méretezése (kihasználható-e több worker egy
 **nyitva marad**, a user kifejezett kérése szerint ("CI-ban futhat több is... ha elviseli, ott
 majd meg kell nézni"): ehhez a tényleges CI futtatókörnyezet terhelhetőségét kellene mérni, ami
 nem ennek a lépésnek a hatóköre. Lásd `.claude/CLAUDE.md` 11. szekció.
+
+**Ezt a "nyitva marad" mondatot a lenti 4. szekció 2026-09-27-én felülírja**: a user döntése
+szerint a CI-ági érték `2`-re változott, egyetlen zöld CI futással igazolva.
+
+---
+
+## 4. CI-ági mérés, 2026-09-27
+
+A user két döntése ("2 legyen, azzal mérjük meg" és "Egy zöld futás elég") alapján a CI-ági
+`workers` érték `1`-ről `2`-re változott. Ez a szekció a hozzá tartozó bizonyítékot rögzíti:
+a GitHub-hosted runner erőforrásait, a helyi `CI=1` igazolást és a PR első CI futásának mérését.
+
+### 4.1 A GitHub-hosted runner erőforrásai (publikus repó, `ubuntu-latest`)
+
+**Forrás 1 (hivatalos doksi):** <https://docs.github.com/en/actions/reference/runners/github-hosted-runners>
+"Standard GitHub-hosted runners for public repositories" táblázata szó szerint: `ubuntu-latest`
+(és a vele azonos sorban álló `ubuntu-24.04`, `ubuntu-22.04`, `ubuntu-26.04`) - Linux, 4 CPU,
+16 GB memória, 14 GB SSD tároló, x64. A táblázat felett a szöveg szó szerint: "Use of the
+standard GitHub-hosted runners is free and unlimited on public repositories." Ugyanez a
+táblázat szó szerint megismétlődik a
+<https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job>
+oldalon is.
+
+**Forrás 2 (hivatalos GitHub blog, 2024-01-17, Larissa Fortuna):**
+<https://github.blog/news-insights/product-news/github-hosted-runners-double-the-power-for-open-source/>
+szó szerint: "we now provide machines that are double their previous specification, with
+4-vCPUs, 16 GiB of memory" - megerősítve, hogy a publikus repókon futó `ubuntu-latest` runner
+4 vCPU-s, 16 GiB memóriájú gép, 2023. december 1. óta (korábban 2 vCPU volt).
+
+**Válasz:** a repó publikus, tehát az `e2e` job (`runs-on: ubuntu-latest`) egy 4 vCPU-s,
+16 GB memóriájú, 14 GB SSD tárolójú Linux gépen fut, ingyenesen és korlátlanul.
+
+### 4.2 Helyi igazolás: `CI=1` mellett a config 2 workert ad
+
+Parancs: `CI=1 bun x playwright test e2e/action-menu-opacity.spec.ts` (`apps/web` alatt, a
+`workers` mező módosítása után, egyetlen Playwright folyamatként). A Playwright saját sora szó
+szerint:
+
+```
+Running 2 tests using 2 workers
+```
+
+Mindkét teszt zöld (`2 passed (10.7s)`). Ez igazolja, hogy a `Boolean(process.env['CI']) ? 2 : 3`
+kifejezés `CI=1` mellett ténylegesen `2`-t ad, függetlenül attól, hogy a valódi CI napló worker
+sorát admin jog nélkül nem látjuk.
+
+### 4.3 A PR első CI futásának mérése
+
+- **PR:** [EggProject/easter-workflow-builder#15](https://github.com/EggProject/easter-workflow-builder/pull/15)
+- **Run id:** `36287275308`
+- **Merge commit SHA** (`refs/pull/15/merge`, a `GET /repos/.../pulls/15` végpont
+  `merge_commit_sha` mezője): `b226753523c85c9a2850dc4fc6315d957d068ab4`
+- **PR head SHA:** `bea701bb95a3c96f642ca0b6d711c5fd8fe8e680` (egyetlen commit, kizárólag
+  `apps/web/playwright.config.ts`), **base SHA:** `67c06a2972e50c6070e1540c8c4ce674249a7b6f`
+  (a `main` változatlan a futás alatt, tehát a tesztszám azonos az alap futáséval)
+- **Eredmény:** `E2E` job `conclusion: success`, a `Run e2e tests` lépés `conclusion: success`
+  (nem cache találat: a lépés ténylegesen 3m31s-ig futott, nem ~0s)
+
+|                                                  | job (`E2E`)                 | `Run e2e tests` lépés       |
+| ------------------------------------------------ | --------------------------- | --------------------------- |
+| Alap (`36277905998`, `main` `67c06a2`, 1 worker) | 7m40s                       | 6m36s                       |
+| Ez a futás (`36287275308`, 2 worker)             | 4m23s (02:01:44 - 02:06:07) | 3m31s (02:02:26 - 02:05:57) |
+
+A job időtartama 42,8%-kal, a `Run e2e tests` lépés 46,7%-kal rövidebb 2 workerrel, ugyanazon a
+tesztkészleten (a `main` a futás alatt nem változott, a PR kizárólag a `workers` értéket
+módosítja). A jobs végpont
+(`https://api.github.com/repos/EggProject/easter-workflow-builder/actions/runs/36287275308/jobs`)
+hitelesítés nélkül olvasható volt, a job naplója (admin jog hiányában) nem.
+
+### 4.4 Következtetés
+
+A négy vCPU-s, 16 GB memóriájú publikus runner elviseli a 2 workert: a futás zöld, és a mérés
+szerint gyorsabb is, mint 1 workerrel. A user "Egy zöld futás elég" döntése szerint ez az egy
+mérés elegendő a `2` érték elfogadásához; a 3 vagy több worker kihasználhatósága (a runner 4
+vCPU-jából elvileg még maradna kapacitás) továbbra sem mért kérdés, és nem tárgya ennek a
+lépésnek.

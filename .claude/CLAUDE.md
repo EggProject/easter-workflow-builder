@@ -538,14 +538,14 @@ párhuzamosan, mert két egyidejű Playwright folyamat együttes worker száma i
 A `apps/web/playwright.config.ts` és `playwright.screenshots.config.ts` `workers` mezője ezt
 kódolja (`docs/research/2026-09-24-playwright-worker-korlat.md`), a
 `apps/web/src/playwright-worker-limit/` regressziós tesztje őrzi a `test` kapun.
-**Nyitott pont a CI-ági workers érték méretezésére** (a 4. szekció 2. pontja szerinti
-jelöléssel): a user kifejezett kérése szerint "CI-ban futhat több is, mert az elviseli... ha
-elviseli, ott majd meg kell nézni" - tehát a tényleges CI worker szám felső korlátja jelenleg
-NEM MÉRT. Mi a viselkedés addig: a CI-ági érték változatlan marad azon, amit a config már eddig
-is használt (jelenleg `1`, a `docs/ci#workers` ajánlása szerint). Mi zárná le: a tényleges CI
-futtatókörnyezet terhelhetőségének mérése (hány worker fut le stabilan a GitHub Actions
-runneren), és a mérés eredményének átvezetése ebbe a szakaszba és a `playwright.config.ts`
-kommentjébe.
+**A CI-ági workers érték lezárva: `2`** (user döntések 2026-09-27: "2 legyen, azzal mérjük meg"
+és "Egy zöld futás elég"). A korábbi nyitott pont ("CI-ban futhat több is, mert az elviseli...
+ha elviseli, ott majd meg kell nézni") ezzel lezárult: a mérés a publikus repó `ubuntu-latest`
+runnerének hivatalos forrásból igazolt erőforrásait (4 vCPU, 16 GB memória), a helyi `CI=1`
+Playwright worker sorát (`Running 2 tests using 2 workers`) és a PR első CI futásának zöld
+`e2e` jobját (run id `36287275308`, a `Run e2e tests` lépés ténylegesen lefutott, nem cache
+találat, és az 1 workeres alaphoz képest gyorsabb is) egyaránt rögzíti, a
+`docs/research/2026-09-24-playwright-worker-korlat.md` 4. szekciójában.
 
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
