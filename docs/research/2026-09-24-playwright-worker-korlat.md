@@ -198,3 +198,89 @@ szerint gyorsabb is, mint 1 workerrel. A user "Egy zöld futás elég" döntése
 mérés elegendő a `2` érték elfogadásához; a 3 vagy több worker kihasználhatósága (a runner 4
 vCPU-jából elvileg még maradna kapacitás) továbbra sem mért kérdés, és nem tárgya ennek a
 lépésnek.
+
+---
+
+## 5. CI runner váltás `blacksmith-2vcpu-ubuntu-2404`-re, 2026-09-27
+
+A fenti 4. szekció mérése a GitHub-hosted, publikus repókon négy vCPU-s `ubuntu-latest` runneren
+történt. A user kifejezett kérésére ("a github runner-t én kértem hogy állítsa át") a
+`.github/workflows/ci.yml` mind a hat jobja (`gate` mátrix, `test`, `build`, `e2e`,
+`coverage-comment`, `ci`) `blacksmith-2vcpu-ubuntu-2404` futtatóra vált (`d26d998` commit).
+
+### 5.1 A Blacksmith runner erőforrásai
+
+**Forrás 1 (hivatalos doksi):** <https://docs.blacksmith.sh/blacksmith-runners/overview>, "x64
+Runners" szekció, "Ubuntu 24.04" tábla szó szerint: `blacksmith-2vcpu-ubuntu-2404` - 2 vCPU,
+8 GB memória, 80 GB tároló. A `blacksmith-2vcpu-ubuntu-2404` tag az `x64 Runners` alatt áll, az
+ARM sorok (`-arm` utótaggal) ettől külön szekcióban, más (6 GB/75 GB) értékekkel szerepelnek,
+tehát a szóban lévő tag architektúrája x64.
+
+**Forrás 2 és Forrás 3 törölve, nem független források voltak (2026-09-27, független
+ellenőrzés nyomán javítva).** A <https://latchkey.dev/learn/runners/blacksmith-runners-explained>
+(Daniel Zoghalchali) saját szövege szerint a táblázatot a Blacksmith dokumentációjából olvasta
+("Everything in it was read from blacksmith.sh and docs.blacksmith.sh"), tehát ugyanazt a
+forrást ismétli, nem attól független ellenőrzés. A
+<https://apis.io/apis/blacksmith-sh/github-actions-runners/> a konkrét 8 GB / 80 GB számot nem
+is közli, csak a vCPU mérettartományt (2-32) és az architektúra családokat nevezi meg, tehát a
+memória- és tároló-állítást nem erősíti meg. Új keresés valódi független forrásra (a
+Blacksmith saját domainjétől eltérő, nem a docs.blacksmith.sh tábláját idéző/másoló oldal)
+nem talált olyat, ami a teljes állítást (2 vCPU, 8 GB, 80 GB, x64) együtt megerősítené. A
+szabálykönyv 4. szekció 2. pontja szerint: **egy hivatalos forrás (Forrás 1) áll, második
+független megerősítés nincs.**
+
+**Válasz:** a `blacksmith-2vcpu-ubuntu-2404` runner 2 vCPU-s, 8 GB memóriájú, 80 GB tárolójú,
+x64 architektúrájú gép, Ubuntu 24.04 image-en, Firecracker microVM-ben, bare-metal gaming CPU
+alapú fizikai hardveren (a docs.blacksmith.sh Overview lapja szerint). Ez a 4. szekcióban mért
+`ubuntu-latest` runnerhez (4 vCPU, 16 GB) képest fele vCPU-számot és fele memóriát jelent.
+
+### 5.2 Nyitott kérdés: bírja-e a 2 vCPU-s runner a 2 Playwright workert
+
+A 4. szekció következtetése ("a négy vCPU-s... runner elviseli a 2 workert") kifejezetten a
+négy vCPU-s hardverre hivatkozott. Ez a Blacksmith runneren nem eleve igaz: fele a mag- és
+memória-számmal a két worker közötti erőforrás verseny nagyobb lehet. **NYITVA marad, amíg egy
+tényleges CI futás nem méri.** Mi a viselkedés addig: a `playwright.config.ts` `workers` mezője
+változatlanul `Boolean(process.env['CI']) ? 2 : 3`, nem csökkentjük óvatosságból. Mi zárná le:
+egy zöld CI `e2e` job ezen a PR-en, a "Run e2e tests" lépés tényleges (nem cache) lefutásával, a
+job és a lépés időtartamának rögzítésével, összevetve a 4.3 alatti két méréssel.
+
+### 5.3 A PR első CI futásának mérése
+
+- **PR:** [EggProject/easter-workflow-builder#17](https://github.com/EggProject/easter-workflow-builder/pull/17)
+- **Run id:** `36334506650`
+- **Runner:** mind a tizenkét job `blacksmith-2vcpu-ubuntu-2404`-en futott, a `GET
+.../actions/runs/36334506650/jobs` végpont `runner_name` mezője szerint (pl.
+  `blacksmith-2vcpu-ubuntu-2404-Runner-a7af74d607`, `...-cb08add2ae`), a `labels` mezőben
+  `["blacksmith-2vcpu-ubuntu-2404"]`. A jobok a queue-olás nélkül, azonnal `in_progress`
+  állapotba kerültek: a `created_at` és a `started_at` között mért különbség jobonként
+  eltér, 9-17 másodperc a tartománya (a `gate` mátrix lábai, a `test` és a `build` 16-17,
+  az `e2e` 10, a `coverage-comment` és az összesítő `ci` 9 másodperc után indult, a GET
+  .../actions/runs/36334506650/jobs végpont `created_at` és `started_at` mezői szerint),
+  tehát a Blacksmith GitHub App telepítve van és működik.
+- **Eredmény:** mind a tizenkét job (a `gate` mátrix hét lába: `format`, `typecheck`, `lint`,
+  `docs`, `casing`, `graph`, `db-drift`, valamint `test`, `build`, `e2e`, `coverage-comment` és
+  az összesítő `ci`) `conclusion: success`.
+- **`test` job:** a `Test` lépés (a `bun run test`, tehát a teljes Vitest suite `--coverage`
+  mellett) `16:47:31` - `16:49:31`, **2m 0s**. A job zöld záró állapota igazolja a 100 százalékos
+  lefedettségi küszöböt is mind a négy metrikán, mert a `test.sh` wrapper a küszöb alatt nem
+  nulla kilépési kóddal állna.
+- **`e2e` job:** a `Run e2e tests` lépés `16:48:17` - `16:51:32`, **3m 15s** (nem cache találat:
+  a lépés ténylegesen ennyi ideig futott, nem ~0s). A teljes `E2E` job **3m 54s**.
+
+|                                                          | job (`E2E`) | `Run e2e tests` lépés |
+| -------------------------------------------------------- | ----------- | --------------------- |
+| `ubuntu-latest`, 1 worker (`36277905998`)                | 7m40s       | 6m36s                 |
+| `ubuntu-latest`, 2 worker (`36287275308`)                | 4m23s       | 3m31s                 |
+| `blacksmith-2vcpu-ubuntu-2404`, 2 worker (`36334506650`) | 3m54s       | 3m15s                 |
+
+### 5.4 Következtetés
+
+**A NYITVA jelölés lezárva.** A 2 vCPU-s, feleannyi magú Blacksmith runner a 2 Playwright
+workert nem csak elviseli, hanem a `Run e2e tests` lépés rajta **gyorsabb** (3m15s), mint a
+korábbi, duplán annyi magú (4 vCPU-s) `ubuntu-latest` runneren ugyanazzal a 2 workeres
+beállítással (3m31s). A `test` job (teljes Vitest suite, 100 százalékos lefedettségi küszöb mind
+a négy metrikán) is zölden, 2 perc alatt lefutott. A magyarázat a Blacksmith saját, hivatalos
+állítása szerint a bare-metal gaming CPU-k magasabb egyszálú teljesítménye (5.1 szekció,
+`docs.blacksmith.sh` "significantly higher single-thread performance"), amivel a fele magszám
+nem jelent tényleges lassulást ezen a terhelésen. A `playwright.config.ts` CI-ági `workers: 2`
+értéke emiatt változatlan marad, csökkentésre vagy a mérés megismétlésére nincs szükség.

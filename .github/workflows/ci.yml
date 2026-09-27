@@ -43,7 +43,7 @@ jobs:
   # ---------------------------------------------------------------------------
   gate:
     name: Gate (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     strategy:
       fail-fast: false
       matrix:
@@ -101,7 +101,7 @@ jobs:
   # ---------------------------------------------------------------------------
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -150,7 +150,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -195,7 +195,7 @@ jobs:
   e2e:
     name: E2E
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -336,7 +336,7 @@ jobs:
     if: >-
       always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name ==
       github.repository
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       pull-requests: write
@@ -409,7 +409,7 @@ jobs:
     name: CI
     if: always()
     needs: [gate, test, build, e2e]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Kapuk eredmenye
         env:
