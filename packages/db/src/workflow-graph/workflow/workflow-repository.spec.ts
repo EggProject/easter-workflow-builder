@@ -438,6 +438,78 @@ describe('createWorkflowRepository', () => {
       sqlite.close();
     });
 
+    it('graph_id_conflict hibaágat ad és visszagörget, ha egy node azonosító egy MÁSIK workflow gráfjában már létezik (a workflow_node.id globális elsődleges kulcs, user döntés 2026-09-27)', () => {
+      const { sqlite, repository } = openRepository();
+      const workflowA = okOrThrow(repository.createWorkflow({ name: 'A', description: null, providerId: null }));
+      okOrThrow(
+        repository.replaceGraph(
+          workflowA.id,
+          [{ id: 'shared-node', label: 'A csomópont', positionX: 0, positionY: 0, config: startConfig }],
+          [],
+        ),
+      );
+
+      const workflowB = okOrThrow(repository.createWorkflow({ name: 'B', description: null, providerId: null }));
+      const outcome = repository.replaceGraph(
+        workflowB.id,
+        [{ id: 'shared-node', label: 'B csomópont', positionX: 0, positionY: 0, config: startConfig }],
+        [],
+      );
+
+      // A `workflow_node.id` elsődleges kulcs sértése ugyanazon a
+      // `transaction()` fallback ágon repül fel, mint a fenti idegen kulcs
+      // eset; a `describeTransactionError` a saját mérés szerinti
+      // `SQLITE_CONSTRAINT_PRIMARYKEY` kódra a `(graph_id_conflict)`
+      // jelölést adja.
+      expect(errorOrThrow(outcome)).toContain('(graph_id_conflict)');
+
+      // A tranzakció visszagörgetése miatt a B workflow gráfja üres marad,
+      // az A workflow-é pedig érintetlen.
+      const graphB = okOrThrow(repository.readGraph(workflowB.id));
+      expect(graphB).toStrictEqual({ nodes: [], edges: [] });
+      const graphA = okOrThrow(repository.readGraph(workflowA.id));
+      expect(graphA.nodes).toHaveLength(1);
+
+      sqlite.close();
+    });
+
+    it('graph_id_conflict hibaágat ad, ha egy él azonosító egy MÁSIK workflow gráfjában már létezik', () => {
+      const { sqlite, repository } = openRepository();
+      const workflowA = okOrThrow(repository.createWorkflow({ name: 'A', description: null, providerId: null }));
+      okOrThrow(repository.replaceGraph(workflowA.id, twoNodesOneEdge().nodes, twoNodesOneEdge().edges));
+
+      // A workflow B saját, egyedi node azonosítókat kap, hogy a csomópont
+      // beszúrás önmagában ne ütközzön: kizárólag az él azonosítója (`edge-1`)
+      // egyezik a workflow A-val, tehát a mérés a él-ütközést, nem a
+      // csomópont-ütközést igazolja.
+      const workflowB = okOrThrow(repository.createWorkflow({ name: 'B', description: null, providerId: null }));
+      const outcome = repository.replaceGraph(
+        workflowB.id,
+        [
+          { id: 'b-node-a', label: 'A', positionX: 0, positionY: 0, config: startConfig },
+          { id: 'b-node-b', label: 'B', positionX: 1, positionY: 1, config: startConfig },
+        ],
+        [
+          {
+            id: 'edge-1',
+            sourceNodeId: 'b-node-a',
+            targetNodeId: 'b-node-b',
+            sourceHandle: 'out',
+            targetHandle: 'in',
+            branchKey: null,
+          },
+        ],
+      );
+
+      expect(errorOrThrow(outcome)).toContain('(graph_id_conflict)');
+
+      // A tranzakció visszagörgetése miatt a B workflow node-jai sem íródtak be.
+      const graphB = okOrThrow(repository.readGraph(workflowB.id));
+      expect(graphB).toStrictEqual({ nodes: [], edges: [] });
+
+      sqlite.close();
+    });
+
     it('corrupt_node_config hibaágat ad, ha egy tárolt node config nem érvényes NodeConfig (korrupt adat)', () => {
       const { sqlite, database, repository } = openRepository();
       const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));

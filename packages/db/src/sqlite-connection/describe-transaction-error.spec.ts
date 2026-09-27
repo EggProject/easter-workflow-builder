@@ -25,4 +25,12 @@ describe('describeTransactionError', () => {
     const error = new SqliteDatabase.SqliteError('FOREIGN KEY constraint failed', 'SQLITE_CONSTRAINT_FOREIGNKEY');
     expect(describeTransactionError(error)).toBe('FOREIGN KEY constraint failed (foreign_key_violation)');
   });
+
+  it('a (graph_id_conflict) jelöléssel egészíti ki az üzenetet SQLITE_CONSTRAINT_PRIMARYKEY kódra (saját mérés: TEXT elsődleges kulcs sértése ezt a kódot adja, nem SQLITE_CONSTRAINT_UNIQUE-t)', () => {
+    const error = new SqliteDatabase.SqliteError(
+      'UNIQUE constraint failed: workflow_node.id',
+      'SQLITE_CONSTRAINT_PRIMARYKEY',
+    );
+    expect(describeTransactionError(error)).toBe('UNIQUE constraint failed: workflow_node.id (graph_id_conflict)');
+  });
 });
