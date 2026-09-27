@@ -11,6 +11,35 @@ export interface ResizableHandleProperties {
   readonly 'aria-label'?: string;
 }
 
+/**
+ * A jelentett `aria-valuenow` szorítása a jelentett `aria-valuemin`/`aria-valuemax`
+ * közé.
+ *
+ * MÉRT HIBA: egy beágyazott `Resizable` csoportnál (pl. a futás nézet transcript
+ * oldalán a belső, transcript-vs-jóváhagyás elválasztó egy külső, gráf-vs-transcript
+ * `Resizable` panelében) a külső elválasztó húzása után a `sizes` állapot (a nyers,
+ * tárolt százalék) a beágyazott csoport rendelkezésre álló pixelterének változását
+ * csak a KÖVETKEZŐ méréskor (fókusz, saját húzás, ablak átméretezés) követi - eddig a
+ * pillanatig a nyers `sizeBefore` a frissen számított `lowestSize`/`highestSize`
+ * tartomány alá (vagy fölé) eshet, tehát az `aria-valuenow` a jelentett minimumon
+ * kívülre kerülhet.
+ *
+ * A W3C WAI-ARIA 1.2 `separator` szerepe fókuszálható elválasztónál KÖTELEZŐVÉ teszi
+ * az `aria-valuenow`-t, ami az elválasztó jelenlegi pozícióját tükrözi
+ * (<https://www.w3.org/TR/wai-aria-1.2/#separator>). A tartományon (min-max) kívüli
+ * érték a spec leírása szerint érvénytelen, de ezt a specifikáció szövege kizárólag a
+ * `meter` szerepnél mondja ki MUST szóval; a `separator`-ra (és a `scrollbar`/`slider`
+ * szerepekre) ugyanez nincs kimondva, ez egy nyitva álló következetlenség
+ * (<https://github.com/w3c/aria/issues/2025>). Az APG Window Splitter minta szerint
+ * mindhárom érték (`aria-valuenow`, `aria-valuemin`, `aria-valuemax`) az ELSŐDLEGES
+ * panel méretét írja le (<https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/>),
+ * tehát a hármuk közötti ellentmondás félrevezető állapotot jelentene, függetlenül a
+ * MUST kérdéstől.
+ */
+function clampToReportedRange(value: number, lowestSize: number, highestSize: number): number {
+  return Math.min(Math.max(value, lowestSize), highestSize);
+}
+
 const ARROW_STEP_PERCENT = 5;
 const SHIFT_ARROW_STEP_PERCENT = 10;
 const HOME_DELTA_PERCENT = -100;
@@ -48,6 +77,10 @@ export function ResizableHandle(properties: Readonly<ResizableHandleProperties>)
   const sizeBefore = sizes[beforeIndex];
   const lowestSize = resizeAt(sizes, beforeIndex, HOME_DELTA_PERCENT, minSizePercents)[beforeIndex];
   const highestSize = resizeAt(sizes, beforeIndex, END_DELTA_PERCENT, minSizePercents)[beforeIndex];
+  const reportedSizeBefore =
+    sizeBefore === undefined || lowestSize === undefined || highestSize === undefined
+      ? sizeBefore
+      : clampToReportedRange(sizeBefore, lowestSize, highestSize);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
     event.preventDefault();
@@ -119,7 +152,7 @@ export function ResizableHandle(properties: Readonly<ResizableHandleProperties>)
       aria-controls={`${panelDomId(beforeIndex)} ${panelDomId(beforeIndex + 1)}`}
       aria-valuemin={lowestSize === undefined ? undefined : Math.round(lowestSize)}
       aria-valuemax={highestSize === undefined ? undefined : Math.round(highestSize)}
-      aria-valuenow={sizeBefore === undefined ? undefined : Math.round(sizeBefore)}
+      aria-valuenow={reportedSizeBefore === undefined ? undefined : Math.round(reportedSizeBefore)}
       tabIndex={0}
       onFocus={refreshGeometry}
       onPointerDown={handlePointerDown}
