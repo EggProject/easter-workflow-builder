@@ -14,6 +14,16 @@ function pressKeyOn(element: Element, key: string, isShiftPressed = false): void
 }
 
 /**
+ * Ablak átméretezés esemény kiváltása, hogy a `Resizable` a stub után
+ * frissen mérje a paneleket (a mintát a meglévő tesztek is követik).
+ */
+function refresh(): void {
+  act(() => {
+    globalThis.dispatchEvent(new Event('resize'));
+  });
+}
+
+/**
  * A csoport közvetlen paneljeinek `flex-basis` értéke.
  */
 function sizesOf(group: Element | null | undefined): readonly string[] {
@@ -97,6 +107,43 @@ describe('Resizable', () => {
       panel.style.minWidth = minimum;
       panel.style.minHeight = minimum;
     }
+  }
+
+  /**
+   * A futás nézet mintája (`contentMinimum` tesztjeihez): a külső csoport
+   * 1-es paneljében egy beágyazott, függőleges csoport (a transcript és a
+   * jóváhagyás szövege) áll, alatta a "Függő jóváhagyások" régió (`region`
+   * id-vel).
+   */
+  function renderWithRegion(contentMinimum?: Readonly<{ panelIndex: number; regionElementId: string }>): void {
+    act(() => {
+      root.render(
+        <Resizable
+          direction="vertical"
+          defaultSizes={[70, 30]}
+          {...(contentMinimum === undefined ? {} : { contentMinimum })}
+        >
+          <ResizablePanel index={0}>Gráf</ResizablePanel>
+          <ResizableHandle beforeIndex={0} aria-label="Külső" />
+          <ResizablePanel index={1}>
+            <Resizable direction="vertical" defaultSizes={[60, 40]}>
+              <ResizablePanel index={0}>Transcript</ResizablePanel>
+              <ResizableHandle beforeIndex={0} aria-label="Belső" />
+              <ResizablePanel index={1}>Jóváhagyás</ResizablePanel>
+            </Resizable>
+            <section id="region">Függő jóváhagyások</section>
+          </ResizablePanel>
+        </Resizable>,
+      );
+    });
+  }
+
+  function stubRegionHeight(height: number): void {
+    const region = container.querySelector('#region');
+    if (region === null) {
+      throw new Error('nincs "region" elem');
+    }
+    region.getBoundingClientRect = () => new DOMRect(0, 0, 0, height);
   }
 
   it('a csoport osztálya vízszintes irányban nem hordozza a --vertical módosítót', () => {
@@ -1079,5 +1126,119 @@ describe('Resizable', () => {
     renderTwoPane();
     const panels = [...container.querySelectorAll('.resizable-panel')];
     expect(panels.map((panel) => panel.textContent)).toEqual(['Sidebar', 'Main']);
+  });
+
+  describe('contentMinimum (2026-09-27, SPEC-008 8. és 10. szekció, O-13)', () => {
+    const CONTENT_MINIMUM = { panelIndex: 1, regionElementId: 'region' };
+
+    it('contentMinimum nélkül a régió mérete nem hat a minimumra', () => {
+      renderWithRegion();
+      stubPanelGeometry([400, 600, 60, 40], '60px');
+      stubRegionHeight(300);
+      refresh();
+      // 60 / 1000 = 6 százalék, a régió mérete nem számít.
+      expect(reportedRange('Külső')).toEqual(['6', '70', '94']);
+    });
+
+    it('nem létező panelindexre nem változtat', () => {
+      renderWithRegion({ panelIndex: 5, regionElementId: 'region' });
+      stubPanelGeometry([400, 600, 60, 40], '60px');
+      stubRegionHeight(300);
+      refresh();
+      expect(reportedRange('Külső')).toEqual(['6', '70', '94']);
+    });
+
+    it('mérhető geometria nélkül (nulla együttes méret) nem változtat', () => {
+      renderWithRegion(CONTENT_MINIMUM);
+      refresh();
+      // A panelek kirajzolt mérete happy-dom alapból nulla: nincs mérhető
+      // geometria, a forrás [5, 95] határa marad, a régió mérete nem is fut.
+      expect(reportedRange('Külső')).toEqual(['5', '70', '95']);
+    });
+
+    it('a régió mérete plusz a beágyazott csoport minimuma bővíti a panel minimumát, ha nagyobb a CSS minimumnál', () => {
+      renderWithRegion(CONTENT_MINIMUM);
+      // Beágyazott csoport két paneljének CSS minimuma együtt 120 (60+60);
+      // a régió 90 magas: a tartalom minimuma 210, 1000-ből 21 százalék, a
+      // panel saját CSS minimuma (60/1000 = 6 százalék) helyett.
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      stubRegionHeight(90);
+      refresh();
+      expect(reportedRange('Külső')).toEqual(['6', '70', '79']);
+    });
+
+    it('ha a régió mérete később nő meg (élő tartalom), a panel mérete felhasználói művelet nélkül is felfelé igazodik', () => {
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      refresh();
+      // Régió nélküli magasság (nem stubbolt, nulla): a minimum csak a
+      // beágyazott csoport 120-ából jön, 1000-ből 12 százalék.
+      pressKeyOn(labelledHandle('Külső'), 'End');
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+
+      // A régió mérete 90-re nő (élő tartalom érkezik, egy döntés hibája
+      // vagy egy betöltés utáni érkezés): a minimum 210-re nő, 21
+      // százalékra. Egy ÚJ `contentMinimum` leírás (a hívó minden
+      // renderelésekor újat ad) váltja ki az újramérést ÉS a méret felfelé
+      // igazítását, felhasználói művelet nélkül - a `measureGeometry` maga
+      // csak a jelentett minimumot frissítené, a kirajzolt méretet a CSS
+      // statikus 60 pixele vágná (`refreshGeometry`, `Resizable.tsx`).
+      stubRegionHeight(90);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['79%', '21%']);
+    });
+
+    it('a régió nélkül (nincs a DOM-ban) a mérés nulla, csak a CSS minimum marad', () => {
+      act(() => {
+        root.render(
+          <Resizable direction="vertical" defaultSizes={[70, 30]} contentMinimum={CONTENT_MINIMUM}>
+            <ResizablePanel index={0}>Gráf</ResizablePanel>
+            <ResizableHandle beforeIndex={0} aria-label="Külső" />
+            <ResizablePanel index={1}>
+              <Resizable direction="vertical" defaultSizes={[60, 40]}>
+                <ResizablePanel index={0}>Transcript</ResizablePanel>
+                <ResizableHandle beforeIndex={0} aria-label="Belső" />
+                <ResizablePanel index={1}>Jóváhagyás</ResizablePanel>
+              </Resizable>
+            </ResizablePanel>
+          </Resizable>,
+        );
+      });
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      refresh();
+      // Nincs "region" elem: a `measureContentMinimumPixels` nullát ad, a
+      // beágyazott csoport minimuma sem számít bele, tehát a panel saját CSS
+      // minimuma (60 / 1000 = 6 százalék) marad.
+      expect(reportedRange('Külső')).toEqual(['6', '70', '94']);
+    });
+
+    it('vízszintes csoportban a régió max-content szélessége számít, a beágyazott csoport nem', () => {
+      act(() => {
+        root.render(
+          <Resizable direction="horizontal" defaultSizes={[70, 30]} contentMinimum={CONTENT_MINIMUM}>
+            <ResizablePanel index={0}>Gráf</ResizablePanel>
+            <ResizableHandle beforeIndex={0} aria-label="Külső" />
+            <ResizablePanel index={1}>
+              <Resizable direction="vertical" defaultSizes={[60, 40]}>
+                <ResizablePanel index={0}>Transcript</ResizablePanel>
+                <ResizableHandle beforeIndex={0} aria-label="Belső" />
+                <ResizablePanel index={1}>Jóváhagyás</ResizablePanel>
+              </Resizable>
+              <section id="region">Függő jóváhagyások</section>
+            </ResizablePanel>
+          </Resizable>,
+        );
+      });
+      stubPanelGeometry([400, 600, 60, 40], '80px');
+      const region = container.querySelector<HTMLElement>('#region');
+      if (region === null) {
+        throw new Error('nincs "region" elem');
+      }
+      region.getBoundingClientRect = () => new DOMRect(0, 0, region.style.width === 'max-content' ? 250 : 0, 0);
+      refresh();
+      // 80 / 1000 = 8 százalék helyett a régió 250 pixeles igénye, 25
+      // százalék; a beágyazott (más tengelyű) csoport nem ad hozzá.
+      expect(reportedRange('Külső')).toEqual(['8', '70', '75']);
+    });
   });
 });
