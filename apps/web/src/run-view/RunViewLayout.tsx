@@ -1,4 +1,10 @@
-import { Resizable, ResizableHandle, ResizablePanel, Tabs } from '@easter-workflow-builder/ui';
+import {
+  Resizable,
+  ResizableHandle,
+  ResizablePanel,
+  Tabs,
+  type ResizableContentMinimum,
+} from '@easter-workflow-builder/ui';
 import { useState, type ReactElement, type ReactNode } from 'react';
 import type { RunViewLayoutBand } from './run-view-layout-band.ts';
 import { RunViewTranscriptVisibility } from './run-view-transcript-visibility.ts';
@@ -22,6 +28,15 @@ export interface RunViewLayoutProperties {
    * vízszintes sávban a kérés más tengelyű, ezért ez az elválasztó nem mozdul.
    */
   readonly adjustsForReveal: boolean;
+  /**
+   * A transcript-oldali panel (1-es index) tartalom alapú kiegészítő
+   * minimuma (SPEC-008 8. és 10. szekció, O-13, user döntés 2026-09-27): a
+   * "Függő jóváhagyások" régió (a lapozó és a döntés akciósávja) mérete a
+   * panel CSS minimumához adódik, hogy a régió a panel semelyik méretén se
+   * vágódjon le. Csak a két osztott sávban áll: a fül sávban a `Tabs` ágon
+   * nincs `Resizable`, tehát a prop itt nem is kerül felhasználásra.
+   */
+  readonly transcriptContentMinimum: ResizableContentMinimum;
 }
 
 const GRAPH_TAB_LABEL = 'Gráf';
@@ -46,7 +61,8 @@ const TRANSCRIPT_TAB_ID = 'transcript';
  *   vásznat.
  */
 export function RunViewLayout(properties: Readonly<RunViewLayoutProperties>): ReactElement {
-  const { band, graph, transcript, defaultSizes, onSizesChange, adjustsForReveal } = properties;
+  const { band, graph, transcript, defaultSizes, onSizesChange, adjustsForReveal, transcriptContentMinimum } =
+    properties;
 
   // A fül sáv aktív füle: a transcript oldal csak a "Transcript" fülön
   // látszik, és ezt a `RunViewTranscriptVisibility` viszi le a jóváhagyás
@@ -91,6 +107,7 @@ export function RunViewLayout(properties: Readonly<RunViewLayoutProperties>): Re
       defaultSizes={defaultSizes}
       onSizesChange={onSizesChange}
       adjustsForReveal={adjustsForReveal}
+      contentMinimum={transcriptContentMinimum}
     >
       <ResizablePanel index={0}>{graphSide}</ResizablePanel>
       <ResizableHandle beforeIndex={0} aria-label={`A ${GRAPH_TAB_LABEL} és a ${TRANSCRIPT_TAB_LABEL} aránya`} />

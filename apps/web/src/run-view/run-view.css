@@ -147,8 +147,10 @@
    tartalma alá (az automatikus minimum a tartalma), a hely hiányát a
    `Resizable` fizeti meg (`min-height: 0`, lent), tehát a lapozó és a két
    gomb a belső elválasztó bármely állásában teljesen látszik. A KÜLSŐ
-   elválasztó szélső állásában a transcript oldal maga a külső panel
-   minimumára zsugorodik, és ott a régió nem fér el (SPEC-008 14.2 O-13). */
+   elválasztó minimuma (2026-09-27, user döntés, SPEC-008 14.1 O-13) a régió
+   és a beágyazott csoport mért méretéhez igazodik (`packages/ui`
+   `Resizable` `contentMinimum`, `RunViewLayout.tsx`), tehát a KÜLSŐ
+   elválasztó szélső állásában is teljesen elfér. */
 .run-view-screen__transcript {
   overflow: hidden;
 }
@@ -167,27 +169,29 @@
   background: transparent;
 }
 
-/* ÉRINTÉSES HÚZÁS a transcript és a jóváhagyás elválasztóján (a fül sáv
-   telefonos méretén is, SPEC-008 10. szekció). A `Resizable` kizárólag
-   pointer eseményekre hallgat, a design system `.resizable-handle` szabálya
-   pedig nem állít `touch-action` értéket, tehát az alapértelmezett `auto`
-   mellett a böngésző az érintéses mozdulatot pásztázásnak veszi, és a
+/* ÉRINTÉSES HÚZÁS a futás nézet mindkét elválasztóján: a transcript és a
+   jóváhagyás közötti (belső), és a gráf és a transcript közötti (külső) is
+   (a fül sáv telefonos méretén a belső, SPEC-008 10. szekció). A `Resizable`
+   kizárólag pointer eseményekre hallgat, a design system `.resizable-handle`
+   szabálya pedig nem állít `touch-action` értéket, tehát az alapértelmezett
+   `auto` mellett a böngésző az érintéses mozdulatot pásztázásnak veszi, és a
    pointer esemény folyamot `pointercancel` eseménnyel lezárja
    (<https://www.w3.org/TR/pointerevents/>: "Authors must instead use
    touch-action", <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action>).
-   Mérve (valódi Chromium, CDP érintés események, 375x812): nélküle egy 100
-   pixeles lefelé húzás 50-ről 54-re viszi az arányt és `pointercancel`
-   jön, vele 69-re, `pointerup` zárással
+   Mérve a belső elválasztóra (valódi Chromium, CDP érintés események,
+   375x812): nélküle egy 100 pixeles lefelé húzás 50-ről 54-re viszi az
+   arányt és `pointercancel` jön, vele 69-re, `pointerup` zárással
    (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). A
-   szabály a fogyasztó oldalán, erre az egy elválasztóra szűkítve áll, mert a
+   szabály a fogyasztó oldalán, erre a két elválasztóra szűkítve áll, mert a
    `resizable.css` bájtazonossági teszt alatt van. A design system maga is
    ezt teszi a saját oszlop méretező fogantyúján (`datatable.css`:
-   `.data-table__resizer { touch-action: none }`). A külső, gráf és
-   transcript közti elválasztó `touch-action` értéke nyitott pont (SPEC-008
-   14.2, O-11): érintéssel ma nem húzható, de a `Resizable` 2026-09-25 óta a
-   `pointercancel` eseményre is lezárja a húzást, tehát a félbeszakadt
-   érintés után a húzás állapota nem ragad bent. */
-.run-view-screen__transcript > .resizable-group > .resizable-handle {
+   `.data-table__resizer { touch-action: none }`). **A külső elválasztó is
+   megkapja** (2026-09-27, user döntés, SPEC-008 14.1 O-11, "Mindegyik
+   húzható legyen"): a `Resizable` 2026-09-25 óta a `pointercancel`
+   eseményre is lezárja a húzást, tehát a félbeszakadt érintés után a húzás
+   állapota egyik elválasztón sem ragad bent. */
+.run-view-screen__transcript > .resizable-group > .resizable-handle,
+.run-view-screen__body > .resizable-group > .resizable-handle {
   touch-action: none;
 }
 

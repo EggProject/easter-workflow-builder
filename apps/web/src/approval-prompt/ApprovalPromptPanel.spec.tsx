@@ -50,6 +50,7 @@ describe('ApprovalPromptPanel', () => {
     act(() => {
       root.render(
         <ApprovalPromptPanel
+          id="approval-prompt-panel-test"
           isFirstLoadPending={options.isFirstLoadPending ?? false}
           failureMessage={options.failureMessage}
           approvalCount={options.approvalCount ?? (shown === undefined ? 0 : 1)}
@@ -78,6 +79,7 @@ describe('ApprovalPromptPanel', () => {
     expect(container.querySelector('nav.pagination')).toBeNull();
     expect(container.querySelector('.actions-placeholder')).toBeNull();
     expect(regionName()).toBe('Függő jóváhagyások');
+    expect(container.querySelector('section.approval-prompt-panel')?.id).toBe('approval-prompt-panel-test');
   });
 
   it('látott jóváhagyás, betöltés és hiba nélkül nem rajzol semmit: üres, név nélküli szakasz, tehát nem régió', () => {

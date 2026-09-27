@@ -280,6 +280,10 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // két azonosító köti össze (`ApprovalDecisionActions`).
   const approvalTitleId = useId();
   const approvalTextId = useId();
+  // A "Függő jóváhagyások" régió azonosítója: a `RunViewLayout` külső
+  // elválasztója ezen méri a régiót, hogy a lapozó és a döntés akciósávja a
+  // panel semelyik méretén se vágódjon le (SPEC-008 8. és 10. szekció, O-13).
+  const approvalRegionId = useId();
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -507,6 +511,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
               }
               approvalPanel={
                 <ApprovalPromptPanel
+                  id={approvalRegionId}
                   isFirstLoadPending={
                     pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
                   }
@@ -554,6 +559,12 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           defaultSizes={storedLayoutSizes ?? DEFAULT_RUN_VIEW_LAYOUT_SIZES}
           onSizesChange={storeRunViewLayoutSizes}
           adjustsForReveal={storedLayoutSizes === undefined}
+          // A transcript-oldali panel (index 1) minimuma a "Függő
+          // jóváhagyások" régió méretéhez igazodik, ha van függő jóváhagyás
+          // (SPEC-008 8. és 10. szekció, O-13, user döntés 2026-09-27); a
+          // mérés a `packages/ui` `Resizable` csomagban áll, ez a képernyő
+          // csak az azonosítót adja át.
+          transcriptContentMinimum={{ panelIndex: 1, regionElementId: approvalRegionId }}
         />
       </div>
       {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}
