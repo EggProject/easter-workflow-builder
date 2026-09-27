@@ -2688,3 +2688,71 @@ for (const { name, layout } of INNER_OWN_LAYOUTS) {
     });
   }
 }
+
+// ============================================================
+// EGY ÉLŐ KERET EGYSZERRE FRISSÍTI A CSOMÓPONT ÁLLAPOTÁT ÉS A TRANSCRIPT
+// UTOLSÓ SORÁT (T-009-30, PLAN-009, AC44, AC50).
+//
+// A csomópont állapota a lépés futás lista (`GET /api/runs/{runId}/steps`)
+// újratöltéséből jön: csak az ÉLŐ, jelző fajtájú keret vált újratöltést
+// (`is-step-run-list-change-frame.ts`, T-009-25a). A transcript utolsó sora
+// közvetlenül a keretből jön (`reduce-run-transcript-frame.ts`), és eldobja
+// a keretet, ha az `id` nem nagyobb a korábbiaknál. A teszt EGYETLEN élő
+// kerettel igazolja, hogy a két hatás ugyanarra a keretre következik be, a
+// `setNoReloadMarker` precedens szerint, oldal újratöltés nélkül. A fájl
+// fejlécének 2. és 3. kivétele alá tartozik: egy MÁR MEGNYITOTT kapcsolatba
+// menet közben beszúrt keret hatását vizsgálja.
+// ============================================================
+
+const NODE_AND_TRANSCRIPT_VISIBLE_LAYOUTS: readonly { readonly name: string; readonly layout: TranscriptLayout }[] = [
+  { name: '1440x900, vízszintes sáv', layout: WIDE_LAYOUT },
+  { name: '900x1000, függőleges sáv', layout: { viewport: { width: 900, height: 1000 }, isTabbed: false } },
+];
+
+for (const { name, layout } of NODE_AND_TRANSCRIPT_VISIBLE_LAYOUTS) {
+  test(`egy élő run_event keret egyszerre frissíti a csomópont állapotát és a transcript utolsó sorát (${name})`, async ({
+    page,
+  }) => {
+    const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+    serverHolder.current = streamServer.server;
+    const state: RunViewMockState = { runStatus: 'running', stepRuns: [] };
+    await mockRunView(page, state);
+    await page.setViewportSize(layout.viewport);
+
+    await page.goto('/run?runId=r-1');
+    const node = nodeLocator(page, 'n1');
+    await expect(node).toBeVisible();
+    await expect(node.getByText('sikeres', { exact: true })).toBeHidden();
+
+    const list = transcriptList(page);
+    streamServer.pushBatch([
+      stepEventFrame(1, 'step_started', 'replayed'),
+      { event: 'replay_complete', runId: 'r-1', throughEventId: 1 },
+    ]);
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await expect(
+      list
+        .getByRole('listitem')
+        .last()
+        .getByRole('button', { name: /Lépés elindult/ }),
+    ).toBeVisible();
+    await setNoReloadMarker(page);
+
+    // A mock lépés futás lista a keret ELŐTT vált az új státuszra, ahogy a
+    // valódi szerveren is: a motor az adatbázist módosítja, UTÁNA írja ki az
+    // eseményt (T-009-25a).
+    state.stepRuns = [stepRun('succeeded')];
+    streamServer.push(stepEventFrame(2, 'step_finished', 'live'));
+
+    // (a) a csomópont állapot jelvénye az új állapotot mutatja.
+    await expect(node.getByText('sikeres', { exact: true })).toBeVisible();
+    // (b) a transcript sorainak száma pontosan eggyel nőtt, és az utolsó sor
+    // a keret fajtájának felirata, az előző utolsó sortól eltérő fajtával.
+    await expect(list.getByRole('listitem')).toHaveCount(2);
+    const lastRow = list.getByRole('listitem').last();
+    await expect(lastRow).toHaveAttribute('aria-posinset', '2');
+    await expect(lastRow.getByRole('button', { name: /Lépés befejeződött/ })).toBeVisible();
+
+    expect(await readNoReloadMarker(page)).toBe(true);
+  });
+}

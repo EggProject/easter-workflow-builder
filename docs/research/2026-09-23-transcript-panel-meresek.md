@@ -160,10 +160,24 @@ után is az utolsó sor látszik (mérve, 375x812).
 
 - Firefox és WebKit ellen nem futott mérés (az `apps/web/playwright.config.ts` ma kizárólag
   chromiumot definiál).
-- Az élő, nyitott kapcsolatba menet közben érkező keretek útja (a szabálykönyv 11. szekciója
-  szerinti `node:http` teszt szerverrel) a PLAN-009 T-009-30 hatóköre; itt az automatikus
-  görgetés mindkét ágát két egymást követő, LEZÁRT SSE válasz (az `EventSource` újracsatlakozása)
-  igazolja.
+- **Lezárva (2026-09-27, PLAN-009 T-009-30).** Az élő, nyitott kapcsolatba menet közben érkező
+  keretek útja (a szabálykönyv 11. szekciója szerinti `node:http` teszt szerverrel) itt korábban
+  nyitva állt: egyetlen teszt sem állította, hogy UGYANAZ az egy keret egyszerre frissíti a
+  csomópont állapotát és a transcript utolsó sorát. Az `apps/web/e2e/sse-real-server.spec.ts`
+  "egy élő run_event keret egyszerre frissíti a csomópont állapotát és a transcript utolsó sorát"
+  tesztje (1440x900 vízszintes és 900x1000 függőleges sávban, web-first assertionnel) ezt EGYETLEN
+  élő kerettel igazolja. Két szándékos, ideiglenes rontás (nem commitolt, visszaállítva): (1) a
+  `reduce-run-transcript-frame.ts` `run_event` ága élő keretre a kapott állapotot adja vissza, a
+  keretet nem veszi fel - a transcript sorszám állítás bukik (`Expected: 2, Received: 1`); (2) a
+  `step_finished` kivétele az `is-step-run-list-change-frame.ts` `STEP_RUN_CHANGING_KINDS`
+  halmazából - a csomópont jelvény állítás bukik (az elem nem található). Az automatikus görgetés
+  mindkét ága (a követés folytatása és az "ugrás az aljára" gomb utáni állapot) már korábban is
+  ugyanezen a nyitott kapcsolaton, az `apps/web/e2e/sse-real-server.spec.ts` "követés közben 3
+  átmeneti sor után az utolsó sor teljes egészében látszik" és "az ugrás az aljára gomb után az
+  utolsó sor teljes egészében látszik" tesztjeivel bizonyított (13. szekció); a két egymást
+  követő, LEZÁRT SSE válasszal (`EventSource` újracsatlakozás) igazoló tesztek más állítást (a
+  kurzor és a duplázódás elmaradása újracsatlakozáskor) fednek, az
+  `apps/web/e2e/transcript-panel.spec.ts` fájlban maradnak.
 - A lépés futások élő frissülése: a panel a providert a képernyő megnyitásakor betöltött
   `StepRunRecord` listából oldja fel; egy később indult lépés `sdk_result` sora addig "nem ismert
   provider" állapotban áll, amíg a lista újra nem töltődik.
