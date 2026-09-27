@@ -67,6 +67,23 @@ describe('Resizable', () => {
     return [...container.querySelectorAll<HTMLDivElement>('.resizable-panel')].map((panel) => panel.style.flexBasis);
   }
 
+  function labelledHandle(label: string): Element {
+    const element = container.querySelector(`[aria-label="${CSS.escape(label)}"]`);
+    if (element === null) {
+      throw new Error(`nincs "${label}" elválasztó`);
+    }
+    return element;
+  }
+
+  /**
+   * Az elválasztó jelentett `aria-valuemin`, `aria-valuenow` és
+   * `aria-valuemax` értéke, ebben a sorrendben.
+   */
+  function reportedRange(label: string): readonly (string | null)[] {
+    const element = labelledHandle(label);
+    return ['aria-valuemin', 'aria-valuenow', 'aria-valuemax'].map((name) => element.getAttribute(name));
+  }
+
   /**
    * Valódi geometria a happy-dom nulla téglalapja helyett: a két panel a
    * csoport tengelyén `pixels` méretű, és a forrás CSS pixeles minimumát
@@ -896,6 +913,165 @@ describe('Resizable', () => {
       pressKeyOn(outerHandle, 'ArrowRight');
       expect(sizesOf(groups()[0])).toEqual(['67.5%', '32.5%']);
       expect(sizesOf(groups()[1])).toEqual(['35%', '65%']);
+    });
+  });
+
+  describe('a mért minimum a csoport minden méretváltozása után friss (2026-09-27)', () => {
+    let restore: (() => void) | undefined;
+
+    /**
+     * A kirajzolást követő geometria (a fenti rögzített geometriával
+     * szemben): a `.resizable-panel` elem mérete a csoportja méretének
+     * `flex-basis` százaléka, egy `.resizable-group` méretét a befoglaló
+     * panel adja, a legkülsőét a legközelebbi `data-group-size` burkoló.
+     * Minden más elem a saját `data-rect` attribútumát kapja
+     * ("x,y,szélesség,magasság"). A pixeles minimum a forrás CSS szabálya.
+     */
+    function installFlexGeometry(): void {
+      const style = document.createElement('style');
+      style.textContent = '.resizable-panel { min-width: 60px; min-height: 60px; }';
+      document.head.append(style);
+      // A burkoló mérete szorozva az elemet tartó (és az elem maga, ha panel)
+      // összes panel `flex-basis` arányával, belülről kifelé.
+      function sizeOf(element: Element): number {
+        let size = Number(element.closest<HTMLElement>('[data-group-size]')?.dataset['groupSize'] ?? '0');
+        let panel: HTMLElement | null | undefined = element.closest<HTMLElement>('.resizable-panel');
+        while (panel !== null && panel !== undefined) {
+          size *= Number(panel.style.flexBasis.slice(0, -'%'.length)) / 100;
+          panel = panel.parentElement?.closest<HTMLElement>('.resizable-panel');
+        }
+        return size;
+      }
+      const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ): DOMRect {
+        if (this.classList.contains('resizable-panel') || this.classList.contains('resizable-group')) {
+          const size = sizeOf(this);
+          return new DOMRect(0, 0, size, size);
+        }
+        const [x = 0, y = 0, width = 0, height = 0] = (this.dataset['rect'] ?? '').split(',').map(Number);
+        return new DOMRect(x, y, width, height);
+      });
+      restore = () => {
+        spy.mockRestore();
+        style.remove();
+      };
+    }
+
+    afterEach(() => {
+      restore?.();
+      restore = undefined;
+    });
+
+    interface FreshOptions {
+      readonly reveal?: { readonly elementId: string };
+      readonly textRect?: string;
+    }
+
+    /**
+     * A belső csoport saját `[70, 30]` aránnyal: felül a "transcript", alul
+     * a görgethető törzs (a látható doboza 100 pixel magas), benne a
+     * felfedendő szöveg. Alapból a szöveg elfér.
+     */
+    function ownInnerGroup(options: Readonly<FreshOptions>): ReactElement {
+      return (
+        <Resizable
+          direction="vertical"
+          defaultSizes={[70, 30]}
+          {...(options.reveal === undefined ? {} : { reveal: options.reveal })}
+        >
+          <ResizablePanel index={0}>Transcript</ResizablePanel>
+          <ResizableHandle beforeIndex={0} aria-label="Belső" />
+          <ResizablePanel index={1}>
+            <div data-rect="0,0,100,100" style={{ overflowY: 'auto' }}>
+              <p id="kerdes" data-rect={options.textRect ?? '0,0,100,10'}>
+                Kérdés
+              </p>
+            </div>
+          </ResizablePanel>
+        </Resizable>
+      );
+    }
+
+    /**
+     * A futás nézet függőleges sávjának mintája: a külső csoport 1000
+     * pixeles, a második panelje tartja a belső csoportot.
+     */
+    function nestedOwnInner(outerSizes: readonly number[], options: Readonly<FreshOptions>): ReactElement {
+      return (
+        <div data-group-size="1000">
+          <Resizable direction="vertical" defaultSizes={outerSizes} adjustsForReveal>
+            <ResizablePanel index={0}>Gráf</ResizablePanel>
+            <ResizableHandle beforeIndex={0} aria-label="Külső" />
+            <ResizablePanel index={1}>{ownInnerGroup(options)}</ResizablePanel>
+          </Resizable>
+        </div>
+      );
+    }
+
+    function renderSizedOwnInner(groupSize: string): void {
+      act(() => {
+        root.render(<div data-group-size={groupSize}>{ownInnerGroup({ reveal: { elementId: 'kerdes' } })}</div>);
+      });
+    }
+
+    it('a befoglaló csoport felfedés miatti növekedése után a belső elválasztó a megnőtt csoportból számol, újabb renderelés nélkül is: a saját arány nem vágódik a felfedés előtti tartományra', () => {
+      installFlexGeometry();
+      act(() => {
+        root.render(nestedOwnInner([85, 15], { reveal: { elementId: 'kerdes' } }));
+      });
+      // A belső csoport 150 pixel, a minimum 60 / 150 = 40 százalék: a
+      // második panel a minimumán áll, a jelentett hely a vágott 60.
+      expect(sizesOf(groups()[1])).toEqual(['70%', '30%']);
+      expect(reportedRange('Belső')).toEqual(['40', '60', '60']);
+      // Egy hosszabb szöveg 90 pixeles második panelt kér: a belső saját
+      // aránya mellett 90 / 0,3 = 300 pixeles csoport, a külső második
+      // panelje 150-ről 300 pixelre nő.
+      act(() => {
+        root.render(nestedOwnInner([85, 15], { reveal: { elementId: 'kerdes' }, textRect: '0,45,100,100' }));
+      });
+      expect(sizesOf(groups()[0])).toEqual(['70%', '30%']);
+      expect(sizesOf(groups()[1])).toEqual(['70%', '30%']);
+      // A 300 pixeles csoportban a minimum 60 / 300 = 20 százalék.
+      expect(reportedRange('Belső')).toEqual(['20', '70', '80']);
+    });
+
+    it('a befoglaló csoport felhasználói méretváltoztatása után a belső elválasztó fókusz nélkül is a friss tartományt jelenti, és a saját aránya megmarad', () => {
+      installFlexGeometry();
+      act(() => {
+        root.render(nestedOwnInner([50, 50], {}));
+      });
+      // 500 pixeles belső csoport: 60 / 500 = 12 százalék.
+      expect(reportedRange('Belső')).toEqual(['12', '70', '88']);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowDown', true);
+      expect(sizesOf(groups()[0])).toEqual(['60%', '40%']);
+      // 400 pixeles belső csoport: 60 / 400 = 15 százalék.
+      expect(reportedRange('Belső')).toEqual(['15', '70', '85']);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowDown', true);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowDown', true);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowDown');
+      expect(sizesOf(groups()[0])).toEqual(['85%', '15%']);
+      // 150 pixeles belső csoport: a második panel a minimumán áll, a
+      // jelentett hely a vágott 60, a belső méret viszont nem íródik át.
+      expect(reportedRange('Belső')).toEqual(['40', '60', '60']);
+      expect(sizesOf(groups()[1])).toEqual(['70%', '30%']);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowUp', true);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowUp', true);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowUp', true);
+      pressKeyOn(labelledHandle('Külső'), 'ArrowUp');
+      expect(sizesOf(groups()[0])).toEqual(['50%', '50%']);
+      expect(reportedRange('Belső')).toEqual(['12', '70', '88']);
+    });
+
+    it('a saját felfedés számítása a csoport más okú méretváltozása után is friss tartományt ad (új leírásra, átméretezés esemény nélkül)', () => {
+      installFlexGeometry();
+      renderSizedOwnInner('500');
+      expect(reportedRange('Belső')).toEqual(['12', '70', '88']);
+      // A csoport egy szomszéd elem miatt 300 pixelre szűkül (a
+      // `ResizeObserver` a csomagban tiltott): a hívó új leírása újramér.
+      renderSizedOwnInner('300');
+      expect(reportedRange('Belső')).toEqual(['20', '70', '80']);
+      expect(sizesOf(groups()[0])).toEqual(['70%', '30%']);
     });
   });
 

@@ -1148,6 +1148,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **Tábla séma tesztelése `getTableConfig` nélkül nem ad 100 százalékot.** Az index lista és a
   `.references(() => ...)` callback lusta: sima insert vagy select soha nem hívja meg őket
   (`packages/db` CLAUDE.md).
+- **A TEXT elsődleges kulcs sértése `SQLITE_CONSTRAINT_PRIMARYKEY` kódot ad, nem
+  `SQLITE_CONSTRAINT_UNIQUE`-ot.** A driver szöveg félrevezető (`UNIQUE constraint failed: ...`),
+  a kiterjesztett hibakód viszont a kulcs típusát mondja meg, nem a driver szöveget; saját mérés,
+  `better-sqlite3` 13.0.3, `:memory:` adatbázis, `CREATE TABLE t (id TEXT PRIMARY KEY)`, két azonos
+  `id` beszúrás. Ezen a mért kódon dönt a `describe-transaction-error.ts` `graph_id_conflict` ága
+  (2026-09-27, a `workflow_node.id`/`workflow_edge.id` globális elsődleges kulcs sértésére, ha egy
+  node vagy él azonosító egy MÁSIK workflow gráfjában már létezik). Védelem:
+  `describe-transaction-error.spec.ts` és a `workflow-repository.spec.ts` valós SQLite tesztjei.
+  Mérés: `docs/research/2026-09-27-szerver-hibatorzs.md`.
 
 **Lint és típus**
 

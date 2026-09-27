@@ -2639,3 +2639,52 @@ for (const theme of ['light', 'dark'] as const) {
     await expectQuestionAndInnerSeparator(page);
   });
 }
+
+/**
+ * A belső elválasztó jelentett `aria-valuenow` értéke a jelentett
+ * `aria-valuemin` és `aria-valuemax` között áll (W3C APG Window Splitter: a
+ * három érték ugyanazt, az elsődleges panel méretét írja le).
+ */
+async function expectInnerValueWithinReportedRange(page: Page): Promise<void> {
+  const separator = innerSeparator(page);
+  const [now, min, max] = await Promise.all([
+    separator.getAttribute('aria-valuenow'),
+    separator.getAttribute('aria-valuemin'),
+    separator.getAttribute('aria-valuemax'),
+  ]);
+  for (const value of [now, min, max]) {
+    expect(value).not.toBeNull();
+  }
+  expect(Number(now)).toBeGreaterThanOrEqual(Number(min));
+  expect(Number(now)).toBeLessThanOrEqual(Number(max));
+}
+
+// A belső elválasztó `aria-valuenow` értéke a jelentett tartományban marad
+// (`packages/ui` `ResizableHandle.tsx` `clampToReportedRange`, 2026-09-27). A
+// belső csoport a pixeles minimumát a jóváhagyás panel csatolásakor méri, még
+// a felfedés előtt, a kis csoportban; a felfedés és a külső elválasztó
+// mozdítása utáni `sizes` már a nagyobb csoportból számít, és a következő
+// saját mérésig (fókusz, saját húzás, ablak átméretezés) a tartományon kívül
+// eshet. A belső elválasztó ezért nem kap fókuszt: a fókusz újramérne, és
+// elfedné a hibát. Az "előtte" mért értékek:
+// docs/research/2026-09-24-jovahagyas-panel-helye.md 16.3 szekció.
+for (const { name, layout } of INNER_OWN_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`csak belső saját aránnyal (${name}): a belső elválasztó aria-valuenow értéke a megnyitás után és a külső elválasztó minden billentyűs mozdítása után is az aria-valuemin és az aria-valuemax között áll (${theme} téma)`, async ({
+      page,
+    }) => {
+      await openWithOwnInnerLayout(page, theme, layout, stateWithApproval());
+      await expectQuestionAndInnerSeparator(page);
+      await expectInnerValueWithinReportedRange(page);
+
+      const outer = outerSeparator(page);
+      await outer.focus();
+      for (let press = 0; press < 3; press += 1) {
+        const valueBefore = (await outer.getAttribute('aria-valuenow')) ?? '';
+        await outer.press('ArrowDown');
+        await expect(outer).not.toHaveAttribute('aria-valuenow', valueBefore);
+        await expectInnerValueWithinReportedRange(page);
+      }
+    });
+  }
+}

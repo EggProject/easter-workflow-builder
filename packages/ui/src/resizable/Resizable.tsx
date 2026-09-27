@@ -190,11 +190,13 @@ function isSameSizes(first: readonly number[], second: readonly number[]): boole
  *   `aria-valuemin`/`aria-valuemax` pedig az a hely, ahol az elsődleges panel
  *   a legkisebb, illetve a legnagyobb (APG Window Splitter Pattern). A mérés
  *   a csatoláskor, egy panel későbbi csatolásakor, az ablak átméretezésekor,
- *   az elválasztó fókuszakor, és minden húzás és billentyű lépés előtt fut; a
+ *   az elválasztó fókuszakor, és minden húzás és billentyű lépés előtt fut,
+ *   2026-09-27 óta a minimumok (a méretek igazítása nélkül) minden felfedés
+ *   számításakor és a befoglaló `Resizable` minden méretváltozásakor is; a
  *   csoport más okú
- *   méretváltozását (például egy szülő elrendezés húzását) a következő ilyen
- *   esemény követi, mert a `ResizeObserver` a csomagban tiltott (SPEC-007 16.
- *   szekció 24. kritérium).
+ *   méretváltozását (például egy szomszéd elem magasságváltozását) a
+ *   következő ilyen esemény követi, mert a `ResizeObserver` a csomagban
+ *   tiltott (SPEC-007 16. szekció 24. kritérium).
  * - **A `pointercancel` is lezárja a húzást**, ugyanúgy, mint a
  *   `pointerup`. A W3C Pointer Events szerint a böngésző `pointercancel`
  *   eseménnyel zárja a pointer esemény folyamát, ha a mozdulatot maga
@@ -225,6 +227,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // A befoglaló `Resizable` kontextusa (befoglaló nélkül a no-op alapérték):
   // a felfedés innen kér helyet.
   const {
+    sizes: containerSizes,
     direction: containerDirection,
     userResizeCount: containerUserResizeCount,
     resizeForReveal: resizeContainerForReveal,
@@ -287,21 +290,40 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
     setUserResizeCount((count) => count + 1);
   }, []);
 
+  // A panelek mérése: a mért pixeles minimum MINDEN mérésből az állapotba
+  // kerül (2026-09-27), nem csak a `refreshGeometry` útján, a felfedés
+  // (saját és befoglaló csoport kérésére) és a befoglaló csoport
+  // méretváltozása utáni mérésből is. Korábban a felfedés csak helyben
+  // használta a friss mérést, tehát a `sizes` már a megnőtt csoportból
+  // számított, az `aria-valuemin`/`aria-valuemax` viszont a felfedés előtti,
+  // kisebb csoportból (mérve a futás nézet belső csoportján, 768x1024-en és
+  // 900x1000-en). Az azonos mérés nem ír új állapotot, hogy a felfedés
+  // ismételt futása ne rendereljen újra.
+  const measureGeometry = useCallback((): PanelGeometry | undefined => {
+    const panels = Array.from({ length: panelCount }, (_, index) => panelElements.current.get(index));
+    const geometry = measurePanelGeometry(panels, isVertical);
+    const measuredMinimums = geometry?.minSizePercents ?? [];
+    setMinSizePercents((previous) =>
+      previous.length === measuredMinimums.length && isSameSizes(previous, measuredMinimums)
+        ? previous
+        : measuredMinimums,
+    );
+    return geometry;
+  }, [panelCount, isVertical]);
+
   // A panelek mérése és a méretek igazítása a mért minimumhoz. A mért
   // geometriát vissza is adja, hogy a hívó (húzás, billentyű) ugyanabban a
   // lépésben a friss minimummal számoljon, ne a még meg nem jelent
   // állapottal.
   const refreshGeometry = useCallback((): PanelGeometry | undefined => {
-    const panels = Array.from({ length: panelCount }, (_, index) => panelElements.current.get(index));
-    const geometry = measurePanelGeometry(panels, isVertical);
+    const geometry = measureGeometry();
     const measuredMinimums = geometry?.minSizePercents ?? [];
-    setMinSizePercents(measuredMinimums);
     setSizes((previous) => {
       const clamped = clampToMinimums(previous, measuredMinimums);
       return isSameSizes(clamped, previous) ? previous : clamped;
     });
     return geometry;
-  }, [panelCount, isVertical]);
+  }, [measureGeometry]);
 
   const beginDrag = useCallback(
     (handleIndex: number, clientPos: number): void => {
@@ -363,7 +385,8 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // A felfedés geometriája: a panelek, a kirajzolt méretük, és a csoport
   // TÉNYLEGESEN rendelkezésre álló mérete (`measure-group-available.ts`),
   // amihez a pixeles minimumok is igazodnak. Nincs, ha egy panel nincs
-  // kirajzolva, vagy a csoport rejtett (`measurePanelGeometry`).
+  // kirajzolva, vagy a csoport rejtett (`measurePanelGeometry`). A mérés a
+  // minimum állapotot is frissíti (`measureGeometry`).
   const measureRevealLayout = useCallback(():
     | {
         readonly group: HTMLDivElement;
@@ -375,7 +398,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
     | undefined => {
     const group = groupElement.current;
     const panels = Array.from({ length: panelCount }, (_, index) => panelElements.current.get(index));
-    const geometry = measurePanelGeometry(panels, isVertical);
+    const geometry = measureGeometry();
     if (group === undefined || geometry === undefined) {
       return undefined;
     }
@@ -391,7 +414,7 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
         (minimum) => (minimum * geometry.availableSizePixels) / availablePixels,
       ),
     };
-  }, [panelCount, isVertical]);
+  }, [measureGeometry, panelCount, isVertical]);
 
   // Egy beágyazott csoport felfedési kérése (`resizable-context.ts`): a
   // kérőt tartó panel az alapállásából a kért méretre nő, vagy ha a csoport
@@ -452,6 +475,16 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
       globalThis.removeEventListener('resize', handleResize);
     };
   }, [refreshGeometry, panelMountCount]);
+
+  // A befoglaló csoport méretváltozása (egy felfedés miatti növekedése, a
+  // felhasználó húzása) ennek a csoportnak a méretét is megváltoztatja, a saját
+  // méretei nélkül is: a minimumok újramérése, a méretek érintése nélkül (a
+  // felhasználó aránya egy szűkebb csoportban is megmarad, a kirajzolást a
+  // CSS minimum vágja, a jelentett értéket a `ResizableHandle`). A
+  // `containerSizes` szándékosan dependency, holott a törzs nem olvassa.
+  useLayoutEffect(() => {
+    measureGeometry();
+  }, [measureGeometry, containerSizes]);
 
   useLayoutEffect(() => {
     sizesReference.current = sizes;

@@ -39,6 +39,7 @@ import {
   readStoredRunViewApprovalLayoutSizes,
   storeRunViewApprovalLayoutSizes,
 } from './run-view-approval-layout.ts';
+import { resolveApprovalRevealAdjustment } from './run-view-approval-reveal-adjustment.ts';
 import {
   DEFAULT_RUN_VIEW_LAYOUT_SIZES,
   readStoredRunViewLayoutSizes,
@@ -528,12 +529,24 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                 />
               }
               approvalReveal={shownApproval === undefined ? undefined : { elementId: approvalTextId }}
-              // A belső elválasztó akkor is ideiglenesen enged, ha csak a
-              // belső arány saját (user döntés 2026-09-26, "Ideiglenesen
-              // engedjen"): előbb a rajz ad helyet, a maradékot a belső
-              // fizeti, a tárolt arány nem íródik felül, és a felfedés végén
-              // visszaáll. Csak ha mindkét arány saját, egyik sem mozdul.
-              adjustsForReveal={storedApprovalLayoutSizes === undefined || storedLayoutSizes === undefined}
+              // A belső elválasztó ideiglenes engedése SÁVFÜGGŐ (user döntés
+              // 2026-09-27, "Csak a látható arány számít", SPEC-008 8.
+              // szekció 1. pont; `resolveApprovalRevealAdjustment.ts`): a
+              // `vertical` sávban a két elválasztó azonos tengelyen áll, a
+              // külső ténylegesen tud helyet adni a belsőnek, ezért ott a
+              // régi szabály marad (a belső VAGY a külső arány nem saját,
+              // user döntés 2026-09-26, "Ideiglenesen engedjen").
+              // `horizontal` sávban a külső más tengelyen áll, `tabs`
+              // sávban pedig nincs is külső elválasztó: ezeken a külső arány
+              // kulcsa nem számít, és a belső MINDIG ideiglenesen enged, a
+              // saját belső aránytól függetlenül, mert a kérdés csak így fér
+              // ki. A tárolt belső arány nem íródik felül, és a felfedés
+              // végén visszaáll.
+              adjustsForReveal={resolveApprovalRevealAdjustment(
+                layoutBand,
+                storedApprovalLayoutSizes,
+                storedLayoutSizes,
+              )}
               defaultSizes={storedApprovalLayoutSizes ?? DEFAULT_RUN_VIEW_APPROVAL_LAYOUT_SIZES}
               onSizesChange={storeRunViewApprovalLayoutSizes}
             />

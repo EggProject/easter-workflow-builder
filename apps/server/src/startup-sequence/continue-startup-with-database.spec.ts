@@ -168,10 +168,13 @@ describe('continueStartupWithDatabase', () => {
       processEnvironment: createProcessEnvironmentReader(),
     });
 
+    const { sink } = collectingSink();
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 30_000 },
+      logger: createServerLogger({ secretValues: [] }, sink),
+      idGenerator: createRandomUuidIdGenerator(),
     });
 
     await new Promise<void>((resolve) => {

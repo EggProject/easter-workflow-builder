@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Resizable } from './Resizable.tsx';
 import { ResizableHandle } from './ResizableHandle.tsx';
 import { ResizablePanel } from './ResizablePanel.tsx';
+import { ResizableContext, type ResizableContextValue } from './resizable-context.ts';
 
 describe('ResizableHandle', () => {
   let container: HTMLDivElement;
@@ -98,5 +99,91 @@ describe('ResizableHandle', () => {
       );
     });
     expect(container.querySelector<HTMLElement>('[role="separator"]')?.tabIndex).toBe(0);
+  });
+
+  it('a mért minimum alá eső nyers méretet a jelentett aria-valuenow a minimumra szorítja', () => {
+    // A beágyazott csoport panelének pixeles minimuma a rendelkezésre álló hely 50
+    // százaléka (`minSizePercents[0] = 50`): ez a MÉRT HIBA (`ResizableHandle.tsx`
+    // fejléc), amikor a nyers, tárolt `sizes` állapot még nem igazodott a friss
+    // minimumhoz. Levezetés a `resize-at.ts` `resizeAt` függvénye szerint:
+    // pairTotal = 45 + 55 = 100, minBefore = max(5, 50) = 50, minAfter = max(5, 0) = 5,
+    // maxBefore = min(95, 100 - 5) = 95.
+    // Home (delta -100): lowestSize = max(50, min(95, 45 - 100)) = 50.
+    // End (delta +100): highestSize = max(50, min(95, 45 + 100)) = 95.
+    // A nyers sizeBefore (45) a lowestSize (50) ALATT van: a fix előtt az
+    // aria-valuenow 45 lenne, a fix után a minimumra (50) szorítva.
+    const contextValue: ResizableContextValue = {
+      sizes: [45, 55],
+      minSizePercents: [50, 0],
+      direction: 'horizontal',
+      activeHandleIndex: -1,
+      panelDomId: (index) => `resizable-panel-${String(index)}`,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      registerPanel: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      beginDrag: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      resizeByDelta: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      toggleCollapse: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      refreshGeometry: () => {},
+      userResizeCount: 0,
+      resizeForReveal: () => 0,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      endReveal: () => {},
+    };
+    act(() => {
+      root.render(
+        <ResizableContext.Provider value={contextValue}>
+          <ResizableHandle beforeIndex={0} />
+        </ResizableContext.Provider>,
+      );
+    });
+    expect(separator().getAttribute('aria-valuemin')).toBe('50');
+    expect(separator().getAttribute('aria-valuemax')).toBe('95');
+    expect(separator().getAttribute('aria-valuenow')).toBe('50');
+  });
+
+  it('a mért maximum fölé eső nyers méretet a jelentett aria-valuenow a maximumra szorítja', () => {
+    // A fordított eset: a szomszéd (index 1) pixeles minimuma a hely 50 százaléka
+    // (`minSizePercents[1] = 50`), tehát az elsődleges (index 0) nem nőhet 50 fölé.
+    // pairTotal = 92 + 8 = 100, minBefore = max(5, 0) = 5, minAfter = max(5, 50) = 50,
+    // maxBefore = min(95, 100 - 50) = 50.
+    // Home (delta -100): lowestSize = max(5, min(50, 92 - 100)) = 5.
+    // End (delta +100): highestSize = max(5, min(50, 92 + 100)) = 50.
+    // A nyers sizeBefore (92) a highestSize (50) FÖLÖTT van: a fix előtt az
+    // aria-valuenow 92 lenne, a fix után a maximumra (50) szorítva.
+    const contextValue: ResizableContextValue = {
+      sizes: [92, 8],
+      minSizePercents: [0, 50],
+      direction: 'horizontal',
+      activeHandleIndex: -1,
+      panelDomId: (index) => `resizable-panel-${String(index)}`,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      registerPanel: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      beginDrag: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      resizeByDelta: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      toggleCollapse: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      refreshGeometry: () => {},
+      userResizeCount: 0,
+      resizeForReveal: () => 0,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- szándékos no-op, a teszt csak a renderelt attribútumokat vizsgálja
+      endReveal: () => {},
+    };
+    act(() => {
+      root.render(
+        <ResizableContext.Provider value={contextValue}>
+          <ResizableHandle beforeIndex={0} />
+        </ResizableContext.Provider>,
+      );
+    });
+    expect(separator().getAttribute('aria-valuemin')).toBe('5');
+    expect(separator().getAttribute('aria-valuemax')).toBe('50');
+    expect(separator().getAttribute('aria-valuenow')).toBe('50');
   });
 });

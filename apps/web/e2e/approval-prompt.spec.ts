@@ -831,7 +831,21 @@ for (const theme of ['light', 'dark'] as const) {
 
       await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
       await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '60');
-      await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      if (viewport.width < 1024) {
+        // A függőleges sávban mindkét arány számít, és mindkettő saját:
+        // egyik elválasztó sem mozdul.
+        await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      } else {
+        // A vízszintes sávban a külső arány nem számít, a belső ideiglenesen
+        // enged, hogy a kérdés kiférjen (user döntés 2026-09-27, "Csak a
+        // látható arány számít", `run-view-approval-reveal-adjustment.ts`).
+        for (const part of questionParts(page)) {
+          await expect(part).toBeInViewport({ ratio: 1 });
+        }
+        await expect
+          .poll(async () => Number(await approvalSeparator(page).getAttribute('aria-valuenow')))
+          .toBeLessThan(70);
+      }
       expect(await readStoredLayouts(page)).toEqual(['[60,40]', '[70,30]']);
     });
 
@@ -1487,3 +1501,71 @@ test('másik futásra váltva a régi futás késve érkező döntés válasza n
   await expect(page.locator('.approval-prompt-card')).toHaveCount(0);
   await expect(page.getByText('Döntés rögzítve', { exact: false })).toHaveCount(0);
 });
+
+// ------------------------------------------------------------
+// CSAK A LÁTHATÓ ARÁNY SZÁMÍT (user döntés 2026-09-27, SPEC-008 8. szekció 1.
+// pont, `run-view-approval-reveal-adjustment.ts`): a vízszintes sávban a külső
+// elválasztó más tengelyen áll, a fül sávban nincs is, tehát egy korábban,
+// másik sávban tárolt saját KÜLSŐ arány itt nem számít. A saját BELSŐ arány
+// mellett a kérdés és a gombok a külső kulcs jelenlététől függetlenül
+// teljesen látszanak, és a tárolt belső arány a döntés után is változatlan
+// (a felfedés ideiglenes). A belső arány `[70, 30]` (transcript, jóváhagyás):
+// a `[30, 70]` alakon a jóváhagyás panel egymaga is elég nagy, ott a kérdés
+// minden változatban kifér, tehát nem különböztet (saját mérés 2026-09-27).
+// Az "előtte" mért arányok: docs/research/2026-09-24-jovahagyas-panel-helye.md
+// 16. szekció.
+// ------------------------------------------------------------
+const OWN_INNER_LAYOUT = '[70,30]';
+const OWN_OUTER_LAYOUT = '[40,60]';
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 1440, height: 600 },
+    { width: 375, height: 812 },
+  ] as const) {
+    const size = `${String(viewport.width)}x${String(viewport.height)}`;
+    for (const storedOuter of [OWN_OUTER_LAYOUT, undefined] as const) {
+      const outerLabel =
+        storedOuter === undefined ? 'saját külső arány nélkül' : 'másik sávban tárolt saját külső aránnyal';
+      test(`${size}, saját belső aránnyal, ${outerLabel}: a kérdés és a gombok teljesen látszanak, a tárolt belső arány a döntés után is változatlan (${theme} téma)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await page.addInitScript(
+          ({ mode, outerKey, innerKey, outerSizes, innerSizes }) => {
+            globalThis.localStorage.setItem('eggTheme', mode);
+            globalThis.localStorage.setItem(innerKey, innerSizes);
+            if (outerSizes !== undefined) {
+              globalThis.localStorage.setItem(outerKey, outerSizes);
+            }
+          },
+          {
+            mode: theme,
+            outerKey: RUN_VIEW_LAYOUT_STORAGE_KEY,
+            innerKey: APPROVAL_LAYOUT_STORAGE_KEY,
+            outerSizes: storedOuter,
+            innerSizes: OWN_INNER_LAYOUT,
+          },
+        );
+        await mockApprovalRunWithTranscript(
+          page,
+          [FIRST_APPROVAL],
+          [mockRoute('decideApproval', async (route) => route.fulfill(decidedResponse(FIRST_APPROVAL)))],
+        );
+        await page.goto(APPROVAL_RUN_URL);
+        if (viewport.width < 768) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
+        }
+
+        for (const part of questionParts(page)) {
+          await expect(part).toBeInViewport({ ratio: 1 });
+        }
+        expect(await readStoredLayouts(page)).toEqual([storedOuter, OWN_INNER_LAYOUT]);
+
+        await decisionButton(page, 'Jóváhagyás').click();
+        await expect(decisionResult(page)).toHaveText('Döntés rögzítve: jóváhagyva.');
+        expect(await readStoredLayouts(page)).toEqual([storedOuter, OWN_INNER_LAYOUT]);
+      });
+    }
+  }
+}

@@ -38,11 +38,14 @@ export async function continueStartupWithDatabase(
   }
   logger.info({ recoveredRunCount: recovery.value.recoveredRunCount }, 'Az indulási helyreállítás lefutott.');
 
-  // 5. motor. Az óra és az azonosító generátor a stream réteggel is megosztott
-  // egyetlen példány (SPEC-006 6.1 "Az azonosítót a szerver induláskor egyszer
-  // generálja", és egyetlen időforrás a motor és az SSE életben tartás között).
+  // 5. motor. Az óra és az azonosító generátor a stream réteggel ÉS a HTTP
+  // réteggel is megosztott egyetlen példány (SPEC-006 6.1 "Az azonosítót a
+  // szerver induláskor egyszer generálja", és egyetlen időforrás a motor és
+  // az SSE életben tartás között; SPEC-006 7.2 "Kontextus": a kérés
+  // azonosítója is ugyanezen az `idGenerator` porton generálódik).
   const clock = createSystemClock();
-  const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
+  const idGenerator = createRandomUuidIdGenerator();
+  const streamRegistry = createStreamRegistry(idGenerator);
   const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
 
   // 6. HTTP szerver összeállítása és a jelkezelők felvétele
@@ -55,6 +58,8 @@ export async function continueStartupWithDatabase(
       clock,
       keepAliveIntervalMs: config.streamKeepAliveIntervalMs,
     },
+    logger,
+    idGenerator,
   });
   registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
 

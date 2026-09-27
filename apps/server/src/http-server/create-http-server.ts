@@ -5,6 +5,8 @@ import {
   type ProtocolErrorBody,
   type RouteId,
 } from '@easter-workflow-builder/protocol';
+import type { ServerLogger } from '@easter-workflow-builder/logger';
+import type { IdGeneratorPort } from '@easter-workflow-builder/engine';
 import { matchRoute } from '../route-dispatch/match-route.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 import { buildProtocolErrorBody } from '../error-mapping/build-protocol-error-body.ts';
@@ -25,11 +27,21 @@ import { wrapResponseAsStreamSink } from './wrap-response-as-stream-sink.ts';
  * `streamDependencies` a `STREAM_PATH` (`GET /events`) kiszolgálásához kell
  * - az a `ROUTE_TABLE`-ön kívül áll (SPEC-005 5.2 szekció), ezért külön ág
  * vezeti, a `matchRoute` elé.
+ *
+ * A `logger` a SPEC-006 7.2 szerinti hibaválasz naplózáshoz kell
+ * (`serveMatchedRoute` hibaága és a `handleRequest` kivétel ága); az egyes
+ * kezelők nem kapnak loggert. Az `idGenerator` a kérés azonosítójának
+ * forrása (SPEC-006 7.2 "Kontextus": "az `idGenerator` porton generálva") -
+ * ugyanaz a port, amit a `stream-registry` a `serverInstanceId`-hez használ,
+ * nem közvetlen `crypto.randomUUID()` hívás, hogy a kérés azonosító
+ * generálása is injektálható/determinisztikus maradjon tesztben.
  */
 export interface HttpServerOptions {
   readonly handlers: Readonly<Record<RouteId, RouteHandler>>;
   readonly devOrigin: string | undefined;
   readonly streamDependencies: StreamConnectionDependencies;
+  readonly logger: ServerLogger;
+  readonly idGenerator: IdGeneratorPort;
 }
 
 function writeJson(
@@ -52,6 +64,16 @@ function writeJson(
  * sikeres és a hiba ág JSON válasszá alakítása (SPEC-006 18. elfogadási
  * kritérium: a HTTP státuszt kizárólag a `protocol` `httpStatusForErrorCode`
  * adja, a 404/405 HTTP szintű ág kivételével).
+ *
+ * **Hibaválasz naplózás (SPEC-006 7.2).** A `logger` a hívó (`handleRequest`)
+ * gyermek loggere, a `serverInstanceId` és a `requestId` kontextussal már
+ * megkötve; itt a `routeId`-vel bővül. Az `internal` kódra képződő válasz
+ * `error`, a `conflict`/`unprocessable` kódra képződő `warn` szinten
+ * naplózódik, az EREDETI `Outcome` üzenettel (a `db` réteg driver szövegével
+ * együtt, ha van), NEM a törzsbe kerülő, esetlegesen saját mondatra
+ * cserélt üzenettel (`build-protocol-error-body.ts`). A `not_found`,
+ * `invalid_request` és `service_unavailable` kód nem naplózódik itt (nyitva
+ * a SPEC-006 7.2 többi sorára, ez nem e lépés tárgya).
  */
 async function serveMatchedRoute(
   request: IncomingMessage,
@@ -61,6 +83,7 @@ async function serveMatchedRoute(
   query: URLSearchParams,
   corsHeaders: Readonly<Record<string, string>>,
   handlers: Readonly<Record<RouteId, RouteHandler>>,
+  logger: ServerLogger,
 ): Promise<void> {
   const bodyOutcome = await readJsonRequestBody(request);
   if (bodyOutcome.kind === 'error') {
@@ -74,6 +97,12 @@ async function serveMatchedRoute(
 
   if (result.kind === 'error') {
     const body = buildProtocolErrorBody(result.message);
+    const routeLogger = logger.child({ routeId });
+    if (body.code === 'internal') {
+      routeLogger.error(result.message);
+    } else if (body.code === 'conflict' || body.code === 'unprocessable') {
+      routeLogger.warn(result.message);
+    }
     writeJson(response, httpStatusForErrorCode(body.code), body, corsHeaders);
     return;
   }
@@ -137,6 +166,13 @@ async function handleRequest(
   response: ServerResponse,
   options: HttpServerOptions,
 ): Promise<void> {
+  // A kérés gyermek loggere, a SPEC-006 7.2 által előírt `serverInstanceId`
+  // és kérés azonosító kontextussal. A kérés azonosítót a szerver generálja
+  // az `idGenerator` porton, soha nem a klienstől jövő értéket (SPEC-006 7.2).
+  const requestLogger = options.logger.child({
+    serverInstanceId: options.streamDependencies.registry.serverInstanceId,
+    requestId: options.idGenerator.nextId(),
+  });
   try {
     const normalized = normalizeIncomingRequest(request.url, request.method);
     const corsHeaders = resolveCorsHeaders(normalized.pathname, options.devOrigin);
@@ -173,11 +209,15 @@ async function handleRequest(
       normalized.searchParams,
       corsHeaders,
       options.handlers,
+      requestLogger,
     );
-  } catch {
+  } catch (error) {
     // Váratlan, kezeletlen kivétel: a válasz szándékosan nem hordozza a hiba
     // részleteit (verem nyomkövetés, üzenet), csak egy általános szöveget
-    // (SPEC-006 20. elfogadási kritérium).
+    // (SPEC-006 20. elfogadási kritérium). A naplóban, ahol a részletek nem
+    // szivárogtatnak ki a klienshez, az elkapott hiba `error` szinten
+    // megjelenik (SPEC-006 7.2, "internal" sor).
+    requestLogger.error({ err: error }, 'Váratlan szerver hiba történt (internal).');
     writeJson(response, 500, { code: 'internal', message: 'Váratlan szerver hiba történt (internal).' }, {});
   }
 }
