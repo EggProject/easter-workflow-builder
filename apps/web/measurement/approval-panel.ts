@@ -103,6 +103,28 @@ const APPROVAL_SEPARATOR_NAMES: readonly string[] = [
 
 const APPROVAL_SEPARATOR_PATTERN = /^A (?:transcript és a jóváhagyás|jóváhagyás és a transcript) aránya$/;
 
+/**
+ * A gráf és a transcript közti KÜLSŐ elválasztó hozzáférhető neve
+ * (`RunViewLayout.tsx`).
+ */
+const OUTER_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
+
+/**
+ * A tárolt saját arány. A jelenet a régi és az új kulcsra is ír (2026-09-26
+ * óta a saját arány új, csak felhasználói írású kulcson áll, és a régit
+ * senki nem olvassa, `run-view-layout.ts`): így ugyanaz a jelenet a kulcscsere
+ * előtti kódon (a régi kulcsot olvassa) és utána (az újat) is ugyanazt az
+ * esetet méri.
+ */
+const OUTER_OWN_STORAGE = [
+  ['eggRunViewLayout', 'eggRunViewUserLayout'],
+  [60, 40],
+] as const;
+const INNER_OWN_STORAGE = [
+  ['eggRunViewTranscriptApprovalLayout', 'eggRunViewTranscriptApprovalUserLayout'],
+  [70, 30],
+] as const;
+
 function report(scenario: string, values: Readonly<Record<string, unknown>>): void {
   console.log(`MEASUREMENT ${JSON.stringify({ scenario, ...values })}`);
 }
@@ -518,61 +540,81 @@ for (const theme of THEMES) {
 }
 
 // ------------------------------------------------------------
-// 6. Érintéses húzás a fül sávban (375x812): a Chrome DevTools Protocol
-//    `Input.dispatchTouchEvent` hívásával, valódi érintés eseményekkel, és a
-//    lapon naplózott pointer eseményekkel (a `Resizable` kizárólag pointer
-//    eseményekre hallgat). A mérés a telefonos húzás használhatóságát adja
-//    (SPEC-008 10. szekció).
+// 6. Érintéses húzás a Chrome DevTools Protocol `Input.dispatchTouchEvent`
+//    hívásával, valódi érintés eseményekkel, és a lapon naplózott pointer
+//    eseményekkel (a `Resizable` kizárólag pointer eseményekre hallgat). A
+//    BELSŐ elválasztó a fül sávban (375x812), a KÜLSŐ a függőleges sávban
+//    (900x1000, 2026-09-27 óta, user döntés, SPEC-008 14.1 O-11, "Mindegyik
+//    húzható legyen"). A mérés a telefonos/tableten húzás használhatóságát
+//    adja (SPEC-008 10. szekció).
 // ------------------------------------------------------------
 test.describe('erintes', () => {
   test.use({ hasTouch: true });
 
+  const ERINTES_CASES = [
+    { which: 'belso', viewport: { width: 375, height: 812 }, name: APPROVAL_SEPARATOR_PATTERN, tab: true },
+    { which: 'kulso', viewport: { width: 900, height: 1000 }, name: OUTER_SEPARATOR_NAME, tab: false },
+  ] as const;
+
   for (const theme of THEMES) {
-    test(`erintes ${theme} 375x812`, async ({ page }) => {
-      await page.addInitScript(() => {
-        const log: string[] = [];
-        Object.defineProperty(globalThis, 'e2ePointerLog', { configurable: true, value: log });
-        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
-          globalThis.addEventListener(
-            type,
-            (event) => {
-              if (log.at(-1) !== event.type) {
-                log.push(event.type);
-              }
-            },
-            { capture: true },
-          );
+    for (const { which, viewport, name, tab } of ERINTES_CASES) {
+      test(`erintes ${theme} ${String(viewport.width)}x${String(viewport.height)} ${which}`, async ({ page }) => {
+        await page.addInitScript(() => {
+          const log: string[] = [];
+          Object.defineProperty(globalThis, 'e2ePointerLog', { configurable: true, value: log });
+          for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+            globalThis.addEventListener(
+              type,
+              (event) => {
+                if (log.at(-1) !== event.type) {
+                  log.push(event.type);
+                }
+              },
+              { capture: true },
+            );
+          }
+        });
+        await mockApprovalRun(page, manyApprovals(1));
+        await openRun(page, theme, viewport);
+        if (tab) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
         }
+        const separator = page.getByRole('separator', { name });
+        if ((await separator.count()) === 0) {
+          report('erintes', {
+            theme,
+            viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+            separator: which,
+            found: false,
+          });
+          return;
+        }
+        const before = await separator.getAttribute('aria-valuenow');
+        const box = await separator.boundingBox();
+        if (box === null) {
+          throw new Error('az elválasztónak nincs befoglaló doboza');
+        }
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const session = await page.context().newCDPSession(page);
+        await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        for (let step = 1; step <= 10; step += 1) {
+          await session.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x, y: y + step * 10 }],
+          });
+        }
+        await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        report('erintes', {
+          theme,
+          viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+          separator: which,
+          before,
+          after: await separator.getAttribute('aria-valuenow'),
+          pointerEvents: await page.evaluate(() => globalThis.e2ePointerLog),
+        });
       });
-      await mockApprovalRun(page, manyApprovals(1));
-      await openRun(page, theme, { width: 375, height: 812 });
-      await page.getByRole('tab', { name: 'Transcript' }).click();
-      const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
-      if ((await separator.count()) === 0) {
-        report('erintes', { theme, viewport: '375x812', separator: false });
-        return;
-      }
-      const before = await separator.getAttribute('aria-valuenow');
-      const box = await separator.boundingBox();
-      if (box === null) {
-        throw new Error('az elválasztónak nincs befoglaló doboza');
-      }
-      const x = box.x + box.width / 2;
-      const y = box.y + box.height / 2;
-      const session = await page.context().newCDPSession(page);
-      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-      for (let step = 1; step <= 10; step += 1) {
-        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + step * 10 }] });
-      }
-      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      report('erintes', {
-        theme,
-        viewport: '375x812',
-        before,
-        after: await separator.getAttribute('aria-valuenow'),
-        pointerEvents: await page.evaluate(() => globalThis.e2ePointerLog),
-      });
-    });
+    }
   }
 });
 
@@ -761,21 +803,15 @@ for (const theme of THEMES) {
   }
 }
 
-/**
- * A gráf és a transcript közti KÜLSŐ elválasztó hozzáférhető neve
- * (`RunViewLayout.tsx`).
- */
-const OUTER_SEPARATOR_NAME = 'A Gráf és a Transcript aránya';
-
 // ------------------------------------------------------------
 // 8. Megszakított érintéses húzás (`pointercancel`), 900x1000-en (a
-//    függőleges sáv, ahol mindkét elválasztó áll): a KÜLSŐ elválasztón egy
-//    valódi érintéses húzás (a design system eleme `touch-action` nélkül a
-//    böngésző pásztázásának adja át a mozdulatot, és `pointercancel` jön),
-//    a BELSŐN (`touch-action: none`) egy `touchCancel` CDP esemény zárja a
-//    húzást. Utána egy puszta egérmozgás a vásznon és egy görgetés a
-//    transcripten: ha a húzás állapota bent ragadt, ezek mozdítják az
-//    elválasztót.
+//    függőleges sáv, ahol mindkét elválasztó áll): mindkét elválasztón
+//    (`touch-action: none`, 2026-09-27 óta a KÜLSŐN is, user döntés, SPEC-008
+//    14.1 O-11) egy `touchCancel` CDP esemény zárja a húzást, a belső eddigi
+//    mintája szerint - a `touch-action` miatt a böngésző nem veszi át a
+//    mozdulatot, tehát a megszakítást a teszt maga váltja ki. Utána egy
+//    puszta egérmozgás a vásznon és egy görgetés a transcripten: ha a húzás
+//    állapota bent ragadt, ezek mozdítják az elválasztót.
 // ------------------------------------------------------------
 test.describe('megszakitas', () => {
   test.use({ hasTouch: true });
@@ -812,17 +848,13 @@ test.describe('megszakitas', () => {
         const y = box.y + box.height / 2;
         const session = await page.context().newCDPSession(page);
         await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-        const steps = which === 'kulso' ? 10 : 3;
-        for (let step = 1; step <= steps; step += 1) {
+        for (let step = 1; step <= 3; step += 1) {
           await session.send('Input.dispatchTouchEvent', {
             type: 'touchMove',
             touchPoints: [{ x, y: y + step * 10 }],
           });
         }
-        await session.send('Input.dispatchTouchEvent', {
-          type: which === 'kulso' ? 'touchEnd' : 'touchCancel',
-          touchPoints: [],
-        });
+        await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
         const afterTouch = await separator.getAttribute('aria-valuenow');
         const isDraggingAfterTouch = ((await separator.getAttribute('class')) ?? '').includes('is-dragging');
         const canvas = await page.locator('.run-graph-canvas').boundingBox();
@@ -857,9 +889,11 @@ test.describe('megszakitas', () => {
 // ------------------------------------------------------------
 // 9. A KÜLSŐ elválasztó szélső állásai a függőleges sávban (900x1000, a
 //    gráf felül, a transcript oldal alul): a transcript oldal a külső
-//    `Resizable` panelje, tehát a `End` állásban a design system 60 pixeles
-//    minimumára zsugorodik. Mérjük, hogy a lapozó és a két gomb ilyenkor is
-//    látszik-e (a belső elválasztó jelenetei ezt nem fedik).
+//    `Resizable` panelje. 2026-09-27 óta (lezárva, SPEC-008 14.1 O-13) az
+//    `End` állásban NEM a design system 60 pixeles CSS minimumára zsugorodik,
+//    hanem a `contentMinimum` mérése szerint a lapozó és a két gomb méretéhez
+//    igazodik. Mérjük, hogy a lapozó és a két gomb ilyenkor is látszik-e (a
+//    belső elválasztó jelenetei ezt nem fedik).
 // ------------------------------------------------------------
 for (const theme of THEMES) {
   test(`kulso-szelso ${theme} 900x1000`, async ({ page }) => {
@@ -1050,10 +1084,11 @@ for (const theme of THEMES) {
 }
 
 // ------------------------------------------------------------
-// 11. A KÜLSŐ elválasztó `End` állása mindkét osztott sávban (SPEC-008 14.2
-//     O-13): a függőleges sávban (768 és 1023 pixel között) a transcript
-//     oldal a külső panel 60 pixeles, a vízszintesben (1024 pixeltől) a 80
-//     pixeles minimumán áll. Mérjük a lapozó és a két gomb látható arányát
+// 11. A KÜLSŐ elválasztó `End` állása mindkét osztott sávban (lezárva,
+//     2026-09-27, SPEC-008 14.1 O-13): a transcript oldal minimuma a
+//     `packages/ui` `Resizable` `contentMinimum` mérése szerint a lapozó és a
+//     két döntés gomb méretéhez igazodik, nem a CSS 60/80 pixeles
+//     alapértelmezésen áll. Mérjük a lapozó és a két gomb látható arányát
 //     görgetés nélkül, majd valódi Tab lépésekkel a külső elválasztótól a
 //     "Jóváhagyás" gombig és még egy lépéssel az "Elutasítás" gombig (a
 //     fókuszra görgetés előhozza-e őket).
@@ -1080,33 +1115,58 @@ const OUTER_END_VIEWPORTS = [
   { width: 1440, height: 900 },
 ] as const;
 
+/**
+ * A tárolt saját arány két esete `End` állásban (user döntés 2026-09-27,
+ * O-13): a `sajat-kulso` esetben csak a KÜLSŐ tárolt (az `End` billentyű
+ * lépés maga is felhasználói méretváltoztatás, tehát a külsőt eleve sajáttá
+ * teszi, előzetes tárolás nélkül); a `sajat-mindketto` esetben a BELSŐ is
+ * tárolt, az `INNER_OWN_STORAGE` előzetes beírásával, mielőtt a külső
+ * elválasztó `End`-re kerülne.
+ */
+const OUTER_END_STORAGE = {
+  'sajat-kulso': [],
+  'sajat-mindketto': [INNER_OWN_STORAGE],
+} as const;
+
 for (const theme of THEMES) {
   for (const viewport of OUTER_END_VIEWPORTS) {
-    test(`kulso-end ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
-      await mockApprovalRunWithTranscript(page, manyApprovals(1));
-      await openRun(page, theme, viewport);
-      const outer = page.getByRole('separator', { name: OUTER_SEPARATOR_NAME });
-      await outer.focus();
-      await outer.press('End');
-      const side = page.locator('.run-view-screen__transcript');
-      const sideBox = await side.boundingBox();
-      const unfocused = await readExtremeGeometry(page);
-      const tabWalk = await walkTabToApprove(page, outer);
-      const approveFocused = await readExtremeGeometry(page);
-      await page.keyboard.press('Tab');
-      const rejectFocused = await readExtremeGeometry(page);
-      report('kulso-end', {
-        theme,
-        viewport: `${String(viewport.width)}x${String(viewport.height)}`,
-        band: viewport.width >= 1024 ? 'vizszintes' : 'fuggoleges',
-        outerValue: await outer.getAttribute('aria-valuenow'),
-        side: sideBox === null ? undefined : { width: Math.round(sideBox.width), height: Math.round(sideBox.height) },
-        unfocused: pickVisibility(unfocused),
-        tabs: tabWalk.tabs,
-        approveFocused: pickVisibility(approveFocused),
-        rejectFocused: pickVisibility(rejectFocused),
+    for (const [storageName, stored] of Object.entries(OUTER_END_STORAGE)) {
+      test(`kulso-end ${theme} ${String(viewport.width)}x${String(viewport.height)} ${storageName}`, async ({
+        page,
+      }) => {
+        await page.addInitScript((pairs) => {
+          for (const [keys, value] of pairs) {
+            for (const key of keys) {
+              globalThis.localStorage.setItem(key, JSON.stringify(value));
+            }
+          }
+        }, stored);
+        await mockApprovalRunWithTranscript(page, manyApprovals(1));
+        await openRun(page, theme, viewport);
+        const outer = page.getByRole('separator', { name: OUTER_SEPARATOR_NAME });
+        await outer.focus();
+        await outer.press('End');
+        const side = page.locator('.run-view-screen__transcript');
+        const sideBox = await side.boundingBox();
+        const unfocused = await readExtremeGeometry(page);
+        const tabWalk = await walkTabToApprove(page, outer);
+        const approveFocused = await readExtremeGeometry(page);
+        await page.keyboard.press('Tab');
+        const rejectFocused = await readExtremeGeometry(page);
+        report('kulso-end', {
+          theme,
+          viewport: `${String(viewport.width)}x${String(viewport.height)}`,
+          storage: storageName,
+          band: viewport.width >= 1024 ? 'vizszintes' : 'fuggoleges',
+          outerValue: await outer.getAttribute('aria-valuenow'),
+          side: sideBox === null ? undefined : { width: Math.round(sideBox.width), height: Math.round(sideBox.height) },
+          unfocused: pickVisibility(unfocused),
+          tabs: tabWalk.tabs,
+          approveFocused: pickVisibility(approveFocused),
+          rejectFocused: pickVisibility(rejectFocused),
+        });
       });
-    });
+    }
   }
 }
 
@@ -1139,22 +1199,6 @@ const LONG_APPROVAL: PendingApproval = {
   body: Array.from({ length: 12 }, (_, index) => `A kifizetés ${String(index + 1)}. feltétele teljesült.`).join(' '),
   payload: Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`mezo${String(index + 1)}`, index + 1])),
 };
-
-/**
- * A tárolt saját arány. A jelenet a régi és az új kulcsra is ír (2026-09-26
- * óta a saját arány új, csak felhasználói írású kulcson áll, és a régit
- * senki nem olvassa, `run-view-layout.ts`): így ugyanaz a jelenet a kulcscsere
- * előtti kódon (a régi kulcsot olvassa) és utána (az újat) is ugyanazt az
- * esetet méri.
- */
-const OUTER_OWN_STORAGE = [
-  ['eggRunViewLayout', 'eggRunViewUserLayout'],
-  [60, 40],
-] as const;
-const INNER_OWN_STORAGE = [
-  ['eggRunViewTranscriptApprovalLayout', 'eggRunViewTranscriptApprovalUserLayout'],
-  [70, 30],
-] as const;
 
 /**
  * A `sajat-mindketto` eset 2026-09-26 óta áll (a teljes saját arány, a
