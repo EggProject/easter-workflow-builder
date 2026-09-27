@@ -556,11 +556,13 @@ hivatalos dokumentációja szerint (<https://docs.blacksmith.sh/blacksmith-runne
 memóriájú, 80 GB tárolójú, x64 gép, Ubuntu 24.04 image-en, Firecracker microVM-ben - tehát a
 fenti bekezdés `ubuntu-latest`-re vonatkozó, 4 vCPU-s alapja ezen a runneren már nem áll,
 a mérési eredmény (a `2` workers érték zöld futása) viszont a runnertől függetlenül változatlanul
-érvényes historikus tény marad. **NYITVA:** a `2` workers érték viselkedése a kisebb, 2 vCPU-s
-Blacksmith runneren nem mért. Mi a viselkedés addig: a `workers` érték változatlanul `2` marad a
-CI ágon. Mi zárná le: egy zöld CI `e2e` futás mérése ugyanezen a PR-en, a jobok és a "Run e2e
-tests" lépés időtartamával, összevetve a fenti `ubuntu-latest` mérésekkel; az eredmény a
-`docs/research/2026-09-24-playwright-worker-korlat.md` 5. szekciójában és itt kerül lezárásra.
+érvényes historikus tény marad. **A nyitott pont lezárva (2026-09-27, PR #17, run id
+`36334506650`):** a `2` workers érték a 2 vCPU-s Blacksmith runneren is zölden fut, és a `Run e2e
+tests` lépés (3m15s) **gyorsabb**, mint a korábbi, dupla magszámú `ubuntu-latest` runneren
+ugyanazzal a beállítással (3m31s); a `test` job (teljes Vitest suite, 100 százalékos lefedettségi
+küszöb) 2 perc alatt zölden lefutott. A `workers` érték emiatt változatlanul `2` marad a CI ágon,
+csökkentésre nincs szükség. Részletek: `docs/research/2026-09-24-playwright-worker-korlat.md` 5.
+szekció.
 
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").

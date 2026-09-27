@@ -245,11 +245,37 @@ job és a lépés időtartamának rögzítésével, összevetve a 4.3 alatti ké
 
 ### 5.3 A PR első CI futásának mérése
 
-<!-- MEASUREMENT_PLACEHOLDER: a mért run id, jobok és a "Run e2e tests" lépés időtartama a
-kilenc kapu és a PR nyitása után, a runner_name/labels mezővel együtt, ide kerül egy második
-commitban. -->
+- **PR:** [EggProject/easter-workflow-builder#17](https://github.com/EggProject/easter-workflow-builder/pull/17)
+- **Run id:** `36334506650`
+- **Runner:** mind a kilenc job `blacksmith-2vcpu-ubuntu-2404`-en futott, a `GET
+.../actions/runs/36334506650/jobs` végpont `runner_name` mezője szerint (pl.
+  `blacksmith-2vcpu-ubuntu-2404-Runner-a7af74d607`, `...-cb08add2ae`), a `labels` mezőben
+  `["blacksmith-2vcpu-ubuntu-2404"]`. A jobok a queue-olás nélkül, azonnal `in_progress`
+  állapotba kerültek (`started_at` a létrehozás után kb. 30 másodperccel), tehát a Blacksmith
+  GitHub App telepítve van és működik.
+- **Eredmény:** mind a kilenc job (`gate` mátrix hat lába, `test`, `build`, `e2e`, plusz a
+  `coverage-comment` és az összesítő `ci`) `conclusion: success`.
+- **`test` job:** a `Test` lépés (a `bun run test`, tehát a teljes Vitest suite `--coverage`
+  mellett) `16:47:31` - `16:49:31`, **2m 0s**. A job zöld záró állapota igazolja a 100 százalékos
+  lefedettségi küszöböt is mind a négy metrikán, mert a `test.sh` wrapper a küszöb alatt nem
+  nulla kilépési kóddal állna.
+- **`e2e` job:** a `Run e2e tests` lépés `16:48:17` - `16:51:32`, **3m 15s** (nem cache találat:
+  a lépés ténylegesen ennyi ideig futott, nem ~0s). A teljes `E2E` job **3m 54s**.
+
+|                                                          | job (`E2E`) | `Run e2e tests` lépés |
+| -------------------------------------------------------- | ----------- | --------------------- |
+| `ubuntu-latest`, 1 worker (`36277905998`)                | 7m40s       | 6m36s                 |
+| `ubuntu-latest`, 2 worker (`36287275308`)                | 4m23s       | 3m31s                 |
+| `blacksmith-2vcpu-ubuntu-2404`, 2 worker (`36334506650`) | 3m54s       | 3m15s                 |
 
 ### 5.4 Következtetés
 
-<!-- CONCLUSION_PLACEHOLDER: a NYITVA jelölés lezárása a mérés után, ugyanabban a második
-commitban, a szabálykönyv 11. szekciójának megfelelő bekezdésével együtt. -->
+**A NYITVA jelölés lezárva.** A 2 vCPU-s, feleannyi magú Blacksmith runner a 2 Playwright
+workert nem csak elviseli, hanem a `Run e2e tests` lépés rajta **gyorsabb** (3m15s), mint a
+korábbi, duplán annyi magú (4 vCPU-s) `ubuntu-latest` runneren ugyanazzal a 2 workeres
+beállítással (3m31s). A `test` job (teljes Vitest suite, 100 százalékos lefedettségi küszöb mind
+a négy metrikán) is zölden, 2 perc alatt lefutott. A magyarázat a Blacksmith saját, hivatalos
+állítása szerint a bare-metal gaming CPU-k magasabb egyszálú teljesítménye (5.1 szekció,
+`docs.blacksmith.sh` "significantly higher single-thread performance"), amivel a fele magszám
+nem jelent tényleges lassulást ezen a terhelésen. A `playwright.config.ts` CI-ági `workers: 2`
+értéke emiatt változatlan marad, csökkentésre vagy a mérés megismétlésére nincs szükség.
