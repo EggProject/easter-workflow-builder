@@ -940,7 +940,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `return` ága UTÁN helyeztem el elsőre, ez "Minified React error #310"-at (a Rules of Hooks
   megszegése) dobott a snapshot betöltés átmeneti állapotában - minden hooknak a komponens összes
   feltételes `return` ága ELŐTT kell állnia. Módszer, ami a bizonyítást adta: `git checkout <bázis>
-  -- <egy fájl>` szelektíven, a teszt fájl és a mérő eszköz érintése nélkül, majd a szűkített
+-- <egy fájl>` szelektíven, a teszt fájl és a mérő eszköz érintése nélkül, majd a szűkített
   teszt újrafuttatása minden lépésben (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5
   szekció).
 
