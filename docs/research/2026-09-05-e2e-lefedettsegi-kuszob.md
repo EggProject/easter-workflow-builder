@@ -1762,3 +1762,42 @@ ugyanabba a nyers könyvtárba), majd `bun run coverage:e2e:report` (exit 0):
 metrikán nőtt (1686 -> 1690, 784 -> 788, 562 -> 563, 1626 -> 1630), a fedetlen egyiken sem, tehát
 a branches küszöb a mért értékre emelkedik (az `nyc` két tizedesre lefelé kerekített értéke,
 777 / 788 = 98,604), a többi marad (`apps/web/package.json`).
+
+## 47. Az O-13 minimum visszaállítás javítása utáni ratchet (2026-09-27): branches és lines küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A `main` `bb3fd06` (PR #18, T-009-30: "egy élő run_event keret egyszerre
+frissíti a csomópont állapotát és a transcript utolsó sorát") összefésülése, plusz a jelen
+munkamenet saját javítása: a `packages/ui` `Resizable` `contentMinimum` mechanizmusa nem állította
+vissza a felhasználó tárolt arányát, ha a tartalom alapú minimum a jóváhagyás eltűnése után
+összehúzódott (`contentMinimumBase` referencia, a `revealBase` mintájára). Új e2e: a
+`sse-real-server.spec.ts` "csak külső saját aránnyal" négy tesztje (két méret, két téma). A
+`packages/ui` forrása nincs az `apps/web` e2e istanbul lefedettségének hatókörében (a
+`vite-istanbul-include-invariant` témája az `apps/web` saját `src/**/*` mintáját rögzíti), tehát a
+`Resizable.tsx` javítása maga nem hat a mért számokra; a változás forrása a `bb3fd06` összefésült
+`apps/web` termékkódja és a hozzá tartozó, már zöld e2e teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával: `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`,
+a teljes Playwright futás (**473 teszt, mind zöld**, `bunx playwright test` közvetlenül, a
+Turborepo által futtatott `bun run test:e2e` ebben a sandboxban a `PLAYWRIGHT_BROWSERS_PATH`
+env változót nem adja át a `turbo run` alfolyamatnak, tehát a böngésző a nem létező
+alapértelmezett gyorsítótár útvonalon indulna - ez sandbox-specifikus tünet, nem termékkód hiba,
+és a mért lefedettségi számokra nincs hatása, mert a `nyc report` a `.nyc_output`-ban lévő nyers
+adatból dolgozik, függetlenül attól, melyik paranccsal futott a Playwright), majd
+`bun run coverage:e2e:report` (exit 0):
+
+| Metrika    | Fedett / összes | Százalék | Küszöb előtte (46.) -> most | Fedetlen darab, előtte -> most |
+| ---------- | --------------- | -------- | --------------------------- | ------------------------------ |
+| statements | 1682 / 1697     | 99.11    | 99.11 (marad)               | 15 -> 15                       |
+| branches   | 784 / 795       | 98.61    | 98.6 -> **98.61**           | 11 -> 11                       |
+| functions  | 562 / 565       | 99.46    | 99.46 (marad)               | 3 -> 3                         |
+| lines      | 1622 / 1637     | 99.08    | 99.07 -> **99.08**          | 15 -> 15                       |
+
+**Nulla új fedetlen tétel**: a fedetlen helyek ugyanazon a hat fájlon és ugyanazokon a sorszámokon
+maradtak, mint a 46. szekcióban (`mount-app.tsx` 16, 21-22; `read-frontend-config.ts` 41, 62, 67,
+72, 77; `is-valid-connection.ts` 36; `browser-history-location-port.ts` 21;
+`perform-route-request.ts` 89; `use-stream-connection.ts` 202). Az összes darabszám minden
+metrikán nőtt (1690 -> 1697, 788 -> 795, 563 -> 565, 1630 -> 1637), a fedett darabszám ugyanannyival
+nőtt (statements +7, branches +7, functions +2, lines +7), tehát a fedetlen darabszám egyiken sem
+változott. A branches és a lines küszöb ezért a mért értékre emelkedik (`nyc` saját, két tizedesre
+kerekített kimenete: 784 / 795 -> 98.61, 1622 / 1637 -> 99.08), a statements és a functions
+küszöb változatlan marad (`apps/web/package.json`).

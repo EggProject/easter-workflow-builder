@@ -1240,5 +1240,75 @@ describe('Resizable', () => {
       // százalék; a beágyazott (más tengelyű) csoport nem ad hozzá.
       expect(reportedRange('Külső')).toEqual(['8', '70', '75']);
     });
+
+    it('a régió mérete UTÓBB csökken, a panel visszaáll a növekedés előtti méretre', () => {
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      refresh();
+      pressKeyOn(labelledHandle('Külső'), 'End');
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+
+      stubRegionHeight(90);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['79%', '21%']);
+
+      // A jóváhagyás eltűnik (a régió magassága visszaesik nullára): a panel
+      // a növekedés előtti méretre áll vissza, mert a feljegyzett alap (12
+      // százalék) eléri a friss, összehúzódott minimumot (12 százalék) - a
+      // `clampToMinimums` egyirányú korlátozása önmagában ezt nem tenné meg
+      // (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.6 szekció).
+      stubRegionHeight(0);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+    });
+
+    it('ismételt növekedés nem írja felül a legkorábbi, valódi alapot', () => {
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      refresh();
+      pressKeyOn(labelledHandle('Külső'), 'End');
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+
+      stubRegionHeight(90);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['79%', '21%']);
+
+      // A régió tovább nő: a panel tovább igazodik, de a feljegyzett alap
+      // (a legkorábbi, 12 százalékos méret) NEM íródik át a köztes (21
+      // százalékos) méretre.
+      stubRegionHeight(150);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['73%', '27%']);
+
+      // Teljes zsugorodás: a visszaállás a LEGKORÁBBI alapra megy, nem a
+      // köztes méretre.
+      stubRegionHeight(0);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+    });
+
+    it('ha a felhasználó a növekedés alatt saját méretet állít be, a régió zsugorodása nem írja felül azt egy korábbi alapra', () => {
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      stubPanelGeometry([400, 600, 60, 60], '60px');
+      refresh();
+      pressKeyOn(labelledHandle('Külső'), 'End');
+      expect(sizesOf(groups()[0])).toEqual(['88%', '12%']);
+
+      stubRegionHeight(90);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['79%', '21%']);
+
+      // A felhasználó saját döntése (nyíl billentyű) törli a feljegyzett
+      // alapot: onnantól a méret az övé, a mechanizmus nem nyúl bele
+      // (`markUserResize`).
+      pressKeyOn(labelledHandle('Külső'), 'ArrowUp');
+      expect(sizesOf(groups()[0])).toEqual(['74%', '26%']);
+
+      // A jóváhagyás eltűnik: nincs feljegyzett alap, tehát nincs
+      // visszaállítás, a felhasználó mérete változatlan marad.
+      stubRegionHeight(0);
+      renderWithRegion({ panelIndex: 1, regionElementId: 'region' });
+      expect(sizesOf(groups()[0])).toEqual(['74%', '26%']);
+    });
   });
 });

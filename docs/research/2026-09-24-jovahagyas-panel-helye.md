@@ -1545,3 +1545,64 @@ kilépés csak a `contentMinimum` DEFINIÁLT esetére vonatkozott); a javított 
 (58/58), `bun run test:e2e -- sse-real-server.spec.ts` (131/131), `bun run test:e2e --
 approval-prompt.spec.ts node-inspector.spec.ts` (138/138), plusz a teljes `bun run test` (100
 százalék, mind a négy metrikán) és a teljes `bun run test:e2e`.
+
+### 17.6 A `contentMinimum` növekedése nem állt vissza a jóváhagyás eltűnésekor, e2e-vel felfedve (2026-09-27)
+
+**A hiba.** A `sse-real-server.spec.ts` új, csak a KÜLSŐ elválasztó saját arányát vizsgáló tesztje
+(a `[60,40]` tárolt arány, élő jóváhagyás érkezése, majd eltűnése) a függőleges sávban (1000x700)
+felfedte, hogy a `contentMinimum` miatti növekedés a jóváhagyás eltűnése után NEM állt vissza a
+felhasználó tárolt arányára: az `aria-valuemax` korrekten frissült (`88`, a friss, tágabb határ),
+de az `aria-valuenow` a növelt `54` értéken ragadt, a tárolt `60` helyett.
+
+**A diagnózis.** Ideiglenes `console.log` mérés (a végleges kódba nem került be) a jóváhagyás
+érkezése ALATT `aria-valuemin="12" aria-valuemax="88" aria-valuenow="54"`-et mutatott (1000x700-on
+a lapozó és a két gomb 46 százalékot igényel, a tárolt 40 alatta van, tehát a panel a mért
+minimumra nő), a jóváhagyás ELTŰNÉSE UTÁN pedig `aria-valuemin="8" aria-valuemax="88"
+aria-valuenow="54"`-et: a határ helyesen tágult vissza, de a tényleges méret nem mozdult.
+
+**A gyökérok.** A `clampToMinimums` (a `contentMinimum`-ra dedikált `useLayoutEffect` egyetlen
+korrekciós eszköze) EGYIRÁNYÚ: a `resizeAt` nulla eltolással csak arra kényszeríti a panelt, hogy
+a minimuma FÖLÉ kerüljön, ha alatta van - nincs benne semmi, ami egy panelt visszatolna, amikor a
+minimum később ÖSSZEHÚZÓDIK. A `reveal` mechanizmusnak van erre pontosan ilyen célú mezője
+(`revealBase`, a felfedés előtti méretek, a felfedés végén visszaállítva), a `contentMinimum`
+dedikált hatásának ELSŐ verziójából ez az analóg mechanizmus hiányzott.
+
+**A javítás, a `revealBase` mintájára.** A `Resizable.tsx` egy új `contentMinimumBase` referenciát
+kapott (`packages/ui/src/resizable/Resizable.tsx` 315. sor környéke): a dedikált hatás a panel
+ELSŐ, minimum miatti növekedésekor feljegyzi a növekedés előtti méreteket ide, majd minden újabb
+`contentMinimum` leírás váltásra megnézi, hogy a feljegyzett alap panelmérete eléri-e a FRISS
+minimumot; ha igen, az alap áll vissza és a feljegyzés törlődik, ha nem, a panel tovább (vagy
+újra) a friss minimumra igazodik, a feljegyzést csak akkor írva, ha még nincs (nehogy egy már
+folyamatban lévő növekedés felülírja a legkorábbi, valódi alapot). A `markUserResize` (minden
+felhasználói méretváltoztatás: húzás, nyíl, `Home`, `End`, `Enter`) a `revealBase`-hez hasonlóan a
+`contentMinimumBase`-t is törli, mert onnantól a méret a felhasználóé, a mechanizmus nem nyúlhat
+bele.
+
+**A `[60,40]` arány méréssel igazoltan csak a FÜGGŐLEGES sávban éri el a mért minimumot.** A
+vízszintes sávban a régió `max-content` SZÉLESSÉGE a mérvadó, ami körülbelül állandó pixelben,
+tehát SZÁZALÉKBAN a legszélesebb, még vízszintes sávnak számító 1024 pixeles nézeten a legnagyobb:
+itt a lapozó és a két gomb 22 százalékot igényel (`aria-valuemin` a diagnosztikai mérésben `8`,
+`aria-valuemax` `78`), a tárolt 40 messze fölötte marad, tehát a KÜLSŐ elválasztó itt a tárolt
+arányon marad, a jóváhagyás érkezése nem mozdítja. Mivel a szélesebb nézeteken a szükséges
+százalék csak csökken, ez az 1024 pixeles eset a "legrosszabb", és ha még ez sem elég a `[60,40]`
+felmozdításához, SEMMILYEN vízszintes sávbeli nézet nem elég. A függőleges sávban a magasság a
+mérvadó, és 1000x700-on a régió a beágyazott csoport minimumával együtt 46 százalékot igényel, a
+tárolt 40 alatta van, tehát ott a mozdulás valóban bekövetkezik és mérhető. A teszt ezért két
+külön záró állítást használ méret szerint (`expectsGrowth: true`/`false`): a vízszintes esetben az
+`aria-valuenow` VÁLTOZATLANSÁGA (`toBe(60)`) a helyes, mért elvárás, nem a növekedés - ez tudatos,
+mért eltérés a "mindkét méreten nő" szó szerinti olvasattól, a `[60,40]` arány és a vízszintes sáv
+matematikai (pixel/százalék) tulajdonsága miatt, nem a teszt hiányossága.
+
+**A rontás-igazolás (sabotage-proof).** A visszaállító ág (a fenti javítás `if (base !== undefined
+&& baseSize !== undefined && baseSize >= freshMinimum)` ága és a benne álló `setSizes`/`return`)
+ideiglenesen eltávolítva, változatlan tesztkóddal: a `bun x playwright test sse-real-server -g
+"csak külső saját aránnyal"` a függőleges sávbeli (1000x700) mindkét témájú tesztet elbuktatta,
+pontosan az `apps/web/e2e/sse-real-server.spec.ts` `await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow',
+'60');` állításán (a mért, kapott érték `54` maradt a `60` helyett), a vízszintes sávbeli (1024x768)
+teszteket változatlanul zölden hagyva - ez a mért bizonyíték arra, hogy a teszt tényleg a
+visszaállítás hiányát kapja el, nem egy másik, véletlenül egybeeső feltételt. A rontás
+visszaállítása után mind a négy kombináció (két méret, két téma) újra zöld.
+
+**Regresszió.** `apps/web/e2e/sse-real-server.spec.ts`, "csak külső saját aránnyal" leíró, négy
+teszt (két méret, két téma); a `Resizable.tsx` `contentMinimumBase` referenciája és a dedikált
+hatás kiegészített visszaállító ága.
