@@ -198,3 +198,58 @@ szerint gyorsabb is, mint 1 workerrel. A user "Egy zöld futás elég" döntése
 mérés elegendő a `2` érték elfogadásához; a 3 vagy több worker kihasználhatósága (a runner 4
 vCPU-jából elvileg még maradna kapacitás) továbbra sem mért kérdés, és nem tárgya ennek a
 lépésnek.
+
+---
+
+## 5. CI runner váltás `blacksmith-2vcpu-ubuntu-2404`-re, 2026-09-27
+
+A fenti 4. szekció mérése a GitHub-hosted, publikus repókon négy vCPU-s `ubuntu-latest` runneren
+történt. A user kifejezett kérésére ("a github runner-t én kértem hogy állítsa át") a
+`.github/workflows/ci.yml` mind a hat jobja (`gate` mátrix, `test`, `build`, `e2e`,
+`coverage-comment`, `ci`) `blacksmith-2vcpu-ubuntu-2404` futtatóra vált (`d26d998` commit).
+
+### 5.1 A Blacksmith runner erőforrásai
+
+**Forrás 1 (hivatalos doksi):** <https://docs.blacksmith.sh/blacksmith-runners/overview>, "x64
+Runners" szekció, "Ubuntu 24.04" tábla szó szerint: `blacksmith-2vcpu-ubuntu-2404` - 2 vCPU,
+8 GB memória, 80 GB tároló. A `blacksmith-2vcpu-ubuntu-2404` tag az `x64 Runners` alatt áll, az
+ARM sorok (`-arm` utótaggal) ettől külön szekcióban, más (6 GB/75 GB) értékekkel szerepelnek,
+tehát a szóban lévő tag architektúrája x64.
+
+**Forrás 2 (független megerősítés):**
+<https://latchkey.dev/learn/runners/blacksmith-runners-explained> (Daniel Zoghalchali, olvasva
+2026-09-20, "published in the instance-types documentation" hivatkozással) szó szerint ugyanazt
+a táblát közli: `blacksmith-2vcpu-ubuntu-2404` - 2 vCPU, 8 GB RAM, 80 GB tároló, és külön
+kiemeli, hogy az x64 és az ARM tier azonos vCPU számnál eltérő memóriát kap (x64: 4 GB/mag, ARM:
+3 GB/mag), tehát a `-arm` utótag nélküli tag x64.
+
+**Forrás 3 (független megerősítés):**
+<https://apis.io/apis/blacksmith-sh/github-actions-runners/> szó szerint: "Linux/Windows jobs run
+in ephemeral Firecracker microVMs; x64, ARM64, and macOS (Apple Silicon M4) families are offered
+in 2-32 vCPU sizes", a `blacksmith-2vcpu-ubuntu-2404` tagot nevesítve példaként.
+
+**Válasz:** a `blacksmith-2vcpu-ubuntu-2404` runner 2 vCPU-s, 8 GB memóriájú, 80 GB tárolójú,
+x64 architektúrájú gép, Ubuntu 24.04 image-en, Firecracker microVM-ben, bare-metal gaming CPU
+alapú fizikai hardveren (a docs.blacksmith.sh Overview lapja szerint). Ez a 4. szekcióban mért
+`ubuntu-latest` runnerhez (4 vCPU, 16 GB) képest fele vCPU-számot és fele memóriát jelent.
+
+### 5.2 Nyitott kérdés: bírja-e a 2 vCPU-s runner a 2 Playwright workert
+
+A 4. szekció következtetése ("a négy vCPU-s... runner elviseli a 2 workert") kifejezetten a
+négy vCPU-s hardverre hivatkozott. Ez a Blacksmith runneren nem eleve igaz: fele a mag- és
+memória-számmal a két worker közötti erőforrás verseny nagyobb lehet. **NYITVA marad, amíg egy
+tényleges CI futás nem méri.** Mi a viselkedés addig: a `playwright.config.ts` `workers` mezője
+változatlanul `Boolean(process.env['CI']) ? 2 : 3`, nem csökkentjük óvatosságból. Mi zárná le:
+egy zöld CI `e2e` job ezen a PR-en, a "Run e2e tests" lépés tényleges (nem cache) lefutásával, a
+job és a lépés időtartamának rögzítésével, összevetve a 4.3 alatti két méréssel.
+
+### 5.3 A PR első CI futásának mérése
+
+<!-- MEASUREMENT_PLACEHOLDER: a mért run id, jobok és a "Run e2e tests" lépés időtartama a
+kilenc kapu és a PR nyitása után, a runner_name/labels mezővel együtt, ide kerül egy második
+commitban. -->
+
+### 5.4 Következtetés
+
+<!-- CONCLUSION_PLACEHOLDER: a NYITVA jelölés lezárása a mérés után, ugyanabban a második
+commitban, a szabálykönyv 11. szekciójának megfelelő bekezdésével együtt. -->
