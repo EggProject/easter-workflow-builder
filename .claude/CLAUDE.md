@@ -550,10 +550,10 @@ találat, és az 1 workeres alaphoz képest gyorsabb is) egyaránt rögzíti, a
 **A futtató 2026-09-27-én `blacksmith-2vcpu-ubuntu-2404`-re változott mind a hat jobon**
 (user kérés, d26d998 commit: "a github runner-t én kértem hogy állítsa át"). A Blacksmith
 hivatalos dokumentációja szerint (<https://docs.blacksmith.sh/blacksmith-runners/overview>,
-"x64 Runners" / Ubuntu 24.04 tábla) és két független megerősítő forrás szerint
-(<https://latchkey.dev/learn/runners/blacksmith-runners-explained>, olvasva 2026-09-20;
-<https://apis.io/apis/blacksmith-sh/github-actions-runners/>) ez a runner 2 vCPU-s, 8 GB
-memóriájú, 80 GB tárolójú, x64 gép, Ubuntu 24.04 image-en, Firecracker microVM-ben - tehát a
+"x64 Runners" / Ubuntu 24.04 tábla; egy hivatalos forrás, második független megerősítés
+nincs - lásd `docs/research/2026-09-24-playwright-worker-korlat.md` 5.1 szekció) ez a
+runner 2 vCPU-s, 8 GB memóriájú, 80 GB tárolójú, x64 gép, Ubuntu 24.04 image-en,
+Firecracker microVM-ben - tehát a
 fenti bekezdés `ubuntu-latest`-re vonatkozó, 4 vCPU-s alapja ezen a runneren már nem áll,
 a mérési eredmény (a `2` workers érték zöld futása) viszont a runnertől függetlenül változatlanul
 érvényes historikus tény marad. **A nyitott pont lezárva (2026-09-27, PR #17, run id
