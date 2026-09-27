@@ -241,7 +241,15 @@ nélkül (`adjustsForReveal`), ideiglenesen és tárolás nélkül. **Ha csak a 
 és szükség esetén a belső arány is ideiglenesen enged** (user döntés 2026-09-26, "Ideiglenesen
 engedjen", SPEC-008 8. szekció 1. pont): a belső `adjustsForReveal` igaz, ha a belső vagy a külső
 arány nem saját, a belső a tárolt arányából indul, a tárolt arány nem íródik felül, és a felfedés
-végén visszaáll; ha mindkét arány saját, egyik sem mozdul. Egy futó felfedést a külső felfedés
+végén visszaáll; ha mindkét arány saját, egyik sem mozdul. **Ez a VAGY-szabály sávfüggő** (user
+döntés 2026-09-27, "Csak a látható arány számít", SPEC-008 8. szekció 1. pont, 14.1 O-18,
+`resolveApprovalRevealAdjustment`, `run-view-approval-reveal-adjustment.ts`): csak a `vertical`
+sávra érvényes, mert ott a két elválasztó azonos tengelyen áll, a külső ténylegesen ad helyet a
+belsőnek. A `horizontal` és a `tabs` sávban a külső más tengelyen áll, vagy nincs is, tehát egy
+máshol beállított saját külső arány ott irreleváns; itt a belső MINDIG ideiglenesen enged, a
+belső arány saját voltától függetlenül (mérve: 1440x600-on és 375x812-n, saját belső ÉS saját
+külső aránnyal is, a kérdés és a gombok teljesen látszanak,
+`docs/research/2026-09-24-jovahagyas-panel-helye.md` 16. szekció). Egy futó felfedést a külső felfedés
 közbeni húzása nem állít meg (a `Resizable` a felfedés végéig igazodik). **A felfedés a képernyő minden
 állapotváltozását követi:** a `RunViewScreen` minden renderelésekor új leírást ad
 (`approvalReveal`), és a `Resizable` minden új leírásra újra számol, tehát a döntés hibaüzenete, a
@@ -417,7 +425,8 @@ kikerül a `GET /api/approvals` válaszából (user döntés 2026-09-23, SPEC-00
 újrapróbálást. Az eredmény a tapadó akciósávban áll, tehát görgetés nélkül látszik, és magától nem
 tűnik el (Clock API e2e). A görgethető törzs tetején a design system `Alert` blokkja mondja ki, hogy
 a döntés visszavonhatatlan (SPEC-008 8.). **A panel helye a transcript sáv** (PLAN-009 5. szekció
-F6 sora, T-009-27 javítás; a "transcript mellé" kétértelműsége nyitott pont, SPEC-008 14.2 O-9): a
+F6 sora, T-009-27 javítás; a "transcript mellé" kétértelműségét a user 2026-09-27-i döntése
+("Lezárjuk így") zárta le, SPEC-008 14.1 O-9): a
 törzs a transcript alatt, a kettő között húzható elválasztó áll, kezdetben felén, perzisztált
 aránnyal (user döntés 2026-09-25, `run-view` téma), tehát a vászon magassága nem függ a
 jóváhagyások számától (mérve, `docs/research/2026-09-24-jovahagyas-panel-helye.md` 8-11. szekció);

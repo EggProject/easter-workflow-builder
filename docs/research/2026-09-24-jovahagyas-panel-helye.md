@@ -1245,3 +1245,113 @@ A munkamenet `outputs/felfedes-ideiglenes/` mappájában, mindkét témában: `u
 `elotte-sajat-belso-*` (1000x700, 1023x768, 1440x600, 375x812, a `c566213` termékkódján) és
 `utana-o17-hibauzenet-1440x600`. A képek a 13.7 szerinti okból egy repón kívüli, eldobott
 Playwright futásból származnak, ami a repó `approval-fixture.ts` fixtúráját importálta.
+
+## 16. Sávfüggő felfedés: "Csak a látható arány számít", és a Resizable geometria frissítése (2026-09-27)
+
+**Kiváltó ok.** Egy független ellenőrzés a `67c06a2` (main) állapoton két hibát mért, mindkettő a
+12-15. szekció felfedés logikájának folytatása.
+
+**(1) Az `adjustsForReveal` tévesen figyelembe vette a NEM LÁTHATÓ külső arányt.** A vízszintes
+(`--ep-screen-lg` fölött) és a fül (`--ep-screen-md` alatt) sávban a KÜLSŐ elválasztó más
+tengelyen áll, vagy nincs is; egy korábban, MÁS sávban (`vertical`) beállított saját külső arány
+ott semmit nem jelent, a régi, sávtól független szabály mégis figyelembe vette, és ha a
+usernek saját BELSŐ aránya is volt, a belső elválasztó ezen a két sávon nem engedett, holott a
+kérdésnek ki kellene férnie. A user döntése (2026-09-27, "Csak a látható arány számít", SPEC-008 8.
+szekció 1. pont): a `vertical` sávban a régi VAGY-szabály marad (a két elválasztó azonos
+tengelyen áll, a külső ténylegesen ad helyet a belsőnek); a `horizontal` és a `tabs` sávban a
+belső MINDIG ideiglenesen enged, függetlenül bármelyik arány saját voltától, mert ezen a két
+sávon nincs versengő szempont, amit a belső mozdulatlansága védene. Megvalósítás:
+`apps/web/src/run-view/run-view-approval-reveal-adjustment.ts`
+(`resolveApprovalRevealAdjustment`), kimerítő `switch` a `RunViewLayoutBand` három értékén.
+
+**(2) A `packages/ui` `Resizable` `aria-valuenow`/`aria-valuemin`/`aria-valuemax` hármasa elavult
+geometriát jelenthetett.** A beágyazott csoport a pixeles minimumát a jóváhagyás panel
+csatolásakor méri, még a felfedés előtti, kisebb csoportban; a felfedés, illetve a befoglaló
+csoport felhasználói méretváltoztatása utáni `sizes` már a nagyobb csoportból számít, és a
+következő saját méréséig (fókusz, saját húzás, ablak átméretezés) a jelentett tartományon kívülre
+eshetett. Javítás: a geometria mérése (`minSizePercents` állapot) mostantól minden
+felfedés-számításkor és a befoglaló csoport minden méretváltozásakor is fut, nem csak
+`refreshGeometry`-n (saját húzás/billentyű/fókusz/ablak) át; emellett a `ResizableHandle`
+a megjelenített `aria-valuenow` értéket a jelentett min/max közé szorítja
+(`clampToReportedRange`, `packages/ui/src/resizable/ResizableHandle.tsx`), védőhálóként a
+maradék, saját méréssel el nem kapott eset ellen.
+
+### 16.1 Módszer
+
+Az (1) hibára saját mérés: `bun run measure:approval -g "kerdes (light|dark) (1440x600|375x812)
+sajat-mindketto egy"` (a mérő eszköz 12. jelenete, `measurement/approval-panel.ts`, képet nem ír,
+instrumentálatlan build), a javított munkafán (`17611a6`, `bf36697`, `e617702`, `548ab4c`), mindkét
+sávon (1440x600 vízszintes, 375x812 fül, a "Transcript" fülön), a `sajat-mindketto` tárolási
+esettel (saját BELSŐ `[70,30]` ÉS saját KÜLSŐ `[60,40]` is), egy jóváhagyással, két témában.
+
+A (2) hibára nem készült önálló mérés: a bugfix e2e tesztje valós Chromiumban már bizonyította
+számokkal (lásd 16.3), és a `.claude/CLAUDE.md` 11. szekció "SSE mockolás" és a repó mérési
+gyakorlata szerint egy már meglévő, adverzariális e2e bizonyíték mellett külön mérő eszköz jelenet
+írása ugyanarra a tényre felesleges duplikáció volna.
+
+### 16.2 A sávfüggő felfedés (1): előtte és utána
+
+**Előtte**, egy független ellenőrzés a `main` `67c06a2` állapotán, saját BELSŐ ÉS saját KÜLSŐ
+aránnyal (a pontos szám a forráskódban is áll,
+`apps/web/src/run-view/run-view-approval-reveal-adjustment.ts` fejléce): 1440x600-on
+(`horizontal` sáv) a "Visszavonhatatlan" figyelmeztetés, a cím és a jóváhagyás szövege 0/0/0
+arányban látszott (a szöveg levágódott); 375x812-n (`tabs` sáv, a "Transcript" fülön) a cím és a
+szöveg 0,05/0 arányban. Csak saját BELSŐ aránnyal, külső arány nélkül mindhárom érték 1/1/1 volt,
+tehát a hiba kizárólag a KÉT saját arány EGYÜTTES jelenlétén állt.
+
+**Utána**, saját méréssel (17611a6, bf36697, e617702, 548ab4c állapotán, `sajat-mindketto`
+tárolással, egy jóváhagyással):
+
+| Sáv, méret                       | Téma  | Figyelm. | Cím | Szöveg | Jóváhagyás gomb | Elutasítás gomb | Belső `aria-valuenow` (30 -> felfedés alatt) | Tárolt belső arány      |
+| -------------------------------- | ----- | -------- | --- | ------ | --------------- | --------------- | -------------------------------------------- | ----------------------- |
+| 1440x600 (horizontal)            | light | 1        | 1   | 1      | 1               | 1               | 30 -> 43                                     | `[70,30]` (változatlan) |
+| 1440x600 (horizontal)            | dark  | 1        | 1   | 1      | 1               | 1               | 30 -> 43                                     | `[70,30]` (változatlan) |
+| 375x812, "Transcript" fül (tabs) | light | 1        | 1   | 1      | 1               | 1               | 30 -> 57                                     | `[70,30]` (változatlan) |
+| 375x812, "Transcript" fül (tabs) | dark  | 1        | 1   | 1      | 1               | 1               | 30 -> 57                                     | `[70,30]` (változatlan) |
+
+A két téma minden mért számban egyezik. A tárolt külső (`storedOuter`/`storedOuterUser`) mindegyik
+sorban `[60,40]`, változatlan marad, a felfedés a belsőt mozdítja, nem a tárolt értéket. A belső
+elválasztó `aria-valuenow` értéke mindkét sávon elmozdul a tárolt `30`-ról (1440x600-on `43`-ra,
+375x812-n `57`-re), ami igazolja, hogy a belső TÉNYLEGESEN ideiglenesen enged, saját arány mellett
+is, mindkét sávon, a KÜLSŐ saját aránytól függetlenül; ez a régi kódon (a VAGY-szabály szerint,
+mindkét arány saját lévén) nem történt volna meg, és pontosan ez okozta az "előtte" 0/0/0, illetve
+0,05/0 arányt.
+
+A nyers kimenet a munkamenet
+`/tmp/claude-0/-home-user-easter-workflow-builder/42dc51d6-4f57-5c64-8abe-c014bb03785c/scratchpad/`
+mappájában nem került külön fájlba: a fenti négy `MEASUREMENT` sor a parancs stdout kimenete,
+`bun run measure:approval -g "kerdes (light|dark) (1440x600|375x812) sajat-mindketto egy"`.
+
+### 16.3 A Resizable geometria frissítés (2): bizonyíték forrása
+
+Nincs önálló mérő eszköz jelenet erre a hibára (16.1 indoklás). A bizonyíték forrása:
+
+- **E2e, valós Chromium:** `apps/web/e2e/sse-real-server.spec.ts`, a
+  `csak belső saját aránnyal (${name}): a belső elválasztó aria-valuenow értéke a megnyitás után
+és a külső elválasztó minden billentyűs mozdítása után is az aria-valuemin és az aria-valuemax
+között áll (${theme} téma)` nevű tesztek (`INNER_OWN_LAYOUTS` négy elrendezésén és mindkét
+  témán, nyolc teszt), az `expectInnerValueWithinReportedRange` segédfüggvénnyel
+  (2648-2660. sor). A fájl fejléc kommentje (2662-2672. sor) a `67c06a2` (a javítás előtti)
+  állapoton mért konkrét számokat is megőrzi: megnyitás után 1023x768-on `aria-valuenow` `58` az
+  `[50, 50]` jelentett tartományban (tehát a tartományon KÍVÜL, mert a min és a max is `50`),
+  768x1024-en `70` a `[46, 54]`-ben, 900x1000-en `70` a `[48, 52]`-ben, és a külső elválasztó egy
+  lefelé nyila után 1000x700-on `45` az `[50, 50]`-ben. Mindegyik eset a jelentett tartományon
+  kívül esett, azaz éppen az elavult geometria bizonyítéka.
+- **Unit, `packages/ui`:** `packages/ui/src/resizable/ResizableHandle.spec.tsx` (a `17611a6`
+  commit 87 új sora) a `clampToReportedRange` szorítást önmagában, szintetikus min/max/valuenow
+  hármasokon igazolja; `packages/ui/src/resizable/Resizable.spec.tsx` (a `548ab4c` commit
+  módosítása) azt, hogy a `minSizePercents` állapot felfedés-számításkor és a befoglaló csoport
+  méretváltozásakor is frissül, nem csak `refreshGeometry`-n át.
+
+### 16.4 Regressziók
+
+- `apps/web/e2e/approval-prompt.spec.ts`, a "CSAK A LÁTHATÓ ARÁNY SZÁMÍT" blokk (1506. sor
+  körül): vízszintes (1440x600) és fül (375x812) sávban, saját belső aránnyal, saját külső
+  aránnyal és anélkül is a kérdés és a gombok teljesen látszanak, és a tárolt belső arány a
+  döntés után is változatlan marad.
+- `apps/web/e2e/sse-real-server.spec.ts`: a 16.3 szerinti nyolc teszt.
+- `apps/web/src/run-view/run-view-approval-reveal-adjustment.spec.ts` és
+  `packages/ui/src/resizable/ResizableHandle.spec.tsx` unit szinten, mindkettő 100 százalékos
+  ág lefedettséggel (a `bf36697` és a `17611a6` commit, illetve a rákövetkező `548ab4c`
+  kiegészítés).
+- CI: a PR #16 zöld, mind a kilenc kapu és az `e2e` job is (a négy commit már a branch fején áll).
