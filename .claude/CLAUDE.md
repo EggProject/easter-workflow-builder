@@ -918,6 +918,31 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `mockSseFramesWithoutReconnect` mockot használja (`apps/web/e2e/sse-mock.ts`), ami csak az első
   kapcsolatot szolgálja ki, időzítő nélkül (`docs/research/2026-09-24-jovahagyas-panel-helye.md`
   15.4 szekció).
+- **Egy plusz, állapotot író `Resizable` renderelés - még ha a végső ÉRTÉKE azonos marad is a
+  korábbival - megzavarhatja a transcript görgetés-követését, ha épp az érkezés pillanatában
+  fut.** A `contentMinimum` (O-13) első verziója egy dedikált hatással minden renderre újramérte a
+  panel tartalom alapú minimumát, a `reveal` mintáját követve; ez buktatta a
+  `sse-real-server.spec.ts` egy MÁSIK lépésből származó tesztjét ("élőben érkező jóváhagyásnál a
+  lista zsugorodik... visszaáll", 900x1000), mert a `measureGeometry` `setMinSizePercents`
+  állapotírása (a `isSameSizes` őr ELLENÉRE, ami csak az ÉRTÉK-egyezést, nem a hívás tényét
+  szűri) egy plusz renderelést vált ki, és ez pontosan egybeesett egy élő jóváhagyás eltűnésével
+  és egy egyidejűleg érkező transcript sorral. Négy más magyarázat (a `contentMinimum` objektum
+  referencia-instabilitása a `measureGeometry` függőségi láncán át, a `withContentMinimum` DOM
+  olvasása vagy értéke, a `measureGeometry` visszatérési objektumának csomagolása, a hatás
+  időzítése `useLayoutEffect` kontra `useEffect`) mind megcáfolva, egy ÜRES hatástörzs (csak a
+  függőségi tömb, hívás nélkül) zölden futott, a hívással buktatott - tehát nem MIT vagy MIKOR
+  mér, hanem a HÍVÁS TÉNYE okozta. Védelem, két rétegben: a hívó (`RunViewScreen.tsx`) a régió
+  méretét meghatározó primitív értékekre memoizálja a leírást (`useMemo`, NEM a `reveal` mintája
+  szerint minden renderre új objektum), ÉS a `Resizable` maga is véd, a hívó szerződésétől
+  függetlenül: a dedikált hatás csak akkor mér, ha az érintett panel a mai (esetleg elavult)
+  minimumán vagy annál kisebb, mert nagyobb méretnél a mérés kihagyása semmit nem vág le. **A
+  memoizálás elhelyezése csapdát is hozott**: a `useMemo`-t a komponens egy KORÁBBI, feltételes
+  `return` ága UTÁN helyeztem el elsőre, ez "Minified React error #310"-at (a Rules of Hooks
+  megszegése) dobott a snapshot betöltés átmeneti állapotában - minden hooknak a komponens összes
+  feltételes `return` ága ELŐTT kell állnia. Módszer, ami a bizonyítást adta: `git checkout <bázis>
+  -- <egy fájl>` szelektíven, a teszt fájl és a mérő eszköz érintése nélkül, majd a szűkített
+  teszt újrafuttatása minden lépésben (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5
+  szekció).
 
 **Képernyőkép és vizuális bizonyíték**
 

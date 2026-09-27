@@ -1464,3 +1464,84 @@ betöltés utáni jóváhagyás érkezés és egy döntés hibája után is").
 - **Bukás igazolva**: a fenti új e2e tesztek mind buknak a `main` (a termékkód ideiglenesen
   visszaállítva, `git stash` a futásidejű fájlokra) állapotán; a `measureContentMinimumPixels`
   szándékos rontása (mindig nullát ad) ugyanezt a tesztkészletet ugyanígy elbuktatja.
+
+### 17.5 Egy állapotíró mérés is megzavarhat egy renderelés-érzékeny görgetés-követést
+
+A `contentMinimum` első verziója (a `Resizable`-ben egy dedikált `useLayoutEffect`, ami minden
+`contentMinimum` leírásra `refreshGeometry`-t hívott, a `reveal` mintáját követve) megbuktatta a
+`sse-real-server.spec.ts` egy MEGLÉVŐ, más lépésből származó tesztjét: "élőben érkező
+jóváhagyásnál a lista zsugorodik... visszaáll" (900x1000, mindkét téma). A hiba: a `approval_decided`
+kerettel egyszerre érkező, huszonkettedik transcript sor a lista tetején maradt, `toBeInViewport`
+nulla arányt jelentett 5000 ms után is.
+
+**A bizonyítás módja**: `git checkout <bázis commit> -- <futásidejű fájl>` szelektíven, csak a
+termékkód egy-egy fájljára, majd `bun run test:e2e -g <teszt neve>` a szűkített teszthalmazon. Ez
+adta a bizonyítékot minden lépésben, hogy melyik VÁLTOZÁS a felelős, mert a teszt fájl és a mérő
+eszköz a `HEAD` állapotán maradt, csak a termékkód váltott.
+
+**A bejárt, ZSÁKUTCÁBA vezető magyarázatok, cáfolva:**
+
+1. A dedikált hatás `contentMinimum` FÜGGŐSÉGE (a hívó minden renderre új objektumot ad) instabillá
+   teszi a `measureGeometry` referenciáját, ami láncban a `measureRevealLayout`/`resizeForReveal`-t
+   is instabillá teszi, amit egy BEÁGYAZOTT `Resizable` `reveal` hatása figyel: ez minden
+   renderelésre újrafuttatná a beágyazott felfedést. **Cáfolva**: a `measureGeometry` függőségét
+   primitívekre bontva (a `contentMinimum.panelIndex`/`regionElementId` mezőre, nem az objektumra)
+   a teszt továbbra is bukott.
+2. A `withContentMinimum` maga (a `measureContentMinimumPixels` DOM olvasása, vagy a visszaadott
+   érték változása) okozza a problémát. **Cáfolva**: a függvényt teljesen no-op-ra írva (a bemenetet
+   változatlanul visszaadva, a DOM olvasás hívása nélkül is) a teszt továbbra is bukott.
+3. A `measureGeometry` visszatérési értékének új objektumba csomagolása
+   (`{ ...geometry, minSizePercents: measuredMinimums }` a puszta `geometry` helyett) okozza.
+   **Cáfolva**: a sort visszaállítva `return geometry`-re a teszt továbbra is bukott.
+4. A hatás IDŐZÍTÉSE (`useLayoutEffect` szemben a `useEffect`-tel, ami később, festés után fut)
+   okozza. **Cáfolva**: `useEffect`-re váltva a teszt továbbra is bukott.
+
+**A tényleges ok, bizonyítva egy üres hatás törzzsel**: egy `useEffect(() => {}, [refreshGeometry,
+contentMinimum])` (a hívás nélkül, csak a függőségi tömbbel) ZÖLDEN futott; ugyanez a hatás,
+`refreshGeometry()` hívással a törzsében, buktatta a tesztet. Tehát nem az, MIT számol a mérés,
+és nem az, MIKOR fut, hanem az, hogy A `measureGeometry` HÍVÁSA MAGA (a `setMinSizePercents`
+állapotírás, még akkor is, ha a végső ÉRTÉK azonos marad, a `isSameSizes` őr által levágva) egy
+plusz React renderelést vált ki a `Resizable` fán, és ez a plusz renderelés - pontosan az élő
+jóváhagyás eltűnése és az egyidejűleg érkező huszonkettedik sor közötti pillanatban - megzavarta a
+`transcript-panel` görgetés-követését. Ez nem `contentMinimum`-specifikus jelenség: bármely extra,
+állapotot író `Resizable` renderelés ugyanezt tehetné, ha épp ebben a pillanatban fut.
+
+**A lezárt javítás, két rétegben:**
+
+1. **A hívó szerződése módosult**: az `apps/web` `RunViewScreen.tsx` a `transcriptContentMinimum`
+   leírást `useMemo`-val, a régió méretét meghatározó primitív értékekre (a betöltés állapota, a
+   lista hibaüzenete, a megjelenített jóváhagyások száma, van-e látott jóváhagyás, a döntés
+   állapota és - `failed` esetén - a hibaüzenet) memoizálja, NEM a `reveal` mintája szerint minden
+   renderre új objektumot adva. Ez a `contentMinimum` mező JSDoc-jában dokumentált, kötelező
+   szerződés (eltérés a `reveal`-től, ami szándékosan minden renderre új leírást vár).
+2. **A `Resizable` maga is véd, a hívó szerződésétől függetlenül**: a `measureGeometry` függősége
+   a `contentMinimum` KÉT MEZŐJE, nem az objektum (védelem egy nem memoizáló hívó ellen is), ÉS a
+   dedikált hatás csak akkor hívja `refreshGeometry`-t, ha az érintett panel a MAI (esetleg
+   elavult) mért minimumán vagy annál kisebb: ha a panel ennél nagyobb, a mérés kihagyása semmit
+   nem vág le (a következő húzás vagy billentyű friss mérést kér), és épp ez a kihagyás védi meg a
+   transcript görgetés-követését egy olyan pillanatban, amikor a mérésnek egyébként sem lenne
+   látható hatása.
+
+**Miért mindkét réteg kell.** Csak az 1. réteg (memoizálás) NEM lett volna elég: egy Rules of
+Hooks hibát is hozott (a `useMemo` a `RunViewScreen` egy korai `return` ága UTÁN állt, ez "Minified
+React error #310"-at dobott a snapshot betöltés átmeneti állapotában - javítva a hook a korai
+`return` ágak ELÉ mozgatásával), és a memoizálás ÖNMAGÁBAN nem oldotta meg a bukást, mert a
+`state.approvals = []` mock mutáció és az `approval_decided` keret egyszerre indítja el a REST
+újratöltést és a transcript sor beszúrását, tehát a memoizált leírás cseréje továbbra is közel
+esik a sor érkezéséhez. Csak a 2. réteg (a "nagyobb, mint a minimum" korai kilépés) zárta le
+véglegesen: 900x1000-en a transcript-oldali panel 70 százalékon áll, ami messze a mért minimum
+fölött van, tehát a dedikált hatás ezen a méreten és ebben a jelenetben SOSEM hívja
+`refreshGeometry`-t, a plusz renderelés forrása megszűnik.
+
+**Regresszió, amit a javítás elkerül**: a `Resizable.spec.tsx` egy KORÁBBI lépésből származó
+tesztje ("a befoglaló csoport felhasználói méretváltoztatása után a belső elválasztó fókusz nélkül
+is a friss tartományt jelenti") a "nagyobb, mint a minimum" feltétel első, hibás verzióján bukott,
+mert az a feltétel `contentMinimum === undefined` esetén is `refreshGeometry`-t hívott (a korai
+kilépés csak a `contentMinimum` DEFINIÁLT esetére vonatkozott); a javított feltétel `contentMinimum
+=== undefined`-re is korai kilépést ad, tehát a `contentMinimum` nélküli `Resizable` példányok
+(a jelen tesztet is beleértve) a dedikált hatástól teljesen érintetlenek maradnak.
+
+**Igazolt teszthalmaz a végső alakon**: `bun run vitest run packages/ui/src/resizable/Resizable.spec.tsx`
+(58/58), `bun run test:e2e -- sse-real-server.spec.ts` (131/131), `bun run test:e2e --
+approval-prompt.spec.ts node-inspector.spec.ts` (138/138), plusz a teljes `bun run test` (100
+százalék, mind a négy metrikán) és a teljes `bun run test:e2e`.

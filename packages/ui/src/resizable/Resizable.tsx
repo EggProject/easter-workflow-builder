@@ -125,6 +125,16 @@ export interface ResizableProperties {
    * vágódjon le. Minden mérés a felfedéshez hasonlóan a `packages/ui`
    * csomagban áll, a hívó nem olvas geometriát. `undefined`, ha a panelnek
    * nincs ilyen tartalma.
+   *
+   * **A hívónak a régió MÉRETÉT meghatározó értékekre kell memoizálnia**
+   * (`useMemo`), NEM a `reveal` mintája szerint minden renderre új objektumot
+   * adnia: a mérés a `measureGeometry`-n át egy BEÁGYAZOTT `Resizable`
+   * `reveal` hatásának is függősége (`measureRevealLayout`,
+   * `resizeForReveal`), és egy minden renderre új objektum ezt is minden
+   * renderre újrafuttatná, függetlenül attól, hogy a `reveal` leírás tényleg
+   * változott-e - ez zavarta meg a transcript panel görgetés-követését egy
+   * élő jóváhagyás érkezése és eltűnése között (mérve,
+   * `docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5 szekció).
    */
   readonly contentMinimum?: ResizableContentMinimum | undefined;
 }
@@ -354,6 +364,8 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
   // kerül (`withContentMinimum`), tehát a lefelé vezető úton (`resizeAt`,
   // `aria-valuemin`/`aria-valuemax`, `clampToReportedRange`) innentől
   // megkülönböztetés nélkül halad tovább.
+  const contentMinimumPanelIndex = contentMinimum?.panelIndex;
+  const contentMinimumRegionElementId = contentMinimum?.regionElementId;
   const measureGeometry = useCallback((): PanelGeometry | undefined => {
     const panels = Array.from({ length: panelCount }, (_, index) => panelElements.current.get(index));
     const geometry = measurePanelGeometry(panels, isVertical);
@@ -370,7 +382,21 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
         : measuredMinimums,
     );
     return geometry === undefined ? undefined : { ...geometry, minSizePercents: measuredMinimums };
-  }, [panelCount, isVertical, contentMinimum]);
+    // A `contentMinimum` szándékosan NEM dependency, csak a két mezője
+    // (`contentMinimumPanelIndex`, `contentMinimumRegionElementId`): a hívó
+    // szerződése szerint memoizál (a `contentMinimum` mező JSDoc-ja), de ha
+    // egy hívó ezt megszegné és minden renderre új objektumot adna, a
+    // `measureGeometry` referenciája primitívekre bontva ATTÓL függetlenül
+    // stabil marad. Enélkül a láncon át (`measureRevealLayout`,
+    // `resizeForReveal`) egy beágyazott `Resizable` `reveal` hatása is
+    // instabillá válna a saját függőségi tömbjében, és minden renderelésre
+    // újra futna, függetlenül attól, hogy a `reveal` leírás tényleg
+    // változott-e - ez zavarta meg a transcript panel görgetés-követését egy
+    // élő jóváhagyás érkezése és eltűnése között, amíg a hívó (`RunViewScreen`)
+    // maga is nem memoizált (mérve, `sse-real-server.spec.ts` "a lista
+    // zsugorodik... visszaáll" teszt, `docs/research/2026-09-24-jovahagyas-panel-helye.md`
+    // 17.5 szekció).
+  }, [panelCount, isVertical, contentMinimumPanelIndex, contentMinimumRegionElementId]);
 
   // A panelek mérése és a méretek igazítása a mért minimumhoz. A mért
   // geometriát vissza is adja, hogy a hívó (húzás, billentyű) ugyanabban a
@@ -547,20 +573,43 @@ export function Resizable(properties: Readonly<ResizableProperties>): ReactEleme
     measureGeometry();
   }, [measureGeometry, containerSizes]);
 
-  // A `contentMinimum` MINDEN új leírására (2026-09-27, `ResizableReveal`
-  // mintája): a hívó minden renderelésekor újat ad, hogy a régió tartalmának
-  // változása (egy döntés hibája, egy élő esemény) is frissen mérve
-  // maradjon, `ResizeObserver` nélkül. Itt a `refreshGeometry` a méretet is
-  // igazítja (nem csak a `measureGeometry`, mint a fenti hatásban): ha a
-  // régió mérete megnő, a panel a jelenlegi méretén maradva a CSS statikus
-  // minimuma (60/80 pixel) alá esne a valódi igényhez képest, és a
-  // `.run-view-screen__transcript` `overflow: hidden` szabálya levágná - a
-  // méret ilyenkor felfelé igazodik. Ha a régió mérete csökken (a jóváhagyás
-  // eltűnik), a `clampToMinimums` nulla eltolása nem tolja lejjebb a már
-  // elég nagy panelt, tehát a felhasználó tárolt aránya változatlan marad.
+  // A `contentMinimum` leírás megváltozására: a hívó a régió MÉRETÉT
+  // meghatározó értékekre memoizálja (a `reveal`-lel ellentétben NEM minden
+  // renderre ad újat, lásd a `contentMinimum` mező JSDoc-ját), tehát ez a
+  // hatás csak akkor fut, amikor a régió tartalma tényleg változhatott (egy
+  // döntés hibája, egy élő jóváhagyás érkezése vagy eltűnése). Itt a
+  // `refreshGeometry` a méretet is igazítja (nem csak a `measureGeometry`,
+  // mint a fenti hatásban): ha a régió mérete megnő, a panel a jelenlegi
+  // méretén maradva a CSS statikus minimuma (60/80 pixel) alá esne a valódi
+  // igényhez képest, és a `.run-view-screen__transcript` `overflow: hidden`
+  // szabálya levágná - a méret ilyenkor felfelé igazodik. Ha a régió mérete
+  // csökken (a jóváhagyás eltűnik), a `clampToMinimums` nulla eltolása nem
+  // tolja lejjebb a már elég nagy panelt, tehát a felhasználó tárolt aránya
+  // változatlan marad.
+  //
+  // **Csak akkor mér, ha a panel a mai (esetleg elavult) minimumán vagy
+  // közel áll hozzá** (mérve, `docs/research/2026-09-24-jovahagyas-panel-helye.md`
+  // 17.5 szekció): ha a panel ennél nagyobb, az `aria-valuemin`/`aria-valuemax`
+  // frissítésének elmaradása semmit nem vág le és semmit nem jelent hamisan
+  // (a következő húzás vagy billentyű friss mérést kér, `refreshGeometry`
+  // minden hívási helyen). A mérés kihagyása ilyenkor nem csak
+  // teljesítmény kérdés: a `measureGeometry` állapotírása egy beágyazott
+  // `Resizable` `reveal` hatásának renderelését is kiváltja
+  // (`measureRevealLayout`, `resizeForReveal`), és ez élő stream közben
+  // megzavarta a transcript panel görgetés-követését, akkor is, amikor a
+  // mért minimum ÉRTÉKE nem változott (mérve, `sse-real-server.spec.ts` "a
+  // lista zsugorodik... visszaáll" teszt).
   useLayoutEffect(() => {
+    if (contentMinimum === undefined) {
+      return;
+    }
+    const currentSize = sizes[contentMinimum.panelIndex];
+    const currentMinimum = minSizePercents[contentMinimum.panelIndex];
+    if (currentSize !== undefined && currentMinimum !== undefined && currentSize > currentMinimum) {
+      return;
+    }
     refreshGeometry();
-  }, [refreshGeometry, contentMinimum]);
+  }, [refreshGeometry, contentMinimum, sizes, minSizePercents]);
 
   useLayoutEffect(() => {
     sizesReference.current = sizes;
