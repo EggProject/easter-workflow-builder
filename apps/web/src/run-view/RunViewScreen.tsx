@@ -538,9 +538,10 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
               // user döntés 2026-09-26, "Ideiglenesen engedjen").
               // `horizontal` sávban a külső más tengelyen áll, `tabs`
               // sávban pedig nincs is külső elválasztó: ezeken a külső arány
-              // kulcsa látszólag/ténylegesen irreleváns, tehát kizárólag a
-              // belső saját aránya dönt. A tárolt belső arány nem íródik
-              // felül, és a felfedés végén visszaáll.
+              // kulcsa nem számít, és a belső MINDIG ideiglenesen enged, a
+              // saját belső aránytól függetlenül, mert a kérdés csak így fér
+              // ki. A tárolt belső arány nem íródik felül, és a felfedés
+              // végén visszaáll.
               adjustsForReveal={resolveApprovalRevealAdjustment(
                 layoutBand,
                 storedApprovalLayoutSizes,

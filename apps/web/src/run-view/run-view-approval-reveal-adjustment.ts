@@ -46,10 +46,22 @@ import type { RunViewLayoutBand } from './run-view-layout-band.ts';
  * tehát a hiba kizárólag a KÉT saját arány EGYÜTTES jelenlétén állt.
  *
  * A DÖNTÉS (user döntés 2026-09-27, "Csak a látható arány számít",
- * SPEC-008 8. szekció 1. pont): `horizontal` és `tabs` sávban KIZÁRÓLAG a
- * belső saját arány számít, a külső kulcsa nem. A `vertical` sávban a
- * fenti indok miatt (a két elválasztó azonos tengelyen áll, a külső
- * ténylegesen ad helyet a belsőnek) a régi szabály változatlan marad.
+ * SPEC-008 8. szekció 1. pont): `horizontal` és `tabs` sávban a külső arány
+ * kulcsa nem számít, és a belső elválasztó MINDIG ideiglenesen enged,
+ * akkor is, ha a belső aránya saját: ezen a két sávon nincs versengő
+ * szempont, amit a belső mozdulatlansága védene, mert a külső nem adhat
+ * helyet, tehát a kérdés csak a belső engedésével fér ki. A `vertical`
+ * sávban VAN ilyen szempont, a külső saját aránya (a két elválasztó azonos
+ * tengelyen áll, a külső ténylegesen ad helyet a belsőnek), ezért ott a
+ * régi VAGY-szabály változatlan marad.
+ *
+ * Ez a saját belső arány mellett nem új viselkedés: a SPEC-008 8. szekció 1.
+ * pontja a `horizontal` és a `tabs` sáv engedését csak belső saját aránnyal
+ * a 2026-09-26-i user döntés ("Ideiglenesen engedjen") óta leírja és méri (a
+ * régi VAGY-szabály ott a hiányzó külső arány miatt igazat adott). Egy korábbi alak (`storedApprovalLayoutSizes ===
+ * undefined`) a saját belső aránytól tette függővé, és pontosan ezt az
+ * esetet tiltotta le (az `approval-prompt.spec.ts` "CSAK A LÁTHATÓ ARÁNY
+ * SZÁMÍT" blokkja).
  *
  * **Ellenőrzött hivatkozás, forrás pontosítás.** A SPEC-008 14.2 táblázat
  * O-9 tétele NEM erről a kérdésről szól (az a jóváhagyás panel HELYÉRŐL,
@@ -84,7 +96,7 @@ export function resolveApprovalRevealAdjustment(
     }
     case 'horizontal':
     case 'tabs': {
-      return storedApprovalLayoutSizes === undefined;
+      return true;
     }
   }
 }

@@ -831,7 +831,21 @@ for (const theme of ['light', 'dark'] as const) {
 
       await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
       await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '60');
-      await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      if (viewport.width < 1024) {
+        // A függőleges sávban mindkét arány számít, és mindkettő saját:
+        // egyik elválasztó sem mozdul.
+        await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
+      } else {
+        // A vízszintes sávban a külső arány nem számít, a belső ideiglenesen
+        // enged, hogy a kérdés kiférjen (user döntés 2026-09-27, "Csak a
+        // látható arány számít", `run-view-approval-reveal-adjustment.ts`).
+        for (const part of questionParts(page)) {
+          await expect(part).toBeInViewport({ ratio: 1 });
+        }
+        await expect
+          .poll(async () => Number(await approvalSeparator(page).getAttribute('aria-valuenow')))
+          .toBeLessThan(70);
+      }
       expect(await readStoredLayouts(page)).toEqual(['[60,40]', '[70,30]']);
     });
 

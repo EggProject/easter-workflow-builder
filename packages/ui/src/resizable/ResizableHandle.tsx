@@ -15,14 +15,16 @@ export interface ResizableHandleProperties {
  * A jelentett `aria-valuenow` szorítása a jelentett `aria-valuemin`/`aria-valuemax`
  * közé.
  *
- * MÉRT HIBA: egy beágyazott `Resizable` csoportnál (pl. a futás nézet transcript
- * oldalán a belső, transcript-vs-jóváhagyás elválasztó egy külső, gráf-vs-transcript
- * `Resizable` panelében) a külső elválasztó húzása után a `sizes` állapot (a nyers,
- * tárolt százalék) a beágyazott csoport rendelkezésre álló pixelterének változását
- * csak a KÖVETKEZŐ méréskor (fókusz, saját húzás, ablak átméretezés) követi - eddig a
- * pillanatig a nyers `sizeBefore` a frissen számított `lowestSize`/`highestSize`
- * tartomány alá (vagy fölé) eshet, tehát az `aria-valuenow` a jelentett minimumon
- * kívülre kerülhet.
+ * MIÉRT KELL: a `Resizable` a mért minimumot minden méretváltozáskor újraméri
+ * (2026-09-27: a felfedéskor és a befoglaló csoport méretváltozásakor is), a
+ * `sizes` állapotot (a nyers százalékot) viszont ilyenkor nem igazítja, hogy a
+ * felhasználó aránya a hely visszatérésekor visszaálljon. Egy szűkebb csoportban
+ * (pl. a futás nézet belső, transcript-vs-jóváhagyás csoportja a külső elválasztó
+ * húzása után), vagy ha a panelek minimumai együtt sem férnek el, a nyers
+ * `sizeBefore` a mért `lowestSize`/`highestSize` tartományon kívül állhat; a
+ * kirajzolást ilyenkor a CSS minimum vágja, tehát a jelentett érték a vágott hely.
+ * A szorítás csak friss tartománnyal helyes: egy elavult (a felfedés előtti,
+ * kisebb csoportból mért) tartomány a helyes értéket is a szélére vágná.
  *
  * A W3C WAI-ARIA 1.2 `separator` szerepe fókuszálható elválasztónál KÖTELEZŐVÉ teszi
  * az `aria-valuenow`-t, ami az elválasztó jelenlegi pozícióját tükrözi
