@@ -86,10 +86,45 @@ export type WorkflowGraphDocument = z.infer<typeof WorkflowGraphDocumentSchema>;
  * `PUT /api/workflows/{workflowId}/graph` kérés törzse: a teljes node és él
  * lista, teljes cserével (SPEC-005 4.2 A táblázat 8. sora, ugyanaz az elv,
  * mint a `SubscriptionRequest`-nél: egy `PUT`, egy állapot, egy válasz).
+ *
+ * **Egyediség ellenőrzés a kérésen belül (user döntés 2026-09-27).** A
+ * `workflow_node.id` és a `workflow_edge.id` globális elsődleges kulcs
+ * (`packages/db`), nem workflow-onkénti; egy kérésen belüli két azonos
+ * csomópont vagy él azonosítót ezért a séma utasítja el, `400 invalid_request`
+ * válasszal, adatbázis hívás nélkül. A csomópont és az él azonosító külön
+ * névtér (egy csomópont és egy él azonos azonosítója nem ütközés): a
+ * `superRefine` a két listát külön vizsgálja. A hiba a MÁSODIK előfordulás
+ * mező útvonalára horgonyoz (`zod-error-to-protocol-error-body.ts`
+ * `issue.path` alapú üzenete), az elutasított azonosító értéke a hibában nem
+ * jelenik meg (SPEC-005 8.4, 28. kritérium).
  */
-export const ReplaceGraphRequestSchema = z.strictObject({
-  nodes: z.array(WorkflowNodeInputSchema).readonly(),
-  edges: z.array(WorkflowEdgeInputSchema).readonly(),
-});
+export const ReplaceGraphRequestSchema = z
+  .strictObject({
+    nodes: z.array(WorkflowNodeInputSchema).readonly(),
+    edges: z.array(WorkflowEdgeInputSchema).readonly(),
+  })
+  .superRefine((value, context) => {
+    const seenNodeIds = new Set<string>();
+    for (const [index, node] of value.nodes.entries()) {
+      if (seenNodeIds.has(node.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['nodes', index, 'id'],
+          message: 'A csomópont azonosító nem egyedi.',
+        });
+        continue;
+      }
+      seenNodeIds.add(node.id);
+    }
+
+    const seenEdgeIds = new Set<string>();
+    for (const [index, edge] of value.edges.entries()) {
+      if (seenEdgeIds.has(edge.id)) {
+        context.addIssue({ code: 'custom', path: ['edges', index, 'id'], message: 'Az él azonosító nem egyedi.' });
+        continue;
+      }
+      seenEdgeIds.add(edge.id);
+    }
+  });
 
 export type ReplaceGraphRequest = z.infer<typeof ReplaceGraphRequestSchema>;

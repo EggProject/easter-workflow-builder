@@ -85,4 +85,34 @@ describe('ReplaceGraphRequestSchema', () => {
   it('elutasítja az ismeretlen kulcsot (15. kritérium)', () => {
     expect(ReplaceGraphRequestSchema.safeParse({ nodes: [], edges: [], extra: 1 }).success).toBe(false);
   });
+
+  it('elutasítja, ha két csomópont azonosítója egyezik, a második előfordulás mező útvonalával (user döntés 2026-09-27)', () => {
+    const outcome = ReplaceGraphRequestSchema.safeParse({
+      nodes: [VALID_NODE, { ...VALID_NODE, label: 'Másik' }],
+      edges: [],
+    });
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) {
+      expect(outcome.error.issues.some((issue) => issue.path.join('.') === 'nodes.1.id')).toBe(true);
+    }
+  });
+
+  it('elutasítja, ha két él azonosítója egyezik, a második előfordulás mező útvonalával', () => {
+    const outcome = ReplaceGraphRequestSchema.safeParse({
+      nodes: [],
+      edges: [VALID_EDGE, { ...VALID_EDGE, targetNodeId: 'node-3' }],
+    });
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) {
+      expect(outcome.error.issues.some((issue) => issue.path.join('.') === 'edges.1.id')).toBe(true);
+    }
+  });
+
+  it('egy csomópont és egy él azonos azonosítója nem ütközés (külön névtér)', () => {
+    const outcome = ReplaceGraphRequestSchema.safeParse({
+      nodes: [{ ...VALID_NODE, id: 'shared-id' }],
+      edges: [{ ...VALID_EDGE, id: 'shared-id' }],
+    });
+    expect(outcome.success).toBe(true);
+  });
 });
