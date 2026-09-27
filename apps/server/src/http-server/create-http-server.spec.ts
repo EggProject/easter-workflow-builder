@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import type { RouteId } from '@easter-workflow-builder/protocol';
+import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
@@ -26,6 +27,46 @@ function buildStreamDependencies(): StreamConnectionDependencies {
     clock: createSystemClock(),
     keepAliveIntervalMs: 60_000,
   };
+}
+
+interface MemorySink extends DestinationStream {
+  readonly lines: () => readonly Record<string, unknown>[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Ugyanaz a mérő minta, mint a `packages/logger` `create-server-logger.spec.ts`-ben:
+ * valódi `createServerLogger`, befecskendezett memória nyelővel, hogy a
+ * naplósorok JSON alakban vizsgálhatók legyenek.
+ */
+function createMemorySink(): MemorySink {
+  const chunks: string[] = [];
+  return {
+    write(message: string): void {
+      chunks.push(message);
+    },
+    lines(): readonly Record<string, unknown>[] {
+      return chunks
+        .join('')
+        .split('\n')
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const parsed: unknown = JSON.parse(line);
+          if (!isRecord(parsed)) {
+            throw new Error('a pino sor nem objektum alakú JSON');
+          }
+          return parsed;
+        });
+    },
+  };
+}
+
+function buildCapturingLogger(): { logger: ServerLogger; sink: MemorySink } {
+  const sink = createMemorySink();
+  return { logger: createServerLogger({ secretValues: [] }, sink), sink };
 }
 
 /**
@@ -69,11 +110,14 @@ function buildHandlers(overrides: Partial<Record<RouteId, RouteHandler>>): Recor
 function buildOptions(
   overrides: Partial<Record<RouteId, RouteHandler>>,
   developmentOrigin: string | undefined,
+  logger: ServerLogger = buildCapturingLogger().logger,
 ): HttpServerOptions {
   return {
     handlers: buildHandlers(overrides),
     devOrigin: developmentOrigin,
     streamDependencies: buildStreamDependencies(),
+    logger,
+    idGenerator: createRandomUuidIdGenerator(),
   };
 }
 
@@ -236,6 +280,107 @@ describe('createHttpServer', () => {
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toStrictEqual({ code: 'invalid_request', message });
+  });
+
+  it('az internal kódra képződő hibaválaszt error szinten naplózza, az EREDETI (osztály nélküli, egyébként szivárogtató) Outcome üzenettel és a szerver kontextussal (SPEC-006 7.2)', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const message = 'ismeretlen, zárójel nélküli belső hiba';
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ getWorkflow: () => Promise.resolve({ kind: 'error', message }) }, undefined, logger),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows/x`);
+    expect(response.status).toBe(500);
+    // A törzs a saját, nyers szöveget nem tartalmazó mondatot kapja (2026-09-27).
+    const body: unknown = await response.json();
+    expect(isRecord(body) ? body['message'] : undefined).not.toBe(message);
+
+    const [entry] = sink.lines();
+    expect(entry?.['level']).toBe(50);
+    expect(entry?.['msg']).toBe(message);
+    expect(entry?.['routeId']).toBe('getWorkflow');
+    expect(typeof entry?.['serverInstanceId']).toBe('string');
+    expect(typeof entry?.['requestId']).toBe('string');
+  });
+
+  it('a conflict és az unprocessable kódra képződő hibaválaszt warn szinten naplózza', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const message =
+      'A gráf egy azonosítója már foglalt: UNIQUE constraint failed: workflow_node.id (graph_id_conflict).';
+    const { baseUrl, close } = await startTestServer(
+      buildOptions({ replaceWorkflowGraph: () => Promise.resolve({ kind: 'error', message }) }, undefined, logger),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows/x/graph`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes: [], edges: [] }),
+    });
+    expect(response.status).toBe(409);
+
+    const [entry] = sink.lines();
+    expect(entry?.['level']).toBe(40);
+    expect(entry?.['msg']).toBe(message);
+  });
+
+  it('a not_found és az invalid_request kódra képződő hibaválaszt NEM naplózza', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const { baseUrl, close } = await startTestServer(buildOptions({}, undefined, logger));
+    closeServer = close;
+
+    await fetch(`${baseUrl}/api/nincs-ilyen`);
+    await fetch(`${baseUrl}/api/workflows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{nem json',
+    });
+
+    expect(sink.lines()).toHaveLength(0);
+  });
+
+  it('a kezelőben eldobott kivételt error szinten naplózza, a kivétellel', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        {
+          listWorkflows: () => {
+            throw new Error('titkos verem nyomkövetési részlet');
+          },
+        },
+        undefined,
+        logger,
+      ),
+    );
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/workflows`);
+    expect(response.status).toBe(500);
+
+    const [entry] = sink.lines();
+    expect(entry?.['level']).toBe(50);
+    expect(entry?.['msg']).toBe('Váratlan szerver hiba történt (internal).');
+    const loggedError = entry?.['err'];
+    expect(isRecord(loggedError) ? loggedError['message'] : undefined).toBe('titkos verem nyomkövetési részlet');
+  });
+
+  it('két kérés különböző requestId kontextussal naplózódik', async () => {
+    const { logger, sink } = buildCapturingLogger();
+    const { baseUrl, close } = await startTestServer(
+      buildOptions(
+        { getWorkflow: () => Promise.resolve({ kind: 'error', message: 'x (database_closed).' }) },
+        undefined,
+        logger,
+      ),
+    );
+    closeServer = close;
+
+    await fetch(`${baseUrl}/api/workflows/x`);
+    await fetch(`${baseUrl}/api/workflows/y`);
+
+    const [first, second] = sink.lines();
+    expect(first?.['requestId']).not.toBe(second?.['requestId']);
   });
 
   it('204 státusznál nincs válasz törzs', async () => {

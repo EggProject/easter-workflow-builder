@@ -305,14 +305,16 @@ describe('runShutdownSequence', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const { sink, lines } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const { sink, lines } = collectingSink();
-    const logger = createServerLogger({ secretValues: [] }, sink);
 
     const exitCode = await runShutdownSequence({ server, engine, database, logger, streamRegistry });
 
@@ -332,14 +334,16 @@ describe('runShutdownSequence', () => {
       ...buildEngineDependencies(database, streamRegistry, clock),
       templateRenderer: PASS_THROUGH_TEMPLATE_RENDERER,
     });
+    const { sink } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const { sink } = collectingSink();
-    const logger = createServerLogger({ secretValues: [] }, sink);
     const workflowId = seedWaitingApprovalWorkflow(database);
 
     const stream = await fetch(`${baseUrlOf(server)}/events?streamId=s1`);
@@ -383,14 +387,16 @@ describe('runShutdownSequence', () => {
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
     });
+    const { sink } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const { sink } = collectingSink();
-    const logger = createServerLogger({ secretValues: [] }, sink);
     const workflowId = seedAgentStepWorkflow(database);
     const runsUrl = `${baseUrlOf(server)}/api/workflows/${workflowId}/runs`;
     const body = JSON.stringify({ input: {} });
@@ -452,14 +458,16 @@ describe('runShutdownSequence', () => {
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
     });
+    const { sink } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const { sink } = collectingSink();
-    const logger = createServerLogger({ secretValues: [] }, sink);
     const workflowId = seedAgentStepWorkflow(database);
     const started = await fetch(`${baseUrlOf(server)}/api/workflows/${workflowId}/runs`, {
       method: 'POST',
@@ -543,14 +551,16 @@ describe('runShutdownSequence', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(racyDatabase, streamRegistry, clock));
+    const { sink, lines } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
       handlers: buildRouteHandlers(racyDatabase, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database: racyDatabase, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const { sink, lines } = collectingSink();
-    const logger = createServerLogger({ secretValues: [] }, sink);
 
     const exitCode = await runShutdownSequence({ server, engine, database: racyDatabase, logger, streamRegistry });
 

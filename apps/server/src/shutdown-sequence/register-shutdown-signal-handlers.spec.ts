@@ -68,13 +68,15 @@ describe('registerShutdownSignalHandlers', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const logger = createServerLogger({ secretValues: [] }, noopSink());
 
     registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
     process.emit('SIGINT', 'SIGINT');
@@ -88,13 +90,15 @@ describe('registerShutdownSignalHandlers', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const logger = createServerLogger({ secretValues: [] }, noopSink());
 
     registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
     process.emit('SIGTERM', 'SIGTERM');
@@ -108,13 +112,15 @@ describe('registerShutdownSignalHandlers', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const logger = createServerLogger({ secretValues: [] }, noopSink());
 
     registerShutdownSignalHandlers({ server, engine, database, logger, streamRegistry });
     process.emit('SIGINT', 'SIGINT');

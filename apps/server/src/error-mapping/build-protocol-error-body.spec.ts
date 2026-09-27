@@ -30,17 +30,35 @@ describe('buildProtocolErrorBody', () => {
     expect(buildProtocolErrorBody(message)).toStrictEqual({ code: 'conflict', message, errorClass: 'already_decided' });
   });
 
-  it('a szótáron kívüli hibaosztálynál nincs errorClass kulcs', () => {
+  it('a szótáron kívüli, de SAJÁT (authored) mondatú hibaosztálynál a mondat változatlan marad, errorClass kulcs nélkül', () => {
     const body = buildProtocolErrorBody('A művelet nem hajtható végre (database_closed).');
 
     expect(body).toStrictEqual({ code: 'internal', message: 'A művelet nem hajtható végre (database_closed).' });
     expect(Object.hasOwn(body, 'errorClass')).toBe(false);
   });
 
-  it('zárójel nélküli üzenetnél nincs errorClass kulcs', () => {
+  it('zárójel nélküli, osztály nélküli üzenetre a szerver saját, nyers szöveget nem tartalmazó mondatát adja (2026-09-27, user döntés "Saját mondat, ok a naplóba"): a régi kód a nyers üzenetet adta volna vissza', () => {
     expect(buildProtocolErrorBody('nincs hibaosztály')).toStrictEqual({
       code: 'internal',
-      message: 'nincs hibaosztály',
+      message: 'Váratlan szerver hiba történt (internal).',
+    });
+  });
+
+  it('foreign_key_violation osztályra a driver szöveget NEM tartalmazó saját mondatot ad, conflict kóddal, errorClass nélkül (2026-09-27)', () => {
+    const message = 'FOREIGN KEY constraint failed (foreign_key_violation)';
+
+    expect(buildProtocolErrorBody(message)).toStrictEqual({
+      code: 'conflict',
+      message: 'A kérés nem létező elemre hivatkozik (foreign_key_violation).',
+    });
+  });
+
+  it('graph_id_conflict osztályra a driver szöveget NEM tartalmazó saját mondatot ad, conflict kóddal, errorClass nélkül (2026-09-27)', () => {
+    const message = 'UNIQUE constraint failed: workflow_node.id (graph_id_conflict)';
+
+    expect(buildProtocolErrorBody(message)).toStrictEqual({
+      code: 'conflict',
+      message: 'A gráf egy azonosítója már foglalt (graph_id_conflict).',
     });
   });
 

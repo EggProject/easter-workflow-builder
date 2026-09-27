@@ -12,6 +12,7 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'foreign_key_violation',
     'duplicate_event',
     'graph_snapshot_hash_collision',
+    'graph_id_conflict',
     'already_decided',
   ])('a(z) %s hibaosztályt conflict kódra képezi', (errorClass) => {
     expect(mapOutcomeMessageToErrorCode(`hiba történt (${errorClass}).`)).toBe('conflict');

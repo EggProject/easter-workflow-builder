@@ -7,13 +7,20 @@ import { extractTrailingErrorClass } from './extract-trailing-error-class.ts';
  * sora): az erőforrás létezik, csak az állapota vagy egy egyidejű írás
  * akadályozza a műveletet. Az `already_decided` a `decideApproval` C
  * táblázat 18. sorának saját hibaága (`packages/db`
- * `human-approval-repository.ts`): a jóváhagyás már el van döntve.
+ * `human-approval-repository.ts`): a jóváhagyás már el van döntve. A
+ * `graph_id_conflict` (user döntés 2026-09-27) a `replaceGraph` beszúrásának
+ * hibaága, ha egy node vagy él azonosító egy MÁSIK workflow gráfjában már
+ * létezik (`packages/db` `describe-transaction-error.ts`); ez nem kerül a
+ * `ProtocolErrorClass` zárt szótárába (SPEC-005 8.5), a válasz `message`
+ * mezőjét az `apps/server` határ saját mondatra cseréli
+ * (`build-protocol-error-body.ts`).
  */
 const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
   'illegal_status_transition',
   'foreign_key_violation',
   'duplicate_event',
   'graph_snapshot_hash_collision',
+  'graph_id_conflict',
   'already_decided',
 ]);
 

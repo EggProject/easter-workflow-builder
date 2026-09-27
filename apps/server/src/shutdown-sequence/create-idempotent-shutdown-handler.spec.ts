@@ -45,13 +45,15 @@ describe('createIdempotentShutdownHandler', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),
       devOrigin: undefined,
       streamDependencies: { database, registry: streamRegistry, clock, keepAliveIntervalMs: 15_000 },
+      logger,
+      idGenerator: createRandomUuidIdGenerator(),
     });
     await listen(server);
-    const logger = createServerLogger({ secretValues: [] }, noopSink());
 
     const shutdown = createIdempotentShutdownHandler({ server, engine, database, logger, streamRegistry });
 
