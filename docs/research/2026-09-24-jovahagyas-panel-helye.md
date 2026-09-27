@@ -1355,3 +1355,112 @@ között áll (${theme} téma)` nevű tesztek (`INNER_OWN_LAYOUTS` négy elrende
   ág lefedettséggel (a `bf36697` és a `17611a6` commit, illetve a rákövetkező `548ab4c`
   kiegészítés).
 - CI: a PR #16 zöld, mind a kilenc kapu és az `e2e` job is (a négy commit már a branch fején áll).
+
+## 17. Mindegyik elválasztó érintéssel húzható, a külső minimum a döntés gombokhoz igazodik (O-11, O-13, 2026-09-27)
+
+**Kiváltó ok.** A user 2026-09-27-i két döntése: O-11, "Mindegyik húzható legyen" (a futás nézet
+külső elválasztója és a gráf szerkesztő elválasztója is érintéssel húzható legyen, a belső
+mintájára); O-13, "A minimum a döntés gombokhoz igazodjon" (a külső transcript panel minimuma a
+lapozó és a két döntés gomb méretéhez igazodjon, ha van függő jóváhagyás).
+
+### 17.1 O-11: érintés, előtte és utána
+
+`bun run measure:approval -g "erintes|megszakitas"` (a mérő eszköz 6. és 8. jelenete, kibővítve a
+KÜLSŐ elválasztóra), 900x1000-en (a függőleges sáv, ahol mindkét elválasztó áll), mindkét témában;
+a két téma minden számban egyezik.
+
+| Jelenet, elválasztó                      | Előtte (`before` -> `after`, `pointerEvents`)                                          | Utána (`before` -> `after`, `pointerEvents`)                                  |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `erintes`, KÜLSŐ (900x1000)              | 45 -> 47, `[pointerdown, pointermove, pointercancel]`                                  | 45 -> 57, `[pointerdown, pointermove, pointerup]`                             |
+| `erintes`, BELSŐ (375x812, változatlan)  | 50 -> 74, `[pointermove, pointerdown, pointerup, pointerdown, pointermove, pointerup]` | ugyanaz (a belső elválasztó `touch-action` értéke 2026-09-25 óta változatlan) |
+| `megszakitas`, KÜLSŐ (`touchCancel`-lel) | 45 -> `afterTouch` 47, `isDraggingAtEnd` hamis                                         | 45 -> `afterTouch` 49, `isDraggingAtEnd` hamis                                |
+| `megszakitas`, BELSŐ (változatlan)       | 50 -> `afterTouch` 59, `isDraggingAtEnd` hamis                                         | ugyanaz                                                                       |
+
+Előtte a KÜLSŐ elválasztón egy 100 pixeles érintéses húzás csak 45-ről 47-re jutott, és
+`pointercancel` zárta (a böngésző a mozdulatot pásztázásnak vette, mert a `.resizable-handle`
+elemnek nincs `touch-action` szabálya): a húzás nem érte el a célt. Utána a húzás tisztán
+`pointerup`-pal zár, és a teljes 100 pixeles elmozdulást hozza (45 -> 57). A `megszakitas` jelenet
+(szándékos `touchCancel`, a belső mintájára) mindkét elválasztón azonos, "nem ragad bent" mintát ad
+(`isDraggingAtEnd` hamis, az utólagos egérmozgás és görgetés nem mozdítja). A gráf szerkesztő
+elválasztójára a mérő eszköznek nincs jelenete (más képernyő, más fixtúra); a viselkedést az
+`apps/web/e2e/node-inspector.spec.ts` `érintés` tesztje igazolja, ugyanazzal a CDP érintés
+technikával, valós Chromiumban.
+
+### 17.2 O-13: a külső elválasztó `End` állása, előtte és utána
+
+`bun run measure:approval -g kulso-end` (a mérő eszköz 11. jelenete, kibővítve a tárolt saját
+arány két esetével: `sajat-kulso` és `sajat-mindketto`, lásd 11.4 szekció). Mind a hét méreten,
+mindkét témában, mindkét tárolási esetben a két téma és a két tárolási eset minden számban
+egyezik (a tárolt belső arány nem hat a KÜLSŐ panel CSS alapú minimumára).
+
+| Sáv, méret | `outerValue` (előtte -> utána) | `side` (előtte -> utána) | lapozó / Következő / Jóváhagyás / Elutasítás (előtte -> utána) |
+| ---------- | ------------------------------ | ------------------------ | -------------------------------------------------------------- |
+| 768x1024   | 93 -> 72                       | 768x60 -> 768x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 820x1180   | 94 -> 77                       | 820x60 -> 820x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 900x1000   | 92 -> 71                       | 900x60 -> 900x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 1000x700   | 88 -> 54                       | 1000x60 -> 1000x229      | 1/1/0/0 -> 1/1/1/1                                             |
+| 1023x768   | 89 -> 59                       | 1023x60 -> 1023x229      | 1/1/0/0 -> 1/1/1/1                                             |
+| 1024x768   | 92 -> 78                       | 80x568 -> 226x568        | 1/0/0/0,72 -> 1/1/1/1                                          |
+| 1440x900   | 94 -> 84                       | 80x700 -> 226x700        | 1/0/0/0,72 -> 1/1/1/1                                          |
+
+Előtte a lapozó és a két gomb NEM fért el a KÜLSŐ elválasztó `End` állásában (a transcript oldal a
+forrás 60, illetve 80 pixeles minimumára zsugorodott): a függőleges sávban a két gomb 0 arányban
+látszott, a vízszintesben a "Következő" és a "Jóváhagyás" 0-n, az "Elutasítás" 0,72-n állt. Utána a
+lapozó és mindkét gomb minden méreten 1 arányban látszik, mert a KÜLSŐ panel minimuma a régió (a
+lapozó és az akciósáv) mért magassága (függőleges sávban) plusz a beágyazott csoport mért
+minimuma, illetve a régió `max-content` szélessége (vízszintes sávban) - lásd 17.3. A `side`
+oszlop mutatja a tényleges méretnövekedést (768x60 -> 768x229, azaz 229 pixel magas a régió és a
+beágyazott csoport minimuma együtt a függőleges sávban; 80x568 -> 226x568, azaz 226 pixel a régió
+`max-content` szélessége a vízszintes sávban). A `tabWalk`, `approveFocused` és `rejectFocused`
+mezők (Tab-bal a gombokra fókuszálva) utána minden méreten 1/1/1/1-et adnak, ugyanúgy, mint az
+`unfocused` oszlop - a fókusz már nem "hozza elő" külön a gombokat, mert eleve látszanak.
+
+### 17.3 A megvalósítás és a bizonyíték forrása
+
+A mérés a `packages/ui` `Resizable` csomagban áll (`measure-content-minimum.ts`,
+`measureContentMinimumPixels`), az `apps/web` termékkódja geometriát nem olvas (greppes
+invariáns (7), (15), (17)). A panel tartalom alapú kiegészítő minimuma:
+
+- **Függőleges csoportban**: a régió (`ApprovalPromptPanel` szakasza, `id` attribútummal
+  megjelölve) `getBoundingClientRect().height` értéke - stabil a csoport aktuális méretétől
+  függetlenül, mert a régió a flex fő tengelyén nem zsugorodik a natúr magassága alá (nincs
+  `flex-grow`, az automatikus minimum a tartalom mérete, mert az `overflow` rajta `visible`) -
+  plusz a panelbe ágyazott, ugyanazon a tengelyen álló `Resizable` csoport saját minimuma (a két
+  belső panel CSS `min-height` értékének összege, `measureNestedVerticalGroupMinimumPixels`).
+- **Vízszintes csoportban**: a régió `max-content` szélessége (`measureIntrinsicWidthPixels`): a
+  `width` ideiglenes, szinkron felülírásával mérve, majd azonnal visszaállítva, mert a
+  keresztirányú tengelyen `align-items: stretch` alatt a régió a befoglalója szélességére nyúlik,
+  amíg belefér, tehát a natúr `getBoundingClientRect().width` csak a `max-content` méréssel
+  érhető el. A beágyazott csoport ilyenkor más tengelyen áll (a jóváhagyás elválasztója
+  függőleges), a szélességéhez nem ad hozzá.
+
+A mért minimum a meglévő úton halad tovább (`minSizePercents` -> `resizeAt` ->
+`aria-valuemin`/`aria-valuemax` -> `clampToReportedRange`, `Resizable.tsx` `withContentMinimum`).
+**Egy külön, saját méréssel igazolt kiegészítés**: a `contentMinimum` prop minden új leírására
+(a hívó minden renderelésekor újat ad, a `reveal` prop mintájára) a `Resizable`
+`refreshGeometry`-t hív, nem csak `measureGeometry`-t - ez a méretet is igazítja, nem csak a
+jelentett minimumot. Ok: ha a régió mérete UTÓBB nő meg (egy döntés hibája megnöveli az
+akciósávot, vagy a lista első betöltése után jelenik meg a lapozó és a gombok), és a panel a
+jelenlegi (kisebb) méretén áll, a `measureGeometry` egyedül csak a jelentett minimumot
+frissítené; a kirajzolt méretet a CSS statikus 60/80 pixele vágná, és a `.run-view-screen__transcript`
+`overflow: hidden` szabálya levágná a lapozót és a gombokat. Saját méréssel igazolva (unit teszt,
+`packages/ui/src/resizable/Resizable.spec.tsx`, "ha a régió mérete később nő meg"): a `refreshGeometry`
+nélkül a panel a régi (kisebb) méretén maradna, azzal a mért minimumhoz igazodik, felhasználói
+művelet nélkül is. E2e-vel is igazolva (`apps/web/e2e/approval-prompt.spec.ts`, "End állásban egy
+betöltés utáni jóváhagyás érkezés és egy döntés hibája után is").
+
+### 17.4 Regressziók és a bukás igazolása
+
+- `apps/web/e2e/approval-prompt.spec.ts`: az "érintés" leíróban a KÜLSŐ elválasztó két új tesztje
+  (1440x900, húzás és megszakítás), az "End állásban" 28 új tesztje (hét méret, két témában, két
+  tárolási esettel), plusz a betöltés utáni érkezés/döntés hiba és a jóváhagyás nélküli eset
+  tesztje.
+- `apps/web/e2e/node-inspector.spec.ts`: az "érintés" leíró új tesztje a gráf szerkesztő
+  elválasztójára (1440x900).
+- `packages/ui/src/resizable/Resizable.spec.tsx`: a `contentMinimum` leíró hat új tesztje
+  (nincs `contentMinimum`, nem létező panelindex, nincs mérhető geometria, a régió plusz a
+  beágyazott csoport minimuma, a régió nélküli eset, a vízszintes `max-content` eset), plusz a
+  "később nő meg" teszt.
+- **Bukás igazolva**: a fenti új e2e tesztek mind buknak a `main` (a termékkód ideiglenesen
+  visszaállítva, `git stash` a futásidejű fájlokra) állapotán; a `measureContentMinimumPixels`
+  szándékos rontása (mindig nullát ad) ugyanezt a tesztkészletet ugyanígy elbuktatja.
