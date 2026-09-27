@@ -35,9 +35,14 @@ export default defineConfig({
   // https://playwright.dev/docs/test-parallel) tobb magos gepen harom
   // workernel tobbet inditana, ami megolheti a fejlesztoi gepet - ezert
   // lokalisan legfeljebb HAROM worker futhat (user keres 2026-09-24,
-  // docs/research/2026-09-24-playwright-worker-korlat.md). A CI-agban a
-  // viselkedes valtozatlan marad, a szam kesobbi meres targya.
-  workers: Boolean(process.env['CI']) ? 1 : 3,
+  // docs/research/2026-09-24-playwright-worker-korlat.md). A CI-agban KET
+  // worker fut (user dontes 2026-09-27, "2 legyen, azzal merjuk meg"): a
+  // korabban ajanlott `1` ertek helyett a `2`-t probaltuk ki, egyetlen zold
+  // CI futassal elfogadva (user dontes 2026-09-27, "Egy zold futas eleg").
+  // A meres (runner eroforrasok, helyi CI=1 Playwright worker sor, a PR
+  // elso futasanak idotartama a korabbi 1 workeres futasokkal osszevetve)
+  // a fenti research fajlban all.
+  workers: Boolean(process.env['CI']) ? 2 : 3,
   reporter: 'list',
   use: {
     baseURL: PREVIEW_ORIGIN,
