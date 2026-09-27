@@ -1512,8 +1512,8 @@ test('másik futásra váltva a régi futás késve érkező döntés válasza n
 // (a felfedés ideiglenes). A belső arány `[70, 30]` (transcript, jóváhagyás):
 // a `[30, 70]` alakon a jóváhagyás panel egymaga is elég nagy, ott a kérdés
 // minden változatban kifér, tehát nem különböztet (saját mérés 2026-09-27).
-// A `main` `67c06a2` állapotán a két saját aránnyal 1440x600-on a cím és a
-// szöveg 0, 375x812-n 0,05 és 0 arányban látszott.
+// Az "előtte" mért arányok: docs/research/2026-09-24-jovahagyas-panel-helye.md
+// 16. szekció.
 // ------------------------------------------------------------
 const OWN_INNER_LAYOUT = '[70,30]';
 const OWN_OUTER_LAYOUT = '[40,60]';

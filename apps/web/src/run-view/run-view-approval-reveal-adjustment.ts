@@ -38,12 +38,10 @@ import type { RunViewLayoutBand } from './run-view-layout-band.ts';
  * BELSŐ aránya is, a belső elválasztó `horizontal`/`tabs` sávban NEM
  * engedett, holott a kérdésnek ki kellene férnie.
  *
- * MÉRT "ELŐTTE" VISELKEDÉS (egy független ellenőrzés, a `main` `67c06a2`
- * állapotán, saját BELSŐ ÉS saját KÜLSŐ aránnyal): 1440x600-on
- * (`horizontal` sáv) a figyelmeztetés, a cím és a szöveg 0/0/0 arányban
- * látszott (a szöveg levágódott); 375x812-n (`tabs` sáv) 0,05/0 arányban.
- * Csak saját belső aránnyal, külső arány nélkül mindhárom 1/1/1 volt,
- * tehát a hiba kizárólag a KÉT saját arány EGYÜTTES jelenlétén állt.
+ * MÉRT "ELŐTTE" VISELKEDÉS: a régi, sávtól független szabály mellett saját
+ * BELSŐ ÉS saját KÜLSŐ aránnyal a jóváhagyás szövege `horizontal` és `tabs`
+ * sávban levágódott (`docs/research/2026-09-24-jovahagyas-panel-helye.md`
+ * 16. szekció).
  *
  * A DÖNTÉS (user döntés 2026-09-27, "Csak a látható arány számít",
  * SPEC-008 8. szekció 1. pont): `horizontal` és `tabs` sávban a külső arány
@@ -54,23 +52,6 @@ import type { RunViewLayoutBand } from './run-view-layout-band.ts';
  * sávban VAN ilyen szempont, a külső saját aránya (a két elválasztó azonos
  * tengelyen áll, a külső ténylegesen ad helyet a belsőnek), ezért ott a
  * régi VAGY-szabály változatlan marad.
- *
- * Ez a saját belső arány mellett nem új viselkedés: a SPEC-008 8. szekció 1.
- * pontja a `horizontal` és a `tabs` sáv engedését csak belső saját aránnyal
- * a 2026-09-26-i user döntés ("Ideiglenesen engedjen") óta leírja és méri (a
- * régi VAGY-szabály ott a hiányzó külső arány miatt igazat adott). Egy korábbi alak (`storedApprovalLayoutSizes ===
- * undefined`) a saját belső aránytól tette függővé, és pontosan ezt az
- * esetet tiltotta le (az `approval-prompt.spec.ts` "CSAK A LÁTHATÓ ARÁNY
- * SZÁMÍT" blokkja).
- *
- * **Ellenőrzött hivatkozás, forrás pontosítás.** A SPEC-008 14.2 táblázat
- * O-9 tétele NEM erről a kérdésről szól (az a jóváhagyás panel HELYÉRŐL,
- * nem az `adjustsForReveal` sávfüggő kapujáról), és jelen módosítás idején
- * (2026-09-27) még nyitott, a 14.2, nem a 14.1 táblázatban áll: ide ezért
- * nem került be hivatkozásként. Az egyetlen releváns forrás a SPEC-008 8.
- * szekció 1. pontja, ami már most is kimondja a `vertical` kontra
- * `horizontal`/fül sáv tengelykülönbséget, csak eddig az `adjustsForReveal`
- * kapuban ez nem tükröződött.
  *
  * A tárolt belső arányt ez a függvény nem írja felül: a `packages/ui`
  * `Resizable` `reveal`/`adjustsForReveal` mechanizmusa csak IDEIGLENESEN

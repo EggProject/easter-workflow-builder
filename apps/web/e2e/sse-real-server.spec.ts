@@ -2666,10 +2666,8 @@ async function expectInnerValueWithinReportedRange(page: Page): Promise<void> {
 // mozdítása utáni `sizes` már a nagyobb csoportból számít, és a következő
 // saját mérésig (fókusz, saját húzás, ablak átméretezés) a tartományon kívül
 // eshet. A belső elválasztó ezért nem kap fókuszt: a fókusz újramérne, és
-// elfedné a hibát. A `67c06a2` állapotán mérve a megnyitás után 1023x768-on
-// 58 a [50, 50] tartományban, 768x1024-en 70 a [46, 54]-ben, 900x1000-en 70
-// a [48, 52]-ben, és a külső egy lefelé nyila után 1000x700-on 45 az [50,
-// 50]-ben.
+// elfedné a hibát. Az "előtte" mért értékek:
+// docs/research/2026-09-24-jovahagyas-panel-helye.md 16.3 szekció.
 for (const { name, layout } of INNER_OWN_LAYOUTS) {
   for (const theme of ['light', 'dark'] as const) {
     test(`csak belső saját aránnyal (${name}): a belső elválasztó aria-valuenow értéke a megnyitás után és a külső elválasztó minden billentyűs mozdítása után is az aria-valuemin és az aria-valuemax között áll (${theme} téma)`, async ({

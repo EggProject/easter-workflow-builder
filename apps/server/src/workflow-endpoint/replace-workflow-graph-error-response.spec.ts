@@ -4,6 +4,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import type { RouteId } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createHttpServer, type HttpServerOptions } from '../http-server/create-http-server.ts';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
@@ -38,10 +39,6 @@ function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
 
 interface MemorySink extends DestinationStream {
   readonly lines: () => readonly Record<string, unknown>[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function createMemorySink(): MemorySink {
