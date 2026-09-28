@@ -1,7 +1,9 @@
 // A mérő eszközök Playwright konfigurációja (2026-09-25): a transcript
-// görgetés (`measurement/transcript-scroll.ts`, `bun run measure:transcript`)
-// és a jóváhagyás panel (`measurement/approval-panel.ts`,
-// `bun run measure:approval`). A két npm script a fájlnév szűrővel választ.
+// görgetés (`measurement/transcript-scroll.ts`, `bun run measure:transcript`),
+// a jóváhagyás panel (`measurement/approval-panel.ts`,
+// `bun run measure:approval`) és a futás nézet sáv-váltási pontja
+// (`measurement/run-view-band.ts`, `bun run measure:run-view-band`, 2026-09-28,
+// O-7). A három npm script a fájlnév szűrővel választ.
 //
 // A `playwright.config.ts` felállását örökli (chromium projekt, `baseURL`, a
 // `webServer` kötelező `VITE_*` konfigurációja), két eltéréssel: kizárólag a
@@ -18,7 +20,7 @@ const baseWebServer = baseConfig.webServer;
 export default defineConfig({
   ...baseConfig,
   testDir: './measurement',
-  testMatch: ['transcript-scroll.ts', 'approval-panel.ts'],
+  testMatch: ['transcript-scroll.ts', 'approval-panel.ts', 'run-view-band.ts'],
   fullyParallel: false,
   workers: 1,
   webServer:
