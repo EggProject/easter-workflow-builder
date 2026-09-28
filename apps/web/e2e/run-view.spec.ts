@@ -542,6 +542,185 @@ test('a viewport szűkülése menet közben átváltja a sávot', async ({ page 
   await expect(separatorLocator(page)).toHaveCount(0);
 });
 
+// ============================================================
+// A KÜLSŐ (gráf vs. transcript) ELVÁLASZTÓ VALÓS POINTER HÚZÁSA ÉS A
+// KEZELT BILLENTYŰK, FÜGGŐ JÓVÁHAGYÁS NÉLKÜL (T-009-29, SPEC-008 8. és 10.
+// szekció, PLAN-009 T-009-29 sora).
+//
+// A `ResizableHandle.tsx` ténylegesen kezelt billentyűi: `ArrowLeft`,
+// `ArrowRight`, `ArrowUp`, `ArrowDown` (tengelyfüggő, a másik irány no-op),
+// `Home`, `End`, `Enter`. A PLAN "négy billentyűje" ugyanaz a négy kategória,
+// mint a T-009-11 sorában ("a nyilakkal, a Home, az End és az Enter
+// billentyűvel"): a tengely szerinti nyilak, a Home, az End és az Enter -
+// nem mind a hét `case` ág külön-külön, mert a másik tengely nyilai erre az
+// elválasztóra no-op-ok, és ezt a `ResizableHandle.spec.tsx` és a
+// `Resizable.spec.tsx` unit tesztje már fedi.
+//
+// A számokat NEM hardkódoljuk: minden lépés után a VALÓS kirajzolt méretből
+// (`.resizable-panel` befoglaló doboza) számolt arányt hasonlítjuk az
+// `aria-valuenow` értékhez, az `approval-prompt.spec.ts` `readApprovalSplit`
+// mintája szerint - ez a mért minimumtól (CSS pixeles minimum) függetlenül
+// helyes, szemben egy kitalált várt százalékkal.
+// ============================================================
+
+/**
+ * A KÜLSŐ (gráf vs. transcript) `resizable-group` VALÓS aránya a kirajzolt
+ * méretekből, a sáv tengelye szerint (vízszintes sávban szélesség,
+ * függőleges sávban magasság), és a csoport túllógása. A `has` szűrő
+ * különbözteti meg a belső, transcript-vs-jóváhagyás `resizable-group`-tól
+ * (`RunViewTranscriptSide.tsx`), ami jóváhagyás nélkül is mindig kirajzolódik.
+ */
+async function readOuterSplit(page: Page): Promise<{ readonly ratio: number; readonly overflow: number }> {
+  return page.locator('.resizable-group', { has: page.locator('.run-view-screen__graph') }).evaluate((group) => {
+    const isVertical = group.classList.contains('resizable-group--vertical');
+    const panels = [...group.children].filter((child) => child.classList.contains('resizable-panel'));
+    const sizes = panels.map((panel) =>
+      isVertical ? panel.getBoundingClientRect().height : panel.getBoundingClientRect().width,
+    );
+    const [first, second] = sizes;
+    const childrenSize = [...group.children].reduce(
+      (sum, child) => sum + (isVertical ? child.getBoundingClientRect().height : child.getBoundingClientRect().width),
+      0,
+    );
+    const groupSize = isVertical ? group.clientHeight : group.clientWidth;
+    return {
+      ratio: first === undefined || second === undefined ? -1 : Math.round((first / (first + second)) * 100),
+      overflow: Math.round(childrenSize - groupSize),
+    };
+  });
+}
+
+test('a külső elválasztó valós pointer húzással és a kezelt billentyűkkel (ArrowLeft/ArrowRight, Home, End, Enter) mozgatható a vízszintes sávban', async ({
+  page,
+}) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: LARGE_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+  const separator = separatorLocator(page);
+  await expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+
+  // Valódi pointer húzás: 100 pixellel balra, tehát a gráf (elsődleges panel)
+  // szűkül. A `handlePointerDown` vízszintes sávban `clientX`-et követ.
+  const box = await separator.boundingBox();
+  if (box === null) {
+    throw new Error('az elválasztónak nincs befoglaló doboza');
+  }
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX - 100, centerY, { steps: 5 });
+  await page.mouse.up();
+  const afterDrag = await readOuterSplit(page);
+  expect(afterDrag.overflow).toBe(0);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterDrag.ratio));
+
+  // Billentyű: ArrowRight növeli, ArrowLeft csökkenti (a lépésköz
+  // `ARROW_STEP_PERCENT`, `ResizableHandle.tsx`).
+  await separator.focus();
+  await separator.press('ArrowRight');
+  const afterRight = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterRight.ratio));
+  expect(afterRight.ratio).toBeGreaterThan(afterDrag.ratio);
+
+  await separator.press('ArrowLeft');
+  await separator.press('ArrowLeft');
+  const afterLeft = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterLeft.ratio));
+  expect(afterLeft.ratio).toBeLessThan(afterRight.ratio);
+
+  // Home a minimumra, End a maximumra viszi: a jelentett érték a határ
+  // (`aria-valuemin`/`aria-valuemax`, W3C APG Window Splitter minta).
+  await separator.press('Home');
+  const afterHome = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterHome.ratio));
+  await expect(separator).toHaveAttribute('aria-valuemin', String(afterHome.ratio));
+
+  await separator.press('End');
+  const afterEnd = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterEnd.ratio));
+  await expect(separator).toHaveAttribute('aria-valuemax', String(afterEnd.ratio));
+
+  // Enter összecsomagolja a gráf panelt, majd a legutóbbi (End) méretre
+  // nyitja vissza (`toggleCollapse`, `Resizable.tsx`).
+  await separator.press('Enter');
+  const afterCollapse = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterCollapse.ratio));
+  expect(afterCollapse.ratio).toBeLessThan(afterEnd.ratio);
+
+  await separator.press('Enter');
+  const afterRestore = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterRestore.ratio));
+  expect(afterRestore.ratio).toBe(afterEnd.ratio);
+});
+
+test('a külső elválasztó valós pointer húzással és a kezelt billentyűkkel (ArrowUp/ArrowDown, Home, End, Enter) mozgatható a függőleges sávban', async ({
+  page,
+}) => {
+  await mockRun(page);
+  await page.setViewportSize({ width: MEDIUM_SCREEN_WIDTH, height: RUN_VIEW_VIEWPORT_HEIGHT });
+  await page.goto(RUN_URL);
+  await expect(nodeLocator(page, 'r-start')).toBeVisible();
+
+  const separator = separatorLocator(page);
+  await expect(separator).toHaveAttribute('aria-orientation', 'horizontal');
+
+  // Valódi pointer húzás: 60 pixellel felfelé, tehát a gráf (elsődleges
+  // panel) szűkül. A `handlePointerDown` függőleges sávban `clientY`-t követ.
+  const box = await separator.boundingBox();
+  if (box === null) {
+    throw new Error('az elválasztónak nincs befoglaló doboza');
+  }
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX, centerY - 60, { steps: 5 });
+  await page.mouse.up();
+  const afterDrag = await readOuterSplit(page);
+  expect(afterDrag.overflow).toBe(0);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterDrag.ratio));
+
+  // Billentyű: ArrowDown növeli, ArrowUp csökkenti.
+  await separator.focus();
+  await separator.press('ArrowDown');
+  const afterDown = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterDown.ratio));
+  expect(afterDown.ratio).toBeGreaterThan(afterDrag.ratio);
+
+  await separator.press('ArrowUp');
+  await separator.press('ArrowUp');
+  const afterUp = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterUp.ratio));
+  expect(afterUp.ratio).toBeLessThan(afterDown.ratio);
+
+  await separator.press('Home');
+  const afterHome = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterHome.ratio));
+  await expect(separator).toHaveAttribute('aria-valuemin', String(afterHome.ratio));
+
+  await separator.press('End');
+  const afterEnd = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterEnd.ratio));
+  await expect(separator).toHaveAttribute('aria-valuemax', String(afterEnd.ratio));
+
+  await separator.press('Enter');
+  const afterCollapse = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterCollapse.ratio));
+  expect(afterCollapse.ratio).toBeLessThan(afterEnd.ratio);
+
+  await separator.press('Enter');
+  const afterRestore = await readOuterSplit(page);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(afterRestore.ratio));
+  expect(afterRestore.ratio).toBe(afterEnd.ratio);
+});
+
+// A `--ep-screen-md` alatti fül sávban az elválasztó teljes hiánya már a
+// "a --ep-screen-md alatt fülek állnak, egyszerre egy nézettel, elválasztó
+// nélkül" teszt `separatorLocator` `toHaveCount(0)` állításában fedve (fent).
+
 /**
  * A tárolt arány beültetése a lap betöltése ELŐTT. `addInitScript`, nem
  * `evaluate`: a `localStorage` olvasása a komponens csatolásakor, az első

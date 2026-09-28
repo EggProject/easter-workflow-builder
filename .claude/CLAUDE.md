@@ -715,6 +715,45 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   `protocol-error-class-message.spec.ts`, a `rest-error-paths.spec.ts` és a
   `rest-error-class.spec.ts`.
 
+**A gráf szerkesztő React Flow specifikus szabályai.** Forrás: SPEC-008.
+
+- **A locator sorrend kivétele React Flow csomópontra és élre.** A kötött locator sorrend
+  (`getByRole` elsőként, `getByTestId` utolsóként) egyetlen kivételt kap: egy React Flow
+  csomópont vagy él kiválasztása a könyvtár saját `data-testid="rf__node-<id>"` attribútumával
+  (és a `rf__edge-<id>`, `rf__wrapper` társaival) történik, mert a node `role="group"` értéke
+  minden csomóponton azonos, tehát `getByRole` önmagában nem különbözteti meg őket, és az
+  attribútumot maga a hivatalos xyflow API szállítja, nem a projekt vezeti be. A kivétel
+  hatóköre szigorúan a csomópont, az él és a vászon konténer megtalálására szűkül, minden más
+  locator (a kártya felirata, a gombjai, a mezők, a fülek, az elválasztó) a kötött sorrend
+  szerinti. Greppes invariáns őrzi: `getByTestId` az `apps/web/e2e` alatt kizárólag `rf__`
+  előtaggal állhat (SPEC-008 12.3).
+- **Az élek kirajzolására vonatkozó állítás kizárólag e2e tesztben áll.** Az élek happy-dom
+  alatt sosem rajzolódnak ki (M-53), ezért az él KIRAJZOLÁSÁRA vonatkozó minden állítás e2e
+  tesztben áll, unit tesztben egy sem; az él ÁLLAPOTÁRA (a `WorkflowEdgeInput` tömb tartalma, a
+  `branchKey` kitöltése) vonatkozó állítás viszont unit teszt, mert az a mi oldalunkon React
+  állapot és tiszta függvény (SPEC-008 47. kritérium, PLAN-009 2. szekció 4. pont).
+- **Egyetlen ág sem függhet mért node geometriától.** A `graph-editor`, a `graph-node-card`, a
+  `graph-auto-layout` és a `run-graph` témában nem állhat `measured.width`/`measured.height`
+  olvasás és `getBoundingClientRect()` hívás, mert az happy-dom alatt sosem futna le, és a 100
+  százalékos lefedettségi küszöböt sértené; ha a számításnak méretre lenne szüksége, a
+  `packages/ui` `menu` témájának mintáját kell követni, tiszta függvényben, szintetikus
+  bemenettel (SPEC-008 12.2).
+- **A React Flow `nodeTypes` objektuma modul szintű `const`.** A komponensen kívül áll, és
+  regressziós teszt igazolja, hogy a hivatkozás két render között azonos marad; enélkül a
+  könyvtár minden szülő rendernél újraépítené a teljes vásznat, amit a hivatalos hibaoldal
+  nevesített hibaként kezel (SPEC-008 5.5, M-56, PLAN-009 T-009-16).
+- **Az automatikus görgetés predikátuma pixel küszöb nélküli.** A felhasználó akkor "van az
+  alján", ha az `onRowsRendered` callback `visibleRows.stopIndex` értéke megegyezik a
+  `rowCount - 1` értékkel, mert egy `scrollTop`/`scrollHeight` alapú küszöbre nincs dokumentált
+  forrás. Greppes invariáns őrzi, hogy az `apps/web/src` alatt nincs görgetési pixel küszöb szám
+  (SPEC-008 7.4, 40. kritérium).
+- **Az elrendezés kártya méret konstansának egyetlen forrás szabálya.** A gráf szerkesztő
+  csomópont kártyájának mérete (a `@dagrejs/dagre` elrendezés bemenete) egyetlen, mért
+  konstansként áll a `graph-node-catalog` témában, amit a kártya CSS-e egy custom propertyn át
+  és a dagre hívás közvetlenül is olvas, hogy a rajzolt és az elrendezéshez használt méret ne
+  tudjon elcsúszni; a dagre minden más opciót saját alapértéken hagy, a `rankdir: 'LR'`
+  kivételével (SPEC-008 5.7, M-93, M-94).
+
 ---
 
 ## 12. Buktatók, amiket már megtapasztaltunk

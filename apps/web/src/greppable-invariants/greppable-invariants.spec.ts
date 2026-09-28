@@ -1,4 +1,4 @@
-// Tizennyolc, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Huszonkettő, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -8,7 +8,11 @@
 // döntése ("Költség külön mezőként is látszódjon") a tiltást visszavonta, a
 // költség SDK becslésként jelenik meg (`run-event-row` téma). A mai (16) és
 // (17) a T-009-25 lépéssel érkezett (SPEC-008 AC39, AC40), a (18) a REST
-// hibaüzenetekről szóló user döntéssel (2026-09-24, SPEC-007 8.4).
+// hibaüzenetekről szóló user döntéssel (2026-09-24, SPEC-007 8.4). A (19), a (20), a (21) és a
+// (22) a T-009-33 hiányzó tételeinek pótlása (PLAN-009 F8 zárás, 2026-09-28): a React Flow
+// `rf__` locator kizárólagosság az e2e alatt (1), a kézi időzítés tilalma az e2e alatt (10), a
+// gráf szemantikai validáció kliens oldali tilalma (3), és a csomópont kártya méret egyetlen
+// forrás szabálya (12).
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -267,5 +271,103 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       ).filter(([, count]) => count > 0),
     );
     expect(alertCounts).toEqual(nonRestAlertCounts);
+  });
+
+  it('(19) getByTestId kizárólag rf__ előtaggal áll az e2e alatt (SPEC-008 12.3, T-009-33 (1))', () => {
+    // A kötött locator sorrend egyetlen kivétele a React Flow saját
+    // `data-testid="rf__node-<id>"` (és `rf__edge-<id>`, `rf__wrapper`)
+    // attribútuma; minden más `getByTestId` hívás a kivétel túlterjeszkedése.
+    const e2eFiles = listSourceFiles(path.join(WEB_SRC, '..', 'e2e'), ['.ts', '.tsx']);
+    const testIdCallPattern = /getByTestId\(\s*[`'"]([^`'"]*)/g;
+    const offenders: string[] = [];
+    for (const file of e2eFiles) {
+      const codeOnly = stripCommentLines(file.content);
+      for (const match of codeOnly.matchAll(testIdCallPattern)) {
+        const literalPrefix = match[1] ?? '';
+        if (!literalPrefix.startsWith('rf__')) {
+          offenders.push(`${file.relativePath}: ${match[0]}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('(20) nincs waitForTimeout, setTimeout és sleep hívás az e2e alatt (docs/research/2026-08-29-playwright-teszt-szabalyok.md, T-009-33 (10))', () => {
+    // A hivatalos Playwright doksi szó szerint tiltja a kézi, idő alapú
+    // várakozást; minden e2e várakozás web-first assertion vagy
+    // `page.waitForResponse()`. A doksi sorok kiszűrve, mert a projekt
+    // szabálykönyve és a spec fájlok fejléc kommentje maga is idézi ezeket a
+    // hívásneveket, magyarázatként, nem hívásként.
+    const e2eFiles = listSourceFiles(path.join(WEB_SRC, '..', 'e2e'), ['.ts', '.tsx']);
+    const forbiddenCallPattern = /\b(?:waitForTimeout|setTimeout|sleep)\s*\(/;
+    const offenders = e2eFiles.filter((file) => forbiddenCallPattern.test(stripCommentLines(file.content)));
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(21) nincs gráf szemantikai validáció a kliensen: a szerver gráf-validációs hibaosztályai kizárólag a hibaüzenet leképezésben és a dokumentált kivételekben szerepelnek (SPEC-008 5.4, 13. szekció, T-009-33 (3))', () => {
+    // A kör, a `loop` visszaél szabályai, a `fan_out` hatókör
+    // kiegyensúlyozottsága és a többi gráf szemantikai validáció kizárólag a
+    // szerveré (SPEC-008 5.4); a kliens csak a séma ALAKJÁT ellenőrzi. A
+    // greppes kritérium a SPEC-008 13. szekciója szerinti "graph_cycle_detected
+    // és társai" mintát követi: ha ezek az azonosítók bármely más fájlban
+    // felbukkannak, az a validációs logika átmásolásának első jele.
+    const graphValidationErrorClasses = [
+      'graph_cycle_detected',
+      'loop_back_edge_outside_body',
+      'loop_missing_branch_edge',
+      'reserved_branch_key_misuse',
+      'unbalanced_fan_out_scope',
+      'invalid_start_node',
+      'dangling_edge',
+      'unreachable_node',
+      'unimplemented_node_type',
+      'branch_key_unknown',
+      'invalid_error_handler_edge',
+      'malformed_node_config',
+      'unhandled_error_policy_missing',
+      'unsupported_join_merge_setting',
+    ];
+    // A megjelenítő leképezés (nem validáció) és a hozzá tartozó teszt, egy
+    // REST hiba fixtúra teszt, és a szerkesztő statikus figyelmeztető szövege
+    // (a motor hibájára hivatkozó magyarázat, nem ellenőrzés) a dokumentált
+    // kivétel.
+    const allowedFiles = new Set([
+      path.join('protocol-error-message', 'protocol-error-class-message.ts'),
+      path.join('protocol-error-message', 'protocol-error-class-message.spec.ts'),
+      path.join('rest-client', 'perform-route-request.spec.ts'),
+      path.join('node-inspector', 'ScriptNodeFields.tsx'),
+      path.join('node-inspector', 'ScriptNodeFields.spec.tsx'),
+      // A saját listája ennek a tesztnek is tartalmazza a mintákat.
+      path.join('greppable-invariants', 'greppable-invariants.spec.ts'),
+    ]);
+    const offenders = ALL_FILES.filter(
+      (file) =>
+        !allowedFiles.has(file.relativePath) &&
+        graphValidationErrorClasses.some((errorClass) => file.content.includes(errorClass)),
+    );
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(22) a csomópont kártya mérete pontosan egyetlen konstansként áll (SPEC-008 5.7, M-94, T-009-33 (12))', () => {
+    // A `graph-node-catalog` téma a kártya méret egyetlen forrása (a kártya
+    // CSS-e egy custom propertyn át, a dagre hívás közvetlenül olvassa); a
+    // konstansok tényleges értékét innen olvassa ki a teszt, hogy a szám
+    // maga ne duplikálódjon a tesztben (a PRODUCT_FILES a .spec.ts/.spec.tsx
+    // fájlokat már kizárja, tehát a szintetikus `measured` teszt fixtúrák nem
+    // adnak hamis találatot).
+    const catalogRelativePath = path.join('graph-node-catalog', 'graph-node-catalog.ts');
+    const catalogSource = readFileSync(path.join(WEB_SRC, catalogRelativePath), 'utf8');
+    const widthMatch = /export const GRAPH_NODE_CARD_WIDTH = (\d+);/.exec(catalogSource);
+    const heightMatch = /export const GRAPH_NODE_CARD_HEIGHT = (\d+);/.exec(catalogSource);
+    const width = widthMatch?.[1];
+    const height = heightMatch?.[1];
+    if (width === undefined || height === undefined) {
+      throw new Error('a graph-node-catalog.ts nem tartalmazza a várt kártya méret konstansokat');
+    }
+    const cardSizeNumberPattern = new RegExp(String.raw`\b(?:${width}|${height})\b`);
+    const offenders = PRODUCT_FILES.filter(
+      (file) => file.relativePath !== catalogRelativePath && cardSizeNumberPattern.test(file.content),
+    );
+    expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 });
