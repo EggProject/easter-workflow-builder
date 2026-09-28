@@ -145,7 +145,8 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   mentési sémájában áll (mind a tíz típusnál nem `null`), a `db` `replaceGraph` a `null` értéket
   elfogadja, mert az új workflow Startját a szerver ezzel az értékkel írja, és az alapérték
   kiválasztása termék döntés volna; a második védvonal a motor `unhandled_error_policy_missing`
-  ellenőrzése, sodródás védelmi ág nem tartozik hozzá (user döntés 2026-09-28, SPEC-008 5.4, O-29).
+  ellenőrzése, sodródás védelmi ág nem tartozik hozzá (a szabály helye technikai döntés a user
+  2026-09-28-i O-29 döntése nyomán, SPEC-008 5.4).
 
 **Fájlok és tesztek**
 
