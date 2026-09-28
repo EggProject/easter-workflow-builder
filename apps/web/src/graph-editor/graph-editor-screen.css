@@ -80,6 +80,20 @@
   min-height: 0;
 }
 
+/* ÉRINTÉSES HÚZÁS az elválasztón (2026-09-27, user döntés, SPEC-008 14.1
+   O-11, "Mindegyik húzható legyen"): a design system `.resizable-handle`
+   szabálya nem állít `touch-action` értéket, tehát az alapértelmezett `auto`
+   mellett a böngésző az érintéses mozdulatot pásztázásnak veszi, és a
+   pointer esemény folyamot `pointercancel` eseménnyel lezárja
+   (<https://www.w3.org/TR/pointerevents/>, ugyanaz a mérés és indok, mint a
+   futás nézet elválasztóin, `docs/research/2026-09-24-jovahagyas-panel-helye.md`
+   9. szekció). A szabály a fogyasztó oldalán áll, mert a `resizable.css`
+   bájtazonossági teszt alatt van. 768 pixel alatt az elválasztó `display:
+   none` (lent), tehát ott a `touch-action` érintetlen marad. */
+.graph-editor-screen__body > .resizable-group > .resizable-handle {
+  touch-action: none;
+}
+
 /* A vászon panelje nem görög: a React Flow saját pásztázása viszi a
    tartalmat, egy külső görgősáv csak elrontaná. A beállítás panel viszont
    ÖNÁLLÓAN görög, azt a `.node-inspector__body` intézi. */

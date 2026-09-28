@@ -911,9 +911,9 @@ for (const theme of ['light', 'dark'] as const) {
  * jóváhagyás szövege a kezdő törzsnél magasabbra tördel, tehát újraszámolás
  * nélkül levágódik, a gombsor viszont még elfér a szélességben. Egy 240
  * pixeles húzásnál már a "Jóváhagyás" gomb is vízszintesen kilóg (mérve 0,87
- * arány): az a fix gombsor szélessége, nem a felfedés kérdése, a 14.2 O-13
- * tételének rokona (`bun run measure:approval -g kulso-huzas`, research
- * `2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
+ * arány): az a fix gombsor szélessége, nem a felfedés kérdése, a lezárt O-13
+ * tétel rokona (SPEC-008 14.1, `bun run measure:approval -g kulso-huzas`,
+ * research `2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
  */
 const OUTER_DRAG_PIXELS = 215;
 
@@ -1049,6 +1049,156 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+// ------------------------------------------------------------
+// O-13: A KÜLSŐ ELVÁLASZTÓ MINIMUMA A LAPOZÓHOZ ÉS A DÖNTÉS GOMBOKHOZ IGAZODIK
+// (user döntés 2026-09-27, SPEC-008 8. és 10. szekció, `packages/ui`
+// `Resizable` `contentMinimum`). Előtte a KÜLSŐ elválasztó `End` állásában a
+// transcript oldal a régi, forrás szerinti pixeles minimumára (60, illetve 80
+// pixel) zsugorodott, és a lapozó, illetve a két döntés gomb nem fért el.
+// Mérve (a mai, mért érték): docs/research/2026-09-24-jovahagyas-panel-helye.md,
+// 17. szekció.
+// ------------------------------------------------------------
+const OUTER_END_VIEWPORTS = [
+  { width: 768, height: 1024 },
+  { width: 820, height: 1180 },
+  { width: 900, height: 1000 },
+  { width: 1000, height: 700 },
+  { width: 1023, height: 768 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 900 },
+] as const;
+
+/**
+ * Az elválasztó egérrel elérhető: a középpontjában a legfelső elem maga az
+ * elválasztó (vagy a leszármazottja), nem egy fölé lógó panel (a
+ * `sse-real-server.spec.ts` azonos mintája, ehhez a fájlhoz nem nyúlunk).
+ */
+async function isReachableAtCenter(locator: Locator): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return element.contains(
+      globalThis.document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+    );
+  });
+}
+
+/**
+ * A lapozó, a két döntés gomb és a belső elválasztó teljesen látszik és
+ * elérhető; a belső `aria-valuenow` a jelentett tartományon belül áll.
+ */
+async function expectOuterEndFullyVisible(page: Page): Promise<void> {
+  await expect(pagination(page)).toBeInViewport({ ratio: 1 });
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+  await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
+  const inner = approvalSeparator(page);
+  await expect(inner).toBeInViewport({ ratio: 1 });
+  await expect.poll(async () => isReachableAtCenter(inner)).toBe(true);
+  const [innerMin, innerMax, innerNow] = await Promise.all([
+    inner.getAttribute('aria-valuemin'),
+    inner.getAttribute('aria-valuemax'),
+    inner.getAttribute('aria-valuenow'),
+  ]);
+  expect(Number(innerNow)).toBeGreaterThanOrEqual(Number(innerMin));
+  expect(Number(innerNow)).toBeLessThanOrEqual(Number(innerMax));
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of OUTER_END_VIEWPORTS) {
+    for (const storageName of ['saját külső', 'mindkét saját'] as const) {
+      const size = `${String(viewport.width)}x${String(viewport.height)}`;
+      test(`${size}, End állásban, ${storageName} aránnyal: a lapozó, a két gomb és a belső elválasztó teljesen látszik (${theme} téma)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await page.addInitScript(
+          ({ mode, key, sizes }) => {
+            globalThis.localStorage.setItem('eggTheme', mode);
+            if (key !== undefined) {
+              globalThis.localStorage.setItem(key, sizes);
+            }
+          },
+          {
+            mode: theme,
+            key: storageName === 'mindkét saját' ? APPROVAL_LAYOUT_STORAGE_KEY : undefined,
+            sizes: '[70,30]',
+          },
+        );
+        await mockApprovalRunWithTranscript(page, manyApprovals(1));
+        await page.goto(APPROVAL_RUN_URL);
+        if (viewport.width < 768) {
+          await page.getByRole('tab', { name: 'Transcript' }).click();
+        }
+        const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
+        await outer.focus();
+        await outer.press('End');
+        await expectOuterEndFullyVisible(page);
+        const [outerNow, outerMax] = await Promise.all([
+          outer.getAttribute('aria-valuenow'),
+          outer.getAttribute('aria-valuemax'),
+        ]);
+        expect(outerNow).toBe(outerMax);
+      });
+    }
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`900x1000, End állásban egy betöltés utáni jóváhagyás érkezés és egy döntés hibája után is a lapozó és a gombok teljesen látszanak (${theme} téma)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 900, height: 1000 });
+    await page.addInitScript((mode) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+    }, theme);
+    // A lista első betöltése KÉSLELTETETT: a régió a `Resizable`
+    // csatolásakor még csak a betöltés jelzését (`ProgressBar`) mutatja, a
+    // lapozó és a gombok csak a válasz feloldása UTÁN jelennek meg - a
+    // tartalom mérete ekkor nő meg, felhasználói művelet nélkül.
+    const releaseApprovals = Promise.withResolvers<undefined>();
+    await mockIdleStream(page);
+    await installApiMocks(page, [
+      ...approvalBaseMocks(async (route) => {
+        await releaseApprovals.promise;
+        await route.fulfill(jsonBody([FIRST_APPROVAL]));
+      }),
+      mockRoute('decideApproval', async (route) =>
+        route.fulfill(jsonBody({ code: 'conflict', message: 'a jóváhagyás már el lett döntve' }, 409)),
+      ),
+    ]);
+    await page.goto(APPROVAL_RUN_URL);
+    await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+    const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
+    await outer.focus();
+    await outer.press('End');
+    // A betöltés jelzése alatt a lapozó és a gombok még nincsenek a DOM-ban:
+    // a régió mérete ekkor kicsi, a panel a mai (CSS) minimumán áll.
+    await expect(pagination(page)).toHaveCount(0);
+
+    releaseApprovals.resolve(undefined);
+    await expectOuterEndFullyVisible(page);
+
+    await decisionButton(page, 'Elutasítás').click();
+    const failure = decisionBar(page).getByRole('alert');
+    await expect(failure).toBeVisible();
+    await expectOuterEndFullyVisible(page);
+  });
+}
+
+test(`900x1000, End állásban, jóváhagyás nélkül a minimum a mai marad`, async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await mockApprovalRun(page, []);
+  await page.goto(APPROVAL_RUN_URL);
+  await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+  const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
+  await outer.focus();
+  await outer.press('End');
+  expect(await outer.getAttribute('aria-valuenow')).toBe(await outer.getAttribute('aria-valuemax'));
+  // Jóváhagyás nélkül a régió üres, tehát a minimum a forrás szerinti
+  // pixeles minimumon marad (60 pixel a függőleges sávban).
+  const sideBox = await page.locator('.run-view-screen__transcript').boundingBox();
+  expect(sideBox?.height).toBeLessThan(100);
+});
+
 test.describe('érintés', () => {
   test.use({ hasTouch: true });
 
@@ -1083,13 +1233,55 @@ test.describe('érintés', () => {
   });
 
   /**
+   * A KÜLSŐ (gráf és transcript közti) elválasztó ugyanígy húzható
+   * érintéssel a vízszintes sávban (2026-09-27, user döntés, SPEC-008 14.1
+   * O-11, "Mindegyik húzható legyen"): a `run-view.css` a `touch-action:
+   * none` szabályt ezen az elválasztón is felveszi. A várt érték a két panel
+   * együttes szélességéből számolt PONTOS arány (a belső elválasztó
+   * 375x812-es tesztjének mintája): a `touch-action` nélküli állapotban a
+   * húzás a böngésző pásztázásának adódna át egy `pointercancel` után, és a
+   * teljes 100 pixeles elmozdulás nem érne célba (a `megszakitas` jelenet
+   * ugyanezt méri).
+   */
+  for (const theme of ['light', 'dark'] as const) {
+    test(`1440x900, ${theme} téma: a KÜLSŐ elválasztó érintéssel is húzható`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, manyApprovals(1));
+      await page.goto(APPROVAL_RUN_URL);
+      await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+      const separator = page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+      const before = Number(await separator.getAttribute('aria-valuenow'));
+      const panelsWidth = await page
+        .locator('.run-view-screen__body > .resizable-group > .resizable-panel')
+        .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
+      const box = await separator.boundingBox();
+      if (box === null) {
+        throw new Error('az elválasztónak nincs befoglaló doboza');
+      }
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 10; step += 1) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + step * 10, y }] });
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before + (100 / panelsWidth) * 100)));
+      await expect(separator).not.toHaveClass(/is-dragging/);
+    });
+  }
+
+  /**
    * MEGSZAKÍTOTT érintéses húzás (`pointercancel`), 900x1000-en, ahol mindkét
-   * elválasztó áll (a függőleges sáv, SPEC-008 10. szekció). A KÜLSŐ
-   * elválasztón egy valódi érintéses húzás: a design system eleme
-   * `touch-action` nélkül a böngésző pásztázásának adja át a mozdulatot, és a
-   * pointer folyamot `pointercancel` zárja (W3C Pointer Events, "suppress a
-   * pointer event stream"). A BELSŐN (`touch-action: none`) egy `touchCancel`
-   * CDP esemény zárja a folyamot ugyanígy. Utána egy puszta egérmozgás a
+   * elválasztó áll (a függőleges sáv, SPEC-008 10. szekció). Mindkét
+   * elválasztón (`touch-action: none`, 2026-09-27 óta a KÜLSŐN is, user
+   * döntés, SPEC-008 14.1 O-11, "Mindegyik húzható legyen") egy `touchCancel`
+   * CDP esemény zárja a húzás folyamát: a `touch-action` miatt a böngésző nem
+   * veszi át a mozdulatot pásztázásnak, tehát a megszakítást a teszt maga
+   * váltja ki, ugyanúgy mindkét elválasztón. Utána egy puszta egérmozgás a
    * vásznon és egy görgetés a transcripten: ha a húzás állapota bent ragad,
    * ezek mozdítják az elválasztót (mérve a `decfa69` állapoton: 73-ról 5-re,
    * majd 85-re; research 10. szekció).
@@ -1117,10 +1309,7 @@ test.describe('érintés', () => {
       for (let step = 1; step <= 10; step += 1) {
         await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + step * 10 }] });
       }
-      await session.send('Input.dispatchTouchEvent', {
-        type: which === 'külső' ? 'touchEnd' : 'touchCancel',
-        touchPoints: [],
-      });
+      await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
       // A húzás állapota (a forrás `.is-dragging` osztálya) nem marad bent.
       await expect(separator).not.toHaveClass(/is-dragging/);
       const afterTouch = await separator.getAttribute('aria-valuenow');

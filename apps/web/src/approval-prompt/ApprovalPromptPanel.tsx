@@ -5,6 +5,13 @@ import './approval-prompt.css';
 
 export interface ApprovalPromptPanelProperties {
   /**
+   * A régió `id` attribútuma: a futás nézet külső osztott elrendezése ezen
+   * az azonosítón méri a régiót, hogy a lapozó és a döntés akciósávja a
+   * transcript-oldali panel semelyik méretén se vágódjon le (SPEC-008 8. és
+   * 10. szekció, O-13, `packages/ui` `Resizable.tsx` `ResizableContentMinimum`).
+   */
+  readonly id: string;
+  /**
    * Igaz, amíg az ELSŐ betöltés tart (`use-pending-approvals.ts`: még nincs
    * sikeres lista és hiba sincs).
    */
@@ -75,11 +82,11 @@ const PAGINATION_SIBLINGS = 0;
  * hookból jön, a `RunViewScreen` szintjén.
  */
 export function ApprovalPromptPanel(properties: Readonly<ApprovalPromptPanelProperties>): ReactElement {
-  const { isFirstLoadPending, failureMessage, approvalCount, shown, onSelectPage, decisionActions } = properties;
+  const { id, isFirstLoadPending, failureMessage, approvalCount, shown, onSelectPage, decisionActions } = properties;
   const hasContent = isFirstLoadPending || failureMessage !== undefined || shown !== undefined;
 
   return (
-    <section className="approval-prompt-panel" aria-label={hasContent ? 'Függő jóváhagyások' : undefined}>
+    <section id={id} className="approval-prompt-panel" aria-label={hasContent ? 'Függő jóváhagyások' : undefined}>
       {isFirstLoadPending && (
         <ProgressBar isLabelVisible={false} ariaLabel="a függő jóváhagyások betöltése folyamatban" value={100} />
       )}

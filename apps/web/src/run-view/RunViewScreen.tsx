@@ -7,7 +7,7 @@ import {
   type RunSnapshotResponse,
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
-import { useCallback, useEffect, useId, useState, type MouseEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactElement } from 'react';
 import { ApprovalDecisionActions } from '../approval-prompt/ApprovalDecisionActions.tsx';
 import { ApprovalPromptBody } from '../approval-prompt/ApprovalPromptBody.tsx';
 import { ApprovalPromptPanel } from '../approval-prompt/ApprovalPromptPanel.tsx';
@@ -280,6 +280,34 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // két azonosító köti össze (`ApprovalDecisionActions`).
   const approvalTitleId = useId();
   const approvalTextId = useId();
+  // A "Függő jóváhagyások" régió azonosítója: a `RunViewLayout` külső
+  // elválasztója ezen méri a régiót, hogy a lapozó és a döntés akciósávja a
+  // panel semelyik méretén se vágódjon le (SPEC-008 8. és 10. szekció, O-13).
+  const approvalRegionId = useId();
+  // A `contentMinimum` leírás csak a "Függő jóváhagyások" régió MÉRETÉT
+  // meghatározó értékek változására kap új objektumot, nem minden renderre
+  // (eltérés a `reveal` mintájától, SPEC-008 8. és 10. szekció, O-13): a
+  // `packages/ui` `Resizable` a hatását erre az objektumra futtatja, és egy
+  // minden renderen újat adó hívó a belső, felfedést figyelő `Resizable`
+  // hatását is instabillá tenné, ami egy élő jóváhagyás érkezése és eltűnése
+  // közötti transcript görgetés-követést megzavart (mérve,
+  // `docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5 szekció). A
+  // hook a komponens korai `return` ágai ELŐTT áll (a Rules of Hooks szerint
+  // kötelezően), ezért az `approvalSelection.shown` értékét itt olvassa,
+  // nem a lejjebb, a JSX-ben újraolvasott `shownApproval` néven.
+  const shownApprovalProgress = approvalSelection.shown?.progress;
+  const transcriptContentMinimum = useMemo(
+    () => ({ panelIndex: 1, regionElementId: approvalRegionId }),
+    [
+      approvalRegionId,
+      pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined,
+      pendingApprovals.failureMessage,
+      approvalDecisions.displayed.length,
+      approvalSelection.shown !== undefined,
+      shownApprovalProgress?.status,
+      shownApprovalProgress?.status === 'failed' ? shownApprovalProgress.message : undefined,
+    ],
+  );
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
@@ -507,6 +535,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
               }
               approvalPanel={
                 <ApprovalPromptPanel
+                  id={approvalRegionId}
                   isFirstLoadPending={
                     pendingApprovals.approvals === undefined && pendingApprovals.failureMessage === undefined
                   }
@@ -554,6 +583,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           defaultSizes={storedLayoutSizes ?? DEFAULT_RUN_VIEW_LAYOUT_SIZES}
           onSizesChange={storeRunViewLayoutSizes}
           adjustsForReveal={storedLayoutSizes === undefined}
+          // A transcript-oldali panel (index 1) minimuma a "Függő
+          // jóváhagyások" régió méretéhez igazodik, ha van függő jóváhagyás
+          // (SPEC-008 8. és 10. szekció, O-13, user döntés 2026-09-27); a
+          // mérés a `packages/ui` `Resizable` csomagban áll, ez a képernyő
+          // csak az azonosítót adja át, a régió méretét meghatározó
+          // értékekre memoizálva (lásd `transcriptContentMinimum` fent).
+          transcriptContentMinimum={transcriptContentMinimum}
         />
       </div>
       {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}

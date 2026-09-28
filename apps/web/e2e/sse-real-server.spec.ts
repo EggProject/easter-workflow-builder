@@ -2756,3 +2756,136 @@ for (const { name, layout } of NODE_AND_TRANSCRIPT_VISIBLE_LAYOUTS) {
     expect(await readNoReloadMarker(page)).toBe(true);
   });
 }
+
+// ============================================================
+// A KÜLSŐ ELVÁLASZTÓ SAJÁT ARÁNYA ÉS AZ O-13 TARTALOM ALAPÚ MINIMUMA EGYÜTT
+// (SPEC-008 14.1 O-13, user döntés 2026-09-27). A `contentMinimum` nem írja
+// felül a felhasználó tárolt arányát: csak addig emeli a KIRAJZOLT méretet
+// és a jelentett `aria-valuenow` értéket, amíg a jóváhagyás régiója
+// megköveteli, mert a `clampToMinimums` nulla eltolása csak FELFELÉ
+// korlátoz. A jóváhagyás eltűnésekor a tárolt arány változatlanul visszaáll.
+// A fájl fejlécének 2. és 3. kivétele alá tartozik: egy MÁR MEGNYITOTT
+// kapcsolatba menet közben beszúrt keret hatását vizsgálja.
+// ============================================================
+
+/**
+ * A vízszintes sávban a régió `max-content` SZÉLESSÉGE a mérvadó, ami
+ * körülbelül állandó pixelben, tehát SZÁZALÉKBAN a legszélesebb, még
+ * vízszintes sávnak számító 1024 pixeles nézeten a legnagyobb - mérve, itt a
+ * lapozó és a két gomb 22 százalékot igényel, a tárolt 40 alatta marad,
+ * tehát a `[60,40]` arány a vízszintes sávban SOHA nem éri el a mért
+ * minimumot: a KÜLSŐ elválasztó itt a tárolt arányon marad, a jóváhagyás
+ * érkezése nem mozdítja (mérve,
+ * `docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.6 szekció). A
+ * függőleges sávban a magasság a mérvadó, és 1000x700-on a régió 46
+ * százalékot igényel, a tárolt 40 alatta van, tehát ott a mozdulás mérhető.
+ */
+const OUTER_OWN_LAYOUTS: readonly {
+  readonly name: string;
+  readonly layout: TranscriptLayout;
+  readonly expectsGrowth: boolean;
+}[] = [
+  {
+    name: '1024x768, vízszintes sáv',
+    layout: { viewport: { width: 1024, height: 768 }, isTabbed: false },
+    expectsGrowth: false,
+  },
+  { name: '1000x700, függőleges sáv', layout: LOW_TABLET_LAYOUT, expectsGrowth: true },
+];
+
+const OUTER_OWN_SIZES = '[60,40]';
+
+/**
+ * A "Függő jóváhagyások" régió akciósávja, a döntés gombjaival: ugyanaz a
+ * hatókör CSS kiválasztó, mint az `approval-prompt.spec.ts` saját, helyi
+ * másolatában (a fájlok között nincs kereszthivatkozás).
+ */
+function decisionBar(page: Page): Locator {
+  return page.locator('.run-view-screen__transcript .drawer__footer');
+}
+
+function decisionButton(page: Page, name: 'Jóváhagyás' | 'Elutasítás'): Locator {
+  return decisionBar(page).getByRole('button', { name, exact: true });
+}
+
+function pagination(page: Page): Locator {
+  return page.getByRole('navigation', { name: 'Jóváhagyások lapozása' });
+}
+
+/**
+ * A lapozó és a két döntés gomb (az O-13 tétel tárgya, `ApprovalPromptPanel`)
+ * teljes egészében látszik, görgetés nélkül.
+ */
+async function expectApprovalPanelFullyVisible(page: Page): Promise<void> {
+  await expect(pagination(page)).toBeInViewport({ ratio: 1 });
+  await expect(decisionButton(page, 'Jóváhagyás')).toBeInViewport({ ratio: 1 });
+  await expect(decisionButton(page, 'Elutasítás')).toBeInViewport({ ratio: 1 });
+}
+
+/**
+ * A futás nézet megnyitása a KÜLSŐ elválasztó saját arányával, jóváhagyás
+ * nélkül: a lista pótlásának végére vár, az `openWithOwnInnerLayout`
+ * mintája szerint, csak az `OUTER_LAYOUT_STORAGE_KEY` kulcsra.
+ */
+async function openWithOwnOuterLayout(
+  page: Page,
+  theme: 'light' | 'dark',
+  layout: TranscriptLayout,
+  state: RunViewMockState,
+): Promise<OpenStreamServer> {
+  const streamServer = await startOpenStreamServer(page, [streamReadyFrame('s-1', [])]);
+  serverHolder.current = streamServer.server;
+  await page.addInitScript(
+    ({ mode, key, sizes }) => {
+      globalThis.localStorage.setItem('eggTheme', mode);
+      globalThis.localStorage.setItem(key, sizes);
+    },
+    { mode: theme, key: OUTER_LAYOUT_STORAGE_KEY, sizes: OUTER_OWN_SIZES },
+  );
+  await mockRunView(page, state);
+  await page.setViewportSize(layout.viewport);
+  await page.goto('/run?runId=r-1');
+  streamServer.pushBatch([
+    ...Array.from({ length: REPLAYED_ROW_COUNT }, (_, index) => stepEventFrame(index + 1, 'step_started', 'replayed')),
+    { event: 'replay_complete', runId: 'r-1', throughEventId: REPLAYED_ROW_COUNT },
+  ]);
+  await expect(
+    transcriptList(page).locator(`[role="listitem"][aria-posinset="${String(REPLAYED_ROW_COUNT)}"]`),
+  ).toBeAttached();
+  return streamServer;
+}
+
+for (const { name, layout, expectsGrowth } of OUTER_OWN_LAYOUTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`csak külső saját aránnyal (${name}): élő jóváhagyás érkezésekor a külső elválasztó ${expectsGrowth ? 'a mért minimumra nő' : 'a tárolt arányon marad, mert a minimum alatta van'}, a tárolt arány változatlan, és eltűnéskor is a tárolt arányon áll (${theme} téma)`, async ({
+      page,
+    }) => {
+      const state: RunViewMockState = { runStatus: 'running', stepRuns: [stepRun('running')] };
+      const streamServer = await openWithOwnOuterLayout(page, theme, layout, state);
+      await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow', '60');
+      expect(await readLayoutStorage(page)).toEqual([OUTER_OWN_SIZES, undefined]);
+
+      state.approvals = [LIVE_APPROVAL];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 1, 'approval_requested', 'live'));
+      await expectApprovalPanelFullyVisible(page);
+      // A KÜLSŐ elválasztó a mért, tartalom alapú minimumra nő (kisebb, mint
+      // a tárolt 60), ha a mért minimum a tárolt aránynál nagyobb helyet
+      // igényel (a függőleges sávban); a vízszintes sávban a tárolt 40 a
+      // mért minimum fölött van, tehát nem mozdul. A tárolt arány mindkét
+      // esetben változatlan marad.
+      const valueDuringApproval = Number(await outerSeparator(page).getAttribute('aria-valuenow'));
+      if (expectsGrowth) {
+        expect(valueDuringApproval).toBeLessThan(60);
+      } else {
+        expect(valueDuringApproval).toBe(60);
+      }
+      expect(await readLayoutStorage(page)).toEqual([OUTER_OWN_SIZES, undefined]);
+
+      state.approvals = [];
+      streamServer.push(stepEventFrame(REPLAYED_ROW_COUNT + 2, 'approval_decided', 'live'));
+      await expect(page.getByRole('heading', { name: LIVE_APPROVAL.title })).toHaveCount(0);
+      await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow', '60');
+      expect(await readLayoutStorage(page)).toEqual([OUTER_OWN_SIZES, undefined]);
+    });
+  }
+}

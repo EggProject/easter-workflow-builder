@@ -1355,3 +1355,254 @@ között áll (${theme} téma)` nevű tesztek (`INNER_OWN_LAYOUTS` négy elrende
   ág lefedettséggel (a `bf36697` és a `17611a6` commit, illetve a rákövetkező `548ab4c`
   kiegészítés).
 - CI: a PR #16 zöld, mind a kilenc kapu és az `e2e` job is (a négy commit már a branch fején áll).
+
+## 17. Mindegyik elválasztó érintéssel húzható, a külső minimum a döntés gombokhoz igazodik (O-11, O-13, 2026-09-27)
+
+**Kiváltó ok.** A user 2026-09-27-i két döntése: O-11, "Mindegyik húzható legyen" (a futás nézet
+külső elválasztója és a gráf szerkesztő elválasztója is érintéssel húzható legyen, a belső
+mintájára); O-13, "A minimum a döntés gombokhoz igazodjon" (a külső transcript panel minimuma a
+lapozó és a két döntés gomb méretéhez igazodjon, ha van függő jóváhagyás).
+
+### 17.1 O-11: érintés, előtte és utána
+
+`bun run measure:approval -g "erintes|megszakitas"` (a mérő eszköz 6. és 8. jelenete, kibővítve a
+KÜLSŐ elválasztóra), 900x1000-en (a függőleges sáv, ahol mindkét elválasztó áll), mindkét témában;
+a két téma minden számban egyezik.
+
+| Jelenet, elválasztó                      | Előtte (`before` -> `after`, `pointerEvents`)                                          | Utána (`before` -> `after`, `pointerEvents`)                                  |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `erintes`, KÜLSŐ (900x1000)              | 45 -> 47, `[pointerdown, pointermove, pointercancel]`                                  | 45 -> 57, `[pointerdown, pointermove, pointerup]`                             |
+| `erintes`, BELSŐ (375x812, változatlan)  | 50 -> 74, `[pointermove, pointerdown, pointerup, pointerdown, pointermove, pointerup]` | ugyanaz (a belső elválasztó `touch-action` értéke 2026-09-25 óta változatlan) |
+| `megszakitas`, KÜLSŐ (`touchCancel`-lel) | 45 -> `afterTouch` 47, `isDraggingAtEnd` hamis                                         | 45 -> `afterTouch` 49, `isDraggingAtEnd` hamis                                |
+| `megszakitas`, BELSŐ (változatlan)       | 50 -> `afterTouch` 59, `isDraggingAtEnd` hamis                                         | ugyanaz                                                                       |
+
+Előtte a KÜLSŐ elválasztón egy 100 pixeles érintéses húzás csak 45-ről 47-re jutott, és
+`pointercancel` zárta (a böngésző a mozdulatot pásztázásnak vette, mert a `.resizable-handle`
+elemnek nincs `touch-action` szabálya): a húzás nem érte el a célt. Utána a húzás tisztán
+`pointerup`-pal zár, és a teljes 100 pixeles elmozdulást hozza (45 -> 57). A `megszakitas` jelenet
+(szándékos `touchCancel`, a belső mintájára) mindkét elválasztón azonos, "nem ragad bent" mintát ad
+(`isDraggingAtEnd` hamis, az utólagos egérmozgás és görgetés nem mozdítja). A gráf szerkesztő
+elválasztójára a mérő eszköznek nincs jelenete (más képernyő, más fixtúra); a viselkedést az
+`apps/web/e2e/node-inspector.spec.ts` `érintés` tesztje igazolja, ugyanazzal a CDP érintés
+technikával, valós Chromiumban.
+
+### 17.2 O-13: a külső elválasztó `End` állása, előtte és utána
+
+`bun run measure:approval -g kulso-end` (a mérő eszköz 11. jelenete, kibővítve a tárolt saját
+arány két esetével: `sajat-kulso` és `sajat-mindketto`, lásd 11.4 szekció). Mind a hét méreten,
+mindkét témában, mindkét tárolási esetben a két téma és a két tárolási eset minden számban
+egyezik (a tárolt belső arány nem hat a KÜLSŐ panel CSS alapú minimumára).
+
+| Sáv, méret | `outerValue` (előtte -> utána) | `side` (előtte -> utána) | lapozó / Következő / Jóváhagyás / Elutasítás (előtte -> utána) |
+| ---------- | ------------------------------ | ------------------------ | -------------------------------------------------------------- |
+| 768x1024   | 93 -> 72                       | 768x60 -> 768x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 820x1180   | 94 -> 77                       | 820x60 -> 820x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 900x1000   | 92 -> 71                       | 900x60 -> 900x229        | 1/1/0/0 -> 1/1/1/1                                             |
+| 1000x700   | 88 -> 54                       | 1000x60 -> 1000x229      | 1/1/0/0 -> 1/1/1/1                                             |
+| 1023x768   | 89 -> 59                       | 1023x60 -> 1023x229      | 1/1/0/0 -> 1/1/1/1                                             |
+| 1024x768   | 92 -> 78                       | 80x568 -> 226x568        | 1/0/0/0,72 -> 1/1/1/1                                          |
+| 1440x900   | 94 -> 84                       | 80x700 -> 226x700        | 1/0/0/0,72 -> 1/1/1/1                                          |
+
+Előtte a lapozó és a két gomb NEM fért el a KÜLSŐ elválasztó `End` állásában (a transcript oldal a
+forrás 60, illetve 80 pixeles minimumára zsugorodott): a függőleges sávban a két gomb 0 arányban
+látszott, a vízszintesben a "Következő" és a "Jóváhagyás" 0-n, az "Elutasítás" 0,72-n állt. Utána a
+lapozó és mindkét gomb minden méreten 1 arányban látszik, mert a KÜLSŐ panel minimuma a régió (a
+lapozó és az akciósáv) mért magassága (függőleges sávban) plusz a beágyazott csoport mért
+minimuma, illetve a régió `max-content` szélessége (vízszintes sávban) - lásd 17.3. A `side`
+oszlop mutatja a tényleges méretnövekedést (768x60 -> 768x229, azaz 229 pixel magas a régió és a
+beágyazott csoport minimuma együtt a függőleges sávban; 80x568 -> 226x568, azaz 226 pixel a régió
+`max-content` szélessége a vízszintes sávban). A `tabWalk`, `approveFocused` és `rejectFocused`
+mezők (Tab-bal a gombokra fókuszálva) utána minden méreten 1/1/1/1-et adnak, ugyanúgy, mint az
+`unfocused` oszlop - a fókusz már nem "hozza elő" külön a gombokat, mert eleve látszanak.
+
+### 17.3 A megvalósítás és a bizonyíték forrása
+
+A mérés a `packages/ui` `Resizable` csomagban áll (`measure-content-minimum.ts`,
+`measureContentMinimumPixels`), az `apps/web` termékkódja geometriát nem olvas (greppes
+invariáns (7), (15), (17)). A panel tartalom alapú kiegészítő minimuma:
+
+- **Függőleges csoportban**: a régió (`ApprovalPromptPanel` szakasza, `id` attribútummal
+  megjelölve) `getBoundingClientRect().height` értéke - stabil a csoport aktuális méretétől
+  függetlenül, mert a régió a flex fő tengelyén nem zsugorodik a natúr magassága alá (nincs
+  `flex-grow`, az automatikus minimum a tartalom mérete, mert az `overflow` rajta `visible`) -
+  plusz a panelbe ágyazott, ugyanazon a tengelyen álló `Resizable` csoport saját minimuma (a két
+  belső panel CSS `min-height` értékének összege, `measureNestedVerticalGroupMinimumPixels`).
+- **Vízszintes csoportban**: a régió `max-content` szélessége (`measureIntrinsicWidthPixels`): a
+  `width` ideiglenes, szinkron felülírásával mérve, majd azonnal visszaállítva, mert a
+  keresztirányú tengelyen `align-items: stretch` alatt a régió a befoglalója szélességére nyúlik,
+  amíg belefér, tehát a natúr `getBoundingClientRect().width` csak a `max-content` méréssel
+  érhető el. A beágyazott csoport ilyenkor más tengelyen áll (a jóváhagyás elválasztója
+  függőleges), a szélességéhez nem ad hozzá.
+
+A mért minimum a meglévő úton halad tovább (`minSizePercents` -> `resizeAt` ->
+`aria-valuemin`/`aria-valuemax` -> `clampToReportedRange`, `Resizable.tsx` `withContentMinimum`).
+**Egy külön, saját méréssel igazolt kiegészítés**: a `contentMinimum` prop minden új leírására
+(a hívó minden renderelésekor újat ad, a `reveal` prop mintájára) a `Resizable`
+`refreshGeometry`-t hív, nem csak `measureGeometry`-t - ez a méretet is igazítja, nem csak a
+jelentett minimumot. Ok: ha a régió mérete UTÓBB nő meg (egy döntés hibája megnöveli az
+akciósávot, vagy a lista első betöltése után jelenik meg a lapozó és a gombok), és a panel a
+jelenlegi (kisebb) méretén áll, a `measureGeometry` egyedül csak a jelentett minimumot
+frissítené; a kirajzolt méretet a CSS statikus 60/80 pixele vágná, és a `.run-view-screen__transcript`
+`overflow: hidden` szabálya levágná a lapozót és a gombokat. Saját méréssel igazolva (unit teszt,
+`packages/ui/src/resizable/Resizable.spec.tsx`, "ha a régió mérete később nő meg"): a `refreshGeometry`
+nélkül a panel a régi (kisebb) méretén maradna, azzal a mért minimumhoz igazodik, felhasználói
+művelet nélkül is. E2e-vel is igazolva (`apps/web/e2e/approval-prompt.spec.ts`, "End állásban egy
+betöltés utáni jóváhagyás érkezés és egy döntés hibája után is").
+
+### 17.4 Regressziók és a bukás igazolása
+
+- `apps/web/e2e/approval-prompt.spec.ts`: az "érintés" leíróban a KÜLSŐ elválasztó két új tesztje
+  (1440x900, húzás és megszakítás), az "End állásban" 28 új tesztje (hét méret, két témában, két
+  tárolási esettel), plusz a betöltés utáni érkezés/döntés hiba és a jóváhagyás nélküli eset
+  tesztje.
+- `apps/web/e2e/node-inspector.spec.ts`: az "érintés" leíró új tesztje a gráf szerkesztő
+  elválasztójára (1440x900).
+- `packages/ui/src/resizable/Resizable.spec.tsx`: a `contentMinimum` leíró hat új tesztje
+  (nincs `contentMinimum`, nem létező panelindex, nincs mérhető geometria, a régió plusz a
+  beágyazott csoport minimuma, a régió nélküli eset, a vízszintes `max-content` eset), plusz a
+  "később nő meg" teszt.
+- **Bukás igazolva**: a fenti új e2e tesztek mind buknak a `main` (a termékkód ideiglenesen
+  visszaállítva, `git stash` a futásidejű fájlokra) állapotán; a `measureContentMinimumPixels`
+  szándékos rontása (mindig nullát ad) ugyanezt a tesztkészletet ugyanígy elbuktatja.
+
+### 17.5 Egy állapotíró mérés is megzavarhat egy renderelés-érzékeny görgetés-követést
+
+A `contentMinimum` első verziója (a `Resizable`-ben egy dedikált `useLayoutEffect`, ami minden
+`contentMinimum` leírásra `refreshGeometry`-t hívott, a `reveal` mintáját követve) megbuktatta a
+`sse-real-server.spec.ts` egy MEGLÉVŐ, más lépésből származó tesztjét: "élőben érkező
+jóváhagyásnál a lista zsugorodik... visszaáll" (900x1000, mindkét téma). A hiba: a `approval_decided`
+kerettel egyszerre érkező, huszonkettedik transcript sor a lista tetején maradt, `toBeInViewport`
+nulla arányt jelentett 5000 ms után is.
+
+**A bizonyítás módja**: `git checkout <bázis commit> -- <futásidejű fájl>` szelektíven, csak a
+termékkód egy-egy fájljára, majd `bun run test:e2e -g <teszt neve>` a szűkített teszthalmazon. Ez
+adta a bizonyítékot minden lépésben, hogy melyik VÁLTOZÁS a felelős, mert a teszt fájl és a mérő
+eszköz a `HEAD` állapotán maradt, csak a termékkód váltott.
+
+**A bejárt, ZSÁKUTCÁBA vezető magyarázatok, cáfolva:**
+
+1. A dedikált hatás `contentMinimum` FÜGGŐSÉGE (a hívó minden renderre új objektumot ad) instabillá
+   teszi a `measureGeometry` referenciáját, ami láncban a `measureRevealLayout`/`resizeForReveal`-t
+   is instabillá teszi, amit egy BEÁGYAZOTT `Resizable` `reveal` hatása figyel: ez minden
+   renderelésre újrafuttatná a beágyazott felfedést. **Cáfolva**: a `measureGeometry` függőségét
+   primitívekre bontva (a `contentMinimum.panelIndex`/`regionElementId` mezőre, nem az objektumra)
+   a teszt továbbra is bukott.
+2. A `withContentMinimum` maga (a `measureContentMinimumPixels` DOM olvasása, vagy a visszaadott
+   érték változása) okozza a problémát. **Cáfolva**: a függvényt teljesen no-op-ra írva (a bemenetet
+   változatlanul visszaadva, a DOM olvasás hívása nélkül is) a teszt továbbra is bukott.
+3. A `measureGeometry` visszatérési értékének új objektumba csomagolása
+   (`{ ...geometry, minSizePercents: measuredMinimums }` a puszta `geometry` helyett) okozza.
+   **Cáfolva**: a sort visszaállítva `return geometry`-re a teszt továbbra is bukott.
+4. A hatás IDŐZÍTÉSE (`useLayoutEffect` szemben a `useEffect`-tel, ami később, festés után fut)
+   okozza. **Cáfolva**: `useEffect`-re váltva a teszt továbbra is bukott.
+
+**A tényleges ok, bizonyítva egy üres hatás törzzsel**: egy `useEffect(() => {}, [refreshGeometry,
+contentMinimum])` (a hívás nélkül, csak a függőségi tömbbel) ZÖLDEN futott; ugyanez a hatás,
+`refreshGeometry()` hívással a törzsében, buktatta a tesztet. Tehát nem az, MIT számol a mérés,
+és nem az, MIKOR fut, hanem az, hogy A `measureGeometry` HÍVÁSA MAGA (a `setMinSizePercents`
+állapotírás, még akkor is, ha a végső ÉRTÉK azonos marad, a `isSameSizes` őr által levágva) egy
+plusz React renderelést vált ki a `Resizable` fán, és ez a plusz renderelés - pontosan az élő
+jóváhagyás eltűnése és az egyidejűleg érkező huszonkettedik sor közötti pillanatban - megzavarta a
+`transcript-panel` görgetés-követését. Ez nem `contentMinimum`-specifikus jelenség: bármely extra,
+állapotot író `Resizable` renderelés ugyanezt tehetné, ha épp ebben a pillanatban fut.
+
+**A lezárt javítás, két rétegben:**
+
+1. **A hívó szerződése módosult**: az `apps/web` `RunViewScreen.tsx` a `transcriptContentMinimum`
+   leírást `useMemo`-val, a régió méretét meghatározó primitív értékekre (a betöltés állapota, a
+   lista hibaüzenete, a megjelenített jóváhagyások száma, van-e látott jóváhagyás, a döntés
+   állapota és - `failed` esetén - a hibaüzenet) memoizálja, NEM a `reveal` mintája szerint minden
+   renderre új objektumot adva. Ez a `contentMinimum` mező JSDoc-jában dokumentált, kötelező
+   szerződés (eltérés a `reveal`-től, ami szándékosan minden renderre új leírást vár).
+2. **A `Resizable` maga is véd, a hívó szerződésétől függetlenül**: a `measureGeometry` függősége
+   a `contentMinimum` KÉT MEZŐJE, nem az objektum (védelem egy nem memoizáló hívó ellen is), ÉS a
+   dedikált hatás csak akkor hívja `refreshGeometry`-t, ha az érintett panel a MAI (esetleg
+   elavult) mért minimumán vagy annál kisebb: ha a panel ennél nagyobb, a mérés kihagyása semmit
+   nem vág le (a következő húzás vagy billentyű friss mérést kér), és épp ez a kihagyás védi meg a
+   transcript görgetés-követését egy olyan pillanatban, amikor a mérésnek egyébként sem lenne
+   látható hatása.
+
+**Miért mindkét réteg kell.** Csak az 1. réteg (memoizálás) NEM lett volna elég: egy Rules of
+Hooks hibát is hozott (a `useMemo` a `RunViewScreen` egy korai `return` ága UTÁN állt, ez "Minified
+React error #310"-at dobott a snapshot betöltés átmeneti állapotában - javítva a hook a korai
+`return` ágak ELÉ mozgatásával), és a memoizálás ÖNMAGÁBAN nem oldotta meg a bukást, mert a
+`state.approvals = []` mock mutáció és az `approval_decided` keret egyszerre indítja el a REST
+újratöltést és a transcript sor beszúrását, tehát a memoizált leírás cseréje továbbra is közel
+esik a sor érkezéséhez. Csak a 2. réteg (a "nagyobb, mint a minimum" korai kilépés) zárta le
+véglegesen: 900x1000-en a transcript-oldali panel 70 százalékon áll, ami messze a mért minimum
+fölött van, tehát a dedikált hatás ezen a méreten és ebben a jelenetben SOSEM hívja
+`refreshGeometry`-t, a plusz renderelés forrása megszűnik.
+
+**Regresszió, amit a javítás elkerül**: a `Resizable.spec.tsx` egy KORÁBBI lépésből származó
+tesztje ("a befoglaló csoport felhasználói méretváltoztatása után a belső elválasztó fókusz nélkül
+is a friss tartományt jelenti") a "nagyobb, mint a minimum" feltétel első, hibás verzióján bukott,
+mert az a feltétel `contentMinimum === undefined` esetén is `refreshGeometry`-t hívott (a korai
+kilépés csak a `contentMinimum` DEFINIÁLT esetére vonatkozott); a javított feltétel `contentMinimum
+=== undefined`-re is korai kilépést ad, tehát a `contentMinimum` nélküli `Resizable` példányok
+(a jelen tesztet is beleértve) a dedikált hatástól teljesen érintetlenek maradnak.
+
+**Igazolt teszthalmaz a végső alakon**: `bun run vitest run packages/ui/src/resizable/Resizable.spec.tsx`
+(58/58), `bun run test:e2e -- sse-real-server.spec.ts` (131/131), `bun run test:e2e --
+approval-prompt.spec.ts node-inspector.spec.ts` (138/138), plusz a teljes `bun run test` (100
+százalék, mind a négy metrikán) és a teljes `bun run test:e2e`.
+
+### 17.6 A `contentMinimum` növekedése nem állt vissza a jóváhagyás eltűnésekor, e2e-vel felfedve (2026-09-27)
+
+**A hiba.** A `sse-real-server.spec.ts` új, csak a KÜLSŐ elválasztó saját arányát vizsgáló tesztje
+(a `[60,40]` tárolt arány, élő jóváhagyás érkezése, majd eltűnése) a függőleges sávban (1000x700)
+felfedte, hogy a `contentMinimum` miatti növekedés a jóváhagyás eltűnése után NEM állt vissza a
+felhasználó tárolt arányára: az `aria-valuemax` korrekten frissült (`88`, a friss, tágabb határ),
+de az `aria-valuenow` a növelt `54` értéken ragadt, a tárolt `60` helyett.
+
+**A diagnózis.** Ideiglenes `console.log` mérés (a végleges kódba nem került be) a jóváhagyás
+érkezése ALATT `aria-valuemin="12" aria-valuemax="88" aria-valuenow="54"`-et mutatott (1000x700-on
+a lapozó és a két gomb 46 százalékot igényel, a tárolt 40 alatta van, tehát a panel a mért
+minimumra nő), a jóváhagyás ELTŰNÉSE UTÁN pedig `aria-valuemin="8" aria-valuemax="88"
+aria-valuenow="54"`-et: a határ helyesen tágult vissza, de a tényleges méret nem mozdult.
+
+**A gyökérok.** A `clampToMinimums` (a `contentMinimum`-ra dedikált `useLayoutEffect` egyetlen
+korrekciós eszköze) EGYIRÁNYÚ: a `resizeAt` nulla eltolással csak arra kényszeríti a panelt, hogy
+a minimuma FÖLÉ kerüljön, ha alatta van - nincs benne semmi, ami egy panelt visszatolna, amikor a
+minimum később ÖSSZEHÚZÓDIK. A `reveal` mechanizmusnak van erre pontosan ilyen célú mezője
+(`revealBase`, a felfedés előtti méretek, a felfedés végén visszaállítva), a `contentMinimum`
+dedikált hatásának ELSŐ verziójából ez az analóg mechanizmus hiányzott.
+
+**A javítás, a `revealBase` mintájára.** A `Resizable.tsx` egy új `contentMinimumBase` referenciát
+kapott (`packages/ui/src/resizable/Resizable.tsx` 315. sor környéke): a dedikált hatás a panel
+ELSŐ, minimum miatti növekedésekor feljegyzi a növekedés előtti méreteket ide, majd minden újabb
+`contentMinimum` leírás váltásra megnézi, hogy a feljegyzett alap panelmérete eléri-e a FRISS
+minimumot; ha igen, az alap áll vissza és a feljegyzés törlődik, ha nem, a panel tovább (vagy
+újra) a friss minimumra igazodik, a feljegyzést csak akkor írva, ha még nincs (nehogy egy már
+folyamatban lévő növekedés felülírja a legkorábbi, valódi alapot). A `markUserResize` (minden
+felhasználói méretváltoztatás: húzás, nyíl, `Home`, `End`, `Enter`) a `revealBase`-hez hasonlóan a
+`contentMinimumBase`-t is törli, mert onnantól a méret a felhasználóé, a mechanizmus nem nyúlhat
+bele.
+
+**A `[60,40]` arány méréssel igazoltan csak a FÜGGŐLEGES sávban éri el a mért minimumot.** A
+vízszintes sávban a régió `max-content` SZÉLESSÉGE a mérvadó, ami körülbelül állandó pixelben,
+tehát SZÁZALÉKBAN a legszélesebb, még vízszintes sávnak számító 1024 pixeles nézeten a legnagyobb:
+itt a lapozó és a két gomb 22 százalékot igényel (`aria-valuemin` a diagnosztikai mérésben `8`,
+`aria-valuemax` `78`), a tárolt 40 messze fölötte marad, tehát a KÜLSŐ elválasztó itt a tárolt
+arányon marad, a jóváhagyás érkezése nem mozdítja. Mivel a szélesebb nézeteken a szükséges
+százalék csak csökken, ez az 1024 pixeles eset a "legrosszabb", és ha még ez sem elég a `[60,40]`
+felmozdításához, SEMMILYEN vízszintes sávbeli nézet nem elég. A függőleges sávban a magasság a
+mérvadó, és 1000x700-on a régió a beágyazott csoport minimumával együtt 46 százalékot igényel, a
+tárolt 40 alatta van, tehát ott a mozdulás valóban bekövetkezik és mérhető. A teszt ezért két
+külön záró állítást használ méret szerint (`expectsGrowth: true`/`false`): a vízszintes esetben az
+`aria-valuenow` VÁLTOZATLANSÁGA (`toBe(60)`) a helyes, mért elvárás, nem a növekedés - ez tudatos,
+mért eltérés a "mindkét méreten nő" szó szerinti olvasattól, a `[60,40]` arány és a vízszintes sáv
+matematikai (pixel/százalék) tulajdonsága miatt, nem a teszt hiányossága.
+
+**A rontás-igazolás (sabotage-proof).** A visszaállító ág (a fenti javítás `if (base !== undefined
+&& baseSize !== undefined && baseSize >= freshMinimum)` ága és a benne álló `setSizes`/`return`)
+ideiglenesen eltávolítva, változatlan tesztkóddal: a `bun x playwright test sse-real-server -g
+"csak külső saját aránnyal"` a függőleges sávbeli (1000x700) mindkét témájú tesztet elbuktatta,
+pontosan az `apps/web/e2e/sse-real-server.spec.ts` `await expect(outerSeparator(page)).toHaveAttribute('aria-valuenow',
+'60');` állításán (a mért, kapott érték `54` maradt a `60` helyett), a vízszintes sávbeli (1024x768)
+teszteket változatlanul zölden hagyva - ez a mért bizonyíték arra, hogy a teszt tényleg a
+visszaállítás hiányát kapja el, nem egy másik, véletlenül egybeeső feltételt. A rontás
+visszaállítása után mind a négy kombináció (két méret, két téma) újra zöld.
+
+**Regresszió.** `apps/web/e2e/sse-real-server.spec.ts`, "csak külső saját aránnyal" leíró, négy
+teszt (két méret, két téma); a `Resizable.tsx` `contentMinimumBase` referenciája és a dedikált
+hatás kiegészített visszaállító ága.

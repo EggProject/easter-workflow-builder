@@ -263,8 +263,9 @@ a két alak ugyanazt a fát rajzolja (a transcript az első gyerek), hogy a tran
 szereljen le. A külső elrendezés `run-view.css` szabályai ezért a külső csoport KÖZVETLEN
 gyerekére szűkülnek (a gráf panel `overflow: hidden` szabálya különben a belső paneleket is
 elérné), a belső csoport a
-külsővel azonos módon kártya keret nélküli, az elválasztója pedig `touch-action: none` értéket kap,
-mert a design system eleme érintéssel nem húzható (mérve, SPEC-008 10. szekció). A transcript panel TARTALMA a
+külsővel azonos módon kártya keret nélküli. 2026-09-27 óta (user döntés, "Mindegyik húzható
+legyen", SPEC-008 14.1 O-11) MINDKÉT elválasztó (a külső és a belső is) `touch-action: none`
+értéket kap, mert a design system eleme érintéssel nem húzható (mérve, SPEC-008 10. szekció). A transcript panel TARTALMA a
 T-009-25 hatóköre, itt egyetlen, mindig kirajzolódó felirat áll a helyén.
 
 **A FUTÁS VEZÉRLÉSE a `run-control` témában áll** (T-009-23, SPEC-008 6.4, 6.5). Három
@@ -433,8 +434,10 @@ jóváhagyások számától (mérve, `docs/research/2026-09-24-jovahagyas-panel-
 a `--ep-screen-md` alatti fül sávban a "Transcript" fülön áll, ugyanazzal az elválasztóval. A
 lapozó és a két gomb az elválasztó minden állásában görgetés nélkül, közvetlenül a szöveg alatt
 látszik, és a Tab sorrend a szövegtől a gombokig nem megy át transcript soron (e2e: kezdő, `Home`,
-`End`, négy méreten, két témában); a külső elválasztó `End` állása mindkét osztott sávban nyitott
-pont (SPEC-008 14.2 O-13). A fejlécben a jelzés a `run-control` vezérlő sávjának `warning` `Badge`
+`End`, négy méreten, két témában); a külső elválasztó `End` állása lezárva (2026-09-27, user
+döntés, SPEC-008 14.1 O-13): a transcript oldal minimuma a `packages/ui` `Resizable`
+`contentMinimum` mérése szerint a lapozó és a két döntés gomb méretéhez igazodik, mindkét osztott
+sávban, hét méreten és két témában mérve e2e-vel (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17. szekció). A fejlécben a jelzés a `run-control` vezérlő sávjának `warning` `Badge`
 jelvénye ("jóváhagyásra vár"), az állapot jelvény mellett, ugyanabban a sorban. **Kártya alakú
 szakasz doboz nincs**: a régió megnevezett, doboz nélküli szakasz (`ApprovalPromptPanel`). **A
 csomópont kártyán a várakozás kezdete abszolút időpont** ("10:32:05 óta vár",

@@ -14,6 +14,7 @@ function VisibilityProbe(): ReactElement {
 
 const GRAPH_TEXT = 'gráf helye';
 const TRANSCRIPT_TEXT = 'transcript helye';
+const TRANSCRIPT_CONTENT_MINIMUM = { panelIndex: 1, regionElementId: 'approval-region-test' };
 
 describe('RunViewLayout', () => {
   let container: HTMLDivElement;
@@ -44,6 +45,7 @@ describe('RunViewLayout', () => {
           defaultSizes={[70, 30]}
           onSizesChange={onSizesChange}
           adjustsForReveal
+          transcriptContentMinimum={TRANSCRIPT_CONTENT_MINIMUM}
         />,
       );
     });
@@ -142,6 +144,7 @@ describe('RunViewLayout', () => {
             defaultSizes={[70, 30]}
             onSizesChange={onSizesChange}
             adjustsForReveal
+            transcriptContentMinimum={TRANSCRIPT_CONTENT_MINIMUM}
           />,
         );
       });

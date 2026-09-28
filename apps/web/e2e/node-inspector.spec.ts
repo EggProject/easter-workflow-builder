@@ -484,6 +484,54 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
   });
 });
 
+test.describe('érintés', () => {
+  test.use({ hasTouch: true });
+
+  /**
+   * Az elválasztó érintéssel is húzható (2026-09-27, user döntés, SPEC-008
+   * 14.1 O-11, "Mindegyik húzható legyen"): a `graph-editor-screen.css` a
+   * futás nézet elválasztóival azonos indokkal és móddal `touch-action: none`
+   * szabályt ad a fogyasztó oldalán, mert a design system `.resizable-handle`
+   * eleme ezt nem állítja (`docs/research/2026-09-24-jovahagyas-panel-helye.md`
+   * 9. szekció). A `768px` alatti `display: none` szabály miatt a mérés
+   * 768 pixel fölötti méreten megy. A várt érték a két panel együttes
+   * szélességéből számolt PONTOS arány (a futás nézet belső elválasztójának
+   * 375x812-es tesztje mintája): `touch-action` nélkül a húzás a böngésző
+   * pásztázásának adódna át egy `pointercancel` után, és a teljes 100
+   * pixeles elmozdulás nem érne célba.
+   */
+  for (const theme of ['light', 'dark'] as const) {
+    test(`1440x900, ${theme} téma: az elválasztó érintéssel is húzható`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await page.reload();
+      await expect(nodeLocator(page, 'n-start')).toBeVisible();
+      await openNode(page, 'n-agent');
+      const separator = page.getByRole('separator', { name: 'A beállítás panel szélessége' });
+      const before = Number(await separator.getAttribute('aria-valuenow'));
+      const panelsWidth = await page
+        .locator('.graph-editor-screen__body > .resizable-group > .resizable-panel')
+        .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
+      const box = await separator.boundingBox();
+      if (box === null) {
+        throw new Error('az elválasztónak nincs befoglaló doboza');
+      }
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 10; step += 1) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - step * 10, y }] });
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before - (100 / panelsWidth) * 100)));
+      await expect(separator).not.toHaveClass(/is-dragging/);
+    });
+  }
+});
+
 test.describe('start node', () => {
   test('a bemeneti mezők listája szerkeszthető, bővíthető, törölhető, és a változás megmarad újranyitás után', async ({
     page,
