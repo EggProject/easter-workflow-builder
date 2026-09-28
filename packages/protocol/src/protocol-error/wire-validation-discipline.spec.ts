@@ -12,7 +12,10 @@ import { describe, expect, it } from 'vitest';
 // kiszivárgás tilalma a hiba boríték alakjához (8.1, 8.4) kötődik a
 // legszorosabban, ugyanaz a minta, mint a
 // `packages/db/src/sqlite-connection/barrel-exports.spec.ts` (a tizedik
-// témamappa a SPEC-005 13. szekció 1. kritériuma szerint tilos).
+// témamappa a SPEC-005 13. szekció 1. kritériuma szerint tilos). A bejárás
+// rekurzív és a teljes `src` fát fedi, ezért a PLAN-009 T-009-33 (13)
+// tételét (a `node-config` séma nem hív `.parse(`, `.default(` vagy
+// `.transform(`) is ez a teszt őrzi, külön, a témára szűkített teszt nélkül.
 const SRC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function listSourceFiles(directory: string): readonly string[] {

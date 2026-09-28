@@ -16,14 +16,14 @@ Ez a terv a SPEC-010-et végrehajtható, egyenként ellenőrizhető lépésekre 
 
 ## 1. Előfeltételek
 
-| Feltétel                     | Elvárt érték                                                                                   | Ellenőrzés                              |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------- |
-| SPEC-010 jóváhagyva          | a user átnézte és jóváhagyta a specet, a 9.4 pontra adott válasszal együtt                     | a user kifejezett válasza               |
-| Feature branch               | `feat/spec-010-sablon-es-kifejezes` a friss `main`-ről                                         | `git rev-parse --abbrev-ref HEAD`       |
-| SPEC-004, SPEC-006, SPEC-008 | a motor, a szerver és a szerkesztő a mai állapotában zöld                                      | a kilenc kapu                           |
-| Node.js és Bun               | a toolchain research szerinti verzió                                                           | `node -v`, `bun -v`                     |
-| Playwright chromium          | a pinelt böngésző telepítve, a `.claude/CLAUDE.md` 12. szekció `LD_LIBRARY_PATH` kerülőútjával | `bun run test:e2e` a mai tesztekre zöld |
-| Tiszta munkakönyvtár         | nincs uncommitted változás a munka kezdetén                                                    | `git status --porcelain` üres           |
+| Feltétel                     | Elvárt érték                                                                                                                                                          | Ellenőrzés                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| SPEC-010 jóváhagyva          | a user 2026-09-27-én jóváhagyta a specet ("Jóváhagyom, korlát később"), a 9.4 pontra adott válasszal együtt; a 15. szekció O-1, O-2 és O-3 korlátkérdése nyitva marad | a SPEC-010 fejléce                      |
+| Feature branch               | `feat/spec-010-sablon-es-kifejezes` a friss `main`-ről                                                                                                                | `git rev-parse --abbrev-ref HEAD`       |
+| SPEC-004, SPEC-006, SPEC-008 | a motor, a szerver és a szerkesztő a mai állapotában zöld                                                                                                             | a kilenc kapu                           |
+| Node.js és Bun               | a toolchain research szerinti verzió                                                                                                                                  | `node -v`, `bun -v`                     |
+| Playwright chromium          | a pinelt böngésző telepítve, a `.claude/CLAUDE.md` 12. szekció `LD_LIBRARY_PATH` kerülőútjával                                                                        | `bun run test:e2e` a mai tesztekre zöld |
+| Tiszta munkakönyvtár         | nincs uncommitted változás a munka kezdetén                                                                                                                           | `git status --porcelain` üres           |
 
 A `main` védett, közvetlen push tiltott, a zárás PR-rel történik. Az `npm` és az `npx` nem használható, csak `bun run` és `bun x`. A futtatókörnyezet izolált, tehát **pusholni nem lehet**: minden commit sorozat után szólni kell a usernek, a branch nevének megadásával.
 
