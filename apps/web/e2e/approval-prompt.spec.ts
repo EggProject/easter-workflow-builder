@@ -1243,31 +1243,36 @@ test.describe('érintés', () => {
    * teljes 100 pixeles elmozdulás nem érne célba (a `megszakitas` jelenet
    * ugyanezt méri).
    */
-  test('1440x900: a KÜLSŐ elválasztó érintéssel is húzható', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await mockApprovalRunWithTranscript(page, manyApprovals(1));
-    await page.goto(APPROVAL_RUN_URL);
-    await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
-    const separator = page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
-    const before = Number(await separator.getAttribute('aria-valuenow'));
-    const panelsWidth = await page
-      .locator('.run-view-screen__body > .resizable-group > .resizable-panel')
-      .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
-    const box = await separator.boundingBox();
-    if (box === null) {
-      throw new Error('az elválasztónak nincs befoglaló doboza');
-    }
-    const x = box.x + box.width / 2;
-    const y = box.y + box.height / 2;
-    const session = await page.context().newCDPSession(page);
-    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-    for (let step = 1; step <= 10; step += 1) {
-      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + step * 10, y }] });
-    }
-    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before + (100 / panelsWidth) * 100)));
-    await expect(separator).not.toHaveClass(/is-dragging/);
-  });
+  for (const theme of ['light', 'dark'] as const) {
+    test(`1440x900, ${theme} téma: a KÜLSŐ elválasztó érintéssel is húzható`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await mockApprovalRunWithTranscript(page, manyApprovals(1));
+      await page.goto(APPROVAL_RUN_URL);
+      await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
+      const separator = page.getByRole('separator', { name: 'A Gráf és a Transcript aránya' });
+      const before = Number(await separator.getAttribute('aria-valuenow'));
+      const panelsWidth = await page
+        .locator('.run-view-screen__body > .resizable-group > .resizable-panel')
+        .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
+      const box = await separator.boundingBox();
+      if (box === null) {
+        throw new Error('az elválasztónak nincs befoglaló doboza');
+      }
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 10; step += 1) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + step * 10, y }] });
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before + (100 / panelsWidth) * 100)));
+      await expect(separator).not.toHaveClass(/is-dragging/);
+    });
+  }
 
   /**
    * MEGSZAKÍTOTT érintéses húzás (`pointercancel`), 900x1000-en, ahol mindkét

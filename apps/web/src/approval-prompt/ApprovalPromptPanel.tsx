@@ -8,7 +8,7 @@ export interface ApprovalPromptPanelProperties {
    * A régió `id` attribútuma: a futás nézet külső osztott elrendezése ezen
    * az azonosítón méri a régiót, hogy a lapozó és a döntés akciósávja a
    * transcript-oldali panel semelyik méretén se vágódjon le (SPEC-008 8. és
-   * 10. szekció, O-13, `run-view-layout.ts` `ResizableContentMinimum`).
+   * 10. szekció, O-13, `packages/ui` `Resizable.tsx` `ResizableContentMinimum`).
    */
   readonly id: string;
   /**

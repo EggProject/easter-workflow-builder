@@ -179,12 +179,13 @@
    (<https://www.w3.org/TR/pointerevents/>: "Authors must instead use
    touch-action", <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action>).
    Mérve a belső elválasztóra (valódi Chromium, CDP érintés események,
-   375x812): nélküle egy 100 pixeles lefelé húzás 50-ről 54-re viszi az
-   arányt és `pointercancel` jön, vele 69-re, `pointerup` zárással
-   (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9. szekció). A
-   szabály a fogyasztó oldalán, erre a két elválasztóra szűkítve áll, mert a
-   `resizable.css` bájtazonossági teszt alatt van. A design system maga is
-   ezt teszi a saját oszlop méretező fogantyúján (`datatable.css`:
+   375x812): a `touch-action: none` nélkül a húzás pásztázásnak adódik át és
+   a teljes elmozdulás nem éri el a célt, vele a húzás `pointerup`-pal zár és
+   célba ér (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9.4
+   szekció). A szabály a fogyasztó oldalán, erre a két elválasztóra
+   szűkítve áll, mert a `resizable.css` bájtazonossági teszt alatt van. A
+   design system maga is ezt teszi a saját oszlop méretező fogantyúján
+   (`datatable.css`:
    `.data-table__resizer { touch-action: none }`). **A külső elválasztó is
    megkapja** (2026-09-27, user döntés, SPEC-008 14.1 O-11, "Mindegyik
    húzható legyen"): a `Resizable` 2026-09-25 óta a `pointercancel`

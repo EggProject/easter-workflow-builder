@@ -500,29 +500,36 @@ test.describe('érintés', () => {
    * pásztázásának adódna át egy `pointercancel` után, és a teljes 100
    * pixeles elmozdulás nem érne célba.
    */
-  test('1440x900: az elválasztó érintéssel is húzható', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openNode(page, 'n-agent');
-    const separator = page.getByRole('separator', { name: 'A beállítás panel szélessége' });
-    const before = Number(await separator.getAttribute('aria-valuenow'));
-    const panelsWidth = await page
-      .locator('.graph-editor-screen__body > .resizable-group > .resizable-panel')
-      .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
-    const box = await separator.boundingBox();
-    if (box === null) {
-      throw new Error('az elválasztónak nincs befoglaló doboza');
-    }
-    const x = box.x + box.width / 2;
-    const y = box.y + box.height / 2;
-    const session = await page.context().newCDPSession(page);
-    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-    for (let step = 1; step <= 10; step += 1) {
-      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - step * 10, y }] });
-    }
-    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before - (100 / panelsWidth) * 100)));
-    await expect(separator).not.toHaveClass(/is-dragging/);
-  });
+  for (const theme of ['light', 'dark'] as const) {
+    test(`1440x900, ${theme} téma: az elválasztó érintéssel is húzható`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.addInitScript((mode) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      await page.reload();
+      await expect(nodeLocator(page, 'n-start')).toBeVisible();
+      await openNode(page, 'n-agent');
+      const separator = page.getByRole('separator', { name: 'A beállítás panel szélessége' });
+      const before = Number(await separator.getAttribute('aria-valuenow'));
+      const panelsWidth = await page
+        .locator('.graph-editor-screen__body > .resizable-group > .resizable-panel')
+        .evaluateAll((panels) => panels.reduce((sum, panel) => sum + panel.getBoundingClientRect().width, 0));
+      const box = await separator.boundingBox();
+      if (box === null) {
+        throw new Error('az elválasztónak nincs befoglaló doboza');
+      }
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      const session = await page.context().newCDPSession(page);
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 10; step += 1) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - step * 10, y }] });
+      }
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await expect(separator).toHaveAttribute('aria-valuenow', String(Math.round(before - (100 / panelsWidth) * 100)));
+      await expect(separator).not.toHaveClass(/is-dragging/);
+    });
+  }
 });
 
 test.describe('start node', () => {
