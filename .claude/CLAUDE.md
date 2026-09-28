@@ -141,6 +141,11 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   az olvasó sémák (`NodeConfigSchema`, `WorkflowGraphDocumentSchema`) és a `db` `readGraph` guardja
   változatlan, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és egy régi, üres mezőt
   hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28, SPEC-008 5.4, O-21).
+  **Az `onUnhandledError` mentési szabálya ezzel szemben nem duplikátum:** kizárólag a `protocol`
+  mentési sémájában áll (mind a tíz típusnál nem `null`), a `db` `replaceGraph` a `null` értéket
+  elfogadja, mert az új workflow Startját a szerver ezzel az értékkel írja, és az alapérték
+  kiválasztása termék döntés volna; a második védvonal a motor `unhandled_error_policy_missing`
+  ellenőrzése, sodródás védelmi ág nem tartozik hozzá (user döntés 2026-09-28, SPEC-008 5.4, O-29).
 
 **Fájlok és tesztek**
 
