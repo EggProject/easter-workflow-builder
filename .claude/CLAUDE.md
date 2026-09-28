@@ -133,6 +133,14 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `'already_decided'`), a futásidejű ág a motor `isEngineErrorKind` guardja. Helye az
   `apps/server` `error-class-drift-protection` témája (user döntés 2026-09-26, "Ismert okokra
   saját mondat").
+- **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
+  védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
+  `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
+  `as const satisfies` táblában; a védelem az `apps/server` `node-config-drift-protection` témájában a
+  két tábla típusszintű egyenlősége plusz mezőnkénti futásidejű ág. **Csak az írás oldala szigorodik:**
+  az olvasó sémák (`NodeConfigSchema`, `WorkflowGraphDocumentSchema`) és a `db` `readGraph` guardja
+  változatlan, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és egy régi, üres mezőt
+  hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28, SPEC-008 5.4, O-21).
 
 **Fájlok és tesztek**
 
