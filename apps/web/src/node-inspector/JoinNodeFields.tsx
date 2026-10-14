@@ -58,17 +58,22 @@ const DEFAULT_AGENT_STEP_SETTINGS: AgentStepConfig = {
   structuredOutput: null,
 };
 
+type SelectedJoinMode = NonNullable<JoinNodeConfig['mode']>;
+
 /**
  * `as const`, hogy a `SelectField` értéktípusa a három módra szűküljön: így
  * a mód kezelője kimerítő `switch` lehet, aminek nincs sosem futó ága
  * (`.claude/CLAUDE.md` 5. szekció, 100 százalékos lefedettség). A `satisfies`
- * őrzi, hogy minden felsorolt érték valóban `JoinNodeConfig` mód legyen.
+ * őrzi, hogy minden felsorolt érték valóban `JoinNodeConfig` mód legyen. A
+ * választatlan (`mode: null`, SPEC-008 O-33) állapotnak nincs opciója: a
+ * felhasználó a három mód közül választ, és amíg nem választott, a mező
+ * értéke egyik opcióval sem egyezik.
  */
 const MODE_OPTIONS = [
   { value: 'merge', label: 'összefésülés' },
   { value: 'script', label: 'szkript' },
   { value: 'ai_synthesis', label: 'AI szintézis' },
-] as const satisfies readonly { readonly value: JoinNodeConfig['mode']; readonly label: string }[];
+] as const satisfies readonly { readonly value: SelectedJoinMode; readonly label: string }[];
 
 /**
  * A `join` node szerkesztett mezői: `mode` és a módhoz tartozó `settings`
@@ -82,14 +87,17 @@ const MODE_OPTIONS = [
  * elöl áll, panel nélkül - a `merge` és a `script` módnak összesen két
  * mezője van. Az `ai_synthesis` mód a saját panelezését az
  * `AgentStepConfigFields`-től örökli, tehát a mód választó után ugyanaz a
- * "elöl a prompt, panelben a felülírások" tagolás jelenik meg.
+ * "elöl a prompt, panelben a felülírások" tagolás jelenik meg. A
+ * választatlan (`mode: null`) állapotban csak a mód választó áll, mert a
+ * beállítás a módtól függ; a mentési séma a mező alatt jelez (SPEC-008 5.4,
+ * O-33).
  */
 export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription } = properties;
   const modeError = useFieldError('mode');
   const sourceError = useFieldError('settings.source');
 
-  function handleModeChange(nextMode: JoinNodeConfig['mode']): void {
+  function handleModeChange(nextMode: SelectedJoinMode): void {
     const { onUnhandledError } = config;
     switch (nextMode) {
       case 'merge': {
@@ -113,10 +121,14 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
       label="Összefésülés módja"
       error={modeError}
       options={MODE_OPTIONS}
-      value={config.mode}
+      value={config.mode ?? ''}
       onChange={handleModeChange}
     />
   );
+
+  if (config.mode === null) {
+    return modeSelect;
+  }
 
   if (config.mode === 'merge') {
     return (

@@ -101,9 +101,23 @@ export interface JoinAiSynthesisNodeConfig {
 }
 
 /**
-Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson.
+A felvett `join` csomópont alakja, amíg a felhasználó nem választott módot
+(SPEC-008 5.4, O-33): `mode: null`, `settings` mező nélkül. Tárolható és
+olvasható; a `protocol` mentési sémája elutasítja, a motor pedig a futás
+indításakor `malformed_node_config` hibával (user döntés 2026-10-14).
 */
-export type JoinNodeConfig = JoinMergeNodeConfig | JoinScriptNodeConfig | JoinAiSynthesisNodeConfig;
+export interface JoinUnselectedNodeConfig {
+  readonly type: 'join';
+  readonly mode: null;
+  readonly onUnhandledError: UnhandledErrorPolicy | null;
+}
+
+/**
+Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson; a
+választatlan, `mode: null` ágnak nincs `settings` mezője.
+*/
+export type JoinNodeConfig =
+  JoinMergeNodeConfig | JoinScriptNodeConfig | JoinAiSynthesisNodeConfig | JoinUnselectedNodeConfig;
 
 /**
 A `maxIterations` kötelező, szállított alapérték nélkül (SPEC-003 4.3).

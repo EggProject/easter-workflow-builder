@@ -1,13 +1,13 @@
 import type { Outcome } from '@easter-workflow-builder/core';
-import type { NodeConfig } from '@easter-workflow-builder/db';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 
 // A `script` jellegű ágak kiszűrése, típusszintű szűkítéssel. A predikátum
 // alak (nem sima logikai függvény) azért kell, hogy a hívó ág a szűkített
 // uniót lássa: ez a `Exclude<NodeConfig, ScriptNodeConfig | JoinScriptNodeConfig>`
 // futásidejű párja.
-function isExecutableNodeConfig(config: NodeConfig): config is ExecutableNodeConfig {
+function isExecutableNodeConfig(config: WellFormedNodeConfig): config is ExecutableNodeConfig {
   if (config.type === 'join') {
     return config.mode !== 'script';
   }
@@ -16,7 +16,7 @@ function isExecutableNodeConfig(config: NodeConfig): config is ExecutableNodeCon
 
 // A hibaüzenetbe kerülő megnevezés: a `join` node `script` módja és a `script`
 // node ugyanazt a hibaosztályt kapja, de nem ugyanaz a két eset.
-function describeUnimplemented(config: NodeConfig): string {
+function describeUnimplemented(config: WellFormedNodeConfig): string {
   return config.type === 'join' ? 'a join node script módja' : 'a script node típus';
 }
 
@@ -35,7 +35,7 @@ function describeUnimplemented(config: NodeConfig): string {
  * utána, hogy **végrehajtható**.
  */
 export function validateImplementedNodeTypes(
-  configsById: ReadonlyMap<string, NodeConfig>,
+  configsById: ReadonlyMap<string, WellFormedNodeConfig>,
 ): Outcome<ReadonlyMap<string, ExecutableNodeConfig>> {
   const executableConfigsById = new Map<string, ExecutableNodeConfig>();
 

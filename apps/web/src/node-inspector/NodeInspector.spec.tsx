@@ -185,6 +185,103 @@ describe('NodeInspector', () => {
     expect(container.textContent).toContain(legend);
   });
 
+  it.each(NODES_BY_TYPE)(
+    'a(z) "$node.type" típusnál a törzs első mezője a "Kezeletlen hiba szabálya" választó, a választás a config.onUnhandledError mezőbe íródik (SPEC-008 5.2, O-29)',
+    ({ node }) => {
+      const onChange = vi.fn<OnChange>();
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={node}
+            onChange={onChange}
+            onClose={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />,
+        );
+      });
+      const firstField = container.querySelector(':scope .node-inspector__body .field');
+      expect(firstField?.querySelector('.field__label')?.textContent).toBe('Kezeletlen hiba szabálya');
+      const trigger = firstField?.querySelector<HTMLButtonElement>('button.select');
+      if (trigger === null || trigger === undefined) {
+        throw new Error('a teszt nem találta a kezeletlen hiba szabály választóját');
+      }
+      expect(trigger.className).toContain('select--sm');
+      expect(trigger.textContent).toBe('nincs beállítva');
+
+      act(() => {
+        trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+      });
+      const panel = document.body.querySelector(`#${trigger.getAttribute('aria-controls') ?? ''}`);
+      const options = [...(panel?.querySelectorAll('[role="option"]') ?? [])];
+      expect(options.map((option) => option.querySelector('.menu__text')?.textContent)).toEqual([
+        'nincs beállítva',
+        'fail_run',
+        'fail_branch',
+      ]);
+      const failBranch = options.find((option) => option.querySelector('.menu__text')?.textContent === 'fail_branch');
+      act(() => {
+        failBranch?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+      });
+      expect(onChange).toHaveBeenLastCalledWith({
+        ...node,
+        config: { ...node.config, onUnhandledError: 'fail_branch' },
+      });
+    },
+  );
+
+  it('sikertelen mentési kísérlet után a null onUnhandledError a választó alatt jelez, a mentési sémán (SPEC-008 5.4, O-29)', () => {
+    const startNode = NODES_BY_TYPE[0]?.node;
+    if (startNode === undefined) {
+      throw new Error('a teszt nem talált start node fixture-t');
+    }
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+        />,
+      );
+    });
+    const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+    expect(invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent)).toEqual([
+      'Kezeletlen hiba szabálya',
+    ]);
+    const errorElement = container.querySelector(`#${invalidFields[0]?.getAttribute('aria-describedby') ?? ''}`);
+    expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
+  });
+
+  it('sikertelen mentési kísérlet után a választatlan join mód a mód választó alatt jelez (SPEC-008 5.4, O-33)', () => {
+    const joinNode: WorkflowNodeInput = {
+      id: 'n-join-unselected',
+      type: 'join',
+      label: 'Összefésülés',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'join', mode: null, onUnhandledError: 'fail_run' },
+    };
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={joinNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+        />,
+      );
+    });
+    const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+    expect(invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent)).toEqual([
+      'Összefésülés módja',
+    ]);
+    const errorElement = container.querySelector(`#${invalidFields[0]?.getAttribute('aria-describedby') ?? ''}`);
+    expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
+  });
+
   it('EGYETLEN csomópont típuson sincs kártya alakú szakasz doboz a panelen', () => {
     for (const { node } of NODES_BY_TYPE) {
       act(() => {
@@ -444,7 +541,7 @@ describe('NodeInspector', () => {
         expression: ' '.repeat(3),
         branches: [{ key: '', label: 'Pozitív' }],
         defaultBranchKey: null,
-        onUnhandledError: null,
+        onUnhandledError: 'fail_run',
       },
     };
     act(() => {
@@ -482,7 +579,7 @@ describe('NodeInspector', () => {
         expression: 'x > 0',
         branches: [{ key: 'pos', label: 'Pozitív' }],
         defaultBranchKey: null,
-        onUnhandledError: null,
+        onUnhandledError: 'fail_run',
       },
     };
     act(() => {

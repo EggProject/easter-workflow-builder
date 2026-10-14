@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { NodeConfig } from '@easter-workflow-builder/db';
+import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateImplementedNodeTypes } from './validate-implemented-node-types.ts';
 
-const START: NodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
-const JOIN_MERGE: NodeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
-const SCRIPT: NodeConfig = {
+const START: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
+const JOIN_MERGE: WellFormedNodeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+const SCRIPT: WellFormedNodeConfig = {
   type: 'script',
   source: 'ertek',
   runtime: 'expression',
   onUnhandledError: 'fail_run',
 };
-const JOIN_SCRIPT: NodeConfig = {
+const JOIN_SCRIPT: WellFormedNodeConfig = {
   type: 'join',
   mode: 'script',
   settings: { source: 'ertek', runtime: 'expression' },
@@ -19,14 +19,14 @@ const JOIN_SCRIPT: NodeConfig = {
 
 describe('validateImplementedNodeTypes', () => {
   it('a végrehajtható configokat változatlanul, szűkített típussal adja vissza', () => {
-    const configsById: ReadonlyMap<string, NodeConfig> = new Map<string, NodeConfig>([
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
       ['start', START],
       ['j', JOIN_MERGE],
     ]);
 
     expect(validateImplementedNodeTypes(configsById)).toStrictEqual({
       kind: 'ok',
-      value: new Map<string, NodeConfig>([
+      value: new Map<string, WellFormedNodeConfig>([
         ['start', START],
         ['j', JOIN_MERGE],
       ]),
@@ -34,7 +34,9 @@ describe('validateImplementedNodeTypes', () => {
   });
 
   it('script node-ra unimplemented_node_type hibát ad', () => {
-    const configsById: ReadonlyMap<string, NodeConfig> = new Map<string, NodeConfig>([['s', SCRIPT]]);
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
+      ['s', SCRIPT],
+    ]);
 
     expect(validateImplementedNodeTypes(configsById)).toStrictEqual({
       kind: 'error',
@@ -43,7 +45,9 @@ describe('validateImplementedNodeTypes', () => {
   });
 
   it('script módú join node-ra unimplemented_node_type hibát ad', () => {
-    const configsById: ReadonlyMap<string, NodeConfig> = new Map<string, NodeConfig>([['j', JOIN_SCRIPT]]);
+    const configsById: ReadonlyMap<string, WellFormedNodeConfig> = new Map<string, WellFormedNodeConfig>([
+      ['j', JOIN_SCRIPT],
+    ]);
 
     expect(validateImplementedNodeTypes(configsById)).toStrictEqual({
       kind: 'error',

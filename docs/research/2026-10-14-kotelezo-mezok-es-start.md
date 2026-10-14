@@ -99,6 +99,8 @@ Futásidőben ugyanez rosszabb: a spec által előírt `isJoinConfig` `case null
 `validateImplementedNodeTypes` is átengedi (`config.mode !== 'script'`), és a végrehajtó diszpécser
 `undefined` értéket adna `Promise` helyett. A motor viselkedéséről (melyik hibaosztállyal utasítja el
 a futás indításakor) a spec nem dönt, ezért az O-33 része a user döntéséig nyitva marad.
+**Lezárva (user döntés 2026-10-14):** a motor `malformed_node_config` hibával utasít el; a
+megvalósítás és a mérések a lenti "T-009-56 és O-33" szekcióban.
 
 ## T-009-49
 
@@ -199,3 +201,93 @@ konfigurációt tölti be, böngészőt és szervert nem indít):
   a PR #19 munkafájának melyik köztes állapotán futott, a squash commit történetéből nem állítható
   vissza, ezért ennek az oka **nem ellenőrzött**. A jelen lépés mérése (477) a `--list` darabszámával
   megegyezik.
+
+## T-009-56 és O-33
+
+**Dátum:** 2026-10-14
+**Ág:** `feat/spec-008-d3-join-mod-es-kezeletlen-hiba`, az `origin/main` `7e61152` állapotáról
+**Környezet:** Node `v26.7.0`, Bun `1.4.0`, `zod@4.4.3` (telepítve), Vitest `4.1.11`, Playwright
+chromium a sandbox `LD_LIBRARY_PATH` kerülőjével (`.claude/CLAUDE.md` 12. szekció).
+**Hatókör:** SPEC-008 5.4 O-29 (a `null` `onUnhandledError` mentési szabálya, a beállítás panel
+választó mezője) és O-33 (a `join` negyedik, `mode: null` ága, a mentési szabály harmadik ága, és a
+motor elutasítása a 2026-10-14-i user döntés szerint: `malformed_node_config`).
+
+### 1. A `null` diszkriminátor a telepített Zod 4 alatt
+
+A hivatalos dokumentáció a diszkriminátor mezőn elfogadott sémák között a `z.null()`-t is felsorolja (<https://zod.dev/api>, "Discriminated unions"; ugyanez a v4.4.3 címkéjű
+forrásban: <https://github.com/colinhacks/zod/blob/v4.4.3/packages/docs/content/api.mdx>), és a
+Zod saját tesztje egy `z.null()` diszkriminátorú ág sikeres `parse`-ját állítja
+(<https://github.com/colinhacks/zod/blob/c7805073/packages/zod/src/v4/classic/tests/discriminated-unions.test.ts>,
+"valid - discriminator value of various primitive types"). A séma ezért `mode: z.null()` alakú,
+nem `z.literal(null)`: a kettő következtetett típusa azonos (`null`), de az utóbbi `null` literált
+igényelne a forrásban, amit a `unicorn/no-null` szabály tilt. Saját futtatás (ideiglenes, nem
+commitolt próba a `packages/protocol` alatt, a telepített csomaggal, mindkét alakkal): egy `type`
+szerinti külső és `mode` szerinti belső `discriminatedUnion`, aminek egyik ága `mode: z.null()`, a
+`{ type: 'join', mode: null, ... }` bemenetet elfogadja, a `null` ág
+`strictObject`-je egy idegen kulcsot (`x`) elutasít, a `mode` nélküli bemenetre pedig
+`invalid_union` hibát ad `["mode"]` útvonalon, "No matching discriminator" megjegyzéssel. A
+`node-config.spec.ts` három új tesztje ugyanezt a commitolt sémán állítja.
+
+### 2. A végrehajtó típus szűkítése
+
+A motor `validateNodeConfigs` lépése a `mode: null` `join` node-ot `malformed_node_config` hibával
+utasítja el, és a sikeres ága `ReadonlyMap<string, WellFormedNodeConfig>` értéket ad, ahol
+`WellFormedNodeConfig = Exclude<NodeConfig, JoinUnselectedNodeConfig>`. Az `ExecutableNodeConfig`
+ebből számol, tehát a végrehajtó `executeJoinNode` kimerítő `switch` szerkezete változatlanul három
+módot lát, `case null` ág nélkül.
+
+Szándékos rontás (nem commitolt, a fájl utána visszaállítva): a `validate-node-configs.ts` `mode: null`
+ellenőrzésének törlése után `flock /tmp/kapu-gep.lock bun run typecheck`:
+
+```
+typecheck | 13s
+23/25 sikeres, 2 hibas, 20 cache-bol
+src/run-validation/validate-node-configs.ts:51:30 TS2345 Argument of type 'NodeConfig' is not assignable to parameter of type 'WellFormedNodeConfig'.
+```
+
+Az elutasítás tehát nem csak tesztelt viselkedés, hanem a típus feltétele: nélküle a szűkített térkép
+nem tölthető fel.
+
+### 3. A sodródás védelem szándékosan elrontott próbája (O-33)
+
+A `db` `JoinNodeConfig` uniójából ideiglenesen kivett negyedik tag (`JoinUnselectedNodeConfig`), a
+`protocol` oldala változatlan, utána `flock /tmp/kapu-gep.lock bun run typecheck`:
+
+```
+typecheck | 13s
+22/25 sikeres, 3 hibas, 20 cache-bol
+src/node-config-drift-protection/node-config-drift-protection.spec.ts:52:54 TS2344 Type 'NodeConfig' does not satisfy the constraint '{ providerId: never; mode: never; ... }'.
+src/node-config-drift-protection/node-config-drift-protection.spec.ts:63:7 TS2344 Type 'JoinNodeConfig' does not satisfy the constraint '{ mode: "Expected: literal string: script, Actual: null" | ... }'.
+```
+
+(A másik két hibás csomag a `db` és az `engine` saját, `mode: null` fixtúrát hordozó tesztje, TS2322.)
+A visszaállítás után a parancs zöld. A futásidejű ág rontása: a `db` `isJoinConfig` `case null`
+ágának törlése után az `apps/server` `node-config-drift-protection` tesztjéből pontosan egy bukik
+(`join null ág`, 64 zöld), visszaállítva mind zöld.
+
+### 4. Az e2e lefedettség előtte és utána
+
+Mérés mindhárom állapotban a 2026-09-05-i küszöb research 29. szekciójának tiszta eljárásával: `rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e`, utána az `apps/web` alatt `bun x playwright test
+--shard=i/8` nyolc egymás utáni hívásban (`flock /tmp/playwright-gep.lock` alatt, legfeljebb három
+workerrel), végül `bun run coverage:e2e:report`; a darabszámok a `nyc report
+--reporter=json-summary` kimenetéből. Az `apps/web/package.json` küszöbe változatlan.
+
+| Metrika    | Előtte, `7e61152` (478 teszt) | Az új e2e nélkül (478 teszt) | Utána (480 teszt) |
+| ---------- | ----------------------------- | ---------------------------- | ----------------- |
+| statements | 1728 / 1743 (15)              | 1733 / 1753 (20)             | 1738 / 1753 (15)  |
+| branches   | 804 / 815 (11)                | 807 / 822 (15)               | 811 / 822 (11)    |
+| functions  | 571 / 574 (3)                 | 573 / 579 (6)                | 576 / 579 (3)     |
+| lines      | 1667 / 1682 (15)              | 1672 / 1691 (19)             | 1676 / 1691 (15)  |
+
+A középső oszlop a kód változtatása után, a meglévő e2e tesztekkel mért állapot: a fedetlen
+darabszám nőtt, a három új fedetlen hely a `JoinNodeFields.tsx` választatlan módú ága, a
+`NodeInspector.tsx` kezeletlen hiba választójának `onChange` hívása és az `UnhandledErrorPolicyField.tsx`
+`onChange` törzse. Ezért a `graph-editor-validation.spec.ts` két új tesztet kapott (a `null`
+`onUnhandledError` és a választatlan `join` mód mentési kísérlete `PUT` nélkül, a mező alatti hibával,
+majd egy érték után a mentés). Utána a fedetlen darabszám egyik metrikán sem nagyobb, mint előtte,
+és a fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a `main` állapotán
+(`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`; a két
+állapot `nyc report --reporter=text` fedetlen sorai `diff` szerint azonosak). A `coverage:e2e:report`
+a meglévő küszöbbel zöld.

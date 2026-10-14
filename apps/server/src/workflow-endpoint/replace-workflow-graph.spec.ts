@@ -21,7 +21,7 @@ function openMemoryDatabase(): DatabaseContext {
 }
 
 function startNodeConfig(): Record<string, unknown> {
-  return { type: 'start', inputFields: [], onUnhandledError: null };
+  return { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 }
 
 describe('createReplaceWorkflowGraphHandler', () => {
@@ -94,7 +94,7 @@ describe('createReplaceWorkflowGraphHandler', () => {
             label: 'Ismétlés',
             positionX: 0,
             positionY: 0,
-            config: { type: 'loop', maxIterations: -1, continueExpression: 'true', onUnhandledError: null },
+            config: { type: 'loop', maxIterations: -1, continueExpression: 'true', onUnhandledError: 'fail_run' },
           },
         ],
         edges: [],

@@ -43,10 +43,16 @@ export type { NodeType } from './workflow-graph/node-type/node-type.ts';
 // `resolveRetryDecision` publikus szignatúrájában áll (SPEC-004 8.2), az
 // utóbbi a `resolveErrorRoute` bemenetében (8.3): mindkettőt névvel említi
 // egy motor felület, tehát az `Exclude`-alapú szűkítés itt nem elég.
+//
+// A `JoinUnselectedNodeConfig` (SPEC-008 5.4, O-33) ugyanazon az okon kerül
+// ki, mint a két `script` jellegű ág: a motor `malformed_node_config`
+// ellenőrzése után a `WellFormedNodeConfig = Exclude<NodeConfig,
+// JoinUnselectedNodeConfig>` szűkítés ebből számol.
 export type {
   NodeConfig,
   ScriptNodeConfig,
   JoinScriptNodeConfig,
+  JoinUnselectedNodeConfig,
   ErrorHandlerNodeConfig,
   UnhandledErrorPolicy,
 } from './workflow-graph/node-config/node-config.ts';
