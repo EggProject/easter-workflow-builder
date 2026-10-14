@@ -47,9 +47,11 @@ import path from 'node:path';
 import { EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE, measureEdgePaintDifference } from './edge-paint-measurement.ts';
 import {
   countNodesOutsideCanvas,
+  expectShowcaseStreamLive,
+  expectShowcaseTranscript,
   fitShowcaseGraphIntoView,
+  installShowcaseLiveRunMocks,
   installShowcaseMocks,
-  installShowcaseRunMocks,
   openShowcaseEditor,
   openShowcaseRunView,
   SHOWCASE_GRAPH,
@@ -188,16 +190,25 @@ for (const theme of ['light', 'dark'] as const) {
     // származtatott alakja, tehát ugyanaz a tizenegy él van rajta, és a pixel
     // mérés ugyanazt a listát tudja igazolni. Enélkül a most megépült
     // felületre (`run-view`, `run-graph`) nulla szállított vizuális bizonyíték
-    // lenne (felhasználói kérés, 2026-09-15).
+    // lenne (felhasználói kérés, 2026-09-15). Az SSE csatorna élő, nyitva
+    // tartott kapcsolat, hogy a stream jelző a képen "élő" legyen, ne
+    // "újracsatlakozás" (user döntés 2026-10-14, SPEC-008 12.6).
     test(`run-view-${theme}`, async ({ page }) => {
       const imageName = `run-view-${theme}.png`;
-      await installShowcaseRunMocks(page);
-      await openShowcaseRunView(page);
-      await fitShowcaseGraphIntoView(page);
-      expect(await countNodesOutsideCanvas(page)).toBe(0);
+      const streamServer = await installShowcaseLiveRunMocks(page);
+      try {
+        await openShowcaseRunView(page);
+        await fitShowcaseGraphIntoView(page);
+        expect(await countNodesOutsideCanvas(page)).toBe(0);
+        await expectShowcaseTranscript(page);
+        await expectShowcaseStreamLive(page);
 
-      await page.screenshot({ path: outputPath(imageName) });
-      await recordPaintedEdges(page, imageName);
+        await page.screenshot({ path: outputPath(imageName) });
+        await recordPaintedEdges(page, imageName);
+      } finally {
+        streamServer.closeAllConnections();
+        streamServer.close();
+      }
     });
 
     test.describe('nagyított kivágat', () => {
