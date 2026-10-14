@@ -15,8 +15,9 @@ export interface GraphNodeOutputHandle {
 /**
  * A `branch` node kimenő handle-ei a node saját `config.branches` listájából
  * jönnek futásidőben, nem statikus katalógus adatból (SPEC-008 5.1 táblázat:
- * "ágankénti egy... plusz az alapértelmezett"). A `dynamic-branch` érték ezt
- * az egyetlen kivételt jelöli; a másik kilenc típus `fixed`, statikus listát ad.
+ * ágankénti egy kimenet, a `branches[].key` értékkel, O-23). A `dynamic-branch`
+ * érték ezt az egyetlen kivételt jelöli; a másik kilenc típus `fixed`,
+ * statikus listát ad.
  */
 export type GraphNodeOutputHandles =
   { readonly kind: 'fixed'; readonly handles: readonly GraphNodeOutputHandle[] } | { readonly kind: 'dynamic-branch' };
