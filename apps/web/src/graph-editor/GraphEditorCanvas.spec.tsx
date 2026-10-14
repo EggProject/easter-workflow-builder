@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import type { AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
-import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import { GraphEditorCanvas, type GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
@@ -94,7 +94,7 @@ const SECOND_EDGE: WorkflowEdgeInput = {
   branchKey: null,
 };
 
-type OnGraphChange = (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => void;
+type OnGraphChange = GraphEditorCanvasProperties['onGraphChange'];
 type OnSelectNode = (nodeId: string | undefined) => void;
 type OnAddNode = AddNodeContextMenuProperties['onAddNode'];
 
@@ -194,6 +194,7 @@ describe('GraphEditorCanvas', () => {
             onChange={vi.fn()}
             onClose={vi.fn()}
             onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />
@@ -284,7 +285,51 @@ describe('GraphEditorCanvas', () => {
     expect(onGraphChange).toHaveBeenLastCalledWith(
       [START_NODE, { ...FAN_OUT_NODE, positionX: 5, positionY: 6 }],
       [EDGE],
+      { key: 'node-drag', isFinal: true },
     );
+  });
+
+  // A visszavonás története a húzást a végéig egy lépésnek veszi (SPEC-008
+  // 5.10, M-117): a húzás közbeni `dragging: true` változás nyitva tartja a
+  // menetet, a `dragging: false` (a húzás vége, a billentyűs mozgatás) zárja.
+  it('a húzás közbeni pozíció változás nyitott, a húzás vége záró mozgatási menetet ad', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n2', type: 'position', position: { x: 5, y: 6 }, dragging: true },
+      ]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith(
+      [START_NODE, { ...FAN_OUT_NODE, positionX: 5, positionY: 6 }],
+      [EDGE],
+      { key: 'node-drag', isFinal: false },
+    );
+
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n2', type: 'position', position: { x: 9, y: 6 }, dragging: false },
+      ]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith(
+      [START_NODE, { ...FAN_OUT_NODE, positionX: 9, positionY: 6 }],
+      [EDGE],
+      { key: 'node-drag', isFinal: true },
+    );
+  });
+
+  it('a nem pozíció típusú csomópont változás záró mozgatási menetet ad', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n2', type: 'replace', item: workflowNodeToFlowNode({ ...FAN_OUT_NODE, positionX: 3 }) },
+      ]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, { ...FAN_OUT_NODE, positionX: 3 }], [EDGE], {
+      key: 'node-drag',
+      isFinal: true,
+    });
   });
 
   // A törlés egyetlen útja az `onDelete` (lásd a lenti `onDelete` csoportot): a
@@ -343,6 +388,7 @@ describe('GraphEditorCanvas', () => {
     expect(onGraphChange).toHaveBeenLastCalledWith(
       [{ ...START_NODE, positionX: 7, positionY: 8 }, FAN_OUT_NODE],
       [EDGE],
+      { key: 'node-drag', isFinal: true },
     );
   });
 

@@ -175,6 +175,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -197,6 +198,7 @@ describe('NodeInspector', () => {
             onChange={onChange}
             onClose={vi.fn()}
             onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -243,6 +245,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -272,6 +275,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -294,6 +298,7 @@ describe('NodeInspector', () => {
             onChange={vi.fn()}
             onClose={vi.fn()}
             onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -316,6 +321,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -338,6 +344,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={onClose}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -365,6 +372,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -388,6 +396,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -418,6 +427,7 @@ describe('NodeInspector', () => {
             onChange={onChange}
             onClose={onClose}
             onDelete={onDelete}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -456,6 +466,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -476,6 +487,7 @@ describe('NodeInspector', () => {
             onChange={vi.fn()}
             onClose={vi.fn()}
             onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -486,6 +498,41 @@ describe('NodeInspector', () => {
       expect(panel?.classList.contains('nokey')).toBe(true);
     },
   );
+
+  // A mező szerkesztési menete a `blur`-ig tart (SPEC-008 5.10): a React
+  // `onBlur` buborékol, tehát a panel gyökerén a mező elhagyása is ideér.
+  it('a panelbeli mező elhagyása az onFieldBlur-t hívja', () => {
+    const onFieldBlur = vi.fn();
+    const agentNode = NODES_BY_TYPE[1]?.node;
+    if (agentNode === undefined) {
+      throw new Error('a teszt nem talált agent_step node fixture-t');
+    }
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={agentNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          onFieldBlur={onFieldBlur}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
+      );
+    });
+    const field = container.querySelector('textarea');
+    if (field === null) {
+      throw new Error('a teszt nem talált szöveg mezőt a panelen');
+    }
+    act(() => {
+      field.focus();
+    });
+    expect(onFieldBlur).not.toHaveBeenCalled();
+    act(() => {
+      field.blur();
+    });
+    expect(onFieldBlur).toHaveBeenCalledTimes(1);
+  });
 
   it('a panel MINDEN gombja sm méretű', () => {
     const agentNode = NODES_BY_TYPE[1]?.node;
@@ -499,6 +546,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -529,6 +577,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -554,6 +603,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -579,6 +629,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -617,6 +668,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -648,6 +700,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -687,6 +740,7 @@ describe('NodeInspector', () => {
           onChange={vi.fn()}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -709,6 +763,7 @@ describe('NodeInspector', () => {
           onChange={onChange}
           onClose={vi.fn()}
           onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,

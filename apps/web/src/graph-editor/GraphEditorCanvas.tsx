@@ -23,6 +23,7 @@ import { AddNodeContextMenu, type AddNodeContextMenuProperties } from './AddNode
 import { FitViewOnAutoLayout } from './FitViewOnAutoLayout.tsx';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
+import type { GraphEditSession } from './graph-edit-history.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import { isNodeDeselected, mergeEdgeSelection, type SelectedEdgeIds } from './graph-selection.ts';
 import { isValidGraphConnection } from './is-valid-connection.ts';
@@ -47,6 +48,12 @@ const NODE_TYPES = { workflowNode: GraphNodeCard };
  */
 const DELETE_KEY_CODE: string[] = ['Backspace', 'Delete'];
 
+/**
+ * A csomópont mozgatás menetének kulcsa a visszavonás történetében (SPEC-008
+ * 5.10): egy húzás a végéig egy lépés.
+ */
+const NODE_DRAG_SESSION_KEY = 'node-drag';
+
 export interface GraphEditorCanvasProperties {
   /**
    * A gráf teljes állapota, a szülő (`graph-editor-screen`, T-009-17) tartja
@@ -62,9 +69,16 @@ export interface GraphEditorCanvasProperties {
   /**
    * Minden node/él változás után hívódik, a domain alakra visszaalakítva
    * (SPEC-008 5.5: a mentetlen jelző és a mentés ebből az állapotból épül,
-   * a `graph-editor-screen` témában, T-009-17).
+   * a `graph-editor-screen` témában, T-009-17). A csomópont mozgatása a
+   * húzás menetét is megadja (`session`), hogy a visszavonás története a
+   * húzást a végéig egy lépésnek vegye (SPEC-008 5.10, M-117); a többi
+   * változás (él létrehozás, törlés) menet nélkül, önálló lépés.
    */
-  readonly onGraphChange: (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => void;
+  readonly onGraphChange: (
+    nodes: readonly WorkflowNodeInput[],
+    edges: readonly WorkflowEdgeInput[],
+    session?: GraphEditSession,
+  ) => void;
   /**
    * A kiválasztott csomópont azonosítója - a beállítás panel (`node-inspector`,
    * T-009-18) ez alapján dönti el, mit szerkeszt. A vászon ezt vizuálisan is
@@ -186,9 +200,14 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
       }
       if (graphChanges.length > 0) {
         const nextFlowNodes = applyNodeChanges(graphChanges, flowNodes);
+        // A húzás közbeni változás `dragging: true`, a húzás vége és a
+        // billentyűs mozgatás `dragging: false` (`updateNodePositions`,
+        // M-117): az utóbbi zárja a menetet, menet nélkül önálló lépés.
+        const isDragging = graphChanges.some((change) => change.type === 'position' && change.dragging === true);
         onGraphChange(
           nextFlowNodes.map((node) => flowNodeToWorkflowNode(node)),
           edges,
+          { key: NODE_DRAG_SESSION_KEY, isFinal: !isDragging },
         );
       }
     },
