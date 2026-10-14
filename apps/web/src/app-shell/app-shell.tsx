@@ -8,6 +8,7 @@ import {
 } from '@easter-workflow-builder/ui';
 import { useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
+import { browserGraphElementIdGenerator } from '../graph-editor/browser-graph-element-id-generator.ts';
 import { GraphEditorScreen } from '../graph-editor/GraphEditorScreen.tsx';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
@@ -240,7 +241,13 @@ function renderRouteContent(
     }
     case 'graphEditor': {
       return (
-        <GraphEditorScreen apiOrigin={apiOrigin} fetchFunction={fetchFunction} search={search} navigate={navigate} />
+        <GraphEditorScreen
+          apiOrigin={apiOrigin}
+          fetchFunction={fetchFunction}
+          search={search}
+          navigate={navigate}
+          graphElementIdGenerator={browserGraphElementIdGenerator}
+        />
       );
     }
     case 'runView': {

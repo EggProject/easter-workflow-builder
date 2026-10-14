@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null -- a szintetikus WorkflowNodeInput fixture nullázható mezői a dróton ténylegesen `null` értéket hordoznak */
-import type { WorkflowNodeInput } from '@easter-workflow-builder/protocol';
+import { NodeTypeSchema, type NodeType, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
 
@@ -19,8 +19,28 @@ describe('workflowNodeToFlowNode', () => {
       id: 'n-1',
       type: 'workflowNode',
       position: { x: 12, y: 34 },
+      deletable: false,
       data: { workflowNode: WORKFLOW_NODE },
     });
+  });
+
+  it('csak a start csomópont vászon alakja nem törölhető (deletable: false), típusonként', () => {
+    const expectedDeletable = {
+      start: false,
+      agent_step: true,
+      branch: true,
+      fan_out: true,
+      join: true,
+      loop: true,
+      human_approval: true,
+      error_handler: true,
+      sub_workflow: true,
+      script: true,
+    } as const satisfies Readonly<Record<NodeType, boolean>>;
+    for (const type of NodeTypeSchema.options) {
+      const flowNode = workflowNodeToFlowNode({ ...WORKFLOW_NODE, type });
+      expect(flowNode.deletable, type).toBe(expectedDeletable[type]);
+    }
   });
 });
 

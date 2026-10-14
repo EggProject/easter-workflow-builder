@@ -1,4 +1,4 @@
-// Huszonkettő, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Huszonhárom, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -12,7 +12,8 @@
 // (22) a T-009-33 hiányzó tételeinek pótlása (PLAN-009 F8 zárás, 2026-09-28): a React Flow
 // `rf__` locator kizárólagosság az e2e alatt (1), a kézi időzítés tilalma az e2e alatt (10), a
 // gráf szemantikai validáció kliens oldali tilalma (3), és a csomópont kártya méret egyetlen
-// forrás szabálya (12).
+// forrás szabálya (12). A (23) a PLAN-009 T-009-42 lépésével érkezett (SPEC-008 5.8, AC79): a
+// `crypto.randomUUID(` hívás kizárólag a két böngésző oldali azonosító generátor fájlban áll.
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -369,5 +370,23 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       (file) => file.relativePath !== catalogRelativePath && cardSizeNumberPattern.test(file.content),
     );
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
+  });
+
+  it('(23) a Web Crypto randomUUID hívása pontosan a két böngésző oldali azonosító generátor fájlban áll (SPEC-008 5.8, AC79)', () => {
+    // A stream azonosító és a gráf elem azonosító generátora az egyetlen hely,
+    // ahol a Web Crypto hívás megjelenik; minden más kód a portot kapja. A
+    // mintát a teszt darabokból rakja össze, és a doksi sorokat kiszűri (mint a
+    // (4), a (7) és a (15) ellenőrzésnél), különben a saját forrása és a port
+    // típusfájljainak magyarázó mondata illeszkedne rá.
+    const randomUuidCall = ['crypto', 'randomUUID('].join('.');
+    const allowedFiles = [
+      path.join('graph-editor', 'browser-graph-element-id-generator.ts'),
+      path.join('stream-client', 'browser-stream-id-generator.ts'),
+    ];
+    const callers = ALL_FILES.filter((file) => stripCommentLines(file.content).includes(randomUuidCall)).map(
+      (file) => file.relativePath,
+    );
+    expect(new Set(callers)).toEqual(new Set(allowedFiles));
+    expect(callers).toHaveLength(allowedFiles.length);
   });
 });
