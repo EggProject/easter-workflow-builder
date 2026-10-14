@@ -435,6 +435,29 @@ test('a gráf szerkesztő a megnyitott beállítás panellel sem lóg túl a leg
   await expect.poll(async () => horizontalOverflow(page)).toBe(0);
 });
 
+// A szerkesztő lábléc gombsora minden támogatott szélességen teljes egészében
+// a nézetablakban áll (T-009-43, SPEC-008 5.8, user döntés 2026-10-14). A
+// dokumentum vízszintes túllógását mérő fenti teszt erre VAK: az
+// `.app-content` `overflow: auto`, tehát a kilógó gomb a dokumentumot nem
+// szélesíti, csak a gombsor jobb széle esik a nézetablakon kívülre. A
+// `ratio: 1` a teljes elem viewportba esését követeli meg.
+test('a gráf szerkesztő lábléc minden gombja minden támogatott szélességen teljes egészében a viewporton belül van', async ({
+  page,
+}) => {
+  const footerButtonNames = ['Futás indítása', 'Hozzáadás', 'Mentés', 'További műveletek'];
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto(EDITOR_URL);
+      await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+      for (const name of footerButtonNames) {
+        await expect(page.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+      }
+    });
+  }
+});
+
 // A táblázat sor műveletek 2026-09-04 óta egyetlen hárompontos ikon gomb
 // mögötti lebegő menübe kerültek (felhasználói kérés), a korábbi három
 // önálló szöveges gomb helyett. A teszt ezért a triggert ÉS a megnyitott
@@ -603,6 +626,31 @@ test('a --ep-screen-sm fölött a márkanév szövege teljes szélességben lát
   const brandText = page.getByText('easter-workflow-builder', { exact: true });
   await expect(brandText).toBeVisible();
   expect(await renderedWidth(brandText)).toBeGreaterThan(1);
+});
+
+// A "Hozzáadás" gomb a --ep-screen-sm tokenen és alatta csak ikon
+// (`.btn--icon`), fölötte szöveges; a neve mindkét alakban "Hozzáadás". A
+// határ a token értéke a `breakpoints.css` fájlból olvasva, a CSS media query
+// és a JS `matchMedia` egyezését a valódi böngésző dönti el.
+test('a "Hozzáadás" gomb a --ep-screen-sm tokenen és alatta ikon gomb, fölötte szöveges, a neve mindkét alakban azonos', async ({
+  page,
+}) => {
+  const trigger = page.getByRole('button', { name: 'Hozzáadás', exact: true });
+  const tokenWidth = smallScreenBreakpointWidth();
+
+  await test.step('a token szélességén ikon gomb', async () => {
+    await page.setViewportSize({ width: tokenWidth, height: VIEWPORT_HEIGHT });
+    await page.goto(EDITOR_URL);
+    await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+    await expect(trigger).toHaveClass(/btn--icon/);
+    await expect(trigger).toHaveText('');
+  });
+
+  await test.step('a token fölött egy pixellel szöveges gomb', async () => {
+    await page.setViewportSize({ width: tokenWidth + 1, height: VIEWPORT_HEIGHT });
+    await expect(trigger).toHaveText('Hozzáadás');
+    await expect(trigger).not.toHaveClass(/btn--icon/);
+  });
 });
 
 // ============================================================

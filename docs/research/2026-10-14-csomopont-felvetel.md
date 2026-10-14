@@ -591,7 +591,8 @@ Saját olvasás a telepített `@xyflow/react@12.11.6` csomagon
   `<ReactFlow>` gyerekeként kapja a `screenToFlowPosition` átváltót, a `FitViewOnAutoLayout`
   mintájára, tehát a vászon unit tesztjei változatlan alakban renderelnek.
 - **A gomb.** A "Hozzáadás" `Button` `size="sm"`, `variant="secondary"`, a látható felirat és a split
-  button nyíl ikonja (`aria-hidden`), a `Menu`/`MenuItem` pár triggerje. A `secondary` az 5.8
+  button nyíl ikonja (`aria-hidden`), a `Menu`/`MenuItem` pár triggerje; a `--ep-screen-sm` tokenen és
+  alatta csak ikon (28. szekció). A `secondary` az 5.8
   "az elsődleges művelet így a sor végén marad" mondatából következik: az elsődleges gomb a
   "Mentés". A store mezőit egy külön, a képernyőn belüli komponens olvassa három `useStore`
   szelektorral, hogy a nézet minden mozdulata csak ezt a gombot renderelje újra.
@@ -658,30 +659,65 @@ tanulság: az első utána futásban a két e2e teszt csak két típust vett fel
 7 ággal és 7 sorral növelte a fedetlen darabszámot; a gomb útjának kilenc típusos felvétele ezt
 nullára vitte. Az `apps/web/package.json` küszöbe nem változott.
 
-### 28. Nyitott kérdés: a lábléc gombsora 320 pixelen nem fér ki
+### 28. A lábléc gombsora szűk nézetben: ikonos "Hozzáadás" (user döntés, 2026-10-14)
 
-**A mérés** (valódi Chromium, `apps/web` preview build, a gombok `getBoundingClientRect()` értéke, a
-lábléc `scrollWidth - clientWidth` különbsége):
+**A hiba és a mérés** (valódi Chromium, `apps/web` preview build, a gombok `getBoundingClientRect()`
+értéke és a lábléc `scrollWidth - clientWidth` különbsége, saját mérés 2026-10-14, a
+`responsive.spec.ts` szerkesztő fixtúrájával). A "régi" a szöveges "Hozzáadás" gombbal, az "új" az
+ikonos alakkal:
 
-| Szélesség | Állapot  | Gombok (bal-jobb pixel)                                                        | Lábléc túllógás |
-| --------- | -------- | ------------------------------------------------------------------------------ | --------------- |
-| 320       | `main`   | Futás indítása 90-191, Mentés 203-269, További műveletek 268-296               | 0               |
-| 320       | jelen ág | Futás indítása 36-137, Hozzáadás 149-256, Mentés 268-334, További műv. 333-361 | 41              |
-| 375       | jelen ág | Futás indítása 36-137, Hozzáadás 149-256, Mentés 268-334, További műv. 333-361 | 0               |
+| Szélesség | Gombsor régi | Lábléc túllógás régi | Gombsor új | Lábléc túllógás új | "Hozzáadás" új (bal-jobb pixel) |
+| --------- | ------------ | -------------------- | ---------- | ------------------ | ------------------------------- |
+| 320       | 325          | 41                   | 246        | 0                  | 163-191                         |
+| 340       | 325          | 21                   | 246        | 0                  | 183-211                         |
+| 360       | 325          | 1                    | 246        | 0                  | 203-231                         |
+| 375       | 325          | 0                    | 246        | 0                  | 218-246                         |
+| 640       | 325          | 0                    | 246        | 0                  | 483-511                         |
+| 641       | 325          | 0                    | 325        | 0                  | 405-512                         |
 
-320 pixelen (a `responsive.spec.ts` támogatott szélességei között, Playwright `iPhone SE`) a "Mentés"
-jobb széle és a split button nyíl gombja a nézetablakon kívül esik, az "Elrendezés" menü ott nem
-érhető el. A dokumentum vízszintes túllógása 0, ezért a `responsive.spec.ts` szerkesztő tesztje
-zöld marad; a `page-footer.css` kommentje szerint viszont "a gombsornak minden viewport
-szélességen teljes egészében a képernyőn kell maradnia". A gombsor magában 325 pixel, tehát a belső
-margó csökkentése nem elég. A SPEC-008 5.8 és 10. szekciója nem dönti el, mi legyen szűk nézetben.
+320 pixelen a régi alakban a "Mentés" split button a nézetablak 79 százalékában látszott (a
+`toBeInViewport` aránya 0,788), a nyíl gomb teljesen kilógott. A dokumentum vízszintes túllógása közben
+0 maradt, mert az `.app-content` `overflow: auto`, ezért a `responsive.spec.ts` meglévő "nem lóg túl
+vízszintesen" tesztje erre vak volt. Az új alakban a legszélső gomb jobb széle 320 pixelen 296, azaz a
+lábléc 24 pixeles jobb belső margója előtt áll.
 
-- **Mi a viselkedés addig:** 375 pixeltől minden gomb a nézetablakon belül van; 320 pixelen a
-  "Mentés" részben, a nyíl gomb teljesen kilóg.
-- **Mi zárná le:** user döntés a lehetőségek közül (például: a gombsor a `--ep-screen-sm` alatt két
-  sorba törik; a "Hozzáadás" ott ikon gombbá válik `aria-label`-lel; vagy egy gomb a split button
-  menüjébe kerül), utána egy e2e állítás, hogy minden lábléc gomb `toBeInViewport({ ratio: 1 })`
-  minden támogatott szélességen.
+**A döntés.** A user a három lehetőségből (a gombsor két sorba törik; a "Hozzáadás" ikon gomb
+`aria-label`-lel; egy gomb a split button menüjébe kerül) ezt választotta: "Ikon gomb keskenyen. Keskeny
+képernyőn a 'Hozzáadás' csak ikon, a neve felolvasónak marad. A spec 'látható felirat' mondata
+módosul." A SPEC-008 5.8 mondata ennek megfelelően módosult.
+
+**A töréspont.** A `--ep-screen-sm` token (`breakpoints.css`), a lekérdezés `(max-width: 640px)`,
+tehát 640 pixelen még ikon, 641 pixeltől szöveg (az e2e mindkét oldalt igazolja). A mért túllógás
+sávjára (320 ... 360 pixel) nincs token; a márkanév szövegének elrejtése (`topnav-shell.css`, SPEC-007
+5.3) ugyanezt a tokent a legkisebb, a mért sávot lefedő tokenként választotta, és ez a precedens
+dönt, kitalált szám nincs. A literált a `add-node-compact-media-query.spec.ts` a token fájlból
+olvasva hasonlítja össze.
+
+**Miért JS (`matchMedia`) és nem CSS.** A `.btn--icon` osztály a `button` elemen áll, amit media query
+nem tud rátenni, a szabályait pedig saját osztályba másolni nem szabad (szabálykönyv 11. szekció,
+"Csak létező design system elem használható"). A váltást a `useIsAddNodeCompact` hook adja
+(`useSyncExternalStore`, `MediaQueryList` `change` esemény), a `GraphEditorScreen` `AddNodeMenuButton`
+komponense ágazik rá.
+
+**Az ikon.** A vendorolt `lucide@0.525.0` `Plus` ikonja (saját olvasás:
+`eggproject-design-components/assets/vendor/lucide.min.js`, a fejléc `lucide v0.525.0`, az ikon
+leírója `["path",{d:"M5 12h14"}],["path",{d:"M12 5v14"}]`, a `Plus` kulcson), 24x24 viewBox, 1.75
+vonalvastagság, a repó meglévő inline SVG konvenciója szerint (`aria-hidden`). A gomb `size="sm"`,
+`variant="secondary"`, `icon`, `aria-label="Hozzáadás"`; a menü ugyanaz.
+
+**Teszt.** Unit: `add-node-compact-media-query.spec.ts` 1 (a literál a token értéke),
+`use-is-add-node-compact.spec.tsx` 4 (illeszkedés, nem illeszkedés, `change` esemény, leiratkozás),
+`GraphEditorScreen.spec.tsx` +1 (szűk nézetben `.btn--icon`, `btn--sm`, `aria-label`, üres szöveg,
+ugyanaz a kilenc menüpont, a választás felvesz). E2E (`responsive.spec.ts`) +2: a lábléc négy gombja
+(`Futás indítása`, `Hozzáadás`, `Mentés`, `További műveletek`) minden támogatott szélességen
+`toBeInViewport({ ratio: 1 })`; és a "Hozzáadás" gomb a token szélességén `.btn--icon` osztályú és
+üres szövegű, a token fölött egy pixellel szöveges és osztály nélküli.
+
+**Bukás a régi alakon.** A `GraphEditorScreen.tsx` a `07fe349` állapotára állítva (a szöveges gomb) a
+két új e2e teszt elbukik: a lábléc teszt az első támogatott szélességen, 320 pixelen
+(`getByRole('button', { name: 'Mentés', exact: true })`, "Expected: in viewport, Received: viewport
+ratio 0.7878788113594055"), a határ teszt a `.btn--icon` osztály hiányán. A javított alakon mindkettő
+zöld. A fájl visszaállítva.
 
 ### 29. Nem ellenőrzött
 
@@ -689,3 +725,7 @@ margó csökkentése nem elég. A SPEC-008 5.8 és 10. szekciója nem dönti el,
   útján a látható vászon középpontja a kártya dobozán belül, a panel megnyílása után is), az M-99
   mezőlista, a csomóponton és élen nem nyíló menü és a két téma: a PLAN-009 T-009-45 e2e lépése
   (75 ... 77. kritérium).
+- Az él jobb klikkje: a szerkesztő nem köti be az `onEdgeContextMenu` eseményt (a kódban nincs), és az
+  `onPaneContextMenu` a 24. szekció forrásolvasása szerint csak a vászon elemén fut. Ezt unit teszt
+  nem tudja bizonyítani, mert az élek happy-dom alatt nem rajzolódnak ki (M-53), ezért a bizonyíték a
+  PLAN-009 T-009-45 elfogadási kritériuma: "az él jobb klikkje nem nyit felvételi menüt (e2e)".

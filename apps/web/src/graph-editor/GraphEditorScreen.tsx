@@ -45,6 +45,7 @@ import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.t
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
+import { useIsAddNodeCompact } from './use-is-add-node-compact.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
 
 export interface GraphEditorScreenProperties {
@@ -98,6 +99,30 @@ function DropdownChevronIcon(): ReactElement {
   );
 }
 
+/**
+ * A vendorolt lucide 0.525.0 készlet `Plus` ikonja (24x24 viewBox), kézzel
+ * beágyazva, a repó meglévő ikon konvenciója szerint (1.75 vonalvastagság,
+ * kerekített vonalvég és csatlakozás). A szűk nézeti "Hozzáadás" gomb
+ * egyetlen tartalma; a nevét az `aria-label` adja.
+ */
+function PlusIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
 const selectViewportWidth = (state: ReactFlowState): number => state.width;
 const selectViewportHeight = (state: ReactFlowState): number => state.height;
 const selectViewportTransform = (state: ReactFlowState): ReactFlowState['transform'] => state.transform;
@@ -109,7 +134,10 @@ interface AddNodeMenuButtonProperties {
 
 /**
  * A lábléc "Hozzáadás" menü gombja (SPEC-008 5.8, O-19): a `Menu`/`MenuItem`
- * pár a kilenc felvehető típussal, a split button nyíl ikonjával. Az új kártya
+ * pár a kilenc felvehető típussal, a split button nyíl ikonjával. A
+ * `--ep-screen-sm` token alatt és azon a gomb csak ikon (`.btn--icon`, `Plus`),
+ * a neve az `aria-label` (user döntés 2026-10-14); a menü mindkét alakban
+ * ugyanaz. Az új kártya
  * közepe a választáskor látható vászon középpontja, a React Flow store
  * `width`, `height` és `transform` mezőjéből (`useStore`, M-99). Külön
  * komponens, hogy a store feliratkozás a nézet minden mozdulatára csak ezt a
@@ -120,14 +148,29 @@ function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): R
   const width = useStore(selectViewportWidth);
   const height = useStore(selectViewportHeight);
   const transform = useStore(selectViewportTransform);
+  const isCompact = useIsAddNodeCompact();
   return (
     <Menu
-      trigger={(triggerProperties) => (
-        <Button {...triggerProperties} type="button" size="sm" variant="secondary" disabled={disabled}>
-          Hozzáadás
-          <DropdownChevronIcon />
-        </Button>
-      )}
+      trigger={(triggerProperties) =>
+        isCompact ? (
+          <Button
+            {...triggerProperties}
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon
+            aria-label="Hozzáadás"
+            disabled={disabled}
+          >
+            <PlusIcon />
+          </Button>
+        ) : (
+          <Button {...triggerProperties} type="button" size="sm" variant="secondary" disabled={disabled}>
+            Hozzáadás
+            <DropdownChevronIcon />
+          </Button>
+        )
+      }
     >
       {ADDABLE_NODE_MENU_ITEMS.map((item) => (
         <MenuItem

@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
+import { ADD_NODE_COMPACT_MEDIA_QUERY } from './add-node-compact-media-query.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
@@ -187,7 +188,7 @@ function findAddMenuTrigger(container: HTMLElement): HTMLButtonElement {
     ...container.querySelectorAll<HTMLButtonElement>(
       ':scope .page-footer__actions > .menu-anchor > button[aria-haspopup="menu"]',
     ),
-  ].find((candidate) => candidate.textContent === 'Hozzáadás');
+  ].find((candidate) => candidate.textContent === 'Hozzáadás' || candidate.getAttribute('aria-label') === 'Hozzáadás');
   if (trigger === undefined) {
     throw new Error('a teszt nem találta a "Hozzáadás" gombot a lábléc akciósávjában');
   }
@@ -918,6 +919,51 @@ describe('GraphEditorScreen', () => {
       expect(container.querySelector('.node-inspector')?.textContent).toContain('Feltétel kifejezés');
       expect(container.textContent).toContain('Mentetlen változtatások');
       expect(calls.count).toBe(callsAfterLoad);
+    });
+
+    describe('szűk nézet: a --ep-screen-sm token alatt csak ikonos gomb (user döntés 2026-10-14)', () => {
+      let restoreMatchMedia: () => void;
+
+      beforeEach(() => {
+        const realMatchMedia = globalThis.matchMedia.bind(globalThis);
+        const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia').mockImplementation((query: string) => {
+          const media = realMatchMedia(query);
+          if (query === ADD_NODE_COMPACT_MEDIA_QUERY) {
+            Object.defineProperty(media, 'matches', { value: true, configurable: true });
+          }
+          return media;
+        });
+        restoreMatchMedia = () => {
+          matchMediaSpy.mockRestore();
+        };
+      });
+
+      afterEach(() => {
+        restoreMatchMedia();
+      });
+
+      it('a "Hozzáadás" sm méretű `.btn--icon` gomb, szöveg nélkül, a nevét az aria-label adja, és ugyanaz a kilenc menüpont nyílik', async () => {
+        const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+        await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+        const trigger = findAddMenuTrigger(container);
+        expect(trigger.classList.contains('btn--icon')).toBe(true);
+        expect(trigger.classList.contains('btn--sm')).toBe(true);
+        expect(trigger.getAttribute('aria-label')).toBe('Hozzáadás');
+        expect(trigger.textContent).toBe('');
+        expect(trigger.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+
+        act(() => {
+          trigger.click();
+        });
+        expect(openedMenuItems()).toHaveLength(9);
+        act(() => {
+          openedMenuItems()[1]?.click();
+        });
+        expect(lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id')).toMatchObject({
+          type: 'branch',
+        });
+      });
     });
   });
 });
