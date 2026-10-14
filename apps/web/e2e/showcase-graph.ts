@@ -18,8 +18,8 @@
 // visszatérni.
 import type {
   NodeConfig,
-  PendingApproval,
   RunDetail,
+  RunEventRecord,
   RunSnapshotResponse,
   SettingsRecord,
   StepRunRecord,
@@ -28,7 +28,8 @@ import type {
 } from '@easter-workflow-builder/protocol';
 import { expect, type Page } from '@playwright/test';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { mockIdleStream } from './sse-mock.ts';
+import { mockIdleStream, mockSseFramesWithoutReconnect } from './sse-mock.ts';
+import { makeRunEventRecord, replayFrames, sdkResultRecord } from './transcript-fixture.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
@@ -104,17 +105,10 @@ const LOOP_CONFIG: NodeConfig = {
   onUnhandledError: null,
 };
 
-/**
- * A `human_approval` csomópont címe és törzse: egyetlen forrás a csomópont
- * `config` mezőjének és a függő jóváhagyásnak (`SHOWCASE_PENDING_APPROVALS`).
- */
-const SHOWCASE_APPROVAL_TITLE = 'Jóváhagyás szükséges';
-const SHOWCASE_APPROVAL_BODY = 'Kérlek hagyd jóvá a lépést.';
-
 const HUMAN_APPROVAL_CONFIG: NodeConfig = {
   type: 'human_approval',
-  title: SHOWCASE_APPROVAL_TITLE,
-  bodyTemplate: SHOWCASE_APPROVAL_BODY,
+  title: 'Jóváhagyás szükséges',
+  bodyTemplate: 'Kérlek hagyd jóvá a lépést.',
   timeoutMs: null,
   onUnhandledError: null,
 };
@@ -463,10 +457,12 @@ const SHOWCASE_BASE_STEP_RUN: StepRunRecord = {
 /**
  * A bemutató futás lépés futásai. Minden sor a pillanatkép egy LÉTEZŐ
  * csomópontjára hivatkozik, tehát a "rajzon nem szereplő lépés futások" lista
- * nem jelenik meg, és a képernyőképen a rajz marad a főszereplő. A statuszok
- * szándékosan eltérők, hogy a kártyák jelvényei ne egyetlen állapotot
- * mutassanak; a `join` csomópontnak nincs sora, mert a futás még nem ért el
- * odáig, és a "még nem futott" kártya is a valós felület része.
+ * nem jelenik meg, és a képernyőképen a rajz marad a főszereplő. A `loop` fut
+ * még, a többi lezárult; a `join` csomópontnak nincs sora, mert a futás még
+ * nem ért el odáig, és a "még nem futott" kártya is a valós felület része.
+ * `waiting_approval` lépés futás nincs: a bemutatón jóváhagyás nem látszik
+ * (SPEC-008 12.6), és az `sr-agent` lezárt, mert a transcript `sdk_result`
+ * sora csak lezárt agent lépéshez tartozhat.
  */
 export const SHOWCASE_RUN_STEP_RUNS: readonly StepRunRecord[] = [
   SHOWCASE_BASE_STEP_RUN,
@@ -478,23 +474,9 @@ export const SHOWCASE_RUN_STEP_RUNS: readonly StepRunRecord[] = [
     nodeType: 'fan_out',
     output: ['egy', 'ketto', 'harom'],
   },
-  {
-    ...SHOWCASE_BASE_STEP_RUN,
-    id: 'sr-agent',
-    nodeId: 'n-agent',
-    nodeType: 'agent_step',
-    status: 'running',
-    finishedAtMs: null,
-  },
+  { ...SHOWCASE_BASE_STEP_RUN, id: 'sr-agent', nodeId: 'n-agent', nodeType: 'agent_step' },
   { ...SHOWCASE_BASE_STEP_RUN, id: 'sr-script', nodeId: 'n-script', nodeType: 'script' },
-  {
-    ...SHOWCASE_BASE_STEP_RUN,
-    id: 'sr-approval',
-    nodeId: 'n-approval',
-    nodeType: 'human_approval',
-    status: 'waiting_approval',
-    finishedAtMs: null,
-  },
+  { ...SHOWCASE_BASE_STEP_RUN, id: 'sr-approval', nodeId: 'n-approval', nodeType: 'human_approval' },
   {
     ...SHOWCASE_BASE_STEP_RUN,
     id: 'sr-loop',
@@ -507,29 +489,81 @@ export const SHOWCASE_RUN_STEP_RUNS: readonly StepRunRecord[] = [
 ];
 
 /**
- * A `n-approval` csomópont függő jóváhagyása, KÖVETKEZETESEN a várakozó
- * lépés futással (`sr-approval`, `waiting_approval`): a `GET /api/approvals`
- * pontosan a `waiting_approval` lépések jóváhagyásait adja (SPEC-008 8.
- * szekció), tehát a bemutató futás nézetén a jóváhagyás panel is látszik. A
- * cím és a törzs ugyanaz, mint a csomópont `config` mezőjében (a
- * `bodyTemplate` itt változó nélküli, tehát a renderelt törzs önmaga); a
- * `payload` a motor szerint a futás kontextusa
- * (`packages/engine/src/node-executor/execute-human-approval.ts`), ebből a
- * bemutató a `start` csomópont bemenetét mutatja.
+ * A sorok időbélyege helyi időben rögzített, tehát a kijelzett óra:perc:másodperc
+ * a gép időzónájától független.
  */
-export const SHOWCASE_PENDING_APPROVALS: readonly PendingApproval[] = [
-  {
-    id: 'appr-bemutato',
-    runId: SHOWCASE_RUN_ID,
-    stepRunId: 'sr-approval',
-    title: SHOWCASE_APPROVAL_TITLE,
-    body: SHOWCASE_APPROVAL_BODY,
-    payload: { input: { topic: 'Workflow tervezés' } },
-    decision: null,
-    requestedAtMs: new Date(2026, 8, 24, 10, 32, 5).getTime(),
-    decidedAtMs: null,
-  },
+const SHOWCASE_EVENTS_START_MS = new Date(2026, 8, 24, 10, 31, 40).getTime();
+const SHOWCASE_EVENT_SPACING_MS = 4000;
+
+function showcaseEvent(record: RunEventRecord): RunEventRecord {
+  return { ...record, occurredAtMs: SHOWCASE_EVENTS_START_MS + record.id * SHOWCASE_EVENT_SPACING_MS };
+}
+
+/**
+ * A bemutató futás transcript sorai (SPEC-008 12.6): a négy jellemző sorfajta,
+ * `step_started`, `sdk_assistant`, `sdk_result` és `step_finished`, a lezárt
+ * `sr-agent` lépéshez, plusz a még futó `sr-loop` indulása. Minden sor
+ * `stepRunId` mezője a `SHOWCASE_RUN_STEP_RUNS` egy sorára mutat. `branch_taken`
+ * sor nincs: az elágazás mind az öt célja futott, amit egyetlen kiemelt él
+ * ellentmondásosan mutatna.
+ */
+export const SHOWCASE_RUN_EVENTS: readonly RunEventRecord[] = [
+  showcaseEvent(
+    makeRunEventRecord(1, SHOWCASE_RUN_ID, {
+      stepRunId: 'sr-agent',
+      kind: 'step_started',
+      payload: {
+        nodeId: 'n-agent',
+        nodeType: 'agent_step',
+        providerId: SHOWCASE_PROVIDER_ID,
+        attempt: 1,
+        iteration: 0,
+      },
+    }),
+  ),
+  showcaseEvent(
+    makeRunEventRecord(2, SHOWCASE_RUN_ID, {
+      stepRunId: 'sr-agent',
+      origin: 'sdk',
+      kind: 'sdk_assistant',
+      sdkMessageType: 'assistant',
+      inputTokens: 1180,
+      outputTokens: 212,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      payload: {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Az összegzés elkészült.' }] },
+      },
+    }),
+  ),
+  showcaseEvent(sdkResultRecord(3, SHOWCASE_RUN_ID, 'sr-agent')),
+  showcaseEvent(
+    makeRunEventRecord(4, SHOWCASE_RUN_ID, {
+      stepRunId: 'sr-agent',
+      kind: 'step_finished',
+      payload: {
+        status: 'succeeded',
+        errorKind: null,
+        durationMs: 3 * SHOWCASE_EVENT_SPACING_MS,
+        tokens: { inputTokens: 1200, outputTokens: 340, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      },
+    }),
+  ),
+  showcaseEvent(
+    makeRunEventRecord(5, SHOWCASE_RUN_ID, {
+      stepRunId: 'sr-loop',
+      kind: 'step_started',
+      payload: { nodeId: 'n-loop', nodeType: 'loop', providerId: SHOWCASE_PROVIDER_ID, attempt: 1, iteration: 2 },
+    }),
+  ),
 ];
+
+/**
+ * A futás pótlása egyetlen SSE válaszban: `stream_ready`, a sorok `replayed`
+ * `run_event` keretként, végül `replay_complete`.
+ */
+export const SHOWCASE_RUN_STREAM_FRAMES = replayFrames(SHOWCASE_RUN_ID, SHOWCASE_RUN_EVENTS);
 
 /* eslint-enable unicorn/no-null */
 
@@ -559,19 +593,21 @@ export async function installShowcaseMocks(page: Page): Promise<void> {
 
 /**
  * Ugyanez a FUTÁS nézet végpontjaira (`getRun`, `readRunSnapshot`,
- * `listStepRuns`, `listPendingApprovals`), a származtatott pillanatképpel és a
- * várakozó csomópont függő jóváhagyásával. A `readSettings` azért
+ * `listStepRuns`, `listPendingApprovals`), a származtatott pillanatképpel. A
+ * `listPendingApprovals` üres listát ad, mert a bemutatón jóváhagyás nem
+ * látszik (SPEC-008 12.6). Az SSE csatorna a transcript soraival, újracsatlakozás
+ * nélkül (`mockSseFramesWithoutReconnect`). A `readSettings` azért
  * szerepel, mert a topnav shell is kérdezi: a hiányzó mock az
  * `installApiMocks` szerint 404-et adna, ami hibaüzenetet tenne a
  * képernyőképre.
  */
 export async function installShowcaseRunMocks(page: Page): Promise<void> {
-  await mockIdleStream(page);
+  await mockSseFramesWithoutReconnect(page, SHOWCASE_RUN_STREAM_FRAMES);
   await installApiMocks(page, [
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_SNAPSHOT))),
     mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_STEP_RUNS))),
-    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(SHOWCASE_PENDING_APPROVALS))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SHOWCASE_SETTINGS))),
   ]);
 }
@@ -610,6 +646,31 @@ export async function openShowcaseEditor(page: Page): Promise<void> {
 export async function openShowcaseRunView(page: Page): Promise<void> {
   await page.goto(SHOWCASE_RUN_URL);
   await waitForShowcaseGraph(page);
+}
+
+/**
+ * A bemutató futás nézet transcriptjének állapota (SPEC-008 12.6, 93.
+ * kritérium): a pótlás lezárult, a sorok száma a fixtúra sorainak száma, mind
+ * TELJESEN látszik (`ratio: 1`, a `toBeInViewport` alapértéke a részleges
+ * láthatóságot is elfogadná, `.claude/CLAUDE.md` 12. szekció), a lista
+ * görgető dobozában nincs mit görgetni, és sem a jóváhagyás panel, sem a
+ * "jóváhagyásra vár" jelvény nincs a lapon.
+ */
+export async function expectShowcaseTranscript(page: Page): Promise<void> {
+  await expect(page.getByText('Előzmények betöltése', { exact: true })).toBeHidden();
+  const list = page.getByRole('list', { name: 'Futás eseményei' });
+  const rows = list.getByRole('listitem');
+  await expect(rows).toHaveCount(SHOWCASE_RUN_EVENTS.length);
+  for (let index = 0; index < SHOWCASE_RUN_EVENTS.length; index += 1) {
+    await expect(rows.nth(index)).toBeInViewport({ ratio: 1 });
+  }
+  const scrollBox = await list.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }));
+  expect(scrollBox.scrollHeight).toBeLessThanOrEqual(scrollBox.clientHeight);
+  await expect(page.getByRole('region', { name: 'Függő jóváhagyások' })).toHaveCount(0);
+  await expect(page.getByText('jóváhagyásra vár', { exact: true })).toHaveCount(0);
 }
 
 /**

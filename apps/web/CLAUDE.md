@@ -533,6 +533,13 @@ tehát az él azonosítók mindkét nézetben azonosak, és a manifeszt egyetlen
 minden képre. A mért értékek táblázata:
 [`../../docs/research/2026-09-09-graf-el-vonal-meres.md`](../../docs/research/2026-09-09-graf-el-vonal-meres.md) 7/b. szekció.
 
+**A futás nézet képén a transcript 3-6 jellemző sort mutat, jóváhagyás nélkül** (SPEC-008 12.6, user
+döntés 2026-09-28, T-009-46): a fixtúra `SHOWCASE_RUN_EVENTS` sorai (lépés indulás és befejezés, agent
+válasz, eredmény), a `listPendingApprovals` üres listát ad, és `waiting_approval` lépés futás nincs.
+A sorok teljes láthatóságát, a görgetés és a jóváhagyás hiányát az `expectShowcaseTranscript` állítja,
+amit a szentesített script is hív a képernyőkép előtt; hogy a sorok az SSE újracsatlakozás után is
+egyszer szerepelnek, az `e2e/showcase-graph.spec.ts` méri.
+
 **A szentesített út GÉPI kényszer, nem csak szabály** (2026-09-15). A csővezeték minden futása
 bizonyítékot hagy az `e2e/screenshot-manifest.json` fájlban: a fixtúra és a szentesített script
 `sha256` lenyomatát, plusz képenként azoknak az éleknek az azonosítóját, amiknek a vonalát a pixel

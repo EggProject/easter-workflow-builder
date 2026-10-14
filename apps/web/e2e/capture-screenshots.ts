@@ -47,6 +47,7 @@ import path from 'node:path';
 import { EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE, measureEdgePaintDifference } from './edge-paint-measurement.ts';
 import {
   countNodesOutsideCanvas,
+  expectShowcaseTranscript,
   fitShowcaseGraphIntoView,
   installShowcaseMocks,
   installShowcaseRunMocks,
@@ -195,6 +196,7 @@ for (const theme of ['light', 'dark'] as const) {
       await openShowcaseRunView(page);
       await fitShowcaseGraphIntoView(page);
       expect(await countNodesOutsideCanvas(page)).toBe(0);
+      await expectShowcaseTranscript(page);
 
       await page.screenshot({ path: outputPath(imageName) });
       await recordPaintedEdges(page, imageName);
