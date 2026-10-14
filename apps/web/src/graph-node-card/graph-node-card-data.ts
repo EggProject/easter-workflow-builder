@@ -54,7 +54,19 @@ export type GraphNodeCardFlowNode = Node<
   {
     readonly workflowNode: WorkflowNodeInput;
     readonly status?: StepRunStatus;
+    /**
+     * A megjelenített lépés futás `attempt` értéke, ugyanabból a sorból, mint
+     * a `status` (SPEC-008 6.6, 1. döntés); a "`N`. próbálkozás" jelvény csak
+     * 1 felett jelenik meg (86.).
+     */
+    readonly attempt?: number;
     readonly runDecoration?: GraphNodeRunDecoration;
+    /**
+     * Pontosan akkor áll, ha a csomópont legutóbbi (legnagyobb `id`-jű)
+     * `branch_taken` döntése `usedDefault: true`; az ág kiemelés módja erre nem
+     * hat (SPEC-008 6.6, 4. döntés, O-24, 91.).
+     */
+    readonly usedDefaultBranch?: true;
   },
   'workflowNode'
 >;
