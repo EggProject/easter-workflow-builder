@@ -200,6 +200,37 @@ describe('Tooltip', () => {
       expect(trigger().hasAttribute('aria-describedby')).toBe(false);
     });
 
+    it('a fókusz érkezése és elvesztése lemondja a függő nyitást, miközben az egér a triggeren marad', () => {
+      renderTooltip();
+      hoverIn();
+      advance(DEFAULT_DELAY_MS / 2);
+      focusIn();
+      expect(tip().hidden).toBe(false);
+
+      focusOut();
+      advance(DEFAULT_DELAY_MS * 5);
+
+      expect(tip().hidden).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('az egér átvitele a triggerről a tippre nem zár, a burkolóból kivitele igen', () => {
+      renderTooltip();
+      hoverIn();
+      advance(DEFAULT_DELAY_MS);
+
+      act(() => {
+        trigger().dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: tip() }));
+        tip().dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: trigger() }));
+      });
+      expect(tip().hidden).toBe(false);
+
+      act(() => {
+        tip().dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      });
+      expect(tip().hidden).toBe(true);
+    });
+
     it('az egér elhagyása nem zár, amíg a fókusz tartja', () => {
       renderTooltip();
       hoverIn();

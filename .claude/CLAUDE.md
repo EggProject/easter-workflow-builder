@@ -673,7 +673,10 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
   emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
   a kész `.textarea` komponens jár, nem az egysoros `.input` osztály
-  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09).
+  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09). Második
+  precedens: a `tooltip` egérrel elérhetősége (WCAG 1.4.13) user döntéssel készült eltérés a
+  design systemtől, a forrás CSS bájtazonos marad, a kiegészítés külön fájlban áll
+  (`packages/ui/src/tooltip/tooltip-hover-bridge.css`, user döntés 2026-10-14).
 - **Ha a forrás komponensnek React és statikus HTML változata is van, a React változat jár.** Mi
   React alkalmazás vagyunk. A `select.css` mindkettőt kiszolgálja ugyanazon a `.select` héjon, de
   a natív `<select>` retrofitről a forrás saját kommentje mondja ki, hogy a STATIKUS oldalaké

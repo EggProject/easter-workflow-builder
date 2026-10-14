@@ -11,6 +11,7 @@ import {
 import { joinAriaTokenList } from '../aria-token-list/join-aria-token-list.ts';
 import { joinClassNames } from '../class-name-list/join-class-names.ts';
 import './tooltip.css';
+import './tooltip-hover-bridge.css';
 
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 export type TooltipVariant = 'dark' | 'light' | 'rich';
@@ -94,11 +95,15 @@ function hasTooltipContent(content: ReactNode): boolean {
  * témával ellentétben itt a forrás API-ját tartjuk meg, mert a `Tooltip`
  * egyetlen propot ír a triggerre, és nincs szüksége a trigger DOM elemére.
  *
- * Forrás korlátja: a `.tooltip` CSS `pointer-events: none` értéke miatt a
- * panelre nem lehet átvinni az egeret, ezért a WCAG 1.4.13 "Hoverable"
- * feltétele és az APG 3. megjegyzése nem teljesül. A CSS bájtra azonos a
- * forrással, ezért az átemelés nem változtat rajta (lásd a research fájl
- * T-009-50 szekcióját).
+ * Eltérés a forrástól (user döntés, 2026-10-14): a forrás CSS `pointer-events:
+ * none` értéke és a tipp 10 px távolsága a triggertől miatt a panelre nem
+ * lehetne átvinni az egeret (WCAG 1.4.13 "Hoverable", APG 3. megjegyzés). A
+ * `tooltip.css` bájtra azonos a forrással, ezért a nyitott tippet `auto`
+ * értékre állító és a rést láthatatlan híddal fedő szabály a
+ * `tooltip-hover-bridge.css` kiegészítő fájlban áll. A JS záró logikája a
+ * forrásé: a tipp a trigger burkolójának leszármazottja, így az egér átvitele
+ * a tippre nem hagyja el a burkolót (lásd a research fájl T-009-50
+ * szekcióját).
  */
 export function Tooltip(properties: Readonly<TooltipProperties>): ReactElement {
   const {

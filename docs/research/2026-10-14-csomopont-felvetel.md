@@ -56,7 +56,7 @@ alkalmazásban egyetlen elemre sem illeszkedik.
 | A tipp konténer `role="tooltip"`, a triggert `aria-describedby` köti hozzá                                                                       | [W3C APG, Tooltip Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/), "WAI-ARIA Roles, States, and Properties"; [MDN, ARIA `tooltip` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/tooltip_role) |
 | Fókuszra és az egér fölé vitelére nyílik; a tipp nem kap fókuszt, a fókusz a triggeren marad                                                     | APG, "About This Pattern" és "Keyboard Interaction" 1. megjegyzés; MDN, "Description" és "Required JavaScript features"                                                                                                                           |
 | Az `Escape` zárja                                                                                                                                | APG, "Keyboard Interaction"; MDN, "Keyboard interactions"                                                                                                                                                                                         |
-| Fókusszal nyitott tipp a fókusz elvesztésekor (`onBlur`) záródik; egérrel nyitott tipp addig nyitva, amíg a kurzor a triggeren vagy a tippen van | APG, "Keyboard Interaction" 2. és 3. megjegyzés. A 3. megjegyzés második fele (a tipp fölött is nyitva marad) a forrás CSS-ével nem teljesül, lásd a 3. szekciót                                                                                  |
+| Fókusszal nyitott tipp a fókusz elvesztésekor (`onBlur`) záródik; egérrel nyitott tipp addig nyitva, amíg a kurzor a triggeren vagy a tippen van | APG, "Keyboard Interaction" 2. és 3. megjegyzés. A 3. megjegyzés második fele (a tipp fölött is nyitva marad) a forrás CSS-ével nem teljesül (3. szekció), a kiegészítő fájllal igen (8. szekció)                                                 |
 | A tipp elemre `aria-describedby` mutat, mielőtt vagy amikor megjelenik; a hívó meglévő leírása nem veszhet el                                    | MDN, "Description" ("Elements with the `tooltip` role should be referenced through the use of `aria-describedby` before or when the tooltip is displayed"); a meglévő hivatkozás megőrzése a forrás `Tooltip.jsx` viselkedése, saját olvasás      |
 
 Az APG Tooltip minta oldala maga jelzi: "This design pattern is work in progress; it does not yet
@@ -77,10 +77,13 @@ without the additional content disappearing"
 megjegyzése is ezt kéri. A forrás tippje tehát a "Dismissible" (`Escape`) és a "Persistent"
 feltételt adja, a "Hoverable" feltételt nem.
 
-A port a CSS bájtazonossága miatt ezen nem változtat. **Nem ellenőrzött böngészőben**: a fenti a
-CSS statikus olvasása és a két dokumentált forrás, valódi böngészős mérés nincs, mert a
-komponensnek még nincs fogyasztója (T-009-51). Döntést igénylő pont, lásd a jelentés nyitott
-kérdését.
+A `pointer-events: none` nem az egyetlen ok: a forrásban a tipp a trigger burkolójától
+`calc(100% + 10px)` távolságra áll (a forrás `tooltip.css` 220., 236., 251. és 266. sora, a négy
+elhelyezés), tehát a panelhez vezető úton az egér egy 10 px-es sávon halad át, ami sem a triggerhez,
+sem a panelhez nem tartozik, és a burkoló `mouseleave` eseménye ott zár. A 8. szekció mérése szerint a rés
+önmagában is zár (`pointer-events: auto` mellett is); a `pointer-events: none` önálló hatása külön
+nem mért. A port eredetileg a CSS bájtazonossága miatt ezen nem változtatott;
+a user 2026-10-14-i döntése nyomán a javítás külön fájlban áll, lásd a 8. szekciót.
 
 ### 4. A megvalósítás döntései
 
@@ -99,20 +102,23 @@ kérdését.
 - **A hívó saját `aria-describedby` értéke** a `joinAriaTokenList` segéddel egyesül (szóköz mentén
   bontva, duplikátum nélkül, üres esetén `undefined`), ami a forrás `Set` alapú összefűzésével azonos
   eredményt ad; az osztálynevek a `joinClassNames` segéddel.
-- **Forrás viselkedés, ami a portban is megvan** (saját unit mérés, happy-dom, hamis óra): ha az
-  egér belép, 100 ms múlva a trigger fókuszt kap, majd a fókusz elvész, miközben az egér még
-  bent van, a tipp záródik. A `focus` és a `blur` lemondja a függő egeres nyitást, így a `hovered`
+- **Forrás viselkedés, ami a portban is megvan** (saját unit teszt, happy-dom, hamis óra,
+  `Tooltip.spec.tsx` "a fókusz érkezése és elvesztése lemondja a függő nyitást, miközben az egér a
+  triggeren marad"): ha az egér belép, 100 ms múlva a trigger fókuszt kap, majd a fókusz elvész,
+  miközben az egér még bent van, a tipp záródik. A `focus` és a `blur` lemondja a függő egeres nyitást, így a `hovered`
   állapot sosem lesz igaz. A "az egyik nem zárja be azt, amit a másik tart" szabály ezért csak a
   már nyitva tartó állapotra igaz. Nem módosítottuk, a forrás szerint maradt.
 
 ### 5. Unit teszt és lefedettség
 
-- `packages/ui/src/tooltip`: 34 teszt két fájlban (`Tooltip.spec.tsx` 33, `tooltip-byte-identity.spec.ts`
-  1), mind zöld. Az egér alatti időzítő tesztjei a Vitest hamis óráját használják
+- `packages/ui/src/tooltip`: 34 teszt két fájlban az eredeti átemelés commitjánál (`Tooltip.spec.tsx`
+  33, `tooltip-byte-identity.spec.ts` 1), a 2026-10-14-i kiegészítés (8. szekció) után 52 teszt három
+  fájlban (`Tooltip.spec.tsx` 35, `tooltip-byte-identity.spec.ts` 1, `tooltip-hover-bridge.spec.ts`
+  16), mind zöld. Az egér alatti időzítő tesztjei a Vitest hamis óráját használják
   (`vi.useFakeTimers()`, `vi.advanceTimersByTime`).
-- A teljes `bun run test`: 551 tesztfájl, 4847 teszt, zöld, a lefedettség mind a négy metrikán 100
-  százalék, a `Tooltip.tsx` is.
-- A kilenc kapu a commitolt fán zöld: `format:check`, `typecheck`, `lint`, `test`, `build`,
+- A teljes `bun run test` az eredeti átemelés commitjánál: 551 tesztfájl, 4847 teszt, zöld, a
+  lefedettség mind a négy metrikán 100 százalék, a `Tooltip.tsx` is.
+- A kilenc kapu az eredeti átemelés commitolt fáján zöld: `format:check`, `typecheck`, `lint`, `test`, `build`,
   `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
 - Szándékos rontással igazolva, hogy a tesztek nem vakok (mindegyik rontás után a teszt fájl
   elbukott, a rontás visszaállítva): az `event.stopPropagation()` törlése 1 tesztet buktat; a
@@ -155,11 +161,74 @@ A fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a 47. sze
 
 ### 7. Nem ellenőrzött
 
-- A tipp valódi böngészőben, valódi hover és fókusz eseményekkel: nincs e2e, mert nincs fogyasztó
-  (a T-009-51 a két ikon gombbal hozza). A hamis órás unit teszt a React eseménykezelőt hívja
-  (`mouseover`, `focusin`, `keydown` az elemen), nem valódi bemenetet.
+- A tipp valódi böngészőben, valódi hover és fókusz eseményekkel, **a repóban**: nincs e2e, mert nincs
+  fogyasztó (a T-009-51 a két ikon gombbal hozza, az e2e a T-009-53). A hamis órás unit teszt a React
+  eseménykezelőt hívja (`mouseover`, `focusin`, `keydown` az elemen), nem valódi bemenetet. A hover
+  átvitelre és a letiltott gombra egy eldobott, nem verziókövetett Chromium próba készült (8.
+  szekció), ami tájékoztató, nem tartós igazolás.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
 - Képernyőolvasó felolvasása: az `aria-describedby` jelenlétét a teszt ellenőrzi, a felolvasást nem.
-- A `disabled` gombra tett tipp: a T-009-51 Visszavonás és Újra gombja üres listánál `disabled`,
-  és a letiltott `button` nem fókuszálható; hogy a burkolóra ilyenkor érkezik-e egéresemény, nem
-  ellenőrzött. A viselkedést a T-009-51 mérje.
+- A nyitott tipp mostantól egér célpont (8. szekció), tehát egy mellette álló elemet takarhat, és
+  egy e2e kattintást elfoghat. Hogy a T-009-51 két gombja mellett ez előfordul-e, nem ellenőrzött; a
+  T-009-53 mérje.
+
+### 8. Egérrel elérhető tipp: kiegészítő CSS (user döntés, 2026-10-14)
+
+**A döntés.** A 3. szekció korlátjáról a PR #27 review-ja után a user ezt választotta: "Külön CSS
+javítás: a bájtra azonos forrás CSS mellé egy kis kiegészítő fájl. A nyitott tippre rá lehet vinni
+az egeret, a gomb és a tipp közti 10 px rést egy láthatatlan híd fedi. JS nem változik, de ez
+eltérés a design systemtől."
+
+**A megvalósítás.** `packages/ui/src/tooltip/tooltip-hover-bridge.css`, a komponens a `tooltip.css`
+után importálja. Szabályai: `.tooltip.is-open` `pointer-events: auto`; egy közös `.tooltip.is-open::after`
+(üres tartalom, abszolút pozíció); négy elhelyezésenként egy 10 px-es híd a tipp trigger felé néző
+oldalán (`top`: `top: 100%; height: 10px`, `bottom`: `bottom: 100%`, `left`: `left: 100%; width: 10px`,
+`right`: `right: 100%`), a másik tengelyen a teljes oldalt fedve. A 10 px a forrás `tooltip.css`
+`calc(100% + 10px)` távolsága (220., 236., 251., 266. sor). A híd a `.tooltip` leszármazottja, tehát
+az egér átvitele a triggerről a tippre nem hagyja el a `Tooltip` burkolóját, a JS záró logikája nem
+változott (a `Tooltip.spec.tsx` "az egér átvitele a triggerről a tippre nem zár" tesztje őrzi).
+
+**Védelem.** A `tooltip-hover-bridge.spec.ts` a kiegészítő fájl létezését és a komponens importját, a
+fejléc három kötelező elemét (user döntés dátuma, WCAG forrás, design systemtől való eltérés), a
+`pointer-events: auto` szabályt, a négy elhelyezés szabályát és azt őrzi, hogy a híd mérete a
+`tooltip.css` aktuális távolsága; a bájtazonos blokkot a `tooltip-byte-identity.spec.ts`, és hogy a
+`tooltip.css` nem hordozza a javítást, ugyanez a spec. Szándékos rontással igazolva (mindegyik
+rontás után a megfelelő teszt elbukott, a rontás visszaállítva): a felső híd 12 px-re; a
+`pointer-events: auto` `none`-ra; a komponens importjának törlése; az `onMouseLeave` cseréje
+`onMouseOut`-ra (az átviteli teszt bukott); a fókusz és a `blur` időzítő lemondásának törlése (a 4. szekció szerinti viselkedés tesztje bukott).
+
+**Böngészős tájékoztató mérés** (eldobott, nem verziókövetett próba, Chromium 151.0.7922.34
+Playwrighttal, fejnélküli mód; a valódi `Tooltip.tsx` és a két CSS fájl `bun build` csomagban,
+`delay` 50 ms; négy elhelyezés, az egér a trigger közepéről a megnyílt panel közepére 40 lépésben,
+lépésenként egy képkocka várakozással). A review hasonló, szintén eldobott mérését ez a próba a saját
+CSS-re megismétli:
+
+| Változat                        | top                | bottom             | left              | right             |
+| ------------------------------- | ------------------ | ------------------ | ----------------- | ----------------- |
+| Forrás CSS (a javítás nélkül)   | zár a 13. lépésnél | zár a 12. lépésnél | zár a 8. lépésnél | zár a 9. lépésnél |
+| Csak `pointer-events: auto`     | zár a 13. lépésnél | zár a 12. lépésnél | zár a 8. lépésnél | zár a 9. lépésnél |
+| `auto` plusz híd (a jelen fájl) | nyitva             | nyitva             | nyitva            | nyitva            |
+
+A harmadik sorban mind a 40 lépés alatt nyitva maradt, a végén a panel közepén az `elementFromPoint`
+a panel eleme volt, és az egér teljes kivitele a burkolóból (a bal felső sarokba) zárt. A második
+sor mutatja, hogy a `pointer-events: auto` a 10 px rés nélkül nem elég. **A letiltott gomb** (ugyanez a
+próba, `disabled` `button` a `Tooltip`-ban): egér alatt a tipp nyílik (a burkoló `span` megkapja az
+egéreseményt), a `focus()` hívás után az `activeElement` a `body` marad, tehát a letiltott gomb
+nem fókuszálható. Ez a review mérésével egyezik. A tartós, verziókövetett igazolás a PLAN-009
+T-009-53 e2e-jének elfogadási kritériuma ("a gombok tippje egérrel elérhető, a tippre vitt egér alatt
+nyitva marad").
+
+**Webes források** (a "Hoverable" feltételre és a rés áthidalására):
+
+- W3C, Understanding SC 1.4.13, "Hoverable" és 2. példa:
+  <https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html>. A szöveg: "If
+  pointer hover can trigger the additional content, then the pointer can be moved over the
+  additional content without the additional content disappearing".
+- W3C, SCR39 technika (a mutató a megjelenő tartalom fölé vihető) és az F95 hiba (a hoverrel
+  megjelenő tartalom nem vihető fölé): <https://w3c.github.io/wcag/techniques/client-side-script/SCR39>.
+- W3C APG, Tooltip Pattern, 3. megjegyzés: <https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/>.
+- NYU Accessibility Testing Standards, 1.4.13 ("The content remains visible when the pointer is
+  hovered over the rendered content"): <https://digitalaccessibility.nyu.edu/testing/sc1413.html>.
+- Curbcut, 1.4.13 útmutató (ha vizuális rés van a trigger és a felugró tartalom között, azt
+  láthatatlan kitöltéssel kell áthidalni):
+  <https://www.curbcutaccessibility.com/wcag/1-4-13-content-on-hover-or-focus/>.
