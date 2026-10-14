@@ -6,12 +6,162 @@ vagy ez a fájl áll, a mérési próza és a nyers számok itt (`.claude/CLAUDE
 Az e2e lefedettség előtte és utána darabszáma lépésenként ide kerül (PLAN-009 F9, "Az e2e
 lefedettségi küszöb kezelése").
 
+## T-009-41
+
+A design system `context-menu` komponensének átemelése a `packages/ui` csomagba, pontra nyitó,
+vezérelt alakban (`packages/ui/src/context-menu/`).
+
+### 1. A forrás
+
+Saját olvasás: `eggproject-design-components/components/context-menu/ContextMenu.jsx`,
+`context-menu.css`, `context-menu.html`.
+
+- A forrás komponens a célelemet maga burkolja (`.context-menu__target`), a saját `contextmenu`
+  eseményén és a `Shift+F10`, illetve a `ContextMenu`/`Apps` billentyűn nyit, a panelt a célelem
+  testvéreként rajzolja, `position: fixed` alakban, a nézetablak koordinátáiban.
+- A nézetablakhoz szorítás (`clampAxis`): a közeli él legalább `VIEWPORT_MARGIN` (8 pixel, a
+  forrás kommentje szerint "positioning-internal; not a token/prop"), a távoli él legfeljebb a
+  nézetablak mérete mínusz a panel mérete mínusz a margó; ha a panel nagyobb a résnél, a közeli
+  margóra tapad; az eredmény egész pixel. A méret az `offsetWidth`/`offsetHeight`, mert a belépő
+  animáció `scale()` transzformációja a `getBoundingClientRect()` értékét nyitás közben
+  kicsinyíti; a mérés `requestAnimationFrame`-ben fut.
+- Bájtazonosság: a forrás `context-menu.css` blokkjának SHA-256 lenyomata a nyitó kommentjétől a
+  fájl végéig (az `@import` sor és az utána álló üres sor nélkül)
+  `c83003b7154925067478e77740dcdf0ea5149ee452833a9576bb9de422dfe9dc`, saját számítás
+  2026-10-14-én. A blokk egyetlen U+2014 karaktert tartalmaz (a fókusz állapot
+  kommentjében); a bájtazonosság miatt ez a forrás része marad, ugyanúgy, mint a
+  `pagination.css` öt és a `drawer.css` tíz ilyen karaktere. Ezért a fájl a `tooling/scripts`
+  `no-em-dash` tesztjének vendorolt listájára is felkerül, ami a `.prettierignore` vendorolt
+  blokkjának másolata.
+
+### 2. A hozzáférhetőségi szerződés forrásai
+
+| Tény                                                                                                                                                                 | Forrás                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nyitáskor a fókusz az első menüpontra kerül                                                                                                                          | [W3C APG, Menu and Menubar Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/), "Keyboard Interaction"; [MDN, ARIA `menu` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/menu_role), "Description" |
+| `ArrowDown`/`ArrowUp` a következő és az előző menüpontra lép, a körbeérés elhagyható; a `Home`/`End` az első és az utolsó elemre ugrik                               | APG, "Keyboard Interaction" (a `Home`/`End` ott a körbeérés nélküli esethez kötött; a forrás mindkettőt adja, a port is)                                                                                                                          |
+| Az `Escape` zár, és a fókuszt annak az elemnek vagy környezetnek adja vissza, ahonnan a menü nyílt; kontextus művelettel nyitott menünél az `Enter` is visszaadhatja | APG, "Keyboard Interaction" és a hozzá tartozó 3. megjegyzés; MDN, "Description"                                                                                                                                                                  |
+| A `Tab` kiviszi a fókuszt a menüből, és bezárja                                                                                                                      | APG, "Keyboard Interaction"                                                                                                                                                                                                                       |
+| A menüben minden menüpont `tabindex="-1"` (a roving `0` csak a menubarban kell), a panel `tabindex` értéke `-1` vagy `0`                                             | APG, "WAI-ARIA Roles, States, and Properties"; MDN, "Associated WAI-ARIA roles, states, and properties" (`tabindex` sor)                                                                                                                          |
+| A `role="menu"` elemnek hozzáférhető neve kell: `aria-labelledby` a megnyitó elemre, vagy `aria-label`                                                               | APG, "WAI-ARIA Roles, States, and Properties"; MDN, `aria-label` vagy `aria-labelledby` sor                                                                                                                                                       |
+| A karakteres típusba-ugrás elhagyható                                                                                                                                | APG, "Keyboard Interaction" ("(Optional)"). **Egy forrás**: az MDN a billentyűt leírja, de az elhagyhatóságról nem szól. A port a típusba-ugrást azért nem emeli át, mert a felvételi menü nem használja, nem e tény miatt                        |
+
+### 3. A megvalósítás többi forrása
+
+- **`useLayoutEffect` a mérésre.** A react.dev leírása szerint a hook "fires before the browser
+  repaints the screen", és a "Measuring layout before the browser repaints the screen" példa
+  pontosan egy lebegő elem méréséhez és újrapozicionálásához használja, a kifestés előtti második
+  renderrel (<https://react.dev/reference/react/useLayoutEffect>). **Egy forrás**, a hivatalos
+  dokumentáció.
+- **Portál a `document.body`-ba.** A `position: fixed` elem tartalmazó blokkja a nézetablak, de
+  egy `transform`, `filter`, `perspective`, `contain: paint` stb. értékű ős a tartalmazó blokkja
+  lesz ([MDN, "Layout and the containing block"](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_display/Containing_block), 4. pont; [W3C CSS Transforms Module Level 1](https://www.w3.org/TR/css-transforms-1/), "any value
+  other than none for the transform property also causes the element to establish a containing
+  block for all descendants"; ugyanez a [CSSWG szerkesztői változatban](https://drafts.csswg.org/css-transforms-1/)).
+  A React Flow nézet rétege inline `transform` stílust kap (a telepített `@xyflow/react`
+  `dist/esm/index.mjs` a `.react-flow__viewport` elemnek `style: { transform: ... }` értéket ad),
+  tehát egy azon belül rajzolt panel nem a nézetablakhoz igazodna.
+  A portál a `menu` téma bevett mintája (`Menu.tsx`).
+
+### 4. A megtervezett felület
+
+`ContextMenu<TValue>` propjai: `position: ContextMenuPosition | undefined` (a nyitási pont
+nézetablak koordinátában, `undefined` esetén zárva), `label: string` (`aria-label`),
+`items: readonly ContextMenuItem<TValue>[]` (`{ value, label }`), `onSelect(value)` és
+`onClose()`. A választás után az `onSelect`, utána az `onClose` fut; egy nyitási ciklusban az
+`onClose` legfeljebb egyszer. A T-009-43 (a jobb klikk menü bekötése) a React Flow
+`onPaneContextMenu` eseményén a `{ x: event.clientX, y: event.clientY }` pontot állapotba teszi, a
+`onClose` hívásra törli, és a választott típust a pontból számolt `screenToFlowPosition` helyre
+veszi fel (SPEC-008 5.8, M-97, M-98).
+
+### 5. Unit teszt és lefedettség
+
+- `packages/ui/src/context-menu`: 42 teszt három fájlban (`ContextMenu.spec.tsx` 33,
+  `compute-context-menu-position.spec.ts` 8, `context-menu-byte-identity.spec.ts` 1), mind zöld.
+- A teljes `bun run test` 546 tesztfájl, 4559 teszt, zöld, a lefedettség mind a négy metrikán 100
+  százalék, a `ContextMenu.tsx` és a `compute-context-menu-position.ts` is.
+- Szándékos rontással igazolva, hogy a tesztek nem vakok: a "nyitási ciklusonként egy zárás" őr
+  eltávolítása hat tesztet buktat (a programozott fókusz visszaadás a happy-dom alatt is
+  `focusout` eseményt vált ki, ami nélküle második zárási kérést adna); a visszaadási cél
+  felülírása áthelyezéskor egy tesztet buktat.
+- Mért buktató: a `no-em-dash` és a `component-boundary-invariant` teszt a `git ls-files`
+  listáján dolgozik, tehát a commit előtti helyi futás a még nem követett új fájlokat nem látja. Az
+  első push CI futása (run `38540342535`) ezért a `no-em-dash` teszten bukott a
+  `context-menu.css` miatt, miközben a helyi futás zöld volt; a lista bővítése után a commitolt
+  fájlokon mindkét teszt helyben is zöld.
+
+### 6. Az e2e lefedettség előtte és utána
+
+Előtte: a `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 47. szekciójának mért értéke. A
+mérés óta az `apps/web/src` alatt csak egy spec fájl változott a `8413882` állapotig
+(`git diff --stat 95f62db 8413882 -- apps/web/src`: kizárólag
+`greppable-invariants/greppable-invariants.spec.ts`), termékkód nem. A `packages/ui` forrása nincs
+az `apps/web` e2e lefedettségének hatókörében.
+
+Utána: a jelen ág (`feat/spec-008-d1-context-menu`) teljes e2e futása a sandboxban, a 47.
+szekció eljárásával: `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, a Playwright az
+`apps/web` alatt közvetlenül, nyolc egymás utáni shardban (`--shard=k/8`, egy futás egy hívásban,
+mert a sandbox a hívás végén a háttérfolyamatot leállítja), **477 teszt, mind zöld**, majd
+`bun run coverage:e2e:report` (exit 0, a meglévő küszöbbel).
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1682 / 1697            | 1682 / 1697           | 15 -> 15                 |
+| branches   | 784 / 795              | 784 / 795             | 11 -> 11                 |
+| functions  | 562 / 565              | 562 / 565             | 3 -> 3                   |
+| lines      | 1622 / 1637            | 1622 / 1637           | 15 -> 15                 |
+
+A fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a 47. szekcióban
+(`mount-app.tsx` 16, 21-22; `read-frontend-config.ts`; `is-valid-connection.ts` 36;
+`browser-history-location-port.ts` 21; `perform-route-request.ts` 89; `use-stream-connection.ts`
+202). Az `apps/web/package.json` küszöbe nem változott.
+
+### 7. A kívülre kattintás zárása a React Flow vásznon
+
+Hiba (független review): a `ContextMenu` panelen kívüli `mousedown` figyelője a `window`
+buborékoló fázisában futott, nem elfogó fázisban. A telepített forrás szerint a React Flow vásznon
+a bal gombos lenyomás nem ér el odáig: a `d3-zoom` 3.0.0 a `mousedown.zoom` kezelőt a vászon
+elemére köti (`src/zoom.js` 76. sor), a `mousedowned` (270. sor) pedig a 280. sorban
+`nopropagation(event)`-et hív, ami `event.stopImmediatePropagation()` (`src/noevent.js` 2. sor). Az
+`@xyflow/system` 0.0.82 `createFilter` szűrője a bal gombot átengedi neki (`dist/esm/index.js`
+2947-2951. sor, `buttonAllowed`, mert a `panOnDrag` alapértéke `true`, `@xyflow/react` 12.11.6
+`dist/esm/index.js` 3767. sor), és a `d3-zoom` az `XYPanZoom` `domNode` elemén, a `zoomPane`
+ref elemén fut (`@xyflow/react` `dist/esm/index.js` 1323-1324. sor). A DOM szabálya szerint a
+`stopImmediatePropagation` az eseményt más objektumokhoz sem engedi tovább
+(<https://developer.mozilla.org/en-US/docs/Web/API/Event/stopImmediatePropagation>), az elfogó
+(`capture`) figyelő viszont a célelem alatti elemek előtt kap eseményt
+(<https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener>, a DOM
+Standard eseményfa szabálya: <https://dom.spec.whatwg.org/#concept-event-dispatch>), és a
+leiratkozáshoz ugyanaz a `capture` érték kell
+(<https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener>).
+
+Javítás: a `mousedown` figyelő `{ capture: true }` opcióval köt fel és ugyanazzal köt le. Két
+új unit teszt őrzi (`ContextMenu.spec.tsx`, `zárás` csoport): egy célelem saját `mousedown`
+figyelője `stopImmediatePropagation`-t hív (a `d3-zoom` mintájára), és az `onClose` ettől
+függetlenül pontosan egyszer fut; valamint a felkötés és a leiratkozás hívásainak egyezése a
+`globalThis` figyelő hívásain. A második teszt azért kell, mert a happy-dom 20.11.6
+`removeEventListener` megvalósítása a `capture` értéket nem veti össze (`lib/event/EventTarget.js`
+64-82. sor, mindkét listából töröl), tehát a hibás leiratkozást (valódi böngészőben szivárgás)
+viselkedés alapú teszt nem látná.
+
+Szándékos rontással igazolva: a felkötés és a leiratkozás is buborékoló alakra állítva két teszt
+bukik (a `stopImmediatePropagation` teszt és a hívás egyezés teszt), 31 zöld marad; csak a
+leiratkozás állítva vissza buborékolóra a hívás egyezés teszt egyedül bukik, a viselkedés alapú
+teszt zöld marad (ezért kell a második). A rontás visszaállítva. `--project ui` futás: 69
+tesztfájl, 671 teszt, zöld, a `packages/ui` lefedettsége mind a négy metrikán 100 százalék, a
+`component-boundary-invariant` is zöld. Az 5. szekció teljes futásának összege (4559 teszt) a
+javítás előtti állapotra szól.
+
+Nem ellenőrzött: valódi böngészőben, valódi React Flow vásznon futó kattintás. A unit teszt a
+`d3-zoom` viselkedését egy célelem figyelőjével utánozza; a vásznon tett kattintás e2e bizonyítéka
+a menü fogyasztójához (T-009-43) tartozik.
+
 ## T-009-50
 
 A design system `tooltip` komponensének átemelése a `packages/ui` csomagba, a `shortcut` propjával
 (`packages/ui/src/tooltip/`).
 
-### 1. A forrás
+### 8. A forrás
 
 Saját olvasás: `eggproject-design-components/components/tooltip/Tooltip.jsx`, `tooltip.css`,
 `tooltip.html`.
@@ -49,21 +199,21 @@ szabályok nem kerültek át. A blokk végén álló `.inline-anchor:focus-visib
 `forced-colors` lekérdezésen belül, a demó mintáé) a bájtazonosság miatt bent maradt, az
 alkalmazásban egyetlen elemre sem illeszkedik.
 
-### 2. A hozzáférhetőségi szerződés forrásai
+### 9. A hozzáférhetőségi szerződés forrásai
 
 | Tény                                                                                                                                             | Forrás                                                                                                                                                                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A tipp konténer `role="tooltip"`, a triggert `aria-describedby` köti hozzá                                                                       | [W3C APG, Tooltip Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/), "WAI-ARIA Roles, States, and Properties"; [MDN, ARIA `tooltip` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/tooltip_role) |
 | Fókuszra és az egér fölé vitelére nyílik; a tipp nem kap fókuszt, a fókusz a triggeren marad                                                     | APG, "About This Pattern" és "Keyboard Interaction" 1. megjegyzés; MDN, "Description" és "Required JavaScript features"                                                                                                                           |
 | Az `Escape` zárja                                                                                                                                | APG, "Keyboard Interaction"; MDN, "Keyboard interactions"                                                                                                                                                                                         |
-| Fókusszal nyitott tipp a fókusz elvesztésekor (`onBlur`) záródik; egérrel nyitott tipp addig nyitva, amíg a kurzor a triggeren vagy a tippen van | APG, "Keyboard Interaction" 2. és 3. megjegyzés. A 3. megjegyzés második fele (a tipp fölött is nyitva marad) a forrás CSS-ével nem teljesül (3. szekció), a kiegészítő fájllal igen (8. szekció)                                                 |
+| Fókusszal nyitott tipp a fókusz elvesztésekor (`onBlur`) záródik; egérrel nyitott tipp addig nyitva, amíg a kurzor a triggeren vagy a tippen van | APG, "Keyboard Interaction" 2. és 3. megjegyzés. A 3. megjegyzés második fele (a tipp fölött is nyitva marad) a forrás CSS-ével nem teljesül (10. szekció), a kiegészítő fájllal igen (15. szekció)                                               |
 | A tipp elemre `aria-describedby` mutat, mielőtt vagy amikor megjelenik; a hívó meglévő leírása nem veszhet el                                    | MDN, "Description" ("Elements with the `tooltip` role should be referenced through the use of `aria-describedby` before or when the tooltip is displayed"); a meglévő hivatkozás megőrzése a forrás `Tooltip.jsx` viselkedése, saját olvasás      |
 
 Az APG Tooltip minta oldala maga jelzi: "This design pattern is work in progress; it does not yet
 have task force consensus". A tény sor tehát a W3C munkaanyagára és az MDN-re áll, két független
 forrás.
 
-### 3. A forrás korlátja: a panelre nem vihető át az egér
+### 10. A forrás korlátja: a panelre nem vihető át az egér
 
 A forrás `.tooltip` szabálya `pointer-events: none` értéket ad (`tooltip.css` 130. sor), a
 `.tooltip.is-open` ezt nem írja felül. Az MDN szerint ez az érték azt jelenti, hogy az elem
@@ -80,12 +230,12 @@ feltételt adja, a "Hoverable" feltételt nem.
 A `pointer-events: none` nem az egyetlen ok: a forrásban a tipp a trigger burkolójától
 `calc(100% + 10px)` távolságra áll (a forrás `tooltip.css` 220., 236., 251. és 266. sora, a négy
 elhelyezés), tehát a panelhez vezető úton az egér egy 10 px-es sávon halad át, ami sem a triggerhez,
-sem a panelhez nem tartozik, és a burkoló `mouseleave` eseménye ott zár. A 8. szekció mérése szerint a rés
+sem a panelhez nem tartozik, és a burkoló `mouseleave` eseménye ott zár. A 15. szekció mérése szerint a rés
 önmagában is zár (`pointer-events: auto` mellett is); a `pointer-events: none` önálló hatása külön
 nem mért. A port eredetileg a CSS bájtazonossága miatt ezen nem változtatott;
-a user 2026-10-14-i döntése nyomán a javítás külön fájlban áll, lásd a 8. szekciót.
+a user 2026-10-14-i döntése nyomán a javítás külön fájlban áll, lásd a 15. szekciót.
 
-### 4. A megvalósítás döntései
+### 11. A megvalósítás döntései
 
 - **A trigger a `children` elem, a `cloneElement` megmaradt.** A `Menu` téma a forrás
   `cloneElement` API-ját render-függvényre cserélte, mert a fókusz visszaadáshoz a trigger DOM
@@ -109,10 +259,10 @@ a user 2026-10-14-i döntése nyomán a javítás külön fájlban áll, lásd a
   állapot sosem lesz igaz. A "az egyik nem zárja be azt, amit a másik tart" szabály ezért csak a
   már nyitva tartó állapotra igaz. Nem módosítottuk, a forrás szerint maradt.
 
-### 5. Unit teszt és lefedettség
+### 12. Unit teszt és lefedettség
 
 - `packages/ui/src/tooltip`: 34 teszt két fájlban az eredeti átemelés commitjánál (`Tooltip.spec.tsx`
-  33, `tooltip-byte-identity.spec.ts` 1), a 2026-10-14-i kiegészítés (8. szekció) után 52 teszt három
+  33, `tooltip-byte-identity.spec.ts` 1), a 2026-10-14-i kiegészítés (15. szekció) után 52 teszt három
   fájlban (`Tooltip.spec.tsx` 35, `tooltip-byte-identity.spec.ts` 1, `tooltip-hover-bridge.spec.ts`
   16), mind zöld. Az egér alatti időzítő tesztjei a Vitest hamis óráját használják
   (`vi.useFakeTimers()`, `vi.advanceTimersByTime`).
@@ -134,7 +284,7 @@ a user 2026-10-14-i döntése nyomán a javítás külön fájlban áll, lásd a
   `bun x turbo run lint --concurrency=1` futás 43/43 zöld. Termékkód hiba nem volt, a lint kimenet
   a `tooltip` mappára külön futtatva is tiszta.
 
-### 6. Az e2e lefedettség előtte és utána
+### 13. Az e2e lefedettség előtte és utána
 
 Előtte: a `docs/research/2026-10-14-kotelezo-mezok-es-start.md` 3. szekciójának mérése (a `main`
 `4ce7de0` állapota, T-009-48 és T-009-49 után). A `packages/ui` forrása nincs az `apps/web` e2e
@@ -159,22 +309,22 @@ A fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a 47. sze
 `browser-history-location-port.ts` 21; `perform-route-request.ts` 89; `use-stream-connection.ts`
 202). Az `apps/web/package.json` küszöbe nem változott.
 
-### 7. Nem ellenőrzött
+### 14. Nem ellenőrzött
 
 - A tipp valódi böngészőben, valódi hover és fókusz eseményekkel, **a repóban**: nincs e2e, mert nincs
   fogyasztó (a T-009-51 a két ikon gombbal hozza, az e2e a T-009-53). A hamis órás unit teszt a React
   eseménykezelőt hívja (`mouseover`, `focusin`, `keydown` az elemen), nem valódi bemenetet. A hover
-  átvitelre és a letiltott gombra egy eldobott, nem verziókövetett Chromium próba készült (8.
+  átvitelre és a letiltott gombra egy eldobott, nem verziókövetett Chromium próba készült (15.
   szekció), ami tájékoztató, nem tartós igazolás.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
 - Képernyőolvasó felolvasása: az `aria-describedby` jelenlétét a teszt ellenőrzi, a felolvasást nem.
-- A nyitott tipp mostantól egér célpont (8. szekció), tehát egy mellette álló elemet takarhat, és
+- A nyitott tipp mostantól egér célpont (15. szekció), tehát egy mellette álló elemet takarhat, és
   egy e2e kattintást elfoghat. Hogy a T-009-51 két gombja mellett ez előfordul-e, nem ellenőrzött; a
   T-009-53 mérje.
 
-### 8. Egérrel elérhető tipp: kiegészítő CSS (user döntés, 2026-10-14)
+### 15. Egérrel elérhető tipp: kiegészítő CSS (user döntés, 2026-10-14)
 
-**A döntés.** A 3. szekció korlátjáról a PR #27 review-ja után a user ezt választotta: "Külön CSS
+**A döntés.** A 10. szekció korlátjáról a PR #27 review-ja után a user ezt választotta: "Külön CSS
 javítás: a bájtra azonos forrás CSS mellé egy kis kiegészítő fájl. A nyitott tippre rá lehet vinni
 az egeret, a gomb és a tipp közti 10 px rést egy láthatatlan híd fedi. JS nem változik, de ez
 eltérés a design systemtől."
@@ -195,7 +345,7 @@ fejléc három kötelező elemét (user döntés dátuma, WCAG forrás, design s
 `tooltip.css` nem hordozza a javítást, ugyanez a spec. Szándékos rontással igazolva (mindegyik
 rontás után a megfelelő teszt elbukott, a rontás visszaállítva): a felső híd 12 px-re; a
 `pointer-events: auto` `none`-ra; a komponens importjának törlése; az `onMouseLeave` cseréje
-`onMouseOut`-ra (az átviteli teszt bukott); a fókusz és a `blur` időzítő lemondásának törlése (a 4. szekció szerinti viselkedés tesztje bukott).
+`onMouseOut`-ra (az átviteli teszt bukott); a fókusz és a `blur` időzítő lemondásának törlése (a 11. szekció szerinti viselkedés tesztje bukott).
 
 **Böngészős tájékoztató mérés** (eldobott, nem verziókövetett próba, Chromium 151.0.7922.34
 Playwrighttal, fejnélküli mód; a valódi `Tooltip.tsx` és a két CSS fájl `bun build` csomagban,

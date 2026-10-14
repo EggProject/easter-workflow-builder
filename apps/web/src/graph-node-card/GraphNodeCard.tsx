@@ -119,10 +119,17 @@ function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
  * nem tíz külön komponens. **Egyetlen ág sem függ mért node geometriától**
  * (SPEC-008 12.2): nincs `measured.` és `getBoundingClientRect()` hivatkozás,
  * a kártya mérete a CSS-é (M-57).
+ *
+ * **A fejléc jelvényei** (SPEC-008 6.6): az állapot jelvény mellett két
+ * `outline` változatú `Badge` állhat. A "`N`. próbálkozás" csak 1 feletti
+ * `attempt` értékre jelenik meg (1. döntés), az "alapértelmezett ág" pontosan
+ * akkor, ha a csomópont legutóbbi döntése az alapértelmezett ágra lépett
+ * (4. döntés, O-24). Az `outline` a státusz nélküli jelölés változata: a
+ * színes változatok a lépés állapotát hordozzák, és pontot is rajzolnak.
  */
 export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNode>>): ReactElement {
   const { data } = properties;
-  const { workflowNode, status, runDecoration } = data;
+  const { workflowNode, status, attempt, usedDefaultBranch, runDecoration } = data;
   const catalogEntry = GRAPH_NODE_CATALOG[workflowNode.type];
   const statusBadge = status === undefined ? undefined : describeStepRunStatusBadge(status);
   const outputHandles = resolveOutputHandles(catalogEntry.outputHandles, workflowNode.config);
@@ -132,7 +139,11 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
       {catalogEntry.hasInputHandle && <Handle type="target" position={Position.Left} aria-label="Bemenet" />}
       <div className="graph-node-card__header">
         <span className="graph-node-card__type">{catalogEntry.label}</span>
-        {statusBadge !== undefined && <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>}
+        <span className="graph-node-card__badges">
+          {statusBadge !== undefined && <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>}
+          {attempt !== undefined && attempt > 1 && <Badge variant="outline">{`${String(attempt)}. próbálkozás`}</Badge>}
+          {usedDefaultBranch === true && <Badge variant="outline">alapértelmezett ág</Badge>}
+        </span>
       </div>
       <p className="graph-node-card__label">{workflowNode.label}</p>
       {runDecoration !== undefined && renderRunSummary(runDecoration)}

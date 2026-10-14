@@ -1,0 +1,167 @@
+/* ============================================================
+   EggProject: Context Menu
+   Forrás: eggproject-design-components/components/context-menu/context-menu.css,
+   bájtra azonos a forrás @import sora (design-token tokenek, amiket a
+   csomag globálisan tölt be) kivételével. Átemelés dátuma: 2026-10-14.
+   Licencállítás nincs (SPEC-007 4.4, M-34).
+   ============================================================ */
+
+/* ============ Context Menu ============
+   Structure:
+     .context-menu[ .context-menu--open ] (positioned absolutely by JS)
+       > .context-menu__item[ .is-danger | .is-disabled ]
+       > .context-menu__separator
+       > .context-menu__submenu-trigger (nested submenu trigger)
+         > .context-menu (submenu panel)
+   Shares visual style with .menu from menu.css but
+   is triggered on contextmenu/right-click.
+============================================ */
+.context-menu {
+  position: fixed;
+  z-index: 2000;
+  background: var(--ep-bg-elevated);
+  border: 1px solid var(--ep-border);
+  border-radius: var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow-lg);
+  padding: 4px;
+  min-width: 180px;
+  outline: none;
+  animation: context-menu-in 120ms var(--ep-ease-out);
+}
+
+@keyframes context-menu-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Keyboard focus on the right-click target wrapper: the system focus ring, only on :focus-visible
+   (a pointer right-click does not trigger it). No transition → instant; no border/padding/margin →
+   no layout change. The wrapper has no overflow of its own, so the ring is not clipped. */
+.context-menu__target:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-shadow-focus);
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--ep-radius-sm);
+  font: var(--ep-text-body);
+  color: var(--ep-fg);
+  cursor: pointer;
+  transition: background var(--ep-dur-fast);
+  user-select: none;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.context-menu__item:hover {
+  background: var(--ep-bg-hover);
+}
+
+.context-menu__item.is-danger {
+  color: var(--ep-danger);
+}
+.context-menu__item.is-danger:hover {
+  background: var(--ep-danger-bg);
+}
+
+/* Keyboard focus: a standalone state — at least as visible as hover, plus the system focus ring.
+   Disabled items are natively non-focusable, so no disabled focus styling is needed here. */
+.context-menu__item:focus-visible {
+  outline: none;
+  background: var(--ep-bg-hover);
+  box-shadow: var(--ep-shadow-focus);
+}
+.context-menu__item.is-danger:focus-visible {
+  background: var(--ep-danger-bg);
+}
+
+.context-menu__item.is-disabled {
+  color: var(--ep-fg-faint);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.context-menu__item svg {
+  width: 15px; height: 15px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.context-menu__shortcut {
+  margin-left: auto;
+  font: 11px/1 var(--ep-font-mono);
+  color: var(--ep-fg-subtle);
+  letter-spacing: 0;
+}
+
+.context-menu__separator {
+  height: 1px;
+  background: var(--ep-divider);
+  margin: 4px 8px;
+}
+
+.context-menu__label {
+  padding: 6px 12px 2px;
+  font: var(--ep-text-overline);
+  letter-spacing: var(--ep-track-overline);
+  text-transform: uppercase;
+  color: var(--ep-fg-subtle);
+}
+
+/* Submenu chevron */
+.context-menu__item--submenu::after {
+  content: '';
+  display: block;
+  margin-left: auto;
+  width: 0; height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  opacity: 0.5;
+}
+
+/* ---- Reduced motion: panel appears instantly at its end state (no scale/translate/opacity move).
+        The JS viewport-clamp + offsetWidth/offsetHeight measurement are unaffected. ---- */
+@media (prefers-reduced-motion: reduce) {
+  .context-menu { animation: none; }
+}
+
+/* ---- Forced colors (Windows High Contrast): system colors only; keyboard focus uses a real
+        Highlight outline since the box-shadow ring is dropped by the UA. ---- */
+@media (forced-colors: active) {
+  .context-menu {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;          /* real border carries separation when shadows are dropped */
+  }
+  /* target wrapper keyboard focus: box-shadow rings are dropped here, so use a real outer Highlight outline */
+  .context-menu__target:focus-visible {
+    box-shadow: none;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;                   /* outer ring; the wrapper has no overflow of its own to clip it */
+  }
+  .context-menu__item { color: CanvasText; background: transparent; }
+  .context-menu__item:hover,
+  .context-menu__item:focus-visible {
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;          /* not shadow-based; ≥2px */
+    outline-offset: -2px;                  /* inside the item → no clipping, no layout shift */
+  }
+  .context-menu__separator { background: GrayText; } /* real GrayText line, not an alpha tint */
+  .context-menu__label { color: GrayText; }
+  .context-menu__shortcut { color: currentColor; }
+  .context-menu__item.is-disabled {        /* placed last → wins over the hover rule on equal specificity */
+    color: GrayText;
+    background: transparent;
+    outline: none;
+  }
+  /* the existing submenu chevron already draws with currentColor, so it follows the system colors above */
+}

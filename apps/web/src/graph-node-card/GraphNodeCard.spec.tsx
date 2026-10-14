@@ -43,6 +43,20 @@ function buildDecoratedFlowNode(
   return { ...base, data: { ...base.data, runDecoration: { summary, onOpenSubWorkflowRun } } };
 }
 
+/**
+ * A két futás nézeti jelvény adatával (SPEC-008 6.6): a megjelenített lépés
+ * futás `attempt` és `status` értéke, illetve a legutóbbi döntésből számolt
+ * `usedDefaultBranch` jelző. Az `exactOptionalPropertyTypes: true` miatt csak
+ * a megadott kulcsok kerülnek fel.
+ */
+function buildBadgedFlowNode(
+  workflowNode: WorkflowNodeInput,
+  badges: Readonly<{ status?: StepRunStatus; attempt?: number; usedDefaultBranch?: true }>,
+): GraphNodeCardFlowNode {
+  const base = buildFlowNode(workflowNode);
+  return { ...base, data: { ...base.data, ...badges } };
+}
+
 const AGENT_STEP_SETTINGS = {
   promptTemplate: 'Foglald össze: {{input}}',
   providerId: null,
@@ -284,6 +298,53 @@ describe('GraphNodeCard', () => {
   it('futás állapot nélkül nincs badge a kártyán', () => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step)]);
     expect(container.querySelector('.badge')).toBeNull();
+  });
+
+  function headerBadgeLabels(): (string | null)[] {
+    return [...container.querySelectorAll(':scope .graph-node-card__header .badge')].map((badge) => badge.textContent);
+  }
+
+  it('a második próbálkozás outline jelvényt kap az állapot jelvény mellett', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.agent_step, { status: 'running', attempt: 2 })]);
+    expect(headerBadgeLabels()).toEqual(['fut', '2. próbálkozás']);
+    const attemptBadge = container.querySelector(':scope .graph-node-card__header .badge--outline');
+    expect(attemptBadge?.textContent).toBe('2. próbálkozás');
+    expect(attemptBadge?.querySelector('.badge__dot')).toBeNull();
+  });
+
+  it('a szám a próbálkozás jelvény szövegében az attempt értéke', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.agent_step, { status: 'running', attempt: 13 })]);
+    expect(headerBadgeLabels()).toEqual(['fut', '13. próbálkozás']);
+  });
+
+  it('az első próbálkozásnál nincs próbálkozás jelvény', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.agent_step, { status: 'running', attempt: 1 })]);
+    expect(headerBadgeLabels()).toEqual(['fut']);
+  });
+
+  it('próbálkozás adat nélkül (nincs megjelenített lépés futás) nincs próbálkozás jelvény', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.agent_step, {})]);
+    expect(container.querySelector('.badge')).toBeNull();
+  });
+
+  it('az alapértelmezett ágra lépett elágazás outline "alapértelmezett ág" jelvényt kap', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.branch, { status: 'succeeded', usedDefaultBranch: true })]);
+    expect(headerBadgeLabels()).toEqual(['sikeres', 'alapértelmezett ág']);
+    expect(container.querySelector(':scope .graph-node-card__header .badge--outline')?.textContent).toBe(
+      'alapértelmezett ág',
+    );
+  });
+
+  it('az alapértelmezett ág jelvény nélkül a kártyán nincs ilyen jelvény', () => {
+    renderNodes([buildBadgedFlowNode(WORKFLOW_NODES.branch, { status: 'succeeded' })]);
+    expect(headerBadgeLabels()).toEqual(['sikeres']);
+  });
+
+  it('a három jelvény az állapot, a próbálkozás, az alapértelmezett ág sorrendjében áll a fejlécben', () => {
+    renderNodes([
+      buildBadgedFlowNode(WORKFLOW_NODES.branch, { status: 'succeeded', attempt: 3, usedDefaultBranch: true }),
+    ]);
+    expect(headerBadgeLabels()).toEqual(['sikeres', '3. próbálkozás', 'alapértelmezett ág']);
   });
 
   it('a node saját magyar címkéje megjelenik', () => {

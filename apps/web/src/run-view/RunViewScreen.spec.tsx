@@ -342,6 +342,52 @@ function sdkResultFrame(id: number, stepRunId: string): StreamFrame {
   };
 }
 
+/**
+ * Az elágazás fixtúrája (SPEC-008 6.6, T-009-38): a pillanatkép egy `branch`
+ * csomóponttal bővül, a lépés futása a második próbálkozás.
+ */
+const BRANCH_SNAPSHOT = {
+  ...SNAPSHOT,
+  nodes: [
+    ...SNAPSHOT.nodes,
+    {
+      id: 'n-branch',
+      type: 'branch',
+      label: 'Elágazás',
+      position: { x: 300, y: 0 },
+      config: {
+        type: 'branch',
+        expression: 'input.kind',
+        branches: [
+          { key: 'igen', label: 'Igen' },
+          { key: 'nem', label: 'Nem' },
+        ],
+        defaultBranchKey: 'nem',
+        onUnhandledError: null,
+      },
+      effectiveProviderId: 'minimax',
+    },
+  ],
+};
+
+const BRANCH_STEP_RUN = { ...BASE_STEP_RUN, id: 's-branch', nodeId: 'n-branch', nodeType: 'branch', attempt: 2 };
+
+function branchTakenFrame(id: number, payload: unknown): StreamFrame {
+  const finished = runFinishedFrame('r-3');
+  if (finished.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return {
+    ...finished,
+    delivery: 'replayed',
+    runEvent: { ...finished.runEvent, id, stepRunId: 's-branch', kind: 'branch_taken', payload },
+  };
+}
+
+function branchCardData(): RunGraphCanvasProperties['nodes'][number] | undefined {
+  return lastCanvasProperties().nodes.find((node) => node.workflowNode.id === 'n-branch');
+}
+
 describe('RunViewScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -646,10 +692,11 @@ describe('RunViewScreen', () => {
 
     it('leszereléskor leiratkozik a keretekről', async () => {
       await renderScreen('?runId=r-3', createFetchFunction());
-      // Négy feliratkozó: a transcript, a csomópontok élő állapota, a futás
-      // lezárásának felismerése (T-009-25, T-009-25a) és a függő
-      // jóváhagyások élő listája (T-009-27).
-      expect(frameListeners.size).toBe(4);
+      // Öt feliratkozó: a transcript, a csomópontok élő állapota, a futás
+      // lezárásának felismerése (T-009-25, T-009-25a), a függő
+      // jóváhagyások élő listája (T-009-27) és az elágazások döntései
+      // (T-009-38).
+      expect(frameListeners.size).toBe(5);
       act(() => {
         root.unmount();
       });
@@ -1257,5 +1304,67 @@ describe('RunViewScreen', () => {
     expect(approvalUrls.length).toBeGreaterThanOrEqual(2);
     // A conflicttel lezárt kártya gombjai nem kapcsolnak vissza.
     expect(approveButton.disabled).toBe(true);
+  });
+
+  // ============================================================
+  // AZ ELÁGAZÁSOK DÖNTÉSEI (SPEC-008 6.6, T-009-38).
+  // ============================================================
+
+  it('a branch_taken keretekből a kártya az alapértelmezett ág és a próbálkozás adatát kapja, új REST hívás nélkül', async () => {
+    const requestedPaths: string[] = [];
+    const baseFetchFunction = createFetchFunction({
+      snapshot: BRANCH_SNAPSHOT,
+      stepRuns: [BASE_STEP_RUN, BRANCH_STEP_RUN],
+    });
+    const fetchFunction: FetchFunction = (input, init) => {
+      requestedPaths.push(new URL(input).pathname);
+      return baseFetchFunction(input, init);
+    };
+    await renderScreen('?runId=r-3', fetchFunction);
+    expect(branchCardData()?.attempt).toBe(2);
+    expect(branchCardData()?.usedDefaultBranch).toBeUndefined();
+    const requestsBeforeFrames = [...requestedPaths];
+
+    // Egy render kötegben: két érvényes döntés, egy ismétlődő id és egy
+    // hibás alakú payload. A legutóbbi (9) az alapértelmezett ágra lépett.
+    await emitFramesAndFlush([
+      branchTakenFrame(5, { branchKey: 'igen', usedDefault: false }),
+      branchTakenFrame(9, { branchKey: null, usedDefault: true }),
+      branchTakenFrame(5, { branchKey: 'igen', usedDefault: false }),
+      branchTakenFrame(11, 'nem objektum'),
+    ]);
+
+    expect(branchCardData()?.usedDefaultBranch).toBe(true);
+    expect(requestedPaths).toEqual(requestsBeforeFrames);
+  });
+
+  it('a vászon a kártyákkal azonos, csomópontonként rendezett döntés térképet kapja (T-009-39)', async () => {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({ snapshot: BRANCH_SNAPSHOT, stepRuns: [BASE_STEP_RUN, BRANCH_STEP_RUN] }),
+    );
+    expect(lastCanvasProperties().branchDecisionsByNodeId.size).toBe(0);
+
+    await emitFramesAndFlush([
+      branchTakenFrame(9, { branchKey: null, usedDefault: true }),
+      branchTakenFrame(5, { branchKey: 'igen', usedDefault: false }),
+    ]);
+
+    expect(
+      lastCanvasProperties()
+        .branchDecisionsByNodeId.get('n-branch')
+        ?.map((decision) => decision.eventId),
+    ).toEqual([5, 9]);
+  });
+
+  it('a még le nem képezhető döntés a lépés futás lista frissülése után kerül a kártyára', async () => {
+    const stepRunResponses = [[BASE_STEP_RUN], [BASE_STEP_RUN, BRANCH_STEP_RUN]];
+    await renderScreen('?runId=r-3', createFetchFunction({ snapshot: BRANCH_SNAPSHOT, stepRunResponses }));
+
+    await emitFramesAndFlush([branchTakenFrame(9, { branchKey: null, usedDefault: true })]);
+    expect(branchCardData()?.usedDefaultBranch).toBeUndefined();
+
+    await emitFramesAndFlush([stepEventFrame('step_finished', 'live', 10)]);
+    expect(branchCardData()?.usedDefaultBranch).toBe(true);
   });
 });
