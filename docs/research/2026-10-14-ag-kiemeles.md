@@ -511,3 +511,139 @@ tesztje átírva: két kimenet a korábbi három helyett, kulccsal és hozzáfé
 
 A `packages/db` sémája és a `packages/db/drizzle` alatti migrációk nem változtak (`git diff --stat
 019c4b4 -- packages/db` üres), a `bun run check:db-drift` zöld.
+
+## T-009-46
+
+A futás nézet bemutató képének transcript tartalma (SPEC-008 12.6, 93. kritérium): a két kép
+(`run-view-light.png`, `run-view-dark.png`) 3-6 jellemző transcript sort mutat, jóváhagyás nélkül,
+görgetés nélkül. Ág: `feat/spec-008-bemutato-kep`, az `origin/main` `fe22c2e` állapotáról.
+
+### 1. A felhasznált tények, forrással
+
+| Tény                                                                                                                                                                       | Forrás                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| A keretek és a mockok kizárólag a fixtúrában állnak, a szentesített script nem tarthat saját `mockRoute` vagy `page.route` hívást                                          | SPEC-008 12.6, `.claude/CLAUDE.md` 12. szekció ("Képernyőkép és vizuális bizonyíték")                                           |
+| A `mockSseFrames` lezárt választ ad, a böngésző újracsatlakozik, és ugyanazt a pótlást kapja újra; a `mockSseFramesWithoutReconnect` csak az első kapcsolatot szolgálja ki | `apps/web/e2e/sse-mock.ts`, `.claude/CLAUDE.md` 12. szekció ("A lezárt `page.route()` SSE mock újracsatlakozáskor újrapótol")   |
+| Az átvett sorok kurzora (`afterEventId`) a már látott azonosítójú keretet eldobja                                                                                          | `apps/web/src/transcript-panel/` reducer                                                                                        |
+| A `toBeInViewport()` alapértéke a részleges láthatóságot is elfogadja, a teljes láthatósághoz `ratio: 1` kell                                                              | <https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>, `.claude/CLAUDE.md` 12. szekció |
+| A stream jelző `reconnecting` állapota a "újracsatlakozás" felirat (üres piros kör)                                                                                        | `apps/web/src/app-shell/StreamStatusIndicator.tsx`                                                                              |
+
+### 2. A tervezési döntések
+
+- **A sorok** (`SHOWCASE_RUN_EVENTS`, öt `run_event`, azonosítóik 1-5): `step_started` (`sr-agent`),
+  `sdk_assistant` (`sr-agent`), `sdk_result` (`sr-agent`, a `sdkResultRecord` segéddel),
+  `step_finished` (`sr-agent`, `succeeded`) és `step_started` (`sr-loop`, a még futó lépés).
+  `branch_taken` sor nincs, a SPEC-008 12.6 szerint: az elágazás mind az öt célja futott, amit egyetlen
+  kiemelt él ellentmondásosan mutatna. A négy sorfajta mind szerepel, az öt sor a 3-6 tartományban van.
+- **A lépés futások.** Az `sr-agent` és az `sr-approval` `succeeded`, az `sr-loop` marad `running`,
+  `waiting_approval` állapotú lépés futás nincs. Az `sdk_result` sor ezért lezárt agent lépéshez tartozik
+  (SPEC-008 12.6: "`sdk_result` csak lezárt agent lépéshez tartozik"), és minden sor `stepRunId` mezője
+  a `SHOWCASE_RUN_STEP_RUNS` egy sorára mutat.
+- **A jóváhagyás hiánya.** A `listPendingApprovals` mock üres listát ad; a `SHOWCASE_PENDING_APPROVALS`
+  konstans és az ahhoz tartozó importok és konstansok törölve (a fixtúra saját árvái).
+- **Az időbélyeg.** A sorok helyi időben rögzített `occurredAtMs` értéket kapnak (4 másodperces
+  közökkel), tehát a kijelzett óra:perc:másodperc a gép időzónájától független.
+- **Az SSE segéd: `mockSseFramesWithoutReconnect`.** Indok: egyetlen, stabil pótlás; a `mockSseFrames`
+  újracsatlakozáskor ugyanazt a pótlást újra kézbesíti (a kurzor eldobja, így a sorok száma ott is
+  azonos, a 4. pont mérése), de minden újrapótlás egy újabb `replay_complete` keretet és újratöltést
+  hoz, ami a képkészítés pillanatában felesleges mozgó rész.
+- **Az állítás helye.** Az `expectShowcaseTranscript` a `showcase-graph.ts` fájlban áll, és a
+  szentesített `capture-screenshots.ts` a képernyőkép előtt hívja: a képet így csak az a futás
+  készítheti el, amelyiken a sorok teljesen látszanak, nincs mit görgetni, és nincs jóváhagyás panel
+  vagy "jóváhagyásra vár" jelvény. A script saját mockot nem kapott.
+- **A manifeszt.** A fixtúra és a szentesített script lenyomata változott (`fixtureSha256`,
+  `captureScriptSha256`), a `bun run screenshots` újrafuttatása után a manifeszt friss; az éllisták
+  változatlanok (az `e-branch-loop` kulcsos marad, 7. pont).
+
+### 3. A mérés: a stream jelző nem mutat hibamentes állapotot (NYITOTT)
+
+A SPEC-008 12.6 előírja, hogy a segéd úgy legyen választva, hogy "a stream állapot jelző ne mutasson
+hibát; ezt a lépés méri, nem feltételezi". Saját mérés (ideiglenes spec, a lap `Stream kapcsolat`
+státusz elemének `aria-label` értéke a pótlás lezárulta után és 1500 ms múlva; a mérő spec a mérés
+után törölve):
+
+| Mock                                                           | Felirat a pótlás után               | 1500 ms múlva                       |
+| -------------------------------------------------------------- | ----------------------------------- | ----------------------------------- |
+| `mockSseFramesWithoutReconnect` (a fixtúra mockja)             | `Stream kapcsolat: újracsatlakozás` | `Stream kapcsolat: újracsatlakozás` |
+| `mockSseFrames` (lezárt válasz, újrapótlás)                    | `Stream kapcsolat: újracsatlakozás` | `Stream kapcsolat: újracsatlakozás` |
+| `mockIdleStream` (`mockSseFrames` egy `stream_ready` kerettel) | `Stream kapcsolat: újracsatlakozás` | `Stream kapcsolat: újracsatlakozás` |
+
+Mindhárom mock lezárt `route.fulfill()` választ ad, tehát az `EventSource` a válasz végén `error`-t
+kap, és a jelző `reconnecting` állapotba kerül. Ez a viselkedés a T-009-46 előtti állapoton is fennáll
+(a `mockIdleStream` sor), tehát nem a T-009-46 hozta be. A "ne mutasson hibát" feltétel a három
+meglévő segédből egyikkel sem teljesíthető; a lépés ezt nem döntötte el.
+
+- **Mi a viselkedés addig.** A képen a jelző "újracsatlakozás" feliratú üres piros kört mutat, mint a
+  T-009-46 előtt. A sorok egyszer szerepelnek (4. pont), a 93. kritérium többi része teljesül.
+- **Mi zárná le.** Döntés a három lehetőség közül: (A) a jelenlegi állapot elfogadása, mert a baseline
+  kép is ezt mutatta; (B) a `node:http` hibrid teszt szerver beemelése a fixtúrába, ami nyitott
+  kapcsolaton tartja az `EventSource` példányt (SPEC-007 13.4, `apps/web/e2e/run-view-stream.ts`),
+  de a szentesített script szabálya (nincs saját szerver, nincs saját mock) és a SPEC-008 12.6 szövege
+  módosítást igényel; (C) a SPEC-008 12.6 "ne mutasson hibát" mondatának elhagyása a 93. kritériumból,
+  mert a lezárt `route.fulfill()` mock mellett a nyitva maradás nem érhető el.
+
+### 4. A sorok egyszer szerepelnek: a mérés
+
+A `showcase-graph.spec.ts` két tesztje egy lap oldali `EventSource` burkolóval számolja a
+kézbesített `run_event` kereteket (`e2eDeliveredRunEventFrameCount`), és a transcript sorokat a DOM-ból:
+
+- a fixtúra mockjával (`mockSseFramesWithoutReconnect`) a böngésző újracsatlakozik (a második `GET
+/events` kérés megérkezik, `streamRequestCount === 2`), a mock nem válaszol rá: kézbesített keretek =
+  küldött keretek (5), sorok = 5;
+- a `mockSseFrames` felülírásával (a később regisztrált útvonalat a Playwright előbb próbálja) a
+  második pótlás is megérkezik: kézbesített keretek = 2 \* küldött keretek (10), sorok = 5. A kurzor
+  tehát a kettős kézbesítést is egyszeri sorrá szűri.
+
+### 5. A szándékos rontások
+
+Mindegyik rontás ideiglenes volt (a fixtúra a rontás után a `git`-ben commitolt állapotra
+visszaállítva); a rontott állapoton a `showcase-graph.spec.ts` felsorolt tesztjei buktak, a
+visszaállítottan mind a 13 teszt zöld.
+
+| Rontás                                                                        | Bukó tesztek (a `showcase-graph.spec.ts`-ben)                                                                                                  |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| (I1) az `sr-approval` lépés futás `waiting_approval` állapotú, lezárás nélkül | a "egyetlen lépés futás sem vár jóváhagyásra" alak teszt, mindkét téma futás nézet tesztje, mindkét újracsatlakozás teszt (5 bukás)            |
+| (I2) a `listPendingApprovals` egy függő jóváhagyást ad                        | mindkét téma futás nézet tesztje, mindkét újracsatlakozás teszt: a jóváhagyás panel kitölti a helyet, a sorok nem látszanak teljesen (4 bukás) |
+| (I3) 20 további `sdk_result` sor a fixtúrában                                 | az alak teszt (a sorok száma a 3-6 tartományon kívül), mindkét téma futás nézet tesztje, mindkét újracsatlakozás teszt (5 bukás)               |
+| (I5) az `sdk_result` sor a futó `sr-loop` lépés futáshoz tartozik             | az alak teszt (az `sdk_result` csak lezárt lépéshez tartozhat); a többi teszt zöld, mert a sor láthatósága nem függ a lépés futástól (1 bukás) |
+
+### 6. Az e2e lefedettség előtte és utána
+
+**Előtte**: saját mérés a `fe22c2e` állapoton (az e2e fa és az `apps/web/CLAUDE.md` a `fe22c2e`-ről
+kicsekkolva, a `src` ugyanaz), a T-009-38 szekció eljárásával: `rm -rf apps/web/e2e/.nyc_output
+apps/web/coverage-e2e`, nyolc egymás utáni `bun x playwright test --shard=<i>/8` `flock
+/tmp/playwright-gep.lock` alatt (három worker), majd `bun run coverage:e2e:report`, kilépési kód 0.
+**493 teszt, mind zöld.**
+
+**Utána**: ugyanez az eljárás a T-009-46 állapoton, a `bun run screenshots` után a `.nyc_output`
+törlésével (a 29. szekció buktatója, `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`). **499
+teszt, mind zöld**, a `coverage:e2e:report` kilépési kódja 0, a küszöb (`apps/web/package.json`)
+változatlan. A nyers összegek az `nyc report --reporter=json-summary` kimenetből:
+
+| Metrika    | Előtte fedett / összes | Utána fedett / összes | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1786 / 1801            | 1786 / 1801           | 15 -> 15                 |
+| branches   | 835 / 846              | 835 / 846             | 11 -> 11                 |
+| functions  | 591 / 594              | 591 / 594             | 3 -> 3                   |
+| lines      | 1721 / 1736            | 1721 / 1736           | 15 -> 15                 |
+
+A `git diff --stat fe22c2e HEAD -- apps/web/src` üres, tehát a termékkód és vele az összegek nem
+változtak, és a hat új e2e teszt (két alak teszt, két futás nézet teszt, két újracsatlakozás teszt)
+nem érintett fedetlen sort. A fedetlen tételek ugyanazon a hat fájlon és sorszámon maradtak
+(`mount-app.tsx` 16, 21-22; `read-frontend-config.ts`; `is-valid-connection.ts` 36;
+`browser-history-location-port.ts` 21; `perform-route-request.ts` 89; `use-stream-connection.ts` 202).
+
+### 7. A többi kritérium
+
+- Az `e-branch-loop` él kulcsos marad (`sourceHandle` és `branchKey` `'feldolgozas'`), a fixtúra alak
+  tesztje (SPEC-008 5.1, 106.) zöld; a `keyless-branch-edges.spec.ts` és a `run-graph-paint.spec.ts`
+  zöld.
+- A D2 kapcsoló ("Minden bejárt ág kiemelése") a futás nézet képén a vezérlők között látszik; a
+  futás nézet tesztje ezt állítja mindkét témában.
+- A transcript sorok címe a panel szélességénél ellipszissel csonkul. Ez a termék viselkedése
+  (a sor fejléce egy szövegsor), a T-009-46 nem változtatta.
+
+### 8. Migráció
+
+A `packages/db` sémája és a `packages/db/drizzle` alatti migrációk nem változtak (`git diff --stat
+fe22c2e HEAD -- packages/db` üres), a `bun run check:db-drift` zöld.

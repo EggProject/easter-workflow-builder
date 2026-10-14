@@ -256,9 +256,6 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(rows.filter({ hasText: label }).first()).toBeVisible();
       }
       await expect(page.getByRole('button', { name: 'Minden bejárt ág kiemelése' })).toBeVisible();
-      console.log(
-        `futás nézet ${theme}: stream jelző ${(await page.getByRole('status', { name: /Stream kapcsolat/ }).getAttribute('aria-label')) ?? 'hiányzik'}`,
-      );
     });
   });
 }
