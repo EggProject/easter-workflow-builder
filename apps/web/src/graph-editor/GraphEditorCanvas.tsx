@@ -1,4 +1,5 @@
 import type { WorkflowEdgeInput, WorkflowNodeInput } from '@easter-workflow-builder/protocol';
+import type { ContextMenuPosition } from '@easter-workflow-builder/ui';
 import {
   addEdge,
   applyEdgeChanges,
@@ -6,6 +7,7 @@ import {
   Background,
   Controls,
   ReactFlow,
+  useReactFlow,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -14,10 +16,11 @@ import {
   type NodeDimensionChange,
   type NodeSelectionChange,
 } from '@xyflow/react';
-import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import { GraphNodeCardSizeStyle } from '../graph-node-card/GraphNodeCardSizeStyle.tsx';
 import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
+import { AddNodeContextMenu, type AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
 import { FitViewOnAutoLayout } from './FitViewOnAutoLayout.tsx';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
@@ -81,6 +84,24 @@ export interface GraphEditorCanvasProperties {
    * egyediség: a `workflow_edge.id` globális elsődleges kulcs.
    */
   readonly graphElementIdGenerator: GraphElementIdGenerator;
+  /**
+   * A jobb klikk menüből választott új csomópont típusa és helye (SPEC-008
+   * 5.8): a csomópontot a szülő veszi fel és választja ki, a "Hozzáadás" gomb
+   * útjával közös kezelőben.
+   */
+  readonly onAddNode: AddNodeContextMenuProperties['onAddNode'];
+}
+
+/**
+ * A jobb klikk menü a `<ReactFlow>` gyerekeként, mert a `screenToFlowPosition`
+ * a `useReactFlow()` hookból jön, ami csak a React Flow saját context
+ * providere alatt hívható (a `FitViewOnAutoLayout` indoka).
+ */
+function PaneAddNodeContextMenu(
+  properties: Readonly<Omit<AddNodeContextMenuProperties, 'screenToFlowPosition'>>,
+): ReactElement {
+  const { screenToFlowPosition } = useReactFlow();
+  return <AddNodeContextMenu {...properties} screenToFlowPosition={screenToFlowPosition} />;
 }
 
 /**
@@ -88,18 +109,26 @@ export interface GraphEditorCanvasProperties {
  * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
  * mintáját követi - a GRÁF állapotát nem duplikálja, minden gráf változás
  * (`applyNodeChanges`, `applyEdgeChanges`, AC9) egy lépésben, közvetlenül az
- * `onGraphChange`-en át jut vissza a szülőhöz. Két saját állapota van, és
+ * `onGraphChange`-en át jut vissza a szülőhöz. Három saját állapota van, és
  * egyik sem gráf adat, tehát egyik sem mentődik: a mért csomópont méret
- * (`measured-node-sizes.ts`) és a kiválasztott élek halmaza
- * (`graph-selection.ts`). Az `onConnect` az `addEdge`
+ * (`measured-node-sizes.ts`), a kiválasztott élek halmaza
+ * (`graph-selection.ts`) és a jobb klikk menü nyitási pontja. Az `onConnect` az `addEdge`
  * segédfüggvényt hívja (M-58) a `getEdgeId` opcióval (M-101); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
  * tölti ki a `sourceHandle` értékéből (AC10). Az `isValidConnection` a
  * katalógus és a meglévő élek adatából dönt, gráf szemantika nélkül (AC11,
  * SPEC-008 5.4).
  */
 export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperties>): ReactElement {
-  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode, autoLayoutRevision, graphElementIdGenerator } =
-    properties;
+  const {
+    nodes,
+    edges,
+    onGraphChange,
+    selectedNodeId,
+    onSelectNode,
+    autoLayoutRevision,
+    graphElementIdGenerator,
+    onAddNode,
+  } = properties;
 
   // A React Flow által mért csomópont méret a vászon SAJÁT nézeti állapota,
   // nem domain adat: a `WorkflowNodeInput` nem hordozza, tehát a vezérelt
@@ -113,6 +142,10 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
   // mi történik enélkül (kattintásra sem kiválasztható, tehát Backspace-szel
   // sem törölhető él, saját méréssel igazolva).
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<SelectedEdgeIds>(() => new Set());
+  // A jobb klikk menü nyitási pontja (kliens koordináta), `undefined` esetén
+  // zárva. Az `onPaneContextMenu` csak a vászon üres területén fut: a React
+  // Flow a csomópont és az él jobb klikkjét nem adja tovább neki (M-97).
+  const [contextMenuPoint, setContextMenuPoint] = useState<ContextMenuPosition | undefined>(undefined);
 
   const flowNodes = useMemo(
     () => nodes.map((node) => withMeasuredNodeSize(workflowNodeToFlowNode(node), measuredNodeSizes[node.id])),
@@ -198,6 +231,16 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
     [flowNodes, flowEdges],
   );
 
+  const handlePaneContextMenu = useCallback((event: ReactMouseEvent | MouseEvent) => {
+    // A böngésző saját menüje helyett a felvételi menü nyílik (SPEC-008 5.8).
+    event.preventDefault();
+    setContextMenuPoint({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuPoint(undefined);
+  }, []);
+
   const displayedNodes = useMemo(
     () => flowNodes.map((node) => ({ ...node, selected: node.id === selectedNodeId })),
     [flowNodes, selectedNodeId],
@@ -235,6 +278,7 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
         onPaneClick={() => {
           onSelectNode(undefined);
         }}
+        onPaneContextMenu={handlePaneContextMenu}
       >
         <Background />
         <Controls />
@@ -243,6 +287,9 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
             pedig magán a `<ReactFlow>`-n belül épül fel, tehát EBBŐL a
             komponensből (ami rendereli) nem érhető el. */}
         <FitViewOnAutoLayout revision={autoLayoutRevision} />
+        {contextMenuPoint !== undefined && (
+          <PaneAddNodeContextMenu point={contextMenuPoint} onAddNode={onAddNode} onClose={closeContextMenu} />
+        )}
       </ReactFlow>
     </div>
   );

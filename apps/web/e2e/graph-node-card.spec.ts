@@ -259,8 +259,11 @@ test('mind a tíz csomópont típus a saját típuscímkéjével és egyedi feli
     'Al-workflow',
     'Szkript',
   ];
+  // A vászonra szűkítve: a lábléc "Hozzáadás" menüje (SPEC-008 5.8) a kilenc
+  // felvehető típus címkéjét zárt, rejtett panelen is a DOM-ban tartja.
+  const canvas = page.getByTestId('rf__wrapper');
   for (const typeLabel of typeLabels) {
-    await expect(page.getByText(typeLabel, { exact: true })).toBeVisible();
+    await expect(canvas.getByText(typeLabel, { exact: true })).toBeVisible();
   }
 
   const customLabels = [
