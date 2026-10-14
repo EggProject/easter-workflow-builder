@@ -76,7 +76,7 @@ function hasTooltipContent(content: ReactNode): boolean {
  * `role="tooltip"`, nyitva a trigger `aria-describedby` hivatkozása mutat
  * rá, zárva a panel `hidden`, tehát elhagyja a hozzáférhetőségi fát. Fókuszra
  * azonnal, egér alatt a `delay` után nyílik; az egér elhagyása és a fókusz
- * elvesztése zár, de az egyik nem zárja be azt, amit a másik még nyitva tart.
+ * elvesztése zár, de az egyik nem zárja be azt, amit a másik már nyitva tart.
  * Az `Escape` zár, a fókusz a triggeren marad, és az esemény nem terjed
  * tovább (egy körülvevő modális nem záródik vele együtt). Zárás után a
  * nyitáshoz új egér belépés vagy új fókusz kell. A tipp nem kap fókuszt.
@@ -111,7 +111,7 @@ export function Tooltip(properties: Readonly<TooltipProperties>): ReactElement {
   } = properties;
 
   // Az egér és a fókusz külön állapot, hogy az egyik elhagyása ne zárja be
-  // azt, amit a másik még nyitva tart.
+  // azt, amit a másik már nyitva tart.
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const openTimerReference = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
