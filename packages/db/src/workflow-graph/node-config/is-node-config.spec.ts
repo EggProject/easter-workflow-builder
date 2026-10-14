@@ -60,6 +60,7 @@ const validConfigs: readonly NodeConfig[] = [
     onUnhandledError: null,
   },
   { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig, onUnhandledError: 'fail_run' },
+  { type: 'join', mode: null, onUnhandledError: null },
   { type: 'loop', maxIterations: 3, continueExpression: 'state.retry', onUnhandledError: 'fail_branch' },
   {
     type: 'human_approval',
@@ -87,8 +88,9 @@ const validConfigs: readonly NodeConfig[] = [
 describe('isNodeConfig', () => {
   it('igazat ad mind a tíz node típus érvényes configjára', () => {
     expect(validConfigs.every((config) => isNodeConfig(config))).toBe(true);
-    // Tíz típus, de tizenkét példány: a `join` mindhárom módja szerepel.
-    expect(validConfigs).toHaveLength(12);
+    // Tíz típus, de tizenhárom példány: a `join` mindhárom módja és a
+    // választatlan (`mode: null`, SPEC-008 O-33) ága is szerepel.
+    expect(validConfigs).toHaveLength(13);
   });
 
   it('igazat ad üres start bemeneti mezőlistára és üres branch listára', () => {
@@ -170,6 +172,10 @@ describe('isNodeConfig', () => {
     ],
     ['join: ismeretlen mód', { type: 'join', mode: 'concat', settings: {} }],
     ['join: hiányzó mód', { type: 'join', settings: {} }],
+    [
+      'join: választatlan mód onUnhandledError érvénytelen',
+      { type: 'join', mode: null, onUnhandledError: 'unknown_policy' },
+    ],
     ['join: merge alobjektum nem rekord', { type: 'join', mode: 'merge', settings: 'first' }],
     ['join: script alobjektum hibás', { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'js' } }],
     ['join: ai_synthesis alobjektum hibás', { type: 'join', mode: 'ai_synthesis', settings: { promptTemplate: 7 } }],

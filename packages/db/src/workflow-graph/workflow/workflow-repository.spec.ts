@@ -797,6 +797,37 @@ describe('createWorkflowRepository', () => {
     }
   });
 
+  describe('replaceGraph: a null onUnhandledError és a választatlan join mód beíródik (SPEC-008 5.4, O-29, O-33)', () => {
+    it('mindkét null értéket elfogadja, és a readGraph változatlanul visszaadja őket', () => {
+      const { sqlite, repository } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+      const nodes: readonly WorkflowNodeInput[] = [
+        {
+          id: 'start-1',
+          label: '',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'start', inputFields: [], onUnhandledError: null },
+        },
+        {
+          id: 'join-1',
+          label: '',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'join', mode: null, onUnhandledError: null },
+        },
+      ];
+
+      okOrThrow(repository.replaceGraph(workflow.id, nodes, []));
+
+      expect(okOrThrow(repository.readGraph(workflow.id)).nodes.map((stored) => stored.config)).toStrictEqual([
+        { type: 'start', inputFields: [], onUnhandledError: null },
+        { type: 'join', mode: null, onUnhandledError: null },
+      ]);
+      sqlite.close();
+    });
+  });
+
   describe('a futáskori pillanatkép sérthetetlensége az élő gráf átírása után (20. kritérium)', () => {
     it('a readSnapshot a futáskori gráfot adja vissza a workflow átírása, a node-jai törlése és a globális alapértelmezett provider átállítása után is', () => {
       const { sqlite, database, repository, runs, settings } = openRepository();

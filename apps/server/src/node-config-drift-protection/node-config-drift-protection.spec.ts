@@ -5,6 +5,7 @@ import {
   isNodeConfig,
   openDatabase,
   type DatabaseContext,
+  type JoinUnselectedNodeConfig as DatabaseJoinUnselectedNodeConfig,
   type NodeConfig as DatabaseNodeConfig,
   type REQUIRED_TEXT_FIELD_PATHS as DATABASE_REQUIRED_TEXT_FIELD_PATHS,
 } from '@easter-workflow-builder/db';
@@ -12,6 +13,7 @@ import {
   NodeConfigSaveSchema,
   NodeConfigSchema,
   REQUIRED_TEXT_FIELD_PATHS as PROTOCOL_REQUIRED_TEXT_FIELD_PATHS,
+  type JoinUnselectedNodeConfig as ProtocolJoinUnselectedNodeConfig,
   type NodeConfig as ProtocolNodeConfig,
 } from '@easter-workflow-builder/protocol';
 
@@ -49,6 +51,22 @@ describe('a protokoll és a db NodeConfig uniója kétirányban megegyezik', () 
   it('NodeConfig', () => {
     expectTypeOf<ProtocolNodeConfig>().toEqualTypeOf<DatabaseNodeConfig>();
   });
+
+  /**
+   * A `join` uniója mindkét oldalon négy tagú: a három kiválasztott mód plusz
+   * a választatlan, `mode: null` ág (SPEC-008 5.4, O-33). A szándékosan
+   * elrontott próba (a negyedik ág kivétele az egyik oldalon) a
+   * `docs/research/2026-10-14-kotelezo-mezok-es-start.md` fájlban.
+   */
+  it('a join négy tagú uniója és a választatlan ág (SPEC-008 O-33)', () => {
+    expectTypeOf<Extract<ProtocolNodeConfig, { readonly type: 'join' }>>().toEqualTypeOf<
+      Extract<DatabaseNodeConfig, { readonly type: 'join' }>
+    >();
+    expectTypeOf<Extract<ProtocolNodeConfig, { readonly type: 'join' }>['mode']>().toEqualTypeOf<
+      'merge' | 'script' | 'ai_synthesis' | null
+    >();
+    expectTypeOf<ProtocolJoinUnselectedNodeConfig>().toEqualTypeOf<DatabaseJoinUnselectedNodeConfig>();
+  });
 });
 
 const VALID_AGENT_STEP_SETTINGS = {
@@ -78,7 +96,9 @@ const VALID_AGENT_STEP_SETTINGS = {
 /**
  * Mind a tíz ágra reprezentatív, érvényes érték: a protokoll séma
  * `.safeParse()`-ával validált alak minden esetben átmegy a `db`
- * `isNodeConfig` guardján is (SPEC-005 7.6 2. pont mintája).
+ * `isNodeConfig` guardján is (SPEC-005 7.6 2. pont mintája). A `join`
+ * mind a négy ága szerepel, a választatlan (`mode: null`, SPEC-008 O-33) is;
+ * az `onUnhandledError` itt `null` is lehet, mert az olvasó séma elfogadja.
  */
 const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   {
@@ -98,6 +118,7 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   { type: 'join', mode: 'merge', settings: { strategy: 'bármi' }, onUnhandledError: null },
   { type: 'join', mode: 'script', settings: { source: 'x + 1', runtime: 'expression' }, onUnhandledError: null },
   { type: 'join', mode: 'ai_synthesis', settings: VALID_AGENT_STEP_SETTINGS, onUnhandledError: null },
+  { type: 'join', mode: null, onUnhandledError: null },
   { type: 'loop', maxIterations: 10, continueExpression: 'i < 10', onUnhandledError: null },
   {
     type: 'human_approval',
@@ -122,10 +143,14 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
   { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
 ];
 
+function describeVariant(config: ProtocolNodeConfig): string {
+  return config.type === 'join' ? `join ${String(config.mode)}` : config.type;
+}
+
 describe('a protokoll séma szerint érvényes érték a db isNodeConfig guardján is átmegy', () => {
   for (const candidate of REPRESENTATIVE_NODE_CONFIGS) {
     const parsed = NodeConfigSchema.safeParse(candidate);
-    const label = parsed.success ? parsed.data.type : 'ismeretlen';
+    const label = parsed.success ? describeVariant(parsed.data) : 'ismeretlen';
     it(`${label} ág`, () => {
       expect(parsed.success).toBe(true);
       expect(isNodeConfig(candidate)).toBe(true);
@@ -153,47 +178,49 @@ describe('a protokoll és a db kötelező szöveg mező táblája kétirányban 
 });
 
 /**
- * Típusonként (a `join` módonként) egy egyébként érvényes konfig: minden
- * listában pontosan egy elem áll, hogy a `*` útvonal elem a 0. indexre
- * mutasson.
+ * Típusonként (a `join` módonként) egy egyébként érvényes, mentésre kész
+ * konfig: minden listában pontosan egy elem áll, hogy a `*` útvonal elem a
+ * 0. indexre mutasson, és az `onUnhandledError` ki van töltve, mert a
+ * `protocol` mentési sémája a `null` értéket elutasítja (SPEC-008 5.4,
+ * O-29); a `db` `replaceGraph` mindkét értéket elfogadja.
  */
 const BASE_CONFIG_BY_VARIANT: Readonly<Record<string, unknown>> = {
   start: {
     type: 'start',
     inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
-  agent_step: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: null },
+  agent_step: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: 'fail_run' },
   branch: {
     type: 'branch',
     expression: 'x > 0',
     branches: [{ key: 'pos', label: 'Pozitív' }],
     defaultBranchKey: null,
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
-  fan_out: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
+  fan_out: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: 'fail_run' },
   'join.script': {
     type: 'join',
     mode: 'script',
     settings: { source: 'x + 1', runtime: 'expression' },
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
   'join.ai_synthesis': {
     type: 'join',
     mode: 'ai_synthesis',
     settings: VALID_AGENT_STEP_SETTINGS,
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
-  loop: { type: 'loop', maxIterations: 10, continueExpression: 'i < 10', onUnhandledError: null },
+  loop: { type: 'loop', maxIterations: 10, continueExpression: 'i < 10', onUnhandledError: 'fail_run' },
   human_approval: {
     type: 'human_approval',
     title: 'Jóváhagyás',
     bodyTemplate: 'Engedélyezed?',
     timeoutMs: null,
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
-  sub_workflow: { type: 'sub_workflow', targetWorkflowId: 'wf-1', inputMapping: {}, onUnhandledError: null },
-  script: { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
+  sub_workflow: { type: 'sub_workflow', targetWorkflowId: 'wf-1', inputMapping: {}, onUnhandledError: 'fail_run' },
+  script: { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: 'fail_run' },
 };
 
 interface RequiredFieldCase {

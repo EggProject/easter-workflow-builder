@@ -240,6 +240,72 @@ describe('JoinNodeFields', () => {
     });
   });
 
+  it('választatlan módra (mode: null) csak a mód választó áll, a helyőrző felirattal, és egy választás a mód alapértelmezett beállítását adja (SPEC-008 O-33)', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <JoinNodeFields
+          config={{ type: 'join', mode: null, onUnhandledError: 'fail_branch' }}
+          onChange={onChange}
+          inheritedProviderDescription="nincs"
+        />,
+      );
+    });
+    const trigger = selectTrigger(container, MODE_LABEL);
+    expect(trigger.textContent).toBe('Válassz…');
+    expect(trigger.querySelector('.select__value')?.classList.contains('select__value--placeholder')).toBe(true);
+    expect(container.querySelectorAll('.field')).toHaveLength(1);
+    expect(container.querySelector('textarea')).toBeNull();
+
+    chooseOption(container, MODE_LABEL, 'összefésülés');
+    expect(onChange).toHaveBeenLastCalledWith({
+      type: 'join',
+      mode: 'merge',
+      settings: {},
+      onUnhandledError: 'fail_branch',
+    });
+  });
+
+  it('a mód listája pontosan a három mód, üres opció nélkül, és választás után a helyőrző nem látszik: üresre visszaállni nem lehet (user döntés 2026-10-14)', () => {
+    const onChange = vi.fn<(nextConfig: JoinNodeConfig) => void>();
+    act(() => {
+      root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />);
+    });
+    const trigger = selectTrigger(container, MODE_LABEL);
+    expect(trigger.textContent).toBe('összefésülés');
+    expect(trigger.querySelector('.select__value')?.classList.contains('select__value--placeholder')).toBe(false);
+    const optionLabels = [...selectPanel(trigger).querySelectorAll('[role="option"]')].map(
+      (option) => option.querySelector('.menu__text')?.textContent,
+    );
+    expect(optionLabels).toEqual(['összefésülés', 'szkript', 'AI szintézis']);
+
+    chooseOption(container, MODE_LABEL, 'szkript');
+    chooseOption(container, MODE_LABEL, 'AI szintézis');
+    chooseOption(container, MODE_LABEL, 'összefésülés');
+    expect(onChange.mock.calls.map(([nextConfig]) => nextConfig.mode)).toEqual(['script', 'ai_synthesis', 'merge']);
+  });
+
+  it('választatlan módra a `mode` hibája a mód választó alatt jelenik meg, aria kötéssel (SPEC-008 5.4, O-33)', () => {
+    act(() => {
+      root.render(
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['mode', 'A mező nem lehet üres.']])}>
+            <JoinNodeFields
+              config={{ type: 'join', mode: null, onUnhandledError: 'fail_run' }}
+              onChange={vi.fn()}
+              inheritedProviderDescription="nincs"
+            />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
+      );
+    });
+    const trigger = selectTrigger(container, MODE_LABEL);
+    expect(trigger.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector('.field__error');
+    expect(errorElement?.id).toBe(trigger.getAttribute('aria-describedby'));
+    expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
+  });
+
   it('"script" módra a `settings.source` mezőnkénti hibája a forrás mező alatt jelenik meg', () => {
     act(() => {
       root.render(

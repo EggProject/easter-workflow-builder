@@ -107,6 +107,21 @@ describe('NodeConfigSchema', () => {
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
   });
 
+  it('elfogadja a join node választatlan (mode: null) ágát, settings mező nélkül (SPEC-008 O-33)', () => {
+    const config = { type: 'join', mode: null, onUnhandledError: null };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('a választatlan join ág settings mezőt nem fogad (strictObject)', () => {
+    const config = { type: 'join', mode: null, settings: {}, onUnhandledError: null };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('a join node mode mező nélkül elutasít', () => {
+    const config = { type: 'join', onUnhandledError: null };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+  });
+
   it('a join node ismeretlen mode értékre elutasít', () => {
     const config = { type: 'join', mode: 'unknown_mode', settings: {}, onUnhandledError: null };
     expect(NodeConfigSchema.safeParse(config).success).toBe(false);

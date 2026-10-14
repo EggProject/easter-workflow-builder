@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { isObject } from '@easter-workflow-builder/typeguards';
 
 // A csomag SRC gyökere (nem csak az event-stream témáé): a hálózat- és
 // szám-mentesség csomagszintű garancia (SPEC-005 10.1, 13. szekció 5. és
@@ -15,14 +16,6 @@ import { describe, expect, it } from 'vitest';
 // SPEC-005 13. szekció 1. kritériuma szerint tilos).
 const SRC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGE_ROOT = path.join(SRC_DIR, '..');
-
-// Helyi, nem exportált typeguard - a csomag `dependencies` mezője
-// szándékosan pontosan `core` és `zod` (SPEC-005 13. szekció 4. kritérium),
-// tehát a `@easter-workflow-builder/typeguards` csomag ide nem hozható be
-// egyetlen ellenőrző tesztért.
-function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null;
-}
 
 function listSourceFiles(directory: string): readonly string[] {
   const entries = readdirSync(directory);
