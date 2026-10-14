@@ -1,4 +1,4 @@
-import { NodeConfigSchema, type NodeConfig, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
+import { NodeConfigSaveSchema, type NodeConfig, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
@@ -133,7 +133,10 @@ function renderConfigFields(
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
   const { node, onChange, onClose, inheritedProviderDescription, isSaveAttempted } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
-  const parsedConfig = NodeConfigSchema.safeParse(node.config);
+  // A mezőnkénti hiba a mentési sémán áll (SPEC-008 5.4, O-21): ugyanaz a
+  // szabály jelez a mező alatt, ami a mentés előtti ellenőrzést és a szerver
+  // `PUT` elutasítását adja, tehát egy üres kötelező szöveg mező is itt jelez.
+  const parsedConfig = NodeConfigSaveSchema.safeParse(node.config);
   const fieldErrors = parsedConfig.success ? NO_FIELD_ERRORS : fieldErrorsFromZodError(parsedConfig.error);
 
   function handleConfigChange(nextConfig: NodeConfig): void {

@@ -1,7 +1,19 @@
 /* eslint-disable unicorn/no-null -- a node config nullázható mezői a dróton ténylegesen `null` értéket hordoznak, nem helyőrző `undefined`-et */
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { isNodeConfig, type NodeConfig as DatabaseNodeConfig } from '@easter-workflow-builder/db';
-import { NodeConfigSchema, type NodeConfig as ProtocolNodeConfig } from '@easter-workflow-builder/protocol';
+import { isRecord } from '@easter-workflow-builder/typeguards';
+import {
+  isNodeConfig,
+  openDatabase,
+  type DatabaseContext,
+  type NodeConfig as DatabaseNodeConfig,
+  type REQUIRED_TEXT_FIELD_PATHS as DATABASE_REQUIRED_TEXT_FIELD_PATHS,
+} from '@easter-workflow-builder/db';
+import {
+  NodeConfigSaveSchema,
+  NodeConfigSchema,
+  REQUIRED_TEXT_FIELD_PATHS as PROTOCOL_REQUIRED_TEXT_FIELD_PATHS,
+  type NodeConfig as ProtocolNodeConfig,
+} from '@easter-workflow-builder/protocol';
 
 /**
  * A `workflow_node.config` tíz ágú `NodeConfig` uniójának sodródás elleni
@@ -117,6 +129,177 @@ describe('a protokoll séma szerint érvényes érték a db isNodeConfig guardj�
     it(`${label} ág`, () => {
       expect(parsed.success).toBe(true);
       expect(isNodeConfig(candidate)).toBe(true);
+    });
+  }
+});
+
+/**
+ * A kötelező szöveg mezők két táblájának sodródás elleni védelme (SPEC-008
+ * 5.4, O-21, `.claude/CLAUDE.md` 5. szekció "A `protocol` a `db` írás oldali
+ * 'kötelező szöveg mező' szabályát is duplikálhatja..."). A lista két helyen
+ * áll: a `protocol` mentési sémájában (`NodeConfigSaveSchema`) és a `db`
+ * `replaceGraph` írás oldali ellenőrzésében, mindkettő `as const satisfies`
+ * táblában. A típusszintű ág a két tábla literál típusának egyenlősége: egy
+ * táblából kivett vagy átírt mező a `bun run typecheck` kaput `TS2344`-es
+ * hibával megbuktatja (a szándékosan elrontott próba a
+ * `docs/research/2026-10-14-kotelezo-mezok-es-start.md` fájlban).
+ */
+describe('a protokoll és a db kötelező szöveg mező táblája kétirányban megegyezik', () => {
+  it('REQUIRED_TEXT_FIELD_PATHS', () => {
+    expectTypeOf<typeof PROTOCOL_REQUIRED_TEXT_FIELD_PATHS>().toEqualTypeOf<
+      typeof DATABASE_REQUIRED_TEXT_FIELD_PATHS
+    >();
+  });
+});
+
+/**
+ * Típusonként (a `join` módonként) egy egyébként érvényes konfig: minden
+ * listában pontosan egy elem áll, hogy a `*` útvonal elem a 0. indexre
+ * mutasson.
+ */
+const BASE_CONFIG_BY_VARIANT: Readonly<Record<string, unknown>> = {
+  start: {
+    type: 'start',
+    inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
+    onUnhandledError: null,
+  },
+  agent_step: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: null },
+  branch: {
+    type: 'branch',
+    expression: 'x > 0',
+    branches: [{ key: 'pos', label: 'Pozitív' }],
+    defaultBranchKey: null,
+    onUnhandledError: null,
+  },
+  fan_out: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
+  'join.script': {
+    type: 'join',
+    mode: 'script',
+    settings: { source: 'x + 1', runtime: 'expression' },
+    onUnhandledError: null,
+  },
+  'join.ai_synthesis': {
+    type: 'join',
+    mode: 'ai_synthesis',
+    settings: VALID_AGENT_STEP_SETTINGS,
+    onUnhandledError: null,
+  },
+  loop: { type: 'loop', maxIterations: 10, continueExpression: 'i < 10', onUnhandledError: null },
+  human_approval: {
+    type: 'human_approval',
+    title: 'Jóváhagyás',
+    bodyTemplate: 'Engedélyezed?',
+    timeoutMs: null,
+    onUnhandledError: null,
+  },
+  sub_workflow: { type: 'sub_workflow', targetWorkflowId: 'wf-1', inputMapping: {}, onUnhandledError: null },
+  script: { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
+};
+
+interface RequiredFieldCase {
+  readonly variant: string;
+  readonly path: string;
+}
+
+/**
+ * A mezőnkénti esetek a `protocol` táblájából jönnek (a két tábla a fenti
+ * típusszintű ág szerint azonos): egy mindkét táblába felvett új mező
+ * külön teszteset nélkül is futásidejű próbát kap.
+ */
+const { join: PROTOCOL_JOIN_PATHS, ...PROTOCOL_PATHS_WITHOUT_JOIN } = PROTOCOL_REQUIRED_TEXT_FIELD_PATHS;
+
+function toCases(variantPrefix: string, entries: readonly [string, readonly string[]][]): readonly RequiredFieldCase[] {
+  return entries.flatMap(([key, paths]) => paths.map((path) => ({ variant: `${variantPrefix}${key}`, path })));
+}
+
+const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
+  ...toCases('', Object.entries(PROTOCOL_PATHS_WITHOUT_JOIN)),
+  ...toCases('join.', Object.entries(PROTOCOL_JOIN_PATHS)),
+];
+
+/**
+ * A `path` (`branches.*.key`) szerinti mező szövegét cseréli egy másolatban;
+ * a `*` a lista 0. elemét jelenti.
+ */
+function withTextAt(value: unknown, segments: readonly string[], text: string): unknown {
+  const [head, ...rest] = segments;
+  if (head === undefined) {
+    return text;
+  }
+  if (head === '*') {
+    if (!Array.isArray(value)) {
+      throw new TypeError('a `*` útvonal elem helyén nem lista áll');
+    }
+    return value.map((element: unknown, index: number) => (index === 0 ? withTextAt(element, rest, text) : element));
+  }
+  if (!isRecord(value)) {
+    throw new TypeError(`a(z) "${head}" kulcs előtt nem objektum áll`);
+  }
+  return { ...value, [head]: withTextAt(value[head], rest, text) };
+}
+
+function configWith(variant: string, path: string, text: string): unknown {
+  return withTextAt(BASE_CONFIG_BY_VARIANT[variant], path.split('.'), text);
+}
+
+function openDatabaseWithWorkflow(): { readonly database: DatabaseContext; readonly workflowId: string } {
+  const opened = openDatabase(':memory:');
+  if (opened.kind === 'error') {
+    throw new Error(opened.message);
+  }
+  const workflow = opened.value.workflows.createWorkflow({ name: 'Sodródás', description: null, providerId: null });
+  if (workflow.kind === 'error') {
+    throw new Error(workflow.message);
+  }
+  return { database: opened.value, workflowId: workflow.value.id };
+}
+
+function replaceWithConfig(database: DatabaseContext, workflowId: string, candidate: unknown): string | undefined {
+  if (!isNodeConfig(candidate)) {
+    throw new TypeError('a próba konfig a db isNodeConfig guardján sem megy át');
+  }
+  const outcome = database.workflows.replaceGraph(
+    workflowId,
+    [{ id: 'node-1', label: '', positionX: 0, positionY: 0, config: candidate }],
+    [],
+  );
+  return outcome.kind === 'error' ? outcome.message : undefined;
+}
+
+describe('a kötelező szöveg mezők mezőnként a protokoll mentési sémáján és a db replaceGraph hívásán is ugyanúgy döntenek', () => {
+  it('a tábla mind a tizenhat mezőt felsorolja', () => {
+    expect(REQUIRED_FIELD_CASES).toHaveLength(16);
+  });
+
+  for (const { variant, path } of REQUIRED_FIELD_CASES) {
+    describe(`${variant}: ${path}`, () => {
+      it('a nem üres érték mindkettőn átmegy', () => {
+        const candidate = configWith(variant, path, 'érték');
+        const { database, workflowId } = openDatabaseWithWorkflow();
+
+        expect(NodeConfigSaveSchema.safeParse(candidate).success).toBe(true);
+        expect(replaceWithConfig(database, workflowId, candidate)).toBeUndefined();
+        database.close();
+      });
+
+      for (const [description, blank] of [
+        ['üres', ''],
+        ['csak szóközös', ' '.repeat(3)],
+      ] as const) {
+        it(`az ${description} érték mindkettőn elbukik, ugyanazon a mezőútvonalon`, () => {
+          const candidate = configWith(variant, path, blank);
+          const concretePath = path.replaceAll('*', '0');
+          const { database, workflowId } = openDatabaseWithWorkflow();
+          const parsed = NodeConfigSaveSchema.safeParse(candidate);
+
+          expect(parsed.success).toBe(false);
+          expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([concretePath]);
+          expect(replaceWithConfig(database, workflowId, candidate)).toContain(
+            `"${concretePath}" kötelező szöveg mezője üres (blank_required_text_field)`,
+          );
+          database.close();
+        });
+      }
     });
   }
 });

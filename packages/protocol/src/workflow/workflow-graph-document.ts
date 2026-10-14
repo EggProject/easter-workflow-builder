@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NodeConfigSchema } from '../node-config/node-config.ts';
+import { NodeConfigSaveSchema } from '../node-config/node-config-save-schema.ts';
 import { NodeTypeSchema } from './node-type.ts';
 
 /**
@@ -18,13 +19,19 @@ import { NodeTypeSchema } from './node-type.ts';
  */
 const NODE_CONFIG_SCHEMA = NodeConfigSchema;
 
+/**
+ * A mentés (`PUT .../graph`) node alakja: a `config` a mentési sémán áll
+ * (`NodeConfigSaveSchema`, SPEC-008 5.4, O-21), tehát egy üres kötelező szöveg
+ * mező a mező útvonalán hibát ad (`nodes.0.config.branches.0.key`). Az olvasó
+ * `WorkflowNodeSchema` ezzel szemben a `NodeConfigSchema`-n marad.
+ */
 export const WorkflowNodeInputSchema = z.strictObject({
   id: z.string(),
   type: NodeTypeSchema,
   label: z.string(),
   positionX: z.number(),
   positionY: z.number(),
-  config: NODE_CONFIG_SCHEMA,
+  config: NodeConfigSaveSchema,
 });
 
 export type WorkflowNodeInput = z.infer<typeof WorkflowNodeInputSchema>;
