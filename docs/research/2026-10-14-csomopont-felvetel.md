@@ -659,6 +659,23 @@ tanulság: az első utána futásban a két e2e teszt csak két típust vett fel
 7 ággal és 7 sorral növelte a fedetlen darabszámot; a gomb útjának kilenc típusos felvétele ezt
 nullára vitte. Az `apps/web/package.json` küszöbe nem változott.
 
+A szűk nézeti ikon gomb és a két új e2e (28. szekció) után ugyanezzel az eljárással, a `b133b0e`-ra
+épülő ágon (a `main` összevonása előtt): **497 teszt, mind zöld** (63 + 62 + 62 + 62 + 62 + 62 + 62 +
+62), `bun run coverage:e2e:report` exit 0, a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------- |
+| statements | 1843 / 1858     | 15       |
+| branches   | 847 / 858       | 11       |
+| functions  | 616 / 619       | 3        |
+| lines      | 1773 / 1788     | 15       |
+
+A fedetlen darabszám a fenti táblával azonos (15 / 11 / 3 / 15), ugyanazon a hat fájlon
+(`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1); a fedett és az összes darabszám +8 / +1 / +5 / +8 nőtt, ez az
+új `PlusIcon`, a `useIsAddNodeCompact` hook és a `AddNodeMenuButton` új ága, mind fedett.
+
 ### 28. A lábléc gombsora szűk nézetben: ikonos "Hozzáadás" (user döntés, 2026-10-14)
 
 **A hiba és a mérés** (valódi Chromium, `apps/web` preview build, a gombok `getBoundingClientRect()`
