@@ -215,11 +215,11 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * lépés futás lista a megnyitáskor betöltődik, majd minden jelző keretre
  * összevont újratöltéssel frissül, oldal újratöltés nélkül.
  *
- * AZ ELÁGAZÁSOK DÖNTÉSEI (SPEC-008 6.6, T-009-38) a `useBranchDecisions`
- * hookból jönnek, ugyanazon a veszteségmentes keret úton, új REST hívás
- * nélkül; a csomópontokhoz a lépés futás lista köti őket
+ * AZ ELÁGAZÁSOK DÖNTÉSEI (SPEC-008 6.6, T-009-38, T-009-39) a
+ * `useBranchDecisions` hookból jönnek, ugyanazon a veszteségmentes keret
+ * úton, új REST hívás nélkül; a csomópontokhoz a lépés futás lista köti őket
  * (`groupBranchDecisionsByNode`), és ebből áll az alapértelmezett ág jelvény
- * adata a kártyán.
+ * adata a kártyán, illetve a vászon ebből emeli ki a választott ág éleit.
  *
  * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
  * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
@@ -471,13 +471,14 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const storedLayoutSizes = readStoredRunViewLayoutSizes();
   const storedApprovalLayoutSizes = readStoredRunViewApprovalLayoutSizes();
   const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
+  const branchDecisionsByNodeId = groupBranchDecisionsByNode(branchDecisions, stepRuns);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,
     nodeStepRuns: merged.nodeStepRuns,
     stepRuns,
     onOpenSubWorkflowRun: navigateToRun,
     pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(listedApprovals),
-    branchDecisionsByNodeId: groupBranchDecisionsByNode(branchDecisions, stepRuns),
+    branchDecisionsByNodeId,
   });
   // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
   // a fenti blokkoló ágon áll meg.
@@ -505,7 +506,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
       <div className="run-view-screen__body">
         <RunViewLayout
           band={layoutBand}
-          graph={<RunGraphCanvas nodes={graphNodes} edges={projected.value.edges} />}
+          graph={
+            <RunGraphCanvas
+              nodes={graphNodes}
+              edges={projected.value.edges}
+              branchDecisionsByNodeId={branchDecisionsByNodeId}
+            />
+          }
           // A jóváhagyás felület a transcript sávban áll (PLAN-009 5.
           // szekció F6: "a transcript mellé"), egy CLI engedélykérés
           // sorrendjében: felül a transcript, alatta húzható elválasztóval a

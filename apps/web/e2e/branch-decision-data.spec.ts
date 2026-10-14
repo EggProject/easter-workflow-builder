@@ -1,5 +1,6 @@
-// E2E a futás nézet elágazás döntéseinek KERET ÚTJÁRA (PLAN-009 T-009-38,
-// SPEC-008 6.6, 87.).
+// E2E a futás nézet elágazás döntéseinek KERET ÚTJÁRA és a rájuk épülő
+// megjelenés funkcionális jeleire (PLAN-009 T-009-38, T-009-39, SPEC-008
+// 6.6, 86., 87., 90., 91.).
 //
 // Amit véd: a valódi böngésző `EventSource` útján, a veszteségmentes
 // `subscribeToFrames` feliratkozáson érkező hibás alakú, ismétlődő, más
@@ -9,12 +10,18 @@
 // lefedettségben marad: ez a lefedettségi ratchet őre (T-009-38 3. szekció,
 // `docs/research/2026-10-14-ag-kiemeles.md`).
 //
-// Amit NEM bizonyít: hogy a döntések gyűjtője fut és az adat a csomópont
-// kártyára jut. A megjelenítés (jelvény, kiemelt él, kapcsoló) még nincs
-// bekötve, ezért a gyűjtő hook kivétele, a `RunViewScreen` bekötésének
-// kivétele és a duplikátum szűrés kikapcsolása mellett is zöld marad. Az adat
-// út megfigyelhető e2e bizonyítéka a T-009-40, amikor a T-009-39 a jelvényt és
-// a kiemelést kirajzolja. A döntés adatának tartalmát a
+// A T-009-39 óta a második teszt a megjelenés két funkcionális jelét is
+// állítja: az "alapértelmezett ág" jelvény CSAK akkor áll a kártyán, ha a
+// döntések gyűjtője fut, és a döntés a lépés futás listán át a csomóponthoz
+// kötődik, tehát a gyűjtő hook vagy a `RunViewScreen` bekötésének kivétele
+// bukást ad; a "N. próbálkozás" jelvény a megjelenített lépés futás
+// `attempt` értékét; a kapcsoló `aria-pressed` állapota pedig a kattintásra
+// vált, oda-vissza.
+//
+// Amit NEM bizonyít: a kiemelt él kifestett vonalát, a két mód különböző
+// élhalmazát, a mód újratöltés utáni megmaradását és a jelvény doboza a
+// kártyán belül voltát. Ezek a T-009-40 hatóköre (kifestett pixel mérés két
+// témában, kétszer futó elágazás fixtúrája). A döntés adatának tartalmát a
 // `use-branch-decisions.spec.tsx`, a `group-branch-decisions-by-node.spec.ts`
 // és a `RunViewScreen.spec.tsx` unit tesztjei állítják. Minden REST hívás
 // `page.route()` mockon megy, az SSE válasz egyetlen, lezárt `page.route()`
@@ -282,4 +289,34 @@ test('a branch_taken keretek mellett a futás nézet nem törik el, és új REST
     RUN_VIEW_ROUTES.every((route) => route.method !== request.method || !route.pathname.test(request.pathname)),
   );
   expect(unexpected).toEqual([]);
+});
+
+test('az elágazás kártyáján a döntésekből látszik a két jelvény, és a kapcsoló váltja a lenyomott állapotát', async ({
+  page,
+}) => {
+  await mockSseFramesWithoutReconnect(page, streamFrames());
+  await installApiMocks(page, RUN_VIEW_ROUTES);
+
+  await page.goto(`/run?runId=${RUN_ID}`);
+
+  // Az elágazás megjelenített lépés futása a második próbálkozás, a legutóbbi
+  // döntése az alapértelmezett ágra lépett (a korábbi, "igen" döntés nem
+  // számít). A kezdő csomópont egyik jelvényt sem kapja.
+  const branchCard = page.getByTestId('rf__node-b-branch');
+  await expect(branchCard.getByText('2. próbálkozás')).toBeVisible();
+  await expect(branchCard.getByText('alapértelmezett ág')).toBeVisible();
+  const startCard = page.getByTestId('rf__node-b-start');
+  await expect(startCard).toBeVisible();
+  await expect(startCard.getByText('próbálkozás')).toHaveCount(0);
+  await expect(startCard.getByText('alapértelmezett ág')).toHaveCount(0);
+
+  // A kapcsoló a vezérlő panel gombja, azonos felirattal és tooltippel; az
+  // alapértelmezett "csak a legutóbbi" módban nincs lenyomva.
+  const toggle = page.getByRole('button', { name: 'Minden bejárt ág kiemelése' });
+  await expect(toggle).toHaveAttribute('title', 'Minden bejárt ág kiemelése');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
 });

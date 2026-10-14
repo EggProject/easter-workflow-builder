@@ -1338,6 +1338,25 @@ describe('RunViewScreen', () => {
     expect(requestedPaths).toEqual(requestsBeforeFrames);
   });
 
+  it('a vászon a kártyákkal azonos, csomópontonként rendezett döntés térképet kapja (T-009-39)', async () => {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({ snapshot: BRANCH_SNAPSHOT, stepRuns: [BASE_STEP_RUN, BRANCH_STEP_RUN] }),
+    );
+    expect(lastCanvasProperties().branchDecisionsByNodeId.size).toBe(0);
+
+    await emitFramesAndFlush([
+      branchTakenFrame(9, { branchKey: null, usedDefault: true }),
+      branchTakenFrame(5, { branchKey: 'igen', usedDefault: false }),
+    ]);
+
+    expect(
+      lastCanvasProperties()
+        .branchDecisionsByNodeId.get('n-branch')
+        ?.map((decision) => decision.eventId),
+    ).toEqual([5, 9]);
+  });
+
   it('a még le nem képezhető döntés a lépés futás lista frissülése után kerül a kártyára', async () => {
     const stepRunResponses = [[BASE_STEP_RUN], [BASE_STEP_RUN, BRANCH_STEP_RUN]];
     await renderScreen('?runId=r-3', createFetchFunction({ snapshot: BRANCH_SNAPSHOT, stepRunResponses }));
