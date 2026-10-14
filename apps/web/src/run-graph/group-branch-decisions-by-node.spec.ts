@@ -81,8 +81,19 @@ describe('groupBranchDecisionsByNode', () => {
 
     const before = groupBranchDecisionsByNode(decisions, [BRANCH_STEP_RUN]);
     expect(before.get('n-branch')?.map((entry) => entry.eventId)).toEqual([5]);
+    expect(before.size).toBe(1);
+    expect(before.keys().toArray()).toEqual(['n-branch']);
 
     const after = groupBranchDecisionsByNode(decisions, [BRANCH_STEP_RUN, secondStepRun]);
     expect(after.get('n-branch')?.map((entry) => entry.eventId)).toEqual([5, 8]);
+    expect(after.size).toBe(1);
+    expect(after.keys().toArray()).toEqual(['n-branch']);
+  });
+
+  it('a kizárólag le nem képezhető döntés semmilyen kulcs alatt nem kerül a térképbe', () => {
+    const grouped = groupBranchDecisionsByNode(decisionMap([decision(8, 's-ismeretlen')]), [BRANCH_STEP_RUN]);
+
+    expect(grouped.size).toBe(0);
+    expect(grouped.keys().toArray()).toEqual([]);
   });
 });

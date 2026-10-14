@@ -42,10 +42,14 @@ kötése, a kiemelés tiszta függvénye és a két jelvény adata a kártyán (
 
 ### 3. Az e2e lefedettség előtte és utána
 
-**Előtte**: a `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 47. szekciójának mérése. A 47. szekció óta (`95f62db`) a `8413882` állapotig az `apps/web/src` alatt egyetlen fájl változott,
-a `greppable-invariants/greppable-invariants.spec.ts` (`git diff --stat 95f62db 8413882 -- apps/web/src
-packages/ui/src`), ami teszt fájl, a termék bundle nem importálja, tehát az istanbul mérésbe nem kerül
-be.
+**Előtte**: a `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 47. szekciójából ÁTVETT szám,
+nem a `8413882` állapoton újra mért érték. A 47. szekció alapja (`95f62db`) óta a `8413882`
+állapotig az `apps/web/e2e` alatt a PR #21 (`0310262`) bővítette a `run-view.spec.ts` fájlt
+(`git diff --stat 95f62db 8413882 -- apps/web/e2e`). Az `apps/web/src` termékkódja nem változott:
+ott egyetlen fájl módosult, a `greppable-invariants/greppable-invariants.spec.ts`
+(`git diff --stat 95f62db 8413882 -- apps/web/src packages/ui/src`), ami teszt fájl, a termék
+bundle nem importálja, tehát az istanbul mérésbe nem kerül be. A `run-view.spec.ts` bővítésének
+hatását az átvett számra nem vizsgáltam (nem ellenőrzött).
 
 **Utána**: saját mérés a jelen ág állapotán, a 47. szekció tiszta eljárásával
 (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt
@@ -83,10 +87,19 @@ A meglévő e2e tesztek egyetlen érvényes `branch_taken` keretet sem küldenek
 döntés ága e2e-ből csak az új teszttel érhető el. Az új teszt a futás nézet valós alakján, egy lezárt
 `page.route()` SSE válaszban két érvényes döntést, egy ismétlődő `id`-t, egy más futáshoz tartozó,
 egy le nem képezhető és négy hibás alakú keretet küld, és azt állítja, hogy a nézet nem törik el, a
-transcript nyolc sort kap, és a futás nézet az öt meglévő végponton kívül REST hívást nem indít. A
-kontroll futásban egy, az új kódtól független tétel is fedetlen maradt
-(`run-view/blocking-failure-message.ts`, 1 statement), ami a teljes futásban fedett volt; ennek
-oka nem vizsgált.
+transcript nyolc sort kap, és a futás nézet az öt meglévő végponton kívül REST hívást nem indít.
+
+**Nyitva (nem vizsgált): a `run-view/blocking-failure-message.ts` 17. sora a kontroll futásban.** A
+kontroll futásban az új kódtól független tétel, a fájl 17. sora (`return failure.message;`,
+1 statement) is fedetlen maradt, a teljes futásban viszont fedett volt. Az ingadozás oka nem
+vizsgált, ezért itt csak a megfigyelés áll, magyarázat nincs.
+
+- **Mi a viselkedés addig:** a kontroll tábla "Fedetlen az új e2e nélkül" oszlopa ezt az új
+  kódtól független tételt is tartalmazza, az új kód hatását az "Ebből az új kód" oszlop adja.
+  Az "Utána" tábla (teljes futás, a tétel fedett) és a küszöb nem érintett.
+- **Mi zárná le:** a kontroll futás megismétlése, és annak megállapítása, hogy a teljes
+  futásban mely e2e teszt fedi a 17. sort, illetve hogy a kontroll futásban minden ismétlésnél
+  fedetlen marad-e.
 
 **Az e2e-ből most el nem érhető új kód.** A `resolve-highlighted-branch-edge-ids.ts` függvényt a
 termékkód még nem hívja (a T-009-39 köti be), ezért a lap nem tölti be, és az istanbul mérésben nem

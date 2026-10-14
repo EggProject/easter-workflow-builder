@@ -39,12 +39,16 @@ export interface HighlightedBranchEdgeInput {
  * 1. **A választott kulcs.** `usedDefault: false` esetén a döntés
  *    `branchKey` értéke; `usedDefault: true` esetén a pillanatkép `branch`
  *    csomópontjának `defaultBranchKey` értéke, mert a motor ilyenkor pontosan
- *    azt a kulcsot választja, a payload kulcsa pedig `null` (`packages/engine` `execute-branch.ts`).
+ *    azt a kulcsot választja, a payload kulcsa pedig `null` (SPEC-008 6.6
+ *    2. pont; `packages/engine` `node-executor/execute-branch.ts`,
+ *    `resolveBranchTarget`).
  * 2. **A mód.** `latest`: csomópontonként csak a legutóbbi (legnagyobb
  *    `eventId`-jű) döntés; `all`: minden döntés.
  * 3. **A kiemelt élek.** A pillanatkép minden éle, aminek a forrása a `branch`
  *    csomópont és a `branchKey` mezője egy választott kulcs. A `null` kulcsú él
- *    soha nem emelődik ki, mert a motor soha nem követi (`packages/engine` `build-node-plans.ts`, SPEC-008 O-23).
+ *    soha nem emelődik ki, mert a motor soha nem követi (SPEC-008 6.6 3. pont;
+ *    `packages/engine` `run-supervisor/build-node-plans.ts`,
+ *    `availableBranchKeysOf`).
  *
  * Döntés csak `branch` típusú csomóponthoz tartozhat; más típusú vagy a
  * pillanatképben nem szereplő csomóponthoz leképezett döntés nem emel ki élt.

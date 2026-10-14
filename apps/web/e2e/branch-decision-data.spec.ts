@@ -1,18 +1,24 @@
-// E2E a futás nézet elágazás döntéseinek ADATÚTJÁRA (PLAN-009 T-009-38,
+// E2E a futás nézet elágazás döntéseinek KERET ÚTJÁRA (PLAN-009 T-009-38,
 // SPEC-008 6.6, 87.).
 //
-// A döntések a valódi böngésző `EventSource` útján, a veszteségmentes
-// `subscribeToFrames` feliratkozáson érkeznek, és a csomópont kártya adatába
-// kerülnek. A megjelenítés (jelvény, kiemelt él, kapcsoló) a T-009-39 és a
-// T-009-40 hatóköre, tehát ez a fájl azt állítja, ami már most megfigyelhető:
-// a hibás alakú, ismétlődő, más futáshoz tartozó és le nem képezhető keretek
-// mellett a futás nézet nem törik el, és a döntések feldolgozása új REST
-// hívást nem indít (SPEC-008 6.6 "Nem async pont", 87.). A döntés adatának
-// tartalmát a `use-branch-decisions.spec.tsx`, a
-// `group-branch-decisions-by-node.spec.ts` és a `RunViewScreen.spec.tsx`
-// unit tesztjei állítják. Minden REST hívás `page.route()` mockon megy, az
-// SSE válasz egyetlen, lezárt `page.route()` válasz, újracsatlakozás
-// nélkül (`.claude/CLAUDE.md` 11. szekció).
+// Amit véd: a valódi böngésző `EventSource` útján, a veszteségmentes
+// `subscribeToFrames` feliratkozáson érkező hibás alakú, ismétlődő, más
+// futáshoz tartozó és le nem képezhető `branch_taken` keretek mellett a keret
+// út hibátlanul fut, a futás nézet nem törik el, új REST hívás nem indul
+// (SPEC-008 6.6 "Nem async pont", 87.), és az új kód érvényes döntés ága e2e
+// lefedettségben marad: ez a lefedettségi ratchet őre (T-009-38 3. szekció,
+// `docs/research/2026-10-14-ag-kiemeles.md`).
+//
+// Amit NEM bizonyít: hogy a döntések gyűjtője fut és az adat a csomópont
+// kártyára jut. A megjelenítés (jelvény, kiemelt él, kapcsoló) még nincs
+// bekötve, ezért a gyűjtő hook kivétele, a `RunViewScreen` bekötésének
+// kivétele és a duplikátum szűrés kikapcsolása mellett is zöld marad. Az adat
+// út megfigyelhető e2e bizonyítéka a T-009-40, amikor a T-009-39 a jelvényt és
+// a kiemelést kirajzolja. A döntés adatának tartalmát a
+// `use-branch-decisions.spec.tsx`, a `group-branch-decisions-by-node.spec.ts`
+// és a `RunViewScreen.spec.tsx` unit tesztjei állítják. Minden REST hívás
+// `page.route()` mockon megy, az SSE válasz egyetlen, lezárt `page.route()`
+// válasz, újracsatlakozás nélkül (`.claude/CLAUDE.md` 11. szekció).
 import type {
   NodeConfig,
   RunDetail,
@@ -260,13 +266,14 @@ test('a branch_taken keretek mellett a futás nézet nem törik el, és új REST
   await page.goto(`/run?runId=${RUN_ID}`);
 
   await expect(page.getByTestId('rf__node-b-branch')).toBeVisible();
-  // A transcript utolsó sora a nyolcadik: a pótlás minden kerete
-  // feldolgozódott, az ismétlődő és a más futáshoz tartozó keret nem kapott
-  // sort.
+  // A transcript utolsó sora a nyolcadik: a pótlás keretei eljutottak a
+  // nézetig, az ismétlődő és a más futáshoz tartozó keret nem kapott sort.
+  // Ez a transcript útját bizonyítja, nem a döntések gyűjtőjét.
   const transcript = page.getByRole('list', { name: 'Futás eseményei' });
   await expect(transcript.getByRole('listitem').last()).toHaveAttribute('aria-posinset', String(RECORDS.length));
   // A pótlás végét jelző keretre a lépés futás lista egyszer újratöltődik: ez
-  // a kérés a feldolgozás végét jelzi (SPEC-008 6.2).
+  // a kérés azt jelzi, hogy a pótlás összes kerete megérkezett (SPEC-008 6.2),
+  // tehát az alábbi "nincs új REST hívás" állítás a teljes pótlásra szól.
   await expect
     .poll(() => requests.filter((request) => request.pathname === `/api/runs/${RUN_ID}/steps`).length)
     .toBe(2);
