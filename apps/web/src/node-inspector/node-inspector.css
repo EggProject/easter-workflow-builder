@@ -40,6 +40,14 @@
   flex: 0 0 auto;
 }
 
+/* A fejléc műveletei: a "Törlés" gomb és a bezáró X egy sorban, a törzsön kívül. */
+.node-inspector__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-space-2);
+  flex: 0 0 auto;
+}
+
 .node-inspector__identity {
   display: flex;
   flex-direction: column;

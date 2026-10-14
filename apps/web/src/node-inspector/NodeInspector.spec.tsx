@@ -174,6 +174,7 @@ describe('NodeInspector', () => {
           node={node}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -195,6 +196,7 @@ describe('NodeInspector', () => {
             node={node}
             onChange={onChange}
             onClose={vi.fn()}
+            onDelete={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -240,6 +242,7 @@ describe('NodeInspector', () => {
           node={startNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -268,6 +271,7 @@ describe('NodeInspector', () => {
           node={joinNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -289,6 +293,7 @@ describe('NodeInspector', () => {
             node={node}
             onChange={vi.fn()}
             onClose={vi.fn()}
+            onDelete={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted={false}
           />,
@@ -310,6 +315,7 @@ describe('NodeInspector', () => {
           node={startNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -331,6 +337,7 @@ describe('NodeInspector', () => {
           node={startNode}
           onChange={vi.fn()}
           onClose={onClose}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -357,6 +364,7 @@ describe('NodeInspector', () => {
           node={startNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -379,6 +387,7 @@ describe('NodeInspector', () => {
           node={startNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -394,6 +403,90 @@ describe('NodeInspector', () => {
     expect(closeButton?.className).not.toContain('btn');
   });
 
+  const DELETABLE_NODES = NODES_BY_TYPE.filter(({ node }) => node.type !== 'start');
+
+  it.each(DELETABLE_NODES)(
+    'a(z) "$node.type" panelének fejlécében van danger, sm "Törlés" gomb, ami az onDelete-et hívja, megerősítés nélkül (SPEC-008 5.9)',
+    ({ node }) => {
+      const onDelete = vi.fn();
+      const onClose = vi.fn();
+      const onChange = vi.fn<OnChange>();
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={node}
+            onChange={onChange}
+            onClose={onClose}
+            onDelete={onDelete}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />,
+        );
+      });
+      const dangerButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Törlés',
+      );
+      if (dangerButton === undefined) {
+        throw new Error('a teszt nem találta a Törlés gombot');
+      }
+      expect(dangerButton.className).toContain('btn--danger');
+      expect(dangerButton.className).toContain('btn--sm');
+      expect(dangerButton.closest('.node-inspector__header')).not.toBeNull();
+      expect(dangerButton.closest('.node-inspector__body')).toBeNull();
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+
+      act(() => {
+        dangerButton.click();
+      });
+      expect(onDelete).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onChange).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a Start panelén NINCS Törlés gomb (SPEC-008 5.9)', () => {
+    const startNode = NODES_BY_TYPE[0]?.node;
+    if (startNode === undefined) {
+      throw new Error('a teszt nem talált start node fixture-t');
+    }
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={startNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={false}
+        />,
+      );
+    });
+    const labels = [...container.querySelectorAll('button')].map((button) => button.textContent);
+    expect(labels).not.toContain('Törlés');
+    expect(container.querySelector('button[aria-label="Bezárás"]')).not.toBeNull();
+  });
+
+  it.each(NODES_BY_TYPE)(
+    'a(z) "$node.type" panel gyökér eleme a nokey osztályt viseli, tehát a panelen a Backspace és a Delete nem töröl csomópontot (SPEC-008 5.9)',
+    ({ node }) => {
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={node}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />,
+        );
+      });
+      const panel = container.querySelector('aside');
+      expect(panel?.classList.contains('node-inspector')).toBe(true);
+      expect(panel?.classList.contains('nokey')).toBe(true);
+    },
+  );
+
   it('a panel MINDEN gombja sm méretű', () => {
     const agentNode = NODES_BY_TYPE[1]?.node;
     if (agentNode === undefined) {
@@ -405,6 +498,7 @@ describe('NodeInspector', () => {
           node={agentNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -434,6 +528,7 @@ describe('NodeInspector', () => {
           node={invalidNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -458,6 +553,7 @@ describe('NodeInspector', () => {
           node={invalidNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -482,6 +578,7 @@ describe('NodeInspector', () => {
           node={invalidNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
@@ -519,6 +616,7 @@ describe('NodeInspector', () => {
           node={invalidNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -549,6 +647,7 @@ describe('NodeInspector', () => {
           node={branchNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -587,6 +686,7 @@ describe('NodeInspector', () => {
           node={branchNode}
           onChange={vi.fn()}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted
         />,
@@ -608,6 +708,7 @@ describe('NodeInspector', () => {
           node={agentNode}
           onChange={onChange}
           onClose={vi.fn()}
+          onDelete={vi.fn()}
           inheritedProviderDescription="nincs"
           isSaveAttempted={false}
         />,
