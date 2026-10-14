@@ -37,6 +37,7 @@ import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
+import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
@@ -56,6 +57,12 @@ export interface GraphEditorScreenProperties {
    * 6.5, 9. szekció 5. async pont).
    */
   readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
+  /**
+   * A csomópont és az él azonosítóját adó port (SPEC-008 5.8, user döntés 8.):
+   * az `app-shell` fecskendezi be a böngésző megvalósítást, a teszt
+   * determinisztikus generátort ad, a `browserStreamIdGenerator` mintájára.
+   */
+  readonly graphElementIdGenerator: GraphElementIdGenerator;
 }
 
 function readWorkflowId(search: string): string | undefined {
@@ -106,7 +113,7 @@ function DropdownChevronIcon(): ReactElement {
  * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
 export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate } = properties;
+  const { apiOrigin, fetchFunction, search, navigate, graphElementIdGenerator } = properties;
   const workflowId = readWorkflowId(search);
 
   const graphState = useRequestState<WorkflowGraphDocument>();
@@ -362,6 +369,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
                   selectedNodeId={selectedNodeId}
                   onSelectNode={setSelectedNodeId}
                   autoLayoutRevision={autoLayoutRevision}
+                  graphElementIdGenerator={graphElementIdGenerator}
                 />
               </div>
             </ResizablePanel>

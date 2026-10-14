@@ -1,7 +1,8 @@
-import { JoinMergeSettingsSchema, type AgentStepConfig, type JoinNodeConfig } from '@easter-workflow-builder/protocol';
+import { JoinMergeSettingsSchema, type JoinNodeConfig } from '@easter-workflow-builder/protocol';
 import { SelectField, TextAreaField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
+import { DEFAULT_AGENT_STEP_SETTINGS } from './default-agent-step-settings.ts';
 import { JsonTextAreaField } from './JsonTextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
@@ -15,48 +16,6 @@ export interface JoinNodeFieldsProperties {
    */
   readonly inheritedProviderDescription: string;
 }
-
-/**
- * Az `ai_synthesis` módra váltáskor felvett, érvényes alapértelmezett
- * `AgentStepConfig` - a `join` node NEM hoz létre új node-ot, csak módot
- * vált egy MÁR LÉTEZŐ node-on, tehát ennek a konstansnak kizárólag ez az
- * egyetlen fogyasztója van.
- */
-const DEFAULT_AGENT_STEP_SETTINGS: AgentStepConfig = {
-  promptTemplate: '',
-  // eslint-disable-next-line unicorn/no-null -- az `AgentStepConfig` nullázható mezői a dróton ténylegesen `null` értéket hordozzák (SPEC-005).
-  providerId: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  modelId: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  effort: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  thinking: null,
-  allowedTools: [],
-  disallowedTools: [],
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  permissionMode: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  maxTurns: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  maxBudgetUsd: null,
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  systemPrompt: null,
-  agents: {},
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  skills: null,
-  mcpServers: {},
-  enabledEngineHooks: [],
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  cwd: null,
-  additionalDirectories: [],
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  sandbox: null,
-  agentTools: [],
-  sessionMode: 'isolated',
-  // eslint-disable-next-line unicorn/no-null -- lásd fent.
-  structuredOutput: null,
-};
 
 type SelectedJoinMode = NonNullable<JoinNodeConfig['mode']>;
 

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
+import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 
 /**
  * A `GraphEditorCanvas` mockolva: ez a spec a `GraphEditorScreen` SAJÁT
@@ -35,6 +36,8 @@ function lastCanvasProperties(): GraphEditorCanvasProperties {
 }
 
 const API_ORIGIN = 'https://api.example.test';
+
+const GRAPH_ELEMENT_ID_GENERATOR: GraphElementIdGenerator = () => 'generated-element-id';
 
 const START_NODE: WorkflowNodeInput = {
   id: 'n-1',
@@ -197,7 +200,13 @@ describe('GraphEditorScreen', () => {
   async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
     await act(async () => {
       root.render(
-        <GraphEditorScreen apiOrigin={API_ORIGIN} fetchFunction={fetchFunction} search={search} navigate={navigate} />,
+        <GraphEditorScreen
+          apiOrigin={API_ORIGIN}
+          fetchFunction={fetchFunction}
+          search={search}
+          navigate={navigate}
+          graphElementIdGenerator={GRAPH_ELEMENT_ID_GENERATOR}
+        />,
       );
       await Promise.resolve();
       await Promise.resolve();
@@ -371,6 +380,12 @@ describe('GraphEditorScreen', () => {
     expect(capturedCanvasProperties.length).toBeGreaterThan(0);
     expect(lastCanvasProperties().nodes).toHaveLength(2);
     expect(container.textContent).not.toContain('Mentetlen változtatások');
+  });
+
+  it('a befecskendezett azonosító generátort változatlanul továbbadja a vászonnak (SPEC-008 5.8)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+    expect(lastCanvasProperties().graphElementIdGenerator).toBe(GRAPH_ELEMENT_ID_GENERATOR);
   });
 
   it('egy módosítás után mentetlen jelzőt mutat, majd visszavonás után eltűnik (AC13)', async () => {

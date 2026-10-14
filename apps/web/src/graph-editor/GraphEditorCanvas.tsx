@@ -21,6 +21,7 @@ import type { GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-d
 import { FitViewOnAutoLayout } from './FitViewOnAutoLayout.tsx';
 import { flowEdgeToWorkflowEdge, workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { flowNodeToWorkflowNode, workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
+import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import { isNodeDeselected, mergeEdgeSelection, type SelectedEdgeIds } from './graph-selection.ts';
 import { isValidGraphConnection } from './is-valid-connection.ts';
 import { mergeMeasuredNodeSizes, withMeasuredNodeSize, type MeasuredNodeSizes } from './measured-node-sizes.ts';
@@ -73,6 +74,13 @@ export interface GraphEditorCanvasProperties {
    * kezdeti nagyítás a kattintás után változatlan maradt).
    */
   readonly autoLayoutRevision: number;
+  /**
+   * Az új él azonosítóját adó port (SPEC-008 5.8, M-101): az `onConnect` az
+   * `addEdge` dokumentált `getEdgeId` opciójával adja át, tehát a könyvtár
+   * `xy-edge__` előtagú azonosítója nem keletkezik. Az ok a globális
+   * egyediség: a `workflow_edge.id` globális elsődleges kulcs.
+   */
+  readonly graphElementIdGenerator: GraphElementIdGenerator;
 }
 
 /**
@@ -84,13 +92,14 @@ export interface GraphEditorCanvasProperties {
  * egyik sem gráf adat, tehát egyik sem mentődik: a mért csomópont méret
  * (`measured-node-sizes.ts`) és a kiválasztott élek halmaza
  * (`graph-selection.ts`). Az `onConnect` az `addEdge`
- * segédfüggvényt hívja (M-58); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
+ * segédfüggvényt hívja (M-58) a `getEdgeId` opcióval (M-101); a `branchKey` mezőt a `flowEdgeToWorkflowEdge`
  * tölti ki a `sourceHandle` értékéből (AC10). Az `isValidConnection` a
  * katalógus és a meglévő élek adatából dönt, gráf szemantika nélkül (AC11,
  * SPEC-008 5.4).
  */
 export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperties>): ReactElement {
-  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode, autoLayoutRevision } = properties;
+  const { nodes, edges, onGraphChange, selectedNodeId, onSelectNode, autoLayoutRevision, graphElementIdGenerator } =
+    properties;
 
   // A React Flow által mért csomópont méret a vászon SAJÁT nézeti állapota,
   // nem domain adat: a `WorkflowNodeInput` nem hordozza, tehát a vezérelt
@@ -175,13 +184,13 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const nextFlowEdges = addEdge(connection, flowEdges);
+      const nextFlowEdges = addEdge(connection, flowEdges, { getEdgeId: graphElementIdGenerator });
       onGraphChange(
         nodes,
         nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
       );
     },
-    [flowEdges, nodes, onGraphChange],
+    [flowEdges, nodes, onGraphChange, graphElementIdGenerator],
   );
 
   const isValidConnection = useCallback(
