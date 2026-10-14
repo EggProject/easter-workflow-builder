@@ -589,6 +589,9 @@ test-nel").
 - Az e2e tesztben minden külső hívás mockolva legyen, ugyanúgy, mint egy unit tesztben: a
   REST hívások `page.route()`-tal adott, garantált válasszal mennek, valós backend szervert a
   teszt nem szólíthat meg.
+- MSW használható, ha a feladat megkívánja (user kérés 2026-10-14). Ma nincs bekötve: a bemutató
+  kép élő streamjéhez a meglévő `node:http` út elég volt, a böngészős MSW termékkód változást
+  igényelt volna (`docs/research/2026-10-14-ag-kiemeles.md` T-009-46 9. pont).
 
 **SSE mockolás: lezárva, hibrid úton.** Forrás:
 `docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
@@ -741,6 +744,13 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   locator (a kártya felirata, a gombjai, a mezők, a fülek, az elválasztó) a kötött sorrend
   szerinti. Greppes invariáns őrzi: `getByTestId` az `apps/web/e2e` alatt kizárólag `rf__`
   előtaggal állhat (SPEC-008 12.3).
+- **A beállítás panel gyökér elemén a `nokey` osztály áll.** A panel teljes területén (gombon,
+  a `SelectField` triggerén) a `Backspace` és a `Delete` nem törölhet csomópontot; a vásznon és
+  fókusz nélkül törölhet. A könyvtár beviteli elem szűrője a `.nokey` osztályú őst is kiszűri
+  (`@xyflow/system` `isInputDOMNode`), a hivatalos dokumentáció viszont az osztályt nem említi, ezért
+  a viselkedést a `NodeInspector.spec.tsx`, a `GraphEditorCanvas.spec.tsx` "a beállítás panelen"
+  csoportja és az `e2e/graph-node-delete.spec.ts` őrzi (user döntés 2026-10-14, SPEC-008 5.9,
+  `docs/research/2026-10-14-csomopont-felvetel.md` 44.6).
 - **Az élek kirajzolására vonatkozó állítás kizárólag e2e tesztben áll.** Az élek happy-dom
   alatt sosem rajzolódnak ki (M-53), ezért az él KIRAJZOLÁSÁRA vonatkozó minden állítás e2e
   tesztben áll, unit tesztben egy sem; az él ÁLLAPOTÁRA (a `WorkflowEdgeInput` tömb tartalma, a
@@ -855,6 +865,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
   számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
   felhasznált, tehát a besorolás változatlan.
+- **Egy csak véletlenül fedett sor billegteti az e2e lefedettségi küszöböt.** A
+  `run-view/blocking-failure-message.ts` hibaüzenet ágát (`return failure.message;`) a teljes e2e
+  futásban csak két, a hibára nem állító teszt érte el, mellékhatásként: a `run-control.spec.ts`
+  két indítás tesztje a futás nézetre navigál, ahol a hiányzó mockok 404-et adnak
+  (`installApiMocks`), és a teszt az URL után azonnal kiolvassa a lefedettséget, tehát a hibás
+  renderelést nem várja meg. Hogy a render a kiolvasás előtt megtörténik-e, versenyhelyzet, ezért
+  a sor találatszáma futásonként más, és a PR #33 első CI futásán a `lines` metrika a küszöb alá
+  esett (99.07 a 99.08 ellen), minden teszt zölden: az `E2E` job bukott. A szabály: **amit
+  a küszöb számol, azt olyan teszt fedje, amelyik a viselkedést állítja és megvárja** (web-first
+  assertion a megjelenő állapotra); egy ingadozó fedetlen darabszámot a sort determinisztikusan
+  fedő teszt old meg, nem a küszöb csökkentése. Védelem: a `run-view.spec.ts` két tesztje (a
+  `getRun` és a `listStepRuns` 404 hibája, danger `Alert` a kódhoz rendelt mondattal), amelyek a
+  hibaüzenet ág `return undefined;` rontására elbuknak. Mérés és a CI hivatkozás:
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 48. szekció.
 
 **Frontend állapot és layout**
 
@@ -1004,6 +1028,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 -- <egy fájl>` szelektíven, a teszt fájl és a mérő eszköz érintése nélkül, majd a szűkített
   teszt újrafuttatása minden lépésben (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5
   szekció).
+- **A billentyűs törlés két változáslistát jelez, és a két vászon kezelő egymás törlését
+  visszaírta.** A React Flow `deleteElements` függvénye rögzített sorrendben hívja a kezelőket: előbb
+  az élek változáslistája (`onEdgesChange`), utána a csomópontoké (`onNodesChange`), legvégül az
+  `onDelete` (a telepített `@xyflow/react` 12.11.6 `dist/esm/index.js` 1129 ... 1153. sora). A
+  `GraphEditorCanvas` két kezelője a saját, azonos renderből való propjaiból építette a teljes gráfot,
+  ezért a második hívás visszaírta az első törlését: a törölt csomópont élei a szerkesztett állapotban
+  és a mentés `PUT` törzsében árván maradtak, a vásznon viszont nem rajzolódtak ki, tehát a
+  felhasználó a hibát nem láthatta. A hiba a `main`-en (`b133b0e`) az alapértelmezett `Backspace`
+  billentyűvel már megvolt; a `deleteKeyCode` prop csak a `Delete` billentyűt tette a hibás útra. A
+  javítás: a két kezelő a `remove` változást nem dolgozza fel, a törlés végeredményét egyetlen
+  `onDelete` adja, egyetlen `onGraphChange` hívásban. Védelem: a `GraphEditorCanvas.spec.tsx` "törlés"
+  csoportja (a valódi könyvtár billentyű útja happy-dom alatt) és az `e2e/graph-node-delete.spec.ts`
+  (a mentés `PUT` törzsében nincs árva él); a `main` vászonkódján mindkettő elbukik
+  (`docs/research/2026-10-14-csomopont-felvetel.md` T-009-44 szekció, 44.2).
 
 **Képernyőkép és vizuális bizonyíték**
 
@@ -1208,6 +1246,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `capture-screenshots.ts` írhat, ezt a `screenshot-pipeline` invariánsai őrzik. Nem `.spec.ts`
   és nem kapu, mert a verseny jelenete a mért változó miatt időzítőt használ (research 17.
   szekció, user kérés 2026-09-24).
+- **A futás nézet bemutató képe élő, nyitva tartott SSE kapcsolattal készül** (user döntés
+  2026-10-14, SPEC-008 12.6). A lezárt `page.route()` SSE mock után a stream jelző a képen
+  "újracsatlakozás" állapotú volt; a szentesített script ezért a fixtúra
+  `installShowcaseLiveRunMocks` függvényén át az `apps/web/e2e/run-view-stream.ts` szabad porton
+  figyelő `node:http` teszt szerverét indítja, a képernyőkép előtt állítja az "élő" állapotot, és a
+  teszt végén lezárja a szervert. A script szabálya nem lazult: saját szervert, gráfot, `mockRoute`
+  vagy `page.route` hívást továbbra sem tart, a szervert és a mockokat a fixtúra adja. Védelem: az
+  `apps/web/e2e/sse-real-server.spec.ts` két bemutató tesztje
+  (`docs/research/2026-10-14-ag-kiemeles.md` T-009-46 9. pont).
 
 **Adatbázis és Drizzle**
 

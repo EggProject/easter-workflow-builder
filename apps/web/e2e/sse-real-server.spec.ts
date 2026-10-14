@@ -21,7 +21,10 @@
 //      `route.fulfill()` lezárt válasz, tehát az `EventSource` a keretek után
 //      azonnal `error`-t kap, a `readyState` kiesik `OPEN`-ből, és a
 //      `computePhase` `reconnecting` ágára fut - a `replaying` felirat így
-//      csak egy meg nem figyelhető pillanatra jelenik meg.
+//      csak egy meg nem figyelhető pillanatra jelenik meg. Ide tartozik a
+//      bemutató futás nézet élő stream jelzője is (user döntés 2026-10-14,
+//      SPEC-008 12.6): a szentesített képkészítés (`capture-screenshots.ts`)
+//      ugyanazt a fixtúra függvényt hívja, amit a fájl végi teszt őriz.
 //
 // PÁRHUZAMOS FUTÁS. Minden teszt szervere az operációs rendszer által kiosztott
 // szabad porton figyel, és a lap a build időben rögzített `VITE_STREAM_ORIGIN`
@@ -42,6 +45,7 @@ import type {
 } from '@easter-workflow-builder/protocol';
 import { encodeStreamFrame } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { STREAM_ORIGIN } from './api-origin.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { makeRunEventRecord } from './transcript-fixture.ts';
@@ -78,6 +82,14 @@ import {
   type RunViewMockState,
   type TranscriptLayout,
 } from './run-view-stream.ts';
+import {
+  expectShowcaseStreamLive,
+  expectShowcaseTranscript,
+  fitShowcaseGraphIntoView,
+  installShowcaseLiveRunMocks,
+  openShowcaseRunView,
+  SHOWCASE_RUN_EVENTS,
+} from './showcase-graph.ts';
 
 declare global {
   // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
@@ -2888,4 +2900,36 @@ for (const { name, layout, expectsGrowth } of OUTER_OWN_LAYOUTS) {
       expect(await readLayoutStorage(page)).toEqual([OUTER_OWN_SIZES, undefined]);
     });
   }
+}
+
+// A bemutató futás nézet élő, nyitva tartott streammel (user döntés 2026-10-14,
+// SPEC-008 12.6, 93. kritérium), ugyanazzal a fixtúra függvénnyel és ugyanazon
+// az ablakméreten, amivel a `capture-screenshots.ts` a `run-view-*.png` képet
+// készíti. Egyetlen `GET /events` kérés azt jelenti, hogy a pótlás egyszer ment
+// ki: újracsatlakozás nincs, tehát második pótlás sincs.
+for (const theme of ['light', 'dark'] as const) {
+  test.describe(`a bemutató futás nézet élő streammel (${theme} téma)`, () => {
+    test.use({ colorScheme: theme, viewport: WIDE_LAYOUT.viewport });
+
+    test('a stream jelző élő, a transcript sorai egyszer szerepelnek, és nincs újracsatlakozás', async ({ page }) => {
+      let streamRequestCount = 0;
+      page.on('request', (request) => {
+        if (request.url().startsWith(`${STREAM_ORIGIN}/events`)) {
+          streamRequestCount += 1;
+        }
+      });
+      await page.addInitScript((mode: string) => {
+        globalThis.localStorage.setItem('eggTheme', mode);
+      }, theme);
+      serverHolder.current = await installShowcaseLiveRunMocks(page);
+
+      await openShowcaseRunView(page);
+      await fitShowcaseGraphIntoView(page);
+      await expectShowcaseTranscript(page);
+      await expectShowcaseStreamLive(page);
+
+      expect(streamRequestCount).toBe(1);
+      await expect(transcriptList(page).getByRole('listitem')).toHaveCount(SHOWCASE_RUN_EVENTS.length);
+    });
+  });
 }

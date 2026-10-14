@@ -40,6 +40,7 @@ import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { createGraphNode } from './create-graph-node.ts';
+import { deleteNodeWithEdges } from './delete-node-with-edges.ts';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
@@ -422,6 +423,15 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     });
   }
 
+  // A panel "Törlés" gombja (SPEC-008 5.9): megerősítés nélkül, kizárólag a
+  // szerkesztett állapotot módosítja, hálózati kérés nincs.
+  function handleDeleteNode(nodeId: string): void {
+    const remaining = deleteNodeWithEdges(currentNodes, currentEdges, nodeId);
+    setCurrentNodes(remaining.nodes);
+    setCurrentEdges(remaining.edges);
+    setSelectedNodeId(undefined);
+  }
+
   const startInputFields = readStartInputFields(currentNodes);
 
   function handleStartRunClick(): void {
@@ -490,6 +500,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
                     onChange={handleUpdateNode}
                     onClose={() => {
                       setSelectedNodeId(undefined);
+                    }}
+                    onDelete={() => {
+                      handleDeleteNode(selectedNode.id);
                     }}
                     inheritedProviderDescription={inheritedProviderDescription}
                     isSaveAttempted={isSaveAttempted}
