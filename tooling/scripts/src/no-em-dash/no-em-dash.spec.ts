@@ -56,6 +56,7 @@ const VENDORED_FILES = new Set([
   'packages/ui/src/pagination/pagination.css',
   'packages/ui/src/drawer/drawer.css',
   'packages/ui/src/context-menu/context-menu.css',
+  'packages/ui/src/tooltip/tooltip.css',
 ]);
 
 function repoRoot(): string {

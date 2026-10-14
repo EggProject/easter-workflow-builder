@@ -1,0 +1,61 @@
+/* ============================================================
+   EggProject: Tooltip, egérrel elérhető tipp
+   Kiegészítő fájl a `tooltip.css` mellett. A `tooltip.css` a design system
+   forrásával bájtra azonos blokkot hordoz, ezért a javítás külön fájlban áll.
+
+   SZÁNDÉKOS ELTÉRÉS A DESIGN SYSTEMTŐL (user döntés, 2026-10-14). A forrás
+   `.tooltip` szabálya `pointer-events: none` értéket ad, és a tipp 10 px
+   távolságra áll a triggertől, ezért az egér nem vihető át a tippre. A
+   WCAG 2.2 1.4.13 "Hoverable" feltétele szerint a mutató a hover tartalom
+   fölé vihető, anélkül hogy az eltűnne:
+   https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html
+
+   Két szabály pótolja:
+   1. A nyitott tipp `pointer-events` értéke `auto`.
+   2. Minden elhelyezéshez egy láthatatlan híd fedi a tipp és a trigger közti
+      rést. A híd mérete a forrás elhelyezéseinek távolsága: `calc(100% + 10px)`
+      a forrás `tooltip.css` 220. (top), 236. (bottom), 251. (left) és 266.
+      (right) során. A `tooltip-hover-bridge.spec.ts` a `tooltip.css` aktuális
+      távolságához méri a hidat.
+
+   A híd a `.tooltip` leszármazottja, ezért az egér átvitele a triggerről a
+   tippre nem hagyja el a `Tooltip` burkolóját, és a JS záró logikája
+   változatlan marad. Zárva a tipp `[hidden]`, tehát a híd sem létezik.
+   ============================================================ */
+
+.tooltip.is-open {
+  pointer-events: auto;
+}
+
+.tooltip.is-open::after {
+  content: '';
+  position: absolute;
+}
+
+.tooltip--top.is-open::after {
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.tooltip--bottom.is-open::after {
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.tooltip--left.is-open::after {
+  left: 100%;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+
+.tooltip--right.is-open::after {
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
