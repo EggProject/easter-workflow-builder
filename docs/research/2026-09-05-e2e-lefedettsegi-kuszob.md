@@ -1801,3 +1801,78 @@ nőtt (statements +7, branches +7, functions +2, lines +7), tehát a fedetlen da
 változott. A branches és a lines küszöb ezért a mért értékre emelkedik (`nyc` saját, két tizedesre
 kerekített kimenete: 784 / 795 -> 98.61, 1622 / 1637 -> 99.08), a statements és a functions
 küszöb változatlan marad (`apps/web/package.json`).
+
+## 48. A `blocking-failure-message.ts` 17. sorának ingadozó lefedettsége (2026-10-14): a küszöb nem mozdul
+
+**A jelenség.** A PR #33 (`feat/spec-008-bemutato-kep`) első `E2E` futásán (GitHub Actions run
+`38609247234`, attempt 1, `E2E` job `116008392392`, head `0525044`) mind a 499 Playwright teszt
+zöld volt, a `coverage:e2e:report` mégis elbukott: `ERROR: Coverage for lines (99.07%) does not
+meet global threshold (99.08%)`. A második attempt kódváltozás nélkül zöld lett. A
+`docs/research/2026-10-14-ag-kiemeles.md` T-009-38 szekciója a kontroll futásban ugyanezt a sort
+találta fedetlennek, és nyitva hagyta. A megbízás szerint a sor a `main` három korábbi CI
+futásában 2, 6 és 3, helyben 2-5 találatot kapott; ezeket a számokat nem mértem újra (nem
+ellenőrzött).
+
+**A sor.** `apps/web/src/run-view/blocking-failure-message.ts` 17. sora (`return
+failure.message;`). Egyetlen hívója a `RunViewScreen.tsx`, a futás rekordjának és a lépés futás
+listának a hibájára (a pillanatkép hibája nem ezen a függvényen megy). Akkor fut le, ha a `getRun`
+vagy a `listStepRuns` hibája nem átmeneti, vagy átmeneti, és nincs korábbi érték.
+
+**Melyik meglévő teszt éri el véletlenül.** Saját mérés a `fe22c2e` állapoton: a teljes e2e futás
+(493 teszt, mind zöld, nyolc shard) minden tesztje a saját nyers lefedettségi fájlját írta (a
+`coverage-fixture.ts` fájlnevét ideiglenesen a teszt címével bővítettem, ez nem került
+commitba). A 490 fájlból a 17. sor pontosan kettőben volt találatos, mindkettő a
+`run-control.spec.ts` tesztje: "üres inputFields lista esetén a modális nem nyílik meg, a futás
+közvetlenül indul" (2 találat) és "a modálison kitöltött értékek a StartRunRequest input
+mezőjébe kerülnek" (4 találat). Egyik sem állít a hibára.
+
+**Miért időzítésfüggő.** Mindkét teszt a szerkesztő mockjaival indul (`mockEditor`: `readWorkflowGraph`,
+`getWorkflow`, `readSettings`, `startRun`), a "Futás indítása" után a `/run?runId=run-1` futás
+nézetre navigál, ahol a `getRun`, a `readRunSnapshot` és a `listStepRuns` mockja nincs. Az
+`installApiMocks` a nem illeszkedő kérésre 404 `not_found` választ ad (`rest-mock.ts`), tehát a
+futás nézet korábbi érték nélküli, nem átmeneti hibával a blokkoló ágra fut. A tesztek utolsó
+állapot alapú várakozása az URL (`toHaveURL`), a `coverage-fixture.ts` pedig ezután azonnal
+kiolvassa a `window.__coverage__` objektumot. A 404 válasznak és a rá következő rendernek ez
+előtt kell megtörténnie; a mért találatarányok szerint ez nem minden futásban sikerül (az
+időzítés pontos sorrendjét nem követtem, nem ellenőrzött). Mérés: ugyanaz a teszt egyedül, `--repeat-each 40`, 3 worker mellett
+az "üres inputFields" teszt 40/40, a "modálison kitöltött" teszt 32/40 futásban érte el a sort;
+az utóbbi négy CPU magot teljesen lefoglaló terhelés mellett 29/30. A két teszt együttes
+kihagyását helyben nem sikerült előidézni, és hogy a PR #33 CI nulla találata pontosan ez volt,
+nem ellenőrzött (a CI naplójában fájlonkénti riport nincs). Az sem ellenőrzött, hogy a két teszt
+közti különbséget az "üres" teszt URL utáni `toHaveCount(0)` állítása adja.
+
+**A javítás.** `apps/web/e2e/run-view.spec.ts`: a `mockRun` új `failingEndpoint` opciója
+(`'getRun'` vagy `'listStepRuns'`, 404 `not_found` protokoll hibával) és két teszt, "a getRun nem
+átmeneti hibájára (404, korábbi érték nélkül) a rajz helyén a danger Alert áll a kódhoz rendelt
+mondattal" és ugyanez a `listStepRuns` végpontra. A teszt a futás nézetet nyitja meg, web-first
+`toHaveText` állítással megvárja a `danger` `Alert` blokkot a `not_found` kód magyar mondatával,
+majd azt állítja, hogy a szerver `message` szövege nem jelenik meg, és a rajz (`rf__wrapper`) meg
+a pillanatkép fejléc nincs a lapon. A teszt a hiba renderelése nélkül nem érhet véget, tehát a sor
+minden futásban lefut a lefedettség kiolvasása előtt. Termékkód nem változott.
+
+**Igazolás.**
+
+- **(a) Önálló futás.** Tiszta `.nyc_output`, kizárólag a két új teszt: a `nyc report` sora
+  `blocking-failure-message.ts | 100 | 75 | 100 | 100 | 14` (statements, branches, functions,
+  lines; a 14. sor a `failure.isTransient` operandus, amit csak a leállás tesztek érnek el), a
+  remapelt `coverage-final.json`-ban a 17. sor statementje 3 találatot kapott. Ismétlés:
+  `--repeat-each 50` (100 futás, 3 worker) mind a 100 nyers fájlban találat; négy CPU magot
+  lefoglaló terhelés mellett `--repeat-each 30` (60 futás) 60/60.
+- **(b) Szándékos rontás.** A `return failure.message;` helyén `return undefined;`: mindkét új
+  teszt elbukik (`toHaveText` időtúllépés, `element(s) not found`); a visszaállítás után zöld.
+- **(c) Teljes e2e a javított állapoton.** `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`,
+  nyolc shard (`--shard=<i>/8`, egymás után, `flock /tmp/playwright-gep.lock` alatt, `workers: 3`),
+  **495 teszt (493 + 2 új), mind zöld**, majd `bun run coverage:e2e:report` a változatlan
+  küszöbbel: exit 0.
+
+| Metrika    | Fedett / összes | Százalék | Küszöb (változatlan) | Fedetlen darab, alap (`fe22c2e`) -> most |
+| ---------- | --------------- | -------- | -------------------- | ---------------------------------------- |
+| statements | 1786 / 1801     | 99.16    | 99.11                | 15 -> 15                                 |
+| branches   | 835 / 846       | 98.69    | 98.61                | 11 -> 11                                 |
+| functions  | 591 / 594       | 99.49    | 99.46                | 3 -> 3                                   |
+| lines      | 1721 / 1736     | 99.13    | 99.08                | 15 -> 15                                 |
+
+A fedetlen darabszám az alapon és a javított állapoton azonos, az összes darabszám is (termékkód
+nem változott). A mért százalékok a küszöb fölött vannak, mert a 47. szekció óta az összes
+darabszám nőtt, a fedetlen nem. **A küszöböt itt nem emeltem**: az újramérés a T-009-31 dolga.
+Más, csak véletlenül fedett sor keresése nem része ennek a szekciónak (nem vizsgált).

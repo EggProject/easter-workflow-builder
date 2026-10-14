@@ -589,6 +589,9 @@ test-nel").
 - Az e2e tesztben minden külső hívás mockolva legyen, ugyanúgy, mint egy unit tesztben: a
   REST hívások `page.route()`-tal adott, garantált válasszal mennek, valós backend szervert a
   teszt nem szólíthat meg.
+- MSW használható, ha a feladat megkívánja (user kérés 2026-10-14). Ma nincs bekötve: a bemutató
+  kép élő streamjéhez a meglévő `node:http` út elég volt, a böngészős MSW termékkód változást
+  igényelt volna (`docs/research/2026-10-14-ag-kiemeles.md` T-009-46 9. pont).
 
 **SSE mockolás: lezárva, hibrid úton.** Forrás:
 `docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
@@ -855,6 +858,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
   számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
   felhasznált, tehát a besorolás változatlan.
+- **Egy csak véletlenül fedett sor billegteti az e2e lefedettségi küszöböt.** A
+  `run-view/blocking-failure-message.ts` hibaüzenet ágát (`return failure.message;`) a teljes e2e
+  futásban csak két, a hibára nem állító teszt érte el, mellékhatásként: a `run-control.spec.ts`
+  két indítás tesztje a futás nézetre navigál, ahol a hiányzó mockok 404-et adnak
+  (`installApiMocks`), és a teszt az URL után azonnal kiolvassa a lefedettséget, tehát a hibás
+  renderelést nem várja meg. Hogy a render a kiolvasás előtt megtörténik-e, versenyhelyzet, ezért
+  a sor találatszáma futásonként más, és a PR #33 első CI futásán a `lines` metrika a küszöb alá
+  esett (99.07 a 99.08 ellen), minden teszt zölden: az `E2E` job bukott. A szabály: **amit
+  a küszöb számol, azt olyan teszt fedje, amelyik a viselkedést állítja és megvárja** (web-first
+  assertion a megjelenő állapotra); egy ingadozó fedetlen darabszámot a sort determinisztikusan
+  fedő teszt old meg, nem a küszöb csökkentése. Védelem: a `run-view.spec.ts` két tesztje (a
+  `getRun` és a `listStepRuns` 404 hibája, danger `Alert` a kódhoz rendelt mondattal), amelyek a
+  hibaüzenet ág `return undefined;` rontására elbuknak. Mérés és a CI hivatkozás:
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 48. szekció.
 
 **Frontend állapot és layout**
 
@@ -1208,6 +1225,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `capture-screenshots.ts` írhat, ezt a `screenshot-pipeline` invariánsai őrzik. Nem `.spec.ts`
   és nem kapu, mert a verseny jelenete a mért változó miatt időzítőt használ (research 17.
   szekció, user kérés 2026-09-24).
+- **A futás nézet bemutató képe élő, nyitva tartott SSE kapcsolattal készül** (user döntés
+  2026-10-14, SPEC-008 12.6). A lezárt `page.route()` SSE mock után a stream jelző a képen
+  "újracsatlakozás" állapotú volt; a szentesített script ezért a fixtúra
+  `installShowcaseLiveRunMocks` függvényén át az `apps/web/e2e/run-view-stream.ts` szabad porton
+  figyelő `node:http` teszt szerverét indítja, a képernyőkép előtt állítja az "élő" állapotot, és a
+  teszt végén lezárja a szervert. A script szabálya nem lazult: saját szervert, gráfot, `mockRoute`
+  vagy `page.route` hívást továbbra sem tart, a szervert és a mockokat a fixtúra adja. Védelem: az
+  `apps/web/e2e/sse-real-server.spec.ts` két bemutató tesztje
+  (`docs/research/2026-10-14-ag-kiemeles.md` T-009-46 9. pont).
 
 **Adatbázis és Drizzle**
 
