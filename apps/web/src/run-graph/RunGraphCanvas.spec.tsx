@@ -288,4 +288,34 @@ describe('RunGraphCanvas', () => {
       expect(highlightedEdgeIds()).toEqual([]);
     });
   });
+
+  describe('a régi, kulcs nélküli elágazás élek (O-27)', () => {
+    const KEYLESS_BRANCH_EDGE: WorkflowEdgeInput = { ...EDGE, id: 'e-regi', sourceNodeId: 'n-branch' };
+
+    it('a branch forrású, null kulcsú él nem jut a vászonra, a többi él igen', () => {
+      act(() => {
+        root.render(
+          <RunGraphCanvas
+            nodes={BRANCH_NODES}
+            edges={[...BRANCH_EDGES, KEYLESS_BRANCH_EDGE]}
+            branchDecisionsByNodeId={NO_DECISIONS}
+          />,
+        );
+      });
+      expect(lastCapturedProperties().edges?.map((edge) => edge.id)).toEqual(['e-in', 'e-yes', 'e-no']);
+    });
+
+    it('az alapértelmezett ágra lépő döntés mellett is csak a kulcsos él kap osztályt', () => {
+      act(() => {
+        root.render(
+          <RunGraphCanvas
+            nodes={BRANCH_NODES}
+            edges={[...BRANCH_EDGES, KEYLESS_BRANCH_EDGE]}
+            branchDecisionsByNodeId={BRANCH_DECISIONS}
+          />,
+        );
+      });
+      expect(highlightedEdgeIds()).toEqual(['e-no']);
+    });
+  });
 });

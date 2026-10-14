@@ -11,8 +11,10 @@ import './graph-node-card.css';
 
 /**
  * A `branch` node kimenő handle-ei a node saját `config.branches` listájából
- * jönnek, plusz egy alapértelmezett (`id: null`) handle a `defaultBranchKey`
- * ágnak (SPEC-008 5.1 táblázat: "ágankénti egy... plusz az alapértelmezett").
+ * jönnek, ágankénti egy, a saját `key` azonosítójával; kulcs nélküli kimenet
+ * nincs (SPEC-008 5.1, O-23). Az alapértelmezett ág az, amelyik kulcsa a
+ * `defaultBranchKey` mezőben áll, külön jelölés nélkül. A régi, kulcs nélküli
+ * elágazás éleket a rajz előtt az `omit-keyless-branch-edges.ts` hagyja el (O-27).
  * A `config` a saját `type` mezőjén diszkriminált unió, tehát a `branch` ág
  * szűkítése `config.type === 'branch'` ellenőrzéssel megy, `unknown` és `as`
  * nélkül. A `WorkflowNodeInputSchema` a `type` és a `config.type` mezőt NEM
@@ -28,11 +30,7 @@ function resolveOutputHandles(
     return outputHandles.handles;
   }
   if (config.type === 'branch') {
-    return [
-      ...config.branches.map((branch) => ({ id: branch.key, label: branch.label })),
-      // eslint-disable-next-line unicorn/no-null -- a handle azonosítója a dróton ténylegesen `null`, a névtelen alapértelmezett ágat jelöli (SPEC-008 5.1)
-      { id: null, label: 'Alapértelmezett' },
-    ];
+    return config.branches.map((branch) => ({ id: branch.key, label: branch.label }));
   }
   return [];
 }
