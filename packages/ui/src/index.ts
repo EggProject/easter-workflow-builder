@@ -35,6 +35,8 @@ export { Breadcrumb, type BreadcrumbAncestor, type BreadcrumbProperties } from '
 export { Button, type ButtonProperties, type ButtonSize, type ButtonVariant } from './button/Button.tsx';
 export { ButtonGroup, type ButtonGroupProperties } from './button-group/ButtonGroup.tsx';
 export { Card, type CardProperties } from './card/Card.tsx';
+export type { ContextMenuPosition } from './context-menu/compute-context-menu-position.ts';
+export { ContextMenu, type ContextMenuItem, type ContextMenuProperties } from './context-menu/ContextMenu.tsx';
 export {
   DataTable,
   type DataTableAlign,
