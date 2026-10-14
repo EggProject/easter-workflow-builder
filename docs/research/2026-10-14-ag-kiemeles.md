@@ -89,17 +89,21 @@ döntés ága e2e-ből csak az új teszttel érhető el. Az új teszt a futás n
 egy le nem képezhető és négy hibás alakú keretet küld, és azt állítja, hogy a nézet nem törik el, a
 transcript nyolc sort kap, és a futás nézet az öt meglévő végponton kívül REST hívást nem indít.
 
-**Nyitva (nem vizsgált): a `run-view/blocking-failure-message.ts` 17. sora a kontroll futásban.** A
-kontroll futásban az új kódtól független tétel, a fájl 17. sora (`return failure.message;`,
-1 statement) is fedetlen maradt, a teljes futásban viszont fedett volt. Az ingadozás oka nem
-vizsgált, ezért itt csak a megfigyelés áll, magyarázat nincs.
+**Lezárva (2026-10-14, `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 48. szekció): a
+`run-view/blocking-failure-message.ts` 17. sora a kontroll futásban.** A kontroll futásban az új
+kódtól független tétel, a fájl 17. sora (`return failure.message;`, 1 statement) is fedetlen
+maradt, a teljes futásban viszont fedett volt. Az ok: a sort a meglévő e2e tesztek közül csak a
+`run-control.spec.ts` két indítás tesztje érte el, mellékhatásként (a futás nézet hiányzó
+mockjainak 404-e, a hibás renderelést a teszt nem várja meg), ezért a találatszám időzítéstől
+függött. A javítás két új, determinisztikus `run-view.spec.ts` teszt, amelyek a hibás renderelést
+megvárják.
 
-- **Mi a viselkedés addig:** a kontroll tábla "Fedetlen az új e2e nélkül" oszlopa ezt az új
-  kódtól független tételt is tartalmazza, az új kód hatását az "Ebből az új kód" oszlop adja.
-  Az "Utána" tábla (teljes futás, a tétel fedett) és a küszöb nem érintett.
-- **Mi zárná le:** a kontroll futás megismétlése, és annak megállapítása, hogy a teljes
-  futásban mely e2e teszt fedi a 17. sort, illetve hogy a kontroll futásban minden ismétlésnél
-  fedetlen marad-e.
+- **Mi volt a viselkedés addig:** a kontroll tábla "Fedetlen az új e2e nélkül" oszlopa ezt az új
+  kódtól független tételt is tartalmazta, az új kód hatását az "Ebből az új kód" oszlop adta. Az
+  "Utána" tábla (teljes futás, a tétel fedett) és a küszöb nem volt érintett.
+- **Mi zárta le:** a 48. szekció mérése: a teljes futásban pontosan két teszt érte el a sort, és a
+  két teszt külön ismételve nem minden futásban; az új tesztek önállóan, ismételve is minden
+  futásban elérik, és a fedetlen darabszám a javítás előtt és után azonos.
 
 **Az e2e-ből most el nem érhető új kód.** A `resolve-highlighted-branch-edge-ids.ts` függvényt a
 termékkód még nem hívja (a T-009-39 köti be), ezért a lap nem tölti be, és az istanbul mérésben nem
