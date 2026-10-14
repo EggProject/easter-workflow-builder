@@ -80,3 +80,26 @@ végül `bun run coverage:e2e:report` (kilépési kód 0, a meglévő küszöbbe
 A fedetlen tételek száma egyik metrikán sem nőtt. A teszt darabszám a 47. szekció 473 tesztjéhez
 képest 477; a különbséget nem ez a lépés adja, mert nem ad hozzá e2e tesztet és az `apps/web`
 fájljai változatlanok.
+
+**A 473 -> 477 különbség tételes magyarázata.** A darabszámot a `bun x playwright test --list`
+adja (`apps/web` alatt, `Total: N tests in 32 files`), a mért állapotokon, egy ideiglenes
+worktree-ben (a `node_modules` a jelen munkafáéra mutat; a lista csak az `e2e/` fájlokat és a
+konfigurációt tölti be, böngészőt és szervert nem indít):
+
+| Állapot                                           | `--list` darabszám |
+| ------------------------------------------------- | ------------------ |
+| `bb3fd06` (a 47. szekció kiváltó `main` commitja) | 436                |
+| `95f62db` (PR #19, a 47. szekciót hordozó commit) | 475                |
+| `8413882` (PR #20 után, a jelen ág bázisa)        | 477                |
+| a jelen ág `HEAD`-je (az `apps/web` változatlan)  | 477                |
+
+- A `95f62db` és a `8413882` között az `apps/web/e2e` alatt egyetlen commit változtatta a teszteket:
+  a `0310262` (PR #21), ami két új `test(...)` blokkot adott a `run-view.spec.ts` fájlhoz (a külső
+  elválasztó pointer és billentyű tesztje a vízszintes és a függőleges sávban). Ezt a
+  `git log 95f62db..8413882 -- apps/web/e2e` (egy commit) és a `git diff --stat` (egy fájl) igazolja.
+  Ez a `475 -> 477`.
+- A fennmaradó `473 -> 475` a 47. szekció és a commitolt `95f62db` állapot eltérése: a szekció ugyanebben
+  a commitban áll, a `--list` ugyanezen a commiton 475 tesztet ad, a szekció pedig 473-at ír. A mérés
+  a PR #19 munkafájának melyik köztes állapotán futott, a squash commit történetéből nem állítható
+  vissza, ezért ennek az oka **nem ellenőrzött**. A jelen lépés mérése (477) a `--list` darabszámával
+  megegyezik.
