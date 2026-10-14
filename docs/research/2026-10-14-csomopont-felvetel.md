@@ -676,6 +676,23 @@ A fedetlen darabszám a fenti táblával azonos (15 / 11 / 3 / 15), ugyanazon a 
 `use-stream-connection.ts` 1/0/1/1); a fedett és az összes darabszám +8 / +1 / +5 / +8 nőtt, ez az
 új `PlusIcon`, a `useIsAddNodeCompact` hook és a `AddNodeMenuButton` új ága, mind fedett.
 
+A `main` (T-009-44, #35) beolvasztása után, `9f9ed22` állapoton, ugyanezzel az eljárással: **515 teszt,
+mind zöld** (65 + 65 + 65 + 64 + 64 + 64 + 64 + 64), `bun run coverage:e2e:report` exit 0, a meglévő
+küszöbbel; az egység kapu (`bun run test`) 574 fájl, 100 százalék mind a négy metrikán.
+
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------- |
+| statements | 1855 / 1870     | 15       |
+| branches   | 850 / 861       | 11       |
+| functions  | 625 / 628       | 3        |
+| lines      | 1783 / 1798     | 15       |
+
+A fedetlen darabszám a beolvasztás előtti és a `main` 44.5a mérésével is azonos (15 / 11 / 3 / 15),
+ugyanazon a hat fájlon (`nyc` json-summary, fájlonként utasítás/ág/függvény: `mount-app.tsx` 3/2/0,
+`read-frontend-config.ts` 8/7/1, `is-valid-connection.ts` 1/1/0, `browser-history-location-port.ts`
+1/0/1, `perform-route-request.ts` 1/1/0, `use-stream-connection.ts` 1/0/1); az `apps/web/package.json`
+küszöbe nem változott.
+
 ### 28. A lábléc gombsora szűk nézetben: ikonos "Hozzáadás" (user döntés, 2026-10-14)
 
 **A hiba és a mérés** (valódi Chromium, `apps/web` preview build, a gombok `getBoundingClientRect()`
