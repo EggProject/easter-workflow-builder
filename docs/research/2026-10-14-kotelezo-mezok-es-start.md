@@ -291,3 +291,35 @@ majd egy érték után a mentés). Utána a fedetlen darabszám egyik metrikán 
 `browser-history-location-port.ts`, `perform-route-request.ts`, `use-stream-connection.ts`; a két
 állapot `nyc report --reporter=text` fedetlen sorai `diff` szerint azonosak). A `coverage:e2e:report`
 a meglévő küszöbbel zöld.
+
+### 5. A `Válassz…` helyőrző, a review javítások és a merge utáni mérés
+
+**User döntés (2026-10-14):** a `join` mód választója és a kezeletlen hiba szabály választója a
+`null` értéket `Válassz…` helyőrzővel mutatja, üres opció nélkül; választás után üresre visszaállni
+nem lehet (SPEC-008 5.2, 5.4, 14.1 O-29 és O-33). A felirat a forrás `Select.jsx` `placeholder =
+'Select…'` alapértékének mintája (saját olvasás: `eggproject-design-components/components/select/Select.jsx` 14. sor), a szín a `packages/ui` `select-field.css` `.select__value--placeholder` szabálya.
+
+**A `z.null()` kontra `z.literal(null)` (review, SPEC-008 5.4).** Saját futtatás, ideiglenes, nem
+commitolt próbafájl a `packages/protocol` alatt: `bun x eslint` a `z.literal(null)` sorra
+`unicorn/no-null` hibát ad (`Use undefined instead of null`), a `z.null()` sorra nem; a `bun x tsc
+--noEmit` szerint a két séma `z.infer` típusa kölcsönösen értékadható, és mindkettő `null`.
+
+**E2E a `main` `019c4b4` állapotának merge-e után**, a 4. szekció eljárásával (`rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e`, `bun x playwright test --shard=i/8` nyolc egymás
+utáni hívásban `flock /tmp/playwright-gep.lock` alatt, végül `bun run coverage:e2e:report`, kilépési
+kód 0, a küszöb változatlan): **481 teszt, mind zöld** (61 + 7 x 60).
+
+| Metrika    | Fedett / összes | Fedetlen darab, a 4. szekció "utána" -> most |
+| ---------- | --------------- | -------------------------------------------- |
+| statements | 1778 / 1793     | 15 -> 15                                     |
+| branches   | 833 / 844       | 11 -> 11                                     |
+| functions  | 585 / 588       | 3 -> 3                                       |
+| lines      | 1717 / 1732     | 15 -> 15                                     |
+
+A fedetlen darabszám egyik metrikán sem nőtt, és a fedetlen helyek ugyanazon a hat fájlon és
+sorszámon állnak (`mount-app.tsx` 16, 21-22; `read-frontend-config.ts` 41, 62, 67, 72, 77;
+`is-valid-connection.ts` 36; `browser-history-location-port.ts` 21; `perform-route-request.ts` 89;
+`use-stream-connection.ts` 202; `nyc report --reporter=text`). A `graph-editor-validation.spec.ts`
+két mentési tesztje a `Válassz…` feliratot és (a kezeletlen hiba szabálynál) a két opciós listát
+állítja; a mező alatti hibát `getByRole('alert')` alapon, a mező `aria-describedby` kapcsolatával
+köti össze.
