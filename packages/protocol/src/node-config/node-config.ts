@@ -142,15 +142,35 @@ export const JoinAiSynthesisNodeConfigSchema = z
 export type JoinAiSynthesisNodeConfig = z.infer<typeof JoinAiSynthesisNodeConfigSchema>;
 
 /**
- * Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson.
- * Beágyazott diszkriminált unió a `mode` mezőn, ami a külső, `type` mezőn
- * álló uniónak is érvényes tagja (mérve: mindhárom ág `type: 'join'`
- * literált hordoz, a Zod 4 ezt elfogadja beágyazott unió tagként).
+ * A felvett `join` csomópont alakja, amíg a felhasználó nem választott módot
+ * (SPEC-008 5.4, O-33): `mode: null`, `settings` mező nélkül. Az olvasó séma
+ * elfogadja, a mentési séma (`NodeConfigSaveSchema`) a `mode` útvonalon
+ * elutasítja, a motor pedig a futás indításakor `malformed_node_config`
+ * hibával (user döntés 2026-10-14). A Zod 4 a `null` diszkriminátor értéket
+ * dokumentáltan elfogadja (<https://zod.dev/api>, discriminated unions).
+ */
+export const JoinUnselectedNodeConfigSchema = z
+  .strictObject({
+    type: z.literal('join'),
+    mode: z.null(),
+    onUnhandledError: UnhandledErrorPolicySchema.nullable(),
+  })
+  .readonly();
+
+export type JoinUnselectedNodeConfig = z.infer<typeof JoinUnselectedNodeConfigSchema>;
+
+/**
+ * Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson;
+ * a negyedik, `mode: null` ágnak nincs `settings` mezője. Beágyazott
+ * diszkriminált unió a `mode` mezőn, ami a külső, `type` mezőn álló uniónak
+ * is érvényes tagja (mérve: mind a négy ág `type: 'join'` literált hordoz, a
+ * Zod 4 ezt elfogadja beágyazott unió tagként).
  */
 export const JoinNodeConfigSchema = z.discriminatedUnion('mode', [
   JoinMergeNodeConfigSchema,
   JoinScriptNodeConfigSchema,
   JoinAiSynthesisNodeConfigSchema,
+  JoinUnselectedNodeConfigSchema,
 ]);
 
 export type JoinNodeConfig = z.infer<typeof JoinNodeConfigSchema>;

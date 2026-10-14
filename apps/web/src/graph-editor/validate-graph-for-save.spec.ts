@@ -9,7 +9,7 @@ const START_NODE: WorkflowNodeInput = {
   label: 'Indítás',
   positionX: 0,
   positionY: 0,
-  config: { type: 'start', inputFields: [], onUnhandledError: null },
+  config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
 };
 
 describe('validateGraphForSave', () => {
@@ -48,6 +48,33 @@ describe('validateGraphForSave', () => {
       }
     },
   );
+
+  it('null onUnhandledError értékre error Outcome-ot ad, ami megnevezi a mező útvonalát (SPEC-008 5.4, O-29)', () => {
+    const outcome = validateGraphForSave(
+      [{ ...START_NODE, config: { ...START_NODE.config, onUnhandledError: null } }],
+      [],
+    );
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind === 'error') {
+      expect(outcome.message).toContain('nodes.0.config.onUnhandledError');
+    }
+  });
+
+  it('választatlan join módra error Outcome-ot ad, ami megnevezi a mező útvonalát (SPEC-008 5.4, O-33)', () => {
+    const joinNode: WorkflowNodeInput = {
+      id: 'n-3',
+      type: 'join',
+      label: 'Összefésülés',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'join', mode: null, onUnhandledError: 'fail_run' },
+    };
+    const outcome = validateGraphForSave([START_NODE, joinNode], []);
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind === 'error') {
+      expect(outcome.message).toContain('nodes.1.config.mode');
+    }
+  });
 
   it('hibás él mezőre (ismeretlen kulcs a strictObject sémán) error Outcome-ot ad', () => {
     const edgeWithExtraField = {

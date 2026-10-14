@@ -42,7 +42,7 @@ const START_NODE: WorkflowNodeInput = {
   label: 'Indítás',
   positionX: 0,
   positionY: 0,
-  config: { type: 'start', inputFields: [], onUnhandledError: null },
+  config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
 };
 
 const AGENT_NODE: WorkflowNodeInput = {
@@ -74,7 +74,7 @@ const AGENT_NODE: WorkflowNodeInput = {
     agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
 };
 

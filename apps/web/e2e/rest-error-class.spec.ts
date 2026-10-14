@@ -21,12 +21,12 @@ import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
-const START_WITHOUT_FIELDS: NodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };
+const START_WITHOUT_FIELDS: NodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 
 const START_WITH_FIELDS: NodeConfig = {
   type: 'start',
   inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }],
-  onUnhandledError: null,
+  onUnhandledError: 'fail_run',
 };
 
 function graphWithStartConfig(startConfig: NodeConfig): WorkflowGraphDocument {

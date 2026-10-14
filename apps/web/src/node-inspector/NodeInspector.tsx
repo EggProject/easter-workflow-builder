@@ -12,6 +12,7 @@ import { LoopNodeFields } from './LoopNodeFields.tsx';
 import { ScriptNodeFields } from './ScriptNodeFields.tsx';
 import { StartNodeFields } from './StartNodeFields.tsx';
 import { SubWorkflowNodeFields } from './SubWorkflowNodeFields.tsx';
+import { UnhandledErrorPolicyField } from './UnhandledErrorPolicyField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 import { fieldErrorsFromZodError } from './field-errors-from-zod-error.ts';
 import './node-inspector.css';
@@ -166,6 +167,14 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
       <div className="node-inspector__body">
         <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>
           <FieldErrorsContext.Provider value={fieldErrors}>
+            {/* A kezeletlen hiba szabálya minden típusnál a törzs első
+                mezője, egyetlen helyen rajzolva (SPEC-008 5.2, O-29). */}
+            <UnhandledErrorPolicyField
+              value={node.config.onUnhandledError}
+              onChange={(nextValue) => {
+                handleConfigChange({ ...node.config, onUnhandledError: nextValue });
+              }}
+            />
             {renderConfigFields(node.config, handleConfigChange, inheritedProviderDescription)}
           </FieldErrorsContext.Provider>
         </FieldErrorVisibilityContext.Provider>

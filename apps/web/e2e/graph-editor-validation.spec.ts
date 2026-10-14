@@ -15,7 +15,10 @@
 // `nullable-number-field-value.ts` fejléc komment). Ez az ág ezért marad
 // unit teszt only (`validate-graph-for-save.spec.ts`). 2026-09-28 óta (SPEC-008
 // 5.4, O-21) a mentési séma egy üres kötelező szöveg mezőn is elbukik; ennek
-// e2e tesztje a PLAN-009 T-009-45 hatóköre.
+// e2e tesztje a PLAN-009 T-009-45 hatóköre. A `null` `onUnhandledError` és a
+// választatlan `join` mód mentési jelzését (O-29, O-33) a fájl végének két
+// tesztje fedi, mert a beállítás panel két választó mezőjét csak ez az út
+// éri el valódi böngészőben (T-009-56).
 import { ReplaceGraphRequestSchema } from '@easter-workflow-builder/protocol';
 import type {
   NodeConfig,
@@ -26,6 +29,7 @@ import type {
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
+import { chooseSelectOption, expectSelectedLabel } from './select-field.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
@@ -60,14 +64,14 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
-  onUnhandledError: null,
+  onUnhandledError: 'fail_run',
 };
 
 const LOOP_CONFIG: NodeConfig = {
   type: 'loop',
   maxIterations: 3,
   continueExpression: 'i < 3',
-  onUnhandledError: null,
+  onUnhandledError: 'fail_run',
 };
 
 /**
@@ -85,7 +89,7 @@ const GRAPH: WorkflowGraphDocument = {
       label: 'Indítás',
       positionX: 0,
       positionY: 0,
-      config: { type: 'start', inputFields: [], onUnhandledError: null },
+      config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
       createdAtMs: 1,
       updatedAtMs: 1,
     },
@@ -426,4 +430,146 @@ test('hiányzó "workflowId" query paraméterre a képernyő figyelmeztet, REST 
   await expect(page.getByRole('alert')).toHaveText(
     'Nincs megadva szerkesztendő workflow (hiányzó "workflowId" query paraméter).',
   );
+});
+
+/**
+ * Egy betöltött gráf, aminek a mentése a mentési séma egyetlen szabályán
+ * bukik: a Start `onUnhandledError` mezője `null` (O-29), vagy a `join`
+ * módja választatlan (O-33). A Start az O-20 létrehozási alakja.
+ */
+function graphWith(nodes: WorkflowGraphDocument['nodes']): WorkflowGraphDocument {
+  return { nodes, edges: [] };
+}
+
+/* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
+const START_WITHOUT_POLICY: WorkflowGraphDocument['nodes'][number] = {
+  id: 'n-start',
+  type: 'start',
+  label: 'Indítás',
+  positionX: 0,
+  positionY: 0,
+  config: { type: 'start', inputFields: [], onUnhandledError: null },
+  createdAtMs: 1,
+  updatedAtMs: 1,
+};
+
+const UNSELECTED_JOIN: WorkflowGraphDocument['nodes'][number] = {
+  id: 'n-join',
+  type: 'join',
+  label: 'Összefésülés',
+  positionX: 500,
+  positionY: 240,
+  config: { type: 'join', mode: null, onUnhandledError: 'fail_run' },
+  createdAtMs: 1,
+  updatedAtMs: 1,
+};
+/* eslint-enable unicorn/no-null */
+
+async function installSaveMocks(page: Page, graph: WorkflowGraphDocument, putBodies: unknown[]): Promise<void> {
+  await installApiMocks(page, [
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(graph))),
+    mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('replaceWorkflowGraph', async (route) => {
+      const body: unknown = route.request().postDataJSON();
+      putBodies.push(body);
+      const parsed = ReplaceGraphRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        throw new Error('a teszt PUT törzse nem felel meg a ReplaceGraphRequestSchema-nak');
+      }
+      await route.fulfill(
+        jsonBody({
+          nodes: parsed.data.nodes.map((node) => ({ ...node, createdAtMs: 1, updatedAtMs: 1 })),
+          edges: [],
+        }),
+      );
+    }),
+  ]);
+}
+
+/**
+ * A mező alatti hiba: `aria-invalid`, és az `aria-describedby` a panel egyetlen
+ * `role="alert"` elemére mutat (SPEC-008 5.4, `.claude/CLAUDE.md` 11.). A
+ * `getByRole('alert')` szigorú: ha a panelen másik riasztás is állna, a
+ * hívás hibával megáll, tehát a hiba a mezőhöz kötött.
+ */
+async function expectFieldError(panel: Locator, select: Locator): Promise<void> {
+  await expect(select).toHaveAttribute('aria-invalid', 'true');
+  const alert = panel.getByRole('alert');
+  await expect(alert).toHaveText('A mező nem lehet üres.');
+  await expect(select).toHaveAttribute('aria-describedby', String(await alert.getAttribute('id')));
+}
+
+test('a null kezeletlen hiba szabály mentési kísérlete PUT nélkül marad, a hiba a választó alatt áll, egy érték után a mentés lefut (SPEC-008 5.4, O-29)', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await installSaveMocks(page, graphWith([START_WITHOUT_POLICY]), putBodies);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+
+  await nodeLocator(page, 'n-start').click();
+  const panel = page.locator('.node-inspector');
+  const policySelect = panel.getByRole('combobox', { name: 'Kezeletlen hiba szabálya' });
+  await expectSelectedLabel(policySelect, 'Válassz…');
+
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expectFieldError(panel, policySelect);
+  expect(putBodies).toHaveLength(0);
+
+  await chooseSelectOption(page, policySelect, 'fail_branch');
+  await expect(policySelect).not.toHaveAttribute('aria-invalid', 'true');
+
+  // Választás után a lista csak a két értéket kínálja: üresre visszaállni nem lehet.
+  await policySelect.click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText(['fail_run', 'fail_branch']);
+  await page.keyboard.press('Escape');
+  await expect(policySelect).toHaveAttribute('aria-expanded', 'false');
+
+  await chooseSelectOption(page, policySelect, 'fail_run');
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+
+  const saved = ReplaceGraphRequestSchema.safeParse(putBodies.at(-1));
+  expect(putBodies).toHaveLength(1);
+  expect(saved.success && saved.data.nodes.map((node) => node.config.onUnhandledError)).toEqual(['fail_run']);
+});
+
+test('a választatlan join mód mentési kísérlete PUT nélkül marad, a hiba a mód választó alatt áll, egy mód után a mentés lefut (SPEC-008 5.4, O-33)', async ({
+  page,
+}) => {
+  const putBodies: unknown[] = [];
+  await installSaveMocks(
+    page,
+    graphWith([
+      { ...START_WITHOUT_POLICY, config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' } },
+      UNSELECTED_JOIN,
+    ]),
+    putBodies,
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+
+  await nodeLocator(page, 'n-join').click();
+  const panel = page.locator('.node-inspector');
+  const modeSelect = panel.getByRole('combobox', { name: 'Összefésülés módja' });
+  await expectSelectedLabel(modeSelect, 'Válassz…');
+
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expectFieldError(panel, modeSelect);
+  expect(putBodies).toHaveLength(0);
+
+  await chooseSelectOption(page, modeSelect, 'összefésülés');
+  await expect(modeSelect).not.toHaveAttribute('aria-invalid', 'true');
+  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+
+  const saved = ReplaceGraphRequestSchema.safeParse(putBodies.at(-1));
+  expect(putBodies).toHaveLength(1);
+  expect(saved.success && saved.data.nodes.find((node) => node.id === 'n-join')?.config).toEqual({
+    type: 'join',
+    mode: 'merge',
+    settings: {},
+    onUnhandledError: 'fail_run',
+  });
 });

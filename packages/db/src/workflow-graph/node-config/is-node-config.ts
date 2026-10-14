@@ -82,9 +82,11 @@ function isFanOutConfig(value: UnknownRecord): boolean {
 }
 
 /**
- * A `join` három módja. Az `ai_synthesis` alobjektuma pontosan az
- * `AgentStepConfig`, a `script` módé ugyanaz a `ScriptConfig`, mint a `script`
- * node-é, a `merge` módé pedig nyitott alakú rekord (lásd `node-config.ts`).
+ * A `join` három módja és a választatlan ág. Az `ai_synthesis` alobjektuma
+ * pontosan az `AgentStepConfig`, a `script` módé ugyanaz a `ScriptConfig`,
+ * mint a `script` node-é, a `merge` módé pedig nyitott alakú rekord (lásd
+ * `node-config.ts`). A `mode: null` ágnak nincs `settings` mezője, tehát csak
+ * az `onUnhandledError` érvényessége dönt (SPEC-008 5.4, O-33).
  */
 function isJoinConfig(value: UnknownRecord): boolean {
   const settings = value['settings'];
@@ -98,6 +100,10 @@ function isJoinConfig(value: UnknownRecord): boolean {
     }
     case 'ai_synthesis': {
       return isAgentStepConfig(settings) && isOnUnhandledErrorValid;
+    }
+    // eslint-disable-next-line unicorn/no-null -- a választatlan join tárolt JSON-jában a `mode` ténylegesen `null` (SPEC-008 O-33).
+    case null: {
+      return isOnUnhandledErrorValid;
     }
     default: {
       return false;
