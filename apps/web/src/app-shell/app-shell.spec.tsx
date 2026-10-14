@@ -1,8 +1,34 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ComponentProps } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { browserGraphElementIdGenerator } from '../graph-editor/browser-graph-element-id-generator.ts';
+import type { GraphEditorScreen } from '../graph-editor/GraphEditorScreen.tsx';
 import { AppShell } from './app-shell.tsx';
+
+type GraphEditorScreenProperties = ComponentProps<typeof GraphEditorScreen>;
+
+/**
+ * A szerkesztő képernyő valódi megvalósítása fut, csak a neki átadott propokat
+ * rögzítjük (`vi.hoisted` a `vi.mock` fölé emelve, Vitest dokumentált mintája),
+ * hogy a befecskendezett azonosító generátort közvetlenül lehessen ellenőrizni.
+ */
+const { capturedScreenProperties } = vi.hoisted(() => {
+  const capturedScreenProperties: GraphEditorScreenProperties[] = [];
+  return { capturedScreenProperties };
+});
+
+vi.mock('../graph-editor/GraphEditorScreen.tsx', async (importOriginal) => {
+  const actual = await importOriginal<{ readonly GraphEditorScreen: typeof GraphEditorScreen }>();
+  return {
+    ...actual,
+    GraphEditorScreen: function GraphEditorScreenSpy(properties: GraphEditorScreenProperties) {
+      capturedScreenProperties.push(properties);
+      return <actual.GraphEditorScreen {...properties} />;
+    },
+  };
+});
 
 const API_ORIGIN = 'https://api.example.test';
 const STREAM_ORIGIN = 'https://stream.example.test';
@@ -147,6 +173,18 @@ describe('AppShell', () => {
     // a hiányzó azonosító üzenetét mutatja, kérés nélkül (SPEC-008 5.3).
     expect(container.textContent).toContain('Nincs megadva szerkesztendő workflow');
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
+  });
+
+  it('a szerkesztőnek a böngésző oldali azonosító generátort fecskendezi be (SPEC-008 5.8)', async () => {
+    capturedScreenProperties.length = 0;
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(capturedScreenProperties.at(-1)?.graphElementIdGenerator).toBe(browserGraphElementIdGenerator);
   });
 
   it('a "/run" útvonalon a RunViewScreen tartalmát rajzolja, "Futás nézet" morzsamenüvel', async () => {

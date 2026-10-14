@@ -382,3 +382,159 @@ nyitva marad").
 - Curbcut, 1.4.13 útmutató (ha vizuális rés van a trigger és a felugró tartalom között, azt
   láthatatlan kitöltéssel kell áthidalni):
   <https://www.curbcutaccessibility.com/wcag/1-4-13-content-on-hover-or-focus/>.
+
+## T-009-42
+
+Az azonosító port és a böngészős megvalósítása, a kilenc típus kezdő konfigurációja, az új csomópont
+függvénye, a nézet középpontjának függvénye és a csomópont törlése az éleivel (SPEC-008 5.8, 5.9);
+a Start `deletable: false` jelölése. A kezelőfelület bekötése (menü gomb, helyi menü, Törlés gomb) nem
+ennek a lépésnek a része (T-009-43, T-009-44).
+
+### 16. Az azonosító forrása: `crypto.randomUUID()`
+
+- MDN, `Crypto: randomUUID()`: "generate a v4 UUID using a cryptographically secure random number
+  generator", visszatérési érték "a randomly generated, 36 character long v4 UUID"; a szolgáltatás
+  csak biztonságos környezetben (HTTPS) áll rendelkezésre, "Baseline Widely available", 2022 márciusa
+  óta minden böngészőben:
+  <https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID>.
+- W3C, Web Cryptography Level 2 (First Public Working Draft, 2025-04-22), a `Crypto-method-randomUUID`
+  szakasz, amire az MDN specifikációként hivatkozik: <https://www.w3.org/TR/webcrypto-2/>.
+- Can I use, `Crypto API: randomUUID()`: Chrome 92-től, Firefox 95-től, Safari 15.4-től támogatott:
+  <https://caniuse.com/mdn-api_crypto_randomuuid>. Független megerősítés: a WICG/uuid 49. issue
+  ("Firefox (version 95) and Safari (version 15.4) have now shipped `crypto.randomUUID()`"):
+  <https://github.com/WICG/uuid/issues/49>.
+
+A biztonságos környezet feltétele: a termék `localhost`-ról vagy HTTPS-ről szolgálódik ki. A
+Playwright `webServer` a `vite preview` szervert a `http://localhost:4174` origin alatt indítja
+(`apps/web/playwright.config.ts`), és a nyc fájlonkénti kimenete szerint a
+`browser-graph-element-id-generator.ts` egyetlen függvénye a meglévő e2e futásban lefutott (21.
+szekció), tehát a `crypto.randomUUID` ezen az origin alatt a valódi Chromiumban elérhető. **Nem
+ellenőrzött**, hogy ugyanez igaz-e a `http://127.0.0.1` alakra és a nem Chromium böngészőkre; a
+termék dokumentált origin-je `localhost`.
+
+### 17. Az él azonosítója: `addEdge` és a `getEdgeId` beállítás
+
+- React Flow dokumentáció, `addEdge()`: a `options.getEdgeId` "Custom function to generate edge IDs",
+  és "If an edge with the same `target` and `source` already exists (and the same `targetHandle` and
+  `sourceHandle` if those are set), then this util won't add a new edge even if the `id` property is
+  different": <https://reactflow.dev/api-reference/utils/add-edge>.
+- A telepített `@xyflow/system@0.0.82` forrása
+  (`node_modules/.bun/@xyflow+system@0.0.82/node_modules/@xyflow/system/dist/esm/index.js`, 1117-1135.
+  sor): az `edgeIdGenerator = options.getEdgeId || getEdgeId` hívása a duplikátum ellenőrzés
+  (`connectionExists`) ELŐTT történik, tehát egy már létező kapcsolatra is lefut a generátor, és az
+  eredménye eldobódik. A saját `getEdgeId` ezért a duplikátum esetében is hív egy azonosítót, ami
+  mellékhatás nélküli (egy UUID), így a duplikátum teszt (`GraphEditorCanvas.spec.tsx`) azt állítja,
+  hogy a meglévő él azonosítója és darabszáma változatlan marad.
+- Az alapértelmezett azonosító alakja ugyanott (1097. sor): `xy-edge__<source><sourceHandle>-<target><targetHandle>`.
+  A saját generátor oka a globális egyediség: a `workflow_node.id` és a `workflow_edge.id` globális
+  elsődleges kulcs, és egy másik workflow gráfjában már létező azonosító `409 graph_id_conflict`
+  hibát ad (SPEC-008 5.8, `.claude/CLAUDE.md` 12. szekció, "A TEXT elsődleges kulcs sértése"; mérés:
+  `docs/research/2026-09-27-szerver-hibatorzs.md`).
+
+### 18. A nézet középpontja: a tároló mezői és az átváltás
+
+A középpont számítás tiszta függvény, bemenete a `{ width, height, transform: [x, y, zoom] }` alak,
+a React Flow tárolójának mezői (`ReactFlowStore`, SPEC-008 M-99). A forrás: a telepített `@xyflow/system@0.0.82`
+`pointToRendererPoint` (611-614. sor): `x: (x - tx) / tScale`, `y: (y - ty) / tScale`. A függvény
+ennek a kártya fél méretével (a `graph-node-catalog` egyetlen méret konstansa, SPEC-008 5.7)
+eltolt alakja, így a kártya KÖZEPE kerül a nézet közepére, nem a bal felső sarka. A függvény nem
+olvas `measured.`-et és nem hív `getBoundingClientRect()`-et (15. invariáns), a bemenete szintetikus,
+a unit teszt öt esetet fed (alap nézet, eltolt nézet, nagyított, kicsinyített, a kettő együtt).
+
+**Nem ellenőrzött:** hogy a valódi Chromiumban a tároló `width`, `height` és `transform` mezői
+mikor kapnak értéket (a vászon első mérése előtt `0` lehet), és hogy a `useStore` selector milyen
+renderelési sorrendben adja őket. Az M-99 mezőlista valós Chromium igazolása a PLAN-009 T-009-45 e2e lépése (SPEC-008 77. kritérium); a jelen lépés függvénye a bemenetet nem értelmezi, csak számol.
+
+### 19. Fordítási bizonyíték: a `start` nem vehető fel, a kimerítő switch hiányt jelez
+
+Az `AddableNodeType = Exclude<NodeType, 'start'>` típus miatt a Start felvétele fordítási hiba. Az
+elfogadási kritérium (2) szerint ideiglenes próbafájllal igazolva (a fájl nem került commitba):
+
+```ts
+// apps/web/src/graph-editor/probe-tmp.ts (törölve)
+import { createGraphNode } from './create-graph-node';
+import { createInitialNodeConfig } from './create-initial-node-config';
+
+export const probeConfig = createInitialNodeConfig('start');
+export const probeNode = createGraphNode('start', { x: 0, y: 0 }, () => 'x');
+```
+
+Parancs: `cd apps/web && bun x tsc --noEmit`. Kimenet:
+
+```text
+src/graph-editor/probe-tmp.ts(4,52): error TS2345: Argument of type '"start"' is not assignable to parameter of type 'AddableNodeType'.
+src/graph-editor/probe-tmp.ts(5,42): error TS2345: Argument of type '"start"' is not assignable to parameter of type 'AddableNodeType'.
+```
+
+A kimerítő switch másik fele: a `create-initial-node-config.ts` `script` ágának ideiglenes
+kivétele ugyanazzal a paranccsal:
+
+```text
+src/graph-editor/create-initial-node-config.ts(17,65): error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+```
+
+Mindkét próba után a fájlok az eredeti állapotra álltak vissza (`git status` tiszta).
+
+### 20. Unit teszt és lefedettség
+
+Új vagy bővített tesztek (a lépés fájljaiban, `vitest run`): `create-initial-node-config.spec.ts` 38,
+`create-graph-node.spec.ts` 3, `compute-viewport-center-node-position.spec.ts` 5,
+`delete-node-with-edges.spec.ts` 4, `browser-graph-element-id-generator.spec.ts` 1,
+`default-agent-step-settings.spec.ts` 2, `graph-editor-node-mapping.spec.ts` 4 (típusonként a
+`deletable` érték, a Start `false`), `GraphEditorCanvas.spec.tsx` 22 (köztük a port azonosítója az
+éleken és a duplikátum), `GraphEditorScreen.spec.tsx` 25, `app-shell.spec.tsx` 14,
+`greppable-invariants.spec.ts` 23 (az új, 23. invariáns: a `crypto.randomUUID(` hívás kizárólag a
+`browser-stream-id-generator.ts` és a `browser-graph-element-id-generator.ts` fájlban áll). A kezdő konfiguráció tesztje mind a kilenc típusra négy állítást tesz (9 x 4 = 36, plusz a típuslista és a hívásonkénti új objektum): az eredmény a SPEC-008 5.8 táblázat szerinti, a `config.type` a kért típus, az olvasó séma (`NodeConfigSchema`) elfogadja (kivéve a `NaN` számot hordozó két típust), a mentési séma (`NodeConfigSaveSchema`) pedig elutasítja a típushoz tartozó mezőútvonalon.
+
+A teljes `bun run test` (gyökér Vitest, v8 lefedettség): 569 fájl, 5168 teszt, mind zöld, a
+lefedettség mind a négy metrikán 100 százalék.
+
+### 21. Az e2e lefedettség előtte és utána
+
+Előtte: a `main` `6539b09` állapotán, a jelen ággal azonos eljárással saját mérés (8 shard,
+`flock` alatt, legfeljebb 3 worker, mind zöld).
+
+Utána: a jelen ág (`feat/spec-008-d1-azonosito-port`, `aa361f7`) teljes e2e futása a sandboxban, a 29. és 47. szekció eljárásával: `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, a
+Playwright az `apps/web` alatt közvetlenül, nyolc egymás utáni shardban (`--shard=k/8`, `flock`
+alatt), **481 teszt, mind zöld** (61 + 60 + 60 + 60 + 60 + 60 + 60 + 60), majd
+`bun run coverage:e2e:report` (exit 0, a meglévő küszöbbel).
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1778 / 1793            | 1780 / 1795           | 15 -> 15                 |
+| branches   | 833 / 844              | 833 / 844             | 11 -> 11                 |
+| functions  | 585 / 588              | 586 / 589             | 3 -> 3                   |
+| lines      | 1717 / 1732            | 1718 / 1733           | 15 -> 15                 |
+
+A fedetlen darabszám egyik metrikán sem nőtt; az összes darabszám növekedése (2 utasítás, 1 függvény,
+1 sor) a `browser-graph-element-id-generator.ts` fájl, ami az `app-shell` importján át bekerül az
+instrumentált csomagba, és mind fedett: a nyc fájlonkénti kimenete szerint
+`browser-graph-element-id-generator.ts` 2/2 utasítás, 1/1 függvény, 1/1 sor; az `app-shell.tsx`,
+a `GraphEditorCanvas.tsx`, a `graph-editor-node-mapping.ts`, a `JoinNodeFields.tsx` és a
+`default-agent-step-settings.ts` minden eleme fedett. A tiszta függvények (`createGraphNode`,
+`createInitialNodeConfig`, `computeViewportCenterNodePosition`, `deleteNodeWithEdges`) nincsenek
+importálva a termékkódból (a bekötés a T-009-43 és T-009-44), tehát az instrumentált csomagba nem
+kerülnek, a számokat nem érintik. Az `apps/web/package.json` küszöbe nem változott. A fedetlen
+helyek ugyanazok, mint a 47. szekcióban (`mount-app.tsx` 16, 21-22; `read-frontend-config.ts`;
+`is-valid-connection.ts` 36; `browser-history-location-port.ts` 21; `perform-route-request.ts` 89;
+`use-stream-connection.ts` 202).
+
+### 22. A kapuk és a sandbox memóriája
+
+A 3,9 GB memóriájú közös gépen a gyökér `bun run typecheck` és a `bun run lint` párhuzamos turbo
+futása a memóriakorlát miatt `SIGKILL`-lel (137) állt le; a kapuk ezért `bun x turbo run typecheck
+--concurrency=1` és `bun x turbo run lint --only --concurrency=1` alakban futottak (a `lint` a
+`typecheck` függőségét a `--only` kapcsolóval kihagyva, mert azt az előző lépés már lefuttatta). A
+`format:check`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`, `test` és `build`
+kapu a gyökér paranccsal, ugyanazon a commitolt fán futott; a `git ls-files` alapú tesztek
+(em dash, komponens határ, kis-nagybetű) csak a commitolt fájlokat látják, ezért a kapuk a commit
+UTÁN futnak.
+
+### 23. Nem ellenőrzött
+
+- A `crypto.randomUUID()` hívás Firefoxban és WebKitben: az `apps/web/playwright.config.ts` csak
+  chromiumot definiál; a támogatásra a 16. szekció forrásai szólnak, saját mérés nincs.
+- A nézet középpont függvényének és a tároló mezőinek viselkedése valódi böngészőben (18. szekció): a PLAN-009 T-009-45 e2e lépése fedi (M-99, 77. kritérium).
+- A `deletable: false` hatása a Delete billentyűre és a kijelölt Start törlésére valódi
+  Chromiumban: a React Flow `getElementsToRemove` forrása szerint (`dist/esm/index.js`, 474-484.
+  sor) a `deletable === false` csomópont kimarad a törlésből; ezt a forrás olvasása igazolja, a tényleges billentyű nyomást a T-009-45 e2e-je fedi (82. kritérium).

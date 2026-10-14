@@ -7,6 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 
 /**
  * A `<ReactFlow>` tényleges propjainak típusa - a mock modul alatt is a
@@ -117,6 +118,7 @@ describe('GraphEditorCanvas', () => {
     onSelectNode: OnSelectNode,
     selectedNodeId?: string,
     autoLayoutRevision = 0,
+    graphElementIdGenerator: GraphElementIdGenerator = () => 'generated-edge-id',
   ): void {
     act(() => {
       root.render(
@@ -127,6 +129,7 @@ describe('GraphEditorCanvas', () => {
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
           autoLayoutRevision={autoLayoutRevision}
+          graphElementIdGenerator={graphElementIdGenerator}
         />,
       );
     });
@@ -348,6 +351,26 @@ describe('GraphEditorCanvas', () => {
     const [, lastEdges] = lastCall;
     expect(lastEdges).toHaveLength(1);
     expect(lastEdges[0]).toMatchObject({ sourceNodeId: 'n1', targetNodeId: 'n2', branchKey: null });
+  });
+
+  it('az új él azonosítója a GraphElementIdGenerator porton át jön, xy-edge__ előtagú azonosító nincs (M-101)', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [], onGraphChange, vi.fn(), undefined, 0, () => 'port-edge-id');
+    act(() => {
+      lastCapturedProperties().onConnect?.({ source: 'n1', target: 'n2', sourceHandle: null, targetHandle: null });
+    });
+    const [, lastEdges] = onGraphChange.mock.calls.at(-1) ?? [];
+    expect(lastEdges?.map((edge) => edge.id)).toEqual(['port-edge-id']);
+  });
+
+  it('már létező kapcsolat újrakötése nem vesz fel új élt, és a meglévő él azonosítója megmarad', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn(), undefined, 0, () => 'duplicate-edge-id');
+    act(() => {
+      lastCapturedProperties().onConnect?.({ source: 'n1', target: 'n2', sourceHandle: null, targetHandle: null });
+    });
+    const [, lastEdges] = onGraphChange.mock.calls.at(-1) ?? [];
+    expect(lastEdges?.map((edge) => edge.id)).toEqual(['e1']);
   });
 
   it('az isValidConnection elutasítja a bemenő handle nélküli start node-ra kötést (AC11)', () => {
