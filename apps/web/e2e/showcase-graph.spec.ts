@@ -57,12 +57,17 @@ test.describe('a bemutató gráf fixtúra alakja', () => {
     expect([...nodeIds].filter((id) => !connectedIds.has(id))).toEqual([]);
   });
 
-  test('egyetlen elágazás csomópontból induló éle sem kulcs nélküli, és az e-branch-loop kulcsa az alapértelmezett ág (SPEC-008 5.1, 106.)', () => {
+  test('egyetlen elágazás csomópontból induló éle sem kulcs nélküli, a sourceHandle egyezik a branchKey-jel, és az e-branch-loop kulcsa az alapértelmezett ág (SPEC-008 5.1, 106.)', () => {
     const branchNodeIds = new Set(SHOWCASE_GRAPH.nodes.filter((node) => node.type === 'branch').map((node) => node.id));
     expect(branchNodeIds.size).toBeGreaterThan(0);
     expect(
       SHOWCASE_GRAPH.edges
         .filter((edge) => branchNodeIds.has(edge.sourceNodeId) && edge.branchKey === null)
+        .map((edge) => edge.id),
+    ).toEqual([]);
+    expect(
+      SHOWCASE_GRAPH.edges
+        .filter((edge) => branchNodeIds.has(edge.sourceNodeId) && edge.sourceHandle !== edge.branchKey)
         .map((edge) => edge.id),
     ).toEqual([]);
 
