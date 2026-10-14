@@ -295,3 +295,55 @@ export async function measureEdgeReferenceDifference(
   await clearProbe(page);
   return maximumChannelDifference(page, paintedShot.toString('base64'), referenceShot.toString('base64'));
 }
+
+/**
+ * Az él `<g>` elemén a megadott osztály be- vagy kikapcsolása.
+ */
+async function setEdgeClass(page: Page, edgeId: string, className: string, isOn: boolean): Promise<void> {
+  await page.evaluate(
+    (input: { readonly selector: string; readonly className: string; readonly isOn: boolean }) => {
+      const element = globalThis.document.querySelector(input.selector);
+      if (element === null) {
+        throw new Error(`a mérés nem találta az élt: ${input.selector}`);
+      }
+      element.classList.toggle(input.className, input.isOn);
+    },
+    { selector: edgeSelector(edgeId), className, isOn },
+  );
+}
+
+async function hasEdgeClass(page: Page, edgeId: string, className: string): Promise<boolean> {
+  return page.evaluate(
+    (input: { readonly selector: string; readonly className: string }) =>
+      globalThis.document.querySelector(input.selector)?.classList.contains(input.className) === true,
+    { selector: edgeSelector(edgeId), className },
+  );
+}
+
+/**
+ * EGYETLEN él egy OSZTÁLYÁNAK kifestett hatása (2026-10-14, PLAN-009
+ * T-009-40): a kivágat az él befoglaló doboza, az első kép az él a mostani
+ * osztályaival, a második UGYANAZ az él a `className` osztály nélkül, a
+ * mérési szonda mindkét képen. A visszaadott szám a két kép legnagyobb
+ * csatorna eltérése; ha az osztály nincs az élen, vagy nem fest semmit, a két
+ * kép azonos, és a szám csak a raszterezés zaja.
+ *
+ * Az osztály a második kép előtt a DOM-ból kerül le, és utána, ha rajta volt,
+ * visszakerül. A React a `className` attribútumot csak akkor írja újra, ha a
+ * prop értéke megváltozik, tehát egy közbeeső újrarenderelés a levett osztályt
+ * nem teszi vissza; a várakozás állapot alapú, az osztály hiányát figyeli.
+ */
+export async function measureEdgeClassPaintDifference(page: Page, edgeId: string, className: string): Promise<number> {
+  const clip = await edgeClip(page, edgeId);
+  await applyProbe(page, undefined);
+  const paintedShot = await page.screenshot({ clip });
+  const wasClassOn = await hasEdgeClass(page, edgeId, className);
+  await setEdgeClass(page, edgeId, className, false);
+  await expect.poll(async () => hasEdgeClass(page, edgeId, className)).toBe(false);
+  const blankShot = await page.screenshot({ clip });
+  if (wasClassOn) {
+    await setEdgeClass(page, edgeId, className, true);
+  }
+  await clearProbe(page);
+  return maximumChannelDifference(page, paintedShot.toString('base64'), blankShot.toString('base64'));
+}
