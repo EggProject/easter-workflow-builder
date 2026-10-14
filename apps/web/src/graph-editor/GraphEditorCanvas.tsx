@@ -1,7 +1,6 @@
 import type { WorkflowEdgeInput, WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import {
   addEdge,
-  applyEdgeChanges,
   applyNodeChanges,
   Background,
   Controls,
@@ -36,6 +35,14 @@ import './graph-editor.css';
  * újra a teljes vásznat minden szülő rendernél (AC8).
  */
 const NODE_TYPES = { workflowNode: GraphNodeCard };
+
+/**
+ * A törlés billentyűi (SPEC-008 5.9, M-95). Modul szintű `const`, mert a
+ * React Flow `useKeyPress` hookja a `keyCode` hivatkozásra memoizál és
+ * iratkozik fel: egy minden renderen új tömb a figyelőt minden renderen
+ * újrakötné.
+ */
+const DELETE_KEY_CODE: string[] = ['Backspace', 'Delete'];
 
 export interface GraphEditorCanvasProperties {
   /**
@@ -87,7 +94,7 @@ export interface GraphEditorCanvasProperties {
  * A vezérelt vászon (SPEC-008 5.5, M-55): a `nodes` és az `edges` a szülő
  * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
  * mintáját követi - a GRÁF állapotát nem duplikálja, minden gráf változás
- * (`applyNodeChanges`, `applyEdgeChanges`, AC9) egy lépésben, közvetlenül az
+ * (`applyNodeChanges`, AC9) egy lépésben, közvetlenül az
  * `onGraphChange`-en át jut vissza a szülőhöz. Két saját állapota van, és
  * egyik sem gráf adat, tehát egyik sem mentődik: a mért csomópont méret
  * (`measured-node-sizes.ts`) és a kiválasztott élek halmaza
@@ -125,6 +132,7 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
       // A `dimensions` változás mérési eredmény, a `select` változás
       // kiválasztás: egyik sem gráf szerkesztés, tehát a domain állapotot
       // egyik sem piszkolja be.
+      // A `remove` változás sem itt dől el: lásd az `onDelete` kezelőt.
       const dimensionChanges: NodeDimensionChange[] = [];
       const selectionChanges: NodeSelectionChange[] = [];
       const graphChanges: NodeChange<GraphNodeCardFlowNode>[] = [];
@@ -133,7 +141,7 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
           dimensionChanges.push(change);
         } else if (change.type === 'select') {
           selectionChanges.push(change);
-        } else {
+        } else if (change.type !== 'remove') {
           graphChanges.push(change);
         }
       }
@@ -154,33 +162,21 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
     [flowNodes, edges, onGraphChange, selectedNodeId, onSelectNode],
   );
 
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange<Edge>[]) => {
-      // Ugyanaz a szétválasztás, mint a csomópontoknál: a `select` változás
-      // kiválasztás, nem gráf szerkesztés, tehát a saját nézeti állapotba
-      // megy, nem a domain alakba (ahol a `selected` mező úgyis elveszne).
-      const selectionChanges: EdgeSelectionChange[] = [];
-      const graphChanges: EdgeChange<Edge>[] = [];
-      for (const change of changes) {
-        if (change.type === 'select') {
-          selectionChanges.push(change);
-        } else {
-          graphChanges.push(change);
-        }
+  const onEdgesChange = useCallback((changes: EdgeChange<Edge>[]) => {
+    // Az él egyetlen saját változása a `select`: kiválasztás, nem gráf
+    // szerkesztés, tehát a saját nézeti állapotba megy, nem a domain alakba
+    // (ahol a `selected` mező úgyis elveszne). A `remove` változást az
+    // `onDelete` kezeli, más élváltozás ebben a szerkesztőben nem keletkezik.
+    const selectionChanges: EdgeSelectionChange[] = [];
+    for (const change of changes) {
+      if (change.type === 'select') {
+        selectionChanges.push(change);
       }
-      if (selectionChanges.length > 0) {
-        setSelectedEdgeIds((previous) => mergeEdgeSelection(previous, selectionChanges));
-      }
-      if (graphChanges.length > 0) {
-        const nextFlowEdges = applyEdgeChanges(graphChanges, flowEdges);
-        onGraphChange(
-          nodes,
-          nextFlowEdges.map((edge) => flowEdgeToWorkflowEdge(edge)),
-        );
-      }
-    },
-    [flowEdges, nodes, onGraphChange],
-  );
+    }
+    if (selectionChanges.length > 0) {
+      setSelectedEdgeIds((previous) => mergeEdgeSelection(previous, selectionChanges));
+    }
+  }, []);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -191,6 +187,24 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
       );
     },
     [flowEdges, nodes, onGraphChange, graphElementIdGenerator],
+  );
+
+  // A billentyűs törlés egyetlen útja (SPEC-008 5.9). A könyvtár a törlést
+  // két külön változáslistában jelzi (előbb az élek, utána a csomópontok);
+  // ha mindkettő a saját, azonos renderből való propjaiból építené a
+  // gráfot, a második hívás visszaírná az első törölt elemeit (a törölt
+  // csomópont élei a gráfban maradnának). Az `onDelete` a kettőt együtt
+  // kapja, ezért egyetlen `onGraphChange` hívás adja a törlés eredményét.
+  const onDelete = useCallback(
+    ({ nodes: deletedNodes, edges: deletedEdges }: { nodes: GraphNodeCardFlowNode[]; edges: Edge[] }) => {
+      const deletedNodeIds = new Set(deletedNodes.map((node) => node.id));
+      const deletedEdgeIds = new Set(deletedEdges.map((edge) => edge.id));
+      onGraphChange(
+        nodes.filter((node) => !deletedNodeIds.has(node.id)),
+        edges.filter((edge) => !deletedEdgeIds.has(edge.id)),
+      );
+    },
+    [nodes, edges, onGraphChange],
   );
 
   const isValidConnection = useCallback(
@@ -228,6 +242,8 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        deleteKeyCode={DELETE_KEY_CODE}
+        onDelete={onDelete}
         isValidConnection={isValidConnection}
         onNodeClick={(_event, node) => {
           onSelectNode(node.id);

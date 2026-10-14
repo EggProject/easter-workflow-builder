@@ -1,5 +1,5 @@
 import { NodeConfigSaveSchema, type NodeConfig, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
-import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
+import { Button, FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import type { ReactElement } from 'react';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
@@ -21,6 +21,12 @@ export interface NodeInspectorProperties {
   readonly node: WorkflowNodeInput;
   readonly onChange: (updatedNode: WorkflowNodeInput) => void;
   readonly onClose: () => void;
+  /**
+   * A "Törlés" gomb művelete (SPEC-008 5.9): a fogyasztó (`GraphEditorScreen`)
+   * törli a csomópontot a rá kötött élekkel, és bezárja a panelt. A `start`
+   * csomópont panelén a gomb nincs kirajzolva, tehát ott a prop sosem hívódik.
+   */
+  readonly onDelete: () => void;
   /**
    * Az `agent_step` node és a `join` `ai_synthesis` módja `providerId`
    * mezőjéhez tartozó, örökölt provider leírás (AC17) - a `NodeInspector`
@@ -132,7 +138,7 @@ function renderConfigFields(
  * szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
-  const { node, onChange, onClose, inheritedProviderDescription, isSaveAttempted } = properties;
+  const { node, onChange, onClose, onDelete, inheritedProviderDescription, isSaveAttempted } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   // A mezőnkénti hiba a mentési sémán áll (SPEC-008 5.4, O-21): ugyanaz a
   // szabály jelez a mező alatt, ami a mentés előtti ellenőrzést és a szerver
@@ -158,11 +164,19 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
             `--ep-accent-fg`, tehát a bezárás elsődleges akciónak látszana. A
             szabályok a `node-inspector.css` `.node-inspector__close`
             blokkjában állnak, a forrás indoklásával együtt. */}
-        <button type="button" className="node-inspector__close" aria-label="Bezárás" onClick={onClose}>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
-        </button>
+        <div className="node-inspector__actions">
+          {/* A Start nem törölhető (SPEC-008 5.9): a panelén nincs gomb. */}
+          {node.type !== 'start' && (
+            <Button type="button" variant="danger" size="sm" onClick={onDelete}>
+              Törlés
+            </Button>
+          )}
+          <button type="button" className="node-inspector__close" aria-label="Bezárás" onClick={onClose}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="node-inspector__body">
         <FieldErrorVisibilityContext.Provider value={isSaveAttempted}>

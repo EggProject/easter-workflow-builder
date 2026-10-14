@@ -7,6 +7,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import { workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
+import { workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 
 /**
@@ -92,6 +94,24 @@ const SECOND_EDGE: WorkflowEdgeInput = {
 
 type OnGraphChange = (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => void;
 type OnSelectNode = (nodeId: string | undefined) => void;
+
+// A valódi könyvtár billentyű útja, happy-dom alatt: a `useKeyPress` a
+// `document` `keydown` eseményét figyeli, a törlendő elemek a kiválasztott
+// (`selected`) csomópontok és élek. REGRESSZIÓ: a könyvtár az éleket és a
+// csomópontokat két külön változáslistában jelzi, és a törölt csomópont élei
+// a gráfban maradtak, mert a második hívás visszaírta az elsőét.
+async function pressKey(key: string): Promise<void> {
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, bubbles: true, cancelable: true }));
+    await Promise.resolve();
+  });
+}
 
 describe('GraphEditorCanvas', () => {
   let container: HTMLDivElement;
@@ -206,13 +226,30 @@ describe('GraphEditorCanvas', () => {
     expect(nodeElement.className).toContain('selected');
   });
 
-  it('az onNodesChange az applyNodeChanges-en át törli a node-ot az állapotból (AC9)', () => {
+  it('az onNodesChange az applyNodeChanges-en át a pozíció változást a domain állapotba írja (AC9)', () => {
+    const onGraphChange = vi.fn<OnGraphChange>();
+    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
+    act(() => {
+      lastCapturedProperties().onNodesChange?.([
+        { id: 'n2', type: 'position', position: { x: 5, y: 6 }, dragging: false },
+      ]);
+    });
+    expect(onGraphChange).toHaveBeenLastCalledWith(
+      [START_NODE, { ...FAN_OUT_NODE, positionX: 5, positionY: 6 }],
+      [EDGE],
+    );
+  });
+
+  // A törlés egyetlen útja az `onDelete` (lásd a lenti `onDelete` csoportot): a
+  // `remove` változásból külön gráf állapot nem épülhet, mert a könyvtár az
+  // élek és a csomópontok törlését két külön hívásban jelzi.
+  it('az onNodesChange a remove változást NEM adja vissza a domain állapotba', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
     act(() => {
       lastCapturedProperties().onNodesChange?.([{ id: 'n2', type: 'remove' }]);
     });
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE], [EDGE]);
+    expect(onGraphChange).not.toHaveBeenCalled();
   });
 
   // REGRESSZIÓ (2026-09-05): a `dimensions` változás mérési eredmény, nem gráf
@@ -245,34 +282,30 @@ describe('GraphEditorCanvas', () => {
     expect(unmeasuredNode?.measured).toBeUndefined();
   });
 
-  it('vegyes változás listánál a nem dimensions ág a domain állapotba kerül', () => {
+  it('vegyes változás listánál a nem dimensions, nem remove ág a domain állapotba kerül', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
     act(() => {
       lastCapturedProperties().onNodesChange?.([
         { id: 'n1', type: 'dimensions', dimensions: { width: 358, height: 106 } },
         { id: 'n2', type: 'remove' },
+        { id: 'n1', type: 'position', position: { x: 7, y: 8 }, dragging: false },
       ]);
     });
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE], [EDGE]);
+    expect(onGraphChange).toHaveBeenCalledTimes(1);
+    expect(onGraphChange).toHaveBeenLastCalledWith(
+      [{ ...START_NODE, positionX: 7, positionY: 8 }, FAN_OUT_NODE],
+      [EDGE],
+    );
   });
 
-  it('az onEdgesChange az applyEdgeChanges-en át törli az élt az állapotból (AC9)', () => {
+  it('az onEdgesChange a remove változást NEM adja vissza a domain állapotba', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn());
     act(() => {
       lastCapturedProperties().onEdgesChange?.([{ id: 'e1', type: 'remove' }]);
     });
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], []);
-  });
-
-  it('az onEdgesChange egy megmaradó élt a flowEdgeToWorkflowEdge-en át ad vissza (AC9)', () => {
-    const onGraphChange = vi.fn<OnGraphChange>();
-    renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
-    act(() => {
-      lastCapturedProperties().onEdgesChange?.([{ id: 'e2', type: 'remove' }]);
-    });
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+    expect(onGraphChange).not.toHaveBeenCalled();
   });
 
   // REGRESSZIÓ (2026-09-06): az él kiválasztása NÉZETI állapot. Ha a domain
@@ -303,7 +336,7 @@ describe('GraphEditorCanvas', () => {
     expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e1')?.selected).toBe(false);
   });
 
-  it('vegyes él változás listánál a select a nézeti, a remove a domain állapotba kerül', () => {
+  it('vegyes él változás listánál a select a nézeti állapotba kerül, a remove nem hat a domain állapotra', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
     act(() => {
@@ -312,7 +345,7 @@ describe('GraphEditorCanvas', () => {
         { id: 'e2', type: 'remove' },
       ]);
     });
-    expect(onGraphChange).toHaveBeenLastCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+    expect(onGraphChange).not.toHaveBeenCalled();
     expect(lastCapturedProperties().edges?.find((edge) => edge.id === 'e1')?.selected).toBe(true);
   });
 
@@ -393,5 +426,77 @@ describe('GraphEditorCanvas', () => {
       targetHandle: null,
     });
     expect(isValid).toBe(true);
+  });
+
+  describe('törlés (SPEC-008 5.9)', () => {
+    it('a deleteKeyCode pontosan a Backspace és a Delete (M-95, AC82)', () => {
+      renderCanvas([START_NODE], [], vi.fn(), vi.fn());
+      expect(lastCapturedProperties().deleteKeyCode).toEqual(['Backspace', 'Delete']);
+    });
+
+    it('a deleteKeyCode referenciája azonos marad két render között', () => {
+      renderCanvas([START_NODE], [], vi.fn(), vi.fn());
+      const firstKeyCode = lastCapturedProperties().deleteKeyCode;
+      renderCanvas([START_NODE], [], vi.fn(), vi.fn(), 'n1');
+      expect(lastCapturedProperties().deleteKeyCode).toBe(firstKeyCode);
+    });
+
+    it('az onDelete egyetlen onGraphChange hívásban törli a csomópontot és a rá kötött éleket', () => {
+      const onGraphChange = vi.fn<OnGraphChange>();
+      renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
+      act(() => {
+        lastCapturedProperties().onDelete?.({
+          nodes: [workflowNodeToFlowNode(FAN_OUT_NODE)],
+          edges: [workflowEdgeToFlowEdge(EDGE), workflowEdgeToFlowEdge(SECOND_EDGE)],
+        });
+      });
+      expect(onGraphChange).toHaveBeenCalledTimes(1);
+      expect(onGraphChange).toHaveBeenCalledWith([START_NODE], []);
+    });
+
+    it('az onDelete csak a törölt élt veszi ki, a csomópontok és a másik él megmarad', () => {
+      const onGraphChange = vi.fn<OnGraphChange>();
+      renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn());
+      act(() => {
+        lastCapturedProperties().onDelete?.({ nodes: [], edges: [workflowEdgeToFlowEdge(SECOND_EDGE)] });
+      });
+      expect(onGraphChange).toHaveBeenCalledTimes(1);
+      expect(onGraphChange).toHaveBeenCalledWith([START_NODE, FAN_OUT_NODE], [EDGE]);
+    });
+
+    it.each(['Backspace', 'Delete'])(
+      'a(z) %s billentyű a kiválasztott csomópontot a rá kötött élekkel együtt, egyetlen hívásban törli',
+      async (key) => {
+        const onGraphChange = vi.fn<OnGraphChange>();
+        renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE, SECOND_EDGE], onGraphChange, vi.fn(), 'n2');
+        await pressKey(key);
+        expect(onGraphChange).toHaveBeenCalledTimes(1);
+        expect(onGraphChange).toHaveBeenCalledWith([START_NODE], []);
+      },
+    );
+
+    it.each(['Backspace', 'Delete'])(
+      'a(z) %s billentyű a Start csomópontot nem törli (deletable: false)',
+      async (key) => {
+        const onGraphChange = vi.fn<OnGraphChange>();
+        renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn(), 'n1');
+        await pressKey(key);
+        expect(onGraphChange).not.toHaveBeenCalled();
+      },
+    );
+
+    it('beviteli elemen lenyomott Backspace nem töröl csomópontot (a könyvtár beviteli elem szűrője)', async () => {
+      const onGraphChange = vi.fn<OnGraphChange>();
+      renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], onGraphChange, vi.fn(), 'n2');
+      const input = document.createElement('input');
+      document.body.append(input);
+      await act(async () => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      input.remove();
+      expect(onGraphChange).not.toHaveBeenCalled();
+    });
   });
 });

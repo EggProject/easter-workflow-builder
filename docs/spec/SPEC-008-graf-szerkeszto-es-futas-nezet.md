@@ -668,7 +668,7 @@ A vászon a hivatalos vezérelt alakot használja (M-55): a `nodes` és az `edge
 
 **A kiindulás.** A billentyűs törlés részben ma is létezik: a kiválasztott csomópont és él a `Backspace` billentyűre törlődik, a csomópont a rá kötött élekkel együtt (5.5, 63. kritérium). Hiányzik a `Delete` billentyű, a panel "Törlés" gombja és a Start védelme: a Start ma törölhető (M-109).
 
-**Billentyű.** `deleteKeyCode={['Backspace', 'Delete']}` (5.5, M-95). A csomópont élei a könyvtár saját törlési útján vele törlődnek (M-96), saját kód nélkül. A beállítás panel beviteli mezőjében lenyomott `Backspace` és `Delete` nem töröl csomópontot, mert a könyvtár a beviteli elemen lenyomott törlés billentyűt kiszűri (M-102); mivel erre egy forrás van, e2e igazolja.
+**Billentyű.** `deleteKeyCode={['Backspace', 'Delete']}` (5.5, M-95). A csomópont élei a könyvtár saját törlési útján vele törlődnek (M-96); a vászon az élek és a csomópontok törlését az `onDelete` kezelőben, egyetlen `onGraphChange` hívásban dolgozza fel, mert a két külön változáslista (él, csomópont) kezelői külön-külön a saját propjaikból építve visszaírnák egymás törlését (mérve: a mentés `PUT` törzsében árva él maradt, `docs/research/2026-10-14-csomopont-felvetel.md` T-009-44 szekció). A beállítás panel beviteli mezőjében lenyomott `Backspace` és `Delete` nem töröl csomópontot, mert a könyvtár a beviteli elemen lenyomott törlés billentyűt kiszűri (M-102); mivel erre egy forrás van, e2e igazolja.
 
 **A Start védelme.** A `start` típusú csomópont vászon alakja `deletable: false` mezőt kap (`graph-editor-node-mapping.ts`, M-96), tehát sem a billentyű, sem az `onNodesChange` nem törli, és a rá kötött élek is maradnak, hacsak nem maguk vannak kiválasztva. A leképezés tiszta függvény, típusonként unit teszttel.
 

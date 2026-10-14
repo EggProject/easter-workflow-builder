@@ -336,6 +336,68 @@ describe('GraphEditorScreen', () => {
     expect(container.querySelector('.node-inspector')).toBeNull();
   });
 
+  function findButtonByText(text: string): HTMLButtonElement {
+    const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.textContent === text,
+    );
+    if (button === undefined) {
+      throw new Error(`a teszt nem talált "${text}" gombot`);
+    }
+    return button;
+  }
+
+  it('a panel Törlés gombja megerősítés és hálózati kérés nélkül törli a csomópontot és a rá kötött éleket, a panel bezárul (SPEC-008 5.9, AC84)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    const requestedUrls: string[] = [];
+    const delegate = createFetchFunction(log);
+    const recordingFetchFunction: FetchFunction = (input, init) => {
+      requestedUrls.push(`${init.method ?? 'GET'} ${input}`);
+      return delegate(input, init);
+    };
+    await renderScreen('?workflowId=wf-1', recordingFetchFunction);
+    // A betöltött gráfban csak egy, a Startra kötött hurokél van: az n-2 csomópontra
+    // kötött élekhez egy bejövő és egy kimenő élt veszünk fel.
+    const edgeToAgent = { ...EDGE_INPUT, id: 'e-in', sourceNodeId: 'n-1', targetNodeId: 'n-2' };
+    const edgeFromAgent = { ...EDGE_INPUT, id: 'e-out', sourceNodeId: 'n-2', targetNodeId: 'n-1' };
+    act(() => {
+      lastCanvasProperties().onGraphChange(lastCanvasProperties().nodes, [
+        ...lastCanvasProperties().edges,
+        edgeToAgent,
+        edgeFromAgent,
+      ]);
+    });
+    act(() => {
+      lastCanvasProperties().onSelectNode('n-2');
+    });
+    expect(container.querySelector('.node-inspector')).not.toBeNull();
+    const requestsBeforeDelete = requestedUrls.length;
+
+    act(() => {
+      findButtonByText('Törlés').click();
+    });
+
+    expect(lastCanvasProperties().nodes.map((node) => node.id)).toEqual(['n-1']);
+    expect(lastCanvasProperties().edges.map((edge) => edge.id)).toEqual(['e-1']);
+    expect(container.querySelector('.node-inspector')).toBeNull();
+    expect(lastCanvasProperties().selectedNodeId).toBeUndefined();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain('Mentetlen változtatások');
+    expect(requestedUrls).toHaveLength(requestsBeforeDelete);
+    expect(log.putBodies).toEqual([]);
+  });
+
+  it('a Start panelén nincs Törlés gomb, és a gráf nem változik (SPEC-008 5.9, AC83)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+    act(() => {
+      lastCanvasProperties().onSelectNode('n-1');
+    });
+    expect(container.querySelector('.node-inspector')).not.toBeNull();
+    const labels = [...container.querySelectorAll(':scope .node-inspector button')].map((button) => button.textContent);
+    expect(labels).not.toContain('Törlés');
+    expect(container.textContent).not.toContain('Mentetlen változtatások');
+  });
+
   it('a node-inspector szerkesztése frissíti a vászon nodes propját (M-55 kör)', async () => {
     const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
     await renderScreen('?workflowId=wf-1', createFetchFunction(log));
