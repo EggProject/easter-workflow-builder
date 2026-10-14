@@ -151,7 +151,11 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
   }
 
   return (
-    <aside className="node-inspector" aria-label={`${catalogEntry.label} beállításai`}>
+    // A `nokey` a React Flow billentyű szűrőjének osztálya: a panel teljes
+    // területén a `Backspace` és a `Delete` nem törli a kiválasztott
+    // csomópontot (user döntés 2026-10-14, SPEC-008 5.9; research
+    // T-009-44, 44.6).
+    <aside className="node-inspector nokey" aria-label={`${catalogEntry.label} beállításai`}>
       <div className="node-inspector__header">
         <div className="node-inspector__identity">
           <h2 className="node-inspector__title">{catalogEntry.label}</h2>

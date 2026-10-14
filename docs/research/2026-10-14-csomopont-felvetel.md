@@ -583,13 +583,15 @@ Dokumentáció:
 
 ### 44.2 A mért hiba: két változáslista, két kezelő
 
-A `deleteKeyCode` puszta bekapcsolása (a `HEAD` vászonkódján, csak a prop hozzáadásával) hibás
-gráfot ad. A `HEAD` `onNodesChange` és `onEdgesChange` kezelője egyaránt a saját, azonos renderből
-való propjaiból (`nodes`, `edges`) építette a teljes gráfot és hívta az `onGraphChange`-et; a
-könyvtár a törlést két külön változáslistában jelzi (44.1), tehát a második hívás visszaírta az
-első törlését.
+A hiba a `main`-en (`b133b0e`) már megvolt, az alapértelmezett `Backspace` billentyűvel: a
+`deleteKeyCode` prop bekapcsolása nem okozta, csak a `Delete` billentyűt tette a hibás útra. A
+`b133b0e` `onNodesChange` és `onEdgesChange` kezelője egyaránt a saját, azonos renderből való
+propjaiból (`nodes`, `edges`) építette a teljes gráfot és hívta az `onGraphChange`-et; a könyvtár a
+törlést két külön változáslistában jelzi (44.1), tehát a második hívás visszaírta az első
+törlését.
 
-Mérés (saját, ebben a munkamenetben futtatva, a `HEAD` vászonkódjával és csak a prop hozzáadásával):
+Mérés (saját, ebben a munkamenetben futtatva, a `b133b0e` vászonkódjával és csak a
+`deleteKeyCode` prop hozzáadásával):
 
 | Út                                                                                             | Eredmény                                                                                                              |
 | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -600,6 +602,15 @@ Mérés (saját, ebben a munkamenetben futtatva, a `HEAD` vászonkódjával és 
 
 A vásznon az árva él nem rajzolódott ki (az `edgeLocator(page, 'e2')` leválasztott volt), tehát a hiba
 csak a szerkesztett állapotban és a mentés `PUT` törzsében látszott, a felhasználó számára nem.
+
+Újramérés a prop nélkül (saját, 2026-10-14; a `b133b0e` `GraphEditorCanvas.tsx` fájlja `git show`-val a
+munkafára másolva, a többi fájl a T-009-44 állapotán, a mérés után `git checkout HEAD -- <fájl>`):
+
+| Út                                                                                                              | Eredmény                                                                 |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| happy-dom, `GraphEditorCanvas.spec.tsx` "törlés" csoport, `Backspace`                                           | az `onGraphChange` 2 hívást kap (1 helyett)                              |
+| ugyanez `Delete`-tel                                                                                            | 0 hívás (a `Delete` a `main`-en nincs kötve)                             |
+| valódi Chromium, `e2e/graph-node-delete.spec.ts` első tesztje: az n3 csomópont törlése `Backspace`-szel, mentés | a mentett gráf élei `["e1", "e2"]` az elvárt `["e1"]` helyett: árva `e2` |
 
 ### 44.3 A megoldás
 
@@ -623,21 +634,31 @@ Unit (a `GraphEditorCanvas.spec.tsx` "törlés" csoportja és a másik két spec
   `Delete` egyetlen `onGraphChange` hívásban `([START_NODE], [])` eredményt ad;
 - a Start egyik billentyűre sem törlődik; `Backspace` egy `<input>` elemen nem töröl csomópontot;
 - a `NodeInspector` Törlés gombja (`danger`, `sm`, a fejlécben, kilenc törölhető típusra), a Start
-  panelen nincs; a `GraphEditorScreen` Törlés gombja hálózati kérés és párbeszéd nélkül töröl.
+  panelen nincs; a `GraphEditorScreen` Törlés gombja hálózati kérés és párbeszéd nélkül töröl;
+- a 44.6 döntés (user, 2026-10-14): mind a tíz típusnál a panel gyökér `<aside>` eleme a `nokey`
+  osztályt viseli (`NodeInspector.spec.tsx`); a valódi vászon és a valódi panel egy dokumentumban
+  (`GraphEditorCanvas.spec.tsx`, "a beállítás panelen" csoport): a panel minden gombján és
+  választóján lenyomott `Backspace` és `Delete` egyetlen `onGraphChange` hívást sem ad, a panelen
+  kívüli gombról lenyomva ugyanaz a billentyű a kiválasztott csomópontot törli.
 
-Rontás igazolás: a `HEAD` vászonkódján, csak `deleteKeyCode={['Backspace', 'Delete']}` hozzáadásával
+Rontás igazolás: a `b133b0e` vászonkódján, csak `deleteKeyCode={['Backspace', 'Delete']}` hozzáadásával
 a "törlés" csoport `Backspace` és `Delete` tesztje elbukik ("expected vi.fn() to be called 1 times,
 but got 2 times"), a Start tesztjei zöldek maradnak. Ugyanezzel a rontott vászonnal az
 `e2e/graph-node-delete.spec.ts` mindkét billentyű tesztje elbukik: a mentett gráf élei
 `["e1"]` helyett `["e1", "e2"]`.
 
-E2E (`apps/web/e2e/graph-node-delete.spec.ts`, 6 teszt): `Backspace` és `Delete` törli az n3
+E2E (`apps/web/e2e/graph-node-delete.spec.ts`, 8 teszt, ebből 2 a 44.6 döntésé): `Backspace` és `Delete` törli az n3
 csomópontot és az `e2` élt, a mentés `PUT` törzse (a `ReplaceGraphRequestSchema` szerint értelmezve)
 `n1, n2` csomópontot és `e1` élt tartalmaz; a Törlés gomb törli az n2 csomópontot és mindkét élét,
 a panel bezárul, mentés előtt nincs kérés, párbeszéd nincs, a gomb teljesen látszik; a Start mindkét
 billentyűre megmarad; a Prompt sablon szövegmezőjében a `Backspace` és a `Delete` a szöveget
 szerkeszti, a csomópont megmarad; egy egérrel húzás csak az n2 mentett pozícióját változtatja
 (a csomópont `graphChanges` ága, ami a törlés útjának átalakítása után csak e2e-ben marad fedett).
+A 44.6 két tesztje (`Backspace` és `Delete`): az n2 csomópont kiválasztása után a panel "Bezárás"
+és "Törlés" gombján, a "Kezeletlen hiba szabálya" választó triggerén, majd a választó nyitott
+listája mellett a billentyű nem töröl (a csomópont és mindkét éle látszik, a mentetlen jelző nem
+jelenik meg); utána a vásznon az n2 csomópontra kattintva ugyanaz a billentyű törli a csomópontot
+és az éleit, a mentés `PUT` törzse `n1, n3` csomópontot és nulla élt tartalmaz.
 
 ### 44.5 Az e2e lefedettség előtte és utána
 
@@ -663,28 +684,108 @@ A fedetlen darabszám közben egyszer nőtt: a törlés útjának átalakítása
 tétel jött ki (utasítás / ág / függvény / sor). Az egérrel húzás tesztje (44.4) ezt az ágat fedi, így
 a számok a fenti, a `main` alappal azonos értékre estek vissza; a küszöb nem módosult.
 
-### 44.6 Nyitott: a Backspace és a Delete a panel nem beviteli vezérlőjén
+### 44.5a Az e2e lefedettség a 44.6 döntés után
 
-Mérve (saját, valódi Chromium): az n3 csomópont kiválasztása után a panel "Bezárás" gombjára
-fókuszt tenni és `Backspace`-t nyomni törli az n3 csomópontot (a csomópont darabszáma a lenyomás
-után 0). A könyvtár `isInputDOMNode` szűrője (44.1) csak az `INPUT`, `SELECT`, `TEXTAREA` és
-`contenteditable` elemet és a `.nokey` osztályú őst védi; egy gomb, a design system `Select`
-triggere vagy bármely más fókuszálható, nem beviteli elem nem. SPEC-008 5.9 és a 82-84. kritérium
-erről nem rendelkezik, ezért nem döntöttük el.
+Saját mérés, 2026-10-14, a `main` `f4e1440` (#33 és #34) beolvasztása után, 8 shard egymás után,
+`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results` után, a számok a
+`bun x nyc report --reporter=json-summary` kimenetéből: 511 e2e teszt, mind zöld (shardonként 64, a
+nyolcadikon 63; a 44.5 fenti mérése 499 tesztet futtatott).
 
-- Mi a viselkedés addig: a kiválasztott csomópont a panel bármely nem beviteli vezérlőjén
-  lenyomott `Backspace` vagy `Delete` billentyűre törlődik, megerősítés nélkül.
-- Mi zárná le: user döntés három lehetőség közül. (a) Marad így (a `Delete` és a `Backspace` a
-  csomópont törlése, ahogy a könyvtár alapértelmezése). (b) A panel `<aside>` elemére a
-  könyvtár saját `nokey` osztálya kerül, így a panelen belül egyik billentyű sem töröl (forrás:
-  `isInputDOMNode`, 922. sor); ehhez a panel gombjainak és a vásznon fókuszban lévő csomópontnak a
-  fókuszkezelését is mérni kell. (c) Saját billentyűkezelő a `deleteKeyCode={null}` mellett.
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------- |
+| statements | 1800 / 1815     | 15       |
+| branches   | 838 / 849       | 11       |
+| functions  | 601 / 604       | 3        |
+| lines      | 1732 / 1747     | 15       |
+
+A számok azonosak a 44.5 "utána" oszlopával: a `NodeInspector.tsx` változása egy osztálynév, futtatható
+utasítást nem ad, a fedetlen darabszám nem nőtt, a küszöb nem módosult. A `bun run coverage:e2e:report`
+nulla kilépési kóddal fut (összesen 99,17 / 98,7 / 99,5 / 99,14 százalék az `apps/web/package.json`
+változatlan 99,11 / 98,61 / 99,46 / 99,08 küszöbei ellen). A fedetlen helyek fájlonkénti listája is
+azonos: `mount-app.tsx` 3 utasítás, `read-frontend-config.ts` 8, `is-valid-connection.ts` 1,
+`browser-history-location-port.ts` 1, `perform-route-request.ts` 1, `use-stream-connection.ts` 1.
+
+### 44.6 A Backspace és a Delete a panelen (user döntés, 2026-10-14)
+
+A kérdés (korábban nyitva): ha egy csomópont ki van választva, és a beállítás panelen egy nem beviteli
+vezérlőn áll a fókusz, a `Backspace` és a `Delete` törli-e a csomópontot. Mérve (saját, valódi
+Chromium, a döntés előtt): az n3 csomópont kiválasztása után a panel "Bezárás" gombjára fókuszt
+tenni és `Backspace`-t nyomni törölte az n3 csomópontot (a csomópont darabszáma a lenyomás után 0). A
+könyvtár `isInputDOMNode` szűrője (44.1) csak az `INPUT`, `SELECT`, `TEXTAREA` és `contenteditable`
+elemet és a `.nokey` osztályú őst védi; egy gomb, a design system `Select` triggere vagy bármely
+más fókuszálható, nem beviteli elem nem. SPEC-008 5.9 és a 82-84. kritérium erről nem rendelkezett.
+
+**A döntés (user, 2026-10-14):** "A panelen ne töröljön. A panel teljes területén a billentyű nem
+töröl csomópontot (React Flow `nokey` osztály). A vásznon és fókusz nélkül továbbra is töröl." A
+korábban felsorolt három lehetőségből a (b) valósult meg; az (a) és a (c) elvetve.
+
+**A megvalósítás:** a `NodeInspector` gyökér `<aside>` elemén a `nokey` osztály (`NodeInspector.tsx`).
+Új szűrő, billentyű kezelő vagy CSS nincs. A panel gombjai és a design system `Select` triggere (a
+nyitott lista `createPortal`-lal a `document.body`-ban áll, a DOM fókusz a triggeren marad, a
+`packages/ui` `SelectField` doksija szerint) az `aside` leszármazottjai, tehát a `.closest('.nokey')`
+találja őket. A "Törlés" gomb egérrel vagy `Enter`/`Space` billentyűvel továbbra is töröl: az
+kifejezett művelet, nem a törlés billentyű.
+
+**A mechanizmus forrása.** A telepített kód az igazolás; a hivatalos dokumentáció a `nokey` osztályt
+nem említi.
+
+- Telepített `@xyflow/system` 0.0.82, `dist/esm/index.js` 914-923. sor: az `inputTags` lista
+  (`INPUT`, `SELECT`, `TEXTAREA`), majd az `isInputDOMNode` függvény; a célelem az esemény
+  `composedPath()[0]` eleme, a visszatérés a 922. sorban: `return isInput || !!target.closest('.nokey');`.
+- Telepített `@xyflow/react` 12.11.6, `dist/esm/index.js`: a `useGlobalKeyHandler` (1245-1259. sor) a
+  törlés billentyűt `useKeyPress(deleteKeyCode, { actInsideInputWithModifier: false })` hívással
+  figyeli; a `useKeyPress` `downHandler`-e modifier nélküli lenyomásnál is az `isInputDOMNode(event)`
+  eredményén dönt, és igaz esetén kilép (`return false`), tehát a `setKeyPressed(true)` nem fut.
+- Upstream, `xyflow/xyflow` `main`, `packages/system/src/utils/dom.ts`: azonos `isInputDOMNode`, azonos
+  `.nokey` sor (<https://raw.githubusercontent.com/xyflow/xyflow/main/packages/system/src/utils/dom.ts>,
+  lekérve 2026-10-14).
+- A karbantartók issue-beli megerősítése, három független szálon: xyflow/xyflow#3939 (peterkogo, a
+  Svelte Flow szálon, ugyanabból a `@xyflow/system` kódból: az eseménycél és a dokumentum gyökér
+  közti bármely elem `.nokey` osztálya számít, és a modális fókuszálása után a törlés billentyű
+  figyelmen kívül marad), #5729 (moklick: a `nokey` osztály mint
+  megkerülő megoldás), #5037 (bcakmakoglu: `className="nokey"` a figyelmen kívül hagyandó elemeken).
+  A #5037 szálán egy felhasználó ki is mondja, hogy a hivatalos oldal a `nokey` használatát nem
+  említi.
+- A hivatalos dokumentáció: a <https://reactflow.dev/api-reference/react-flow>, a
+  <https://reactflow.dev/learn/customization/utility-classes>, a
+  <https://reactflow.dev/api-reference/types/key-code> és a
+  <https://reactflow.dev/api-reference/hooks/use-key-press> oldalon a `nokey` szó nulla előfordulású
+  (saját `curl` és `grep`, 2026-10-14), a `nodrag` ugyanazokon az első két oldalon dokumentált. A
+  viselkedés tehát nem dokumentált API, hanem a telepített kód és a karbantartók által ajánlott
+  megkerülő megoldás; a könyvtár frissítése előtt a 44.4 e2e tesztjének zöldnek kell maradnia.
+
+**A mérés a döntés után (saját, valódi Chromium).** A `graph-node-delete.spec.ts` két új tesztje (44.4): az
+n2 csomópont kiválasztása után a panel "Bezárás" és "Törlés" gombján, a "Kezeletlen hiba szabálya"
+választó triggerén és nyitott listája mellett a `Backspace` és a `Delete` nem töröl; ugyanaz a
+csomópont a vásznon rákattintva, ugyanazzal a billentyűvel törlődik (a fókusz helye az egyetlen
+különbség).
+
+**Rontás igazolás (saját, 2026-10-14).** Ideiglenesen a `NodeInspector.tsx` `nokey` osztálya nélkül:
+az `e2e/graph-node-delete.spec.ts` 8-ból 6 teszt zöld, a 2 új elbukik ("element(s) not found" az n2
+csomópontra, a "Bezárás" gombon lenyomott billentyű után); a `GraphEditorCanvas.spec.tsx` két új
+tesztje elbukik ("expected vi.fn() to not be called at all, but actually been called 3 times": a
+panel mind a három vizsgált vezérlőjén töröl); a `NodeInspector.spec.tsx` osztály tesztje mind a tíz
+típusra elbukik. Az osztállyal mindhárom zöld. A rontást utána visszaállítottuk.
+
+**Hatókör és következmény.**
+
+- A `nokey` a panel gyökér `<aside>` elemére szól. A panel melletti `Resizable` elválasztó
+  (`role="separator"`) nem a panel leszármazottja, így a `nokey` nem fedi; az ott álló fókusz
+  melletti `Backspace` viselkedését nem mértük (44.7).
+- A fókusz nélküli eset (`document.activeElement` a `body`) a döntés szerint változatlanul töröl; a
+  telepített forrás szerint az `isInputDOMNode` az eseménycél ősláncát nézi, ami `body` célnál nem
+  tartalmaz `.nokey` elemet.
+- A SPEC-008 5.10 első szabálya szerint a visszavonás billentyű szűrője pontosan az `isInputDOMNode`
+  körére épül (`INPUT`, `SELECT`, `TEXTAREA`, `contenteditable`, `.nokey`; M-102, M-117). Ha a szűrő
+  a `.nokey` osztályt is kiszűri, a panelen belül lenyomott `Ctrl+Z` sem hat a gráfra. Ez a PLAN-009
+  T-009-52 és T-009-53 lépésének hatóköre; a döntés ezt a kapcsolatot nem mondta ki, ezért ott
+  külön ellenőrizendő.
 
 ### 44.7 Nem ellenőrzött
 
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál, a billentyű útra
   egyik motoron sem futott mérés.
-- A `nokey` osztály (44.6 b) tényleges hatása a panelen: a forrás olvasása igazolja, a mérés nem
-  futott, mert a lehetőségről nincs döntés.
+- A `Resizable` elválasztón (`role="separator"`) álló fókusz melletti `Backspace` és `Delete`: az
+  elválasztó nem a panel leszármazottja, a viselkedést nem mértük.
 - A `Delete` billentyű macOS-en (a `Backspace` helyett használt `Delete` gomb a laptop billentyűzeten
   `Fn` + `Backspace`): a Chromium `KeyboardEvent.key` értékeit nem mértük Mac hardveren.

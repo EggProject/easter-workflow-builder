@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
@@ -99,16 +100,17 @@ type OnSelectNode = (nodeId: string | undefined) => void;
 // `document` `keydown` eseményét figyeli, a törlendő elemek a kiválasztott
 // (`selected`) csomópontok és élek. REGRESSZIÓ: a könyvtár az éleket és a
 // csomópontokat két külön változáslistában jelzi, és a törölt csomópont élei
-// a gráfban maradtak, mert a második hívás visszaírta az elsőét.
-async function pressKey(key: string): Promise<void> {
+// a gráfban maradtak, mert a második hívás visszaírta az elsőét. A `target` az
+// esemény célja (alapértelmezésben a `document`: nincs fókuszált elem).
+async function pressKey(key: string, target: EventTarget = document): Promise<void> {
   await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
   });
   await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, bubbles: true, cancelable: true }));
+    target.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, bubbles: true, cancelable: true }));
     await Promise.resolve();
   });
 }
@@ -151,6 +153,34 @@ describe('GraphEditorCanvas', () => {
           autoLayoutRevision={autoLayoutRevision}
           graphElementIdGenerator={graphElementIdGenerator}
         />,
+      );
+    });
+  }
+
+  // A beállítás panel és a vászon egy dokumentumban, ahogy a `GraphEditorScreen`
+  // összerakja őket (a "törlés" csoport panel tesztjei használják).
+  function renderCanvasWithInspector(onGraphChange: OnGraphChange): void {
+    act(() => {
+      root.render(
+        <>
+          <GraphEditorCanvas
+            nodes={[START_NODE, FAN_OUT_NODE]}
+            edges={[EDGE]}
+            onGraphChange={onGraphChange}
+            selectedNodeId="n2"
+            onSelectNode={vi.fn()}
+            autoLayoutRevision={0}
+            graphElementIdGenerator={() => 'generated-edge-id'}
+          />
+          <NodeInspector
+            node={FAN_OUT_NODE}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />
+        </>,
       );
     });
   }
@@ -497,6 +527,43 @@ describe('GraphEditorCanvas', () => {
       });
       input.remove();
       expect(onGraphChange).not.toHaveBeenCalled();
+    });
+
+    // A billentyűt a `document` figyeli, a panel `.nokey` osztálya pedig a
+    // panel teljes területén kiszűri a törlést (user döntés 2026-10-14,
+    // SPEC-008 5.9).
+    describe('a beállítás panelen (user döntés 2026-10-14)', () => {
+      it.each(['Backspace', 'Delete'])(
+        'a panel minden gombján és választóján lenyomott %s nem töröl csomópontot',
+        async (key) => {
+          const onGraphChange = vi.fn<OnGraphChange>();
+          renderCanvasWithInspector(onGraphChange);
+          const panelControls = [...container.querySelectorAll<HTMLButtonElement>(':scope .node-inspector button')];
+          // A Törlés gomb, a Bezárás gomb és legalább egy választó (combobox).
+          expect(panelControls.length).toBeGreaterThanOrEqual(3);
+          expect(panelControls.some((control) => control.getAttribute('role') === 'combobox')).toBe(true);
+          for (const control of panelControls) {
+            control.focus();
+            await pressKey(key, control);
+          }
+          expect(onGraphChange).not.toHaveBeenCalled();
+        },
+      );
+
+      it.each(['Backspace', 'Delete'])(
+        'a panelen kívüli gombon lenyomott %s a kiválasztott csomópontot törli',
+        async (key) => {
+          const onGraphChange = vi.fn<OnGraphChange>();
+          renderCanvasWithInspector(onGraphChange);
+          const outsideButton = document.createElement('button');
+          document.body.append(outsideButton);
+          outsideButton.focus();
+          await pressKey(key, outsideButton);
+          outsideButton.remove();
+          expect(onGraphChange).toHaveBeenCalledTimes(1);
+          expect(onGraphChange).toHaveBeenCalledWith([START_NODE], []);
+        },
+      );
     });
   });
 });

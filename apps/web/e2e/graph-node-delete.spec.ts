@@ -259,6 +259,53 @@ test('beviteli mezőben a Backspace és a Delete a mezőt szerkeszti, a kiválas
   await expect(nodeLocator(page, 'n2')).toBeVisible();
 });
 
+// A beállítás panel teljes területén a billentyű nem töröl csomópontot (user
+// döntés 2026-10-14, SPEC-008 5.9): a panel gyökerén a React Flow `nokey`
+// osztálya áll. A vizsgált vezérlők nem beviteli elemek, tehát a könyvtár saját
+// beviteli elem szűrője őket nem védi (research T-009-44, 44.6). Ugyanaz a
+// kiválasztott csomópont és ugyanaz a billentyű: kizárólag a fókusz helye dönt.
+for (const key of ['Backspace', 'Delete']) {
+  test(`a panel gombján és a választó triggerén lenyomott ${key} nem töröl, a vásznon kiválasztott csomópontra viszont igen`, async ({
+    page,
+  }) => {
+    await nodeLocator(page, 'n2').click();
+    await expect(nodeLocator(page, 'n2')).toHaveClass(/selected/);
+    const panel = page.getByRole('complementary');
+    const policySelect = panel.getByRole('combobox', { name: 'Kezeletlen hiba szabálya' });
+    const panelControls = [
+      panel.getByRole('button', { name: 'Bezárás' }),
+      panel.getByRole('button', { name: 'Törlés' }),
+      policySelect,
+    ];
+
+    for (const control of panelControls) {
+      await control.focus();
+      await expect(control).toBeFocused();
+      await page.keyboard.press(key);
+      await expect(nodeLocator(page, 'n2')).toBeVisible();
+      await expect(edgeLocator(page, 'e1')).toBeVisible();
+      await expect(edgeLocator(page, 'e2')).toBeVisible();
+    }
+    // A nyitott lista a panelen kívül, a `document.body`-ban áll, a DOM fókusz
+    // viszont a triggeren marad.
+    await policySelect.click();
+    await expect(policySelect).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press(key);
+    await expect(nodeLocator(page, 'n2')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(policySelect).toHaveAttribute('aria-expanded', 'false');
+    await expect(unsavedIndicator(page)).toBeHidden();
+
+    await nodeLocator(page, 'n2').click();
+    await page.keyboard.press(key);
+
+    await expect(nodeLocator(page, 'n2')).toBeAttached({ attached: false });
+    await expect(edgeLocator(page, 'e1')).toBeAttached({ attached: false });
+    await expect(edgeLocator(page, 'e2')).toBeAttached({ attached: false });
+    expect(await saveAndReadGraphIds(page)).toEqual({ nodeIds: ['n1', 'n3'], edgeIds: [] });
+  });
+}
+
 test('a csomópont húzása a szerkesztett gráfba írja az új pozíciót, a többi csomópont és az élek nem változnak', async ({
   page,
 }) => {

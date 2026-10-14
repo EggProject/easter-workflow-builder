@@ -744,6 +744,13 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   locator (a kártya felirata, a gombjai, a mezők, a fülek, az elválasztó) a kötött sorrend
   szerinti. Greppes invariáns őrzi: `getByTestId` az `apps/web/e2e` alatt kizárólag `rf__`
   előtaggal állhat (SPEC-008 12.3).
+- **A beállítás panel gyökér elemén a `nokey` osztály áll.** A panel teljes területén (gombon,
+  a `SelectField` triggerén) a `Backspace` és a `Delete` nem törölhet csomópontot; a vásznon és
+  fókusz nélkül törölhet. A könyvtár beviteli elem szűrője a `.nokey` osztályú őst is kiszűri
+  (`@xyflow/system` `isInputDOMNode`), a hivatalos dokumentáció viszont az osztályt nem említi, ezért
+  a viselkedést a `NodeInspector.spec.tsx`, a `GraphEditorCanvas.spec.tsx` "a beállítás panelen"
+  csoportja és az `e2e/graph-node-delete.spec.ts` őrzi (user döntés 2026-10-14, SPEC-008 5.9,
+  `docs/research/2026-10-14-csomopont-felvetel.md` 44.6).
 - **Az élek kirajzolására vonatkozó állítás kizárólag e2e tesztben áll.** Az élek happy-dom
   alatt sosem rajzolódnak ki (M-53), ezért az él KIRAJZOLÁSÁRA vonatkozó minden állítás e2e
   tesztben áll, unit tesztben egy sem; az él ÁLLAPOTÁRA (a `WorkflowEdgeInput` tömb tartalma, a
@@ -1021,6 +1028,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 -- <egy fájl>` szelektíven, a teszt fájl és a mérő eszköz érintése nélkül, majd a szűkített
   teszt újrafuttatása minden lépésben (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 17.5
   szekció).
+- **A billentyűs törlés két változáslistát jelez, és a két vászon kezelő egymás törlését
+  visszaírta.** A React Flow `deleteElements` függvénye rögzített sorrendben hívja a kezelőket: előbb
+  az élek változáslistája (`onEdgesChange`), utána a csomópontoké (`onNodesChange`), legvégül az
+  `onDelete` (a telepített `@xyflow/react` 12.11.6 `dist/esm/index.js` 1129 ... 1153. sora). A
+  `GraphEditorCanvas` két kezelője a saját, azonos renderből való propjaiból építette a teljes gráfot,
+  ezért a második hívás visszaírta az első törlését: a törölt csomópont élei a szerkesztett állapotban
+  és a mentés `PUT` törzsében árván maradtak, a vásznon viszont nem rajzolódtak ki, tehát a
+  felhasználó a hibát nem láthatta. A hiba a `main`-en (`b133b0e`) az alapértelmezett `Backspace`
+  billentyűvel már megvolt; a `deleteKeyCode` prop csak a `Delete` billentyűt tette a hibás útra. A
+  javítás: a két kezelő a `remove` változást nem dolgozza fel, a törlés végeredményét egyetlen
+  `onDelete` adja, egyetlen `onGraphChange` hívásban. Védelem: a `GraphEditorCanvas.spec.tsx` "törlés"
+  csoportja (a valódi könyvtár billentyű útja happy-dom alatt) és az `e2e/graph-node-delete.spec.ts`
+  (a mentés `PUT` törzsében nincs árva él); a `main` vászonkódján mindkettő elbukik
+  (`docs/research/2026-10-14-csomopont-felvetel.md` T-009-44 szekció, 44.2).
 
 **Képernyőkép és vizuális bizonyíték**
 

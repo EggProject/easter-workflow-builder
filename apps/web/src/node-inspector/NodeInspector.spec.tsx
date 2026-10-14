@@ -466,6 +466,27 @@ describe('NodeInspector', () => {
     expect(container.querySelector('button[aria-label="Bezárás"]')).not.toBeNull();
   });
 
+  it.each(NODES_BY_TYPE)(
+    'a(z) "$node.type" panel gyökér eleme a nokey osztályt viseli, tehát a panelen a Backspace és a Delete nem töröl csomópontot (SPEC-008 5.9)',
+    ({ node }) => {
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={node}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted={false}
+          />,
+        );
+      });
+      const panel = container.querySelector('aside');
+      expect(panel?.classList.contains('node-inspector')).toBe(true);
+      expect(panel?.classList.contains('nokey')).toBe(true);
+    },
+  );
+
   it('a panel MINDEN gombja sm méretű', () => {
     const agentNode = NODES_BY_TYPE[1]?.node;
     if (agentNode === undefined) {
