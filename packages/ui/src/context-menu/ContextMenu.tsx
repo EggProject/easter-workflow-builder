@@ -212,12 +212,16 @@ export function ContextMenu<TValue>(properties: Readonly<ContextMenuProperties<T
     const handleScroll = (): void => {
       requestClose(panel.contains(document.activeElement));
     };
-    globalThis.addEventListener('mousedown', handleMouseDown);
+    // Elfogó fázis: a d3-zoom `mousedowned` kezelője `stopImmediatePropagation`-t hív (`zoom.js`,
+    // `nopropagation`), tehát a React Flow vásznon a buborékoló figyelő nem kapná meg az eseményt;
+    // az elfogó figyelő a célelem előtt fut (MDN, `EventTarget.addEventListener`, `capture`).
+    globalThis.addEventListener('mousedown', handleMouseDown, { capture: true });
     globalThis.addEventListener('resize', handleResize);
     // Elfogó fázis: a beágyazott görgető dobozok `scroll` eseménye nem buborékol.
     globalThis.addEventListener('scroll', handleScroll, { capture: true });
     return () => {
-      globalThis.removeEventListener('mousedown', handleMouseDown);
+      // A leiratkozásnál csak a `capture` érték számít (MDN, `removeEventListener`).
+      globalThis.removeEventListener('mousedown', handleMouseDown, { capture: true });
       globalThis.removeEventListener('resize', handleResize);
       globalThis.removeEventListener('scroll', handleScroll, { capture: true });
     };

@@ -76,7 +76,7 @@ veszi fel (SPEC-008 5.8, M-97, M-98).
 
 ### 5. Unit teszt és lefedettség
 
-- `packages/ui/src/context-menu`: 40 teszt három fájlban (`ContextMenu.spec.tsx` 31,
+- `packages/ui/src/context-menu`: 42 teszt három fájlban (`ContextMenu.spec.tsx` 33,
   `compute-context-menu-position.spec.ts` 8, `context-menu-byte-identity.spec.ts` 1), mind zöld.
 - A teljes `bun run test` 546 tesztfájl, 4559 teszt, zöld, a lefedettség mind a négy metrikán 100
   százalék, a `ContextMenu.tsx` és a `compute-context-menu-position.ts` is.
@@ -115,3 +115,43 @@ A fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a 47. sze
 (`mount-app.tsx` 16, 21-22; `read-frontend-config.ts`; `is-valid-connection.ts` 36;
 `browser-history-location-port.ts` 21; `perform-route-request.ts` 89; `use-stream-connection.ts`
 202). Az `apps/web/package.json` küszöbe nem változott.
+
+### 7. A kívülre kattintás zárása a React Flow vásznon
+
+Hiba (független review): a `ContextMenu` panelen kívüli `mousedown` figyelője a `window`
+buborékoló fázisában futott, nem elfogó fázisban. A telepített forrás szerint a React Flow vásznon
+a bal gombos lenyomás nem ér el odáig: a `d3-zoom` 3.0.0 a `mousedown.zoom` kezelőt a vászon
+elemére köti (`src/zoom.js` 76. sor), a `mousedowned` (270. sor) pedig a 280. sorban
+`nopropagation(event)`-et hív, ami `event.stopImmediatePropagation()` (`src/noevent.js` 2. sor). Az
+`@xyflow/system` 0.0.82 `createFilter` szűrője a bal gombot átengedi neki (`dist/esm/index.js`
+2947-2951. sor, `buttonAllowed`, mert a `panOnDrag` alapértéke `true`, `@xyflow/react` 12.11.6
+`dist/esm/index.js` 3767. sor), és a `d3-zoom` az `XYPanZoom` `domNode` elemén, a `zoomPane`
+ref elemén fut (`@xyflow/react` `dist/esm/index.js` 1323-1324. sor). A DOM szabálya szerint a
+`stopImmediatePropagation` az eseményt más objektumokhoz sem engedi tovább
+(<https://developer.mozilla.org/en-US/docs/Web/API/Event/stopImmediatePropagation>), az elfogó
+(`capture`) figyelő viszont a célelem alatti elemek előtt kap eseményt
+(<https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener>, a DOM
+Standard eseményfa szabálya: <https://dom.spec.whatwg.org/#concept-event-dispatch>), és a
+leiratkozáshoz ugyanaz a `capture` érték kell
+(<https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener>).
+
+Javítás: a `mousedown` figyelő `{ capture: true }` opcióval köt fel és ugyanazzal köt le. Két
+új unit teszt őrzi (`ContextMenu.spec.tsx`, `zárás` csoport): egy célelem saját `mousedown`
+figyelője `stopImmediatePropagation`-t hív (a `d3-zoom` mintájára), és az `onClose` ettől
+függetlenül pontosan egyszer fut; valamint a felkötés és a leiratkozás hívásainak egyezése a
+`globalThis` figyelő hívásain. A második teszt azért kell, mert a happy-dom 20.11.6
+`removeEventListener` megvalósítása a `capture` értéket nem veti össze (`lib/event/EventTarget.js`
+64-82. sor, mindkét listából töröl), tehát a hibás leiratkozást (valódi böngészőben szivárgás)
+viselkedés alapú teszt nem látná.
+
+Szándékos rontással igazolva: a felkötés és a leiratkozás is buborékoló alakra állítva két teszt
+bukik (a `stopImmediatePropagation` teszt és a hívás egyezés teszt), 31 zöld marad; csak a
+leiratkozás állítva vissza buborékolóra a hívás egyezés teszt egyedül bukik, a viselkedés alapú
+teszt zöld marad (ezért kell a második). A rontás visszaállítva. `--project ui` futás: 69
+tesztfájl, 671 teszt, zöld, a `packages/ui` lefedettsége mind a négy metrikán 100 százalék, a
+`component-boundary-invariant` is zöld. Az 5. szekció teljes futásának összege (4559 teszt) a
+javítás előtti állapotra szól.
+
+Nem ellenőrzött: valódi böngészőben, valódi React Flow vásznon futó kattintás. A unit teszt a
+`d3-zoom` viselkedését egy célelem figyelőjével utánozza; a vásznon tett kattintás e2e bizonyítéka
+a menü fogyasztójához (T-009-43) tartozik.

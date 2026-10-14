@@ -375,6 +375,35 @@ describe('ContextMenu', () => {
       expect(document.activeElement).toBe(item(0));
     });
 
+    it('a célelem saját mousedown figyelőjének stopImmediatePropagation hívása (d3-zoom minta) ellenére is zár, pontosan egyszer', () => {
+      const onClose = vi.fn();
+      const target = document.createElement('div');
+      const stopHandler = vi.fn((event: MouseEvent): void => {
+        event.stopImmediatePropagation();
+      });
+      target.addEventListener('mousedown', stopHandler);
+      document.body.append(target);
+      try {
+        openFromOpener({ onClose });
+        mouseDownOn(target);
+        expect(stopHandler).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(1);
+      } finally {
+        target.remove();
+      }
+    });
+
+    it('a mousedown figyelőt elfogó fázisban köti fel és ugyanazzal a capture értékkel köti le (a happy-dom a leiratkozásnál a capture értéket nem veti össze)', () => {
+      const addSpy = vi.spyOn(globalThis, 'addEventListener');
+      const removeSpy = vi.spyOn(globalThis, 'removeEventListener');
+      openFromOpener();
+      renderMenu(undefined);
+      const added = addSpy.mock.calls.filter(([type]) => type === 'mousedown');
+      const removed = removeSpy.mock.calls.filter(([type]) => type === 'mousedown');
+      expect(added).toEqual([['mousedown', expect.any(Function), { capture: true }]]);
+      expect(removed).toEqual(added);
+    });
+
     it('a panelen belüli mousedown nem zár', () => {
       const onClose = vi.fn();
       openFromOpener({ onClose });
