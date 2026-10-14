@@ -634,7 +634,15 @@ export async function installShowcaseRunMocks(page: Page): Promise<void> {
  */
 export async function installShowcaseLiveRunMocks(page: Page): Promise<Server> {
   const { server } = await startOpenStreamServer(page, SHOWCASE_RUN_STREAM_FRAMES);
-  await installShowcaseRunApiMocks(page);
+  try {
+    await installShowcaseRunApiMocks(page);
+  } catch (error: unknown) {
+    // A hívó csak sikeres visszatérés után kapja meg a szervert, tehát
+    // hibánál ő nem tudja lezárni: a nyitott kapcsolat életben tartaná.
+    server.closeAllConnections();
+    server.close();
+    throw error;
+  }
   return server;
 }
 
