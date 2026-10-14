@@ -858,6 +858,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
   számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
   felhasznált, tehát a besorolás változatlan.
+- **Egy csak véletlenül fedett sor billegteti az e2e lefedettségi küszöböt.** A
+  `run-view/blocking-failure-message.ts` hibaüzenet ágát (`return failure.message;`) a teljes e2e
+  futásban csak két, a hibára nem állító teszt érte el, mellékhatásként: a `run-control.spec.ts`
+  két indítás tesztje a futás nézetre navigál, ahol a hiányzó mockok 404-et adnak
+  (`installApiMocks`), és a teszt az URL után azonnal kiolvassa a lefedettséget, tehát a hibás
+  renderelést nem várja meg. Hogy a render a kiolvasás előtt megtörténik-e, versenyhelyzet, ezért
+  a sor találatszáma futásonként más, és a PR #33 első CI futásán a `lines` metrika a küszöb alá
+  esett (99.07 a 99.08 ellen), minden teszt zölden: az `E2E` job bukott. A szabály: **amit
+  a küszöb számol, azt olyan teszt fedje, amelyik a viselkedést állítja és megvárja** (web-first
+  assertion a megjelenő állapotra); egy ingadozó fedetlen darabszámot a sort determinisztikusan
+  fedő teszt old meg, nem a küszöb csökkentése. Védelem: a `run-view.spec.ts` két tesztje (a
+  `getRun` és a `listStepRuns` 404 hibája, danger `Alert` a kódhoz rendelt mondattal), amelyek a
+  hibaüzenet ág `return undefined;` rontására elbuknak. Mérés és a CI hivatkozás:
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 48. szekció.
 
 **Frontend állapot és layout**
 
