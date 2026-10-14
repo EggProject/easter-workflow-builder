@@ -51,6 +51,10 @@ export type {
   UnhandledErrorPolicy,
 } from './workflow-graph/node-config/node-config.ts';
 export { isNodeConfig } from './workflow-graph/node-config/is-node-config.ts';
+// A kötelező szöveg mezők táblája (SPEC-008 5.4, O-21): a `replaceGraph` írás oldali
+// ellenőrzése ebből dolgozik, és az `apps/server` `node-config-drift-protection` témája
+// ezt veti össze a `protocol` mentési sémájának táblájával.
+export { REQUIRED_TEXT_FIELD_PATHS } from './workflow-graph/node-config/required-text-field-paths.ts';
 // Az agent lépés beállításai (T-005-19, SPEC-004 5.2 4. pont): az `engine`
 // csomag `agent-step` témája ebből állítja össze a kimenő SDK `Options`
 // objektumot, és az `ai_synthesis` módú `join` ugyanezt az alakot hordozza a

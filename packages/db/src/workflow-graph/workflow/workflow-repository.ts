@@ -9,6 +9,7 @@ import { workflowEdgeTable } from './workflow-edge.ts';
 import type { NodeConfig } from '../node-config/node-config.ts';
 import type { NodeType } from '../node-type/node-type.ts';
 import { isNodeConfig } from '../node-config/is-node-config.ts';
+import { findBlankRequiredTextField } from '../node-config/find-blank-required-text-field.ts';
 import { workflowRunTable } from '../../workflow-run/workflow-run.ts';
 import { runEventTable } from '../../run-event/event-record/run-event.ts';
 
@@ -240,12 +241,30 @@ export function createWorkflowRepository(
    * A teljes gráfot cseréli, nincs node/él szintű CRUD (SPEC-003 9.2). A
    * bemenet már típusos `NodeConfig`, nincs mit typeguarddal szűkíteni
    * íráskor (9.4 szekció, a `readGraph` unknown-ját ez különbözteti meg).
+   *
+   * **Írás oldali kötelező mező szabály (SPEC-008 5.4, O-21).** A beszúrás
+   * ELŐTT, a tranzakción kívül fut: egy üres vagy csak szóközös kötelező
+   * szöveg mező `blank_required_text_field` hibaágat ad, és semmi nem
+   * íródik, tehát a korábban tárolt gráf változatlan. A `readGraph` ezt a
+   * szabályt nem futtatja, mert a tárolt gráfban lehet üres kötelező mező.
+   * HTTP-n át a `protocol` mentési sémája előbb utasít el; ez a második
+   * védvonal a szerveren kívüli hívóknak.
    */
   function replaceGraph(
     workflowId: string,
     nodes: readonly WorkflowNodeInput[],
     edges: readonly WorkflowEdgeInput[],
   ): Outcome<void> {
+    for (const node of nodes) {
+      const blankField = findBlankRequiredTextField(node.config);
+      if (blankField !== undefined) {
+        return {
+          kind: 'error',
+          message: `A(z) "${node.id}" node config "${blankField}" kötelező szöveg mezője üres (blank_required_text_field).`,
+        };
+      }
+    }
+
     return transaction(() => {
       database.delete(workflowEdgeTable).where(eq(workflowEdgeTable.workflowId, workflowId)).run();
       database.delete(workflowNodeTable).where(eq(workflowNodeTable.workflowId, workflowId)).run();

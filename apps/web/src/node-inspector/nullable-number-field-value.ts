@@ -2,7 +2,7 @@
  * Nullázható szám mező és a natív `<input type="number">` értéke közötti
  * oda-vissza leképezés, a `nullable-text-field-value.ts` mintájára. A
  * `fromNumberFieldValue` szándékosan nem szűri ki az érvénytelen (NaN)
- * bevitelt: a `NodeConfigSchema.safeParse` ezt a `node-inspector` saját
+ * bevitelt: a `NodeConfigSaveSchema.safeParse` ezt a `node-inspector` saját
  * mezőnkénti hibajelzésén keresztül veti el, ugyanúgy, mint a
  * `graph-editor` `validateGraphForSave` mentés előtti kapuja.
  */

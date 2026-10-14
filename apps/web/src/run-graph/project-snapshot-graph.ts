@@ -1,9 +1,9 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import {
-  ReplaceGraphRequestSchema,
-  zodErrorToProtocolErrorBody,
+  NodeConfigSchema,
   type ReplaceGraphRequest,
   type RunSnapshotResponse,
+  type WorkflowNodeInput,
 } from '@easter-workflow-builder/protocol';
 
 /**
@@ -14,35 +14,39 @@ import {
  * `WorkflowNodeInput` alakot rajzolja, `positionX`/`positionY` mezővel és
  * diszkriminált `NodeConfig` unióval - ez a függvény a kettő között fordít.
  *
- * **Miért egyetlen séma hívás, és miért a `ReplaceGraphRequestSchema`.** A
- * `config` a dróton `unknown`, tehát a diszkriminált unióra szűkítés
- * futásidejű ellenőrzést igényel; ugyanezt a szűkítést a mentés útja
- * (`validate-graph-for-save.ts`) már elvégzi a teljes node és él listára,
- * ugyanazzal a sémával. A pillanatkép ugyanazt az alakot hordozza (a
- * `graph_snapshot` dokumentum az élő gráfból készül, SPEC-003 5.1), tehát
- * nincs ok második, kézzel írt ellenőrzésre: egy `safeParse` hívás egyszerre
- * adja a tíz ágra szűkített `config` mezőt és a hibás mező ÚTVONALÁT is
- * (`nodes.0.config.maxIterations` alakban, `zodErrorToProtocolErrorBody`).
+ * **Miért az olvasó `NodeConfigSchema`, és nem a mentés sémája.** A `config`
+ * a dróton `unknown`, tehát a diszkriminált unióra szűkítés futásidejű
+ * ellenőrzést igényel. A mentés útja (`validate-graph-for-save.ts`) a
+ * `ReplaceGraphRequestSchema`-t futtatja, ami 2026-09-28 óta a kötelező szöveg
+ * mezők mentési szabályát is hordozza (SPEC-008 5.4, O-21); a pillanatkép
+ * viszont megváltoztathatatlan (SPEC-003 5.5), és egy régi, üres kötelező
+ * mezőt hordozó pillanatkép rajzának változatlanul ki kell rajzolódnia. A
+ * vetítés ezért csomópontonként az olvasó sémán szűkít, a mentési szabály
+ * nélkül, és az élek a pillanatkép saját, már szűkített alakjukban mennek át.
  *
- * A hibaág valódi: a `graph_snapshot` sor megváltoztathatatlan (SPEC-003
- * 5.5), tehát egy régebbi séma szerint írt vagy sérült pillanatkép a mai
- * ellenőrzésen elbukhat. Ilyenkor a felület a hibát nevezi meg, nem rajzol
- * hiányos gráfot.
+ * A hibaág valódi: egy régebbi séma szerint írt vagy sérült pillanatkép a mai
+ * olvasó sémán is elbukhat. Ilyenkor a felület a hibás mező ÚTVONALÁT nevezi
+ * meg (`nodes.0.config.maxIterations` alakban), nem rajzol hiányos gráfot, és
+ * a kapott értéket nem visszhangozza.
  */
 export function projectSnapshotGraph(snapshot: RunSnapshotResponse): Outcome<ReplaceGraphRequest> {
-  const parsed = ReplaceGraphRequestSchema.safeParse({
-    nodes: snapshot.nodes.map((node) => ({
+  const nodes: WorkflowNodeInput[] = [];
+  for (const [index, node] of snapshot.nodes.entries()) {
+    const parsed = NodeConfigSchema.safeParse(node.config);
+    if (!parsed.success) {
+      const fieldPaths = parsed.error.issues.map((issue) =>
+        ['nodes', index, 'config', ...issue.path].map(String).join('.'),
+      );
+      return { kind: 'error', message: `A pillanatkép érvénytelen, hibás mező(k): ${fieldPaths.join(', ')}.` };
+    }
+    nodes.push({
       id: node.id,
       type: node.type,
       label: node.label,
       positionX: node.position.x,
       positionY: node.position.y,
-      config: node.config,
-    })),
-    edges: snapshot.edges,
-  });
-  if (!parsed.success) {
-    return { kind: 'error', message: zodErrorToProtocolErrorBody(parsed.error).message };
+      config: parsed.data,
+    });
   }
-  return { kind: 'ok', value: parsed.data };
+  return { kind: 'ok', value: { nodes, edges: snapshot.edges } };
 }

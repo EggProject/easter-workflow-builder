@@ -1,9 +1,9 @@
 /**
- * A `NodeConfigSchema.safeParse` `error` mezőjének szűkített, drótszintű
+ * A `NodeConfigSaveSchema.safeParse` `error` mezőjének szűkített, drótszintű
  * `zod` típust NEM igénylő alakja - az `apps/web` nem importálhat közvetlenül
  * `zod`-ot, mert az a drótszintű validáció a `packages/protocol` kizárólagos
  * felelőssége (T-008-31, `greppable-invariants` (2) tétel). A `NodeInspector`
- * a `NodeConfigSchema.safeParse(...).error` értéket adja át, ami
+ * a `NodeConfigSaveSchema.safeParse(...).error` értéket adja át, ami
  * strukturálisan illeszkedik erre a típusra, `as` típuskényszerítés nélkül.
  */
 export interface ZodIssueLike {
@@ -16,7 +16,7 @@ export interface ZodErrorLike {
 }
 
 /**
- * A `NodeConfigSchema.safeParse` hibáit mezőnkénti térképpé alakítja, hogy a
+ * A `NodeConfigSaveSchema.safeParse` hibáit mezőnkénti térképpé alakítja, hogy a
  * panel a hibás mező MELLETT tudja megjeleníteni a hibaüzenetet (SPEC-008
  * 5.4 "mezőnkénti hibajelzéssel"). Az útvonal pontokkal összefűzött alakja
  * (pl. `branches.0.key`) a kulcs; egy útvonalon több hiba esetén az ELSŐ

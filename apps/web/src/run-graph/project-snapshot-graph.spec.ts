@@ -87,6 +87,53 @@ describe('projectSnapshotGraph', () => {
     if (projected.kind !== 'error') {
       throw new Error('a projekció váratlanul sikeres lett');
     }
-    expect(projected.message).toContain('maxIterations');
+    expect(projected.message).toContain('nodes.0.config.maxIterations');
+  });
+
+  it('egy üres kötelező szöveg mezőt hordozó régi pillanatképet a mentési szabály nélkül vetít, az üres értéket megtartva (SPEC-008 5.4, O-21)', () => {
+    const projected = projectSnapshotGraph(
+      buildSnapshot({
+        nodes: [
+          {
+            id: 'n-branch',
+            type: 'branch',
+            label: '',
+            position: { x: 0, y: 0 },
+            config: {
+              type: 'branch',
+              expression: ' ',
+              branches: [{ key: '', label: '' }],
+              defaultBranchKey: null,
+              onUnhandledError: null,
+            },
+            effectiveProviderId: 'minimax',
+          },
+          {
+            id: 'n-loop',
+            type: 'loop',
+            label: 'Ciklus',
+            position: { x: 200, y: 0 },
+            config: { type: 'loop', maxIterations: 4, continueExpression: '', onUnhandledError: null },
+            effectiveProviderId: 'minimax',
+          },
+        ],
+        edges: [],
+      }),
+    );
+
+    expect(projected.kind).toBe('ok');
+    if (projected.kind !== 'ok') {
+      throw new Error('a projekció váratlanul hibát adott');
+    }
+    expect(projected.value.nodes.map((node) => node.config)).toEqual([
+      {
+        type: 'branch',
+        expression: ' ',
+        branches: [{ key: '', label: '' }],
+        defaultBranchKey: null,
+        onUnhandledError: null,
+      },
+      { type: 'loop', maxIterations: 4, continueExpression: '', onUnhandledError: null },
+    ]);
   });
 });

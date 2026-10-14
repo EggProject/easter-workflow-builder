@@ -28,7 +28,7 @@ const VALID_EDGE = {
 };
 
 describe('WorkflowNodeInputSchema', () => {
-  it('elfogadja az érvényes node bemenetet, a NodeConfigSchema szerint érvényes config alakkal', () => {
+  it('elfogadja az érvényes node bemenetet, a mentési séma szerint érvényes config alakkal', () => {
     expect(WorkflowNodeInputSchema.safeParse(VALID_NODE).success).toBe(true);
   });
 
@@ -41,9 +41,45 @@ describe('WorkflowNodeInputSchema', () => {
   });
 });
 
+/**
+ * Egy üres kötelező szöveg mezőt hordozó csomópont (SPEC-008 5.4, O-21): a
+ * `branch` első ágának kulcsa üres. A mentési sémán elbukik, az olvasó
+ * sémákon átmegy.
+ */
+const NODE_WITH_BLANK_REQUIRED_FIELD = {
+  id: 'node-branch',
+  type: 'branch',
+  label: 'Elágazás',
+  positionX: 0,
+  positionY: 0,
+  config: {
+    type: 'branch',
+    expression: 'x > 0',
+    branches: [{ key: '', label: 'Pozitív' }],
+    defaultBranchKey: null,
+    onUnhandledError: null,
+  },
+};
+
+describe('WorkflowNodeInputSchema a mentési sémán áll (SPEC-008 5.4, O-21)', () => {
+  it('üres kötelező szöveg mezőre a config mezőútvonalán bukik', () => {
+    const outcome = WorkflowNodeInputSchema.safeParse(NODE_WITH_BLANK_REQUIRED_FIELD);
+
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) {
+      expect(outcome.error.issues.map((issue) => issue.path.join('.'))).toEqual(['config.branches.0.key']);
+    }
+  });
+});
+
 describe('WorkflowNodeSchema', () => {
   it('elfogadja az időbélyeggel kiegészített rekordot', () => {
     const outcome = WorkflowNodeSchema.safeParse({ ...VALID_NODE, createdAtMs: 1, updatedAtMs: 2 });
+    expect(outcome.success).toBe(true);
+  });
+
+  it('az üres kötelező szöveg mezőt elfogadja (az olvasó séma nem szigorodik)', () => {
+    const outcome = WorkflowNodeSchema.safeParse({ ...NODE_WITH_BLANK_REQUIRED_FIELD, createdAtMs: 1, updatedAtMs: 2 });
     expect(outcome.success).toBe(true);
   });
 });
@@ -67,6 +103,14 @@ describe('WorkflowGraphDocumentSchema', () => {
     const outcome = WorkflowGraphDocumentSchema.safeParse({
       nodes: [{ ...VALID_NODE, createdAtMs: 1, updatedAtMs: 2 }],
       edges: [{ ...VALID_EDGE, createdAtMs: 1 }],
+    });
+    expect(outcome.success).toBe(true);
+  });
+
+  it('egy üres kötelező szöveg mezőt hordozó régi gráfot elfogad (az olvasó séma nem szigorodik)', () => {
+    const outcome = WorkflowGraphDocumentSchema.safeParse({
+      nodes: [{ ...NODE_WITH_BLANK_REQUIRED_FIELD, createdAtMs: 1, updatedAtMs: 2 }],
+      edges: [],
     });
     expect(outcome.success).toBe(true);
   });
@@ -105,6 +149,17 @@ describe('ReplaceGraphRequestSchema', () => {
     expect(outcome.success).toBe(false);
     if (!outcome.success) {
       expect(outcome.error.issues.some((issue) => issue.path.join('.') === 'edges.1.id')).toBe(true);
+    }
+  });
+
+  it('üres kötelező szöveg mezőre a teljes mezőútvonalon bukik (SPEC-008 5.4, O-21)', () => {
+    const outcome = ReplaceGraphRequestSchema.safeParse({
+      nodes: [VALID_NODE, NODE_WITH_BLANK_REQUIRED_FIELD],
+      edges: [],
+    });
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) {
+      expect(outcome.error.issues.map((issue) => issue.path.join('.'))).toEqual(['nodes.1.config.branches.0.key']);
     }
   });
 

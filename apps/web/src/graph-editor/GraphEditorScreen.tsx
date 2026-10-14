@@ -130,7 +130,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
   // node-inspectornak minden érvénytelen mezőn ki kell írnia a hibáját,
   // akkor is, ha a felhasználó az adott mezőhöz még hozzá sem nyúlt. Csak a
   // KLIENS oldali séma ellenőrzés hibája állítja igazra, mert csak az a
-  // hiba forrása ugyanannak a `NodeConfigSchema`-nak, amit a node-inspector
+  // hiba forrása ugyanannak a mentési sémának (`NodeConfigSaveSchema`), amit a node-inspector
   // is fut a mezőnkénti hibákhoz - a szerver oldali (hálózati/500) hiba nem
   // mezőszintű, ahhoz nincs mit kiírni a panelen.
   const [isSaveAttempted, setIsSaveAttempted] = useState(false);

@@ -432,6 +432,74 @@ describe('NodeInspector', () => {
     expect(container.querySelector('[aria-invalid="true"]')).not.toBeNull();
   });
 
+  it('sikertelen mentési kísérlet után az üres kötelező szöveg mező a mező alatt jelez, a mentési sémán (SPEC-008 5.4, O-21)', () => {
+    const branchNode: WorkflowNodeInput = {
+      id: 'n-branch-blank',
+      type: 'branch',
+      label: 'Elágazás',
+      positionX: 0,
+      positionY: 0,
+      config: {
+        type: 'branch',
+        expression: ' '.repeat(3),
+        branches: [{ key: '', label: 'Pozitív' }],
+        defaultBranchKey: null,
+        onUnhandledError: null,
+      },
+    };
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={branchNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+        />,
+      );
+    });
+
+    const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+    expect(invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent)).toEqual([
+      'Feltétel kifejezés',
+      'Ág kulcsa',
+    ]);
+    for (const field of invalidFields) {
+      const errorElement = container.querySelector(`#${field.getAttribute('aria-describedby') ?? ''}`);
+      expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
+    }
+  });
+
+  it('kitöltött kötelező szöveg mezőknél a mentési kísérlet után sincs hibaüzenet', () => {
+    const branchNode: WorkflowNodeInput = {
+      id: 'n-branch-filled',
+      type: 'branch',
+      label: 'Elágazás',
+      positionX: 0,
+      positionY: 0,
+      config: {
+        type: 'branch',
+        expression: 'x > 0',
+        branches: [{ key: 'pos', label: 'Pozitív' }],
+        defaultBranchKey: null,
+        onUnhandledError: null,
+      },
+    };
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={branchNode}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+        />,
+      );
+    });
+
+    expect(container.querySelector('[aria-invalid="true"]')).toBeNull();
+  });
+
   it('az `agent_step` node szerkesztése a type és az onUnhandledError mezőt megőrzi', () => {
     const onChange = vi.fn<OnChange>();
     const agentNode = NODES_BY_TYPE[1]?.node;

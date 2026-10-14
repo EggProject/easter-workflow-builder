@@ -15,7 +15,7 @@ export interface LoopNodeFieldsProperties {
  * mező itt sem kap alapértéket. A natív `<input type="number">` érvénytelen
  * szöveges bevitelre a saját `.value`-ját üres sztringre állítja (mért
  * viselkedés), a `Number('')` pedig `0`-t ad, nem `NaN`-t - a mentés előtti
- * `NodeConfigSchema.safeParse` ezért csak akkor jelez hibát, ha a hívó
+ * `NodeConfigSaveSchema.safeParse` ezért csak akkor jelez hibát, ha a hívó
  * oldalon valamilyen külön korlát (pl. minimum érték) is érvényben van.
  *
  * CSOPORTOSÍTÁS: nincs összecsukható panel. A `maxIterations` látszólag

@@ -13,7 +13,9 @@
 // böngésző szintű bemenet-tisztítása miatt sosem jut el a React állapotig -
 // ezt maga a kódbázis is dokumentálja (`LoopNodeFields.tsx` és
 // `nullable-number-field-value.ts` fejléc komment). Ez az ág ezért marad
-// unit teszt only (`validate-graph-for-save.spec.ts`).
+// unit teszt only (`validate-graph-for-save.spec.ts`). 2026-09-28 óta (SPEC-008
+// 5.4, O-21) a mentési séma egy üres kötelező szöveg mezőn is elbukik; ennek
+// e2e tesztje a PLAN-009 T-009-45 hatóköre.
 import { ReplaceGraphRequestSchema } from '@easter-workflow-builder/protocol';
 import type {
   NodeConfig,
