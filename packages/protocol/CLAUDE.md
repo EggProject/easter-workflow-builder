@@ -25,10 +25,12 @@ készülnek.
 
 ## Függőségi irány
 
-A `protocol` a `core` csomagtól és a `zod` külső csomagtól függhet, mástól nem, L1 réteg
-(SPEC-002 4. szekció: "a `protocol` L1, mert csak a `core` csomagtól függhet"; SPEC-005 3.4
-szekció). A `db` (L2), a `provider-capability` (L1, azonos réteg) és az `engine` (L5) importja
-tilos.
+A `protocol` a `core` és a `typeguards` workspace csomagtól (mindkettő L0) és a `zod` külső
+csomagtól függhet, mástól nem, L1 réteg; a `package.json` `dependencies` mezője pontosan ezt a
+hármat listázza. A `typeguards` csak ott használható, ahol a kérdés nem drótszintű alak, hanem
+egyszerű primitív ellenőrzés (SPEC-005 7.2). A SPEC-002 4. és a SPEC-005 3.4 szekciója ennél
+szűkebb, csak a `core` és a `zod` csomagot nevezi meg. A `db` (L2), a `provider-capability` (L1,
+azonos réteg) és az `engine` (L5) importja tilos.
 
 ## Szabályok
 
