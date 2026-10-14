@@ -30,7 +30,9 @@ Saját olvasás: `eggproject-design-components/components/context-menu/ContextMe
   `c83003b7154925067478e77740dcdf0ea5149ee452833a9576bb9de422dfe9dc`, saját számítás
   2026-10-14-én. A blokk egyetlen U+2014 karaktert tartalmaz (a fókusz állapot
   kommentjében); a bájtazonosság miatt ez a forrás része marad, ugyanúgy, mint a
-  `pagination.css` öt és a `drawer.css` tíz ilyen karaktere.
+  `pagination.css` öt és a `drawer.css` tíz ilyen karaktere. Ezért a fájl a `tooling/scripts`
+  `no-em-dash` tesztjének vendorolt listájára is felkerül, ami a `.prettierignore` vendorolt
+  blokkjának másolata.
 
 ### 2. A hozzáférhetőségi szerződés forrásai
 
@@ -82,6 +84,11 @@ veszi fel (SPEC-008 5.8, M-97, M-98).
   eltávolítása hat tesztet buktat (a programozott fókusz visszaadás a happy-dom alatt is
   `focusout` eseményt vált ki, ami nélküle második zárási kérést adna); a visszaadási cél
   felülírása áthelyezéskor egy tesztet buktat.
+- Mért buktató: a `no-em-dash` és a `component-boundary-invariant` teszt a `git ls-files`
+  listáján dolgozik, tehát a commit előtti helyi futás a még nem követett új fájlokat nem látja. Az
+  első push CI futása (run `38540342535`) ezért a `no-em-dash` teszten bukott a
+  `context-menu.css` miatt, miközben a helyi futás zöld volt; a lista bővítése után a commitolt
+  fájlokon mindkét teszt helyben is zöld.
 
 ### 6. Az e2e lefedettség előtte és utána
 
