@@ -41,6 +41,15 @@
   gap: 8px;
 }
 
+/* A fejléc jelvényei (állapot, próbálkozás, alapértelmezett ág): egy sorba
+   férnek, szűk kártyán a jobb szélhez igazítva törnek új sorba. */
+.graph-node-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 .graph-node-card__type {
   font-size: 12px;
   font-weight: 600;

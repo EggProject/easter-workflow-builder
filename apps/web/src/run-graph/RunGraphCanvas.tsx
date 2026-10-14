@@ -4,12 +4,16 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import { GraphNodeCardSizeStyle } from '../graph-node-card/GraphNodeCardSizeStyle.tsx';
 import type { GraphNodeCardData, GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
-import { workflowEdgeToFlowEdge } from '../graph-editor/graph-editor-edge-mapping.ts';
 import {
   mergeMeasuredNodeSizes,
   withMeasuredNodeSize,
   type MeasuredNodeSizes,
 } from '../graph-editor/measured-node-sizes.ts';
+import { BranchHighlightToggle } from './BranchHighlightToggle.tsx';
+import type { BranchDecision } from './branch-decision.ts';
+import { readStoredBranchHighlightMode, storeBranchHighlightMode } from './branch-highlight-mode-storage.ts';
+import { buildRunGraphFlowEdges } from './build-run-graph-flow-edges.ts';
+import { resolveHighlightedBranchEdgeIds } from './resolve-highlighted-branch-edge-ids.ts';
 import '@xyflow/react/dist/style.css';
 import '../graph-editor/graph-canvas-theme.css';
 import './run-graph.css';
@@ -28,6 +32,12 @@ export interface RunGraphCanvasProperties {
    */
   readonly nodes: readonly GraphNodeCardData[];
   readonly edges: readonly WorkflowEdgeInput[];
+  /**
+   * Csomópont azonosító -> a hozzá leképezett `branch_taken` döntések, növekvő
+   * `eventId` szerint (`group-branch-decisions-by-node.ts`): ebből számolódik
+   * a kiemelendő élek halmaza (SPEC-008 6.6).
+   */
+  readonly branchDecisionsByNodeId: ReadonlyMap<string, readonly BranchDecision[]>;
 }
 
 /**
@@ -51,11 +61,19 @@ export interface RunGraphCanvasProperties {
  * `measured.` tulajdonság-elérés és a `getBoundingClientRect(` hívás
  * egyaránt hiányzik, a mért méret kizárólag a React Flow saját `dimensions`
  * változásából jut a térképbe.
+ *
+ * **Az ág kiemelés** (SPEC-008 6.6): a választott ág élei egy osztályt kapnak,
+ * amit a `run-graph.css` fest. A mód ("csak a legutóbbi választás" vagy
+ * "minden eddig bejárt ág") a vászon nézeti állapota, a böngésző megjegyzi
+ * (`branch-highlight-mode-storage.ts`), és a kapcsolója a vezérlő panel
+ * utolsó gombja, ami csak `branch` csomópontot tartalmazó pillanatképen
+ * jelenik meg.
  */
 export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): ReactElement {
-  const { nodes, edges } = properties;
+  const { nodes, edges, branchDecisionsByNodeId } = properties;
 
   const [measuredNodeSizes, setMeasuredNodeSizes] = useState<MeasuredNodeSizes>({});
+  const [branchHighlightMode, setBranchHighlightMode] = useState(readStoredBranchHighlightMode);
 
   const flowNodes = useMemo(
     () =>
@@ -72,7 +90,26 @@ export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): 
       ),
     [nodes, measuredNodeSizes],
   );
-  const flowEdges = useMemo(() => edges.map((edge) => workflowEdgeToFlowEdge(edge)), [edges]);
+  const flowEdges = useMemo(
+    () =>
+      buildRunGraphFlowEdges(
+        edges,
+        resolveHighlightedBranchEdgeIds({
+          decisionsByNodeId: branchDecisionsByNodeId,
+          nodes: nodes.map((data) => data.workflowNode),
+          edges,
+          mode: branchHighlightMode,
+        }),
+      ),
+    [edges, nodes, branchDecisionsByNodeId, branchHighlightMode],
+  );
+  const hasBranchNode = nodes.some((data) => data.workflowNode.type === 'branch');
+
+  const toggleBranchHighlightMode = useCallback(() => {
+    const nextMode = branchHighlightMode === 'latest' ? 'all' : 'latest';
+    storeBranchHighlightMode(nextMode);
+    setBranchHighlightMode(nextMode);
+  }, [branchHighlightMode]);
 
   // A csak olvasható vásznon a React Flow egyetlen érdemi változást küld: a
   // `dimensions` típusú mérési eredményt. Minden más változás típus (húzás,
@@ -112,7 +149,9 @@ export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): 
         fitView
       >
         <Background />
-        <Controls />
+        <Controls>
+          {hasBranchNode && <BranchHighlightToggle mode={branchHighlightMode} onToggle={toggleBranchHighlightMode} />}
+        </Controls>
       </ReactFlow>
     </div>
   );

@@ -33,6 +33,34 @@
   pointer-events: auto;
 }
 
+/* A KIEMELT ÁG ÉLE (SPEC-008 6.6, O-26). A `branch` csomópont választott
+   ágának éle a design system kiemelő színével és vastagabb vonallal fest, hogy
+   ne csak a szín hordozza az információt. A szín a `--ep-accent` token, ugyanaz,
+   amivel a szerkesztő a kiválasztott élt festi (`graph-editor.css`
+   `--xy-edge-stroke-selected`). A vastagság a design system diagram elemének
+   kiemelt (első) sorozatra eső `strokeWidth` értéke: `eggproject-design-
+   components/components/charts/LineChart.jsx` 239. sor. A nem kiemelt él a
+   React Flow szállított alapértelmezésén marad. */
+.run-graph-canvas .react-flow__edge.run-graph-edge--highlighted .react-flow__edge-path {
+  stroke: var(--ep-accent);
+  stroke-width: 2.4;
+}
+
+/* AZ ÁG KIEMELÉS KAPCSOLÓJA (SPEC-008 6.6, O-25). A React Flow vezérlő
+   gombjainak szállított szabálya a belső `svg` elemet kitöltéssel festi
+   (`fill: currentColor`), mert a beépített ikonjai kitöltöttek; a kapcsoló
+   ikonja vonalas, ezért a kitöltést ki kell kapcsolni. A lenyomott állapot
+   ("minden eddig bejárt ág") a kiemelő token halvány hátterét és keretét
+   kapja, az ikon színe a gomb színe marad. */
+.run-graph-canvas .react-flow__controls-button .run-graph-branch-toggle__icon {
+  fill: none;
+}
+
+.run-graph-canvas .react-flow__controls-button[aria-pressed='true'] {
+  background: var(--ep-accent-bg);
+  box-shadow: inset 0 0 0 1px var(--ep-accent);
+}
+
 /* Megnevezett, doboz nélküli szakasz: se szegély, se lekerekítés, se saját
    háttér, tehát nem kártya (tilos a card in card). A tagolást a fejléc és a
    térköz adja, kizárólag design system tokenekkel. */

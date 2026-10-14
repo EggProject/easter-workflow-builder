@@ -105,3 +105,96 @@ vizsgált, ezért itt csak a megfigyelés áll, magyarázat nincs.
 termékkód még nem hívja (a T-009-39 köti be), ezért a lap nem tölti be, és az istanbul mérésben nem
 szerepel; a `branch-decision.ts` és a `branch-highlight-mode.ts` típus-only. Mindhárom unit
 teszttel fedett (a két típus-only fájlnak nincs futásidejű kódja), a unit lefedettség 100 százalék.
+
+## T-009-39
+
+A megjelenítés: a két jelvény a kártya fejlécében, a kiemelés osztálya és CSS szabálya, a kapcsoló a
+`Controls` utolsó gombjaként, `localStorage` tárolással (SPEC-008 6.6, O-25, O-26).
+
+### 1. A forrás tényei, saját olvasással
+
+| Tény                                                                                                                                                                      | Forrás                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A forrás vonaldiagram az első sorozat vonalát `2.4` szélességgel rajzolja: `strokeWidth={seriesIndex === 0 ? 2.4 : 1.8}` (239. sor)                                       | `components/charts/LineChart.jsx` 239. sor, a `eggproject-design-components` skill forrása |
+| A `Route` ikon három elemből áll: két `circle` (`6,19` és `18,5`, `r=3`) és egy `path` (`M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15`)                           | `assets/vendor/lucide.min.js`, fejléc: `lucide v0.525.0`, `Route` exportja                 |
+| A React Flow `Edge.className` a `<g class="react-flow__edge ...">` elemre kerül, a vonal a `.react-flow__edge-path`                                                       | saját olvasás, `@xyflow/react` 12.11.6 telepített forrása                                  |
+| A `Controls` a beépített gombok UTÁN rendereli a gyerekeit; a `ControlButton` `<button type="button" class="react-flow__controls-button">` és átadja a `...rest` propokat | saját olvasás, `@xyflow/react` 12.11.6 telepített forrása                                  |
+| A beépített `.react-flow__controls-button svg` szabály `fill: currentColor` és `12px` felső korlátot ad, ezért a körvonalas ikonhoz specifikusabb felülírás kell          | saját olvasás, `@xyflow/react` 12.11.6 `style.css`                                         |
+
+### 2. Az ikon választása
+
+**`Route`** a vendorolt `lucide@0.525.0` készletből. Indok: két végpontot összekötő, kanyarodó utat
+rajzol, ami az "összes bejárt út" jelentést hordozza, és nincs verziókezelési (merge, fork) vagy
+szétválási jelentése, amit a felhasználó az elágazás csomóponttal vagy egy másik funkcióval
+téveszthetne össze. A repó `packages/ui` ikonjainak konvenciója szerint `viewBox="0 0 24 24"`,
+`strokeWidth="1.75"`, kerek végek, `stroke="currentColor"`, `fill="none"`, `aria-hidden`.
+
+Megfontolt és elvetett jelöltek (mind ugyanabban a vendorolt készletben megvannak): `GitFork` (verzió
+kezelési jelentés), `Waypoints` (csomópont hálózatot idéz, nem egyetlen bejárt utat), `Split` (egy
+elágazás ikonja, tehát az elágazás csomópont jele lehetne, nem a bejárt utaké).
+
+### 3. A tervezési döntések
+
+- A tárolt módot a `BRANCH_HIGHLIGHT_MODES.find((mode) => mode === stored) ?? DEFAULT` olvassa:
+  nincs `as`, nincs külön guard, és a hiányzó, ismeretlen és dobó tároló ugyanarra az alapértékre
+  esik (`latest`). A tárolt érték a nyers szöveg, nem JSON.
+- A kiemelés osztálya a `Edge.className` mezőn át megy (`buildRunGraphFlowEdges`, tiszta függvény),
+  mert az élek happy-dom alatt nem rajzolódnak ki (M-53): az él állapota unit teszt, a kifestés nem.
+- A kapcsoló csak akkor jelenik meg, ha a pillanatképben van `branch` csomópont.
+- **Saját tervezési részlet, nem a SPEC szövege:** a lenyomott (`aria-pressed="true"`) gomb
+  `--ep-accent-bg` hátteret és `--ep-accent` belső gyűrűt kap. A SPEC a lenyomott állapot
+  megjelenéséről nem rendelkezik; csak design token szerepel benne.
+
+### 4. Az e2e lefedettség előtte és utána
+
+**Előtte**: saját mérés a tiszta `origin/main` (`7e61152`) állapoton (a munkamásolat `git stash`
+alatt), a T-009-38 szekció eljárásával (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, nyolc
+egymás utáni `bun x playwright test --shard=<i>/8` `flock /tmp/playwright-gep.lock` alatt, majd
+`bun run coverage:e2e:report`, kilépési kód 0). **478 teszt, mind zöld.** A nyers összeget a
+`nyc report --reporter=json-summary` adta.
+
+**Utána**: ugyanez az eljárás a T-009-39 állapoton. **479 teszt, mind zöld**, a
+`coverage:e2e:report` kilépési kódja 0.
+
+| Metrika    | Előtte fedett / összes | Utána fedett / összes | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1728 / 1743            | 1771 / 1786           | 15 -> 15                 |
+| branches   | 804 / 815              | 828 / 839             | 11 -> 11                 |
+| functions  | 571 / 574              | 582 / 585             | 3 -> 3                   |
+| lines      | 1667 / 1682            | 1710 / 1725           | 15 -> 15                 |
+
+A fedetlen tételek ugyanazon a hat fájlon maradtak (`mount-app.tsx`, `read-frontend-config.ts`,
+`is-valid-connection.ts`, `browser-history-location-port.ts`, `perform-route-request.ts`,
+`use-stream-connection.ts`). A küszöb nem mozdult (`apps/web/package.json`).
+
+**Megjegyzés a T-009-38 szekció "utána" számához.** Az ott rögzített összes (1739 / 815 / 574 / 1678)
+a `8413882` alapú ág állapotát írja le; a tiszta `main` összege ma 1743 / 815 / 574 / 1682. A
+`8413882` és a `7e61152` között az `apps/web/src` alatt a PR #25 mellett csak a PR #26 (`4ce7de0`,
+T-009-48) módosított fájlt (`git log --oneline 8413882..HEAD -- apps/web/src`), tehát a négy
+statements és lines különbség a #26 termékkódjától származik; a pontos fájl szerinti bontást nem
+mértem (nem ellenőrzött). A fedetlen darabszám (15 / 11 / 3 / 15) azonos, tehát a ratchet jelentése (a
+fedetlen sorok száma) nem változott.
+
+**Kontroll mérés: az új e2e teszt nélkül.** Ugyanez a nyolc shard
+`--grep-invert "az elágazás kártyáján a döntésekből látszik"` kapcsolóval (az új teszt nélkül, minden
+más zöld):
+
+| Metrika    | Fedetlen az új e2e nélkül | Ebből az új kód                                                        |
+| ---------- | ------------------------- | ---------------------------------------------------------------------- |
+| statements | 20                        | 5 (`RunGraphCanvas.tsx` 3, `branch-highlight-mode-storage.ts` 2)       |
+| branches   | 15                        | 4 (`RunGraphCanvas.tsx` 2, `resolve-highlighted-branch-edge-ids.ts` 2) |
+| functions  | 5                         | 2 (`RunGraphCanvas.tsx` 1, `branch-highlight-mode-storage.ts` 1)       |
+| lines      | 20                        | 5 (ugyanaz a két fájl, mint a statements soron)                        |
+
+A meglévő e2e tesztek egyetlen `branch` csomópontos pillanatképet sem nyitnak meg döntésekkel, tehát a
+kapcsoló kezelője, a tárolás és a kiemelés számítás ága e2e-ből csak az új teszttel érhető el. Az új
+teszt a `branch-decision-data.spec.ts` fájlban a két jelvény szövegét és a kapcsoló `aria-pressed`
+állapotát állítja (kattintás után `true`, a második után `false`), pixel mérés, újratöltés és kép
+nélkül (T-009-40).
+
+### 5. A kifestett kiemelés számított stílusa
+
+Egyszeri számított stílus mérés a lapon (eldobott, nem commitolt Playwright szkript, kép nem készült):
+a kiemelt él vonala `rgb(227, 181, 99)`, `2.4px`, a nem kiemelté `rgb(177, 177, 183)`, `1px`; a kiemelt
+szín a `--ep-accent` feloldott értéke. A kifestett pixelre vonatkozó, két témás bizonyíték a T-009-40
+dolga.
