@@ -149,7 +149,8 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   értéket elfogadja, mert az új workflow Startját a szerver `null` `onUnhandledError` értékkel írja,
   és az alapérték kiválasztása termék döntés volna; a második védvonal a motor: a futás indításakor
   `unhandled_error_policy_missing`, illetve a választatlan `join` módra a meglévő
-  `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág egyikhez sem tartozik (a
+  `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág e két mentési szabályhoz nem
+  tartozik (a `join` unió negyedik, `mode: null` ága viszont a meglévő sodródás védelem bővítése; a
   szabály helye technikai döntés a user 2026-09-28-i O-29 és O-33 döntése nyomán, SPEC-008 5.4).
 
 **Fájlok és tesztek**

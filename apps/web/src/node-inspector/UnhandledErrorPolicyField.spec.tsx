@@ -67,31 +67,42 @@ describe('UnhandledErrorPolicyField', () => {
     container.remove();
   });
 
-  it('sm méretű SelectField a "Kezeletlen hiba szabálya" címkével és pontosan három opcióval (SPEC-008 5.2, O-29)', () => {
+  it('sm méretű SelectField a "Kezeletlen hiba szabálya" címkével, a null érték a helyőrzőt mutatja, a lista pontosan két opció (SPEC-008 5.2, O-29)', () => {
     act(() => {
       root.render(<UnhandledErrorPolicyField value={null} onChange={vi.fn()} />);
     });
     const button = trigger(container);
     expect(button.className).toContain('select--sm');
     expect(button.closest('.field')?.querySelector('.field__label')?.textContent).toBe(LABEL);
-    expect(button.textContent).toBe('nincs beállítva');
+    expect(button.textContent).toBe('Válassz…');
+    expect(button.querySelector('.select__value')?.classList.contains('select__value--placeholder')).toBe(true);
 
     clickOn(button);
-    expect(optionLabels(button)).toEqual(['nincs beállítva', 'fail_run', 'fail_branch']);
+    expect(optionLabels(button)).toEqual(['fail_run', 'fail_branch']);
   });
 
-  it('a választott érték a tárolt értéket kapja, a "nincs beállítva" null értéket ad', () => {
+  it('a választott érték a tárolt értéket kapja, és a helyőrző nem látszik', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(<UnhandledErrorPolicyField value="fail_run" onChange={onChange} />);
     });
-    expect(trigger(container).textContent).toBe('fail_run');
+    const button = trigger(container);
+    expect(button.textContent).toBe('fail_run');
+    expect(button.querySelector('.select__value')?.classList.contains('select__value--placeholder')).toBe(false);
 
     chooseOption(container, 'fail_branch');
     expect(onChange).toHaveBeenLastCalledWith('fail_branch');
+  });
 
-    chooseOption(container, 'nincs beállítva');
-    expect(onChange).toHaveBeenLastCalledWith(null);
+  it('választás után a lista egyetlen opciója sem adja vissza a null értéket: a mező üresre nem állítható vissza (user döntés 2026-10-14)', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(<UnhandledErrorPolicyField value="fail_run" onChange={onChange} />);
+    });
+    expect(optionLabels(trigger(container))).toEqual(['fail_run', 'fail_branch']);
+    chooseOption(container, 'fail_run');
+    chooseOption(container, 'fail_branch');
+    expect(onChange.mock.calls).toEqual([['fail_run'], ['fail_branch']]);
   });
 
   it('az `onUnhandledError` útvonal hibája a mező ALATT jelenik meg, aria-invalid és aria-describedby kötéssel', () => {

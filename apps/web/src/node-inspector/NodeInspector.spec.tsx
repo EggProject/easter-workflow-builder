@@ -186,7 +186,7 @@ describe('NodeInspector', () => {
   });
 
   it.each(NODES_BY_TYPE)(
-    'a(z) "$node.type" típusnál a törzs első mezője a "Kezeletlen hiba szabálya" választó, a választás a config.onUnhandledError mezőbe íródik (SPEC-008 5.2, O-29)',
+    'a(z) "$node.type" típusnál a törzs első mezője a "Kezeletlen hiba szabálya" választó helyőrzővel, a választás a config.onUnhandledError mezőbe íródik (SPEC-008 5.2, O-29)',
     ({ node }) => {
       const onChange = vi.fn<OnChange>();
       act(() => {
@@ -207,7 +207,7 @@ describe('NodeInspector', () => {
         throw new Error('a teszt nem találta a kezeletlen hiba szabály választóját');
       }
       expect(trigger.className).toContain('select--sm');
-      expect(trigger.textContent).toBe('nincs beállítva');
+      expect(trigger.textContent).toBe('Válassz…');
 
       act(() => {
         trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
@@ -215,7 +215,6 @@ describe('NodeInspector', () => {
       const panel = document.body.querySelector(`#${trigger.getAttribute('aria-controls') ?? ''}`);
       const options = [...(panel?.querySelectorAll('[role="option"]') ?? [])];
       expect(options.map((option) => option.querySelector('.menu__text')?.textContent)).toEqual([
-        'nincs beállítva',
         'fail_run',
         'fail_branch',
       ]);

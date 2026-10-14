@@ -5,7 +5,7 @@ import { useFieldError } from './use-field-error.ts';
 
 export interface UnhandledErrorPolicyFieldProperties {
   readonly value: UnhandledErrorPolicy | null;
-  readonly onChange: (nextValue: UnhandledErrorPolicy | null) => void;
+  readonly onChange: (nextValue: UnhandledErrorPolicy) => void;
 }
 
 /**
@@ -14,10 +14,11 @@ export interface UnhandledErrorPolicyFieldProperties {
  * áll, ezért a `NodeInspector` egyetlen helyen, a törzs első mezőjeként
  * rajzolja, nem a típus szerinti komponensek (SPEC-008 5.2, O-29).
  *
- * Az opciók a panel meglévő zárt listás mezőinek mintáját követik: az üres
- * opció kisbetűs leírás, a tárolt alakja `null`, a többi a séma értéke. A
- * mentési séma a `null` értéket a mező alatt jelzi (SPEC-008 5.4); a
- * megjelenés szabálya a `SelectField` saját, a többi mezővel közös szabálya.
+ * Kötelezően választandó mező: a tárolt `null` (még nem választott) a
+ * `SelectField` helyőrző feliratát mutatja, a lista pedig csak a séma két
+ * értékét tartalmazza, tehát választás után üresre visszaállni nem lehet
+ * (user döntés 2026-10-14). A mentési séma a `null` értéket a mező alatt
+ * jelzi (SPEC-008 5.4).
  */
 export function UnhandledErrorPolicyField(properties: Readonly<UnhandledErrorPolicyFieldProperties>): ReactElement {
   const { value, onChange } = properties;
@@ -28,19 +29,10 @@ export function UnhandledErrorPolicyField(properties: Readonly<UnhandledErrorPol
       size="sm"
       label="Kezeletlen hiba szabálya"
       error={error}
-      options={[
-        { value: '', label: 'nincs beállítva' },
-        ...UnhandledErrorPolicySchema.options.map((option) => ({ value: option, label: option })),
-      ]}
+      placeholder="Válassz…"
+      options={UnhandledErrorPolicySchema.options.map((option) => ({ value: option, label: option }))}
       value={value ?? ''}
-      onChange={(nextValue) => {
-        // A `nextValue` itt `'' | UnhandledErrorPolicy`; a `.find` az üres
-        // ("nincs beállítva") értéket szűri ki, ugyanúgy, mint az
-        // `AgentStepConfigFields` nullázható választó mezői.
-        const matched = UnhandledErrorPolicySchema.options.find((option) => option === nextValue);
-        // eslint-disable-next-line unicorn/no-null -- az `onUnhandledError: UnhandledErrorPolicy | null` `null` értéke jelenti a "nincs beállítva" állapotot.
-        onChange(matched ?? null);
-      }}
+      onChange={onChange}
     />
   );
 }

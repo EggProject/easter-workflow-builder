@@ -488,15 +488,16 @@ async function installSaveMocks(page: Page, graph: WorkflowGraphDocument, putBod
 }
 
 /**
- * A mező alatti hiba: `aria-invalid`, és az `aria-describedby` a mező
- * alatti `.field__error` elemre mutat (SPEC-008 5.4, `.claude/CLAUDE.md` 11.).
+ * A mező alatti hiba: `aria-invalid`, és az `aria-describedby` a panel egyetlen
+ * `role="alert"` elemére mutat (SPEC-008 5.4, `.claude/CLAUDE.md` 11.). A
+ * `getByRole('alert')` szigorú: ha a panelen másik riasztás is állna, a
+ * hívás hibával megáll, tehát a hiba a mezőhöz kötött.
  */
 async function expectFieldError(panel: Locator, select: Locator): Promise<void> {
   await expect(select).toHaveAttribute('aria-invalid', 'true');
-  const describedBy = await select.getAttribute('aria-describedby');
-  const message = panel.locator(`#${String(describedBy)}`);
-  await expect(message).toHaveText('A mező nem lehet üres.');
-  await expect(message).toHaveClass(/field__error/);
+  const alert = panel.getByRole('alert');
+  await expect(alert).toHaveText('A mező nem lehet üres.');
+  await expect(select).toHaveAttribute('aria-describedby', String(await alert.getAttribute('id')));
 }
 
 test('a null kezeletlen hiba szabály mentési kísérlete PUT nélkül marad, a hiba a választó alatt áll, egy érték után a mentés lefut (SPEC-008 5.4, O-29)', async ({
@@ -510,16 +511,20 @@ test('a null kezeletlen hiba szabály mentési kísérlete PUT nélkül marad, a
   await nodeLocator(page, 'n-start').click();
   const panel = page.locator('.node-inspector');
   const policySelect = panel.getByRole('combobox', { name: 'Kezeletlen hiba szabálya' });
-  await expectSelectedLabel(policySelect, 'nincs beállítva');
+  await expectSelectedLabel(policySelect, 'Válassz…');
 
   await page.getByRole('button', { name: /^Mentés/ }).click();
   await expectFieldError(panel, policySelect);
+  expect(putBodies).toHaveLength(0);
 
   await chooseSelectOption(page, policySelect, 'fail_branch');
   await expect(policySelect).not.toHaveAttribute('aria-invalid', 'true');
-  await chooseSelectOption(page, policySelect, 'nincs beállítva');
-  await expectFieldError(panel, policySelect);
-  expect(putBodies).toHaveLength(0);
+
+  // Választás után a lista csak a két értéket kínálja: üresre visszaállni nem lehet.
+  await policySelect.click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText(['fail_run', 'fail_branch']);
+  await page.keyboard.press('Escape');
+  await expect(policySelect).toHaveAttribute('aria-expanded', 'false');
 
   await chooseSelectOption(page, policySelect, 'fail_run');
   await page.getByRole('button', { name: /^Mentés/ }).click();
@@ -548,7 +553,7 @@ test('a választatlan join mód mentési kísérlete PUT nélkül marad, a hiba 
   await nodeLocator(page, 'n-join').click();
   const panel = page.locator('.node-inspector');
   const modeSelect = panel.getByRole('combobox', { name: 'Összefésülés módja' });
-  await expectSelectedLabel(modeSelect, '');
+  await expectSelectedLabel(modeSelect, 'Válassz…');
 
   await page.getByRole('button', { name: /^Mentés/ }).click();
   await expectFieldError(panel, modeSelect);

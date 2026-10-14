@@ -67,7 +67,8 @@ type SelectedJoinMode = NonNullable<JoinNodeConfig['mode']>;
  * őrzi, hogy minden felsorolt érték valóban `JoinNodeConfig` mód legyen. A
  * választatlan (`mode: null`, SPEC-008 O-33) állapotnak nincs opciója: a
  * felhasználó a három mód közül választ, és amíg nem választott, a mező
- * értéke egyik opcióval sem egyezik.
+ * értéke egyik opcióval sem egyezik, ezért a helyőrző felirat látszik.
+ * Választás után üresre visszaállni nem lehet (user döntés 2026-10-14).
  */
 const MODE_OPTIONS = [
   { value: 'merge', label: 'összefésülés' },
@@ -120,6 +121,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
       size="sm"
       label="Összefésülés módja"
       error={modeError}
+      placeholder="Válassz…"
       options={MODE_OPTIONS}
       value={config.mode ?? ''}
       onChange={handleModeChange}
