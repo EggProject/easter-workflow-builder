@@ -1,11 +1,14 @@
 /* eslint-disable unicorn/no-null -- a szintetikus WorkflowGraphDocument/WorkflowNodeInput fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak */
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import { ReplaceGraphRequestSchema, type WorkflowNodeInput } from '@easter-workflow-builder/protocol';
+import type { useStoreApi } from '@xyflow/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
+import { ADD_NODE_COMPACT_MEDIA_QUERY } from './add-node-compact-media-query.ts';
+import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 
@@ -13,19 +16,26 @@ import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
  * A `GraphEditorCanvas` mockolva: ez a spec a `GraphEditorScreen` SAJÁT
  * felelősségét teszteli (betöltés, mentés, piszkos állapot, mentés előtti
  * validáció, node-inspector wiring), a vászon belső React Flow vezérlését a
- * `GraphEditorCanvas.spec.tsx` már lefedi.
+ * `GraphEditorCanvas.spec.tsx` már lefedi. A mock a képernyő
+ * `ReactFlowProvider`-ének store-ját is rögzíti, hogy a teszt a "Hozzáadás"
+ * gomb bemenetét (a store `width`, `height` és `transform` mezőjét) beállíthassa.
  */
-const { capturedCanvasProperties } = vi.hoisted(() => {
+const { capturedCanvasProperties, capturedStoreApis } = vi.hoisted(() => {
   const capturedCanvasProperties: GraphEditorCanvasProperties[] = [];
-  return { capturedCanvasProperties };
+  const capturedStoreApis: ReturnType<typeof useStoreApi>[] = [];
+  return { capturedCanvasProperties, capturedStoreApis };
 });
 
-vi.mock('./GraphEditorCanvas.tsx', () => ({
-  GraphEditorCanvas: (properties: GraphEditorCanvasProperties) => {
-    capturedCanvasProperties.push(properties);
-    return null;
-  },
-}));
+vi.mock('./GraphEditorCanvas.tsx', async () => {
+  const { useStoreApi: useActualStoreApi } = await import('@xyflow/react');
+  return {
+    GraphEditorCanvas: (properties: GraphEditorCanvasProperties) => {
+      capturedCanvasProperties.push(properties);
+      capturedStoreApis.push(useActualStoreApi());
+      return null;
+    },
+  };
+});
 
 function lastCanvasProperties(): GraphEditorCanvasProperties {
   const properties = capturedCanvasProperties.at(-1);
@@ -173,6 +183,30 @@ const failingPutFetchFunction: FetchFunction = (input, init) => {
   return Promise.resolve(jsonResponse(WORKFLOW_DETAIL));
 };
 
+function findAddMenuTrigger(container: HTMLElement): HTMLButtonElement {
+  const trigger = [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      ':scope .page-footer__actions > .menu-anchor > button[aria-haspopup="menu"]',
+    ),
+  ].find((candidate) => candidate.textContent === 'Hozzáadás' || candidate.getAttribute('aria-label') === 'Hozzáadás');
+  if (trigger === undefined) {
+    throw new Error('a teszt nem találta a "Hozzáadás" gombot a lábléc akciósávjában');
+  }
+  return trigger;
+}
+
+function openedMenuItems(): readonly HTMLButtonElement[] {
+  return [...document.body.querySelectorAll<HTMLButtonElement>(':scope [role="menu"]:not([hidden]) [role="menuitem"]')];
+}
+
+function countingFetchFunction(log: RouteCallLog, calls: { count: number }): FetchFunction {
+  const fetchFunction = createFetchFunction(log);
+  return (input, init) => {
+    calls.count += 1;
+    return fetchFunction(input, init);
+  };
+}
+
 describe('GraphEditorScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -180,6 +214,7 @@ describe('GraphEditorScreen', () => {
 
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
+    capturedStoreApis.length = 0;
     navigate.mockClear();
     // A perzisztált elrendezés arány tesztek közötti átszivárgásának
     // megelőzése: a `Resizable` a csatoláskor is jelent, tehát minden
@@ -269,7 +304,7 @@ describe('GraphEditorScreen', () => {
     act(() => {
       buttons[1]?.click();
     });
-    const menuPanel = document.body.querySelector('[role="menu"]');
+    const menuPanel = document.body.querySelector('[role="menu"]:not([hidden])');
     if (menuPanel === null) {
       throw new Error('a teszt nem talált nyitott menü panelt');
     }
@@ -861,5 +896,136 @@ describe('GraphEditorScreen', () => {
       container.querySelector(':scope [role="dialog"] .modal__body > .alert--danger[role="alert"]'),
     ).not.toBeNull();
     expect(container.querySelector(':scope .page-footer .alert--danger[role="alert"]')).toBeNull();
+  });
+
+  describe('csomópont felvétel (SPEC-008 5.8)', () => {
+    it('a "Hozzáadás" sm méretű menü gomb a lábléc akciósávjában, közvetlenül a split button előtt, kilenc menüponttal (AC74)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      const trigger = findAddMenuTrigger(container);
+      expect(trigger.classList.contains('btn--sm')).toBe(true);
+      expect(trigger.disabled).toBe(false);
+      // A `Menu` a triggert egy `.menu-anchor` burkolóba teszi: ez a burkoló az
+      // akciósáv közvetlen gyereke, és a split button gombcsoport közvetlenül
+      // utána áll.
+      const anchor = trigger.parentElement;
+      expect(anchor?.nextElementSibling?.classList.contains('button-group')).toBe(true);
+      expect(anchor?.nextElementSibling?.getAttribute('aria-label')).toBe('Gráf műveletek');
+
+      act(() => {
+        trigger.click();
+      });
+      expect(openedMenuItems().map((item) => item.textContent)).toEqual([
+        'Agent lépés',
+        'Elágazás',
+        'Szétosztás',
+        'Összefésülés',
+        'Ciklus',
+        'Emberi jóváhagyás',
+        'Hibakezelő',
+        'Al-workflow',
+        'Szkript',
+      ]);
+    });
+
+    it('a gomb menüpontja a látható vászon közepére vesz fel, kiválaszt, panelt nyit, mentetlen jelzőt ad, kérés nélkül (AC77, AC78)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      const calls = { count: 0 };
+      await renderScreen('?workflowId=wf-1', countingFetchFunction(log, calls));
+      const callsAfterLoad = calls.count;
+      const geometry = { width: 1000, height: 600, transform: [100, 50, 2] as const };
+      act(() => {
+        capturedStoreApis.at(-1)?.setState({
+          width: geometry.width,
+          height: geometry.height,
+          transform: [...geometry.transform],
+        });
+      });
+
+      act(() => {
+        findAddMenuTrigger(container).click();
+      });
+      act(() => {
+        openedMenuItems()[4]?.click();
+      });
+
+      const expectedPosition = computeViewportCenterNodePosition(geometry);
+      const addedNode = lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id');
+      expect(addedNode).toMatchObject({
+        type: 'loop',
+        label: '',
+        positionX: expectedPosition.x,
+        positionY: expectedPosition.y,
+      });
+      expect(lastCanvasProperties().nodes).toHaveLength(3);
+      expect(lastCanvasProperties().selectedNodeId).toBe('generated-element-id');
+      expect(container.querySelector('.node-inspector')?.textContent).toContain('Max. iterációk száma');
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(calls.count).toBe(callsAfterLoad);
+    });
+
+    it('a jobb klikk menü helyét a vászon adja, a felvétel ugyanígy kiválaszt, panelt nyit és mentetlen jelzőt ad, kérés nélkül (AC78)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      const calls = { count: 0 };
+      await renderScreen('?workflowId=wf-1', countingFetchFunction(log, calls));
+      const callsAfterLoad = calls.count;
+
+      act(() => {
+        lastCanvasProperties().onAddNode('branch', { x: 40, y: 60 });
+      });
+
+      const addedNode = lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id');
+      expect(addedNode).toMatchObject({ type: 'branch', label: '', positionX: 40, positionY: 60 });
+      expect(lastCanvasProperties().selectedNodeId).toBe('generated-element-id');
+      expect(container.querySelector('.node-inspector')?.textContent).toContain('Feltétel kifejezés');
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(calls.count).toBe(callsAfterLoad);
+    });
+
+    describe('szűk nézet: a --ep-screen-sm token alatt csak ikonos gomb (user döntés 2026-10-14)', () => {
+      let restoreMatchMedia: () => void;
+
+      beforeEach(() => {
+        const realMatchMedia = globalThis.matchMedia.bind(globalThis);
+        const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia').mockImplementation((query: string) => {
+          const media = realMatchMedia(query);
+          if (query === ADD_NODE_COMPACT_MEDIA_QUERY) {
+            Object.defineProperty(media, 'matches', { value: true, configurable: true });
+          }
+          return media;
+        });
+        restoreMatchMedia = () => {
+          matchMediaSpy.mockRestore();
+        };
+      });
+
+      afterEach(() => {
+        restoreMatchMedia();
+      });
+
+      it('a "Hozzáadás" sm méretű `.btn--icon` gomb, szöveg nélkül, a nevét az aria-label adja, és ugyanaz a kilenc menüpont nyílik', async () => {
+        const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+        await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+        const trigger = findAddMenuTrigger(container);
+        expect(trigger.classList.contains('btn--icon')).toBe(true);
+        expect(trigger.classList.contains('btn--sm')).toBe(true);
+        expect(trigger.getAttribute('aria-label')).toBe('Hozzáadás');
+        expect(trigger.textContent).toBe('');
+        expect(trigger.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+
+        act(() => {
+          trigger.click();
+        });
+        expect(openedMenuItems()).toHaveLength(9);
+        act(() => {
+          openedMenuItems()[1]?.click();
+        });
+        expect(lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id')).toMatchObject({
+          type: 'branch',
+        });
+      });
+    });
   });
 });

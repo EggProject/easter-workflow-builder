@@ -539,6 +539,231 @@ UTÁN futnak.
   Chromiumban: a React Flow `getElementsToRemove` forrása szerint (`dist/esm/index.js`, 474-484.
   sor) a `deletable === false` csomópont kimarad a törlésből; ezt a forrás olvasása igazolja, a tényleges billentyű nyomást a T-009-45 e2e-je fedi (82. kritérium).
 
+## T-009-43
+
+A felvétel bekötése (SPEC-008 5.8): a "Hozzáadás" menü gomb a lábléc akciósávjában, a "Mentés" split
+button előtt, és a vászon jobb klikk menüje; mindkét út a `GraphEditorScreen` egyetlen kezelőjén át
+veszi fel a csomópontot (`createGraphNode`), és kiválasztja, tehát a beállítás panel megnyílik.
+
+### 24. A forrás: `onPaneContextMenu`, `screenToFlowPosition`, `ReactFlowProvider`, `useStore`
+
+Saját olvasás a telepített `@xyflow/react@12.11.6` csomagon
+(`node_modules/.bun/@xyflow+react@12.11.6+c647125726432005/node_modules/@xyflow/react/dist/esm/`).
+
+- **`onPaneContextMenu` csak az üres vásznon.** A `Pane` komponens a `.react-flow__pane` elem
+  `onContextMenu` eseményét `wrapHandler(onContextMenu, container)` alakban köti
+  (`index.js` 1647. sor), a `wrapHandler` pedig csak akkor hívja a kezelőt, ha
+  `event.target === containerRef.current` (1420-1427. sor); a `onContextMenu` a `panOnDrag` tömb 2-es
+  gombjánál `preventDefault()` után kilép, különben `onPaneContextMenu?.(event)` (1462-1468. sor).
+  A csomópont és az él tehát nem a vászon eleme, a jobb klikkjük nem jut a kezelőhöz. A prop típusa
+  `(event: ReactMouseEvent | MouseEvent) => void`, a leírása "gets called when user right clicks
+  inside the pane" (`types/component-props.d.ts` 195-196. sor); a hivatalos doksi ugyanezt mondja
+  (SPEC-008 M-97).
+- **`screenToFlowPosition`.** A `useReactFlow()` példányán (`index.js` 559-571. sor): a kliens pontból
+  a `domNode.getBoundingClientRect()` bal felső sarkát vonja le, és a `pointToRendererPoint` a
+  `transform` szerint vált (SPEC-008 M-98). Hivatalos doksi: "With this function you can translate a
+  screen pixel position to a flow position"
+  (<https://reactflow.dev/api-reference/types/react-flow-instance>); a forrás típus kommentje a
+  `{ x: event.clientX, y: event.clientY }` példát adja
+  (<https://github.com/xyflow/xyflow/blob/main/packages/react/src/types/general.ts>); a 11.10.0
+  kiadás óta a konténer dobozát a hívónak nem kell levonnia
+  (<https://reactflow.dev/whats-new/2023-11-10>).
+- **`ReactFlowProvider` a `<ReactFlow>` komponensen kívüli olvasáshoz.** Hivatalos doksi: "a context
+  provider that makes it possible to access a flow's internal state outside of the `<ReactFlow />`
+  component" (<https://reactflow.dev/api-reference/react-flow-provider>). A telepített `Wrapper`
+  (`index.js` 3748-3757. sor) a `StoreContext` meglétét nézi, és ha van, nem hoz létre saját
+  providert, tehát a vászon a külső store-t használja. A `fitView` prop ebben az esetben is hat: a
+  `StoreUpdater` a `fitView` mező változására a `fitViewQueued` értéket állítja (317-318. sor). A
+  meglévő `fitView` e2e tesztek (`graph-editor.spec.ts`, `graph-auto-layout.spec.ts`,
+  `showcase-graph.spec.ts`) a változás után zöldek (27. szekció).
+- **`useStore`.** Hivatalos doksi: "This hook can be used to subscribe to internal state changes"
+  (<https://reactflow.dev/api-reference/hooks/use-store>); a szignatúra
+  `useStore(selector: (state: ReactFlowState) => StateSlice, equalityFn?)`
+  (`hooks/useStore.d.ts` 25. sor), a `width`, `height`, `transform` mező a `types/store.d.ts`
+  5-7. sorában. A `useReactFlow()` csak a `ReactFlow` vagy a `ReactFlowProvider` gyerekében hívható
+  (<https://reactflow.dev/api-reference/hooks/use-react-flow>, "Notes").
+
+### 25. A megvalósítás döntései
+
+- **A provider helye.** A lábléc a `<ReactFlow>` komponensen kívül áll, ezért a `GraphEditorScreen`
+  exportja a tartalmát `ReactFlowProvider` alá teszi (a JSX fa újratördelése nélkül, egy külön
+  burkoló függvénnyel). A `GraphEditorCanvas` provider nélkül is működik: a jobb klikk menü a
+  `<ReactFlow>` gyerekeként kapja a `screenToFlowPosition` átváltót, a `FitViewOnAutoLayout`
+  mintájára, tehát a vászon unit tesztjei változatlan alakban renderelnek.
+- **A gomb.** A "Hozzáadás" `Button` `size="sm"`, `variant="secondary"`, a látható felirat és a split
+  button nyíl ikonja (`aria-hidden`), a `Menu`/`MenuItem` pár triggerje; a `--ep-screen-sm` tokenen és
+  alatta csak ikon (28. szekció). A `secondary` az 5.8
+  "az elsődleges művelet így a sor végén marad" mondatából következik: az elsődleges gomb a
+  "Mentés". A store mezőit egy külön, a képernyőn belüli komponens olvassa három `useStore`
+  szelektorral, hogy a nézet minden mozdulata csak ezt a gombot renderelje újra.
+- **A jobb klikk menü.** Az `AddNodeContextMenu` a `ContextMenu` portját kapja "Hozzáadás"
+  `label`-lel (user döntés 2026-10-14), a kattintás kliens pontjával és a befecskendezett
+  átváltóval; a vászon a pontot állapotban tartja, és a menüt csak nyitott állapotban rendereli.
+  Az átváltás a menüpont választásakor fut, a tárolt kattintási ponton. **Kimondott
+  következmény:** ha a nyitott menü alatt a nézet a görgővel változik, a kártya bal felső sarka a
+  kattintás képernyő pontja alá kerül (a menü bal felső sarkához), nem a kattintáskori flow pontra.
+- **A rejtett menü panel a DOM-ban.** A `packages/ui` `Menu` a zárt panelt `hidden` attribútummal a
+  `document.body`-ban tartja, tehát a lábléc menüjének kilenc típuscímkéje zárt állapotban is a
+  DOM-ban áll. Ez két meglévő tesztet érintett, mindkettő szűkítve: a `GraphEditorScreen.spec.tsx`
+  split button tesztje a nyitott panelt keresi (`:not([hidden])`), a `graph-node-card.spec.ts`
+  típuscímke állítása a vászonra szűkül (`rf__wrapper`), mert a `getByText` a rejtett elemet is
+  illeszti, és strict mode hibát adott.
+
+### 26. Unit teszt és lefedettség
+
+Új vagy bővített tesztek: `addable-node-menu-items.spec.ts` 2 (kilenc menüpont a katalógus kulcs
+sorrendjében, a `start` nélkül; a magyar címkék), `AddNodeContextMenu.spec.tsx` 2 (a "Hozzáadás"
+név és a kilenc menüpont; a választott típus helye pontosan a befecskendezett, nem azonos átváltó
+eredménye a kattintás kliens pontján, 76. kritérium unit része), `GraphEditorCanvas.spec.tsx` +3 (a
+vászon üres területén a `contextmenu` esemény `defaultPrevented`, és a kilenc menüpontos menü
+nyílik; csomóponton nem nyílik és nem tilt; a választás a típust és a helyet adja tovább, a menü
+bezárul, a vászon maga nem vesz fel), `GraphEditorScreen.spec.tsx` +3 (a gomb `sm`, a `.menu-anchor`
+burkolója közvetlenül a split button előtt áll, kilenc menüpont; a gomb útja a store beállított
+`width`, `height`, `transform` értékéből számolt középpontra vesz fel, kiválaszt, panelt nyit,
+mentetlen jelzőt ad, kérés nélkül; a jobb klikk út ugyanezt adja).
+
+A teljes `bun run test` (gyökér Vitest, v8 lefedettség): 572 fájl, 5190 teszt, mind zöld, a
+lefedettség mind a négy metrikán 100 százalék.
+
+Szándékos rontással igazolva, hogy a tesztek nem vakok (mindegyik visszaállítva):
+
+| Rontás                                                               | Bukó teszt |
+| -------------------------------------------------------------------- | ---------- |
+| (a) az `AddNodeContextMenu` a kattintás pontját átváltás nélkül adja | 1          |
+| (b) a `preventDefault()` hívás elhagyása a jobb klikk kezelőből      | 1          |
+| (c) a gomb a store helyett nulla geometriával számol                 | 1          |
+| (d) a felvett csomópont kiválasztásának elhagyása                    | 2          |
+
+### 27. Az e2e lefedettség előtte és utána
+
+Előtte: a `main` `b133b0e` állapotán saját mérés, a 6. szekció eljárásával
+(`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, nyolc egymás utáni shard `flock` alatt,
+legfeljebb 3 workerrel), **493 teszt, mind zöld**, majd `bun run coverage:e2e:report` (exit 0).
+
+Utána: a jelen ág ugyanazzal az eljárással, **495 teszt, mind zöld** (62 + 62 + 62 + 62 + 62 + 62 +
+62 + 61), `bun run coverage:e2e:report` exit 0, a meglévő küszöbbel. Az új e2e
+(`apps/web/e2e/graph-node-add.spec.ts`, két teszt) a gomb útján mind a kilenc típust felveszi
+(minden felvétel után a típus beállítás panelje látszik), a jobb klikk útján egy felvételt tesz,
+és mindkettő a mentetlen jelzőt és a betöltés utáni nulla API kérést állítja.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1788 / 1803            | 1835 / 1850           | 15 -> 15                 |
+| branches   | 835 / 846              | 846 / 857             | 11 -> 11                 |
+| functions  | 592 / 595              | 611 / 614             | 3 -> 3                   |
+| lines      | 1722 / 1737            | 1765 / 1780           | 15 -> 15                 |
+
+A fedetlen helyek ugyanazon a hat fájlon és sorszámon állnak, mint a 21. szekcióban. Mérési
+tanulság: az első utána futásban a két e2e teszt csak két típust vett fel, és a
+`create-initial-node-config.ts` (ami a bekötéssel került az instrumentált csomagba) 7 utasítással,
+7 ággal és 7 sorral növelte a fedetlen darabszámot; a gomb útjának kilenc típusos felvétele ezt
+nullára vitte. Az `apps/web/package.json` küszöbe nem változott.
+
+A szűk nézeti ikon gomb és a két új e2e (28. szekció) után ugyanezzel az eljárással, a `b133b0e`-ra
+épülő ágon (a `main` összevonása előtt): **497 teszt, mind zöld** (63 + 62 + 62 + 62 + 62 + 62 + 62 +
+62), `bun run coverage:e2e:report` exit 0, a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------- |
+| statements | 1843 / 1858     | 15       |
+| branches   | 847 / 858       | 11       |
+| functions  | 616 / 619       | 3        |
+| lines      | 1773 / 1788     | 15       |
+
+A fedetlen darabszám a fenti táblával azonos (15 / 11 / 3 / 15), ugyanazon a hat fájlon
+(`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1); a fedett és az összes darabszám +8 / +1 / +5 / +8 nőtt, ez az
+új `PlusIcon`, a `useIsAddNodeCompact` hook és a `AddNodeMenuButton` új ága, mind fedett.
+
+A `main` (T-009-44, #35) beolvasztása után, `9f9ed22` állapoton, ugyanezzel az eljárással: **515 teszt,
+mind zöld** (65 + 65 + 65 + 64 + 64 + 64 + 64 + 64), `bun run coverage:e2e:report` exit 0, a meglévő
+küszöbbel; az egység kapu (`bun run test`) 574 fájl, 100 százalék mind a négy metrikán.
+
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------- |
+| statements | 1855 / 1870     | 15       |
+| branches   | 850 / 861       | 11       |
+| functions  | 625 / 628       | 3        |
+| lines      | 1783 / 1798     | 15       |
+
+A fedetlen darabszám a beolvasztás előtti és a `main` 44.5a mérésével is azonos (15 / 11 / 3 / 15),
+ugyanazon a hat fájlon (`nyc` json-summary, fájlonként utasítás/ág/függvény: `mount-app.tsx` 3/2/0,
+`read-frontend-config.ts` 8/7/1, `is-valid-connection.ts` 1/1/0, `browser-history-location-port.ts`
+1/0/1, `perform-route-request.ts` 1/1/0, `use-stream-connection.ts` 1/0/1); az `apps/web/package.json`
+küszöbe nem változott.
+
+### 28. A lábléc gombsora szűk nézetben: ikonos "Hozzáadás" (user döntés, 2026-10-14)
+
+**A hiba és a mérés** (valódi Chromium, `apps/web` preview build, a gombok `getBoundingClientRect()`
+értéke és a lábléc `scrollWidth - clientWidth` különbsége, saját mérés 2026-10-14, a
+`responsive.spec.ts` szerkesztő fixtúrájával). A "régi" a szöveges "Hozzáadás" gombbal, az "új" az
+ikonos alakkal:
+
+| Szélesség | Gombsor régi | Lábléc túllógás régi | Gombsor új | Lábléc túllógás új | "Hozzáadás" új (bal-jobb pixel) |
+| --------- | ------------ | -------------------- | ---------- | ------------------ | ------------------------------- |
+| 320       | 325          | 41                   | 246        | 0                  | 163-191                         |
+| 340       | 325          | 21                   | 246        | 0                  | 183-211                         |
+| 360       | 325          | 1                    | 246        | 0                  | 203-231                         |
+| 375       | 325          | 0                    | 246        | 0                  | 218-246                         |
+| 640       | 325          | 0                    | 246        | 0                  | 483-511                         |
+| 641       | 325          | 0                    | 325        | 0                  | 405-512                         |
+
+320 pixelen a régi alakban a "Mentés" split button a nézetablak 79 százalékában látszott (a
+`toBeInViewport` aránya 0,788), a nyíl gomb teljesen kilógott. A dokumentum vízszintes túllógása közben
+0 maradt, mert az `.app-content` `overflow: auto`, ezért a `responsive.spec.ts` meglévő "nem lóg túl
+vízszintesen" tesztje erre vak volt. Az új alakban a legszélső gomb jobb széle 320 pixelen 296, azaz a
+lábléc 24 pixeles jobb belső margója előtt áll.
+
+**A döntés.** A user a három lehetőségből (a gombsor két sorba törik; a "Hozzáadás" ikon gomb
+`aria-label`-lel; egy gomb a split button menüjébe kerül) ezt választotta: "Ikon gomb keskenyen. Keskeny
+képernyőn a 'Hozzáadás' csak ikon, a neve felolvasónak marad. A spec 'látható felirat' mondata
+módosul." A SPEC-008 5.8 mondata ennek megfelelően módosult.
+
+**A töréspont.** A `--ep-screen-sm` token (`breakpoints.css`), a lekérdezés `(max-width: 640px)`,
+tehát 640 pixelen még ikon, 641 pixeltől szöveg (az e2e mindkét oldalt igazolja). A mért túllógás
+sávjára (320 ... 360 pixel) nincs token; a márkanév szövegének elrejtése (`topnav-shell.css`, SPEC-007
+5.3) ugyanezt a tokent a legkisebb, a mért sávot lefedő tokenként választotta, és ez a precedens
+dönt, kitalált szám nincs. A literált a `add-node-compact-media-query.spec.ts` a token fájlból
+olvasva hasonlítja össze.
+
+**Miért JS (`matchMedia`) és nem CSS.** A `.btn--icon` osztály a `button` elemen áll, amit media query
+nem tud rátenni, a szabályait pedig saját osztályba másolni nem szabad (szabálykönyv 11. szekció,
+"Csak létező design system elem használható"). A váltást a `useIsAddNodeCompact` hook adja
+(`useSyncExternalStore`, `MediaQueryList` `change` esemény), a `GraphEditorScreen` `AddNodeMenuButton`
+komponense ágazik rá.
+
+**Az ikon.** A vendorolt `lucide@0.525.0` `Plus` ikonja (saját olvasás:
+`eggproject-design-components/assets/vendor/lucide.min.js`, a fejléc `lucide v0.525.0`, az ikon
+leírója `["path",{d:"M5 12h14"}],["path",{d:"M12 5v14"}]`, a `Plus` kulcson), 24x24 viewBox, 1.75
+vonalvastagság, a repó meglévő inline SVG konvenciója szerint (`aria-hidden`). A gomb `size="sm"`,
+`variant="secondary"`, `icon`, `aria-label="Hozzáadás"`; a menü ugyanaz.
+
+**Teszt.** Unit: `add-node-compact-media-query.spec.ts` 1 (a literál a token értéke),
+`use-is-add-node-compact.spec.tsx` 4 (illeszkedés, nem illeszkedés, `change` esemény, leiratkozás),
+`GraphEditorScreen.spec.tsx` +1 (szűk nézetben `.btn--icon`, `btn--sm`, `aria-label`, üres szöveg,
+ugyanaz a kilenc menüpont, a választás felvesz). E2E (`responsive.spec.ts`) +2: a lábléc négy gombja
+(`Futás indítása`, `Hozzáadás`, `Mentés`, `További műveletek`) minden támogatott szélességen
+`toBeInViewport({ ratio: 1 })`; és a "Hozzáadás" gomb a token szélességén `.btn--icon` osztályú és
+üres szövegű, a token fölött egy pixellel szöveges és osztály nélküli.
+
+**Bukás a régi alakon.** A `GraphEditorScreen.tsx` a `07fe349` állapotára állítva (a szöveges gomb) a
+két új e2e teszt elbukik: a lábléc teszt az első támogatott szélességen, 320 pixelen
+(`getByRole('button', { name: 'Mentés', exact: true })`, "Expected: in viewport, Received: viewport
+ratio 0.7878788113594055"), a határ teszt a `.btn--icon` osztály hiányán. A javított alakon mindkettő
+zöld. A fájl visszaállítva.
+
+### 29. Nem ellenőrzött
+
+- A két pozíció szabály valódi Chromiumban (a kattintás pontja az új kártya dobozán belül; a gomb
+  útján a látható vászon középpontja a kártya dobozán belül, a panel megnyílása után is), az M-99
+  mezőlista, a csomóponton és élen nem nyíló menü és a két téma: a PLAN-009 T-009-45 e2e lépése
+  (75 ... 77. kritérium).
+- Az él jobb klikkje: a szerkesztő nem köti be az `onEdgeContextMenu` eseményt (a kódban nincs), és az
+  `onPaneContextMenu` a 24. szekció forrásolvasása szerint csak a vászon elemén fut. Ezt unit teszt
+  nem tudja bizonyítani, mert az élek happy-dom alatt nem rajzolódnak ki (M-53), ezért a bizonyíték a
+  PLAN-009 T-009-45 elfogadási kritériuma: "az él jobb klikkje nem nyit felvételi menüt (e2e)".
+
 ## T-009-44
 
 A csomópont törlése billentyűvel és a beállítás panel "Törlés" gombjával (SPEC-008 5.9, 82-84.

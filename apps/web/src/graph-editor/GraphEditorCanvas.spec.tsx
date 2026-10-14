@@ -7,6 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
+import type { AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
 import { workflowEdgeToFlowEdge } from './graph-editor-edge-mapping.ts';
 import { workflowNodeToFlowNode } from './graph-editor-node-mapping.ts';
@@ -95,6 +96,19 @@ const SECOND_EDGE: WorkflowEdgeInput = {
 
 type OnGraphChange = (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]) => void;
 type OnSelectNode = (nodeId: string | undefined) => void;
+type OnAddNode = AddNodeContextMenuProperties['onAddNode'];
+
+function dispatchContextMenu(target: Element, clientX: number, clientY: number): MouseEvent {
+  const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX, clientY });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
+}
+
+function findAddNodeMenu(): Element | null {
+  return document.body.querySelector(':scope [role="menu"][aria-label="Hozzáadás"]');
+}
 
 // A valódi könyvtár billentyű útja, happy-dom alatt: a `useKeyPress` a
 // `document` `keydown` eseményét figyeli, a törlendő elemek a kiválasztott
@@ -141,6 +155,7 @@ describe('GraphEditorCanvas', () => {
     selectedNodeId?: string,
     autoLayoutRevision = 0,
     graphElementIdGenerator: GraphElementIdGenerator = () => 'generated-edge-id',
+    onAddNode: OnAddNode = vi.fn<OnAddNode>(),
   ): void {
     act(() => {
       root.render(
@@ -152,6 +167,7 @@ describe('GraphEditorCanvas', () => {
           onSelectNode={onSelectNode}
           autoLayoutRevision={autoLayoutRevision}
           graphElementIdGenerator={graphElementIdGenerator}
+          onAddNode={onAddNode}
         />,
       );
     });
@@ -171,6 +187,7 @@ describe('GraphEditorCanvas', () => {
             onSelectNode={vi.fn()}
             autoLayoutRevision={0}
             graphElementIdGenerator={() => 'generated-edge-id'}
+            onAddNode={vi.fn()}
           />
           <NodeInspector
             node={FAN_OUT_NODE}
@@ -456,6 +473,74 @@ describe('GraphEditorCanvas', () => {
       targetHandle: null,
     });
     expect(isValid).toBe(true);
+  });
+
+  describe('jobb klikk menü (SPEC-008 5.8)', () => {
+    it('a vászon üres területén jobb klikkre a böngésző menüje helyett a kilenc menüpontos "Hozzáadás" menü nyílik (AC75)', () => {
+      renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], vi.fn(), vi.fn());
+      const paneElement = container.querySelector('.react-flow__pane');
+      if (paneElement === null) {
+        throw new Error('a teszt nem talált .react-flow__pane elemet');
+      }
+      expect(findAddNodeMenu()).toBeNull();
+
+      const event = dispatchContextMenu(paneElement, 120, 80);
+
+      expect(event.defaultPrevented).toBe(true);
+      const menu = findAddNodeMenu();
+      expect([...(menu?.querySelectorAll('[role="menuitem"]') ?? [])].map((item) => item.textContent)).toEqual([
+        'Agent lépés',
+        'Elágazás',
+        'Szétosztás',
+        'Összefésülés',
+        'Ciklus',
+        'Emberi jóváhagyás',
+        'Hibakezelő',
+        'Al-workflow',
+        'Szkript',
+      ]);
+    });
+
+    it('csomóponton jobb klikkre nem nyílik menü, és a böngésző saját menüje sincs tiltva (AC75)', () => {
+      renderCanvas([START_NODE, FAN_OUT_NODE], [EDGE], vi.fn(), vi.fn());
+      const nodeElement = container.querySelector('[data-id="n1"]');
+      if (nodeElement === null) {
+        throw new Error('a teszt nem talált "n1" node elemet');
+      }
+
+      const event = dispatchContextMenu(nodeElement, 10, 10);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(findAddNodeMenu()).toBeNull();
+    });
+
+    it('menüpont választására a típust és a kattintás pontjából átváltott helyet adja tovább, majd bezárul (AC76)', () => {
+      const onAddNode = vi.fn<OnAddNode>();
+      const onGraphChange = vi.fn<OnGraphChange>();
+      renderCanvas([START_NODE], [], onGraphChange, vi.fn(), undefined, 0, undefined, onAddNode);
+      const paneElement = container.querySelector('.react-flow__pane');
+      if (paneElement === null) {
+        throw new Error('a teszt nem talált .react-flow__pane elemet');
+      }
+      dispatchContextMenu(paneElement, 120, 80);
+      const loopItem = [...(findAddNodeMenu()?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])].find(
+        (item) => item.textContent === 'Ciklus',
+      );
+
+      act(() => {
+        loopItem?.click();
+      });
+
+      // happy-dom alatt a vászon doboza a (0, 0) pontban áll, és a nézet
+      // eltolás nélküli, egyszeres nagyítású, tehát a valódi átváltás a
+      // kattintás pontját adja; a nem azonos átváltást az
+      // `AddNodeContextMenu.spec.tsx` befecskendezett átváltója igazolja.
+      expect(onAddNode).toHaveBeenCalledTimes(1);
+      expect(onAddNode).toHaveBeenCalledWith('loop', { x: 120, y: 80 });
+      expect(findAddNodeMenu()).toBeNull();
+      // A vászon maga nem vesz fel csomópontot: a felvétel a szülőé.
+      expect(onGraphChange).not.toHaveBeenCalled();
+    });
   });
 
   describe('törlés (SPEC-008 5.9)', () => {

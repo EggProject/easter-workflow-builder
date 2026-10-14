@@ -23,6 +23,7 @@ import {
   joinClassNames,
   useToasts,
 } from '@easter-workflow-builder/ui';
+import { ReactFlowProvider, useStore, type ReactFlowState } from '@xyflow/react';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
@@ -34,13 +35,18 @@ import { useRequestState } from '../request-state/use-request-state.ts';
 import { StartRunModal } from '../run-control/StartRunModal.tsx';
 import { readStartInputFields } from '../run-control/read-start-input-fields.ts';
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
+import type { AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
+import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
+import { createGraphNode } from './create-graph-node.ts';
 import { deleteNodeWithEdges } from './delete-node-with-edges.ts';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
+import { useIsAddNodeCompact } from './use-is-add-node-compact.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
 
 export interface GraphEditorScreenProperties {
@@ -95,6 +101,93 @@ function DropdownChevronIcon(): ReactElement {
 }
 
 /**
+ * A vendorolt lucide 0.525.0 készlet `Plus` ikonja (24x24 viewBox), kézzel
+ * beágyazva, a repó meglévő ikon konvenciója szerint (1.75 vonalvastagság,
+ * kerekített vonalvég és csatlakozás). A szűk nézeti "Hozzáadás" gomb
+ * egyetlen tartalma; a nevét az `aria-label` adja.
+ */
+function PlusIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
+const selectViewportWidth = (state: ReactFlowState): number => state.width;
+const selectViewportHeight = (state: ReactFlowState): number => state.height;
+const selectViewportTransform = (state: ReactFlowState): ReactFlowState['transform'] => state.transform;
+
+interface AddNodeMenuButtonProperties {
+  readonly disabled: boolean;
+  readonly onAddNode: AddNodeContextMenuProperties['onAddNode'];
+}
+
+/**
+ * A lábléc "Hozzáadás" menü gombja (SPEC-008 5.8, O-19): a `Menu`/`MenuItem`
+ * pár a kilenc felvehető típussal, a split button nyíl ikonjával. A
+ * `--ep-screen-sm` token alatt és azon a gomb csak ikon (`.btn--icon`, `Plus`),
+ * a neve az `aria-label` (user döntés 2026-10-14); a menü mindkét alakban
+ * ugyanaz. Az új kártya
+ * közepe a választáskor látható vászon középpontja, a React Flow store
+ * `width`, `height` és `transform` mezőjéből (`useStore`, M-99). Külön
+ * komponens, hogy a store feliratkozás a nézet minden mozdulatára csak ezt a
+ * gombot renderelje újra, ne a képernyőt.
+ */
+function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): ReactElement {
+  const { disabled, onAddNode } = properties;
+  const width = useStore(selectViewportWidth);
+  const height = useStore(selectViewportHeight);
+  const transform = useStore(selectViewportTransform);
+  const isCompact = useIsAddNodeCompact();
+  return (
+    <Menu
+      trigger={(triggerProperties) =>
+        isCompact ? (
+          <Button
+            {...triggerProperties}
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon
+            aria-label="Hozzáadás"
+            disabled={disabled}
+          >
+            <PlusIcon />
+          </Button>
+        ) : (
+          <Button {...triggerProperties} type="button" size="sm" variant="secondary" disabled={disabled}>
+            Hozzáadás
+            <DropdownChevronIcon />
+          </Button>
+        )
+      }
+    >
+      {ADDABLE_NODE_MENU_ITEMS.map((item) => (
+        <MenuItem
+          key={item.value}
+          onSelect={() => {
+            onAddNode(item.value, computeViewportCenterNodePosition({ width, height, transform }));
+          }}
+        >
+          {item.label}
+        </MenuItem>
+      ))}
+    </Menu>
+  );
+}
+
+/**
  * A gráf szerkesztő képernyő: betöltés, mentés, mentetlen jelző és a mentés
  * előtti séma ellenőrzés (SPEC-008 5.5, T-009-17, AC12, AC13, AC15), plusz a
  * csomópont beállítás panel (`node-inspector`, T-009-18, AC16, AC17). A
@@ -113,7 +206,7 @@ function DropdownChevronIcon(): ReactElement {
  * és az osztott elrendezés aránya a `localStorage`-be mentődik, majd a
  * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
-export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
+function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
   const { apiOrigin, fetchFunction, search, navigate, graphElementIdGenerator } = properties;
   const workflowId = readWorkflowId(search);
 
@@ -231,6 +324,20 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       setCurrentEdges(edges);
     },
     [],
+  );
+
+  // A csomópont felvétel (SPEC-008 5.8): a "Hozzáadás" gomb és a jobb klikk
+  // menü csak a helyet adja, a csomópontot mindkét úton ez veszi fel. Helyi,
+  // szinkron művelet, hálózati kérés nélkül; a felvett csomópont kiválasztott,
+  // tehát a beállítás panel megnyílik, és a mentetlen jelző az `isGraphDirty`
+  // összehasonlításból jelenik meg.
+  const handleAddNode = useCallback<AddNodeContextMenuProperties['onAddNode']>(
+    (type, position) => {
+      const node = createGraphNode(type, position, graphElementIdGenerator);
+      setCurrentNodes((current) => [...current, node]);
+      setSelectedNodeId(node.id);
+    },
+    [graphElementIdGenerator],
   );
 
   const handleUpdateNode = useCallback((updatedNode: WorkflowNodeInput): void => {
@@ -380,6 +487,7 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
                   onSelectNode={setSelectedNodeId}
                   autoLayoutRevision={autoLayoutRevision}
                   graphElementIdGenerator={graphElementIdGenerator}
+                  onAddNode={handleAddNode}
                 />
               </div>
             </ResizablePanel>
@@ -447,6 +555,9 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
               `getByRole`/`getByText` locatorokon is kétértelmű lenne. */}
           Futás indítása
         </Button>
+        {/* A "Hozzáadás" közvetlenül a "Mentés" split button előtt áll, így az
+            elsődleges művelet a sor végén marad (SPEC-008 5.8, O-19). */}
+        <AddNodeMenuButton disabled={isLoading} onAddNode={handleAddNode} />
         <ButtonGroup aria-label="Gráf műveletek">
           <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}
@@ -476,5 +587,19 @@ export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperti
       />
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </div>
+  );
+}
+
+/**
+ * A gráf szerkesztő képernyő a `ReactFlowProvider` alatt: a provider a React
+ * Flow store-ját a `<ReactFlow>` komponensen kívül is elérhetővé teszi (a
+ * lábléc "Hozzáadás" gombjának kell, SPEC-008 5.8), és a vászon `<ReactFlow>`
+ * eleme ugyanezt a store-t használja.
+ */
+export function GraphEditorScreen(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
+  return (
+    <ReactFlowProvider>
+      <GraphEditorScreenContent {...properties} />
+    </ReactFlowProvider>
   );
 }
