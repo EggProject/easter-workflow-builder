@@ -256,16 +256,32 @@ const RUN_URL = '/run?runId=run-2';
 interface RunViewMocks {
   readonly snapshot?: unknown;
   readonly snapshotStatus?: number;
+  /**
+   * Melyik újratöltött erőforrás végpontja adjon nem átmeneti (404) hibát a
+   * futás nézet megnyitásakor: a futás rekordja vagy a lépés futás lista.
+   */
+  readonly failingEndpoint?: 'getRun' | 'listStepRuns';
 }
+
+/**
+ * A szerver protokoll hibatörzse egy nem létező futásra (SPEC-005 8.3).
+ */
+const RUN_NOT_FOUND_BODY = { code: 'not_found', message: 'nincs ilyen futás' };
 
 async function mockRun(page: Page, overrides: RunViewMocks = {}): Promise<void> {
   await mockIdleStream(page);
   await installApiMocks(page, [
-    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
+    mockRoute('getRun', async (route) =>
+      route.fulfill(overrides.failingEndpoint === 'getRun' ? jsonBody(RUN_NOT_FOUND_BODY, 404) : jsonBody(RUN_DETAIL)),
+    ),
     mockRoute('readRunSnapshot', async (route) =>
       route.fulfill(jsonBody(overrides.snapshot ?? SNAPSHOT, overrides.snapshotStatus ?? 200)),
     ),
-    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(STEP_RUNS))),
+    mockRoute('listStepRuns', async (route) =>
+      route.fulfill(
+        overrides.failingEndpoint === 'listStepRuns' ? jsonBody(RUN_NOT_FOUND_BODY, 404) : jsonBody(STEP_RUNS),
+      ),
+    ),
     mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     // A futás nézet a SAJÁT futására iratkozik fel az app szintű stream
     // kapcsolaton (T-009-23): enélkül a hívás a `installApiMocks` "nincs mock"
@@ -400,6 +416,28 @@ test('a pillanatkép betöltésének hibájára a hibaüzenetet mutatja', async 
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.getByTestId('rf__wrapper')).toHaveCount(0);
 });
+
+/**
+ * A `blocking-failure-message.ts` hibaüzenet ága itt fedett determinisztikusan:
+ * a teszt a futás nézet megnyitásakor, korábbi érték nélkül adott nem átmeneti
+ * hibát várja meg (`docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 48.
+ * szekció).
+ */
+for (const failingEndpoint of ['getRun', 'listStepRuns'] as const) {
+  test(`a ${failingEndpoint} nem átmeneti hibájára (404, korábbi érték nélkül) a rajz helyén a danger Alert áll a kódhoz rendelt mondattal`, async ({
+    page,
+  }) => {
+    await mockRun(page, { failingEndpoint });
+    await page.goto(RUN_URL);
+
+    const alert = page.getByRole('alert');
+    await expect(alert).toHaveText('A keresett elem nem létezik, esetleg időközben törölték.');
+    await expect(alert).toHaveClass(/\balert--danger\b/);
+    await expect(page.getByText('nincs ilyen futás')).toHaveCount(0);
+    await expect(page.getByTestId('rf__wrapper')).toHaveCount(0);
+    await expect(page.getByText('A rajz a futás pillanatképe')).toHaveCount(0);
+  });
+}
 
 // ============================================================
 // AZ OSZTOTT ELRENDEZÉS ÉS A HÁROM RESZPONZÍV SÁV (T-009-22, AC33, AC34).
