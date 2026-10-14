@@ -15,7 +15,7 @@ const VALID_NODE = {
   label: 'Start',
   positionX: 0,
   positionY: 0,
-  config: { type: 'start', inputFields: [], onUnhandledError: null },
+  config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
 };
 
 const VALID_EDGE = {
@@ -57,7 +57,7 @@ const NODE_WITH_BLANK_REQUIRED_FIELD = {
     expression: 'x > 0',
     branches: [{ key: '', label: 'Pozitív' }],
     defaultBranchKey: null,
-    onUnhandledError: null,
+    onUnhandledError: 'fail_run',
   },
 };
 

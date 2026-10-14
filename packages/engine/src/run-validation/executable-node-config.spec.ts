@@ -4,7 +4,8 @@
  * tudja elkapni: a `@ts-expect-error` direktíva akkor **bukik**, ha a
  * megjelölt sor mégis lefordul ("Unused '@ts-expect-error' directive"), tehát
  * a `bun run typecheck` kapu pirosra vált abban a pillanatban, amikor a
- * `script` ágak visszakerülnek az unióba.
+ * `script` ágak vagy a választatlan `join` ág (`mode: null`, SPEC-008 O-33)
+ * visszakerülnek az unióba.
  *
  * Ez az egyetlen `.spec.ts` a repóban egy típus-only fájl mellett. A
  * konvenció szerint típus-only fájlhoz nem készül teszt (SPEC-002 6.3), de itt
@@ -13,7 +14,12 @@
  * futásidőben létező, valódi `script` config.
  */
 import { describe, expect, it } from 'vitest';
-import type { JoinScriptNodeConfig, NodeConfig, ScriptNodeConfig } from '@easter-workflow-builder/db';
+import type {
+  JoinScriptNodeConfig,
+  JoinUnselectedNodeConfig,
+  NodeConfig,
+  ScriptNodeConfig,
+} from '@easter-workflow-builder/db';
 import type { ExecutableNodeConfig } from './executable-node-config.ts';
 
 // A bizonyíték hordozója: a paramétere pontosan az a szűkített unió, amit a
@@ -37,6 +43,9 @@ const JOIN_SCRIPT_CONFIG: JoinScriptNodeConfig = {
   onUnhandledError: 'fail_run',
 };
 
+// eslint-disable-next-line unicorn/no-null -- a választatlan join `mode` mezője a tárolt alakban ténylegesen `null` (SPEC-008 O-33).
+const JOIN_UNSELECTED_CONFIG: JoinUnselectedNodeConfig = { type: 'join', mode: null, onUnhandledError: 'fail_run' };
+
 describe('ExecutableNodeConfig', () => {
   it('a ScriptNodeConfig ágat a fordító elutasítja', () => {
     // @ts-expect-error a `ScriptNodeConfig` ágat az `Exclude` kiveszi az unióból (SPEC-004 4.7)
@@ -51,6 +60,14 @@ describe('ExecutableNodeConfig', () => {
 
     expect(rejected.type).toBe('join');
     expect(JOIN_SCRIPT_CONFIG.mode).toBe('script');
+  });
+
+  it('a választatlan join ágat (mode: null) a fordító elutasítja', () => {
+    // @ts-expect-error a `WellFormedNodeConfig` a `mode: null` ágat már kivette (SPEC-008 O-33)
+    const rejected: ExecutableNodeConfig = JOIN_UNSELECTED_CONFIG;
+
+    expect(rejected.type).toBe('join');
+    expect(JOIN_UNSELECTED_CONFIG.mode).toBeNull();
   });
 
   it('a script node configja a végrehajtható configot váró függvénynek sem adható át', () => {

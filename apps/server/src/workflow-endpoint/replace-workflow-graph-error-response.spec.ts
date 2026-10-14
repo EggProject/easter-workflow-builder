@@ -136,7 +136,7 @@ async function startTestServer(options: HttpServerOptions): Promise<{ baseUrl: s
 }
 
 function startNodeConfig(): Record<string, unknown> {
-  return { type: 'start', inputFields: [], onUnhandledError: null };
+  return { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
 }
 
 async function createWorkflowViaApi(baseUrl: string): Promise<string> {
@@ -164,7 +164,7 @@ function branchNode(key: string): Record<string, unknown> {
       expression: 'x > 0',
       branches: [{ key, label: 'Pozitív' }],
       defaultBranchKey: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     },
   };
 }
@@ -382,4 +382,50 @@ describe('PUT /api/workflows/{workflowId}/graph - öt hibás eset (SPEC-005/006,
     expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
     expect(sink.lines()).toHaveLength(0);
   });
+
+  for (const { label, node, path } of [
+    {
+      label: '(g) null onUnhandledError (SPEC-008 5.4, O-29)',
+      node: {
+        id: 'n-start',
+        type: 'start',
+        label: 'Start',
+        positionX: 0,
+        positionY: 0,
+        config: { type: 'start', inputFields: [], onUnhandledError: null },
+      },
+      path: 'nodes.0.config.onUnhandledError',
+    },
+    {
+      label: '(h) választatlan join mód (SPEC-008 5.4, O-33)',
+      node: {
+        id: 'n-join',
+        type: 'join',
+        label: 'Összefésülés',
+        positionX: 0,
+        positionY: 0,
+        config: { type: 'join', mode: null, onUnhandledError: 'fail_run' },
+      },
+      path: 'nodes.0.config.mode',
+    },
+  ]) {
+    it(`${label}: 400 invalid_request a mező útvonalával, a tárolt gráf változatlan, nem naplózva`, async () => {
+      const { baseUrl, sink, workflowId } = await setup();
+      const stored = await putGraph(baseUrl, workflowId, { nodes: [branchNode('pos')], edges: [] });
+      expect(stored.status).toBe(200);
+      const before = database?.workflows.readGraph(workflowId);
+
+      const response = await putGraph(baseUrl, workflowId, { nodes: [node], edges: [] });
+
+      expect(response.status).toBe(400);
+      const body: unknown = await response.json();
+      if (!isRecord(body)) {
+        throw new Error('a hiba törzs nem objektum alakú');
+      }
+      expect(body['code']).toBe('invalid_request');
+      expect(body['message']).toContain(path);
+      expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
+      expect(sink.lines()).toHaveLength(0);
+    });
+  }
 });

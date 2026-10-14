@@ -88,6 +88,10 @@ describe('findBlankRequiredTextField', () => {
     ).toBeUndefined();
   });
 
+  it('a választatlan join (mode: null) átmegy: kötelező szöveg mezője nincs (SPEC-008 O-33)', () => {
+    expect(findBlankRequiredTextField({ type: 'join', mode: null, onUnhandledError: null })).toBeUndefined();
+  });
+
   it('a nullázható szöveg mező üres értéke nem kötelező mező (agent_step cwd)', () => {
     expect(
       findBlankRequiredTextField({ ...agentStepConfig, cwd: '', type: 'agent_step', onUnhandledError: null }),

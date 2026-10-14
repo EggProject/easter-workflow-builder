@@ -1,14 +1,16 @@
 import type { JoinNodeConfig, NodeConfig } from './node-config.ts';
 
 type RequiredTextFieldPathTable = Readonly<Record<Exclude<NodeConfig['type'], 'join'>, readonly string[]>> &
-  Readonly<Record<'join', Readonly<Record<JoinNodeConfig['mode'], readonly string[]>>>>;
+  Readonly<Record<'join', Readonly<Record<NonNullable<JoinNodeConfig['mode']>, readonly string[]>>>>;
 
 /**
  * A kötelező szöveg mezők listája node típusonként, a `join` módonként
  * (SPEC-008 5.4 táblázata, user döntés 2026-09-28, O-21): ponttal
  * összefűzött mezőútvonal a `config`-on belül, a lista minden elemén `*`
  * áll. Kötelező az a szöveg mező, aminek a típusa nem nullázható `string`,
- * és amit a beállítás panel szerkeszt.
+ * és amit a beállítás panel szerkeszt. A `join` választatlan (`mode: null`,
+ * O-33) ágának nincs `settings` mezője, tehát kötelező szöveg mezője sincs:
+ * a tábla csak a három kiválasztott módot sorolja.
  *
  * A `packages/db` `required-text-field-paths.ts` táblájának SZÁNDÉKOS
  * duplikátuma (a `protocol` L1 réteg a `db`-t nem importálhatja,
