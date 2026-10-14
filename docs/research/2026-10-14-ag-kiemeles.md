@@ -229,6 +229,8 @@ a repóban van: a `build-run-graph-flow-edges.spec.ts` a `run-graph.css` forrás
 kifestett pixelt a PLAN-009 T-009-40 sora vezeti be (az `edge-paint-measurement.ts` mintájára), addig
 a fenti két szám nem újrafuttatható.
 
+Lezárva: a `T-009-40` 4. pontja szerint a `branch-highlight.spec.ts` minden e2e futásban visszaolvassa.
+
 ### 6. A lenyomott kapcsoló számított stílusa
 
 Egyszeri számított stílus mérés a lapon (2026-10-14, a T-009-39 állapoton a `color` szabály
