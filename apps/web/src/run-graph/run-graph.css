@@ -50,8 +50,12 @@
    gombjainak szállított szabálya a belső `svg` elemet kitöltéssel festi
    (`fill: currentColor`), mert a beépített ikonjai kitöltöttek; a kapcsoló
    ikonja vonalas, ezért a kitöltést ki kell kapcsolni. A lenyomott állapot
-   ("minden eddig bejárt ág") a kiemelő token halvány hátterét és keretét
-   kapja, az ikon színe a gomb színe marad. */
+   ("minden eddig bejárt ág") a design system `toggle/toggle.css` 33 ... 37.
+   sorának `[aria-pressed="true"]` szabályát követi: halvány háttér, kiemelő
+   keret és kiemelő szín (az ikon `currentColor`). A keret itt inset gyűrűként
+   fest, mert a React Flow gomb `border: none` mellett csak alsó elválasztó
+   szegélyt visel (`@xyflow/react` `style.css`, `.react-flow__controls-button`),
+   a `border-color` tehát nem rajzolna teljes keretet. */
 .run-graph-canvas .react-flow__controls-button .run-graph-branch-toggle__icon {
   fill: none;
 }
@@ -59,6 +63,7 @@
 .run-graph-canvas .react-flow__controls-button[aria-pressed='true'] {
   background: var(--ep-accent-bg);
   box-shadow: inset 0 0 0 1px var(--ep-accent);
+  color: var(--ep-accent-fg, var(--ep-yolk-700));
 }
 
 /* Megnevezett, doboz nélküli szakasz: se szegély, se lekerekítés, se saját

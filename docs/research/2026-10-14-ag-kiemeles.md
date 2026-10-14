@@ -141,9 +141,15 @@ elágazás ikonja, tehát az elágazás csomópont jele lehetne, nem a bejárt u
 - A kiemelés osztálya a `Edge.className` mezőn át megy (`buildRunGraphFlowEdges`, tiszta függvény),
   mert az élek happy-dom alatt nem rajzolódnak ki (M-53): az él állapota unit teszt, a kifestés nem.
 - A kapcsoló csak akkor jelenik meg, ha a pillanatképben van `branch` csomópont.
-- **Saját tervezési részlet, nem a SPEC szövege:** a lenyomott (`aria-pressed="true"`) gomb
-  `--ep-accent-bg` hátteret és `--ep-accent` belső gyűrűt kap. A SPEC a lenyomott állapot
-  megjelenéséről nem rendelkezik; csak design token szerepel benne.
+- A lenyomott (`aria-pressed="true"`) gomb a design system `toggle/toggle.css` 33 ... 37. sorának
+  `.toggle[aria-pressed="true"]` szabályát követi (`eggproject-design-components` skill forrása):
+  `background: var(--ep-accent-bg)`, keret `--ep-accent`, szín
+  `var(--ep-accent-fg, var(--ep-yolk-700))`. Az egyetlen eltérés a keret alakja: a forrás `border-color`-t állít, itt
+  inset gyűrű (`box-shadow: inset 0 0 0 1px var(--ep-accent)`) fest, mert a React Flow
+  `.react-flow__controls-button` `border: none` mellett csak `border-bottom` szegélyt visel (saját
+  olvasás, `@xyflow/react` 12.11.6 `dist/style.css` 422 ... 428. sor), tehát a `border-color` nem
+  rajzolna teljes keretet. A SPEC a lenyomott állapot megjelenéséről nem rendelkezik; csak design
+  token szerepel benne. A `toggle` komponens maga nincs átemelve (O-25).
 
 ### 4. Az e2e lefedettség előtte és utána
 
@@ -171,9 +177,26 @@ A fedetlen tételek ugyanazon a hat fájlon maradtak (`mount-app.tsx`, `read-fro
 a `8413882` alapú ág állapotát írja le; a tiszta `main` összege ma 1743 / 815 / 574 / 1682. A
 `8413882` és a `7e61152` között az `apps/web/src` alatt a PR #25 mellett csak a PR #26 (`4ce7de0`,
 T-009-48) módosított fájlt (`git log --oneline 8413882..HEAD -- apps/web/src`), tehát a négy
-statements és lines különbség a #26 termékkódjától származik; a pontos fájl szerinti bontást nem
-mértem (nem ellenőrzött). A fedetlen darabszám (15 / 11 / 3 / 15) azonos, tehát a ratchet jelentése (a
-fedetlen sorok száma) nem változott.
+statements és lines különbség a #26 termékkódjától származik. A fedetlen darabszám (15 / 11 / 3 / 15)
+azonos, tehát a ratchet jelentése (a fedetlen sorok száma) nem változott.
+
+**A +4 forrása, fájl szerint mérve** (2026-10-14). A `git diff --name-only 8413882 4ce7de0 --
+apps/web/src ':!*.spec.ts' ':!*.spec.tsx'` nyolc termékfájlt ad, mind a #26-é (a köztes #23, `538414d`
+az `apps/web/src` alatt nem módosított fájlt). A nyolc fájl mindkét állapotát (`git show
+<rev>:<fájl>`) `esbuild` 0.28.2 (`ts`/`tsx` betöltő, automatikus JSX) alakította át, majd
+`istanbul-lib-instrument` 6.0.3 (`createInstrumenter({ esModules: true })`) műszerezte; a számláló a
+`statementMap` kulcsainak, a `branchMap` ágainak (`locations`), az `fnMap` kulcsainak és a statementek
+egyedi kezdősorainak száma. Összeg a nyolc fájlra: statements 143 -> 147, branches 71 -> 71,
+functions 41 -> 41, lines 135 -> 139, vagyis +4 / 0 / 0 / +4, ami megegyezik az e2e összegek
+eltérésével (1739 -> 1743, 815 -> 815, 574 -> 574, 1678 -> 1682). A változás egyetlen fájlból jön:
+`run-graph/project-snapshot-graph.ts` 5 -> 9 statement és 5 -> 9 sor, 2 ág és 2 függvény mindkét
+állapotban; a másik hét fájl mind a négy metrikán azonos. **Korlát:** a mérés nem a
+`vite-plugin-istanbul` útján futott (a Vite saját transzformációja helyett `esbuild`), tehát a
+fájlonkénti szám nem az e2e riportból való, csak az összegben egyezik vele. A mérő szkript eldobott,
+nincs a repóban. Ismételhető út a repóban: a fenti "Utána" eljárás a `4ce7de0^` (ez a `538414d`) és a
+`4ce7de0` állapoton, a `coverage:e2e:report` helyett vagy mellett `nyc report
+--reporter=json-summary` kimenettel, ami az összeg mellett fájlonkénti sort is ad (az
+`istanbul-reports` `json-summary` forrása: minden fájl külön bejegyzés a `total` mellett).
 
 **Kontroll mérés: az új e2e teszt nélkül.** Ugyanez a nyolc shard
 `--grep-invert "az elágazás kártyáján a döntésekből látszik"` kapcsolóval (az új teszt nélkül, minden
@@ -198,3 +221,35 @@ Egyszeri számított stílus mérés a lapon (eldobott, nem commitolt Playwright
 a kiemelt él vonala `rgb(227, 181, 99)`, `2.4px`, a nem kiemelté `rgb(177, 177, 183)`, `1px`; a kiemelt
 szín a `--ep-accent` feloldott értéke. A kifestett pixelre vonatkozó, két témás bizonyíték a T-009-40
 dolga.
+
+**Ismételhető út a repóban: erre a számra jelenleg nincs.** A mérést eldobott szkript adta, és a repó
+egyetlen tesztje sem olvassa vissza a kiemelt él számított `stroke` és `stroke-width` értékét. Ami
+a repóban van: a `build-run-graph-flow-edges.spec.ts` a `run-graph.css` forrásában ellenőrzi a
+`--ep-accent` tokent és a `2.4` vastagságot (nem a számított stílust). A számított értéket és a
+kifestett pixelt a PLAN-009 T-009-40 sora vezeti be (az `edge-paint-measurement.ts` mintájára), addig
+a fenti két szám nem újrafuttatható.
+
+### 6. A lenyomott kapcsoló számított stílusa
+
+Egyszeri számított stílus mérés a lapon (2026-10-14, a T-009-39 állapoton a `color` szabály
+felvételével; eldobott, nem commitolt Playwright szkript: a `branch-decision-data.spec.ts` második
+tesztjének másolata, ami a kapcsolón a kattintás előtt és után `getComputedStyle`-t olvas, a
+`colorScheme` `'light'` és `'dark'` értékével, `vite build` plusz `vite preview` ellen; kép nem
+készült). A `color` az ikon `stroke` értékével azonos, mert az ikon `stroke="currentColor"`.
+
+| Téma    | Állapot   | `color`              | `background-color`                        | `box-shadow`                              | `--ep-accent-fg` |
+| ------- | --------- | -------------------- | ----------------------------------------- | ----------------------------------------- | ---------------- |
+| világos | nyomatlan | `rgb(10, 18, 48)`    | `rgb(255, 255, 255)`                      | `none`                                    | `#8a6220`        |
+| világos | lenyomott | `rgb(138, 98, 32)`   | `rgba(227, 181, 99, 0.16)`                | `rgb(227, 181, 99) 0px 0px 0px 1px inset` | `#8a6220`        |
+| sötét   | nyomatlan | `rgb(236, 231, 218)` | `oklab(0.234469 -0.000292671 -0.0124669)` | `none`                                    | `#efcb85`        |
+| sötét   | lenyomott | `rgb(239, 203, 133)` | `rgba(227, 181, 99, 0.14)`                | `rgb(227, 181, 99) 0px 0px 0px 1px inset` | `#efcb85`        |
+
+A lenyomott szín mindkét témában a `--ep-accent-fg` feloldott értéke (`#8A6220` = `rgb(138, 98, 32)`,
+`#EFCB85` = `rgb(239, 203, 133)`), az ikon színe ezt követi. Egyezik a review saját mérésével.
+
+**Ismételhető út a repóban: a számított értékre nincs.** A szkript eldobott, és a PLAN-009 T-009-40
+sora a kapcsoló két módját és az újratöltést említi, a lenyomott állapot számított színét nem. Ami
+a repóban van, az forrás szintű: a `BranchHighlightToggle.spec.tsx` a `run-graph.css` lenyomott
+szabályában ellenőrzi a háttér, a keret és a szín tokenjét (a `color` nélküli régi CSS-en bukik,
+mérve). Az, hogy a feloldott érték tényleg a tokené, csak futó böngészőben látszik, és ezt jelenleg
+semmi nem őrzi.

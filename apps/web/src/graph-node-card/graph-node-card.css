@@ -47,7 +47,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--ep-space-1);
 }
 
 .graph-node-card__type {

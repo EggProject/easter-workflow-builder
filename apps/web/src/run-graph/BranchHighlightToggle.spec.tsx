@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -70,5 +73,18 @@ describe('BranchHighlightToggle', () => {
       button.click();
     });
     expect(toggleCount).toBe(1);
+  });
+});
+
+describe('a kapcsoló lenyomott állapota és a run-graph.css', () => {
+  const directory = path.dirname(fileURLToPath(import.meta.url));
+  const stylesheet = readFileSync(path.join(directory, 'run-graph.css'), 'utf8');
+  const rulePattern = /^\.run-graph-canvas[^{]*\[aria-pressed='true'\][^{]*\{([^}]*)\}/m;
+
+  it("a design system toggle [aria-pressed='true'] szabályának háttér, keret és szín tokenjeit követi", () => {
+    const declarations = rulePattern.exec(stylesheet)?.[1] ?? '';
+    expect(declarations).toMatch(/background:\s*var\(--ep-accent-bg\);/);
+    expect(declarations).toMatch(/box-shadow:\s*inset 0 0 0 1px var\(--ep-accent\);/);
+    expect(declarations).toMatch(/color:\s*var\(--ep-accent-fg, var\(--ep-yolk-700\)\);/);
   });
 });
