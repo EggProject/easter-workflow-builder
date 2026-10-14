@@ -291,7 +291,7 @@ test('a start típusnak nincs bemenő handle-je, a többi kilencnek van', async 
   await expect(inputHandles(page, 't-branch')).toHaveCount(1);
 });
 
-test('az elágazás node a config.branches listája szerint, plusz egy alapértelmezett kimenő handle-t rajzol', async ({
+test('az elágazás node pontosan a config.branches listája szerint rajzol kimenő handle-t, kulcs nélküli kimenet nélkül', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
@@ -299,10 +299,14 @@ test('az elágazás node a config.branches listája szerint, plusz egy alapérte
   await page.goto(EDITOR_URL);
   await expect(nodeLocator(page, 't-branch')).toBeVisible();
 
-  // Két konfigurált ág (pos, neg) plusz egy névtelen alapértelmezett - a
-  // `GraphNodeCard.tsx` `resolveOutputHandles` `branch` ága
-  // (`config.branches.map(...)` plusz a fix alapértelmezett bejegyzés).
-  await expect(outputHandles(page, 't-branch')).toHaveCount(3);
+  // Két konfigurált ág (pos, neg), mindegyik a saját kulcsával és címkéjével;
+  // a kulcs nélküli "Alapértelmezett" kimenet megszűnt (SPEC-008 5.1, O-23,
+  // a `GraphNodeCard.tsx` `resolveOutputHandles` `branch` ága).
+  await expect(outputHandles(page, 't-branch')).toHaveCount(2);
+  await expect(outputHandles(page, 't-branch').nth(0)).toHaveAttribute('data-handleid', 'pos');
+  await expect(outputHandles(page, 't-branch').nth(0)).toHaveAccessibleName('Pozitív');
+  await expect(outputHandles(page, 't-branch').nth(1)).toHaveAttribute('data-handleid', 'neg');
+  await expect(outputHandles(page, 't-branch').nth(1)).toHaveAccessibleName('Negatív');
   // Összehasonlításul: egy fix, egykimenetű típus egyetlen handle-t rajzol.
   await expect(outputHandles(page, 't-agent')).toHaveCount(1);
   // A két fenntartott azonosítójú típus a katalógus szerinti darabszámot adja.

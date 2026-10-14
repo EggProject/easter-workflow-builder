@@ -56,6 +56,29 @@ test.describe('a bemutató gráf fixtúra alakja', () => {
     }
     expect([...nodeIds].filter((id) => !connectedIds.has(id))).toEqual([]);
   });
+
+  test('egyetlen elágazás csomópontból induló éle sem kulcs nélküli, a sourceHandle egyezik a branchKey-jel, és az e-branch-loop kulcsa az alapértelmezett ág (SPEC-008 5.1, 106.)', () => {
+    const branchNodeIds = new Set(SHOWCASE_GRAPH.nodes.filter((node) => node.type === 'branch').map((node) => node.id));
+    expect(branchNodeIds.size).toBeGreaterThan(0);
+    expect(
+      SHOWCASE_GRAPH.edges
+        .filter((edge) => branchNodeIds.has(edge.sourceNodeId) && edge.branchKey === null)
+        .map((edge) => edge.id),
+    ).toEqual([]);
+    expect(
+      SHOWCASE_GRAPH.edges
+        .filter((edge) => branchNodeIds.has(edge.sourceNodeId) && edge.sourceHandle !== edge.branchKey)
+        .map((edge) => edge.id),
+    ).toEqual([]);
+
+    const loopEdge = SHOWCASE_GRAPH.edges.find((edge) => edge.id === 'e-branch-loop');
+    const loopSource = SHOWCASE_GRAPH.nodes.find((node) => node.id === loopEdge?.sourceNodeId);
+    if (loopSource?.config.type !== 'branch') {
+      throw new Error('az e-branch-loop él forrása nem branch konfigurációjú csomópont');
+    }
+    expect(loopEdge?.branchKey).toBe(loopSource.config.defaultBranchKey);
+    expect(loopSource.config.branches.map((branch) => branch.key)).toContain(loopSource.config.defaultBranchKey);
+  });
 });
 
 for (const theme of ['light', 'dark'] as const) {

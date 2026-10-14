@@ -228,10 +228,25 @@ describe('GraphNodeCard', () => {
     expect(sourceHandleIds()).toEqual([undefined]);
   });
 
-  it('a branch a config.branches listája szerint, plusz egy alapértelmezett handle-t rajzol', () => {
+  it('a branch pontosan a config.branches listája szerint rajzol kimenő handle-t, kulcs nélküli kimenet nélkül (O-23)', () => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.branch)]);
     expect(handleElements('target')).toHaveLength(1);
-    expect(sourceHandleIds()).toEqual(['pos', 'neg', undefined]);
+    expect(sourceHandleIds()).toEqual(['pos', 'neg']);
+    expect(handleElements('source').map((element) => element.getAttribute('aria-label'))).toEqual([
+      'Pozitív',
+      'Negatív',
+    ]);
+    expect(container.querySelector('[aria-label="Alapértelmezett"]')).toBeNull();
+  });
+
+  it('az üres ág listájú branch nulla kimenő handle-t rajzol', () => {
+    const { branch } = WORKFLOW_NODES;
+    if (branch.config.type !== 'branch') {
+      throw new Error('a branch fixture config.type mezője nem branch');
+    }
+    renderNodes([buildFlowNode({ ...branch, config: { ...branch.config, branches: [] } })]);
+    expect(handleElements('target')).toHaveLength(1);
+    expect(sourceHandleIds()).toEqual([]);
   });
 
   it('a branch node nulla kimenő handle-t rajzol, ha a config.type nem branch (a séma nem kapcsolja össze a két mezőt)', () => {

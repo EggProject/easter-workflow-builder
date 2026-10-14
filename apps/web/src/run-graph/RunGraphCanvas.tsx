@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
 import { GraphNodeCardSizeStyle } from '../graph-node-card/GraphNodeCardSizeStyle.tsx';
 import type { GraphNodeCardData, GraphNodeCardFlowNode } from '../graph-node-card/graph-node-card-data.ts';
+import { omitKeylessBranchEdges } from '../graph-node-card/omit-keyless-branch-edges.ts';
 import {
   mergeMeasuredNodeSizes,
   withMeasuredNodeSize,
@@ -68,6 +69,11 @@ export interface RunGraphCanvasProperties {
  * (`branch-highlight-mode-storage.ts`), és a kapcsolója a vezérlő panel
  * utolsó gombja, ami csak `branch` csomópontot tartalmazó pillanatképen
  * jelenik meg.
+ *
+ * **A régi, kulcs nélküli elágazás élek** (SPEC-008 5.1 3. pont, O-27) a
+ * pillanatkép vetítése után, a vászon élleképezése előtt maradnak ki
+ * (`omit-keyless-branch-edges.ts`): a rajzon nem jelennek meg, és kiemelni sem
+ * lehet őket; a pillanatkép sora változatlan marad.
  */
 export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): ReactElement {
   const { nodes, edges, branchDecisionsByNodeId } = properties;
@@ -90,18 +96,26 @@ export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): 
       ),
     [nodes, measuredNodeSizes],
   );
+  const visibleEdges = useMemo(
+    () =>
+      omitKeylessBranchEdges(
+        nodes.map((data) => data.workflowNode),
+        edges,
+      ),
+    [nodes, edges],
+  );
   const flowEdges = useMemo(
     () =>
       buildRunGraphFlowEdges(
-        edges,
+        visibleEdges,
         resolveHighlightedBranchEdgeIds({
           decisionsByNodeId: branchDecisionsByNodeId,
           nodes: nodes.map((data) => data.workflowNode),
-          edges,
+          edges: visibleEdges,
           mode: branchHighlightMode,
         }),
       ),
-    [edges, nodes, branchDecisionsByNodeId, branchHighlightMode],
+    [visibleEdges, nodes, branchDecisionsByNodeId, branchHighlightMode],
   );
   const hasBranchNode = nodes.some((data) => data.workflowNode.type === 'branch');
 

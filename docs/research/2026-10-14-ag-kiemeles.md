@@ -389,3 +389,125 @@ A fedetlen tételek fájlonkénti listája (a `nyc report --reporter=text` 100 a
 állapoton betűre azonos, ugyanaz a hat fájl, mint a T-009-39 szekcióban. Az összes sem változott,
 mert termékkód nem változott, és az új tesztek a már fedett kódot futtatják. A küszöb nem mozdult
 (`apps/web/package.json`).
+
+## T-009-54
+
+A kulcs nélküli elágazás kimenet megszüntetése és a régi, kulcs nélküli elágazás élek elhagyása a
+futás nézetben (SPEC-008 5.1, O-23, O-27, 106., a 108. unit és futás nézet része). Ág:
+`feat/spec-008-d2-kulcs-nelkuli-kimenet`, az `origin/main` `019c4b4` állapotáról.
+
+### 1. A felhasznált tények, forrással
+
+| Tény                                                                                                                                                               | Forrás                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| A kártya kimenő handle-jeinek készletét a csomópont `type` mezője választja ki (`GRAPH_NODE_CATALOG`), a `branch` ágat a `config.type` szűkíti                     | `apps/web/src/graph-node-card/GraphNodeCard.tsx` (`resolveOutputHandles`), `graph-node-catalog/graph-node-catalog.ts` |
+| A `WorkflowNodeInputSchema` a `type` és a `config.type` mezőt nem kapcsolja össze                                                                                  | a `GraphNodeCard.tsx` doksija, `packages/protocol/src/workflow/workflow-graph-document.ts`                            |
+| A `null` handle azonosítójú élt a React Flow az első handle-hez kötve rajzolja                                                                                     | SPEC-008 M-111; saját mérés: a 3. pont (b) rontása, a szűrő nélkül a régi él a vásznon van (7 él a várt 6 helyett)    |
+| A motor a `null` kulcsú kimenő élt soha nem követi                                                                                                                 | SPEC-008 M-106, 6.6 3. pont                                                                                           |
+| A fix kimenetű típusok névtelen kimenete (`start`, `agent_step`, `fan_out`, `join`, `sub_workflow`, `script`, az `error_handler` első kimenete) `null` azonosítójú | `graph-node-catalog.ts` (`SINGLE_UNNAMED_OUTPUT`, `error_handler` bejegyzés)                                          |
+
+### 2. A tervezési döntések
+
+- **A kártya.** A `resolveOutputHandles` `branch` ága pontosan a `config.branches` listát képezi le
+  (`id: key`, `label`); a `null` azonosítójú "Alapértelmezett" bejegyzés és a hozzá tartozó
+  `eslint-disable` sor törölve. A `key={handle.id ?? 'default'}` megmaradt, mert a fix kimenetű
+  típusok névtelen handle-je továbbra is `null` azonosítójú.
+- **A szűrő** (`graph-node-card/omit-keyless-branch-edges.ts`): `(nodes, edges)` bemenet, a
+  `branch` **`type`** mezőjű csomópontok azonosítóinak halmaza, és az él akkor marad ki, ha a
+  `branchKey` `null` és a forrása ebben a halmazban van. A SPEC-008 5.1 1. pontja "a forrás
+  csomópontja `branch` típusú" alakban fogalmaz; a `type` mező választás oka, hogy a kártya
+  kimenetkészletét is ez választja ki. A két mező eltérésének két esete: `type: 'branch'` és nem
+  `branch` config mellett a kártya nulla kimenetet rajzol, az él elmarad; `type: 'agent_step'` és
+  `branch` config mellett a kártya a fix névtelen kimenetet rajzolja, az él megmarad. A listában nem
+  szereplő forrás éle megmarad. A szignatúra a szerkesztő (`WorkflowNodeInput`/`WorkflowEdgeInput`,
+  `graph-editor-document-projection.ts`) és a futás nézet alakjával egyezik, tehát a T-009-55
+  átalakítás nélkül hívhatja.
+- **A bekötés** a `RunGraphCanvas` egy `useMemo` lépésében, a pillanatkép vetítése után, a
+  `buildRunGraphFlowEdges` és a `resolveHighlightedBranchEdgeIds` előtt: mindkettő a szűrt listát
+  kapja. A `project-snapshot-graph.ts` nem változott (a D3 fájlja, SPEC-008 11.4 3. pont), a
+  pillanatkép sora sem.
+- **A bemutató fixtúra.** A `branch` csomópont ötödik ága `{ key: 'feldolgozas', label:
+'Feldolgozás' }`, a `defaultBranchKey` erre mutat, az `e-branch-loop` `sourceHandle` és
+  `branchKey` mezője `'feldolgozas'`. A kulcs és a címke neve saját választás (a PLAN-009 csak annyit
+  ír elő, hogy az él saját kulcsot kap); a célcsomópont "Forrásonkénti feldolgozás" címkéjéből
+  származik, a többi ág kulcsának mintájára. A handle-ek száma nem változott (korábban négy ág plusz
+  az "Alapértelmezett", most öt ág), tehát az elrendezés sem; az `e-branch-loop` a kártya ötödik
+  (legalsó) kimenetéből indul, korábban az M-111 szerint az elsőből.
+- **A képernyőképek.** A fixtúra lenyomata megváltozott, a `screenshot-pipeline` (6) invariánsa a
+  `test` kapun bukott (a várt és a tárolt `fixtureSha256` eltért). A `bun run screenshots` lefutott
+  (8 kép, mind zöld), a manifeszt `fixtureSha256` értéke frissült (`captureScriptSha256` és az
+  éllisták változatlanok); a képeket átnéztem (`editor-no-selection-light`, `editor-panel-dark`,
+  `run-view-dark`, `graph-edges-light`): az elágazás kártyán öt kimenet áll, az `e-branch-loop` a
+  legalsóból fut a "Ciklus" kártyához, minden él kifestett. A képek nincsenek a repóban
+  (`.gitignore`), csak a manifeszt.
+
+### 3. A szándékos rontások
+
+Mindegyik rontás ideiglenes volt, a fájl utána visszaállítva; a visszaállított állapoton minden
+felsorolt teszt zöld.
+
+**(a) A szűrő `branch` feltételének elhagyása** (a PLAN-009 elfogadási kritériuma):
+`return edges.filter((edge) => edge.branchKey !== null);`. Unit, 7 bukás:
+
+- `omit-keyless-branch-edges.spec.ts`: "az agent_step null kulcsú élét megtartja", "az error_handler
+  null kulcsú élét megtartja, a kulcsos on_error élével együtt", "a csomópont listában nem szereplő
+  forrás null kulcsú élét megtartja", "a forrás típusát a csomópont type mezője adja, nem a
+  config.type", "vegyes listán csak a kulcs nélküli elágazás élt hagyja el, a sorrendet megtartja";
+- `RunGraphCanvas.spec.tsx`: "a pillanatkép csomópontjaiból és éleiből épít, a kártya adatát
+  továbbadva", "a régi, kulcs nélküli elágazás élek (O-27) > a branch forrású, null kulcsú él nem jut a
+  vászonra, a többi él igen".
+
+E2e, 8 bukás: a `keyless-branch-edges.spec.ts` "egy kulcs nélküli elágazás élt tartalmazó
+pillanatképre a futás nézet ezt az élt nem rajzolja, a többit igen" (`rf__edge-k-e-start` nincs a
+DOM-ban) és "a futás nézetben az elágazás kártyája ágankénti egy, kulcsos kimenetet rajzol", valamint
+a `run-graph-paint.spec.ts` mind a hat tesztje (mindkét témában; `rf__edge-e-start-branch` nincs a
+DOM-ban). A `showcase-graph.spec.ts` zöld maradt, mert a szerkesztőt méri, ott a szűrő még nincs
+bekötve (T-009-55).
+
+**(b) A szűrő bekötésének elhagyása a `RunGraphCanvas`-ból** (a `visibleEdges` helyett az `edges`).
+Unit, 1 bukás: "a branch forrású, null kulcsú él nem jut a vászonra, a többi él igen". E2e, 1 bukás:
+a régi élű pillanatkép tesztje, `locator('.react-flow__edge')` 6 helyett 7. Ez egyben a saját mérés
+az M-111 tényre: a `null` handle azonosítójú régi él a szűrő nélkül a vásznon van.
+
+**(c) A kulcs nélküli "Alapértelmezett" handle visszahelyezése a `resolveOutputHandles`-be.** Unit, 2
+bukás a `GraphNodeCard.spec.tsx`-ben (a `branch` handle lista és az üres ág listájú `branch`); e2e, 3
+bukás: a `graph-node-card.spec.ts` elágazás tesztje és a `keyless-branch-edges.spec.ts` két handle
+tesztje (szerkesztő és futás nézet).
+
+### 4. Az e2e lefedettség előtte és utána
+
+**Előtte**: saját mérés a tiszta `019c4b4` állapoton, a módosítások előtt, a T-009-38 szekció
+eljárásával (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, nyolc egymás utáni
+`bun x playwright test --shard=<i>/8` `flock /tmp/playwright-gep.lock` alatt, majd
+`bun run coverage:e2e:report`, kilépési kód 0, a nyers összeg `nyc report --reporter=json-summary`
+kimenetből). **479 teszt, mind zöld.**
+
+**Utána**: ugyanez az eljárás a T-009-54 állapoton, a `bun run screenshots` futása után a
+`.nyc_output` törlésével (a 29. szekció buktatója, `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`).
+**483 teszt, mind zöld**, a `coverage:e2e:report` kilépési kódja 0, a küszöb változatlan.
+
+| Metrika    | Előtte fedett / összes | Utána fedett / összes | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1771 / 1786            | 1779 / 1794           | 15 -> 15                 |
+| branches   | 828 / 839              | 830 / 841             | 11 -> 11                 |
+| functions  | 582 / 585              | 588 / 591             | 3 -> 3                   |
+| lines      | 1710 / 1725            | 1714 / 1729           | 15 -> 15                 |
+
+Az összes változása fájlonként (a `json-summary` fájl soraiból, statements / branches / functions /
+lines): `omit-keyless-branch-edges.ts` új, 5 / 2 / 4 / 2, mind fedett; `RunGraphCanvas.tsx` 24 / 6 / 9 /
+22 -> 27 / 6 / 11 / 25, mind fedett; `GraphNodeCard.tsx` lines 21 -> 20 (a törölt bejegyzés), a többi
+metrika változatlan, mind fedett. Összeg: +8 / +2 / +6 / +4, egyezik a táblázattal. A fedetlen
+tételek ugyanazon a hat fájlon és sorszámon maradtak (`mount-app.tsx` 16, 21-22;
+`read-frontend-config.ts`; `is-valid-connection.ts` 36; `browser-history-location-port.ts` 21;
+`perform-route-request.ts` 89; `use-stream-connection.ts` 202).
+
+A négy új e2e teszt: a `keyless-branch-edges.spec.ts` három tesztje (a 106. kritérium két
+képernyője a bemutató fixtúrán, és a 108. kritérium futás nézet része saját, régi élű
+pillanatképpel) és a `showcase-graph.spec.ts` fixtúra alak tesztje (egyetlen `branch` forrású él sem
+kulcs nélküli, az `e-branch-loop` kulcsa az alapértelmezett ág). A `graph-node-card.spec.ts` elágazás
+tesztje átírva: két kimenet a korábbi három helyett, kulccsal és hozzáférhető névvel.
+
+### 5. Migráció
+
+A `packages/db` sémája és a `packages/db/drizzle` alatti migrációk nem változtak (`git diff --stat
+019c4b4 -- packages/db` üres), a `bun run check:db-drift` zöld.

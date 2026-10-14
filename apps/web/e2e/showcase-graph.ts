@@ -38,6 +38,11 @@ const START_CONFIG: NodeConfig = {
   onUnhandledError: null,
 };
 
+/**
+ * Az ötödik ág (`feldolgozas`) az alapértelmezett: a `branch` kártyán kulcs
+ * nélküli kimenet nincs, az alapértelmezett ág az, amelyik kulcsa a
+ * `defaultBranchKey` mezőben áll (SPEC-008 5.1, O-23).
+ */
 const BRANCH_CONFIG: NodeConfig = {
   type: 'branch',
   expression: 'input.kind',
@@ -46,8 +51,9 @@ const BRANCH_CONFIG: NodeConfig = {
     { key: 'osszegzes', label: 'Összegzés' },
     { key: 'metaadat', label: 'Metaadat' },
     { key: 'jovahagyas', label: 'Jóváhagyás' },
+    { key: 'feldolgozas', label: 'Feldolgozás' },
   ],
-  defaultBranchKey: null,
+  defaultBranchKey: 'feldolgozas',
   onUnhandledError: null,
 };
 
@@ -292,9 +298,9 @@ export const SHOWCASE_GRAPH: WorkflowGraphDocument = {
       id: 'e-branch-loop',
       sourceNodeId: 'n-branch',
       targetNodeId: 'n-loop',
-      sourceHandle: null,
+      sourceHandle: 'feldolgozas',
       targetHandle: null,
-      branchKey: null,
+      branchKey: 'feldolgozas',
       createdAtMs: 1,
     },
     {
