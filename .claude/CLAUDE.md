@@ -141,12 +141,17 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   az olvasó sémák (`NodeConfigSchema`, `WorkflowGraphDocumentSchema`) és a `db` `readGraph` guardja
   változatlan, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és egy régi, üres mezőt
   hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28, SPEC-008 5.4, O-21).
-  **Az `onUnhandledError` mentési szabálya ezzel szemben nem duplikátum:** kizárólag a `protocol`
-  mentési sémájában áll (mind a tíz típusnál nem `null`), a `db` `replaceGraph` a `null` értéket
-  elfogadja, mert az új workflow Startját a szerver ezzel az értékkel írja, és az alapérték
-  kiválasztása termék döntés volna; a második védvonal a motor `unhandled_error_policy_missing`
-  ellenőrzése, sodródás védelmi ág nem tartozik hozzá (a szabály helye technikai döntés a user
-  2026-09-28-i O-29 döntése nyomán, SPEC-008 5.4).
+  **Az `onUnhandledError` és a `join` `mode` mentési szabálya ezzel szemben nem duplikátum:**
+  kizárólag a `protocol` `NodeConfigSaveSchema` `superRefine` hívásában áll, a kötelező szöveg mezők
+  szabálya mellett: mind a tíz típusnál a `null` `onUnhandledError`, `join` típusnál a `null` `mode`
+  (a választatlan ág, O-33) hibát ad, a mező útvonalára horgonyozva (`config.onUnhandledError`,
+  `config.mode`), a beállítás panel pedig a mező alatt jelzi. A `db` `replaceGraph` mindkét `null`
+  értéket elfogadja, mert az új workflow Startját a szerver `null` `onUnhandledError` értékkel írja,
+  és az alapérték kiválasztása termék döntés volna; a második védvonal a motor: a futás indításakor
+  `unhandled_error_policy_missing`, illetve a választatlan `join` módra a meglévő
+  `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág e két mentési szabályhoz nem
+  tartozik (a `join` unió negyedik, `mode: null` ága viszont a meglévő sodródás védelem bővítése; a
+  szabály helye technikai döntés a user 2026-09-28-i O-29 és O-33 döntése nyomán, SPEC-008 5.4).
 
 **Fájlok és tesztek**
 
@@ -673,7 +678,10 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   meg, azt nem gyártjuk le sajátként némán: jelezni kell a usernek. Ami megvan, azt át kell
   emelni, nem egy másik komponens osztályát ráhúzni. Konkrét precedens: a `<textarea>` elemre
   a kész `.textarea` komponens jár, nem az egysoros `.input` osztály
-  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09).
+  (`docs/research/2026-09-08-design-system-audit.md` 4.4, user kérés 2026-09-09). Második
+  precedens: a `tooltip` egérrel elérhetősége (WCAG 1.4.13) user döntéssel készült eltérés a
+  design systemtől, a forrás CSS bájtazonos marad, a kiegészítés külön fájlban áll
+  (`packages/ui/src/tooltip/tooltip-hover-bridge.css`, user döntés 2026-10-14).
 - **Ha a forrás komponensnek React és statikus HTML változata is van, a React változat jár.** Mi
   React alkalmazás vagyunk. A `select.css` mindkettőt kiszolgálja ugyanazon a `.select` héjon, de
   a natív `<select>` retrofitről a forrás saját kommentje mondja ki, hogy a STATIKUS oldalaké

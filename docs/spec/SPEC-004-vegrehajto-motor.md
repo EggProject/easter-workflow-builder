@@ -262,24 +262,26 @@ flowchart TD
 
 ### 4.7 Egyéb gráf validációk
 
-| Ellenőrzés                                                              | Hibaosztály                      |
-| ----------------------------------------------------------------------- | -------------------------------- |
-| pontosan egy `start` típusú node van                                    | `invalid_start_node`             |
-| minden él forrása és célja létező node a pillanatképben                 | `dangling_edge`                  |
-| minden node elérhető a `start` node-ból                                 | `unreachable_node`               |
-| `script` node vagy `join` `script` mód nincs a gráfban                  | `unimplemented_node_type` (F-19) |
-| minden `branch` él `branch_key` értéke szerepel a `branches[]` listában | `branch_key_unknown`             |
-| a `defaultBranchKey`, ha nem `null`, szerepel a `branches[]` listában   | `branch_key_unknown`             |
-| minden `on_error` él célja `error_handler` típusú node                  | `invalid_error_handler_edge`     |
-| minden node configja illeszkedik a saját típusára                       | `malformed_node_config`          |
-| minden node configjában van `onUnhandledError` érték                    | `unhandled_error_policy_missing` |
-| a `join` `merge` módjának `settings` rekordja üres                      | `unsupported_join_merge_setting` |
+| Ellenőrzés                                                                                               | Hibaosztály                      |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| pontosan egy `start` típusú node van                                                                     | `invalid_start_node`             |
+| minden él forrása és célja létező node a pillanatképben                                                  | `dangling_edge`                  |
+| minden node elérhető a `start` node-ból                                                                  | `unreachable_node`               |
+| `script` node vagy `join` `script` mód nincs a gráfban                                                   | `unimplemented_node_type` (F-19) |
+| minden `branch` él `branch_key` értéke szerepel a `branches[]` listában                                  | `branch_key_unknown`             |
+| a `defaultBranchKey`, ha nem `null`, szerepel a `branches[]` listában                                    | `branch_key_unknown`             |
+| minden `on_error` él célja `error_handler` típusú node                                                   | `invalid_error_handler_edge`     |
+| minden node configja illeszkedik a saját típusára, és a `join` módja ki van választva (nem `mode: null`) | `malformed_node_config`          |
+| minden node configjában van `onUnhandledError` érték                                                     | `unhandled_error_policy_missing` |
+| a `join` `merge` módjának `settings` rekordja üres                                                       | `unsupported_join_merge_setting` |
 
 **A SPEC-010 9.2 ezt a listát egy ellenőrzéssel bővíti:** minden sablon és kifejezés mező lefordítható a port `compile` metódusával, különben a futás indítása `template_render_failed`, illetve `expression_evaluation_failed` osztállyal elutasít, ugyanebben a lépésben, tehát adat írása nélkül. Az ellenőrzés elfogadási kritériumai a SPEC-010 16. szekciójában állnak; a jelen spec 8. kritériumának "tíz ellenőrzés" száma a SPEC-004 saját táblázatára vonatkozik.
 
 **Miért utasítjuk el az ismeretlen `merge` beállítást.** A SPEC-003 4.3 szerint a `merge` mód alobjektumának egyetlen mezője sincs megnevezve, és mezőt kitalálni tilos. Ha a motor csendben figyelmen kívül hagyna egy ott álló kulcsot, a felhasználó azt hinné, hogy hat. Ezért az első verzió `merge` módja pontosan egy dolgot tud (5.6), és minden más kulcs elutasításra kerül, névvel.
 
-**A validáció eredménye típusszintű szűkítés.** A `validateRun` sikeres ága nem `NodeConfig` uniót ad vissza, hanem `ExecutableNodeConfig = Exclude<NodeConfig, ScriptNodeConfig | JoinScriptNodeConfig>` értéket. Ebből következik, hogy a végrehajtó diszpécser kimerítő `switch` szerkezetében **nincs** `script` ág, tehát nem keletkezik olyan kódág, ami logikailag sosem fut, és a 100 százalékos lefedettségi küszöb kizárás nélkül tartható (`.claude/CLAUDE.md` 5. szekció).
+**A választatlan `join` mód (user döntés 2026-10-14, SPEC-008 5.4, O-33).** A `db` `JoinNodeConfig` uniójának negyedik, `mode: null` ága tárolható és olvasható (a felvett `join` csomópont kezdő alakja), a futás viszont nem indulhat vele: a motor a meglévő `malformed_node_config` hibaosztállyal utasítja el, a táblázat fenti sora szerint, a config illeszkedési ellenőrzésével egy lépésben (`validate-node-configs.ts`). Új hibaosztály nincs, és a szerver hibaleképezése nem változik.
+
+**A validáció eredménye típusszintű szűkítés.** A `validateRun` sikeres ága nem `NodeConfig` uniót ad vissza, hanem `ExecutableNodeConfig = Exclude<WellFormedNodeConfig, ScriptNodeConfig | JoinScriptNodeConfig>` értéket, ahol `WellFormedNodeConfig = Exclude<NodeConfig, JoinUnselectedNodeConfig>` a `malformed_node_config` ellenőrzés eredménye. Ebből következik, hogy a végrehajtó diszpécser kimerítő `switch` szerkezetében **nincs** `script` ág és `mode: null` ág, tehát nem keletkezik olyan kódág, ami logikailag sosem fut, és a 100 százalékos lefedettségi küszöb kizárás nélkül tartható (`.claude/CLAUDE.md` 5. szekció).
 
 ### 4.8 A futás indításának sorrendje
 

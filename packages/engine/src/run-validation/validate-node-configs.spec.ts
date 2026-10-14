@@ -59,6 +59,23 @@ describe('validateNodeConfigs', () => {
     });
   });
 
+  it('választatlan módú (mode: null) join node-ra malformed_node_config hibát ad (SPEC-008 O-33)', () => {
+    const joinUnselectedConfig = { type: 'join', mode: null, onUnhandledError: 'fail_run' };
+    const graph = graphOf([node('start', 'start', startConfig), node('j', 'join', joinUnselectedConfig)]);
+
+    expect(validateNodeConfigs(graph)).toStrictEqual({
+      kind: 'error',
+      message: 'A(z) j join node módja nincs kiválasztva (malformed_node_config).',
+    });
+  });
+
+  it('a kiválasztott módú join node átmegy', () => {
+    const joinMergeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+    const graph = graphOf([node('j', 'join', joinMergeConfig)]);
+
+    expect(validateNodeConfigs(graph)).toStrictEqual({ kind: 'ok', value: new Map([['j', joinMergeConfig]]) });
+  });
+
   it('node nélküli gráfra üres térképet ad', () => {
     expect(validateNodeConfigs(graphOf([]))).toStrictEqual({ kind: 'ok', value: new Map() });
   });

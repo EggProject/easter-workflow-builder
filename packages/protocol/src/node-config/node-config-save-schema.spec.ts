@@ -51,7 +51,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'start',
       inputFields: [{ name: text, label: 'Téma', valueKind: 'string', required: true }],
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -60,7 +60,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'start',
       inputFields: [{ name: 'topic', label: text, valueKind: 'string', required: true }],
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -69,7 +69,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
     build: (text) => ({
       type: 'start',
       inputFields: [{ name: 'topic', label: 'Téma', valueKind: text, required: true }],
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -79,7 +79,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       ...VALID_AGENT_STEP_SETTINGS,
       promptTemplate: text,
       type: 'agent_step',
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -90,7 +90,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       expression: text,
       branches: [{ key: 'pos', label: 'Pozitív' }],
       defaultBranchKey: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -101,7 +101,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       expression: 'x > 0',
       branches: [{ key: text, label: 'Pozitív' }],
       defaultBranchKey: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -112,7 +112,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       expression: 'x > 0',
       branches: [{ key: 'pos', label: text }],
       defaultBranchKey: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -122,13 +122,18 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       type: 'fan_out',
       itemsExpression: text,
       branchLabelTemplate: '{{item}}',
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
     field: 'fan_out branchLabelTemplate',
     path: ['branchLabelTemplate'],
-    build: (text) => ({ type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: text, onUnhandledError: null }),
+    build: (text) => ({
+      type: 'fan_out',
+      itemsExpression: 'items',
+      branchLabelTemplate: text,
+      onUnhandledError: 'fail_run',
+    }),
   },
   {
     field: 'join ai_synthesis settings.promptTemplate',
@@ -137,7 +142,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       type: 'join',
       mode: 'ai_synthesis',
       settings: { ...VALID_AGENT_STEP_SETTINGS, promptTemplate: text },
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -147,13 +152,13 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       type: 'join',
       mode: 'script',
       settings: { source: text, runtime: 'expression' },
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
     field: 'loop continueExpression',
     path: ['continueExpression'],
-    build: (text) => ({ type: 'loop', maxIterations: 3, continueExpression: text, onUnhandledError: null }),
+    build: (text) => ({ type: 'loop', maxIterations: 3, continueExpression: text, onUnhandledError: 'fail_run' }),
   },
   {
     field: 'human_approval title',
@@ -163,7 +168,7 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       title: text,
       bodyTemplate: 'Engedélyezed?',
       timeoutMs: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
@@ -174,18 +179,18 @@ const REQUIRED_FIELD_CASES: readonly RequiredFieldCase[] = [
       title: 'Jóváhagyás',
       bodyTemplate: text,
       timeoutMs: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     }),
   },
   {
     field: 'sub_workflow targetWorkflowId',
     path: ['targetWorkflowId'],
-    build: (text) => ({ type: 'sub_workflow', targetWorkflowId: text, inputMapping: {}, onUnhandledError: null }),
+    build: (text) => ({ type: 'sub_workflow', targetWorkflowId: text, inputMapping: {}, onUnhandledError: 'fail_run' }),
   },
   {
     field: 'script source',
     path: ['source'],
-    build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: null }),
+    build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: 'fail_run' }),
   },
 ];
 
@@ -261,7 +266,7 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
         { key: '', label: 'Negatív' },
       ],
       defaultBranchKey: null,
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     });
 
     expect(parsed.success).toBe(false);
@@ -279,14 +284,14 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
       type: 'join',
       mode: 'merge',
       settings: { source: '', promptTemplate: '' },
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
   });
 
   it('a nullázható szöveg mező üres értéke nem kötelező mező (agent_step cwd)', () => {
-    const config = { ...VALID_AGENT_STEP_SETTINGS, cwd: '', type: 'agent_step', onUnhandledError: null };
+    const config = { ...VALID_AGENT_STEP_SETTINGS, cwd: '', type: 'agent_step', onUnhandledError: 'fail_run' };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
   });
@@ -297,14 +302,18 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
       maxAttempts: 3,
       backoffMs: [1000],
       handledErrorKinds: [''],
-      onUnhandledError: null,
+      onUnhandledError: 'fail_run',
     };
 
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
   });
 
   it('alak hibánál a kötelező mező szabály nem fut, csak a séma saját hibája áll', () => {
-    const parsed = NodeConfigSaveSchema.safeParse({ type: 'loop', continueExpression: '', onUnhandledError: null });
+    const parsed = NodeConfigSaveSchema.safeParse({
+      type: 'loop',
+      continueExpression: '',
+      onUnhandledError: 'fail_run',
+    });
 
     expect(parsed.success).toBe(false);
     if (parsed.success) {
@@ -315,5 +324,158 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
 
   it('a kimeneti típus ugyanaz, mint az olvasó sémáé', () => {
     expectTypeOf<z.infer<typeof NodeConfigSaveSchema>>().toEqualTypeOf<NodeConfig>();
+  });
+});
+
+/**
+ * Típusonként (a `join` minden kiválasztott módjával) egy egyébként
+ * mentésre kész konfig: csak az `onUnhandledError` értéke változik.
+ */
+const SAVABLE_CONFIG_BY_VARIANT: readonly {
+  readonly variant: string;
+  readonly config: Readonly<Record<string, unknown>>;
+}[] = [
+  {
+    variant: 'start',
+    config: { type: 'start', inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true }] },
+  },
+  { variant: 'agent_step', config: { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step' } },
+  {
+    variant: 'branch',
+    config: {
+      type: 'branch',
+      expression: 'x > 0',
+      branches: [{ key: 'pos', label: 'Pozitív' }],
+      defaultBranchKey: null,
+    },
+  },
+  { variant: 'fan_out', config: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}' } },
+  { variant: 'join merge', config: { type: 'join', mode: 'merge', settings: {} } },
+  {
+    variant: 'join script',
+    config: { type: 'join', mode: 'script', settings: { source: 'x', runtime: 'expression' } },
+  },
+  { variant: 'join ai_synthesis', config: { type: 'join', mode: 'ai_synthesis', settings: VALID_AGENT_STEP_SETTINGS } },
+  { variant: 'loop', config: { type: 'loop', maxIterations: 3, continueExpression: 'i < 3' } },
+  {
+    variant: 'human_approval',
+    config: { type: 'human_approval', title: 'Jóváhagyás', bodyTemplate: 'Engedélyezed?', timeoutMs: null },
+  },
+  {
+    variant: 'error_handler',
+    config: { type: 'error_handler', maxAttempts: 3, backoffMs: [1000], handledErrorKinds: [] },
+  },
+  { variant: 'sub_workflow', config: { type: 'sub_workflow', targetWorkflowId: 'wf-1', inputMapping: {} } },
+  { variant: 'script', config: { type: 'script', source: 'x + 1', runtime: 'expression' } },
+];
+
+describe('NodeConfigSaveSchema: az onUnhandledError nem lehet null (SPEC-008 5.4, O-29)', () => {
+  it('mind a tíz típus szerepel az esetek között', () => {
+    expect(new Set(SAVABLE_CONFIG_BY_VARIANT.map(({ config }) => config['type'])).size).toBe(10);
+  });
+
+  for (const { variant, config } of SAVABLE_CONFIG_BY_VARIANT) {
+    describe(variant, () => {
+      it('a null érték elbukik, a hiba a mező útvonalán áll', () => {
+        const parsed = NodeConfigSaveSchema.safeParse({ ...config, onUnhandledError: null });
+
+        expect(parsed.success).toBe(false);
+        if (parsed.success) {
+          return;
+        }
+        expect(issuePaths(parsed.error)).toEqual([['onUnhandledError']]);
+        expect(parsed.error.issues[0]?.message).toBe('A mező nem lehet üres.');
+      });
+
+      it('a WorkflowNodeInputSchema és a ReplaceGraphRequestSchema a null értéket a teljes útvonalon utasítja el', () => {
+        const blankNode = nodeWith({ ...config, onUnhandledError: null });
+        const node = WorkflowNodeInputSchema.safeParse(blankNode);
+        const request = ReplaceGraphRequestSchema.safeParse({ nodes: [blankNode], edges: [] });
+
+        expect(node.success).toBe(false);
+        expect(request.success).toBe(false);
+        if (node.success || request.success) {
+          return;
+        }
+        expect(issuePaths(node.error)).toEqual([['config', 'onUnhandledError']]);
+        expect(issuePaths(request.error)).toEqual([['nodes', 0, 'config', 'onUnhandledError']]);
+      });
+
+      for (const policy of ['fail_run', 'fail_branch'] as const) {
+        it(`a(z) ${policy} érték átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse({ ...config, onUnhandledError: policy }).success).toBe(true);
+        });
+      }
+
+      it('az olvasó NodeConfigSchema, WorkflowNodeSchema és WorkflowGraphDocumentSchema a null értéket elfogadja', () => {
+        const stored = { ...config, onUnhandledError: null };
+        const storedNode = storedNodeWith(stored);
+
+        expect(NodeConfigSchema.safeParse(stored).success).toBe(true);
+        expect(WorkflowNodeSchema.safeParse(storedNode).success).toBe(true);
+        expect(WorkflowGraphDocumentSchema.safeParse({ nodes: [storedNode], edges: [] }).success).toBe(true);
+      });
+    });
+  }
+
+  it('az üres kötelező szöveg mező és a null onUnhandledError együtt két külön hibát ad', () => {
+    const parsed = NodeConfigSaveSchema.safeParse({
+      type: 'loop',
+      maxIterations: 3,
+      continueExpression: '',
+      onUnhandledError: null,
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['continueExpression'], ['onUnhandledError']]);
+  });
+});
+
+describe('NodeConfigSaveSchema: a join mode nem lehet null (SPEC-008 5.4, O-33)', () => {
+  const unselectedJoin = { type: 'join', mode: null, onUnhandledError: 'fail_run' } as const;
+
+  it('a választatlan join elbukik, a hiba a mode útvonalán áll', () => {
+    const parsed = NodeConfigSaveSchema.safeParse(unselectedJoin);
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['mode']]);
+    expect(parsed.error.issues[0]?.message).toBe('A mező nem lehet üres.');
+  });
+
+  it('a WorkflowNodeInputSchema és a ReplaceGraphRequestSchema a teljes útvonalon utasítja el', () => {
+    const node = WorkflowNodeInputSchema.safeParse(nodeWith(unselectedJoin));
+    const request = ReplaceGraphRequestSchema.safeParse({ nodes: [nodeWith(unselectedJoin)], edges: [] });
+
+    expect(node.success).toBe(false);
+    expect(request.success).toBe(false);
+    if (node.success || request.success) {
+      return;
+    }
+    expect(issuePaths(node.error)).toEqual([['config', 'mode']]);
+    expect(issuePaths(request.error)).toEqual([['nodes', 0, 'config', 'mode']]);
+  });
+
+  it('null onUnhandledError mellett mindkét mező külön hibát ad', () => {
+    const parsed = NodeConfigSaveSchema.safeParse({ ...unselectedJoin, onUnhandledError: null });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['onUnhandledError'], ['mode']]);
+  });
+
+  it('az olvasó NodeConfigSchema, WorkflowNodeSchema és WorkflowGraphDocumentSchema elfogadja', () => {
+    const storedNode = storedNodeWith(unselectedJoin);
+
+    expect(NodeConfigSchema.safeParse(unselectedJoin).success).toBe(true);
+    expect(WorkflowNodeSchema.safeParse(storedNode).success).toBe(true);
+    expect(WorkflowGraphDocumentSchema.safeParse({ nodes: [storedNode], edges: [] }).success).toBe(true);
   });
 });

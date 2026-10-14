@@ -634,6 +634,30 @@ describe('createRunSupervisor', () => {
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
     });
 
+    it('választatlan módú join (mode: null) esetén malformed_node_config, és nem jön létre workflow_run sor (SPEC-008 O-33, user döntés 2026-10-14)', () => {
+      const harness = openHarness();
+      const workflowId = createWorkflow(
+        harness.database,
+        'join-mod',
+        [
+          startNode('start'),
+          fanOutNode('fo', '[1,2]'),
+          agentNode('elem', 'sikeres'),
+          nodeOf('j', { type: 'join', mode: null, onUnhandledError: 'fail_run' }),
+        ],
+        [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'elem'), edgeOf('e3', 'elem', 'j')],
+      );
+
+      const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+
+      expect(outcome).toStrictEqual({
+        kind: 'error',
+        message: 'A(z) j join node módja nincs kiválasztva (malformed_node_config).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+      expect(harness.published).toStrictEqual([]);
+    });
+
     it('hiányzó kötelező bemenet esetén nem jön létre workflow_run sor', () => {
       const harness = openHarness();
       const workflowId = createWorkflow(

@@ -85,6 +85,7 @@ export { resolveEffectiveProvider } from './provider-resolution/resolve-effectiv
 // tizenegy ellenőrző függvény azért is szerepel a barrelben, mert
 // mindegyik önállóan futtatható, adatbázis nélküli tiszta függvény.
 export type { ExecutableNodeConfig } from './run-validation/executable-node-config.ts';
+export type { WellFormedNodeConfig } from './run-validation/well-formed-node-config.ts';
 export type { ValidatedRun } from './run-validation/validated-run.ts';
 export { validateRun } from './run-validation/validate-run.ts';
 export { validateStartNode } from './run-validation/validate-start-node.ts';
