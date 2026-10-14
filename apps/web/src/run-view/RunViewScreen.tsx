@@ -25,8 +25,10 @@ import { RunControlBar } from '../run-control/RunControlBar.tsx';
 import { RunGraphCanvas } from '../run-graph/RunGraphCanvas.tsx';
 import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
 import { buildRunGraphNodes } from '../run-graph/build-run-graph-nodes.ts';
+import { groupBranchDecisionsByNode } from '../run-graph/group-branch-decisions-by-node.ts';
 import { mergeSnapshotStepRuns } from '../run-graph/merge-snapshot-step-runs.ts';
 import { projectSnapshotGraph } from '../run-graph/project-snapshot-graph.ts';
+import { useBranchDecisions } from '../run-graph/use-branch-decisions.ts';
 import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
 import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
 import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
@@ -213,6 +215,12 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * lépés futás lista a megnyitáskor betöltődik, majd minden jelző keretre
  * összevont újratöltéssel frissül, oldal újratöltés nélkül.
  *
+ * AZ ELÁGAZÁSOK DÖNTÉSEI (SPEC-008 6.6, T-009-38) a `useBranchDecisions`
+ * hookból jönnek, ugyanazon a veszteségmentes keret úton, új REST hívás
+ * nélkül; a csomópontokhoz a lépés futás lista köti őket
+ * (`groupBranchDecisionsByNode`), és ebből áll az alapértelmezett ág jelvény
+ * adata a kártyán.
+ *
  * A JÓVÁHAGYÁS (T-009-27, SPEC-008 8. szekció) három helyen látszik: a
  * fejléc vezérlő sávjában egy jelvény, a csomóponton a várakozás kezdete, és
  * a transcript sávban a döntési felület, egy CLI engedélykérés sorrendjében:
@@ -265,6 +273,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const runId = readRunId(search);
   const transcript = useRunTranscript(runId, subscribeToFrames);
   const liveStepRuns = useLiveStepRuns({ runId, subscribeToFrames, fetchFunction, apiOrigin, serverRestartCount });
+  const branchDecisions = useBranchDecisions(runId, subscribeToFrames);
   const pendingApprovals = usePendingApprovals({ runId, subscribeToFrames, fetchFunction, apiOrigin });
   const listedApprovals = pendingApprovals.approvals ?? [];
   const approvalDecisions = useApprovalDecisions({
@@ -468,6 +477,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     stepRuns,
     onOpenSubWorkflowRun: navigateToRun,
     pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(listedApprovals),
+    branchDecisionsByNodeId: groupBranchDecisionsByNode(branchDecisions, stepRuns),
   });
   // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
   // a fenti blokkoló ágon áll meg.
