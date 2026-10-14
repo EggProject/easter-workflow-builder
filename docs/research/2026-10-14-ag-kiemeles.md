@@ -229,6 +229,8 @@ a repóban van: a `build-run-graph-flow-edges.spec.ts` a `run-graph.css` forrás
 kifestett pixelt a PLAN-009 T-009-40 sora vezeti be (az `edge-paint-measurement.ts` mintájára), addig
 a fenti két szám nem újrafuttatható.
 
+Lezárva: a `T-009-40` 4. pontja szerint a `branch-highlight.spec.ts` minden e2e futásban visszaolvassa.
+
 ### 6. A lenyomott kapcsoló számított stílusa
 
 Egyszeri számított stílus mérés a lapon (2026-10-14, a T-009-39 állapoton a `color` szabály
@@ -253,3 +255,137 @@ a repóban van, az forrás szintű: a `BranchHighlightToggle.spec.tsx` a `run-gr
 szabályában ellenőrzi a háttér, a keret és a szín tokenjét (a `color` nélküli régi CSS-en bukik,
 mérve). Az, hogy a feloldott érték tényleg a tokené, csak futó böngészőben látszik, és ezt jelenleg
 semmi nem őrzi.
+
+## T-009-40
+
+Az e2e és a mérés: a kétszer futó elágazás fixtúrája, a kiemelés kifestett pixel mérése két témában,
+a kapcsoló két módja az újratöltéssel, a két jelvény és a szándékos rontások (SPEC-008 6.6, 86.,
+89., 90., 91.). Ág: `feat/spec-008-d2-e2e-meres`, az `origin/main` `019c4b4` állapotáról. Új fájl az
+`apps/web/e2e/branch-highlight.spec.ts`; az `apps/web/e2e/edge-paint-measurement.ts` egy új
+függvényt kapott (`measureEdgeClassPaintDifference`). Termékkód nem változott.
+
+### 1. A fixtúra
+
+Saját, a spec fájlban álló fixtúra (a `showcase-graph.ts` és a `branch-decision-data.spec.ts`
+fixtúrája változatlan): `start` -> `branch` -> két `script` csomópont, az elágazás két kulcsos éllel
+(`igen`, `nem`, a `defaultBranchKey` a `nem`), tehát a kulcs nélküli élek elhagyása (O-27, T-009-54)
+erre a fixtúrára nem hat. Az elágazásnak két lépés futása van (a második `attempt: 2`), mindkettő egy
+`branch_taken` döntéssel. Két forgatókönyv, csak a döntések sorrendjében eltérve:
+
+| Forgatókönyv            | 1. döntés (`id` 2)           | 2. döntés (`id` 3)           | "csak a legutóbbi" | "minden bejárt"         | Jelvény mindkét módban |
+| ----------------------- | ---------------------------- | ---------------------------- | ------------------ | ----------------------- | ---------------------- |
+| a legutóbbi alapért.    | `igen`, `usedDefault: false` | `null`, `usedDefault: true`  | `ag-e-nem`         | `ag-e-igen`, `ag-e-nem` | van                    |
+| csak a korábbi alapért. | `null`, `usedDefault: true`  | `igen`, `usedDefault: false` | `ag-e-igen`        | `ag-e-igen`, `ag-e-nem` | nincs                  |
+
+Minden REST hívás `page.route()` mockon megy (a futás nézet öt végpontja). Az SSE csatorna lezárt
+`page.route()` válasz: a kifestés, a jelvény és a próbálkozás tesztje a
+`mockSseFramesWithoutReconnect` segédet használja, az újratöltéses teszt a `mockSseFrames` segédet,
+mert az újratöltés utáni kapcsolatnak is meg kell kapnia a pótlást. A várakozás egyik vizsgált
+jelvényre sem épül (a kártya állapot jelvényére vár, "sikeres"), hogy egy jelvény rontása csak a saját
+tesztjét buktassa.
+
+### 2. A kifestett pixel mérés módszere
+
+A `.claude/CLAUDE.md` 11. szekciójának kifestett pixel szabálya, a `run-graph-paint.spec.ts`
+mintájára, a valós futás nézet alakján (1440x900, a transcript panellel együtt), a "Fit View" gomb
+után, mindkét témában (`colorScheme` és `eggTheme`). A `measureEdgeClassPaintDifference` két
+képernyőképet készít UGYANARRÓL a kivágatról (az él befoglaló doboza, a meglévő `edgeClip`
+ráhagyásával), mindkettőt a meglévő mérési szondával (a pontminta, a csomópontok és a panelek
+eltüntetve, `docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció): az elsőt az él mostani
+osztályaival, a másodikat a kiemelés osztálya (`run-graph-edge--highlighted`) nélkül, amit a mérés a
+DOM-ból vesz le és utána visszatesz. A szám a két kép legnagyobb csatorna eltérése, a böngésző
+vászon API-ján, memóriában; képet lemezre semmi nem ír. Mért élek: "csak a legutóbbi" módban a
+`ag-e-nem`, "minden bejárt" módban az `ag-e-igen` és az `ag-e-nem`; kontrollként (állítás nélkül) a
+nem kiemelt `ag-e-start`.
+
+### 3. Nyers számok és a küszöb
+
+Saját mérés, 2026-10-14, `@playwright/test@1.62.1` chromium, a sandbox rootless konténere. Az ép
+állapot a végső spec állapotán, a teljes e2e futásban és külön `--repeat-each 4` mellett
+(determinisztikus, mind a négy ismétlés azonos), a rontott állapotok a termékkód ideiglenes
+módosításával, egyenként, a módosítás visszaállításával (`git checkout`).
+
+| Állapot                                                              | világos `ag-e-nem` legutóbbi | világos `ag-e-igen` / `ag-e-nem` minden | sötét `ag-e-nem` legutóbbi | sötét `ag-e-igen` / `ag-e-nem` minden |
+| -------------------------------------------------------------------- | ---------------------------- | --------------------------------------- | -------------------------- | ------------------------------------- |
+| ép                                                                   | 117                          | 122 / 117                               | 178                        | 180 / 178                             |
+| ép kiemelés a (b2) rontás futásában (a jelvény hiányzik)             | 122                          | 121 / 122                               | 170                        | 175 / 170                             |
+| (a) a kiemelés osztálya nem kerül az élre                            | 0                            | (nem fut le)                            | 0                          | (nem fut le)                          |
+| (a2) a `run-graph.css` kiemelés szabályának két deklarációja törölve | 0                            | (nem fut le)                            | 0                          | (nem fut le)                          |
+| részleges: csak a szín marad (a `stroke-width` törölve)              | 66                           | 66 / 66                                 | 65                         | 66 / 65                               |
+| részleges: csak a vastagság marad (a `stroke` törölve)               | 57                           | (nem fut le)                            | 133                        | 132 / 133                             |
+
+A kontroll él (`ag-e-start`, osztály nélkül) minden futásban 0 mindkét témában. A második sor
+kiemelése ép (a (b2) rontás csak a jelvényt érinti), a számai mégis eltérnek az első sorétól; az
+eltérés oka nem vizsgált (nem ellenőrzött feltevés: a hiányzó jelvény a kártya méretén át az él
+geometriáját változtatja). Az ép tartomány a két sorból 117 ... 180. "(nem fut le)": az első állítás bukása után a teszt megáll.
+
+**A küszöb: 58.** A hibás állapot (a kiemelés nem fest: (a), (a2)) mért legnagyobb értéke 0, az ép
+állapoté legalább 117 (világos téma); az 58 a kettő egész felezőpontja (`floor(117 / 2)`), mindkét
+témára egyetlen szám. **Amit a pixel küszöb nem dönt el:** a két részleges rontás a világos témában
+a küszöb két oldalára esik (csak szín 66, csak vastagság 57), a sötétben mindkettő felette van; a
+pixel állítás tárgya az, hogy a kiemelés látszik-e, nem a pontos szín és vastagság. Ezt a számított
+stílus tesztje dönti el, és mindkét részleges rontásra, mindkét témában bukik (5. pont).
+
+### 4. A számított stílus
+
+A kiemelt él (`ag-e-nem`, "csak a legutóbbi" mód) számított `stroke` értéke a `--ep-accent`
+feloldott értéke, a teszt saját futásában kiolvasva `rgb(227, 181, 99)` mindkét témában (egy
+ideiglenes elem `stroke: var(--ep-accent)` számított értéke a vásznon belül), a számított
+`stroke-width` számértéke 2.4. A nem kiemelt `ag-e-start` és `ag-e-igen` éle `rgb(177, 177, 183)` és
+1, a React Flow szállított alapértéke (`@xyflow/react@12.11.6` `dist/style.css`:
+`--xy-edge-stroke-default: #b1b1b7`, `--xy-edge-stroke-width-default: 1`). Ezzel a T-009-39 5.
+pontjának "Ismételhető út a repóban: erre a számra jelenleg nincs" mondata a kiemelt él `stroke` és
+`stroke-width` értékére nem áll tovább: a `branch-highlight.spec.ts` minden e2e futásban visszaolvassa.
+
+### 5. Szándékos rontások és a bukó tesztek
+
+Mindegyik a termékkód egyetlen helyének ideiglenes módosítása, a teljes `branch-highlight.spec.ts`
+(8 teszt) lefuttatva, utána visszaállítva. A rövidítések: K-v és K-s a "a kiemelt él vonala eltér
+ugyanannak a kivágatnak az osztály nélküli képétől, mindkét módban" (világos, sötét); S-v és S-s a "a
+kiemelt él számított stroke értéke a --ep-accent feloldott értéke és 2.4 vastag, a nem kiemelté a
+React Flow alapértéke"; M a "a két mód különböző élhalmazt emel ki, és újratöltés után a mentett mód
+marad"; J1 a "ha a legutóbbi döntés az alapértelmezett ágra lépett, a jelvény mindkét módban áll"; J2
+a "ha csak egy korábbi döntés lépett az alapértelmezett ágra, a jelvény a minden bejárt módban sem
+áll"; P a "a kétszer futó elágazáson a próbálkozás jelvény "2. próbálkozás" felirattal, a kártya
+dobozán belül áll".
+
+| Rontás                                                                                                     | Hely                                     | Bukó tesztek                        |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------- |
+| (a) a kiemelés osztálya nem kerül az élre (`{ ...flowEdge }` a `className` helyett)                        | `build-run-graph-flow-edges.ts`          | K-v, K-s, S-v, S-s, M, J1, J2 (7/8) |
+| (a2) a kiemelés CSS szabályának `stroke` és `stroke-width` deklarációja törölve                            | `run-graph.css`                          | K-v, K-s, S-v, S-s (4/8)            |
+| (b1) "csak a legutóbbi" helyett az első döntés (`slice(-1)` -> `slice(0, 1)`)                              | `resolve-highlighted-branch-edge-ids.ts` | K-v, K-s, S-v, S-s, M, J2 (6/8)     |
+| (b2) a jelvény a legutóbbi helyett az első döntésből (`at(-1)` -> `at(0)`)                                 | `build-run-graph-nodes.ts`               | J1, J2 (2/8)                        |
+| (b3) a jelvény bármelyik alapértelmezett döntésre (`at(-1)` -> `find((decision) => decision.usedDefault)`) | `build-run-graph-nodes.ts`               | J2 (1/8)                            |
+| (b4) a döntések csökkenő `eventId` sorrendben (a "legutóbbi" mindkét felhasználójánál elrontva)            | `group-branch-decisions-by-node.ts`      | K-v, K-s, S-v, S-s, M, J1, J2 (7/8) |
+| (c) a kapcsoló nem menti a módot (`storeBranchHighlightMode` hívás törölve)                                | `RunGraphCanvas.tsx`                     | M (1/8)                             |
+| (d) a próbálkozás jelvény csak 2 felett (`attempt > 1` -> `attempt > 2`)                                   | `GraphNodeCard.tsx`                      | P (1/8)                             |
+| részleges: csak a szín marad                                                                               | `run-graph.css`                          | S-v, S-s (2/8)                      |
+| részleges: csak a vastagság marad                                                                          | `run-graph.css`                          | K-v, S-v, S-s (3/8)                 |
+
+A (b3) az O-24 döntés pontos megsértése (a jelvény a "minden bejárt" értelemben követné a
+döntéseket): egyedül a J2 fogja, és ez az a teszt, ami a "minden bejárt" módban is állítja a jelvény
+hiányát. A rontatlan állapoton mind a 8 teszt zöld, a `run-graph-paint.spec.ts`, a
+`branch-decision-data.spec.ts` és a `showcase-graph.spec.ts` is (22/22, egy futásban).
+
+### 6. Az e2e lefedettség előtte és utána
+
+**Előtte**: saját mérés a tiszta `origin/main` (`019c4b4`) állapoton, a T-009-38 szekció eljárásával
+(`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, nyolc egymás utáni
+`bun x playwright test --shard=<i>/8` `flock /tmp/playwright-gep.lock` alatt, majd
+`bun run coverage:e2e:report`, kilépési kód 0, a nyers összeg `nyc report --reporter=json-summary`
+kimenetéből). **479 teszt, mind zöld.**
+
+**Utána**: ugyanez az eljárás a jelen ág állapotán. **487 teszt, mind zöld** (a 8 új teszttel), a
+`coverage:e2e:report` kilépési kódja 0.
+
+| Metrika    | Előtte fedett / összes | Utána fedett / összes | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1771 / 1786            | 1771 / 1786           | 15 -> 15                 |
+| branches   | 828 / 839              | 828 / 839             | 11 -> 11                 |
+| functions  | 582 / 585              | 582 / 585             | 3 -> 3                   |
+| lines      | 1710 / 1725            | 1710 / 1725           | 15 -> 15                 |
+
+A fedetlen tételek fájlonkénti listája (a `nyc report --reporter=text` 100 alatti sorai) a két
+állapoton betűre azonos, ugyanaz a hat fájl, mint a T-009-39 szekcióban. Az összes sem változott,
+mert termékkód nem változott, és az új tesztek a már fedett kódot futtatják. A küszöb nem mozdult
+(`apps/web/package.json`).
