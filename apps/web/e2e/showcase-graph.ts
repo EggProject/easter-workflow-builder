@@ -26,8 +26,10 @@ import type {
   WorkflowDetail,
   WorkflowGraphDocument,
 } from '@easter-workflow-builder/protocol';
+import type { Server } from 'node:http';
 import { expect, type Page } from '@playwright/test';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
+import { startOpenStreamServer } from './run-view-stream.ts';
 import { mockIdleStream, mockSseFramesWithoutReconnect } from './sse-mock.ts';
 import { makeRunEventRecord, replayFrames, sdkResultRecord } from './transcript-fixture.ts';
 
@@ -592,17 +594,14 @@ export async function installShowcaseMocks(page: Page): Promise<void> {
 }
 
 /**
- * Ugyanez a FUTÁS nézet végpontjaira (`getRun`, `readRunSnapshot`,
- * `listStepRuns`, `listPendingApprovals`), a származtatott pillanatképpel. A
+ * A FUTÁS nézet REST végpontjai (`getRun`, `readRunSnapshot`, `listStepRuns`,
+ * `listPendingApprovals`), a származtatott pillanatképpel. A
  * `listPendingApprovals` üres listát ad, mert a bemutatón jóváhagyás nem
- * látszik (SPEC-008 12.6). Az SSE csatorna a transcript soraival, újracsatlakozás
- * nélkül (`mockSseFramesWithoutReconnect`). A `readSettings` azért
- * szerepel, mert a topnav shell is kérdezi: a hiányzó mock az
- * `installApiMocks` szerint 404-et adna, ami hibaüzenetet tenne a
- * képernyőképre.
+ * látszik (SPEC-008 12.6). A `readSettings` azért szerepel, mert a topnav
+ * shell is kérdezi: a hiányzó mock az `installApiMocks` szerint 404-et adna,
+ * ami hibaüzenetet tenne a képernyőképre.
  */
-export async function installShowcaseRunMocks(page: Page): Promise<void> {
-  await mockSseFramesWithoutReconnect(page, SHOWCASE_RUN_STREAM_FRAMES);
+async function installShowcaseRunApiMocks(page: Page): Promise<void> {
   await installApiMocks(page, [
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SHOWCASE_RUN_SNAPSHOT))),
@@ -610,6 +609,33 @@ export async function installShowcaseRunMocks(page: Page): Promise<void> {
     mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SHOWCASE_SETTINGS))),
   ]);
+}
+
+/**
+ * A futás nézet mockjai a transcript soraival, az SSE csatorna lezárt
+ * `page.route()` válaszon, újracsatlakozás nélkül
+ * (`mockSseFramesWithoutReconnect`). A lezárt válasz után a stream jelző
+ * "újracsatlakozás" állapotban áll; a rajzot és a transcriptet vizsgáló
+ * tesztekhez ez elég.
+ */
+export async function installShowcaseRunMocks(page: Page): Promise<void> {
+  await mockSseFramesWithoutReconnect(page, SHOWCASE_RUN_STREAM_FRAMES);
+  await installShowcaseRunApiMocks(page);
+}
+
+/**
+ * Ugyanez ÉLŐ, nyitva tartott SSE kapcsolattal (user döntés 2026-10-14,
+ * SPEC-008 12.6): a keretek a `run-view-stream.ts` szabad porton figyelő
+ * `node:http` teszt szerveréről jönnek, ami a kapcsolatot nyitva hagyja, tehát
+ * az `EventSource` nem kap `error`-t, és a stream jelző "élő" állapotú. A REST
+ * hívások ugyanúgy `page.route()` mockon mennek. Visszatér a szerverrel, amit
+ * a hívó zár le (`closeAllConnections()` és `close()`, különben a nyitott
+ * kapcsolat életben tartja).
+ */
+export async function installShowcaseLiveRunMocks(page: Page): Promise<Server> {
+  const { server } = await startOpenStreamServer(page, SHOWCASE_RUN_STREAM_FRAMES);
+  await installShowcaseRunApiMocks(page);
+  return server;
 }
 
 /**
@@ -671,6 +697,15 @@ export async function expectShowcaseTranscript(page: Page): Promise<void> {
   expect(scrollBox.scrollHeight).toBeLessThanOrEqual(scrollBox.clientHeight);
   await expect(page.getByRole('region', { name: 'Függő jóváhagyások' })).toHaveCount(0);
   await expect(page.getByText('jóváhagyásra vár', { exact: true })).toHaveCount(0);
+}
+
+/**
+ * A topnav stream jelzője "élő" állapotú (SPEC-008 12.6, 93. kritérium): a
+ * kapcsolat nyitva, és nincs folyamatban lévő pótlás. Csak az
+ * `installShowcaseLiveRunMocks` nyitott kapcsolatán teljesülhet.
+ */
+export async function expectShowcaseStreamLive(page: Page): Promise<void> {
+  await expect(page.getByRole('status', { name: 'Stream kapcsolat: élő' })).toBeVisible();
 }
 
 /**
