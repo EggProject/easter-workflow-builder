@@ -11,6 +11,7 @@ import { workflowTable } from './workflow.ts';
 import { workflowNodeTable } from './workflow-node.ts';
 import { workflowEdgeTable } from './workflow-edge.ts';
 import type { NodeConfig } from '../node-config/node-config.ts';
+import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { graphSnapshotTable } from '../../graph-snapshot/stored-snapshot/graph-snapshot.ts';
 import {
   GRAPH_DOCUMENT_VERSION,
@@ -163,6 +164,181 @@ function twoNodesOneEdge(): { nodes: readonly WorkflowNodeInput[]; edges: readon
   ];
   return { nodes, edges };
 }
+
+const agentStepSettings: AgentStepConfig = {
+  promptTemplate: 'Foglald össze: {{input}}',
+  providerId: null,
+  modelId: null,
+  effort: null,
+  thinking: null,
+  allowedTools: [],
+  disallowedTools: [],
+  permissionMode: null,
+  maxTurns: null,
+  maxBudgetUsd: null,
+  systemPrompt: null,
+  agents: {},
+  skills: null,
+  mcpServers: {},
+  enabledEngineHooks: [],
+  cwd: null,
+  additionalDirectories: [],
+  sandbox: null,
+  agentTools: [],
+  sessionMode: 'isolated',
+  structuredOutput: null,
+};
+
+interface RequiredFieldCase {
+  readonly field: string;
+  readonly path: string;
+  readonly build: (text: string) => NodeConfig;
+}
+
+/**
+ * A SPEC-008 5.4 táblázatának tizenhat kötelező szöveg mezője (O-21),
+ * mezőnként egy egyébként érvényes konfiggal, amiben csak a vizsgált mező
+ * szövege változik.
+ */
+const requiredFieldCases: readonly RequiredFieldCase[] = [
+  {
+    field: 'start inputFields[].name',
+    path: 'inputFields.0.name',
+    build: (text) => ({
+      type: 'start',
+      inputFields: [{ name: text, label: 'Téma', valueKind: 'text', required: true }],
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'start inputFields[].label',
+    path: 'inputFields.0.label',
+    build: (text) => ({
+      type: 'start',
+      inputFields: [{ name: 'topic', label: text, valueKind: 'text', required: true }],
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'start inputFields[].valueKind',
+    path: 'inputFields.0.valueKind',
+    build: (text) => ({
+      type: 'start',
+      inputFields: [{ name: 'topic', label: 'Téma', valueKind: text, required: true }],
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'agent_step promptTemplate',
+    path: 'promptTemplate',
+    build: (text) => ({ ...agentStepSettings, promptTemplate: text, type: 'agent_step', onUnhandledError: null }),
+  },
+  {
+    field: 'branch expression',
+    path: 'expression',
+    build: (text) => ({
+      type: 'branch',
+      expression: text,
+      branches: [{ key: 'high', label: 'Magas' }],
+      defaultBranchKey: null,
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'branch branches[].key',
+    path: 'branches.0.key',
+    build: (text) => ({
+      type: 'branch',
+      expression: 'true',
+      branches: [{ key: text, label: 'Magas' }],
+      defaultBranchKey: null,
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'branch branches[].label',
+    path: 'branches.0.label',
+    build: (text) => ({
+      type: 'branch',
+      expression: 'true',
+      branches: [{ key: 'high', label: text }],
+      defaultBranchKey: null,
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'fan_out itemsExpression',
+    path: 'itemsExpression',
+    build: (text) => ({
+      type: 'fan_out',
+      itemsExpression: text,
+      branchLabelTemplate: '{{item}}',
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'fan_out branchLabelTemplate',
+    path: 'branchLabelTemplate',
+    build: (text) => ({ type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: text, onUnhandledError: null }),
+  },
+  {
+    field: 'join ai_synthesis settings.promptTemplate',
+    path: 'settings.promptTemplate',
+    build: (text) => ({
+      type: 'join',
+      mode: 'ai_synthesis',
+      settings: { ...agentStepSettings, promptTemplate: text },
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'join script settings.source',
+    path: 'settings.source',
+    build: (text) => ({
+      type: 'join',
+      mode: 'script',
+      settings: { source: text, runtime: 'expression' },
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'loop continueExpression',
+    path: 'continueExpression',
+    build: (text) => ({ type: 'loop', maxIterations: 3, continueExpression: text, onUnhandledError: null }),
+  },
+  {
+    field: 'human_approval title',
+    path: 'title',
+    build: (text) => ({
+      type: 'human_approval',
+      title: text,
+      bodyTemplate: 'Engedélyezed?',
+      timeoutMs: null,
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'human_approval bodyTemplate',
+    path: 'bodyTemplate',
+    build: (text) => ({
+      type: 'human_approval',
+      title: 'Jóváhagyás',
+      bodyTemplate: text,
+      timeoutMs: null,
+      onUnhandledError: null,
+    }),
+  },
+  {
+    field: 'sub_workflow targetWorkflowId',
+    path: 'targetWorkflowId',
+    build: (text) => ({ type: 'sub_workflow', targetWorkflowId: text, inputMapping: {}, onUnhandledError: null }),
+  },
+  {
+    field: 'script source',
+    path: 'source',
+    build: (text) => ({ type: 'script', source: text, runtime: 'expression', onUnhandledError: null }),
+  },
+];
 
 describe('createWorkflowRepository', () => {
   describe('createWorkflow / getWorkflow', () => {
@@ -533,6 +709,92 @@ describe('createWorkflowRepository', () => {
 
       sqlite.close();
     });
+  });
+
+  describe('replaceGraph: a kötelező szöveg mezők írás oldali szabálya (SPEC-008 5.4, O-21)', () => {
+    it('a tizenhat mező mindegyike szerepel az esetek között', () => {
+      expect(requiredFieldCases).toHaveLength(16);
+    });
+
+    for (const { field, path, build } of requiredFieldCases) {
+      describe(field, () => {
+        it('a nem üres érték beíródik', () => {
+          const { sqlite, repository } = openRepository();
+          const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+          const node: WorkflowNodeInput = {
+            id: 'node-x',
+            label: '',
+            positionX: 0,
+            positionY: 0,
+            config: build('érték'),
+          };
+
+          okOrThrow(repository.replaceGraph(workflow.id, [node], []));
+
+          expect(okOrThrow(repository.readGraph(workflow.id)).nodes.map((stored) => stored.config)).toStrictEqual([
+            node.config,
+          ]);
+          sqlite.close();
+        });
+
+        for (const [description, blank] of [
+          ['üres', ''],
+          ['csak szóközös', ' '.repeat(3)],
+        ] as const) {
+          it(`az ${description} érték hibaágat ad a hibaosztállyal, sort nem ír, a korábbi gráf változatlan`, () => {
+            const { sqlite, database, repository } = openRepository();
+            const workflow = okOrThrow(
+              repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }),
+            );
+            const { nodes, edges } = twoNodesOneEdge();
+            okOrThrow(repository.replaceGraph(workflow.id, nodes, edges));
+            const before = okOrThrow(repository.readGraph(workflow.id));
+            const blankNode: WorkflowNodeInput = {
+              id: 'node-x',
+              label: '',
+              positionX: 0,
+              positionY: 0,
+              config: build(blank),
+            };
+
+            const message = errorOrThrow(repository.replaceGraph(workflow.id, [blankNode], []));
+
+            expect(message).toContain('(blank_required_text_field)');
+            expect(message).toContain(`"${path}"`);
+            expect(okOrThrow(repository.readGraph(workflow.id))).toStrictEqual(before);
+            expect(
+              database.select().from(workflowNodeTable).where(eq(workflowNodeTable.id, 'node-x')).all(),
+            ).toHaveLength(0);
+            sqlite.close();
+          });
+        }
+
+        it('a readGraph egy korábban tárolt, üres kötelező mezőt hordozó sort változatlanul visszaad', () => {
+          const { sqlite, database, repository } = openRepository();
+          const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+          const config = build('');
+          database
+            .insert(workflowNodeTable)
+            .values({
+              id: 'old-node',
+              workflowId: workflow.id,
+              type: config.type,
+              label: '',
+              positionX: 0,
+              positionY: 0,
+              config,
+              createdAtMs: new Date(0),
+              updatedAtMs: new Date(0),
+            })
+            .run();
+
+          const graph = okOrThrow(repository.readGraph(workflow.id));
+
+          expect(graph.nodes.map((node) => node.config)).toStrictEqual([config]);
+          sqlite.close();
+        });
+      });
+    }
   });
 
   describe('a futáskori pillanatkép sérthetetlensége az élő gráf átírása után (20. kritérium)', () => {

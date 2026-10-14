@@ -60,7 +60,7 @@ function readExportStatements(): { names: readonly string[]; moduleSpecifiers: r
 }
 
 describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritérium)', () => {
-  it('futásidőben pontosan a kilenc nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
+  it('futásidőben pontosan a tíz nevesített értéket adja ki, factory függvény és adatbázis handle nélkül', () => {
     expect(new Set(Object.keys(barrel))).toStrictEqual(
       new Set([
         'ENV_EASTER_DB_FILE',
@@ -78,6 +78,11 @@ describe('a packages/db barrel exportlistája (SPEC-003 9.3 szekció, 4. kritér
         // témája ebből tölti a pillanatkép dokumentum `version` mezőjét, a
         // futás indításakor (SPEC-004 4.8 5. lépés).
         'GRAPH_DOCUMENT_VERSION',
+        // A tizedik a PLAN-009 T-009-48 óta: az `apps/server`
+        // `node-config-drift-protection` témája ezt a kötelező szöveg mező
+        // táblát veti össze a `protocol` mentési sémájának táblájával
+        // (SPEC-008 5.4, O-21).
+        'REQUIRED_TEXT_FIELD_PATHS',
       ]),
     );
   });

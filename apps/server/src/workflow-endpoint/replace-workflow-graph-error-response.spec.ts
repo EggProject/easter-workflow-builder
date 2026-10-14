@@ -152,6 +152,23 @@ async function createWorkflowViaApi(baseUrl: string): Promise<string> {
   return body['id'];
 }
 
+function branchNode(key: string): Record<string, unknown> {
+  return {
+    id: 'n-branch',
+    type: 'branch',
+    label: 'Elágazás',
+    positionX: 0,
+    positionY: 0,
+    config: {
+      type: 'branch',
+      expression: 'x > 0',
+      branches: [{ key, label: 'Pozitív' }],
+      defaultBranchKey: null,
+      onUnhandledError: null,
+    },
+  };
+}
+
 function putGraph(baseUrl: string, workflowId: string, graph: unknown): Promise<Response> {
   return fetch(`${baseUrl}/api/workflows/${workflowId}/graph`, {
     method: 'PUT',
@@ -345,5 +362,24 @@ describe('PUT /api/workflows/{workflowId}/graph - öt hibás eset (SPEC-005/006,
     expect(warnEntry).toBeDefined();
     expect(warnEntry?.['msg']).toContain('FOREIGN KEY constraint failed');
     expect(warnEntry?.['msg']).toContain('(foreign_key_violation)');
+  });
+
+  it('(f) üres kötelező szöveg mező: 400 invalid_request a mező útvonalával, a tárolt gráf változatlan, nem naplózva (SPEC-008 5.4, O-21)', async () => {
+    const { baseUrl, sink, workflowId } = await setup();
+    const stored = await putGraph(baseUrl, workflowId, { nodes: [branchNode('pos')], edges: [] });
+    expect(stored.status).toBe(200);
+    const before = database?.workflows.readGraph(workflowId);
+
+    const response = await putGraph(baseUrl, workflowId, { nodes: [branchNode('  ')], edges: [] });
+
+    expect(response.status).toBe(400);
+    const body: unknown = await response.json();
+    if (!isRecord(body)) {
+      throw new Error('a hiba törzs nem objektum alakú');
+    }
+    expect(body['code']).toBe('invalid_request');
+    expect(body['message']).toContain('nodes.0.config.branches.0.key');
+    expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
+    expect(sink.lines()).toHaveLength(0);
   });
 });

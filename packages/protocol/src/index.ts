@@ -215,3 +215,7 @@ export {
   SubWorkflowNodeConfigSchema,
   UnhandledErrorPolicySchema,
 } from './node-config/node-config.ts';
+// A mentési séma és a kötelező szöveg mezők táblája (SPEC-008 5.4, O-21): csak az írás oldala
+// szigorodik, az olvasó NodeConfigSchema változatlan.
+export { NodeConfigSaveSchema } from './node-config/node-config-save-schema.ts';
+export { REQUIRED_TEXT_FIELD_PATHS } from './node-config/required-text-field-paths.ts';

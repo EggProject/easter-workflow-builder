@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 
 /**
- * A panel aktuális, mezőnkénti hibatérképe: a `NodeConfigSchema.safeParse`
+ * A panel aktuális, mezőnkénti hibatérképe: a `NodeConfigSaveSchema.safeParse`
  * hibáiból épült, ponttal összefűzött útvonal (`branches.0.key`) mutat a
  * hibaüzenetre (`field-errors-from-zod-error.ts`).
  *

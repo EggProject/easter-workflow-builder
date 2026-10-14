@@ -3,7 +3,7 @@
  * hordozó `<textarea>` értéke közötti oda-vissza leképezés. A
  * `sub_workflow` node `inputMapping` mezőjének egyetlen fogyasztója. Egy
  * `=` jel nélküli vagy üres kulcsú sor figyelmen kívül marad - a
- * `NodeConfigSchema.safeParse` a végleges alakot úgyis ellenőrzi.
+ * `NodeConfigSaveSchema.safeParse` a végleges alakot úgyis ellenőrzi.
  */
 export function toStringRecordFieldValue(value: Readonly<Record<string, string>>): string {
   return Object.entries(value)
