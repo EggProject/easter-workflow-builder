@@ -1,0 +1,230 @@
+/* ============================================================
+   EggProject: Tooltip
+   Forrás: eggproject-design-components/components/tooltip/tooltip.css,
+   a "TOOLTIP" nyitó kommenttől a fájl végéig, bájtra azonosan. Átemelés
+   dátuma: 2026-10-14. Licencállítás nincs (SPEC-007 4.4, M-34).
+
+   MIÉRT SZŰKÍTETT. A forrás fájl a komponens előtt a demó oldal
+   saját szabályait is tartalmazza: globális reset (`*`, `html, body`,
+   `button`, `code`, `h1, h2`, `#root`), a `.demo*` oldalváz, a `.btn*`,
+   `.toolbar*`, `.icon-btn` és `.inline-anchor*` minták. Ezek az
+   alkalmazás globális stílusát és a `button` téma `.btn` osztályát
+   írnák felül, ezért kimaradtak (ugyanaz az elv, mint a `data-table` és
+   a `loading-indicator` témában). Az @import sor szintén kimarad (a
+   design-token tokeneket a csomag globálisan tölti be). Az átemelt
+   blokk végén, a `forced-colors` lekérdezésen belül álló
+   `.inline-anchor:focus-visible` szabály a forrás demó mintájáé; a
+   bájtazonosság miatt a blokkban marad, és az alkalmazásban egyetlen
+   elemre sem illeszkedik.
+   ============================================================ */
+
+/* ============ TOOLTIP — the actual component ============ */
+.tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+  /* Tooltip becomes positioned relative to this wrapper */
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms var(--ep-ease-out),
+              transform 140ms var(--ep-ease-out);
+  will-change: opacity, transform;
+}
+.tooltip.is-open { opacity: 1; }
+/* Closed tooltip leaves the accessibility tree, the pointer surface and layout entirely —
+   not merely opacity:0. The attribute selector outranks the visible/positioning rules. */
+.tooltip[hidden] { display: none; }
+
+.tooltip__body {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--ep-radius-md);
+  padding: 7px 10px;
+  font: 500 12px/1.4 var(--ep-font-sans);
+  white-space: nowrap;
+  box-shadow: var(--ep-shadow-lg);
+}
+.tooltip__text { display: inline-block; }
+.tooltip__shortcut {
+  font: 500 11px var(--ep-font-mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ep-paper-100);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip__arrow {
+  position: absolute;
+  width: 8px; height: 8px;
+  transform: rotate(45deg);
+}
+
+/* ---- Variant: dark (default) ---- */
+.tooltip--dark .tooltip__body { background: var(--ep-ink-900); color: var(--ep-paper-50); }
+.tooltip--dark .tooltip__arrow { background: var(--ep-ink-900); }
+
+/* ---- Variant: light ---- */
+.tooltip--light .tooltip__body {
+  background: var(--ep-bg-elevated);
+  color: var(--ep-fg);
+  border: 1px solid var(--ep-border-subtle);
+  box-shadow: var(--ep-shadow-md);
+}
+.tooltip--light .tooltip__arrow {
+  background: var(--ep-bg-elevated);
+  border-right: 1px solid var(--ep-border-subtle);
+  border-bottom: 1px solid var(--ep-border-subtle);
+}
+.tooltip--light .tooltip__shortcut {
+  background: var(--ep-bg-hover);
+  border-color: var(--ep-border);
+  color: var(--ep-fg-muted);
+}
+
+/* ---- Variant: rich (allows multi-line, wider content) ---- */
+.tooltip--rich .tooltip__body {
+  background: var(--ep-bg-elevated);
+  color: var(--ep-fg);
+  border: 1px solid var(--ep-border-subtle);
+  box-shadow: var(--ep-shadow-lg);
+  display: block;
+  white-space: normal;
+  min-width: 240px; max-width: 280px;
+  padding: 14px 16px;
+}
+.tooltip--rich .tooltip__arrow {
+  background: var(--ep-bg-elevated);
+  border-right: 1px solid var(--ep-border-subtle);
+  border-bottom: 1px solid var(--ep-border-subtle);
+}
+
+/* Rich content styles */
+.rich { display: flex; flex-direction: column; gap: 6px; }
+.rich__title { font: 600 14px var(--ep-font-sans); color: var(--ep-fg); }
+.rich__meta  { font: var(--ep-text-meta); font-family: var(--ep-font-mono); color: var(--ep-fg-subtle); }
+.rich__body  { font: 400 13px/1.5 var(--ep-font-sans); color: var(--ep-fg-muted); margin-top: 4px; }
+.rich__row   {
+  display: flex; align-items: center; gap: 8px;
+  font: 400 12px var(--ep-font-sans);
+  color: var(--ep-fg);
+  margin-top: 2px;
+}
+.rich__sw   { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+/* ---- Placement: top ---- */
+.tooltip--top {
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+}
+.tooltip--top.is-open { transform: translateX(-50%) translateY(0); }
+.tooltip--top .tooltip__arrow {
+  bottom: -4px; left: 50%; margin-left: -4px;
+  /* For light/rich variants, only bottom-right corners need borders so they show */
+}
+.tooltip--top.tooltip--light .tooltip__arrow,
+.tooltip--top.tooltip--rich  .tooltip__arrow {
+  border-top: 0; border-left: 0;
+}
+
+/* ---- Placement: bottom ---- */
+.tooltip--bottom {
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+}
+.tooltip--bottom.is-open { transform: translateX(-50%) translateY(0); }
+.tooltip--bottom .tooltip__arrow { top: -4px; left: 50%; margin-left: -4px; }
+.tooltip--bottom.tooltip--light .tooltip__arrow,
+.tooltip--bottom.tooltip--rich  .tooltip__arrow {
+  border-bottom: 0; border-right: 0;
+  border-top: 1px solid var(--ep-border-subtle);
+  border-left: 1px solid var(--ep-border-subtle);
+}
+
+/* ---- Placement: left ---- */
+.tooltip--left {
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px);
+}
+.tooltip--left.is-open { transform: translateY(-50%) translateX(0); }
+.tooltip--left .tooltip__arrow { right: -4px; top: 50%; margin-top: -4px; }
+.tooltip--left.tooltip--light .tooltip__arrow,
+.tooltip--left.tooltip--rich  .tooltip__arrow {
+  border-bottom: 0; border-left: 0;
+  border-top: 1px solid var(--ep-border-subtle);
+  border-right: 1px solid var(--ep-border-subtle);
+}
+
+/* ---- Placement: right ---- */
+.tooltip--right {
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+}
+.tooltip--right.is-open { transform: translateY(-50%) translateX(0); }
+.tooltip--right .tooltip__arrow { left: -4px; top: 50%; margin-top: -4px; }
+.tooltip--right.tooltip--light .tooltip__arrow,
+.tooltip--right.tooltip--rich  .tooltip__arrow {
+  border-top: 0; border-right: 0;
+  border-bottom: 1px solid var(--ep-border-subtle);
+  border-left: 1px solid var(--ep-border-subtle);
+}
+
+/* ============ Forced colors (Windows High Contrast etc.) ============ */
+/* System colors only; no tokens / var() / hex / rgb / alpha / color-mix / forced-color-adjust / !important.
+   Positioning, size, radius and z-index are untouched — this only re-paints surfaces and borders. */
+@media (forced-colors: active) {
+  /* Every variant converges on a real, bordered system surface, so the tip separates without the
+     (dropped) box-shadow and never reads as a focus ring or a selected option. */
+  .tooltip--dark .tooltip__body,
+  .tooltip--light .tooltip__body,
+  .tooltip--rich .tooltip__body {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  /* Arrow: a Canvas fill plus a CanvasText border keeps it visible and pointing at the panel at
+     every placement (the dark arrow has no border of its own and would otherwise disappear). */
+  .tooltip__arrow {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  /* Shortcut chip: legible and bordered, never Highlight or interactive-looking. */
+  .tooltip__shortcut {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  /* Rich, non-interactive content stays readable on the system surface. */
+  .rich__title { color: CanvasText; }
+  .rich__meta  { color: GrayText; }
+  .rich__body  { color: CanvasText; }
+  /* The swatch fill is forced away by the system — a real border keeps the chip perceivable. */
+  .rich__sw { border: 1px solid CanvasText; }
+  /* Inline demo trigger: box-shadow focus rings are dropped in forced colors, so use a real outline. */
+  .inline-anchor:focus-visible {
+    box-shadow: none;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* ============ Reduced motion ============ */
+/* The open state is an instant display swap (closed = [hidden] → display:none), so this only
+   neutralises the entrance opacity/transform transition. It sets no display value and never
+   reveals a hidden tip; Escape/blur/mouseleave hiding stays immediate. */
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+    animation: none;
+  }
+}

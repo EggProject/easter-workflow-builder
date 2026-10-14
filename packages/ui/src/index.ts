@@ -93,6 +93,13 @@ export {
   type UseToastsOptions,
   type UseToastsResult,
 } from './toast/use-toasts.ts';
+export {
+  Tooltip,
+  type TooltipPlacement,
+  type TooltipProperties,
+  type TooltipTriggerProperties,
+  type TooltipVariant,
+} from './tooltip/Tooltip.tsx';
 
 // Idegen csomagból jövő típus, ami a csomag publikus szignatúrájában
 // megjelenik (SPEC-002 6.6): a `DataTable` sor típusának megszorítása a
