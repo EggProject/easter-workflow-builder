@@ -14,11 +14,13 @@ interface InitialConfigCase {
   readonly type: AddableNodeType;
   readonly expected: NodeConfig;
   /**
-   * A mentési séma egyik hibájának útvonala: a `NaN` számot hordozó két
-   * típusnál a szám mező (az olvasó séma már ott megáll, M-104), a többinél az
-   * üresen hagyott `onUnhandledError` (O-29).
+   * A mentési séma összes hibájának útvonala, sorrendben: a `NaN` számot
+   * hordozó két típusnál a szám mező típushibája (M-104), utána minden üres
+   * kötelező szöveg mező (O-21), az üresen hagyott `onUnhandledError` (O-29) és
+   * a `join` üres módja (O-33). Egy mentési kísérlet mindet egyszerre adja
+   * (user döntés 2026-10-16, SPEC-008 81. kritérium).
    */
-  readonly saveIssuePath: string;
+  readonly saveIssuePaths: readonly string[];
 }
 
 /**
@@ -29,37 +31,37 @@ interface InitialConfigCase {
 const CASES: readonly InitialConfigCase[] = [
   {
     type: 'agent_step',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['promptTemplate', 'onUnhandledError'],
     expected: { ...DEFAULT_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: null },
   },
   {
     type: 'branch',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['expression', 'onUnhandledError'],
     expected: { type: 'branch', expression: '', branches: [], defaultBranchKey: null, onUnhandledError: null },
   },
   {
     type: 'fan_out',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['itemsExpression', 'branchLabelTemplate', 'onUnhandledError'],
     expected: { type: 'fan_out', itemsExpression: '', branchLabelTemplate: '', onUnhandledError: null },
   },
   {
     type: 'join',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['onUnhandledError', 'mode'],
     expected: { type: 'join', mode: null, onUnhandledError: null },
   },
   {
     type: 'loop',
-    saveIssuePath: 'maxIterations',
+    saveIssuePaths: ['maxIterations', 'continueExpression', 'onUnhandledError'],
     expected: { type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null },
   },
   {
     type: 'human_approval',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['title', 'bodyTemplate', 'onUnhandledError'],
     expected: { type: 'human_approval', title: '', bodyTemplate: '', timeoutMs: null, onUnhandledError: null },
   },
   {
     type: 'error_handler',
-    saveIssuePath: 'maxAttempts',
+    saveIssuePaths: ['maxAttempts', 'onUnhandledError'],
     expected: {
       type: 'error_handler',
       maxAttempts: NaN,
@@ -70,12 +72,12 @@ const CASES: readonly InitialConfigCase[] = [
   },
   {
     type: 'sub_workflow',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['targetWorkflowId', 'onUnhandledError'],
     expected: { type: 'sub_workflow', targetWorkflowId: '', inputMapping: {}, onUnhandledError: null },
   },
   {
     type: 'script',
-    saveIssuePath: 'onUnhandledError',
+    saveIssuePaths: ['source', 'onUnhandledError'],
     expected: { type: 'script', source: '', runtime: 'expression', onUnhandledError: null },
   },
 ];
@@ -102,12 +104,15 @@ describe('createInitialNodeConfig', () => {
     expect(parsed.success).toBe(!NAN_FIELD_TYPES.has(type));
   });
 
-  it.each(CASES)('$type: a mentési séma elutasítja, a hiba útvonala $saveIssuePath', ({ type, saveIssuePath }) => {
-    const parsed = NodeConfigSaveSchema.safeParse(createInitialNodeConfig(type));
-    expect(parsed.success).toBe(false);
-    const issuePaths = parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join('.'));
-    expect(issuePaths).toContain(saveIssuePath);
-  });
+  it.each(CASES)(
+    '$type: a mentési séma egy kísérletben minden üres kötelező mezőt elutasít ($saveIssuePaths)',
+    ({ type, saveIssuePaths }) => {
+      const parsed = NodeConfigSaveSchema.safeParse(createInitialNodeConfig(type));
+      expect(parsed.success).toBe(false);
+      const issuePaths = parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join('.'));
+      expect(issuePaths).toEqual(saveIssuePaths);
+    },
+  );
 
   it('hívásonként új, egymástól független legfelső szintű objektumot ad', () => {
     expect(createInitialNodeConfig('branch')).not.toBe(createInitialNodeConfig('branch'));

@@ -201,6 +201,25 @@ for (const key of ['Backspace', 'Delete']) {
   });
 }
 
+// Az él billentyűs törlése a `Delete` billentyűvel is (SPEC-008 82. kritérium);
+// a `Backspace` útját a `graph-edge-selection.spec.ts` fedi.
+test('a Delete billentyű a kiválasztott élt törli, a csomópontok és a másik él maradnak, a mentett gráfban sincs meg', async ({
+  page,
+}) => {
+  await edgeLocator(page, 'e2').click();
+  await expect(edgeLocator(page, 'e2')).toHaveClass(/selected/);
+
+  await page.keyboard.press('Delete');
+
+  await expect(edgeLocator(page, 'e2')).toBeAttached({ attached: false });
+  await expect(edgeLocator(page, 'e1')).toBeVisible();
+  await expect(nodeLocator(page, 'n2')).toBeVisible();
+  await expect(nodeLocator(page, 'n3')).toBeVisible();
+  await expect(unsavedIndicator(page)).toHaveText('Mentetlen változtatások');
+
+  expect(await saveAndReadGraphIds(page)).toEqual({ nodeIds: ['n1', 'n2', 'n3'], edgeIds: ['e1'] });
+});
+
 test('a panel Törlés gombja megerősítés nélkül törli a csomópontot és a rá kötött éleket, a panel bezárul, kérés nem indul', async ({
   page,
 }) => {

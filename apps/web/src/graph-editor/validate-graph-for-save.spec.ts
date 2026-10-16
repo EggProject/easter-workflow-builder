@@ -49,6 +49,23 @@ describe('validateGraphForSave', () => {
     },
   );
 
+  it('a felvett ciklus kezdő konfigjára egy hívásban minden hibás mező útvonalát megnevezi (SPEC-008 81. kritérium)', () => {
+    const loopNode: WorkflowNodeInput = {
+      id: 'n-2',
+      type: 'loop',
+      label: '',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null },
+    };
+    expect(validateGraphForSave([START_NODE, loopNode], [])).toEqual({
+      kind: 'error',
+      message:
+        'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.maxIterations, ' +
+        'nodes.1.config.continueExpression, nodes.1.config.onUnhandledError (invalid_request).',
+    });
+  });
+
   it('null onUnhandledError értékre error Outcome-ot ad, ami megnevezi a mező útvonalát (SPEC-008 5.4, O-29)', () => {
     const outcome = validateGraphForSave(
       [{ ...START_NODE, config: { ...START_NODE.config, onUnhandledError: null } }],
