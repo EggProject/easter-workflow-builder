@@ -308,20 +308,6 @@ describe('NodeConfigSaveSchema: a kötelező szöveg mezők (SPEC-008 5.4, O-21)
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
   });
 
-  it('alak hibánál a kötelező mező szabály nem fut, csak a séma saját hibája áll', () => {
-    const parsed = NodeConfigSaveSchema.safeParse({
-      type: 'loop',
-      continueExpression: '',
-      onUnhandledError: 'fail_run',
-    });
-
-    expect(parsed.success).toBe(false);
-    if (parsed.success) {
-      return;
-    }
-    expect(issuePaths(parsed.error)).toEqual([['maxIterations']]);
-  });
-
   it('a kimeneti típus ugyanaz, mint az olvasó sémáé', () => {
     expectTypeOf<z.infer<typeof NodeConfigSaveSchema>>().toEqualTypeOf<NodeConfig>();
   });
@@ -477,5 +463,163 @@ describe('NodeConfigSaveSchema: a join mode nem lehet null (SPEC-008 5.4, O-33)'
     expect(NodeConfigSchema.safeParse(unselectedJoin).success).toBe(true);
     expect(WorkflowNodeSchema.safeParse(storedNode).success).toBe(true);
     expect(WorkflowGraphDocumentSchema.safeParse({ nodes: [storedNode], edges: [] }).success).toBe(true);
+  });
+});
+
+interface MalformedConfigCase {
+  readonly description: string;
+  readonly config: unknown;
+  readonly issues: readonly (readonly [code: string, path: string])[];
+}
+
+/**
+ * A típushibás konfig esetei (user döntés 2026-10-16, "Egyszerre látsszon
+ * mind", SPEC-008 81. kritérium): ha a diszkriminált unió ágat választott, a
+ * három szabály a típushiba mellett is lefut, és minden hiba egy
+ * kísérletben, a saját mezőútvonalán jelenik meg; ha nem választott, csak a
+ * séma saját hibája áll.
+ */
+const MALFORMED_CONFIG_CASES: readonly MalformedConfigCase[] = [
+  {
+    description: 'a felvett loop (NaN maxIterations, üres continueExpression, null onUnhandledError)',
+    config: { type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null },
+    issues: [
+      ['invalid_type', 'maxIterations'],
+      ['custom', 'continueExpression'],
+      ['custom', 'onUnhandledError'],
+    ],
+  },
+  {
+    description: 'a felvett error_handler (NaN maxAttempts, null onUnhandledError)',
+    config: {
+      type: 'error_handler',
+      maxAttempts: NaN,
+      backoffMs: [],
+      handledErrorKinds: [],
+      onUnhandledError: null,
+    },
+    issues: [
+      ['invalid_type', 'maxAttempts'],
+      ['custom', 'onUnhandledError'],
+    ],
+  },
+  {
+    description: 'a dróton érkező loop (a JSON a NaN értéket null-ként írja)',
+    config: { type: 'loop', maxIterations: null, continueExpression: '  ', onUnhandledError: null },
+    issues: [
+      ['invalid_type', 'maxIterations'],
+      ['custom', 'continueExpression'],
+      ['custom', 'onUnhandledError'],
+    ],
+  },
+  {
+    description: 'a hiányzó mező és az ismeretlen kulcs mellett is',
+    config: { type: 'loop', continueExpression: '', onUnhandledError: 'fail_run', extra: true },
+    issues: [
+      ['invalid_type', 'maxIterations'],
+      ['unrecognized_keys', ''],
+      ['custom', 'continueExpression'],
+    ],
+  },
+  {
+    description: 'a választatlan join érvénytelen onUnhandledError értékkel',
+    config: { type: 'join', mode: null, onUnhandledError: 'ismeretlen' },
+    issues: [
+      ['invalid_value', 'onUnhandledError'],
+      ['custom', 'mode'],
+    ],
+  },
+  {
+    description: 'a választott módú join érvénytelen settings mezővel',
+    config: { type: 'join', mode: 'script', settings: { source: '', runtime: 'ismeretlen' }, onUnhandledError: null },
+    issues: [
+      ['invalid_value', 'settings.runtime'],
+      ['custom', 'settings.source'],
+      ['custom', 'onUnhandledError'],
+    ],
+  },
+  {
+    description: 'a típushibás kötelező szöveg mező nem kap második, üres mező hibát',
+    config: { type: 'loop', maxIterations: NaN, continueExpression: 5, onUnhandledError: 'fail_run' },
+    issues: [
+      ['invalid_type', 'maxIterations'],
+      ['invalid_type', 'continueExpression'],
+    ],
+  },
+  {
+    description: 'nem objektum bemenet: csak a séma hibája',
+    config: 'loop',
+    issues: [['invalid_type', '']],
+  },
+  {
+    description: 'null bemenet: csak a séma hibája',
+    config: null,
+    issues: [['invalid_type', '']],
+  },
+  {
+    description: 'ismeretlen type: csak a séma hibája, a null onUnhandledError nem jelez',
+    config: { type: 'ismeretlen', continueExpression: '', onUnhandledError: null },
+    issues: [['invalid_union', 'type']],
+  },
+  {
+    description: 'nem szöveg type: csak a séma hibája',
+    config: { type: 5, onUnhandledError: null },
+    issues: [['invalid_union', 'type']],
+  },
+  {
+    description: 'a join ismeretlen móddal: csak a séma hibája, a null onUnhandledError nem jelez',
+    config: { type: 'join', mode: 'ismeretlen', onUnhandledError: null },
+    issues: [['invalid_union', 'mode']],
+  },
+  {
+    description: 'a join nem szöveg móddal: csak a séma hibája',
+    config: { type: 'join', mode: 5, onUnhandledError: null },
+    issues: [['invalid_union', 'mode']],
+  },
+];
+
+describe('NodeConfigSaveSchema: a szabályok a típushiba mellett is lefutnak (SPEC-008 81. kritérium)', () => {
+  for (const { description, config, issues } of MALFORMED_CONFIG_CASES) {
+    it(description, () => {
+      const parsed = NodeConfigSaveSchema.safeParse(config);
+
+      expect(parsed.success).toBe(false);
+      if (parsed.success) {
+        return;
+      }
+      expect(parsed.error.issues.map((issue) => [issue.code, issue.path.join('.')])).toEqual(issues);
+    });
+  }
+
+  it('a felvett loop minden hibája a ReplaceGraphRequestSchema teljes útvonalán áll', () => {
+    const request = ReplaceGraphRequestSchema.safeParse({
+      nodes: [nodeWith({ type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null })],
+      edges: [],
+    });
+
+    expect(request.success).toBe(false);
+    if (request.success) {
+      return;
+    }
+    expect(issuePaths(request.error)).toEqual([
+      ['nodes', 0, 'config', 'maxIterations'],
+      ['nodes', 0, 'config', 'continueExpression'],
+      ['nodes', 0, 'config', 'onUnhandledError'],
+    ]);
+  });
+
+  it('az olvasó NodeConfigSchema típushibánál csak a saját hibáját adja', () => {
+    const parsed = NodeConfigSchema.safeParse({
+      type: 'loop',
+      maxIterations: NaN,
+      continueExpression: '',
+      onUnhandledError: null,
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['maxIterations']]);
   });
 });

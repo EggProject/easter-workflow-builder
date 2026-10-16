@@ -665,6 +665,57 @@ describe('NodeInspector', () => {
     }
   });
 
+  for (const { description, config, expectedLabels } of [
+    {
+      description: 'a felvett ciklus',
+      config: { type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null },
+      expectedLabels: ['Kezeletlen hiba szabálya', 'Max. iterációk száma', 'Folytatás feltétel (continueExpression)'],
+    },
+    {
+      description: 'a felvett hibakezelő',
+      config: {
+        type: 'error_handler',
+        maxAttempts: NaN,
+        backoffMs: [],
+        handledErrorKinds: [],
+        onUnhandledError: null,
+      },
+      expectedLabels: ['Kezeletlen hiba szabálya', 'Max. próbálkozások száma'],
+    },
+  ] satisfies readonly {
+    readonly description: string;
+    readonly config: WorkflowNodeInput['config'];
+    readonly expectedLabels: readonly string[];
+  }[]) {
+    it(`${description}: egy sikertelen mentési kísérlet után a szám mező típushibája mellett minden üres kötelező mező is jelez (SPEC-008 81. kritérium)`, () => {
+      const addedNode: WorkflowNodeInput = {
+        id: 'n-added',
+        type: config.type,
+        label: '',
+        positionX: 0,
+        positionY: 0,
+        config,
+      };
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={addedNode}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted
+          />,
+        );
+      });
+
+      const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+      expect(
+        invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent),
+      ).toEqual(expectedLabels);
+    });
+  }
+
   it('kitöltött kötelező szöveg mezőknél a mentési kísérlet után sincs hibaüzenet', () => {
     const branchNode: WorkflowNodeInput = {
       id: 'n-branch-filled',

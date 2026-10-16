@@ -2,7 +2,8 @@
 // mentésére valós Chromiumban (PLAN-009 T-009-45, SPEC-008 5.4, 5.8): a
 // mentési séma (`NodeConfigSaveSchema`) a kötelező szöveg mezőt, a két
 // kötelező szám mezőt és a `null` kezeletlen hiba szabályt a mező alatt jelzi,
-// és `PUT` kérés nem indul (79., 81., 100. és 111. kritérium). A mentés kérés
+// egy mentési kísérletben mindet, mind a kilenc felvehető típusnál, és `PUT`
+// kérés nem indul (79., 81., 100. és 111. kritérium). A mentés kérés
 // törzse `page.route()` mockon rögzül, a `ReplaceGraphRequestSchema` szerint
 // értelmezve. A mért tények: docs/research/2026-10-14-csomopont-felvetel.md,
 // T-009-45 szekció.
@@ -291,7 +292,7 @@ test('a felvett agent lépés minden más kötelező mezővel is PUT nélkül ma
   expect(saved.nodes.map((node) => node.id)).toEqual(['n1', 'n2', addedId]);
 });
 
-test('a felvett ciklus kezdő NaN értéke a szám mezőben üresen látszik, a mentési kísérlet PUT nélkül a szám mező alatt jelez, és a szám kitöltése után a folytatás feltétel és a kezeletlen hiba szabálya is', async ({
+test('a felvett ciklus kezdő NaN értéke a szám mezőben üresen látszik, és egyetlen mentési kísérlet PUT nélkül a szám mező, a folytatás feltétel és a kezeletlen hiba szabálya alatt is jelez', async ({
   page,
 }) => {
   const putBodies: unknown[] = [];
@@ -312,27 +313,139 @@ test('a felvett ciklus kezdő NaN értéke a szám mezőben üresen látszik, a 
   // A mentési kísérlet előtt egyik mező sem jelez (a 69. kritérium szabálya).
   await expectNoFieldError(maxIterations);
   await expectNoFieldError(continueExpression);
+  await expectNoFieldError(policySelect);
 
+  // 81. kritérium (user döntés 2026-10-16, "Egyszerre látsszon mind"): egy
+  // kísérlet után a szám mező típushibája MELLETT a két üres kötelező mező is
+  // jelez, és a lábléc üzenete mindhárom útvonalat megnevezi.
   await saveButton(page).click();
   // A `NaN` a szám séma típus hibája (M-104), az üzenete a zod saját szövege,
   // ezért itt csak a meglétét állítjuk.
   await expectFieldError(maxIterations, /\S/);
+  await expectFieldError(continueExpression, BLANK_FIELD_MESSAGE);
+  await expectFieldError(policySelect, BLANK_FIELD_MESSAGE);
+  await expect(
+    page.getByText(
+      'A kérés törzse érvénytelen, hibás mező(k): nodes.2.config.maxIterations, ' +
+        'nodes.2.config.continueExpression, nodes.2.config.onUnhandledError (invalid_request).',
+      { exact: true },
+    ),
+  ).toBeVisible();
   expect(putBodies).toHaveLength(0);
 
-  // NYITOTT (research T-009-45): a mentési séma `superRefine` szabálya a zod
-  // dokumentált viselkedése szerint nem fut, amíg a konfig típus hibát hordoz,
-  // ezért a két üres mező hibája ebben a mentési kísérletben még nem
-  // látszik; a 81. kritérium szerint látszania kellene. A teszt ezt az
-  // eltérést szándékosan nem rögzíti, csak a döntéstől független részt: a
-  // szám kitöltése után mindkettő a mező alatt jelez, kérés nélkül.
+  // A szám kitöltése csak a saját hibáját szünteti meg, a mentés kérés nélkül marad.
   await maxIterations.fill('3');
   await expectNoFieldError(maxIterations);
   await expectFieldError(continueExpression, BLANK_FIELD_MESSAGE);
   await expectFieldError(policySelect, BLANK_FIELD_MESSAGE);
   await saveButton(page).click();
-  await expectFieldError(continueExpression, BLANK_FIELD_MESSAGE);
   expect(putBodies).toHaveLength(0);
+
+  await continueExpression.fill('i < 3');
+  await chooseSelectOption(page, policySelect, 'fail_run');
+  await expectNoFieldError(continueExpression);
+  await expectNoFieldError(policySelect);
+  await saveButton(page).click();
+  await expect(page.getByText('Gráf mentve')).toBeVisible();
+  expect(putBodies).toHaveLength(1);
+  expect(parseSavedGraph(putBodies[0]).nodes[2]?.config).toEqual({
+    type: 'loop',
+    maxIterations: 3,
+    continueExpression: 'i < 3',
+    onUnhandledError: 'fail_run',
+  });
 });
+
+interface RequiredFieldLocator {
+  readonly role: 'textbox' | 'spinbutton' | 'combobox';
+  readonly name: string;
+  // A szám mező `NaN` értéke típushiba, az üzenete a zod saját szövege (M-104).
+  readonly message: string | RegExp;
+}
+
+const POLICY_FIELD: RequiredFieldLocator = {
+  role: 'combobox',
+  name: 'Kezeletlen hiba szabálya',
+  message: BLANK_FIELD_MESSAGE,
+};
+
+function blankTextField(name: string): RequiredFieldLocator {
+  return { role: 'textbox', name, message: BLANK_FIELD_MESSAGE };
+}
+
+/**
+ * A kilenc felvehető típus (SPEC-008 5.8) menüpontja és a kezdő konfig minden
+ * üresen induló kötelező mezője (5.4 táblázata, O-29, O-33): a `branch` üres
+ * ág listájának nincs elem mezője, az `error_handler` egyetlen kötelező
+ * mezője a szám mező.
+ */
+const ADDED_NODE_CASES: readonly { readonly menuItem: string; readonly fields: readonly RequiredFieldLocator[] }[] = [
+  { menuItem: 'Agent lépés', fields: [blankTextField('Prompt sablon'), POLICY_FIELD] },
+  { menuItem: 'Elágazás', fields: [blankTextField('Feltétel kifejezés'), POLICY_FIELD] },
+  {
+    menuItem: 'Szétosztás',
+    fields: [
+      blankTextField('Elemek kifejezés (itemsExpression)'),
+      blankTextField('Ág címke sablon (branchLabelTemplate)'),
+      POLICY_FIELD,
+    ],
+  },
+  {
+    menuItem: 'Összefésülés',
+    fields: [{ role: 'combobox', name: 'Összefésülés módja', message: BLANK_FIELD_MESSAGE }, POLICY_FIELD],
+  },
+  {
+    menuItem: 'Ciklus',
+    fields: [
+      { role: 'spinbutton', name: 'Max. iterációk száma', message: /\S/ },
+      blankTextField('Folytatás feltétel (continueExpression)'),
+      POLICY_FIELD,
+    ],
+  },
+  {
+    menuItem: 'Emberi jóváhagyás',
+    fields: [blankTextField('Cím'), blankTextField('Törzs sablon (bodyTemplate)'), POLICY_FIELD],
+  },
+  {
+    menuItem: 'Hibakezelő',
+    fields: [{ role: 'spinbutton', name: 'Max. próbálkozások száma', message: /\S/ }, POLICY_FIELD],
+  },
+  { menuItem: 'Al-workflow', fields: [blankTextField('Célzott workflow azonosítója'), POLICY_FIELD] },
+  { menuItem: 'Szkript', fields: [blankTextField('Forrás (source)'), POLICY_FIELD] },
+];
+
+test('a kilenc felvehető típus mindegyike szerepel az esetek között', () => {
+  expect(ADDED_NODE_CASES).toHaveLength(9);
+});
+
+for (const { menuItem, fields } of ADDED_NODE_CASES) {
+  test(`a felvett ${menuItem} egyetlen mentési kísérlet után PUT nélkül minden üres kötelező mezője alatt jelez (81. kritérium)`, async ({
+    page,
+  }) => {
+    const putBodies: unknown[] = [];
+    await installEditorMocks(page, GRAPH, putBodies);
+    await page.goto(EDITOR_URL);
+    await expect(nodeLocator(page, 'n2')).toBeVisible();
+
+    await addNodeWithButton(page, menuItem);
+    const panel = page.getByRole('complementary', { name: `${menuItem} beállításai` });
+    const locators = fields.map((field) => ({ ...field, locator: panel.getByRole(field.role, { name: field.name }) }));
+    for (const { locator } of locators) {
+      await expectNoFieldError(locator);
+    }
+
+    await saveButton(page).click();
+    for (const { locator, message } of locators) {
+      await expectFieldError(locator, message);
+    }
+    // A panelen pontosan ennyi mező érvénytelen: a felsorolás teljes. Az
+    // `aria-invalid` állapotra nincs `getByRole` opció, és a `role="alert"`
+    // számlálása a panel nem mezőhöz tartozó figyelmeztetését (a `script`
+    // típusé) is beszámolná, ezért itt attribútum szelektor áll.
+    await expect(panel.locator('[aria-invalid="true"]')).toHaveCount(fields.length);
+    expect(putBodies).toHaveLength(0);
+  });
+}
 
 test('a régi, üres kötelező szöveg mezőt hordozó gráf betölt, a mentési kísérlet PUT nélkül a mező alatt jelez, kitöltés után a mentés lefut', async ({
   page,

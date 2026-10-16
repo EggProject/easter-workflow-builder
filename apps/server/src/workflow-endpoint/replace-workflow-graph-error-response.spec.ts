@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
-import type { RouteId } from '@easter-workflow-builder/protocol';
+import {
+  ReplaceGraphRequestSchema,
+  zodErrorToProtocolErrorBody,
+  type RouteId,
+} from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createHttpServer, type HttpServerOptions } from '../http-server/create-http-server.ts';
@@ -424,6 +428,53 @@ describe('PUT /api/workflows/{workflowId}/graph - öt hibás eset (SPEC-005/006,
       }
       expect(body['code']).toBe('invalid_request');
       expect(body['message']).toContain(path);
+      expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
+      expect(sink.lines()).toHaveLength(0);
+    });
+  }
+  for (const { label, config, paths } of [
+    {
+      label: '(i) a felvett ciklus kezdő konfigja (SPEC-008 81. kritérium)',
+      config: { type: 'loop', maxIterations: NaN, continueExpression: '', onUnhandledError: null },
+      paths: ['nodes.0.config.maxIterations', 'nodes.0.config.continueExpression', 'nodes.0.config.onUnhandledError'],
+    },
+    {
+      label: '(j) a felvett hibakezelő kezdő konfigja (SPEC-008 81. kritérium)',
+      config: {
+        type: 'error_handler',
+        maxAttempts: NaN,
+        backoffMs: [],
+        handledErrorKinds: [],
+        onUnhandledError: null,
+      },
+      paths: ['nodes.0.config.maxAttempts', 'nodes.0.config.onUnhandledError'],
+    },
+  ]) {
+    it(`${label}: 400 invalid_request minden hibás mező útvonalával, ugyanazzal az üzenettel, mint a kliens mentés előtti ellenőrzése`, async () => {
+      const { baseUrl, sink, workflowId } = await setup();
+      const stored = await putGraph(baseUrl, workflowId, { nodes: [branchNode('pos')], edges: [] });
+      expect(stored.status).toBe(200);
+      const before = database?.workflows.readGraph(workflowId);
+      const graph = {
+        nodes: [{ id: 'n-added', type: config.type, label: '', positionX: 0, positionY: 0, config }],
+        edges: [],
+      };
+
+      // A kliens a `NaN` értékkel ellenőriz, a dróton a JSON `null`-t ír
+      // helyette: a két bemenet ugyanazt a mezőútvonal listát adja.
+      const clientCheck = ReplaceGraphRequestSchema.safeParse(graph);
+      if (clientCheck.success) {
+        throw new Error('a kliens oldali ellenőrzésnek el kell utasítania a kezdő konfigot');
+      }
+      const response = await putGraph(baseUrl, workflowId, graph);
+
+      expect(response.status).toBe(400);
+      const body: unknown = await response.json();
+      expect(body).toStrictEqual({
+        code: 'invalid_request',
+        message: `A kérés törzse érvénytelen, hibás mező(k): ${paths.join(', ')} (invalid_request).`,
+      });
+      expect(body).toStrictEqual(zodErrorToProtocolErrorBody(clientCheck.error));
       expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
       expect(sink.lines()).toHaveLength(0);
     });
