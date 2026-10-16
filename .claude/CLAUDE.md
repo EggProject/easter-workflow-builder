@@ -1321,6 +1321,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - A `projectService` `allowDefaultProject` globja nem tartalmazhat `**`-ot, és egy fájl nem lehet
   egyszerre `allowDefaultProject` alatt és egy valódi tsconfig `include` listáján (gyökér
   `eslint.config.ts`).
+- **A zod finomítása (`refine`, `superRefine`) alapból nem fut, ha a bemenet már típushibát hordoz**
+  (<https://zod.dev/api>, "Refinements", `when`). A mentési séma szabályai ezért a típushibás mező
+  mellett csendben kimaradtak: a felvett `loop` első mentési kísérlete csak a `NaN` szám mezőt
+  jelezte, a két üres kötelező mezőt nem. A javítás a `superRefine` `when` paramétere
+  (colinhacks/zod #5741), ami pontosan azt ellenőrzi, amit a finomítás típusosan olvas (`packages/protocol`
+  CLAUDE.md). Védelem: a `node-config-save-schema.spec.ts` típushibás esetei és a
+  `graph-node-required-fields.spec.ts` kilenc típusos e2e-je (research
+  `2026-10-14-csomopont-felvetel.md` 45.5, user döntés 2026-10-16).
 
 **Provider**
 

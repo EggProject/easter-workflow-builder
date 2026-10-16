@@ -1,8 +1,9 @@
-// A csomópont felvétel két útjának minimális e2e lefedése (PLAN-009 T-009-43,
-// SPEC-008 5.8): a "Hozzáadás" gomb menüje és a vászon jobb klikk menüje,
-// mindkettőn egy felvétel. A teljes D1 e2e (a két pozíció szabály, a
-// csomóponton és élen nem nyíló menü, mindkét téma, az UUID a `PUT` törzsben)
-// a T-009-45 lépésé.
+// A csomópont felvétel két útja (PLAN-009 T-009-43, SPEC-008 5.8): a "Hozzáadás"
+// gomb menüje és helye a láblécben, és a vászon jobb klikk menüje, mindkettőn
+// felvétellel. A két pozíció szabály, a csomóponton és élen nem nyíló menü és a
+// két téma a `graph-node-add-placement.spec.ts`, az UUID a `PUT` törzsben és a
+// felvett csomópont mentési jelzése a `graph-node-required-fields.spec.ts`
+// fájlban áll (T-009-45).
 import type { SettingsRecord, WorkflowDetail, WorkflowGraphDocument } from '@easter-workflow-builder/protocol';
 import type { Page } from '@playwright/test';
 import { API_ORIGIN } from './api-origin.ts';
@@ -128,4 +129,24 @@ test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, é
   await expect(page.getByRole('complementary', { name: 'Elágazás beállításai' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
   expect(apiRequests).toHaveLength(3);
+});
+
+// A "Hozzáadás" a lábléc akciósávjában, közvetlenül a "Mentés" split button
+// előtt áll, így az elsődleges művelet a sor végén marad (SPEC-008 5.8, O-19,
+// 74. kritérium). Az akciósáv `div`, landmark szerep nélkül (`PageFooter.tsx`),
+// ezért a teszt az osztályán éri el; a sáv közvetlen gyerekeinek neve a gomb
+// felirata, illetve a csoport `aria-label` értéke.
+test('a "Hozzáadás" gomb a lábléc akciósávjában, közvetlenül a "Mentés" split button előtt áll', async ({ page }) => {
+  await page.goto(EDITOR_URL);
+  await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+
+  const actionNames = await page
+    .locator('.page-footer__actions')
+    .evaluate((actions) =>
+      [...actions.children].map((child) => child.getAttribute('aria-label') ?? child.textContent.trim()),
+    );
+  expect(actionNames.slice(actionNames.indexOf('Hozzáadás'))).toEqual(['Hozzáadás', 'Gráf műveletek']);
+  await expect(
+    page.locator('.page-footer__actions').getByRole('button', { name: 'Hozzáadás', exact: true }),
+  ).toBeVisible();
 });

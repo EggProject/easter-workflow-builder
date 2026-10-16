@@ -1014,3 +1014,194 @@ típusra elbukik. Az osztállyal mindhárom zöld. A rontást utána visszaáll�
   elválasztó nem a panel leszármazottja, a viselkedést nem mértük.
 - A `Delete` billentyű macOS-en (a `Backspace` helyett használt `Delete` gomb a laptop billentyűzeten
   `Fn` + `Backspace`): a Chromium `KeyboardEvent.key` értékeit nem mértük Mac hardveren.
+
+## T-009-45
+
+A D1 e2e lépése (SPEC-008 5.4, 5.8, 5.9; 74 ... 85., 100. és 111. kritérium e2e része) valós
+Chromiumban, a szándékos rontásokkal. A szekciók számozása `45.x`, a T-009-44 mintájára.
+
+### 45.1 A kiindulás: mit fedett már a meglévő e2e
+
+A `main` `45f5af5` állapotán a kritériumok e2e részéből már fedett volt, ezért nem duplikáltam:
+
+| Kritérium | Már fedett rész                                                                                                | Meglévő teszt                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 74., 78.  | a gomb és a jobb klikk menü kilenc menüpontja, a felvett típus panelje, mentetlen jelző, nulla kérés           | `graph-node-add.spec.ts` két tesztje                                                                                                    |
+| 82.       | `Backspace` és `Delete` a csomópontot az éleivel törli; a szöveg mező, a panel gombjai és a választó nem töröl | `graph-node-delete.spec.ts` billentyű és panel tesztjei; a kiválasztott él `Backspace` törlése: `graph-edge-selection.spec.ts`          |
+| 83.       | a Start mindkét billentyű után marad az élével, a panelén nincs Törlés gomb                                    | `graph-node-delete.spec.ts` "a Start nem törölhető ..."                                                                                 |
+| 84., 85.  | a Törlés gomb megerősítés nélkül, a mentés `PUT` törzsében nincs árva él                                       | `graph-node-delete.spec.ts` Törlés gomb és billentyű tesztjei (`saveAndReadGraphIds`)                                                   |
+| 111.      | a `null` kezeletlen hiba szabály mentése `PUT` nélkül, a választó alatt jelez, érték után a mentés lefut       | `graph-editor-validation.spec.ts`, de **betöltött** Starttal; a kritérium **felvett** csomópontot ír elő, ezért új teszt készült (45.2) |
+
+Hiányzott: a két pozíció szabály és az M-99, a jobb klikk menü csomóponton és élen, az `Escape` és
+a kívülre kattintás zárása, a böngésző menüjének tiltása, mindkét téma, az UUID a `PUT` törzsben, a
+felvett `loop` mentése üres konfiggal, a régi gráf betöltése üres kötelező mezővel, a kiválasztott
+él `Delete` törlése és a "Hozzáadás" helye a láblécben.
+
+### 45.2 Az új e2e tesztek
+
+- `apps/web/e2e/graph-node-add-placement.spec.ts` (új, 6 teszt): a gomb útja (77., 78., M-99), a
+  jobb klikk útja (76., 78.), és a 75. kritérium két tesztje mindkét témában (üres terület: a menü
+  nyílik, a `contextmenu` esemény `defaultPrevented`, `Escape` és kívülre kattintás zár; csomópont
+  és él: nem nyílik, nem tilt).
+- `apps/web/e2e/graph-node-required-fields.spec.ts` (új, 13 teszt): a felvett agent lépés (79., 111.),
+  a felvett ciklus teljes útja (81.: egy kísérlet után mindhárom mező jelez, a lábléc üzenete mindhárom
+  útvonalat megnevezi, kitöltés után a mentés lefut), a kilenc felvehető típus egy kísérletes mentése
+  (81., táblázatos, típusonként egy teszt, plusz az esetszámot rögzítő teszt; 45.5), és a régi, üres
+  `promptTemplate` mezőt hordozó gráf (100.).
+- `apps/web/e2e/graph-node-delete.spec.ts` (+1): a kiválasztott él `Delete` billentyűvel (82.).
+- `apps/web/e2e/graph-node-add.spec.ts` (+1): a "Hozzáadás" a lábléc akciósávjában, közvetlenül a
+  "Mentés" split button előtt (74.).
+
+A felvett csomópont azonosítója a böngészőben keletkezik, ezért a tesztek a React Flow `data-id`
+attribútumából olvassák, és a `rf__node-<id>` fogódzón érik el (a `getByTestId` `rf__` kivétele,
+SPEC-008 12.3). A `contextmenu` esemény `defaultPrevented` értékét egy `window` buborékoló figyelő
+adja a `page.exposeFunction` útján, tehát a React kezelője után.
+
+### 45.3 A mérések (saját, valódi Chromium, 1440x900, 2026-10-15)
+
+**M-99, a gomb útja.** A fixtúra két csomópontja (`n1` a `(0, 0)`, `n2` az `(1000, 480)` ponton) a
+`fitView` után: a `rf__wrapper` doboza `x 0, y 108, 1440 x 745`, a `.react-flow__renderer`
+`offsetWidth`/`offsetHeight` értéke `1440 x 745` (a store `width`/`height` forrása, a telepített
+`useResizeHandler`), a `.react-flow__viewport` inline stílusa `translate(65px, 89.8564px)
+scale(0.964654)` (a store `transform` mezője, `toTransformString`). A felvett csomópont flow helye
+`(500, 240)`; a DOM-ból olvasott értékeken futtatott `((width / 2 - x) / zoom - 358 / 2, (height /
+2 - y) / zoom - 106 / 2)` képlet `(499.99991, 240)`. A különbség 0,0001 flow pixel alatti, és abból
+jön, hogy a böngésző az inline `transform` értéket hat értékes jegyre írja vissza (`89.8564px`,
+`0.964654`), a `DOMMatrixReadOnly` pedig ezt egyszeres pontossággal olvassa; a teszt ezért
+`toBeCloseTo(..., 1)` (0,05 alatti eltérés) mellett állít. Ezzel az M-99 mezőlistája valós
+Chromiumban igazolt: a store `width` és `height` mezője a vászon renderer elemének mérete, a
+`transform` a nézet `[x, y, zoom]` alakja, és a gomb ezekből számol. A kártya kirajzolt doboza
+`345,35 x 102,25` pixel, azaz a méret konstans (`358 x 106`, a `:root` custom propertyje) szorozva a
+nagyítással; a látható vászon középpontja `(720, 480,5)`, a dobozon belül (`547,3 ... 892,7`,
+`429,4 ... 531,6`). A panel megnyílása után a vászon 1004,5 pixel széles, a kártya jobb széle
+892,7, tehát a teljes doboz a vásznon belül marad.
+
+**M-98, a jobb klikk útja.** A kattintás pontja `(1080, 257)` (a vászon jobb felső negyede, egész
+pixelre kerekítve), a felvett csomópont flow helye `(1052,19, 61,31)`, ami a `(pont - a vászon bal
+felső sarka - eltolás) / nagyítás` képlet; a kártya doboza `x 1080, y 257` ponton kezdődik, tehát a
+pont a bal felső sarok.
+
+**A jobb klikk menü (75.).** Mindkét témában (`data-theme="dark"`, illetve nélküle): az üres
+területen a `contextmenu` esemény `defaultPrevented` értéke `true`, a menü `toBeInViewport({ ratio:
+1 })`, a fókusz az első menüponton; az `Escape` és a menün kívüli bal klikk zár, csomópont nem kerül
+fel. Az `n2` csomóponton és az `e1` élen a `defaultPrevented` `false`, menü nem nyílik; ugyanabban a
+futásban az üres területen `true` és a menü nyílik (kontroll).
+
+**A felvett ciklus (81.), a 45.5 javítása előtt.** A kezdő `maxIterations` `NaN`: a szám mező `value` attribútuma `NaN`, a
+`value` tulajdonsága `''`, a `validity.valid` `true`, tehát a mező üresen látszik (mérve). A mentés
+gombra `PUT` nem indul, de **csak** a `maxIterations` mező jelez (`aria-invalid="true"`, a zod
+saját "Invalid input" üzenetével), a lábléc üzenete: "A kérés törzse érvénytelen, hibás mező(k):
+nodes.2.config.maxIterations (invalid_request)." A `continueExpression` és az `onUnhandledError`
+mező ekkor **nem** jelez. A `maxIterations` kitöltése (`3`) után mindkettő azonnal jelez ("A mező
+nem lehet üres."), új mentési kísérlet nélkül, és a következő mentés is `PUT` nélkül marad. A
+felvett `error_handler` ugyanígy viselkedik: az első kísérlet után csak a `maxAttempts` mező jelez,
+az `onUnhandledError` nem. Ez eltért a SPEC-008 5.8 "Mit jelez a mentés" bekezdésétől és a 81.
+kritériumtól; a 45.5 javítása óta egy kísérlet mindet jelzi.
+
+**Az ok, forrással.** A `NodeConfigSaveSchema` a három írás oldali szabályt egy, a
+`NodeConfigSchema`-ra tett `superRefine` hívásban futtatja
+(`packages/protocol/src/node-config/node-config-save-schema.ts`). A zod dokumentációja szerint "By
+default, refinements don't run if any non-continuable issues have already been encountered. Zod is
+careful to ensure the type signature of the value is correct before passing it into any refinement
+functions" (<https://zod.dev/api>, "Refinements", `when`); a karbantartó megerősítése szerint "Refinements
+run as long as no _non-continuable_ issues have occurred. Generally these are `invalid_type` errors"
+(<https://github.com/colinhacks/zod/issues/4598>). A `z.number()` a `NaN` értéket típus hibával
+utasítja el (M-104), tehát a `superRefine` ebben a mentési kísérletben nem fut.
+
+**Az UUID (79.).** A felvett csomópont és az új él azonosítója a `PUT` törzsben a 4. verziós UUID
+alakja: öt hexadecimális csoport, a harmadik `4`-gyel, a negyedik `8`, `9`, `a` vagy `b` értékkel
+kezdődik (RFC 9562 4.2. szakasz: a verzió `0b0100`, a variáns `10xx`; 5.4. szakasz: a `ver` mező a 48
+... 51. bit, a `var` a 64 ... 65. bit, <https://www.rfc-editor.org/rfc/rfc9562.html>; a 4. szakasz
+szerint a betűk kis- és nagybetűsek is lehetnek, ezért a minta kis- és nagybetű független). `xy-edge__`
+előtagú él nincs a törzsben. A felvett agent lépés minden más kötelező mezővel (a `promptTemplate`
+kitöltve, él a Start kimenetéről) is `PUT` nélkül marad, amíg az `onUnhandledError` `null`, és a
+választó alatt jelez (111.); a `fail_run` választása után a mentés egy kéréssel lefut.
+
+**A régi gráf (100.).** Az üres `promptTemplate` mezőt hordozó `n2` csomóponttal a szerkesztő
+betölt (a csomópont látszik, `role="alert"` nincs), a mentési kísérlet `PUT` nélkül a "Prompt sablon"
+mező alatt jelez, a csak szóközből álló érték is, kitöltés után a mentés lefut.
+
+### 45.4 Szándékos rontások (mindegyik visszaállítva, a commitban nincs)
+
+| Rontás                                                                                               | Bukó e2e teszt                                                                                                                                                                                                                                                                   | Bukó unit teszt                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a1) `DELETE_KEY_CODE` = `['Backspace']` (`GraphEditorCanvas.tsx`)                                   | `graph-node-delete.spec.ts`: "a(z) Delete billentyű a kiválasztott csomópontot ...", "a Delete billentyű a kiválasztott élt törli ...", "a panel gombján és a választó triggerén lenyomott Delete nem töröl, a vásznon kiválasztott csomópontra viszont igen" (3 bukik, 10 zöld) | `GraphEditorCanvas.spec.tsx`: "a deleteKeyCode pontosan a Backspace és a Delete", "a(z) Delete billentyű a kiválasztott csomópontot ...", "a panelen kívüli gombon lenyomott Delete ..."                                                                                         |
+| (a2) `DELETE_KEY_CODE` = `['Delete']`                                                                | `graph-node-delete.spec.ts`: a `Backspace` csomópont törlés és a `Backspace` panel teszt; `graph-edge-selection.spec.ts`: a három `Backspace` teszt (5 bukik, 8 zöld)                                                                                                            | ugyanaz a három teszt a `Backspace` változatával                                                                                                                                                                                                                                 |
+| (b) a `deletable: workflowNode.type !== 'start'` sor törlése (`graph-editor-node-mapping.ts`)        | `graph-node-delete.spec.ts`: "a Start nem törölhető: a billentyűk után a vásznon marad ..." ("element(s) not found" az `n1` csomópontra; 1 bukik, 12 zöld)                                                                                                                       | `graph-editor-node-mapping.spec.ts` 2, `GraphEditorCanvas.spec.tsx` a két Start billentyű teszt                                                                                                                                                                                  |
+| (c1) a középpont képletéből a `/ zoom` osztás elhagyása (`compute-viewport-center-node-position.ts`) | `graph-node-add-placement.spec.ts` gomb útja teszt: `Expected: 499.9999115804794, Received: 476` (1 bukik, 11 zöld)                                                                                                                                                              | `compute-viewport-center-node-position.spec.ts` 3                                                                                                                                                                                                                                |
+| (c2) a kártya fél méretének elhagyása ugyanott                                                       | ugyanaz a teszt: `Expected: 499.9999115804794, Received: 679` (1 bukik, 11 zöld)                                                                                                                                                                                                 | `compute-viewport-center-node-position.spec.ts` 5                                                                                                                                                                                                                                |
+| (d) a `NodeConfigSaveSchema` `when` feltételének elhagyása (a javítás előtti szerkezet, 45.5)        | `graph-node-required-fields.spec.ts`: a ciklus teljes útja (a `continueExpression` mezőn), a táblázat `Ciklus` és `Hibakezelő` esete (a `Kezeletlen hiba szabálya` mezőn); 3 bukik, 10 zöld                                                                                      | 14 bukik: a `node-config-save-schema.spec.ts` hét típushibás esete, a `NodeInspector.spec.tsx` két, a `create-initial-node-config.spec.ts` két, a `validate-graph-for-save.spec.ts` egy és az `apps/server` `replace-workflow-graph-error-response.spec.ts` két (i), (j) tesztje |
+| (e) a `when` feltétel helyén `() => true` (a diszkriminátor ellenőrzés nélkül)                       | nem futtatva: a hiba nem felhasználói úton jön elő                                                                                                                                                                                                                               | `node-config-save-schema.spec.ts` hat esete (nem objektum, `null`, ismeretlen és nem szöveg `type`, ismeretlen és nem szöveg `join` mód): a finomítás `TypeError`-t dob                                                                                                          |
+
+Tanulság a (c) rontásokból: a 77. kritérium "a középpont a kártya dobozán belül" állítása önmagában
+egyik rontást sem fogná meg biztosan (0,96 nagyításnál a `/ zoom` elhagyása 24 flow pixeles, a fél
+méret elhagyása a kártya sarkára tolja a középpontot); a bukást az M-99 képlet egyezésének állítása
+adja, ezért a teszt mindkettőt állítja. A `GraphEditorScreen.spec.tsx` gomb útja tesztje egyik (c)
+rontásra sem bukik, mert a várt helyet ugyanazzal a függvénnyel számolja; a képletet a saját unit
+tesztje és ez az e2e őrzi.
+
+### 45.5 Lezárva: a felvett ciklus és hibakezelő első mentési kísérlete (81. kritérium)
+
+| Kérdés             | Válasz                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| mi volt az eltérés | a SPEC-008 5.8 és a 81. kritérium szerint a felvett csomópont mentési kísérlete minden üres kötelező mezőn jelez; mérve (45.3) a `loop` és az `error_handler` első kísérlete csak a `NaN` szám mezőn jelzett, mert a `NodeConfigSaveSchema` `superRefine` hívása típushiba mellett nem futott                                                                                                                                                                                                                                                                                   |
+| a döntés           | user döntés 2026-10-16: "Egyszerre látsszon mind." A spec változatlan; a SPEC-008 15. szekciójának kritériumai állapotot nem jelölnek, ezért a 81. kritérium szövege sem változott                                                                                                                                                                                                                                                                                                                                                                                              |
+| a javítás          | a `NodeConfigSaveSchema` `superRefine` hívása második paraméterként `when` feltételt kap (`packages/protocol/src/node-config/node-config-save-schema.ts`): a három szabály (kötelező szöveg mező, `null` `onUnhandledError`, `null` `join` mód) a konfig típushibája mellett is lefut, ha a bemenet ismert `type` és (a `join`-nál) ismert vagy `null` `mode` értékkel áll, azaz a diszkriminált unió ágat választott. Az ismert értékek forrása a `REQUIRED_TEXT_FIELD_PATHS` tábla kulcsai. A séma szerkezete, a `z.infer` eredménye és a négy séma írási szabály változatlan |
+| miért ez az út     | ugyanaz a séma fut a kliensen (`validateGraphForSave`, a beállítás panel mezőnkénti hibája) és a szerveren (`PUT` törzs), tehát a két oldal ugyanazokat az útvonalakat adja; a két független ellenőrzés összefésülése egy második szabályforrást hozott volna. A `when` feltétel nélkül (`() => true`) a finomítás nem objektum vagy ismeretlen diszkriminátorú bemeneten `TypeError`-t dobna (45.4 (e)); a karbantartó szerint típushiba után a bemenet "possibly malformed", ezért a feltétel pontosan azt ellenőrzi, amit a finomítás típusosan olvas                        |
+| a bizonyíték       | unit: `node-config-save-schema.spec.ts` (13 típushibás eset, a `when` minden ága), `create-initial-node-config.spec.ts` (a kilenc kezdő konfig teljes hibalistája), `NodeInspector.spec.tsx` (a ciklus és a hibakezelő mező alatti hibái), `validate-graph-for-save.spec.ts` (a lábléc üzenete); szerver: `replace-workflow-graph-error-response.spec.ts` (i), (j): `400 invalid_request`, az üzenet bájtra egyezik a kliens ellenőrzéséével (a kliens `NaN`, a drót `null` értékkel); e2e: 45.2; rontás: 45.4 (d), (e)                                                         |
+
+**Források.** A zod dokumentációja: "By default, refinements don't run if any non-continuable issues have
+already been encountered" és a `when` paraméter leírása, a "power user feature" figyelmeztetéssel
+(<https://zod.dev/api>, "Refinements", `when`). A `superRefine` `when` paramétere: colinhacks/zod #5741
+("feat: allow 'when' parameter in .superRefine", "Landed in Zod 4.4",
+<https://github.com/colinhacks/zod/pull/5741>, commit `65fab33`), előzménye a #5739 issue
+(<https://github.com/colinhacks/zod/issues/5739>). A karbantartó indoka, miért nem fut alapból: "If
+validation has failed on the base schema, then Zod has no confidence in the fact that the input data agrees
+with the inferred type signature" (<https://github.com/colinhacks/zod/issues/5197>), és a #4598
+(<https://github.com/colinhacks/zod/issues/4598>). A telepített `zod@4.4.3` forrása: a
+`src/v4/core/api.ts` `$ZodSuperRefineParams` interfésze (`when`) és `_superRefine` függvénye, ami a
+paramétert a `_check` hívásnak adja; a `src/v4/core/schemas.ts` `runChecks` függvénye, ami `when`
+megléte esetén az alapértelmezett kihagyás helyett a feltételt futtatja (`explicitlyAborted` esetén
+nem); a telepített teszt: `src/v4/classic/tests/refine.test.ts` "should run superRefine validation even
+when base schema validation fails when 'when' is defined and returns true". Saját mérés a telepített
+verzión: a `NaN` `maxIterations` mellett a `when` nélküli finomítás nem fut (egy hiba), a `when`
+feltétellel fut (három hiba), a `ReplaceGraphRequestSchema` útvonalain is.
+
+### 45.6 Az e2e lefedettség előtte és utána
+
+Saját mérés, a 6. szekció eljárásával (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e
+apps/web/test-results`, nyolc egymás utáni shard `flock` alatt, legfeljebb 3 workerrel, majd
+`bun run coverage:e2e:report`, a darabszámok a `nyc report --reporter=json-summary` kimenetéből).
+Előtte a `main` `45f5af5` állapota: **515 teszt, mind zöld** (65 + 65 + 65 + 64 + 64 + 64 + 64 + 64).
+Utána a jelen ág: **526 teszt, mind zöld** (66 + 66 + 66 + 66 + 66 + 66 + 65 + 65), a riport exit 0
+a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1855 / 1870            | 1855 / 1870           | 15 -> 15                 |
+| branches   | 850 / 861              | 850 / 861             | 11 -> 11                 |
+| functions  | 625 / 628              | 625 / 628             | 3 -> 3                   |
+| lines      | 1783 / 1798            | 1783 / 1798           | 15 -> 15                 |
+
+A lépés termékkódot nem módosít, tehát az összes darabszám sem változott.
+
+**A 45.5 javítása után** (ugyanaz az eljárás, 2026-10-16): **536 teszt, mind zöld** (8 x 67), a riport
+exit 0 a meglévő küszöbbel. A javítás a `packages/protocol` csomagban áll, ami az `apps/web` e2e
+istanbul hatókörén kívül esik (a `vite-istanbul-include-invariant` az `apps/web` saját `src/**/*`
+mintáját rögzíti), az `apps/web` termékkódja nem változott: a négy metrika fedett és összes darabszáma
+(1855 / 1870, 850 / 861, 625 / 628, 1783 / 1798) és a fedetlen darab (15, 11, 3, 15) változatlan, a
+fedetlen helyek ugyanazon a hat fájlon állnak. A fedetlen helyek
+ugyanazon a hat fájlon állnak, mint a 27. szekcióban (`mount-app.tsx` 3/2/0/3,
+`read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1). Az `apps/web/package.json` küszöbe nem változott.
+
+### 45.7 Nem ellenőrzött
+
+- A 74. kritérium sorrendjének a Visszavonás és az Újra gombhoz viszonyított része: a két gomb a
+  párhuzamos T-009-51 lépéssel érkezik; a teszt a "Hozzáadás" utáni szomszédot állítja (a "Mentés"
+  split button csoportja), ami a két gomb beérkezése után is igaz. A teljes sorrend e2e-je a 103.
+  kritériumé.
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- A böngésző saját helyi menüjének megjelenése: fejnélküli Chromiumban nem látható; a tiltását a
+  `defaultPrevented` értéke igazolja, a menü kirajzolását nem.
