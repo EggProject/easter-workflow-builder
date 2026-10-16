@@ -756,6 +756,7 @@ describe('NodeInspector', () => {
             onChange={vi.fn()}
             onClose={vi.fn()}
             onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
             inheritedProviderDescription="nincs"
             isSaveAttempted
           />,
