@@ -14,6 +14,16 @@ export type UndoShortcutKeyboardEvent = Pick<
 >;
 
 /**
+ * A szerkesztő állapota, amiből a döntés áll a billentyű eseményen kívül.
+ */
+export interface UndoShortcutState {
+  /**
+   * Fut-e a mentés (SPEC-008 5.10, 5. szabály).
+   */
+  readonly isSaving: boolean;
+}
+
+/**
  * A React Flow törlés billentyű szűrőjének köre (`@xyflow/system`
  * `isInputDOMNode`, M-102, M-117): a beviteli elem, a `contenteditable` elem és
  * a `.nokey` osztályú elem vagy ős. A cél elem a `composedPath()` első eleme,
@@ -45,14 +55,18 @@ const SHORTCUT_ACTIONS = new Map<string, UndoShortcutAction>([
 ]);
 
 /**
- * A szerkesztő visszavonás billentyűjének szűrője (SPEC-008 5.10, 1. és 2.
- * szabály): beviteli célponton (a szöveg mező natív visszavonása marad) és nem
- * kezelt billentyűn `undefined`. Módosítóként kizárólag a `Ctrl` számít; a
- * `Meta` vagy az `Alt` mellett a billentyű nem kezelt. A beállítható módosító
- * a PLAN-009 T-009-58 lépése.
+ * A szerkesztő visszavonás billentyűjének szűrője (SPEC-008 5.10, 1., 2. és 5.
+ * szabály): beviteli célponton (a szöveg mező natív visszavonása marad), nem
+ * kezelt billentyűn és a mentés futása alatt `undefined`, ugyanúgy, ahogy a
+ * mentés alatt a két gomb is tiltott (user döntés 2026-10-16). Módosítóként
+ * kizárólag a `Ctrl` számít; a `Meta` vagy az `Alt` mellett a billentyű nem
+ * kezelt. A beállítható módosító a PLAN-009 T-009-58 lépése.
  */
-export function resolveUndoShortcut(event: UndoShortcutKeyboardEvent): UndoShortcutAction | undefined {
-  if (!event.ctrlKey || event.metaKey || event.altKey || isKeyboardInputTarget(event)) {
+export function resolveUndoShortcut(
+  event: UndoShortcutKeyboardEvent,
+  state: UndoShortcutState,
+): UndoShortcutAction | undefined {
+  if (state.isSaving || !event.ctrlKey || event.metaKey || event.altKey || isKeyboardInputTarget(event)) {
     return undefined;
   }
   return SHORTCUT_ACTIONS.get(`${event.shiftKey ? 'shift+' : ''}${event.key.toLowerCase()}`);

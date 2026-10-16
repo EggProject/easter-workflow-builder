@@ -674,7 +674,8 @@ A fedetlen darabszám a fenti táblával azonos (15 / 11 / 3 / 15), ugyanazon a 
 (`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
 `browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
 `use-stream-connection.ts` 1/0/1/1); a fedett és az összes darabszám +8 / +1 / +5 / +8 nőtt, ez az
-új `PlusIcon`, a `useIsAddNodeCompact` hook és a `AddNodeMenuButton` új ága, mind fedett.
+új `PlusIcon`, a `useIsAddNodeCompact` hook (T-009-51 óta `useIsFooterCompact`, 51.8) és a
+`AddNodeMenuButton` új ága, mind fedett.
 
 A `main` (T-009-44, #35) beolvasztása után, `9f9ed22` állapoton, ugyanezzel az eljárással: **515 teszt,
 mind zöld** (65 + 65 + 65 + 64 + 64 + 64 + 64 + 64), `bun run coverage:e2e:report` exit 0, a meglévő
@@ -724,12 +725,12 @@ módosul." A SPEC-008 5.8 mondata ennek megfelelően módosult.
 tehát 640 pixelen még ikon, 641 pixeltől szöveg (az e2e mindkét oldalt igazolja). A mért túllógás
 sávjára (320 ... 360 pixel) nincs token; a márkanév szövegének elrejtése (`topnav-shell.css`, SPEC-007
 5.3) ugyanezt a tokent a legkisebb, a mért sávot lefedő tokenként választotta, és ez a precedens
-dönt, kitalált szám nincs. A literált a `add-node-compact-media-query.spec.ts` a token fájlból
-olvasva hasonlítja össze.
+dönt, kitalált szám nincs. A literált a `footer-compact-media-query.spec.ts` (T-009-51 előtt
+`add-node-compact-media-query.spec.ts`, 51.8) a token fájlból olvasva hasonlítja össze.
 
 **Miért JS (`matchMedia`) és nem CSS.** A `.btn--icon` osztály a `button` elemen áll, amit media query
 nem tud rátenni, a szabályait pedig saját osztályba másolni nem szabad (szabálykönyv 11. szekció,
-"Csak létező design system elem használható"). A váltást a `useIsAddNodeCompact` hook adja
+"Csak létező design system elem használható"). A váltást a `useIsFooterCompact` hook adja
 (`useSyncExternalStore`, `MediaQueryList` `change` esemény), a `GraphEditorScreen` `AddNodeMenuButton`
 komponense ágazik rá.
 
@@ -739,8 +740,8 @@ leírója `["path",{d:"M5 12h14"}],["path",{d:"M12 5v14"}]`, a `Plus` kulcson), 
 vonalvastagság, a repó meglévő inline SVG konvenciója szerint (`aria-hidden`). A gomb `size="sm"`,
 `variant="secondary"`, `icon`, `aria-label="Hozzáadás"`; a menü ugyanaz.
 
-**Teszt.** Unit: `add-node-compact-media-query.spec.ts` 1 (a literál a token értéke),
-`use-is-add-node-compact.spec.tsx` 4 (illeszkedés, nem illeszkedés, `change` esemény, leiratkozás),
+**Teszt.** Unit: `footer-compact-media-query.spec.ts` 1 (a literál a token értéke),
+`use-is-footer-compact.spec.tsx` 4 (illeszkedés, nem illeszkedés, `change` esemény, leiratkozás),
 `GraphEditorScreen.spec.tsx` +1 (szűk nézetben `.btn--icon`, `btn--sm`, `aria-label`, üres szöveg,
 ugyanaz a kilenc menüpont, a választás felvesz). E2E (`responsive.spec.ts`) +2: a lábléc négy gombja
 (`Futás indítása`, `Hozzáadás`, `Mentés`, `További műveletek`) minden támogatott szélességen
@@ -1018,8 +1019,10 @@ típusra elbukik. Az osztállyal mindhárom zöld. A rontást utána visszaáll�
 ## T-009-51
 
 A visszavonás és az újra elvégzés (SPEC-008 5.10, O-22): a történet tiszta függvénye, a billentyű
-szűrő, a figyelő, a rögzítés bekötése és a lábléc két ikon gombja. **A lépés a lábléc szélességén
-megállt** (51.6): a két gomb a spec szerinti helyén 320 pixelen nem fér ki.
+szűrő, a figyelő, a rögzítés bekötése és a lábléc két ikon gombja. A lépés a lábléc szélességén
+megállt (51.6): a két gomb a spec szerinti helyén 320 pixelen nem fért ki. **Lezárva a user két
+2026-10-16-i döntésével (51.8):** a "Futás indítása" keskenyen ikon gomb, és a mentés alatt a
+billentyű sem von vissza.
 
 ### 51.1 Források
 
@@ -1118,7 +1121,7 @@ mező menete a visszavonás előtt lezárul.
   (saját olvasás: `lucide.min.js`, `Undo2` = `M9 14 4 9l5-5`, `M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5
 5.5 0 0 1-5.5 5.5H11`; `Redo2` = `m15 14 5-5-5-5`, `M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0
 9.5 20H13`), a `Tooltip` `shortcut` propjával. Tiltott, ha a lista üres, és a betöltés vagy a
-  mentés alatt.
+  mentés alatt; a billentyű a mentés alatt sem hat (51.8).
 - **A modális szabály (5.10, 4. pont)** a megerősítő modálissal együtt a T-009-52 lépésé; ma a
   szerkesztőben ilyen modális nincs.
 
@@ -1162,6 +1165,9 @@ küszöbe nem változott.
 
 ### 51.6 A lábléc szélessége: a két gomb 320 pixelen nem fér ki
 
+(Az állapot a lezárás előtti, a `146551c` commité; a döntés és a lezárás utáni mérés az 51.8
+szekcióban áll.)
+
 Saját mérés, 2026-10-15, valódi Chromium, a `responsive.spec.ts` szerkesztő fixtúrájával, a
 gombok `boundingBox()` értéke (bal-jobb pixel) és a lábléc `scrollWidth - clientWidth` különbsége.
 A gombsor szélessége a lábléc akciósávjáé. Az "A" oszlop a spec szerinti hely (Futás indítása,
@@ -1197,3 +1203,104 @@ Két, a döntéshez készült, nem commitolt mérés (a kód utána visszaállí
 - A tiltott gombon a `Tooltip` egér alatti nyitása: a tiltott gomb nem kap fókuszt, és az egér
   eseményeit nem mértük.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- A `Button` várakozás jelzése (`isLoading`) a négyzetes ikon gombon: a `button.css` a három
+  pöttyöt `position: absolute; inset: 0` alakban középre teszi (forrásolvasás), vizuálisan nem
+  mértem. A "Futás indítása" gomb sikeres indítás után a futás nézetre navigál, tehát a jelzés
+  rövid ideig látszik.
+- A "Futás indítása" ikon gomb tippje: nincs, a "Hozzáadás" ikon gombhoz hasonlóan (a user
+  döntése "ahogy a Hozzáadás"); a név az `aria-label`.
+
+### 51.8 A lábléc és a mentés alatti billentyű: a két user döntés (2026-10-16)
+
+**A döntések**, szó szerint:
+
+1. A 320 pixeles lábléc (51.6): "A 'Futás indítása' is ikon gomb lesz keskenyen, ahogy a
+   'Hozzáadás'." Az 51.6 két mért alternatívája közül ez a "Futás indítása" ikon gombja; a
+   `flex-wrap` tördelés nem készült el.
+2. A billentyű a mentés alatt: "Mentés közben a billentyű sem von vissza, ahogy a gomb sem."
+
+**A megvalósítás.**
+
+- A "Hozzáadás" gomb konstansa és hookja két gombé lett, ezért átnevezve (`git mv`):
+  `footer-compact-media-query.ts` (`FOOTER_COMPACT_MEDIA_QUERY`) és `use-is-footer-compact.ts`
+  (`useIsFooterCompact`), a spec fájlokkal együtt. A literál változatlanul a `--ep-screen-sm` token
+  értéke, a regressziós teszt (`footer-compact-media-query.spec.ts`) a `breakpoints.css` fájlból
+  olvassa vissza. A `GraphEditorScreen` egyszer hívja a hookot, és az értéket átadja az
+  `AddNodeMenuButton` `isCompact` propjának és a "Futás indítása" gombnak.
+- A "Futás indítása" gomb a token szélességén és alatta `icon` (`.btn--icon`), `aria-label="Futás
+indítása"`, tartalma a `PlayIcon`; a `disabled`, az `isLoading` és az `onClick` nem változott.
+- A billentyű szűrő: `resolveUndoShortcut(event, { isSaving })`, futó mentésnél `undefined`,
+  `preventDefault()` sem fut. A `useUndoRedoShortcut(onShortcut, isSaving)` a `saveState`
+  állapotából kapja az értéket, a figyelő az `isSaving` váltásakor újrakötődik. Sikertelen mentés
+  után a listák érintetlenek, a billentyű ismét hat; sikeres mentés után a listák üresek.
+
+**Az ikon: lucide `Play`.** A vendorolt `lucide@0.525.0` készlet (`lucide.min.js`, a fejléc
+`lucide v0.525.0`) `Play` kulcsa `["polygon",{points:"6 3 20 12 6 21 6 3"}]` (saját olvasás).
+Megerősítés két független helyről, mindkettő a 0.525.0 verziót adja és ugyanezt a poligont:
+a `lucide-static@0.525.0` npm csomag `icons/play.svg` fájlja
+(<https://unpkg.com/lucide-static@0.525.0/icons/play.svg>, ugyanez a jsDelivr tükrön:
+<https://cdn.jsdelivr.net/npm/lucide-static@0.525.0/icons/play.svg>), és a GitHub `0.525.0` címke
+`icons/play.svg` fájlja
+(<https://raw.githubusercontent.com/lucide-icons/lucide/0.525.0/icons/play.svg>). Az ikon
+kiválasztása ízlés kérdése, dokumentált szabály nincs rá; a "Futás indítása" gomb szokásos jele.
+24x24 viewBox, 1.75 vonalvastagság, a repó meglévő inline SVG konvenciója szerint (`aria-hidden`).
+
+**A lábléc mérése.** A mérő eszköz a repóban van: `apps/web/measurement/footer-width.ts`
+(`bun run measure:footer-width`), a bemutató szerkesztő fixtúrájával (`e2e/showcase-graph.ts`),
+valódi Chromium. A hat gomb `boundingBox()` értékéből a gombsor szélessége (az első gomb bal és az
+utolsó gomb jobb széle között), és a legkijjebb álló gomb jobb szélének túllógása a nézetablakhoz
+képest; a lábléc `scrollWidth - clientWidth` különbsége. Az "előtte" sor ugyanezzel az eszközzel,
+a "Futás indítása" gombot ideiglenesen szöveges alakban tartva készült (a kód utána
+visszaállítva), és pontosan az 51.6 számait adja (326 pixel, 42 pixel túllógás 320 pixelen), tehát
+az eszköz az akkori, nem commitolt méréssel egyezik.
+
+| Szélesség | Gombsor előtte | Túllógás előtte | Gombsor utána | Túllógás utána | Legkijjebb álló jobb szél utána |
+| --------- | -------------- | --------------- | ------------- | -------------- | ------------------------------- |
+| 320       | 326            | 42              | 253           | 0              | 296                             |
+| 340       | 326            | 22              | 253           | 0              | 316                             |
+| 360       | 326            | 2               | 253           | 0              | 336                             |
+| 375       | 326            | 0               | 253           | 0              | 351                             |
+| 393       | 326            | 0               | 253           | 0              | 369                             |
+| 640       | 326            | 0               | 253           | 0              | 616                             |
+| 641       | 405            | 0               | 405           | 0              | 617                             |
+
+320 pixelen a gombok (bal-jobb): "Futás indítása" 43-71, "Visszavonás" 83-111, "Újra" 123-151,
+"Hozzáadás" 163-191, "Mentés" 203-269, "További műveletek" 268-296. A lábléc `scrollWidth -
+clientWidth` különbsége minden szélességen 0.
+
+**Unit teszt.** `resolve-undo-shortcut.spec.ts` 20 -> 23 (a `Ctrl+Z`, a `Ctrl+Shift+Z` és a `Ctrl+Y`
+futó mentésnél nem kezelt, mentés nélkül ugyanaz kezelt), `use-undo-redo-shortcut.spec.tsx` 3 -> 4
+(mentés alatt nincs hívás és `preventDefault`, a mentés végén ismét hat), `GraphEditorScreen.spec.tsx`
++3 (szűk nézetben a "Futás indítása" `.btn--icon`, `btn--sm`, `aria-label`, üres szöveg, `polygon`
+az ikonban, és a kattintása elindítja a futást; sikertelen mentés után a billentyű visszavon;
+futó mentés alatt a `Ctrl+Z`, a `Ctrl+Shift+Z` és a `Ctrl+Y` sem hat, a két lista nem üres). A
+"szűk nézet" teszt csoport kikerült a "csomópont felvétel" csoportból, mert két gombot fed. A
+`bun run test`: 577 fájl, 5294 teszt, 100 százalék mind a négy metrikán.
+
+**Rontás igazolás** (saját, 2026-10-16, utána visszaállítva): a `state.isSaving ||` törlése a
+szűrőből 5 tesztet buktat (3 a szűrőé, 1 a hooké, 1 a képernyőé); a `useUndoRedoShortcut` hívásban
+az `isSaving` helyén `false` a képernyő mentés tesztjét; a "Futás indítása" gomb szöveges alakra
+kényszerítése a képernyő szűk nézet tesztjét, és e2e-ben a `responsive.spec.ts` két tesztjét
+(a lábléc teszt 320 pixelen: `viewport ratio 0.7727272510528564`, a 51.6-ban mért érték; a token
+szélességű teszt: `Expected pattern: /btn--icon/`, `Received string: "btn btn--secondary
+btn--sm"`).
+
+**E2E.** `responsive.spec.ts`: a lábléc teszt hat gombra bővült (a "Visszavonás" és az "Újra"
+is `toBeInViewport({ ratio: 1 })` minden támogatott szélességen), a "Hozzáadás" token határ tesztje
+a "Futás indítása" gombra is kiterjed (a token szélességén `.btn--icon`, üres szöveg, látható
+`svg`; egy pixellel fölötte szöveg és `.btn--icon` nélkül). A teljes e2e, az 51.5 eljárásával
+(nyolc shard, `flock` alatt): **516 teszt, mind zöld** (65 + 65 + 65 + 65 + 64 + 64 + 64 + 64),
+`bun run coverage:e2e:report` exit 0 a meglévő küszöbbel (`nyc`: statements 99.21, branches 98.78,
+functions 99.54, lines 99.18).
+
+| Metrika    | Fedett / összes | Fedetlen: `main` `45f5af5` (51.5) -> most |
+| ---------- | --------------- | ----------------------------------------- |
+| statements | 1903 / 1918     | 15 -> 15                                  |
+| branches   | 892 / 903       | 11 -> 11                                  |
+| functions  | 650 / 653       | 3 -> 3                                    |
+| lines      | 1833 / 1848     | 15 -> 15                                  |
+
+A fedetlen helyek ugyanazon a hat fájlon, ugyanazokkal a darabszámokkal állnak, mint az 51.5-ben
+(`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1). Az `apps/web/package.json` küszöbe nem változott.

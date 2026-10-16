@@ -6,12 +6,13 @@ import { resolveUndoShortcut, type UndoShortcutAction } from './resolve-undo-sho
  * hívó képernyő élettartama alatt a dokumentum `keydown` eseményén áll. A
  * döntés a `resolveUndoShortcut` szűrőé; a kezelt billentyűn `preventDefault()`
  * fut, a nem kezelt érintetlen (3. szabály). Az `onShortcut` hivatkozásának
- * stabilnak kell lennie, különben a figyelő minden renderen újra kötődik.
+ * stabilnak kell lennie, különben a figyelő minden renderen újra kötődik; az
+ * `isSaving` váltása is újrakötést okoz.
  */
-export function useUndoRedoShortcut(onShortcut: (action: UndoShortcutAction) => void): void {
+export function useUndoRedoShortcut(onShortcut: (action: UndoShortcutAction) => void, isSaving: boolean): void {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      const action = resolveUndoShortcut(event);
+      const action = resolveUndoShortcut(event, { isSaving });
       if (action === undefined) {
         return;
       }
@@ -22,5 +23,5 @@ export function useUndoRedoShortcut(onShortcut: (action: UndoShortcutAction) => 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onShortcut]);
+  }, [onShortcut, isSaving]);
 }

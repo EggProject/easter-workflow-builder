@@ -3,7 +3,9 @@
 // a jóváhagyás panel (`measurement/approval-panel.ts`,
 // `bun run measure:approval`) és a futás nézet sáv-váltási pontja
 // (`measurement/run-view-band.ts`, `bun run measure:run-view-band`, 2026-09-28,
-// O-7). A három npm script a fájlnév szűrővel választ.
+// O-7) és a lábléc gombsora (`measurement/footer-width.ts`,
+// `bun run measure:footer-width`, 2026-10-16, T-009-51). A négy npm script a
+// fájlnév szűrővel választ.
 //
 // A `playwright.config.ts` felállását örökli (chromium projekt, `baseURL`, a
 // `webServer` kötelező `VITE_*` konfigurációja), két eltéréssel: kizárólag a
@@ -20,7 +22,7 @@ const baseWebServer = baseConfig.webServer;
 export default defineConfig({
   ...baseConfig,
   testDir: './measurement',
-  testMatch: ['transcript-scroll.ts', 'approval-panel.ts', 'run-view-band.ts'],
+  testMatch: ['transcript-scroll.ts', 'approval-panel.ts', 'run-view-band.ts', 'footer-width.ts'],
   fullyParallel: false,
   workers: 1,
   webServer:

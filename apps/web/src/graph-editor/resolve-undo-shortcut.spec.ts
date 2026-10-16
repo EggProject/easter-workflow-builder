@@ -1,14 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveUndoShortcut, type UndoShortcutAction } from './resolve-undo-shortcut.ts';
+import { resolveUndoShortcut, type UndoShortcutAction, type UndoShortcutState } from './resolve-undo-shortcut.ts';
 
 /**
  * A billentyű esemény a valódi útján, a célponton kiváltva: a döntés a
  * figyelőben fut, amikor a `composedPath()` már a cél elemtől indul.
  */
-function resolveOn(target: EventTarget, init: KeyboardEventInit): UndoShortcutAction | undefined {
+const NOT_SAVING: UndoShortcutState = { isSaving: false };
+
+function resolveOn(
+  target: EventTarget,
+  init: KeyboardEventInit,
+  state: UndoShortcutState = NOT_SAVING,
+): UndoShortcutAction | undefined {
   let resolved: UndoShortcutAction | undefined;
   function listener(event: KeyboardEvent): void {
-    resolved = resolveUndoShortcut(event);
+    resolved = resolveUndoShortcut(event, state);
   }
   document.addEventListener('keydown', listener);
   target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
@@ -59,6 +65,17 @@ describe('resolveUndoShortcut', () => {
       { name: 'Ctrl lenyomása önmagában', init: { key: 'Control', ctrlKey: true } },
     ] as const)('$name', ({ init }) => {
       expect(resolveOn(document, init)).toBeUndefined();
+    });
+  });
+
+  describe('futó mentés (user döntés 2026-10-16)', () => {
+    it.each([
+      { name: 'Ctrl+Z', init: { key: 'z', ctrlKey: true } },
+      { name: 'Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
+      { name: 'Ctrl+Y', init: { key: 'y', ctrlKey: true } },
+    ] as const)('a(z) $name a mentés alatt nem kezelt, ugyanaz a billentyű mentés nélkül kezelt', ({ init }) => {
+      expect(resolveOn(document, init, { isSaving: true })).toBeUndefined();
+      expect(resolveOn(document, init, { isSaving: false })).toBeDefined();
     });
   });
 

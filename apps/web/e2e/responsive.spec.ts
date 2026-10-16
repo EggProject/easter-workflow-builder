@@ -436,15 +436,15 @@ test('a gráf szerkesztő a megnyitott beállítás panellel sem lóg túl a leg
 });
 
 // A szerkesztő lábléc gombsora minden támogatott szélességen teljes egészében
-// a nézetablakban áll (T-009-43, SPEC-008 5.8, user döntés 2026-10-14). A
-// dokumentum vízszintes túllógását mérő fenti teszt erre VAK: az
-// `.app-content` `overflow: auto`, tehát a kilógó gomb a dokumentumot nem
-// szélesíti, csak a gombsor jobb széle esik a nézetablakon kívülre. A
-// `ratio: 1` a teljes elem viewportba esését követeli meg.
+// a nézetablakban áll (T-009-43, T-009-51, SPEC-008 5.8, user döntések
+// 2026-10-14 és 2026-10-16). A dokumentum vízszintes túllógását mérő fenti
+// teszt erre VAK: az `.app-content` `overflow: auto`, tehát a kilógó gomb a
+// dokumentumot nem szélesíti, csak a gombsor jobb széle esik a nézetablakon
+// kívülre. A `ratio: 1` a teljes elem viewportba esését követeli meg.
 test('a gráf szerkesztő lábléc minden gombja minden támogatott szélességen teljes egészében a viewporton belül van', async ({
   page,
 }) => {
-  const footerButtonNames = ['Futás indítása', 'Hozzáadás', 'Mentés', 'További műveletek'];
+  const footerButtonNames = ['Futás indítása', 'Visszavonás', 'Újra', 'Hozzáadás', 'Mentés', 'További műveletek'];
   for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
     await test.step(`viewport szélesség: ${String(width)}px`, async () => {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
@@ -628,28 +628,36 @@ test('a --ep-screen-sm fölött a márkanév szövege teljes szélességben lát
   expect(await renderedWidth(brandText)).toBeGreaterThan(1);
 });
 
-// A "Hozzáadás" gomb a --ep-screen-sm tokenen és alatta csak ikon
-// (`.btn--icon`), fölötte szöveges; a neve mindkét alakban "Hozzáadás". A
-// határ a token értéke a `breakpoints.css` fájlból olvasva, a CSS media query
-// és a JS `matchMedia` egyezését a valódi böngésző dönti el.
-test('a "Hozzáadás" gomb a --ep-screen-sm tokenen és alatta ikon gomb, fölötte szöveges, a neve mindkét alakban azonos', async ({
+// A "Hozzáadás" és a "Futás indítása" gomb a --ep-screen-sm tokenen és alatta
+// csak ikon (`.btn--icon`), fölötte szöveges; a nevük mindkét alakban
+// azonos (user döntések 2026-10-14 és 2026-10-16). A határ a token értéke a
+// `breakpoints.css` fájlból olvasva, a CSS media query és a JS `matchMedia`
+// egyezését a valódi böngésző dönti el.
+test('a "Hozzáadás" és a "Futás indítása" gomb a --ep-screen-sm tokenen és alatta ikon gomb, fölötte szöveges, a nevük mindkét alakban azonos', async ({
   page,
 }) => {
-  const trigger = page.getByRole('button', { name: 'Hozzáadás', exact: true });
+  const buttonNames = ['Hozzáadás', 'Futás indítása'];
   const tokenWidth = smallScreenBreakpointWidth();
 
-  await test.step('a token szélességén ikon gomb', async () => {
+  await test.step('a token szélességén ikon gomb, látható ikonnal', async () => {
     await page.setViewportSize({ width: tokenWidth, height: VIEWPORT_HEIGHT });
     await page.goto(EDITOR_URL);
     await expect(page.getByTestId('rf__node-n1')).toBeVisible();
-    await expect(trigger).toHaveClass(/btn--icon/);
-    await expect(trigger).toHaveText('');
+    for (const name of buttonNames) {
+      const button = page.getByRole('button', { name, exact: true });
+      await expect(button).toHaveClass(/btn--icon/);
+      await expect(button).toHaveText('');
+      await expect(button.locator('svg')).toBeVisible();
+    }
   });
 
   await test.step('a token fölött egy pixellel szöveges gomb', async () => {
     await page.setViewportSize({ width: tokenWidth + 1, height: VIEWPORT_HEIGHT });
-    await expect(trigger).toHaveText('Hozzáadás');
-    await expect(trigger).not.toHaveClass(/btn--icon/);
+    for (const name of buttonNames) {
+      const button = page.getByRole('button', { name, exact: true });
+      await expect(button).toHaveText(name);
+      await expect(button).not.toHaveClass(/btn--icon/);
+    }
   });
 });
 

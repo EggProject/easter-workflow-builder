@@ -57,7 +57,7 @@ import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
-import { useIsAddNodeCompact } from './use-is-add-node-compact.ts';
+import { useIsFooterCompact } from './use-is-footer-compact.ts';
 import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
 
@@ -137,6 +137,28 @@ function PlusIcon(): ReactElement {
 }
 
 /**
+ * A vendorolt lucide 0.525.0 készlet `Play` ikonja (M-118), a `PlusIcon`
+ * konvenciója szerint. A szűk nézeti "Futás indítása" gomb egyetlen tartalma;
+ * a nevét az `aria-label` adja.
+ */
+function PlayIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon points="6 3 20 12 6 21 6 3" />
+    </svg>
+  );
+}
+
+/**
  * A vendorolt lucide 0.525.0 készlet `Undo2` ikonjának útvonal adata (M-118),
  * a `PlusIcon` konvenciója szerint. A Visszavonás gomb egyetlen tartalma; a
  * nevét az `aria-label` adja.
@@ -208,26 +230,28 @@ const selectViewportTransform = (state: ReactFlowState): ReactFlowState['transfo
 
 interface AddNodeMenuButtonProperties {
   readonly disabled: boolean;
+  /**
+   * Igaz a `--ep-screen-sm` tokenen és alatta: a gomb csak ikon.
+   */
+  readonly isCompact: boolean;
   readonly onAddNode: AddNodeContextMenuProperties['onAddNode'];
 }
 
 /**
  * A lábléc "Hozzáadás" menü gombja (SPEC-008 5.8, O-19): a `Menu`/`MenuItem`
- * pár a kilenc felvehető típussal, a split button nyíl ikonjával. A
- * `--ep-screen-sm` token alatt és azon a gomb csak ikon (`.btn--icon`, `Plus`),
- * a neve az `aria-label` (user döntés 2026-10-14); a menü mindkét alakban
- * ugyanaz. Az új kártya
+ * pár a kilenc felvehető típussal, a split button nyíl ikonjával. Kompakt
+ * alakban a gomb csak ikon (`.btn--icon`, `Plus`), a neve az `aria-label`
+ * (user döntés 2026-10-14); a menü mindkét alakban ugyanaz. Az új kártya
  * közepe a választáskor látható vászon középpontja, a React Flow store
  * `width`, `height` és `transform` mezőjéből (`useStore`, M-99). Külön
  * komponens, hogy a store feliratkozás a nézet minden mozdulatára csak ezt a
  * gombot renderelje újra, ne a képernyőt.
  */
 function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): ReactElement {
-  const { disabled, onAddNode } = properties;
+  const { disabled, isCompact, onAddNode } = properties;
   const width = useStore(selectViewportWidth);
   const height = useStore(selectViewportHeight);
   const transform = useStore(selectViewportTransform);
-  const isCompact = useIsAddNodeCompact();
   return (
     <Menu
       trigger={(triggerProperties) =>
@@ -298,6 +322,8 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   const workflowState = useRequestState<{ readonly providerId: string | null }>();
   const settingsState = useRequestState<{ readonly defaultProviderId: string | null }>();
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+  const isCompactFooter = useIsFooterCompact();
+  const isSaving = saveState.state.status === 'pending';
 
   const [baseline, setBaseline] = useState<WorkflowGraphDocument | undefined>(undefined);
   // A szerkesztett dokumentum a visszavonás történetével együtt egy állapot
@@ -449,11 +475,13 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   }, []);
 
   // A visszavonás és az újra elvégzés a gombból és a billentyűből (SPEC-008
-  // 5.10). Helyi, szinkron művelet, hálózati kérés nélkül.
+  // 5.10). Helyi, szinkron művelet, hálózati kérés nélkül. A mentés alatt a
+  // gombok tiltottak, a billentyű pedig nem lép működésbe (user döntés
+  // 2026-10-16).
   const handleHistoryStep = useCallback((action: UndoShortcutAction): void => {
     setHistory(stepGraphEditHistory(action));
   }, []);
-  useUndoRedoShortcut(handleHistoryStep);
+  useUndoRedoShortcut(handleHistoryStep, isSaving);
 
   // Ha a kiválasztott csomópont nincs a dokumentumban (a visszavonás vagy az
   // újra elvégzés kivette), a kiválasztás megszűnik, és a panel bezárul
@@ -570,7 +598,6 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   }
 
   const isLoading = !isHydrated;
-  const isSaving = saveState.state.status === 'pending';
   const isStartingRun = startRunState.state.status === 'pending';
   const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
@@ -673,6 +700,8 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           type="button"
           size="sm"
           variant="secondary"
+          icon={isCompactFooter}
+          aria-label={isCompactFooter ? 'Futás indítása' : undefined}
           isLoading={isStartingRun}
           disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0}
           onClick={handleStartRunClick}
@@ -680,8 +709,11 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           {/* A felirat SZÁNDÉKOSAN nem a puszta "Indítás": az a `start`
               csomópont TÍPUSCÍMKÉJE a vásznon (`graph-node-catalog`), tehát
               egy azonos feliratú gomb a felületen is, a
-              `getByRole`/`getByText` locatorokon is kétértelmű lenne. */}
-          Futás indítása
+              `getByRole`/`getByText` locatorokon is kétértelmű lenne. A
+              `--ep-screen-sm` tokenen és alatta a gomb csak ikon, a neve az
+              `aria-label` (user döntés 2026-10-16, mint a "Hozzáadás"
+              gombé). */}
+          {isCompactFooter ? <PlayIcon /> : 'Futás indítása'}
         </Button>
         {/* A Visszavonás és az Újra a "Hozzáadás" és a "Mentés" split button
             előtt (SPEC-008 5.10): ikon gomb, a neve az `aria-label`, a tipp a
@@ -719,7 +751,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         </Tooltip>
         {/* A "Hozzáadás" közvetlenül a "Mentés" split button előtt áll, így az
             elsődleges művelet a sor végén marad (SPEC-008 5.8, O-19). */}
-        <AddNodeMenuButton disabled={isLoading} onAddNode={handleAddNode} />
+        <AddNodeMenuButton disabled={isLoading} isCompact={isCompactFooter} onAddNode={handleAddNode} />
         <ButtonGroup aria-label="Gráf műveletek">
           <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}
