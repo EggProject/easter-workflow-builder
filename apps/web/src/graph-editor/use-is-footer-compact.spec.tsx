@@ -6,11 +6,11 @@ import { act } from 'react';
 import type { ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ADD_NODE_COMPACT_MEDIA_QUERY } from './add-node-compact-media-query.ts';
-import { useIsAddNodeCompact } from './use-is-add-node-compact.ts';
+import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
+import { useIsFooterCompact } from './use-is-footer-compact.ts';
 
 function CompactProbe(): ReactElement {
-  const isCompact = useIsAddNodeCompact();
+  const isCompact = useIsFooterCompact();
   return <span data-compact={String(isCompact)} />;
 }
 
@@ -18,13 +18,13 @@ function setMatches(media: MediaQueryList, isMatching: boolean): void {
   Object.defineProperty(media, 'matches', { value: isMatching, configurable: true });
 }
 
-describe('useIsAddNodeCompact', () => {
+describe('useIsFooterCompact', () => {
   let container: HTMLDivElement;
   let root: Root;
   let compactMedia: MediaQueryList;
 
   beforeEach(() => {
-    compactMedia = globalThis.matchMedia(ADD_NODE_COMPACT_MEDIA_QUERY);
+    compactMedia = globalThis.matchMedia(FOOTER_COMPACT_MEDIA_QUERY);
     vi.spyOn(globalThis, 'matchMedia').mockImplementation(() => compactMedia);
     container = document.createElement('div');
     document.body.append(container);

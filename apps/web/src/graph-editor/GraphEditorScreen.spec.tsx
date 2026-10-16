@@ -7,8 +7,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
-import { ADD_NODE_COMPACT_MEDIA_QUERY } from './add-node-compact-media-query.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
+import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 
@@ -207,6 +207,78 @@ function countingFetchFunction(log: RouteCallLog, calls: { count: number }): Fet
   };
 }
 
+// ============================================================
+// A VISSZAVONÁS ÉS AZ ÚJRA ELVÉGZÉS segédei (SPEC-008 5.10).
+// ============================================================
+
+function footerActionButtons(container: HTMLElement): readonly HTMLButtonElement[] {
+  return [...container.querySelectorAll<HTMLButtonElement>(':scope .page-footer__actions button')];
+}
+
+function footerButtonNamed(container: HTMLElement, name: string): HTMLButtonElement {
+  const button = footerActionButtons(container).find(
+    (candidate) => candidate.getAttribute('aria-label') === name || candidate.textContent === name,
+  );
+  if (button === undefined) {
+    throw new Error(`a teszt nem talált "${name}" nevű gombot a láblécben`);
+  }
+  return button;
+}
+
+function pressShortcut(init: KeyboardEventInit, target: EventTarget = document.body): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
+}
+
+function canvasNodeIds(): readonly string[] {
+  return lastCanvasProperties().nodes.map((node) => node.id);
+}
+
+function canvasPositionOf(nodeId: string): number | undefined {
+  return lastCanvasProperties().nodes.find((node) => node.id === nodeId)?.positionX;
+}
+
+function moveStartNode(positionX: number, session?: { readonly key: string; readonly isFinal: boolean }): void {
+  act(() => {
+    lastCanvasProperties().onGraphChange(
+      lastCanvasProperties().nodes.map((node) => (node.id === 'n-1' ? { ...node, positionX } : node)),
+      lastCanvasProperties().edges,
+      session,
+    );
+  });
+}
+
+function inspectorTextarea(container: HTMLElement): HTMLTextAreaElement {
+  const textarea = container.querySelector<HTMLTextAreaElement>(':scope .node-inspector textarea');
+  if (textarea === null) {
+    throw new Error('a teszt nem találta a prompt sablon mezőt');
+  }
+  return textarea;
+}
+
+function typeInto(textarea: HTMLTextAreaElement, value: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+  act(() => {
+    descriptor?.set?.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+function agentPromptTemplate(): unknown {
+  const config = lastCanvasProperties().nodes.find((node) => node.id === 'n-2')?.config;
+  return config?.type === 'agent_step' ? config.promptTemplate : undefined;
+}
+
+const pendingPutFetchFunction: FetchFunction = (input, init) =>
+  init.method === 'PUT'
+    ? new Promise<Response>(() => {
+        // A mentés szándékosan sosem fejeződik be: a teszt a futó mentés állapotát nézi.
+      })
+    : createFetchFunction({ putBodies: [], graphGetCount: 0 })(input, init);
+
 describe('GraphEditorScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -246,6 +318,16 @@ describe('GraphEditorScreen', () => {
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
+    });
+  }
+
+  function buttonNamed(name: string): HTMLButtonElement {
+    return footerButtonNamed(container, name);
+  }
+
+  function clickButton(name: string): void {
+    act(() => {
+      buttonNamed(name).click();
     });
   }
 
@@ -982,50 +1064,386 @@ describe('GraphEditorScreen', () => {
       expect(container.textContent).toContain('Mentetlen változtatások');
       expect(calls.count).toBe(callsAfterLoad);
     });
+  });
 
-    describe('szűk nézet: a --ep-screen-sm token alatt csak ikonos gomb (user döntés 2026-10-14)', () => {
-      let restoreMatchMedia: () => void;
+  describe('szűk nézet: a --ep-screen-sm token alatt a lábléc "Hozzáadás" és "Futás indítása" gombja csak ikon (SPEC-008 5.8, user döntések 2026-10-14 és 2026-10-16)', () => {
+    let restoreMatchMedia: () => void;
 
-      beforeEach(() => {
-        const realMatchMedia = globalThis.matchMedia.bind(globalThis);
-        const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia').mockImplementation((query: string) => {
-          const media = realMatchMedia(query);
-          if (query === ADD_NODE_COMPACT_MEDIA_QUERY) {
-            Object.defineProperty(media, 'matches', { value: true, configurable: true });
-          }
-          return media;
-        });
-        restoreMatchMedia = () => {
-          matchMediaSpy.mockRestore();
-        };
+    beforeEach(() => {
+      const realMatchMedia = globalThis.matchMedia.bind(globalThis);
+      const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia').mockImplementation((query: string) => {
+        const media = realMatchMedia(query);
+        if (query === FOOTER_COMPACT_MEDIA_QUERY) {
+          Object.defineProperty(media, 'matches', { value: true, configurable: true });
+        }
+        return media;
       });
+      restoreMatchMedia = () => {
+        matchMediaSpy.mockRestore();
+      };
+    });
 
-      afterEach(() => {
-        restoreMatchMedia();
+    afterEach(() => {
+      restoreMatchMedia();
+    });
+
+    it('a "Hozzáadás" sm méretű `.btn--icon` gomb, szöveg nélkül, a nevét az aria-label adja, és ugyanaz a kilenc menüpont nyílik', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      const trigger = findAddMenuTrigger(container);
+      expect(trigger.classList.contains('btn--icon')).toBe(true);
+      expect(trigger.classList.contains('btn--sm')).toBe(true);
+      expect(trigger.getAttribute('aria-label')).toBe('Hozzáadás');
+      expect(trigger.textContent).toBe('');
+      expect(trigger.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+
+      act(() => {
+        trigger.click();
       });
+      expect(openedMenuItems()).toHaveLength(9);
+      act(() => {
+        openedMenuItems()[1]?.click();
+      });
+      expect(lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id')).toMatchObject({
+        type: 'branch',
+      });
+    });
 
-      it('a "Hozzáadás" sm méretű `.btn--icon` gomb, szöveg nélkül, a nevét az aria-label adja, és ugyanaz a kilenc menüpont nyílik', async () => {
+    it('a "Futás indítása" sm méretű `.btn--icon` gomb, szöveg nélkül, a nevét az aria-label adja, és a kattintása változatlanul elindítja a futást', async () => {
+      const log: StartRunLog = { postBodies: [] };
+      await renderScreen('?workflowId=wf-1', createStartRunFetchFunction(log, []));
+
+      const button = buttonNamed('Futás indítása');
+      expect(button.classList.contains('btn--icon')).toBe(true);
+      expect(button.classList.contains('btn--sm')).toBe(true);
+      expect(button.getAttribute('aria-label')).toBe('Futás indítása');
+      expect(button.textContent).toBe('');
+      expect(button.querySelector(':scope svg[aria-hidden="true"] polygon')).not.toBeNull();
+
+      await act(async () => {
+        button.click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(log.postBodies).toEqual([JSON.stringify({ input: {} })]);
+      expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-7');
+    });
+  });
+
+  describe('visszavonás és újra elvégzés (SPEC-008 5.10)', () => {
+    it('a lábléc sorrendje Futás indítása, Visszavonás, Újra, Hozzáadás, Mentés; a két új gomb sm ikon gomb aria-label névvel, betöltés után tiltott (AC103)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      expect(
+        footerActionButtons(container).map((button) => button.getAttribute('aria-label') ?? button.textContent),
+      ).toEqual(['Futás indítása', 'Visszavonás', 'Újra', 'Hozzáadás', 'Mentés', 'További műveletek']);
+      for (const name of ['Visszavonás', 'Újra']) {
+        const button = buttonNamed(name);
+        expect(button.classList.contains('btn--icon')).toBe(true);
+        expect(button.classList.contains('btn--sm')).toBe(true);
+        expect(button.textContent).toBe('');
+        expect(button.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+        expect(button.disabled).toBe(true);
+      }
+    });
+
+    it.each([
+      { name: 'Visszavonás', shortcut: 'Ctrl+Z' },
+      { name: 'Újra', shortcut: 'Ctrl+Shift+Z / Ctrl+Y' },
+    ])(
+      'a(z) $name gomb fókuszára a Tooltip a feliratot és a $shortcut jelölést mutatja (AC103)',
+      async ({ name, shortcut }) => {
         const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
         await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+        // Két változás és egy visszavonás után mindkét gomb engedélyezett, tehát
+        // fókuszálható.
+        moveStartNode(99);
+        moveStartNode(150);
+        clickButton('Visszavonás');
 
-        const trigger = findAddMenuTrigger(container);
-        expect(trigger.classList.contains('btn--icon')).toBe(true);
-        expect(trigger.classList.contains('btn--sm')).toBe(true);
-        expect(trigger.getAttribute('aria-label')).toBe('Hozzáadás');
-        expect(trigger.textContent).toBe('');
-        expect(trigger.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+        const button = buttonNamed(name);
+        act(() => {
+          button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+        });
+        const tooltip = container.querySelector(':scope .page-footer [role="tooltip"]:not([hidden])');
+        expect(tooltip).not.toBeNull();
+        expect(button.getAttribute('aria-describedby')).toBe(tooltip?.id);
+        expect(tooltip?.getAttribute('role')).toBe('tooltip');
+        expect(tooltip?.querySelector('.tooltip__text')?.textContent).toBe(name);
+        expect(tooltip?.querySelector('kbd')?.textContent).toBe(shortcut);
+        expect(button.getAttribute('aria-label')).toBe(name);
+      },
+    );
 
-        act(() => {
-          trigger.click();
-        });
-        expect(openedMenuItems()).toHaveLength(9);
-        act(() => {
-          openedMenuItems()[1]?.click();
-        });
-        expect(lastCanvasProperties().nodes.find((node) => node.id === 'generated-element-id')).toMatchObject({
-          type: 'branch',
-        });
+    it('a gombok pontosan a művelet előtti és utáni dokumentumot állítják vissza, a betöltött állapotig visszavonva a mentetlen jelző eltűnik (AC101)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      const calls = { count: 0 };
+      await renderScreen('?workflowId=wf-1', countingFetchFunction(log, calls));
+      const callsAfterLoad = calls.count;
+      const loadedNodes = lastCanvasProperties().nodes;
+
+      moveStartNode(99);
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      expect(buttonNamed('Újra').disabled).toBe(true);
+
+      clickButton('Visszavonás');
+      expect(lastCanvasProperties().nodes).toEqual(loadedNodes);
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+      expect(buttonNamed('Újra').disabled).toBe(false);
+
+      clickButton('Újra');
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(buttonNamed('Újra').disabled).toBe(true);
+      expect(calls.count).toBe(callsAfterLoad);
+    });
+
+    it('Ctrl+Z visszavon, Ctrl+Y és Ctrl+Shift+Z újra elvégez, a kezelt billentyűn preventDefault fut (AC101, AC102)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      moveStartNode(99);
+      moveStartNode(150);
+
+      const undoEvent = pressShortcut({ key: 'z', ctrlKey: true });
+      expect(undoEvent.defaultPrevented).toBe(true);
+      expect(canvasPositionOf('n-1')).toBe(99);
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(0);
+      // Üres visszavonás listánál a billentyű nem változtat.
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(0);
+
+      pressShortcut({ key: 'y', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
+      pressShortcut({ key: 'Z', ctrlKey: true, shiftKey: true });
+      expect(canvasPositionOf('n-1')).toBe(150);
+    });
+
+    it('egy új változás az újra listát kiüríti', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      moveStartNode(99);
+      clickButton('Visszavonás');
+      expect(buttonNamed('Újra').disabled).toBe(false);
+
+      moveStartNode(42);
+      expect(buttonNamed('Újra').disabled).toBe(true);
+    });
+
+    it('a beviteli mezőben lenyomott Ctrl+Z a gráfot nem vonja vissza (AC102)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      moveStartNode(99);
+      act(() => {
+        lastCanvasProperties().onSelectNode('n-2');
       });
+
+      const event = pressShortcut({ key: 'z', ctrlKey: true }, inspectorTextarea(container));
+      expect(event.defaultPrevented).toBe(false);
+      expect(canvasPositionOf('n-1')).toBe(99);
+    });
+
+    it('egy húzás a végéig egy lépés (AC101)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      moveStartNode(10, { key: 'node-drag', isFinal: false });
+      moveStartNode(20, { key: 'node-drag', isFinal: false });
+      moveStartNode(30, { key: 'node-drag', isFinal: true });
+
+      clickButton('Visszavonás');
+      expect(canvasPositionOf('n-1')).toBe(0);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+    });
+
+    it('a mező egy szerkesztési menete a blur-ig egy lépés, a következő menet új lépés (AC102)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      act(() => {
+        lastCanvasProperties().onSelectNode('n-2');
+      });
+
+      act(() => {
+        inspectorTextarea(container).focus();
+      });
+      typeInto(inspectorTextarea(container), 'sablon 1');
+      typeInto(inspectorTextarea(container), 'sablon 12');
+      act(() => {
+        inspectorTextarea(container).blur();
+      });
+      act(() => {
+        inspectorTextarea(container).focus();
+      });
+      typeInto(inspectorTextarea(container), 'sablon 123');
+      act(() => {
+        inspectorTextarea(container).blur();
+      });
+      expect(agentPromptTemplate()).toBe('sablon 123');
+
+      clickButton('Visszavonás');
+      expect(agentPromptTemplate()).toBe('sablon 12');
+      clickButton('Visszavonás');
+      expect(agentPromptTemplate()).toBe('sablon');
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+    });
+
+    it('a felvétel visszavonása a kiválasztást megszünteti, és az újra elvégzés sem nyitja meg újra a panelt (AC101, 5.10)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      act(() => {
+        lastCanvasProperties().onAddNode('script', { x: 5, y: 5 });
+      });
+      expect(lastCanvasProperties().selectedNodeId).toBe('generated-element-id');
+
+      clickButton('Visszavonás');
+      expect(canvasNodeIds()).toEqual(['n-1', 'n-2']);
+      expect(lastCanvasProperties().selectedNodeId).toBeUndefined();
+      expect(container.querySelector('.node-inspector')).toBeNull();
+
+      clickButton('Újra');
+      expect(canvasNodeIds()).toEqual(['n-1', 'n-2', 'generated-element-id']);
+      expect(lastCanvasProperties().selectedNodeId).toBeUndefined();
+      expect(container.querySelector('.node-inspector')).toBeNull();
+    });
+
+    it('a panel Törlés gombja a vele törlődő élekkel együtt egy lépés (AC101)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      const edgeToAgent = { ...EDGE_INPUT, id: 'e-in', sourceNodeId: 'n-1', targetNodeId: 'n-2' };
+      act(() => {
+        lastCanvasProperties().onGraphChange(lastCanvasProperties().nodes, [
+          ...lastCanvasProperties().edges,
+          edgeToAgent,
+        ]);
+      });
+      act(() => {
+        lastCanvasProperties().onSelectNode('n-2');
+      });
+      act(() => {
+        [...container.querySelectorAll<HTMLButtonElement>('button')]
+          .find((button) => button.textContent === 'Törlés')
+          ?.click();
+      });
+      expect(canvasNodeIds()).toEqual(['n-1']);
+
+      clickButton('Visszavonás');
+      expect(canvasNodeIds()).toEqual(['n-1', 'n-2']);
+      expect(lastCanvasProperties().edges.map((edge) => edge.id)).toEqual(['e-1', 'e-in']);
+    });
+
+    it('az automatikus elrendezés egy lépés (AC101)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      const loadedNodes = lastCanvasProperties().nodes;
+      act(() => {
+        buttonNamed('További műveletek').click();
+      });
+      act(() => {
+        [...document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+          .find((item) => item.textContent === 'Elrendezés')
+          ?.click();
+      });
+      expect(lastCanvasProperties().nodes).not.toEqual(loadedNodes);
+
+      clickButton('Visszavonás');
+      expect(lastCanvasProperties().nodes).toEqual(loadedNodes);
+    });
+
+    it('sikeres mentés után mindkét lista üres, mindkét gomb tiltott (AC103, 5.10)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+      moveStartNode(99);
+      moveStartNode(150);
+      clickButton('Visszavonás');
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      expect(buttonNamed('Újra').disabled).toBe(false);
+
+      await act(async () => {
+        buttonNamed('Mentés').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(log.putBodies).toHaveLength(1);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+      expect(buttonNamed('Újra').disabled).toBe(true);
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
+    });
+
+    it('sikertelen mentés a listákat nem érinti', async () => {
+      await renderScreen('?workflowId=wf-1', failingPutFetchFunction);
+      moveStartNode(99);
+
+      await act(async () => {
+        buttonNamed('Mentés').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(container.querySelector('.toast__title')?.textContent).toBe('A mentés sikertelen');
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      clickButton('Visszavonás');
+      expect(canvasPositionOf('n-1')).toBe(0);
+    });
+
+    it('sikertelen mentés után a billentyű ismét visszavon (user döntés 2026-10-16)', async () => {
+      await renderScreen('?workflowId=wf-1', failingPutFetchFunction);
+      moveStartNode(99);
+
+      await act(async () => {
+        buttonNamed('Mentés').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const event = pressShortcut({ key: 'z', ctrlKey: true });
+      expect(event.defaultPrevented).toBe(true);
+      expect(canvasPositionOf('n-1')).toBe(0);
+    });
+
+    it('a mentés alatt a Ctrl+Z, a Ctrl+Shift+Z és a Ctrl+Y sem von vissza és nem végez újra, a gombokhoz hasonlóan (user döntés 2026-10-16)', async () => {
+      await renderScreen('?workflowId=wf-1', pendingPutFetchFunction);
+      moveStartNode(99);
+      moveStartNode(150);
+      clickButton('Visszavonás');
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      expect(buttonNamed('Újra').disabled).toBe(false);
+
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+      expect(buttonNamed('Mentés...').disabled).toBe(true);
+
+      const undoEvent = pressShortcut({ key: 'z', ctrlKey: true });
+      const redoEvent = pressShortcut({ key: 'Z', ctrlKey: true, shiftKey: true });
+      const redoYEvent = pressShortcut({ key: 'y', ctrlKey: true });
+
+      expect(canvasPositionOf('n-1')).toBe(99);
+      for (const event of [undoEvent, redoEvent, redoYEvent]) {
+        expect(event.defaultPrevented).toBe(false);
+      }
+    });
+
+    it('a mentés alatt mindkét gomb tiltott (AC103)', async () => {
+      await renderScreen('?workflowId=wf-1', pendingPutFetchFunction);
+      moveStartNode(99);
+      moveStartNode(150);
+      clickButton('Visszavonás');
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      expect(buttonNamed('Újra').disabled).toBe(false);
+
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+
+      expect(buttonNamed('Mentés...').disabled).toBe(true);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+      expect(buttonNamed('Újra').disabled).toBe(true);
     });
   });
 });

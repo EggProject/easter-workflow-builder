@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADD_NODE_COMPACT_MEDIA_QUERY } from './add-node-compact-media-query.ts';
+import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
 
 const BREAKPOINTS_CSS_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -29,8 +29,8 @@ function breakpointTokenValue(tokenName: string): number {
   return Number(match[1]);
 }
 
-describe('ADD_NODE_COMPACT_MEDIA_QUERY', () => {
+describe('FOOTER_COMPACT_MEDIA_QUERY', () => {
   it('a query literálja a --ep-screen-sm token értéke', () => {
-    expect(ADD_NODE_COMPACT_MEDIA_QUERY).toBe(`(max-width: ${String(breakpointTokenValue('--ep-screen-sm'))}px)`);
+    expect(FOOTER_COMPACT_MEDIA_QUERY).toBe(`(max-width: ${String(breakpointTokenValue('--ep-screen-sm'))}px)`);
   });
 });

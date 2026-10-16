@@ -20,6 +20,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ToastViewport,
+  Tooltip,
   joinClassNames,
   useToasts,
 } from '@easter-workflow-builder/ui';
@@ -41,12 +42,23 @@ import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { createGraphNode } from './create-graph-node.ts';
 import { deleteNodeWithEdges } from './delete-node-with-edges.ts';
+import {
+  closeGraphEditSession,
+  recordGraphEdit,
+  redoGraphEdit,
+  startGraphEditHistory,
+  undoGraphEdit,
+  type GraphEditHistory,
+  type GraphEditSession,
+} from './graph-edit-history.ts';
 import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor-document-projection.ts';
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
-import { useIsAddNodeCompact } from './use-is-add-node-compact.ts';
+import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
+import { useIsFooterCompact } from './use-is-footer-compact.ts';
+import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
 
 export interface GraphEditorScreenProperties {
@@ -124,32 +136,122 @@ function PlusIcon(): ReactElement {
   );
 }
 
+/**
+ * A vendorolt lucide 0.525.0 készlet `Play` ikonja (M-118), a `PlusIcon`
+ * konvenciója szerint. A szűk nézeti "Futás indítása" gomb egyetlen tartalma;
+ * a nevét az `aria-label` adja.
+ */
+function PlayIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon points="6 3 20 12 6 21 6 3" />
+    </svg>
+  );
+}
+
+/**
+ * A vendorolt lucide 0.525.0 készlet `Undo2` ikonjának útvonal adata (M-118),
+ * a `PlusIcon` konvenciója szerint. A Visszavonás gomb egyetlen tartalma; a
+ * nevét az `aria-label` adja.
+ */
+function UndoIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />
+    </svg>
+  );
+}
+
+/**
+ * A vendorolt lucide 0.525.0 készlet `Redo2` ikonjának útvonal adata (M-118),
+ * az `UndoIcon` párja.
+ */
+function RedoIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="m15 14 5-5-5-5" />
+      <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" />
+    </svg>
+  );
+}
+
+/**
+ * A két gomb tippjének billentyű jelölése (SPEC-008 5.10). A módosító a
+ * PLAN-009 T-009-58 lépéséig a `Ctrl`.
+ */
+const UNDO_SHORTCUT_LABEL = 'Ctrl+Z';
+const REDO_SHORTCUT_LABEL = 'Ctrl+Shift+Z / Ctrl+Y';
+
+/**
+ * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
+ * konstans, hogy a kezdő állapot minden renderen ugyanaz az objektum legyen.
+ */
+const EMPTY_GRAPH_EDIT_HISTORY: GraphEditHistory = startGraphEditHistory({ nodes: [], edges: [] });
+
+/**
+ * A billentyű művelete a történet lépésére fordítva. Modul szintű függvény,
+ * tehát a figyelőnek átadott hivatkozás stabil.
+ */
+function stepGraphEditHistory(action: UndoShortcutAction): (history: GraphEditHistory) => GraphEditHistory {
+  return action === 'undo' ? undoGraphEdit : redoGraphEdit;
+}
+
 const selectViewportWidth = (state: ReactFlowState): number => state.width;
 const selectViewportHeight = (state: ReactFlowState): number => state.height;
 const selectViewportTransform = (state: ReactFlowState): ReactFlowState['transform'] => state.transform;
 
 interface AddNodeMenuButtonProperties {
   readonly disabled: boolean;
+  /**
+   * Igaz a `--ep-screen-sm` tokenen és alatta: a gomb csak ikon.
+   */
+  readonly isCompact: boolean;
   readonly onAddNode: AddNodeContextMenuProperties['onAddNode'];
 }
 
 /**
  * A lábléc "Hozzáadás" menü gombja (SPEC-008 5.8, O-19): a `Menu`/`MenuItem`
- * pár a kilenc felvehető típussal, a split button nyíl ikonjával. A
- * `--ep-screen-sm` token alatt és azon a gomb csak ikon (`.btn--icon`, `Plus`),
- * a neve az `aria-label` (user döntés 2026-10-14); a menü mindkét alakban
- * ugyanaz. Az új kártya
+ * pár a kilenc felvehető típussal, a split button nyíl ikonjával. Kompakt
+ * alakban a gomb csak ikon (`.btn--icon`, `Plus`), a neve az `aria-label`
+ * (user döntés 2026-10-14); a menü mindkét alakban ugyanaz. Az új kártya
  * közepe a választáskor látható vászon középpontja, a React Flow store
  * `width`, `height` és `transform` mezőjéből (`useStore`, M-99). Külön
  * komponens, hogy a store feliratkozás a nézet minden mozdulatára csak ezt a
  * gombot renderelje újra, ne a képernyőt.
  */
 function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): ReactElement {
-  const { disabled, onAddNode } = properties;
+  const { disabled, isCompact, onAddNode } = properties;
   const width = useStore(selectViewportWidth);
   const height = useStore(selectViewportHeight);
   const transform = useStore(selectViewportTransform);
-  const isCompact = useIsAddNodeCompact();
   return (
     <Menu
       trigger={(triggerProperties) =>
@@ -220,10 +322,17 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   const workflowState = useRequestState<{ readonly providerId: string | null }>();
   const settingsState = useRequestState<{ readonly defaultProviderId: string | null }>();
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+  const isCompactFooter = useIsFooterCompact();
+  const isSaving = saveState.state.status === 'pending';
 
   const [baseline, setBaseline] = useState<WorkflowGraphDocument | undefined>(undefined);
-  const [currentNodes, setCurrentNodes] = useState<readonly WorkflowNodeInput[]>([]);
-  const [currentEdges, setCurrentEdges] = useState<readonly WorkflowEdgeInput[]>([]);
+  // A szerkesztett dokumentum a visszavonás történetével együtt egy állapot
+  // (SPEC-008 5.10): minden gráf változás függvény alakú frissítéssel, a
+  // korábbi dokumentumból rögzül, tehát egy renderbe vont két változás sem
+  // veszíti el egyik lépést sem.
+  const [history, setHistory] = useState<GraphEditHistory>(EMPTY_GRAPH_EDIT_HISTORY);
+  const currentNodes = history.document.nodes;
+  const currentEdges = history.document.edges;
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [validationMessage, setValidationMessage] = useState<string | undefined>(undefined);
   // Megkíséreltek-e már menteni úgy, hogy a mentés a séma ellenőrzésén
@@ -311,17 +420,20 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     // mint amit az `isGraphDirty` a `baseline`-ből is előállít - enélkül a
     // dupla mező miatt a gráf a betöltés UTÁN azonnal piszkosnak látszana.
     setBaseline(graphState.state.value);
-    setCurrentNodes(graphState.state.value.nodes.map((node) => workflowNodeToNodeInput(node)));
-    setCurrentEdges(graphState.state.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)));
+    setHistory(
+      startGraphEditHistory({
+        nodes: graphState.state.value.nodes.map((node) => workflowNodeToNodeInput(node)),
+        edges: graphState.state.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)),
+      }),
+    );
     setIsHydrated(true);
     // Lásd a fenti megjegyzést: a `react-hooks/exhaustive-deps` szabály nincs
     // bekötve, a `graphState.state` a valódi, szándékos kiváltó.
   }, [graphState.state]);
 
   const handleGraphChange = useCallback(
-    (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[]): void => {
-      setCurrentNodes(nodes);
-      setCurrentEdges(edges);
+    (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[], session?: GraphEditSession): void => {
+      setHistory((current) => recordGraphEdit(current, { nodes, edges }, session));
     },
     [],
   );
@@ -334,24 +446,65 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   const handleAddNode = useCallback<AddNodeContextMenuProperties['onAddNode']>(
     (type, position) => {
       const node = createGraphNode(type, position, graphElementIdGenerator);
-      setCurrentNodes((current) => [...current, node]);
+      setHistory((current) =>
+        recordGraphEdit(current, { nodes: [...current.document.nodes, node], edges: current.document.edges }),
+      );
       setSelectedNodeId(node.id);
     },
     [graphElementIdGenerator],
   );
 
+  // A beállítás panel mezőjének változásai a mező elhagyásáig (`blur`) egy
+  // lépés (SPEC-008 5.10): a menet kulcsa a csomópont, és a panel `onBlur`
+  // eseménye zárja (`handleFieldBlur`).
   const handleUpdateNode = useCallback((updatedNode: WorkflowNodeInput): void => {
-    setCurrentNodes((current) => current.map((node) => (node.id === updatedNode.id ? updatedNode : node)));
+    setHistory((current) =>
+      recordGraphEdit(
+        current,
+        {
+          nodes: current.document.nodes.map((node) => (node.id === updatedNode.id ? updatedNode : node)),
+          edges: current.document.edges,
+        },
+        { key: `field:${updatedNode.id}`, isFinal: false },
+      ),
+    );
   }, []);
+
+  const handleFieldBlur = useCallback((): void => {
+    setHistory(closeGraphEditSession);
+  }, []);
+
+  // A visszavonás és az újra elvégzés a gombból és a billentyűből (SPEC-008
+  // 5.10). Helyi, szinkron művelet, hálózati kérés nélkül. A mentés alatt a
+  // gombok tiltottak, a billentyű pedig nem lép működésbe (user döntés
+  // 2026-10-16).
+  const handleHistoryStep = useCallback((action: UndoShortcutAction): void => {
+    setHistory(stepGraphEditHistory(action));
+  }, []);
+  useUndoRedoShortcut(handleHistoryStep, isSaving);
+
+  // Ha a kiválasztott csomópont nincs a dokumentumban (a visszavonás vagy az
+  // újra elvégzés kivette), a kiválasztás megszűnik, és a panel bezárul
+  // (SPEC-008 5.10, AC67): egy későbbi újra elvégzés sem nyitja meg újra.
+  useEffect(() => {
+    if (selectedNodeId !== undefined && currentNodes.every((node) => node.id !== selectedNodeId)) {
+      setSelectedNodeId(undefined);
+    }
+  }, [currentNodes, selectedNodeId]);
 
   // Az automatikus elrendezés (`graph-auto-layout`, T-009-19, SPEC-008 5.7)
   // szinkron fut, jelzés nélkül, és NEM ment: csak a `currentNodes` állapotot
   // írja át, amitől a mentetlen jelző (`isDirty`) a meglévő
   // `isGraphDirty`-n át magától igazra vált - nincs hozzá külön jelző.
   const handleAutoLayout = useCallback((): void => {
-    setCurrentNodes((current) => layoutGraph(current, currentEdges));
+    setHistory((current) =>
+      recordGraphEdit(current, {
+        nodes: layoutGraph(current.document.nodes, current.document.edges),
+        edges: current.document.edges,
+      }),
+    );
     setAutoLayoutRevision((revision) => revision + 1);
-  }, [currentEdges]);
+  }, []);
 
   // A korai visszatérés minden hook UTÁN, de a lenti `handleSave` ELŐTT áll:
   // a `workflowId` innentől `string` (nem `string | undefined`), mert a
@@ -391,6 +544,8 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
       });
       if (outcome.kind === 'ok') {
         setBaseline(outcome.value);
+        // Mentés után mindkét lista kiürül (user döntés, SPEC-008 5.10).
+        setHistory((current) => startGraphEditHistory(current.document));
         pushToast({ variant: 'success', title: 'Gráf mentve', message: resolvedWorkflowId });
       } else {
         pushToast({ variant: 'danger', title: 'A mentés sikertelen', message: outcome.message });
@@ -426,9 +581,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // A panel "Törlés" gombja (SPEC-008 5.9): megerősítés nélkül, kizárólag a
   // szerkesztett állapotot módosítja, hálózati kérés nincs.
   function handleDeleteNode(nodeId: string): void {
-    const remaining = deleteNodeWithEdges(currentNodes, currentEdges, nodeId);
-    setCurrentNodes(remaining.nodes);
-    setCurrentEdges(remaining.edges);
+    setHistory((current) =>
+      recordGraphEdit(current, deleteNodeWithEdges(current.document.nodes, current.document.edges, nodeId)),
+    );
     setSelectedNodeId(undefined);
   }
 
@@ -443,7 +598,6 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   }
 
   const isLoading = !isHydrated;
-  const isSaving = saveState.state.status === 'pending';
   const isStartingRun = startRunState.state.status === 'pending';
   const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
@@ -504,6 +658,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
                     onDelete={() => {
                       handleDeleteNode(selectedNode.id);
                     }}
+                    onFieldBlur={handleFieldBlur}
                     inheritedProviderDescription={inheritedProviderDescription}
                     isSaveAttempted={isSaveAttempted}
                   />
@@ -545,6 +700,8 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           type="button"
           size="sm"
           variant="secondary"
+          icon={isCompactFooter}
+          aria-label={isCompactFooter ? 'Futás indítása' : undefined}
           isLoading={isStartingRun}
           disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0}
           onClick={handleStartRunClick}
@@ -552,12 +709,49 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           {/* A felirat SZÁNDÉKOSAN nem a puszta "Indítás": az a `start`
               csomópont TÍPUSCÍMKÉJE a vásznon (`graph-node-catalog`), tehát
               egy azonos feliratú gomb a felületen is, a
-              `getByRole`/`getByText` locatorokon is kétértelmű lenne. */}
-          Futás indítása
+              `getByRole`/`getByText` locatorokon is kétértelmű lenne. A
+              `--ep-screen-sm` tokenen és alatta a gomb csak ikon, a neve az
+              `aria-label` (user döntés 2026-10-16, mint a "Hozzáadás"
+              gombé). */}
+          {isCompactFooter ? <PlayIcon /> : 'Futás indítása'}
         </Button>
+        {/* A Visszavonás és az Újra a "Hozzáadás" és a "Mentés" split button
+            előtt (SPEC-008 5.10): ikon gomb, a neve az `aria-label`, a tipp a
+            billentyűt mutatja. Üres listánál és betöltés vagy mentés alatt
+            tiltott. */}
+        <Tooltip content="Visszavonás" shortcut={UNDO_SHORTCUT_LABEL}>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon
+            aria-label="Visszavonás"
+            disabled={isLoading || isSaving || history.undoStack.length === 0}
+            onClick={() => {
+              handleHistoryStep('undo');
+            }}
+          >
+            <UndoIcon />
+          </Button>
+        </Tooltip>
+        <Tooltip content="Újra" shortcut={REDO_SHORTCUT_LABEL}>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon
+            aria-label="Újra"
+            disabled={isLoading || isSaving || history.redoStack.length === 0}
+            onClick={() => {
+              handleHistoryStep('redo');
+            }}
+          >
+            <RedoIcon />
+          </Button>
+        </Tooltip>
         {/* A "Hozzáadás" közvetlenül a "Mentés" split button előtt áll, így az
             elsődleges művelet a sor végén marad (SPEC-008 5.8, O-19). */}
-        <AddNodeMenuButton disabled={isLoading} onAddNode={handleAddNode} />
+        <AddNodeMenuButton disabled={isLoading} isCompact={isCompactFooter} onAddNode={handleAddNode} />
         <ButtonGroup aria-label="Gráf műveletek">
           <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}

@@ -28,6 +28,14 @@ export interface NodeInspectorProperties {
    */
   readonly onDelete: () => void;
   /**
+   * A panel egy mezőjének elhagyása (a fókusz kilép egy panelbeli elemből): a
+   * fogyasztó (`GraphEditorScreen`) ezen zárja a mező szerkesztési menetét, hogy
+   * a mező változásai a `blur`-ig egy visszavonható lépést adjanak (SPEC-008
+   * 5.10). A React `onBlur` eseménye buborékol (a natív `focusout` eseményen
+   * fut), tehát a panel gyökerén minden mező elhagyása ideér.
+   */
+  readonly onFieldBlur: () => void;
+  /**
    * Az `agent_step` node és a `join` `ai_synthesis` módja `providerId`
    * mezőjéhez tartozó, örökölt provider leírás (AC17) - a `NodeInspector`
    * fogyasztója (`GraphEditorScreen`, T-009-17) számolja ki a workflow és a
@@ -138,7 +146,7 @@ function renderConfigFields(
  * szerinti komponens szignatúrája ne hízzon egy csak áttovábbított proppal.
  */
 export function NodeInspector(properties: Readonly<NodeInspectorProperties>): ReactElement {
-  const { node, onChange, onClose, onDelete, inheritedProviderDescription, isSaveAttempted } = properties;
+  const { node, onChange, onClose, onDelete, onFieldBlur, inheritedProviderDescription, isSaveAttempted } = properties;
   const catalogEntry = GRAPH_NODE_CATALOG[node.type];
   // A mezőnkénti hiba a mentési sémán áll (SPEC-008 5.4, O-21): ugyanaz a
   // szabály jelez a mező alatt, ami a mentés előtti ellenőrzést és a szerver
@@ -155,7 +163,7 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
     // területén a `Backspace` és a `Delete` nem törli a kiválasztott
     // csomópontot (user döntés 2026-10-14, SPEC-008 5.9; research
     // T-009-44, 44.6).
-    <aside className="node-inspector nokey" aria-label={`${catalogEntry.label} beállításai`}>
+    <aside className="node-inspector nokey" aria-label={`${catalogEntry.label} beállításai`} onBlur={onFieldBlur}>
       <div className="node-inspector__header">
         <div className="node-inspector__identity">
           <h2 className="node-inspector__title">{catalogEntry.label}</h2>
