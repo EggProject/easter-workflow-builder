@@ -16,7 +16,7 @@
     "measure:run-view-band": "playwright test --config playwright.measurement.config.ts run-view-band.ts",
     "measure:footer-width": "playwright test --config playwright.measurement.config.ts footer-width.ts",
     "measure:settings-width": "playwright test --config playwright.measurement.config.ts settings-width.ts",
-    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.11 --branches 98.61 --functions 99.46 --lines 99.08"
+    "coverage:e2e:report": "nyc report --temp-dir e2e/.nyc_output --report-dir coverage-e2e --reporter=text --reporter=html --reporter=lcov --check-coverage --statements 99.3 --branches 98.81 --functions 99.7 --lines 99.27"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",
