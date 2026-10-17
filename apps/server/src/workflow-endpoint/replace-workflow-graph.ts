@@ -17,7 +17,9 @@ import { toWorkflowGraphDocument } from './to-workflow-graph-document.ts';
  * szabályait a mentési séma (`ReplaceGraphRequestSchema`) is érvényesíti, a
  * pozitív egész szám mezőkét is (SPEC-008 5.4, O-37), tehát egy itteni guard
  * hibaága a HTTP úton garantáltan sosem futna (`.claude/CLAUDE.md` 5. szekció,
- * `docs/research/2026-10-17-szam-es-agent-mezok.md`). A két oldal egyezését az
+ * `docs/research/2026-10-17-szam-es-agent-mezok.md`). Az írás előtti guard a
+ * `db` `replaceGraph` hívásában fut (user döntés 2026-10-17), a kezelőben
+ * nem. A két oldal egyezését az
  * `apps/server` `node-config-drift-protection` regressziós tesztje őrzi. A wire
  * `type` mezőt a `db` `WorkflowNodeInput` nem kéri (a `config.type`
  * diszkriminátor már hordozza, `workflow-repository.ts` doksija), ezért itt

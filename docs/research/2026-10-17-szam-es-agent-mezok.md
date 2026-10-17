@@ -45,10 +45,35 @@ hibaág a HTTP úton garantáltan sosem futna, ami a 100 százalékos lefedetts�
 `node-config-drift-protection.spec.ts` "a mentési séma és a db isNodeConfig guard a guard ellenőrzött
 alakjain ugyanúgy dönt" blokkja (19 eset), tehát a két oldal szétválása a `test` kapun bukik.
 
-**Mellékhatás, nem javítva (megfigyelés):** az `apps/web` `rest-error-class.spec.ts` "a mentés
+**Review megállapítás és user döntés (2026-10-17): a guard az adatbázis rétegbe kerül.** A review
+mérése szerint a `db` `replaceGraph` soha nem hívta az `isNodeConfig` guardot, csak a
+`findBlankRequiredTextField` ellenőrzést, a szerver `PUT` kezelője pedig ennek a változtatásnak a
+következtében a guardot is elvesztette. Az eredmény: ma egyetlen írási úton sincs írás előtti
+`isNodeConfig`, tehát a szerveren kívüli hívó (vagy egy jövőbeli, a mentési sémát megkerülő út) hibás
+gráfot menthetne, ami elmentődne, és utólag a `readGraph` `corrupt_node_config` hibával utasítaná el.
+A user döntése: a `db` `replaceGraph` a beszúrás előtt, a tranzakción kívül minden node configot
+`isNodeConfig`-gal ellenőriz, hibánál `Outcome` hibaágat ad és semmit nem ír. A hibaosztály a meglévő
+`malformed_node_config`: a pozitív egész szám mezők javítása előtt a szerver `PUT` kezelője ugyanezzel
+az osztállyal utasította el ugyanezt a hibát, a motor futás indítási osztályával azonos nevű
+(SPEC-004 4.7), és a szerver hibaleképezése már `422 unprocessable` kódra képezi
+(`map-outcome-message-to-error-code.ts`, `ENGINE_VALIDATION_ERROR_CLASSES`), tehát új osztály és új
+leképezési ág nem kell; a SPEC-003 12.4 listája a `malformed_node_config` osztállyal bővült. Ez nem
+halott ág: a szám invariáns nincs típusszinten (`number`), így a `maxIterations: 0` típushelyesen,
+`as` nélkül állítható elő. Igazolás: a `workflow-repository.spec.ts` új blokkja valós `:memory:`
+adatbázison a három mezőre (a `backoffMs` egy elemére is) a 0, -3 és 1,5 értékkel hibaágat vár, a
+korábbi gráf változatlan, a megelőző érvényes node sem íródik be; pozitív egész érték beíródik. A guard
+nem commitolt kivétele (`if (false)`) 9 tesztet buktatott (9 bukott, 96 zöld, 105-ből). A szerver
+oldalon az `error-mapping` új tesztje a valódi `db` üzenetet adja a leképezésnek, és `unprocessable`
+kódot vár. A szerver `PUT` kezelőjének `isNodeConfig` ága továbbra sincs: HTTP-n át a mentési séma
+előbb utasít el, az ottani ág garantáltan sosem futna.
+
+**Mellékhatás, javítva (review):** az `apps/web` `rest-error-class.spec.ts` "a mentés
 malformed_node_config hibája a Toast üzenetében a saját mondatával áll" tesztje egy `PUT` válasz
-mockja; a valós szerver ezt a hibaosztályt a `PUT` végponton ezentúl nem adja (a futás indításakor a
-motor igen). A teszt a kliens hibaosztály leképezését ellenőrzi, ami ettől változatlanul érvényes.
+mockja volt; a valós szerver ezt a hibaosztályt a `PUT` végponton ezentúl nem adja (a futás
+indításakor a motor igen). A teszt a futás indításának útjára került ("a futás indításának
+malformed_node_config hibája a lábléc danger Alert blokkjában a saját mondatával áll"), a
+hibaosztály saját mondatát (a teszt eredeti célját) változatlanul állítja; a mentés Toast útját az
+`invalid_request` teszt és a többi e2e fedi. A SPEC-007 8.4 e2e felsorolása követi.
 
 ## 3. A sodródás védelem szándékosan elrontott próbái (116. kritérium)
 
@@ -103,22 +128,16 @@ mint előtte (`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-va
 `isBlankAgentDefinitionField` "nem szöveg" ágát az új e2e prompt nélküli régi bejegyzése (`regi`) fedi.
 A küszöb nem mozdul (PLAN-009 F9 bevezető szabálya: a lépés a darabszámot vezeti, a küszöböt nem).
 
-## 6. Nyitott kérdés: a szám mező alatti hibaszöveg mondata
+## 6. A szám mező alatti hibaszöveg mondata: lezárva
 
-**Nyitva.** A SPEC-008 5.4 "Amit a döntés nem rögzít" bekezdése szerint a mondatot a user döntése nem
-rögzíti. A meglévő minták: a mentési séma egyetlen saját mondata "A mező nem lehet üres." (a számra
-nem illik), a szám mezők típushibája a zod saját, angol alapértelmezett szövege (a `VITE_COVERAGE`
-buildben "Invalid input"), és az `apps/web` `read-frontend-config.ts` "A(z) X konfiguráció értéke nem
-pozitív egész szám." mondata (konfigurációs hiba, nem mező alatti). Egyik sem dönti el.
+**Lezárva (user döntés 2026-10-17).** A mondat "A mező értéke nem pozitív egész szám.", azaz a
+mentési séma `NOT_POSITIVE_INTEGER_MESSAGE` konstansának jelenlegi szövege. A SPEC-008 5.4 nyitott
+jelölése ezzel megszűnt. A SPEC-008 5.4 "Amit a döntés nem rögzít" bekezdése szerint a meglévő minták
+(a mentési séma "A mező nem lehet üres." mondata a számra nem illik, a szám mezők típushibája a zod
+saját angol alapértelmezett szövege, az `apps/web` `read-frontend-config.ts` mondata konfigurációs
+hiba, nem mező alatti) egyike sem döntött, ezért a user döntött a három megfontolt változat közül:
 
-**Addig:** a mentési séma `NOT_POSITIVE_INTEGER_MESSAGE` konstansa "A mező értéke nem pozitív egész
-szám.", a két meglévő magyar minta összevonása (a `BLANK_FIELD_MESSAGE` "A mező ..." alanya és a
-`read-frontend-config.ts` "... értéke nem pozitív egész szám." állítmánya). A szöveg egy konstansban
-áll, a unit, a szerver és az e2e tesztek a literált állítják.
-
-**Mi zárná le:** a user döntése. A megfontolt változatok:
-
-1. "A mező értéke nem pozitív egész szám." (a jelenlegi, a két meglévő minta összevonása);
-2. "A mező pozitív egész számot vár." (pozitív, elvárást megnevező alak);
-3. a zod saját alapértelmezett üzenete, ahogy a `NaN` típushibánál ma (angol szöveg, a lefedettségi
-   buildben "Invalid input").
+1. "A mező értéke nem pozitív egész szám." (a két meglévő minta összevonása) - **ez a döntés**;
+2. "A mező pozitív egész számot vár." (nem választott);
+3. a zod saját alapértelmezett üzenete, ahogy a `NaN` típushibánál ma (nem választott; angol szöveg, a
+   lefedettségi buildben "Invalid input").

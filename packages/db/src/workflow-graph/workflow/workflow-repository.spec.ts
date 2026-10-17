@@ -797,6 +797,93 @@ describe('createWorkflowRepository', () => {
     }
   });
 
+  describe('replaceGraph: az isNodeConfig guard írás előtt fut (user döntés 2026-10-17, SPEC-005 7.7)', () => {
+    // A pozitív egész szám invariáns nincs típusszinten (`number`), ezért a
+    // hibás érték típushelyesen, `as` nélkül épül.
+    const positiveIntegerFieldCases: readonly {
+      readonly field: string;
+      readonly build: (value: number) => NodeConfig;
+    }[] = [
+      {
+        field: 'loop.maxIterations',
+        build: (value) => ({ type: 'loop', maxIterations: value, continueExpression: 'true', onUnhandledError: null }),
+      },
+      {
+        field: 'error_handler.maxAttempts',
+        build: (value) => ({
+          type: 'error_handler',
+          maxAttempts: value,
+          backoffMs: [5],
+          handledErrorKinds: [],
+          onUnhandledError: null,
+        }),
+      },
+      {
+        field: 'error_handler.backoffMs',
+        build: (value) => ({
+          type: 'error_handler',
+          maxAttempts: 2,
+          backoffMs: [5, value],
+          handledErrorKinds: [],
+          onUnhandledError: null,
+        }),
+      },
+    ];
+
+    for (const { field, build } of positiveIntegerFieldCases) {
+      describe(field, () => {
+        it('a pozitív egész érték beíródik', () => {
+          const { sqlite, repository } = openRepository();
+          const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+          const node: WorkflowNodeInput = { id: 'node-x', label: '', positionX: 0, positionY: 0, config: build(5) };
+
+          okOrThrow(repository.replaceGraph(workflow.id, [node], []));
+
+          expect(okOrThrow(repository.readGraph(workflow.id)).nodes.map((stored) => stored.config)).toStrictEqual([
+            node.config,
+          ]);
+          sqlite.close();
+        });
+
+        for (const invalid of [0, -3, 1.5]) {
+          it(`a(z) ${invalid} érték malformed_node_config hibaágat ad, sort nem ír, a korábbi gráf változatlan`, () => {
+            const { sqlite, database, repository } = openRepository();
+            const workflow = okOrThrow(
+              repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }),
+            );
+            const { nodes, edges } = twoNodesOneEdge();
+            okOrThrow(repository.replaceGraph(workflow.id, nodes, edges));
+            const before = okOrThrow(repository.readGraph(workflow.id));
+            const validNode: WorkflowNodeInput = {
+              id: 'node-valid',
+              label: '',
+              positionX: 0,
+              positionY: 0,
+              config: startConfig,
+            };
+            const invalidNode: WorkflowNodeInput = {
+              id: 'node-x',
+              label: '',
+              positionX: 0,
+              positionY: 0,
+              config: build(invalid),
+            };
+
+            const message = errorOrThrow(repository.replaceGraph(workflow.id, [validNode, invalidNode], []));
+
+            expect(message).toContain('(malformed_node_config)');
+            expect(message).toContain('"node-x"');
+            expect(okOrThrow(repository.readGraph(workflow.id))).toStrictEqual(before);
+            expect(
+              database.select().from(workflowNodeTable).where(eq(workflowNodeTable.id, 'node-valid')).all(),
+            ).toHaveLength(0);
+            sqlite.close();
+          });
+        }
+      });
+    }
+  });
+
   describe('replaceGraph: a null onUnhandledError és a választatlan join mód beíródik (SPEC-008 5.4, O-29, O-33)', () => {
     it('mindkét null értéket elfogadja, és a readGraph változatlanul visszaadja őket', () => {
       const { sqlite, repository } = openRepository();

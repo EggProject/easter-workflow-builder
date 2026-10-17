@@ -7,10 +7,8 @@ import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
 /**
  * A nem pozitív egész szám mező hibaüzenete (SPEC-008 5.4, O-37). A mondatot
- * a user döntése nem rögzíti; a jelen szöveg a két meglévő minta összevonása
- * (a `BLANK_FIELD_MESSAGE` "A mező ..." alanya és az `apps/web`
- * `read-frontend-config.ts` "... értéke nem pozitív egész szám." állítmánya),
- * a user jóváhagyásáig nyitott (`docs/research/2026-10-17-szam-es-agent-mezok.md`).
+ * a user 2026-10-17-i döntése rögzíti (`docs/research/2026-10-17-szam-es-agent-mezok.md`
+ * 6. szekció).
  */
 const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
 

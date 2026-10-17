@@ -161,7 +161,10 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   elbukik, a pozitív egész mindkettőn átmegy, és a szabály alá nem tartozó szám mezők (`timeoutMs`,
   `maxTurns`, `maxBudgetUsd`) mindkettőn átmennek. A szerver `PUT .../graph` kezelője ezért a `config`
   mezőt guard nélkül adja át a `db`-nek: egy ottani `isNodeConfig` hibaág a HTTP úton garantáltan
-  sosem futna (SPEC-008 5.4, `docs/research/2026-10-17-szam-es-agent-mezok.md`).
+  sosem futna (SPEC-008 5.4, `docs/research/2026-10-17-szam-es-agent-mezok.md`). **Az írás előtti
+  `isNodeConfig` guard ezért a `db` `replaceGraph` hívásában fut** (`malformed_node_config`, a meglévő
+  hibaleképezésen, user döntés 2026-10-17): a szám invariáns nincs típusszinten, tehát az ág nem
+  halott, és típushelyesen, `as` nélkül tesztelhető valós `:memory:` adatbázison.
 
 **Fájlok és tesztek**
 

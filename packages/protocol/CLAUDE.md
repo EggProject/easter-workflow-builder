@@ -63,8 +63,8 @@ szabály a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezőjére �
 pozitív egész számot kér (user döntés 2026-10-17, O-37): a `db` `isNodeConfig` guard pozitív egész
 szabályának szándékos duplikátuma, a mezőnkénti egyezését az `apps/server` `node-config-drift-protection`
 tesztje őrzi; a nem véges szám (`NaN`, végtelen) a séma saját típushibája marad, mellé nem kerül második
-hiba. A hibaszöveg mondatát a döntés nem rögzíti, a jelenlegi szöveg a user jóváhagyásáig nyitott
-(`docs/research/2026-10-17-szam-es-agent-mezok.md`).
+hiba. A hibaszöveg mondata "A mező értéke nem pozitív egész szám." (user döntés 2026-10-17,
+`docs/research/2026-10-17-szam-es-agent-mezok.md` 6. szekció).
 **A négy szabály a konfig típushibája mellett is lefut** (user döntés 2026-10-16, "Egyszerre látsszon
 mind", SPEC-008 81. kritérium): a `superRefine` második paramétere egy `when` feltétel (colinhacks/zod
 #5741), ami a finomítást akkor is futtatja, ha a konfig már típushibát hordoz (például a
