@@ -1832,3 +1832,157 @@ Az `apps/web/package.json` küszöbe nem változott.
   Chromium mutatja, a fizikai `Cmd` billentyű lenyomása nem mért.
 - A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és
   olvasást a unit teszt szimulálja, e2e nem méri.
+
+## T-009-57
+
+A böngésző vissza és előre gombja mentetlen változásnál (SPEC-008 5.10 3. pont, O-30, a 112.
+kritérium): a `use-client-route` `popstate` figyelője a T-009-52 navigációs őrét kérdezi, regisztrált
+őrnél a korábbi címet `pushState` hívással visszaírja, és a `popstate` utáni címet célként az őrnek
+adja; a megerősítő modális kilépése a célra navigál az őr megkerülésével.
+
+### 57.1 Források
+
+**A `popstate` a bejegyzés váltása után fut, és csak ugyanannak a dokumentumnak a bejegyzései
+között.**
+
+- MDN, `popstate` (<https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event>): az
+  esemény akkor fut, amikor az aktív előzmény bejegyzés a felhasználó navigációja közben változik; a
+  kezelőben a `window.location` már az új állapotot mutatja; a `history.pushState()` és a
+  `history.replaceState()` hívás nem vált ki `popstate` eseményt, a vissza és az előre gomb (és a
+  `history.back()`, `history.forward()`) igen.
+- MDN, `PopStateEvent` (<https://developer.mozilla.org/en-US/docs/Web/API/PopStateEvent>): az
+  esemény minden olyan esetben fut, amikor az aktív bejegyzés ugyanannak a dokumentumnak két
+  bejegyzése között vált.
+- WHATWG HTML, "Session history and navigation"
+  (<https://html.spec.whatwg.org/multipage/browsing-the-web.html>), a "URL and history update steps"
+  megjegyzése: a `popstate` a fragment navigációra fut, a `history.pushState()` hívásra nem. Az
+  "update document for history step application" algoritmus `popstate` lépését (csak akkor fut, ha a
+  dokumentum nem új, `documentIsNew` hamis) a LibWeb böngészőmotor forrása szó szerint idézi
+  (<https://git.etawen.dev/sleirsgoevy/serenity/commit/6c1944ee61bba982f033160ffed35b5c14cc36e9>,
+  "5. If documentIsNew is false, then: ... 2. Fire an event named popstate"); a spec oldalt magát a
+  mérete miatt nem olvastam végig, ezért ez a pont a 57.4 saját mérésére támaszkodik.
+
+**A `pushState` az előre bejegyzéseket törli.** Forrás: SPEC-008 M-119 (WHATWG HTML "history
+handling behavior", W3C HTML5 5.4). Saját mérés: a 57.4 második sora.
+
+**A Playwright `page.goBack()` és `page.goForward()` működése.** Saját olvasás, a telepített
+`playwright-core@1.62.1` `lib/coreBundle.js` fájlja: a Chromium oldali `_go(delta)` a
+`Page.getNavigationHistory` CDP hívással lekéri az előzményeket, és a `currentIndex + delta` indexű
+bejegyzésre a `Page.navigateToHistoryEntry` hívással lép; ha nincs ilyen bejegyzés, `null` a válasz.
+A `goBack` a lépés után a navigációra vár (`waitForNavigation`, `waitUntil` alapértéke `load`),
+tehát egy megszakított navigációnál az időkorlátig vár (57.4).
+
+**A Chromium előzmény manipulációs beavatkozása (History Manipulation Intervention).** A Chromium
+dokumentációja (<https://chromium.googlesource.com/chromium/src/+/main/docs/history_manipulation_intervention.md>)
+és a blink-dev bejelentése
+(<https://groups.google.com/a/chromium.org/g/blink-dev/c/T8d4_BRb2xQ/m/WSdOiOFcBAAJ>): ha egy
+dokumentum felhasználói aktiváció nélkül vesz fel előzmény bejegyzést, a dokumentum minden
+bejegyzése "kihagyható" jelölést kap, és a böngésző vissza és előre gombja (a felülete, nem a
+`history.back()` API) ezeket átlépi; egy újabb felhasználói aktiváció a jelölést törli; az azonos
+dokumentumon belüli vissza vagy előre lépés után a korábbi aktiváció új bejegyzésre nem számít. A
+két forrás ugyanattól a kiadótól származik, tehát a következménye a 57.6 nem ellenőrzött pontja.
+Az aktiváló bemenet köre: WHATWG HTML, "activation triggering input event"
+(<https://html.spec.whatwg.org/multipage/interaction.html>): a `keydown` csak akkor aktiváló, ha a
+billentyű nem az `Esc`; ugyanezt a WebKit `EventHandler.cpp` forrása idézi és valósítja meg
+(<https://github.com/WebKit/WebKit/blob/main/Source/WebCore/page/EventHandler.cpp>).
+
+### 57.2 A megvalósítás döntései
+
+- **A `popstate` ág** (`use-client-route.ts`): őr nélkül a korábbi út (az állapot a `location`
+  értékéből), változatlan kóddal. Regisztrált őrnél a figyelő a `location` értékét célként
+  eltárolja, az állapotban álló útvonalat és query stringet `pushState` hívással visszaírja, az
+  állapotot nem frissíti, és az őrt egy olyan `proceed` függvénnyel hívja, ami a célra `pushState`
+  hívással és az állapot frissítésével navigál. A `NavigationGuard` típusa nem változott: a cél a
+  `proceed` zárványában utazik, ugyanúgy, mint a `navigate` ágán.
+- **A visszaírt cím az állapotból jön, nem a `location` értékéből**, mert a `popstate` idején a
+  `location` már a célt mutatja (57.1). A hatás függősége ezért `[port, pathname, search]`: a
+  figyelő minden megjelenített útvonal váltáskor újra feliratkozik, és mindig a legutóbbi címet írja
+  vissza; a `[port]` függőségű alak a csatoláskori címet írná vissza (57.3 (c) rontás).
+- **A szerkesztő oldala nem változott.** A T-009-52 őre a megerősítésre váró navigációt állapotba
+  teszi (`setPendingNavigation({ proceed })`), tehát egy újabb vissza vagy előre lépés a nyitott
+  modálisnál a legutóbbi célt veszi át, ahogy az 5.10 3. pontja kimondja.
+
+### 57.3 Unit teszt és rontás igazolás
+
+A `use-client-route.spec.tsx` hat új tesztje (13 -> 19): regisztrált őrnél a `popstate` után a
+`pushState` a korábbi útvonallal és query stringgel hívódik, és a megjelenített útvonal nem vált; a
+kilépés a `popstate` utáni címre (query stringgel) navigál, az őr megkerülésével; egy újabb `popstate`
+a címet ugyanígy visszaírja, és az őr a legutóbbi célt kapja; a visszaírt cím a legutóbbi navigáció
+utáni útvonal, nem a csatoláskori; őr nélkül a `popstate` a mai módon vált, visszaírás nélkül; az
+eltávolított őr után ugyanígy. A hamis port a `pushState` hívásokat sorrendben rögzíti
+(`pushedPaths`), és a bejegyzés váltást a cím átállításával és a `popstate` kiváltásával utánozza
+(`traverseForTest`); a meglévő 13 teszt változatlan és zöld. A `bun run test` 583 fájl, 5407 teszt,
+100 százalék mind a négy metrikán.
+
+Ideiglenes rontások (saját, 2026-10-17, utána visszaállítva):
+
+| Rontás                                                      | Unit (`use-client-route.spec.tsx`) | E2e (`graph-editor-back-forward.spec.ts`)                                            |
+| ----------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ |
+| (a) a cím visszaírásának elhagyása                          | 4 bukik                            | 2 bukik: `toHaveURL` a szerkesztő címét várja, a cél áll (`/run?runId=...`, `/runs`) |
+| (b) az őr kihagyása a `popstate` ágon                       | 4 bukik                            | 2 bukik: a megerősítő `Modal` nem jelenik meg, a navigáció megerősítés nélkül fut    |
+| (c) a figyelő `[port]` függőséggel (a csatoláskori zárvány) | 1 bukik                            | nem futtatva                                                                         |
+
+Az eredeti alakon mind zöld.
+
+### 57.4 A mérések (saját, valódi Chromium, 1440x900, 2026-10-17)
+
+| Helyzet                                                                                                     | Eredmény                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (1) futás nézet -> ős link -> szerkesztő, mentetlen változás, `page.goBack()`                               | a megerősítő `Modal` látszik, a cím a szerkesztőé; "Mégse" után a két csomópont és a mentetlen jelző marad; egy újabb `page.goBack()` és a "Kilépés mentés nélkül" után a futás nézet címe áll  |
+| (2) szerkesztő -> "Futás előzmények" -> `page.goBack()` (őr nélkül), mentetlen változás, `page.goForward()` | a `Modal` látszik, a cím a szerkesztőé; "Mégse" után a `page.goForward()` válasza `null`, a cím a szerkesztőé: a visszaíró `pushState` az előre bejegyzést törölte (M-119)                      |
+| (3) futás nézet -> ős link -> szerkesztő, mentetlen változás nélkül, `page.goBack()`                        | modális nélkül a futás nézet címe áll                                                                                                                                                           |
+| (4) `page.goto('/runs')`, `page.goto(szerkesztő)`, mentetlen változás, `history.back()`, elutasítva         | `beforeunload` típusú párbeszéd; a cím a szerkesztőé, a két csomópont marad, alkalmazás modális nincs, `popstate` nem futott                                                                    |
+| (5) ugyanez, `page.goBack()`, elutasítva                                                                    | `beforeunload` párbeszéd, utána a `page.goBack()` a meg nem történt navigációra vár, és a hívásnak adott időkorlátnál `TimeoutError`-ral tér vissza; a cím a szerkesztőé, `popstate` nem futott |
+| (6) ugyanez, `page.goBack()`, elfogadva                                                                     | `beforeunload` párbeszéd, a `page.goBack()` a `/runs` dokumentumra lép; a szerkesztő dokumentumában `popstate` nem futott (a jel a `sessionStorage`-ban, ami a dokumentum váltását túléli)      |
+
+**A SPEC-008 5.10 3. pontjának nem ellenőrzött állítása ezzel mérve:** a másik dokumentumra vezető
+vissza lépésnél `popstate` nem fut, és a lap elhagyása a 2. pont `beforeunload` útján kér
+megerősítést; elutasításnál a szerkesztő és a változás marad, elfogadásnál a böngésző a másik
+dokumentumra lép. A spec mondata ennek megfelelően átvezetve.
+
+Az (1) ... (4) és a (6) sort az állandó e2e (`apps/web/e2e/graph-editor-back-forward.spec.ts`, négy
+teszt) állítja, `--repeat-each=3` mellett 12/12 zöld. Az (5) sor egy egyszeri, a mérés után törölt
+spec fájlból jött, és csak azt indokolja, miért váltja ki az állandó e2e az elutasított ágat a
+`history.back()` hívással: a `page.goBack()` itt csak időkorláttal térne vissza, időkorlátra váró
+állítás pedig az e2e-ben nem állhat (`.claude/CLAUDE.md` 11. szekció).
+
+### 57.5 Az e2e lefedettség előtte és utána
+
+Saját mérés, a 6. szekció eljárásával (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e
+apps/web/test-results`, nyolc egymás utáni shard `flock` alatt, legfeljebb 3 workerrel, majd
+`bun run coverage:e2e:report`, a darabszámok a `nyc report --reporter=json-summary` kimenetéből).
+Előtte a `main` `f041052` állapota: **550 teszt, mind zöld** (69 + 69 + 69 + 69 + 69 + 69 + 68 + 68).
+Utána a jelen ág: **554 teszt, mind zöld** (70 + 70 + 69 + 69 + 69 + 69 + 69 + 69), a riport exit 0
+a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1960 / 1975            | 1971 / 1985           | 15 -> 14                 |
+| branches   | 913 / 924              | 914 / 925             | 11 -> 11                 |
+| functions  | 674 / 677              | 676 / 678             | 3 -> 2                   |
+| lines      | 1890 / 1905            | 1901 / 1915           | 15 -> 14                 |
+
+A fedetlen darab egyik metrikán sem nőtt. A csökkenés oka a `browser-history-location-port.ts`
+leiratkozó függvénye (21. sor, 1/0/1/1 előtte): a `popstate` figyelő a megjelenített útvonal minden
+váltásakor újra feliratkozik (57.2), tehát a leiratkozás e2e úton is fut, és a fájl 100 százalékos
+lett. A többi fedetlen hely ugyanazon az öt fájlon áll, mint előtte (`mount-app.tsx` 3/2/0/3,
+`read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1, `perform-route-request.ts`
+1/1/0/1, `use-stream-connection.ts` 1/0/1/1). Az `apps/web/package.json` küszöbe nem változott (a
+PLAN-009 T-009-57 sora a meglévő küszöböt írja elő; a százalékok előtte 99.24 / 98.8 / 99.55 /
+99.21, utána 99.29 / 98.81 / 99.7 / 99.26).
+
+### 57.6 Nem ellenőrzött
+
+- **A böngésző felületének vissza gombja a Chromium előzmény manipulációs beavatkozása mellett.** A
+  visszaíró `pushState` a `popstate` kezelőjében, felhasználói aktiváció nélkül fut, közvetlenül egy
+  azonos dokumentumon belüli vissza lépés után; a 57.1 forrása szerint ilyenkor a dokumentum
+  bejegyzései kihagyható jelölést kapnak, és csak egy újabb aktiváció törli őket. Ebből az
+  következne, hogy a "Mégse" kattintása (aktiváció) után a következő vissza gomb a szerkesztő előtti
+  bejegyzésre lép, ahogy az e2e méri; ha viszont a felhasználó a modálist `Esc` billentyűvel zárja
+  (nem aktiváló, 57.1), vagy a nyitott modálisnál kattintás nélkül újra a vissza gombot nyomja, a
+  böngésző a kihagyható bejegyzéseken átléphet, a lap elhagyásáig, ahol a 2. pont `beforeunload`
+  párbeszéde kér megerősítést. A Playwright `page.goBack()` a `Page.navigateToHistoryEntry` hívással
+  egy adott bejegyzésre lép (57.1), tehát a felület gombjának kihagyó logikáját nem futtatja: ez a
+  pont ebben a környezetben nem mérhető. Mérni valódi Chrome-ban, kézzel lehetne.
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- A kézzel beírt cím és az újratöltés `beforeunload` párbeszéde a T-009-53 lépése (52.6).
