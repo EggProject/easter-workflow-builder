@@ -231,6 +231,32 @@ function nodeLocator(page: Page, nodeId: string): Locator {
   return page.getByTestId(`rf__node-${nodeId}`);
 }
 
+/**
+ * A várakozás jelzés elemei (SPEC-008 9. szekció): a nem async pontok (AC94) után
+ * egyik sem állhat a lapon.
+ */
+const BUSY_INDICATOR_SELECTOR = '[aria-busy="true"], .is-loading, .progress-bar, [role="progressbar"], .skel';
+
+/**
+ * A REST kérések (`/api/` alatt) száma a teszt saját mentés-olvasásai (`PUT`, lásd
+ * `readSavedDocument`) nélkül. Az SSE csatorna (`/events`) újracsatlakozása nem
+ * REST kérés, a `PUT` pedig a teszt eszköze: az alkalmazás saját, váratlan mentését
+ * a `readSavedDocument` kérés számlálója (`requestsBefore + 1`) fogja meg.
+ */
+function restRequestCount(traffic: EditorTraffic): number {
+  return traffic.apiRequests.filter((request) => request.includes(` ${API_ORIGIN}/api/`) && !request.startsWith('PUT '))
+    .length;
+}
+
+/**
+ * A nem async pont bizonyítéka (AC94): a betöltés óta nem indult REST kérés, és
+ * nincs várakozás jelzés a lapon.
+ */
+async function expectNoAsyncActivity(page: Page, traffic: EditorTraffic, loadedRequestCount: number): Promise<void> {
+  expect(restRequestCount(traffic)).toBe(loadedRequestCount);
+  await expect(page.locator(BUSY_INDICATOR_SELECTOR)).toHaveCount(0);
+}
+
 function undoButton(page: Page): Locator {
   return page.getByRole('button', { name: 'Visszavonás', exact: true });
 }
@@ -536,6 +562,12 @@ for (const operation of OPERATION_CASES) {
   }) => {
     const traffic = await installEditorMocks(page);
     await openEditor(page);
+    // A betöltés utáni állapot a viszonyítási pont: nincs várakozás jelzés, és a
+    // betöltés kérései a lap egyetlen REST kérései.
+    const loadedRequestCount = restRequestCount(traffic);
+    // A betöltés három kérése: gráf, workflow, beállítások.
+    expect(loadedRequestCount).toBe(3);
+    await expectNoAsyncActivity(page, traffic, loadedRequestCount);
     // Horgony: a mentés törzse a betöltött gráf, tehát a törzs olvasása pontos.
     expect(await readSavedDocument(page, traffic)).toEqual(LOADED_DOCUMENT);
 
@@ -546,6 +578,7 @@ for (const operation of OPERATION_CASES) {
       isDirty: operation.isBeforeDirty,
     };
     await operation.perform(page, traffic);
+    await expectNoAsyncActivity(page, traffic, loadedRequestCount);
     const afterCanvas = await readSettledCanvas(page);
     const after: DocumentState = {
       canvas: afterCanvas,
@@ -562,6 +595,7 @@ for (const operation of OPERATION_CASES) {
         await step.run(page);
         const isBefore = step.target === 'before';
         await expectDocumentState(page, traffic, isBefore ? before : after);
+        await expectNoAsyncActivity(page, traffic, loadedRequestCount);
         // Egy művelet egy lépés: a művelet előtt csak az elvetés előkészítő
         // lépése áll a visszavonás listán, a művelet után az újra lista üres.
         if (isBefore) {

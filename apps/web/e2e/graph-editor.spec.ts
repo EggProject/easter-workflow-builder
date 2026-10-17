@@ -28,6 +28,7 @@ import type {
   WorkflowGraphDocument,
 } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { API_ORIGIN } from './api-origin.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
@@ -118,6 +119,12 @@ const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas:
 /* eslint-enable unicorn/no-null */
 
 const EDITOR_URL = '/editor?workflowId=w-alfa';
+
+/**
+ * A várakozás jelzés elemei (SPEC-008 9. szekció): a nem async pontok (AC35)
+ * után egyik sem állhat a lapon.
+ */
+const BUSY_INDICATOR_SELECTOR = '[aria-busy="true"], .is-loading, .progress-bar, [role="progressbar"], .skel';
 
 test.beforeEach(async ({ page }) => {
   await mockIdleStream(page);
@@ -323,4 +330,58 @@ test('a beállítás panel önállóan görget, és nem vágódik le a viewport 
     return element.scrollTop;
   });
   expect(scrolled).toBeGreaterThan(0);
+});
+
+test('a vászon pásztázása egér húzással: a nézet transzformja az egér elmozdulásával változik, nincs API kérés és várakozás jelzés (AC35)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+  await expect(nodeLocator(page, 'n1')).toBeVisible();
+  await expect(page.getByTestId('rf__edge-e1')).toBeVisible();
+  const busyIndicators = page.locator(BUSY_INDICATOR_SELECTOR);
+  await expect(busyIndicators).toHaveCount(0);
+
+  // A nézet transzformja a `.react-flow__viewport` inline `transform` stílusa
+  // (eltolás és nagyítás); a mátrixot a böngésző értelmezi.
+  const readViewportTransform = async (): Promise<{ x: number; y: number; zoom: number }> =>
+    page.locator('.react-flow__viewport').evaluate((element) => {
+      const matrix = new DOMMatrixReadOnly(element.style.transform);
+      return { x: matrix.e, y: matrix.f, zoom: matrix.a };
+    });
+  const before = await readViewportTransform();
+
+  const apiRequestsDuringPan: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().startsWith(`${API_ORIGIN}/api/`)) {
+      apiRequestsDuringPan.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+
+  // A `fitView` a csomópontok köré térközt hagy, tehát a vászon bal felső
+  // sarka üres terület (`graph-editor-validation.spec.ts`), a React Flow
+  // `panOnDrag` alapértéke pedig az üres területen húzott egérrel pásztáz.
+  const paneBox = await page.locator('.react-flow__pane').boundingBox();
+  if (paneBox === null) {
+    throw new Error('a vászon nem rendelkezik befoglaló dobozzal');
+  }
+  const start = { x: paneBox.x + 10, y: paneBox.y + 10 };
+  const delta = { x: 120, y: 80 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + delta.x, start.y + delta.y, { steps: 8 });
+  await page.mouse.up();
+
+  // A nagyítás változatlan, az eltolás pontosan az egér elmozdulása.
+  await expect
+    .poll(async () => {
+      const current = await readViewportTransform();
+      return current.x - before.x;
+    })
+    .toBeCloseTo(delta.x, 0);
+  const after = await readViewportTransform();
+  expect(after.y - before.y).toBeCloseTo(delta.y, 0);
+  expect(after.zoom).toBe(before.zoom);
+  expect(apiRequestsDuringPan).toEqual([]);
+  await expect(busyIndicators).toHaveCount(0);
 });

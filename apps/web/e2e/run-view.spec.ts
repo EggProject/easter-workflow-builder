@@ -399,6 +399,15 @@ test('a pillanatképpel nem párosítható lépés futás a gráf alatt, listás
   const section = page.getByRole('region', { name: 'A rajzon nem szereplő lépés futások' });
   await expect(section.getByText('r-torolt')).toBeVisible();
   await expect(section.getByRole('listitem')).toHaveCount(1);
+
+  // A "gráf ALATT" elhelyezés (AC23): a régió befoglaló dobozának teteje nem
+  // előzi meg a vászon dobozának alját (legfeljebb 1 px tűrés tört pixelre).
+  const canvasBox = await page.getByTestId('rf__wrapper').boundingBox();
+  const sectionBox = await section.boundingBox();
+  if (canvasBox === null || sectionBox === null) {
+    throw new Error('hiányzó befoglaló doboz a vásznon vagy a nem párosítható lépés futások régióján');
+  }
+  expect(sectionBox.y).toBeGreaterThanOrEqual(canvasBox.y + canvasBox.height - 1);
 });
 
 test('érvénytelen alakú pillanatképre a hibás mező útvonalát mutatja, rajz nélkül', async ({ page }) => {

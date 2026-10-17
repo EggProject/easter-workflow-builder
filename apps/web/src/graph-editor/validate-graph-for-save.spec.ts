@@ -105,6 +105,28 @@ describe('validateGraphForSave', () => {
     };
     const outcome = validateGraphForSave([START_NODE], [edgeWithExtraField]);
     expect(outcome.kind).toBe('error');
+    // Az ismeretlen kulcs a strictObject saját hibája, az útvonala az él maga
+    // (AC13, mérve 2026-10-18): az üzenet megnevezi, melyik él hibás.
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A kérés törzse érvénytelen, hibás mező(k): edges.0 (invalid_request).',
+    });
+  });
+
+  it('két azonos azonosítójú élre az üzenet a második él id mezőjét nevezi meg (AC13)', () => {
+    const edge = {
+      id: 'e-1',
+      sourceNodeId: 'n-1',
+      targetNodeId: 'n-2',
+      sourceHandle: null,
+      targetHandle: null,
+      branchKey: null,
+    };
+    const outcome = validateGraphForSave([START_NODE], [edge, { ...edge, targetNodeId: 'n-3' }]);
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A kérés törzse érvénytelen, hibás mező(k): edges.1.id (invalid_request).',
+    });
   });
 
   it('nem pozitív egész szám mezőre error Outcome-ot ad, ami megnevezi a mező útvonalát (SPEC-008 5.4, O-37)', () => {

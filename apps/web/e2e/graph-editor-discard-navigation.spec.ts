@@ -9,6 +9,7 @@
 // `graph-editor-undo-operations.spec.ts` fájlban áll.
 import type { SettingsRecord, WorkflowDetail, WorkflowGraphDocument } from '@easter-workflow-builder/protocol';
 import type { Page } from '@playwright/test';
+import { API_ORIGIN } from './api-origin.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
@@ -46,6 +47,12 @@ const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas:
 /* eslint-enable unicorn/no-null */
 
 const EDITOR_URL = '/editor?workflowId=w-alfa';
+
+/**
+ * A várakozás jelzés elemei (SPEC-008 9. szekció): a nem async pontok (AC94)
+ * után egyik sem állhat a lapon.
+ */
+const BUSY_INDICATOR_SELECTOR = '[aria-busy="true"], .is-loading, .progress-bar, [role="progressbar"], .skel';
 
 // A fájl a `Ctrl` módosítót méri: az Automatikus beállítás a felhasználói
 // ügynökből old fel (SPEC-008 5.10, O-31), ezért az ügynök nem macOS értékre
@@ -126,6 +133,34 @@ test('mentetlen változásnál a belső navigáció megerősítést kér: a "Mé
   await dialog.getByRole('button', { name: 'Kilépés mentés nélkül' }).click();
   await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/');
+});
+
+test('az elnavigálás megerősítése nem async pont: a modális megnyitása és a "Mégse" nem indít API kérést, és nincs várakozás jelzés (AC94)', async ({
+  page,
+}) => {
+  await openEditorWithUnsavedNode(page);
+  const dialog = page.getByRole('dialog', { name: 'Kilépés mentés nélkül?' });
+  const busyIndicators = page.locator(BUSY_INDICATOR_SELECTOR);
+  await expect(busyIndicators).toHaveCount(0);
+
+  // A felvétel utáni állapottól számolva: a betöltés kérései már lezajlottak.
+  const apiRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().startsWith(`${API_ORIGIN}/api/`)) {
+      apiRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+
+  await page.locator('.app-tn__navigation').getByRole('link', { name: 'Futás előzmények' }).click();
+  await expect(dialog).toBeVisible();
+  expect(apiRequests).toEqual([]);
+  await expect(busyIndicators).toHaveCount(0);
+
+  await dialog.getByRole('button', { name: 'Mégse', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.react-flow__node')).toHaveCount(2);
+  expect(apiRequests).toEqual([]);
+  await expect(busyIndicators).toHaveCount(0);
 });
 
 test('mentetlen változásnál a lap elhagyása beforeunload párbeszédet ad', async ({ page }) => {
