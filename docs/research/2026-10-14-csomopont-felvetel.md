@@ -1496,6 +1496,150 @@ A fedetlen helyek ugyanazon a hat fájlon, ugyanazokkal a darabszámokkal állna
 `browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
 `use-stream-connection.ts` 1/0/1/1). Az `apps/web/package.json` küszöbe nem változott.
 
+## T-009-52
+
+A változtatások elvetése és az elnavigálás megerősítése (SPEC-008 5.10, O-22): a "Változtatások
+elvetése" menüpont, a `history-navigation` navigációs őre és a regisztráció továbbadása az
+`app-shell`-ben, a megerősítő `Modal` a szerkesztőben, a `beforeunload` figyelő a mentetlen
+változás idejére, és a billentyű szűrő 4. szabálya. A böngésző vissza és előre gombja (O-30) a
+T-009-57, a betöltés normalizálása a T-009-55, a teljes O-22 e2e a T-009-53 lépése.
+
+### 52.1 Források
+
+**A `beforeunload` párbeszéd.** Három egybehangzó forrás szerint a figyelőben hívott
+`preventDefault()` a böngésző saját megerősítő párbeszédét kéri, a szöveg nem vezérelhető, és a
+párbeszéd csak a lapon történt felhasználói interakció (sticky activation) után jelenik meg:
+
+- MDN, `beforeunload` (<https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event>):
+  a párbeszéd kiváltható a `preventDefault()` hívással; a `returnValue` beállítása és a visszatérési
+  érték régi (legacy) út; a figyelőt csak mentetlen változás idejére ajánlja felvenni.
+- WHATWG HTML, "steps to fire `beforeunload`"
+  (<https://html.spec.whatwg.org/multipage/browsing-the-web.html>): a párbeszéd feltétele, hogy az
+  esemény kiváltásának eredménye hamis (a `preventDefault()` hívás) vagy a `returnValue` nem üres,
+  és a dokumentum globális objektumának van sticky activationje; a megjelenő üzenetet a böngésző
+  adja, a `returnValue` értéke figyelmen kívül marad.
+- Chromium, "Intent to Ship: Change beforeunload handler dialog condition"
+  (<https://groups.google.com/a/chromium.org/g/blink-dev/c/yi3GzzB6AtI>): a Chrome a
+  `preventDefault()` hívásra is megerősítő párbeszédet mutat; az MDN példája szerint ez a Chrome 119
+  óta áll ("Included for legacy support, e.g. Chrome/Edge < 119").
+
+A megvalósítás a SPEC-008 5.10 2. pontja szerint kizárólag `preventDefault()` hívást tesz; a
+`returnValue` régi útját nem állítja.
+
+**A Playwright `beforeunload` párbeszéde.** A Playwright Dialogs oldala
+(<https://playwright.dev/docs/dialogs>): a `page.close({ runBeforeUnload: true })` lefuttatja az
+unload kezelőket, és ilyenkor nem várja meg a lap bezárását, mert a lap nyitva maradhat; a
+párbeszéd `dialog.type() === 'beforeunload'` alakban kezelhető. Saját mérés (valódi Chromium,
+2026-10-17, `graph-editor-discard-navigation.spec.ts`): egy "Hozzáadás" menüből felvett csomópont
+után a hívás `beforeunload` típusú párbeszédet ad, tehát a Playwright kattintása sticky activationt
+ad; a `dialog.dismiss()` után a lap nyitva marad, a vászon két csomópontja megvan, és a lefedettségi
+fixtúra a teszt végén kiolvassa a lefedettséget.
+
+### 52.2 A megvalósítás döntései
+
+- **A navigációs őr** (`use-client-route.ts`): `NavigationGuard = (proceed: () => void) => void`,
+  a `registerNavigationGuard` ref-ben tartja, egyszerre egyet; a visszaadott függvény eltávolítja.
+  Regisztrált őrnél a `navigate` sem `pushState`-et nem hív, sem az állapotot nem frissíti, hanem a
+  végrehajtást (`proceed`) adja az őrnek; a `proceed` ugyanazt teszi, amit őr nélkül a `navigate`
+  tenne. Őr nélkül a kód útja a korábbi, a meglévő `use-client-route` tesztek változatlanul zöldek.
+  Az eltávolító feltétel nélkül töröl: az egyetlen regisztráló a szerkesztő képernyő, aminek a
+  hatás takarítása mindig az újraregisztrálás előtt fut, tehát egy "csak a saját őrét" ág sem
+  unit, sem e2e úton nem futna a termékben.
+- **A szerkesztő** a mentetlen jelző (`isGraphDirty`) igaz értéke alatt regisztrál, az őr a
+  megerősítésre váró navigációt állapotba teszi, és a `NavigationConfirmationModal` addig áll a
+  DOM-ban. A "Kilépés mentés nélkül" a `proceed`-et hívja, a "Mégse", a fejléc bezárás gombja és az
+  `Escape` a modálist zárja; a gombok sorrendje és változata (`secondary`, `danger`) és a "Bezárás"
+  felirat a `delete-workflow-modal.tsx` mintája, amire a SPEC-008 5.10 1. pontja hivatkozik. A
+  gombok nem `sm` méretűek.
+- **A `beforeunload`** a `useBeforeUnloadPrompt(isDirty)` hookban: hamis értéknél figyelő nincs.
+- **A billentyű szűrő 4. szabálya**: a `UndoShortcutState` új mezője, az
+  `isNavigationConfirmationOpen`; igaz értéknél a szűrő `undefined`-et ad, tehát `preventDefault()`
+  sem fut. A szerkesztő a megerősítésre váró navigáció meglétét adja át.
+- **A kiinduló dokumentum** a történet új mezője (`initialDocument`), a `startGraphEditHistory`
+  második, elhagyható paramétere. Betöltéskor a betöltött dokumentum vetítése; sikeres mentés után a
+  mentett dokumentum vetítése (a `PUT` válasza), mert a mentés futása alatt a vászon szerkeszthető,
+  és a SPEC-008 5.10 a kiinduló dokumentumot "mentés után a mentett dokumentum"-ként határozza meg.
+  A mentés alatti szerkesztés a jelenlegi dokumentumban marad, mindkét lista üres.
+- **Az elvetés** (`discardGraphEdits`) a `recordGraphEdit` hívása a kiinduló dokumentummal, tehát
+  egy lépés: a nyitott menetet lezárja, az újra listát kiüríti, és egy visszavonás a korábbi
+  dokumentumot hozza vissza. A menüpont tiltott, ha a jelenlegi dokumentum tartalmilag (a
+  `JSON.stringify` alakon, az `is-graph-dirty.ts` érvével) azonos a kiinduló dokumentummal
+  (`canDiscardGraphEdits`). A kiválasztás a meglévő hatáson át szűnik meg, ha a kiválasztott
+  csomópont az elvetés után nincs a dokumentumban.
+
+### 52.3 Unit teszt és rontás igazolás
+
+Új spec fájlok: `NavigationConfirmationModal.spec.tsx` (3), `use-before-unload-prompt.spec.tsx`
+(4); bővítve: `use-client-route.spec.tsx` (+5), `graph-edit-history.spec.ts` (+6),
+`resolve-undo-shortcut.spec.ts` (+3), `use-undo-redo-shortcut.spec.tsx` (+1),
+`GraphEditorScreen.spec.tsx` (+8), `app-shell.spec.tsx` (+1). A `bun run test` 579 fájl, 5344
+teszt, 100 százalék mind a négy metrikán.
+
+Ideiglenes rontások (saját, 2026-10-17, utána visszaállítva): a szerkesztő őr hatásából a
+`!isDirty` feltétel törlése két képernyő tesztet (őr és figyelő mentetlen változás nélkül, illetve
+mentés után) buktat; a szűrő 4. szabályának törlése öt tesztet (három a szűrőé, egy a hooké, egy a
+képernyőé); az elvetés lépés nélküli alakja (a dokumentum cseréje rögzítés nélkül) három tesztet
+(kettő a történeté, egy a képernyőé). Az eredeti alakon mind zöld.
+
+### 52.4 Az e2e lefedettség előtte és utána
+
+Előtte: a `main` `68055bd` állapotán saját mérés, `rm -rf apps/web/e2e/.nyc_output
+apps/web/coverage-e2e apps/web/test-results` után nyolc egymás utáni shard `flock` alatt,
+legfeljebb 3 workerrel, **537 teszt, mind zöld** (68 + 67 + 67 + 67 + 67 + 67 + 67 + 67), majd
+`bun run coverage:e2e:report` (exit 0).
+
+Utána: a jelen ág ugyanazzal az eljárással, **540 teszt, mind zöld** (68 + 68 + 68 + 68 + 67 + 67
+
+- 67 + 67); az új `apps/web/e2e/graph-editor-discard-navigation.spec.ts` három tesztje: az elvetés
+  és a visszavonása, a belső navigáció megerősítése mindkét gombbal (a felső navigáció és a
+  morzsamenü linkjén, nyitott modálisnál hatástalan `Control+z` billentyűvel), és a `beforeunload`
+  párbeszéd. `bun run coverage:e2e:report` exit 0 a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1903 / 1918            | 1942 / 1957           | 15 -> 15                 |
+| branches   | 892 / 903              | 899 / 910             | 11 -> 11                 |
+| functions  | 650 / 653              | 667 / 670             | 3 -> 3                   |
+| lines      | 1833 / 1848            | 1872 / 1887           | 15 -> 15                 |
+
+A fedetlen helyek mindkét állapoton ugyanazon a hat fájlon állnak (utasítás / ág / függvény / sor):
+`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1. Egy köztes futás a nyitott modálisnál lenyomott billentyű
+nélkül a `resolve-undo-shortcut.ts` 4. szabályát fedetlenül hagyta (16/12/3/16); a második teszt
+billentyű lépése ezt zárja. Az `apps/web/package.json` küszöbe nem változott.
+
+### 52.5 A megerősítő modális címe és törzse (lezárva)
+
+A SPEC-008 5.10 1. pontja a modális két gombját rögzítette ("Kilépés mentés nélkül", "Mégse"), a
+címét és a törzsét nem; a megvalósítás ideiglenesen a lábléc státuszának "Mentetlen változtatások"
+szövegét használta címként, törzs nélkül. **User döntés (2026-10-17):** a cím "Kilépés mentés
+nélkül?", a törzs "A mentetlen változtatások elvesznek."; a gombok szövege változatlan. A döntés a
+SPEC-008 5.10 1. pontjába és a 105. kritériumba átvezetve; a `NavigationConfirmationModal` a törzset
+a `Modal` gyerekeként, `<p>` elemben rajzolja (a `delete-workflow-modal.tsx` mintája). A unit
+(`NavigationConfirmationModal.spec.tsx`) és az e2e
+(`graph-editor-discard-navigation.spec.ts`) a címet és a törzset állítja.
+
+### 52.6 Nem ellenőrzött
+
+- A `beforeunload` párbeszéd a kézzel beírt címre és az újratöltésre: csak a
+  `page.close({ runBeforeUnload: true })` út mérve; a többi a T-009-53 lépése.
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- A böngésző vissza és előre gombja mentetlen változásnál: ma megerősítés nélkül vált (a
+  `popstate` ág az őrt nem kérdezi), és a T-009-57 lépése.
+
+### 52.7 A változtatások elvetése mentés közben
+
+A review hibát talált: a "Változtatások elvetése" menüpont mentés közben is választható volt, miközben
+a Visszavonás gomb tiltott. A review mérése szerint mentés közben elvetve a `PUT` a régi állapotot
+mentette, a képernyő viszont az elvetett állapotot mutatta "Mentetlen változtatások" jelzéssel. A user
+2026-10-16-i döntése szerint mentés közben se a gomb, se a billentyű nem von vissza (SPEC-008 5.10, a
+billentyűk 5. szabálya); az elvetés ugyanennek a szándéknak felel meg. Javítás: a menüpont `disabled`,
+ha `isSaving`. Unit teszt: `GraphEditorScreen.spec.tsx`, "a mentés alatt a menüpont tiltott...";
+a mentés indítása után a menüpont tiltott, a kattintás nem változtat a dokumentumon. **Rontás
+igazolás:** az `isSaving ||` elhagyásával a fájl tesztjei közül pontosan ez az egy bukik (1 bukott, 57
+sikeres), a javított állapoton mind a 58 zöld.
+
 ## T-009-58
 
 A visszavonás és az újra elvégzés billentyűjének módosítója (SPEC-008 5.10, O-31): az

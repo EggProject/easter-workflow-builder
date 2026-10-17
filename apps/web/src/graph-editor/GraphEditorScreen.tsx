@@ -28,6 +28,7 @@ import { ReactFlowProvider, useStore, type ReactFlowState } from '@xyflow/react'
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
+import type { UseClientRouteResult } from '../history-navigation/use-client-route.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
@@ -38,13 +39,16 @@ import { readStartInputFields } from '../run-control/read-start-input-fields.ts'
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import type { AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import { NavigationConfirmationModal } from './NavigationConfirmationModal.tsx';
 import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { createGraphNode } from './create-graph-node.ts';
 import { deleteNodeWithEdges } from './delete-node-with-edges.ts';
 import { formatUndoShortcutLabels } from './format-undo-shortcut-labels.ts';
 import {
+  canDiscardGraphEdits,
   closeGraphEditSession,
+  discardGraphEdits,
   recordGraphEdit,
   redoGraphEdit,
   startGraphEditHistory,
@@ -60,6 +64,7 @@ import { isGraphDirty } from './is-graph-dirty.ts';
 import { resolveUndoModifier, type UndoModifier } from './resolve-undo-modifier.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
 import { getBrowserLocalStorage, readUndoModifierPreference } from './undo-modifier-storage.ts';
+import { useBeforeUnloadPrompt } from './use-before-unload-prompt.ts';
 import { useIsFooterCompact } from './use-is-footer-compact.ts';
 import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
@@ -85,6 +90,21 @@ export interface GraphEditorScreenProperties {
    * determinisztikus generátort ad, a `browserStreamIdGenerator` mintájára.
    */
   readonly graphElementIdGenerator: GraphElementIdGenerator;
+  /**
+   * A kliens útválasztó navigációs őrének regisztrálása (SPEC-008 5.10, 1.
+   * pont): az `app-shell` adja tovább a `useClientRoute` eredményéből. A
+   * képernyő mentetlen változásnál regisztrál, és az őr a megerősítő
+   * modálist nyitja.
+   */
+  readonly registerNavigationGuard: UseClientRouteResult['registerNavigationGuard'];
+}
+
+/**
+ * A megerősítésre váró navigáció: a `proceed` az őr megkerülésével hajtja
+ * végre (SPEC-008 5.10, 1. pont).
+ */
+interface PendingNavigation {
+  readonly proceed: () => void;
 }
 
 function readWorkflowId(search: string): string | undefined {
@@ -305,7 +325,7 @@ function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): R
  * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
 function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate, graphElementIdGenerator } = properties;
+  const { apiOrigin, fetchFunction, search, navigate, graphElementIdGenerator, registerNavigationGuard } = properties;
   const workflowId = readWorkflowId(search);
 
   const graphState = useRequestState<WorkflowGraphDocument>();
@@ -364,6 +384,10 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // szintű függvényén megy, aminek a hivatkozása stabil, tehát a
   // `Resizable` értesítő hatása nem futhat körbe.
   const [initialLayoutSizes] = useState<readonly number[]>(readStoredLayoutSizes);
+  // Az elnavigálás megerősítő modálisának tárgya (SPEC-008 5.10, 1. pont):
+  // nyitva van, amíg nem `undefined`.
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | undefined>(undefined);
+  const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
 
   useEffect(() => {
     if (workflowId === undefined) {
@@ -484,7 +508,28 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     resolveUndoModifier(readUndoModifierPreference(getBrowserLocalStorage), globalThis.navigator.userAgent),
   );
   const undoShortcutLabels = formatUndoShortcutLabels(undoModifier);
-  useUndoRedoShortcut(handleHistoryStep, isSaving, undoModifier);
+  useUndoRedoShortcut(handleHistoryStep, isSaving, pendingNavigation !== undefined, undoModifier);
+
+  // Az elnavigálás megerősítése (SPEC-008 5.10, 1. és 2. pont): az őr és a
+  // `beforeunload` figyelő csak mentetlen változás idejére áll, mentetlen
+  // változás nélkül a navigáció azonnal megtörténik.
+  useEffect(() => {
+    if (!isDirty) {
+      return;
+    }
+    return registerNavigationGuard((proceed) => {
+      setPendingNavigation({ proceed });
+    });
+  }, [isDirty, registerNavigationGuard]);
+  useBeforeUnloadPrompt(isDirty);
+
+  // A változtatások elvetése (SPEC-008 5.10): a kiinduló dokumentumra állít,
+  // egy visszavonható lépésként, megerősítés és hálózati kérés nélkül. A
+  // mentés alatt a menüpont tiltott, a Visszavonás gombhoz hasonlóan (user
+  // döntés 2026-10-16).
+  const handleDiscard = useCallback((): void => {
+    setHistory(discardGraphEdits);
+  }, []);
 
   // Ha a kiválasztott csomópont nincs a dokumentumban (a visszavonás vagy az
   // újra elvégzés kivette), a kiválasztás megszűnik, és a panel bezárul
@@ -547,8 +592,15 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
       });
       if (outcome.kind === 'ok') {
         setBaseline(outcome.value);
-        // Mentés után mindkét lista kiürül (user döntés, SPEC-008 5.10).
-        setHistory((current) => startGraphEditHistory(current.document));
+        // Mentés után mindkét lista kiürül (user döntés, SPEC-008 5.10), és a
+        // kiinduló dokumentum a mentett dokumentum: a mentés futása alatti
+        // szerkesztés a jelenlegi dokumentumban marad, az elvetés viszont a
+        // mentett állapotra állít.
+        const savedDocument = {
+          nodes: outcome.value.nodes.map((node) => workflowNodeToNodeInput(node)),
+          edges: outcome.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)),
+        };
+        setHistory((current) => startGraphEditHistory(current.document, savedDocument));
         pushToast({ variant: 'success', title: 'Gráf mentve', message: resolvedWorkflowId });
       } else {
         pushToast({ variant: 'danger', title: 'A mentés sikertelen', message: outcome.message });
@@ -602,7 +654,6 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
 
   const isLoading = !isHydrated;
   const isStartingRun = startRunState.state.status === 'pending';
-  const isDirty = isGraphDirty(baseline, currentNodes, currentEdges);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
   const workflowProviderId =
     // eslint-disable-next-line unicorn/no-null -- a `describeInheritedProvider` a drótszintű `string | null` alakot várja.
@@ -676,7 +727,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           státusz, jobbra egy valódi split button (design system "Mixed"
           mintája, `button-group.html`): az elsődleges "Mentés" művelet
           mellett egy szöveg nélküli nyíl gomb nyitja a további műveletek
-          (ma egyetlen: "Elrendezés") lenyíló menüjét. A gombok `sm`
+          ("Elrendezés", "Változtatások elvetése") lenyíló menüjét. A gombok `sm`
           méretűek, mert ez nem modális és nem popup felület. */}
       <PageFooter
         status={
@@ -769,6 +820,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
             <MenuItem onSelect={handleAutoLayout} disabled={isLoading}>
               Elrendezés
             </MenuItem>
+            <MenuItem onSelect={handleDiscard} disabled={isSaving || !canDiscardGraphEdits(history)}>
+              Változtatások elvetése
+            </MenuItem>
           </Menu>
         </ButtonGroup>
       </PageFooter>
@@ -782,6 +836,17 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         }}
         onSubmit={startRun}
       />
+      {pendingNavigation !== undefined && (
+        <NavigationConfirmationModal
+          onLeave={() => {
+            pendingNavigation.proceed();
+            setPendingNavigation(undefined);
+          }}
+          onCancel={() => {
+            setPendingNavigation(undefined);
+          }}
+        />
+      )}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

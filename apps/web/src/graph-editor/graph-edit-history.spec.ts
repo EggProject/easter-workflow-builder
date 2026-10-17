@@ -1,7 +1,9 @@
 import type { WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
 import {
+  canDiscardGraphEdits,
   closeGraphEditSession,
+  discardGraphEdits,
   recordGraphEdit,
   redoGraphEdit,
   startGraphEditHistory,
@@ -36,6 +38,7 @@ describe('graph-edit-history', () => {
   it('a kiinduló dokumentumról üres listákkal, nyitott menet nélkül indul', () => {
     expect(startGraphEditHistory(INITIAL)).toEqual({
       document: INITIAL,
+      initialDocument: INITIAL,
       undoStack: [],
       redoStack: [],
       openSessionKey: undefined,
@@ -90,6 +93,63 @@ describe('graph-edit-history', () => {
     expect(afterSave.document).toBe(FIRST);
     expect(afterSave.undoStack).toEqual([]);
     expect(afterSave.redoStack).toEqual([]);
+  });
+
+  it('a mentés utáni kiinduló dokumentum a mentett dokumentum, akkor is, ha a jelenlegi eltér tőle', () => {
+    const afterSave = startGraphEditHistory(SECOND, FIRST);
+    expect(afterSave.document).toBe(SECOND);
+    expect(afterSave.initialDocument).toBe(FIRST);
+    expect(afterSave.undoStack).toEqual([]);
+    expect(afterSave.redoStack).toEqual([]);
+  });
+
+  it('a kiinduló dokumentum a rögzítésen, a visszavonáson és az újra elvégzésen át változatlan', () => {
+    const recorded = recordGraphEdit(startGraphEditHistory(INITIAL), FIRST);
+    expect(recorded.initialDocument).toBe(INITIAL);
+    const undone = undoGraphEdit(recorded);
+    expect(undone.initialDocument).toBe(INITIAL);
+    expect(redoGraphEdit(undone).initialDocument).toBe(INITIAL);
+  });
+
+  describe('a változtatások elvetése (SPEC-008 5.10)', () => {
+    it('akkor választható, ha a jelenlegi dokumentum tartalmilag eltér a kiinduló dokumentumtól', () => {
+      const history = startGraphEditHistory(INITIAL);
+      expect(canDiscardGraphEdits(history)).toBe(false);
+      const recorded = recordGraphEdit(history, FIRST);
+      expect(canDiscardGraphEdits(recorded)).toBe(true);
+      // A tartalom dönt, nem a hivatkozás: egy azonos tartalmú, új objektum
+      // nem eltérés.
+      const sameContent = recordGraphEdit(recorded, documentOf(node('a')));
+      expect(canDiscardGraphEdits(sameContent)).toBe(false);
+      expect(canDiscardGraphEdits(undoGraphEdit(recorded))).toBe(false);
+    });
+
+    it('a kiinduló dokumentumra állít, egyetlen visszavonható lépésként', () => {
+      const edited = recordGraphEdit(recordGraphEdit(startGraphEditHistory(INITIAL), FIRST), SECOND);
+      const discarded = discardGraphEdits(edited);
+      expect(discarded.document).toBe(INITIAL);
+      expect(discarded.undoStack).toEqual([INITIAL, FIRST, SECOND]);
+      expect(discarded.redoStack).toEqual([]);
+      expect(canDiscardGraphEdits(discarded)).toBe(false);
+
+      const undone = undoGraphEdit(discarded);
+      expect(undone.document).toBe(SECOND);
+      expect(redoGraphEdit(undone).document).toBe(INITIAL);
+    });
+
+    it('a nyitott menetet lezárja, és az újra listát kiüríti', () => {
+      const undone = undoGraphEdit(recordGraphEdit(startGraphEditHistory(INITIAL), FIRST));
+      const opened = recordGraphEdit(undone, SECOND, FIELD_SESSION);
+      const discarded = discardGraphEdits(opened);
+      expect(discarded.openSessionKey).toBeUndefined();
+      expect(discarded.redoStack).toEqual([]);
+    });
+
+    it('mentés után a mentett dokumentumra állít vissza', () => {
+      const afterSave = startGraphEditHistory(SECOND, FIRST);
+      expect(canDiscardGraphEdits(afterSave)).toBe(true);
+      expect(discardGraphEdits(afterSave).document).toBe(FIRST);
+    });
   });
 
   it('felső darabszám korlát nélkül minden lépést megtart', () => {

@@ -5,6 +5,7 @@ import type { useStoreApi } from '@xyflow/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import type { NavigationGuard } from '../history-navigation/use-client-route.ts';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
@@ -281,6 +282,51 @@ const pendingPutFetchFunction: FetchFunction = (input, init) =>
     : createFetchFunction({ putBodies: [], graphGetCount: 0 })(input, init);
 
 /**
+ * A kliens útválasztó navigációs őrének tesztbeli párja (`useClientRoute`
+ * `registerNavigationGuard`): egyszerre egy őr, az eltávolító kiveszi. A
+ * `registrationCount` a regisztrációk száma.
+ */
+const navigationGuardRegistry: { active: NavigationGuard | undefined; registrationCount: number } = {
+  active: undefined,
+  registrationCount: 0,
+};
+
+function registerNavigationGuard(guard: NavigationGuard): () => void {
+  navigationGuardRegistry.active = guard;
+  navigationGuardRegistry.registrationCount += 1;
+  return () => {
+    navigationGuardRegistry.active = undefined;
+  };
+}
+
+/**
+ * Egy `beforeunload` esemény a `globalThis` objektumon: az eredmény az, hogy
+ * kérte-e figyelő a böngésző párbeszédét.
+ */
+function isBeforeUnloadPrevented(): boolean {
+  const event = new Event('beforeunload', { cancelable: true });
+  globalThis.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
+/**
+ * Egy navigáció a regisztrált őrön át, ahogy a `useClientRoute` `navigate`
+ * függvénye adná: a visszaadott `proceed` az őr megkerülésével végrehajtandó
+ * navigáció.
+ */
+function requestNavigation(): ReturnType<typeof vi.fn<() => void>> {
+  const guard = navigationGuardRegistry.active;
+  if (guard === undefined) {
+    throw new Error('a teszt nem talált regisztrált navigációs őrt');
+  }
+  const proceed = vi.fn<() => void>();
+  act(() => {
+    guard(proceed);
+  });
+  return proceed;
+}
+
+/**
  * A két felhasználói ügynök szöveg: az `auto` beállítás ezek alapján dönt a
  * módosítóról (SPEC-008 5.10, O-31). A teszt minden futásban kifejezetten
  * rögzíti az értéket, mert a happy-dom saját ügynöke a futtató gép
@@ -298,6 +344,8 @@ describe('GraphEditorScreen', () => {
   const navigate = vi.fn();
 
   beforeEach(() => {
+    navigationGuardRegistry.active = undefined;
+    navigationGuardRegistry.registrationCount = 0;
     capturedCanvasProperties.length = 0;
     capturedStoreApis.length = 0;
     navigate.mockClear();
@@ -328,6 +376,7 @@ describe('GraphEditorScreen', () => {
           search={search}
           navigate={navigate}
           graphElementIdGenerator={GRAPH_ELEMENT_ID_GENERATOR}
+          registerNavigationGuard={registerNavigationGuard}
         />,
       );
       await Promise.resolve();
@@ -359,6 +408,31 @@ describe('GraphEditorScreen', () => {
     act(() => {
       buttonNamed(name).click();
     });
+  }
+
+  function openMoreActionsMenu(): readonly HTMLButtonElement[] {
+    act(() => {
+      buttonNamed('További műveletek').click();
+    });
+    return openedMenuItems();
+  }
+
+  function discardMenuItem(): HTMLButtonElement {
+    const item = openMoreActionsMenu().find((candidate) => candidate.textContent === 'Változtatások elvetése');
+    if (item === undefined) {
+      throw new Error('a teszt nem talált "Változtatások elvetése" menüpontot');
+    }
+    return item;
+  }
+
+  function confirmationButton(name: string): HTMLButtonElement {
+    const button = [...container.querySelectorAll<HTMLButtonElement>(':scope [role="dialog"] button')].find(
+      (candidate) => candidate.textContent === name,
+    );
+    if (button === undefined) {
+      throw new Error(`a teszt nem talált "${name}" gombot a megerősítő modálisban`);
+    }
+    return button;
   }
 
   it('a betöltés sikertelenségére hibaüzenetet mutat', async () => {
@@ -1474,6 +1548,186 @@ describe('GraphEditorScreen', () => {
       expect(buttonNamed('Mentés...').disabled).toBe(true);
       expect(buttonNamed('Visszavonás').disabled).toBe(true);
       expect(buttonNamed('Újra').disabled).toBe(true);
+    });
+  });
+
+  describe('a változtatások elvetése (SPEC-008 5.10)', () => {
+    it('a menüpont az "Elrendezés" után áll, és változás nélkül tiltott (AC104)', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+
+      const items = openMoreActionsMenu();
+      expect(items.map((item) => item.textContent)).toEqual(['Elrendezés', 'Változtatások elvetése']);
+      expect(items[1]?.disabled).toBe(true);
+    });
+
+    it('a mentés alatt a menüpont tiltott, a Visszavonás gombhoz hasonlóan, és a kattintás nem veti el a változásokat (user döntés 2026-10-16)', async () => {
+      await renderScreen('?workflowId=wf-1', pendingPutFetchFunction);
+      moveStartNode(99);
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+      expect(buttonNamed('Mentés...').disabled).toBe(true);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+
+      const item = discardMenuItem();
+      expect(item.disabled).toBe(true);
+      act(() => {
+        item.click();
+      });
+
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+    });
+
+    it('a kiinduló dokumentumra állít, megerősítés és hálózati kérés nélkül, a mentetlen jelző eltűnik, és egy Visszavonás a változásokat visszahozza (AC104)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      const calls = { count: 0 };
+      await renderScreen('?workflowId=wf-1', countingFetchFunction(log, calls));
+      const loadedNodes = lastCanvasProperties().nodes;
+      moveStartNode(99);
+      moveStartNode(150);
+      const callsBeforeDiscard = calls.count;
+      const item = discardMenuItem();
+      expect(item.disabled).toBe(false);
+
+      act(() => {
+        item.click();
+      });
+
+      expect(lastCanvasProperties().nodes).toEqual(loadedNodes);
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+      expect(calls.count).toBe(callsBeforeDiscard);
+      expect(buttonNamed('Újra').disabled).toBe(true);
+
+      clickButton('Visszavonás');
+      expect(canvasPositionOf('n-1')).toBe(150);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      clickButton('Újra');
+      expect(lastCanvasProperties().nodes).toEqual(loadedNodes);
+    });
+
+    it('sikeres mentés után a mentett dokumentumra állít: a mentés futása alatti szerkesztést veti el', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      const echo = createFetchFunction(log);
+      const pendingPuts: (() => void)[] = [];
+      const deferredPutFetchFunction: FetchFunction = (input, init) =>
+        init.method === 'PUT'
+          ? new Promise<Response>((resolve) => {
+              pendingPuts.push(() => {
+                void echo(input, init).then(resolve);
+              });
+            })
+          : echo(input, init);
+      await renderScreen('?workflowId=wf-1', deferredPutFetchFunction);
+      moveStartNode(99);
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+      moveStartNode(150);
+
+      await act(async () => {
+        pendingPuts[0]?.();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(log.putBodies).toHaveLength(1);
+      expect(canvasPositionOf('n-1')).toBe(150);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      const item = discardMenuItem();
+      expect(item.disabled).toBe(false);
+      act(() => {
+        item.click();
+      });
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
+      expect(discardMenuItem().disabled).toBe(true);
+    });
+  });
+
+  describe('az elnavigálás megerősítése (SPEC-008 5.10, 1. és 2. pont)', () => {
+    it('mentetlen változás nélkül nincs őr és nincs beforeunload figyelő; változásnál mindkettő áll, a betöltött állapotig visszavonva mindkettő lekerül (AC105 unit)', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+      expect(navigationGuardRegistry.registrationCount).toBe(0);
+      expect(navigationGuardRegistry.active).toBeUndefined();
+      expect(isBeforeUnloadPrevented()).toBe(false);
+
+      moveStartNode(99);
+      expect(navigationGuardRegistry.active).toBeDefined();
+      expect(isBeforeUnloadPrevented()).toBe(true);
+
+      clickButton('Visszavonás');
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
+      expect(navigationGuardRegistry.active).toBeUndefined();
+      expect(isBeforeUnloadPrevented()).toBe(false);
+    });
+
+    it('sikeres mentés után az őr és a beforeunload figyelő lekerül', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+      moveStartNode(99);
+      expect(navigationGuardRegistry.active).toBeDefined();
+
+      await act(async () => {
+        buttonNamed('Mentés').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(navigationGuardRegistry.active).toBeUndefined();
+      expect(isBeforeUnloadPrevented()).toBe(false);
+    });
+
+    it('a regisztrált őr a megerősítő modálist nyitja; a "Mégse" bezárja, a navigáció nem fut, a változás megmarad (AC105 unit)', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+      moveStartNode(99);
+
+      const proceed = requestNavigation();
+      expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+      expect(proceed).not.toHaveBeenCalled();
+
+      act(() => {
+        confirmationButton('Mégse').click();
+      });
+
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+      expect(proceed).not.toHaveBeenCalled();
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(navigationGuardRegistry.active).toBeDefined();
+    });
+
+    it('a "Kilépés mentés nélkül" a navigációt az őr megkerülésével végrehajtja, és a modális bezárul (AC105 unit)', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+      moveStartNode(99);
+      const proceed = requestNavigation();
+
+      act(() => {
+        confirmationButton('Kilépés mentés nélkül').click();
+      });
+
+      expect(proceed).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('[role="dialog"]')).toBeNull();
+    });
+
+    it('nyitott megerősítő modálisnál a Ctrl+Z nem von vissza és nem kap preventDefault hívást, a zárás után ismét visszavon (5.10, 4. szabály)', async () => {
+      await renderScreen('?workflowId=wf-1', createFetchFunction({ putBodies: [], graphGetCount: 0 }));
+      moveStartNode(99);
+      requestNavigation();
+
+      const whileOpen = pressShortcut({ key: 'z', ctrlKey: true });
+      expect(whileOpen.defaultPrevented).toBe(false);
+      expect(canvasPositionOf('n-1')).toBe(99);
+
+      act(() => {
+        confirmationButton('Mégse').click();
+      });
+      const afterClose = pressShortcut({ key: 'z', ctrlKey: true });
+      expect(afterClose.defaultPrevented).toBe(true);
+      expect(canvasPositionOf('n-1')).toBe(0);
     });
   });
 

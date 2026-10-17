@@ -23,24 +23,35 @@ export interface GraphEditSession {
 
 /**
  * A lineáris visszavonás története (SPEC-008 5.10): a jelenlegi dokumentum, a
- * visszavonás lista a korábbi, az újra lista a visszavont dokumentumokkal, és a
- * nyitott szerkesztési menet kulcsa. Felső darabszám korlát nincs, mert a
- * számra nincs forrás (`.claude/CLAUDE.md` 4. szekció 1. pont).
+ * kiinduló dokumentum, a visszavonás lista a korábbi, az újra lista a
+ * visszavont dokumentumokkal, és a nyitott szerkesztési menet kulcsa. Felső
+ * darabszám korlát nincs, mert a számra nincs forrás (`.claude/CLAUDE.md` 4.
+ * szekció 1. pont).
  */
 export interface GraphEditHistory {
   readonly document: GraphEditorDocument;
+  /**
+   * A kiinduló dokumentum: a betöltés, illetve a legutóbbi sikeres mentés
+   * utáni dokumentum. A változtatások elvetése erre állít vissza.
+   */
+  readonly initialDocument: GraphEditorDocument;
   readonly undoStack: readonly GraphEditorDocument[];
   readonly redoStack: readonly GraphEditorDocument[];
   readonly openSessionKey: string | undefined;
 }
 
 /**
- * Üres listákkal induló történet a kiinduló dokumentumról: a betöltés és a
- * sikeres mentés után (mentés után mindkét lista kiürül, user döntés). A
- * visszavonás ennél korábbra nem lép.
+ * Üres listákkal induló történet: a betöltés és a sikeres mentés után (mentés
+ * után mindkét lista kiürül, user döntés). A visszavonás a jelenlegi
+ * dokumentumnál korábbra nem lép. A kiinduló dokumentum alapból a jelenlegi;
+ * mentés után a mentett dokumentum, ami a mentés futása alatti szerkesztés
+ * miatt eltérhet a jelenlegitől (SPEC-008 5.10, "A kiinduló dokumentum").
  */
-export function startGraphEditHistory(document: GraphEditorDocument): GraphEditHistory {
-  return { document, undoStack: [], redoStack: [], openSessionKey: undefined };
+export function startGraphEditHistory(
+  document: GraphEditorDocument,
+  initialDocument: GraphEditorDocument = document,
+): GraphEditHistory {
+  return { document, initialDocument, undoStack: [], redoStack: [], openSessionKey: undefined };
 }
 
 /**
@@ -58,6 +69,7 @@ export function recordGraphEdit(
   const isSessionContinued = session !== undefined && session.key === history.openSessionKey;
   return {
     document: nextDocument,
+    initialDocument: history.initialDocument,
     undoStack: isSessionContinued ? history.undoStack : [...history.undoStack, history.document],
     redoStack: [],
     openSessionKey: session === undefined || session.isFinal ? undefined : session.key,
@@ -85,6 +97,7 @@ export function undoGraphEdit(history: GraphEditHistory): GraphEditHistory {
   }
   return {
     document: previous,
+    initialDocument: history.initialDocument,
     undoStack: history.undoStack.slice(0, -1),
     redoStack: [...history.redoStack, history.document],
     openSessionKey: undefined,
@@ -102,8 +115,28 @@ export function redoGraphEdit(history: GraphEditHistory): GraphEditHistory {
   }
   return {
     document: next,
+    initialDocument: history.initialDocument,
     undoStack: [...history.undoStack, history.document],
     redoStack: history.redoStack.slice(0, -1),
     openSessionKey: undefined,
   };
+}
+
+/**
+ * Eltér-e a jelenlegi dokumentum a kiinduló dokumentumtól: a "Változtatások
+ * elvetése" menüpont ekkor választható (SPEC-008 5.10). A `JSON.stringify`
+ * összehasonlítás elég, mert mindkét oldal ugyanazon a leképezési láncon megy
+ * át, tehát a mezők sorrendje azonos (`is-graph-dirty.ts`).
+ */
+export function canDiscardGraphEdits(history: GraphEditHistory): boolean {
+  return JSON.stringify(history.document) !== JSON.stringify(history.initialDocument);
+}
+
+/**
+ * A változtatások elvetése (SPEC-008 5.10): a jelenlegi dokumentum a kiinduló
+ * dokumentumra áll vissza, egyetlen visszavonható lépésként, tehát egy
+ * visszavonás a változásokat visszahozza.
+ */
+export function discardGraphEdits(history: GraphEditHistory): GraphEditHistory {
+  return recordGraphEdit(history, history.initialDocument);
 }

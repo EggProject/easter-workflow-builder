@@ -87,7 +87,7 @@ function resolveBreadcrumbCurrent(routeId: ClientRouteId | undefined): string {
 export function AppShell(properties: Readonly<AppShellProperties>): ReactElement {
   const { apiOrigin, streamOrigin, listLimit, streamReplayLimit, fetchFunction } = properties;
 
-  const { routeId, search, navigate } = useClientRoute(browserHistoryLocationPort);
+  const { routeId, search, navigate, registerNavigationGuard } = useClientRoute(browserHistoryLocationPort);
   const streamConnection = useStreamConnection({
     streamOrigin,
     eventSourceFactory: browserEventSourceFactory,
@@ -106,6 +106,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     fetchFunction,
     search,
     navigate,
+    registerNavigationGuard,
     streamId: streamConnection.streamId,
     subscribeToFrames: streamConnection.subscribeToFrames,
     serverRestartCount: streamConnection.serverRestartCount,
@@ -192,6 +193,7 @@ interface RouteContentDependencies {
   readonly fetchFunction: FetchFunction;
   readonly search: string;
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
+  readonly registerNavigationGuard: ReturnType<typeof useClientRoute>['registerNavigationGuard'];
   readonly streamId: string;
   readonly subscribeToFrames: ReturnType<typeof useStreamConnection>['subscribeToFrames'];
   readonly serverRestartCount: number;
@@ -208,6 +210,7 @@ function renderRouteContent(
     fetchFunction,
     search,
     navigate,
+    registerNavigationGuard,
     streamId,
     subscribeToFrames,
     serverRestartCount,
@@ -247,6 +250,7 @@ function renderRouteContent(
           search={search}
           navigate={navigate}
           graphElementIdGenerator={browserGraphElementIdGenerator}
+          registerNavigationGuard={registerNavigationGuard}
         />
       );
     }

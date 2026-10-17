@@ -8,17 +8,18 @@ import { resolveUndoShortcut, type UndoShortcutAction } from './resolve-undo-sho
  * döntés a `resolveUndoShortcut` szűrőé; a kezelt billentyűn `preventDefault()`
  * fut, a nem kezelt érintetlen (3. szabály). Az `onShortcut` hivatkozásának
  * stabilnak kell lennie, különben a figyelő minden renderen újra kötődik; az
- * `isSaving` váltása is újrakötést okoz. A `modifier` a feloldott módosító
- * (SPEC-008 5.10, O-31).
+ * `isSaving` és az `isNavigationConfirmationOpen` váltása is újrakötést okoz. A
+ * `modifier` a feloldott módosító (SPEC-008 5.10, O-31).
  */
 export function useUndoRedoShortcut(
   onShortcut: (action: UndoShortcutAction) => void,
   isSaving: boolean,
+  isNavigationConfirmationOpen: boolean,
   modifier: UndoModifier,
 ): void {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      const action = resolveUndoShortcut(event, { isSaving, modifier });
+      const action = resolveUndoShortcut(event, { isSaving, isNavigationConfirmationOpen, modifier });
       if (action === undefined) {
         return;
       }
@@ -29,5 +30,5 @@ export function useUndoRedoShortcut(
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onShortcut, isSaving, modifier]);
+  }, [onShortcut, isSaving, isNavigationConfirmationOpen, modifier]);
 }

@@ -5,8 +5,8 @@ import { resolveUndoShortcut, type UndoShortcutAction, type UndoShortcutState } 
  * A billentyű esemény a valódi útján, a célponton kiváltva: a döntés a
  * figyelőben fut, amikor a `composedPath()` már a cél elemtől indul.
  */
-const NOT_SAVING: UndoShortcutState = { isSaving: false, modifier: 'ctrl' };
-const NOT_SAVING_META: UndoShortcutState = { isSaving: false, modifier: 'meta' };
+const NOT_SAVING: UndoShortcutState = { isSaving: false, isNavigationConfirmationOpen: false, modifier: 'ctrl' };
+const NOT_SAVING_META: UndoShortcutState = { isSaving: false, isNavigationConfirmationOpen: false, modifier: 'meta' };
 
 function resolveOn(
   target: EventTarget,
@@ -120,6 +120,17 @@ describe('resolveUndoShortcut', () => {
     it('beviteli célponton a mező natív visszavonása marad', () => {
       const field = appendToBody(document.createElement('input'));
       expect(resolveOn(field, { key: 'z', metaKey: true }, NOT_SAVING_META)).toBeUndefined();
+    });
+  });
+
+  describe('nyitott megerősítő modális (SPEC-008 5.10, 4. szabály)', () => {
+    it.each([
+      { name: 'Ctrl+Z', init: { key: 'z', ctrlKey: true } },
+      { name: 'Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
+      { name: 'Ctrl+Y', init: { key: 'y', ctrlKey: true } },
+    ] as const)('a(z) $name nyitott modálisnál nem kezelt, zárt modálisnál kezelt', ({ init }) => {
+      expect(resolveOn(document, init, { ...NOT_SAVING, isNavigationConfirmationOpen: true })).toBeUndefined();
+      expect(resolveOn(document, init, NOT_SAVING)).toBeDefined();
     });
   });
 

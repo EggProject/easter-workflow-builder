@@ -24,6 +24,10 @@ export interface UndoShortcutState {
    */
   readonly isSaving: boolean;
   /**
+   * Nyitva van-e az elnavigálás megerősítő modálisa (SPEC-008 5.10, 4. szabály).
+   */
+  readonly isNavigationConfirmationOpen: boolean;
+  /**
    * A beállított, feloldott módosító (SPEC-008 5.10, O-31).
    */
   readonly modifier: UndoModifier;
@@ -70,7 +74,7 @@ const SHORTCUT_ACTIONS = new Map<string, UndoShortcutAction>([
 ]);
 
 /**
- * A szerkesztő visszavonás billentyűjének szűrője (SPEC-008 5.10, 1., 2. és 5.
+ * A szerkesztő visszavonás billentyűjének szűrője (SPEC-008 5.10, 1., 2., 4. és 5.
  * szabály): beviteli célponton (a szöveg mező natív visszavonása marad), nem
  * kezelt billentyűn és a mentés futása alatt `undefined`, ugyanúgy, ahogy a
  * mentés alatt a két gomb is tiltott (user döntés 2026-10-16). Módosítóként
@@ -82,6 +86,11 @@ export function resolveUndoShortcut(
   state: UndoShortcutState,
 ): UndoShortcutAction | undefined {
   if (state.isSaving || !isOnlyModifierPressed(event, state.modifier) || event.altKey || isKeyboardInputTarget(event)) {
+    return undefined;
+  }
+  // 4. szabály: nyitott megerősítő modálisnál a billentyű nem kezelt, tehát a
+  // `preventDefault()` sem fut.
+  if (state.isNavigationConfirmationOpen) {
     return undefined;
   }
   return SHORTCUT_ACTIONS.get(`${event.shiftKey ? 'shift+' : ''}${event.key.toLowerCase()}`);

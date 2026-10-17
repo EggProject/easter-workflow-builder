@@ -8,13 +8,15 @@ import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 function ShortcutProbe({
   onShortcut,
   isSaving = false,
+  isNavigationConfirmationOpen = false,
   modifier = 'ctrl',
 }: {
   readonly onShortcut: (action: UndoShortcutAction) => void;
   readonly isSaving?: boolean;
+  readonly isNavigationConfirmationOpen?: boolean;
   readonly modifier?: UndoModifier;
 }): ReactElement {
-  useUndoRedoShortcut(onShortcut, isSaving, modifier);
+  useUndoRedoShortcut(onShortcut, isSaving, isNavigationConfirmationOpen, modifier);
   return <input aria-label="mező" />;
 }
 
@@ -114,6 +116,26 @@ describe('useUndoRedoShortcut', () => {
     pressKey(document.body, { key: 'y', ctrlKey: true });
     expect(onShortcut.mock.calls).toEqual([['undo'], ['redo']]);
     expect(metaAfterSwitch.defaultPrevented).toBe(false);
+  });
+
+  it('nyitott megerősítő modálisnál a billentyű nem hat és nem kap preventDefault hívást, zárás után ismét hat (SPEC-008 5.10, 4. szabály)', () => {
+    const onShortcut = vi.fn<(action: UndoShortcutAction) => void>();
+    act(() => {
+      root.render(<ShortcutProbe onShortcut={onShortcut} isNavigationConfirmationOpen />);
+    });
+
+    const whileOpen = pressKey(document.body, { key: 'z', ctrlKey: true });
+    const redoWhileOpen = pressKey(document.body, { key: 'y', ctrlKey: true });
+    expect(onShortcut).not.toHaveBeenCalled();
+    expect(whileOpen.defaultPrevented).toBe(false);
+    expect(redoWhileOpen.defaultPrevented).toBe(false);
+
+    act(() => {
+      root.render(<ShortcutProbe onShortcut={onShortcut} isNavigationConfirmationOpen={false} />);
+    });
+    const afterClose = pressKey(document.body, { key: 'z', ctrlKey: true });
+    expect(onShortcut.mock.calls).toEqual([['undo']]);
+    expect(afterClose.defaultPrevented).toBe(true);
   });
 
   it('leszerelés után a figyelő nem fut', () => {

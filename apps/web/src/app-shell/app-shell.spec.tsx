@@ -187,6 +187,49 @@ describe('AppShell', () => {
     expect(capturedScreenProperties.at(-1)?.graphElementIdGenerator).toBe(browserGraphElementIdGenerator);
   });
 
+  it('a szerkesztőnek a kliens útválasztó navigációs őrét adja tovább: a regisztrált őr a felső navigációt és a morzsamenüt is megkapja (SPEC-008 5.10)', async () => {
+    capturedScreenProperties.length = 0;
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const registerNavigationGuard = capturedScreenProperties.at(-1)?.registerNavigationGuard;
+    if (registerNavigationGuard === undefined) {
+      throw new Error('a teszt nem talált rögzített registerNavigationGuard propot');
+    }
+    const proceeds: (() => void)[] = [];
+    act(() => {
+      registerNavigationGuard((proceed) => {
+        proceeds.push(proceed);
+      });
+    });
+
+    const breadcrumb = container.querySelector('.app-pagehead');
+    if (breadcrumb === null) {
+      throw new Error('a teszt nem találta a morzsamenüt');
+    }
+    act(() => {
+      findLinkByText(container, 'Futás előzmények').click();
+    });
+    act(() => {
+      findLinkByText(breadcrumb, 'Workflow-k').click();
+    });
+
+    expect(proceeds).toHaveLength(2);
+    expect(globalThis.location.pathname).toBe('/editor');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
+    expect(container.textContent).toContain('Nincs megadva szerkesztendő workflow');
+
+    await act(async () => {
+      proceeds[0]?.();
+      await Promise.resolve();
+    });
+    expect(globalThis.location.pathname).toBe('/runs');
+    expect(container.querySelector('.app-pagehead')?.textContent).toContain('Futás előzmények');
+  });
+
   it('a "/run" útvonalon a RunViewScreen tartalmát rajzolja, "Futás nézet" morzsamenüvel', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/run');
