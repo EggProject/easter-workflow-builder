@@ -1832,3 +1832,105 @@ Az `apps/web/package.json` küszöbe nem változott.
   Chromium mutatja, a fizikai `Cmd` billentyű lenyomása nem mért.
 - A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és
   olvasást a unit teszt szimulálja, e2e nem méri.
+
+## T-009-55
+
+A betöltés normalizálása (SPEC-008 5.1, 5.5, 5.8, 5.10, O-27, O-28; a 108. kritérium szerkesztő
+része és a 109. kritérium): a kulcs nélküli elágazás élek elhagyása és a Start nélküli gráfba egy
+Start felvétele a szerkesztett, kiinduló dokumentumon; a mentetlen jelző alapja a szerver nyers
+válasza marad. A futás nézet elhagyása (a 108. kritérium másik része) a T-009-54 lépése volt.
+
+### 55.1 A megvalósítás döntései
+
+- **A normalizáló** (`graph-editor/normalize-loaded-graph-document.ts`) tiszta függvény: a
+  bemenete a betöltött dokumentum vetítése (`WorkflowNodeInput`, `WorkflowEdgeInput`) és a
+  `GraphElementIdGenerator` port, az importjai a T-009-54 `omitKeylessBranchEdges` szűrője és két
+  típus; DOM és `@xyflow/react` hivatkozás nincs benne. Előbb a szűrés fut, utána a Start vizsgálat
+  (SPEC-008 5.8, "Mikor"); a szűrés a csomópontokat nem érinti, tehát a sorrend az eredményen nem
+  változtat. Egy vagy több meglévő Start mellett a csomópont lista ugyanaz az objektum.
+- **A Start helye a lista vége.** A SPEC-008 a felvett Start helyét a listában nem rögzíti; a
+  választás a felvett csomópont meglévő mintája (`handleAddNode` a lista végére tesz). Az alakja az
+  5.8 szerinti: azonosító a porton át, `label: ''`, origó, `{ type: 'start', inputFields: [],
+onUnhandledError: null }`; nincs kiválasztva, a panel nem nyílik meg.
+- **A képernyő** (`GraphEditorScreen`, a betöltés hatása) a `baseline` állapotba a szerver nyers
+  válaszát teszi, a visszavonás történetét pedig a normalizált alakról indítja
+  (`startGraphEditHistory`). Ebből következik minden kért viselkedés, új ág nélkül: az
+  `isGraphDirty` a nyers alappal hasonlít, tehát az elhagyás és a felvétel azonnal mentetlen
+  változás, az őr és a `beforeunload` figyelő a meglévő `isDirty` úton áll; a visszavonás lista
+  üres, tehát a Visszavonás gomb `disabled`, és a billentyű sem vesz ki semmit; a kiinduló
+  dokumentum a normalizált alak, tehát a "Változtatások elvetése" is azt állítja vissza. A
+  generátor szándékosan nincs a hatás függőségi listáján, mert a változása a történetet nem
+  indíthatja újra. Sikeres mentés után a `PUT` válasza lesz az alap és a kiinduló dokumentum
+  (T-009-52), és a válaszban már nincs elhagyott él, és benne van a Start.
+
+### 55.2 Egy meglévő e2e fixtúra igazítása
+
+A `form-control-typography.spec.ts` gráfja egyetlen, az origón álló agent lépésből állt, Start
+nélkül. A normalizálás az origóra egy Startot vett fel, ami az agent kártyát fedte: a fájl három
+tesztje a `rf__node-n-agent` kattintásán 30 másodperc után időtúllépéssel bukott (saját mérés, a
+teljes e2e 3. shardja). A Start a lista végén áll, tehát a vásznon az agent kártya fölött rajzolódik;
+ez az 5.8 kimondott következménye ("a Start vele átfedésben rajzolódik"). A fixtúra ezért Startot
+kapott (`positionX: -450`), mint minden mai workflow (O-20); a teszt tárgya (a vezérlők betűtípusa és
+a bezáró gomb színe) nem változott, a fájl három tesztje zöld. A többi szerkesztő e2e fixtúrájában
+van Start, és `branch` forrású kulcs nélküli él egyikben sincs; a `skeleton-theme.spec.ts` üres
+gráfja a betöltés kiengedése előtt állít, tehát nem érintett.
+
+### 55.3 Unit teszt és rontás igazolás
+
+Új spec fájl: `normalize-loaded-graph-document.spec.ts` (4); bővítve: `GraphEditorScreen.spec.tsx`
+(+6, "a betöltés normalizálása" csoport). A `bun run test` 584 fájl, 5411 teszt, 100 százalék mind a
+négy metrikán.
+
+Új e2e: `apps/web/e2e/graph-editor-load-normalization.spec.ts`, két teszt. (1) A 108. kritérium
+szerkesztő része: a három élű válaszból a vászon kettőt rajzol (`.react-flow__edge` darabszám), a
+`rf__edge-e-regi` nincs, a mentetlen jelző azonnal látszik, a Visszavonás gomb és az elvetés
+menüpont `disabled`, a `Control+z` az élt nem hozza vissza, egy "Elrendezés" utáni elvetés után a
+menüpont ismét `disabled` és az él továbbra sincs, egy második "Elrendezés" utáni mentés `PUT`
+törzsének élei `e-start`, `e-igen`, és a mentés után a jelző eltűnik. (2) A 109. kritérium: a Start
+kártya megjelenik, azonosítója 4. verziós UUID, a panel zárva, a mentetlen jelző azonnal látszik, a
+Visszavonás gomb és az elvetés menüpont `disabled`, a `Control+z` és egy "Elrendezés" utáni elvetés
+a Startot megtartja, a felső navigáció "Futás előzmények" linkje a megerősítő modálist nyitja (a cím
+`/editor` marad), az üres kezeletlen hiba szabály mellett a mentés kérés nélkül a mező alatt jelez,
+a kitöltés után a `PUT` törzse a Startot az 5.8 alakjával viszi, és a jelző eltűnik.
+
+Ideiglenes rontások (saját, 2026-10-17, utána visszaállítva):
+
+| Rontás                                                                                                                                | Unit (`GraphEditorScreen.spec.tsx`)                                 | E2E                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+| a kulcs nélküli élek szűrése a mentetlen jelző alapja ELÉ (a `baseline` élei a szűrt lista)                                           | 2 bukik (az AC108 jelző és az elvetés teszt), 68 zöld               | az AC108 teszt bukik: a mentetlen jelző nem jelenik meg        |
+| a Start felvétele visszavonható lépésként (`startGraphEditHistory` a Start nélküli alakról, utána `recordGraphEdit` a normalizálttal) | 2 bukik (az AC109 betöltés és a visszavonás/elvetés teszt), 68 zöld | az AC109 teszt bukik: a Visszavonás gomb nem `disabled`        |
+| a `main` `f041052` képernyő kódja (normalizálás nélkül)                                                                               |                                                                     | mindkét teszt bukik: 3 él a 2 helyett, 1 csomópont a 2 helyett |
+
+Az eredeti alakon a fájl mind a 70 unit tesztje és mindkét e2e teszt zöld.
+
+### 55.4 Az e2e lefedettség előtte és utána
+
+Eljárás (51.5 szerint): `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`,
+majd nyolc egymás utáni shard `flock` alatt, legfeljebb 3 workerrel, majd `bun run
+coverage:e2e:report`.
+
+Előtte: a `main` `f041052` állapotán **550 teszt, mind zöld** (69 + 69 + 69 + 69 + 69 + 69 + 68 +
+68). Utána: a jelen ág kódján (`34866e9`) **552 teszt, mind zöld** (8 x 69). A `bun run
+coverage:e2e:report` mindkét állapoton exit 0 a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Százalék utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | -------------- | ------------------------ |
+| statements | 1960 / 1975            | 1966 / 1981           | 99.24          | 15 -> 15                 |
+| branches   | 913 / 924              | 914 / 925             | 98.81          | 11 -> 11                 |
+| functions  | 674 / 677              | 676 / 679             | 99.55          | 3 -> 3                   |
+| lines      | 1890 / 1905            | 1895 / 1910           | 99.21          | 15 -> 15                 |
+
+A fedetlen helyek mindkét állapoton ugyanazon a hat fájlon, ugyanazokkal a darabszámokkal állnak
+(`nyc` json-summary, utasítás / ág / függvény / sor): `mount-app.tsx` 3/2/0/3,
+`read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1. Az új `normalize-loaded-graph-document.ts` teljesen fedett (5/5,
+1/1, 2/2, 4/4), a `GraphEditorScreen.tsx` is (148/148, 62/62, 59/59, 140/140). Az `apps/web/package.json`
+küszöbe nem változott.
+
+### 55.5 Nem ellenőrzött
+
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- Valódi `apps/server` ellen a normalizált gráf mentése nem futott: a `PUT` törzs csak a
+  `page.route()` mockon mérve; a szerver oldali elfogadást (kötelező mezők, `onUnhandledError`) a
+  meglévő protokoll és szerver tesztek fedik, nem ez a lépés.
