@@ -1832,3 +1832,185 @@ Az `apps/web/package.json` küszöbe nem változott.
   Chromium mutatja, a fizikai `Cmd` billentyű lenyomása nem mért.
 - A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és
   olvasást a unit teszt szimulálja, e2e nem méri.
+
+## T-009-59
+
+A Beállítások képernyő és a visszavonás módosítójának választója (PLAN-009 T-009-59, SPEC-008 5.10,
+5.11, O-31, O-32, 113. kritérium írás része, 114. és 115. kritérium). Az ág a `main` `f041052`
+állapotára épül; a tároló írása (`storeUndoModifierPreference`) a `feat/spec-008-d1-modosito-billentyu-iras`
+ág `d1fe2b4` commitjából átvéve (user döntés 2026-10-17, 58.4), a `d1fe2b4` `apps/web/CLAUDE.md`
+változása nélkül.
+
+### 59.1 Források
+
+- **A `<label for>` a `<button>` elemet is címkézi.** A WHATWG HTML Living Standard "labelable elements"
+  kategóriája a `button` elemet is felsorolja ("These are elements that can be associated with a `label`
+  element. `button`, `input` ..."), és a `for` attribútum "the ID of a labelable element" lehet
+  (<https://html.spec.whatwg.org/multipage/forms.html>, 4.10.2 és 4.10.4). Megerősítés: a WHATWG
+  fejlesztői kiadás elem indexe a `button` kategóriái között a "labelable" szót adja
+  (<https://html.spec.whatwg.org/dev/indices.html>), és az MDN `<label>` oldala szerint a `for`
+  attribútum a dokumentum első egyező `id` elemét címkézi, ha az labelable
+  (<https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/label>). A `SelectField`
+  triggere `<button role="combobox">`, a komponens `id` propja a gombra kerül, tehát a sor felirata
+  `<label htmlFor>` kötéssel a trigger hozzáférhető neve. Mérve: az e2e `getByLabel` a felirattal megtalálja
+  a triggert (`e2e/settings-screen.spec.ts`).
+- **Az `addInitScript` minden navigációnál újra fut**: "Adds a script which would be evaluated in one of the
+  following scenarios: Whenever the page is navigated. ..."
+  (<https://playwright.dev/docs/api/class-page#page-add-init-script>). Ezért az e2e a kiinduló tárolt értéket
+  `page.evaluate` és `page.reload` úton állítja be: egy init script a szerkesztő betöltésekor felülírná a
+  választást.
+- **A design system minta.** `eggproject-design-admin-app-examples/examples/settings.html`: a lap saját
+  `<style>` blokkja adja a `.card` (40-46. sor) és a `.preference-row` (54-59. sor) szabályait; a "Preferences"
+  kártya választós sora `<label class="preference-row__title" for>` plusz `select select--sm` (190. sor). A
+  komponens `card` (`eggproject-design-components/components/card/card.css`) a `packages/ui` `card.css`
+  forrása; a lap NEM tölti be (a `<link>` listán nincs), a saját `.card` szabálya belső térköz nélküli,
+  szakaszokra (`card__header`, `card__body`) bontott változat.
+- **A `flex: 1` alapmérete 0.** Az MDN `flex` oldala szerint az egy értékes, egység nélküli alak
+  "expands to `flex: <number> 1 0%`"
+  (<https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/flex>); megerősítés: a W3C CSS
+  Flexible Box Layout Level 1 "flex: <positive-number>" leírása ("sets the flex basis to zero",
+  <https://www.w3.org/TR/css-flexbox-1/#flex-common>) és a web-platform-tests `flex-shorthand.html` tesztje
+  (`flex: 1` -> `flex-basis: 0%`,
+  <https://github.com/web-platform-tests/wpt/blob/master/css/css-flexbox/parsing/flex-shorthand.html>). A
+  `.preference-row__body` ezt a deklarációt viseli, tehát egy sorban a szabad helyből csak a trigger tartalmi
+  szélessége után maradó rész jut neki (59.3, mérve).
+- **Saját mérés**: `apps/web/measurement/settings-width.ts` (`bun run measure:settings-width`, 59.3).
+
+### 59.2 A megvalósítás döntései
+
+- **A kártya a `packages/ui` `Card` szerkezete, nem a komponens és nem a lap saját változata.** A `Card`
+  React komponens a gyerekeit `<p>` elembe teszi, amiben a `SelectField` `<div class="field">` gyökere nem
+  állhat. A lap saját `.card`, `.card__header` szabálya a komponens `card.css` szabályaival azonos
+  osztálynéven ütközne, globálisan (a `not-found-route` a `Card` komponenst használja), és a komponens 18px
+  belső térköze a lap `card__header` térközével összeadódna. A képernyő ezért a komponens DOM alakját írja
+  (`<section class="card">`, `.card__header`, `<h3>`), a meglévő, globálisan betöltött `card.css`
+  szabályokkal; saját kártya CSS nincs. Lásd 59.6, 1. kérdés.
+- **A kártya címe** a `CLIENT_ROUTE_TABLE.graphEditor` felirata ("Szerkesztő"), mert a beállítás a
+  szerkesztő billentyűire hat; a spec a címet nem nevezi meg. Lásd 59.6, 2. kérdés.
+- **A `preference-row`** négy szabálya (`.preference-row`, `:last-child`, `__body`, `__title`) a forrás
+  deklarációival áll az `apps/web` `settings-screen.css` fájlban; a két `__hint` szabály kimaradt, mert a
+  sornak nincs magyarázó szövege. Nem `packages/ui` téma: a minta a lap saját stílusa, nem komponens, és a
+  SPEC-008 11.4 szerint a `packages/ui` két új témája a `context-menu` és a `tooltip`.
+- **Saját reszponzív szabály** a `--ep-screen-sm` (640px) alatt: `flex-direction: column` és
+  `align-items: stretch`; a forrás oldal nem reszponzív. A szükségességet a 59.3 mérés adja.
+- **A felirat `<label for>`, nem a `SelectField` `label` propja**: a prop a mező fölötti nagybetűs
+  `field__label` címkét rajzolja, ami a `preference-row` bal oldali feliratával nem azonos alak.
+- **A tároló**: a képernyő a `GraphEditorScreen` mintájára a `getBrowserLocalStorage` elérést adja a
+  `readUndoModifierPreference` (betöltéskor, egyszer) és a `storeUndoModifierPreference` (választáskor)
+  függvénynek. A választás hálózati kérést nem indít.
+- **A `greppable-invariants` (9)** tiltott listájáról a `settings-screen` kikerült; a `skill-upload` és az
+  `mcp-server-config` maradt. A SPEC-007 16. szekció 3. kritériumának lazítása a spec szövegében már a
+  2026-09-28-i bővítéskor átvezetve állt, a kód oldali átvezetés ez a lista. A SPEC-008 1. szekció
+  "Kimondott határeset" mondata még a lezárás előtti állapotot írta (a választó helye nyitott tétel), ez a
+  talált helyen javítva (`.claude/CLAUDE.md` 14. szekció 1. pont).
+
+### 59.3 A topnav és a Beállítások sor szélessége (mérés)
+
+Eljárás: `cd apps/web && flock /tmp/playwright-gep.lock bun run measure:settings-width`, valódi Chromium, nem
+instrumentált preview build, 900 pixel magas nézetablak, a `/settings` útvonal, üres tároló (a kiválasztott
+érték az Automatikus). A `--ep-screen-md` (768px) alatt a navigáció a lenyíló menüben áll (a mérés előtt
+kinyitva), fölötte a sávban.
+
+**A topnav: a harmadik link minden mért szélességen elfér.** 320 pixelen a három link a lenyíló menüben
+egymás alatt áll, mindegyik bal széle 8, jobb széle 312 pixel (a nézetablak 320), túllógás 0; a sáv
+`scrollWidth - clientWidth` különbsége 0. A sávban (769 pixeltől) a "Beállítások" link jobb széle 575.39
+(769) és 578.19 pixel (1023 ... 1440), túllógás és sáv túllógás 0. A mért szélességek: 320, 340, 360, 375,
+393, 639, 640, 767, 768, 769, 1023, 1024, 1280, 1440.
+
+**A sor: a saját szabály előtt a felirat összenyomódott.** A forrás deklarációival (a 640px alatti szabály
+nélkül, a munkapéldányon mérve):
+
+| Szélesség | Felirat szélessége | Trigger szélessége | Trigger túllógása | `.app-content` túllógás |
+| --------- | ------------------ | ------------------ | ----------------- | ----------------------- |
+| 320       | 0                  | 289                | 28                | 28                      |
+| 340       | 0                  | 289                | 8                 | 8                       |
+| 360, 375  | 0                  | 289                | 0                 | 0                       |
+| 393       | 2                  | 289                | 0                 | 0                       |
+| 639       | 248                | 289                | 0                 | 0                       |
+
+A felirat törzse `flex: 1` alapú (0 alapméret), a trigger a tartalma szerinti 289 pixelt kéri, tehát egy
+sorban a trigger minden helyet elvesz. Csak `flex-direction: column` mellett a trigger 320 pixelen 12 pixellel kilógott (a szélessége ekkor is 289 pixel maradt); `align-items: stretch` mellett nem.
+
+**A szabállyal (a commitolt állapot):** 640 pixelig a felirat a trigger fölött áll, mindkettő a sor teljes
+szélességén (320: 234, 340: 254, 360: 274, 375: 289, 393: 307, 639: 553, 640: 554 pixel), túllógás 0;
+767 pixeltől egy sorban (felirat 376 ... 1017, trigger 289 pixel), átfedés 0. **Csonkolás**: 320, 340 és
+360 pixelen a triggerben az "Automatikus (macOS-en Cmd, máshol Ctrl)" felirat három ponttal rövidül (55, 35
+és 15 pixel rejtve), a kinyitott listában az opció szövege 320 és 340 pixelen (36 és 16 pixel rejtve);
+375 pixeltől egyik sem. Ez a design system `select.css` és `menu.css` meglévő `text-overflow: ellipsis`
+szabálya. Lásd 59.6, 3. kérdés.
+
+A kapu nem a mért szám: a `responsive.spec.ts` két új tesztje minden támogatott szélességen (az eszköz
+lista és a töréspont tokenek két oldala) a három linket és a sor két elemét `toBeInViewport({ ratio: 1 })`
+állítással, a sor két elemét átfedés nélkül és a feliratot túllógás nélkül követeli.
+
+### 59.4 Unit teszt és rontás igazolás
+
+Új spec fájl egy: `settings-screen.spec.tsx` (11 teszt: a kártya és a hozzáférhető neve, a sor és a
+`label for` kötés, `select--sm`, a három opció sorrendben, az alapérték, a három tárolt érték és az
+ismeretlen érték, a három választás írása). Bővítve: `match-client-route.spec.ts` (öt bejegyzés, a
+`settings` sor, a `/settings` illesztése), `app-shell.spec.tsx` (a `/settings` tartalma és morzsamenüje, a
+harmadik link és az `is-on` jelölés), `undo-modifier-storage.spec.ts` (a `d1fe2b4` négy tesztje: a három
+érték körbejárása, a dobó elérés és a dobó írás). `bun run test`: **584 fájl, 5420 teszt, 100 százalék
+mind a négy metrikán** (előtte, a `main` `f041052` fájával azonos `5d7abce` fejen: 583 fájl, 5401 teszt).
+
+**Szándékos rontások** (saját, 2026-10-17, utána visszaállítva; a kód a commitban nincs ilyen):
+
+- **(A) a választás nem ír** (a `storeUndoModifierPreference` hívás törölve): 3 unit teszt és 7 e2e teszt
+  bukik (a három írás teszt és a négy szerkesztő teszt).
+- **(B) a 640px alatti szabály törlése**: a `responsive.spec.ts` sor tesztje 320 pixelen bukik
+  (`toBeInViewport`).
+- **(C) a `settings-screen` visszaírása a (9) tiltott listájára**: a (9) bukik ("expected [
+  'settings-screen' ] to deeply equal []"); a javított listával egy ideiglenes `src/skill-upload/` mappa
+  is bukást ad.
+- **(D) a harmadik link törlése a topnavból**: 1 unit és 2 e2e teszt bukik (a link teszt és a navigáció
+  reszponzív tesztje).
+
+### 59.5 Az e2e lefedettség előtte és utána
+
+Eljárás (51.5 szerint): `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`, nyolc
+egymás utáni shard `flock` alatt, 3 workerrel, majd `bun run coverage:e2e:report`.
+
+Előtte: a `main` `f041052` fájával azonos `5d7abce` fej (PR #41 helyi merge kapuja): **550 teszt**.
+Utána: a jelen ág fején (a PR leírása adja a SHA-t) **562 teszt, mind zöld** (71 + 71 + 70 + 70 + 70 + 70 + 70 + 70; a
++12 az új `settings-screen.spec.ts` tíz és a `responsive.spec.ts` két tesztje). `bun run coverage:e2e:report`
+exit 0 a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1960 / 1975            | 1974 / 1989           | 15 -> 15                 |
+| branches   | 913 / 924              | 916 / 927             | 11 -> 11                 |
+| functions  | 674 / 677              | 680 / 683             | 3 -> 3                   |
+| lines      | 1890 / 1905            | 1904 / 1919           | 15 -> 15                 |
+
+A fedetlen helyek mindkét állapoton ugyanazon a hat fájlon állnak (`mount-app.tsx`,
+`read-frontend-config.ts`, `is-valid-connection.ts`, `browser-history-location-port.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`). **Egy köztes futás bukott**: amíg a választás és a
+szerkesztő betöltése egy tesztben állt, a `coverage-fixture.ts` a teszt végén csak a szerkesztő lapjáról
+gyűjtött, tehát a Beállítások lap választása elveszett (+2 sor a `settings-screen.tsx`, +2 a
+`undo-modifier-storage.ts` fájlban; exit 1: statements 99.04 < 99.11, functions 99.26 < 99.46, lines 99 <
+99.08). Az írás állítása ezért külön, navigáció nélküli teszt. Az `apps/web/package.json` küszöbe nem
+változott.
+
+### 59.6 Nyitott kérdések és nem ellenőrzött pontok
+
+Három kérdés, amit a spec és a user döntései nem zárnak le; a megvalósítás az első opciót követi:
+
+1. **A kártya változata.** (a) a komponens kártyája, fejléc `<h3>` címmel (a mai állapot); (b) a lap saját,
+   szakaszolt kártyája (`card__header` `<h2>` plusz leírás, `card__body`), a `settings-screen` alá
+   hatókörözött szelektorokkal, ami a forrás szabályainak szelektor szintű módosítása; (c) a `packages/ui`
+   `Card` bővítése nem `<p>` törzzsel, ami a `packages/ui` hatókörét bővíti.
+2. **A kártya címe.** (a) "Szerkesztő" (a mai állapot, a route tábla felirata); (b) más, a usertől kért szöveg
+   (például "Billentyűk"); (c) leírás sor a cím alatt.
+3. **A csonkolt felirat 320 ... 360 pixelen.** (a) elfogadva, a design system ellipszise (a mai állapot; a
+   hozzáférhető név teljes); (b) rövidebb opció felirat keskeny kijelzőn (termék szöveg döntés); (c) a
+   trigger és a lista szövegének tördelése, ami a design system `select.css` és `menu.css` szabályától
+   eltérés.
+
+Nem ellenőrzött:
+
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
+- A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és írást
+  a unit teszt szimulálja, e2e nem méri; a felület ilyenkor a választást mutatja, de a következő betöltés az
+  Automatikus értékkel indul.
+- Képernyőolvasó tényleges bemondása a `label for` kötésű `combobox` gombra: a hozzáférhető nevet a
+  Playwright `getByLabel` igazolja, valódi képernyőolvasó nem futott.
