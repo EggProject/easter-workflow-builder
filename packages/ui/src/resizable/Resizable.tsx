@@ -266,13 +266,17 @@ function withContentMinimum(
  * - **A `pointercancel` is lezárja a húzást**, ugyanúgy, mint a
  *   `pointerup`. A W3C Pointer Events szerint a böngésző `pointercancel`
  *   eseménnyel zárja a pointer esemény folyamát, ha a mozdulatot maga
- *   veszi át (érintéses pásztázás), és utána arra a pointerre már csak a
- *   lezáró `pointerout`/`pointerleave` (és `lostpointercapture`) érkezik,
- *   `pointermove`/`pointerup` nem, ezért a húzást a `pointercancel`-nek kell
- *   lezárnia (<https://www.w3.org/TR/pointerevents3/>, 4.1.3.3 "Suppressing a
- *   pointer event stream"). A forrás csak a `pointerup`
- *   eseményre zárt, így a húzás állapota bent ragadt, és a következő
- *   egérmozgás vagy görgetés mozdította az elválasztót.
+ *   veszi át (érintéses pásztázás), és ilyenkor a `pointerout`, a
+ *   `pointerleave` és a pointer capture implicit elengedése követi
+ *   (<https://www.w3.org/TR/pointerevents3/>, 4.1.3.3 "Suppressing a pointer
+ *   event stream" és 9.5). Hogy utána az adott pointerre `pointermove` vagy
+ *   `pointerup` már nem érkezik, a szöveg csak a lezárás feltételeként
+ *   mondja ("unlikely to continue to receive pointer events"), tiltást nem:
+ *   ez következtetés, **nem ellenőrzött**. A húzás lezárása ezért a
+ *   `pointercancel` eseményre épül, és nem függ attól, hogy utána jön-e
+ *   még esemény. A forrás csak a `pointerup` eseményre zárt, így a húzás
+ *   állapota bent ragadt, és a következő egérmozgás vagy görgetés mozdította
+ *   az elválasztót.
  *
  * A húzás állapota (`DragState`) szándékosan `useState`-ben él, nem
  * `useRef`-ben: az effektus így a `dragState === undefined` ágra a KEZDŐ

@@ -109,7 +109,7 @@ Cáfolt vagy hamis állítások (közepes súly, mind javítva forrással):
 
 Túlzó vagy pontatlan állítások (alacsony súly, pontosítva forrással): `localStorage` hibák (HTML
 Web Storage, MDN `setItem`), `pushState` `unused` paraméter (MDN), APG régió címke ("kerülendő",
-nem "tilos"), `pointercancel` utáni események (Pointer Events 3, 4.1.3.3), ContextMenu `tabindex`
+nem "tilos"), `pointercancel` utáni események (Pointer Events 3, 4.1.3.3; a koordinátori review után a `pointermove`/`pointerup` elmaradása "nem ellenőrzött" jelölést kapott, mert a szöveg tiltást nem mond ki), ContextMenu `tabindex`
 (APG Menubar), ButtonGroup név (APG Names and Descriptions: Discretionary), a Zod `when` kivétele
 megszakító hiba után (zod 4.4.3 `v4/core/util.js` 536-545), a `hasPointerEvents` idézet
 (`index.mjs` 2266), `-1px` margó átfedés, a mérő config elavult indoka. Forrás került a hiányzó
