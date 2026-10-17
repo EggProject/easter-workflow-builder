@@ -4,11 +4,8 @@
 //
 // A HIBA, AMIT ŐRIZ. A `--xy-*` téma blokk addig csak a szerkesztő
 // konténerén (`.graph-editor-canvas`) állt, a futás nézet vásznán nem, tehát
-// ott a React Flow szállított, világos alapértelmezése festett. Mérve sötét
-// témában, 1440x900: a vezérlő gomb 254,254,254 (a szállított `#fefefe`) a
-// 11,13,18 vásznon, az attribúció doboza 133,134,137 (a szállított
-// `rgba(255, 255, 255, 0.5)` a sötét vásznon). A mérés és a mechanizmus:
-// `docs/research/2026-09-23-react-flow-sotet-tema.md`.
+// ott a React Flow szállított, világos alapértelmezése festett. A mért színek
+// és a mechanizmus: `docs/research/2026-09-23-react-flow-sotet-tema.md`.
 //
 // A MÓDSZER KÜSZÖB NÉLKÜLI PIXEL EGYEZÉS. A teszt egy mérő szondát fest a
 // vászon üres sarkára `var(--ep-bg-elevated)` háttérrel, és ugyanarról a
@@ -16,8 +13,8 @@
 // pixelét a szonda pixelével PONTOSAN egyezőnek állítja. A számított stílus
 // önmagában nem elég (szabálykönyv 11. szekció: vizuális állítást csak
 // kifestett pixel bizonyít), a pixel egyezés viszont kitalált szám nélkül
-// dönt: a hibás állapot világos témában is elbukik (254 kontra 255 a gombon,
-// 251,249,245 kontra 255 az attribúción), sötétben pedig nagyságrenddel.
+// dönt: a hibás állapot mindkét témában elbukik (a mért értékek a research
+// 1. és 4. szekciójában állnak).
 import type {
   NodeConfig,
   RunDetail,

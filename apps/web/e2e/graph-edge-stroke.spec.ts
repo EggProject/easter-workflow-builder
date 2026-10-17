@@ -10,10 +10,9 @@
 //      (https://playwright.dev/docs/actionability#visible) - a VONAL SZÍNÉRŐL
 //      semmit nem állít. Ha az `--xy-edge-stroke` egy háttér tokenre kerülne,
 //      az él doboza változatlanul ott van és látható, tehát az állítás
-//      átmegy, miközben a képernyőn semmi nem látszik. Mérve 2026-09-09:
-//      `--xy-edge-stroke: var(--ep-bg-sunken)` mellett a kifestett pixelek
-//      maximális csatorna eltérése világos témában 0, sötétben 1 (a lenti
-//      pixel mérés metrikájával), a `toBeVisible()` viszont zöld marad.
+//      átmegy, miközben a képernyőn semmi nem látszik (mérve: háttér színű
+//      vonalnál a lenti pixel mérés bukik, a `toBeVisible()` zöld marad,
+//      `docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció).
 //   2. Az ott használt fixtúra SZÁNDÉKOSAN átlós (a második csomópont
 //      `positionY: 240`), mert egy vízszintes él befoglaló doboza 0 magas, és
 //      a `toBeVisible()` ott hamis bukást adna. A VALÓS alkalmazás viszont
@@ -24,14 +23,12 @@
 // nem a DOM meglétét, hanem a KIFESTETT PIXELEKET állítja. A módszer: két
 // képernyőkép ugyanarról a kis területről (a két csomópont közötti szakasz),
 // egyszer az éllel, egyszer az él útvonalát elrejtve, majd a két kép
-// pixelenkénti összevetése. Ez immunis a React Flow háttér pontmintájára is,
-// mert az mindkét képen ugyanott áll.
+// pixelenkénti összevetése. Ezen a kis, üres kivágaton a React Flow háttér
+// pontmintájának hatása a küszöb alatt marad (research 7. szekció).
 //
-// A MÉRT SZÁMOK (chromium, 1440x900, 2026-09-09). Ép állapotban a maximális
-// csatorna eltérés világos témában 236, sötétben 53. A fenti, szándékosan
-// elrontott állapotban 0, illetve 1. A küszöb ezért 24: jóval a mért sötét
-// témás 53 alatt (nem törékeny), és nagyságrenddel a hibás állapot 1 értéke
-// felett (ténylegesen fog).
+// A KÜSZÖB a mért ép és a mért hibás állapot közé esik, a nyers mért számok a
+// research 4. és 5. szekciójában állnak
+// (`docs/research/2026-09-09-graf-el-vonal-meres.md`).
 import type {
   NodeConfig,
   SettingsRecord,
@@ -108,8 +105,8 @@ const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas:
 const EDITOR_URL = '/editor?workflowId=w-alfa';
 
 /**
- * A mért ép állapot (236 világos, 53 sötét) és a mért hibás állapot (0, illetve
- * 1) közötti küszöb.
+ * A mért ép és a mért hibás állapot közötti küszöb
+ * (`docs/research/2026-09-09-graf-el-vonal-meres.md` 5. szekció).
  */
 const MINIMUM_CHANNEL_DIFFERENCE = 24;
 

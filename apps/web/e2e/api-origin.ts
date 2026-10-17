@@ -28,7 +28,7 @@ export const STREAM_ORIGIN = API_ORIGIN;
 
 /**
  * A `playwright.config.ts` `use.baseURL`-je és a `vite preview --port`
- * ugyanerre az értékre mutat. A `sse-reconnect.spec.ts` valódi teszt
+ * ugyanerre az értékre mutat. A `sse-real-server.spec.ts` valódi teszt
  * szervere ezt írja az `Access-Control-Allow-Origin` fejlécbe (nem `*`),
  * mert az `EventSource` innen indul kereszt-origin kéréssel.
  */

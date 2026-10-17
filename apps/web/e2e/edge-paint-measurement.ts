@@ -11,33 +11,25 @@
 // A MÉRÉSI SZONDA, ÉS MIÉRT KELL. A puszta "él be, él ki" összevetés a valós
 // vászonon NEM dönt, mert az él alatt nem egyenletes a háttér: a React Flow
 // pontmintája és a csomópont kártyák árnyéka is odaesik, és ezeket a
-// háttérszínnel festő (tehát HIBÁS) él is eltakarja. Mérve 2026-09-09-én, a
-// `graph-editor.css`-be ideiglenesen beszúrt
-// `.react-flow__edge-path { stroke: var(--ep-bg-sunken); }` szabály mellett,
-// sötét témában: szonda nélkül a HIBÁS állapot legnagyobb csatorna eltérése
-// felment 25-ig, miközben az ÉP állapot legkisebb értéke 16 volt, tehát a
-// két állapot ÁTFEDETT és a mérés nem döntött semmit.
+// háttérszínnel festő (tehát HIBÁS) él is eltakarja. Szonda nélkül a HIBÁS és
+// az ÉP állapot mért tartománya ÁTFEDETT, tehát a mérés nem dönt (mérve,
+// `docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
 //
 // A szonda ezért mindkét képernyőképen ELTÜNTETI a nem egyenletes hátteret:
 // a pontmintát `display: none`, a csomópont kártyákat és a vezérlő paneleket
 // `visibility: hidden` alá teszi (nem `display: none`, hogy a React Flow
 // méret figyelője ne induljon el és az élek ne mozduljanak el). Így az él
 // alatt egyetlen, egyenletes szín marad, a vászon `--ep-bg-sunken` háttere.
-// Ugyanaz a mérés a szondával, a bemutató fixtúra kilenc élén, mindkét
-// témában és mindkét nézetben (36 mérés): a HIBÁS állapot legnagyobb értéke
-// 3, az ÉP állapoté 15 és 136 között van. A két tartomány így nem érintkezik.
+// A szondával a HIBÁS és az ÉP állapot mért tartománya nem érintkezik
+// (research 7. szekció; a bemutató fixtúra ma tizenegy élű, ép értékei a
+// 7/a. szekcióban állnak).
 import { expect, type Page } from '@playwright/test';
 
 /**
  * A küszöb, ami felett a vonal ténylegesen ki van festve. A szám MÉRÉSBŐL
- * jön, nem becslésből: a fenti szondás mérés szerint a hibás állapot
- * legnagyobb értéke 3, az ép állapot legkisebb értéke 15 (sötét téma,
- * nyitott beállítás panel melletti 0.58-as illesztési nagyítás, a
- * legkedvezőtlenebb, vízszintes él). A 8 a két mért tartomány közé esik:
- * több mint két és félszerese a hibás állapot maximumának, és nagyjából
- * fele az ép állapot minimumának, tehát mindkét irányban van tartaléka.
- * A teljes táblázat: `docs/research/2026-09-09-graf-el-vonal-meres.md`
- * 7. szekció.
+ * jön, nem becslésből: a szondás mérés hibás és ép állapotának mért
+ * tartománya közé esik. A mért értékek és a levezetés:
+ * `docs/research/2026-09-09-graf-el-vonal-meres.md` 7. és 7/a. szekció.
  */
 export const EDGE_PAINT_MINIMUM_CHANNEL_DIFFERENCE = 8;
 
@@ -50,7 +42,8 @@ const PROBE_STYLE_ID = 'edge-paint-probe';
 /**
  * A kivágat köré hagyott ráhagyás pixelben. A befoglaló doboz a görbe
  * matematikai burkolója, a kifestett vonalnak viszont van vonalvastagsága és
- * élsimítása, ami azon egy-két pixellel túlnyúlhat.
+ * élsimítása, ami azon egy-két pixellel túlnyúlhat (becslés, a 8 pixeles
+ * ráhagyásnak nincs forrása; nyitott kérdés: SPEC-008 O-36).
  */
 const CLIP_MARGIN = 8;
 

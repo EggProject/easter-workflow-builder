@@ -83,10 +83,25 @@ const VIEWPORTS = [
 const APPROVAL_COUNTS = [0, 1, 4, 10] as const;
 
 /**
- * A `--ep-screen-md` (768px) alatt a futás nézet fül sávban áll, a panel a
- * "Transcript" fülön (SPEC-008 10. szekció).
+ * Egy töréspont token értéke az oldalra betöltött design system CSS-ből
+ * (`design-token/breakpoints.css`), nem beírva. A `--ep-screen-md` alatt a
+ * futás nézet fül sávban áll, a panel a "Transcript" fülön, a
+ * `--ep-screen-lg` alatt a függőleges sávban (SPEC-008 10. szekció). Az oldalról
+ * olvasunk, nem a fájlrendszerből: ez a fájl képernyőképet készít (memóriában),
+ * ezért a `screenshot-pipeline` invariáns szerint nem hivatkozhat a Node `fs`
+ * moduljára.
  */
-const TABBED_WIDTH_LIMIT = 768;
+async function screenWidthToken(page: Page, tokenName: '--ep-screen-md' | '--ep-screen-lg'): Promise<number> {
+  const value = await page.evaluate(
+    (name) => globalThis.getComputedStyle(globalThis.document.documentElement).getPropertyValue(name),
+    tokenName,
+  );
+  const match = /^\s*(\d+)px\s*$/.exec(value);
+  if (match?.[1] === undefined) {
+    throw new TypeError(`A ${tokenName} token nem található az oldalon.`);
+  }
+  return Number(match[1]);
+}
 
 /**
  * A jóváhagyás és a transcript közti húzható elválasztó hozzáférhető neve
@@ -292,7 +307,7 @@ for (const theme of THEMES) {
         // A vászon magassága a "Gráf" fülön mérhető, a panel a "Transcript"
         // fülön: fül sávban kétszer olvasunk.
         const beforeTab = await readPanelGeometry(page);
-        if (viewport.width < TABBED_WIDTH_LIMIT) {
+        if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         const geometry = await readPanelGeometry(page);
@@ -329,7 +344,7 @@ for (const theme of THEMES) {
           ),
         ]);
         await openRun(page, theme, viewport);
-        if (viewport.width < TABBED_WIDTH_LIMIT) {
+        if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         const panel = page.locator('.run-view-screen__transcript');
@@ -463,7 +478,7 @@ for (const theme of THEMES) {
     test(`felulet ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
       await mockApprovalRun(page, manyApprovals(1));
       await openRun(page, theme, viewport);
-      if (viewport.width < TABBED_WIDTH_LIMIT) {
+      if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
@@ -493,7 +508,7 @@ for (const theme of THEMES) {
     test(`kuszob ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
       await mockApprovalRun(page, manyApprovals(1));
       await openRun(page, theme, viewport);
-      if (viewport.width < TABBED_WIDTH_LIMIT) {
+      if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       const separator = page.getByRole('separator', { name: APPROVAL_SEPARATOR_PATTERN });
@@ -779,7 +794,7 @@ for (const theme of THEMES) {
     test(`szelso ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
       await mockApprovalRunWithTranscript(page, manyApprovals(1));
       await openRun(page, theme, viewport);
-      if (viewport.width < TABBED_WIDTH_LIMIT) {
+      if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();
@@ -1051,7 +1066,7 @@ for (const theme of THEMES) {
     test(`sorrend ${theme} ${String(viewport.width)}x${String(viewport.height)}`, async ({ page }) => {
       await mockApprovalRunWithTranscript(page, manyApprovals(1));
       await openRun(page, theme, viewport);
-      if (viewport.width < TABBED_WIDTH_LIMIT) {
+      if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
@@ -1157,7 +1172,7 @@ for (const theme of THEMES) {
           theme,
           viewport: `${String(viewport.width)}x${String(viewport.height)}`,
           storage: storageName,
-          band: viewport.width >= 1024 ? 'vizszintes' : 'fuggoleges',
+          band: viewport.width >= (await screenWidthToken(page, '--ep-screen-lg')) ? 'vizszintes' : 'fuggoleges',
           outerValue: await outer.getAttribute('aria-valuenow'),
           side: sideBox === null ? undefined : { width: Math.round(sideBox.width), height: Math.round(sideBox.height) },
           unfocused: pickVisibility(unfocused),
@@ -1340,7 +1355,7 @@ for (const theme of THEMES) {
         }, stored);
         await mockApprovalRunWithTranscript(page, approvals);
         await openRun(page, theme, viewport);
-        if (viewport.width < TABBED_WIDTH_LIMIT) {
+        if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         if (approvals.length > 0) {
@@ -1378,7 +1393,7 @@ for (const theme of THEMES) {
       }) => {
         await mockApprovalRunWithTranscript(page, manyApprovals(count));
         await openRun(page, theme, viewport);
-        if (viewport.width < TABBED_WIDTH_LIMIT) {
+        if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeVisible();
@@ -1429,7 +1444,7 @@ for (const theme of THEMES) {
         ],
       );
       await openRun(page, theme, viewport);
-      if (viewport.width < TABBED_WIDTH_LIMIT) {
+      if (viewport.width < (await screenWidthToken(page, '--ep-screen-md'))) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       await expect(page.getByText('A döntés visszavonhatatlan', { exact: true })).toBeAttached();

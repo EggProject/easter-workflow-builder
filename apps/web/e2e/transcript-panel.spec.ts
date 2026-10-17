@@ -717,7 +717,7 @@ test('az alján állva az új események érkezésekor a lista az utolsó sorra 
   stream.release();
   const totalCount = FIRST_BATCH_SIZE + NEW_EVENT_COUNT;
   await expect(list.getByRole('listitem').last()).toHaveAttribute('aria-posinset', String(totalCount));
-  await expect(list.getByRole('listitem').last()).toBeInViewport();
+  await expect(list.getByRole('listitem').last()).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('button', { name: /^Ugrás az aljára/ })).toHaveCount(0);
 });
 
@@ -743,7 +743,7 @@ test('felgörgetve az új események nem görgetnek, az ugrás az aljára gomb a
   await jumpButton.click();
   const totalCount = FIRST_BATCH_SIZE + NEW_EVENT_COUNT;
   await expect(list.getByRole('listitem').last()).toHaveAttribute('aria-posinset', String(totalCount));
-  await expect(list.getByRole('listitem').last()).toBeInViewport();
+  await expect(list.getByRole('listitem').last()).toBeInViewport({ ratio: 1 });
   await expect(jumpButton).toHaveCount(0);
 });
 
@@ -755,13 +755,13 @@ test('a fül sávban a transcript fül megnyitásakor és egy fülváltás után
   const records = Array.from({ length: FIRST_BATCH_SIZE }, (_, index) => makeRunEventRecord(index + 1, RUN_ID));
   await mockTranscript(page, records);
   const list = await openTranscript(page, FIRST_BATCH_SIZE);
-  await expect(list.getByRole('listitem').last()).toBeInViewport();
+  await expect(list.getByRole('listitem').last()).toBeInViewport({ ratio: 1 });
 
   await page.getByRole('tab', { name: 'Gráf' }).click();
   await expect(list).toBeHidden();
   await page.getByRole('tab', { name: 'Transcript' }).click();
   await expect(list.getByRole('listitem').last()).toHaveAttribute('aria-posinset', String(FIRST_BATCH_SIZE));
-  await expect(list.getByRole('listitem').last()).toBeInViewport();
+  await expect(list.getByRole('listitem').last()).toBeInViewport({ ratio: 1 });
 });
 
 const FIRST_EVENT_WAIT_TEXT = 'Várakozás az első eseményre';
