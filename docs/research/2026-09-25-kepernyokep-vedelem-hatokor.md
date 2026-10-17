@@ -305,10 +305,102 @@ Az injekció nélküli fán a régi és az új alak is 7/7 zöld.
 író feltételből, illetve a `package.json` scriptek feltételéből. Mind a három a (7) invariánson
 bukik (6/7).
 
-**Nyitva:** a Playwright CLI `pdf <url> <filename>` alparancsa (a telepített `coreBundle.js` 72993. sora, "save page as pdf") és a CDP `Page.printToPDF` metódusa nincs nevesítve, a hatókörüket
-a 2026-10-17-i döntés nem mondja ki. Addig a kapu mindkettőt átengedi (a CLI alparancsot a shell és a
-`package.json` scriptből, a CDP metódust egy író hívással együtt is). A user hatóköri döntése zárja
-le.
+**Lezárva:** a Playwright CLI `pdf <url> <filename>` alparancsa és a CDP `Page.printToPDF` metódusa a
+döntés teljes megvalósításaként ugyanúgy tiltott, mint a képernyőkép párjuk (8.5 és 8.6 szekció).
+
+### 8.5 A Playwright CLI `pdf` alparancsa és a CDP `Page.printToPDF` (2026-10-17)
+
+Kiváltó: a koordinátor utasítása, hogy az "Igen, tiltsuk." döntés teljes megvalósításaként a két még
+nevesítetlen utat is ugyanígy tiltsa, mint a képernyőkép CLI alparancsát és a CDP képet adó
+metódusait.
+
+**A Playwright CLI `pdf` alparancsa.**
+
+- **Telepített forrás (saját olvasás, `playwright-core` `1.62.1`, `lib/coreBundle.js`):** a 72993-72994.
+  sor a `pdf <url> <filename>` parancsot "save page as pdf" leírással regisztrálja; a 69654-69664. sor
+  `pdf2` függvénye a `page.pdf({ path: <filename>, format })` hívást adja, tehát a fájlnév argumentum a
+  `path` opció, és a fájlt a CLI maga írja lemezre (a kliens `pdf()` metódusa a 8.1 szekció szerint a 61611. sorban `writeFile` hívással ír). A böngésző megkötése a 69655. sorban: nem Chromium alatt
+  "PDF creation is only working with Chromium" hiba.
+- **Dokumentáció:** a <https://playwright.dev/docs/cli> "Generate PDF" szakasza: `npx playwright pdf
+https://en.wikipedia.org/wiki/PDF wiki.pdf`. **A playwright.dev lapot ebben a munkamenetben a lekérő
+  eszközök nem tudták letölteni** (üres válasz, illetve `CRAWL_NOT_FOUND`), a szöveget a hivatalos
+  dokumentáció két tükre adta (<https://playwright.bootcss.com/docs/cli>,
+  <https://www.cuketest.com/playwright/docs/cli/>); a tükör másolat, nem független megerősítés, tehát
+  maga a playwright.dev lap **nem ellenőrzött**.
+- **Független megerősítés:** a testersdock.com cikk (2022-07-10,
+  <https://testersdock.com/playwright-command-line-tools/>): `npx playwright pdf
+https://en.wikipedia.org/wiki/Helsinki Helsinki.pdf`, "Once the command is run, the pdf is generated
+  and saved at the project root."; a bytetunnels.com cikk (2026-02-13,
+  <https://bytetunnels.com/posts/using-playwright-cli-quick-browser-testing/>): "The `pdf` command
+  converts a web page to a PDF document." A második cikk opciónevei (`--format`, `--landscape`)
+  eltérnek a telepített forrástól (`--paper-format`), ezért csak az alparancs létezésére és a
+  fájlba írásra hivatkozunk.
+- **Következmény:** a `playwright` szó és az önálló `pdf` szó együtt egy shell scriptben, YAML lépésben
+  vagy `package.json` scriptben tiltott (`SHELL_PDF_PATTERN`, `isShellCapture`), a sortöréses
+  folytatósorral együtt (a minta a fájl, illetve a script teljes szövegét nézi). Programból indítva az
+  argumentum listában álló `'pdf'` string literál a `CAPTURE_CALL_PATTERN` mintában áll, a
+  `screenshot` párjával azonosan, tehát egy író hivatkozással együtt bukik. A minta önálló szót keres
+  (a szó előtt és után nincs `.`, `/`, `-` vagy szójel karakter), mert a `\bpdf\b` alak a jogos CI
+  lépést (`name: pdf-report`, `path: out/report.pdf` egy `playwright test` mellett) is megjelölte
+  (a (7) jogos esete így bukott, 8.6 szekció).
+
+**A CDP `Page.printToPDF` metódusa.**
+
+- **Elsődleges forrás:** a `ChromeDevTools/devtools-protocol` tároló `json/browser_protocol.json`
+  fájlja (az oldal a <https://chromedevtools.github.io/devtools-protocol/tot/Page/> ebből készül; maga
+  az oldal egy böngészős alkalmazás, a lekérő eszköz nem tudta kiolvasni, ezért a JSON-t olvastam,
+  letöltve `curl`-lel 2026-10-17-én, protokoll verzió `1.3`): `Page.printToPDF`, "Print page as PDF.";
+  visszatérés: `data` "Base64-encoded pdf data. Empty if |returnAsStream| is specified." és `stream`
+  "A handle of the stream that holds resulting PDF data.". A metódusnak nincs `path` paramétere.
+- **Független megerősítés:** a protokollból generált két kliens, a `chromedp/cdproto` `page/page.go`
+  (<https://github.com/chromedp/cdproto/blob/master/page/page.go>, "PrintToPDF print page as PDF",
+  "Base64-encoded pdf data") és a Selenium `selenium-devtools-v111` `Page.printToPDF`
+  (<https://www.javadoc.io/static/org.seleniumhq.selenium/selenium-devtools-v111/4.9.1/org/openqa/selenium/devtools/v111/page/Page.html>,
+  "Print page as PDF."). A telepített Playwright maga is ezt hívja (`coreBundle.js` 36499. sor,
+  `transferMode: "ReturnAsStream"`, majd `readProtocolStream`).
+- **Következmény:** a PDF a hívóhoz kerül (base64 vagy adatfolyam azonosító), a lemezre írás a hívó
+  dolga: ugyanaz a helyzet, mint a `captureScreenshot` és a `startScreencast` metódusnál. A metódus
+  neve a `CAPTURE_CALL_PATTERN` mintában áll (`CDP_PRINT_TO_PDF_WORD`), tehát egy író hivatkozással
+  vagy `path` kulccsal együtt bukik, nélkülük (a PDF a memóriában marad) átmegy.
+- **Hamis jelzés:** a tiszta fán a vizsgált 1555 fájlban (a spec fájlon kívül) a `pdf` szó egyszer
+  sem fordul elő, kis- és nagybetűtől függetlenül (`git ls-files` szűrve a vizsgált kiterjesztésekre és
+  a `package.json` fájlokra, `grep -il pdf`), a módosított spec fájl a tiszta fán 7/7 zöld, tehát a
+  bővítés ma nulla hamis jelzést ad.
+
+### 8.6 Mérések (saját, 2026-10-17)
+
+**Módszer.** A 8.4 szekció módszere: egy ideiglenes git indexen (`GIT_INDEX_FILE`, `git read-tree
+HEAD`, a közös index érintetlen) egyenként felvett, nem commitolt fájl. A régi alak az `a62188b`
+spec fájlja, egy ideiglenes, nem követett másolatból futtatva; az új alak a módosított spec fájl.
+
+| Injekció                                                                                | Régi alak (`a62188b`) | Új alak                      |
+| --------------------------------------------------------------------------------------- | --------------------- | ---------------------------- |
+| shell script: `bun x playwright pdf "$URL" x.pdf`                                       | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| bash script: `bunx playwright --device=x pdf "$URL" x.pdf`                              | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| shell script, sortöréses folytatósorral: `bun x playwright \` ... `pdf "$URL" x.pdf`    | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| workflow YAML lépés: `- run: bun x playwright pdf "$URL" x.pdf`                         | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| `package.json` script: `bun x playwright pdf url x.pdf`                                 | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| Node: `execFileSync('playwright', ['pdf', url, 'x.pdf'])`                               | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| CDP: `Page.printToPDF` plusz `writeFileSync`                                            | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| CDP: `Page.printToPDF` `path` kulcsú opció objektummal                                  | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| CDP: `Page.printToPDF` `ReturnAsStream` móddal plusz `Bun.write`                        | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| jogos: CDP `Page.printToPDF`, a PDF a memóriában marad                                  | 7/7 zöld              | 7/7 zöld                     |
+| jogos: `['pdf', 'txt']` felsorolás író hivatkozás nélkül                                | 7/7 zöld              | 7/7 zöld                     |
+| jogos: CI YAML `name: pdf-report`, `path: out/report.pdf` egy `playwright test` mellett | 7/7 zöld              | 7/7 zöld                     |
+| jogos: shell `cp out/report.pdf`, `make-pdf-report.mjs` egy `playwright test` mellett   | 7/7 zöld              | 7/7 zöld                     |
+| jogos: `package.json` script `make-pdf-report.mjs` egy `playwright test` mellett        | 7/7 zöld              | 7/7 zöld                     |
+
+Az injekció nélküli fán a régi és az új alak is 7/7 zöld.
+
+**Az új kód gyengítései.** A spec fájl egy-egy pontú módosítása egy ideiglenes másolatban, utána
+visszaállítva: a CDP PDF ág kivétele a `CAPTURE_CALL_PATTERN` mintából, a `'pdf'` string literál ág
+kivétele ugyanonnan, a PDF ág kivétele az `isShellCapture` függvényből, és a `SHELL_PDF_PATTERN`
+önálló szó alakjának cseréje `\bpdf\b` mintára. Mind a négy a (7) invariánson bukik (6/7): az első
+három a saját pozitív esetén, a negyedik a jogos CI esetén.
+
+**Elfogadott korlát.** A lemezre írás a 8.1 szekció szerinti ismert utakon látszik; egy PDF, amit más
+író csomag vagy futásidőben összerakott modulnév ír ki, a minta számára nem látszik (a
+szándékos megkerülés a szabálykönyv 12. szekciójának elfogadott korlátja).
 
 ## 9. Áthelyezett mérési adatok a szabálykönyv 12. szekciójából (2026-10-17)
 

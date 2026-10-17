@@ -316,20 +316,23 @@ pixelen (bizonytalan).
 
 A döntések szövege a user szavaival, az átvezetés helye mellettük.
 
-| Tétel                                  | Döntés                       | Átvezetés                                                                                                       |
-| -------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| O-37 szám mezők szabálya               | "Mező alatti hiba."          | SPEC-008 14.1 O-37 és 5.4, PLAN-009 T-009-60                                                                    |
-| O-38 `agents` kötelező mezői           | "Üresen ne legyen menthető." | SPEC-008 14.1 O-38 és 5.4, PLAN-009 T-009-60                                                                    |
-| O-39 tételes lista a csomópontra       | "Épüljön meg most"           | SPEC-008 14.1 O-39 és 6.3, PLAN-009 T-009-61                                                                    |
-| `page.pdf({ path })`, `--print-to-pdf` | "Igen, tiltsuk."             | `screenshot-pipeline.spec.ts`, `2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció, szabálykönyv 12.         |
-| Nyers mért számok a szabálykönyvben    | "Research hivatkozásra."     | szabálykönyv 11. és 12. szekció, 14. szekció tétele törölve; a számok a hivatkozott research szekciókban állnak |
+| Tétel                                       | Döntés                                  | Átvezetés                                                                                                       |
+| ------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| O-37 szám mezők szabálya                    | "Mező alatti hiba."                     | SPEC-008 14.1 O-37 és 5.4, PLAN-009 T-009-60                                                                    |
+| O-38 `agents` kötelező mezői                | "Üresen ne legyen menthető."            | SPEC-008 14.1 O-38 és 5.4, PLAN-009 T-009-60                                                                    |
+| O-39 tételes lista a csomópontra            | "Épüljön meg most"                      | SPEC-008 14.1 O-39 és 6.3, PLAN-009 T-009-61                                                                    |
+| `page.pdf({ path })`, `--print-to-pdf`      | "Igen, tiltsuk."                        | `screenshot-pipeline.spec.ts`, `2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció, szabálykönyv 12.         |
+| Playwright CLI `pdf`, CDP `Page.printToPDF` | a "Igen, tiltsuk." teljes megvalósítása | `screenshot-pipeline.spec.ts`, `2026-09-25-kepernyokep-vedelem-hatokor.md` 8.5 és 8.6 szekció, szabálykönyv 12. |
+| Nyers mért számok a szabálykönyvben         | "Research hivatkozásra."                | szabálykönyv 11. és 12. szekció, 14. szekció tétele törölve; a számok a hivatkozott research szekciókban állnak |
 
 **Ami az átvezetés után nyitva maradt.** A T-009-61 (O-39) megvalósítása előtt a megjelenítés módja
-nincs rögzítve (SPEC-008 6.3), ezért a lépés megáll és kérdez. A Playwright CLI `pdf` alparancsa és
-a CDP `Page.printToPDF` metódusa a PDF tiltásban nincs nevesítve (a `2026-09-25-kepernyokep-vedelem-hatokor.md`
-8.4 szekció "Nyitva" bekezdése). A szabálykönyvben bent maradtak: a hivatalos dokumentációból származó értékek (az 5000 ms és a 30000 ms
-alapértelmezés, a futtató gépek hivatalos erőforrás adatai), a CSS és a viewport konfigurációs értékei,
-az azonosítók (futás azonosítók), valamint a `better-sqlite3` és a `@xyflow/react` verziószáma és a
-telepített forrás sorszámai két mérési leírásban (a 12. szekció SQLite elsődleges kulcs és a billentyűs
-törlés bejegyzése). Ezek nem saját mérésből származó nyers számok, de a verziószámok a szabálykönyv 7.
-szekciója szerint sem tartoznak oda; a kiváltásukról a user dönt.
+nincs rögzítve (SPEC-008 6.3), ezért a lépés megáll és kérdez.
+
+**Lezárva a koordinátori review után (2026-10-17).** A Playwright CLI `pdf` alparancsa és a CDP
+`Page.printToPDF` metódusa a PDF tiltásba került (`2026-09-25-kepernyokep-vedelem-hatokor.md` 8.5 és
+8.6 szekció). A `better-sqlite3`, a `@xyflow/react` és a `@playwright/test` verziószáma és a telepített
+forrás sorszámai kikerültek a szabálykönyvből (a 12. szekció SQLite elsődleges kulcs és billentyűs
+törlés bejegyzése, a 11. szekció SSE mockolás bekezdése), a research szekciókra hivatkozás vette át a
+helyüket. A szabálykönyvben bent maradtak: a hivatalos dokumentációból származó értékek (az 5000 ms és a
+30000 ms alapértelmezés, a futtató gépek hivatalos erőforrás adatai), a CSS és a viewport konfigurációs
+értékei, az azonosítók (futás azonosítók).

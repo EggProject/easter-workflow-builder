@@ -174,6 +174,7 @@ const SCREENCAST_WORD = ['screen', 'cast'].join('');
 const VIDEO_WORD = ['vid', 'eo'].join('');
 const CONTEXT_VIDEO_WORD = ['record', 'Video'].join('');
 const PDF_WORD = ['p', 'df'].join('');
+const CDP_PRINT_TO_PDF_WORD = ['print', 'To', 'PDF'].join('');
 const PRINT_TO_PDF_WORD = ['print-to-', PDF_WORD].join('');
 
 /**
@@ -217,10 +218,11 @@ function hasPathOptionKey(content: string): boolean {
 
 /**
  * Képernyőképet vagy videót készítő hívás: a Playwright API hívása, a CLI
- * `screenshot` alparancsa programból indítva (a parancs argumentum listájában
- * álló szó mint string literál), a Chrome DevTools Protocol `Page` doménjének
- * két képet adó metódusa (a képernyőkép és a screencast indítása,
- * `CDP_CAPTURE_WORD` és `CDP_SCREENCAST_WORD`,
+ * `screenshot` és (2026-10-17 óta) `pdf` alparancsa programból indítva (a
+ * parancs argumentum listájában álló szó mint string literál), a Chrome
+ * DevTools Protocol `Page` doménjének három képet vagy PDF-et adó metódusa (a
+ * képernyőkép, a screencast indítása és 2026-10-17 óta a PDF nyomtatás,
+ * `CDP_CAPTURE_WORD`, `CDP_SCREENCAST_WORD` és `CDP_PRINT_TO_PDF_WORD`,
  * <https://chromedevtools.github.io/devtools-protocol/tot/Page/>), és a
  * Playwright oldal screencast objektuma (`SCREENCAST_WORD`, 2026-09-25 óta:
  * `path` opcióval videót ment, a képkocka visszahívása JPEG adatot ad, research
@@ -228,18 +230,24 @@ function hasPathOptionKey(content: string): boolean {
  * (`PDF_WORD` hívás): a Playwright `Page.pdf` metódusa a `path` opcióval a PDF-et
  * lemezre írja, nélküle csak a puffert adja vissza
  * (<https://playwright.dev/docs/api/class-page#page-pdf>, research 8. szekció),
- * tehát a képernyőkép hívással azonos szabály vonatkozik rá. A metódusok neve
- * darabokból áll össze, mert ez a fájl maga is a vizsgált halmazban van.
+ * a CDP PDF nyomtatás metódusa base64 adatot vagy adatfolyam azonosítót ad
+ * vissza, a lemezre írás a hívó dolga (research 8.5 szekció), a CLI `pdf`
+ * alparancsa a fájlt maga írja (`PDF_WORD` string literál, a `page.pdf` hívás
+ * `path` opcióval), tehát a képernyőkép hívással azonos szabály vonatkozik
+ * mindháromra. A metódusok neve darabokból áll össze, mert ez a fájl maga is a
+ * vizsgált halmazban van.
  */
 const CAPTURE_CALL_PATTERN = new RegExp(
-  String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]|\b${CDP_CAPTURE_WORD}\b|\b${CDP_SCREENCAST_WORD}\b|\.${SCREENCAST_WORD}\b|\b${PDF_WORD}\(`,
+  String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]|\b${CDP_CAPTURE_WORD}\b|\b${CDP_SCREENCAST_WORD}\b|\b${CDP_PRINT_TO_PDF_WORD}\b|\.${SCREENCAST_WORD}\b|\b${PDF_WORD}\(|['"]${PDF_WORD}['"]`,
 );
 
 /**
  * A Playwright CLI a shell parancsban és a `package.json` scriptben: a
- * `playwright` szó a `screenshot` alparanccsal, vagy egy nem `off` értékű
- * `--trace` kapcsoló. Az alparancs a képet mindig a megadott fájlba írja
- * (<https://playwright.dev/docs/cli>); a `--trace` kapcsoló a config trace
+ * `playwright` szó a `screenshot` vagy (2026-10-17 óta) a `pdf` alparanccsal,
+ * vagy egy nem `off` értékű
+ * `--trace` kapcsoló. Az alparancs a képet vagy a PDF-et mindig a megadott
+ * fájlba írja (<https://playwright.dev/docs/cli>, research 8.5 szekció); a
+ * `--trace` kapcsoló a config trace
  * opcióját írja felül (<https://playwright.dev/docs/test-cli>, research 4.
  * szekció), tehát ugyanaz a zárt lista vonatkozik rá, mint a config trace
  * opciójára. A kapcsoló 2026-09-25 óta a `playwright` szó nélkül is tiltott: egy
@@ -249,10 +257,17 @@ const CAPTURE_CALL_PATTERN = new RegExp(
  */
 const PLAYWRIGHT_CLI_PATTERN = /\bplaywright\b/;
 const SHELL_SCREENSHOT_PATTERN = new RegExp(String.raw`\b${SCREENSHOT_WORD}\b`);
+// Önálló szó, a fájlnév (`x.pdf`), az útvonal (`out/pdf`) és az összetett szó
+// (`pdf-report`) nélkül: a `pdf <url> <fájl>` alparancs mindig szóközzel
+// határolt argumentum, egy `playwright test` mellett álló artefaktum név nem az.
+const SHELL_PDF_PATTERN = new RegExp(String.raw`(?<![\w./-])${PDF_WORD}(?![\w./-])`);
 const TRACE_FLAG_PATTERN = new RegExp(String.raw`--${TRACE_WORD}(?![\w-])(?!(?:=|\s+)['"]?off\b)`);
 
 function isShellCapture(text: string): boolean {
-  return TRACE_FLAG_PATTERN.test(text) || (PLAYWRIGHT_CLI_PATTERN.test(text) && SHELL_SCREENSHOT_PATTERN.test(text));
+  return (
+    TRACE_FLAG_PATTERN.test(text) ||
+    (PLAYWRIGHT_CLI_PATTERN.test(text) && (SHELL_SCREENSHOT_PATTERN.test(text) || SHELL_PDF_PATTERN.test(text)))
+  );
 }
 
 /**
@@ -1573,8 +1588,77 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
           'tools/print.ts',
         ],
       },
+      // 2026-10-17 (az "Igen, tiltsuk." döntés teljes megvalósítása): a Playwright
+      // CLI PDF alparancsa és a CDP PDF nyomtatás metódusa ugyanúgy tiltott, mint
+      // a képernyőkép párjuk (`SHELL_PDF_PATTERN`, `CAPTURE_CALL_PATTERN`).
       {
-        name: 'jogos és hatókörön kívüli: memóriában maradó PDF a lefedettségi fixtúrán át, a hívás és a kapcsoló puszta említése, Playwright import nélküli termékkód, nem vizsgált kiterjesztés',
+        name: 'a Playwright CLI PDF alparancsa shell, bash, YAML és package.json scriptből, sortöréses folytatósorral is',
+        files: [
+          { trackedPath: 'tools/print.sh', content: `bun x playwright ${PDF_WORD} "$URL" editor.${PDF_WORD}` },
+          {
+            trackedPath: 'tools/print.bash',
+            content: `bunx playwright --device=x ${PDF_WORD} "$URL" editor.${PDF_WORD}`,
+          },
+          {
+            trackedPath: 'tools/multi.sh',
+            content: `bun x playwright \\\n  --paper-format A4 \\\n  ${PDF_WORD} "$URL" editor.${PDF_WORD}`,
+          },
+          {
+            trackedPath: '.github/workflows/print.yml',
+            content: `      - run: bun x playwright ${PDF_WORD} "$URL" x.${PDF_WORD}`,
+          },
+          {
+            trackedPath: 'tools/package.json',
+            content: JSON.stringify({ scripts: { print: `bun x playwright ${PDF_WORD} url x.${PDF_WORD}` } }),
+          },
+        ],
+        offenders: [
+          '.github/workflows/print.yml',
+          'tools/multi.sh',
+          'tools/package.json',
+          'tools/print.bash',
+          'tools/print.sh',
+        ],
+      },
+      {
+        name: 'a Playwright CLI PDF alparancsa programból, a folyamatindító argumentum listájában',
+        files: [
+          {
+            trackedPath: 'tools/print.ts',
+            content: `import { execFileSync } from 'node:child_process';\nexecFileSync('playwright', ['${PDF_WORD}', url, 'x.${PDF_WORD}']);`,
+          },
+          {
+            trackedPath: 'e2e/print.mjs',
+            content: `import { spawnSync } from 'node:child_process';\nspawnSync('bunx', ['playwright', "${PDF_WORD}", url, name]);`,
+          },
+        ],
+        offenders: ['e2e/print.mjs', 'tools/print.ts'],
+      },
+      {
+        name: 'a CDP PDF nyomtatás writeFileSync hívással, path kulccsal és író segédfüggvénnyel egy másik fájlban',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `${fsImport('writeFileSync')}const { data } = await cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}');\nwriteFileSync('x.${PDF_WORD}', Buffer.from(data, 'base64'));`,
+          },
+          {
+            trackedPath: 'e2e/b.ts',
+            content: `await cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}', { landscape: true, path: 'x.${PDF_WORD}' });`,
+          },
+          { trackedPath: 'e2e/save.ts', content: `${fsImport('writeFileSync')}export const save = writeFileSync;` },
+          {
+            trackedPath: 'e2e/c.ts',
+            content: `import { save } from './save.ts';\nsave('x.${PDF_WORD}', await cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}'));`,
+          },
+          {
+            trackedPath: 'packages/x/src/print/print.ts',
+            content: `import { chromium } from 'playwright';\nawait cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}', { transferMode: 'ReturnAsStream', path });`,
+          },
+        ],
+        offenders: ['e2e/a.ts', 'e2e/b.ts', 'e2e/save.ts', 'packages/x/src/print/print.ts'],
+      },
+      {
+        name: 'jogos és hatókörön kívüli: memóriában maradó PDF (Playwright hívás és CDP) a lefedettségi fixtúrán át, a hívás és a kapcsoló puszta említése, a PDF szó fájlnévben és összetett szóban egy playwright test mellett, Playwright import nélküli termékkód, nem vizsgált kiterjesztés',
         files: [
           {
             trackedPath: 'apps/web/e2e/coverage-fixture.ts',
@@ -1604,6 +1688,29 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
           {
             trackedPath: 'docs/print.md',
             content: `chromium --headless --${PRINT_TO_PDF_WORD}=x.${PDF_WORD} "$URL"`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/cdp-print.spec.ts',
+            content: `import { test } from './coverage-fixture.ts';\nconst { data } = await cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}');\nexpect(data.length).toBeGreaterThan(0);`,
+          },
+          {
+            trackedPath: 'packages/report/src/print/cdp-print.ts',
+            content: `export const print = async (cdp) => cdp.send('Page.${CDP_PRINT_TO_PDF_WORD}');`,
+          },
+          { trackedPath: 'tools/types.ts', content: `export const extensions = ['${PDF_WORD}', 'txt'];` },
+          {
+            trackedPath: '.github/workflows/ci.yml',
+            content: `      - run: bun x playwright test\n      - uses: actions/upload-artifact@v4\n        with:\n          name: ${PDF_WORD}-report\n          path: out/report.${PDF_WORD}`,
+          },
+          {
+            trackedPath: 'tools/report.sh',
+            content: `bun x playwright test\ncp out/report.${PDF_WORD} dist/\nnode make-${PDF_WORD}-report.mjs ${PDF_WORD}/index.html`,
+          },
+          {
+            trackedPath: 'tools/package.json',
+            content: JSON.stringify({
+              scripts: { e2e: 'playwright test', report: `node make-${PDF_WORD}-report.mjs` },
+            }),
           },
         ],
         offenders: [],

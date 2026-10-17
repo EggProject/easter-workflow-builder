@@ -1280,11 +1280,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   tiltásban nem volt nevesítve. Ma a `page.pdf` hívás a képernyőkép hívással azonos körbe esik (a
   `path` kulcs minden alakja és az író utak rá is vonatkoznak), a `--print-to-pdf` kapcsoló pedig a
   `--screenshot` mintáját követi: a `playwright` szótól függetlenül tiltott minden vizsgált fájlban,
-  shell scriptben, YAML lépésben és `package.json` scriptben. A jogos eset, a `page.pdf()` író
-  hívás nélkül (a PDF a memóriában marad), továbbra is átmegy. Az injekciók, a gyengítések és a források:
-  `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció. **Nyitva:** a Playwright CLI
-  `pdf` alparancsa és a CDP `Page.printToPDF` metódusa a tiltásban nincs nevesítve, a hatókörüket a
-  döntés nem mondja ki. Addig a kapu mindkettőt átengedi; a user hatóköri döntése zárja le.
+  shell scriptben, YAML lépésben és `package.json` scriptben. A döntés hatóköre a két másik utat is
+  lefedi, ugyanúgy, mint a képernyőkép párjukat: a Playwright CLI `pdf` alparancsa (a `playwright` szó
+  és az önálló `pdf` szó együtt a shell scriptben, YAML lépésben és `package.json` scriptben,
+  folytatósorral is; programból indítva az argumentum listában álló string literál, író hivatkozással
+  együtt) és a CDP `Page.printToPDF` metódusa (író hivatkozással vagy `path` kulccsal együtt). A jogos
+  eset, a `page.pdf()` vagy a CDP metódus író hívás nélkül (a PDF a memóriában marad), továbbra is
+  átmegy. Az injekciók, a gyengítések és a források:
+  `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
