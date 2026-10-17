@@ -220,9 +220,8 @@ bukik (a régió nem jelenik meg).
 User döntés: "Az iteráció lépései alapján." A megvalósítás: `resolve-loop-iteration-status.ts`, az
 iteráció lépés futása és minden leszármazottja közül a legerősebb állapot (`failed`, `rejected`,
 `interrupted`, `cancelled`, `waiting_approval`, `running`, `pending`, `succeeded` sorrendben). A
-sorrend a végrehajtó választása a user példája ("ha egy lépés elbukott, sikertelen") köré, a SPEC-008
-6.3 rögzíti. Unit teszt minden párra mindkét sorrendben, plusz a lépés nélküli, a beágyazott és a
-hatókörön kívüli esetre. E2e: a `loop` második iterációjának kiértékelése sikeres, a törzse elbukott, a
+sorrend user döntés (2026-10-17, "A legrosszabb"), a SPEC-008 6.3 rögzíti. Unit teszt minden párra
+mindkét sorrendben, plusz a lépés nélküli, a beágyazott és a hatókörön kívüli esetre. E2e: a `loop` második iterációjának kiértékelése sikeres, a törzse elbukott, a
 tétel jelvénye "sikertelen". **Szándékos rontás:** a jelvény a lépés futás saját állapotából (a régi
 alak) mellett az e2e bukik.
 

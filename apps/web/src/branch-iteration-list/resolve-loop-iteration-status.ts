@@ -5,11 +5,11 @@ import { collectStepRunScope } from './collect-step-run-scope.ts';
  * Az állapotok erőssége egy iteráció összesítésében (kisebb szám erősebb).
  * A `Record` kimerítő, tehát egy kilencedik állapot fordítási hibát ad.
  *
- * A sorrend: elöl a bukás (a user döntés példája, 2026-10-17: "ha egy lépés
- * elbukott, sikertelen"), utána a többi nem sikeres lezárás (elutasítva,
- * félbeszakítva, megszakítva), utána a még tartó állapotok (jóváhagyásra vár,
- * fut, várakozik), végül a sikeres. Így az iteráció csak akkor sikeres, ha
- * minden lépése az, és amíg egy lépése tart, nem látszik lezártnak.
+ * A sorrend user döntés (2026-10-17, "A legrosszabb", SPEC-008 6.3): elöl a
+ * bukás, utána a többi nem sikeres lezárás (elutasítva, félbeszakítva,
+ * megszakítva), utána a még tartó állapotok (jóváhagyásra vár, fut,
+ * várakozik), végül a sikeres. Így az iteráció csak akkor sikeres, ha minden
+ * lépése az, és amíg egy lépése tart, nem látszik lezártnak.
  */
 const ITERATION_STATUS_STRENGTH: Readonly<Record<StepRunStatus, number>> = {
   failed: 0,
