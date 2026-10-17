@@ -1495,3 +1495,169 @@ A fedetlen helyek ugyanazon a hat fájlon, ugyanazokkal a darabszámokkal állna
 (`mount-app.tsx` 3/2/0/3, `read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
 `browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
 `use-stream-connection.ts` 1/0/1/1). Az `apps/web/package.json` küszöbe nem változott.
+
+## T-009-58
+
+A visszavonás és az újra elvégzés billentyűjének módosítója (SPEC-008 5.10, O-31): az
+`eggGraphEditorUndoModifier` tároló olvasása, az Automatikus feloldása a felhasználói ügynökből, a
+billentyű szűrő a beállított módosítóra, és a két gomb tippjének szövege. A választó és a `/settings`
+képernyő a T-009-59 lépése. **Az írás (`storeUndoModifierPreference`) ebben a lépésben nem készült
+el** (58.4).
+
+### 58.1 Források
+
+**A módosítók és a `key`.** A SPEC-008 M-120 és M-116 sora és az 51.1 szekció (W3C UI Events, MDN
+`KeyboardEvent`): a `metaKey` a `Meta` módosító (macOS-en a `Command`), a `ctrlKey` a `Control`; a
+szűrő a `key` szerint dönt. Új külső állítás ebben a lépésben nem keletkezett.
+
+**A React Flow macOS felismerése (SPEC-008 M-121, egy forrás).** Saját olvasás, 2026-10-17, a
+telepített csomagokon:
+
+- `@xyflow/system` 0.0.82, `dist/esm/index.js` 746. sor:
+  `const isMacOs = () => typeof navigator !== 'undefined' && navigator?.userAgent?.indexOf('Mac') >= 0;`
+- `@xyflow/react` 12.11.6, `dist/esm/index.js` 3767. sor (a `ReactFlow` paramétereinek alapértéke):
+  `multiSelectionKeyCode = isMacOs() ? 'Meta' : 'Control'`, ugyanez a `zoomActivationKeyCode`.
+
+A saját feloldás ugyanezt a szabályt használja (`userAgent.includes('Mac')`), hogy a szerkesztő két
+billentyű szabálya egy platform döntésen álljon. **Nem ellenőrzött**, hogy a hivatalos doksi a
+felismerés módját is rögzíti-e: a doksi csak az alapértékeket adja (SPEC-008 M-117), a felismerés
+szabálya egy forrásból, a telepített kódból van.
+
+**A Playwright `userAgent` opciója.**
+
+- Elsődleges: Playwright, Emulation, "User Agent",
+  <https://playwright.dev/docs/emulation>: "if you do need to test a different user agent you can
+  override it with the `userAgent` property", példa: `test.use({ userAgent: 'My user agent' });`. Ugyanitt:
+  "Pre-configured devices assume a specific platform. For example, "Desktop Chrome" will provide a
+  Windows-specific user agent string."
+- Megerősítés 1: Playwright, `test.use`, <https://playwright.dev/docs/api/class-test>: a `test.use` egyetlen
+  teszt fájlra vagy egy `test.describe()` csoportra állít opciót, és a `userAgent` a `TestOptions` között
+  szerepel (<https://playwright.dev/docs/api/class-testoptions>, "Alternatively, with test.use() you can
+  override some options for a file"). Ugyanitt az opció azon kevés kontextus opció között áll, amelyek
+  egymást követő tesztek között új kontextus nélkül is eltérhetnek.
+- Megerősítés 2 (a Playwright projekttől független): Stack Overflow, "How to add custom headers in
+  Playwright", <https://stackoverflow.com/questions/62605422/how-to-add-custom-headers-in-playwright>:
+  `@playwright/test` esetén a `test.describe` blokkban hívott `test.use({ userAgent })` állítja be a
+  felhasználói ügynököt. Ide tartozik a microsoft/playwright #16077 issue,
+  <https://github.com/microsoft/playwright/issues/16077>: a `test.describe` blokk `test.use({ userAgent })`
+  hívása a `navigator.userAgent` értékét átírta ("when I uncomment `test.use` it works"), és a
+  config `use` blokkjában a `...devices['Desktop Chrome']` szétterítés a korábban megadott `userAgent`
+  értéket felülírja. A Playwright saját tesztje,
+  `tests/library/browsercontext-user-agent.spec.ts`
+  (<https://github.com/microsoft/playwright/blob/main/tests/library/browsercontext-user-agent.spec.ts>),
+  a `userAgent` kontextus opciót a kérés `user-agent` fejlécén is igazolja.
+
+**A két rögzített felhasználói ügynök formátuma.**
+
+- Chromium, User-Agent Reduction, <https://www.chromium.org/updates/ua-reduction/>: a csökkentett
+  asztali alak `Mozilla/5.0 (<unifiedPlatform>) AppleWebKit/537.36 (KHTML, like Gecko)
+Chrome/<majorVersion>.0.0.0 Safari/537.36`, a lehetséges `unifiedPlatform` értékek között
+  `Macintosh; Intel Mac OS X 10_15_7` és `Windows NT 10.0; Win64; x64`.
+- MDN, User-Agent reduction,
+  <https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/User-agent_reduction>: ugyanezek a fix
+  platform értékek (`Macintosh; Intel Mac OS X 10_15_7` macOS-en, `Windows NT 10.0; Win64; x64`
+  Windowson), és a kisebb verziószámok mindig `0.0.0`.
+
+A két konstans (`apps/web/e2e/user-agent.ts`) ezt az alakot követi; a szerkesztő csak a `Mac` szót
+keresi, a verzió token nem számít.
+
+### 58.2 A megvalósítás döntései
+
+- **A tároló olvasása befecskendezett, lusta elérővel** (`readUndoModifierPreference(getStorage)`,
+  `getStorage: () => Pick<Storage, 'getItem'>`). Lusta, mert már a `localStorage` tulajdonság elérése is
+  dobhat (`SecurityError`); a `try` ezért a `getStorage()` hívást és a `getItem` hívást is fedi. A
+  hiányzó kulcs, az ismeretlen értékű (`cmd`, `CTRL`, üres szöveg, idézőjeles szöveg) és
+  a dobó elérés vagy olvasás mind `auto`. Az éles elérő a `getBrowserLocalStorage()`.
+- **A feloldás tiszta függvény** (`resolveUndoModifier(preference, userAgent)`): `ctrl` és `meta`
+  esetén a felhasználói ügynök nem számít, `auto` esetén a `Mac` szó dönt. Kimerítő `switch`, a
+  `UndoModifierPreference` uniójára.
+- **A beállítás típusa egy forrásból:** `UNDO_MODIFIER_PREFERENCES = ['auto', 'ctrl', 'meta'] as const`,
+  az `isUndoModifierPreference(value: unknown)` guard ezt a halmazt vizsgálja.
+- **A szűrő** (`resolveUndoShortcut`) a `state.modifier` mezőt kapja (`UndoShortcutState`): csak a
+  beállított módosító mellett kezel, ha a másik módosító vagy az `Alt` is le van nyomva, nem (5.10 2.
+  pont). A `useUndoRedoShortcut(onShortcut, isSaving, modifier)` függőségi tömbje a módosítót is
+  tartalmazza, tehát a váltás újrakötést ad.
+- **A képernyő a beállítást egyszer, a betöltéskor olvassa** (`useState` lusta kezdeti érték): a
+  módosító egy munkamenetben nem változik, a váltás a következő betöltéstől érvényes (5.10: "A
+  szerkesztő a beállítást a képernyő betöltésekor olvassa").
+- **A tipp szövege** a `formatUndoShortcutLabels(modifier)` kimenete: `Ctrl+Z` és `Ctrl+Shift+Z / Ctrl+Y`,
+  illetve `Cmd+Z` és `Cmd+Shift+Z / Cmd+Y`.
+
+### 58.3 Unit teszt és rontás igazolás
+
+Új spec fájl négy: `undo-modifier-storage.spec.ts` (15 teszt), `is-undo-modifier-preference.spec.ts` (10),
+`resolve-undo-modifier.spec.ts` (4), `format-undo-shortcut-labels.spec.ts` (2). Bővítve:
+`resolve-undo-shortcut.spec.ts` (mindhárom billentyű, mindkét módosító, a másik módosító és az `Alt`),
+`use-undo-redo-shortcut.spec.tsx` (a módosító váltása újrakötéssel), `GraphEditorScreen.spec.tsx` (hat
+teszt: öt platform/tároló eset a tipp szövegével, és a hibás tárolt érték). `bun run test` (2026-10-17, az írás
+nélküli állapoton): **581 fájl, 5366 teszt, 100 százalék mind a négy metrikán**.
+
+**Szándékos rontások** (saját, 2026-10-17, utána visszaállítva; a kód a commitban nincs ilyen):
+
+- **(A) a módosító rögzítése `ctrl` értékre** (a `resolveUndoModifier` mindig `ctrl`-t ad): 3 unit
+  teszt bukik (`GraphEditorScreen.spec.tsx`), és az e2e-ből a 11 érintett teszt közül (az öt új eset
+  10 tesztje és a meglévő `graph-editor-undo.spec.ts` egy tesztje) 6 bukik.
+- **(B) a másik módosító kizárásának törlése** (az `isOnlyModifierPressed` a másik módosító hiányát nem követeli): 2 unit teszt bukik, az e2e-ből 5.
+
+A (B) rontás első e2e változata zölden ment át: egy önmagában lenyomott másik módosító (`Control+z`
+`meta` beállításnál) a szűrőben a beállított módosító hiánya miatt amúgy sem kezelt, tehát az
+"kizárás" ága csak a **mindkét módosítós** billentyűn látszik. Ezért az e2e minden esete a
+`Control+Meta+z` billentyűt is megnyomja, és a rontás ezzel buktat.
+
+### 58.4 Az írás kihagyása: a nyitott kérdés
+
+A PLAN-009 T-009-58 sora és a 113. kritérium "a dobó írás nem dob tovább" tagmondata ide írná a
+tároló írását is. Ebben a lépésben **nincs olyan alkalmazás útvonal, ami hívná**: a választó a
+T-009-59 lépése. Egy olyan függvény, amit sem a termék, sem az e2e nem ér el, a 100 százalékos unit
+lefedettség mellett az e2e lefedettségben fedetlen marad. Mérés: a `storeUndoModifierPreference`
+függvénnyel az e2e fedetlen darabszáma 17 / 11 / 4 / 17 lett (statements / branches / functions /
+lines; a `main` 15 / 11 / 3 / 15 értékéhez képest +2 / 0 / +1 / +2), a `coverage:e2e:report` **exit 1**
+(functions 99.39 < 99.46 küszöb). A küszöb csökkentése tiltott (`.claude/CLAUDE.md` 8. szekció),
+user döntés nélkül nem tehető.
+
+A döntés a koordinátoré, a három út a PR leírásában áll. A jelen PR az (A) utat követi: az írás és a
+hozzá tartozó unit tesztek a T-009-59 lépésére maradnak, amelynek e2e-je (a választás a kulcsba ír) fedi.
+A függvény és a tesztjei, a dobó írás tesztjével és a körbejárási teszttel együtt, egyetlen
+commitként a `feat/spec-008-d1-modosito-billentyu-iras` ágon megőrizve, ennek a PR-nek a fejére építve.
+
+### 58.5 Az e2e lefedettség előtte és utána
+
+Eljárás (51.5 szerint): `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`,
+majd nyolc egymás utáni shard `flock` alatt, legfeljebb 3 workerrel, majd `bun run
+coverage:e2e:report`.
+
+Előtte: a `main` `68055bd` állapotán **537 teszt, mind zöld** (68 + 67 + 67 + 67 + 67 + 67 + 67 + 67).
+Utána: a jelen ág `3243507` commitján **547 teszt, mind zöld** (69 + 69 + 69 + 68 + 68 + 68 + 68 +
+68; a +10 az új `graph-editor-undo-modifier.spec.ts` öt esete, esetenként két teszt).
+`bun run coverage:e2e:report` exit 0 a meglévő küszöbbel (`--statements 99.11 --branches 98.61
+--functions 99.46 --lines 99.08`).
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Százalék utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | -------------- | ------------------------ |
+| statements | 1903 / 1918            | 1921 / 1936           | 99.22          | 15 -> 15                 |
+| branches   | 892 / 903              | 904 / 915             | 98.79          | 11 -> 11                 |
+| functions  | 650 / 653              | 657 / 660             | 99.54          | 3 -> 3                   |
+| lines      | 1833 / 1848            | 1851 / 1866           | 99.19          | 15 -> 15                 |
+
+A fedetlen helyek mindkét állapoton ugyanazon a hat fájlon, ugyanazokkal a darabszámokkal állnak
+(`nyc` json-summary, utasítás / ág / függvény / sor): `mount-app.tsx` 3/2/0/3,
+`read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1. Az új fájlok mind teljesen fedettek (`undo-modifier-storage.ts`
+6/6, 2/2, 2/2, 6/6; `resolve-undo-modifier.ts` 4/4, 5/5, 1/1, 4/4; `resolve-undo-shortcut.ts` 8/8,
+17/17, 3/3, 8/8; `format-undo-shortcut-labels.ts` és `is-undo-modifier-preference.ts` 100 százalék).
+Az `apps/web/package.json` küszöbe nem változott.
+
+### 58.6 Nem ellenőrzött
+
+- **A `Cmd+Y` valós macOS Chrome-beli viselkedése (SPEC-008 M-122).** A Chrome macOS-en a `⌘ + y`
+  kombinációra az Előzmények oldalt nyitja (<https://support.google.com/chrome/answer/157179>). Hogy a
+  szerkesztő `preventDefault()` hívása ezt megelőzi-e, arra forrást nem találtunk, és a Linux alatti
+  Chromium e2e nem méri: az e2e csak azt igazolja, hogy a `metaKey` + `y` esemény újra elvégez. Ha a
+  böngésző a kombinációt maga kezeli, a `Cmd+Shift+Z` és az Újra gomb változatlanul újra elvégez.
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál; a `navigator.userAgent`
+  `Mac` szavának jelenléte macOS-en Firefoxban és Safariban nem mért.
+- Valódi macOS-en futtatott böngésző: a macOS viselkedést rögzített felhasználói ügynök és a Linux alatti
+  Chromium mutatja, a fizikai `Cmd` billentyű lenyomása nem mért.
+- A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és
+  olvasást a unit teszt szimulálja, e2e nem méri.
