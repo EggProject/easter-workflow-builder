@@ -1876,3 +1876,137 @@ A fedetlen darabszám az alapon és a javított állapoton azonos, az összes da
 nem változott). A mért százalékok a küszöb fölött vannak, mert a 47. szekció óta az összes
 darabszám nőtt, a fedetlen nem. **A küszöböt itt nem emeltem**: az újramérés a T-009-31 dolga.
 Más, csak véletlenül fedett sor keresése nem része ennek a szekciónak (nem vizsgált).
+
+## 49. A PLAN-009 F9 zárása utáni újramérés (2026-10-17, T-009-47, T-009-31): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A PLAN-009 T-009-47 (az F9 zárása) és T-009-31 (a küszöb újramérése, AC51) lépése. Az
+F9 lépései a küszöböt nem mozdították (PLAN-009 F9 bevezető, "Az e2e lefedettségi küszöb
+kezelése"): a fedetlen darabszámot a három munkacsomag a saját research fájljába vezette, az új
+küszöböt ez a szekció állítja be, a három fájl összesítéséből. A mért fa a `main` `42c02ac` állapota
+(PR #45, T-009-59); a jelen ág ehhez képest csak a küszöböt és dokumentációt változtat, a
+termékkód és az e2e tesztek azonosak (`git diff 42c02ac -- apps/web/src apps/web/e2e packages`
+üres).
+
+### 49.1 A három munkacsomag fedetlen darabszámai, összesítve (T-009-47)
+
+Lépésenként a munkacsomag research fájljának "előtte -> utána" sora, statements / branches /
+functions / lines sorrendben. Minden lépés a saját alapján mért (a `main` akkori állapotán), a
+meglévő küszöbbel zöld `coverage:e2e:report` mellett.
+
+| Munkacsomag és research fájl                | Lépés (szekció)                                                  | Fedetlen előtte -> utána     |
+| ------------------------------------------- | ---------------------------------------------------------------- | ---------------------------- |
+| D2, `2026-10-14-ag-kiemeles.md`             | T-009-38 (3.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-39 (4.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-40 (6.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-54 (4.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-46 (6.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+| D3, `2026-10-14-kotelezo-mezok-es-start.md` | T-009-48 (3.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-49 (4.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-56 és O-33 (4.)                                            | 15/11/3/15 -> 15/11/3/15     |
+|                                             | a `019c4b4` összefésülése utáni mérés (5.)                       | 15/11/3/15 -> 15/11/3/15     |
+| D1, `2026-10-14-csomopont-felvetel.md`      | T-009-41 (6.)                                                    | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-50 (13.)                                                   | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-42 (21.)                                                   | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-43 (27.)                                                   | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-44 (44.5, 44.5a)                                           | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-45 (45.6)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-51 (51.5)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-52 (52.4)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-53 (53.7)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-58 (58.5)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-55 (55.4)                                                  | 15/11/3/15 -> 15/11/3/15     |
+|                                             | T-009-57 (57.5)                                                  | 15/11/3/15 -> **14/11/2/14** |
+|                                             | T-009-59 (59.5, alap: `f041052`, a T-009-57 összefésülése előtt) | 15/11/3/15 -> 15/11/3/15     |
+| közös, jelen fájl                           | 48. szekció (`blocking-failure-message.ts` 17. sor)              | 15/11/3/15 -> 15/11/3/15     |
+
+**Összesítés.** Az F9 egyetlen lépése sem növelte a fedetlen darabszámot egyik metrikán sem; az
+egyetlen változás a T-009-57 csökkenése: a `browser-history-location-port.ts` 21. sora (a `popstate`
+leiratkozás, 1/0/1/1) e2e úton is lefut, mert a figyelő a megjelenített útvonal minden váltásakor
+újra feliratkozik (D1 57.2, 57.5). Az F9 nettó változása tehát 15/11/3/15 -> 14/11/2/14. Öt lépésben
+a fedetlen darab köztes állapotban nőtt, és a lépésen belül írt új e2e teszt zárta: D3 T-009-56
+(4. szekció, 20/15/6/19), D1 T-009-43 (27. szekció, plusz 7 utasítás, 7 ág és 7 sor), T-009-44 (44.5,
+20/13/5/20), T-009-52 (52.4, 16/12/3/16) és T-009-59 (59.5, egy köztes, bukott futás); a lépések
+végső mérése mindegyiknél a fenti táblázat.
+
+### 49.2 A mérés
+
+A 29. szekció tiszta eljárása, a sandboxban a 47. szekció módja szerint: `rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`, az `apps/web` alatt `bun x
+playwright test --shard=<i>/8` nyolc egymás utáni futásban, mindegyik `flock
+/tmp/playwright-gep.lock` alatt, a config `workers: 3` értékével, majd `bun run
+coverage:e2e:report`. **593 teszt, mind zöld** (75 + 7 x 74). A darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | Pontos arány | `nyc` kimenet = új küszöb | Küszöb előtte | Fedetlen darab, 48. szekció -> most |
+| ---------- | --------------- | ------------ | ------------------------- | ------------- | ----------------------------------- |
+| statements | 1991 / 2005     | 99,3017      | **99.3**                  | 99.11         | 15 -> 14                            |
+| branches   | 918 / 929       | 98,8159      | **98.81**                 | 98.61         | 11 -> 11                            |
+| functions  | 684 / 686       | 99,7085      | **99.7**                  | 99.46         | 3 -> 2                              |
+| lines      | 1920 / 1934     | 99,2761      | **99.27**                 | 99.08         | 15 -> 14                            |
+
+**Levezetés.** A 48. szekció mérése (1786 / 1801, 835 / 846, 591 / 594, 1721 / 1736) óta az összes
+darabszám +204 / +83 / +92 / +198, a fedett +205 / +83 / +93 / +199 tétellel nőtt, tehát a fedetlen
+darab -1 / 0 / -1 / -1: egyik metrikán sem nőtt, a csökkenés a 49.1 T-009-57 sora. A ratchet ezért
+FELFELÉ mozdul, mind a négy küszöb a mért értékre áll, felfelé kerekítés nélkül, az `nyc` két
+tizedesre lefelé kerekített kimenete szerint (5. szekció: `Math.floor(tmp / 10) / 100`). Lefelé
+követés nincs, tehát a fedett kód törlésének tételes levezetésére (15. szekció) itt nincs szükség
+(`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
+egy századdal magasabb küszöbbel (99.31 / 98.82 / 99.71 / 99.28) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`, exit 1).
+
+**A T-009-1 értéke.** A PLAN-009 T-009-1 feljegyzését név szerint egyik research fájl sem tartalmazza
+(`grep` a `docs/` alatt `T-009-1` azonosítóra csak a PLAN-009 sorát adja; a lépés nyoma a `deae2d8`
+commit üzenete, 2026-09-05). A lépés idején érvényes küszöb az 5. szekcióé: 96.83 / 94.02 / 97.7 /
+96.75 (`git show deae2d8:apps/web/package.json`). Az új érték mind a négy metrikán fölötte áll, és a
+közvetlenül előző küszöb (99.11 / 98.61 / 99.46 / 99.08) fölött is.
+
+### 49.3 A nem fedett helyek fájlonként, fájl kizárás nulla (T-009-31)
+
+A fedetlen tételek öt fájlon állnak (`nyc report --reporter=json-summary` és a `coverage-e2e/lcov.info`
+nulla találatú sorai). Mind a 2.2, a 8. és a 9.2 szekció már indokolt tétele, mai sorszámmal; új,
+e2e-vel el nem érhető tétel az F9-ben nem keletkezett. Mindegyik unit teszttel fedett: a `bun run
+test` kapu 100 százalékos küszöbe kizárás nélkül fut.
+
+| Fájl (`apps/web/src/`)                    | Fedetlen (s / b / f / l) | Hely                                                                                    | Miért nem érhető el e2e-vel                                                                                                                                                                                     | Unit teszt                                                      |
+| ----------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `app-mount/mount-app.tsx`                 | 3 / 2 / 0 / 3            | 16. sor (`#root` hiánya), 21-22. sor (konfigurációs hibaág), a 15. és a 20. sor ága     | az `index.html` mindig tartalmazza a `#root` elemet; a `VITE_*` változók build időben égnek a bundle-be (`playwright.config.ts` `webServer.env`), a hibaághoz második, hibás konfigurációjú build kellene (2.2) | `mount-app.spec.tsx`                                            |
+| `frontend-config/read-frontend-config.ts` | 8 / 7 / 1 / 8            | 23., 29., 37., 41., 62., 67., 72., 77. sor, a `missingVariableMessage` függvény, hét ág | ugyanaz az ok: mind a hiányzó vagy értelmezhetetlen `VITE_*` változó ága (2.2, 9.1)                                                                                                                             | `read-frontend-config.spec.ts`                                  |
+| `graph-editor/is-valid-connection.ts`     | 1 / 1 / 0 / 1            | 36. sor (`return false`), a 35. sor ága                                                 | a `start` csomópontnak nincs bemenő `Handle` eleme (`GraphNodeCard.tsx` 137. sor, `hasInputHandle &&`), tehát a React Flow húzás a függvény hívása előtt elakad (9.2)                                           | `is-valid-connection.spec.ts`                                   |
+| `rest-client/perform-route-request.ts`    | 1 / 1 / 0 / 1            | 89. sor, a 88. sor ága                                                                  | a `buildRoutePath` hibaága hiányzó útvonal paraméterre; a felület minden hívása betöltött rekordból veszi az azonosítót (2.2, 8.)                                                                               | `perform-route-request.spec.ts` ("útvonal építési hiba esetén") |
+| `stream-client/use-stream-connection.ts`  | 1 / 0 / 1 / 1            | 202. sor (`source.close()`), a `useEffect` cleanup függvénye                            | a cleanup csak leszereléskor fut; a hookot egyedül az `AppShell` hívja (`app-shell.tsx` 92. sor), és a 593 teszt egyikében sem futott le (2.2)                                                                  | `use-stream-connection.spec.tsx` (`closeCallCount`)             |
+
+**Fájl kizárás nulla.** Az istanbul `include` mintája `src/**/*`, az `exclude` csak a `node_modules` és
+az `e2e/**` (`vite.config.ts`, a `vite-istanbul-include-invariant` téma őrzi), az `nyc report`
+parancsnak nincs `--exclude` kapcsolója. A `src/` 178 nem teszt `.ts`/`.tsx` fájljából 160 áll a
+riportban; a maradék 18 a `src/index.ts` barrel (a lap nem tölti be, futásidejű elágazás nélkül) és
+17 típus-only fájl (futásidejű kódjuk nincs, tehát a böngésző betöltött modulja sem hordozza őket),
+egyik sem kizárás.
+
+### 49.4 A jóváhagyás teljes folyamata, mindkét döntéssel (T-009-31)
+
+Új e2e teszt nem készült, mert a meglévők lejátsszák (minden REST hívás `page.route()` mockon, a 11.
+szekció hibrid SSE szabálya szerint):
+
+- **A kérés megjelenése**: `approval-prompt.spec.ts` "a csomópont a kérés abszolút időpontját mutatja,
+  a fejlécben jelvény, a panel a transcript sávban kimondja a visszavonhatatlanságot" (a
+  `waiting_approval` csomópont felirata, a fejléc jelvénye, a panel a transcript sávban).
+- **Élő érkezés és eltűnés**: `sse-real-server.spec.ts` "élő approval_requested keretre a jóváhagyás
+  panel oldal újratöltés nélkül megjelenik, approval_decided keretre eltűnik" (valódi `node:http` SSE
+  szerver).
+- **Mindkét döntés**: `approval-prompt.spec.ts` "fan_out ágak azonos címmel: lapozás után a döntés a
+  LÁTOTT jóváhagyás azonosítójára megy, és az eredmény a saját lapján marad": a Jóváhagyás a
+  `{ decision: 'approved' }`, az Elutasítás a `{ decision: 'rejected' }` törzzsel megy a saját
+  `/api/approvals/<id>/decision` útjára, és a felület a "Döntés rögzítve: jóváhagyva." és a "Döntés
+  rögzítve: elutasítva." mondatot mutatja.
+- **A siker utáni állapot**: "siker után a látott jóváhagyás megmarad: mindkét gomb letiltva marad, az
+  eredmény görgetés nélkül látszik, nyugtázó gomb nincs, és a futás váltása viszi el" (a lista
+  újratöltése után a csomópont várakozás felirata eltűnik).
+- **A hibaágak**: "az Elutasítás gombra kapott conflict után a gombok letiltva maradnak, a hibaüzenet
+  görgetés nélkül látszik, és a lista újratöltődik", "átmeneti hibára (503) a gombok újrapróbálásra
+  engedélyezettek, és az újrapróbálás rögzíti a döntést" és "a jóváhagyás lista betöltési hibájára
+  figyelmeztetést mutat a panelen".
+
+Az `approval-prompt` téma minden fájlja mind a négy metrikán 100 százalék (a 49.3 öt fájlja között
+nincs).
