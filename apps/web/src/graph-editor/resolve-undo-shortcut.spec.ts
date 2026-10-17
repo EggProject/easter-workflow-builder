@@ -5,7 +5,7 @@ import { resolveUndoShortcut, type UndoShortcutAction, type UndoShortcutState } 
  * A billentyű esemény a valódi útján, a célponton kiváltva: a döntés a
  * figyelőben fut, amikor a `composedPath()` már a cél elemtől indul.
  */
-const NOT_SAVING: UndoShortcutState = { isSaving: false };
+const NOT_SAVING: UndoShortcutState = { isSaving: false, isNavigationConfirmationOpen: false };
 
 function resolveOn(
   target: EventTarget,
@@ -74,8 +74,19 @@ describe('resolveUndoShortcut', () => {
       { name: 'Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
       { name: 'Ctrl+Y', init: { key: 'y', ctrlKey: true } },
     ] as const)('a(z) $name a mentés alatt nem kezelt, ugyanaz a billentyű mentés nélkül kezelt', ({ init }) => {
-      expect(resolveOn(document, init, { isSaving: true })).toBeUndefined();
-      expect(resolveOn(document, init, { isSaving: false })).toBeDefined();
+      expect(resolveOn(document, init, { ...NOT_SAVING, isSaving: true })).toBeUndefined();
+      expect(resolveOn(document, init, NOT_SAVING)).toBeDefined();
+    });
+  });
+
+  describe('nyitott megerősítő modális (SPEC-008 5.10, 4. szabály)', () => {
+    it.each([
+      { name: 'Ctrl+Z', init: { key: 'z', ctrlKey: true } },
+      { name: 'Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
+      { name: 'Ctrl+Y', init: { key: 'y', ctrlKey: true } },
+    ] as const)('a(z) $name nyitott modálisnál nem kezelt, zárt modálisnál kezelt', ({ init }) => {
+      expect(resolveOn(document, init, { ...NOT_SAVING, isNavigationConfirmationOpen: true })).toBeUndefined();
+      expect(resolveOn(document, init, NOT_SAVING)).toBeDefined();
     });
   });
 

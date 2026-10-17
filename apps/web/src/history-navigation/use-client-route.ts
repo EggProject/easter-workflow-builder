@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { matchClientRoute } from '../client-route/match-client-route.ts';
 import type { HistoryLocationPort } from './history-location-port.ts';
+
+/**
+ * A kliens útválasztó regisztrálható navigációs őre (SPEC-008 5.10, 1. pont):
+ * regisztrált őrnél a `navigate` a navigációt nem hajtja végre, hanem az őrnek
+ * adja. A `proceed` a navigációt az őr megkerülésével végrehajtja (a
+ * megerősítő modális "Kilépés mentés nélkül" gombja).
+ */
+export type NavigationGuard = (proceed: () => void) => void;
 
 export interface UseClientRouteResult {
   /**
@@ -26,6 +34,14 @@ export interface UseClientRouteResult {
    * azonosítót is át kell adni.
    */
   readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
+  /**
+   * Navigációs őr regisztrálása (SPEC-008 5.10, 1. pont). Egyszerre egy őr
+   * áll, egyetlen regisztrálóval (a szerkesztő képernyő): egy újabb
+   * regisztráció a korábbit lecseréli, a visszaadott függvény az őrt
+   * eltávolítja. Őr nélkül a `navigate` a fenti, változatlan módon navigál. A
+   * hivatkozás stabil, tehát a hívó hatása nem fut újra miatta.
+   */
+  readonly registerNavigationGuard: (guard: NavigationGuard) => () => void;
 }
 
 /**
@@ -36,6 +52,9 @@ export interface UseClientRouteResult {
 export function useClientRoute(port: HistoryLocationPort): UseClientRouteResult {
   const [pathname, setPathname] = useState<string>(port.pathname);
   const [search, setSearch] = useState<string>(port.search);
+  // Ref, nem állapot: az őr regisztrálása és eltávolítása nem renderel újra,
+  // a `navigate` a hívás pillanatában olvassa.
+  const guardReference = useRef<NavigationGuard | undefined>(undefined);
 
   useEffect(() => {
     return port.addPopStateListener(() => {
@@ -52,12 +71,27 @@ export function useClientRoute(port: HistoryLocationPort): UseClientRouteResult 
       // paraméter nélkül üresre (SPEC-007 7.2). A `search` állapot a
       // `location.search` konvencióját követi, tehát a kérdőjelet is hordozza.
       const search = searchParameters === '' ? '' : `?${searchParameters}`;
-      port.pushState(`${path}${search}`);
-      setPathname(path);
-      setSearch(search);
+      const applyNavigation = (): void => {
+        port.pushState(`${path}${search}`);
+        setPathname(path);
+        setSearch(search);
+      };
+      const guard = guardReference.current;
+      if (guard === undefined) {
+        applyNavigation();
+        return;
+      }
+      guard(applyNavigation);
     },
     [port],
   );
 
-  return { routeId: matchClientRoute(pathname), search, navigate };
+  const registerNavigationGuard = useCallback((guard: NavigationGuard): (() => void) => {
+    guardReference.current = guard;
+    return () => {
+      guardReference.current = undefined;
+    };
+  }, []);
+
+  return { routeId: matchClientRoute(pathname), search, navigate, registerNavigationGuard };
 }

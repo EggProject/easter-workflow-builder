@@ -1,8 +1,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HistoryLocationPort } from './history-location-port.ts';
-import { useClientRoute, type UseClientRouteResult } from './use-client-route.ts';
+import { useClientRoute, type NavigationGuard, type UseClientRouteResult } from './use-client-route.ts';
 
 interface FakePort extends HistoryLocationPort {
   readonly emitPopState: () => void;
@@ -149,6 +149,109 @@ describe('useClientRoute', () => {
     });
 
     expect(latest?.search).toBe('?workflowId=workflow-2');
+  });
+
+  describe('a navigációs őr (SPEC-008 5.10, 1. pont)', () => {
+    it('regisztrált őrnél a navigate nem navigál, hanem az őrnek adja a végrehajtást', () => {
+      const port = createFakePort('/editor', '?workflowId=w-1');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const guard = vi.fn<NavigationGuard>();
+      act(() => {
+        latest?.registerNavigationGuard(guard);
+      });
+
+      act(() => {
+        latest?.navigate('runHistory');
+      });
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(port.pathname()).toBe('/editor');
+      expect(latest?.routeId).toBe('graphEditor');
+      expect(latest?.search).toBe('?workflowId=w-1');
+    });
+
+    it('az őrnek adott végrehajtás az őr megkerülésével a célra navigál', () => {
+      const port = createFakePort('/editor', '?workflowId=w-1');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const proceeds: (() => void)[] = [];
+      const guard = vi.fn<NavigationGuard>((proceed) => {
+        proceeds.push(proceed);
+      });
+      act(() => {
+        latest?.registerNavigationGuard(guard);
+      });
+      act(() => {
+        latest?.navigate('runView', 'runId=r-1');
+      });
+
+      act(() => {
+        proceeds[0]?.();
+      });
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(port.pathname()).toBe('/run?runId=r-1');
+      expect(latest?.routeId).toBe('runView');
+      expect(latest?.search).toBe('?runId=r-1');
+    });
+
+    it('az eltávolított őr után a navigate a mai módon, azonnal navigál', () => {
+      const port = createFakePort('/editor');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const guard = vi.fn<NavigationGuard>();
+      act(() => {
+        const unregister = latest?.registerNavigationGuard(guard);
+        unregister?.();
+      });
+
+      act(() => {
+        latest?.navigate('runHistory');
+      });
+
+      expect(guard).not.toHaveBeenCalled();
+      expect(port.pathname()).toBe('/runs');
+      expect(latest?.routeId).toBe('runHistory');
+    });
+
+    it('az újabb regisztráció lecseréli a korábbit', () => {
+      const port = createFakePort('/editor');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const firstGuard = vi.fn<NavigationGuard>();
+      const secondGuard = vi.fn<NavigationGuard>();
+      act(() => {
+        latest?.registerNavigationGuard(firstGuard);
+        latest?.registerNavigationGuard(secondGuard);
+      });
+
+      act(() => {
+        latest?.navigate('runHistory');
+      });
+
+      expect(firstGuard).not.toHaveBeenCalled();
+      expect(secondGuard).toHaveBeenCalledTimes(1);
+      expect(port.pathname()).toBe('/editor');
+    });
+
+    it('a registerNavigationGuard hivatkozása két render között azonos', () => {
+      const port = createFakePort('/');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const first = latest?.registerNavigationGuard;
+
+      act(() => {
+        latest?.navigate('runHistory');
+      });
+
+      expect(latest?.registerNavigationGuard).toBe(first);
+    });
   });
 
   it('leszereléskor leiratkozik a popstate eseményről', () => {
