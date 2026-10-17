@@ -326,6 +326,57 @@ function requestNavigation(): ReturnType<typeof vi.fn<() => void>> {
   return proceed;
 }
 
+// ============================================================
+// A BETÖLTÉS NORMALIZÁLÁSÁNAK segédei (SPEC-008 5.1, 5.8, O-27, O-28).
+// ============================================================
+
+/**
+ * A `GET /graph` a megadott dokumentumot adja, minden más a
+ * `createFetchFunction` útján megy (a `PUT` a törzset adja vissza).
+ */
+function createGraphFetchFunction(log: RouteCallLog, graph: unknown): FetchFunction {
+  const delegate = createFetchFunction(log);
+  return (input, init) =>
+    init.method !== 'PUT' && new URL(input).pathname.endsWith('/graph')
+      ? Promise.resolve(jsonResponse(graph))
+      : delegate(input, init);
+}
+
+function canvasEdgeIds(): readonly string[] {
+  return lastCanvasProperties().edges.map((edge) => edge.id);
+}
+
+function moveNode(nodeId: string, positionX: number): void {
+  act(() => {
+    lastCanvasProperties().onGraphChange(
+      lastCanvasProperties().nodes.map((node) => (node.id === nodeId ? { ...node, positionX } : node)),
+      lastCanvasProperties().edges,
+    );
+  });
+}
+
+async function clickSave(container: HTMLElement): Promise<void> {
+  await act(async () => {
+    footerButtonNamed(container, 'Mentés').click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function putBodyIds(log: RouteCallLog): {
+  readonly nodeIds: readonly string[];
+  readonly edgeIds: readonly string[];
+} {
+  const parsed = ReplaceGraphRequestSchema.safeParse(JSON.parse(log.putBodies.at(-1) ?? '{}'));
+  if (!parsed.success) {
+    throw new Error('a teszt nem talált érvényes PUT törzset');
+  }
+  return {
+    nodeIds: parsed.data.nodes.map((node) => node.id),
+    edgeIds: parsed.data.edges.map((edge) => edge.id),
+  };
+}
+
 /**
  * A két felhasználói ügynök szöveg: az `auto` beállítás ezek alapján dönt a
  * módosítóról (SPEC-008 5.10, O-31). A teszt minden futásban kifejezetten
@@ -1800,6 +1851,160 @@ describe('GraphEditorScreen', () => {
 
       pressShortcut({ key: 'z', ctrlKey: true });
       expect(canvasPositionOf('n-1')).toBe(99);
+    });
+  });
+
+  describe('a betöltés normalizálása (SPEC-008 5.1, 5.5, 5.8, 5.10, O-27, O-28)', () => {
+    const BRANCH_NODE: WorkflowNodeInput = {
+      id: 'n-3',
+      type: 'branch',
+      label: 'Döntés',
+      positionX: 20,
+      positionY: 20,
+      config: {
+        type: 'branch',
+        expression: 'input.kind',
+        branches: [{ key: 'igen', label: 'Igen' }],
+        defaultBranchKey: 'igen',
+        onUnhandledError: 'fail_run',
+      },
+    };
+    const START_TO_BRANCH_EDGE = { ...EDGE_INPUT, id: 'e-start', targetNodeId: 'n-3' };
+    const KEYED_BRANCH_EDGE = {
+      ...EDGE_INPUT,
+      id: 'e-igen',
+      sourceNodeId: 'n-3',
+      targetNodeId: 'n-2',
+      sourceHandle: 'igen',
+      branchKey: 'igen',
+    };
+    const KEYLESS_BRANCH_EDGE = { ...EDGE_INPUT, id: 'e-regi', sourceNodeId: 'n-3', targetNodeId: 'n-2' };
+    const KEYLESS_EDGE_GRAPH = {
+      nodes: [START_NODE, AGENT_NODE, BRANCH_NODE].map((node) => ({ ...node, createdAtMs: 0, updatedAtMs: 0 })),
+      edges: [START_TO_BRANCH_EDGE, KEYLESS_BRANCH_EDGE, KEYED_BRANCH_EDGE].map((edge) => ({
+        ...edge,
+        createdAtMs: 0,
+      })),
+    };
+    const STARTLESS_GRAPH = { nodes: [{ ...AGENT_NODE, createdAtMs: 0, updatedAtMs: 0 }], edges: [] };
+    const ADDED_START_NODE: WorkflowNodeInput = {
+      id: 'generated-element-id',
+      type: 'start',
+      label: '',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'start', inputFields: [], onUnhandledError: null },
+    };
+
+    it('a kulcs nélküli elágazás élt a vászon nem kapja meg, a mentetlen jelző azonnal megjelenik, a Visszavonás gomb és az elvetés tiltott, az őr és a beforeunload figyelő áll (AC108)', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        createGraphFetchFunction({ putBodies: [], graphGetCount: 0 }, KEYLESS_EDGE_GRAPH),
+      );
+
+      expect(canvasEdgeIds()).toEqual(['e-start', 'e-igen']);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+      expect(discardMenuItem().disabled).toBe(true);
+      expect(navigationGuardRegistry.active).toBeDefined();
+      expect(isBeforeUnloadPrevented()).toBe(true);
+    });
+
+    it('a visszavonás billentyűje az elhagyott élt nem hozza vissza, és egy további változtatás utáni elvetés is megtartja az elhagyást (AC108)', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        createGraphFetchFunction({ putBodies: [], graphGetCount: 0 }, KEYLESS_EDGE_GRAPH),
+      );
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasEdgeIds()).toEqual(['e-start', 'e-igen']);
+
+      moveNode('n-1', 99);
+      const discardItem = discardMenuItem();
+      act(() => {
+        discardItem.click();
+      });
+      expect(canvasPositionOf('n-1')).toBe(0);
+      expect(canvasEdgeIds()).toEqual(['e-start', 'e-igen']);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(0);
+      expect(canvasEdgeIds()).toEqual(['e-start', 'e-igen']);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+    });
+
+    it('egy másik változtatás utáni mentés PUT törzsében az elhagyott él nincs, és a mentés után a jelző eltűnik (AC108)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createGraphFetchFunction(log, KEYLESS_EDGE_GRAPH));
+
+      moveNode('n-1', 99);
+      await clickSave(container);
+
+      expect(putBodyIds(log).edgeIds).toEqual(['e-start', 'e-igen']);
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
+      expect(navigationGuardRegistry.active).toBeUndefined();
+    });
+
+    it('Start nélküli gráfba egy kiválasztatlan Startot vesz fel a generátor azonosítójával, a mentetlen jelző azonnal megjelenik, a Visszavonás gomb és az elvetés tiltott, az őr áll (AC109)', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        createGraphFetchFunction({ putBodies: [], graphGetCount: 0 }, STARTLESS_GRAPH),
+      );
+
+      expect(lastCanvasProperties().nodes).toEqual([AGENT_NODE, ADDED_START_NODE]);
+      expect(lastCanvasProperties().selectedNodeId).toBeUndefined();
+      expect(container.querySelector('.node-inspector')).toBeNull();
+      expect(container.textContent).toContain('Mentetlen változtatások');
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+      expect(discardMenuItem().disabled).toBe(true);
+      expect(navigationGuardRegistry.active).toBeDefined();
+      expect(isBeforeUnloadPrevented()).toBe(true);
+    });
+
+    it('a visszavonás billentyűje a Startot nem veszi ki, és egy további változtatás utáni elvetés is megtartja (AC109)', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        createGraphFetchFunction({ putBodies: [], graphGetCount: 0 }, STARTLESS_GRAPH),
+      );
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasNodeIds()).toEqual(['n-2', 'generated-element-id']);
+
+      moveNode('n-2', 99);
+      const discardItem = discardMenuItem();
+      act(() => {
+        discardItem.click();
+      });
+      expect(lastCanvasProperties().nodes).toEqual([AGENT_NODE, ADDED_START_NODE]);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(lastCanvasProperties().nodes).toEqual([AGENT_NODE, ADDED_START_NODE]);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+    });
+
+    it('a Start üres kezeletlen hiba szabályával a mentés nem indul; a kitöltése után a PUT törzse a Startot tartalmazza, és a jelző eltűnik (AC109)', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createGraphFetchFunction(log, STARTLESS_GRAPH));
+
+      await clickSave(container);
+      expect(log.putBodies).toEqual([]);
+
+      act(() => {
+        lastCanvasProperties().onGraphChange(
+          lastCanvasProperties().nodes.map((node) =>
+            node.config.type === 'start' ? { ...node, config: { ...node.config, onUnhandledError: 'fail_run' } } : node,
+          ),
+          lastCanvasProperties().edges,
+        );
+      });
+      await clickSave(container);
+
+      expect(putBodyIds(log).nodeIds).toEqual(['n-2', 'generated-element-id']);
+      expect(container.textContent).not.toContain('Mentetlen változtatások');
     });
   });
 });

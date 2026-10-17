@@ -61,6 +61,7 @@ import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.t
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
+import { normalizeLoadedGraphDocument } from './normalize-loaded-graph-document.ts';
 import { resolveUndoModifier, type UndoModifier } from './resolve-undo-modifier.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
 import { getBrowserLocalStorage, readUndoModifierPreference } from './undo-modifier-storage.ts';
@@ -439,16 +440,21 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     // `currentNodes`/`currentEdges` PONTOSAN ugyanazt az alakot hordozza,
     // mint amit az `isGraphDirty` a `baseline`-ből is előállít - enélkül a
     // dupla mező miatt a gráf a betöltés UTÁN azonnal piszkosnak látszana.
+    // A mentetlen jelző alapja a szerver nyers válasza; a történet viszont a
+    // normalizált alakról indul (SPEC-008 5.5, O-27, O-28): az elhagyott
+    // kulcs nélküli elágazás él és a felvett Start így mentetlen változás, de
+    // nem visszavonható lépés, és az elvetés is megtartja.
+    const loadedDocument = {
+      nodes: graphState.state.value.nodes.map((node) => workflowNodeToNodeInput(node)),
+      edges: graphState.state.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)),
+    };
     setBaseline(graphState.state.value);
-    setHistory(
-      startGraphEditHistory({
-        nodes: graphState.state.value.nodes.map((node) => workflowNodeToNodeInput(node)),
-        edges: graphState.state.value.edges.map((edge) => workflowEdgeToEdgeInput(edge)),
-      }),
-    );
+    setHistory(startGraphEditHistory(normalizeLoadedGraphDocument(loadedDocument, graphElementIdGenerator)));
     setIsHydrated(true);
     // Lásd a fenti megjegyzést: a `react-hooks/exhaustive-deps` szabály nincs
-    // bekötve, a `graphState.state` a valódi, szándékos kiváltó.
+    // bekötve, a `graphState.state` a valódi, szándékos kiváltó; a generátor
+    // szándékosan nincs a listán, mert a változása a történetet nem
+    // indíthatja újra.
   }, [graphState.state]);
 
   const handleGraphChange = useCallback(
