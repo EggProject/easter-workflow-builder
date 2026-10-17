@@ -846,7 +846,7 @@ describe('createWorkflowRepository', () => {
         });
 
         for (const invalid of [0, -3, 1.5]) {
-          it(`a(z) ${invalid} érték malformed_node_config hibaágat ad, sort nem ír, a korábbi gráf változatlan`, () => {
+          it(`a(z) ${String(invalid)} érték malformed_node_config hibaágat ad, sort nem ír, a korábbi gráf változatlan`, () => {
             const { sqlite, database, repository } = openRepository();
             const workflow = okOrThrow(
               repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }),
