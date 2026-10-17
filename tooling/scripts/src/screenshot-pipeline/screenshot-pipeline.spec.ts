@@ -249,6 +249,25 @@ function isShellCapture(text: string): boolean {
 }
 
 /**
+ * A Chrome és a Chromium headless módjának képernyőkép kapcsolója: a `--`
+ * előtag a `SCREENSHOT_WORD` szóval, érték nélkül vagy `=` jel utáni
+ * fájlnévvel. A betöltött oldal képét mindig lemezre menti, érték nélkül a
+ * munkakönyvtárba ("takes a screenshot of the target page and saves it",
+ * <https://developer.chrome.com/docs/automation-and-testing/headless-cli>; a
+ * Chromium forrásában a `headless_command_switches.cc` `kScreenshot`
+ * kapcsolója). Kikapcsolt értéke nincs, ezért 2026-10-17 óta minden
+ * előfordulása tiltott, a `playwright` szótól függetlenül, a vizsgált fájlok
+ * minden fajtájában: kódfájlban (egy folyamatindító hívás argumentum
+ * listájában), shell scriptben, GitHub Actions YAML lépésben és `package.json`
+ * scriptben. Előtte a CLI minta a képernyőkép szót csak a `playwright` szóval
+ * együtt nézte, és a shell scriptből, valamint a Node-ból indított alak is
+ * átcsúszott (független ellenőrzés,
+ * `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`). Pontosan
+ * ez a kapcsolónév számít, ugyanúgy, mint a `TRACE_FLAG_PATTERN` mintánál.
+ */
+const SCREENSHOT_FLAG_PATTERN = new RegExp(String.raw`--${SCREENSHOT_WORD}(?![\w-])`);
+
+/**
  * A Playwright `use` beállításának képernyőkép opciója bármely olyan értékkel,
  * ami nem a szó szerinti `'off'`: a Playwright ilyenkor a tesztek
  * képernyőképét maga írja a teszt kimeneti könyvtárába ("Trace files,
@@ -547,8 +566,10 @@ function reachable(start: Iterable<string>, edges: ReadonlyMap<string, readonly 
  *
  * - Közvetlen író: a Playwright `use` képernyőkép és videó opciója, a
  *   kontextus videó felvétele, a trace képernyőképei, a CLI a shell parancsból
- *   vagy a `package.json` scriptből (`isShellCapture`), vagy a képernyőképet
- *   készítő képösszehasonlító assertion.
+ *   vagy a `package.json` scriptből (`isShellCapture`), a Chrome headless
+ *   képernyőkép kapcsolója bármely vizsgált fájlban és `package.json`
+ *   scriptben (`SCREENSHOT_FLAG_PATTERN`), vagy a képernyőképet készítő
+ *   képösszehasonlító assertion.
  * - A KÉPERNYŐKÉP KÖR: a képernyőképet készítő fájlok, és minden fájl, ami
  *   ezeket (közvetve is) importálja. Ezek egyike sem hivatkozhat lemezre
  *   írni képes modulra vagy hívásra, és a `path` opciót sem használhatja:
@@ -587,9 +608,12 @@ function findScreenshotDiskWriters(trackedPaths: readonly string[], read: ReadTr
       TRACE_OPTION_PATTERN.test(file.content) ||
       SCREENSHOTS_OPTION_PATTERN.test(file.content) ||
       file.content.includes(SCREENSHOT_ASSERTION_CALL) ||
+      SCREENSHOT_FLAG_PATTERN.test(file.content) ||
       (isShellPath(file.trackedPath) && isShellCapture(file.content)),
   );
-  const directManifests = manifests.filter((manifest) => manifest.scriptValues.some((value) => isShellCapture(value)));
+  const directManifests = manifests.filter((manifest) =>
+    manifest.scriptValues.some((value) => isShellCapture(value) || SCREENSHOT_FLAG_PATTERN.test(value)),
+  );
   const capturing = files
     .filter((file) => file.trackedPath !== SANCTIONED_CAPTURE_FILE && CAPTURE_CALL_PATTERN.test(file.content))
     .map((file) => file.trackedPath);
@@ -1340,6 +1364,75 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
               },
               devDependencies: { '@playwright/test': '1.62.1' },
             }),
+          },
+        ],
+        offenders: [],
+      },
+      // 2026-10-17: a független ellenőrzés két jóhiszemű rése, a Chrome
+      // headless képernyőkép kapcsolója a `playwright` szó nélkül, shell
+      // scriptből és Node-ból (`SCREENSHOT_FLAG_PATTERN`), a hatókörrel együtt.
+      {
+        name: 'a Chrome headless képernyőkép kapcsolója shell, bash, YAML és package.json scriptben, a playwright szó nélkül',
+        files: [
+          {
+            trackedPath: 'tools/shot.sh',
+            content: `chromium --headless --${SCREENSHOT_WORD}=editor.${PNG_EXTENSION} "$URL"`,
+          },
+          {
+            trackedPath: 'tools/shot.bash',
+            content: `google-chrome --headless --${SCREENSHOT_WORD} --window-size=1440,900 "$URL"`,
+          },
+          {
+            trackedPath: '.github/workflows/shot.yml',
+            content: `      - run: chromium --headless --${SCREENSHOT_WORD}='x.jpg' "$URL"`,
+          },
+          {
+            trackedPath: 'tools/package.json',
+            content: JSON.stringify({ scripts: { shot: `chrome --headless --${SCREENSHOT_WORD} "$URL"` } }),
+          },
+        ],
+        offenders: ['.github/workflows/shot.yml', 'tools/package.json', 'tools/shot.bash', 'tools/shot.sh'],
+      },
+      {
+        name: 'a Chrome headless képernyőkép kapcsolója Node-ból, a folyamatindító argumentum listájában',
+        files: [
+          {
+            trackedPath: 'tools/shot.ts',
+            content: `import { execFileSync } from 'node:child_process';\nexecFileSync('chromium', ['--headless', '--${SCREENSHOT_WORD}=x.${PNG_EXTENSION}', url]);`,
+          },
+          {
+            trackedPath: 'e2e/shot.mjs',
+            content: `import { spawnSync } from 'node:child_process';\nspawnSync('chrome', ['--headless', \`--${SCREENSHOT_WORD}=\${name}\`, url]);`,
+          },
+          {
+            trackedPath: 'packages/x/src/shot/shot.spec.ts',
+            content: `execFileSync('chromium', ['--headless', '--${SCREENSHOT_WORD}', url]);`,
+          },
+          {
+            trackedPath: 'packages/x/src/shot/shot.ts',
+            content: `import { chromium } from 'playwright';\nexport const flags = ['--headless', '--${SCREENSHOT_WORD}'];`,
+          },
+        ],
+        offenders: ['e2e/shot.mjs', 'packages/x/src/shot/shot.spec.ts', 'packages/x/src/shot/shot.ts', 'tools/shot.ts'],
+      },
+      {
+        name: 'jogos és hatókörön kívüli: headless mód képernyőkép nélkül, a puszta szó, a kapcsoló Playwright import nélküli termékkódban és nem vizsgált kiterjesztésű fájlban',
+        files: [
+          {
+            trackedPath: 'tools/dom.sh',
+            content: `chromium --headless --dump-dom "$URL" # ${SCREENSHOT_WORD} nélkül`,
+          },
+          {
+            trackedPath: 'tools/package.json',
+            content: JSON.stringify({ scripts: { dom: `chrome --headless --dump-dom "$URL"` } }),
+          },
+          {
+            trackedPath: 'packages/tool/src/browser/browser.ts',
+            content: `export const flags = ['--headless', '--${SCREENSHOT_WORD}'];`,
+          },
+          {
+            trackedPath: 'docs/headless.md',
+            content: `chromium --headless --${SCREENSHOT_WORD}=x.${PNG_EXTENSION} "$URL"`,
           },
         ],
         offenders: [],

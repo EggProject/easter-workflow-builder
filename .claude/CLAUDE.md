@@ -1268,6 +1268,11 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   alakon mind bukott, az újon mind zöld; a korábbi tizennyolc kerülő út és a három új rés az (1)
   invariánson bukik, a három új rés a régi alakon zöld volt; az új kód nyolc egy pontú
   gyengítése a (7)-en bukik. Forrás: `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 7. szekció, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
+- **A Chrome headless képernyőkép kapcsolója (2026-10-17, javítva).** A `--screenshot` kapcsoló shell
+  scriptből és Node-ból (`execFileSync`) átment, mert a CLI minta a `playwright` szót is kereste; ma a
+  szótól függetlenül tiltott minden vizsgált fájlban és `package.json` scriptben, a (7) esetei mindkét
+  irányt őrzik. **Nyitva:** a `page.pdf({ path })` a tiltásban nincs nevesítve, addig a kapu átengedi; a
+  user hatóköri döntése zárja le (`docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`).
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
