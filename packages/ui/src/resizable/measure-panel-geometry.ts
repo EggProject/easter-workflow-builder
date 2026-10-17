@@ -38,9 +38,8 @@ export interface PanelGeometry {
  * (`.resizable-panel { min-width: 80px; min-height: 60px }`), a forrás
  * `resizeAt` viszont csak a százalékos `[5, 95]` tartományt ismeri, tehát
  * egy kis csoportban a `Home` és az `End` olyan értéket jelentett, amit a
- * CSS minimum felülírt (1440x600-on az 5, a 10 és a 15 ugyanazt a 60 pixeles
- * panelt adta, mérve: `docs/research/2026-09-24-jovahagyas-panel-helye.md`
- * 10. szekció).
+ * CSS minimum felülírt (mérve:
+ * `docs/research/2026-09-24-jovahagyas-panel-helye.md` 10. szekció).
  */
 export function measurePanelGeometry(
   panels: readonly (Element | undefined)[],

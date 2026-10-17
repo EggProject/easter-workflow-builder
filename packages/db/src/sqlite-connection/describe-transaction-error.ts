@@ -33,9 +33,10 @@ import { describeError } from '@easter-workflow-builder/core';
  * és a `workflow_edge.id` globális elsődleges kulcs, nem workflow-onkénti
  * (SPEC-003 4.2, 4.7); ha egy `replaceGraph` beszúrás egy MÁSIK workflow
  * gráfjában már létező azonosítót küld, a `better-sqlite3` a TEXT elsődleges
- * kulcs sértését saját méréssel igazoltan `SQLITE_CONSTRAINT_PRIMARYKEY`
- * kóddal jelzi (nem `SQLITE_CONSTRAINT_UNIQUE`-dal), `UNIQUE constraint
- * failed: <tábla>.id` szöveggel. Az azonosító globálisan egyedi marad (nincs
+ * kulcs sértését `SQLITE_CONSTRAINT_PRIMARYKEY` kóddal jelzi (nem
+ * `SQLITE_CONSTRAINT_UNIQUE`-dal), `UNIQUE constraint failed: <tábla>.id`
+ * szöveggel (mérés: `docs/research/2026-09-27-szerver-hibatorzs.md` 1.
+ * szekció). Az azonosító globálisan egyedi marad (nincs
  * séma vagy migráció változás, SPEC-003 döntés 2026-09-27); az ütköző
  * azonosító a válasz törzsében nem jelenhet meg (SPEC-005 8.4), ezért a
  * záró zárójel csak a hibaosztályt nevezi meg, az `apps/server` határon

@@ -17,11 +17,12 @@ export interface ResizablePanelProperties {
  *
  * **Eltérés a forrástól: `flex-shrink: 1` a forrás `0` értéke helyett**
  * (2026-09-25, SPEC-008 14.2 O-10). A forrás panelei a 100 százalékon felül
- * az 5 pixeles elválasztót is elfoglalták, a csoport 5 pixellel túllógott, és
- * a csoport `overflow: hidden` szabálya levágta (a forrás saját
- * `resizable.html` demójában is, mérve 4,98 pixel): a futás nézetben a
- * transcript oldal jobb szélét, a jóváhagyás felület jobb belső térköze ezért
- * volt 19 pixel a bal 24 helyett. Zsugorodó panelekkel a túllógást a
+ * az 5 pixeles elválasztót is elfoglalták, a csoport túllógott, és a csoport
+ * `overflow: hidden` szabálya levágta (a forrás saját `resizable.html`
+ * demójában is): a futás nézetben a transcript oldal jobb szélét, a
+ * jóváhagyás felület jobb belső térköze ezért kisebb volt a balnál (mérés:
+ * `docs/research/2026-09-24-jovahagyas-panel-helye.md` 9.2 és 10.4
+ * szekció). Zsugorodó panelekkel a túllógást a
  * panelek a `flex-basis` méretük arányában adják le (CSS Flexbox 9.7:
  * "scaled flex shrink factor" = a zsugorodási tényező szorozva a belső
  * `flex-basis` mérettel), tehát a két panel aránya pontosan a százalék

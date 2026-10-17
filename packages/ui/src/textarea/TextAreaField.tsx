@@ -85,6 +85,7 @@ export function TextAreaField(properties: Readonly<TextAreaFieldProperties>): Re
       <textarea
         {...rest}
         id={resolvedId}
+        // A design system `textarea.html` alapváltozata `rows="3"`.
         rows={rows ?? 3}
         className={joinClassNames('textarea', size === 'sm' && 'textarea--sm', isErrorVisible && 'is-error', className)}
         onBlur={handleBlur}

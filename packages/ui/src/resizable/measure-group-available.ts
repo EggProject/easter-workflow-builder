@@ -8,8 +8,8 @@ import { readPixels } from './read-pixels.ts';
  *
  * Miért nem a panelek összege (`measurePanelGeometry`): ha a csoport kisebb a
  * panelek pixeles minimumainak összegénél, a panelek a minimumukon állnak és
- * túllógnak a csoporton, tehát az összegük nagyobb a csoportnál (mérve
- * 1000x700-on a futás nézet belső csoportja 34,5 pixel, a két panel 60 és 60).
+ * túllógnak a csoporton, tehát az összegük nagyobb a csoportnál (mérés:
+ * `docs/research/2026-09-24-jovahagyas-panel-helye.md` 12.3 szekció).
  * A felfedés (`plan-reveal.ts`) ebből számolja, mekkora csoportban fér el a
  * felfedendő panel, ezért a valódi méret kell neki.
  *

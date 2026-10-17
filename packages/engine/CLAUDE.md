@@ -131,7 +131,7 @@ hely:
   felszabadítása ELŐTT veszi ki a saját futásának várakozóit, ha a
   `NodeExecutionInstance.failureStopsRun` igaz (a `run-supervisor` a `resolveErrorRoute`
   döntéséből számítja). A hurok erre nem elég: a `releaseSlot` a felszabaduló helyet szinkron adja
-  a sor következő elemének, és az a hurok reakciója előtt elindul (mérve: 4 ms-mal a bukás után);
+  a sor következő elemének, és az a hurok reakciója előtt elindul (mérve, `docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, negyedik kör);
 - **a léptető hurok** (`run-supervisor/advance-run.ts`) a `failRunRequested` igazra váltása után,
   pontosan egyszer, a SAJÁT `runId`-jára: ez viszi el a sort, ha a bukott lépés nem foglalt helyet
   (például elutasított jóváhagyás), ez zárja le a testvér jóváhagyások várakozását, és ugyanebben a
@@ -143,8 +143,7 @@ hely:
   hibával bukik, és a `human_approval` sor írása is visszagördül. A sorból kivétel az `interrupt()` ELŐTT áll: az `AgentQuery` szerződése nem
   köti ki, hogy a nyugta a folyam vége előtt érkezik, és ha utána, fordított sorrendben a
   megszakított lépés felszabaduló helyét a sorban álló testvér kapná meg. Ezt az `advance-run.spec.ts`
-  sorrend tesztje őrzi (a nyugta a hely felszabadítása után; fordított sorrenddel `expected 2 to
-be 1`); a valódi SDK nyugtájának időzítése nem mért;
+  sorrend tesztje őrzi (a nyugta a hely felszabadítása után; fordított sorrenddel a teszt elbukik, `docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, ötödik kör); a valódi SDK nyugtájának időzítése nem mért;
 - **a záró menet** (`finishRun`, `cancelStoppedStepRuns`) a `markRunFailed` előtt a futás minden
   `pending` sorát `cancelled` állapotba viszi (SPEC-003 7.2); a hurok ekkorra minden elindított
   példányt megvárt, tehát `running` sor nem maradhat. A `pending` sort a hurok menete szándékosan
@@ -156,12 +155,7 @@ be 1`); a valódi SDK nyugtájának időzítése nem mért;
 
 **A teljes `stopAndAwaitRunTree` menetet itt nem lehet hívni**: az a saját `completion`
 Promise-át várná meg, ami holtpont, és a `cancelled` záró állapotot készítené elő, holott a
-`fail_run` záró állapota `failed` (8.4). Mérve (korlát 1, a bukás 300 ms-nál, a testvérek
-természetes hossza 8000 ms): előtte 3 agent hívás és a futás 9013 ms-mal a bukás után `failed`,
-utána 1 hívás, 6 ms, a két testvér `cancelled`. Döntésre váró, korlátlan várakozású
-(`timeoutMs: null`) testvér jóváhagyással, a valódi `apps/server` modulokon, hamis agenttel: előtte
-a futás a döntésig `running` maradt, utána 2 ... 6 ms-mal a bukás után `failed`
-(`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció). A fájl irányában nincs kör:
+`fail_run` záró állapota `failed` (8.4). Mérve a valódi `apps/server` modulokon, hamis agenttel (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, negyedik és ötödik kör): a javítás előtt a sorban álló testvérek végigfutottak, és a futás csak a természetes hosszuk után lett `failed`; utána a bukás után azonnal `failed`, a két testvér `cancelled`. Döntésre váró, korlátlan várakozású (`timeoutMs: null`) testvér jóváhagyásnál a futás előtte a döntésig `running` maradt, utána azonnal `failed`. A fájl irányában nincs kör:
 az `interrupt-live-agent-queries.ts` csak az `agent-query-registry.ts`-től függ.
 
 **A `fail_run` a bukott futás al-workflow futásait a teljes fa mechanizmussal zárja (user döntés
@@ -179,8 +173,8 @@ menetben jön létre. A léptető hurok a lezárást a saját `interrupt()` hív
 szinkron része a leszármazottak sorból kivétele), és utána várja meg. A futó `sub_workflow` lépés a
 gyerek lezárulása után a saját útján zár: `failed`, `sub_workflow_failed` (SPEC-004 5.9 6. pont).
 Mérve a valódi `apps/server` modulokon, hamis agenttel, a gyerek és az unoka jóváhagyásra vár:
-előtte a szülő 3000 ms-mal a bukás után is `running`, a gyerek döntése HTTP 200 és a `sub` lépés
-`succeeded` egy `failed` futásban; utána a szülő 5 ... 12 ms-mal a bukás után `failed`, a gyerek és
+előtte a szülő a bukás után is `running` maradt, a gyerek döntése átment és a `sub` lépés
+`succeeded` lett egy `failed` futásban; utána a szülő a bukás után azonnal `failed`, a gyerek és
 az unoka `cancelled`, az utólagos döntés HTTP 409 `conflict`, egy másik futás gyerek fája érintetlen
 (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, hetedik kör).
 
@@ -194,7 +188,7 @@ a `run-supervisor` a `ChildWorkflowRunResult.stopTargetStatus` mezőjébe teszi,
 `running` sorú gyereknél ezt írja az eseménybe és a lépés hibaüzenetébe. A már terminális sorú
 gyereknél a sor állapota dönt, mert a fa zárása csak a nem terminális sorokat írja. Mérve a valódi
 `apps/server` modulokon, gyerekre és unokára, mindhárom úton: előtte `running`, utána a célállapot,
-ami mind a 30 esetben egyezik a gyerek sorával a fa zárása után (research 7. szekció, kilencedik
+ami mindhárom úton egyezik a gyerek sorával a fa zárása után (research 7. szekció, kilencedik
 kör).
 
 **Két leállításnál az első célállapota zár a DB-ben is (SPEC-004 9. szekció, 10.2).** A szabályos
@@ -203,9 +197,9 @@ leállás közben beágyazott `fail_run` (egy testvér `sub_workflow` lépés a 
 a `cancelRuns`-nak. A leállás által már `interrupted` célú gyereket a `shutdownActiveRuns`
 `recoverInterruptedRuns` zárása viszi `interrupted` állapotba, egyezően a szülő lépés eseményével;
 fordított sorrendben (előbb `fail_run`, közben leállás) a gyerek `cancelled` marad. Mérve a valódi
-`apps/server` modulokon, hamis agenttel, sorrendenként 5 futással: a leállás előbb sorrendben előtte
-a gyerek sora `cancelled`, az eseménye `interrupted` (0/5 egyezés), utána mindkettő `interrupted`
-(5/5); a fordított sorrend előtte és utána is `cancelled` (5/5). Regresszió: a `create-engine.spec.ts`
+`apps/server` modulokon, hamis agenttel: a leállás előbb sorrendben előtte
+a gyerek sora `cancelled`, az eseménye `interrupted` volt (nem egyeztek), utána mindkettő `interrupted`;
+a fordított sorrend előtte és utána is `cancelled`. Regresszió: a `create-engine.spec.ts`
 "az első leállítás célállapota" blokkja (research 7. szekció, tizedik kör).
 
 **A szabályos leállás alatt érkező megszakítás nem fut le (user döntés 2026-09-24, SPEC-004 9.
@@ -213,10 +207,10 @@ szekció).** Az `interruptRun` első lépése a `RunSupervisor.isAcceptingRuns()
 amin a futás indítás elutasítása áll: ha a `stopAcceptingRuns` már lefutott, `engine_shutting_down`
 hibával, olvasás és írás nélkül tér vissza (a szerveren `503`), és a fát a leállás zárja
 `interrupted` állapotba. A már folyamatban lévő megszakítást a később kezdődő leállás nem érinti, az
-`cancelled`-del zár. Mérve a valódi `apps/server` modulokon, hamis agenttel, esetenként 5 futással:
+`cancelled`-del zár. Mérve a valódi `apps/server` modulokon, hamis agenttel:
 előtte a válasz `socket hang up` (csak a fa aktív), illetve `200` és `cancelled` sor `interrupted`
-eseménnyel (egy másik futás tovább tartja a leállást, 0/5 egyezés); utána `503` és egyezően
-`interrupted` (5/5); a fordított sorrend előtte és utána is `cancelled` (5/5). Regresszió: a
+eseménnyel (egy másik futás tovább tartja a leállást, a sor és az esemény nem egyezett); utána `503` és egyezően
+`interrupted`; a fordított sorrend előtte és utána is `cancelled`. Regresszió: a
 `create-engine.spec.ts` "szabályos leállás közben érkező megszakítás" blokkja (research 7. szekció,
 tizenegyedik kör).
 
@@ -580,9 +574,9 @@ viselkedését írja le, a felületét nem, ezért a négy döntés indoklása i
   `onDenied` visszahívással zárja; a foglalt helyek és más futások várakozói érintetlenek. A
   lezárástól eltérően ez nem végleges: a futás léptető hurka a `requestStop()` után úgysem kér
   újabb helyet. Mérve a valódi szerveren: e nélkül egy három párhuzamos agent lépéses futás
-  megszakítása (korlát 1) után a két sorban álló lépés `interrupt()` nélkül végigfutott, három
-  agent hívással, és a megszakító kérés 17043 ms-ig nem válaszolt; vele egy hívás, 1012 ms
-  (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció). Ugyanezt a műveletet
+  megszakítása (korlát 1) után a két sorban álló lépés `interrupt()` nélkül végigfutott, és a
+  megszakító kérés csak ezután válaszolt; vele a két sorban álló lépés el sem indult
+  (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció, harmadik kör). Ugyanezt a műveletet
   hívja a `fail_run` politika a bukott futásra (SPEC-004 8.3, lásd "Szabályok" eleje): a
   szabályozónak nincs külön `fail_run` ága.
 - **Állapotot tartó lezárás, nem tiszta reducer, mint a `scheduling` témában.** Az ütemező

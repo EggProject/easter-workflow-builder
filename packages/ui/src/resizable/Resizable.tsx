@@ -148,14 +148,20 @@ interface DragState {
 }
 
 /**
- * A `ResizableHandle` `Enter` billentyűje ide/innen csomagolja össze/ki a
- * panelt (T-009-11, dokumentált eltérés a W3C Window Splitter mintától, ami
- * az `Enter`-t nem sorolja fel).
+ * A `ResizableHandle` `Enter` billentyűje ide csomagolja össze a panelt, és
+ * innen nyitja vissza (T-009-11). Az `Enter` az APG Window Splitter
+ * mintában jelölés nélkül áll, tehát nem opcionális (SPEC-008 6.1, M-74). Az
+ * érték a design system `Resizable.jsx` `[5, 95]` alsó határa (`minA = 5`),
+ * ugyanaz, mint a `resize-at.ts` `MIN_PANEL_SIZE_PERCENT`.
  */
 const COLLAPSED_SIZE_PERCENT = 5;
 /**
  * Ha nincs korábban feljegyzett kibontott méret (a panel már összecsomagolva
  * indult), erre a méretre nyílik vissza.
+ *
+ * NYITOTT KÉRDÉS (SPEC-008 O-34): sem a forrás `Resizable.jsx`, sem a
+ * SPEC-008 6.1 nem ad visszanyitási alapértéket. Addig az 50 százalék áll.
+ * Lezárja: a user döntése az alapértelmezett arányok forrásáról.
  */
 const DEFAULT_RESTORE_SIZE_PERCENT = 50;
 
@@ -219,10 +225,10 @@ function withContentMinimum(
  * A forrás billentyűzet kezelése (nyilak, `Shift` dupla lépésköz, `Home`,
  * `End`) változatlan; az `Enter` billentyű ÚJ, nem a forrásból jön: az
  * elválasztóhoz tartozó bal/felső panelt csomagolja össze a minimumára,
- * majd a legutóbb feljegyzett méretre nyitja vissza (a W3C WAI Window
- * Splitter minta az `Enter`-t nem sorolja fel opcionális billentyűként,
- * szemben a `Home`/`End`/`F6` hármassal; a döntés a T-009-11 kifejezett
- * kérése).
+ * majd a legutóbb feljegyzett méretre nyitja vissza. Az indok az APG Window
+ * Splitter mintának való megfelelés: az `Enter` ott jelölés nélkül áll,
+ * szemben a `(Optional)` jelölésű `Home`/`End`/`F6` hármassal (SPEC-008 6.1,
+ * M-74; T-009-11).
  *
  * **Ideiglenes felfedés, eltérés a forrástól (2026-09-25, SPEC-008 8.
  * szekció 1. pont):** a `reveal` és az `adjustsForReveal` prop, a befoglaló
@@ -260,8 +266,11 @@ function withContentMinimum(
  * - **A `pointercancel` is lezárja a húzást**, ugyanúgy, mint a
  *   `pointerup`. A W3C Pointer Events szerint a böngésző `pointercancel`
  *   eseménnyel zárja a pointer esemény folyamát, ha a mozdulatot maga
- *   veszi át (érintéses pásztázás), és utána arra a pointerre több eseményt
- *   nem küld, tehát `pointerup` sem jön. A forrás csak a `pointerup`
+ *   veszi át (érintéses pásztázás), és utána arra a pointerre már csak a
+ *   lezáró `pointerout`/`pointerleave` (és `lostpointercapture`) érkezik,
+ *   `pointermove`/`pointerup` nem, ezért a húzást a `pointercancel`-nek kell
+ *   lezárnia (<https://www.w3.org/TR/pointerevents3/>, 4.1.3.3 "Suppressing a
+ *   pointer event stream"). A forrás csak a `pointerup`
  *   eseményre zárt, így a húzás állapota bent ragadt, és a következő
  *   egérmozgás vagy görgetés mozdította az elválasztót.
  *

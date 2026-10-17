@@ -132,7 +132,9 @@ function focusWithoutScroll(element: Element | null | undefined): void {
  *   elhagyható), mert a gráf szerkesztő felvételi menüje egyiket sem
  *   használja; a CSS szabályaik a bájtazonos fájlban megmaradnak.
  * - Minden menüpont `tabIndex={-1}`, a forrás roving `tabIndex=0` írása
- *   nélkül: a W3C APG Menu mintája szerint menüben minden elem `-1`.
+ *   nélkül: a W3C APG Menu mintája szerint a (nem menubar) menüben minden
+ *   elem `tabindex="-1"`, a fókuszt szkript mozgatja
+ *   (<https://www.w3.org/WAI/ARIA/apg/patterns/menubar/>).
  * - A panel `createPortal`-lal a `document.body`-ba kerül (a `Menu` mintája):
  *   a `position: fixed` elem tartalmazó blokkja csak akkor a nézetablak, ha
  *   egyik őse sem `transform`/`filter`/`contain` stb. értékű (MDN, "Layout

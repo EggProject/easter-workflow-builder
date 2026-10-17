@@ -43,10 +43,9 @@ export interface ShutdownActiveRunsDependencies {
  *    `engine_shutting_down` hibát ad, a `concurrencyGate.close()` után pedig
  *    egyetlen agent lépés sem kap helyet, a sorban állók sem. Mindkettő
  *    szinkron, és az 1. pont ELŐTT fut, tehát a lekérdezett lista a leállás
- *    teljes hatóköre marad. Mérve: e pont nélkül egy a jel előtt fogadott, de
- *    csak utána beérkező törzsű indító kérés új futást indított, aminek az
- *    agent lépése `interrupt()` nélkül végigfutott, és a kilépést a lépés
- *    teljes hosszával késleltette (SPEC-006 8.2).
+ *    teljes hatóköre marad. Mérve (SPEC-006 M-36, 8.2): e pont nélkül egy a
+ *    jel előtt fogadott, de csak utána beérkező törzsű indító kérés új futást
+ *    indított.
  * 1. **MINDEN aktív futás lekérdezése** (`runSupervisor.listActiveRuns()`,
  *    NEM egyetlen futás fájára szűkítve, ellentétben az `interruptRun`-nal -
  *    a szabályos leállás a TELJES szervert viszi le, nem egy felhasználói
@@ -57,11 +56,10 @@ export interface ShutdownActiveRunsDependencies {
  *    futó lépések leállásáig tartó ablakban érkező döntés így a sor
  *    állapotán bukik (`illegal_status_transition`), ugyanaz a mechanizmus,
  *    mint a felhasználói megszakításnál és a `fail_run`-nál, csak a záró
- *    állapot más (SPEC-004 10.2 3. pont, 8.3). Mérve: e pont nélkül a jel
- *    előtt fejléccel megkezdett, az ablakban befejezett döntési kérés HTTP
- *    200-at kapott, a lépés `succeeded` lett egy `interrupted` futásban,
- *    esemény nélkül (`docs/research/2026-09-23-megszakitas-leallas-meres.md`
- *    7. szekció). Ha az írás hibázik, a függvény a futások leállítása és a
+ *    állapot más (SPEC-004 10.2 3. pont, 8.3). Mérve: e pont nélkül az
+ *    ablakban befejezett döntési kérés sikeres lett egy `interrupted`
+ *    futásban (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7.
+ *    szekció). Ha az írás hibázik, a függvény a futások leállítása és a
  *    helyreállítás nélkül adja vissza a hibát, ugyanúgy, mint a
  *    `cancelActiveRunTree`; a következő indulás helyreállítása ugyanoda
  *    érkezik (10.2 "A szabályos és a durva leállás ugyanoda érkezik").

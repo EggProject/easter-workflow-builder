@@ -111,10 +111,10 @@ const NO_OPTIONS: readonly SelectFieldOption<never>[] = [];
  * static pages uses the platform control"), és a platform indikátorát
  * rajzolja, ami a jobb szegélyre tapad; a React trigger a `.select__caret`
  * SVG-t a `padding: 10px 14px` belső térközön belül helyezi el. Mérve
- * (`docs/research/2026-09-09-select-chevron-meres.md`): a chevron
- * középpontja a referencián 22px-re, a natív retrofiton 9px-re áll a mező
- * jobb szélétől. Mi React alkalmazás vagyunk, tehát a forrás React
- * változata jár - felhasználói döntés, 2026-09-09.
+ * (`docs/research/2026-09-09-select-chevron-meres.md`): a két változat
+ * chevronja eltérő távolságra áll a mező jobb szélétől. Mi React alkalmazás
+ * vagyunk, tehát a forrás React változata jár - felhasználói döntés,
+ * 2026-09-09.
  *
  * ELTÉRÉS A FORRÁSTÓL, PORTÁL. A panel `createPortal`-lal a
  * `document.body`-ba kerül, `position: fixed` alakban, a trigger

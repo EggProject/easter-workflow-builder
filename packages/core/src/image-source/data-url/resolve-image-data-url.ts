@@ -19,10 +19,13 @@ const SUPPORTED_FORMATS_HINT = 'Támogatott formátumok: JPEG, PNG, WebP.';
  * `import ... from 'node:buffer'` ezért `vite dev` alatt (ahol nincs
  * tree shaking) a böngészőbe kerül, és az egész alkalmazást megbuktatja:
  * "Module node:buffer has been externalized for browser compatibility."
- * A `toBase64()` az ES2026 szabvány része, a böngészőkben és a Node 22 óta
- * elérhető, tehát ugyanaz a kód fut mindkét oldalon.
+ * A `toBase64()` az ES2026 része; böngészőkben és a Node 25 óta (V8 14.1)
+ * elérhető, a projekt `engines` mezője Node >=26, tehát ugyanaz a kód fut
+ * mindkét oldalon.
  * Forrás: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/toBase64
- * és https://github.com/tc39/proposal-arraybuffer-base64
+ * és https://github.com/tc39/proposal-arraybuffer-base64, a Node oldali
+ * verzió: https://nodejs.org/en/blog/release/v25.0.0, az ES2026 besorolás:
+ * https://github.com/tc39/proposals/blob/main/finished-proposals.md
  */
 function toDataUrl(mediaType: ImageMediaType, bytes: Uint8Array): string {
   return `data:${mediaType};base64,${bytes.toBase64()}`;
