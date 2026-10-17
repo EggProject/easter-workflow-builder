@@ -131,8 +131,10 @@ function stepRun(overrides: Partial<StepRunRecord>): StepRunRecord {
 
 /**
  * A szétosztás két ága egy-egy jóváhagyás lépéssel, és a ciklus két
- * iterációja, a második törzsében egy lépéssel (SPEC-004 4.3 és 4.6: a
- * hatókörben futó lépés szülője a hatókört nyitó lépés futás).
+ * iterációja, a második törzsében egy elbukott lépéssel (SPEC-004 4.3 és 4.6:
+ * a hatókörben futó lépés szülője a hatókört nyitó lépés futás). A második
+ * iteráció kiértékelése (`sr-l1`) sikeres, tehát a tétel "sikertelen"
+ * jelvénye csak a törzs lépéséből jöhet (user döntés 2026-10-17).
  */
 const STEP_RUNS: readonly StepRunRecord[] = [
   stepRun({}),
@@ -154,6 +156,7 @@ const STEP_RUNS: readonly StepRunRecord[] = [
     nodeType: 'human_approval',
     parentStepRunId: 'sr-l1',
     iteration: 1,
+    status: 'failed',
     createdAtMs: 8,
   }),
 ];
@@ -186,8 +189,12 @@ const RECORDS: readonly RunEventRecord[] = [
 
 /* eslint-enable unicorn/no-null */
 
-async function mockRun(page: Page, stepRuns: readonly StepRunRecord[] = STEP_RUNS): Promise<void> {
-  await mockSseFramesWithoutReconnect(page, replayFrames(RUN_ID, RECORDS));
+async function mockRun(
+  page: Page,
+  stepRuns: readonly StepRunRecord[] = STEP_RUNS,
+  records: readonly RunEventRecord[] = RECORDS,
+): Promise<void> {
+  await mockSseFramesWithoutReconnect(page, replayFrames(RUN_ID, records));
   await installApiMocks(page, [
     mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
     mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
@@ -228,6 +235,36 @@ async function openRunView(page: Page, stepRuns?: readonly StepRunRecord[]): Pro
   await expect(transcriptList(page).getByRole('listitem')).toHaveCount(RECORDS.length);
 }
 
+test('a fókuszált fan_out és loop csomóponton az Enter és a szóköz ugyanúgy nyitja a listát, mint a kattintás, kijelölés nélkül (O-41, AC19)', async ({
+  page,
+}) => {
+  await openRunView(page);
+
+  const fanNode = nodeLocator(page, 'n-fan');
+  await fanNode.focus();
+  await expect(fanNode).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Ágak: Elemek szétosztása' })).toBeVisible();
+  await expect(transcriptList(page).getByRole('listitem')).toHaveCount(3);
+  await expect(fanNode).not.toHaveClass(/selected/);
+
+  const loopNode = nodeLocator(page, 'n-loop');
+  await loopNode.focus();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('region', { name: 'Iterációk: Ismétlés' })).toBeVisible();
+  await expect(loopNode).not.toHaveClass(/selected/);
+  await expect(loopNode).not.toHaveClass(/selectable/);
+
+  // Más típusú csomóponton a billentyű, mint a kattintás, a nézetet nem
+  // változtatja: a nyitott lista marad.
+  const startNode = nodeLocator(page, 'n-start');
+  await startNode.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('region', { name: 'Iterációk: Ismétlés' })).toBeVisible();
+  await expect(startNode).not.toHaveClass(/selected/);
+});
+
 test('a fan_out csomópontra kattintva kinyílik az ágak listája, egy ágra kattintva a transcript csak annak eseményeit mutatja, a bezárás visszaállít', async ({
   page,
 }) => {
@@ -266,10 +303,13 @@ test('a loop csomópontra kattintva kinyílik az iterációk listája, egy iter�
   await nodeLocator(page, 'n-loop').click();
   const region = page.getByRole('region', { name: 'Iterációk: Ismétlés' });
   await expect(region).toBeVisible();
-  await expect(region.getByRole('button', { name: '1. iteráció: 0' })).toBeVisible();
+  // A felirat a kártya "iteráció: N / M" alakja; a jelvény az iteráció
+  // lépéseiből számol, nem a kiértékelés saját (sikeres) állapotából.
+  await expect(region.getByRole('row', { name: /iteráció: 0 \/ 5/ }).getByText('sikeres')).toBeVisible();
+  await expect(region.getByRole('row', { name: /iteráció: 1 \/ 5/ }).getByText('sikertelen')).toBeVisible();
   await expect(transcriptList(page).getByRole('listitem')).toHaveCount(3);
 
-  await region.getByRole('button', { name: '2. iteráció: 1' }).click();
+  await region.getByRole('button', { name: 'iteráció: 1 / 5' }).click();
   await expect(transcriptList(page).getByRole('listitem')).toHaveCount(2);
   expect(await transcriptTitles(page)).toEqual([
     expect.stringContaining('Első iteráció sora'),
@@ -277,7 +317,7 @@ test('a loop csomópontra kattintva kinyílik az iterációk listája, egy iter�
   ]);
 
   // Az ismételt megnyomás a csomópont minden tételére állít vissza.
-  await region.getByRole('button', { name: '2. iteráció: 1' }).click();
+  await region.getByRole('button', { name: 'iteráció: 1 / 5' }).click();
   await expect(transcriptList(page).getByRole('listitem')).toHaveCount(3);
 
   await region.getByRole('button', { name: 'A lista bezárása' }).click();
@@ -429,4 +469,38 @@ test('a pillanatképen kívüli csomópontra mutató ág tétele a csomópont az
   await expect(region.getByRole('button', { name: '3. n-torolt' })).toBeVisible();
   await region.getByRole('button', { name: '3. n-torolt' }).click();
   await expect(transcriptList(page).getByRole('listitem')).toHaveCount(0);
+});
+
+test('a lista bezárása után a transcript tiszta lappal indul: a szűkített nézetben feljebb görgetett lista nem jelez új eseményt, és a teljes lista az aljára áll (SPEC-008 6.3)', async ({
+  page,
+}) => {
+  // A szétosztás első ágához annyi sor, hogy a szűkített lista görgessen. Ha
+  // a transcript panel a szűkítés váltásakor nem indulna újra, a görgetés
+  // követésének állapota (feljebb görgetve: nem követ) átjönne a teljes
+  // listára, és a bezáráskor visszatérő sorokat új eseménynek számolná
+  // ("Ugrás az aljára (N új esemény)").
+  const branchRecords = Array.from({ length: 40 }, (_unused, index) =>
+    userTurn(RECORDS.length + 1 + index, 'sr-a', `Első ág ${String(index + 1)}. sora`),
+  );
+  const records = [...RECORDS, ...branchRecords];
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockRun(page, STEP_RUNS, records);
+  await page.goto(`/run?runId=${RUN_ID}`);
+  await expect(nodeLocator(page, 'n-fan')).toBeVisible();
+
+  await nodeLocator(page, 'n-fan').click();
+  const list = transcriptList(page);
+  const filteredRowCount = 3 + branchRecords.length;
+  await expect(list.locator(`[role="listitem"][aria-posinset="${String(filteredRowCount)}"]`)).toBeInViewport();
+
+  await list.hover();
+  await page.mouse.wheel(0, -10_000);
+  await expect(list.locator('[role="listitem"][aria-posinset="1"]')).toBeInViewport({ ratio: 1 });
+
+  await page
+    .getByRole('region', { name: 'Ágak: Elemek szétosztása' })
+    .getByRole('button', { name: 'A lista bezárása' })
+    .click();
+  await expect(list.locator(`[role="listitem"][aria-posinset="${String(records.length)}"]`)).toBeInViewport();
+  await expect(page.getByRole('button', { name: /^Ugrás az aljára/ })).toHaveCount(0);
 });

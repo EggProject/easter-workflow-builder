@@ -112,11 +112,20 @@ describe('buildBranchIterationItems', () => {
     ]);
   });
 
-  it('a loop tételei a csomópont saját lépés futásai, létrehozási sorrendben, az iteráció számával', () => {
+  it('a loop tételei a csomópont saját lépés futásai, létrehozási sorrendben, a kártya "iteráció: N / M" feliratával', () => {
     expect(buildBranchIterationItems({ node: LOOP_NODE, kind: 'loop' }, NODES, STEP_RUNS)).toEqual([
-      { stepRunId: 's-i0', label: '1. iteráció: 0', status: 'succeeded' },
-      { stepRunId: 's-i1', label: '2. iteráció: 1', status: 'succeeded' },
+      { stepRunId: 's-i0', label: 'iteráció: 0 / 5', status: 'succeeded' },
+      { stepRunId: 's-i1', label: 'iteráció: 1 / 5', status: 'succeeded' },
     ]);
+  });
+
+  it('a loop tételének állapota az iteráció lépéseiből jön, nem a kiértékelés saját állapotából', () => {
+    const failedBody = STEP_RUNS.map((candidate) =>
+      candidate.id === 's-body' ? { ...candidate, status: 'failed' as const } : candidate,
+    );
+    expect(
+      buildBranchIterationItems({ node: LOOP_NODE, kind: 'loop' }, NODES, failedBody).map((item) => item.status),
+    ).toEqual(['failed', 'succeeded']);
   });
 
   it('még nem futott csomópontra üres listát ad', () => {

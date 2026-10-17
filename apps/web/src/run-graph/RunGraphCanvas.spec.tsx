@@ -126,6 +126,16 @@ function recordNodeClick(workflowNode: WorkflowNodeInput): void {
   clickedNodes.push(workflowNode);
 }
 
+/**
+ * Egy `keydown` esemény a célponton, buborékolva, ahogy a böngésző a
+ * fókuszált elemről küldi.
+ */
+function pressKey(target: Element, key: string): void {
+  act(() => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  });
+}
+
 describe('RunGraphCanvas', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -226,6 +236,30 @@ describe('RunGraphCanvas', () => {
         false,
         false,
       ]);
+    });
+  });
+
+  describe('a billentyűs út (SPEC-008 6.3, O-41, AC19)', () => {
+    it('a csomópont dobozán az Enter és a szóköz ugyanazt adja a hívónak, mint a kattintás', () => {
+      renderCanvas();
+      pressKey(nodeElement(), 'Enter');
+      pressKey(nodeElement(), ' ');
+      expect(clickedNodes).toEqual([START_NODE, START_NODE]);
+    });
+
+    it('más billentyű és a dobozon kívüli célpont nem hív, és a csomópont billentyűre sem lesz kijelölt', () => {
+      renderCanvas();
+      pressKey(nodeElement(), 'a');
+      const pane = container.querySelector('.react-flow__pane');
+      if (pane === null) {
+        throw new Error('a teszt nem talált vászon panelt');
+      }
+      pressKey(pane, 'Enter');
+      expect(clickedNodes).toEqual([]);
+
+      pressKey(nodeElement(), 'Enter');
+      expect(nodeElement().classList.contains('selected')).toBe(false);
+      expect(nodeElement().classList.contains('selectable')).toBe(false);
     });
   });
 

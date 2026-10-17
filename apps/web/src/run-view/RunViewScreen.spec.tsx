@@ -1567,7 +1567,7 @@ describe('RunViewScreen', () => {
       expect(transcriptRowCount()).toBe(3);
 
       act(() => {
-        itemButton('2. iteráció: 1').click();
+        itemButton('iteráció: 1 / 5').click();
       });
       expect(transcriptRowCount()).toBe(2);
     });

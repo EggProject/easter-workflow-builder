@@ -7,8 +7,8 @@
 `LD_LIBRARY_PATH` kerülő).
 
 A SPEC-008 6.3, 14.1 O-39 és a 118. kritérium megvalósításának mért tényei, forrásai és e2e
-lefedettségi darabszámai. A megvalósított alakot a SPEC-008 6.3 írja le; a nyitva maradt két
-kérdést a SPEC-008 14.2 O-40 és O-41 tartja.
+lefedettségi darabszámai. A megvalósított alakot a SPEC-008 6.3 írja le; a megvalósításból nyílt két
+kérdést (SPEC-008 O-40, O-41) a user 2026-10-17-én eldöntötte, a lezárás a 10. szekcióban áll.
 
 ## 1. A user döntései, amiket a lépés megvalósít (2026-10-17)
 
@@ -74,7 +74,7 @@ szabálya azt pótolta, hogy kattintás kezelő nélkül a doboz `pointer-events
 (2266. sor). Az `onNodeClick` óta a doboz `all`, a szabály hatástalan, ezért törlődött; a `sub_workflow`
 gomb kattintását a `run-view.spec.ts` meglévő e2e tesztje továbbra is igazolja (zöld).
 
-## 3. A billentyűzetes út hiánya (SPEC-008 14.2 O-41)
+## 3. A billentyűzetes út (SPEC-008 O-41, lezárva: 10.2)
 
 **Saját mérés** (valós Chromium, ideiglenes, nem commitolt teszt a `branch-iteration-list.spec.ts`
 fixtúráján): a `fan_out` csomópont doboza `tabindex="0"`, fókuszálható (`toBeFocused`), és a fókuszált
@@ -101,7 +101,7 @@ A tétel gombja a lenyomott állapotot `aria-pressed` attribútummal és a `ghos
 változattal mutatja, tehát a kiválasztás nem csak színnel látszik. A bezárás ikonja a `packages/ui`
 `Modal.tsx` bezárás útvonala (`M4 4l8 8M12 4l-8 8`, a design system `Drawer.jsx` fejlécéével azonos).
 
-## 5. A szűkítés útja (SPEC-008 14.2 O-40)
+## 5. A szűkítés útja (SPEC-008 O-40, lezárva: 10.1)
 
 | Tény                                                                                                                                                  | Forrás                                                                     |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -174,6 +174,70 @@ prop lett, alapérték nélkül.
   azonos időpont), `filter-transcript-by-step-runs.spec.ts`, `toggle-branch-iteration-item.spec.ts`,
   `BranchIterationList.spec.tsx`, plusz a `RunGraphCanvas.spec.tsx`, a `RunViewScreen.spec.tsx` és a
   `TranscriptPanel.spec.tsx` új esetei.
-- E2e (`apps/web/e2e/branch-iteration-list.spec.ts`, nyolc teszt): `fan_out` és `loop` lista, szűkítés,
+- E2e (`apps/web/e2e/branch-iteration-list.spec.ts`, eredetileg nyolc teszt, a 10. szekció kettővel bővítette): `fan_out` és `loop` lista, szűkítés,
   ismételt megnyomás, bezárás, csak olvasható vászon, más típusú csomópont, a két magasság eset, a
   rendezés hiánya és a pillanatképen kívüli csomópont.
+
+## 10. A 2026-10-17-i user döntések és a review lezárása
+
+### 10.1 O-40: a szűkítés útja
+
+User döntés: "Marad a böngészőben." A kliens oldali szűrés (5. szekció) marad; a SPEC-008 118.
+kritériumának zárójele a kliens oldali szűrést írja elő, az O-40 a 14.1-be került.
+
+### 10.2 O-41: az `Enter` és a szóköz a fókuszált csomóponton
+
+User döntés: "Enter és szóköz nyissa." A megvalósítás: `apps/web/src/run-graph/find-keyboard-activated-node.ts`
+(tiszta függvény) és a `RunGraphCanvas` `ReactFlow` elemének `onKeyDown` propja. A `ReactFlowProps`
+a `HTMLAttributes<HTMLDivElement>` bővítése (`types/component-props.d.ts` 8. sor), a `...rest` a
+burkoló `div`-re kerül (`dist/esm/index.js` 3775. sor), tehát a fókuszált csomópont dobozáról
+felbuborékoló `keydown` itt látszik. A figyelő csak akkor lép, ha a célpont maga a csomópont doboza
+(`react-flow__node` osztály, 2345. sor; `data-id`, 2366. sor).
+
+**A React Flow saját billentyűi** a telepített `@xyflow/react` 12.11.6 és `@xyflow/system` 0.0.82
+forrásában:
+
+| Billentyű kezelő (forrás sor)                                                                                                                  | Hatás a futás vásznán (`elementsSelectable`, `nodesDraggable` hamis)                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a csomópont `onKeyDown`: `elementSelectionKeys` (`Enter`, szóköz, `Escape`) csak `isSelectable` mellett (2303.)                                | nem lép; a nyilak csak húzható, kijelölt csomópontot mozgatnak (2312.), szintén nem lép                                                                   |
+| `deleteKeyCode` alapérték `Backspace`, `selectionKeyCode` `Shift`, `multiSelectionKeyCode` és `zoomActivationKeyCode` `Meta`/`Control` (3767.) | egyik sem az `Enter` vagy a szóköz                                                                                                                        |
+| `panActivationKeyCode` alapérték `Space` (3767.), `useKeyPress` a `window`-on (2118.)                                                          | amíg lenyomva áll, `panOnDrag` és `panOnScroll` igaz (2119-2120.); a `preventDefault` a nem `BUTTON`/`A` célponton fut (446-447.), a lap tehát nem görget |
+
+Tehát az `Enter` és a szóköz a csomóponton a React Flow-ban semmit nem jelöl ki és nem mozdít, és a
+lista nyitása egyik kezelőt sem zavarja. Az `Escape` szándékosan kimarad (a kijelölés visszavonása, nem
+aktiválás).
+
+**Mérés:** unit (`find-keyboard-activated-node.spec.ts`; `RunGraphCanvas.spec.tsx` "a billentyűs út":
+az `Enter` és a szóköz a valódi könyvtár dobozán a kattintással azonos hívást ad, más billentyű és a
+panel nem, és a doboz billentyűre sem kap `selected` vagy `selectable` osztályt); e2e
+(`branch-iteration-list.spec.ts` "a fókuszált fan_out és loop csomóponton ..."): `focus()` után
+`Enter` a `fan_out`, `Space` a `loop` listáját nyitja, a `start` csomóponton a nézet nem változik, és
+egyik csomópont sem lesz kijelölt. **Szándékos rontás:** a figyelő hívásának elhagyása mellett az e2e
+bukik (a régió nem jelenik meg).
+
+### 10.3 Az iteráció jelvénye az iteráció lépéseiből
+
+User döntés: "Az iteráció lépései alapján." A megvalósítás: `resolve-loop-iteration-status.ts`, az
+iteráció lépés futása és minden leszármazottja közül a legerősebb állapot (`failed`, `rejected`,
+`interrupted`, `cancelled`, `waiting_approval`, `running`, `pending`, `succeeded` sorrendben). A
+sorrend a végrehajtó választása a user példája ("ha egy lépés elbukott, sikertelen") köré, a SPEC-008
+6.3 rögzíti. Unit teszt minden párra mindkét sorrendben, plusz a lépés nélküli, a beágyazott és a
+hatókörön kívüli esetre. E2e: a `loop` második iterációjának kiértékelése sikeres, a törzse elbukott, a
+tétel jelvénye "sikertelen". **Szándékos rontás:** a jelvény a lépés futás saját állapotából (a régi
+alak) mellett az e2e bukik.
+
+### 10.4 Review: a `loop` tétel felirata
+
+A korábbi "1. iteráció: 0" felirat a sorszámot (1-től) és az `iteration` értéket (0-tól) keverte. Az
+új felirat a kártya összesítésének alakja, "iteráció: N / M" (`GraphNodeCard.tsx`), sorszám nélkül;
+a `fan_out` tétele a sorszámot és a nevet tartja.
+
+### 10.5 Review: a transcript panel `key` értéke
+
+A `key={transcriptPanelKey}` szükséges: a szűkítés váltásakor a transcript panel görgetés követése
+(`use-transcript-auto-scroll.ts`) nem viheti át az állapotát a másik sorlistára. E2e
+(`branch-iteration-list.spec.ts` "a lista bezárása után a transcript tiszta lappal indul ..."): 40
+ágsorral a szűkített lista görget, a teszt a tetejére görget, majd bezárja a listát; a teljes lista
+utolsó sora a nézetbe kerül, és "Ugrás az aljára" gomb nincs. **Szándékos rontás:** `key={runId}`
+mellett a teszt bukik (a lista a tetején marad, az utolsó sor nincs kirajzolva), mert a követés nélküli
+állapot átjön, és a visszatérő sorokat új eseménynek számolja.
