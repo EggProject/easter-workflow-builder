@@ -10,6 +10,13 @@ export interface AgentsFieldEditorProperties {
    * `AgentDefinition` alakra (`.claude/CLAUDE.md` 5. szekció).
    */
   readonly value: Readonly<Record<string, unknown>>;
+  /**
+   * Az `agents` mező útvonal előtagja a node `config` gyökeréhez képest, a
+   * bejegyzések mezőnkénti hibájához (`AgentStepConfigFields` azonos nevű
+   * propja: az `agent_step` node-on üres sztring, a `join` `ai_synthesis`
+   * módjában `settings.`).
+   */
+  readonly fieldPathPrefix: string;
   readonly onChange: (nextValue: Readonly<Record<string, unknown>>) => void;
 }
 
@@ -30,7 +37,7 @@ export interface AgentsFieldEditorProperties {
  * szerkesztett tartalom elrejtése ott történik meg.
  */
 export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperties>): ReactElement {
-  const { value, onChange } = properties;
+  const { value, fieldPathPrefix, onChange } = properties;
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set());
   const [renameDrafts, setRenameDrafts] = useState<Readonly<Record<string, string>>>({});
   const [newAgentName, setNewAgentName] = useState('');
@@ -141,6 +148,7 @@ export function AgentsFieldEditor(properties: Readonly<AgentsFieldEditorProperti
             {isExpanded && (
               <AgentDefinitionEntryFields
                 value={value[key]}
+                fieldPathPrefix={`${fieldPathPrefix}agents.${key}.`}
                 onChange={(nextEntryValue) => {
                   handleEntryChange(key, nextEntryValue);
                 }}

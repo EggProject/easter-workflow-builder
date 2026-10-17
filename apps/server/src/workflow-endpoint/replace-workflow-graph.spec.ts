@@ -70,13 +70,11 @@ describe('createReplaceWorkflowGraphHandler', () => {
     expect(result.kind === 'error' && result.message).toContain('(not_found)');
   });
 
-  it('érvénytelen node config-ra malformed_node_config hibát ad', async () => {
-    // A `NodeConfigSchema` a `loop.maxIterations` mezőt csak `number`-ként ellenőrzi
-    // (a Zod séma nem hordozza a "pozitív egész" finomítást, mert az a TypeScript
-    // típusszintű egyenlőségét nem érintené), a `db` `isNodeConfig` guardja viszont
-    // igen (`isPositiveInteger`). Ez a rés az egyetlen mód, amivel a Zod séma
-    // rétegen átjutó, de az `isNodeConfig` mély ellenőrzésén elbukó értéket lehet
-    // előállítani, tehát ez a teszt kifejezetten ezt a rést célozza.
+  it('nem pozitív egész szám mezőre invalid_request hibát ad a mező útvonalával (SPEC-008 5.4, O-37)', async () => {
+    // A `db` `isNodeConfig` guard pozitív egész szabályát (`isPositiveInteger`)
+    // a mentési séma is érvényesíti, tehát a hibás érték már a séma rétegen
+    // elbukik, a `db` hívása előtt (korábban ez a rés `malformed_node_config`
+    // hibát adott, mezőútvonal nélkül).
     const database = openMemoryDatabase();
     const created = okOrThrow(
       database.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null }),
@@ -101,7 +99,10 @@ describe('createReplaceWorkflowGraphHandler', () => {
       },
     });
     expect(result.kind).toBe('error');
-    expect(result.kind === 'error' && result.message).toContain('(malformed_node_config)');
+    expect(result.kind === 'error' && result.message).toBe(
+      'A kérés törzse érvénytelen, hibás mező(k): nodes.0.config.maxIterations (invalid_request).',
+    );
+    expect(okOrThrow(database.workflows.readGraph(created.id)).nodes).toEqual([]);
   });
 
   it('nem létező node-ra mutató él idegenkulcs-sértést ad, ami conflict hibaosztályra képződik', async () => {

@@ -320,6 +320,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         <AccordionItem title="Al-agentek (agents)">
           <AgentsFieldEditor
             value={config.agents}
+            fieldPathPrefix={fieldPathPrefix}
             onChange={(nextValue) => {
               setField('agents', nextValue);
             }}

@@ -605,7 +605,7 @@ A `protocol` csomag hat kódot ismer, és a `protocol-error-message` téma minde
 3. **Ez megjelenítés, nem validáció.** A gráf szemantikai ellenőrzése változatlanul csak a szerveren fut (SPEC-008 5.4); a kliens a szerver által megnevezett osztályhoz rendel mondatot.
 4. **A mezőút nem kap mondatot.** A mentés `invalid_request` hibájában a szerver által megnevezett mező a felület nyelvén nem nevezhető meg egyértelműen: a mentés előtt a kliens ugyanazzal a protokoll sémával ellenőriz (`validate-graph-for-save.ts`, a mező alatti hibák a node inspectorban), a létrehozás és az átnevezés modálisa üres névvel nem küld, tehát a szerver mezőútja csak szerződés sértésnél jönne. Ilyenkor a kód mondata marad ("A kérés nem volt érvényes."), a mezőút nélkül (SPEC-005 8.5).
 
-E2e: `rest-error-class.spec.ts` (futás indítás `no_default_provider` a láblécben, `graph_cycle_detected` a modálisban, mentés `malformed_node_config` a `Toast` üzenetében, mentés `invalid_request` a kód mondatával a mezőút nélkül, jóváhagyás `already_decided`); a nyers szöveg a mockban szerepel, a DOM-ban nem. A `c566213` e2e tesztjei változatlanul zöldek, mert az ő mockjaikban nincs `errorClass` mező.
+E2e: `rest-error-class.spec.ts` (futás indítás `no_default_provider` és `malformed_node_config` a láblécben, `graph_cycle_detected` a modálisban, mentés `invalid_request` a kód mondatával a mezőút nélkül, jóváhagyás `already_decided`); a nyers szöveg a mockban szerepel, a DOM-ban nem. A `c566213` e2e tesztjei változatlanul zöldek, mert az ő mockjaikban nincs `errorClass` mező.
 
 ## 9. Az SSE kliens réteg
 

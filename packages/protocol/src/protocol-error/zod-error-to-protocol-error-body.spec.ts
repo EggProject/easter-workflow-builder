@@ -52,3 +52,16 @@ describe('zodErrorToProtocolErrorBody', () => {
     expect(body.message.length).toBeGreaterThan(0);
   });
 });
+
+describe('zodErrorToProtocolErrorBody: szerkezeti bemenet (SPEC-008 5.4, O-38)', () => {
+  it('a zod hibán kívüli, ugyanilyen alakú hibalistából is a mezőútvonalakat nevezi meg', () => {
+    const body = zodErrorToProtocolErrorBody({
+      issues: [{ path: ['nodes', 0, 'config', 'agents', 'reviewer', 'description'] }],
+    });
+    expect(body).toStrictEqual({
+      code: 'invalid_request',
+      message:
+        'A kérés törzse érvénytelen, hibás mező(k): nodes.0.config.agents.reviewer.description (invalid_request).',
+    });
+  });
+});

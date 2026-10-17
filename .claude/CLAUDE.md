@@ -153,6 +153,18 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `malformed_node_config` (user döntés 2026-10-14). Sodródás védelmi ág e két mentési szabályhoz nem
   tartozik (a `join` unió negyedik, `mode: null` ága viszont a meglévő sodródás védelem bővítése; a
   szabály helye technikai döntés a user 2026-09-28-i O-29 és O-33 döntése nyomán, SPEC-008 5.4).
+- **A `protocol` a `db` pozitív egész szám szabályát is duplikálhatja, ugyanezzel a védelemmel.** A
+  `loop.maxIterations`, az `error_handler.maxAttempts` és a `backoffMs` minden eleme a mentési sémában
+  is pozitív egész (user döntés 2026-10-17, O-37), a `db` `isNodeConfig` guard `isPositiveInteger`
+  szabályának duplikátumaként. A `db` oldalon nincs mezőtábla, tehát a védelem az `apps/server`
+  `node-config-drift-protection` témájában mezőnként futásidejű: a hibás érték mindkét oldalon
+  elbukik, a pozitív egész mindkettőn átmegy, és a szabály alá nem tartozó szám mezők (`timeoutMs`,
+  `maxTurns`, `maxBudgetUsd`) mindkettőn átmennek. A szerver `PUT .../graph` kezelője ezért a `config`
+  mezőt guard nélkül adja át a `db`-nek: egy ottani `isNodeConfig` hibaág a HTTP úton garantáltan
+  sosem futna (SPEC-008 5.4, `docs/research/2026-10-17-szam-es-agent-mezok.md`). **Az írás előtti
+  `isNodeConfig` guard ezért a `db` `replaceGraph` hívásában fut** (`malformed_node_config`, a meglévő
+  hibaleképezésen, user döntés 2026-10-17): a szám invariáns nincs típusszinten, tehát az ág nem
+  halott, és típushelyesen, `as` nélkül tesztelhető valós `:memory:` adatbázison.
 
 **Fájlok és tesztek**
 

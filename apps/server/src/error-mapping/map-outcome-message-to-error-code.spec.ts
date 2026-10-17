@@ -1,4 +1,7 @@
+/* eslint-disable unicorn/no-null -- a CreateWorkflowInput nullázható mezői (description, providerId) tárolt `null` értéket hordoznak (SPEC-003 4.3) */
 import { describe, expect, it } from 'vitest';
+import { isOkOutcome } from '@easter-workflow-builder/core';
+import { openDatabase } from '@easter-workflow-builder/db';
 import { formatEngineErrorMessage } from '@easter-workflow-builder/engine';
 import { mapOutcomeMessageToErrorCode } from './map-outcome-message-to-error-code.ts';
 
@@ -58,6 +61,37 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'expression_evaluator_unavailable',
   ] as const)('a motor %s validációs hibaosztályát unprocessable kódra képezi', (kind) => {
     expect(mapOutcomeMessageToErrorCode(formatEngineErrorMessage(kind, 'A futás nem indítható'))).toBe('unprocessable');
+  });
+
+  it('a db replaceGraph írás előtti isNodeConfig hibáját (malformed_node_config) unprocessable kódra képezi, a meglévő ágon (user döntés 2026-10-17)', () => {
+    // A valódi `:memory:` adatbázis saját üzenete: ha a `db` átnevezi a
+    // hibaosztályt, ez a teszt bukik, és nem esik csendben `internal` kódra.
+    const database = openDatabase(':memory:');
+    if (!isOkOutcome(database)) {
+      throw new Error(`váratlan hibaág: ${database.message}`);
+    }
+    const workflow = database.value.workflows.createWorkflow({ name: 'Teszt', description: null, providerId: null });
+    if (!isOkOutcome(workflow)) {
+      throw new Error(`váratlan hibaág: ${workflow.message}`);
+    }
+
+    const replaced = database.value.workflows.replaceGraph(
+      workflow.value.id,
+      [
+        {
+          id: 'n1',
+          label: 'Ismétlés',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'loop', maxIterations: 0, continueExpression: 'true', onUnhandledError: 'fail_run' },
+        },
+      ],
+      [],
+    );
+    database.value.close();
+
+    expect(replaced.kind).toBe('error');
+    expect(replaced.kind === 'error' && mapOutcomeMessageToErrorCode(replaced.message)).toBe('unprocessable');
   });
 
   it('a végpont kezelő invalid_request hibaosztályát invalid_request kódra képezi (2026-09-26-ig internal volt)', () => {

@@ -96,6 +96,18 @@ módonként ponttal összefűzött útvonal, a lista elemein `*`). A tábla a `p
 azonos nevű táblájával szándékos duplikátum, a sodródás védelmét az `apps/server`
 `node-config-drift-protection` tesztje adja (típusszintű egyenlőség és mezőnkénti futásidejű ág).
 
+**Az `isNodeConfig` guard írás előtt (user döntés 2026-10-17).** A `replaceGraph` a beszúrás előtt,
+a tranzakción kívül minden node configot az `isNodeConfig` guarddal is ellenőriz, mégpedig a kötelező
+szöveg mezők ellenőrzése előtt; a guardon el nem menő config `malformed_node_config` hibaágat ad a node
+azonosítójával, sort nem ír, a korábban tárolt gráf változatlan. Ez az egyetlen írás előtti
+`isNodeConfig` hívás: a szerver `PUT` kezelője a mentési séma után guard nélkül adja át a `config`
+mezőt, mert az ottani hibaág a HTTP úton garantáltan sosem futna (SPEC-005 7.7, SPEC-008 5.4).
+Guard nélkül a hibás gráf elmentődne, és utólag a `readGraph` adna `corrupt_node_config` hibát. A
+hibaosztály a motor futás indítási osztályával azonos nevű (SPEC-004 4.7), így a szerver
+hibaleképezése új ágat nem kap (`422 unprocessable`). A szám invariáns (`isPositiveInteger`) nincs
+típusszinten, tehát a hibás érték (`maxIterations: 0`) típushelyesen, `as` nélkül tesztelhető, valós
+`:memory:` adatbázison (`workflow-repository.spec.ts`).
+
 **Csak az írás oldala szigorodik.** A `readGraph` és az `isNodeConfig` guard az üres kötelező mezőt
 változatlanul elfogadja, mert a tárolt gráfban és a megváltoztathatatlan pillanatképben lehet ilyen.
 HTTP-n át a `protocol` mentési sémája előbb utasít el, ezért az `apps/server` hibaleképezése a

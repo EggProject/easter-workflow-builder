@@ -147,7 +147,13 @@ test('a futás indításának graph_cycle_detected hibája a modálisban a sajá
   await expectNoInternalText(page, 'graph_cycle_detected');
 });
 
-test('a mentés malformed_node_config hibája a Toast üzenetében a saját mondatával áll', async ({ page }) => {
+// A `malformed_node_config` hibaosztályt a szerver a futás indításakor adja (a
+// motor validációja); a `PUT .../graph` végponton a mentési séma előbb
+// utasít el `invalid_request` kóddal (SPEC-008 5.4, O-37), tehát a mentés
+// válaszaként ezt az osztályt a valós szerver nem adhatja.
+test('a futás indításának malformed_node_config hibája a lábléc danger Alert blokkjában a saját mondatával áll', async ({
+  page,
+}) => {
   await mockEditor(
     page,
     START_WITHOUT_FIELDS,
@@ -160,10 +166,11 @@ test('a mentés malformed_node_config hibája a Toast üzenetében a saját mond
   );
   await page.goto(EDITOR_URL);
 
-  await page.getByRole('button', { name: /^Mentés/ }).click();
+  await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
 
-  await expect(page.getByText('A mentés sikertelen')).toBeVisible();
-  await expect(page.getByText('Egy csomópont beállításai hibásak.')).toBeVisible();
+  const alert = page.locator('.page-footer').getByRole('alert');
+  await expect(alert).toHaveText('Egy csomópont beállításai hibásak.');
+  await expect(alert).toHaveClass(/\balert--danger\b/);
   await expectNoInternalText(page, 'malformed_node_config');
 });
 
