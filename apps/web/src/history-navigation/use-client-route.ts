@@ -4,10 +4,12 @@ import { matchClientRoute } from '../client-route/match-client-route.ts';
 import type { HistoryLocationPort } from './history-location-port.ts';
 
 /**
- * A kliens útválasztó regisztrálható navigációs őre (SPEC-008 5.10, 1. pont):
- * regisztrált őrnél a `navigate` a navigációt nem hajtja végre, hanem az őrnek
- * adja. A `proceed` a navigációt az őr megkerülésével végrehajtja (a
- * megerősítő modális "Kilépés mentés nélkül" gombja).
+ * A kliens útválasztó regisztrálható navigációs őre (SPEC-008 5.10, 1. és 3.
+ * pont): regisztrált őrnél a `navigate` a navigációt nem hajtja végre, a
+ * böngésző vissza és előre lépését (`popstate`) pedig visszafordítja, és
+ * mindkét esetben a célra vezető végrehajtást az őrnek adja. A `proceed` a
+ * navigációt az őr megkerülésével végrehajtja (a megerősítő modális "Kilépés
+ * mentés nélkül" gombja).
  */
 export type NavigationGuard = (proceed: () => void) => void;
 
@@ -35,33 +37,53 @@ export interface UseClientRouteResult {
    */
   readonly navigate: (routeId: ClientRouteId, searchParameters?: string) => void;
   /**
-   * Navigációs őr regisztrálása (SPEC-008 5.10, 1. pont). Egyszerre egy őr
-   * áll, egyetlen regisztrálóval (a szerkesztő képernyő): egy újabb
+   * Navigációs őr regisztrálása (SPEC-008 5.10, 1. és 3. pont). Egyszerre
+   * egy őr áll, egyetlen regisztrálóval (a szerkesztő képernyő): egy újabb
    * regisztráció a korábbit lecseréli, a visszaadott függvény az őrt
-   * eltávolítja. Őr nélkül a `navigate` a fenti, változatlan módon navigál. A
-   * hivatkozás stabil, tehát a hívó hatása nem fut újra miatta.
+   * eltávolítja. Őr nélkül a `navigate` és a `popstate` a fenti, változatlan
+   * módon navigál. A hivatkozás stabil, tehát a hívó hatása nem fut újra
+   * miatta.
    */
   readonly registerNavigationGuard: (guard: NavigationGuard) => () => void;
 }
 
 /**
  * A kliens oldali útvonal állapota, a befecskendezett `HistoryLocationPort`
- * fölött (SPEC-007 7.2). A vissza/előre navigáció (`popstate`, M-13) a
- * `location.pathname` értékéből számol újra.
+ * fölött (SPEC-007 7.2). A vissza/előre navigáció (`popstate`, M-13) őr
+ * nélkül a `location.pathname` értékéből számol újra, regisztrált őrnél a
+ * lépést visszafordítja (SPEC-008 5.10, 3. pont).
  */
 export function useClientRoute(port: HistoryLocationPort): UseClientRouteResult {
   const [pathname, setPathname] = useState<string>(port.pathname);
   const [search, setSearch] = useState<string>(port.search);
   // Ref, nem állapot: az őr regisztrálása és eltávolítása nem renderel újra,
-  // a `navigate` a hívás pillanatában olvassa.
+  // a `navigate` és a `popstate` figyelő a hívás pillanatában olvassa.
   const guardReference = useRef<NavigationGuard | undefined>(undefined);
 
   useEffect(() => {
     return port.addPopStateListener(() => {
-      setPathname(port.pathname());
-      setSearch(port.search());
+      const guard = guardReference.current;
+      if (guard === undefined) {
+        setPathname(port.pathname());
+        setSearch(port.search());
+        return;
+      }
+      // A `popstate` a bejegyzés váltása UTÁN fut, tehát a lépést nem
+      // megakadályozzuk, hanem visszafordítjuk (SPEC-008 5.10, 3. pont, M-115):
+      // a megjelenített útvonal marad, a cím az állapotban álló útvonalra és
+      // query stringre íródik vissza, a cél pedig az őrhöz kerül. A `pathname`
+      // és a `search` a hatás függősége, tehát a figyelő mindig a legutóbb
+      // megjelenített címet írja vissza.
+      const targetPathname = port.pathname();
+      const targetSearch = port.search();
+      port.pushState(`${pathname}${search}`);
+      guard(() => {
+        port.pushState(`${targetPathname}${targetSearch}`);
+        setPathname(targetPathname);
+        setSearch(targetSearch);
+      });
     });
-  }, [port]);
+  }, [port, pathname, search]);
 
   const navigate = useCallback(
     (routeId: ClientRouteId, searchParameters = ''): void => {
