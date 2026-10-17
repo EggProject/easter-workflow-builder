@@ -11,9 +11,16 @@
 // "Module node:buffer has been externalized for browser compatibility."
 // Az e2e kapu nem fogta meg, mert az build + preview párt futtat.
 //
-// AMIT ŐRIZ. Az `apps/web` futásidejű (nem `devDependencies`) workspace
-// függőségi zárt halmazában, plusz magában az `apps/web/src` fában egyetlen
-// termékkód fájl sem hivatkozhat Node beépített modulra. A `node:` előtag
+// AMIT ŐRIZ. Az `apps/web` workspace függőségi zárt halmazában, plusz magában
+// az `apps/web/src` fában egyetlen termékkód fájl sem hivatkozhat Node
+// beépített modulra. A zárt halmaz a `dependencies` és a `devDependencies`
+// mezőn át is épül: a `bun install` a `devDependencies` csomagjait is a csomag
+// saját `node_modules` mappájába köti (az `apps/web/node_modules` alatt a
+// `vite` és a `nyc` is ott áll), tehát egy oda felvett workspace csomag a
+// termékkódból ugyanúgy importálható, és a böngésző modulgráfjába kerül. A
+// `devDependencies` alatti, `packages/` és `apps/` mappán kívüli eszköz csomag
+// (`tooling/*`, `tools/*`, `.claude/CLAUDE.md` 6. szekció) kimarad: azok csak
+// fejlesztői eszközök, és a mezőn kívül máshol nem is állhatnak. A `node:` előtag
 // vizsgálata TELJES: az `unicorn/prefer-node-protocol` szabály a
 // `tooling/eslint-config` `unicorn.configs.recommended` készletében `error`
 // szinten aktív, tehát előtag nélküli alak (`from 'buffer'`) nem is menne át
@@ -38,11 +45,13 @@ const NODE_BUILTIN_SPECIFIER_PATTERN = /(?:from\s*|import\s*\(\s*|require\s*\(\s
 interface PackageManifest {
   readonly name?: string;
   readonly dependencies?: Record<string, string>;
+  readonly devDependencies?: Record<string, string>;
 }
 
 interface WorkspacePackage {
   readonly directory: string;
   readonly workspaceDependencyNames: readonly string[];
+  readonly workspaceDevelopmentDependencyNames: readonly string[];
 }
 
 function readPackageManifest(packageDirectory: string): PackageManifest {
@@ -84,9 +93,13 @@ function collectWorkspacePackages(): ReadonlyMap<string, WorkspacePackage> {
   for (const packageDirectory of listPackageDirectories()) {
     const manifest = readPackageManifest(packageDirectory);
     const dependencyNames = Object.keys(manifest.dependencies ?? {});
+    const developmentDependencyNames = Object.keys(manifest.devDependencies ?? {});
     packages.set(requiredPackageName(manifest, packageDirectory), {
       directory: packageDirectory,
       workspaceDependencyNames: dependencyNames.filter((name) => name.startsWith(WORKSPACE_SCOPE)),
+      workspaceDevelopmentDependencyNames: developmentDependencyNames.filter((name) =>
+        name.startsWith(WORKSPACE_SCOPE),
+      ),
     });
   }
   return packages;
@@ -101,9 +114,10 @@ function requiredPackage(packages: ReadonlyMap<string, WorkspacePackage>, name: 
 }
 
 /**
- * Az `apps/web` futásidejű workspace függőségeinek tranzitív lezártja,
- * magát az `apps/web` csomagot is beleértve. A `devDependencies` szándékosan
- * kimarad: az soha nem kerül a böngészőbe.
+ * Az `apps/web` workspace függőségeinek tranzitív lezártja, magát az
+ * `apps/web` csomagot is beleértve. A `dependencies` minden workspace neve
+ * kötelezően a `packages/` vagy az `apps/` alatt áll; a `devDependencies`
+ * nevei közül az ott nem álló eszköz csomag kimarad (lásd a fejléc kommentet).
  */
 function browserReachablePackageDirectories(): readonly string[] {
   const packages = collectWorkspacePackages();
@@ -114,7 +128,11 @@ function browserReachablePackageDirectories(): readonly string[] {
     const currentName = pendingNames.pop() ?? '';
     if (!visitedNames.has(currentName)) {
       visitedNames.add(currentName);
-      pendingNames.push(...requiredPackage(packages, currentName).workspaceDependencyNames);
+      const current = requiredPackage(packages, currentName);
+      pendingNames.push(
+        ...current.workspaceDependencyNames,
+        ...current.workspaceDevelopmentDependencyNames.filter((name) => packages.has(name)),
+      );
     }
   }
   return [...visitedNames].map((name) => requiredPackage(packages, name).directory);

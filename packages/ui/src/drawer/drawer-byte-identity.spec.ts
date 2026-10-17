@@ -24,12 +24,28 @@ const TRANSPLANTED_BLOCK_SHA256 = 'bc8d3619a96df2d2969355dfaf9f03b65f41258bc5a8f
  */
 const START_MARKER = '/* ============ Drawer / Sheet ============';
 
-function extractTransplantedBlock(fileContent: string): string {
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g;
+
+function findStartIndex(fileContent: string): number {
   const startIndex = fileContent.indexOf(START_MARKER);
   if (startIndex === -1) {
     throw new Error('Az átemelt blokk kezdő jelölője nem található a fájlban.');
   }
-  return fileContent.slice(startIndex);
+  return startIndex;
+}
+
+function extractTransplantedBlock(fileContent: string): string {
+  return fileContent.slice(findStartIndex(fileContent));
+}
+
+/**
+ * A kezdő jelölő előtti rész a kommentek nélkül. A lenyomat csak a jelölőtől
+ * a fájl végéig tartó blokkot fedi, ezért egy jelölő elé tett szabály,
+ * `@import` vagy `@media` a kaszkádban felülírhatná a bájtazonos blokkot
+ * úgy, hogy a lenyomat nem változik.
+ */
+function extractCodeBeforeStartMarker(fileContent: string): string {
+  return fileContent.slice(0, findStartIndex(fileContent)).replaceAll(CSS_COMMENT_PATTERN, '');
 }
 
 describe('drawer bájtazonosság a forrással', () => {
@@ -37,5 +53,10 @@ describe('drawer bájtazonosság a forrással', () => {
     const content = readFileSync(path.join(directory, 'drawer.css'), 'utf8');
     const block = extractTransplantedBlock(content);
     expect(createHash('sha256').update(block).digest('hex')).toBe(TRANSPLANTED_BLOCK_SHA256);
+  });
+
+  it('a jelölő előtt a fejléc kommenten kívül csak whitespace áll', () => {
+    const content = readFileSync(path.join(directory, 'drawer.css'), 'utf8');
+    expect(extractCodeBeforeStartMarker(content).trim()).toBe('');
   });
 });

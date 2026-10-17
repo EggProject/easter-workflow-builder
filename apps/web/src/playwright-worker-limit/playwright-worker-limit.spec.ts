@@ -9,6 +9,14 @@
 // egy `^\s*workers:\s*...` alakú regex a `sonarjs/super-linear-regex` szabály szerint
 // backtracking kockázatot hordozna, a sortördelés + `startsWith`/`split` viszont ugyanazt
 // determinisztikusan, lineáris időben adja.
+//
+// A CLI kapcsoló a config értéke elé kerül (`docs/research/2026-09-24-playwright-worker-korlat.md`
+// 3. szekció), tehát egy scriptben álló `--workers`/`-j` a fenti korlátot csendben megkerülné. A
+// worker számot ezért kizárólag a config adhatja: a kapcsoló a repó minden commitolt
+// `package.json` fájljában, shell scriptjében és YAML fájljában (a `_github` workflow és action
+// fájlok is) értéktől függetlenül tiltott, mert a `50%` vagy egy változó értéke a korláthoz nem
+// is hasonlítható. A teljes soros shell és YAML komment kimarad, mert az nem fut le.
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +24,16 @@ import { describe, expect, it } from 'vitest';
 
 const LOCAL_WORKER_LIMIT = 3;
 const WORKERS_FIELD_PREFIX = 'workers:';
+
+const SCRIPT_FILE_PATTERN = /(?:^|\/)package\.json$|\.(?:sh|bash|ya?ml)$/;
+// A szavakra bontás elválasztója: minden, ami egy kapcsolóban nem állhat
+// (szóköz, idézőjel, `=`, `$`, zárójel), így a `--workers=6`, a `"-j 6"` és a
+// `--workers ${{ matrix.n }}` is külön szóként adja a kapcsolót.
+const SCRIPT_WORD_SEPARATOR_PATTERN = /[^\w.%-]+/;
+// A rövid alak önállóan (`-j`), hozzáírt értékkel (`-j6`) és összevont
+// rövid kapcsolók végén (`-xj`) is; a `-jar`-hoz hasonló, `j` betűvel kezdődő
+// más kapcsoló nem.
+const SHORT_WORKERS_OPTION_PATTERN = /^-[A-Za-z]*j\d*$/;
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.join(directory, '..', '..');
@@ -50,6 +68,34 @@ function extractLocalWorkersValue(workersLine: string): number {
   return Number((localBranch ?? '').trim());
 }
 
+function repoRoot(): string {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path -- a git a fejlesztoi/CI PATH resze, ugyanugy mint a tobbi wrapper scriptben
+  return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+}
+
+function listTrackedScriptFiles(root: string): readonly string[] {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path -- a git a fejlesztoi/CI PATH resze, ugyanugy mint a tobbi wrapper scriptben
+  const output = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' });
+  return output.split('\n').filter((line) => SCRIPT_FILE_PATTERN.test(line));
+}
+
+function isWorkersOption(word: string): boolean {
+  return word === '--workers' || SHORT_WORKERS_OPTION_PATTERN.test(word);
+}
+
+/**
+ * A szöveg minden olyan sora, ami worker szám kapcsolót tartalmaz. A `#`
+ * kezdetű teljes soros komment kimarad (shell és YAML); a `package.json`
+ * fájlban ilyen sor nem áll, tehát ott nem szűr.
+ */
+function findWorkersOptionLines(content: string): readonly string[] {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => !line.startsWith('#'))
+    .filter((line) => line.split(SCRIPT_WORD_SEPARATOR_PATTERN).some((word) => isWorkersOption(word)));
+}
+
 describe('Playwright worker korlát invariáns', () => {
   const configFileNames = findPlaywrightConfigFileNames();
 
@@ -70,4 +116,33 @@ describe('Playwright worker korlát invariáns', () => {
     expect(Number.isNaN(localValue), `${configFileName}: a workers lokális értéke nem szám`).toBe(false);
     expect(localValue).toBeLessThanOrEqual(LOCAL_WORKER_LIMIT);
   });
+
+  it('egyetlen commitolt script sem ad át worker szám kapcsolót a Playwrightnak', () => {
+    const root = repoRoot();
+    const offenders = listTrackedScriptFiles(root).flatMap((relativePath) =>
+      findWorkersOptionLines(readFileSync(path.join(root, relativePath), 'utf8')).map(
+        (line) => `${relativePath}: ${line}`,
+      ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    'playwright test --workers=6',
+    'playwright test --workers 6',
+    'playwright test -j 6',
+    'playwright test -j6',
+    'bun run test:e2e -- --workers=50%',
+    '"test:e2e": "playwright test -xj 6"',
+    'run: bun run test:e2e -- --workers ${{ matrix.workers }}',
+  ])('a "%s" alak worker szám kapcsolónak számít', (line) => {
+    expect(findWorkersOptionLines(line)).toEqual([line]);
+  });
+
+  it.each(['java -jar app.jar', 'vitest run --maxWorkers=2', '# playwright test --workers=6'])(
+    'a "%s" alak nem számít worker szám kapcsolónak',
+    (line) => {
+      expect(findWorkersOptionLines(line)).toEqual([]);
+    },
+  );
 });

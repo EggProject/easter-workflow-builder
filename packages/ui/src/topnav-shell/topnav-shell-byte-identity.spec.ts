@@ -12,9 +12,12 @@
 // var(...) hivatkozast nem oldja fel (a MaxWidth stringje valtozatlanul
 // "var(--ep-layout-max-full)" marad), tehat egy DOM alapu computed-style
 // assertion hamis biztonsagot adna. A teszt ezert magat a CSS szoveget
-// elemzi, es a var() lancot maga oldja fel, ugyanazzal a szaballyal, amit a
-// CSS kaszkad kovetne: a kesobb deklaralt, szukebb scope-ban (.app-tn) allo
-// custom property ertek felulirja a korabbi/tagabb ertekeket.
+// elemzi, es a var() lancot maga oldja fel. A lanc minden tulajdonsaga a
+// vizsgalt fajlokban (breakpoints.css, topnav-shell.css) pontosan EGY
+// deklaraciot kaphat: egy masodik (kesobbi, nagyobb specificitasu,
+// `@media` alatti vagy `!important`) deklaracio a kaszkadban felulirhatna a
+// "faltol falig" erteket, es egy szoveges feloldo ezt nem tudja kovetni,
+// tehat a masodik deklaracio maga a hiba.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -40,26 +43,42 @@ function extractTransplantedBlock(fileContent: string): string {
   return fileContent.slice(startIndex, endLineIndex + END_MARKER_LINE.length);
 }
 
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g;
+
+/**
+ * Egy custom property osszes deklaraciojanak erteke a megadott blokkokban,
+ * kommentek nelkul. Az ertek a `;` vagy a deklaracios blokkot zaro `}`
+ * elott er veget, igy a zaro pontosvesszo nelkuli utolso deklaracio is
+ * szamit.
+ */
+function collectDeclarationValues(propertyName: string, declarationBlocks: readonly string[]): readonly string[] {
+  const pattern = new RegExp(String.raw`(?<![\w-])${propertyName}\s*:([^;}]*)`, 'g');
+  return declarationBlocks.flatMap((block) =>
+    block
+      .replaceAll(CSS_COMMENT_PATTERN, ' ')
+      .matchAll(pattern)
+      .map((match) => (match[1] ?? '').trim())
+      .toArray(),
+  );
+}
+
 /**
  * Egy custom property teljes var() lancanak feloldasa (nem csak egy
  * fokozat): amig az ertek var(--x) alaku, tovabb keresi --x deklaraciojat,
- * ciklusban, rekurzio nelkul.
+ * ciklusban, rekurzio nelkul. A lanc minden tulajdonsaganak pontosan egy
+ * deklaracioja lehet (lasd a fejlec kommentet).
  */
 function resolveCustomProperty(propertyName: string, declarationBlocks: readonly string[]): string {
   let currentPropertyName = propertyName;
 
   for (;;) {
-    let value: string | undefined;
-    for (const block of declarationBlocks) {
-      const pattern = new RegExp(String.raw`${currentPropertyName}:\s*([^;]+);`);
-      const match = pattern.exec(block);
-      if (match?.[1] !== undefined) {
-        value = match[1].trim();
-      }
+    const values = collectDeclarationValues(currentPropertyName, declarationBlocks);
+    if (values.length !== 1) {
+      throw new Error(
+        `A ${currentPropertyName} tulajdonsagnak pontosan egy deklaracioja lehet, ${String(values.length)} van.`,
+      );
     }
-    if (value === undefined) {
-      throw new Error(`Nincs deklaracio a ${currentPropertyName} tulajdonsagra.`);
-    }
+    const [value = ''] = values;
     const variableMatch = /^var\((--[a-z0-9-]+)\)$/.exec(value);
     if (variableMatch?.[1] === undefined) {
       return value;

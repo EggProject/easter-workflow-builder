@@ -23,12 +23,28 @@ const TRANSPLANTED_BLOCK_SHA256 = '0676d8ba2fe34892db0daaa8eb125a73c21aa3e07b357
  */
 const START_MARKER = `/* ${'='.repeat(60)}\n   FeedIndicator \u{2014} live-feed connection state`;
 
-function extractTransplantedBlock(fileContent: string): string {
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g;
+
+function findStartIndex(fileContent: string): number {
   const startIndex = fileContent.indexOf(START_MARKER);
   if (startIndex === -1) {
     throw new Error('Az átemelt blokk kezdő jelölője nem található a fájlban.');
   }
-  return fileContent.slice(startIndex);
+  return startIndex;
+}
+
+function extractTransplantedBlock(fileContent: string): string {
+  return fileContent.slice(findStartIndex(fileContent));
+}
+
+/**
+ * A kezdő jelölő előtti rész a kommentek nélkül. A lenyomat csak a jelölőtől
+ * a fájl végéig tartó blokkot fedi, ezért egy jelölő elé tett szabály,
+ * `@import` vagy `@media` a kaszkádban felülírhatná a bájtazonos blokkot
+ * úgy, hogy a lenyomat nem változik.
+ */
+function extractCodeBeforeStartMarker(fileContent: string): string {
+  return fileContent.slice(0, findStartIndex(fileContent)).replaceAll(CSS_COMMENT_PATTERN, '');
 }
 
 describe('feed-indicator bájtazonosság a forrással', () => {
@@ -36,5 +52,10 @@ describe('feed-indicator bájtazonosság a forrással', () => {
     const content = readFileSync(path.join(directory, 'feed-indicator.css'), 'utf8');
     const block = extractTransplantedBlock(content);
     expect(createHash('sha256').update(block).digest('hex')).toBe(TRANSPLANTED_BLOCK_SHA256);
+  });
+
+  it('a jelölő előtt a fejléc kommenten kívül csak whitespace áll', () => {
+    const content = readFileSync(path.join(directory, 'feed-indicator.css'), 'utf8');
+    expect(extractCodeBeforeStartMarker(content).trim()).toBe('');
   });
 });
