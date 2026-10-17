@@ -1,6 +1,7 @@
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { UndoModifier } from './resolve-undo-modifier.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
 import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 
@@ -8,12 +9,14 @@ function ShortcutProbe({
   onShortcut,
   isSaving = false,
   isNavigationConfirmationOpen = false,
+  modifier = 'ctrl',
 }: {
   readonly onShortcut: (action: UndoShortcutAction) => void;
   readonly isSaving?: boolean;
   readonly isNavigationConfirmationOpen?: boolean;
+  readonly modifier?: UndoModifier;
 }): ReactElement {
-  useUndoRedoShortcut(onShortcut, isSaving, isNavigationConfirmationOpen);
+  useUndoRedoShortcut(onShortcut, isSaving, isNavigationConfirmationOpen, modifier);
   return <input aria-label="mező" />;
 }
 
@@ -92,6 +95,27 @@ describe('useUndoRedoShortcut', () => {
     const afterSave = pressKey(document.body, { key: 'z', ctrlKey: true });
     expect(onShortcut.mock.calls).toEqual([['undo']]);
     expect(afterSave.defaultPrevented).toBe(true);
+  });
+
+  it('a beállított módosítóra figyel: Cmd mellett a Cmd+Z hat, a Ctrl+Z nem, és a módosító váltása újrakötéssel érvényesül (O-31)', () => {
+    const onShortcut = vi.fn<(action: UndoShortcutAction) => void>();
+    act(() => {
+      root.render(<ShortcutProbe onShortcut={onShortcut} modifier="meta" />);
+    });
+
+    const ctrlEvent = pressKey(document.body, { key: 'z', ctrlKey: true });
+    const metaEvent = pressKey(document.body, { key: 'z', metaKey: true });
+    expect(onShortcut.mock.calls).toEqual([['undo']]);
+    expect(ctrlEvent.defaultPrevented).toBe(false);
+    expect(metaEvent.defaultPrevented).toBe(true);
+
+    act(() => {
+      root.render(<ShortcutProbe onShortcut={onShortcut} modifier="ctrl" />);
+    });
+    const metaAfterSwitch = pressKey(document.body, { key: 'z', metaKey: true });
+    pressKey(document.body, { key: 'y', ctrlKey: true });
+    expect(onShortcut.mock.calls).toEqual([['undo'], ['redo']]);
+    expect(metaAfterSwitch.defaultPrevented).toBe(false);
   });
 
   it('nyitott megerősítő modálisnál a billentyű nem hat és nem kap preventDefault hívást, zárás után ismét hat (SPEC-008 5.10, 4. szabály)', () => {

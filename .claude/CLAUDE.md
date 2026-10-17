@@ -40,6 +40,7 @@ Forrás: gyökér `CLAUDE.md`.
 | Minden lépés önálló, zöld commit: a kilenc kapu előbb fut le (8. szekció).                                                                                                                  | gyökér `CLAUDE.md` 7. |
 | **Pusholni nem tudsz.** A futtatókörnyezet izolált Linux sandbox, nincs SSH kulcs, nincs `gh`. Minden commit sorozat után szólni kell a usernek, hogy pusholjon, és megadni a branch nevét. | gyökér `CLAUDE.md`    |
 | Fájlt átnevezni `git mv` paranccsal kell, nem kézi törléssel és újralétrehozással, különben a git indexben a régi betűzés marad (12. szekció).                                              | SPEC-002 10.          |
+| **A CI ideiglenesen ki van kapcsolva: merge előtt az agentek helyben futtatják a CI összes lépését** (8. szekció, kötelező merge kapu).                                                     | user kérés 2026-10-17 |
 
 A Todo lista, a commit kötelezettsége, az askuserquestion tool és a "mindig azt kell csinálni,
 amit a user kér" szabály szó szerint a gyökér `CLAUDE.md` 7. szekciójában áll, itt nem ismételjük.
@@ -329,10 +330,55 @@ történik (user döntés 2026-09-23, SPEC-010).
 
 ## 8. Minőségi kapuk
 
+**A CI ideiglenesen ki van kapcsolva (user kérés 2026-10-17: "Kapcsoljuk ki a CI-t ideiglenesen,
+mert elfogyott a limit").** A `.github` mappa `_github` néven áll (`git mv`), ezért a GitHub nem
+talál workflow fájlt: a hivatalos dokumentáció szerint "You must store workflow files in the
+.github/workflows directory of your repository"
+(<https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax>). A `main`
+rulesetjét (id `21510009`) a user maga tiltotta le; saját lekérdezés 2026-10-17-én
+(`gh api repos/EggProject/easter-workflow-builder/rulesets/21510009`): `enforcement: disabled`. A
+`_github` alatti fájlok tartalma szándékosan változatlan, még a
+`.github` útvonalakra hivatkozik (`uses: ./.github/actions/setup`), hogy a visszakapcsolás tiszta
+átnevezés legyen. A szekció alábbi CI leírásai (jobok, `needs` lista, ruleset) a CI
+visszakapcsolásáig nem futnak, de érvényes tervként megmaradnak.
+
+**Merge kapu, amíg a CI ki van kapcsolva (kötelező).** Az agentek futtatják a CI összes lépését,
+minden merge előtt. A PR pontosan azon a fején, amit mergelnek (a friss `main` bemergelése után),
+helyben lefut és zöld:
+
+- a kilenc kapu (`format:check`, `typecheck`, `lint`, `test`, `build`, `docs:check`,
+  `check:casing`, `check:graph`, `check:db-drift`);
+- a teljes e2e (`test:e2e`) és a `coverage:e2e:report` a küszöbbel.
+
+A parancsok, a kilépési kódok, a tesztszámok, a lefedettségi számok és a fej SHA-ja a PR
+leírásába kerülnek. Ha a `main` a futás után elmozdul, a kaput a bemergelés után újra kell
+futtatni. Forrás: user kérés 2026-10-17 ("ti futtatjátok a CI lépéseket").
+
+**A helyi futtatás módja** (a memória korlát miatt): a lint `bun x turbo run lint --concurrency=1`;
+a teljes e2e nyolc shardban (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, majd
+`--shard=<i>/8` egymás után, ugyanabba a nyers könyvtárba, végül `bun run coverage:e2e:report`),
+a Playwright `flock /tmp/playwright-gep.lock` alatt, legfeljebb 3 workerrel (11. szekció).
+Forrás: `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 29., 47. és 48. szekció.
+
+**A ruleset valódi kötelező csekkjei a letiltás előtt (a visszakapcsolás pontos alapja).** A
+`main` ruleset (id `21510009`) tizenkét kötelező státuszcsekket tartalmaz,
+`strict_required_status_checks_policy: true` mellett: `E2E`, `Build`, `Coverage PR comment`, `CI`,
+`Gate (casing)`, `Gate (docs)`, `Gate (format)`, `Gate (graph)`, `Gate (lint)`, `Gate (typecheck)`,
+`Test`, `Gate (db-drift)` (saját lekérdezés 2026-10-17, ugyanaz a `gh api` hívás). A korábbi
+állítás, hogy az összesítő `ci` job az egyetlen kötelező státuszcsekk, nem volt igaz; a lenti
+szöveg javítva.
+
+**Visszakapcsolás.** 1. `git mv _github .github`. 2. Az
+`apps/web/src/e2e-coverage-threshold/e2e-coverage-threshold.spec.ts` olvasott útvonalának
+visszaírása `_github`-ról `.github`-ra (a teszt fejléce is kimondja). 3. A ruleset
+újraengedélyezése (user). 4. A kikapcsolásról, a merge kapuról és a helyi futtatásról szóló
+bekezdés, valamint ez a bekezdés törlendő vagy átírandó; a ruleset csekkek rögzítése marad.
+
 **Ez a szekció a kapuk listájának mérvadó, egyetlen forrása. Minden más dokumentum, ami a
 kapuk számát vagy listáját említi, ide mutat.** Minden lépés végén mind a kilenc parancs nulla
 kilépési kóddal fut, és a lépés csak ezután commitolható. Forrás: gyökér `package.json`
-scriptjei, `.github/workflows/ci.yml` `gate` mátrix, SPEC-003 15. szekció 44. kritérium.
+scriptjei, `.github/workflows/ci.yml` (ma `_github/workflows/ci.yml`) `gate` mátrix, SPEC-003 15.
+szekció 44. kritérium.
 
 | Parancs                  | Mit őriz                                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
@@ -346,14 +392,15 @@ scriptjei, `.github/workflows/ci.yml` `gate` mátrix, SPEC-003 15. szekció 44. 
 | `bun run check:graph`    | aciklikus gráf, szigorúan csökkenő rétegszám                                             |
 | `bun run check:db-drift` | a `packages/db` séma és a commitolt `packages/db/drizzle` migrációk szinkronban vannak-e |
 
-A `test` és a `build` a CI-ben önálló jobként fut, a többi hét a `gate` mátrix egy-egy lába;
-mind a kilenc egyenrangú kapu, egyik sem "kiegészítő" a másikhoz képest (`tooling/scripts`
-CLAUDE.md, SPEC-003 10.3).
+A `test` és a `build` a CI-ben önálló jobként fut, a többi hét a `gate` mátrix egy-egy lába (a CI
+visszakapcsolásáig nem fut); mind a kilenc egyenrangú kapu, egyik sem "kiegészítő" a másikhoz
+képest (`tooling/scripts` CLAUDE.md, SPEC-003 10.3).
 
 **A `bun run test:e2e` és a `bun run coverage:e2e:report` nem tagja a kilenc kapunak, de
 2026-09-05 óta KIKÉNYSZERÍTETT KÜSZÖBŰ CI KAPU.** A Playwright futtatás és az e2e lefedettségi
-riport a CI-ban külön `e2e` jobban fut, a `build` jobra várva; nem szerepel sem a gyökér kilenc
-kapu parancsai között, sem a `gate` mátrixban.
+riport a CI-ban külön `e2e` jobban fut, a `build` jobra várva (a CI visszakapcsolásáig nem fut,
+helyette a fenti merge kapu érvényes); nem szerepel sem a gyökér kilenc kapu parancsai között,
+sem a `gate` mátrixban.
 
 **Miért nem a tizedik kapu, és mi teszi mégis kapuvá.** A kilenc kapu a **lokális, commit előtti**
 készlet: mindegyik parancs futtatható build és böngésző nélkül, másodpercek alatt. Az e2e ezzel
@@ -361,8 +408,9 @@ szemben Chromium telepítést és teljes frontend buildet igényel (a fejlesztő
 csak a 12. szekcióban leírt `LD_LIBRARY_PATH` kerülővel indul el), ezért marad külön kategória, a
 CI saját `e2e` jobjában. Ami kapuvá teszi: a `bun run coverage:e2e:report` a küszöb alatt **nem
 nulla kilépési kódot** ad, ettől az `e2e` job elbukik, az `e2e` job pedig szerepel az összesítő
-`ci` job `needs` listájában (`[gate, test, build, e2e]`), ami a repository ruleset egyetlen
-kötelező státuszcsekkje. A lánc mind a három szeme mérve, illetve dokumentált forrásból igazolva:
+`ci` job `needs` listájában (`[gate, test, build, e2e]`), amelynek `CI` csekkje (az `E2E` csekkel
+együtt) a ruleset tizenkét kötelező csekkje közt áll (lásd fent; a CI visszakapcsolásáig nem fut).
+A lánc mind a három szeme mérve, illetve dokumentált forrásból igazolva:
 `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 6. szekció.
 
 **A küszöb értéke mért szám, ratchet.** A kikényszerítés helye az `apps/web/package.json`
@@ -416,10 +464,13 @@ telepítés se némítsa el őket (gyökér `CLAUDE.md`, SPEC-001 11.).
 
 **CI.** A kapuk külön jobokban, párhuzamosan futnak, `fail-fast: false` mellett; a `gate` mátrix
 minden lába ugyanazt a gyökér npm scriptet hívja, amit a fejlesztő helyben futtat. Az `e2e` a
-`build` jobra vár. Az összesítő `ci` job az egyetlen, amit a repository ruleset kötelező
-státuszcsekként megkövetel, ezért egy új kapu felvétele nem igényel ruleset módosítást. A
-`coverage-comment` **nem** minőségi kapu, ezért nincs a `ci` job `needs` listájában. A CI nem kap
-MiniMax API kulcsot (SPEC-001 12.).
+`build` jobra vár. Az összesítő `ci` job a `gate`, `test`, `build` és `e2e` jobokra vár, de nem az
+egyetlen, amit a ruleset kötelező státuszcsekként megkövetel: tizenkét csekket követel (lista a
+szekció elején). Hogy egy új kapu felvétele igényel-e ruleset módosítást, nem ellenőrzött (a
+korábbi "nem igényel" állítás a hibás "egyetlen csekk" előfeltevésre épült). A `coverage-comment`
+**nem** minőségi kapu, ezért nincs a `ci` job `needs` listájában, a ruleset viszont a
+`Coverage PR comment` csekket kötelezőnek követelte. A CI nem kap MiniMax API kulcsot (SPEC-001
+12.). A bekezdés által leírt CI a visszakapcsolásáig nem fut.
 
 ---
 

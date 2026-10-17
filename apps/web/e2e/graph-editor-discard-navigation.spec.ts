@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream } from './sse-mock.ts';
+import { WINDOWS_CHROME_USER_AGENT } from './user-agent.ts';
 
 /* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
 
@@ -41,6 +42,11 @@ const SETTINGS: SettingsRecord = { defaultProviderId: null, persistStreamDeltas:
 /* eslint-enable unicorn/no-null */
 
 const EDITOR_URL = '/editor?workflowId=w-alfa';
+
+// A fájl a `Ctrl` módosítót méri: az Automatikus beállítás a felhasználói
+// ügynökből old fel (SPEC-008 5.10, O-31), ezért az ügynök nem macOS értékre
+// van rögzítve.
+test.use({ userAgent: WINDOWS_CHROME_USER_AGENT });
 
 test.beforeEach(async ({ page }) => {
   await mockIdleStream(page);
