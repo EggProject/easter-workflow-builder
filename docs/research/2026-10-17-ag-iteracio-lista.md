@@ -8,7 +8,8 @@
 
 A SPEC-008 6.3, 14.1 O-39 és a 118. kritérium megvalósításának mért tényei, forrásai és e2e
 lefedettségi darabszámai. A megvalósított alakot a SPEC-008 6.3 írja le; a megvalósításból nyílt két
-kérdést (SPEC-008 O-40, O-41) a user 2026-10-17-én eldöntötte, a lezárás a 10. szekcióban áll.
+kérdést (SPEC-008 O-40, O-41) a user 2026-10-17-én eldöntötte, a lezárás a 10. szekcióban áll. A lista
+függő jóváhagyás alatti alakja (legördülő) a 11. szekcióban áll.
 
 ## 1. A user döntései, amiket a lépés megvalósít (2026-10-17)
 
@@ -20,8 +21,9 @@ kérdést (SPEC-008 O-40, O-41) a user 2026-10-17-én eldöntötte, a lezárás 
 
 A jóváhagyás felülete a transcript sáv ALJÁN áll (SPEC-008 8. szekció 1. pont, user döntés
 2026-09-25, "transcript felül, kérdés alul", `RunViewTranscriptSide.tsx`), tehát a lista (felül) és a
-jóváhagyás (alul) nem versenyez egy helyért; a spec helyettesítési vagy egymás alatti szabályára nincs
-szükség.
+jóváhagyás (alul) más helyen áll. **Pontosítás (2026-10-17):** a sáv MAGASSÁGÁÉRT viszont versenyeznek;
+egy függő jóváhagyás mellett a táblás lista és a transcript szinte eltűnik, ezért függő jóváhagyás alatt
+a lista legördülő (user döntés 2026-10-17, "Legördülő jóváhagyáskor", 11. szekció).
 
 ## 2. A 19. kritérium a kattintás kezelő mellett: forrás
 
@@ -240,3 +242,95 @@ A `key={transcriptPanelKey}` szükséges: a szűkítés váltásakor a transcrip
 utolsó sora a nézetbe kerül, és "Ugrás az aljára" gomb nincs. **Szándékos rontás:** `key={runId}`
 mellett a teszt bukik (a lista a tetején marad, az utolsó sor nincs kirajzolva), mert a követés nélküli
 állapot átjön, és a visszatérő sorokat új eseménynek számolja.
+
+## 11. Függő jóváhagyás alatt legördülő (user döntés 2026-10-17, "Legördülő jóváhagyáskor")
+
+### 11.1 A felülírt döntés és a mért indok
+
+A user 2026-10-17-én először azt döntötte, hogy nyitott lista és függő jóváhagyás mellett a transcript
+sáv két, húzható elválasztóval osztott fele legyen: felül a lista, alul a transcript és a jóváhagyás
+("fele-fele"). Ennek a prototípusa (egy előző munkamenet nem commitolt `RunViewTranscriptSide`
+változata: külső `Resizable` `[50, 50]` arányon, a lista az első panelen, a transcript, a jóváhagyás
+törzse és a "Függő jóváhagyások" régió a másodikon) a mérés szerint egyetlen teljes listasort sem
+mutatott, és a transcriptet szinte eltüntette. **A döntést a user ugyanaznap felülírta** ("Legördülő
+jóváhagyáskor"), ezért a fele-fele elválasztó nem épült meg.
+
+**A mérés** ebben a munkamenetben újrafuttatva: a `bc436c0` állapotán a prototípus javítása, valós
+Chromium, egy `fan_out` 32 ággal (az első `waiting_approval`), 20 transcript sorral, egy függő
+jóváhagyással, a lista kinyitva; a mérő spec nem commitolt, képet nem ír, csak számot (`page.evaluate`,
+`getBoundingClientRect`, egész pixelre kerekítve). "Teljes listasor": a tábla sora teljes egészében a
+tábla görgető régiójában, a lista paneljében és a nézetben, a fejléc alatt.
+
+| Méret, jóváhagyás                                         | A rajz | A transcript oldal | A lista panel | Teljes listasor | A transcript panel | A jóváhagyás törzse |
+| --------------------------------------------------------- | -----: | -----------------: | ------------: | --------------: | -----------------: | ------------------: |
+| 1440x600, függő jóváhagyás                                |    400 |                400 |           198 |               0 |                 12 |                  44 |
+| 1000x700, függő jóváhagyás                                |    266 |                229 |           112 |               0 |                  0 |                   2 |
+| 1000x700, függő jóváhagyás, tárolt külső arány `[10, 90]` |     60 |                435 |           215 |               1 |                 21 |                  53 |
+| 375x812, függő jóváhagyás, Transcript fül                 |      0 |                533 |           264 |               1 |                 46 |                  78 |
+
+A lista panel teteje és a tábla fejlécének alja között (a cím, a mondat és a tábla fejléce) 122 pixel
+állt, 375x812-n 143, egy tábla sor 57 pixel magas volt. A jóváhagyás gombjai mindegyik esetben a nézetben álltak.
+
+### 11.2 A megvalósult alak
+
+Függő jóváhagyás alatt (amíg a jóváhagyás felülete látszik: `shownApproval !== undefined`, ugyanaz a
+feltétel, ami a jóváhagyás törzsét és az elválasztót kiteszi) a lista tábla helyett egyetlen sor: a
+`packages/ui` `SelectField` eleme `size="sm"` mérettel és a bezárás ikon gombja
+(`BranchIterationList.tsx` `isCompact`, `branch-iteration-list.css` `.branch-iteration-list--compact`).
+Az első opció "Összes ág", illetve "Összes iteráció", a továbbiak tételenként "<a tétel felirata>, <az
+állapot jelvény felirata>" (`describeStepRunStatusBadge`, SPEC-008 6.2). A legördülő értéke a tétel
+lépés futás azonosítója előtaggal, hogy egyetlen azonosító (a drótszintű séma szerint tetszőleges szöveg,
+`StepRunRecordSchema` `id: z.string()`) se eshessen egybe a "minden tétel" opció értékével. A
+`packages/ui` nem változott.
+
+**A transcript panel nem szerel le.** A lista és a transcript panel ugyanannak a `transcriptPanel`
+töredéknek két testvére (`RunViewScreen.tsx`); a váltás csak a `BranchIterationList` belsejét cseréli, a
+transcript panel helye és a `key` értéke (a futás és a szűkítés) változatlan, a kiválasztás a
+`RunViewScreen` állapota. A React a helyben maradó elemet megtartja
+(<https://react.dev/learn/preserving-and-resetting-state#same-component-at-the-same-position-preserves-state>),
+és a `RunViewTranscriptSide` a transcriptet a jóváhagyás nélkül és vele is ugyanazon a helyen tartja
+(a fájl fejkommentje).
+
+**Mérés utána**, ugyanazzal a fixtúrával és mérő spec alakkal (nem commitolt), a jelen lépés kódján
+(`bc436c0` plusz a lépés változásai):
+
+| Méret, jóváhagyás                         | A rajz | A transcript oldal | A lista régió | A legördülő | A legördülő a nézetben | A transcript panel | A jóváhagyás törzse |
+| ----------------------------------------- | -----: | -----------------: | ------------: | ----------: | ---------------------- | -----------------: | ------------------: |
+| 1440x600, függő jóváhagyás                |    400 |                400 |            36 |          36 | igen                   |                 21 |                 181 |
+| 1000x700, függő jóváhagyás                |     60 |                435 |            36 |          36 | igen                   |                 75 |                 162 |
+| 375x812, függő jóváhagyás, Transcript fül |      0 |                533 |            36 |          36 | igen                   |                125 |                 210 |
+| 1440x600, jóváhagyás nélkül (tábla)       |    400 |                400 |           176 |           - | -                      |                176 |                   - |
+
+A jóváhagyás gombjai mindhárom jóváhagyásos esetben a nézetben álltak. 1000x700-on (függőleges sáv) a
+rajz a felfedés szabálya szerint 60 pixelre húzódott össze (SPEC-008 8. szekció 1. pont, "a rajz
+húzódjon össze"); a prototípusban ugyanezen a méreten 266 pixelen maradt, az eltérés okát ez a mérés
+nem vizsgálta (nem ellenőrzött). 1440x600-on (vízszintes sáv) a külső elválasztó más tengelyen áll,
+tehát a kérdés felfedése a belső elválasztót mozdítja (SPEC-008 8. szekció 1. pont), és a transcript
+panelnek 21 pixel marad; ebből a magasságból a legördülő sora a saját 36 pixelét és a lista alsó
+margóját veszi el.
+
+### 11.3 E2e és szándékos rontások
+
+`apps/web/e2e/branch-iteration-list.spec.ts`, négy új teszt, plusz egy állítás a meglévő `fan_out`
+tesztben (jóváhagyás nélkül a tábla áll, legördülő nincs):
+
+- 1440x600, 1000x700 és 375x812 (a fül sávban a "Transcript" fülön): nyitott lista és függő jóváhagyás
+  mellett a legördülő és a bezárás gomb teljesen a nézetben (`toBeInViewport({ ratio: 1 })`), tábla
+  nincs, az opciók a 11.2 alakjában, a "2. Ellenőrzés, elutasítva" választás a transcriptet egy sorra
+  szűkíti, az "Összes ág" visszaállítja, és a kérdés címe, szövege és a két gomb előtte és utána is
+  teljesen látszik.
+- 1440x600, élőben érkező és eltűnő jóváhagyás (a kapcsolat a `node:http` teszt szerveren nyitott,
+  `startOpenStreamServer`, a szabálykönyv 11. szekciójának kivétele): a táblában választott tétel a
+  legördülő értéke lesz, a szűkítés marad, a transcript panel DOM eleme (`data-e2e-mounted` jelöléssel)
+  megmarad; az eltűnés után a tábla áll, a tétel gombja lenyomott, a szűkítés és a DOM elem marad.
+
+| Rontás (`RunViewScreen.tsx`)                                                                    | Eredmény                                                                                           |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| a legördülő választása nem írja a kiválasztást (`onSelectItem` a régi kiválasztást adja vissza) | a három méret tesztje bukik: a legördülő felirata "Összes ág" marad                                |
+| a választás nem szűkít (jóváhagyás alatt a szűkítés a tételt figyelmen kívül hagyja)            | négy teszt bukik (a három méret és az élő érkezés): "Expected: 1, Received: 3" a transcript sorain |
+| mindig a tábla (`isCompact={false}`)                                                            | négy teszt bukik: a legördülő nincs a nézetben, illetve nincs legördülő                            |
+| a transcript panel a jóváhagyás váltásakor újra felcsatolódik (a `key` része a jóváhagyás)      | az élő érkezés tesztje bukik: a jelölt DOM elem száma 0                                            |
+
+Mindegyik rontás visszaállítva, utána a fájl mind a 14 tesztje zöld. Unit:
+`BranchIterationList.spec.tsx` (a legördülő alak hat esete) és `RunViewScreen.spec.tsx` (élő
+érkezés és eltűnés, a választás, a szűkítés és a transcript panel eleme marad).

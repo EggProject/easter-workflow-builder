@@ -501,6 +501,28 @@ function clickNode(nodeId: string): void {
   });
 }
 
+/**
+ * Egy élő jóváhagyás lista változás keret (`approval_requested` vagy
+ * `approval_decided`) a futás szintjén, a megadott esemény azonosítóval.
+ */
+function approvalListFrame(id: number, kind: 'approval_requested' | 'approval_decided'): StreamFrame {
+  const frame = runFinishedFrame('r-3');
+  if (frame.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return { ...frame, runEvent: { ...frame.runEvent, id, kind } };
+}
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickWithMouse(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
 describe('RunViewScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -1521,6 +1543,33 @@ describe('RunViewScreen', () => {
     return button;
   }
 
+  function listSelect(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(':scope .branch-iteration-list button[role="combobox"]');
+  }
+
+  /**
+   * A legördülő egy opciójának választása; a panel `createPortal`-lal a
+   * `document.body`-ba kerül, a triggerhez az `aria-controls` köti.
+   */
+  function chooseListOption(optionLabel: string): void {
+    const trigger = listSelect();
+    if (trigger === null) {
+      throw new Error('a teszt nem talált legördülőt');
+    }
+    clickWithMouse(trigger);
+    const panelId = trigger.getAttribute('aria-controls');
+    const panel = [...document.body.querySelectorAll<HTMLElement>(':scope [role="listbox"]')].find(
+      (candidate) => candidate.id === panelId,
+    );
+    const option = [...(panel?.querySelectorAll<HTMLElement>(':scope [role="option"]') ?? [])].find(
+      (candidate) => candidate.textContent === optionLabel,
+    );
+    if (option === undefined) {
+      throw new Error(`a teszt nem talált "${optionLabel}" opciót`);
+    }
+    clickWithMouse(option);
+  }
+
   describe('a fan_out ágainak és a loop iterációinak tételes listája (SPEC-008 6.3, O-39)', () => {
     it('kattintás nélkül nincs lista, és a transcript minden sort mutat', async () => {
       await renderBranchIterationScreen();
@@ -1627,6 +1676,49 @@ describe('RunViewScreen', () => {
       expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe(
         'A kiválasztott tételeknek nincs eseménye.',
       );
+    });
+
+    it('függő jóváhagyás alatt a lista legördülő: élő érkezéskor és eltűnéskor a választás és a szűkítés megmarad, a transcript panel nem szerel le (user döntés 2026-10-17)', async () => {
+      let approvals: readonly unknown[] = [];
+      const baseFetchFunction = createFetchFunction({
+        snapshot: BRANCH_ITERATION_SNAPSHOT,
+        stepRuns: BRANCH_ITERATION_STEP_RUNS,
+      });
+      const fetchFunction: FetchFunction = (input, init) => {
+        if (!new URL(input).pathname.endsWith('/approvals')) {
+          return baseFetchFunction(input, init);
+        }
+        return Promise.resolve(Response.json(approvals));
+      };
+      await renderScreen('?runId=r-3', fetchFunction);
+      await emitFramesAndFlush(BRANCH_ITERATION_FRAMES);
+      clickNode('n-fan');
+      act(() => {
+        itemButton('2. Ellenőrzés').click();
+      });
+      expect(transcriptRowCount()).toBe(1);
+      const transcriptPanelBefore = container.querySelector('.transcript-panel');
+      expect(listSelect()).toBeNull();
+
+      approvals = [{ ...APPROVAL, stepRunId: 's-a' }];
+      await emitFramesAndFlush([approvalListFrame(42, 'approval_requested')]);
+      expect(container.querySelectorAll('.approval-prompt-card')).toHaveLength(1);
+      expect(listRegion()?.querySelector('[role="table"]')).toBeNull();
+      expect(listSelect()?.textContent).toBe('2. Ellenőrzés, sikertelen');
+      expect(transcriptRowCount()).toBe(1);
+      expect(container.querySelector('.transcript-panel')).toBe(transcriptPanelBefore);
+
+      chooseListOption('Összes ág');
+      expect(transcriptRowCount()).toBe(3);
+      chooseListOption('1. Ellenőrzés, sikeres');
+      expect(transcriptRowCount()).toBe(1);
+
+      approvals = [];
+      await emitFramesAndFlush([approvalListFrame(43, 'approval_decided')]);
+      expect(container.querySelector('.approval-prompt-card')).toBeNull();
+      expect(listSelect()).toBeNull();
+      expect(itemButton('1. Ellenőrzés').getAttribute('aria-pressed')).toBe('true');
+      expect(transcriptRowCount()).toBe(1);
     });
 
     it('másik futásra váltva a lista zárva indul', async () => {

@@ -12,16 +12,31 @@
 // mockon megy; az SSE csatorna egyetlen lezárt pótlás, ami a szabálykönyv 11.
 // szekciója szerint a HASZNÁLANDÓ út egyetlen lezárt válaszon belüli
 // viselkedéshez.
+//
+// Függő jóváhagyás alatt a lista egyetlen sor magas legördülő (user döntés
+// 2026-10-17, "Legördülő jóváhagyáskor", SPEC-008 6.3 és 8. szekció). Az
+// ÉLŐBEN érkező és eltűnő jóváhagyás tesztje az egyetlen kivétel a lezárt
+// pótlás alól: egy már megnyitott kapcsolatba menet közben beszúrt keret a
+// `route.fulfill()` lezárt válaszán nem küldhető, ezért ott a kapcsolat a
+// célra írt `node:http` teszt szerveren nyitott (`run-view-stream.ts`
+// `startOpenStreamServer`; szabálykönyv 11. szekció, SPEC-007 13.4,
+// `docs/research/2026-08-30-sse-mockolas-meres.md`), a REST hívások
+// változatlanul `page.route()` mockon mennek.
+import type { Server } from 'node:http';
 import type {
   NodeConfig,
+  PendingApproval,
   RunDetail,
   RunEventRecord,
   RunSnapshotResponse,
   StepRunRecord,
 } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { FIRST_APPROVAL } from './approval-fixture.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
+import { startOpenStreamServer } from './run-view-stream.ts';
+import { chooseSelectOption, expectSelectedLabel } from './select-field.ts';
 import { mockSseFramesWithoutReconnect } from './sse-mock.ts';
 import { makeRunEventRecord, replayFrames } from './transcript-fixture.ts';
 
@@ -189,21 +204,47 @@ const RECORDS: readonly RunEventRecord[] = [
 
 /* eslint-enable unicorn/no-null */
 
+/**
+ * A függő jóváhagyások listája, amit a `listPendingApprovals` mock minden
+ * kérésre újraolvas: menet közben átírható.
+ */
+interface ApprovalListState {
+  approvals: readonly PendingApproval[];
+}
+
+/**
+ * Az üres jóváhagyás lista alapértéke; sosem íródik át.
+ */
+const NO_APPROVALS: ApprovalListState = { approvals: [] };
+
+/**
+ * A futás nézet REST mockjai. A futás rekordja alapból a lezárt futásé; a
+ * jóváhagyás tesztjei a még futó futást adják.
+ */
+async function mockRest(
+  page: Page,
+  stepRuns: readonly StepRunRecord[],
+  approvalState: ApprovalListState = NO_APPROVALS,
+  runDetail: RunDetail = RUN_DETAIL,
+): Promise<void> {
+  await installApiMocks(page, [
+    mockRoute('getRun', async (route) => route.fulfill(jsonBody(runDetail))),
+    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
+    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(stepRuns))),
+    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody(approvalState.approvals))),
+    mockRoute('replaceStreamSubscriptions', async (route) =>
+      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
+    ),
+  ]);
+}
+
 async function mockRun(
   page: Page,
   stepRuns: readonly StepRunRecord[] = STEP_RUNS,
   records: readonly RunEventRecord[] = RECORDS,
 ): Promise<void> {
   await mockSseFramesWithoutReconnect(page, replayFrames(RUN_ID, records));
-  await installApiMocks(page, [
-    mockRoute('getRun', async (route) => route.fulfill(jsonBody(RUN_DETAIL))),
-    mockRoute('readRunSnapshot', async (route) => route.fulfill(jsonBody(SNAPSHOT))),
-    mockRoute('listStepRuns', async (route) => route.fulfill(jsonBody(stepRuns))),
-    mockRoute('listPendingApprovals', async (route) => route.fulfill(jsonBody([]))),
-    mockRoute('replaceStreamSubscriptions', async (route) =>
-      route.fulfill(jsonBody({ streamId: 'e2e-stream', subscriptions: [] })),
-    ),
-  ]);
+  await mockRest(page, stepRuns);
 }
 
 /**
@@ -273,6 +314,9 @@ test('a fan_out csomópontra kattintva kinyílik az ágak listája, egy ágra ka
   await nodeLocator(page, 'n-fan').click();
   const region = page.getByRole('region', { name: 'Ágak: Elemek szétosztása' });
   await expect(region).toBeVisible();
+  // Jóváhagyás nélkül a tábla áll, legördülő nincs (user döntés 2026-10-17).
+  await expect(region.getByRole('table')).toBeVisible();
+  await expect(region.getByRole('combobox')).toHaveCount(0);
   await expect(region.getByRole('row')).toHaveCount(3);
   await expect(region.getByRole('button', { name: '1. Ellenőrzés' })).toHaveAttribute('aria-pressed', 'false');
   await expect(region.getByRole('row', { name: /2\. Ellenőrzés/ }).getByText('elutasítva')).toBeVisible();
@@ -503,4 +547,186 @@ test('a lista bezárása után a transcript tiszta lappal indul: a szűkített n
     .click();
   await expect(list.locator(`[role="listitem"][aria-posinset="${String(records.length)}"]`)).toBeInViewport();
   await expect(page.getByRole('button', { name: /^Ugrás az aljára/ })).toHaveCount(0);
+});
+
+// ============================================================
+// FÜGGŐ JÓVÁHAGYÁS ALATT LEGÖRDÜLŐ (user döntés 2026-10-17, "Legördülő
+// jóváhagyáskor", SPEC-008 6.3 és 8. szekció). A korábbi "lista és
+// transcript plusz jóváhagyás fele-fele" elrendezés 1440x600-on és
+// 1000x700-on egyetlen teljes listasort sem mutatott, és a transcript szinte
+// eltűnt (`docs/research/2026-10-17-ag-iteracio-lista.md` 11. szekció).
+// ============================================================
+
+/* eslint-disable unicorn/no-null -- a protokoll nullázható mezői a dróton ténylegesen `null` értéket hordoznak (packages/protocol) */
+
+const RUNNING_RUN_DETAIL: RunDetail = { ...RUN_DETAIL, status: 'running', finishedAtMs: null };
+
+/* eslint-enable unicorn/no-null */
+
+/**
+ * A szétosztás első ága jóváhagyásra vár; a jóváhagyás ehhez a lépés
+ * futáshoz tartozik.
+ */
+const WAITING_STEP_RUNS: readonly StepRunRecord[] = STEP_RUNS.map((record) =>
+  record.id === 'sr-a' ? { ...record, status: 'waiting_approval' } : record,
+);
+
+const BRANCH_APPROVAL: PendingApproval = { ...FIRST_APPROVAL, runId: RUN_ID, stepRunId: 'sr-a' };
+
+interface ApprovalLayout {
+  readonly viewport: { readonly width: number; readonly height: number };
+  /**
+   * A fül sáv (telefon): a csomópontra a "Gráf" fülön kell kattintani, a
+   * lista és a jóváhagyás a "Transcript" fülön áll.
+   */
+  readonly isTabbed: boolean;
+}
+
+const APPROVAL_LAYOUTS: readonly ApprovalLayout[] = [
+  { viewport: { width: 1440, height: 600 }, isTabbed: false },
+  { viewport: { width: 1000, height: 700 }, isTabbed: false },
+  { viewport: { width: 375, height: 812 }, isTabbed: true },
+];
+
+function layoutName(layout: ApprovalLayout): string {
+  return `${String(layout.viewport.width)}x${String(layout.viewport.height)}`;
+}
+
+function listCombobox(page: Page): Locator {
+  return page
+    .getByRole('region', { name: 'Ágak: Elemek szétosztása' })
+    .getByRole('combobox', { name: 'Ágak: Elemek szétosztása' });
+}
+
+/**
+ * A látott jóváhagyás kérdése (a cím és a szöveg) és a két gomb teljes
+ * egészében látszik (a 2026-09-25-i "a kérdés kifér" szabály, SPEC-008 8.
+ * szekció 1. pont).
+ */
+async function expectQuestionVisible(page: Page): Promise<void> {
+  const body = page.locator('.run-view-screen__transcript .approval-prompt-body');
+  await expect(body.getByRole('heading', { name: BRANCH_APPROVAL.title })).toBeInViewport({ ratio: 1 });
+  await expect(body.getByText(BRANCH_APPROVAL.body, { exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Jóváhagyás', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Elutasítás', exact: true })).toBeInViewport({ ratio: 1 });
+}
+
+/**
+ * A futás nézet megnyitása és a `fan_out` lista kinyitása a megadott
+ * elrendezésben; a fül sávban utána a "Transcript" fülre vált.
+ */
+async function openFanOutList(page: Page, layout: ApprovalLayout): Promise<void> {
+  await page.setViewportSize(layout.viewport);
+  await page.goto(`/run?runId=${RUN_ID}`);
+  await expect(nodeLocator(page, 'n-fan')).toBeVisible();
+  await nodeLocator(page, 'n-fan').click();
+  if (layout.isTabbed) {
+    await page.getByRole('tab', { name: 'Transcript' }).click();
+  }
+  await expect(page.getByRole('region', { name: 'Ágak: Elemek szétosztása' })).toBeVisible();
+}
+
+for (const layout of APPROVAL_LAYOUTS) {
+  test(`${layoutName(layout)}, nyitott lista és függő jóváhagyás: a lista legördülő, látható és használható, szűkít, és a kérdés meg a gombok teljesen látszanak`, async ({
+    page,
+  }) => {
+    await mockSseFramesWithoutReconnect(page, replayFrames(RUN_ID, RECORDS));
+    await mockRest(page, WAITING_STEP_RUNS, { approvals: [BRANCH_APPROVAL] }, RUNNING_RUN_DETAIL);
+    await openFanOutList(page, layout);
+
+    const region = page.getByRole('region', { name: 'Ágak: Elemek szétosztása' });
+    const select = listCombobox(page);
+    await expect(select).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: 'A lista bezárása' })).toBeInViewport({ ratio: 1 });
+    await expect(region.getByRole('table')).toHaveCount(0);
+    await expectSelectedLabel(select, 'Összes ág');
+    await expectQuestionVisible(page);
+    await expect(transcriptList(page).getByRole('listitem')).toHaveCount(3);
+
+    // Az opciók: a csomópont minden ága, utána tételenként a felirat és az
+    // állapot jelvényének felirata.
+    await select.click();
+    await expect(page.getByRole('listbox').getByRole('option')).toHaveText([
+      'Összes ág',
+      '1. Ellenőrzés, jóváhagyásra vár',
+      '2. Ellenőrzés, elutasítva',
+    ]);
+    await page.keyboard.press('Escape');
+    await expect(select).toHaveAttribute('aria-expanded', 'false');
+
+    await chooseSelectOption(page, select, '2. Ellenőrzés, elutasítva');
+    await expectSelectedLabel(select, '2. Ellenőrzés, elutasítva');
+    await expect(transcriptList(page).getByRole('listitem')).toHaveCount(1);
+    expect(await transcriptTitles(page)).toEqual([expect.stringContaining('Második ág sora')]);
+    await expectQuestionVisible(page);
+
+    await chooseSelectOption(page, select, 'Összes ág');
+    await expect(transcriptList(page).getByRole('listitem')).toHaveCount(3);
+  });
+}
+
+const streamServerHolder: { current: Server | undefined } = { current: undefined };
+
+test.afterEach(() => {
+  // A `closeAllConnections()` KELL a `close()` mellé: a nyitva hagyott SSE
+  // kapcsolat egyébként életben tartaná a szervert (és vele a portját) a
+  // worker folyamat végéig (`sse-real-server.spec.ts` azonos mintája).
+  streamServerHolder.current?.closeAllConnections();
+  streamServerHolder.current?.close();
+  streamServerHolder.current = undefined;
+});
+
+/**
+ * Egy élő, futás szintű (lépéshez nem kötött) jóváhagyás lista változás
+ * keret: a szűkített transcriptbe nem kerül sor miatta.
+ */
+function approvalListFrame(id: number, kind: 'approval_requested' | 'approval_decided'): RunEventRecord {
+  return makeRunEventRecord(id, RUN_ID, { kind });
+}
+
+test('1440x600, élőben érkező és eltűnő jóváhagyásnál a választás és a szűkítés megmarad, és a transcript panel nem szerel le', async ({
+  page,
+}) => {
+  const approvalState: ApprovalListState = { approvals: [] };
+  const streamServer = await startOpenStreamServer(page, replayFrames(RUN_ID, RECORDS));
+  streamServerHolder.current = streamServer.server;
+  await mockRest(page, WAITING_STEP_RUNS, approvalState, RUNNING_RUN_DETAIL);
+  await openFanOutList(page, { viewport: { width: 1440, height: 600 }, isTabbed: false });
+
+  const region = page.getByRole('region', { name: 'Ágak: Elemek szétosztása' });
+  await region.getByRole('button', { name: '2. Ellenőrzés' }).click();
+  await expect(transcriptList(page).getByRole('listitem')).toHaveCount(1);
+  // A transcript panel DOM eleme megjelölve: ha a panel leszerelne és újra
+  // felcsatolódna, az új elemen a jelölés nem állna.
+  await page.locator('.transcript-panel').evaluate((element) => {
+    element.dataset['e2eMounted'] = 'eredeti';
+  });
+  const markedPanel = page.locator('.transcript-panel[data-e2e-mounted="eredeti"]');
+
+  approvalState.approvals = [BRANCH_APPROVAL];
+  streamServer.push({
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: approvalListFrame(RECORDS.length + 1, 'approval_requested'),
+  });
+  await expectQuestionVisible(page);
+  const select = listCombobox(page);
+  await expectSelectedLabel(select, '2. Ellenőrzés, elutasítva');
+  await expect(region.getByRole('table')).toHaveCount(0);
+  await expect(transcriptList(page).getByRole('listitem')).toHaveCount(1);
+  expect(await transcriptTitles(page)).toEqual([expect.stringContaining('Második ág sora')]);
+  await expect(markedPanel).toHaveCount(1);
+
+  approvalState.approvals = [];
+  streamServer.push({
+    event: 'run_event',
+    delivery: 'live',
+    runEvent: approvalListFrame(RECORDS.length + 2, 'approval_decided'),
+  });
+  await expect(page.getByRole('heading', { name: BRANCH_APPROVAL.title })).toHaveCount(0);
+  await expect(region.getByRole('table')).toBeVisible();
+  await expect(region.getByRole('combobox')).toHaveCount(0);
+  await expect(region.getByRole('button', { name: '2. Ellenőrzés' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(transcriptList(page).getByRole('listitem')).toHaveCount(1);
+  await expect(markedPanel).toHaveCount(1);
 });

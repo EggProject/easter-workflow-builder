@@ -14,7 +14,8 @@
    listánál a kettő egyenlően osztozik, és a lista a design system
    `.data-table-scroll` görgető régiójában görget (`data-table.css`:
    `flex: 1 1 auto; min-height: 0; overflow: auto`). Kitalált pixel szám nincs;
-   a mérés: `docs/research/2026-10-17-ag-iteracio-lista.md`. */
+   a mérés: `docs/research/2026-10-17-ag-iteracio-lista.md`. Függő jóváhagyás
+   alatt a lista a fájl végén álló legördülő alakra vált. */
 .branch-iteration-list {
   display: flex;
   flex-direction: column;
@@ -46,4 +47,22 @@
   margin: 0;
   font: var(--ep-text-small);
   color: var(--ep-fg-muted);
+}
+
+/* A LEGÖRDÜLŐ ALAK függő jóváhagyás alatt (user döntés 2026-10-17,
+   "Legördülő jóváhagyáskor", SPEC-008 6.3 és 8. szekció): egyetlen sor a
+   saját magasságán, nem osztozik a transcripttel, tehát a maradék a
+   transcripté. A `SelectField` `.field` burkolója kitölti a sort a bezárás
+   gombja mellett; a `min-width: 0` engedi, hogy a felirat a design system
+   saját csonkolásával (`.select__value` `text-overflow: ellipsis`) rövidüljön,
+   ne a sor lógjon ki. */
+.branch-iteration-list--compact {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+}
+
+.branch-iteration-list--compact > .field {
+  flex: 1;
+  min-width: 0;
 }

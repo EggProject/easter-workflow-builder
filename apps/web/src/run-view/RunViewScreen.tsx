@@ -254,7 +254,10 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * transcript már összegyűjtött sorain fut, a `stepRunId` mezőjük szerint, a
  * `parent_step_run_id` láncon gyűjtött lépés futás halmazra
  * (`resolveBranchIterationScope`), új REST hívás nélkül. A kiválasztás a
- * futás váltásakor törlődik.
+ * futás váltásakor törlődik. Függő jóváhagyás alatt a lista egyetlen sor
+ * magas legördülő (user döntés 2026-10-17, "Legördülő jóváhagyáskor"); a
+ * kiválasztás itt él, tehát egy élőben érkező vagy eltűnő jóváhagyás a
+ * választást és a szűkítést nem érinti.
  *
  * A futás rekordja saját `useState` értékben áll, nem `useRequestState`
  * állapotban: az újratöltés alatt egy `pending` állapot a csontvázat hozná
@@ -570,7 +573,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           // panel (és a görgetés állapota) tiszta lappal indul. A tételes
           // lista a transcript fölött, ugyanabban a görgethető panelben áll
           // (SPEC-008 6.3, user döntés 2026-10-17: "a transcript sáv
-          // tetején"), a jóváhagyás felülete változatlanul alul. A
+          // tetején"), a jóváhagyás felülete változatlanul alul; függő
+          // jóváhagyás alatt a lista egyetlen sor magas legördülő, és a
+          // transcript panel ugyanazon a helyen marad, tehát nem szerel le. A
           // látott jóváhagyás szövegét a transcript oldal felfedi (a
           // `Resizable` `reveal`). A felfedés leírása minden renderen új
           // objektum, és ez szándékos: minden új leírás újraszámolást vált
@@ -590,9 +595,17 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                       onToggleItem={(stepRunId) => {
                         setBranchIterationSelection(toggleBranchIterationItem(branchIterationSelection, stepRunId));
                       }}
+                      onSelectItem={(stepRunId) => {
+                        setBranchIterationSelection({ ...branchIterationSelection, stepRunId });
+                      }}
                       onClose={() => {
                         setBranchIterationSelection(undefined);
                       }}
+                      // Függő jóváhagyás alatt a tábla helyén legördülő áll
+                      // (user döntés 2026-10-17, "Legördülő jóváhagyáskor"):
+                      // ugyanaz a feltétel, ami a jóváhagyás törzsét és az
+                      // elválasztót kiteszi (`approvalReveal`).
+                      isCompact={shownApproval !== undefined}
                     />
                   )}
                   <TranscriptPanel

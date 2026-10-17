@@ -9,10 +9,21 @@ const ITEMS: readonly BranchIterationItem[] = [
   { stepRunId: 's-b', label: '2. Elemzés', status: 'failed' },
 ];
 
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickOn(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
 describe('BranchIterationList', () => {
   let container: HTMLDivElement;
   let root: Root;
   let toggledStepRunIds: string[];
+  let selectedStepRunIds: (string | undefined)[];
   let closeCount: number;
 
   beforeEach(() => {
@@ -20,6 +31,7 @@ describe('BranchIterationList', () => {
     document.body.append(container);
     root = createRoot(container);
     toggledStepRunIds = [];
+    selectedStepRunIds = [];
     closeCount = 0;
   });
 
@@ -41,9 +53,13 @@ describe('BranchIterationList', () => {
           onToggleItem={(stepRunId) => {
             toggledStepRunIds.push(stepRunId);
           }}
+          onSelectItem={(stepRunId) => {
+            selectedStepRunIds.push(stepRunId);
+          }}
           onClose={() => {
             closeCount += 1;
           }}
+          isCompact={false}
           {...overrides}
         />,
       );
@@ -66,6 +82,35 @@ describe('BranchIterationList', () => {
       throw new Error('a teszt nem talált bezárás gombot');
     }
     return button;
+  }
+
+  function selectTrigger(): HTMLButtonElement {
+    const trigger = container.querySelector<HTMLButtonElement>('button[role="combobox"]');
+    if (trigger === null) {
+      throw new Error('a teszt nem talált legördülőt');
+    }
+    return trigger;
+  }
+
+  /**
+   * A panel `createPortal`-lal a `document.body`-ba kerül; a triggerhez az
+   * `aria-controls` köti.
+   */
+  function optionElements(): readonly HTMLElement[] {
+    const panelId = selectTrigger().getAttribute('aria-controls');
+    const panel = [...document.body.querySelectorAll<HTMLElement>('[role="listbox"]')].find(
+      (candidate) => candidate.id === panelId,
+    );
+    return [...(panel?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])];
+  }
+
+  function chooseOption(optionLabel: string): void {
+    clickOn(selectTrigger());
+    const option = optionElements().find((candidate) => candidate.textContent === optionLabel);
+    if (option === undefined) {
+      throw new Error(`a teszt nem talált "${optionLabel}" opciót`);
+    }
+    clickOn(option);
   }
 
   it('a fan_out listája a csomópont nevével címzett, megnevezett régió', () => {
@@ -143,5 +188,58 @@ describe('BranchIterationList', () => {
     expect(container.querySelector('.data-table__empty')?.textContent).toBe('A csomópontnak még nincs ága.');
     renderList({ kind: 'loop', items: [] });
     expect(container.querySelector('.data-table__empty')?.textContent).toBe('A csomópontnak még nincs iterációja.');
+  });
+
+  describe('legördülő alak, függő jóváhagyás alatt (user döntés 2026-10-17)', () => {
+    it('egyetlen sor: a régió neve a cím, se cím elem, se tábla, se mondat; a legördülő sm méretű, a cím a neve', () => {
+      renderList({ isCompact: true });
+      const region = container.querySelector('section');
+      expect(region?.getAttribute('aria-label')).toBe('Ágak: Elemek szétosztása');
+      expect(region?.classList.contains('branch-iteration-list--compact')).toBe(true);
+      expect(container.querySelector('h3')).toBeNull();
+      expect(container.querySelector('[role="table"]')).toBeNull();
+      expect(container.querySelector('.branch-iteration-list__note')).toBeNull();
+      expect(selectTrigger().getAttribute('aria-label')).toBe('Ágak: Elemek szétosztása');
+      expect(selectTrigger().classList.contains('select--sm')).toBe(true);
+    });
+
+    it('az első opció a csomópont minden ága, utána tételenként a felirat és az állapot jelvény felirata', () => {
+      renderList({ isCompact: true });
+      expect(selectTrigger().textContent).toBe('Összes ág');
+      clickOn(selectTrigger());
+      expect(optionElements().map((option) => option.textContent)).toEqual([
+        'Összes ág',
+        '1. Elemzés, sikeres',
+        '2. Elemzés, sikertelen',
+      ]);
+    });
+
+    it('a loop első opciója a csomópont minden iterációja', () => {
+      renderList({ isCompact: true, kind: 'loop', nodeLabel: 'Ismétlés' });
+      expect(container.querySelector('section')?.getAttribute('aria-label')).toBe('Iterációk: Ismétlés');
+      expect(selectTrigger().textContent).toBe('Összes iteráció');
+    });
+
+    it('a kiválasztott tétel a legördülő értéke', () => {
+      renderList({ isCompact: true, selectedStepRunId: 's-b' });
+      expect(selectTrigger().textContent).toBe('2. Elemzés, sikertelen');
+    });
+
+    it('egy tétel választása a lépés futásával, a minden tétel opció undefined értékkel hívja a választót', () => {
+      renderList({ isCompact: true, selectedStepRunId: 's-a' });
+      chooseOption('2. Elemzés, sikertelen');
+      chooseOption('Összes ág');
+      expect(selectedStepRunIds).toEqual(['s-b', undefined]);
+      expect(toggledStepRunIds).toEqual([]);
+    });
+
+    it('a bezárás gombja a legördülő mellett is ott áll, és a bezárást hívja', () => {
+      renderList({ isCompact: true });
+      expect(closeButton().classList.contains('btn--icon')).toBe(true);
+      act(() => {
+        closeButton().click();
+      });
+      expect(closeCount).toBe(1);
+    });
   });
 });
