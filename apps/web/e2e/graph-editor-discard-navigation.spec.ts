@@ -1,8 +1,12 @@
-// A változtatások elvetésének és az elnavigálás megerősítésének minimális e2e
-// lefedése (PLAN-009 T-009-52, SPEC-008 5.10): az elvetés és a visszavonása,
-// a belső navigáció megerősítése mindkét gombbal (nyitott modálisnál hatástalan
-// visszavonás billentyűvel), és a lap elhagyásának `beforeunload` párbeszéde. A teljes O-22 e2e és a szándékos rontások a
-// T-009-53 lépésé.
+// A változtatások elvetésének és az elnavigálás megerősítésének e2e lefedése
+// (PLAN-009 T-009-52, T-009-53, SPEC-008 5.10, 104. és 105. kritérium): az
+// elvetés helye a menüben és a visszavonása, a belső navigáció megerősítése a
+// felső navigáció és a morzsamenü linkjén mindkét gombbal (nyitott modálisnál
+// hatástalan visszavonás billentyűvel), mentetlen változás nélkül modális nélkül,
+// és a lap elhagyásának `beforeunload` párbeszéde a bezárásra, az újratöltésre és
+// a kézzel beírt címre, mentetlen változás nélkül párbeszéd nélkül. Az elvetés
+// visszavonása és újra elvégzése mind az öt úton a
+// `graph-editor-undo-operations.spec.ts` fájlban áll.
 import type { SettingsRecord, WorkflowDetail, WorkflowGraphDocument } from '@easter-workflow-builder/protocol';
 import type { Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
@@ -48,16 +52,20 @@ const EDITOR_URL = '/editor?workflowId=w-alfa';
 // van rögzítve.
 test.use({ userAgent: WINDOWS_CHROME_USER_AGENT });
 
-test.beforeEach(async ({ page }) => {
-  await mockIdleStream(page);
-  await installApiMocks(page, [
+async function installEditorMocks(target: Page): Promise<void> {
+  await mockIdleStream(target);
+  await installApiMocks(target, [
     mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('listRuns', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
   ]);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await target.setViewportSize({ width: 1440, height: 900 });
+}
+
+test.beforeEach(async ({ page }) => {
+  await installEditorMocks(page);
 });
 
 /**
@@ -131,4 +139,133 @@ test('mentetlen változásnál a lap elhagyása beforeunload párbeszédet ad', 
   // teszt végén kiolvashatja.
   await unloadDialog.dismiss();
   await expect(page.locator('.react-flow__node')).toHaveCount(2);
+});
+
+test('a "Változtatások elvetése" a split button menüjében az "Elrendezés" után áll', async ({ page }) => {
+  await openEditorWithUnsavedNode(page);
+  await page.getByRole('button', { name: 'További műveletek' }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Elrendezés', 'Változtatások elvetése']);
+  await expect(page.getByRole('menuitem', { name: 'Változtatások elvetése' })).toBeEnabled();
+});
+
+// A két link és a két gomb hiányzó párosítása (a fenti teszt a felső navigációt
+// a "Mégse", a morzsamenüt a "Kilépés mentés nélkül" gombbal méri).
+const NAVIGATION_CASES = [
+  {
+    name: 'a felső navigáció linkje és a "Kilépés mentés nélkül"',
+    link: (page: Page) => page.locator('.app-tn__navigation').getByRole('link', { name: 'Futás előzmények' }),
+    button: 'Kilépés mentés nélkül',
+    expectedPathname: '/runs',
+  },
+  {
+    name: 'a morzsamenü linkje és a "Mégse"',
+    link: (page: Page) =>
+      page.getByRole('navigation', { name: 'Morzsamenü' }).getByRole('link', { name: 'Workflow-k' }),
+    button: 'Mégse',
+    expectedPathname: '/editor',
+  },
+] as const;
+
+for (const navigation of NAVIGATION_CASES) {
+  test(`mentetlen változásnál ${navigation.name}: a cím a döntésig nem változik`, async ({ page }) => {
+    await openEditorWithUnsavedNode(page);
+    const dialog = page.getByRole('dialog', { name: 'Kilépés mentés nélkül?' });
+
+    await navigation.link(page).click();
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/\/editor\?workflowId=w-alfa$/);
+    await dialog.getByRole('button', { name: navigation.button, exact: true }).click();
+
+    await expect(dialog).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe(navigation.expectedPathname);
+    if (navigation.expectedPathname === '/editor') {
+      await expect(page.locator('.react-flow__node')).toHaveCount(2);
+      await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
+    }
+  });
+}
+
+test('mentetlen változás nélkül a belső navigáció modális nélkül, azonnal megtörténik, a visszavont változás után is', async ({
+  page,
+}) => {
+  await page.goto(EDITOR_URL);
+  await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+  await page.locator('.app-tn__navigation').getByRole('link', { name: 'Futás előzmények' }).click();
+  await expect(page).toHaveURL(/\/runs$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // A betöltött állapotig visszavont változás után sincs mentetlen változás.
+  await openEditorWithUnsavedNode(page);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await page.getByRole('navigation', { name: 'Morzsamenü' }).getByRole('link', { name: 'Workflow-k' }).click();
+  await expect(page.getByRole('table', { name: 'Workflow-k' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('mentetlen változás nélkül a lap bezárása beforeunload párbeszéd nélkül zár, a visszavont változás után is', async ({
+  page,
+}) => {
+  // Külön lap, mert a bezárt lapról a lefedettségi fixtúra nem olvashat; a
+  // felvétel és a visszavonás felhasználói interakció, tehát a böngésző
+  // párbeszédének feltétele (sticky activation, M-114) teljesül.
+  const secondPage = await page.context().newPage();
+  await installEditorMocks(secondPage);
+  await openEditorWithUnsavedNode(secondPage);
+  await secondPage.keyboard.press('Control+z');
+  await expect(secondPage.locator('.react-flow__node')).toHaveCount(1);
+  await expect(secondPage.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toHaveCount(0);
+
+  const dialogTypes: string[] = [];
+  secondPage.on('dialog', async (dialog) => {
+    dialogTypes.push(dialog.type());
+    await dialog.dismiss();
+  });
+  const closed = secondPage.waitForEvent('close');
+  await secondPage.close({ runBeforeUnload: true });
+  await closed;
+  expect(dialogTypes).toEqual([]);
+  expect(secondPage.isClosed()).toBe(true);
+});
+
+test('mentetlen változásnál az újratöltés beforeunload párbeszédet ad, elfogadva a lap újratölt', async ({ page }) => {
+  await openEditorWithUnsavedNode(page);
+  const dialogTypes: string[] = [];
+  page.on('dialog', async (dialog) => {
+    dialogTypes.push(dialog.type());
+    await dialog.accept();
+  });
+
+  await page.reload();
+
+  expect(dialogTypes).toEqual(['beforeunload']);
+  await expect(page.getByTestId('rf__node-n1')).toBeVisible();
+  await expect(page.locator('.react-flow__node')).toHaveCount(1);
+  await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toHaveCount(0);
+});
+
+test('mentetlen változásnál a kézzel beírt cím beforeunload párbeszédet ad: elutasítva a szerkesztő marad, elfogadva a cím betölt', async ({
+  page,
+}) => {
+  await openEditorWithUnsavedNode(page);
+  const dialogTypes: string[] = [];
+  let shouldAcceptDialog = false;
+  page.on('dialog', async (dialog) => {
+    dialogTypes.push(dialog.type());
+    await (shouldAcceptDialog ? dialog.accept() : dialog.dismiss());
+  });
+
+  // Elutasítva a navigáció megszakad (mért: `net::ERR_ABORTED`), a lap és a
+  // változás megmarad.
+  await expect(page.goto('/runs')).rejects.toThrow('net::ERR_ABORTED');
+  expect(dialogTypes).toEqual(['beforeunload']);
+  await expect(page).toHaveURL(/\/editor\?workflowId=w-alfa$/);
+  await expect(page.locator('.react-flow__node')).toHaveCount(2);
+
+  shouldAcceptDialog = true;
+  await page.goto('/runs');
+  expect(dialogTypes).toEqual(['beforeunload', 'beforeunload']);
+  await expect(page.getByRole('table', { name: 'Futások' })).toBeVisible();
 });

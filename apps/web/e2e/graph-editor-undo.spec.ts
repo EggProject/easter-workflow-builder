@@ -1,7 +1,9 @@
 // A visszavonás és az újra elvégzés minimális e2e lefedése (PLAN-009 T-009-51,
 // SPEC-008 5.10): egy felvétel visszavonása és újra elvégzése billentyűvel és a
-// lábléc két gombjával. A hét művelettípus, a mező natív visszavonása, a tipp
-// egérrel és a szándékos rontások a T-009-53 lépésé.
+// lábléc két gombjával, üres listán hatástalan billentyűvel. A hét művelettípus,
+// a két gomb állapota és tippje a `graph-editor-undo-operations.spec.ts`, a mező
+// menete és natív visszavonása a `graph-editor-undo-field.spec.ts` fájlban áll
+// (T-009-53).
 import type { SettingsRecord, WorkflowDetail, WorkflowGraphDocument } from '@easter-workflow-builder/protocol';
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
