@@ -388,6 +388,141 @@ function branchCardData(): RunGraphCanvasProperties['nodes'][number] | undefined
   return lastCanvasProperties().nodes.find((node) => node.workflowNode.id === 'n-branch');
 }
 
+/**
+ * A tételes lista fixtúrája (SPEC-008 6.3, O-39): egy `fan_out` két ággal,
+ * egy-egy `human_approval` lépéssel az ágakban, és egy `loop` két
+ * iterációval, a második törzsében egy lépéssel. Minden lépés futáshoz egy
+ * pótolt transcript sor tartozik, plusz egy lépéshez nem kötött sor.
+ */
+const BRANCH_ITERATION_SNAPSHOT = {
+  ...SNAPSHOT,
+  nodes: [
+    ...SNAPSHOT.nodes,
+    {
+      id: 'n-fan',
+      type: 'fan_out',
+      label: 'Elemek szétosztása',
+      position: { x: 300, y: 0 },
+      config: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
+      effectiveProviderId: 'minimax',
+    },
+    {
+      id: 'n-check',
+      type: 'human_approval',
+      label: 'Ellenőrzés',
+      position: { x: 600, y: 0 },
+      config: {
+        type: 'human_approval',
+        title: 'Ellenőrzés',
+        bodyTemplate: 'Rendben?',
+        timeoutMs: null,
+        onUnhandledError: null,
+      },
+      effectiveProviderId: 'minimax',
+    },
+    {
+      id: 'n-loop',
+      type: 'loop',
+      label: 'Ismétlés',
+      position: { x: 900, y: 0 },
+      config: { type: 'loop', maxIterations: 5, continueExpression: 'i < 5', onUnhandledError: null },
+      effectiveProviderId: 'minimax',
+    },
+  ],
+};
+
+const BRANCH_ITERATION_STEP_RUNS = [
+  BASE_STEP_RUN,
+  { ...BASE_STEP_RUN, id: 's-fan', nodeId: 'n-fan', nodeType: 'fan_out', output: ['a', 'b'], createdAtMs: 21 },
+  {
+    ...BASE_STEP_RUN,
+    id: 's-a',
+    nodeId: 'n-check',
+    nodeType: 'human_approval',
+    parentStepRunId: 's-fan',
+    createdAtMs: 22,
+  },
+  {
+    ...BASE_STEP_RUN,
+    id: 's-b',
+    nodeId: 'n-check',
+    nodeType: 'human_approval',
+    parentStepRunId: 's-fan',
+    status: 'failed',
+    createdAtMs: 23,
+  },
+  { ...BASE_STEP_RUN, id: 's-l0', nodeId: 'n-loop', nodeType: 'loop', iteration: 0, createdAtMs: 24 },
+  { ...BASE_STEP_RUN, id: 's-l1', nodeId: 'n-loop', nodeType: 'loop', iteration: 1, createdAtMs: 25 },
+  {
+    ...BASE_STEP_RUN,
+    id: 's-body',
+    nodeId: 'n-check',
+    nodeType: 'human_approval',
+    parentStepRunId: 's-l1',
+    createdAtMs: 26,
+  },
+];
+
+/**
+ * Egy pótolt `step_started` sor a megadott lépés futáshoz (`null`: a futás
+ * szintű, lépéshez nem kötött sor).
+ */
+function replayedStepFrame(id: number, stepRunId: string | null): StreamFrame {
+  const finished = runFinishedFrame('r-3');
+  if (finished.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return { ...finished, delivery: 'replayed', runEvent: { ...finished.runEvent, id, stepRunId, kind: 'step_started' } };
+}
+
+const BRANCH_ITERATION_FRAMES: readonly StreamFrame[] = [
+  replayedStepFrame(1, null),
+  replayedStepFrame(2, 's-1'),
+  replayedStepFrame(3, 's-fan'),
+  replayedStepFrame(4, 's-a'),
+  replayedStepFrame(5, 's-b'),
+  replayedStepFrame(6, 's-l0'),
+  replayedStepFrame(7, 's-l1'),
+  replayedStepFrame(8, 's-body'),
+  { event: 'replay_complete', runId: 'r-3', throughEventId: 8 },
+];
+
+/**
+ * Egy csomópontra kattintás a mockolt vászon `onNodeClick` propján át, a
+ * vászonnak átadott pillanatkép csomóponttal.
+ */
+function clickNode(nodeId: string): void {
+  const node = lastCanvasProperties().nodes.find((data) => data.workflowNode.id === nodeId)?.workflowNode;
+  if (node === undefined) {
+    throw new Error(`a teszt nem talált "${nodeId}" csomópontot`);
+  }
+  act(() => {
+    lastCanvasProperties().onNodeClick(node);
+  });
+}
+
+/**
+ * Egy élő jóváhagyás lista változás keret (`approval_requested` vagy
+ * `approval_decided`) a futás szintjén, a megadott esemény azonosítóval.
+ */
+function approvalListFrame(id: number, kind: 'approval_requested' | 'approval_decided'): StreamFrame {
+  const frame = runFinishedFrame('r-3');
+  if (frame.event !== 'run_event') {
+    throw new Error('a teszt run_event keretet vár');
+  }
+  return { ...frame, runEvent: { ...frame.runEvent, id, kind } };
+}
+
+/**
+ * A `detail: 1` kötelező: a `SelectField` a `detail === 0` kattintást
+ * billentyűzetből származónak tekinti, és szándékosan nem nyit rá.
+ */
+function clickWithMouse(target: Element): void {
+  act(() => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  });
+}
+
 describe('RunViewScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -1366,5 +1501,236 @@ describe('RunViewScreen', () => {
 
     await emitFramesAndFlush([stepEventFrame('step_finished', 'live', 10)]);
     expect(branchCardData()?.usedDefaultBranch).toBe(true);
+  });
+
+  async function renderBranchIterationScreen(): Promise<void> {
+    await renderScreen(
+      '?runId=r-3',
+      createFetchFunction({ snapshot: BRANCH_ITERATION_SNAPSHOT, stepRuns: BRANCH_ITERATION_STEP_RUNS }),
+    );
+    await emitFramesAndFlush(BRANCH_ITERATION_FRAMES);
+  }
+
+  /**
+   * A transcript sorainak száma: a virtualizált lista csak a látható
+   * sorokat rajzolja ki, de minden kirajzolt sor a teljes sorszámot viseli
+   * (`aria-setsize`, a `react-window` sor attribútuma).
+   */
+  function transcriptRowCount(): number {
+    const firstRow = container.querySelector(':scope .transcript-panel [role="listitem"]');
+    return firstRow === null ? 0 : Number(firstRow.getAttribute('aria-setsize'));
+  }
+
+  function listRegion(): Element | null {
+    return container.querySelector(':scope .run-view-screen__transcript .branch-iteration-list');
+  }
+
+  function itemButton(name: string): HTMLButtonElement {
+    const button = [...container.querySelectorAll<HTMLButtonElement>(':scope .branch-iteration-list button')].find(
+      (candidate) => candidate.textContent === name,
+    );
+    if (button === undefined) {
+      throw new Error(`a teszt nem talált "${name}" gombot`);
+    }
+    return button;
+  }
+
+  function closeButton(): HTMLButtonElement {
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="A lista bezárása"]');
+    if (button === null) {
+      throw new Error('a teszt nem talált bezárás gombot');
+    }
+    return button;
+  }
+
+  function listSelect(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(':scope .branch-iteration-list button[role="combobox"]');
+  }
+
+  /**
+   * A legördülő egy opciójának választása; a panel `createPortal`-lal a
+   * `document.body`-ba kerül, a triggerhez az `aria-controls` köti.
+   */
+  function chooseListOption(optionLabel: string): void {
+    const trigger = listSelect();
+    if (trigger === null) {
+      throw new Error('a teszt nem talált legördülőt');
+    }
+    clickWithMouse(trigger);
+    const panelId = trigger.getAttribute('aria-controls');
+    const panel = [...document.body.querySelectorAll<HTMLElement>(':scope [role="listbox"]')].find(
+      (candidate) => candidate.id === panelId,
+    );
+    const option = [...(panel?.querySelectorAll<HTMLElement>(':scope [role="option"]') ?? [])].find(
+      (candidate) => candidate.textContent === optionLabel,
+    );
+    if (option === undefined) {
+      throw new Error(`a teszt nem talált "${optionLabel}" opciót`);
+    }
+    clickWithMouse(option);
+  }
+
+  describe('a fan_out ágainak és a loop iterációinak tételes listája (SPEC-008 6.3, O-39)', () => {
+    it('kattintás nélkül nincs lista, és a transcript minden sort mutat', async () => {
+      await renderBranchIterationScreen();
+      expect(listRegion()).toBeNull();
+      expect(transcriptRowCount()).toBe(8);
+    });
+
+    it('a fan_out csomópontra kattintva a transcript sáv tetején kinyílik az ágak listája, és a transcript az összes ág eseményeire szűkül', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-fan');
+
+      const content = container.querySelector(':scope .run-view-screen__transcript-content');
+      expect(content?.firstElementChild).toBe(listRegion());
+      expect(listRegion()?.querySelector('h3')?.textContent).toBe('Ágak: Elemek szétosztása');
+      expect([
+        ...container.querySelectorAll(':scope .branch-iteration-list .data-table__body [role="row"]'),
+      ]).toHaveLength(2);
+      // A szétosztás saját sora és a két ág sora.
+      expect(transcriptRowCount()).toBe(3);
+    });
+
+    it('egy ágra kattintva csak annak az eseményei látszanak, ismételt kattintásra újra az összes ágé', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-fan');
+
+      act(() => {
+        itemButton('2. Ellenőrzés').click();
+      });
+      expect(transcriptRowCount()).toBe(1);
+      expect(itemButton('2. Ellenőrzés').getAttribute('aria-pressed')).toBe('true');
+
+      act(() => {
+        itemButton('2. Ellenőrzés').click();
+      });
+      expect(transcriptRowCount()).toBe(3);
+      expect(itemButton('2. Ellenőrzés').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('a loop csomópontra kattintva az iterációk listája nyílik, egy iteráció a törzsével együtt szűkít', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-loop');
+
+      expect(listRegion()?.querySelector('h3')?.textContent).toBe('Iterációk: Ismétlés');
+      expect(transcriptRowCount()).toBe(3);
+
+      act(() => {
+        itemButton('iteráció: 1 / 5').click();
+      });
+      expect(transcriptRowCount()).toBe(2);
+    });
+
+    it('a lista bezárása visszahozza a teljes transcriptet', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-fan');
+      act(() => {
+        itemButton('1. Ellenőrzés').click();
+      });
+
+      act(() => {
+        closeButton().click();
+      });
+      expect(listRegion()).toBeNull();
+      expect(transcriptRowCount()).toBe(8);
+    });
+
+    it('egy másik fan_out vagy loop csomópontra kattintás arra a csomópontra vált, tétel nélkül', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-fan');
+      act(() => {
+        itemButton('1. Ellenőrzés').click();
+      });
+
+      clickNode('n-loop');
+      expect(listRegion()?.querySelector('h3')?.textContent).toBe('Iterációk: Ismétlés');
+      expect(transcriptRowCount()).toBe(3);
+    });
+
+    it('más típusú csomópontra kattintás a nézetet nem változtatja', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-start');
+      expect(listRegion()).toBeNull();
+      expect(transcriptRowCount()).toBe(8);
+
+      clickNode('n-fan');
+      clickNode('n-check');
+      expect(listRegion()?.querySelector('h3')?.textContent).toBe('Ágak: Elemek szétosztása');
+    });
+
+    it('a szűkített nézet lezárt futásnál üres listára a kiválasztott tételekről szól', async () => {
+      await renderScreen(
+        '?runId=r-3',
+        createFetchFunction({
+          runDetail: { ...RUN_DETAIL, status: 'succeeded' },
+          snapshot: BRANCH_ITERATION_SNAPSHOT,
+          stepRuns: BRANCH_ITERATION_STEP_RUNS,
+        }),
+      );
+      await emitFramesAndFlush([
+        replayedStepFrame(1, null),
+        { event: 'replay_complete', runId: 'r-3', throughEventId: 1 },
+      ]);
+      clickNode('n-fan');
+
+      expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe(
+        'A kiválasztott tételeknek nincs eseménye.',
+      );
+    });
+
+    it('függő jóváhagyás alatt a lista legördülő: élő érkezéskor és eltűnéskor a választás és a szűkítés megmarad, a transcript panel nem szerel le (user döntés 2026-10-17)', async () => {
+      let approvals: readonly unknown[] = [];
+      const baseFetchFunction = createFetchFunction({
+        snapshot: BRANCH_ITERATION_SNAPSHOT,
+        stepRuns: BRANCH_ITERATION_STEP_RUNS,
+      });
+      const fetchFunction: FetchFunction = (input, init) => {
+        if (!new URL(input).pathname.endsWith('/approvals')) {
+          return baseFetchFunction(input, init);
+        }
+        return Promise.resolve(Response.json(approvals));
+      };
+      await renderScreen('?runId=r-3', fetchFunction);
+      await emitFramesAndFlush(BRANCH_ITERATION_FRAMES);
+      clickNode('n-fan');
+      act(() => {
+        itemButton('2. Ellenőrzés').click();
+      });
+      expect(transcriptRowCount()).toBe(1);
+      const transcriptPanelBefore = container.querySelector('.transcript-panel');
+      expect(listSelect()).toBeNull();
+
+      approvals = [{ ...APPROVAL, stepRunId: 's-a' }];
+      await emitFramesAndFlush([approvalListFrame(42, 'approval_requested')]);
+      expect(container.querySelectorAll('.approval-prompt-card')).toHaveLength(1);
+      expect(listRegion()?.querySelector('[role="table"]')).toBeNull();
+      expect(listSelect()?.textContent).toBe('2. Ellenőrzés, sikertelen');
+      expect(transcriptRowCount()).toBe(1);
+      expect(container.querySelector('.transcript-panel')).toBe(transcriptPanelBefore);
+
+      chooseListOption('Összes ág');
+      expect(transcriptRowCount()).toBe(3);
+      chooseListOption('1. Ellenőrzés, sikeres');
+      expect(transcriptRowCount()).toBe(1);
+
+      approvals = [];
+      await emitFramesAndFlush([approvalListFrame(43, 'approval_decided')]);
+      expect(container.querySelector('.approval-prompt-card')).toBeNull();
+      expect(listSelect()).toBeNull();
+      expect(itemButton('1. Ellenőrzés').getAttribute('aria-pressed')).toBe('true');
+      expect(transcriptRowCount()).toBe(1);
+    });
+
+    it('másik futásra váltva a lista zárva indul', async () => {
+      await renderBranchIterationScreen();
+      clickNode('n-fan');
+      expect(listRegion()).not.toBeNull();
+
+      await renderScreen(
+        '?runId=r-4',
+        createFetchFunction({ snapshot: BRANCH_ITERATION_SNAPSHOT, stepRuns: BRANCH_ITERATION_STEP_RUNS }),
+      );
+      expect(listRegion()).toBeNull();
+    });
   });
 });

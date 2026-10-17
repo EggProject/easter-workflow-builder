@@ -1,4 +1,4 @@
-import type { WorkflowEdgeInput } from '@easter-workflow-builder/protocol';
+import type { WorkflowEdgeInput, WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { Background, Controls, ReactFlow, type NodeChange, type NodeDimensionChange } from '@xyflow/react';
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { GraphNodeCard } from '../graph-node-card/GraphNodeCard.tsx';
@@ -14,6 +14,7 @@ import { BranchHighlightToggle } from './BranchHighlightToggle.tsx';
 import type { BranchDecision } from './branch-decision.ts';
 import { readStoredBranchHighlightMode, storeBranchHighlightMode } from './branch-highlight-mode-storage.ts';
 import { buildRunGraphFlowEdges } from './build-run-graph-flow-edges.ts';
+import { findKeyboardActivatedNode } from './find-keyboard-activated-node.ts';
 import { resolveHighlightedBranchEdgeIds } from './resolve-highlighted-branch-edge-ids.ts';
 import '@xyflow/react/dist/style.css';
 import '../graph-editor/graph-canvas-theme.css';
@@ -39,6 +40,14 @@ export interface RunGraphCanvasProperties {
    * a kiemelendő élek halmaza (SPEC-008 6.6).
    */
   readonly branchDecisionsByNodeId: ReadonlyMap<string, readonly BranchDecision[]>;
+  /**
+   * Egy csomópontra kattintás, vagy a fókuszált csomóponton az `Enter` és a
+   * szóköz (SPEC-008 6.3, O-39, O-41): a hívó dönti el, mit nyit ki (a
+   * `fan_out` és a `loop` tételes listáját). A vászon a csomópont pillanatkép
+   * szerinti alakját adja át, nem az azonosítóját, hogy a hívónak ne kelljen
+   * visszakeresnie.
+   */
+  readonly onNodeClick: (workflowNode: WorkflowNodeInput) => void;
 }
 
 /**
@@ -47,6 +56,28 @@ export interface RunGraphCanvasProperties {
  * `nodesConnectable` és `elementsSelectable`, mindhárom hamis. A vászon
  * PÁSZTÁZHATÓ és NAGYÍTHATÓ marad, mert az nem szerkesztés, hanem a nagy
  * gráfok megtekintésének egyetlen módja.
+ *
+ * **A kattintás kezelő nem old fel semmit a három tiltásból** (SPEC-008 6.3,
+ * O-39, AC19, AC118). A telepített `@xyflow/react` 12.11.6 `NodeWrapper`
+ * komponense (`dist/esm/index.js`) a csomópont `onClick` kezelőjében a
+ * kijelölést csak `isSelectable` mellett végzi, az `onNodeClick` hívása
+ * ettől független; az `isSelectable`, az `isDraggable` és az `isConnectable`
+ * kizárólag a három propból (és a csomópont saját, itt nem adott
+ * `selectable`/`draggable`/`connectable` mezőjéből) számolódik. A kezelő
+ * egyetlen mellékhatása, hogy a csomópont doboza `pointer-events: all`
+ * értéket kap (`hasPointerEvents`), tehát a kártyán álló gombok is
+ * kattinthatók. A mérés és a forrás idézete:
+ * `docs/research/2026-10-17-ag-iteracio-lista.md`.
+ *
+ * **A billentyűs út** (user döntés 2026-10-17, "Enter és szóköz nyissa",
+ * SPEC-008 6.3, O-41): a fókuszált csomóponton az `Enter` és a szóköz
+ * ugyanazt a hívást adja, mint a kattintás. A React Flow a csomópont saját
+ * billentyű kezelőjében ezt nem teszi meg (az `Enter`/szóköz csak
+ * kijelölhető csomópontot jelöl ki, az `onNodeClick` billentyűre nem fut),
+ * ezért a figyelő a vászon `keydown` eseményén áll, és csak akkor lép, ha a
+ * célpont maga a csomópont doboza (`find-keyboard-activated-node.ts`). A
+ * React Flow saját billentyűivel nem ütközik, és a kijelölést sem oldja fel;
+ * a telepített forrás és a mérés: a research fájl.
  *
  * **A mért csomópont méret itt is nézeti állapot**, ugyanabból az okból, mint
  * a szerkesztőben (`graph-editor/measured-node-sizes.ts` doksija): a `nodes`
@@ -76,7 +107,7 @@ export interface RunGraphCanvasProperties {
  * lehet őket; a pillanatkép sora változatlan marad.
  */
 export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): ReactElement {
-  const { nodes, edges, branchDecisionsByNodeId } = properties;
+  const { nodes, edges, branchDecisionsByNodeId, onNodeClick } = properties;
 
   const [measuredNodeSizes, setMeasuredNodeSizes] = useState<MeasuredNodeSizes>({});
   const [branchHighlightMode, setBranchHighlightMode] = useState(readStoredBranchHighlightMode);
@@ -155,6 +186,18 @@ export function RunGraphCanvas(properties: Readonly<RunGraphCanvasProperties>): 
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
+        onNodeClick={(_event, node) => {
+          onNodeClick(node.data.workflowNode);
+        }}
+        onKeyDown={(event) => {
+          const activatedNode = findKeyboardActivatedNode(
+            event,
+            nodes.map((data) => data.workflowNode),
+          );
+          if (activatedNode !== undefined) {
+            onNodeClick(activatedNode);
+          }
+        }}
         /* A betöltött pillanatkép beleillik a vászonba, ahelyett hogy az
            alapértelmezett `{ x: 0, y: 0, zoom: 1 }` nézetben a jobb szélen
            levágódna. A prop dokumentált jelentése kizárólag a KEZDETI nézetre

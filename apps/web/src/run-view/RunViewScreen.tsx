@@ -5,6 +5,7 @@ import {
   SubscriptionStateSchema,
   type RunDetail,
   type RunSnapshotResponse,
+  type WorkflowNodeInput,
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
 import { useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactElement } from 'react';
@@ -15,6 +16,13 @@ import { pendingApprovalRequestedAtByStepRun } from '../approval-prompt/pending-
 import { useApprovalDecisions } from '../approval-prompt/use-approval-decisions.ts';
 import { useApprovalSelection } from '../approval-prompt/use-approval-selection.ts';
 import { usePendingApprovals } from '../approval-prompt/use-pending-approvals.ts';
+import { BranchIterationList } from '../branch-iteration-list/BranchIterationList.tsx';
+import { resolveBranchIterationListKind } from '../branch-iteration-list/branch-iteration-list-kind.ts';
+import type { BranchIterationSelection } from '../branch-iteration-list/branch-iteration-selection.ts';
+import { buildBranchIterationItems } from '../branch-iteration-list/build-branch-iteration-items.ts';
+import { filterTranscriptByStepRuns } from '../branch-iteration-list/filter-transcript-by-step-runs.ts';
+import { resolveBranchIterationScope } from '../branch-iteration-list/resolve-branch-iteration-scope.ts';
+import { toggleBranchIterationItem } from '../branch-iteration-list/toggle-branch-iteration-item.ts';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
@@ -238,6 +246,19 @@ function RunViewHeader(properties: Readonly<RunViewHeaderProperties>): ReactElem
  * mindhárom itt, a képernyő szintjén, mert a transcript sáv a reszponzív sáv
  * váltásakor újra felcsatolódik.
  *
+ * A `fan_out` ÁGAINAK ÉS A `loop` ITERÁCIÓINAK TÉTELES LISTÁJA (SPEC-008 6.3,
+ * O-39, user döntés 2026-10-17) a csomópontra kattintva nyílik, a transcript
+ * sáv tetején (`BranchIterationList`). A kattintás után a transcript a
+ * csomópont minden tételének eseményeire szűkül, egy tétel gombjára csak az
+ * övéire, a bezárás a teljes transcriptet hozza vissza. A szűkítés a
+ * transcript már összegyűjtött sorain fut, a `stepRunId` mezőjük szerint, a
+ * `parent_step_run_id` láncon gyűjtött lépés futás halmazra
+ * (`resolveBranchIterationScope`), új REST hívás nélkül. A kiválasztás a
+ * futás váltásakor törlődik. Függő jóváhagyás alatt a lista egyetlen sor
+ * magas legördülő (user döntés 2026-10-17, "Legördülő jóváhagyáskor"); a
+ * kiválasztás itt él, tehát egy élőben érkező vagy eltűnő jóváhagyás a
+ * választást és a szűkítést nem érinti.
+ *
  * A futás rekordja saját `useState` értékben áll, nem `useRequestState`
  * állapotban: az újratöltés alatt egy `pending` állapot a csontvázat hozná
  * vissza, és az az egész rajzot villogtatná.
@@ -320,6 +341,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
 
   const snapshotState = useRequestState<RunSnapshotResponse>();
   const [runDetailLoad, setRunDetailLoad] = useState<RunDetailLoad>(EMPTY_RUN_DETAIL_LOAD);
+  const [branchIterationSelection, setBranchIterationSelection] = useState<BranchIterationSelection | undefined>(
+    undefined,
+  );
   const layoutBand = useRunViewLayoutBand();
 
   // Az al-workflow futás megnyitása és az újraindítás UGYANERRE a képernyőre
@@ -354,6 +378,10 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // rajza fölött (a `useLiveStepRuns` azonos mintája).
   useEffect(() => {
     setRunDetailLoad(EMPTY_RUN_DETAIL_LOAD);
+    // A tételes lista egy másik futás csomópontjára nem vonatkozhat (SPEC-008
+    // 6.3): az al-workflow futás megnyitása és az újraindítás után a lista
+    // zárva indul, a transcript teljes.
+    setBranchIterationSelection(undefined);
   }, [runId]);
 
   useEffect(() => {
@@ -484,6 +512,25 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // Ide csak átmeneti, korábbi értékkel rendelkező hiba juthat el: minden más
   // a fenti blokkoló ágon áll meg.
   const transientFailure = runDetailFailure ?? stepRunsFailure;
+  // A tételes lista csak a `fan_out` és a `loop` csomópontra nyílik (SPEC-008
+  // 6.3, O-39); a többi csomópontra kattintás a nézetet nem változtatja.
+  const openBranchIterationList = (workflowNode: WorkflowNodeInput): void => {
+    const kind = resolveBranchIterationListKind(workflowNode.config);
+    if (kind !== undefined) {
+      setBranchIterationSelection({ node: workflowNode, kind, stepRunId: undefined });
+    }
+  };
+  const shownTranscript =
+    branchIterationSelection === undefined
+      ? transcript
+      : filterTranscriptByStepRuns(transcript, resolveBranchIterationScope(branchIterationSelection, stepRuns));
+  // A transcript panel a szűkítés minden váltásakor tiszta lappal indul (a
+  // görgetés követése és a sor magasság gyorsítótára a teljes és a szűkített
+  // sorlistára nem ugyanaz): a kulcs a futás azonosítója, plusz a szűkítés.
+  const transcriptPanelKey =
+    branchIterationSelection === undefined
+      ? runId
+      : `${runId}:${branchIterationSelection.node.id}:${branchIterationSelection.stepRunId ?? ''}`;
 
   return (
     <div className="run-view-screen">
@@ -512,6 +559,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
               nodes={graphNodes}
               edges={projected.value.edges}
               branchDecisionsByNodeId={branchDecisionsByNodeId}
+              onNodeClick={openBranchIterationList}
             />
           }
           // A jóváhagyás felület a transcript sávban áll (PLAN-009 5.
@@ -520,8 +568,14 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           // látott jóváhagyás szövege, közvetlenül alatta, az elválasztón
           // kívül a "Függő jóváhagyások" régió a lapozóval és a döntés
           // gombjaival (user döntés 2026-09-25, `RunViewTranscriptSide.tsx`).
-          // A `key` a futás azonosítója: egy másik futásra navigálva a
-          // transcript panel (és a görgetés állapota) tiszta lappal indul. A
+          // A `key` a futás azonosítója és a tételes lista szűkítése: egy
+          // másik futásra navigálva vagy a szűkítés váltásakor a transcript
+          // panel (és a görgetés állapota) tiszta lappal indul. A tételes
+          // lista a transcript fölött, ugyanabban a görgethető panelben áll
+          // (SPEC-008 6.3, user döntés 2026-10-17: "a transcript sáv
+          // tetején"), a jóváhagyás felülete változatlanul alul; függő
+          // jóváhagyás alatt a lista egyetlen sor magas legördülő, és a
+          // transcript panel ugyanazon a helyen marad, tehát nem szerel le. A
           // látott jóváhagyás szövegét a transcript oldal felfedi (a
           // `Resizable` `reveal`). A felfedés leírása minden renderen új
           // objektum, és ez szándékos: minden új leírás újraszámolást vált
@@ -531,13 +585,38 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           transcript={
             <RunViewTranscriptSide
               transcriptPanel={
-                <TranscriptPanel
-                  key={runId}
-                  transcript={transcript}
-                  stepRuns={stepRuns}
-                  runStatus={runDetail.status}
-                  persistedStreamDeltas={runDetail.persistedStreamDeltas}
-                />
+                <>
+                  {branchIterationSelection !== undefined && (
+                    <BranchIterationList
+                      kind={branchIterationSelection.kind}
+                      nodeLabel={branchIterationSelection.node.label}
+                      items={buildBranchIterationItems(branchIterationSelection, projected.value.nodes, stepRuns)}
+                      selectedStepRunId={branchIterationSelection.stepRunId}
+                      onToggleItem={(stepRunId) => {
+                        setBranchIterationSelection(toggleBranchIterationItem(branchIterationSelection, stepRunId));
+                      }}
+                      onSelectItem={(stepRunId) => {
+                        setBranchIterationSelection({ ...branchIterationSelection, stepRunId });
+                      }}
+                      onClose={() => {
+                        setBranchIterationSelection(undefined);
+                      }}
+                      // Függő jóváhagyás alatt a tábla helyén legördülő áll
+                      // (user döntés 2026-10-17, "Legördülő jóváhagyáskor"):
+                      // ugyanaz a feltétel, ami a jóváhagyás törzsét és az
+                      // elválasztót kiteszi (`approvalReveal`).
+                      isCompact={shownApproval !== undefined}
+                    />
+                  )}
+                  <TranscriptPanel
+                    key={transcriptPanelKey}
+                    transcript={shownTranscript}
+                    stepRuns={stepRuns}
+                    runStatus={runDetail.status}
+                    persistedStreamDeltas={runDetail.persistedStreamDeltas}
+                    isFiltered={branchIterationSelection !== undefined}
+                  />
+                </>
               }
               // A törzs kulcsa a jóváhagyás azonosítója: lapozáskor a törzs a
               // tetejéről indul (`ApprovalPromptBody`).

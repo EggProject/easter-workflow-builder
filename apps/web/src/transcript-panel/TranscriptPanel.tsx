@@ -33,6 +33,12 @@ export interface TranscriptPanelProperties {
    * befagy (SPEC-008 7.5 2. szabály).
    */
   readonly persistedStreamDeltas: boolean;
+  /**
+   * Igaz, ha a `transcript` sorai a futás nézet tételes listája szerint
+   * szűkítettek (SPEC-008 6.3, O-39): a lezárt futás üres listája ilyenkor a
+   * szűkítésről szól, nem a futásról.
+   */
+  readonly isFiltered: boolean;
 }
 
 interface TranscriptRowProperties {
@@ -139,9 +145,14 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * jelzése fölött egy mondat mondja ki, hogy az csak élőben látszik. A mondat
  * a meglévő, halvány kis szöveg mintája (`transcript-panel__status`), doboz
  * nélkül, és a futás teljes nézése alatt a helyén marad.
+ *
+ * **A szűkített nézet** (SPEC-008 6.3, O-39): a panel a kapott sorokat
+ * rajzolja, a szűrés a hívóé (`branch-iteration-list` téma). Az egyetlen
+ * különbség a lezárt futás üres listájának mondata, ami ilyenkor a
+ * kiválasztott tételekről szól.
  */
 export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>): ReactElement {
-  const { transcript, stepRuns, runStatus, persistedStreamDeltas } = properties;
+  const { transcript, stepRuns, runStatus, persistedStreamDeltas, isFiltered } = properties;
   const { rows, isReplayComplete } = transcript;
   const rowCount = rows.length;
   // A futás pontosan akkor tart még, ha megszakítható: a hat állapot nem
@@ -186,7 +197,9 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
                 Várakozás az első eseményre
               </p>
             ) : (
-              <p className="transcript-panel__empty">A futásnak nincs eseménye.</p>
+              <p className="transcript-panel__empty">
+                {isFiltered ? 'A kiválasztott tételeknek nincs eseménye.' : 'A futásnak nincs eseménye.'}
+              </p>
             ))}
           <div
             className={`transcript-panel__list-frame${isCompact ? ' transcript-panel__list-frame--compact' : ''}`}
