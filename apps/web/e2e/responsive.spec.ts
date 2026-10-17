@@ -516,6 +516,64 @@ test('a futás előzmények téma váltója és művelet gombja minden széless�
   }
 });
 
+// A topnav navigáció harmadik linkje, a "Beállítások" (T-009-59, SPEC-008
+// 5.11): a `--ep-screen-md` fölött a sávban, alatta a lenyíló menüben áll,
+// és mindhárom link minden támogatott szélességen teljes egészében a
+// nézetablakban van. A mért szélességek: `measurement/settings-width.ts`.
+test('a topnav navigáció mindhárom linkje minden támogatott szélességen teljes egészében a viewporton belül van', async ({
+  page,
+}) => {
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto('/settings');
+      await expect(page.getByLabel('Visszavonás/újra billentyű módosítója')).toBeVisible();
+
+      const toggle = page.getByRole('button', { name: 'Navigáció megnyitása' });
+      if (await toggle.isVisible()) {
+        await toggle.click();
+      }
+      const navigation = page.locator('.app-tn__navigation');
+      for (const name of ['Workflow-k', 'Futás előzmények', 'Beállítások']) {
+        await expect(navigation.getByRole('link', { name, exact: true })).toBeInViewport({ ratio: 1 });
+      }
+    });
+  }
+});
+
+// A Beállítások sora (T-009-59): a felirat és a választó minden támogatott
+// szélességen teljes egészében a nézetablakban van, és nem fedik egymást. A
+// dokumentum túllógása erre vak (az `.app-content` `overflow: auto`), ezért a
+// két elem saját doboza a mért mennyiség. A `--ep-screen-sm` alatt a felirat a
+// választó fölé kerül (research T-009-59).
+test('a Beállítások sorának felirata és választója minden támogatott szélességen a viewporton belül van, átfedés nélkül', async ({
+  page,
+}) => {
+  for (const width of SUPPORTED_VIEWPORT_WIDTHS) {
+    await test.step(`viewport szélesség: ${String(width)}px`, async () => {
+      await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+      await page.goto('/settings');
+      const title = page.getByText('Visszavonás/újra billentyű módosítója', { exact: true });
+      const select = page.getByLabel('Visszavonás/újra billentyű módosítója');
+      await expect(title).toBeInViewport({ ratio: 1 });
+      await expect(select).toBeInViewport({ ratio: 1 });
+
+      const titleBox = await title.boundingBox();
+      const selectBox = await select.boundingBox();
+      expect(titleBox).not.toBeNull();
+      expect(selectBox).not.toBeNull();
+      const titleRight = (titleBox?.x ?? 0) + (titleBox?.width ?? 0);
+      const titleBottom = (titleBox?.y ?? 0) + (titleBox?.height ?? 0);
+      const isBeside = titleRight <= (selectBox?.x ?? 0);
+      const isAbove = titleBottom <= (selectBox?.y ?? 0);
+      expect(isBeside || isAbove).toBe(true);
+      // A felirat a saját dobozában is elfér: összenyomva a leghosszabb szava
+      // is túllógna rajta.
+      expect(await title.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+    });
+  }
+});
+
 test('a lenyíló navigáció nyitott állapotban sem okoz vízszintes túllógást', async ({ page }) => {
   const narrowWidth = SUPPORTED_VIEWPORT_WIDTHS[0];
   expect(narrowWidth).toBeDefined();

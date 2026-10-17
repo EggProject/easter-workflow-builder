@@ -147,7 +147,10 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
     // A `graph-auto-layout` téma szándékosan NEM engedett (SPEC-008 5.7: "az
     // elrendezés tiszta függvény, és nem importál @xyflow/react szimbólumot").
-    const outOfScopeThemeNames = new Set(['settings-screen', 'skill-upload', 'mcp-server-config']);
+    // A `settings-screen` 2026-09-28 óta nem tiltott: a SPEC-008 5.11 (O-32)
+    // a Beállítások képernyőt a módosító választójával ide hozza (SPEC-007 16.
+    // szekció 3. kritériumának lazítása); a SPEC-009 többi eleme marad tiltva.
+    const outOfScopeThemeNames = new Set(['skill-upload', 'mcp-server-config']);
     const themeDirectories = readdirSync(WEB_SRC, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);

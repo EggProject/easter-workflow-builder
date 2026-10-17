@@ -4,7 +4,9 @@
 // `bun run measure:approval`) és a futás nézet sáv-váltási pontja
 // (`measurement/run-view-band.ts`, `bun run measure:run-view-band`, 2026-09-28,
 // O-7) és a lábléc gombsora (`measurement/footer-width.ts`,
-// `bun run measure:footer-width`, 2026-10-16, T-009-51). A négy npm script a
+// `bun run measure:footer-width`, 2026-10-16, T-009-51) és a topnav és a
+// Beállítások képernyő szélessége (`measurement/settings-width.ts`,
+// `bun run measure:settings-width`, 2026-10-17, T-009-59). Az öt npm script a
 // fájlnév szűrővel választ.
 //
 // A `playwright.config.ts` felállását örökli (chromium projekt, `baseURL`, a
@@ -22,7 +24,7 @@ const baseWebServer = baseConfig.webServer;
 export default defineConfig({
   ...baseConfig,
   testDir: './measurement',
-  testMatch: ['transcript-scroll.ts', 'approval-panel.ts', 'run-view-band.ts', 'footer-width.ts'],
+  testMatch: ['transcript-scroll.ts', 'approval-panel.ts', 'run-view-band.ts', 'footer-width.ts', 'settings-width.ts'],
   fullyParallel: false,
   workers: 1,
   webServer:
