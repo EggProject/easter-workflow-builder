@@ -304,6 +304,14 @@ test('a fókuszált fan_out és loop csomóponton az Enter és a szóköz ugyan�
   await page.keyboard.press('Space');
   await expect(page.getByRole('region', { name: 'Iterációk: Ismétlés' })).toBeVisible();
   await expect(startNode).not.toHaveClass(/selected/);
+
+  // Más billentyű a fókuszált fan_out csomóponton a listát nem nyitja: csak
+  // az Enter és a szóköz aktivál (`find-keyboard-activated-node.ts`).
+  await page.getByRole('button', { name: 'A lista bezárása' }).click();
+  await fanNode.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(fanNode).toBeFocused();
+  await expect(page.getByRole('region', { name: /^(Ágak|Iterációk): / })).toHaveCount(0);
 });
 
 test('a fan_out csomópontra kattintva kinyílik az ágak listája, egy ágra kattintva a transcript csak annak eseményeit mutatja, a bezárás visszaállít', async ({

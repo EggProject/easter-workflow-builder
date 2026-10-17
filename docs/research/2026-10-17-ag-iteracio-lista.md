@@ -334,3 +334,30 @@ tesztben (jóváhagyás nélkül a tábla áll, legördülő nincs):
 Mindegyik rontás visszaállítva, utána a fájl mind a 14 tesztje zöld. Unit:
 `BranchIterationList.spec.tsx` (a legördülő alak hat esete) és `RunViewScreen.spec.tsx` (élő
 érkezés és eltűnés, a választás, a szűkítés és a transcript panel eleme marad).
+
+### 11.4 E2e lefedettség a merge kapun
+
+A 8. szekció eljárása szerint (nyolc egymás utáni shard, `--workers=3`, `flock`, utána
+`bun run coverage:e2e:report`), az `origin/main` `7233fef` (PR #48) beolvasztása után.
+
+**Első futás a `30918f3` merge fejen (615 teszt, mind zöld):** 15 / 12 / 2 / 15 fedetlen tétel, a
+`coverage:e2e:report` a küszöb alatt bukott (statements 99.29, branches 98.78, lines 99.26). Az új
+fedetlen tétel a `run-graph/find-keyboard-activated-node.ts` 41. sora (a nem aktiváló billentyű ága,
+és vele az `if` igaz ága): a `b14146a` óta egyetlen e2e sem nyomott a fókuszált csomóponton az
+`Enter`-től és a szóköztől eltérő billentyűt. A lezárás: a "fókuszált fan_out és loop csomóponton"
+e2e teszt végén az `ArrowDown` a fókuszált `fan_out` csomóponton a listát nem nyitja. **Szándékos
+rontás:** az `ArrowDown` felvétele az aktiváló billentyűk közé mellett a teszt bukik ("Expected: 0,
+Received: 1" a lista régióin).
+
+**A végső fejen (615 teszt):**
+
+| Metrika    | Fedett / összes | Fedetlen |
+| ---------- | --------------- | -------: |
+| statements | 2112 / 2126     |       14 |
+| branches   | 980 / 991       |       11 |
+| functions  | 735 / 737       |        2 |
+| lines      | 2033 / 2047     |       14 |
+
+A fedetlen darabszám a 8. szekció és a `7233fef` állapotával azonos (14 / 11 / 2 / 14), ugyanazon az öt
+fájlon (`mount-app.tsx`, `read-frontend-config.ts`, `is-valid-connection.ts`,
+`perform-route-request.ts`, `use-stream-connection.ts`); a küszöb nem mozdul.
