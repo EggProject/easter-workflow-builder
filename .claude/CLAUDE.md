@@ -647,7 +647,8 @@ test-nel").
 `docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
 `docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekciójának nyitott kérdését
 saját, dokumentált méréssel lezárta (lefuttatott Playwright tesztek a pinelt
-`@playwright/test@1.62.1` és chromium ellen, a darabszámmal: 5. szekció). A korábbi nyitva
+`@playwright/test` és chromium ellen; a verzió a mérési fájl 1. szekciójában, a darabszám az 5.
+szekcióban áll, a pinelt verzió forrása `docs/research/2026-08-26-toolchain.md`). A korábbi nyitva
 jelölés ezzel törölve; a
 döntést a `docs/spec/SPEC-007-frontend-alkalmazas.md` 13.4 szekciója valósítja meg.
 
@@ -1078,7 +1079,8 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A billentyűs törlés két változáslistát jelez, és a két vászon kezelő egymás törlését
   visszaírta.** A React Flow `deleteElements` függvénye rögzített sorrendben hívja a kezelőket: előbb
   az élek változáslistája (`onEdgesChange`), utána a csomópontoké (`onNodesChange`), legvégül az
-  `onDelete` (a telepített `@xyflow/react` 12.11.6 `dist/esm/index.js` 1129 ... 1153. sora). A
+  `onDelete` (a telepített `@xyflow/react` forrása, a verzióval és a sorszámokkal:
+  `docs/research/2026-10-14-csomopont-felvetel.md` 44.1 szekció). A
   `GraphEditorCanvas` két kezelője a saját, azonos renderből való propjaiból építette a teljes gráfot,
   ezért a második hívás visszaírta az első törlését: a törölt csomópont élei a szerkesztett állapotban
   és a mentés `PUT` törzsében árván maradtak, a vásznon viszont nem rajzolódtak ki, tehát a
@@ -1365,13 +1367,13 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   (`packages/db` CLAUDE.md).
 - **A TEXT elsődleges kulcs sértése `SQLITE_CONSTRAINT_PRIMARYKEY` kódot ad, nem
   `SQLITE_CONSTRAINT_UNIQUE`-ot.** A driver szöveg félrevezető (`UNIQUE constraint failed: ...`),
-  a kiterjesztett hibakód viszont a kulcs típusát mondja meg, nem a driver szöveget; saját mérés,
-  `better-sqlite3` 13.0.3, `:memory:` adatbázis, `CREATE TABLE t (id TEXT PRIMARY KEY)`, két azonos
-  `id` beszúrás. Ezen a mért kódon dönt a `describe-transaction-error.ts` `graph_id_conflict` ága
+  a kiterjesztett hibakód viszont a kulcs típusát mondja meg, nem a driver szöveget; saját mérés
+  `:memory:` adatbázison, a `better-sqlite3` verziója és a módszer a research fájl 1.
+  szekciójában. Ezen a mért kódon dönt a `describe-transaction-error.ts` `graph_id_conflict` ága
   (2026-09-27, a `workflow_node.id`/`workflow_edge.id` globális elsődleges kulcs sértésére, ha egy
   node vagy él azonosító egy MÁSIK workflow gráfjában már létezik). Védelem:
   `describe-transaction-error.spec.ts` és a `workflow-repository.spec.ts` valós SQLite tesztjei.
-  Mérés: `docs/research/2026-09-27-szerver-hibatorzs.md`.
+  Mérés: `docs/research/2026-09-27-szerver-hibatorzs.md` 1. szekció.
 
 **Lint és típus**
 
