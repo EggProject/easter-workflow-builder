@@ -284,3 +284,25 @@ a négy metrikán) is zölden, 2 perc alatt lefutott. A magyarázat a Blacksmith
 `docs.blacksmith.sh` "significantly higher single-thread performance"), amivel a fele magszám
 nem jelent tényleges lassulást ezen a terhelésen. A `playwright.config.ts` CI-ági `workers: 2`
 értéke emiatt változatlan marad, csökkentésre vagy a mérés megismétlésére nincs szükség.
+
+## 6. A rövid `-j` kapcsoló sortöréses folytatósorban (2026-10-17, adverzariális review)
+
+A `playwright-worker-limit` invariáns a rövid `-j` alakot csak a `playwright` vagy a `test:e2e` szót
+tartalmazó sorban tiltja (`make -j4` és `jq -j` miatt). Egy `playwright test \` sorral kezdődő, majd
+`-j 6` sorral folytatódó shell parancsban a `-j 6` sor önmagában nem tartalmazza a szót, ezért a
+sorokat külön néző vizsgálat átengedte. Ma a vizsgálat a logikai sorokat nézi: a végén `\` jelet
+viselő sor a következővel összefűzve áll, a `#` kezdetű teljes soros komment kimarad és nem folytatódik
+tovább (a shell a megjegyzést a sor végén lezárja).
+
+**Mérés (saját, 2026-10-17).** Egy ideiglenes git indexen (`GIT_INDEX_FILE`, `git read-tree HEAD`,
+a közös index érintetlen) egyenként felvett, nem commitolt `.sh` fájl; a régi alak az `a62188b`
+spec fájlja egy ideiglenes, nem követett másolatból futtatva, az új alak a módosított spec fájl.
+
+| Fájl tartalma                                                                           | Régi alak | Új alak                         |
+| --------------------------------------------------------------------------------------- | --------- | ------------------------------- |
+| tiszta fa                                                                               | zöld      | zöld                            |
+| `bun x playwright test \`, `--reporter=dot \`, `-j 6` külön sorokban                    | zöld      | bukik, a fájlt és a sort nevezi |
+| jogos: `make \` és `-j4` külön sorban; `playwright test \` és `--reporter=dot`; komment | zöld      | zöld                            |
+
+Az invariáns szintetikus esetei négy új pozitív és három új negatív esettel bővültek (köztük a
+komment sor, amelynek végi `\` jele nem rejtheti el a rákövetkező valódi parancsot).
