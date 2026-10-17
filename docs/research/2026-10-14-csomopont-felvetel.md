@@ -1640,6 +1640,235 @@ a mentés indítása után a menüpont tiltott, a kattintás nem változtat a do
 igazolás:** az `isSaving ||` elhagyásával a fájl tesztjei közül pontosan ez az egy bukik (1 bukott, 57
 sikeres), a javított állapoton mind a 58 zöld.
 
+## T-009-53
+
+A D1 e2e és mérés lépése az O-22-re (SPEC-008 5.10; a 101 ... 105. kritérium e2e része) valós
+Chromiumban, a szándékos rontásokkal. A szekciók számozása `53.x`, a T-009-45 mintájára. A mérések
+a Playwright 1.62.1 által telepített Chromiumon futottak (Chrome for Testing 151.0.7922.34, a
+`playwright-core` `browsers.json` szerint), fejnélküli módban, Linuxon, a nem macOS felhasználói
+ügynökkel (`Ctrl` módosító, O-31).
+
+### 53.1 A kiindulás: mit fedett már a meglévő e2e
+
+A `main` `f041052` állapotán:
+
+| Kritérium | Már fedett rész                                                                                                                               | Meglévő teszt                                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 101.      | egy felvétel a gombbal, a `Ctrl+Z`, a `Ctrl+Y`, a `Ctrl+Shift+Z` és a két gomb, a csomópontok száma szerint; üres listán hatástalan billentyű | `graph-editor-undo.spec.ts`                                |
+| 103.      | a lábléc hat gombja minden támogatott szélességen a nézetablakban; a tipp fókuszra, a `kbd` jelöléssel                                        | `responsive.spec.ts`, `graph-editor-undo-modifier.spec.ts` |
+| 104.      | az elvetés a betöltött dokumentumra állít, a jelző eltűnik, a menüpont utána tiltott, egy Visszavonás gomb visszahozza                        | `graph-editor-discard-navigation.spec.ts`                  |
+| 105.      | a felső navigáció a "Mégse", a morzsamenü a "Kilépés mentés nélkül" gombbal; nyitott modálisnál hatástalan `Ctrl+Z`; a bezárás párbeszéde     | `graph-editor-discard-navigation.spec.ts`                  |
+
+Hiányzott: a többi hat művelettípus és a jobb klikkes felvétel, a pontos (pozíció és `PUT` törzs
+szerinti) visszaállítás, a 102. kritérium egésze, a gombsor sorrendje, a betöltés és a mentés
+alatti tiltás, a sikeres mentés utáni tiltás, a tipp egérrel, a menüpont helye, a két link és a két
+gomb másik két párosítása, a mentetlen változás nélküli navigáció, és a `beforeunload` párbeszéd
+hiánya mentetlen változás nélkül, illetve az újratöltésre és a kézzel beírt címre.
+
+### 53.2 Az új e2e tesztek
+
+- `apps/web/e2e/graph-editor-undo-operations.spec.ts` (új, 12 teszt): kilenc eset (a felvétel a
+  gombbal és a jobb klikk menüvel, a törlés billentyűvel és a "Törlés" gombbal, él létrehozás,
+  mozgatás, automatikus elrendezés, a beállítás panel mező változása, elvetés). Minden eset után
+  hat lépés: `Ctrl+Z`, `Ctrl+Shift+Z`, Visszavonás gomb, `Ctrl+Y`, `Ctrl+Z`, Újra gomb, és minden
+  lépés után a vászon, a mentetlen jelző, a két gomb állapota és (menthető állapotban) a `PUT`
+  törzs pontosan a művelet előtti, illetve utáni állapot. Mellette a lábléc gombsorának sorrendje,
+  a betöltés és a mentés alatti tiltás (a billentyűvel és a "Változtatások elvetése" menüponttal
+  együtt), a sikeres mentés utáni tiltás, és a tipp egérrel (53.5).
+- `apps/web/e2e/graph-editor-undo-field.spec.ts` (új, 6 teszt): a 102. kritérium két tesztje
+  (a szűrő a szöveg területen és a szöveges beviteli mezőn, táblázatosan; a mező menete gombbal és
+  billentyűvel), és három mérés teszt (53.3).
+- `apps/web/e2e/graph-editor-discard-navigation.spec.ts` (+7): a menüpont helye; a felső
+  navigáció a "Kilépés mentés nélkül", a morzsamenü a "Mégse" gombbal, a cím a döntésig változatlan;
+  mentetlen változás nélkül (a visszavont változás után is) modális nélküli navigáció; mentetlen
+  változás nélkül párbeszéd nélküli bezárás; az újratöltés és a kézzel beírt cím párbeszéde (53.4).
+- `apps/web/e2e/graph-editor-undo.spec.ts`: csak a fejléc komment mutat az új fájlokra.
+
+**A vászon és a törzs olvasása.** A vászon állapota a csomópontok `data-id` értéke és a React
+Flow által írt `transform` (folyam koordináta, a nagyítástól és a pásztázástól független), és az
+élek `data-id` értéke a könyvtár hozzáférhető nevével ("Edge from n1 to n2"), DOM sorrendben. A
+`PUT` törzs sikertelen mentéssel olvasható: a mock 500-at ad, és a sikertelen mentés a két listát
+nem érinti (SPEC-008 5.10), tehát a mentés után is tovább lehet lépni a történetben. A felvett
+csomópont utáni állapot nem menthető, mert a kezdő konfig kötelező mezői üresek (81. kritérium,
+45.5), ezért ott a vászon (az új csomópont azonosítója és helye) a bizonyíték; a felvétel előtti
+állapot mindkét úton a `PUT` törzzsel is igazolt. Minden eset elején egy horgony: a betöltés utáni
+`PUT` törzs pontosan a fixtúra, az időbélyegek nélkül.
+
+**Egy művelet egy lépés.** A mozgatás tíz közbenső pozíció változással megy, a billentyűs törlés a
+csomópontot az élével együtt viszi; mindkettőnél egyetlen `Ctrl+Z` a művelet előtti pozíciót,
+illetve a csomópontot és az élt adja vissza, és a művelet előtti állapotban a Visszavonás gomb
+tiltott (a lista üres). A mező változás kilenc karakteres gépelés, a mező elhagyásáig egy lépés.
+
+### 53.3 A vezérelt mező natív visszavonása (mérés, SPEC-008 5.10 nem ellenőrzött pontja)
+
+Saját mérés (2026-10-17), a lenti eredményeket a `graph-editor-undo-field.spec.ts` három "mérés"
+tesztje rögzíti, tehát a repóból újra előállíthatók. A natív művelet a dokumentum `beforeinput`
+eseményének `inputType` értékéből látszik (`historyUndo`, `historyRedo`; W3C Input Events Level 2,
+<https://www.w3.org/TR/input-events-2/>, és az 51.1 szekció forrásai).
+
+1. **A natív visszavonás a vezérelt mező értékét visszaállítja.** A billentyű szűrő a beviteli
+   célponton nem fut (`preventDefault()` sincs), a böngésző `historyUndo`, illetve `historyRedo`
+   eseményt ad, a mező értéke változik, és a React `onChange` útján a szerkesztő állapotába jut: a
+   mentés `PUT` törzse a mező látható értékét hordozza. Az újra elvégzés (`Ctrl+Shift+Z`, `Ctrl+Y`)
+   ugyanígy natív.
+2. **A lépés mérete mezőnként más.** A vezérelt szöveg területen (`textarea`, "Prompt sablon") a
+   karakterenként begépelt `XYZ` után a `Ctrl+Z` karakterenként lép vissza (`XY`, majd `X`). A
+   vezérelt szöveges beviteli mezőn (`input`, "Modell azonosító") ugyanez a gépelés egy lépés (egy
+   `Ctrl+Z` után az érték üres). Egy eldobott, nem verziókövetett próba (tájékoztató, a repóban
+   nincs eszköze) szerint egy nem vezérelt, a lapra szúrt `textarea` a gépelést egy lépésben vonja
+   vissza, tehát a karakterenkénti lépés a vezérelt szöveg területé. Az ok **nem ellenőrzött**: a
+   telepített `react-dom` 19.2.8 `updateTextarea` függvénye minden frissítéskor a `defaultValue`
+   értéket is írja (`react-dom-client.production.js`, saját olvasás), de hogy a Chromium ettől bontja
+   a gépelés lépését, nem mértem.
+3. **A natív változás a mező menetébe vonódik.** A menet közbeni natív visszavonás és újra elvégzés
+   a nyitott mező menet része: a gráf történetén egy lépés áll, az újra lista üres, és a mező
+   elhagyása után egyetlen Visszavonás a teljes menetet (a natív lépésekkel együtt) visszavonja. Ez
+   a SPEC-008 5.10 1. szabályának állítása, most mérve.
+4. **A natív történet a dokumentum közös története.** Egy szöveg mezőben gépelés, majd egy másik
+   szöveg mezőre lépés után a `Ctrl+Z` a korábbi mező utolsó lépését vonja vissza: a "Prompt sablon"
+   gépelése után a "Modell azonosító" mezőben lenyomott `Ctrl+Z` a "Prompt sablon" utolsó karakterét
+   veszi ki, a `beforeinput` célpontja a nem fókuszált "Prompt sablon". Mivel a "Prompt sablon"
+   menete a mező elhagyásakor lezárult, ez a változás új gráf lépés: az első Visszavonás a teljes
+   gépelést hozza vissza, a második a kiinduló értéket. A gráf visszavonása közben nem fut.
+5. **Üres natív történetnél** a `Ctrl+Z` nem ad `beforeinput` eseményt, a mező és a gráf nem
+   változik.
+
+**A 4. pont forrásai.** A Chromium a visszavonás vermét keretenként vezeti, a keret minden
+szerkesztésére közösen: "This patch changes UndoStack from per-page to per-frame, so that undos and
+redos are consistently resolved by the frame where script is run or which gets focused" (Chromium
+`512508f`, "Reland of Move UndoStack from Page to Editor",
+<https://chromium.googlesource.com/chromium/src/+/512508f0d652a006407ce66aafcd339b296a5276>). A
+`beforeinput` célpontja 2024 óta a visszavont lépés eleme, nem a fókuszált elem: "Type something
+into the #one and move focus to the #two, when excuate undo command, `beforeinput` event is
+triggered on #two ... it is possible that the node associated with the undo/redo command may not be
+the currently focused node" (Chromium `debff86`,
+<https://github.com/chromium/chromium/commit/debff860c6b692eb929b9d56afd6f941462e146d>), ami a
+mérésünkkel egyezik. Független megerősítés: a WebKit szerkesztő mérnöke a W3C Editing munkacsoport
+listáján: "Chrome certainly shares a single undo stack for the entire page"
+(<https://lists.w3.org/Archives/Public/public-webapps-github/2016Sep/1411.html>, w3c/editing #150),
+és egy fejlesztői beszámoló: "I can still undo the changes of the input by pressing CTRL+Z in another
+input field" (<https://stackoverflow.com/questions/54238187>).
+
+**Következmény a 102. kritériumra.** A kritérium zárójele ("egy korábbi, másik mezőn végzett és
+lezárt szerkesztés változatlan marad") a gráf visszavonására igaz, a natív visszavonásra nem: egy
+szöveg mezőben gépeléssel végzett korábbi szerkesztést a másik szöveg mezőben lenyomott `Ctrl+Z`
+natívan visszavonja. Ezért a 102. kritérium e2e tesztje a korábbi, lezárt szerkesztést a
+"Kezeletlen hiba szabálya" választón végzi, ami nem natív szerkesztés, tehát a natív történet nem
+éri el, és a szűrő hatása elkülönül; a szöveg mezőkre vonatkozó viselkedést a mérés teszt rögzíti.
+A kérdést a user lezárta: a böngésző viselkedése elfogadva (53.8).
+
+### 53.4 A `beforeunload` párbeszéd Playwright alatt
+
+**Források.** A Playwright Dialogs oldala (<https://playwright.dev/docs/dialogs>): "When
+page.close() is invoked with the truthy runBeforeUnload value, the page runs its unload handlers",
+a párbeszéd `dialog.type() === 'beforeunload'` alakban kezelhető, és figyelő nélkül minden
+párbeszéd automatikusan elutasított; a `Page` osztály (<https://playwright.dev/docs/api/class-page>,
+`close`): "if runBeforeUnload is passed as true, a beforeunload dialog might be summoned and should be
+handled manually via page.on('dialog') event"; a `Dialog` osztály
+(<https://playwright.dev/docs/api/class-dialog>): a típus `alert`, `beforeunload`, `confirm` vagy
+`prompt`, és figyelő esetén a párbeszédet el kell fogadni vagy utasítani. Független megerősítés a
+navigációs utakra: microsoft/playwright #20624 (<https://github.com/microsoft/playwright/issues/20624>):
+a `page.reload()` `beforeunload` típusú párbeszédet ad, és elutasítás után a hívás a betöltésre vár
+("if you have an beforeunload event handle on a page and reload and let Playwright dismiss it, it
+will stall and timeout"); microsoft/playwright #23141
+(<https://github.com/microsoft/playwright/issues/23141>): a `location.reload()` útján is `beforeunload`
+párbeszéd jön, elutasítható.
+
+**Mérés** (saját, 2026-10-17; a tesztek a `graph-editor-discard-navigation.spec.ts` fájlban):
+
+| Út                                      | Mentetlen változás | Párbeszéd      | Kezelés  | Eredmény                                                                    |
+| --------------------------------------- | ------------------ | -------------- | -------- | --------------------------------------------------------------------------- |
+| `page.close({ runBeforeUnload: true })` | igen               | `beforeunload` | elutasít | a lap nyitva, a változás megmarad (52.1)                                    |
+| `page.close({ runBeforeUnload: true })` | nem (visszavonva)  | nincs          | nincs    | a lap bezárul                                                               |
+| `page.reload()` (újratöltés)            | igen               | `beforeunload` | elfogad  | a szerkesztő újratölt, a változás elveszik                                  |
+| `page.goto('/runs')` (kézzel beírt cím) | igen               | `beforeunload` | elutasít | a hívás `net::ERR_ABORTED` hibával tér vissza, a cím és a változás megmarad |
+| `page.goto('/runs')` (kézzel beírt cím) | igen               | `beforeunload` | elfogad  | a futás előzmények betölt                                                   |
+
+A mentetlen változás nélküli bezárás külön lapon fut, mert a bezárt lapról a lefedettségi fixtúra
+nem olvashat; a felvétel és a visszavonás felhasználói interakció, tehát a böngésző párbeszédének
+feltétele (sticky activation, M-114, 52.1) teljesül, és a párbeszéd hiánya a figyelő hiányát
+mutatja. Az újratöltés elutasító útja nincs tesztben: a `page.reload()` ilyenkor a betöltésre várva
+lejár (a #20624 szerinti viselkedés, egy eldobott próbában is így mérve, 4000 ms-os hívás szintű
+korláttal).
+
+### 53.5 A tipp egérrel (WCAG 2.2 1.4.13, user döntés 2026-10-14)
+
+A T-009-50 15. szekció tájékoztató mérését a `graph-editor-undo-operations.spec.ts` tipp tesztje a
+két valódi gombon, verziókövetve teszi tartóssá. Mindkét gombra: az egér a gomb közepére (a fókusz
+nem a gombon áll, tehát a tippet az egér nyitja), a tipp a felirattal és a `kbd` jelöléssel látszik;
+az egér a gomb közepéről a tipp közepére húzva húsz lépésben, két pixeles lépésekkel halad át a
+10 px-es résen, és a tipp végig nyitva marad; a végén a tipp `:hover` állapotú, és a közepén az
+`elementFromPoint` a tipp eleme (a `pointer-events: auto` hat); az egér kivitele a burkolóból zár.
+
+**A T-009-50 14. szekció nyitott pontja (a nyitott tipp takarhat-e egy lábléc gombot) lezárva a két
+gombra:** nyitott tippnél a lábléc mind a hat gombjának közepén az `elementFromPoint` maga a gomb,
+tehát a tipp és a híd a gombsor fölött áll, és kattintást nem fog el.
+
+**Rontással igazolva:** a híd `content` értéke `none` (`tooltip-hover-bridge.css`, a híd nem
+keletkezik) mellett a teszt a Visszavonás lépésén bukik (a tippre vitt egér alatt a tipp nem
+látszik); visszaállítva zöld.
+
+### 53.6 Szándékos rontások (mindegyik visszaállítva, a commitban nincs)
+
+A hatókör minden rontásnál ugyanaz az öt fájl, 39 teszt: `graph-editor-undo-operations.spec.ts`,
+`graph-editor-undo-field.spec.ts`, `graph-editor-discard-navigation.spec.ts`,
+`graph-editor-undo.spec.ts`, `graph-editor-undo-modifier.spec.ts`.
+
+| Rontás                                                                                                                          | Bukó e2e tesztek                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) a szűrő elhagyása: a `resolveUndoShortcut` beviteli célpont ága (`isKeyboardInputTarget`) kiiktatva                         | 5 bukik, 34 zöld: a 102. kritérium két szűrő tesztje (szöveg terület és beviteli mező; `Expected: "fail_branch"`, `Received: "fail_run"`, a mezőben lenyomott `Ctrl+Z` a gráfot vonta vissza) és a három mérés teszt (a natív lépés helyett a gráf menete fordult vissza) |
+| (b) a mező menet összevonásának elhagyása: a `handleUpdateNode` `recordGraphEdit` hívása menet nélkül (`GraphEditorScreen.tsx`) | 4 bukik, 35 zöld: a mező menet tesztje (`Expected: "Foglald össze a bemenetet."`, `Received: "Foglald össze a bemenetet. Röviden"`), a műveletek tábla mező esete (az első `Ctrl+Z` után a jelző megmaradt), és két mérés teszt                                           |
+| (c) az őr elhagyása: a szerkesztő őr regisztráló hatása mindig korán tér vissza (`GraphEditorScreen.tsx`)                       | 3 bukik, 36 zöld: a meglévő navigációs teszt és a két új párosítás (a megerősítő modális nem jelenik meg, a navigáció azonnal lefut)                                                                                                                                      |
+| (d) kiegészítő: a `useBeforeUnloadPrompt` mindig hamis értéket kap                                                              | 3 bukik a `graph-editor-discard-navigation.spec.ts` 10 tesztjéből: a bezárás, az újratöltés és a kézzel beírt cím párbeszéde                                                                                                                                              |
+| (e) kiegészítő: a tipp hídja nem keletkezik (53.5)                                                                              | a tipp teszt bukik                                                                                                                                                                                                                                                        |
+
+Az eredeti alakon mind zöld. A (b) rontás mellett a műveletek tábla többi nyolc esete zöld marad,
+mert csak a mező menete változik; az (a) mellett a nem beviteli célponton lenyomott billentyű
+változatlanul hat, ezért a többi visszavonás teszt zöld.
+
+### 53.7 Az e2e lefedettség előtte és utána
+
+Eljárás (51.5 szerint): `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`,
+nyolc egymás utáni shard `flock` alatt, legfeljebb 3 workerrel, majd `bun run coverage:e2e:report`,
+a darabszámok a `nyc report --reporter=json-summary` kimenetéből.
+
+Előtte: a `main` `f041052` állapotán **550 teszt, mind zöld** (69 + 69 + 69 + 69 + 69 + 69 + 68 +
+68). Utána: a jelen ág **575 teszt, mind zöld** (72 + 72 + 72 + 72 + 72 + 72 + 72 + 71; a +25 a
+12 + 6 + 7 új teszt). A `coverage:e2e:report` mindkét állapoton exit 0 a meglévő küszöbbel.
+
+| Metrika    | Fedett / összes előtte | Fedett / összes utána | Fedetlen előtte -> utána |
+| ---------- | ---------------------- | --------------------- | ------------------------ |
+| statements | 1960 / 1975            | 1960 / 1975           | 15 -> 15                 |
+| branches   | 913 / 924              | 913 / 924             | 11 -> 11                 |
+| functions  | 674 / 677              | 674 / 677             | 3 -> 3                   |
+| lines      | 1890 / 1905            | 1890 / 1905           | 15 -> 15                 |
+
+A lépés termékkódot nem módosít, a fedetlen helyek ugyanazon a hat fájlon, ugyanazokkal a
+darabszámokkal állnak (utasítás / ág / függvény / sor): `mount-app.tsx` 3/2/0/3,
+`read-frontend-config.ts` 8/7/1/8, `is-valid-connection.ts` 1/1/0/1,
+`browser-history-location-port.ts` 1/0/1/1, `perform-route-request.ts` 1/1/0/1,
+`use-stream-connection.ts` 1/0/1/1. Az `apps/web/package.json` küszöbe nem változott.
+
+### 53.8 Lezárva (user döntés 2026-10-17): a natív visszavonás egy másik szöveg mezőre is hat
+
+| Mező                | Tartalom                                                                                                                                                                                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| melyik két forrás   | a SPEC-008 5.10 billentyű szabályainak 1. pontja ("Szöveg mezőben a `Ctrl+Z` a mező natív visszavonása marad") és a 102. kritérium zárójele ("egy korábbi, másik mezőn végzett és lezárt szerkesztés változatlan marad"), szemben az 53.3 4. pontjának mérésével                       |
+| a tényleges eltérés | a natív visszavonás nem a mezőé, hanem a dokumentumé: egy szöveg mezőben lenyomott `Ctrl+Z` egy másik szöveg mező gépelését is visszavonja, és ez új gráf lépésként a dokumentumba jut. A gráf visszavonása a mezőben nem fut, ez a kritérium lényegi állítása, és teljesül            |
+| a döntés            | user döntés (2026-10-17): "Elfogadjuk." Az (A) út: a böngésző viselkedése elfogadva, kód nem változik. A (B) út (a natív visszavonás szűkítése a fókuszált mezőre) és a (C) út (a billentyű a panel szöveg mezőiben a gráfot vonja vissza) nem készül el                               |
+| átvezetve           | a SPEC-008 5.10 1. pontja és a 102. kritérium a mért viselkedéshez igazítva (az 53.3 4. pontjának Chromium forrásaival); az e2e teszt változatlan: a korábbi szerkesztés a választón áll, a szöveg mezők közötti viselkedést a `graph-editor-undo-field.spec.ts` mérés tesztje rögzíti |
+
+### 53.9 Nem ellenőrzött
+
+- Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál; a natív történet
+  közös volta és a lépés mérete ott nem mért.
+- Valódi macOS (a `Cmd` módosító és a `Cmd+Y`, M-122): változatlanul az 58.6 szerint.
+- A vezérelt szöveg terület karakterenkénti natív lépésének oka (53.3 2. pont).
+- Az újratöltés elutasító útja (53.4) és a valódi címsorba írt cím: a `page.goto` a böngészőből
+  indított navigáció, hogy a felhasználó címsorba írt címével minden részletben egyezik-e, nem
+  mértem; a párbeszéd és az elutasítás utáni megszakadás mindkettőnél a `beforeunload` szabálya.
+- A tipp a tiltott gombon egér alatt (51.7): a teszt mindkét gombot engedélyezett állapotban méri.
+
 ## T-009-58
 
 A visszavonás és az újra elvégzés billentyűjének módosítója (SPEC-008 5.10, O-31): az
