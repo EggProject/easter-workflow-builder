@@ -163,8 +163,9 @@ test('a lábléc ragadós, balra a státusszal és jobbra a sm méretű split bu
     await expect(button).toHaveCSS('font-size', '12px');
   }
 
-  // A két gomb ÖSSZERAGASZTOTT: a nyíl trigger bal széle a "Mentés" gomb
-  // jobb szélével esik egybe (a .button-group -1px margója miatt épp azon).
+  // A két gomb ÖSSZERAGASZTOTT: a nyíl trigger bal széle legfeljebb 1 pixelre
+  // van a "Mentés" gomb jobb szélétől (a .button-group `margin-left: -1px`
+  // szabálya 1 pixeles átfedést ad, tehát a két szél nem esik egybe).
   const saveBox = await saveButton.boundingBox();
   const triggerBox = await menuTrigger.boundingBox();
   if (saveBox === null || triggerBox === null) {

@@ -11,11 +11,15 @@
 //
 // A `playwright.config.ts` felállását örökli (chromium projekt, `baseURL`, a
 // `webServer` kötelező `VITE_*` konfigurációja), két eltéréssel: kizárólag a
-// mérő eszközök futnak, egyetlen workeren (a `node:http` SSE szerver egyetlen
-// portra kötődik), és a build NEM instrumentált. A `vite.config.ts` az
-// istanbul instrumentálást csak `VITE_COVERAGE=true` mellett kapcsolja be
-// (`requireEnv`); az instrumentált kód lassabb, és a verseny mérése időzítés
-// érzékeny, ezért itt a változó `false`.
+// mérő eszközök futnak, egyetlen workeren, és a build NEM instrumentált. Az
+// egy worker korábbi indoka (a `node:http` SSE szerver egyetlen portra
+// kötődött) elavult: ma minden teszt szervere szabad porton figyel
+// (`e2e/run-view-stream.ts` `listenOnLoopback`). Az egy worker mai okát
+// dokumentum nem nevezi meg; hogy az időzítés érzékeny mérések miatt kell-e,
+// nem ellenőrzött. A `vite.config.ts` az istanbul instrumentálást csak
+// `VITE_COVERAGE=true` mellett kapcsolja be (`requireEnv`); az instrumentált
+// kód lassabb, és a verseny mérése időzítés érzékeny, ezért itt a változó
+// `false`.
 import { defineConfig } from '@playwright/test';
 import baseConfig from './playwright.config.ts';
 

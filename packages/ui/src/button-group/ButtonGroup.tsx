@@ -4,10 +4,10 @@ import './button-group.css';
 
 export interface ButtonGroupProperties extends HTMLAttributes<HTMLDivElement> {
   /**
-   * A gombcsoport hozzáférhető neve. Kötelező, mert a `role="group"`
-   * önmagában nem hordoz nevet, és a WAI-ARIA szerint a csoportnak
-   * megnevezhetőnek kell lennie ahhoz, hogy a benne álló gombok
-   * összetartozása felolvasható legyen.
+   * A gombcsoport hozzáférhető neve. A név kötelező prop (projekt döntés): a
+   * `group` megnevezhető, de a WAI-ARIA nem teszi kötelezővé (APG:
+   * Discretionary,
+   * <https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/>).
    */
   readonly 'aria-label': string;
 }

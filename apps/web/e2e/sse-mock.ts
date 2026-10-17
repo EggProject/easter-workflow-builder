@@ -2,7 +2,7 @@
 // 2026-08-30-sse-mockolas-meres.md` 3. szekció 1. pontja szerint ez a
 // HASZNÁLANDÓ út minden olyan teszthez, ami egyetlen, lezárt SSE válaszon
 // belüli viselkedést ellenőriz - a `Last-Event-ID` alapú újracsatlakozás
-// EGYETLEN, mérten indokolt kivétel, ld. `sse-reconnect.spec.ts`.
+// EGYETLEN, mérten indokolt kivétel, ld. `sse-real-server.spec.ts`.
 import type { Page } from '@playwright/test';
 import { encodeStreamFrame, type StreamFrame } from '@easter-workflow-builder/protocol';
 import { STREAM_ORIGIN } from './api-origin.ts';

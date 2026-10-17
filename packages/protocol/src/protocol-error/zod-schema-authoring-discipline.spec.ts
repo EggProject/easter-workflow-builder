@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { isObject, isString } from '@easter-workflow-builder/typeguards';
 import type { ProtocolErrorBody } from './protocol-error-body.ts';
 import type { ConcurrencyLimitView } from '../settings/concurrency-limit-view.ts';
 import type { SettingsRecord } from '../settings/settings-record.ts';
@@ -33,6 +34,7 @@ import type {
 import type { SubscriptionState } from '../event-stream/stream-subscription.ts';
 
 const SRC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PACKAGE_ROOT = path.join(SRC_DIR, '..');
 
 function listSourceFiles(directory: string): readonly string[] {
   const entries = readdirSync(directory);
@@ -167,5 +169,81 @@ describe('a packages/protocol minden kimenő REST válasz és SSE keret alakja R
   // tényleges típus mégsem az, a `toEqualTypeOf` fordítási hibával bukna.
   it('ReplaceGraphRequest (bemeneti kontroll) nem readonly objektum', () => {
     expectTypeOf<ReplaceGraphRequest>().not.toEqualTypeOf<Readonly<ReplaceGraphRequest>>();
+  });
+});
+
+// A `superRefine(fn, { when })` második paraméterét a zod a 4.4.0 kiadástól
+// szállítja (colinhacks/zod #5741); régebbi kiadáson a második argumentum
+// csendben elvész, és a finomítás kimarad. A mérés és a két forrás a
+// `docs/research/2026-08-26-toolchain.md` "`zod` alsó határ a
+// `packages/protocol` csomagban" szekciójában áll.
+const ZOD_VERSION_WITH_SUPER_REFINE_WHEN: readonly number[] = [4, 4, 0];
+
+function hasWhenOption(content: string): boolean {
+  return /\bwhen\s*:/.test(content);
+}
+
+/**
+ * A tartomány első verziószáma (`^4.4.0`, `~4.4.0`, `>=4.4.0`, `4.4.0`) legalább a
+ * küszöb-e.
+ */
+function hasLowerBoundAtLeast(range: string, floor: readonly number[]): boolean {
+  const parts = range.replace(/^\D*/, '').split('.').map(Number);
+  for (const [index, minimum] of floor.entries()) {
+    const actual = parts[index];
+    if (actual === undefined || Number.isNaN(actual)) {
+      return false;
+    }
+    if (actual !== minimum) {
+      return actual > minimum;
+    }
+  }
+  return true;
+}
+
+function readZodRange(): string {
+  const parsed: unknown = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+  if (
+    !isObject(parsed) ||
+    !('dependencies' in parsed) ||
+    !isObject(parsed.dependencies) ||
+    !('zod' in parsed.dependencies) ||
+    !isString(parsed.dependencies.zod)
+  ) {
+    throw new Error('a package.json dependencies mezője nem tartalmaz szöveges zod tartományt');
+  }
+  return parsed.dependencies.zod;
+}
+
+describe('a packages/protocol zod alsó határa a használt `superRefine` `when` opcióhoz igazodik (SPEC-008 81. kritérium)', () => {
+  it('a package.json dependencies.zod alsó határa legalább a `when` opciót szállító kiadás, ha a src alatt (a spec fájlok nélkül) áll `when:` opció', () => {
+    const filesUsingWhen = listSourceFiles(SRC_DIR)
+      .filter((file) => hasWhenOption(readFileSync(file, 'utf8')))
+      .map((file) => path.relative(SRC_DIR, file));
+    const range = readZodRange();
+    expect(
+      filesUsingWhen.length === 0 || hasLowerBoundAtLeast(range, ZOD_VERSION_WITH_SUPER_REFINE_WHEN),
+      `a zod tartománya "${range}", de a következő fájl(ok) \`when:\` opciót használnak: ${filesUsingWhen.join(', ')}`,
+    ).toBe(true);
+  });
+
+  it('a `when:` kereső a szó határán dönt', () => {
+    expect(hasWhenOption('{ when: hasKnownDiscriminators }')).toBe(true);
+    expect(hasWhenOption('{ when : hasKnownDiscriminators }')).toBe(true);
+    expect(hasWhenOption('whenever: 1')).toBe(false);
+    expect(hasWhenOption('const then: number = 1;')).toBe(false);
+  });
+
+  it('az alsó határ összehasonlítás számként dönt, nem szövegként', () => {
+    expect(hasLowerBoundAtLeast('^4.4.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(true);
+    expect(hasLowerBoundAtLeast('^4.4.3', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(true);
+    expect(hasLowerBoundAtLeast('~4.10.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(true);
+    expect(hasLowerBoundAtLeast('>=5.0.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(true);
+    expect(hasLowerBoundAtLeast('4.4.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(true);
+    expect(hasLowerBoundAtLeast('^4.3.6', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(false);
+    expect(hasLowerBoundAtLeast('^4.0.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(false);
+    expect(hasLowerBoundAtLeast('^3.25.0', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(false);
+    expect(hasLowerBoundAtLeast('^4', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(false);
+    expect(hasLowerBoundAtLeast('latest', ZOD_VERSION_WITH_SUPER_REFINE_WHEN)).toBe(false);
   });
 });

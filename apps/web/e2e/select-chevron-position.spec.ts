@@ -109,6 +109,9 @@ test('a lenyíló chevron a design system referenciájával azonos helyen, kifes
       context.drawImage(image, 0, 0);
       const { data, width, height } = context.getImageData(0, 0, image.width, image.height);
       const channelAt = (x: number, y: number, channel: number): number => data[(y * width + x) * 4 + channel] ?? 0;
+      // Az 8 és a 4 CSS pixeles ráhagyás, a szélesség 0,7 szorosa és a 90-es
+      // csatorna távolság forrás nélküli, a research 1. szekciója pedig a
+      // jobb harmadot írja le (nyitott kérdés: SPEC-008 O-36).
       const inset = 8 * scale;
       const rightInset = 4 * scale;
       const background = [

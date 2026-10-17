@@ -11,12 +11,11 @@
 //
 // A HIBA, AMIT ŐRIZ (a `da9fa70` állapot, független ellenőrzés és research 9.
 // szekció): a tapadó akciósáv saját `--ep-bg-elevated` hátterű fehér doboz
-// volt a bézs panelen, a törzs háttér nélkül, és a lapozó a transcript sáv 16
-// pixeles szélén állt, a törzs tartalma a 24 pixeles drawer térközön, tehát két
-// bal igazítási vonal volt. 2026-09-25 óta a jobb belső térközt is (a
-// `5093e67` állapotban 19 pixel volt a bal 24 helyett, mert a `Resizable`
-// csoport 5 pixellel túllógott, és a túllógást levágta; research 10.
-// szekció).
+// volt a bézs panelen, a törzs háttér nélkül, és a lapozó más bal szélen
+// állt, mint a törzs tartalma, tehát két bal igazítási vonal volt.
+// 2026-09-25 óta a jobb belső térközt is: a `5093e67` állapotban kisebb volt
+// a balnál, mert a `Resizable` csoport túllógott, és a túllógást levágta
+// (research 10. szekció).
 import type { Page } from '@playwright/test';
 import { APPROVAL_RUN_URL, manyApprovals, mockApprovalRun } from './approval-fixture.ts';
 import { expect, test } from './coverage-fixture.ts';

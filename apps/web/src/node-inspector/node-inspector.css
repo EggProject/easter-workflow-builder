@@ -6,10 +6,11 @@
    Minden térköz a design system `--ep-space-*` tokenjeiből jön, minden
    tipográfia a `--ep-text-*` tokenekből; kitalált pixel érték nincs.
 
-   NINCS CARD IN CARD. A panel egy kártya alakú `.resizable-group`
-   belsejében ül, ezért itt egyetlen szabály sem rajzol második kártyát:
-   nincs szegély plusz lekerekítés plusz saját háttér kombináció egyetlen
-   belső dobozon sem. A korábbi `.inspector-section` (kitalált, a design
+   NINCS CARD IN CARD. A panel maga a dokkolt, saját hátterű felület (a
+   `.resizable-group` kártya keretét a `graph-editor-screen.css` törli),
+   ezért itt egyetlen szabály sem rajzol rajta belül kártyát: nincs
+   szegély plusz lekerekítés plusz saját háttér kombináció egyetlen belső
+   dobozon sem. A korábbi `.inspector-section` (kitalált, a design
    system `.card`-jától eltérő tokenkombinációjú kártya) és a panel tetején
    álló, szegélyezett hibaösszesítő emiatt megszűnt
    (`docs/research/2026-09-08-design-system-audit.md` 6. szekció,
@@ -78,11 +79,11 @@
    `.toast__close` néven is, komponensenként saját néven.
 
    MIÉRT NEM A `.btn--ghost`. A design system `.btn--ghost` variánsának
-   szövegszíne `var(--ep-accent-fg)` (button.css 91. sor), ami az arany
-   `#8A6220`. Chromium 141 alatt mérve a korábbi
-   `<Button variant="ghost" size="sm" icon>` bezáró gomb számított
-   `color` értéke pontosan `rgb(138, 98, 32)` volt, tehát a bezárás
-   elsődleges akciónak látszott (felhasználói kifogás, 2026-09-09). A
+   szövegszíne `var(--ep-accent-fg)` (a design system forrás `button.css` 91. sora), az arany. A
+   korábbi `<Button variant="ghost" size="sm" icon>` bezáró gomb mért
+   színe is ez volt, tehát a bezárás elsődleges akciónak látszott
+   (felhasználói kifogás, 2026-09-09; mérés:
+   `docs/research/2026-09-09-elem-audit.md` 10. szekció). A
    design system a panel bezárásra NEM a gomb komponenst használja: a
    Drawer és a Modal is saját, `--ep-fg-muted` színű vezérlőt kap. A
    `NodeInspector` a Drawer alakját követi (jobb oldalra dokkolt panel,
@@ -93,6 +94,9 @@
    felhasználói szabály a `.btn` méretskálájára vonatkozik; ez a vezérlő
    nem `.btn`, hanem a design system dedikált bezáró vezérlője, aminek
    egyetlen szállított mérete van.
+
+   ÁTKERÜL a forrás `@media (prefers-reduced-motion: reduce)` blokkjának
+   `.drawer__close` deklarációja (lent), a Drawer animációi nem.
 
    AMI NEM KERÜL ÁT: a forrás `@media (forced-colors: active)` blokkja. Az
    a Drawer EGÉSZÉT képezi le rendszerszínekre (overlay, panel, cím,
@@ -133,6 +137,11 @@
 .node-inspector__close svg {
   width: 16px;
   height: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .node-inspector__close {
+    transition: none;
+  }
 }
 
 /* A panel ÖNÁLLÓAN görög, a viewporton belül maradva: a görgetés itt van, a
@@ -180,13 +189,12 @@
       többi mezőjét (a layout nem ugrik). A `.field` alap `gap` értéke a
       design systemé marad.
 
-      A fenntartott magasság a `--ep-space-5` token (20px), NEM a nála
-      kisebb `--ep-space-4` (16px): a hibaüzenet a `--ep-text-meta` tokent
-      viseli, ami `500 12px/1.4`, tehát a tényleges sormagassága 16,8px.
-      16px-es fenntartott sorral a mérés 0,8px elmozdulást mutatott a
-      szomszédos mezőn (`apps/web/e2e/node-inspector.spec.ts`, "a
-      hibaüzenet megjelenése nem tolja el a szomszédos mezőt"); a
-      következő skálalépcső ezt nullára viszi. */
+      A fenntartott magasság a `--ep-space-5` token, NEM a nála kisebb
+      `--ep-space-4`: a hibaüzenet sora a `--ep-text-meta` miatt magasabb
+      16 pixelnél, és ez a szomszédos mezőt elmozdította (mérés:
+      `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
+      "Áthelyezett mérési próza"; regresszió: `apps/web/e2e/node-inspector.spec.ts`,
+      "a hibaüzenet megjelenése nem tolja el a szomszédos mezőt"). */
 .node-inspector .input,
 .node-inspector .textarea {
   min-width: 0;
@@ -205,8 +213,9 @@
    `StructuredOutputField`), vagy csak olvasható értéket mutatnak
    (`Skillek`, `MCP szerverek`, `Futásidő`) - egyiknek sincs hibaüzenete,
    tehát fenntartott hely sem kell nekik. Enélkül a csoportosító dobozok
-   üres, fenntartott sora mérten 32px felesleges rést nyitott a mezők
-   között. */
+   üres, fenntartott sora felesleges rést nyitna a mezők között (mérés:
+   `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
+   "Áthelyezett mérési próza"). */
 .node-inspector label.field {
   display: grid;
   grid-template-rows: auto auto minmax(var(--ep-space-5), auto);

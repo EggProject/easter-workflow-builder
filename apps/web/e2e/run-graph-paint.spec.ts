@@ -71,28 +71,28 @@ const EDGE_MINIMUM_CHANNEL_DIFFERENCE = { light: 12, dark: 39 } as const;
  * `dist/style.css` 6. és 7. sor, https://reactflow.dev/learn/customization/theming).
  *
  * MIÉRT REFERENCIA, ÉS NEM FELSŐ KORLÁT. Az alsó korlát csak az eltűnést
- * fogja: világosban az erősebb (`7229769`, 69..136) és a felére gyengített
- * (12..21) él is átment rajta, és a gyengített él tartománya az ép 21..40-es
- * tartományával átfed, tehát egy közös alsó-felső sáv sem választaná el. A
+ * fogja: világosban az erősebb (`7229769`) és a felére gyengített él is
+ * átment rajta, és a gyengített él mért tartománya az ép tartomány alsó
+ * szélével átfed, tehát egy közös alsó-felső sáv sem választaná el
+ * (`docs/research/2026-09-23-react-flow-sotet-tema.md` 7. szekció). A
  * referencia összevetés az élt UGYANAZON a geometrián a mostani festéssel
  * rajzolja újra, így élenként mér, nem tartományt hasonlít.
  */
 const RUN_VIEW_EDGE_REFERENCE_PAINT: EdgeReferencePaint = { stroke: '#b1b1b7', strokeWidth: '1px' };
 
 /**
- * Az eltérés felső korlátja a referencia festéstől, mindkét témában. Ép
- * állapotban a mért legnagyobb érték 2 (a raszterezés zaja a végpontok
- * körül), a legenyhébb mért rontás (a felére gyengített él, világos téma)
- * legkisebb értéke 10: a 6 a kettő egész felezőpontja. A `7229769` erősebb
- * festése világosban 48..98, sötétben 33..65, a gyengített él sötétben
- * 24..49 (`docs/research/2026-09-23-react-flow-sotet-tema.md` 7. szekció).
+ * Az eltérés felső korlátja a referencia festéstől, mindkét témában: a mért ép
+ * állapot (a raszterezés zaja a végpontok körül) és a legenyhébb mért rontás
+ * közé esik (`docs/research/2026-09-23-react-flow-sotet-tema.md` 7. szekció,
+ * "A küszöb").
  */
 const EDGE_REFERENCE_MAXIMUM_CHANNEL_DIFFERENCE = 6;
 
 /**
- * A pontminta alsó korlátja, mindkét témában. A `7229769` állapotában a mért
- * legnagyobb érték 6 (sötét), az ép állapotban a legkisebb 21 (világos): a 13
- * a kettő egész felezőpontja.
+ * A pontminta alsó korlátja, mindkét témában: a `7229769` állapotának mért
+ * legnagyobb és az ép állapot mért legkisebb értéke közé esik
+ * (`docs/research/2026-09-23-react-flow-sotet-tema.md` 6. szekció, küszöb
+ * táblázat).
  */
 const PATTERN_MINIMUM_CHANNEL_DIFFERENCE = 13;
 

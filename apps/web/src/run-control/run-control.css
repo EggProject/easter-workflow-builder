@@ -38,6 +38,9 @@
 
 /* A megszakított al-workflow futások megnevezett, doboz nélküli szakasza
    (AC26). */
+/* A címke recept (nagybetű, `letter-spacing: 0.04em`) a design system
+   `.field__label` szabályát követi (`eggproject-design-components`
+   `input/input.css`; a repóban `packages/ui/src/text-field/text-field.css`). */
 .run-control__cancelled-runs-title {
   margin: 0;
   font: var(--ep-text-meta);
@@ -59,6 +62,7 @@
   gap: var(--ep-space-1);
 }
 
+/* Ugyanaz a címke recept, mint a megszakított futások címkéjén. */
 .run-control__run-error-kind {
   margin: 0;
   font: var(--ep-text-meta);

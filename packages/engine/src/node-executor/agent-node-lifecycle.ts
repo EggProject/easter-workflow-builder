@@ -259,9 +259,9 @@ async function runAfterSlotGranted(
  * terminális lépést lezár"; `NodeExecutionInstance.failureStopsRun`). A
  * felszabaduló helyet a `releaseSlot` szinkron adja a sor következő elemének,
  * és az a léptető hurok előtt jut szóhoz: enélkül a bukott lépés testvére a
- * hurok reakciója előtt elindulna. Mérve: korlát 1 mellett 3 agent hívás
- * helyett 1 (`docs/research/2026-09-23-megszakitas-leallas-meres.md` 7.
- * szekció). Más futás várakozóját ez nem érinti.
+ * hurok reakciója előtt elindulna (mérés:
+ * `docs/research/2026-09-23-megszakitas-leallas-meres.md` 7. szekció). Más
+ * futás várakozóját ez nem érinti.
  *
  * **Az `agentQueryRegistry` paramétert változatlanul továbbadja a
  * `runAgentStep`-nek** (SPEC-004 9. szekció 3. pont, PLAN-005 T-005-26): ez a

@@ -30,7 +30,7 @@ function closeHttpServer(server: Server): Promise<void> {
  *    lezárulnak. A visszahívását itt még NEM várjuk meg: az csak akkor fut
  *    le, amikor minden kapcsolat véget ért, a nyitott SSE kapcsolat viszont
  *    magától sosem ér véget, tehát a várakozás a leállást elakasztaná
- *    (SPEC-006 8.2, mérve).
+ *    (SPEC-006 8.2, M-34 és M-35).
  * 3. `engine.shutdown()`: minden futás leáll, és a futásonként beírt
  *    `run_interrupted` esemény élőben is kimegy. Ezért áll a motor az SSE
  *    nyelők lezárása ELŐTT: lezárt kapcsolaton a lezáró keret nem érné el a

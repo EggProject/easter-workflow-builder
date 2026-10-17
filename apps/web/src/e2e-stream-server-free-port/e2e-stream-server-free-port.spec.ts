@@ -15,7 +15,8 @@
 //   2. a `listenOnLoopback` port paraméterének alapértéke `0` (a Node doksi szerint ekkor az
 //      operációs rendszer oszt ki szabad portot), és a `listen` hívás ezt a paramétert kapja;
 //   3. a `listenOnLoopback` egyetlen hívása sem ad át portként szám, szöveg vagy origin literált;
-//   4. minden `port` nevű függvény paraméter alapértéke `0`.
+//   4. minden `port` nevű függvény paraméter és destrukturált mező (`({ port = ... } = {})`)
+//      alapértéke `0`.
 // A korlát kimondva: egy nevesített konstansban álló szám, amit egy helper paramétereként adnak
 // tovább, egyik szabályon sem akad fenn; a teszt a visszaállítást és a véletlen fix portot zárja
 // ki, a szándékos megkerülést nem.
@@ -37,6 +38,11 @@ const LISTEN_SIGNATURE = 'export async function listenOnLoopback(server: NetServ
 const LISTEN_CALL = 'server.listen(port, LOOPBACK_HOST, () => {';
 const CALL_PREFIX = 'listenOnLoopback(';
 const FORBIDDEN_IN_PORT_ARGUMENT = ['ORIGIN', 'URL', 'env', "'", '"', '`'] as const;
+// Egy `(`, `,` vagy `{` után álló `port` név alapértékkel: a függvény
+// paraméter (`(port = 0)`, `(server, port: number = 0)`) és a destrukturált
+// mező (`({ port = 0 } = {})`). Az `=` után nem állhat másik `=` vagy `>`,
+// tehát az összehasonlítás és a nyíl függvény nem számít alapértéknek.
+const PORT_DEFAULT_PATTERN = /[(,{]\s*port(?::\s*number)?\s*=(?![=>])\s*([^,)}\n]*)/g;
 
 function collectTypeScriptFiles(relativeDirectory: string): readonly string[] {
   return readdirSync(path.join(webRoot, relativeDirectory), { withFileTypes: true }).flatMap((entry) => {
@@ -108,14 +114,32 @@ describe('e2e SSE teszt szerver szabad port invariáns', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('minden port nevű függvény paraméter alapértéke 0', () => {
+  it('minden port nevű függvény paraméter és destrukturált mező alapértéke 0', () => {
     const defaults = files.flatMap((file) =>
       file.content
-        .matchAll(/[(,]\s*port(?::\s*number)? = ([^,)\n]*)/g)
-        .map((match) => ({ file: file.relativePath, value: match[1] }))
+        .matchAll(PORT_DEFAULT_PATTERN)
+        .map((match) => ({ file: file.relativePath, value: (match[1] ?? '').trim() }))
         .toArray(),
     );
     expect(defaults.length).toBeGreaterThan(0);
     expect(defaults.filter((entry) => entry.value !== '0')).toEqual([]);
+  });
+
+  it.each([
+    ['függvény paraméter', 'function start(server: Server, port = 4174) {}', '4174'],
+    ['típusos paraméter', 'function start(port: number = 4174) {}', '4174'],
+    ['destrukturált mező', 'function start({ port = 4174 } = {}) {}', '4174'],
+    ['destrukturált mező társ után', 'function start({ host, port = 4174 }: Options = {}) {}', '4174'],
+  ])('a %s alapértéke is a vizsgálat alá esik', (_label, source, expected) => {
+    expect(
+      source
+        .matchAll(PORT_DEFAULT_PATTERN)
+        .map((match) => (match[1] ?? '').trim())
+        .toArray(),
+    ).toEqual([expected]);
+  });
+
+  it('az összehasonlítás és a nyíl függvény nem számít alapértéknek', () => {
+    expect('if (port === 4174) {} items.map((port => port))'.matchAll(PORT_DEFAULT_PATTERN).toArray()).toEqual([]);
   });
 });

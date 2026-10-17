@@ -8,23 +8,23 @@
    `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7. szekció
    "Mit NEM zár le ez a mérés" bekezdését).
 
+   A `.graph-node-card` nem design system elem: a `.card` mintáját követi
+   (szegély, lekerekítés, `--ep-bg-elevated` háttér, árnyék), de nem a `.card`
+   osztály (`docs/research/2026-09-08-design-system-audit.md` 2.2 szekció).
+
    A `box-sizing: border-box` NEM stílus ízlés, hanem a konstans jelentésének
-   helyreállítása, és egy mért hiba javítása (research 7. szekció "A mért
-   érték doboz modellje"). A mérés a kártya `offsetWidth`/`offsetHeight`
-   értékét vette fel, ami DEFINÍCIÓ SZERINT border-box méret (keret és
-   belső margó együtt). A böngésző alapértelmezett `content-box` modelljében
-   viszont a `min-width`/`min-height` a TARTALOM dobozra vonatkozik, tehát a
-   358x106-os konstansból 392x132-es kirajzolt kártya lett (mérve: 358 + 2*16
-   belső margó + 2*1 keret = 392, illetve 106 + 2*12 + 2*1 = 132), miközben a
-   dagre elrendezés ugyanezt a konstanst 358x106-ként kapta meg. A két szám
-   különbsége ült rá a csomópontok közti hézagra: a dokumentált 50 egységes
-   `ranksep`-ből 16, az 50 egységes `nodesep`-ből 24 maradt. */
+   helyreállítása: a mérés a kártya `offsetWidth`/`offsetHeight` értékét vette
+   fel, ami definíció szerint border-box méret, a böngésző alapértelmezett
+   `content-box` modelljében viszont a `min-width`/`min-height` a TARTALOM
+   dobozra vonatkozik, tehát a kirajzolt kártya nagyobb lenne a konstansnál, és
+   a dagre elrendezés hézagai összezsugorodnának (mérés és számok: a research
+   7.1 szekciója). */
 .graph-node-card {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
+  gap: var(--ep-space-1);
+  padding: var(--ep-space-3) var(--ep-space-4);
   min-width: var(--graph-node-card-width);
   min-height: var(--graph-node-card-height);
   border-radius: var(--ep-radius-md);
@@ -38,7 +38,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ep-space-2);
 }
 
 /* A fejléc jelvényei (állapot, próbálkozás, alapértelmezett ág): egy sorba
@@ -50,6 +50,11 @@
   gap: var(--ep-space-1);
 }
 
+/* A típuscímke a design system `.field__label` receptje
+   (`packages/ui/src/text-field/text-field.css`: 12px, 0.04em, nagybetűs,
+   `--ep-fg-muted`); a 12px méretre és a 0.04em betűközre nincs önálló token
+   (a `--ep-text-*` összetett `font` érték, a `--ep-track-*` más értékeket ad).
+   A recept 500-as súlya helyett 600 áll: nyitott kérdés: SPEC-008 O-35. */
 .graph-node-card__type {
   font-size: 12px;
   font-weight: 600;
@@ -74,6 +79,10 @@
   color: var(--ep-fg-muted);
 }
 
+/* A 12px a `--ep-text-meta` mérete, de a token teljes `font` értéke (500-as
+   súly, 1.4 sormagasság) a számított értéket változtatná; a legközelebbi
+   design system recept a `.field__error` (`font: var(--ep-text-meta)`).
+   Nyitott kérdés: SPEC-008 O-35. */
 .graph-node-card__warning {
   margin: 0;
   font-size: 12px;

@@ -100,8 +100,8 @@
    döntés 2026-09-24): a görgetést kizárólag a `useTranscriptAutoScroll` hook
    végzi. A CSS Scroll Anchoring spec szerint a `none` érték mellett a görgető
    dobozban nem választódik horgony, tehát a böngésző nem igazít a görgetési
-   pozíción; bekapcsolva az "ugrás az aljára" utáni első kinyitásnál a kinyitott
-   sor 1-3 képkockára elugrott (mérés és forrás:
+   pozíción; bekapcsolva folyamatos streamnél a kinyitások egy részében a lista
+   a hook görgetése nélkül is elmozdult (mérés és forrás:
    `docs/research/2026-09-23-transcript-panel-meresek.md` 17. szekció). A
    lista kereten át a minimuma egy összecsukott sor, inline stílusként a
    `TranscriptPanel.tsx` fájlban, a sormagasság egyetlen forrásából

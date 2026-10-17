@@ -104,15 +104,12 @@ test('a morzsamenü "Workflow-k" ős linkje a futás előzményekről visszanavi
 });
 
 /**
- * A nagy oldalcím (`<h1 class="app-pagehead__title">`, 36px betűméret) helyén
- * ma a jóval alacsonyabb morzsamenü áll. Saját, izolált Playwright méréssel
- * igazolt érték (2026-09-06, chromium, a valódi átemelt CSS és design tokenek
- * ellen): a `.app-pagehead` teljes magassága a régi cím mellett 139.8px, az
- * új morzsamenü mellett 47px (`docs/spec/SPEC-007-frontend-alkalmazas.md`
- * 5.1 szekció). A 80px küszöb a kettő között felezi a különbséget bőséges
- * tartalékkal, tehát a régi, nagy fejléc visszatérése ezt a tesztet
- * megbuktatná, egy betűtípus-metrika okozta pár pixeles ingadozás viszont
- * nem.
+ * A nagy oldalcím (`<h1 class="app-pagehead__title">`) helyén ma a jóval
+ * alacsonyabb morzsamenü áll. A `.app-pagehead` két mért magassága
+ * (`docs/spec/SPEC-007-frontend-alkalmazas.md` 5.1 szekció, "Mért nyereség")
+ * közé esik a 80px küszöb, tehát a régi, nagy fejléc visszatérése ezt a
+ * tesztet megbuktatná, egy betűtípus-metrika okozta pár pixeles ingadozás
+ * viszont nem.
  */
 test('a page-head (a morzsamenü sávja) jelentősen alacsonyabb, mint a korábbi nagy oldalcím volt', async ({ page }) => {
   await page.goto('/');

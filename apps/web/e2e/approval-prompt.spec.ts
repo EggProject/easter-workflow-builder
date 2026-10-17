@@ -15,6 +15,9 @@
 // eszközzel közös (`approval-fixture.ts`).
 import type { ApprovalDecisionRequest, PendingApproval } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   APPROVAL_RUN_URL,
   APPROVAL_TRANSCRIPT_ROW_COUNT,
@@ -33,6 +36,46 @@ import {
 import { expect, test } from './coverage-fixture.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
 import { mockIdleStream, mockSseFramesWithoutReconnect } from './sse-mock.ts';
+
+const UI_SOURCE_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  'packages',
+  'ui',
+  'src',
+);
+
+/**
+ * A design system forrásából olvasott érték, nem beírva (ugyanaz a módszer,
+ * mint a `run-view.spec.ts` fájlban): a `design-token/breakpoints.css`
+ * töréspont tokenje.
+ */
+function breakpointTokenValue(tokenName: string): number {
+  const content = readFileSync(path.join(UI_SOURCE_PATH, 'design-token', 'breakpoints.css'), 'utf8');
+  const match = new RegExp(String.raw`${tokenName}:\s*(\d+)px`).exec(content);
+  if (match?.[1] === undefined) {
+    throw new Error(`A ${tokenName} token nem található a breakpoints.css fájlban.`);
+  }
+  return Number(match[1]);
+}
+
+const MEDIUM_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-md');
+const LARGE_SCREEN_WIDTH = breakpointTokenValue('--ep-screen-lg');
+
+/**
+ * A `Resizable` panel pixeles minimális magassága a design system
+ * `resizable/resizable.css` fájljának `.resizable-panel` szabályából.
+ */
+function resizablePanelMinHeight(): number {
+  const content = readFileSync(path.join(UI_SOURCE_PATH, 'resizable', 'resizable.css'), 'utf8');
+  const match = /\.resizable-panel\s*\{[^}]*?min-height:\s*(\d+)px/.exec(content);
+  if (match?.[1] === undefined) {
+    throw new Error('A .resizable-panel min-height értéke nem található a resizable.css fájlban.');
+  }
+  return Number(match[1]);
+}
 
 declare global {
   // Ambiens globális változó deklaráció, a `coverage-fixture.ts` mintájára: a
@@ -280,7 +323,7 @@ for (const theme of ['light', 'dark'] as const) {
         if (shown === undefined) {
           continue;
         }
-        if (viewport.width < 768) {
+        if (viewport.width < MEDIUM_SCREEN_WIDTH) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         await expect(paginationPosition(page, `1 / ${String(count)}`)).toBeVisible();
@@ -350,7 +393,7 @@ for (const theme of ['light', 'dark'] as const) {
     test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: a jóváhagyás és a transcript között húzható elválasztó áll, kezdetben felén; valódi egér húzással és billentyűvel mozdul, az aria-valuenow követi, az arány újratöltés után megmarad; a gombok görgetés nélkül látszanak, a vászon és a tartalom terület nem változik`, async ({
       page,
     }) => {
-      const isTabbed = viewport.width < 768;
+      const isTabbed = viewport.width < MEDIUM_SCREEN_WIDTH;
       await page.setViewportSize(viewport);
       await page.addInitScript((mode) => {
         globalThis.localStorage.setItem('eggTheme', mode);
@@ -495,6 +538,7 @@ async function expectLastTranscriptRowReachable(page: Page): Promise<void> {
     }
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.wheel(0, 1000);
+    // Az 1000 ms-os belső korlát forrás nélküli (nyitott kérdés: SPEC-008 O-36).
     await expect(lastRow).toBeInViewport({ ratio: 1, timeout: 1000 });
   }).toPass();
 }
@@ -508,7 +552,7 @@ for (const theme of ['light', 'dark'] as const) {
     test(`${String(viewport.width)}x${String(viewport.height)}, ${theme} téma: az elválasztó minden állásában (kezdő, Home, End) a lapozó és a két gomb teljesen látszik, a transcript utolsó sora görgetve teljesen látszik, a jelentett érték a valódi arány, és a Home és az End a határ; a vászon és a tartalom terület nem változik`, async ({
       page,
     }) => {
-      const isTabbed = viewport.width < 768;
+      const isTabbed = viewport.width < MEDIUM_SCREEN_WIDTH;
       await page.setViewportSize(viewport);
       await page.addInitScript((mode) => {
         globalThis.localStorage.setItem('eggTheme', mode);
@@ -538,6 +582,8 @@ for (const theme of ['light', 'dark'] as const) {
         // az End állás maga a határ (APG Window Splitter: `aria-valuemin` és
         // `aria-valuemax` a legkisebb és a legnagyobb elsődleges panel).
         await expect(separator).toHaveAttribute('aria-valuenow', String(split.ratio));
+        // Az 5 és a 95 a forrás `resizeAt` `[5, 95]` korlátja (SPEC-008 M-73):
+        // a pixeles minimum ennél szűkebbre vág, ezért szigorú az egyenlőtlenség.
         if (position === 'Home') {
           await expect(separator).toHaveAttribute('aria-valuemin', String(split.ratio));
           expect(split.ratio).toBeGreaterThan(5);
@@ -635,7 +681,7 @@ for (const theme of ['light', 'dark'] as const) {
       await mockApprovalRunWithTranscript(page, manyApprovals(4));
       await page.goto(APPROVAL_RUN_URL);
       await expect(page.getByTestId('rf__node-n-first')).toBeVisible();
-      if (viewport.width < 768) {
+      if (viewport.width < MEDIUM_SCREEN_WIDTH) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       await expect(page.getByRole('list', { name: 'Futás eseményei' }).getByRole('listitem').first()).toBeVisible();
@@ -809,10 +855,12 @@ for (const theme of ['light', 'dark'] as const) {
       // alapértelmezés alatt áll), a vízszintesben a transcript (a belső
       // elválasztó az 50-es alapértelmezés alatt).
       const moved =
-        viewport.width < 1024 ? page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME }) : approvalSeparator(page);
+        viewport.width < LARGE_SCREEN_WIDTH
+          ? page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })
+          : approvalSeparator(page);
       await expect
         .poll(async () => Number(await moved.getAttribute('aria-valuenow')))
-        .toBeLessThan(viewport.width < 1024 ? 70 : 50);
+        .toBeLessThan(viewport.width < LARGE_SCREEN_WIDTH ? 70 : 50);
       expect(await readStoredLayouts(page)).toEqual([undefined, undefined]);
     });
 
@@ -831,7 +879,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       await expect(approvalText(page).getByRole('heading', { name: FIRST_APPROVAL.title })).toBeAttached();
       await expect(page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME })).toHaveAttribute('aria-valuenow', '60');
-      if (viewport.width < 1024) {
+      if (viewport.width < LARGE_SCREEN_WIDTH) {
         // A függőleges sávban mindkét arány számít, és mindkettő saját:
         // egyik elválasztó sem mozdul.
         await expect(approvalSeparator(page)).toHaveAttribute('aria-valuenow', '70');
@@ -909,11 +957,9 @@ for (const theme of ['light', 'dark'] as const) {
  * nem küszöb): 1440x900-on ennyivel keskenyebb transcript oldalon (a
  * billentyűs jelenet három lépésével, 85 százalékkal egyező hely) a
  * jóváhagyás szövege a kezdő törzsnél magasabbra tördel, tehát újraszámolás
- * nélkül levágódik, a gombsor viszont még elfér a szélességben. Egy 240
- * pixeles húzásnál már a "Jóváhagyás" gomb is vízszintesen kilóg (mérve 0,87
- * arány): az a fix gombsor szélessége, nem a felfedés kérdése, a lezárt O-13
- * tétel rokona (SPEC-008 14.1, `bun run measure:approval -g kulso-huzas`,
- * research `2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
+ * nélkül levágódik, a gombsor viszont még elfér a szélességben (SPEC-008
+ * 14.1, `bun run measure:approval -g kulso-huzas`, research
+ * `2026-09-24-jovahagyas-panel-helye.md` 13. szekció).
  */
 const OUTER_DRAG_PIXELS = 215;
 
@@ -948,7 +994,7 @@ for (const theme of ['light', 'dark'] as const) {
         ],
       );
       await page.goto(APPROVAL_RUN_URL);
-      if (viewport.width < 768) {
+      if (viewport.width < MEDIUM_SCREEN_WIDTH) {
         await page.getByRole('tab', { name: 'Transcript' }).click();
       }
       for (const part of questionParts(page)) {
@@ -1125,7 +1171,7 @@ for (const theme of ['light', 'dark'] as const) {
         );
         await mockApprovalRunWithTranscript(page, manyApprovals(1));
         await page.goto(APPROVAL_RUN_URL);
-        if (viewport.width < 768) {
+        if (viewport.width < MEDIUM_SCREEN_WIDTH) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
         const outer = page.getByRole('separator', { name: GRAPH_SEPARATOR_NAME });
@@ -1194,9 +1240,9 @@ test(`900x1000, End állásban, jóváhagyás nélkül a minimum a mai marad`, a
   await outer.press('End');
   expect(await outer.getAttribute('aria-valuenow')).toBe(await outer.getAttribute('aria-valuemax'));
   // Jóváhagyás nélkül a régió üres, tehát a minimum a forrás szerinti
-  // pixeles minimumon marad (60 pixel a függőleges sávban).
+  // pixeles minimumon marad a függőleges sávban (`resizable.css`).
   const sideBox = await page.locator('.run-view-screen__transcript').boundingBox();
-  expect(sideBox?.height).toBeLessThan(100);
+  expect(sideBox?.height).toBe(resizablePanelMinHeight());
 });
 
 test.describe('érintés', () => {
@@ -1205,8 +1251,8 @@ test.describe('érintés', () => {
   /**
    * Érintéses húzás a telefonos fül sávban: a `run-view.css` `touch-action:
    * none` szabálya nélkül a böngésző az érintést pásztázásnak veszi, és a
-   * pointer folyamot `pointercancel` zárja (mérve: 100 pixeles húzásra 50-ről
-   * csak 54-re mozdul; research 9. szekció). A Chrome DevTools Protocol
+   * pointer folyamot `pointercancel` zárja (mérve, research 9. szekció, 9.4
+   * "Érintés a fül sávban"). A Chrome DevTools Protocol
    * `Input.dispatchTouchEvent` hívása valódi érintés eseményt ad, nem egeret.
    */
   test('375x812: az elválasztó érintéssel is húzható', async ({ page }) => {
@@ -1283,8 +1329,8 @@ test.describe('érintés', () => {
    * veszi át a mozdulatot pásztázásnak, tehát a megszakítást a teszt maga
    * váltja ki, ugyanúgy mindkét elválasztón. Utána egy puszta egérmozgás a
    * vásznon és egy görgetés a transcripten: ha a húzás állapota bent ragad,
-   * ezek mozdítják az elválasztót (mérve a `decfa69` állapoton: 73-ról 5-re,
-   * majd 85-re; research 10. szekció).
+   * ezek mozdítják az elválasztót (mérve a `decfa69` állapoton, research 10.
+   * szekció, 10.3).
    */
   for (const which of ['külső', 'belső'] as const) {
     test(`900x1000: a ${which} elválasztón a megszakított érintéses húzás után nem ragad bent a húzás, és egy egérmozgás vagy görgetés nem mozdítja`, async ({
@@ -1742,7 +1788,7 @@ for (const theme of ['light', 'dark'] as const) {
           [mockRoute('decideApproval', async (route) => route.fulfill(decidedResponse(FIRST_APPROVAL)))],
         );
         await page.goto(APPROVAL_RUN_URL);
-        if (viewport.width < 768) {
+        if (viewport.width < MEDIUM_SCREEN_WIDTH) {
           await page.getByRole('tab', { name: 'Transcript' }).click();
         }
 

@@ -14,25 +14,26 @@ export interface FitViewOnAutoLayoutProperties {
  * A vászon nézetét a teljes gráfra illeszti, valahányszor az automatikus
  * elrendezés lefutott (SPEC-008 5.7).
  *
- * **A mért hiba, ami ezt indokolja (2026-09-06).** A `<ReactFlow fitView>`
- * prop dokumentált jelentése kizárólag a KEZDETI nézetre szól ("the flow will
- * be zoomed and panned to fit all the nodes initially provided"), ezért az
+ * **A mért hiba, ami ezt indokolja.** A `<ReactFlow fitView>` prop
+ * dokumentált jelentése kizárólag a KEZDETI nézetre szól ("the flow will be
+ * zoomed and panned to fit all the nodes initially provided"), ezért az
  * "Elrendezés" gomb után a vászon a betöltéskori nagyításon és eltolásán
- * maradt: az új elrendezés a vászon egy sarkába csúszott, nagy üres területet
- * hagyva maga körül (saját mérés: a nagyítás a kattintás előtt és után is
- * pontosan ugyanaz a szám volt).
+ * maradt (saját mérés:
+ * `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7.2 szekció).
  *
  * **Miért önálló komponens, a `<ReactFlow>` gyerekeként.** A `useReactFlow()`
- * hook a React Flow saját context providerét igényli, azt viszont maga a
- * `<ReactFlow>` építi fel a saját fáján belül - a `GraphEditorCanvas`, ami
- * rendereli, még kívül van rajta. A gyerekek viszont már a provider alatt
- * állnak, tehát ez az egyetlen hely, ahonnan a hook hívható extra
- * `<ReactFlowProvider>` beszúrása nélkül.
+ * hook a React Flow context providere alatt hívható. A `GraphEditorScreen`
+ * ma külső `ReactFlowProvider`-t ad, de a `<ReactFlow>` is felépít egyet, ha
+ * nincs (`Wrapper`, `@xyflow/react` 12.11.6 `dist/esm/index.js` 3748-3757.
+ * sor), és a `GraphEditorCanvas` külső provider nélkül is csatolható. A
+ * gyerekként állás mindkét esetben a provider alatt tartja a hookot.
  *
- * **A hatás függősége szándékosan csak a `revision`.** A `useReactFlow()`
- * által adott objektum azonossága a nézet állapotától függ, a `fitView()`
- * hívás pedig épp a nézetet írja át - a `fitView` függőségre kötése így egy
- * önmagát tápláló hurkot kockáztatna. A kiváltó ok maga a számláló.
+ * **A hatás függősége szándékosan csak a `revision`.** A kiváltó ok maga a
+ * számláló. A `fitView` hivatkozás a telepített `@xyflow/react` 12.11.6-ban
+ * stabil (a `useReactFlow()` a segédfüggvényeit `[]` függőségű `useMemo`-ban
+ * építi, a visszaadott objektum csak a `viewportInitialized` értékre
+ * frissül, `dist/esm/index.js` 1052-1236. sor), ezért a kihagyása nem nyel el
+ * hívást.
  */
 export function FitViewOnAutoLayout(properties: Readonly<FitViewOnAutoLayoutProperties>): undefined {
   const { revision } = properties;

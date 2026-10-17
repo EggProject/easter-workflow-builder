@@ -178,9 +178,7 @@
    pointer esemény folyamot `pointercancel` eseménnyel lezárja
    (<https://www.w3.org/TR/pointerevents/>: "Authors must instead use
    touch-action", <https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action>).
-   Mérve a belső elválasztóra (valódi Chromium, CDP érintés események,
-   375x812): a `touch-action: none` nélkül a húzás pásztázásnak adódik át és
-   a teljes elmozdulás nem éri el a célt, vele a húzás `pointerup`-pal zár és
+   Mérés: a `touch-action: none` nélkül a húzás pásztázásnak adódik át, vele
    célba ér (`docs/research/2026-09-24-jovahagyas-panel-helye.md` 9.4
    szekció). A szabály a fogyasztó oldalán, erre a két elválasztóra
    szűkítve áll, mert a `resizable.css` bájtazonossági teszt alatt van. A

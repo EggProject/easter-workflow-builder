@@ -442,7 +442,8 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
 
   if (runDetail === undefined || stepRuns === undefined || snapshotState.state.status !== 'success') {
     // Várakozás jelzése: a betöltés alatt csontváz áll, nem üres képernyő
-    // (`.claude/CLAUDE.md` 11. szekció).
+    // (`.claude/CLAUDE.md` 11. szekció). A sorok számának (4) forrása nincs
+    // igazolva (nyitott kérdés: SPEC-008 O-35).
     return (
       <div className="run-view-screen__loading" role="status">
         <ThemedSkeleton shape="text" lines={4} />

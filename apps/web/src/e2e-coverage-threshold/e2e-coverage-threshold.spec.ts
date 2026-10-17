@@ -21,14 +21,41 @@
 //      (enélkül az `e2e` bukása nem bukná meg a ruleset által kötelezőnek
 //      kért `CI` státuszcsekket, tehát a küszöb nem lenne kapu).
 //
+// A "nulla fájl kizárás" döntést egy nyc konfiguráció csendben megkerülhetné:
+// az `exclude`/`include` lista a riport előtt kiszűri a fájlokat (a telepített
+// nyc `excludeAfterRemap` alapértéke `true`). A riport az `apps/web` mappából
+// fut (`tooling/scripts/e2e-coverage.sh`), és a telepített
+// `@istanbuljs/load-nyc-config` innen felfelé keresi a `standardConfigFiles`
+// listájának fájljait, a `nyc` kulcsot pedig a legközelebbi `package.json`
+// fájlban. Ezért sem az `apps/web`, sem a repó gyökere nem tartalmazhat nyc
+// konfigurációs fájlt, és egyikük `package.json` fájlja sem kaphat `nyc`
+// kulcsot. A tiltás a tartalomtól független: a konfiguráció léte már maga a
+// megkerülés helye.
+//
 // A számok forrása és a származtatás:
 // `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { describe, expect, it } from 'vitest';
 
 const THRESHOLD_FLAGS = ['--statements', '--branches', '--functions', '--lines'] as const;
+const NYC_CONFIG_FILE_NAMES = [
+  '.nycrc',
+  '.nycrc.json',
+  '.nycrc.yml',
+  '.nycrc.yaml',
+  'nyc.config.js',
+  'nyc.config.cjs',
+  'nyc.config.mjs',
+] as const;
+// A mappák a repón belül, ahol a riport futásakor a nyc konfigurációt keresi: a futás
+// helye (`apps/web`), és a felfelé keresés útján az `apps` mappa és a repó gyökere. A
+// `package.json` `nyc` kulcsa csak a két csomag manifesztben állhat (az `apps` mappának
+// nincs saját `package.json` fájlja).
+const NYC_LOOKUP_DIRECTORIES = [path.join('apps', 'web'), 'apps', '.'] as const;
+const NYC_MANIFEST_DIRECTORIES = [path.join('apps', 'web'), '.'] as const;
 
 function repoRoot(): string {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- a git a fejlesztoi/CI PATH resze, ugyanugy mint a tobbi wrapper scriptben
@@ -42,6 +69,11 @@ function readCoverageReportScript(): string {
     throw new Error('Az apps/web/package.json nem tartalmaz coverage:e2e:report scriptet.');
   }
   return match[1];
+}
+
+function hasNycKey(manifestContent: string): boolean {
+  const parsed: unknown = JSON.parse(manifestContent);
+  return isRecord(parsed) && 'nyc' in parsed;
 }
 
 function readContinuousIntegrationWorkflow(): string {
@@ -80,5 +112,27 @@ describe('e2e lefedettségi küszöb invariáns', () => {
     // ki annak idején ez a kapcsoló az `e2e` jobból.
     const workflowLines = readContinuousIntegrationWorkflow().split('\n');
     expect(workflowLines.filter((line) => /^\s+continue-on-error:/.test(line))).toEqual([]);
+  });
+
+  it.each(NYC_LOOKUP_DIRECTORIES)('a(z) %s mappában nincs nyc konfigurációs fájl', (lookupDirectory) => {
+    const root = repoRoot();
+    const configFiles = NYC_CONFIG_FILE_NAMES.filter((fileName) =>
+      existsSync(path.join(root, lookupDirectory, fileName)),
+    );
+    expect(configFiles).toEqual([]);
+  });
+
+  it.each(NYC_MANIFEST_DIRECTORIES)(
+    'a(z) %s mappa package.json fájlja nem tartalmaz nyc kulcsot',
+    (lookupDirectory) => {
+      const manifestContent = readFileSync(path.join(repoRoot(), lookupDirectory, 'package.json'), 'utf8');
+      expect(hasNycKey(manifestContent)).toBe(false);
+    },
+  );
+
+  it('a nyc kulcs felismerése a kulcs meglétén áll, a tartalmától függetlenül', () => {
+    expect(hasNycKey('{ "name": "web", "nyc": { "exclude": ["src/x.ts"] } }')).toBe(true);
+    expect(hasNycKey('{ "name": "web", "nyc": {} }')).toBe(true);
+    expect(hasNycKey('{ "name": "web", "devDependencies": { "nyc": "18.0.0" } }')).toBe(false);
   });
 });

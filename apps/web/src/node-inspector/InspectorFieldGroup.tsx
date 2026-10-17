@@ -17,9 +17,10 @@ export interface InspectorFieldGroupProperties {
  * system `.card` osztályával, hanem egy attól eltérő tokenkombinációjú,
  * kitalált `.inspector-section` osztállyal
  * (`docs/research/2026-09-08-design-system-audit.md` 6. szekció). A panel
- * viszont már eleve egy kártya alakú `.resizable-group` belsejében ül,
- * tehát minden ilyen doboz card in card volt - amit a felhasználó
- * kifejezetten tiltott -, és a doboz saját belső térköze a mezők közötti
+ * viszont maga is dokkolt, saját hátterű felület (a `.resizable-group`
+ * kártya keretét a `graph-editor-screen.css` törli), tehát minden ilyen
+ * doboz card in card volt - amit a felhasználó kifejezetten tiltott -, és
+ * a doboz saját belső térköze a mezők közötti
  * térközzel dupla eltartást adott. A csoport ezért ma **tisztán elrendezés**
  * (egy flex oszlop token térközzel) plusz a design system saját
  * `.field__label` címkéje, kártya chrome nélkül.

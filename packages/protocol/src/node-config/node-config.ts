@@ -163,8 +163,10 @@ export type JoinUnselectedNodeConfig = z.infer<typeof JoinUnselectedNodeConfigSc
  * Ágak összezárása. Módonként egyetlen alobjektum áll, a `settings` kulcson;
  * a negyedik, `mode: null` ágnak nincs `settings` mezője. Beágyazott
  * diszkriminált unió a `mode` mezőn, ami a külső, `type` mezőn álló uniónak
- * is érvényes tagja (mérve: mind a négy ág `type: 'join'` literált hordoz, a
- * Zod 4 ezt elfogadja beágyazott unió tagként).
+ * is érvényes tagja: mind a négy ág `type: 'join'` literált hordoz, a Zod 4
+ * pedig az opciók `propValues` halmazát összegzi, így a beágyazott unió a
+ * belső ágak `type` értékét adja a külsőnek (telepített `zod@4.4.3`,
+ * `v4/core/schemas.js` 1128-1159. sor).
  */
 export const JoinNodeConfigSchema = z.discriminatedUnion('mode', [
   JoinMergeNodeConfigSchema,

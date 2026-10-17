@@ -92,7 +92,7 @@ L0  nincs workspace fuggosege
 
 L1  csak L0-ra epul
     provider-capability  ->  nincs workspace ele
-    protocol             ->  core
+    protocol             ->  core, typeguards
 
 L2  L0 es L1 folott
     minimax-client   ->  core, typeguards
@@ -165,7 +165,7 @@ A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van réteg
 
 Összesen 19 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 25 workspace csomag.
 
-A `protocol` L1, mert csak a `core` csomagtól függhet. A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L5, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert, tehát az `agent` (L4) fölött áll; a `server` emiatt L6, mert az `engine`-től is függ. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
+A `protocol` L1, mert csak L0 csomagoktól függhet: a `core` és a `typeguards` csomagtól (a `typeguards` felvétele a SPEC-005 7.2 szekció és a szabálykönyv 5. szekciója szerint: a `protocol` is használhat belőle guardot ott, ahol a kérdés nem drótszintű alak). A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L5, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert, tehát az `agent` (L4) fölött áll; a `server` emiatt L6, mert az `engine`-től is függ. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
 
 ### A megszűnt két kiinduló csomag
 

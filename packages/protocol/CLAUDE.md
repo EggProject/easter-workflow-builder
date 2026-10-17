@@ -66,7 +66,11 @@ felvett `loop` `NaN` `maxIterations` értéke), feltéve, hogy a diszkriminált 
 `type`, a `join` ismert vagy `null` `mode` értékkel). A finomítás ezért csak a két diszkriminátort olvassa
 típusosan, minden más mezőt az `unknown` bemenetű `findBlankTextFields` vizsgál, vagy csak `null`
 értékkel hasonlít össze; egy új szabály sem olvashat más mezőt típusosan, mert az a `when` ágon
-típushibás értéket kaphat.
+típushibás értéket kaphat. **A `when` paramétert a `zod` csak egy adott kiadástól szállítja** (régebbi
+kiadáson a második argumentum csendben elvész, és a finomítás kimarad), ezért a `package.json` `zod`
+tartományának alsó határa ahhoz a kiadáshoz igazodik; az érték és a két forrás a
+`docs/research/2026-08-26-toolchain.md` "`zod` alsó határ a `packages/protocol` csomagban" szekciójában
+áll, a védelmet a `zod-schema-authoring-discipline.spec.ts` alsó határ tesztje adja.
 
 ## Kapcsolódó dokumentumok
 

@@ -105,7 +105,7 @@ A csomag a REST és az SSE kontraktus egyetlen forrása. Az `apps/server` (L6) �
 
 ### 3.4 Függőségi irány
 
-A `protocol` `dependencies` mezője a jelen spec után: `@easter-workflow-builder/core` (az `Outcome` miatt) és `zod`. A `zod` külső npm csomag, tehát a `check:graph` réteg szabályát nem érinti; a workspace élek száma nem nő, a csomag L1 marad.
+A `protocol` `dependencies` mezője a jelen spec után: `@easter-workflow-builder/core` (az `Outcome` miatt), `@easter-workflow-builder/typeguards` (a 7.2 szekció szerint, ott, ahol a kérdés nem drótszintű alak; szabálykönyv 5. szekció) és `zod`. A `zod` külső npm csomag, tehát a `check:graph` réteg szabályát nem érinti; a `core` és a `typeguards` egyaránt L0, tehát a csomag L1 marad.
 
 **Verziószámot nem vezetünk be.** A `zod` deklarált range-e szó szerint ugyanaz, amit a fában már négy csomag és az Agent SDK peer mezője használ: `^4.0.0` (F-12). Ebből következik, hogy a Bun ugyanarra az egyetlen verzióra oldja fel, mint eddig, és nem keletkezik új verzió döntés, amit két független forrással kellene igazolni. A registry `latest` értéke a jelen spec írásakor magasabb, mint amire a fa feloldódik; ez ismert, és **nem** ok a frissítésre a jelen spec keretében.
 

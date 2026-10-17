@@ -1577,6 +1577,9 @@ for (const theme of ['light', 'dark'] as const) {
  * teteje (az utolsó sornál a `react-window` méretező eleme, a lista utolsó,
  * `aria-hidden` gyereke) a sor alsó élénél áll. A mérés előtt a lista még a
  * becsült magassággal pozicionál, tehát a kinyitott sor rálóg a következőre.
+ * A 0,5 pixeles tűrés a lista aljára szóló user döntés (2026-09-24,
+ * `run-view-stream.ts` `expectLastRowFullyVisibleAtBottom`); két sor közti
+ * résre alkalmazva forrás nélküli (nyitott kérdés: SPEC-008 O-36).
  */
 async function waitForRowMeasured(list: Locator, position: number): Promise<void> {
   await expect

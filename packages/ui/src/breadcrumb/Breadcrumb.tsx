@@ -22,9 +22,10 @@ export interface BreadcrumbProperties {
    */
   readonly ancestors?: readonly BreadcrumbAncestor[];
   /**
-   * A jelenlegi oldal neve. Sosem link: a WAI-ARIA APG minta és a MDN
-   * `aria-current` dokumentációja szerint az aktuális elem `aria-current="page"`
-   * jelölésű, nem interaktív elem.
+   * A jelenlegi oldal neve. Az aktuális elem sosem link (tervezési döntés);
+   * az APG megengedi a nem link elemet, ilyenkor az `aria-current` opcionális,
+   * itt `aria-current="page"` áll rajta
+   * (<https://www.w3.org/WAI/ARIA/apg/patterns/breadcrumb/>).
    */
   readonly current: string;
   /**

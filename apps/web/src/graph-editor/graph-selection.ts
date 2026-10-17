@@ -24,9 +24,7 @@ export type SelectedEdgeIds = ReadonlySet<string>;
  * osztályt is onnan kapja az él. Ha a `selected` nem jut vissza, az él
  * kattintásra sosem lesz kiválasztott, tehát a `deleteKeyCode`
  * alapértelmezése (`Backspace`, `@xyflow/react@12.11.6`) sem tud mit
- * törölni. Saját méréssel igazolva 2026-09-06, valós chromiumban: kattintás
- * után az él `class` attribútuma `selected` osztály nélkül maradt, és a
- * `Backspace` az élt nem törölte.
+ * törölni (saját mérés, valós chromium, SPEC-008 5.5 "hatodik állapotdarab").
  *
  * A halmaz szándékosan nem tisztul a törölt élek azonosítóitól: kizárólag a
  * ténylegesen meglévő éleken olvassuk vissza, tehát egy él nélküli
@@ -59,8 +57,8 @@ export function mergeEdgeSelection(
  * `select: false` változást ad. Ez a változás a domain oda-vissza
  * leképezésen ugyanúgy elveszne, mint az él kiválasztása, és a csomópont
  * kiválasztva maradna - a `Backspace` ilyenkor a kiválasztott élen kívül a
- * csomópontot (és vele a rá kötött éleket) is törölné. Saját méréssel
- * igazolva 2026-09-06, valós chromiumban.
+ * csomópontot (és vele a rá kötött éleket) is törölné (saját mérés, valós
+ * chromium, SPEC-008 5.5).
  *
  * A kiválasztás felvételét ez a függvény szándékosan nem kezeli: azt a
  * vászon `onNodeClick` propja adja vissza a szülőnek, és a React Flow a

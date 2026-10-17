@@ -94,9 +94,9 @@ export type EngineErrorKind =
   | 'run_execution_failed'
   // 10.2 1. pont: a szabályos leállás kezdete után a motor új futást nem
   // indít (gyökér, újraindított és al-workflow futást sem), hanem ezzel a
-  // hibaosztállyal utasítja el. Mérve: enélkül egy a jel előtt fogadott, de
-  // csak utána beérkező törzsű indító kérés új futást indított, aminek az agent
-  // lépése a leállás alatt megszakítás nélkül végigfutott (SPEC-006 8.2).
+  // hibaosztállyal utasítja el. Mérve (SPEC-006 M-36, 8.2): enélkül egy a jel
+  // előtt fogadott, de csak utána beérkező törzsű indító kérés új futást
+  // indított.
   // Ugyanezzel utasítja el a leállás alatt érkező felhasználói megszakítást
   // is, írás nélkül: a futás a leállás szerint zár (9. szekció, user döntés
   // 2026-09-24).

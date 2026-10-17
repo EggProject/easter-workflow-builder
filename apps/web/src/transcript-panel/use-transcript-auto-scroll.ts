@@ -33,7 +33,8 @@ export interface TranscriptAutoScroll {
    * való ("This may be used to (re)scroll a row into view"). Enélkül a fül
    * sávban (a `--ep-screen-md` alatt) a csatoláskori görgetés elveszne, mert
    * a transcript fül ekkor még rejtett, és egy rejtett elem nem görgethető:
-   * a fül megnyitásakor a lista a tetején állna (saját mérés, 375 pixelen).
+   * a fül megnyitásakor a lista a tetején állna (research 7. szekció d) sor
+   * és 8. szekció).
    *
    * A callback maga NEM görget, csak jelez, és a görgetés a következő
    * passzív effektben fut. Ok, saját mérés és a telepített forrás
@@ -43,7 +44,7 @@ export interface TranscriptAutoScroll {
    * aktuális sorszámra frissíti. Ha ugyanabban a commitban a méret és a
    * sorszám is változik, egy azonnali `scrollToRow` a régi sorszámmal
    * ellenőriz, és `RangeError` bontja le a teljes fát ("Invalid index
-   * specified"), mért, 3000 soros pótlásnál.
+   * specified"), mérve (research 7. szekció e) sor).
    */
   readonly onResize: () => void;
   /**

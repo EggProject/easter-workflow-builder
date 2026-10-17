@@ -35,5 +35,6 @@ export function JsonTextAreaField(properties: Readonly<JsonTextAreaFieldProperti
     }
   }
 
+  // A 6 soros kezdő magasság forrás nélküli felületi érték: nyitott kérdés: SPEC-008 O-35.
   return <TextAreaField size="sm" label={label} value={text} onChange={handleChange} rows={6} error={parseError} />;
 }

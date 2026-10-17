@@ -1,6 +1,6 @@
 // Közös REST mockolás segédfüggvények minden e2e spec fájlhoz (T-008-27).
 // Minden REST hívás `page.route()` mockon megy, valós backend szervert
-// egyetlen teszt sem szólít meg (a `sse-reconnect.spec.ts` az egyetlen,
+// egyetlen teszt sem szólít meg (a `sse-real-server.spec.ts` az egyetlen,
 // mérten indokolt kivétel az SSE csatornán,
 // docs/research/2026-08-30-sse-mockolas-meres.md 3. szekció).
 import type { Page, Route } from '@playwright/test';

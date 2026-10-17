@@ -8,11 +8,11 @@ import {
 
 /**
  * A jelenlegi sáv leolvasása a böngészőtől. Mindkét query külön
- * `matchMedia` hívás: a `MediaQueryList.matches` az egyetlen dokumentált
- * mód a töréspont állapotának leolvasására JS-ből, és a viewport
- * szélességének saját kiszámolása (`innerWidth` olvasás) NEM
- * helyettesíti, mert nem ugyanaz a viewport modell, amit a media query
- * használ.
+ * `matchMedia` hívás: a `MediaQueryList.matches` közvetlenül a böngésző
+ * media query kiértékelését adja, így a JS nem térhet el a CSS `@media`
+ * szabálytól
+ * (<https://drafts.csswg.org/cssom-view/#the-mediaquerylist-interface>,
+ * <https://www.w3.org/TR/mediaqueries-4/#width>).
  */
 function readLayoutBand(): RunViewLayoutBand {
   return resolveRunViewLayoutBand(

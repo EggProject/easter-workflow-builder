@@ -65,9 +65,13 @@ export interface RunViewTranscriptSideProperties {
  * transcript közti elválasztó ad helyet (a függőleges sávban, a rajz
  * rovására, ennek a csoportnak az arányát megtartva), a maradékot ez az
  * elválasztó, a transcript rovására. A külső csak saját külső arány nélkül
- * mozdul; ez az elválasztó saját arány nélkül, és 2026-09-26 óta akkor is, ha
- * csak a belső arány saját (user döntés, "Ideiglenesen engedjen"); ha mindkét
- * arány saját, egyik sem. A mozdulás ideiglenes: nem tárolódik, és a
+ * mozdul. A függőleges sávban ez az elválasztó saját arány nélkül, és
+ * 2026-09-26 óta akkor is mozdul, ha csak a belső arány saját (user döntés,
+ * "Ideiglenesen engedjen"); ha ott mindkét arány saját, egyik sem. A
+ * vízszintes és a fül sávban a külső nem ad helyet, ezért ott a belső
+ * elválasztó mindig enged, saját aránnyal is (user döntés 2026-09-27,
+ * `run-view-approval-reveal-adjustment.ts`). A mozdulás ideiglenes: nem
+ * tárolódik, és a
  * jóváhagyás eltűnésekor az előző (a tárolt saját) arány áll vissza (SPEC-008
  * 8. szekció 1. pont).
  *

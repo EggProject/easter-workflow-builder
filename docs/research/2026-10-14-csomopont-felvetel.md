@@ -141,7 +141,7 @@ figyelője `stopImmediatePropagation`-t hív (a `d3-zoom` mintájára), és az `
 függetlenül pontosan egyszer fut; valamint a felkötés és a leiratkozás hívásainak egyezése a
 `globalThis` figyelő hívásain. A második teszt azért kell, mert a happy-dom 20.11.6
 `removeEventListener` megvalósítása a `capture` értéket nem veti össze (`lib/event/EventTarget.js`
-64-82. sor, mindkét listából töröl), tehát a hibás leiratkozást (valódi böngészőben szivárgás)
+64-82. sor: előbb a buborékoló listából töröl és kilép, a capture listából csak akkor, ha a buborékolóban nincs ilyen figyelő), tehát a hibás leiratkozást (valódi böngészőben szivárgás)
 viselkedés alapú teszt nem látná.
 
 Szándékos rontással igazolva: a felkötés és a leiratkozás is buborékoló alakra állítva két teszt
@@ -219,8 +219,8 @@ A forrás `.tooltip` szabálya `pointer-events: none` értéket ad (`tooltip.css
 `.tooltip.is-open` ezt nem írja felül. Az MDN szerint ez az érték azt jelenti, hogy az elem
 önmagában sosem célpontja a mutató eseményeknek, és az esemény "átmegy" rajta arra, ami alatta van
 ([MDN, `pointer-events`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/pointer-events));
-ugyanezt mondja a W3C wiki CSS UI vázlata ("The element is never the target of pointer events",
-<https://www.w3.org/wiki/User:Tantekelik/pointer-events>). A WCAG 2.2 1.4.13 "Hoverable" feltétele
+ezt erősíti az SVG 2 15.6 szakasza is a `none` értékről, SVG elemekre ("The given element does not receive pointer events.",
+<https://www.w3.org/TR/SVG2/interact.html#PointerEventsProperty>). A WCAG 2.2 1.4.13 "Hoverable" feltétele
 szerint, ha a hover tartalmat hoz elő, "the pointer can be moved over the additional content
 without the additional content disappearing"
 (<https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html>); az APG 3.
@@ -536,7 +536,7 @@ UTÁN futnak.
   chromiumot definiál; a támogatásra a 16. szekció forrásai szólnak, saját mérés nincs.
 - A nézet középpont függvényének és a tároló mezőinek viselkedése valódi böngészőben (18. szekció): a PLAN-009 T-009-45 e2e lépése fedi (M-99, 77. kritérium).
 - A `deletable: false` hatása a Delete billentyűre és a kijelölt Start törlésére valódi
-  Chromiumban: a React Flow `getElementsToRemove` forrása szerint (`dist/esm/index.js`, 474-484.
+  Chromiumban: a `@xyflow/system` 0.0.82 `getElementsToRemove` forrása szerint (`dist/esm/index.js`, 475-491.
   sor) a `deletable === false` csomópont kimarad a törlésből; ezt a forrás olvasása igazolja, a tényleges billentyű nyomást a T-009-45 e2e-je fedi (82. kritérium).
 
 ## T-009-43
@@ -779,8 +779,8 @@ a `dist/esm/index.js` fájlokra szólnak):
 - `useGlobalKeyHandler` (react, 1245-1259. sor): a `deleteKeyCode` a `useKeyPress` hívásnak megy
   (`actInsideInputWithModifier: false`), a lenyomásra a kiválasztott csomópontokat és éleket
   a `deleteElements` kapja.
-- `useKeyPress` (react, 387. sortól): a `keyCode` prop a `useMemo` függőségi tömbjében áll
-  (414-429. sor), a beviteli elem szűrése a 436-437. sorban, tehát egy minden renderen új tömb minden renderen újraépítené a figyelőt. Ezért a
+- `useKeyPress` (react, 387. sortól): a `keyCode` prop a figyelőt felkötő `useEffect` függőségi tömbjében áll
+  (`[keyCode, setKeyPressed]`, 482. sor; a `useMemo` a 414-429. sorban csak a `keyCodes` és `keysToWatch` értékeket számolja, `[keyCode]` függéssel), a beviteli elem szűrése a 436-437. sorban, tehát egy minden renderen új tömb minden renderen újrakötné a figyelőt. Ezért a
   `GraphEditorCanvas.tsx` modul szintű `const DELETE_KEY_CODE` konstanst használ.
 - `deleteElements` (react, 1129-1154. sor): a sorrend rögzített: előbb az éleken `onEdgesDelete`
   és `triggerEdgeChanges`, utána a csomópontokon `onNodesDelete` és `triggerNodeChanges`, legvégül
@@ -1068,7 +1068,7 @@ scale(0.964654)` (a store `transform` mezője, `toTransformString`). A felvett c
 `(500, 240)`; a DOM-ból olvasott értékeken futtatott `((width / 2 - x) / zoom - 358 / 2, (height /
 2 - y) / zoom - 106 / 2)` képlet `(499.99991, 240)`. A különbség 0,0001 flow pixel alatti, és abból
 jön, hogy a böngésző az inline `transform` értéket hat értékes jegyre írja vissza (`89.8564px`,
-`0.964654`), a `DOMMatrixReadOnly` pedig ezt egyszeres pontossággal olvassa; a teszt ezért
+`0.964654`), a Chromium 151 mérés szerint a `DOMMatrixReadOnly` a `translate()`/`scale()` argumentumokat egyszeres pontosságra kerekítve olvassa, a spec `unrestricted double` típust ír (<https://drafts.csswg.org/geometry-1/>); ez böngésző specifikus, a mérés: 2026-10-17, T-009-34; a teszt ezért
 `toBeCloseTo(..., 1)` (0,05 alatti eltérés) mellett állít. Ezzel az M-99 mezőlistája valós
 Chromiumban igazolt: a store `width` és `height` mezője a vászon renderer elemének mérete, a
 `transform` a nézet `[x, y, zoom]` alakja, és a gomb ezekből számol. A kártya kirajzolt doboza
@@ -1111,8 +1111,8 @@ utasítja el (M-104), tehát a `superRefine` ebben a mentési kísérletben nem 
 
 **Az UUID (79.).** A felvett csomópont és az új él azonosítója a `PUT` törzsben a 4. verziós UUID
 alakja: öt hexadecimális csoport, a harmadik `4`-gyel, a negyedik `8`, `9`, `a` vagy `b` értékkel
-kezdődik (RFC 9562 4.2. szakasz: a verzió `0b0100`, a variáns `10xx`; 5.4. szakasz: a `ver` mező a 48
-... 51. bit, a `var` a 64 ... 65. bit, <https://www.rfc-editor.org/rfc/rfc9562.html>; a 4. szakasz
+kezdődik (RFC 9562 4.2. szakasz: a verzió `0b0100`, a 48 ... 51. biten; 4.1. szakasz: a variáns `10xx`, a 64 ... 65. biten;
+az 5.4. szakasz a `ver` és `var` mezőt ezekre a szakaszokra utalva helyezi el, <https://www.rfc-editor.org/rfc/rfc9562.html>; a 4. szakasz
 szerint a betűk kis- és nagybetűsek is lehetnek, ezért a minta kis- és nagybetű független). `xy-edge__`
 előtagú él nincs a törzsben. A felvett agent lépés minden más kötelező mezővel (a `promptTemplate`
 kitöltve, él a Start kimenetéről) is `PUT` nélkül marad, amíg az `onUnhandledError` `null`, és a
@@ -1260,7 +1260,8 @@ eseményén zárja, ami a panel minden mezőjének elhagyásakor fut.
   <https://developer.mozilla.org/en-US/docs/Web/API/InputEvent/inputType>: a teljes lista a fenti
   spec Attributes szekciója.
 - w3c/editing#509, <https://github.com/w3c/editing/issues/509>: a böngészőnek saját, natív
-  visszavonás vereme van, a `historyUndo` csak akkor fut, ha abban van bejegyzés.
+  visszavonás vereme van, a `historyUndo` csak akkor fut, ha abban van bejegyzés; megfigyelt böngésző viselkedés (w3c/editing #509, nyitott issue),
+  nem specifikációs szabály.
 
 A szűrő ezért beviteli célponton nem lép működésbe és `preventDefault()` sem fut, tehát a natív
 visszavonás érintetlen. **Nem ellenőrzött**, hogy a vezérelt React mezőn a natív visszavonás
@@ -1520,8 +1521,9 @@ párbeszéd csak a lapon történt felhasználói interakció (sticky activation
   adja, a `returnValue` értéke figyelmen kívül marad.
 - Chromium, "Intent to Ship: Change beforeunload handler dialog condition"
   (<https://groups.google.com/a/chromium.org/g/blink-dev/c/yi3GzzB6AtI>): a Chrome a
-  `preventDefault()` hívásra is megerősítő párbeszédet mutat; az MDN példája szerint ez a Chrome 119
-  óta áll ("Included for legacy support, e.g. Chrome/Edge < 119").
+  `preventDefault()` hívásra is megerősítő párbeszédet mutat; az első verzió nem ellenőrzött, a források 117 és 119
+  között eltérnek (a chromestatus <https://chromestatus.com/feature/4968823574233088> szerint Chrome 117, az MDN példája
+  szerint "Included for legacy support, e.g. Chrome/Edge < 119").
 
 A megvalósítás a SPEC-008 5.10 2. pontja szerint kizárólag `preventDefault()` hívást tesz; a
 `returnValue` régi útját nem állítja.
@@ -2187,11 +2189,11 @@ között.**
 - WHATWG HTML, "Session history and navigation"
   (<https://html.spec.whatwg.org/multipage/browsing-the-web.html>), a "URL and history update steps"
   megjegyzése: a `popstate` a fragment navigációra fut, a `history.pushState()` hívásra nem. Az
-  "update document for history step application" algoritmus `popstate` lépését (csak akkor fut, ha a
-  dokumentum nem új, `documentIsNew` hamis) a LibWeb böngészőmotor forrása szó szerint idézi
-  (<https://git.etawen.dev/sleirsgoevy/serenity/commit/6c1944ee61bba982f033160ffed35b5c14cc36e9>,
-  "5. If documentIsNew is false, then: ... 2. Fire an event named popstate"); a spec oldalt magát a
-  mérete miatt nem olvastam végig, ezért ez a pont a 57.4 saját mérésére támaszkodik.
+  "update document for history step application" algoritmus `popstate` lépése csak akkor fut, ha a
+  dokumentum nem új (`documentIsNew` hamis)
+  (<https://html.spec.whatwg.org/multipage/browsing-the-web.html#update-document-for-history-step-application>,
+  "If documentIsNew is false: ... Fire an event named popstate at document's relevant global object", a spec szövegét
+  2026-10-17-én olvastam); a pont emellett a 57.4 saját mérésére is támaszkodik.
 
 **A `pushState` az előre bejegyzéseket törli.** Forrás: SPEC-008 M-119 (WHATWG HTML "history
 handling behavior", W3C HTML5 5.4). Saját mérés: a 57.4 második sora.

@@ -3,7 +3,7 @@
    Forrás: eggproject-design-components/components/menu/menu.css, a
    `.menu`, a `.menu__item` (és állapotai), a `.menu__text`, valamint a
    `.menu-anchor` trigger-konténer szabályai, szabályonként bájtra
-   azonosan a forrásból.
+   azonosan a forrásból, az alább felsorolt eltérések kivételével.
 
    MIÉRT SZŰKÍTETT. A forrás Menu.jsx `MenuLabel`, `MenuDivider`,
    `MenuGroup`, jelölhető (`checked`) elem, billentyű-gyorsparancs felirat
@@ -38,6 +38,20 @@
    `DataTable` saját, görgethető törzsében ül (`data-table.css`
    `.data-table-scroll { overflow: auto; }`), ami a relatív pozícionálású
    panelt ténylegesen levágta.
+
+   A forráshoz képesti eltérések szabályonként (a `diff` a forrás
+   `menu.css` fájlja ellen):
+   - `.menu`: kiegészül a `position: fixed; z-index: 600` párral (a
+     forrásban ezt a `.menu-anchor > .menu` szabály adja),
+   - `.menu-anchor`: a `position: relative` kiesett, mert a panel nem a
+     gyermeke,
+   - `.menu-anchor > .menu` (`position: absolute`, `top`, `left`, `z-index`)
+     nem került át,
+   - `.menu-anchor--right > .menu` nem került át,
+   - a nyitási animáció szelektora `.menu-anchor.is-open > .menu` helyett
+     `.menu:not([hidden])`, és ugyanez a reduced-motion blokkban,
+   - a `menu-in` kulcskockából az `opacity` kiesett (lásd a kulcskocka
+     melletti komment).
    ============================================================ */
 .menu {
   position: fixed;

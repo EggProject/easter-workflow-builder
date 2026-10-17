@@ -542,10 +542,16 @@ belső elválasztón 375x812-n 50-ről 74-re visz (6. jelenet, változatlanul m�
 - **`pointercancel`** (`Resizable.tsx`): a húzást a `pointerup` mellett a `pointercancel` is lezárja,
   a már alkalmazott méret marad. A W3C Pointer Events szerint a böngésző `pointercancel` eseménnyel
   zárja a pointer esemény folyamát, ha a mozdulatot maga veszi át (pásztázás, nagyítás) vagy a pointer
-  várhatóan nem ad több eseményt, és utána arra a pointerre `pointerup` sem jön
-  (<https://www.w3.org/TR/pointerevents3/>, "Suppressing a pointer event stream" és "The pointercancel
-  event"; <https://www.w3.org/TR/2019/SPSD-pointerevents1-20190404/>, 5.2.8;
-  <https://developer.mozilla.org/en-US/docs/Web/API/Element/pointercancel_event>). A külső elválasztó
+  várhatóan nem ad több eseményt
+  (<https://www.w3.org/TR/pointerevents3/>, 4.1.3.3 "Suppressing a pointer event stream", 4.2.7 "The
+  pointercancel event" és 9.5; <https://www.w3.org/TR/2019/SPSD-pointerevents1-20190404/>, 5.2.8;
+  <https://developer.mozilla.org/en-US/docs/Web/API/Element/pointercancel_event>). **Hogy utána az adott
+  pointerre `pointermove` vagy `pointerup` nem érkezik, következtetés, nem ellenőrzött** (2026-10-17, a
+  PE3 szövegének újraolvasása): a 4.1.3.3 szekció a lezárás feltételét ("unlikely to continue to receive
+  pointer events with a specific pointerId") és a kötelező lépéseket mondja ki (`pointercancel`,
+  `pointerout`, `pointerleave`, a capture implicit elengedése, majd a 9.5 szerint `lostpointercapture`),
+  további események tiltását nem; az MDN oldala ugyanígy csak a `pointerout` és a `pointerleave` utáni
+  küldést állítja. A húzás lezárása ezért a `pointercancel` eseményre épül. A külső elválasztó
   `touch-action` értéke nem változott (O-11 nyitva a külső érintéses húzására); a belső elválasztó
   `touch-action: none` szabálya helyes, a design system maga is ezt teszi a saját oszlop méretező
   fogantyúján (`datatable.css`: `.data-table__resizer { touch-action: none }`), és a W3C Pointer

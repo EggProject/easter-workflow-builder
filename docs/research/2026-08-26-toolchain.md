@@ -31,7 +31,7 @@ verzió-döntéseinek forrása. Ha frissítesz egy csomagot, ide is vezesd át.
 | `@types/better-sqlite3`          | 9.6.0                      | npm `latest`, T-003-2, lásd lent                      |
 | `ws`                             | 8.21.3                     |                                                       |
 | `pino` / `pino-roll`             | 10.3.1 / 4.0.0             | log rotation                                          |
-| `zod`                            | `^4.0.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent |
+| `zod`                            | `^4.4.0` (telepítve 4.4.3) | `packages/protocol` drótszintű séma, T-006, lásd lent |
 | `mustache`                       | 4.2.0                      | **pinelve**, sablon nyelv, SPEC-010, lásd lent        |
 | `@types/mustache`                | 4.2.6                      | **pinelve**, dev függőség, SPEC-010, lásd lent        |
 | `@marcbachmann/cel-js`           | 8.0.0                      | **pinelve**, kifejezés nyelv, SPEC-010, lásd lent     |
@@ -68,6 +68,70 @@ verziódöntés, hanem a fában már meglévő négy hely közös metszete (SPEC
 telepített, `bun.lock`-ban rögzített tényleges verzió `4.4.3` (a `^4.0.0` range-nek megfelel), nem
 a legfrissebb `4.5.2`, mert a projekt a lockfile-ban rögzített verziót használja, és a frissítés
 külön, forrásolt lépés (SPEC-005 6. táblázat, "A `zod` verzió frissül..." sor).
+
+2026-10-17 óta a `protocol` alsó határa `^4.4.0`, lásd a következő szekciót.
+
+## `zod` alsó határ a `packages/protocol` csomagban, 2026-10-17 (PLAN-009 T-009-34, SPEC-008 81. kritérium)
+
+A `packages/protocol/src/node-config/node-config-save-schema.ts` a `NodeConfigSchema.superRefine(fn,
+{ when })` alakot használja (89. sor), hogy a kötelező szöveg mező szabályok a konfig típushibája
+mellett is lefussanak. A `superRefine` második paramétere a `zod` **4.4.0**-ban jelent meg; a
+`^4.0.0` tartomány 4.0.0 ... 4.3.x verziót is megengedne, ahol a `when` nem létezik: a második
+argumentum típushibát adna, és futásidőben csendben elveszne (a 4.3.6 tarballban a
+`v4/classic/schemas.js` 55. és 1111. sora, valamint a `v4/core/api.js` 957. sora egyparaméteres
+`superRefine(fn)` és `_superRefine(fn)`), tehát a finomítás a típushibás konfigon kimaradna. Az
+alsó határ ezért `^4.4.0`.
+
+**Forrás 1, a registry tarballok összehasonlítása** (`https://registry.npmjs.org/zod/4.3.6` és
+`.../4.4.0`, `dist.tarball`; a letöltött tarball sha1 értéke egyezik a registry `dist.shasum`
+mezőjével: 4.3.6 `89c56e0a...`, 4.4.0 `fdbd3c0c...`):
+
+| Fájl (a tarballban)               | 4.3.6                                                                                                    | 4.4.0                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `package/v4/classic/schemas.d.ts` | 39. sor: `superRefine(refinement: (...) => void \| Promise<void>): this;` (egy paraméter)                | 39. sor: ugyanez `, params?: core.$ZodSuperRefineParams): this;` záradékkal                                         |
+| `package/v4/classic/schemas.d.ts` | 715. sor: `export declare function superRefine<T>(fn: (...) => ...): core.$ZodCheck<T>;` (egy paraméter) | 737. sor: ugyanez `, params?: core.$ZodSuperRefineParams` paraméterrel                                              |
+| `package/v4/core/api.d.ts`        | nincs `$ZodSuperRefineParams` találat                                                                    | 300. sor: `export interface $ZodSuperRefineParams`, 304. sor: `_superRefine<T>(fn, params?: $ZodSuperRefineParams)` |
+
+**Forrás 2, a felsőáramú változásnapló:** a GitHub kiadás
+<https://github.com/colinhacks/zod/releases/tag/v4.4.0> (közzétéve 2026-04-29) és az abban
+hivatkozott PR <https://github.com/colinhacks/zod/pull/5741> ("feat: allow 'when' parameter in
+.superRefine", merged 2026-04-27; a szerző megjegyzése szerint a `params` típusa a `{ when }`
+alakra szűkítve, "Landed in Zod 4.4"). A PR leírása szerint a `when` visszahívás `true` értéke
+akkor is futtatja a finomítást, ha az alapséma hibát adott, ami pontosan a 81. kritérium igénye.
+A 4.4.0 tarballban a futásidejű oldal is átadja a paramétert (`v4/classic/schemas.js` 118-119. és
+1340-1341. sor, `v4/core/api.js` 962. sor).
+
+**A `latest` két független forrásból** (élő lekérdezés, 2026-10-17): a
+https://registry.npmjs.org/zod/latest `version` mezője `4.6.7`, a https://unpkg.com/zod/package.json
+(átirányítás a `zod@4.6.7` fájlra) `version` mezője szintén `4.6.7`. A telepített, `bun.lock`-ban rögzített `4.4.3` ezért nem a legfrissebb, de kielégíti
+a `^4.4.0` tartományt, így a `bun.lock` feloldott `zod@4.4.3` sora változatlan, csak a `packages/protocol`
+workspace bejegyzésének tartománya változott. A frissítés külön, forrásolt lépés marad.
+
+**Lockfile konzisztencia** (a `node_modules` érintése nélkül, eldobható másolaton): a `git ls-files
+'*package.json'` fájlok és a `bun.lock` másolatán a régi (`HEAD`) lockfile plusz az új
+`package.json` mellett a `bun install --lockfile-only --ignore-scripts` kimenete **bájtra azonos** a
+kézzel szerkesztett `bun.lock` fájllal, a `bun install --frozen-lockfile --lockfile-only
+--ignore-scripts` az új lockfile-lal nulla kilépési kóddal fut, egy kontrollként beírt, nem
+teljesíthető `^4.9.0` tartománnyal pedig hibával áll meg ("No version matching"). Megjegyzés: a
+`--frozen-lockfile` a `--lockfile-only` móddal együtt a régi lockfile-t sem utasította vissza
+(kilépési kód nulla, a fájl változatlan), tehát az ellenőrzés bizonyító ereje a bájtazonos
+előállításon áll, nem a frozen kapcsolón.
+
+**A többi `zod` fogyasztó `^4.0.0`-n marad:** a `packages/tool-firecrawl-web-fetch`,
+`packages/tool-minimax-understand-image`, `packages/tool-minimax-web-search` és `tools/wire-probe`
+nem használ `when` opciót. Bizonyíték (`grep -rn "when:" packages/*/src tools/*/src apps/*/src
+tooling/*/src`, 2026-10-17; a kimenet a spec fájlok nélkül, a regressziós teszt saját,
+`when:` szót tartalmazó sorai kiszűrve):
+
+```
+packages/protocol/src/node-config/node-config-save-schema.ts:89:  { when: hasKnownDiscriminators },
+```
+
+A `superRefine` hívás a `src` fájlok közül csak a `packages/protocol` két fájljában áll
+(`workflow/workflow-graph-document.ts`, `node-config/node-config-save-schema.ts`), a `when` opció
+egyedül a másodikban. Regressziós védelem: a `packages/protocol/src/protocol-error/zod-schema-authoring-discipline.spec.ts`
+"alsó határ" tesztje, ami a `src` alatt (a spec fájlok nélkül) talált `when:` opcióhoz a
+`dependencies.zod` tartományának legalább `4.4.0` alsó határát követeli.
 
 ## Miért TypeScript 6.0.3 és nem 7
 

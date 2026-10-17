@@ -42,8 +42,13 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
  * alapértelmezés szerint kihagyja a finomítást, ha a bemenet már típushibát
  * hordoz (a felvett `loop` `NaN` `maxIterations` értéke), a `when` feltétel
- * ezt írja felül (<https://zod.dev/api>, "when"; a `superRefine` paramétere:
- * colinhacks/zod #5741). A feltétel pontosan azt garantálja, amit
+ * ezt írja felül (<https://zod.dev/api>, "when"; a `superRefine` `when`
+ * paramétere a zod 4.4.0-ban jelent meg:
+ * <https://github.com/colinhacks/zod/releases/tag/v4.4.0>, colinhacks/zod
+ * #5741). Ha viszont egy korábbi hiba kifejezetten megszakító
+ * (`continue: false`), a finomítás a `when` mellett is kimarad (zod 4.4.3
+ * `v4/core/schemas.js` 37-40. sor, `v4/core/util.js` 536-545. sor). A feltétel
+ * pontosan azt garantálja, amit
  * a finomítás típusosan olvas: a `type` és a `join` `mode` ismert értékét. A
  * többi mezőt a finomítás csak az `unknown` bemenetű `findBlankTextFields`
  * hívással vizsgálja, vagy `null` értékkel hasonlítja össze, tehát egy
