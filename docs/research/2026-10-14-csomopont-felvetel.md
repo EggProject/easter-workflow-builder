@@ -1523,6 +1523,28 @@ billentyű szabálya egy platform döntésen álljon. **Nem ellenőrzött**, hog
 felismerés módját is rögzíti-e: a doksi csak az alapértékeket adja (SPEC-008 M-117), a felismerés
 szabálya egy forrásból, a telepített kódból van.
 
+**Az ügynök alapú felismerés korlátja.** Az MDN a `Navigator.userAgent` lapján kimondja, hogy az ügynökre
+épülő felismerés "unreliable and is not recommended"
+(<https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgent>), a User-Agent reduction lap pedig
+ugyanezt indokkal: a gyártók a sztringet szabadon alakíthatják, és a felhasználó is átírhatja ("UA spoofing";
+<https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/User-agent_reduction>). Független megerősítés: a
+jQuery Learning Center (OpenJS Foundation), "User Agents are unreliable ... In general, we do not recommend UA
+string-based feature detection" (<https://learn.jquery.com/code-organization/feature-browser-detection/>), és a
+Mozilla Hacks, "User-Agent sniffing is a future fail strategy"
+(<https://hacks.mozilla.org/2013/09/user-agent-detection-history-and-checklist/>). Ezért az `auto` csak az
+alapérték, az ellensúlya a `ctrl` és a `meta` választás, amelynél az ügynök nem számít (58.2).
+
+**A mobil Apple ügynökök.** Az iPhone Safari ügynöke tartalmazza a `like Mac OS X` szöveget (MDN, User-Agent
+fejléc, <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent>: `Mozilla/5.0 (iPhone;
+CPU iPhone OS 18_6 like Mac OS X) ...`), az iPad mobil alakja ugyanígy (`iPad; CPU OS ... like Mac OS X`), az
+iPadOS asztali módú Safari pedig `Macintosh` alakot küld (Apple Developer Forums,
+<https://forums.developer.apple.com/forums/thread/119186>; ScientiaMobile,
+<https://scientiamobile.com/detect-ipados-13/>; 51Degrees,
+<https://51degrees.com/blog/missing-ipad-tablet-web-traffic>). A `Mac` szó tehát az iOS és az iPadOS minden
+alakjában jelen van, az `auto` ezeken `meta`. Ez egyezik az Apple hardveres billentyűzetes iPad leírásával:
+`Command-Z` visszavon, `Shift-Command-Z` újra elvégez (<https://support.apple.com/en-us/102393>). Az Android
+ügynök (`Linux; Android 10; K`) nem tartalmazza a `Mac` szót, az `auto` ott `ctrl`.
+
 **A Playwright `userAgent` opciója.**
 
 - Elsődleges: Playwright, Emulation, "User Agent",
@@ -1586,11 +1608,11 @@ keresi, a verzió token nem számít.
 ### 58.3 Unit teszt és rontás igazolás
 
 Új spec fájl négy: `undo-modifier-storage.spec.ts` (15 teszt), `is-undo-modifier-preference.spec.ts` (10),
-`resolve-undo-modifier.spec.ts` (4), `format-undo-shortcut-labels.spec.ts` (2). Bővítve:
-`resolve-undo-shortcut.spec.ts` (mindhárom billentyű, mindkét módosító, a másik módosító és az `Alt`),
+`resolve-undo-modifier.spec.ts` (5), `format-undo-shortcut-labels.spec.ts` (2). Bővítve:
+`resolve-undo-shortcut.spec.ts` (mindhárom billentyű, mindkét módosító, a másik módosító, a `Meta+Shift+Z` és a `Meta+Y` `Ctrl` módban, és az `Alt`),
 `use-undo-redo-shortcut.spec.tsx` (a módosító váltása újrakötéssel), `GraphEditorScreen.spec.tsx` (hat
 teszt: öt platform/tároló eset a tipp szövegével, és a hibás tárolt érték). `bun run test` (2026-10-17, az írás
-nélküli állapoton): **581 fájl, 5366 teszt, 100 százalék mind a négy metrikán**.
+nélküli állapoton): **581 fájl, 5369 teszt, 100 százalék mind a négy metrikán**.
 
 **Szándékos rontások** (saját, 2026-10-17, utána visszaállítva; a kód a commitban nincs ilyen):
 
@@ -1604,10 +1626,10 @@ A (B) rontás első e2e változata zölden ment át: egy önmagában lenyomott m
 "kizárás" ága csak a **mindkét módosítós** billentyűn látszik. Ezért az e2e minden esete a
 `Control+Meta+z` billentyűt is megnyomja, és a rontás ezzel buktat.
 
-### 58.4 Az írás kihagyása: a nyitott kérdés
+### 58.4 Az írás kihagyása: lezárt döntés
 
-A PLAN-009 T-009-58 sora és a 113. kritérium "a dobó írás nem dob tovább" tagmondata ide írná a
-tároló írását is. Ebben a lépésben **nincs olyan alkalmazás útvonal, ami hívná**: a választó a
+A PLAN-009 T-009-58 sora a döntés előtt és a 113. kritérium "a dobó írás nem dob tovább" tagmondata ide
+írta volna a tároló írását is. Ebben a lépésben **nincs olyan alkalmazás útvonal, ami hívná**: a választó a
 T-009-59 lépése. Egy olyan függvény, amit sem a termék, sem az e2e nem ér el, a 100 százalékos unit
 lefedettség mellett az e2e lefedettségben fedetlen marad. Mérés: a `storeUndoModifierPreference`
 függvénnyel az e2e fedetlen darabszáma 17 / 11 / 4 / 17 lett (statements / branches / functions /
@@ -1615,10 +1637,12 @@ lines; a `main` 15 / 11 / 3 / 15 értékéhez képest +2 / 0 / +1 / +2), a `cove
 (functions 99.39 < 99.46 küszöb). A küszöb csökkentése tiltott (`.claude/CLAUDE.md` 8. szekció),
 user döntés nélkül nem tehető.
 
-A döntés a koordinátoré, a három út a PR leírásában áll. A jelen PR az (A) utat követi: az írás és a
-hozzá tartozó unit tesztek a T-009-59 lépésére maradnak, amelynek e2e-je (a választás a kulcsba ír) fedi.
-A függvény és a tesztjei, a dobó írás tesztjével és a körbejárási teszttel együtt, egyetlen
-commitként a `feat/spec-008-d1-modosito-billentyu-iras` ágon megőrizve, ennek a PR-nek a fejére építve.
+**Döntés (user, 2026-10-17):** "A mentés a Beállítások képernyő lépésével kerül be, ott a teszt is lefedi. A
+terv szövege ehhez igazodik." Az írás és a hozzá tartozó unit tesztek tehát a T-009-59 lépésére maradnak,
+amelynek e2e-je (a választás a kulcsba ír) fedi; a PLAN-009 T-009-58 és T-009-59 sora és a 113. kritérium
+tagmondatának helye ennek megfelelően átírva. A függvény és a tesztjei, a dobó írás tesztjével és a
+körbejárási teszttel együtt, egyetlen commitként (`d1fe2b4`) a `feat/spec-008-d1-modosito-billentyu-iras`
+ágon megőrizve, a T-009-59 használja majd; ebbe a PR-be nem kerül.
 
 ### 58.5 Az e2e lefedettség előtte és utána
 
@@ -1657,6 +1681,9 @@ Az `apps/web/package.json` küszöbe nem változott.
   böngésző a kombinációt maga kezeli, a `Cmd+Shift+Z` és az Újra gomb változatlanul újra elvégez.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál; a `navigator.userAgent`
   `Mac` szavának jelenléte macOS-en Firefoxban és Safariban nem mért.
+- iPhone és iPad valódi eszközön, hardveres billentyűzettel: az Apple oldal az iPad alkalmazások parancsait
+  adja, az, hogy a Safari a weboldalnak `metaKey` eseményt küld-e, nem mért. A feloldás csak a unit teszt
+  ügynök sztringjein igazolt.
 - Valódi macOS-en futtatott böngésző: a macOS viselkedést rögzített felhasználói ügynök és a Linux alatti
   Chromium mutatja, a fizikai `Cmd` billentyű lenyomása nem mért.
 - A tároló viselkedése privát ablakban és letiltott tárolással valódi böngészőben: a dobó elérést és

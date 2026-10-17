@@ -58,6 +58,8 @@ describe('resolveUndoShortcut', () => {
     it.each([
       { name: 'módosító nélküli z', init: { key: 'z' } },
       { name: 'csak Meta+Z', init: { key: 'z', metaKey: true } },
+      { name: 'csak Meta+Shift+Z', init: { key: 'Z', metaKey: true, shiftKey: true } },
+      { name: 'csak Meta+Y', init: { key: 'y', metaKey: true } },
       { name: 'Ctrl+Meta+Z', init: { key: 'z', ctrlKey: true, metaKey: true } },
       { name: 'Ctrl+Alt+Z', init: { key: 'z', ctrlKey: true, altKey: true } },
       { name: 'Ctrl+Alt+Y', init: { key: 'y', ctrlKey: true, altKey: true } },
