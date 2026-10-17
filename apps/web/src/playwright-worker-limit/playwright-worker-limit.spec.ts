@@ -18,6 +18,8 @@
 // is hasonlítható. A hosszú `--workers` alak minden sorban tilos; a rövid `-j` alak csak a
 // `playwright` vagy `test:e2e` szót tartalmazó sorban, mert más eszközök (`make -j4`, `jq -j`)
 // ugyanezt a betűt mással jelölik. A teljes soros shell és YAML komment kimarad, mert az nem fut le.
+// A sortöréses (`\`) folytatósorokat a vizsgálat összefűzve nézi: egy `playwright test \` sor után
+// álló `-j 6` sor önmagában nem tartalmazza a `playwright` szót, és a rövid alak átcsúszott volna.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -92,16 +94,35 @@ function hasWorkersOption(line: string): boolean {
 }
 
 /**
- * A szöveg minden olyan sora, ami worker szám kapcsolót tartalmaz. A `#`
- * kezdetű teljes soros komment kimarad (shell és YAML); a `package.json`
- * fájlban ilyen sor nem áll, tehát ott nem szűr.
+ * A szöveg logikai sorai: a végén `\` jelet viselő sor a következővel összefűzve
+ * áll (a shell is így olvassa). A `#` kezdetű teljes soros komment kimarad
+ * (shell és YAML), és a végén álló `\` nem fűzi tovább a következő sort, mert a
+ * megjegyzés a sor végén véget ér; a `package.json` fájlban ilyen sor nem áll,
+ * tehát ott nem szűr.
+ */
+function toLogicalLines(content: string): readonly string[] {
+  const logicalLines: string[] = [];
+  let pending: string | undefined;
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (pending !== undefined || !line.startsWith('#')) {
+      const isContinued = line.endsWith('\\');
+      const lineText = isContinued ? `${line.slice(0, -1).trimEnd()} ` : line;
+      const text = `${pending ?? ''}${lineText}`;
+      pending = isContinued ? text : undefined;
+      if (!isContinued) {
+        logicalLines.push(text);
+      }
+    }
+  }
+  return pending === undefined ? logicalLines : [...logicalLines, pending];
+}
+
+/**
+ * A szöveg minden olyan logikai sora, ami worker szám kapcsolót tartalmaz.
  */
 function findWorkersOptionLines(content: string): readonly string[] {
-  return content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => !line.startsWith('#'))
-    .filter((line) => hasWorkersOption(line));
+  return toLogicalLines(content).filter((line) => hasWorkersOption(line));
 }
 
 describe('Playwright worker korlát invariáns', () => {
@@ -148,11 +169,26 @@ describe('Playwright worker korlát invariáns', () => {
   });
 
   it.each([
+    ['playwright test \\\n  -j 6', 'playwright test -j 6'],
+    [
+      'bun x playwright test --reporter=dot \\\n  --grep smoke \\\n  -j6',
+      'bun x playwright test --reporter=dot --grep smoke -j6',
+    ],
+    ['# megjegyzés \\\nplaywright test -j 6', 'playwright test -j 6'],
+    ['playwright test \\\n  --workers=6', 'playwright test --workers=6'],
+  ])('a sortöréses "%s" alak összefűzve worker szám kapcsolónak számít', (content, logicalLine) => {
+    expect(findWorkersOptionLines(content)).toEqual([logicalLine]);
+  });
+
+  it.each([
     'java -jar app.jar',
     'vitest run --maxWorkers=2',
     '# playwright test --workers=6',
     'make -j4',
     'jq -j .name package.json',
+    'make \\\n  -j4',
+    '# playwright test \\\nmake -j4',
+    'playwright test \\\n  --reporter=dot',
   ])('a "%s" alak nem számít worker szám kapcsolónak', (line) => {
     expect(findWorkersOptionLines(line)).toEqual([]);
   });
