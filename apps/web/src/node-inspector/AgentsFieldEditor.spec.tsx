@@ -1,7 +1,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FieldErrorVisibilityContext } from '@easter-workflow-builder/ui';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
+import { FieldErrorsContext } from './field-errors-context.ts';
 
 function typeInto(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
@@ -37,14 +39,16 @@ describe('AgentsFieldEditor', () => {
 
   it('üres rekordra "Nincs felvett agent" szöveget mutat', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{}} onChange={vi.fn()} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{}} onChange={vi.fn()} />);
     });
     expect(container.textContent).toContain('Nincs felvett agent');
   });
 
   it('minden kulcsot felsorol, kezdetben összecsukva', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />);
+      root.render(
+        <AgentsFieldEditor fieldPathPrefix="" value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />,
+      );
     });
     // A bejegyzés megnevezett, DOBOZ NÉLKÜLI csoport (`InspectorFieldGroup`):
     // a design system `.field__label` címkéje viszi az agent nevét, kártya
@@ -57,7 +61,9 @@ describe('AgentsFieldEditor', () => {
 
   it('a kibontás gombra megjelenik a bejegyzés szerkesztő űrlapja, majd az összecsukás elrejti', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />);
+      root.render(
+        <AgentsFieldEditor fieldPathPrefix="" value={{ kutato: { description: '', prompt: '' } }} onChange={vi.fn()} />,
+      );
     });
     act(() => {
       findButtonByText(container, 'Kibontás').click();
@@ -75,6 +81,7 @@ describe('AgentsFieldEditor', () => {
     act(() => {
       root.render(
         <AgentsFieldEditor
+          fieldPathPrefix=""
           value={{ kutato: { description: '', prompt: '' }, masik: { description: 'x', prompt: 'y' } }}
           onChange={onChange}
         />,
@@ -103,7 +110,11 @@ describe('AgentsFieldEditor', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
-        <AgentsFieldEditor value={{ kutato: { description: '', prompt: '' }, masik: {} }} onChange={onChange} />,
+        <AgentsFieldEditor
+          fieldPathPrefix=""
+          value={{ kutato: { description: '', prompt: '' }, masik: {} }}
+          onChange={onChange}
+        />,
       );
     });
     act(() => {
@@ -115,7 +126,7 @@ describe('AgentsFieldEditor', () => {
   it('az új agent hozzáadása gomb üres névre le van tiltva, kitöltésre felveszi az alapértéket', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<AgentsFieldEditor value={{}} onChange={onChange} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{}} onChange={onChange} />);
     });
     const agentAddButton = findButtonByText(container, 'Agent hozzáadása');
     expect(agentAddButton.disabled).toBe(true);
@@ -136,7 +147,7 @@ describe('AgentsFieldEditor', () => {
 
   it('meglévő névre a hozzáadás gomb letiltva marad', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: {} }} onChange={vi.fn()} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{ kutato: {} }} onChange={vi.fn()} />);
     });
     const nameInput = [...container.querySelectorAll('input')].at(-1);
     if (nameInput === undefined) {
@@ -152,7 +163,11 @@ describe('AgentsFieldEditor', () => {
     const onChange = vi.fn();
     act(() => {
       root.render(
-        <AgentsFieldEditor value={{ kutato: { description: 'x', prompt: 'y' }, masik: {} }} onChange={onChange} />,
+        <AgentsFieldEditor
+          fieldPathPrefix=""
+          value={{ kutato: { description: 'x', prompt: 'y' }, masik: {} }}
+          onChange={onChange}
+        />,
       );
     });
     const renameInput = container.querySelector<HTMLInputElement>(`input[aria-label='"kutato" agent új neve']`);
@@ -170,14 +185,14 @@ describe('AgentsFieldEditor', () => {
 
   it('az átnevezés gomb változatlan névre letiltva marad', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: {} }} onChange={vi.fn()} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{ kutato: {} }} onChange={vi.fn()} />);
     });
     expect(findButtonByText(container, 'Átnevezés').disabled).toBe(true);
   });
 
   it('az átnevezés gomb ütköző (már létező) névre letiltva marad', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: {}, masik: {} }} onChange={vi.fn()} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{ kutato: {}, masik: {} }} onChange={vi.fn()} />);
     });
     const renameInput = container.querySelector<HTMLInputElement>(`input[aria-label='"kutato" agent új neve']`);
     if (renameInput === null) {
@@ -191,7 +206,7 @@ describe('AgentsFieldEditor', () => {
 
   it('az átnevezés gomb csak szóközből álló névre is letiltva marad', () => {
     act(() => {
-      root.render(<AgentsFieldEditor value={{ kutato: {} }} onChange={vi.fn()} />);
+      root.render(<AgentsFieldEditor fieldPathPrefix="" value={{ kutato: {} }} onChange={vi.fn()} />);
     });
     const renameInput = container.querySelector<HTMLInputElement>(`input[aria-label='"kutato" agent új neve']`);
     if (renameInput === null) {
@@ -201,5 +216,29 @@ describe('AgentsFieldEditor', () => {
       typeInto(renameInput, ' '.repeat(3));
     });
     expect(findButtonByText(container, 'Átnevezés').disabled).toBe(true);
+  });
+
+  it('a bejegyzés mezőinek hibáját az útvonal előtagja és a bejegyzés neve szerint keresi (SPEC-008 5.4, O-38)', () => {
+    act(() => {
+      root.render(
+        <FieldErrorVisibilityContext.Provider value>
+          <FieldErrorsContext.Provider value={new Map([['settings.agents.kutato.prompt', 'A mező nem lehet üres.']])}>
+            <AgentsFieldEditor
+              fieldPathPrefix="settings."
+              value={{ kutato: { description: 'Kutató', prompt: '' } }}
+              onChange={vi.fn()}
+            />
+          </FieldErrorsContext.Provider>
+        </FieldErrorVisibilityContext.Provider>,
+      );
+    });
+    act(() => {
+      findButtonByText(container, 'Kibontás').click();
+    });
+
+    const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+    expect(invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent)).toEqual([
+      'Prompt',
+    ]);
   });
 });

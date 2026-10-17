@@ -1,9 +1,36 @@
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
+import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
+import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
 
-const BLANK_FIELD_MESSAGE = 'A mező nem lehet üres.';
+/**
+ * A nem pozitív egész szám mező hibaüzenete (SPEC-008 5.4, O-37). A mondatot
+ * a user 2026-10-17-i döntése rögzíti (`docs/research/2026-10-17-szam-es-agent-mezok.md`
+ * 6. szekció).
+ */
+const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
+
+/**
+ * A pozitív egész szám mezők node típusonként (SPEC-008 5.4, O-37): ponttal
+ * összefűzött mezőútvonal a `config`-on belül, a lista minden elemén `*`. A
+ * lista a `db` `isNodeConfig` guardjának pozitív egész szabályát duplikálja
+ * (SPEC-003 4.3, `isPositiveInteger`); a két oldal mezőnkénti egyezését az
+ * `apps/server` `node-config-drift-protection` tesztje őrzi.
+ */
+const POSITIVE_INTEGER_FIELD_PATHS = {
+  start: [],
+  agent_step: [],
+  branch: [],
+  fan_out: [],
+  join: [],
+  loop: ['maxIterations'],
+  human_approval: [],
+  error_handler: ['maxAttempts', 'backoffMs.*'],
+  sub_workflow: [],
+  script: [],
+} as const satisfies Readonly<Record<NodeConfig['type'], readonly string[]>>;
 
 function requiredTextFieldPathsOf(config: NodeConfig): readonly string[] {
   if (config.type !== 'join') {
@@ -31,12 +58,14 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
 }
 
 /**
- * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz három
+ * A mentési séma (SPEC-008 5.4): a `NodeConfigSchema` olvasó séma plusz négy
  * írás oldali szabály, egyetlen `superRefine` hívásban:
  *
  * 1. a kötelező szöveg mezők nem üresek (user döntés 2026-09-28, O-21);
  * 2. az `onUnhandledError` mind a tíz típusnál nem `null` (O-29);
- * 3. a `join` `mode` mezője nem `null` (O-33).
+ * 3. a `join` `mode` mezője nem `null` (O-33);
+ * 4. a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezője és a
+ *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37).
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -50,8 +79,9 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * `v4/core/schemas.js` 37-40. sor, `v4/core/util.js` 536-545. sor). A feltétel
  * pontosan azt garantálja, amit
  * a finomítás típusosan olvas: a `type` és a `join` `mode` ismert értékét. A
- * többi mezőt a finomítás csak az `unknown` bemenetű `findBlankTextFields`
- * hívással vizsgálja, vagy `null` értékkel hasonlítja össze, tehát egy
+ * többi mezőt a finomítás csak az `unknown` bemenetű `findBlankTextFields` és
+ * `findNonPositiveIntegerFields` hívással vizsgálja, vagy `null` értékkel
+ * hasonlítja össze, tehát egy
  * típushibás mező a szabályt nem töri meg. Ugyanez a séma fut a kliensen a
  * mentés előtt és a szerveren a `PUT` törzsén, tehát mindkét oldal ugyanazokat
  * a mezőútvonalakat adja.
@@ -70,7 +100,8 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * védelem típusszintű ága is változatlan. A 2. és a 3. szabálynak nincs `db`
  * oldali párja: a `db` `replaceGraph` mindkét `null` értéket elfogadja, mert
  * a workflow létrehozásakor írt Start `onUnhandledError: null` értékkel áll
- * (SPEC-008 5.4, 5.8).
+ * (SPEC-008 5.4, 5.8). A 4. szabály párja a `db` `isNodeConfig` guardja; az
+ * olvasó sémák a nem pozitív egész számot változatlanul elfogadják.
  */
 export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
   (config, context) => {
@@ -84,6 +115,12 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
     }
     if (config.type === 'join' && config.mode === null) {
       context.addIssue({ code: 'custom', path: ['mode'], message: BLANK_FIELD_MESSAGE });
+    }
+    const positiveIntegerFieldPaths: readonly string[] = POSITIVE_INTEGER_FIELD_PATHS[config.type];
+    for (const path of positiveIntegerFieldPaths) {
+      for (const fieldPath of findNonPositiveIntegerFields(config, path)) {
+        context.addIssue({ code: 'custom', path: [...fieldPath], message: NOT_POSITIVE_INTEGER_MESSAGE });
+      }
     }
   },
   { when: hasKnownDiscriminators },

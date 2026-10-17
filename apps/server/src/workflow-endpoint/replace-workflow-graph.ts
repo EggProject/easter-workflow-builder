@@ -3,31 +3,29 @@ import {
   zodErrorToProtocolErrorBody,
   type ReplaceGraphRequest,
 } from '@easter-workflow-builder/protocol';
-import { isNodeConfig, type DatabaseContext, type WorkflowNodeInput } from '@easter-workflow-builder/db';
+import type { DatabaseContext, WorkflowNodeInput } from '@easter-workflow-builder/db';
 import type { Outcome } from '@easter-workflow-builder/core';
 import type { RouteHandler, RouteHandlerResult } from '../route-dispatch/route-handler.ts';
 import { toWorkflowGraphDocument } from './to-workflow-graph-document.ts';
 
-function malformedNodeConfigMessage(nodeId: string): string {
-  return `A(z) "${nodeId}" node config mezője nem érvényes NodeConfig alakú (malformed_node_config).`;
-}
-
 /**
  * A wire `WorkflowNodeInputSchema.config` mezője a `protocol` saját,
  * duplikált `NodeConfig` uniója (PLAN-009 T-009-13, SPEC-005 7.7): a `protocol`
- * L1 réteg a `db` domain típusát változatlanul nem importálhatja, de a Zod
- * séma innentől a helyes ágakra szűkít, nem `unknown`-ra. A szerver, ami már
- * L6 rétegen áll, az `isNodeConfig` guarddal így is átvezet a `db` saját
- * `NodeConfig` típusára a `db` hívása előtt - a két oldal egyezését az
- * `apps/server` `node-config-drift-protection` regressziós tesztje őrzi. A
- * wire `type` mezőt a `db` `WorkflowNodeInput` nem kéri (a `config.type`
+ * L1 réteg a `db` domain típusát változatlanul nem importálhatja, de a két
+ * unió típusszinten azonos, tehát a `config` guard nélkül átadható a `db`
+ * `WorkflowNodeInput` alakjának. A `db` `isNodeConfig` guard futásidejű
+ * szabályait a mentési séma (`ReplaceGraphRequestSchema`) is érvényesíti, a
+ * pozitív egész szám mezőkét is (SPEC-008 5.4, O-37), tehát egy itteni guard
+ * hibaága a HTTP úton garantáltan sosem futna (`.claude/CLAUDE.md` 5. szekció,
+ * `docs/research/2026-10-17-szam-es-agent-mezok.md`). Az írás előtti guard a
+ * `db` `replaceGraph` hívásában fut (user döntés 2026-10-17), a kezelőben
+ * nem. A két oldal egyezését az
+ * `apps/server` `node-config-drift-protection` regressziós tesztje őrzi. A wire
+ * `type` mezőt a `db` `WorkflowNodeInput` nem kéri (a `config.type`
  * diszkriminátor már hordozza, `workflow-repository.ts` doksija), ezért itt
  * nem kerül át.
  */
-function toDatabaseNode(node: ReplaceGraphRequest['nodes'][number]): WorkflowNodeInput | undefined {
-  if (!isNodeConfig(node.config)) {
-    return undefined;
-  }
+function toDatabaseNode(node: ReplaceGraphRequest['nodes'][number]): WorkflowNodeInput {
   return { id: node.id, label: node.label, positionX: node.positionX, positionY: node.positionY, config: node.config };
 }
 
@@ -40,15 +38,7 @@ function handleReplaceWorkflowGraph(
   request: ReplaceGraphRequest,
   database: DatabaseContext,
 ): Outcome<RouteHandlerResult> {
-  const databaseNodes: WorkflowNodeInput[] = [];
-  for (const node of request.nodes) {
-    const databaseNode = toDatabaseNode(node);
-    if (databaseNode === undefined) {
-      return { kind: 'error', message: malformedNodeConfigMessage(node.id) };
-    }
-    databaseNodes.push(databaseNode);
-  }
-
+  const databaseNodes = request.nodes.map((node) => toDatabaseNode(node));
   const replaced = database.workflows.replaceGraph(workflowId, databaseNodes, request.edges);
   if (replaced.kind === 'error') {
     return replaced;

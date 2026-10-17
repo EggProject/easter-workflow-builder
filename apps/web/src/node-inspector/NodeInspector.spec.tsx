@@ -840,4 +840,132 @@ describe('NodeInspector', () => {
       config: { type: 'agent_step', onUnhandledError: null, promptTemplate: 'módosított' },
     });
   });
+
+  for (const { description, config, expectedLabels } of [
+    {
+      description: 'a ciklus nulla iterációszáma',
+      config: { type: 'loop', maxIterations: 0, continueExpression: 'i < 3', onUnhandledError: 'fail_run' },
+      expectedLabels: ['Max. iterációk száma'],
+    },
+    {
+      description: 'a hibakezelő negatív próbálkozásszáma és tört várakozása',
+      config: {
+        type: 'error_handler',
+        maxAttempts: -3,
+        backoffMs: [100, 1.5],
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_run',
+      },
+      expectedLabels: ['Max. próbálkozások száma', 'Várakozás próbálkozásonként, ms (soronként egy szám)'],
+    },
+  ] satisfies readonly {
+    readonly description: string;
+    readonly config: WorkflowNodeInput['config'];
+    readonly expectedLabels: readonly string[];
+  }[]) {
+    it(`${description}: sikertelen mentési kísérlet után a szám mező alatt jelez (SPEC-008 5.4, O-37)`, () => {
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={{ id: 'n-number', type: config.type, label: '', positionX: 0, positionY: 0, config }}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted
+          />,
+        );
+      });
+
+      const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+      expect(
+        invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent),
+      ).toEqual(expectedLabels);
+      for (const field of invalidFields) {
+        const errorElement = container.querySelector(`#${field.getAttribute('aria-describedby') ?? ''}`);
+        expect(errorElement?.textContent).toBe('A mező értéke nem pozitív egész szám.');
+      }
+    });
+  }
+
+  for (const { description, config } of [
+    {
+      description: 'agent lépés',
+      config: {
+        ...AGENT_STEP_SETTINGS,
+        agents: { kutato: { description: '', prompt: ' '.repeat(2) } },
+        type: 'agent_step',
+        onUnhandledError: 'fail_run',
+      },
+    },
+    {
+      description: 'ai_synthesis módú összefésülés',
+      config: {
+        type: 'join',
+        mode: 'ai_synthesis',
+        settings: { ...AGENT_STEP_SETTINGS, agents: { kutato: { description: '', prompt: ' '.repeat(2) } } },
+        onUnhandledError: 'fail_run',
+      },
+    },
+  ] satisfies readonly { readonly description: string; readonly config: WorkflowNodeInput['config'] }[]) {
+    it(`${description}: sikertelen mentési kísérlet után az agent bejegyzés üres leírása és promptja a mező alatt jelez (SPEC-008 5.4, O-38)`, () => {
+      act(() => {
+        root.render(
+          <NodeInspector
+            node={{ id: 'n-agents', type: config.type, label: '', positionX: 0, positionY: 0, config }}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            onDelete={vi.fn()}
+            onFieldBlur={vi.fn()}
+            inheritedProviderDescription="nincs"
+            isSaveAttempted
+          />,
+        );
+      });
+      const expandButton = [...container.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Kibontás',
+      );
+      act(() => {
+        expandButton?.click();
+      });
+
+      const invalidFields = [...container.querySelectorAll('[aria-invalid="true"]')];
+      expect(
+        invalidFields.map((field) => field.closest('.field')?.querySelector('.field__label')?.textContent),
+      ).toEqual(['Leírás', 'Prompt']);
+      for (const field of invalidFields) {
+        const errorElement = container.querySelector(`#${field.getAttribute('aria-describedby') ?? ''}`);
+        expect(errorElement?.textContent).toBe('A mező nem lehet üres.');
+      }
+    });
+  }
+
+  it('kitöltött agent bejegyzésnél a mentési kísérlet után sincs hibaüzenet (SPEC-008 5.4, O-38)', () => {
+    const config: WorkflowNodeInput['config'] = {
+      ...AGENT_STEP_SETTINGS,
+      agents: { kutato: { description: 'Kutató', prompt: 'Keress forrást.' } },
+      type: 'agent_step',
+      onUnhandledError: 'fail_run',
+    };
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={{ id: 'n-agents', type: 'agent_step', label: '', positionX: 0, positionY: 0, config }}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted
+        />,
+      );
+    });
+    const expandButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Kibontás');
+    act(() => {
+      expandButton?.click();
+    });
+
+    expect(container.querySelector('[aria-invalid="true"]')).toBeNull();
+  });
 });

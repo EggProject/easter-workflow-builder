@@ -1,6 +1,6 @@
 import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
-import type { ChangeEvent, ReactElement } from 'react';
+import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import {
   UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS,
   UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON,
@@ -9,6 +9,7 @@ import {
   type AgentDefinitionFieldGroup,
 } from './agent-definition-field-table.ts';
 import { describeUnknownValue } from './describe-unknown-value.ts';
+import { FieldErrorsContext } from './field-errors-context.ts';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import './node-inspector.css';
@@ -40,6 +41,12 @@ export interface AgentDefinitionEntryFieldsProperties {
    */
   readonly value: unknown;
   /**
+   * A bejegyzés mezőinek útvonal előtagja a node `config` gyökeréhez képest
+   * (`agents.<név>.`, a `join` `ai_synthesis` módjában `settings.agents.<név>.`),
+   * a kötelező mezők hibájához (SPEC-008 5.4, O-38).
+   */
+  readonly fieldPathPrefix: string;
+  /**
    * A mentés RÁOLVASZT, nem cserél (AC60): minden mezőváltozás a TELJES,
    * jelenlegi rekordot adja tovább, a szerkesztett kulcs felülírásával -
    * egy ismeretlen kulcs (pl. a mérés után megjelenő SDK mező) így mindig
@@ -52,6 +59,7 @@ function renderFieldControl(
   field: AgentDefinitionFieldDescriptor,
   record: Readonly<Record<string, unknown>>,
   setField: (key: string, fieldValue: unknown) => void,
+  error: string | undefined,
 ): ReactElement {
   const rawValue = record[field.key];
   const { control } = field;
@@ -62,6 +70,7 @@ function renderFieldControl(
           size="sm"
           label={field.label}
           value={isString(rawValue) ? rawValue : ''}
+          error={error}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             setField(field.key, event.target.value);
           }}
@@ -74,6 +83,7 @@ function renderFieldControl(
           size="sm"
           label={field.label}
           value={isString(rawValue) ? rawValue : ''}
+          error={error}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setField(field.key, event.target.value);
           }}
@@ -153,12 +163,21 @@ function renderFieldControl(
  * itt **nincs Zod sémája** (szándékosan `Record<string, unknown>` marad),
  * tehát ezen a szinten nincs mezőnkénti Zod hibaüzenet sem - a felület
  * típusőrökkel olvassa ki a mért mezőket, hibás alak esetén az "üres"
- * alapértékre esik vissza, sosem omlik össze.
+ * alapértékre esik vissza, sosem omlik össze. Az egyetlen mező alatti hiba a
+ * két kötelező mezőé (`description`, `prompt`): az űrlap saját "üresen nem
+ * menthető" szabálya (`findBlankAgentDefinitionFields`, SPEC-008 5.4, O-38),
+ * a panel hibatérképén át.
  *
  * CSOPORTOSÍTÁS: lásd az `ACCORDION_PANELS` konstans fölötti indoklást.
  */
 export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionEntryFieldsProperties>): ReactElement {
-  const { value, onChange } = properties;
+  const { value, fieldPathPrefix, onChange } = properties;
+  // A hiba a mező PONTOS útvonalán áll (`findBlankAgentDefinitionFields`),
+  // nem a `useFieldError` előtag egyezésén: az agent neve pontot is
+  // tartalmazhat, és egy `x.description` nevű bejegyzés `prompt` mezőjének
+  // útvonala (`agents.x.description.prompt`) előtagként az `x` bejegyzés
+  // `description` mezőjére is illeszkedne.
+  const fieldErrors = useContext(FieldErrorsContext);
 
   if (!isRecord(value)) {
     return <p role="alert">Ez a bejegyzés nem objektum alakú, itt nem szerkeszthető.</p>;
@@ -172,14 +191,18 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
   return (
     <div className="node-inspector__group agent-definition-entry-fields">
       {AGENT_DEFINITION_FIELD_TABLE.filter((field) => field.group === 'kötelező').map((field) => (
-        <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
+        <div key={field.key}>
+          {renderFieldControl(field, record, setField, fieldErrors.get(`${fieldPathPrefix}${field.key}`))}
+        </div>
       ))}
       <Accordion>
         {ACCORDION_PANELS.map((panel) => (
           <AccordionItem key={panel.title} title={panel.title}>
             <div className="node-inspector__group">
               {AGENT_DEFINITION_FIELD_TABLE.filter((field) => panel.groups.includes(field.group)).map((field) => (
-                <div key={field.key}>{renderFieldControl(field, record, setField)}</div>
+                <div key={field.key}>
+                  {renderFieldControl(field, record, setField, fieldErrors.get(`${fieldPathPrefix}${field.key}`))}
+                </div>
               ))}
               {panel.groups.includes('SPEC-009 hatókör') && (
                 <>

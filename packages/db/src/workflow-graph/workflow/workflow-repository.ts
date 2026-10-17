@@ -239,16 +239,23 @@ export function createWorkflowRepository(
 
   /**
    * A teljes gráfot cseréli, nincs node/él szintű CRUD (SPEC-003 9.2). A
-   * bemenet már típusos `NodeConfig`, nincs mit typeguarddal szűkíteni
-   * íráskor (9.4 szekció, a `readGraph` unknown-ját ez különbözteti meg).
+   * bemenet típusos `NodeConfig`, de a típus nem őrzi a futásidejű
+   * invariánsokat (például a pozitív egész szám mezőket), ezért a beszúrás
+   * ELŐTT, a tranzakción kívül két ellenőrzés fut, és bármelyik hibája
+   * esetén semmi nem íródik, tehát a korábban tárolt gráf változatlan.
    *
-   * **Írás oldali kötelező mező szabály (SPEC-008 5.4, O-21).** A beszúrás
-   * ELŐTT, a tranzakción kívül fut: egy üres vagy csak szóközös kötelező
-   * szöveg mező `blank_required_text_field` hibaágat ad, és semmi nem
-   * íródik, tehát a korábban tárolt gráf változatlan. A `readGraph` ezt a
-   * szabályt nem futtatja, mert a tárolt gráfban lehet üres kötelező mező.
-   * HTTP-n át a `protocol` mentési sémája előbb utasít el; ez a második
-   * védvonal a szerveren kívüli hívóknak.
+   * **Az `isNodeConfig` guard írás előtt (user döntés 2026-10-17, SPEC-005
+   * 7.7).** Egy, a guardon el nem menő config `malformed_node_config`
+   * hibaágat ad. Az `apps/server` `PUT` kezelője a mentési séma után nem
+   * hívja a guardot (az ottani hibaág a HTTP úton sosem futna), ez a
+   * hívás az egyetlen írás előtti guard: nélküle egy hibás gráf
+   * elmentődne, és utólag a `readGraph` adna `corrupt_node_config` hibát.
+   *
+   * **Írás oldali kötelező mező szabály (SPEC-008 5.4, O-21).** Egy üres
+   * vagy csak szóközös kötelező szöveg mező `blank_required_text_field`
+   * hibaágat ad. A `readGraph` ezt a szabályt nem futtatja, mert a tárolt
+   * gráfban lehet üres kötelező mező. HTTP-n át a `protocol` mentési sémája
+   * előbb utasít el; ez a második védvonal a szerveren kívüli hívóknak.
    */
   function replaceGraph(
     workflowId: string,
@@ -256,6 +263,12 @@ export function createWorkflowRepository(
     edges: readonly WorkflowEdgeInput[],
   ): Outcome<void> {
     for (const node of nodes) {
+      if (!isNodeConfig(node.config)) {
+        return {
+          kind: 'error',
+          message: `A(z) "${node.id}" node config mezője nem érvényes NodeConfig alakú (malformed_node_config).`,
+        };
+      }
       const blankField = findBlankRequiredTextField(node.config);
       if (blankField !== undefined) {
         return {
