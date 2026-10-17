@@ -5,7 +5,8 @@ import { resolveUndoShortcut, type UndoShortcutAction, type UndoShortcutState } 
  * A billentyű esemény a valódi útján, a célponton kiváltva: a döntés a
  * figyelőben fut, amikor a `composedPath()` már a cél elemtől indul.
  */
-const NOT_SAVING: UndoShortcutState = { isSaving: false };
+const NOT_SAVING: UndoShortcutState = { isSaving: false, modifier: 'ctrl' };
+const NOT_SAVING_META: UndoShortcutState = { isSaving: false, modifier: 'meta' };
 
 function resolveOn(
   target: EventTarget,
@@ -57,6 +58,8 @@ describe('resolveUndoShortcut', () => {
     it.each([
       { name: 'módosító nélküli z', init: { key: 'z' } },
       { name: 'csak Meta+Z', init: { key: 'z', metaKey: true } },
+      { name: 'csak Meta+Shift+Z', init: { key: 'Z', metaKey: true, shiftKey: true } },
+      { name: 'csak Meta+Y', init: { key: 'y', metaKey: true } },
       { name: 'Ctrl+Meta+Z', init: { key: 'z', ctrlKey: true, metaKey: true } },
       { name: 'Ctrl+Alt+Z', init: { key: 'z', ctrlKey: true, altKey: true } },
       { name: 'Ctrl+Alt+Y', init: { key: 'y', ctrlKey: true, altKey: true } },
@@ -74,8 +77,49 @@ describe('resolveUndoShortcut', () => {
       { name: 'Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
       { name: 'Ctrl+Y', init: { key: 'y', ctrlKey: true } },
     ] as const)('a(z) $name a mentés alatt nem kezelt, ugyanaz a billentyű mentés nélkül kezelt', ({ init }) => {
-      expect(resolveOn(document, init, { isSaving: true })).toBeUndefined();
-      expect(resolveOn(document, init, { isSaving: false })).toBeDefined();
+      expect(resolveOn(document, init, { ...NOT_SAVING, isSaving: true })).toBeUndefined();
+      expect(resolveOn(document, init, NOT_SAVING)).toBeDefined();
+    });
+  });
+
+  describe('a Cmd módosító (meta, O-31, 113. kritérium)', () => {
+    it.each([
+      { name: 'Cmd+Z visszavon', init: { key: 'z', metaKey: true }, expected: 'undo' },
+      { name: 'Cmd+Shift+Z újra elvégez', init: { key: 'Z', metaKey: true, shiftKey: true }, expected: 'redo' },
+      { name: 'Cmd+Y újra elvégez', init: { key: 'y', metaKey: true }, expected: 'redo' },
+      { name: 'bekapcsolt CapsLock mellett a Cmd+Z visszavon', init: { key: 'Z', metaKey: true }, expected: 'undo' },
+    ] as const)('$name', ({ init, expected }) => {
+      expect(resolveOn(document, init, NOT_SAVING_META)).toBe(expected);
+    });
+
+    it('a KeyboardEvent.key szerint dönt, a code mezőt nem nézi', () => {
+      expect(resolveOn(document, { key: 'y', code: 'KeyZ', metaKey: true }, NOT_SAVING_META)).toBe('redo');
+      expect(resolveOn(document, { key: 'z', code: 'KeyY', metaKey: true }, NOT_SAVING_META)).toBe('undo');
+    });
+
+    it.each([
+      { name: 'módosító nélküli z', init: { key: 'z' } },
+      { name: 'csak Ctrl+Z', init: { key: 'z', ctrlKey: true } },
+      { name: 'csak Ctrl+Shift+Z', init: { key: 'Z', ctrlKey: true, shiftKey: true } },
+      { name: 'csak Ctrl+Y', init: { key: 'y', ctrlKey: true } },
+      { name: 'Ctrl+Meta+Z', init: { key: 'z', ctrlKey: true, metaKey: true } },
+      { name: 'Cmd+Alt+Z', init: { key: 'z', metaKey: true, altKey: true } },
+      { name: 'Cmd+Shift+Y', init: { key: 'Y', metaKey: true, shiftKey: true } },
+      { name: 'Cmd+A', init: { key: 'a', metaKey: true } },
+      { name: 'Cmd lenyomása önmagában', init: { key: 'Meta', metaKey: true } },
+    ] as const)('a nem kezelt billentyű: $name', ({ init }) => {
+      expect(resolveOn(document, init, NOT_SAVING_META)).toBeUndefined();
+    });
+
+    it('futó mentésnél nem kezelt, mentés nélkül ugyanaz a billentyű kezelt', () => {
+      const init = { key: 'z', metaKey: true };
+      expect(resolveOn(document, init, { ...NOT_SAVING_META, isSaving: true })).toBeUndefined();
+      expect(resolveOn(document, init, NOT_SAVING_META)).toBe('undo');
+    });
+
+    it('beviteli célponton a mező natív visszavonása marad', () => {
+      const field = appendToBody(document.createElement('input'));
+      expect(resolveOn(field, { key: 'z', metaKey: true }, NOT_SAVING_META)).toBeUndefined();
     });
   });
 
