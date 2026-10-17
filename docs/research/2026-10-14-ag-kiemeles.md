@@ -117,13 +117,13 @@ A megjelenítés: a két jelvény a kártya fejlécében, a kiemelés osztálya 
 
 ### 1. A forrás tényei, saját olvasással
 
-| Tény                                                                                                                                                                      | Forrás                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| A forrás vonaldiagram az első sorozat vonalát `2.4` szélességgel rajzolja: `strokeWidth={seriesIndex === 0 ? 2.4 : 1.8}` (239. sor)                                       | `components/charts/LineChart.jsx` 239. sor, a `eggproject-design-components` skill forrása |
-| A `Route` ikon három elemből áll: két `circle` (`6,19` és `18,5`, `r=3`) és egy `path` (`M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15`)                           | `assets/vendor/lucide.min.js`, fejléc: `lucide v0.525.0`, `Route` exportja                 |
-| A React Flow `Edge.className` a `<g class="react-flow__edge ...">` elemre kerül, a vonal a `.react-flow__edge-path`                                                       | saját olvasás, `@xyflow/react` 12.11.6 telepített forrása                                  |
-| A `Controls` a beépített gombok UTÁN rendereli a gyerekeit; a `ControlButton` `<button type="button" class="react-flow__controls-button">` és átadja a `...rest` propokat | saját olvasás, `@xyflow/react` 12.11.6 telepített forrása                                  |
-| A beépített `.react-flow__controls-button svg` szabály `fill: currentColor` és `12px` felső korlátot ad, ezért a körvonalas ikonhoz specifikusabb felülírás kell          | saját olvasás, `@xyflow/react` 12.11.6 `style.css`                                         |
+| Tény                                                                                                                                                                      | Forrás                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A forrás vonaldiagram az első sorozat vonalát `2.4` szélességgel rajzolja: `strokeWidth={seriesIndex === 0 ? 2.4 : 1.8}` (239. sor)                                       | `components/charts/LineChart.jsx` 239. sor, a `eggproject-design-components` skill forrása                                                                                     |
+| A `Route` ikon három elemből áll: két `circle` (`6,19` és `18,5`, `r=3`) és egy `path` (`M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15`)                           | `assets/vendor/lucide.min.js`, fejléc: `lucide v0.525.0`, `Route` exportja                                                                                                     |
+| A React Flow `Edge.className` a `<g class="react-flow__edge ...">` elemre kerül, a vonal a `.react-flow__edge-path`                                                       | saját olvasás, `@xyflow/react` 12.11.6 `dist/esm/index.js` 3031-3034. sor (a `<g>` `className` listája, `edge.className` a 3034.) és 2588. sor (`react-flow__edge-path`)       |
+| A `Controls` a beépített gombok UTÁN rendereli a gyerekeit; a `ControlButton` `<button type="button" class="react-flow__controls-button">` és átadja a `...rest` propokat | saját olvasás, `@xyflow/react` 12.11.6 `dist/esm/index.js` 4587-4589. sor (`ControlButton`) és 4622. sor (a `Controls` a `children` értéket a beépített gombok után rendereli) |
+| A beépített `.react-flow__controls-button svg` szabály `fill: currentColor` és `12px` felső korlátot ad, ezért a körvonalas ikonhoz specifikusabb felülírás kell          | saját olvasás, `@xyflow/react` 12.11.6 `dist/style.css` 438-443. sor                                                                                                           |
 
 ### 2. Az ikon választása
 
@@ -724,8 +724,8 @@ látszik, jóváhagyás panel nincs; a képeket átnéztem. A manifeszt két len
 (`fixtureSha256`, `captureScriptSha256`), az éllisták változatlanok. A gráf szerkesztő képeinek útja
 nem változott.
 
-**Az e2e lefedettség.** Előtte: a 6. pont mérése (`0525044`) és a `main` `b133b0e` T-009-42 mérése
-(`docs/research/2026-10-14-csomopont-felvetel.md` 21. szekció) is 15 / 11 / 3 / 15 fedetlen tételt
+**Az e2e lefedettség.** Előtte: a 6. pont mérése (`0525044`) és a `main` `b133b0e` mérése
+(`docs/research/2026-10-14-csomopont-felvetel.md` 27. és 44.5 szekció) is 15 / 11 / 3 / 15 fedetlen tételt
 adott. Utána: a jelen ág (a `main` összefésülése után) a 6. pont eljárásával, nyolc shardban, **501
 teszt, mind zöld** (63 + 63 + 63 + 63 + 63 + 62 + 62 + 62), a `coverage:e2e:report` kilépési kódja 0, a
 küszöb változatlan:

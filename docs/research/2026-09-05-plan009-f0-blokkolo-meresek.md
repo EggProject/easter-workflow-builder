@@ -51,8 +51,7 @@ semmilyen méret mező, (3) `initialWidth`/`initialHeight`.
 | `initialWidth: 150, initialHeight: 40` | `visibility: visible; width: 150px; height: 40px` - **azonos** az (1) esettel |
 
 **Verdikt, O-3 lezárva.** Az `initialWidth`/`initialHeight` **ugyanúgy láthatóvá teszi** a
-node-ot happy-dom alatt, mint a `width`/`height` (a forrás `measured.width ??
-initialWidth` lánca ugyanoda fut ki, ha nincs `ResizeObserver` callback hívás). A doksi
+node-ot happy-dom alatt, mint a `width`/`height` (a forrás lánca ugyanoda fut ki, ha nincs `ResizeObserver` callback hívás: a `@xyflow/system` 0.0.82 `nodeHasDimensions` függvénye, `dist/esm/index.js` 756-759. sor, a `measured?.width ?? node.width ?? node.initialWidth` láncot vizsgálja `undefined`-ra, amit a `@xyflow/react` 12.11.6 `dist/esm/index.js` 2249. és 2363. sora a `visibility` értékére vált; az inline méretet a `getNodeInlineStyleDimensions` adja, 2044-2049. sor; ugyanez a lánc `?? 0` zárással a `@xyflow/system` 334. (`measured.width`), 574. és 752. sorában is áll). A doksi
 (M-57) a `width`/`height` **közvetlen beállításától** óv a termékkódban, az
 `initialWidth`/`initialHeight` mezőt nem sorolja tiltottként - ez a mérés megerősíti, hogy
 ez a mező a dokumentált, biztonságos választás a teszt fixture-ökhöz. **A teszt fixture

@@ -274,8 +274,8 @@ mind lekérve 2026-09-23-án.
 
 A referencia szabály az útvonalat `all: initial` alá teszi, tehát semmilyen szerzői szabály
 (osztály, `--xy-*` változó, átlátszóság, szűrő) nem hat rá; a geometriát a saját `d`
-attribútumából kapja vissza (`d: path(...)`, mert az `all` a Chromiumban a `d` tulajdonságot is
-alaphelyzetbe tenné), a festést kizárólag a várt szín és vastagság adja. Az ősökön (a közös
+attribútumából kapja vissza (`d: path(...)`, mert az `all` a `d` tulajdonságot is
+alaphelyzetbe teszi: a W3C CSS Cascade 4 szerint az `all` "resets all CSS properties except direction and unicode-bidi" (<https://www.w3.org/TR/css-cascade-4/#all-shorthand>), és saját mérés Chromium 151-en: `all: initial` után a `d` kiszámított értéke `none` (2026-10-17, T-009-34)), a festést kizárólag a várt szín és vastagság adja. Az ősökön (a közös
 `.react-flow__edges` réteg, az él `<svg>` burkolója és `<g>` csoportja) az `opacity`, a `filter` és
 a `mix-blend-mode` áll alaphelyzetben; `all: initial`-t nem kaphatnak, mert az a pozíciójukat is
 elvenné. **A módszer elvi korlátja:** ami a közös `.react-flow__viewport` vagy afölötti ős
@@ -302,7 +302,7 @@ A (b) sorok "látszik" értéke világosban (11..21) egyezik az ellenőrzés 12.
 
 **Az ép állapot nem mindig 0.** Az ép 88 mérésből 58 volt 0, 12 volt 1, 18 volt 2. A 0-tól eltérő
 pixelek mindig az él végpontjai körül, a csomópontok helyén állnak, és akkor is előfordulnak, ha
-ugyanazt az állapotot kétszer fényképezzük le, a kettő között egy másik szonda állapottal: a
+ugyanazt az állapotot kétszer fényképezzük le, a kettő között egy másik szonda állapottal. Magyarázat (nem ellenőrzött feltevés): a
 Chromium a szonda váltásakor csak a kivágat egy részét raszterizálja újra, és az újra
 raszterizált rész széle 1..2 szinttel eltérhet. Mért, sikertelen kísérletek a zaj megszüntetésére
 (mind a fenti futtatókörnyezetben): két `requestAnimationFrame` várakozás a felvétel előtt

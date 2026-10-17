@@ -358,7 +358,7 @@ futtatni. Forrás: user kérés 2026-10-17 ("ti futtatjátok a CI lépéseket").
 a teljes e2e nyolc shardban (`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, majd
 `--shard=<i>/8` egymás után, ugyanabba a nyers könyvtárba, végül `bun run coverage:e2e:report`),
 a Playwright `flock /tmp/playwright-gep.lock` alatt, legfeljebb 3 workerrel (11. szekció).
-Forrás: `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 29., 47. és 48. szekció.
+Forrás: `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 29. szekció (a tiszta mérés sorrendje), 47. szekció (a `bunx playwright test` közvetlen futtatása a sandboxban), 48. és 49.2 szekció (a nyolc shard és a `flock`); a `lint --concurrency=1` forrása `docs/research/2026-10-14-csomopont-felvetel.md` 12. és 22. szekció.
 
 **A ruleset valódi kötelező csekkjei a letiltás előtt (a visszakapcsolás pontos alapja).** A
 `main` ruleset (id `21510009`) tizenkét kötelező státuszcsekket tartalmaz,
@@ -1427,7 +1427,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Nyitott tétel jelenleg nincs.**
+**Nyitott tétel jelenleg egy van (1. tétel, lent).**
+
+**1. tétel (2026-10-17, PLAN-009 T-009-34): a 15. szekció tiltja a nyers mért számot és a mérési narratívát, a 11. és 12. szekció PLAN-009 alatt bekerült bejegyzései mégis hordozzák.**
+
+- **Melyik két forrás mond mást.** A 15. szekció "Mi nem kerül bele" pontja (mérési narratíva és nyers számok nem kerülnek a szabálykönyvbe), kontra a 11. és a 12. szekció PLAN-009 alatt felvett bejegyzései.
+- **Az eltérés.** A 12. szekció görgetési és képernyőkép bejegyzései, valamint a 11. szekció runner és pixel bejegyzései nyers mért számokat és mérési leírást hordoznak (arányok, pixel értékek, futásidők, erőforrás adatok), a research hivatkozás mellett.
+- **Mi a viselkedés addig.** A 11. és 12. szekció bejegyzései változatlanok.
+- **Mi zárná le.** User döntés: vagy a számok research hivatkozásra cserélése, vagy a 15. szekció kivétele a buktató bejegyzésekre.
+- **Forrás.** `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`.
 
 A korábban itt állt hatodik tétel (a fejlesztői REST hívás originje és a szerver CORS engedélyének
 hatóköre) 2026-09-05-én lezárult: a user termékdöntése szerint a **szerver portja `3001`**, a Vite

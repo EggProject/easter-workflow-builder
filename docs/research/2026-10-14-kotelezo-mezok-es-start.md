@@ -24,7 +24,7 @@ this.check(superRefine(refinement, params)); }`, tehát ugyanazt a séma osztál
   plusz ellenőrzéssel, nem `.transform()`-ot és nem `.default()`-ot. A
   `node-config-save-schema.spec.ts` `expectTypeOf<z.infer<typeof NodeConfigSaveSchema>>()
 .toEqualTypeOf<NodeConfig>()` sora ezt a `typecheck` kapun rögzíti.
-- **A finomítás alak hibánál nem fut.** A telepített `zod@4.4.3/v4/core/schemas.js` `runChecks`
+- **A finomítás alak hibánál nem fut.** _(Felülírva: `docs/research/2026-10-14-csomopont-felvetel.md` 45.5; a `NodeConfigSaveSchema` `superRefine` hívása azóta `when` feltételt kap, és ismert `type` esetén típushiba mellett is fut. Az alábbi szöveg a korábbi állapotot rögzíti.)_ A telepített `zod@4.4.3/v4/core/schemas.js` `runChecks`
   függvénye a `when` opció nélküli ellenőrzést kihagyja, ha a bemenet már hibás
   (`util.aborted(payload)`); a `node-config-save-schema.spec.ts` "alak hibánál a kötelező mező
   szabály nem fut" tesztje ezt méri: egy `maxIterations` nélküli `loop` konfig üres

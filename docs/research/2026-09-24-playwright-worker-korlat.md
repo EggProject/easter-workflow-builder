@@ -97,7 +97,7 @@ config értéke marad érvényben.
 `testConfig.tsconfig` mezőt. Ez azt jelenti, hogy egy lokális `playwright test --workers=8`
 hívás MEGKERÜLHETI a configban rögzített hármas korlátot - ez a config szintjén nem zárható ki
 (a CLI mindig az utolsó szó), ezért a korlát valódi kikényszerítése emberi fegyelem kérdése:
-a configban rögzített `3` az alapértelmezett, nem felülírt viselkedés lokálisan.
+a configban rögzített `3` az alapértelmezett, nem felülírt viselkedés lokálisan. A commitolt scriptekben (`package.json`, shell, GitHub Actions YAML) álló `--workers`/`-j` kapcsolót az `apps/web/src/playwright-worker-limit/` regressziós teszt ma értéktől függetlenül tiltja (2026-10-17, T-009-34); a parancssorból kézzel adott kapcsoló viszont továbbra is emberi fegyelem kérdése.
 
 ---
 
