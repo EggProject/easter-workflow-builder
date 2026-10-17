@@ -74,7 +74,7 @@ külön, forrásolt lépés (SPEC-005 6. táblázat, "A `zod` verzió frissül..
 ## `zod` alsó határ a `packages/protocol` csomagban, 2026-10-17 (PLAN-009 T-009-34, SPEC-008 81. kritérium)
 
 A `packages/protocol/src/node-config/node-config-save-schema.ts` a `NodeConfigSchema.superRefine(fn,
-{ when })` alakot használja (84. sor), hogy a kötelező szöveg mező szabályok a konfig típushibája
+{ when })` alakot használja (89. sor), hogy a kötelező szöveg mező szabályok a konfig típushibája
 mellett is lefussanak. A `superRefine` második paramétere a `zod` **4.4.0**-ban jelent meg; a
 `^4.0.0` tartomány 4.0.0 ... 4.3.x verziót is megengedne, ahol a `when` nem létezik: a második
 argumentum típushibát adna, és futásidőben csendben elveszne (a 4.3.6 tarballban a
@@ -120,10 +120,11 @@ előállításon áll, nem a frozen kapcsolón.
 **A többi `zod` fogyasztó `^4.0.0`-n marad:** a `packages/tool-firecrawl-web-fetch`,
 `packages/tool-minimax-understand-image`, `packages/tool-minimax-web-search` és `tools/wire-probe`
 nem használ `when` opciót. Bizonyíték (`grep -rn "when:" packages/*/src tools/*/src apps/*/src
-tooling/*/src`, 2026-10-17, a teljes kimenet):
+tooling/*/src`, 2026-10-17; a kimenet a spec fájlok nélkül, a regressziós teszt saját,
+`when:` szót tartalmazó sorai kiszűrve):
 
 ```
-packages/protocol/src/node-config/node-config-save-schema.ts:84:  { when: hasKnownDiscriminators },
+packages/protocol/src/node-config/node-config-save-schema.ts:89:  { when: hasKnownDiscriminators },
 ```
 
 A `superRefine` hívás a `src` fájlok közül csak a `packages/protocol` két fájljában áll

@@ -79,7 +79,7 @@
    `.toast__close` néven is, komponensenként saját néven.
 
    MIÉRT NEM A `.btn--ghost`. A design system `.btn--ghost` variánsának
-   szövegszíne `var(--ep-accent-fg)` (button.css 91. sor), az arany. A
+   szövegszíne `var(--ep-accent-fg)` (a design system forrás `button.css` 91. sora), az arany. A
    korábbi `<Button variant="ghost" size="sm" icon>` bezáró gomb mért
    színe is ez volt, tehát a bezárás elsődleges akciónak látszott
    (felhasználói kifogás, 2026-09-09; mérés:

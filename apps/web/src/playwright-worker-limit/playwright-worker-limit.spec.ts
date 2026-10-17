@@ -15,7 +15,9 @@
 // worker számot ezért kizárólag a config adhatja: a kapcsoló a repó minden commitolt
 // `package.json` fájljában, shell scriptjében és YAML fájljában (a `_github` workflow és action
 // fájlok is) értéktől függetlenül tiltott, mert a `50%` vagy egy változó értéke a korláthoz nem
-// is hasonlítható. A teljes soros shell és YAML komment kimarad, mert az nem fut le.
+// is hasonlítható. A hosszú `--workers` alak minden sorban tilos; a rövid `-j` alak csak a
+// `playwright` vagy `test:e2e` szót tartalmazó sorban, mert más eszközök (`make -j4`, `jq -j`)
+// ugyanezt a betűt mással jelölik. A teljes soros shell és YAML komment kimarad, mert az nem fut le.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -79,8 +81,14 @@ function listTrackedScriptFiles(root: string): readonly string[] {
   return output.split('\n').filter((line) => SCRIPT_FILE_PATTERN.test(line));
 }
 
-function isWorkersOption(word: string): boolean {
-  return word === '--workers' || SHORT_WORKERS_OPTION_PATTERN.test(word);
+const PLAYWRIGHT_COMMAND_PATTERN = /playwright|test:e2e/;
+
+function hasWorkersOption(line: string): boolean {
+  const words = line.split(SCRIPT_WORD_SEPARATOR_PATTERN);
+  if (words.includes('--workers')) {
+    return true;
+  }
+  return PLAYWRIGHT_COMMAND_PATTERN.test(line) && words.some((word) => SHORT_WORKERS_OPTION_PATTERN.test(word));
 }
 
 /**
@@ -93,7 +101,7 @@ function findWorkersOptionLines(content: string): readonly string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => !line.startsWith('#'))
-    .filter((line) => line.split(SCRIPT_WORD_SEPARATOR_PATTERN).some((word) => isWorkersOption(word)));
+    .filter((line) => hasWorkersOption(line));
 }
 
 describe('Playwright worker korlát invariáns', () => {
@@ -139,10 +147,13 @@ describe('Playwright worker korlát invariáns', () => {
     expect(findWorkersOptionLines(line)).toEqual([line]);
   });
 
-  it.each(['java -jar app.jar', 'vitest run --maxWorkers=2', '# playwright test --workers=6'])(
-    'a "%s" alak nem számít worker szám kapcsolónak',
-    (line) => {
-      expect(findWorkersOptionLines(line)).toEqual([]);
-    },
-  );
+  it.each([
+    'java -jar app.jar',
+    'vitest run --maxWorkers=2',
+    '# playwright test --workers=6',
+    'make -j4',
+    'jq -j .name package.json',
+  ])('a "%s" alak nem számít worker szám kapcsolónak', (line) => {
+    expect(findWorkersOptionLines(line)).toEqual([]);
+  });
 });

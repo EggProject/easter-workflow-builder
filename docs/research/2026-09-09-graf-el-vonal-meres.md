@@ -29,6 +29,8 @@ hívások `page.route()` mockján:
    16x17 CSS pixel) két képernyőkép, egyszer az éllel, egyszer az él útvonalát
    `display: none` alá rejtve, majd a két kép legnagyobb csatorna eltérése. Ez a metrika immunis
    a React Flow háttér pontmintájára, mert az mindkét képen ugyanott áll.
+   (Pontosítva: a 7. szekció szerint az elrejtett él alól a pontminta előbukkanhat, tehát a
+   metrika csak kis kivágaton, mint ez, marad a küszöb alatt; T-009-34, 2026-10-17.)
 
 ---
 

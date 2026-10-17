@@ -50,9 +50,12 @@ const NYC_CONFIG_FILE_NAMES = [
   'nyc.config.cjs',
   'nyc.config.mjs',
 ] as const;
-// A két mappa a repón belül, ahol a riport futásakor a nyc konfigurációt keresi:
-// a futás helye (`apps/web`) és a felfelé keresés útján a repó gyökere.
-const NYC_LOOKUP_DIRECTORIES = [path.join('apps', 'web'), '.'] as const;
+// A mappák a repón belül, ahol a riport futásakor a nyc konfigurációt keresi: a futás
+// helye (`apps/web`), és a felfelé keresés útján az `apps` mappa és a repó gyökere. A
+// `package.json` `nyc` kulcsa csak a két csomag manifesztben állhat (az `apps` mappának
+// nincs saját `package.json` fájlja).
+const NYC_LOOKUP_DIRECTORIES = [path.join('apps', 'web'), 'apps', '.'] as const;
+const NYC_MANIFEST_DIRECTORIES = [path.join('apps', 'web'), '.'] as const;
 
 function repoRoot(): string {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- a git a fejlesztoi/CI PATH resze, ugyanugy mint a tobbi wrapper scriptben
@@ -119,10 +122,13 @@ describe('e2e lefedettségi küszöb invariáns', () => {
     expect(configFiles).toEqual([]);
   });
 
-  it.each(NYC_LOOKUP_DIRECTORIES)('a(z) %s mappa package.json fájlja nem tartalmaz nyc kulcsot', (lookupDirectory) => {
-    const manifestContent = readFileSync(path.join(repoRoot(), lookupDirectory, 'package.json'), 'utf8');
-    expect(hasNycKey(manifestContent)).toBe(false);
-  });
+  it.each(NYC_MANIFEST_DIRECTORIES)(
+    'a(z) %s mappa package.json fájlja nem tartalmaz nyc kulcsot',
+    (lookupDirectory) => {
+      const manifestContent = readFileSync(path.join(repoRoot(), lookupDirectory, 'package.json'), 'utf8');
+      expect(hasNycKey(manifestContent)).toBe(false);
+    },
+  );
 
   it('a nyc kulcs felismerése a kulcs meglétén áll, a tartalmától függetlenül', () => {
     expect(hasNycKey('{ "name": "web", "nyc": { "exclude": ["src/x.ts"] } }')).toBe(true);

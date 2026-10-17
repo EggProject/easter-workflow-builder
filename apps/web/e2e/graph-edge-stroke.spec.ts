@@ -24,7 +24,8 @@
 // képernyőkép ugyanarról a kis területről (a két csomópont közötti szakasz),
 // egyszer az éllel, egyszer az él útvonalát elrejtve, majd a két kép
 // pixelenkénti összevetése. Ezen a kis, üres kivágaton a React Flow háttér
-// pontmintájának hatása a küszöb alatt marad (research 7. szekció).
+// pontmintájának hatása a küszöb alatt marad (a mért hibás állapot a research 4.,
+// a pontminta hatása a 7. szekcióban).
 //
 // A KÜSZÖB a mért ép és a mért hibás állapot közé esik, a nyers mért számok a
 // research 4. és 5. szekciójában állnak
