@@ -4,22 +4,30 @@ import {
   UNDO_MODIFIER_STORAGE_KEY,
   getBrowserLocalStorage,
   readUndoModifierPreference,
+  storeUndoModifierPreference,
   type UndoModifierStorageAccessor,
 } from './undo-modifier-storage.ts';
 
 /**
  * Memóriabeli tároló a befecskendezéshez: a kezdő érték a beállítás kulcsára
- * kerül.
+ * kerül, az `entries` térkép pedig a teszt számára láthatóvá teszi az írást.
  */
-function createMemoryStorage(initial?: string): { readonly accessor: UndoModifierStorageAccessor } {
+function createMemoryStorage(initial?: string): {
+  readonly accessor: UndoModifierStorageAccessor;
+  readonly entries: Map<string, string>;
+} {
   const entries = new Map<string, string>();
   if (initial !== undefined) {
     entries.set(UNDO_MODIFIER_STORAGE_KEY, initial);
   }
   return {
+    entries,
     accessor: () => ({
       // eslint-disable-next-line unicorn/no-null -- a `Storage#getItem` hiányzó bejegyzésre `null` értéket ad.
       getItem: (key) => entries.get(key) ?? null,
+      setItem: (key, value) => {
+        entries.set(key, value);
+      },
     }),
   };
 }
@@ -33,6 +41,9 @@ const THROWING_ACCESS: UndoModifierStorageAccessor = () => {
 };
 const THROWING_METHODS: UndoModifierStorageAccessor = () => ({
   getItem: () => {
+    throw new Error('a tárolás le van tiltva');
+  },
+  setItem: () => {
     throw new Error('a tárolás le van tiltva');
   },
 });
@@ -69,10 +80,28 @@ describe('undo-modifier-storage', () => {
     });
   });
 
+  describe('storeUndoModifierPreference', () => {
+    it.each(['auto', 'ctrl', 'meta'] as const)('a(z) "%s" szövegét írja a kulcsra, JSON nélkül', (preference) => {
+      const { accessor, entries } = createMemoryStorage();
+      storeUndoModifierPreference(accessor, preference);
+      expect(entries.get(UNDO_MODIFIER_STORAGE_KEY)).toBe(preference);
+      expect(readUndoModifierPreference(accessor)).toBe(preference);
+    });
+
+    it('dobó tároló elérésnél és dobó metódusnál sem dob tovább', () => {
+      expect(() => {
+        storeUndoModifierPreference(THROWING_ACCESS, 'meta');
+      }).not.toThrow();
+      expect(() => {
+        storeUndoModifierPreference(THROWING_METHODS, 'meta');
+      }).not.toThrow();
+    });
+  });
+
   describe('getBrowserLocalStorage', () => {
-    it('a böngésző localStorage tárolóját adja, amiből az olvasás a tárolt értéket adja', () => {
-      expect(getBrowserLocalStorage()).toBe(globalThis.localStorage);
-      globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, 'ctrl');
+    it('a böngésző localStorage tárolóját adja, amin az írás és az olvasás körbejár', () => {
+      storeUndoModifierPreference(getBrowserLocalStorage, 'ctrl');
+      expect(globalThis.localStorage.getItem(UNDO_MODIFIER_STORAGE_KEY)).toBe('ctrl');
       expect(readUndoModifierPreference(getBrowserLocalStorage)).toBe('ctrl');
     });
   });
