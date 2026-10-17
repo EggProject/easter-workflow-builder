@@ -3,8 +3,12 @@ import { CLIENT_ROUTE_TABLE } from './client-route-table.ts';
 import { matchClientRoute } from './match-client-route.ts';
 
 describe('CLIENT_ROUTE_TABLE', () => {
-  it('pontosan négy bejegyzést tartalmaz', () => {
-    expect(Object.keys(CLIENT_ROUTE_TABLE)).toHaveLength(4);
+  it('pontosan öt bejegyzést tartalmaz', () => {
+    expect(Object.keys(CLIENT_ROUTE_TABLE)).toHaveLength(5);
+  });
+
+  it('az ötödik bejegyzés a Beállítások képernyő, paraméteres szegmens nélkül (SPEC-008 5.11)', () => {
+    expect(CLIENT_ROUTE_TABLE.settings).toEqual({ template: '/settings', label: 'Beállítások' });
   });
 });
 
@@ -23,6 +27,10 @@ describe('matchClientRoute', () => {
 
   it('a /run útvonalat a runView azonosítóra illeszti', () => {
     expect(matchClientRoute('/run')).toBe('runView');
+  });
+
+  it('a /settings útvonalat a settings azonosítóra illeszti', () => {
+    expect(matchClientRoute('/settings')).toBe('settings');
   });
 
   it('ismeretlen útvonalra undefined-et ad', () => {

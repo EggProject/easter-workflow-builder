@@ -15,6 +15,7 @@ import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
 import { RunHistoryScreen } from '../run-history/run-history-screen.tsx';
 import { RunViewScreen } from '../run-view/RunViewScreen.tsx';
+import { SettingsScreen } from '../settings-screen/settings-screen.tsx';
 import { browserEventSourceFactory } from '../stream-client/browser-event-source-factory.ts';
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
 import { useStreamConnection } from '../stream-client/use-stream-connection.ts';
@@ -172,6 +173,16 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
           >
             {CLIENT_ROUTE_TABLE.runHistory.label}
           </a>
+          <a
+            href={CLIENT_ROUTE_TABLE.settings.template}
+            className={routeId === 'settings' ? 'is-on' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              navigate('settings');
+            }}
+          >
+            {CLIENT_ROUTE_TABLE.settings.label}
+          </a>
         </>
       }
       actions={
@@ -267,6 +278,9 @@ function renderRouteContent(
           serverRestartCount={serverRestartCount}
         />
       );
+    }
+    case 'settings': {
+      return <SettingsScreen />;
     }
     case undefined: {
       return <NotFoundRoute navigate={navigate} />;

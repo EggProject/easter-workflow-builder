@@ -244,6 +244,45 @@ describe('AppShell', () => {
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Futás nézet');
   });
 
+  it('a "/settings" útvonalon a Beállítások képernyőt rajzolja, "Beállítások" morzsamenüvel (SPEC-008 5.11)', async () => {
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/settings');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Visszavonás/újra billentyű módosítója');
+    const breadcrumb = container.querySelector(':scope .app-pagehead nav[aria-label="Morzsamenü"]');
+    expect(breadcrumb?.querySelector('a')?.textContent).toBe('Workflow-k');
+    expect(breadcrumb?.querySelector('[aria-current="page"]')?.textContent).toBe('Beállítások');
+  });
+
+  it('a topnav navigáció harmadik linkje a "Beállítások", a "/settings" címre mutat, és kattintásra oda navigál', async () => {
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const navigationLinks = [...container.querySelectorAll<HTMLAnchorElement>(':scope .app-tn__navigation a')];
+    expect(navigationLinks.map((link) => link.textContent)).toEqual(['Workflow-k', 'Futás előzmények', 'Beállítások']);
+    const settingsLink = findLinkByText(container, 'Beállítások');
+    expect(settingsLink.getAttribute('href')).toBe('/settings');
+    expect(settingsLink.className).toBe('');
+
+    act(() => {
+      settingsLink.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(globalThis.location.pathname).toBe('/settings');
+    expect(findLinkByText(container, 'Beállítások').className).toBe('is-on');
+    expect(findLinkByText(container, 'Workflow-k').className).toBe('');
+    expect(container.textContent).toContain('Visszavonás/újra billentyű módosítója');
+  });
+
   it('ismeretlen útvonalon a "nem található" képernyőt rajzolja', async () => {
     // eslint-disable-next-line unicorn/no-null -- lásd fent.
     globalThis.history.pushState(null, '', '/nincs-ilyen');
