@@ -17,12 +17,13 @@
    A mért állapot, amit ez javít: a React Flow a csomópont doboznak INLINE
    `pointer-events` értéket ad, és az `all` helyett `none` jár neki, ha a node
    se nem húzható, se nem kiválasztható, és nincs rajta kattintás kezelő
-   (`@xyflow/react` `dist/esm/index.mjs`: `pointerEvents: hasPointerEvents ?
-   'all' : 'none'`, ahol a `hasPointerEvents` az `isDraggable || onClick ||
-   onMouseEnter || onMouseMove || onMouseLeave` értéke). A futás nézet vászna
-   PONTOSAN ilyen (AC19), tehát a `sub_workflow` csomópont gombja kattintásra
-   nem reagált: a Playwright mérése szerint a `.react-flow__pane` fogta el a
-   pointer eseményt.
+   (`@xyflow/react` 12.11.6 `dist/esm/index.mjs`: `pointerEvents:
+   hasPointerEvents ? 'all' : 'none'`, ahol a `hasPointerEvents` az
+   `isSelectable || isDraggable || onClick || onMouseEnter || onMouseMove ||
+   onMouseLeave` értéke). A futás nézet vászna PONTOSAN ilyen (AC19), tehát a
+   `sub_workflow` csomópont gombja kattintásra nem reagált (a mérés leírása:
+   `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
+   "Áthelyezett mérési próza" szekció).
 
    Miért a gombon, és miért nem a node dobozon: az inline stílust egy osztály
    szintű szabály csak `!important`-tal tudná felülírni, egy LESZÁRMAZOTT
@@ -77,6 +78,8 @@
   border-top: 1px solid var(--ep-border-subtle);
 }
 
+/* A 600 súly a design system `.accordion__header` súlya (`accordion.css`); a
+   méretet a `--ep-text-small` adja. */
 .unmatched-step-run-list__title {
   margin: 0;
   font: var(--ep-text-small);

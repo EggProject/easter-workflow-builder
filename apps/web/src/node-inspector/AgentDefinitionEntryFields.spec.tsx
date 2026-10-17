@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentDefinitionEntryFields } from './AgentDefinitionEntryFields.tsx';
+import { UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS } from './agent-definition-field-table.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -242,5 +243,33 @@ describe('AgentDefinitionEntryFields', () => {
       root.render(<AgentDefinitionEntryFields value={FULL_ENTRY} onChange={vi.fn()} />);
     });
     expect(container.textContent).toContain('SPEC-009');
+  });
+
+  it('a három nem megerősített mező (M-90) értékkel is csak olvasható szöveg, vezérlő nélkül', () => {
+    const unconfirmedValues = {
+      criticalSystemReminder_EXPERIMENTAL: 'emlekezteto-ertek',
+      observer: 'megfigyelo-ertek',
+      observerMessage: 'uzenet-ertek',
+    } as const satisfies Readonly<Record<(typeof UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS)[number], string>>;
+    act(() => {
+      root.render(<AgentDefinitionEntryFields value={{ ...FULL_ENTRY, ...unconfirmedValues }} onChange={vi.fn()} />);
+    });
+    const controls = [
+      ...container.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input, textarea, select',
+      ),
+    ];
+    expect(controls.length).toBeGreaterThan(0);
+    for (const key of UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS) {
+      const readOnlyLine = [...container.querySelectorAll('p')].find(
+        (paragraph) => paragraph.querySelector('b')?.textContent === key,
+      );
+      expect(readOnlyLine?.textContent).toBe(`${key}: ${unconfirmedValues[key]}`);
+      for (const control of controls) {
+        const controlLabel = control.closest('.field')?.querySelector('.field__label')?.textContent ?? '';
+        expect(control.value).not.toBe(unconfirmedValues[key]);
+        expect(controlLabel.toLowerCase()).not.toContain(key.toLowerCase());
+      }
+    }
   });
 });

@@ -13,8 +13,10 @@ export interface LoopNodeFieldsProperties {
  * (SPEC-008 5.1). A `maxIterations` kötelező, szállított alapérték nélkül
  * (`packages/protocol/src/node-config/node-config.ts` doksija), tehát a
  * mező itt sem kap alapértéket. A natív `<input type="number">` érvénytelen
- * szöveges bevitelre a saját `.value`-ját üres sztringre állítja (mért
- * viselkedés), a `Number('')` pedig `0`-t ad, nem `NaN`-t - a mentés előtti
+ * szöveges bevitelre a saját `.value`-ját üres sztringre állítja (HTML Living
+ * Standard, number állapot, value sanitization:
+ * <https://html.spec.whatwg.org/multipage/input.html#number-state-(type=number)>),
+ * a `Number('')` pedig `0`-t ad, nem `NaN`-t - a mentés előtti
  * `NodeConfigSaveSchema.safeParse` ezért csak akkor jelez hibát, ha a hívó
  * oldalon valamilyen külön korlát (pl. minimum érték) is érvényben van.
  *

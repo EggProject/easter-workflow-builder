@@ -94,8 +94,8 @@ export interface GraphEditorCanvasProperties {
    * fit all the nodes INITIALLY provided") - egy későbbi, teljes pozíció
    * átírás után a nézet a régi nagyításon és eltolásán maradna, tehát az új
    * elrendezés a vászon egy tetszőleges sarkába csúszna, nagy üres területet
-   * hagyva maga körül (2026-09-06-i saját mérés: a `fitView` prop szerinti
-   * kezdeti nagyítás a kattintás után változatlan maradt).
+   * hagyva maga körül (saját mérés:
+   * `docs/research/2026-09-05-grafszerkeszto-es-transcript.md` 7.2 szekció).
    */
   readonly autoLayoutRevision: number;
   /**
@@ -115,8 +115,9 @@ export interface GraphEditorCanvasProperties {
 
 /**
  * A jobb klikk menü a `<ReactFlow>` gyerekeként, mert a `screenToFlowPosition`
- * a `useReactFlow()` hookból jön, ami csak a React Flow saját context
- * providere alatt hívható (a `FitViewOnAutoLayout` indoka).
+ * a `useReactFlow()` hookból jön, ami csak a React Flow context providere
+ * alatt hívható: a `<ReactFlow>` külső provider nélkül is felépít egyet (a
+ * `FitViewOnAutoLayout` indoka).
  */
 function PaneAddNodeContextMenu(
   properties: Readonly<Omit<AddNodeContextMenuProperties, 'screenToFlowPosition'>>,
@@ -318,9 +319,9 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
         <Background />
         <Controls />
         {/* A `<ReactFlow>` GYEREKEKÉNT áll, mert a `useReactFlow()` hook
-            kizárólag a React Flow saját context providere alatt hívható - az
-            pedig magán a `<ReactFlow>`-n belül épül fel, tehát EBBŐL a
-            komponensből (ami rendereli) nem érhető el. */}
+            kizárólag a React Flow context providere alatt hívható, és a
+            `<ReactFlow>` külső provider nélkül is felépít egyet, tehát a
+            vászon külső `ReactFlowProvider` nélkül is működik. */}
         <FitViewOnAutoLayout revision={autoLayoutRevision} />
         {contextMenuPoint !== undefined && (
           <PaneAddNodeContextMenu point={contextMenuPoint} onAddNode={onAddNode} onClose={closeContextMenu} />

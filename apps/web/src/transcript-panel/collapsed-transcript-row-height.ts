@@ -19,14 +19,14 @@ const HEADER_LINE_HEIGHT = 1.5;
  * két belső margója plusz EGY szövegsor. A `run-event-row.css` a fejléc
  * magasságát pontosan erre állítja (`height: calc(1lh + 2 * 16px)`), tehát a
  * magasság a szöveg hosszától, a panel szélességétől és a meta szlot
- * tartalmától is független: a "Nem tárolt" `Badge` (22 pixel) a 21 pixeles
- * szövegsor fölé és alá fél-fél pixelt nyúlik a belső margóba, a sort nem
- * növeli. Az `.accordion__item` alsó szegélye nem adódik hozzá: a sor
+ * tartalmától is független: a "Nem tárolt" `Badge` magasabb a szövegsornál,
+ * ezért középre igazítva a belső margóba nyúlik, a sort nem növeli (research
+ * 16. szekció). Az `.accordion__item` alsó szegélye nem adódik hozzá: a sor
  * egyetlen `.accordion__item` eleme a saját burkolójának utolsó gyereke,
  * amire a forrás `:last-child` szabálya nulla szegélyt ad.
  *
  * Nem kitalált szám: a tényezők a design system forrás CSS-éből jönnek, és
- * valódi Chromiumban mérve a tárolt és az átmeneti sor is 53 pixel
+ * valódi Chromiumban mérve a tárolt és az átmeneti sor is ekkora
  * (`docs/research/2026-09-23-transcript-panel-meresek.md` 16. szekció). Két
  * regressziós teszt őrzi: a `collapsed-transcript-row-height.spec.ts` a
  * forrás CSS szabályaiból számolja újra, az e2e a valódi böngészőben

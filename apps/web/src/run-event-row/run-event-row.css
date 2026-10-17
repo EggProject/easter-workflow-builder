@@ -26,9 +26,9 @@
    `border-box` értéket ad (HTML Living Standard, Rendering), ezért a
    magasság a belső margót is tartalmazza. Ettől a sor magassága független
    a meta szlot tartalmától: a "Nem tárolt" `Badge` (a design system
-   egyetlen mérete, 22 pixel) nem növeli a 21 pixeles szövegsort, hanem
-   középre igazítva fél-fél pixelt nyúlik a belső margóba, teljes egészében
-   látszva. Így az átmeneti és a tárolt sor egyformán magas, és a lista
+   egyetlen mérete) magasabb a szövegsornál, de nem növeli azt, hanem
+   középre igazítva a belső margóba nyúlik, teljes egészében látszva. Így az
+   átmeneti és a tárolt sor egyformán magas, és a lista
    becslése minden sorra pontos
    (`transcript-panel/collapsed-transcript-row-height.ts`, ami a két számot
    a forrás CSS-ből ellenőrzi). Mérés:
@@ -64,7 +64,11 @@
    érték görgető konténerré teszi a flex elemet, amire a `min-width: auto`
    nullára old fel, nem a tartalom legszélesebb, törhetetlen szavára (CSS
    Flexbox 1, 4.5, <https://www.w3.org/TR/css-flexbox-1/#min-size-auto>);
-   enélkül a cím egy 400 karakteres URL-nél mért 3400 pixelre feszülne.
+   enélkül a cím a törhetetlen szó teljes szélességére feszülne (mérés:
+   `docs/research/2026-09-23-transcript-panel-meresek.md` 4. szekció; a
+   korábban itt álló szám kikerült, lásd
+   `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
+   "Áthelyezett mérési próza" szekció).
    Külön `min-width: 0` ezért nem kell: saját mérés szerint nélküle is
    ugyanaz a geometria. A meta ugyanígy csonkolható, hogy a legkeskenyebb
    panelen se lógjon ki a sorból. */

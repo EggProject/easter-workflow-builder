@@ -173,7 +173,8 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
       {rowCount === 0 && !isReplayComplete ? (
         // A várakozás csontváza ugyanazzal a sorszámmal, mint a képernyő
         // saját betöltés jelzése (`RunViewScreen`), hogy a két egymást
-        // követő csontváz ne ugorjon.
+        // követő csontváz ne ugorjon. A sorok számának (4) forrása nincs
+        // igazolva (nyitott kérdés: SPEC-008 O-35).
         <div className="transcript-panel__loading">
           <ThemedSkeleton shape="text" lines={4} />
         </div>
@@ -208,11 +209,10 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
               // A lista magassága egész pixel (a keretnél legfeljebb egy
               // pixellel kisebb, a felső belső margóval együtt, mert a lista
               // `border-box`): a húzható elválasztó százalékos felosztása
-              // tört magasságot ad (mérve 375x812-n 85,5 pixel), a böngésző
-              // görgetési tartománya viszont egész pixelre kerekít (a legnagyobb
-              // `scrollTop` 974 volt a szükséges 974,5 helyett), így az utolsó
-              // sor fél pixele sehogy sem látszott (research 20. szekció). A
-              // `round()` CSS függvény: MDN "CSS round()".
+              // tört magasságot ad, a böngésző görgetési tartománya viszont
+              // egész pixelre kerekít, így az utolsó sor tört része sehogy sem
+              // látszott (research 20. szekció (H)). A `round()` CSS függvény:
+              // MDN "CSS round()".
               style={{ maxHeight: 'round(down, 100%, 1px)' }}
               listRef={setList}
               onResize={handleResize}

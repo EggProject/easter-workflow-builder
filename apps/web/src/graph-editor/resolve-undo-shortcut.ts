@@ -37,7 +37,11 @@ export interface UndoShortcutState {
  * A React Flow törlés billentyű szűrőjének köre (`@xyflow/system`
  * `isInputDOMNode`, M-102, M-117): a beviteli elem, a `contenteditable` elem és
  * a `.nokey` osztályú elem vagy ős. A cél elem a `composedPath()` első eleme,
- * ugyanúgy, mint a könyvtárban.
+ * ugyanúgy, mint a könyvtárban. A `.nokey` osztály nem szerepel a reactflow.dev
+ * API referenciájában (keresés alapján, nem ellenőrzött kimerítően); a
+ * viselkedés forrása a telepített `@xyflow/system` 0.0.82 `dist/esm/index.js`
+ * 914-923. sora és a karbantartói ajánlás (xyflow/xyflow #2254), a regressziót
+ * az `apps/web/e2e/graph-node-delete.spec.ts` őrzi.
  */
 const INPUT_TAG_NAMES: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
 

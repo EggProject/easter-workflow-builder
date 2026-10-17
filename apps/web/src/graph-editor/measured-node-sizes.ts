@@ -31,10 +31,8 @@ export type MeasuredNodeSizes = Readonly<Record<string, MeasuredNodeSize>>;
  * elvész: a `nodeHasDimensions` sosem teljesül (a csomópont tartósan
  * `visibility: hidden` marad, él nem rajzolódik), a `parseHandles` pedig a
  * handle határokat is nullázza, ami újabb mérést kényszerít - végtelen
- * `ResizeObserver` hurok. Saját méréssel igazolva 2026-09-05, valós
- * Chromiumban: 1920 `observe` és 960 callback hívás az első másodpercben,
- * miközben mindkét csomópont `visibility: hidden` maradt és nulla él
- * rajzolódott ki.
+ * `ResizeObserver` hurok (saját mérés, valós Chromium: SPEC-008 5.5, "Az
+ * ötödik állapotdarab").
  *
  * A `dimensions` mező a típus szerint elhagyható (`NodeDimensionChange`), a
  * mező nélküli változás (pl. `resizing` jelzés) ezért nem ír a térképbe.

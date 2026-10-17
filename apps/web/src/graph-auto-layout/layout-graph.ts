@@ -6,7 +6,8 @@ import { GRAPH_NODE_CARD_HEIGHT, GRAPH_NODE_CARD_WIDTH } from '../graph-node-cat
  * A dagre `NodeLabel` saját típusa a layout ELŐTTI és UTÁNI állapotot is
  * ugyanazzal az alakkal írja le, ezért az `x`/`y` mező nála opcionális - a
  * `layout()` hívás UTÁN viszont minden `setNode`-dal felvett csomópontra
- * ténylegesen kitöltött (dokumentált dagre viselkedés). Ahelyett, hogy egy
+ * ténylegesen kitöltött (dokumentált dagre viselkedés,
+ * <https://github.com/dagrejs/dagre/wiki>). Ahelyett, hogy egy
  * `x === undefined` ellenőrzést vezetnénk be, ami erre a hívási mintára
  * garantáltan sosem futna (`.claude/CLAUDE.md` 5. szekció), a gráf SAJÁT,
  * ennél szigorúbb node címke típussal épül, ahol az `x`/`y` kezdetben `0`

@@ -36,18 +36,17 @@ const SINGLE_UNNAMED_OUTPUT: GraphNodeOutputHandles = {
 /**
  * A tíz csomópont típus megjelenítési és handle táblája (SPEC-008 5.1
  * táblázat). A `satisfies Readonly<Record<NodeType, ...>>` alak miatt egy
- * hiányzó típus fordítási hibát ad, nem futásidejű ágat (SPEC-008 12.4,
- * AC7): a végrehajtás során ezt egy pillanatra szándékosan kivett `script`
- * bejegyzéssel is igazoltuk - a `bun run typecheck` `TS2741` hibával bukott
- * ("Property 'script' is missing"), majd a bejegyzés visszaállítása után
- * újra zöld lett.
+ * hiányzó típus fordítási hibát ad (`TS2741`), nem futásidejű ágat (SPEC-008
+ * 12.4, AC7).
  */
 /**
  * A gráf csomópont kártya (`graph-node-card` téma) mért méretének alsó
- * korlátja pixelben (SPEC-008 5.7, AC62, T-009-19). Két fogyasztója van: a
- * kártya CSS-e egy custom propertyn át (`GraphEditorCanvas` injektálja), és a
- * `graph-auto-layout` téma dagre hívása közvetlenül - **ez a kódbázis
- * egyetlen helye, ahol ez a két szám literálként szerepel**. Nincs rá
+ * korlátja pixelben (SPEC-008 5.7, AC62, T-009-19). Három fogyasztója van: a
+ * kártya CSS-e egy custom propertyn át (`GraphEditorCanvas` injektálja), a
+ * `graph-auto-layout` téma dagre hívása közvetlenül, és a
+ * `graph-editor/compute-viewport-center-node-position.ts` (az új kártya
+ * bal felső sarkát a méret felével tolja a nézet középpontjától) - **ez a
+ * kódbázis egyetlen helye, ahol ez a két szám literálként szerepel**. Nincs rá
  * dokumentált külső forrás, mert ez a mi saját kártyánk mérete, nem a dagre
  * könyvtáré: a szám a `docs/research/2026-09-05-grafszerkeszto-es-transcript.md`
  * 7. szekció saját méréséből jön, valós Chromiumban, a SPEC-007 5.3

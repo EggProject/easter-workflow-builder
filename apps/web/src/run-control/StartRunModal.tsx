@@ -102,7 +102,9 @@ export function StartRunModal(properties: Readonly<StartRunModalProperties>): Re
             szekciója szerinti szabályon megy (a hibaüzenet a MEZŐ ALATT áll).
             Enélkül a böngésző natív ellenőrzése a `required` mezőn még a
             `submit` esemény ELŐTT megállítaná a beküldést, a saját buborékával,
-            és a mező alatti üzenet sosem jelenne meg. A `required` attribútum
+            és a mező alatti üzenet sosem jelenne meg
+            (<https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-algorithm>,
+            <https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/submit_event>). A `required` attribútum
             marad a mezőn, mert az a kötelezőség HOZZÁFÉRHETŐSÉGI jelzése. */}
         <form id={FORM_DOM_ID} noValidate onSubmit={handleSubmit}>
           {fields.map((field) => (

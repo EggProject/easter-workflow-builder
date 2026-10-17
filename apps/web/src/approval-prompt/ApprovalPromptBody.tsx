@@ -25,9 +25,10 @@ export interface ApprovalPromptBodyProperties {
  *
  * **Nem régió.** A "Függő jóváhagyások" régió a lapozót és a gombokat fogja
  * össze (`ApprovalPromptPanel`), a törzs a húzható panelben áll, tehát a
- * kettő nem lehet egy DOM elem gyereke; egy második, azonos nevű régió a W3C
- * APG szerint tilos. A gombok csoportja a cím és a szöveg azonosítójával
- * kötődik a törzshöz.
+ * kettő nem lehet egy DOM elem gyereke; két azonos nevű régió az APG szerint
+ * kerülendő (minden `region` egyedi címkét kap,
+ * <https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/>). A gombok
+ * csoportja a cím és a szöveg azonosítójával kötődik a törzshöz.
  *
  * A hívó a jóváhagyás azonosítóját adja `key` értéknek, hogy lapozáskor a
  * törzs a tetejéről induljon, ne az előző jóváhagyás görgetési helyéről.

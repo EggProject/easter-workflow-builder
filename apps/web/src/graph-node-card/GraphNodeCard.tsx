@@ -39,8 +39,10 @@ function resolveOutputHandles(
  * Egyenletes függőleges elosztás a kártya jobb szélén, `N` kimenetre: az
  * `i`-edik handle a `(i + 1) / (N + 1)` arányos magasságban áll, tehát egy
  * kimenetnél középen (50%), kettőnél a felső és az alsó harmadban, és a
- * képlet tetszőleges kimenet számra (a `branch` dinamikus ágaira is) működik
- * (SPEC-008 5.1, M-58 `Position`).
+ * képlet tetszőleges kimenet számra (a `branch` dinamikus ágaira is) működik.
+ * A `Handle` propjait és a `Position` típust az M-58 adja (SPEC-008 2.1); az
+ * elosztás képlete sem a SPEC-008 5.1, sem az M-58 szerint nem rögzített:
+ * nyitott kérdés: SPEC-008 O-35.
  */
 function computeHandleTopPercent(index: number, count: number): number {
   return ((index + 1) * 100) / (count + 1);

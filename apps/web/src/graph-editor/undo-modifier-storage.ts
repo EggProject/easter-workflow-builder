@@ -16,8 +16,9 @@ export const UNDO_MODIFIER_STORAGE_KEY = 'eggGraphEditorUndoModifier';
 export const DEFAULT_UNDO_MODIFIER_PREFERENCE: UndoModifierPreference = 'auto';
 
 /**
- * A tároló, késleltetve elérve: privát ablakban és letiltott tárolás mellett
- * már a `localStorage` elérése is dobhat (`SecurityError`), ezért a hívó nem
+ * A tároló, késleltetve elérve: letiltott tárolás vagy opak origin mellett
+ * már a `localStorage` elérése is dobhat (`SecurityError`,
+ * <https://html.spec.whatwg.org/multipage/webstorage.html>), ezért a hívó nem
  * a kész objektumot, hanem az elérés módját adja át, és az elérés is a
  * `try`/`catch` védelme alatt fut.
  */
@@ -48,9 +49,11 @@ export function readUndoModifierPreference(getStorage: UndoModifierStorageAccess
 }
 
 /**
- * A beállítás elmentése. A `try`/`catch` itt is kötelező, ugyanazzal az
- * indokkal: a `setItem` privát ablakban, letiltott tárolás mellett és tele
- * kvóta esetén is dobhat. A mentés elmaradása nem hiba a felhasználó felé,
+ * A beállítás elmentése. A `try`/`catch` itt is kötelező: a `setItem` tele
+ * kvótánál `QuotaExceededError`-t dob
+ * (<https://developer.mozilla.org/en-US/docs/Web/API/Storage/setItem>),
+ * letiltott tárolásnál pedig már az elérés is dobhat. A mentés elmaradása nem
+ * hiba a felhasználó felé,
  * csak annyit jelent, hogy a következő betöltés az alapértelmezéssel indul.
  */
 export function storeUndoModifierPreference(

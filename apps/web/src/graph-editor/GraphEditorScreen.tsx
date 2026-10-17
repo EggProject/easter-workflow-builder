@@ -374,9 +374,10 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // a `graphState.state` sikeresre váltása és a `currentNodes`/`currentEdges`
   // TÉNYLEGES feltöltése két külön render (az állapotfrissítés csak a
   // következő rendernél fut le hatásként). Enélkül a vászon egy köztes
-  // renderen üres kezdő node/él listával mondana le, és mivel a
-  // `GraphEditorCanvas` belső állapota `useState` lusta kezdőértékkel épül
-  // (csak csatoláskor fut le), a később érkező valódi adat már nem jutna be.
+  // renderen üres node/él listával csatolódna fel (a vászon vezérelt, saját
+  // `nodes`/`edges` állapota nincs), és a `<ReactFlow fitView>` prop csak a
+  // KEZDETI csomópontokra illeszti a nézetet (lásd `GraphEditorCanvas`), tehát
+  // a később érkező valódi gráfra a nézet már nem illeszkedne.
   const [isHydrated, setIsHydrated] = useState(false);
   // A perzisztált osztott elrendezés arány EGYSZER, csatoláskor olvasódik
   // be (lusta `useState` kezdőérték): a `Resizable` a `defaultSizes` propot
@@ -560,23 +561,20 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     setAutoLayoutRevision((revision) => revision + 1);
   }, []);
 
-  // A korai visszatérés minden hook UTÁN, de a lenti `handleSave` ELŐTT áll:
-  // a `workflowId` innentől `string` (nem `string | undefined`), mert a
-  // TypeScript a `const` kötés szűkítését a szövegben utána következő
-  // zárványokba is átviszi. Enélkül a `handleSave`-ben egy sosem futó,
-  // csak típusbiztonsági `if (workflowId === undefined)` ág kéne, ami a 100
+  // A korai visszatérés minden hook UTÁN áll: a `workflowId` innentől
+  // `string` (nem `string | undefined`). Enélkül egy sosem futó, csak
+  // típusbiztonsági `if (workflowId === undefined)` ág kéne, ami a 100
   // százalékos elágazás lefedettséget sértené (`.claude/CLAUDE.md` 5.).
   if (workflowId === undefined) {
     return <p role="alert">Nincs megadva szerkesztendő workflow (hiányzó "workflowId" query paraméter).</p>;
   }
-  // Új `const` kötés a FÜGGVÉNYTÖRZS szintjén, nem egy zárványon belül: a
-  // TypeScript a szűkítést nem viszi át zárványba (sem a `handleSave`, sem a
-  // benne futó `async` callback nem örökli a fenti korai visszatérésből
-  // származó `string` szűkítést), tehát a zárványon belül újra kiszámolt
-  // kötés is `string | undefined` maradna. Ez a kötés viszont a szűkített
-  // ponton, zárvány NÉLKÜL jön létre, ezért a típusa itt már véglegesen
-  // `string` - ezt viszik tovább a lenti zárványok (saját méréssel igazolt
-  // `tsc` viselkedés).
+  // Új `const` kötés a FÜGGVÉNYTÖRZS szintjén: a `handleSave` hoistolt
+  // függvény deklaráció, és a TypeScript a szűkítést a függvény deklarációkba
+  // nem viszi át, csak a nem hoistolt függvényekbe (nyíl függvény, függvény
+  // kifejezés; <https://devblogs.microsoft.com/typescript/announcing-typescript-5-4/>,
+  // <https://github.com/microsoft/TypeScript/pull/56908>). A `workflowId`
+  // tehát a `handleSave`-ben újra `string | undefined` lenne; ez a kötés a
+  // szűkített ponton jön létre, ezért `string`, és ezt viszik a lenti zárványok.
   const resolvedWorkflowId = workflowId;
 
   function handleSave(): void {
@@ -673,6 +671,11 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     <div className="graph-editor-screen">
       {isLoading ? (
         <div className="graph-editor-screen__loading">
+          {/* A `Skeleton` jelzés forrása a SPEC-008 9. szekció 1. pontja; a 4
+              soros darabszámra sem az, sem a SPEC-007 11. szekciója nem ad
+              értéket (a lista, a futás előzmények, a futás nézet és a
+              transcript várakozása is 4 sort használ). Nyitott kérdés:
+              SPEC-008 O-35. */}
           <ThemedSkeleton shape="text" lines={4} />
         </div>
       ) : (

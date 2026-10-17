@@ -29,18 +29,16 @@ export const RUN_VIEW_LAYOUT_STORAGE_KEY = 'eggRunViewUserLayout';
 /**
  * A kezdő arány, amikor nincs tárolt érték: a gráf kapja a nagyobb részt.
  *
- * MIÉRT EZ A KÉT SZÁM. Egyrészt szó szerint ugyanaz, ami a gráf szerkesztő
- * szállított alapértelmezése (`DEFAULT_GRAPH_EDITOR_LAYOUT_SIZES`): a
- * SPEC-008 10. szekciója kimondja, hogy a két képernyő ugyanazzal a
- * `Resizable` komponenssel, egyformán viselkedik, tehát az arányuk sem tér
- * el indok nélkül. Másrészt MÉRT alsó korlát is van: a React Flow `minZoom`
- * alapértelmezése `0.5`, a `fitView` pedig
- * `zoom = szélesség / (tartalom * (1 + padding))` alakban számol, tehát a
- * bemutató gráf 1582 pixeles tartalmi szélességéhez az 1440 pixeles
- * referencia ablakon legalább 1582 * 0.5 * 1.1 = 870 pixel, azaz a
- * szélesség kb. 61 százaléka kell, különben a nézet a `minZoom`-on megáll és
- * a gráf jobb széle levágódik (`apps/web/e2e/showcase-graph.ts` számítása,
- * `docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció).
+ * A `[70, 30]` szó szerint ugyanaz, ami a gráf szerkesztő szállított
+ * alapértelmezése (`DEFAULT_GRAPH_EDITOR_LAYOUT_SIZES`): a SPEC-008 10.
+ * szekciója kimondja, hogy a két képernyő ugyanazzal a `Resizable`
+ * komponenssel, egyformán viselkedik. Az arány értékének forrása nincs
+ * igazolva (nyitott kérdés: SPEC-008 O-34). A gráf szélességének alsó
+ * korlátja a React Flow `minZoom` alapértelmezéséből és a `fitView`
+ * képletéből jön (`docs/research/2026-09-09-graf-el-vonal-meres.md` 6.
+ * szekció); az ebből a futás nézetre számolt levezetés kikerült, lásd
+ * `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
+ * "Áthelyezett mérési próza" szekció.
  */
 export const DEFAULT_RUN_VIEW_LAYOUT_SIZES: readonly number[] = [70, 30];
 

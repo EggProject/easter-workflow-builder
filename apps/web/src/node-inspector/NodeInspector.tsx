@@ -52,7 +52,8 @@ export interface NodeInspectorProperties {
    * mindig explicit értéket ad át, tehát egy opcionális + `false`
    * alapértékű mező garantáltan sosem futna a default ágon e2e-vel - ez a
    * `.claude/CLAUDE.md` 5. szekciójának "nincs garantáltan sosem futó ág"
-   * szabályát sértette volna (2026-09-09-i e2e lefedettségi mérés találta).
+   * szabályát sértette volna (e2e lefedettségi mérés:
+   * `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 13. szekció).
    */
   readonly isSaveAttempted: boolean;
 }
@@ -159,10 +160,15 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
   }
 
   return (
-    // A `nokey` a React Flow billentyű szűrőjének osztálya: a panel teljes
-    // területén a `Backspace` és a `Delete` nem törli a kiválasztott
-    // csomópontot (user döntés 2026-10-14, SPEC-008 5.9; research
-    // T-009-44, 44.6).
+    // A `nokey` osztályú elemet a React Flow billentyű szűrője beviteli
+    // elemnek veszi (`@xyflow/system` 0.0.82 `isInputDOMNode`, `dist/esm/index.js`
+    // 914-923. sor), ezért a panelen a `Backspace` és a `Delete` nem törli a
+    // kiválasztott csomópontot (user döntés 2026-10-14, SPEC-008 5.9; research
+    // T-009-44, 44.6). Az osztály nem szerepel a reactflow.dev API
+    // referenciájában (keresés alapján, nem ellenőrzött kimerítően), a
+    // karbantartói ajánlás: xyflow/xyflow #2254. Regresszió:
+    // `apps/web/e2e/graph-node-delete.spec.ts`, "a panel gombján és a választó
+    // triggerén lenyomott ... nem töröl".
     <aside className="node-inspector nokey" aria-label={`${catalogEntry.label} beállításai`} onBlur={onFieldBlur}>
       <div className="node-inspector__header">
         <div className="node-inspector__identity">
