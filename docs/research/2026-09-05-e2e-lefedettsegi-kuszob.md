@@ -2010,3 +2010,28 @@ szekció hibrid SSE szabálya szerint):
 
 Az `approval-prompt` téma minden fájlja mind a négy metrikán 100 százalék (a 49.3 öt fájlja között
 nincs).
+
+## 50. A `[INVALID_ANNOTATION]` figyelmeztetés a `VITE_COVERAGE=true` buildben (2026-09-23 és 2026-09-24 mérései, áthelyezve a szabálykönyv 12. szekciójából 2026-10-17-én)
+
+A `.claude/CLAUDE.md` 15. szekciója szerint nyers mért szám nem kerül a szabálykönyvbe (user döntés
+2026-10-17: "Research hivatkozásra"). Az alábbi számok a 12. szekció `[INVALID_ANNOTATION]`
+bejegyzésében álltak; a szabálykönyv csak a besorolást és a tanulságot tartja. **A nyers rekord (a
+`webServer` buildlog) a repóban nincs, a mérést a szekció átvitelekor nem ismételtem meg: a számok
+historikus adatok, nem ellenőrzöttek.**
+
+**A mérés (saját, 2026-09-23, T-009-25).** `vite build` a `VITE_COVERAGE=true` env változóval:
+**kilenc fájl, húsz előfordulás**: `src/app-shell/app-shell.tsx`,
+`src/graph-editor/GraphEditorScreen.tsx`, `src/node-inspector/JoinNodeFields.tsx`,
+`src/run-control/RunControlBar.tsx`, `src/run-event-row/RunEventRow.tsx`,
+`src/run-history/run-history-screen.tsx`, `src/run-view/RunViewLayout.tsx`,
+`src/transcript-panel/TranscriptPanel.tsx`, `src/workflow-list/workflow-list-screen.tsx`.
+Mindegyik olyan `? (/* @__PURE__ */jsx(...)) : (/* @__PURE__ */jsx(...))` ág, aminek az eredménye
+MINDIG felhasznált (`return` vagy render gyerek), tehát a PURE jelzés nem tehetne semmit: az csak
+akkor engedne eltávolítást, ha az eredmény eldobva állna. `VITE_COVERAGE` nélkül (a valódi, éles
+build) az előfordulások száma **nulla**.
+
+**Az újramérés (2026-09-24).** A transcript sor tipográfiája után, a `test:e2e` `webServer`
+buildlogjából: **nyolc fájl, huszonhét előfordulás**, az `app-shell.tsx` már nincs köztük. A
+`RunEventRow.tsx` egyik új előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció
+Istanbul statement számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt
+is felhasznált, tehát a besorolás változatlan.

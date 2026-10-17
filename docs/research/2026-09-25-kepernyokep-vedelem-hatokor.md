@@ -309,3 +309,40 @@ bukik (6/7).
 a 2026-10-17-i döntés nem mondja ki. Addig a kapu mindkettőt átengedi (a CLI alparancsot a shell és a
 `package.json` scriptből, a CDP metódust egy író hívással együtt is). A user hatóköri döntése zárja
 le.
+
+## 9. Áthelyezett mérési adatok a szabálykönyv 12. szekciójából (2026-10-17)
+
+A `.claude/CLAUDE.md` 15. szekciója szerint nyers mért szám nem kerül a szabálykönyvbe (user döntés
+2026-10-17: "Research hivatkozásra"). A 12. szekció negyedik és ötödik réscsoport bejegyzésének
+alábbi számai a 6. és a 7. szekcióban nem álltak, ezért szó szerint ide kerültek. **A nyers
+rekord (az injekciók kimenete) a repóban nincs, a méréseket az átvitelkor nem ismételtem meg: a
+számok historikus adatok, nem ellenőrzöttek.** Az akkori invariáns darabszám a bejegyzés idején
+hat, illetve nyolc volt, a mai hét.
+
+**A negyedik réscsoport (a `741f63e` körül, 2026-09-25).**
+
+- Egy JPEG formátumú, memóriába kért képernyőkép plusz egy `writeFileSync('x.jpg')` hívás bármely
+  commitolt fájlban mind a hat akkori invariánson átment. Egy független ellenőrzés mérte, és saját
+  injekcióval is: 6/6 zöld, egy stream alapú és egy két fájlra bontott, író segédfüggvényes
+  változattal együtt.
+- A javítás után a három injekció a `test` kapun bukik (1/7), a jogos, memóriában mérő pixel
+  tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét tizenegy szintetikus eseten
+  futtatta.
+- Pontosítás: egy független ellenőrzés tizennégy gyengítéséből ötöt a tizenegy eset nem fogott (a
+  `Bun.write`, a `saveAs` és az `fs/promises` törlése, a képösszehasonlító assertion minta
+  törlése, és az opció értékének `'on'`-ra szűkítése), és az (1) invariáns régi alakjára állítása
+  a három injekcióval zöld maradt.
+
+**Az ötödik réscsoport (a `741f63e` után, 2026-09-25).**
+
+- A hetedik invariáns akkor harmincnégy esetet futtatott.
+- Igazolva: mind az öt kerülő út (a trace két alakkal, hat injekció) egyenként a `test` kapun
+  bukott (1/8), a régi alakon mind zöld volt (7/7); harminchárom gyengítés (a független ellenőrzés
+  öt nem fogott gyengítésével és az akkori lezárások gyengítéseivel együtt) mind bukott a hetedik
+  invariánson, és az (1) régi alakra állítása a három injekcióval a nyolcadikon bukott.
+
+**A harmadik réscsoport (a 2026-09-15-i gépi kényszer első alakja).** Az első invariáns
+karakterosztályos ablaka megszűnt: egy fájlnak nem lehet EGYSZERRE képernyőkép hívása és `path`
+opciója. A szabálykönyv korábbi szövege szerint ez "a commitolt fán mérten egyetlen fájlra
+illeszkedik". **A mérés nyers rekordja a repóban nincs, a darabszámot nem ismételtem meg: nem
+ellenőrzött, historikus.**

@@ -596,9 +596,9 @@ szabálylista" ott áll részletesen, itt csak a lényeg.
   elem a háttér színével fest. A bizonyíték két képernyőkép ugyanarról a kivágatról, egyszer az
   elemmel, egyszer elrejtve, és a két kép csatorna eltérése. Ehhez jön, hogy az állítás a VALÓS
   alkalmazás alakján fusson, ne egy csak a tesztnek gyártott elrendezésen, és mindkét témában.
-  Mérten megkülönböztető: az él vonalán 236 (világos) és 53 (sötét) az ép, 0 és 1 az elrontott
-  érték, miközben a `toBeVisible()` mindkét esetben átment
-  (`docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
+  Mérten megkülönböztető: az él vonalán az ép és az elrontott érték a két témában élesen
+  elválik, miközben a `toBeVisible()` mindkét esetben átment (a mért értékek:
+  `docs/research/2026-09-09-graf-el-vonal-meres.md` 4. szekció, user kérés 2026-09-09).
 
 **A Playwright lokálisan legfeljebb HÁROM workert használhat** (user kérés 2026-09-24): "A
 Playwright teszteknél maximum három worker futhat. Több nem, lokál... mert megöli a gépet." A
@@ -628,11 +628,10 @@ fenti bekezdés `ubuntu-latest`-re vonatkozó, 4 vCPU-s alapja ezen a runneren m
 a mérési eredmény (a `2` workers érték zöld futása) viszont a runnertől függetlenül változatlanul
 érvényes historikus tény marad. **A nyitott pont lezárva (2026-09-27, PR #17, run id
 `36334506650`):** a `2` workers érték a 2 vCPU-s Blacksmith runneren is zölden fut, és a `Run e2e
-tests` lépés (3m15s) **gyorsabb**, mint a korábbi, dupla magszámú `ubuntu-latest` runneren
-ugyanazzal a beállítással (3m31s); a `test` job (teljes Vitest suite, 100 százalékos lefedettségi
-küszöb) 2 perc alatt zölden lefutott. A `workers` érték emiatt változatlanul `2` marad a CI ágon,
-csökkentésre nincs szükség. Részletek: `docs/research/2026-09-24-playwright-worker-korlat.md` 5.
-szekció.
+tests` lépés **gyorsabb**, mint a korábbi, dupla magszámú `ubuntu-latest` runneren ugyanazzal a
+beállítással; a `test` job (teljes Vitest suite, 100 százalékos lefedettségi küszöb) zölden
+lefutott. A `workers` érték emiatt változatlanul `2` marad a CI ágon, csökkentésre nincs szükség.
+Az időket és az összevetést lásd: `docs/research/2026-09-24-playwright-worker-korlat.md` 5. szekció.
 
 **E2E mockolás.** Forrás: felhasználó kérése ("e2e -nel minden mockolva legyen mint unit
 test-nel").
@@ -647,8 +646,9 @@ test-nel").
 **SSE mockolás: lezárva, hibrid úton.** Forrás:
 `docs/research/2026-08-30-sse-mockolas-meres.md`, ami a
 `docs/research/2026-08-29-playwright-teszt-szabalyok.md` 9. szekciójának nyitott kérdését
-saját, dokumentált méréssel lezárta (10 lefuttatott Playwright teszt a pinelt
-`@playwright/test@1.62.1` és chromium ellen). A korábbi nyitva jelölés ezzel törölve; a
+saját, dokumentált méréssel lezárta (lefuttatott Playwright tesztek a pinelt
+`@playwright/test@1.62.1` és chromium ellen, a darabszámmal: 5. szekció). A korábbi nyitva
+jelölés ezzel törölve; a
 döntést a `docs/spec/SPEC-007-frontend-alkalmazas.md` 13.4 szekciója valósítja meg.
 
 A "minden mockolva legyen" szabály az SSE csatornán (`GET /events`, `EventSource`) **az
@@ -740,9 +740,9 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   React alkalmazás vagyunk. A `select.css` mindkettőt kiszolgálja ugyanazon a `.select` héjon, de
   a natív `<select>` retrofitről a forrás saját kommentje mondja ki, hogy a STATIKUS oldalaké
   ("the native `<select>` retrofit ON STATIC PAGES uses the platform control"), és a platform
-  indikátorát rajzolja: a chevron a jobb szegélyre tapad (mérve 9px), a React trigger 22px-e
+  indikátorát rajzolja: a chevron a jobb szegélyre tapad, a React trigger saját, szélesebb sávja
   helyett. A natív ág megépítése ezért nem "bájtra másolás" volt, hanem a rossz ág kiválasztása
-  (`docs/research/2026-09-09-select-chevron-meres.md`, user kérés 2026-09-09).
+  (a mért és a forrásból levezetett értékek: `docs/research/2026-09-09-select-chevron-meres.md` 3. szekció, user kérés 2026-09-09).
 - **Tilos a card in card.** Kártya alakú dobozon (szegély plusz lekerekítés plusz saját
   háttér) belül nem állhat második ilyen doboz, és nem lehet dupla belső térköz sem. Ami a
   tagoláshoz kell: vagy összecsukható panel (`accordion`), vagy megnevezett, doboz nélküli
@@ -895,27 +895,20 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `/* @__PURE__ */` kommentjét eltolja a hívás elől. A Rolldown emiatt nem tudja értelmezni a
   kommentet, és minden ilyen esetre `[INVALID_ANNOTATION]` figyelmeztetést ír a `webServer`
   buildlogba. **Ártalmatlan minden eddig talált előfordulásra** (saját mérés, `vite build` a
-  `VITE_COVERAGE=true` env változóval, 2026-09-23, T-009-25: kilenc fájl, húsz előfordulás -
-  `src/app-shell/app-shell.tsx`, `src/graph-editor/GraphEditorScreen.tsx`,
-  `src/node-inspector/JoinNodeFields.tsx`, `src/run-control/RunControlBar.tsx`,
-  `src/run-event-row/RunEventRow.tsx`, `src/run-history/run-history-screen.tsx`,
-  `src/run-view/RunViewLayout.tsx`, `src/transcript-panel/TranscriptPanel.tsx`,
-  `src/workflow-list/workflow-list-screen.tsx`): mindegyik olyan `? (/* @__PURE__ */jsx(...)) :
-(/* @__PURE__ */jsx(...))` ág, aminek az eredménye MINDIG felhasznált (`return` vagy render
-  gyerek), tehát a PURE jelzés nem tehetne semmit: az csak akkor engedne eltávolítást, ha az
-  eredmény eldobva állna, ami itt sosem igaz. `VITE_COVERAGE` nélkül (a valódi, éles build) az
-  előfordulások száma NULLA (saját mérés), tehát a felhasználó felé szállított kód nem érintett.
-  **Ez a besorolás fájlonként újra ellenőrizendő, ha valaki egy `/* @__PURE__ */`-lel jelölt hívás
-  eredményét ELDOBva használná** (pl. egy csak mellékhatásért hívott függvény): a
-  `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy MÁSIK, nem JSX ternary
-  mechanizmus (a zod alapértelmezett locale regisztrációjának tree-shake-elése) ténylegesen
-  megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input" jelenik meg) - az az eset már
-  dokumentált és kezelt ott, külön jelenség, nem ez a kilenc fájl. **Újramérve 2026-09-24**
-  (a transcript sor tipográfiája után, a `test:e2e` `webServer` buildlogjából): nyolc fájl,
-  huszonhét előfordulás, az `app-shell.tsx` már nincs köztük. A `RunEventRow.tsx` egyik új
-  előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció Istanbul statement
-  számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt is
-  felhasznált, tehát a besorolás változatlan.
+  `VITE_COVERAGE=true` env változóval, 2026-09-23, T-009-25, újramérve 2026-09-24): mindegyik olyan
+  `? (/* @__PURE__ */jsx(...)) : (/* @__PURE__ */jsx(...))` ág, vagy a `const title = (<>...</>)`
+  deklaráció Istanbul statement számlálója (`(cov().s[n]++, _jsxs(...))`), aminek az eredménye
+  MINDIG felhasznált (`return` vagy render gyerek), tehát a PURE jelzés nem tehetne semmit: az csak
+  akkor engedne eltávolítást, ha az eredmény eldobva állna, ami itt sosem igaz. `VITE_COVERAGE`
+  nélkül (a valódi, éles build) nincs előfordulás (saját mérés), tehát a felhasználó felé szállított
+  kód nem érintett. **Ez a besorolás fájlonként újra ellenőrizendő, ha valaki egy
+  `/* @__PURE__ */`-lel jelölt hívás eredményét ELDOBva használná** (pl. egy csak mellékhatásért
+  hívott függvény): a `node-inspector.spec.ts` egyik tesztje szerint UGYANEBBEN a buildben, egy
+  MÁSIK, nem JSX ternary mechanizmus (a zod alapértelmezett locale regisztrációjának
+  tree-shake-elése) ténylegesen megváltoztatja a megjelenő hibaszöveget (rövidebb "Invalid input"
+  jelenik meg) - az az eset már dokumentált és kezelt ott, külön jelenség, nem ezek az
+  előfordulások. Az érintett fájlok listája és az előfordulások száma mindkét mérésből:
+  `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md` 50. szekció.
 - **Egy csak véletlenül fedett sor billegteti az e2e lefedettségi küszöböt.** A
   `run-view/blocking-failure-message.ts` hibaüzenet ágát (`return failure.message;`) a teljes e2e
   futásban csak két, a hibára nem állító teszt érte el, mellékhatásként: a `run-control.spec.ts`
@@ -923,7 +916,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   (`installApiMocks`), és a teszt az URL után azonnal kiolvassa a lefedettséget, tehát a hibás
   renderelést nem várja meg. Hogy a render a kiolvasás előtt megtörténik-e, versenyhelyzet, ezért
   a sor találatszáma futásonként más, és a PR #33 első CI futásán a `lines` metrika a küszöb alá
-  esett (99.07 a 99.08 ellen), minden teszt zölden: az `E2E` job bukott. A szabály: **amit
+  esett, minden teszt zölden: az `E2E` job bukott. A szabály: **amit
   a küszöb számol, azt olyan teszt fedje, amelyik a viselkedést állítja és megvárja** (web-first
   assertion a megjelenő állapotra); egy ingadozó fedetlen darabszámot a sort determinisztikusan
   fedő teszt old meg, nem a küszöb csökkentése. Védelem: a `run-view.spec.ts` két tesztje (a
@@ -936,9 +929,10 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **Egy "legutolsó érték" alakú React állapot löketben érkező eseményfolyamnál keretet veszít, az
   újratöltést kiváltó jelzéseket is.** A React a natív `EventSource` kezelőből jövő frissítéseket
   egy renderbe vonja össze, tehát egy `lastFrame` függésű effekt a köztes kereteket sosem látja:
-  valós Chromiumban egyetlen hálózati darabban érkező 10, 1000 és 3000 keretre az effekt
-  mindháromszor EGYSZER futott, a függvény alakú állapotfrissítés viszont mindet megkapta (saját
-  mérés, `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). **A korábbi
+  valós Chromiumban egyetlen hálózati darabban érkező kerethalmazokra az effekt minden mért
+  méretnél EGYSZER futott, a függvény alakú állapotfrissítés viszont mindet megkapta (saját
+  mérés, a méretekkel és a találatszámokkal:
+  `docs/research/2026-09-23-transcript-panel-meresek.md` 1. szekció). **A korábbi
   feltevés, hogy az ilyen állapot "valami történt, tölts újra" jelzésre még jó, hamisnak bizonyult**:
   a jelzés szűrője (melyik keret, melyik futás) is csak az utolsó keretet látja. A szerver a pótlás
   végén szinkron `replay_complete` keretet ír, így a `run_finished` után a futás nézet fejléce
@@ -956,25 +950,25 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **A dokumentum `scrollWidth` mérése nem látja a saját görgető dobozban maradó túllógást.** A
   `react-window` lista gyökere `overflow-y: auto`, amitől az `overflow-x` is `auto` lesz, tehát
   egy kilógó transcript sor a LISTÁT görgeti vízszintesen, a dokumentumot nem: csonkolás nélkül
-  mérve a dokumentum túllógása 0, a listáé 3719 pixel (375 pixelen). A vízszintes túllógás
+  mérve a dokumentum túllógása nulla, a listáé nem (375 pixelen, a mért érték:
+  `docs/research/2026-09-23-transcript-panel-meresek.md` 4. szekció). A vízszintes túllógás
   tesztje ezért a görgető dobozt is méri (`responsive.spec.ts`, T-009-25).
 - **A `toBeInViewport()` alapértéke a részleges láthatóságot is elfogadja** (a `ratio` alapértéke
   0, <https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport>).
   A transcript görgetés tesztjei emiatt nem vették észre, hogy az utolsó sor alja lemarad: a
-  becslésnél egy pixellel magasabb átmeneti sor miatt, és mert a `height: 100%` plusz belső
-  térközű burkoló `box-sizing` nélkül a lista alsó 16 pixelét a panel levágta. Ha egy teszt tárgya
+  becslésnél magasabb átmeneti sor miatt, és mert a `height: 100%` plusz belső
+  térközű burkoló `box-sizing` nélkül a lista alsó sávját a panel levágta. Ha egy teszt tárgya
   az, hogy valami TELJESEN látszik, `toBeInViewport({ ratio: 1 })` kell, ami a levágó ősöket is
   figyelembe veszi. Védelem: `apps/web/e2e/sse-real-server.spec.ts` lista alja tesztjei
   (`docs/research/2026-09-23-transcript-panel-meresek.md` 13. szekció).
 - **A `react-window` látható tartomány jelentése a mért sormagasság mögött jár.** Egy sor
   kinyitása után a lista a sor új magasságát a következő mérésből kapja meg, és addig a jelentései
   a kinyitás előtti elrendezést írják le. Egy ebben az ablakban érkező új sor követése ezért a
-  kinyitott sort elrántotta, már a `dfcaa38` előtt is: 40 ms-os streamnél a véletlen fázisú, csak
-  `click` eseménnyel indított kinyitások mintegy harmadában (a `dfcaa38` előtti hookkal 60/200,
-  ebből 40 egy soros és 20 teljes elrántás, saját mérés 2026-09-25 a repóbeli mérő eszközzel,
-  minden kísérletet számolva; a korábbi 34/205 és "mintegy hatod" egy hibás szűrőből jött, lásd
-  lent; a repón kívüli mérések 12/40 és 23/80, egy független ellenőrzés 38/100 arányt adott,
-  research 17. és 18. szekció). A szabály: felhasználói layout változás után görgetési döntés
+  kinyitott sort elrántotta, már a `dfcaa38` előtt is: folyamatos streamnél a véletlen fázisú, csak
+  `click` eseménnyel indított kinyitások jelentős részében (a `dfcaa38` előtti hookkal, saját mérés
+  2026-09-25 a repóbeli mérő eszközzel, minden kísérletet számolva; a korábbi, kisebb arányt egy
+  hibás szűrő adta, lásd lent; a stream üteme, a darabszámok, a repón kívüli mérések és egy
+  független ellenőrzés mérése: research 17. és 18. szekció). A szabály: felhasználói layout változás után görgetési döntés
   csak a mért magassággal számolt jelentés után születhet; a hook ezért a fejléc `click`
   eseményétől szünetelteti a követést, a szünet alatti jelentés nem kapcsolhatja vissza, és egy
   kinyitás szünete a mérés után is tart, amíg a felhasználó vissza nem ér az aljára vagy meg nem
@@ -985,8 +979,9 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 - **Egy mérés szűrője nem dobhatja ki azt, amit mér.** A mérő eszköz verseny jelenete egy
   kísérletet csak akkor számolt, ha a kinyitás utáni harmadik képkockán az utolsó sor nem látszott;
   a teljes elrántás viszont a listát az aljára viszi, tehát pontosan azt a kísérletet dobta ki. A
-  hamis szám (34/205, "minden elrántás -53 pixel") két dokumentumba is bekerült, és egy független
-  ellenőrzés találta meg: ugyanazzal a hookkal a szűrővel 33/170, szűrő nélkül 60/200. Ha egy
+  hamis arány (és az az állítás, hogy minden elrántás ugyanakkora) két dokumentumba is bekerült, és
+  egy független ellenőrzés találta meg: ugyanazzal a hookkal a szűrővel és szűrő nélkül mért arány
+  jelentősen eltért (a számok: research 18. szekció). Ha egy
   szűrő a kimenetel alapján dönt arról, mi számít, előbb meg kell nézni, hogy a keresett hiba maga
   nem változtatja-e meg a szűrő bemenetét. Védelem: a jelenet ma minden kísérletet számol
   (`apps/web/measurement/transcript-scroll.ts`, research 18. szekció).
@@ -1003,31 +998,32 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   a fülváltás egy feladatban a lista követését végleg leállította: a rejtett sor 0 magasságát a
   `useDynamicRowHeight` nem tárolja, a sor a szűkült kirajzolt tartományból leszerelődik, a
   gyorsítótár nem változik, és a kézi görgetés az aljára sem oldotta fel (mérve: a három új sor
-  után 53, 106, 159 pixel lemaradás, "6 új esemény"). A negyedik kilépés a kézi visszatérés az
+  után soronként növekvő lemaradás, a számokkal: research 17. szekció). A negyedik kilépés a kézi visszatérés az
   aljára (user döntés 2026-09-24), az alj előzetes elhagyásának feltételével. A tanulság: egy
   külső jelre (itt a mérésre) váró állapotnál a felhasználó saját, egyértelmű szándéka is legyen
   kilépés. Védelem: `sse-real-server.spec.ts` fülváltás és ugrás gomb tesztjei, a `bffd75d`
   állapotán bukik (research 17. szekció).
 - **A böngésző görgetés rögzítése (scroll anchoring) a virtualizált lista mellett saját
   görgetést csinál.** Bekapcsolt `overflow-anchor` mellett folyamatos streamnél a véletlen fázisú
-  kinyitások egy részében a lista a hook nélkül elmozdult (két saját mérésben 9/80 és 7/80, mind -36
-  pixel, kikapcsolva 0/80, minden kísérletet számolva; a korábbi 6/78 a hibás szűrőből jött; egy
-  független ellenőrzés 5/80-at mért, köztük egy -574 pixeles teljes elrántást, tehát a "mind -36"
-  nem általános). A -36 a gomb akkori sávjának magassága volt: a sáv helyének fenntartásával
-  (`1c7dd13`) bekapcsolt rögzítéssel is 0/80 lett (research 19. szekció). Az ugrás gomb azóta
+  kinyitások egy részében a lista a hook nélkül elmozdult (két saját mérésben; kikapcsolva elmozdulás
+  nélkül, minden kísérletet számolva; a korábbi arányt a hibás szűrő adta; egy független ellenőrzés
+  teljes elrántást is mért, tehát az elmozdulás mértéke nem általános; a darabszámok és a pixel
+  értékek: research 17., 18. és 19. szekció). Az elmozdulás mértéke a gomb akkori sávjának magassága
+  volt: a sáv helyének fenntartásával (`1c7dd13`) bekapcsolt rögzítéssel is elmozdulás nélkül maradt
+  (research 19. szekció). Az ugrás gomb azóta
   saját sáv nélkül, a lista fölött lebeg, és a megjelenése a listát nem mozdítja (research 20.
   szekció). Az elmozdulás miatt a listán `overflow-anchor: none` áll
   (user döntés 2026-09-24, CSS Scroll Anchoring spec, MDN). A jelenség fázisfüggő, időzítő nélküli
-  lépéssorral nem állítható elő (hat érkezési mód, 0/120); a védelem ezért KIZÁRÓLAG a
+  lépéssorral nem állítható elő (hat érkezési mód, egyetlen elmozdulás sem; a darabszám: research 17.
+  és 18. szekció); a védelem ezért KIZÁRÓLAG a
   konfigurációt őrzi: az e2e a lista kiszámított `overflow-anchor` értékét ellenőrzi. A korábbi,
   képkockánként mérő rész vak volt (a CSS nélkül is zöld), és kikerült (research 17. és 18.
   szekció).
 - **A `react-window` az érkezés utáni első renderben még a régi látható tartományt jelenti.** A
   látható tartomány a könyvtárban állapot, amit egy layout effekt számol újra, tehát a sorszám
-  növekedése után előbb a régi utolsó sorra vágott jelentés jön (2 a 4 sorból), és csak utána az
-  új (3 a 4-ből). A szünet "alj elhagyása, majd visszatérés" kilépése ezt nem teli listán hamis
+  növekedése után előbb a régi utolsó sorra vágott jelentés jön, és csak utána az új. A szünet "alj elhagyása, majd visszatérés" kilépése ezt nem teli listán hamis
   párnak vette: a szünet minden érkezésnél lezárult, gomb nem jelent meg, és a lista megtelése után
-  minden új sor a kinyitott sort 53 pixellel feljebb vitte. Az e2e addig csak teli listát (20 + 10
+  minden új sor a kinyitott sort feljebb vitte. Az e2e addig csak teli listát (20 + 10
   sor) vizsgált, és a "determinisztikus" állítás erre az esetre nem volt igaz. A tanulság: egy
   állapotgép, ami egy könyvtár jelentéseinek SORRENDJÉBŐL következtet, a jelentés érvényességi
   idejét is ellenőrizze, és a tesztje fedje a határesetet (itt a nem teli listát). Védelem:
@@ -1039,11 +1035,11 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   fájl három példányát, és `EADDRINUSE` jött. Ma minden teszt szervere az operációs rendszer által
   kiosztott szabad porton figyel, és a lap kérését a `route.continue({ url })` irányítja rá (Node
   `server.listen(0)`, Playwright `route.continue`); `--repeat-each 3` mellett három workerrel a
-  fájl minden tesztje zöld, nulla `EADDRINUSE` (legutóbb 279/279, 93 teszt, research 20. szekció).
-- **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor egy
-  pixellel magasabb volt (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
+  fájl minden tesztje zöld, `EADDRINUSE` egyszer sem (legutóbbi futás darabszámai: research 20. szekció).
+- **Egy korrekciós gépezet helyett előbb az okot kell megszüntetni.** Az átmeneti sor
+  magasabb volt a többinél (a jelvény túlnőtt a sordobozon), és a `dfcaa38` ezt egy újragörgető
   gépezettel kompenzálta, ami két újabb hibát hozott. A sor fejlécének pontosan egy szövegsor
-  magasra állításával minden összecsukott sor egyforma, és az eredeti követés 0 pixelre pontos
+  magasra állításával minden összecsukott sor egyforma, és az eredeti követés pixelre pontos
   (research 16. szekció).
 - **A lezárt `page.route()` SSE mock újracsatlakozáskor újrapótol, és az újrarenderelés elfedi a
   renderelésen kívüli jelre futó számítás hibáját.** A böngésző a lezárt válasz végén
@@ -1115,8 +1111,8 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `tooling/scripts/src/screenshot-pipeline/screenshot-pipeline.spec.ts`: hét invariáns a
   `bun run test` kapun (tehát a CI `ci` job `needs` listáján keresztül kötelező státuszcsekk).
   **Hatókör (user döntés 2026-09-25):** a védelem kizárólag a repóba commitolt forráskódot
-  olvassa a `test` kapun, és csak a böngésző képernyőkép, a videó és a trace kép lemezre írását
-  tiltja a saját teszt- és segédkódunkban; a termék futását, az agentek fájlírását (az Agent SDK
+  olvassa a `test` kapun, és csak a böngésző képernyőkép, a videó, a trace kép és (2026-10-17-től,
+  user döntés) az oldal PDF mentésének lemezre írását tiltja a saját teszt- és segédkódunkban; a termék futását, az agentek fájlírását (az Agent SDK
   eszközeivel, futásidőben) és a termékkód egyéb fájlírását nem érinti. A megvalósításban: a
   termékkód (a `packages/*/src` és az `apps/*/src` nem teszt fájlja) csak akkor vizsgált, ha
   Playwright csomagot importál; minden más commitolt kód (teszt, e2e, config, eszköz, shell
@@ -1154,15 +1150,17 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   hatástalanította; és a hat szállított képből kettő (a nagyított kivágat) sosem kapott pixel
   mérést, tehát a frissesség bizonyíték csak négyre szólt. A javítás: a két kiterjesztés felvéve;
   az ablak teljesen megszűnt (egy fájlnak nem lehet EGYSZERRE képernyőkép hívása és `path`
-  opciója, ami a commitolt fán mérten egyetlen fájlra illeszkedik); és MINDEN szállított kép mért,
+  opciója; a commitolt fán mért illeszkedés: research `2026-09-25-kepernyokep-vedelem-hatokor.md` 9.
+  szekció); és MINDEN szállított kép mért,
   a futás nézet két új képét is beleértve. **A karakterosztályos ablak általános tanulsága:** egy
   greppes invariánsban a tiltott karakterosztály mindig hagy kerülő utat egy másik karakterrel, a
   puszta együttes jelenlét vizsgálata nem.
 - **A negyedik mért rés: a kép formátuma és az írás módja (2026-09-25, javítva).** Az első
   invariáns csak a `path` opciót, a második csak a PNG fájlnevet nézte, ezért egy JPEG formátumú,
   memóriába kért képernyőkép plusz egy `writeFileSync('x.jpg')` hívás bármely commitolt fájlban
-  mind a hat invariánson átment (egy független ellenőrzés mérte, és saját injekcióval is: 6/6
-  zöld, egy stream alapú és egy két fájlra bontott, író segédfüggvényes változattal együtt). A
+  mind a hat invariánson átment (egy független ellenőrzés mérte, és saját injekcióval is: minden
+  akkori invariánson átment, egy stream alapú és egy két fájlra bontott, író segédfüggvényes
+  változattal együtt; a számok: research `2026-09-25-kepernyokep-vedelem-hatokor.md` 9. szekció). A
   javítás a puszta együttes jelenlétre épül, a kép formátumától függetlenül, az alább felsorolt
   írási utakon (az "írás módjától függetlenül" megfogalmazás túlzó volt, lásd a hatodik
   bejegyzést): egy
@@ -1172,13 +1170,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   opciót sem használhatja; mindaz, amit ez a kör importál (workspace csomagon át is), szintén nem
   hivatkozhat lemezre író modulra, a lefedettségi fixtúra (`coverage-fixture.ts`) kimondott
   kivételével; a Playwright `use` képernyőkép opciója `off`-tól eltérő értékkel, és a CLI
-  alparancsa shell scriptből önmagában tilos. A három injekció utána a `test` kapun bukik (1/7), a
-  jogos, memóriában mérő pixel tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét tizenegy
-  szintetikus eseten futtatta. **Pontosítás (2026-09-25):** az eredeti "egy gyengítése maga is
-  bukik" mondat túlzó volt: egy független ellenőrzés tizennégy gyengítéséből ötöt a tizenegy eset
-  nem fogott (a `Bun.write`, a `saveAs` és az `fs/promises` törlése, a képösszehasonlító assertion
-  minta törlése, és az opció értékének `'on'`-ra szűkítése), és az (1) invariáns régi alakjára
-  állítása a három injekcióval zöld maradt. Mindkettő javítva, lásd a következő bejegyzést.
+  alparancsa shell scriptből önmagában tilos. A három injekció utána a `test` kapun bukik, a
+  jogos, memóriában mérő pixel tesztek zöldek; a hetedik invariáns az ellenőrzés függvényét
+  szintetikus eseteken futtatta. **Pontosítás (2026-09-25):** az eredeti "egy gyengítése maga is
+  bukik" mondat túlzó volt: egy független ellenőrzés gyengítései közül néhányat az akkori
+  szintetikus esetek nem fogtak (a `Bun.write`, a `saveAs` és az `fs/promises` törlése, a
+  képösszehasonlító assertion minta törlése, és az opció értékének `'on'`-ra szűkítése), és az (1)
+  invariáns régi alakjára állítása a három injekcióval zöld maradt. Mindkettő javítva, lásd a
+  következő bejegyzést.
   **A bejegyzés nyitott pontja lezárva (user döntés 2026-09-25):** a Node beépített moduljain
   kívüli író csomag (például egy új függőség) és a szándékos elrejtés (a hívás vagy a modul nevének
   futásidejű összerakása) szándékos megkerülés, elfogadott korlát; a lista a hatodik bejegyzésben.
@@ -1200,13 +1199,13 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   `apps/web/playwright.config.ts` a korábbi `on-first-retry` módot megtartva, képernyőkép nélkül
   maradt zöld (`{ mode: 'on-first-retry', screenshots: false }`; `retries: 0` mellett nem is
   rögzített; 2026-09-25 óta `'off'`, lásd a hatodik bejegyzést). A hetedik invariáns akkor
-  harmincnégy esetet futtatott, és egy új, nyolcadik invariáns a saját forrásából ellenőrizte,
-  hogy az (1) törzse a hetedik által igazolt függvényt futtatja a commitolt fán (2026-09-25 óta
-  törölve, lásd a hetedik bejegyzést). Igazolva: mind az
-  öt kerülő út (a trace két alakkal, hat injekció) egyenként a `test` kapun bukott (1/8), a régi
-  alakon mind zöld volt (7/7); harminchárom gyengítés (a független ellenőrzés öt nem fogott
-  gyengítésével és az akkori lezárások gyengítéseivel együtt) mind bukott a hetedik invariánson,
-  és az (1) régi alakra állítása a három injekcióval a nyolcadikon bukott. A bejegyzés idején
+  szintetikus esetek egy bővített halmazát futtatta, és egy új, nyolcadik invariáns a saját
+  forrásából ellenőrizte, hogy az (1) törzse a hetedik által igazolt függvényt futtatja a commitolt
+  fán (2026-09-25 óta törölve, lásd a hetedik bejegyzést). Igazolva: mind az öt kerülő út (a trace
+  két alakkal) egyenként a `test` kapun bukott, a régi alakon mind zöld volt; a gyengítések (a
+  független ellenőrzés nem fogott gyengítéseivel és az akkori lezárások gyengítéseivel együtt) mind
+  bukottak a hetedik invariánson, és az (1) régi alakra állítása a három injekcióval a nyolcadikon
+  bukott (a darabszámok: research `2026-09-25-kepernyokep-vedelem-hatokor.md` 9. szekció). A bejegyzés idején
   nyitva maradt a fenti nyitott pont két tétele és a Playwright videó felvétele; mindhármat a
   2026-09-25-i user döntés zárta le, lásd a hatodik bejegyzést. Forrás: `tooling/scripts`
   CLAUDE.md `## Fájlok` táblázat, a spec fájl fejléce és a (7) esetei.
@@ -1229,9 +1228,9 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   kivétel lista gyengítése a hetedik invariáns esetein bukik. **Pontosítás (2026-09-25):** az
   akkori "egyik kihagyása sem marad észrevétlen" állítás hamis volt: a lenyomat csak a rögzített
   blokkokat fedte, tehát például a (6) kihagyása és a segédfüggvényeken át végzett gyengítés
-  észrevétlen maradt; a (8) és a (9) azóta törölve, lásd a hetedik bejegyzést. Mérve: a harmincöt egy pontú gyengítés mind bukik, AST elemzés egyikhez sem
-  kellett; a kilenc injekció az (1)-en bukik, a régi alakon közülük hét zöld volt, kettőt azon nem
-  futtattunk (`docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 6. szekció). **Pontosítás:**
+  észrevétlen maradt; a (8) és a (9) azóta törölve, lásd a hetedik bejegyzést. Mérve: az egy pontú gyengítések mind bukik, AST elemzés egyikhez sem
+  kellett; az injekciók az (1)-en bukik, a régi alakon közülük a legtöbb zöld volt, néhányat azon
+  nem futtattunk (a darabszámok és a tábla: `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 6. szekció). **Pontosítás:**
   a `741f63e` óta használt "a formátumtól és az írás módjától függetlenül" megfogalmazás túlzó volt;
   a védelem a kép formátumától független, az írás módjától csak a felsorolt utakon (a Node
   `fs`, `fs/promises` és `child_process` modulja string literálként megnevezve, `Bun.write`,
@@ -1250,7 +1249,7 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   megvalósítás nem: a kapu minden commitolt kódfájlt olvasott, a termékkódot is, és ártatlan
   termékbeli alakok bukást adtak (egy naplózási szint `trace` kulcsa, egy MIME térkép `video`
   kulcsa, egy Vitest pillanatkép assertion, egy `'screenshot'` literál, egy kommentben álló
-  képernyőkép hívás; az utolsó a mérésünkben 31 fájlt jelölt meg). A javítás: a termékkód csak
+  képernyőkép hívás; az utolsó a mérésünkben sok fájlt jelölt meg). A javítás: a termékkód csak
   Playwright importtal vizsgált (a pontos határ a második bejegyzésben), és a pillanatkép
   assertion (`toMatchSnapshot`) író minta lett, nem közvetlen: egy unit teszt szöveges
   pillanatképe nem jelez, a képernyőkép körben viszont bukik. **Kimondott következmény:** egy
@@ -1262,35 +1261,45 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   párjára is feloldódik, a telepített Playwright betöltő sorrendjében. **A (8) és a (9)
   törölve:** egy komment, egy átnevezés vagy egy új jogos (7) eset is bukást adott, az üzenet
   csak egy lenyomat volt teendő nélkül, a jogos javítás és a gyengítés ugyanaz a lépés volt (a
-  lenyomat bemásolása), és a segédfüggvényeken át nem is védett (öt saját gyengítés zöld
-  maradt). A (7) marad a viselkedés önellenőrzése; a teszt saját gyengítése code review kérdés
-  (harmadik elvi korlát, a második bejegyzésben). Mérve: a hat hamis pozitív injekció a régi
-  alakon mind bukott, az újon mind zöld; a korábbi tizennyolc kerülő út és a három új rés az (1)
-  invariánson bukik, a három új rés a régi alakon zöld volt; az új kód nyolc egy pontú
-  gyengítése a (7)-en bukik. Forrás: `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 7. szekció, `tooling/scripts` CLAUDE.md `## Fájlok` táblázat.
+  lenyomat bemásolása), és a segédfüggvényeken át nem is védett (saját gyengítések zöld
+  maradtak). A (7) marad a viselkedés önellenőrzése; a teszt saját gyengítése code review kérdés
+  (harmadik elvi korlát, a második bejegyzésben). Mérve: a hamis pozitív injekciók a régi
+  alakon mind bukottak, az újon mind zöldek; a korábbi kerülő utak és a három új rés az (1)
+  invariánson bukik, a három új rés a régi alakon zöld volt; az új kód egy pontú gyengítései a
+  (7)-en bukik (a darabszámok és a tábla: 7.4 szekció). Forrás:
+  `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 7. szekció, `tooling/scripts` CLAUDE.md
+  `## Fájlok` táblázat.
 - **A Chrome headless képernyőkép kapcsolója (2026-10-17, javítva).** A `--screenshot` kapcsoló shell
   scriptből és Node-ból (`execFileSync`) átment, mert a CLI minta a `playwright` szót is kereste; ma a
   szótól függetlenül tiltott minden vizsgált fájlban és `package.json` scriptben, a (7) esetei mindkét
-  irányt őrzik. **Nyitva:** a `page.pdf({ path })` a tiltásban nincs nevesítve, addig a kapu átengedi; a
-  user hatóköri döntése zárja le (`docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`).
+  irányt őrzik.
+- **Az oldal PDF mentése is lemezre írt kép (2026-10-17, user döntés: "Igen, tiltsuk.").** A
+  `page.pdf({ path })` és a Chrome headless `--print-to-pdf` kapcsolója átment a kapun, mert a
+  tiltásban nem volt nevesítve. Ma a `page.pdf` hívás a képernyőkép hívással azonos körbe esik (a
+  `path` kulcs minden alakja és az író utak rá is vonatkoznak), a `--print-to-pdf` kapcsoló pedig a
+  `--screenshot` mintáját követi: a `playwright` szótól függetlenül tiltott minden vizsgált fájlban,
+  shell scriptben, YAML lépésben és `package.json` scriptben. A jogos eset, a `page.pdf()` író
+  hívás nélkül (a PDF a memóriában marad), továbbra is átmegy. Az injekciók, a gyengítések és a források:
+  `docs/research/2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció. **Nyitva:** a Playwright CLI
+  `pdf` alparancsa és a CDP `Page.printToPDF` metódusa a tiltásban nincs nevesítve, a hatókörüket a
+  döntés nem mondja ki. Addig a kapu mindkettőt átengedi; a user hatóköri döntése zárja le.
 - **A `fitView` prop kizárólag a KEZDETI nézetre szól.** A beállítás panel megnyitása után a vászon
   keskenyebb lesz, a nézet viszont a régi nagításon marad, tehát a gráf jobb széle levágódik - ez
   adta a "két csomópont ránagyítva" képet. A képernyőkép készítés ezért a panel megnyitása UTÁN
   nyomja meg a React Flow saját "Fit View" vezérlő gombját, és a záró állítása mérhető: nulla
   csomópont lóg ki a vászon befoglaló dobozából (`showcase-graph.ts`, `countNodesOutsideCanvas`).
 - **A React Flow `minZoom` alapértelmezése 0.5, ezért a fixtúra szélessége felső korlátos.** Egy
-  1440x900-as ablakban, nyitott panel mellett a vászon 1013 pixel széles, tehát 1842 pixelnél
+  1440x900-as ablakban, nyitott panel mellett a vászon keskenyebb, tehát egy bizonyos szélességnél
   szélesebb gráfot a `fitView` már nem tud beilleszteni: a `minZoom`-on megáll. A bemutató fixtúra
-  emiatt négy oszlop széles (1582 pixel). Számítás és mérés:
-  `docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció.
+  emiatt négy oszlop széles. A mért vászonszélesség, a határ és a fixtúra szélessége, számítással
+  és méréssel: `docs/research/2026-09-09-graf-el-vonal-meres.md` 6. szekció.
 - **A kifestett vonal pixel mérése mérési szondát igényel, ha a kivágat nagyobb egy tenyérnyi üres
   területnél.** A React Flow háttér pontmintáját és a csomópont kártyák árnyékát a HÁTTÉRSZÍNNEL
   festő (tehát hibás) él is eltakarja, tehát az elrejtésekor újra előbukkannak, és ez önmagában
-  eltérést ad: mérve a hibás állapot 25-ig felment, miközben az ép állapot 16-ról indult, azaz a
-  két tartomány átfedett és a mérés nem döntött. A szonda mindkét képernyőképen eltünteti a nem
-  egyenletes hátteret (a pontmintát `display: none`, a kártyákat és a paneleket
-  `visibility: hidden` alá); ezzel a hibás állapot 3-ig, az ép 15-től felfelé megy, és a küszöb
-  mért szám lehet. `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
+  eltérést ad: mérve a hibás és az ép állapot tartománya átfedett, tehát a mérés nem döntött. A
+  szonda mindkét képernyőképen eltünteti a nem egyenletes hátteret (a pontmintát `display: none`,
+  a kártyákat és a paneleket `visibility: hidden` alá); ezzel a két tartomány szétvált, és a küszöb
+  mért szám lehet (a tartományok a hivatkozott szekcióban). `visibility` és nem `display`, mert az utóbbi a React Flow méret figyelőjén át
   elmozdíthatná az éleket a két felvétel között
   (`docs/research/2026-09-09-graf-el-vonal-meres.md` 7. szekció).
 - **A számokat előállító mérő eszköz is a repóba tartozik, nem csak a képkészítő.** A
