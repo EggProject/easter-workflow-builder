@@ -117,12 +117,22 @@ const BRANCH_DECISIONS: ReadonlyMap<string, readonly BranchDecision[]> = new Map
 
 const TOGGLE_SELECTOR = 'button[aria-label="Minden bejárt ág kiemelése"]';
 
+/**
+ * A vászon `onNodeClick` propjának hívásai, tesztenként ürítve.
+ */
+const clickedNodes: WorkflowNodeInput[] = [];
+
+function recordNodeClick(workflowNode: WorkflowNodeInput): void {
+  clickedNodes.push(workflowNode);
+}
+
 describe('RunGraphCanvas', () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
     capturedProperties.length = 0;
+    clickedNodes.length = 0;
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -138,14 +148,26 @@ describe('RunGraphCanvas', () => {
 
   function renderCanvas(nodes: readonly GraphNodeCardData[] = NODES): void {
     act(() => {
-      root.render(<RunGraphCanvas nodes={nodes} edges={[EDGE]} branchDecisionsByNodeId={NO_DECISIONS} />);
+      root.render(
+        <RunGraphCanvas
+          nodes={nodes}
+          edges={[EDGE]}
+          branchDecisionsByNodeId={NO_DECISIONS}
+          onNodeClick={recordNodeClick}
+        />,
+      );
     });
   }
 
   function renderBranchCanvas(): void {
     act(() => {
       root.render(
-        <RunGraphCanvas nodes={BRANCH_NODES} edges={BRANCH_EDGES} branchDecisionsByNodeId={BRANCH_DECISIONS} />,
+        <RunGraphCanvas
+          nodes={BRANCH_NODES}
+          edges={BRANCH_EDGES}
+          branchDecisionsByNodeId={BRANCH_DECISIONS}
+          onNodeClick={recordNodeClick}
+        />,
       );
     });
   }
@@ -171,6 +193,40 @@ describe('RunGraphCanvas', () => {
   it('az elementsSelectable prop hamis', () => {
     renderCanvas();
     expect(lastCapturedProperties().elementsSelectable).toBe(false);
+  });
+
+  function nodeElement(): HTMLElement {
+    const element = container.querySelector<HTMLElement>('[data-testid="rf__node-n1"]');
+    if (element === null) {
+      throw new Error('a teszt nem talált csomópont elemet');
+    }
+    return element;
+  }
+
+  describe('a csomópontra kattintás (SPEC-008 6.3, O-39, AC19, AC118)', () => {
+    it('a valódi könyvtár kattintás útja a csomópont pillanatkép szerinti alakját adja a hívónak', () => {
+      renderCanvas();
+      act(() => {
+        nodeElement().click();
+      });
+      expect(clickedNodes).toEqual([START_NODE]);
+    });
+
+    it('a kattintás után a csomópont nem lesz kijelölt, és se kijelölhető, se húzható osztályt nem kap', () => {
+      renderCanvas();
+      act(() => {
+        nodeElement().click();
+      });
+      expect(nodeElement().classList.contains('selected')).toBe(false);
+      expect(nodeElement().classList.contains('selectable')).toBe(false);
+      expect(nodeElement().classList.contains('draggable')).toBe(false);
+      const properties = lastCapturedProperties();
+      expect([properties.nodesDraggable, properties.nodesConnectable, properties.elementsSelectable]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+    });
   });
 
   it('a pillanatkép csomópontjaiból és éleiből épít, a kártya adatát továbbadva', () => {
@@ -282,7 +338,12 @@ describe('RunGraphCanvas', () => {
     it('döntés nélkül egyik él sem kap osztályt', () => {
       act(() => {
         root.render(
-          <RunGraphCanvas nodes={BRANCH_NODES} edges={BRANCH_EDGES} branchDecisionsByNodeId={NO_DECISIONS} />,
+          <RunGraphCanvas
+            nodes={BRANCH_NODES}
+            edges={BRANCH_EDGES}
+            branchDecisionsByNodeId={NO_DECISIONS}
+            onNodeClick={recordNodeClick}
+          />,
         );
       });
       expect(highlightedEdgeIds()).toEqual([]);
@@ -299,6 +360,7 @@ describe('RunGraphCanvas', () => {
             nodes={BRANCH_NODES}
             edges={[...BRANCH_EDGES, KEYLESS_BRANCH_EDGE]}
             branchDecisionsByNodeId={NO_DECISIONS}
+            onNodeClick={recordNodeClick}
           />,
         );
       });
@@ -312,6 +374,7 @@ describe('RunGraphCanvas', () => {
             nodes={BRANCH_NODES}
             edges={[...BRANCH_EDGES, KEYLESS_BRANCH_EDGE]}
             branchDecisionsByNodeId={BRANCH_DECISIONS}
+            onNodeClick={recordNodeClick}
           />,
         );
       });

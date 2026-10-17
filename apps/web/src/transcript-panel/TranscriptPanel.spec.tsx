@@ -173,6 +173,7 @@ describe('TranscriptPanel', () => {
           stepRuns={stepRuns}
           runStatus={runStatus}
           persistedStreamDeltas={hasPersistedStreamDeltas}
+          isFiltered={false}
         />,
       );
     });
@@ -260,6 +261,24 @@ describe('TranscriptPanel', () => {
       expect(list().querySelectorAll('[role="listitem"]')).toHaveLength(0);
     },
   );
+
+  it('szűkített nézetben (isFiltered) a lezárt futás üres listája a kiválasztott tételekről szól (SPEC-008 6.3, O-39)', () => {
+    act(() => {
+      root.render(
+        <TranscriptPanel
+          transcript={transcriptOf([], true)}
+          stepRuns={[]}
+          runStatus="succeeded"
+          persistedStreamDeltas
+          isFiltered
+        />,
+      );
+    });
+
+    expect(container.querySelector('.transcript-panel__empty')?.textContent).toBe(
+      'A kiválasztott tételeknek nincs eseménye.',
+    );
+  });
 
   it('a még tartó futás első eseménye után a várakozás jelzés eltűnik', () => {
     renderPanel(transcriptOf([], true));

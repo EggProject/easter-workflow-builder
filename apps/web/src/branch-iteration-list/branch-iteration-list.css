@@ -1,0 +1,49 @@
+/* A `fan_out` ágainak és a `loop` iterációinak tételes listája (SPEC-008
+   6.3, O-39, user döntés 2026-10-17) a transcript sáv tetején, a
+   transcript fölött, a `.run-view-screen__transcript-content` flex
+   oszlopában (`run-view.css`).
+   DOBOZ NÉLKÜLI, MEGNEVEZETT CSOPORT: se szegély, se lekerekítés, se saját
+   háttér, mert a transcript sávban áll, és a card in card tilos
+   (`.claude/CLAUDE.md` 11. szekció). Minden szín, betű és térköz design
+   system token.
+
+   A MAGASSÁG. A lista és a transcript panel (`.transcript-panel { flex: 1 }`)
+   ugyanazzal a `flex: 1 1 0` értékkel osztozik a sáv magasságán, a lista
+   viszont legfeljebb a saját tartalmának magasságát kapja
+   (`max-height: max-content`): rövid listánál a maradék a transcripté, hosszú
+   listánál a kettő egyenlően osztozik, és a lista a design system
+   `.data-table-scroll` görgető régiójában görget (`data-table.css`:
+   `flex: 1 1 auto; min-height: 0; overflow: auto`). Kitalált pixel szám nincs;
+   a mérés: `docs/research/2026-10-17-ag-iteracio-lista.md`. */
+.branch-iteration-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  max-height: max-content;
+  min-height: 0;
+  gap: var(--ep-space-2);
+  margin-bottom: var(--ep-space-4);
+}
+
+.branch-iteration-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ep-space-2);
+}
+
+/* A cím a jóváhagyás kártya címének tokenje (`approval-prompt.css`
+   `.approval-prompt-card__title`), ugyanabban a sávban. */
+.branch-iteration-list__title {
+  margin: 0;
+  font: var(--ep-text-h4);
+  color: var(--ep-fg);
+}
+
+/* A szűkítés kimondása: a transcript panel halvány kis szövegének mintája
+   (`transcript-panel.css` `.transcript-panel__status`). */
+.branch-iteration-list__note {
+  margin: 0;
+  font: var(--ep-text-small);
+  color: var(--ep-fg-muted);
+}

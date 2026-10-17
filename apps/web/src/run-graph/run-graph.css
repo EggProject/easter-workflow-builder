@@ -12,28 +12,6 @@
   min-height: 0;
 }
 
-/* AZ AL-WORKFLOW GOMB KATTINTHATÓSÁGA A CSAK OLVASHATÓ VÁSZNON.
-
-   A mért állapot, amit ez javít: a React Flow a csomópont doboznak INLINE
-   `pointer-events` értéket ad, és az `all` helyett `none` jár neki, ha a node
-   se nem húzható, se nem kiválasztható, és nincs rajta kattintás kezelő
-   (`@xyflow/react` 12.11.6 `dist/esm/index.mjs`: `pointerEvents:
-   hasPointerEvents ? 'all' : 'none'`, ahol a `hasPointerEvents` az
-   `isSelectable || isDraggable || onClick || onMouseEnter || onMouseMove ||
-   onMouseLeave` értéke). A futás nézet vászna PONTOSAN ilyen (AC19), tehát a
-   `sub_workflow` csomópont gombja kattintásra nem reagált (a mérés leírása:
-   `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`,
-   "Áthelyezett mérési próza" szekció).
-
-   Miért a gombon, és miért nem a node dobozon: az inline stílust egy osztály
-   szintű szabály csak `!important`-tal tudná felülírni, egy LESZÁRMAZOTT
-   explicit `pointer-events: auto` értéke viszont a CSS szabályai szerint
-   önmagában visszaadja a találati tesztet, az ős `none` értéke ellenére.
-   Regresszió: `apps/web/e2e/run-view.spec.ts`. */
-.run-graph-canvas .react-flow__node .btn {
-  pointer-events: auto;
-}
-
 /* A KIEMELT ÁG ÉLE (SPEC-008 6.6, O-26). A `branch` csomópont választott
    ágának éle a design system kiemelő színével és vastagabb vonallal fest, hogy
    ne csak a szín hordozza az információt. A szín a `--ep-accent` token, ugyanaz,
