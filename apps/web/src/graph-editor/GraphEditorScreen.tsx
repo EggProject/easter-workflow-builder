@@ -42,6 +42,7 @@ import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { createGraphNode } from './create-graph-node.ts';
 import { deleteNodeWithEdges } from './delete-node-with-edges.ts';
+import { formatUndoShortcutLabels } from './format-undo-shortcut-labels.ts';
 import {
   closeGraphEditSession,
   recordGraphEdit,
@@ -56,7 +57,9 @@ import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.t
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
 import { isGraphDirty } from './is-graph-dirty.ts';
+import { resolveUndoModifier, type UndoModifier } from './resolve-undo-modifier.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
+import { getBrowserLocalStorage, readUndoModifierPreference } from './undo-modifier-storage.ts';
 import { useIsFooterCompact } from './use-is-footer-compact.ts';
 import { useUndoRedoShortcut } from './use-undo-redo-shortcut.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
@@ -202,13 +205,6 @@ function RedoIcon(): ReactElement {
     </svg>
   );
 }
-
-/**
- * A két gomb tippjének billentyű jelölése (SPEC-008 5.10). A módosító a
- * PLAN-009 T-009-58 lépéséig a `Ctrl`.
- */
-const UNDO_SHORTCUT_LABEL = 'Ctrl+Z';
-const REDO_SHORTCUT_LABEL = 'Ctrl+Shift+Z / Ctrl+Y';
 
 /**
  * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
@@ -481,7 +477,14 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   const handleHistoryStep = useCallback((action: UndoShortcutAction): void => {
     setHistory(stepGraphEditHistory(action));
   }, []);
-  useUndoRedoShortcut(handleHistoryStep, isSaving);
+  // A módosító (Cmd vagy Ctrl) a képernyő betöltésekor olvasott beállításból
+  // és a felhasználói ügynökből áll elő (SPEC-008 5.10, O-31); a tipp is ezt
+  // mutatja.
+  const [undoModifier] = useState<UndoModifier>(() =>
+    resolveUndoModifier(readUndoModifierPreference(getBrowserLocalStorage), globalThis.navigator.userAgent),
+  );
+  const undoShortcutLabels = formatUndoShortcutLabels(undoModifier);
+  useUndoRedoShortcut(handleHistoryStep, isSaving, undoModifier);
 
   // Ha a kiválasztott csomópont nincs a dokumentumban (a visszavonás vagy az
   // újra elvégzés kivette), a kiválasztás megszűnik, és a panel bezárul
@@ -719,7 +722,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
             előtt (SPEC-008 5.10): ikon gomb, a neve az `aria-label`, a tipp a
             billentyűt mutatja. Üres listánál és betöltés vagy mentés alatt
             tiltott. */}
-        <Tooltip content="Visszavonás" shortcut={UNDO_SHORTCUT_LABEL}>
+        <Tooltip content="Visszavonás" shortcut={undoShortcutLabels.undo}>
           <Button
             type="button"
             size="sm"
@@ -734,7 +737,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
             <UndoIcon />
           </Button>
         </Tooltip>
-        <Tooltip content="Újra" shortcut={REDO_SHORTCUT_LABEL}>
+        <Tooltip content="Újra" shortcut={undoShortcutLabels.redo}>
           <Button
             type="button"
             size="sm"

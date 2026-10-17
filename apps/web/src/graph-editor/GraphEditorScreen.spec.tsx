@@ -4,13 +4,14 @@ import { ReplaceGraphRequestSchema, type WorkflowNodeInput } from '@easter-workf
 import type { useStoreApi } from '@xyflow/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
 import { GraphEditorScreen } from './GraphEditorScreen.tsx';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
+import { UNDO_MODIFIER_STORAGE_KEY } from './undo-modifier-storage.ts';
 
 /**
  * A `GraphEditorCanvas` mockolva: ez a spec a `GraphEditorScreen` SAJÁT
@@ -279,15 +280,28 @@ const pendingPutFetchFunction: FetchFunction = (input, init) =>
       })
     : createFetchFunction({ putBodies: [], graphGetCount: 0 })(input, init);
 
+/**
+ * A két felhasználói ügynök szöveg: az `auto` beállítás ezek alapján dönt a
+ * módosítóról (SPEC-008 5.10, O-31). A teszt minden futásban kifejezetten
+ * rögzíti az értéket, mert a happy-dom saját ügynöke a futtató gép
+ * platformjától függ.
+ */
+const NON_MACOS_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
+const MACOS_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
+
 describe('GraphEditorScreen', () => {
   let container: HTMLDivElement;
   let root: Root;
+  let userAgentSpy: MockInstance<() => string>;
   const navigate = vi.fn();
 
   beforeEach(() => {
     capturedCanvasProperties.length = 0;
     capturedStoreApis.length = 0;
     navigate.mockClear();
+    userAgentSpy = vi.spyOn(globalThis.navigator, 'userAgent', 'get').mockReturnValue(NON_MACOS_USER_AGENT);
     // A perzisztált elrendezés arány tesztek közötti átszivárgásának
     // megelőzése: a `Resizable` a csatoláskor is jelent, tehát minden
     // renderelés ír a kulcsra.
@@ -302,6 +316,7 @@ describe('GraphEditorScreen', () => {
       root.unmount();
     });
     container.remove();
+    userAgentSpy.mockRestore();
   });
 
   async function renderScreen(search: string, fetchFunction: FetchFunction): Promise<void> {
@@ -323,6 +338,21 @@ describe('GraphEditorScreen', () => {
 
   function buttonNamed(name: string): HTMLButtonElement {
     return footerButtonNamed(container, name);
+  }
+
+  async function renderWithTwoMoves(): Promise<void> {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+    moveStartNode(99);
+    moveStartNode(150);
+  }
+
+  function focusTooltipShortcut(name: string): string | undefined {
+    const button = buttonNamed(name);
+    act(() => {
+      button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    });
+    return container.querySelector(':scope .page-footer [role="tooltip"]:not([hidden]) kbd')?.textContent ?? undefined;
   }
 
   function clickButton(name: string): void {
@@ -1444,6 +1474,78 @@ describe('GraphEditorScreen', () => {
       expect(buttonNamed('Mentés...').disabled).toBe(true);
       expect(buttonNamed('Visszavonás').disabled).toBe(true);
       expect(buttonNamed('Újra').disabled).toBe(true);
+    });
+  });
+
+  describe('a visszavonás módosító billentyűje (SPEC-008 5.10, O-31, AC113)', () => {
+    it('macOS felhasználói ügynökkel és üres tárolóval a Cmd+Z visszavon, a Ctrl+Z nem, a tipp a Cmd alakot mutatja', async () => {
+      userAgentSpy.mockReturnValue(MACOS_USER_AGENT);
+      await renderWithTwoMoves();
+
+      const ctrlEvent = pressShortcut({ key: 'z', ctrlKey: true });
+      expect(ctrlEvent.defaultPrevented).toBe(false);
+      expect(canvasPositionOf('n-1')).toBe(150);
+
+      const metaEvent = pressShortcut({ key: 'z', metaKey: true });
+      expect(metaEvent.defaultPrevented).toBe(true);
+      expect(canvasPositionOf('n-1')).toBe(99);
+      pressShortcut({ key: 'y', metaKey: true });
+      expect(canvasPositionOf('n-1')).toBe(150);
+      pressShortcut({ key: 'z', metaKey: true });
+      pressShortcut({ key: 'Z', metaKey: true, shiftKey: true });
+      expect(canvasPositionOf('n-1')).toBe(150);
+
+      expect(focusTooltipShortcut('Visszavonás')).toBe('Cmd+Z');
+    });
+
+    it('macOS felhasználói ügynökkel a Újra gomb tippje a Cmd alakot mutatja', async () => {
+      userAgentSpy.mockReturnValue(MACOS_USER_AGENT);
+      await renderWithTwoMoves();
+      clickButton('Visszavonás');
+
+      expect(focusTooltipShortcut('Újra')).toBe('Cmd+Shift+Z / Cmd+Y');
+    });
+
+    it('macOS felhasználói ügynökkel és tárolt ctrl értékkel a Ctrl+Z visszavon, a Cmd+Z nem, a tipp a Ctrl alakot mutatja', async () => {
+      userAgentSpy.mockReturnValue(MACOS_USER_AGENT);
+      globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, 'ctrl');
+      await renderWithTwoMoves();
+
+      const metaEvent = pressShortcut({ key: 'z', metaKey: true });
+      expect(metaEvent.defaultPrevented).toBe(false);
+      expect(canvasPositionOf('n-1')).toBe(150);
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(focusTooltipShortcut('Visszavonás')).toBe('Ctrl+Z');
+    });
+
+    it('nem macOS felhasználói ügynökkel és üres tárolóval a Ctrl+Z visszavon, a Cmd+Z nem', async () => {
+      await renderWithTwoMoves();
+
+      pressShortcut({ key: 'z', metaKey: true });
+      expect(canvasPositionOf('n-1')).toBe(150);
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
+    });
+
+    it('nem macOS felhasználói ügynökkel és tárolt meta értékkel a Cmd+Z visszavon, a Ctrl+Z nem, a tipp a Cmd alakot mutatja', async () => {
+      globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, 'meta');
+      await renderWithTwoMoves();
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(150);
+      pressShortcut({ key: 'z', metaKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(focusTooltipShortcut('Visszavonás')).toBe('Cmd+Z');
+    });
+
+    it('hibás tárolt érték az Automatikus szerint dönt: nem macOS felhasználói ügynökkel a Ctrl+Z visszavon', async () => {
+      globalThis.localStorage.setItem(UNDO_MODIFIER_STORAGE_KEY, 'cmd');
+      await renderWithTwoMoves();
+
+      pressShortcut({ key: 'z', ctrlKey: true });
+      expect(canvasPositionOf('n-1')).toBe(99);
     });
   });
 });
