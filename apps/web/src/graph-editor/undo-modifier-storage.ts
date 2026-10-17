@@ -21,7 +21,7 @@ export const DEFAULT_UNDO_MODIFIER_PREFERENCE: UndoModifierPreference = 'auto';
  * a kész objektumot, hanem az elérés módját adja át, és az elérés is a
  * `try`/`catch` védelme alatt fut.
  */
-export type UndoModifierStorageAccessor = () => Pick<Storage, 'getItem'>;
+export type UndoModifierStorageAccessor = () => Pick<Storage, 'getItem' | 'setItem'>;
 
 /**
  * A böngésző `localStorage` tárolója, a `UndoModifierStorageAccessor` alakban.
@@ -45,4 +45,21 @@ export function readUndoModifierPreference(getStorage: UndoModifierStorageAccess
     // az alapértelmezés áll be.
   }
   return isUndoModifierPreference(stored) ? stored : DEFAULT_UNDO_MODIFIER_PREFERENCE;
+}
+
+/**
+ * A beállítás elmentése. A `try`/`catch` itt is kötelező, ugyanazzal az
+ * indokkal: a `setItem` privát ablakban, letiltott tárolás mellett és tele
+ * kvóta esetén is dobhat. A mentés elmaradása nem hiba a felhasználó felé,
+ * csak annyit jelent, hogy a következő betöltés az alapértelmezéssel indul.
+ */
+export function storeUndoModifierPreference(
+  getStorage: UndoModifierStorageAccessor,
+  preference: UndoModifierPreference,
+): void {
+  try {
+    getStorage().setItem(UNDO_MODIFIER_STORAGE_KEY, preference);
+  } catch {
+    // Szándékosan elnyelt: a perzisztálás legjobb szándékú, nem kötelező.
+  }
 }
