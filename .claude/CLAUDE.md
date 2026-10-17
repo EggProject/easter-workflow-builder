@@ -1436,15 +1436,15 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
 
 ## 14. Ellentmondás esetén
 
-**Nyitott tétel jelenleg egy van (1. tétel, lent).**
+**Nyitott tétel jelenleg nincs.**
 
-**1. tétel (2026-10-17, PLAN-009 T-009-34): a 15. szekció tiltja a nyers mért számot és a mérési narratívát, a 11. és 12. szekció PLAN-009 alatt bekerült bejegyzései mégis hordozzák.**
-
-- **Melyik két forrás mond mást.** A 15. szekció "Mi nem kerül bele" pontja (mérési narratíva és nyers számok nem kerülnek a szabálykönyvbe), kontra a 11. és a 12. szekció PLAN-009 alatt felvett bejegyzései.
-- **Az eltérés.** A 12. szekció görgetési és képernyőkép bejegyzései, valamint a 11. szekció runner és pixel bejegyzései nyers mért számokat és mérési leírást hordoznak (arányok, pixel értékek, futásidők, erőforrás adatok), a research hivatkozás mellett.
-- **Mi a viselkedés addig.** A 11. és 12. szekció bejegyzései változatlanok.
-- **Mi zárná le.** User döntés: vagy a számok research hivatkozásra cserélése, vagy a 15. szekció kivétele a buktató bejegyzésekre.
-- **Forrás.** `docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`.
+A korábban itt állt, 2026-10-17-i tétel (PLAN-009 T-009-34: a 15. szekció tiltja a nyers mért számot
+és a mérési narratívát, a 11. és 12. szekció PLAN-009 alatt bekerült bejegyzései mégis hordozták)
+2026-10-17-én lezárult: a user döntése "Research hivatkozásra". A 11. és 12. szekció bejegyzéseiből a
+nyers mért számok (arányok, pixel értékek, futásidők, darabszámok) a research fájlokba kerültek,
+vagy már ott álltak, a szabálykönyv a besorolást, a tanulságot és a hivatkozást tartja. A 15.
+szekció változatlan, kivétel nem készült. A forrás:
+`docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`.
 
 A korábban itt állt hatodik tétel (a fejlesztői REST hívás originje és a szerver CORS engedélyének
 hatóköre) 2026-09-05-én lezárult: a user termékdöntése szerint a **szerver portja `3001`**, a Vite

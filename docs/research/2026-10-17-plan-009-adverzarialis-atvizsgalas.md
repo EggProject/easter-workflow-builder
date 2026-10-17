@@ -131,34 +131,34 @@ mondata "Felülírva" jelölést kapott.
 
 Mind injekcióval igazolva egy eldobható worktree-ben (a régi teszt zöld maradt, a javított bukik).
 
-| Védelem                               | Jóhiszemű kerülő alak                                            | Súly     | Rendezés                  |
-| ------------------------------------- | ---------------------------------------------------------------- | -------- | ------------------------- |
-| greppes (15) mért geometria           | `node.measured?.width`                                           | magas    | javítva                   |
-| greppes (8) időkorlát szám            | `setTimeout(() => ..., 5000)`, `durationMs: 4000`                | magas    | javítva                   |
-| töréspont invariáns                   | `(width >= 900px)`, `767.98px`, `em`, `@container`               | magas    | javítva                   |
-| `playwright-worker-limit`             | `playwright test --workers=6` scriptben                          | magas    | javítva                   |
-| `e2e-coverage-threshold`              | `.nycrc.json` `exclude` listával (az `apps` mappában is)         | magas    | javítva                   |
-| `browser-safe-imports`                | workspace csomag a `devDependencies` alatt                       | magas    | javítva                   |
-| greppes (19) `rf__` locator           | `getByTestId(KONST)`, regex, `[data-testid="foo"]`               | közepes  | javítva                   |
-| greppes (20) kézi időzítés            | `setInterval` pollozás                                           | közepes  | javítva                   |
-| greppes (8) origin                    | `127.0.0.1`, `[::1]`, `:3001`                                    | közepes  | javítva                   |
-| greppes (13) proxy időkorlát          | `proxyTimeout`                                                   | közepes  | javítva                   |
-| greppes (5) `EventSource`             | `new globalThis.EventSource(`                                    | közepes  | javítva                   |
-| greppes (6) Navigation API            | csupasz `navigation.addEventListener`                            | közepes  | javítva                   |
-| greppes (14) dagre opciók             | `ranker`/`align` felülírás                                       | közepes  | javítva (pozitív lista)   |
-| greppes (22) kártya méret             | `max-width: 358px` CSS-ben                                       | közepes  | javítva                   |
-| greppes (11), (12) `package.json`     | tiltott függőség a `packages/ui` manifesztjében                  | közepes  | javítva                   |
-| `run-view-layout-band`                | `matchMedia('(min-width: 900px)')` más fájlban                   | közepes  | új (24) invariáns         |
-| `topnav-shell-byte-identity`          | későbbi `@media` felülírja a lánc tulajdonságot                  | közepes  | javítva                   |
-| `*-byte-identity` (hét fájl)          | a jelölő ELÉ tett, erősebb szabály                               | közepes  | javítva                   |
-| `screenshot-pipeline`                 | Chrome headless `--screenshot` shellből és `execFileSync`-ből    | közepes  | javítva                   |
-| `screenshot-pipeline`                 | `page.pdf({ path })`, `--print-to-pdf`                           | alacsony | nyitott (hatóköri döntés) |
-| greppes (17) görgetési geometria      | `getClientRects()`, `innerHeight`                                | alacsony | javítva                   |
-| greppes (18) `role="alert"`           | `role={'alert'}`                                                 | alacsony | javítva                   |
-| greppes (3) `.parse(`                 | `.parseAsync(`                                                   | alacsony | javítva                   |
-| `e2e-stream-server-free-port`         | `({ port = 4174 } = {})`                                         | alacsony | javítva                   |
-| `node-config-drift-protection`        | a `protocol` szám mezői `z.number()`, a `db` pozitív egészet vár | magas    | nyitott: O-37             |
-| `AgentDefinitionEntryFields.spec.tsx` | a három nem megerősített mezőhöz vezérlő került volna            | közepes  | új unit teszt             |
+| Védelem                               | Jóhiszemű kerülő alak                                            | Súly     | Rendezés                |
+| ------------------------------------- | ---------------------------------------------------------------- | -------- | ----------------------- |
+| greppes (15) mért geometria           | `node.measured?.width`                                           | magas    | javítva                 |
+| greppes (8) időkorlát szám            | `setTimeout(() => ..., 5000)`, `durationMs: 4000`                | magas    | javítva                 |
+| töréspont invariáns                   | `(width >= 900px)`, `767.98px`, `em`, `@container`               | magas    | javítva                 |
+| `playwright-worker-limit`             | `playwright test --workers=6` scriptben                          | magas    | javítva                 |
+| `e2e-coverage-threshold`              | `.nycrc.json` `exclude` listával (az `apps` mappában is)         | magas    | javítva                 |
+| `browser-safe-imports`                | workspace csomag a `devDependencies` alatt                       | magas    | javítva                 |
+| greppes (19) `rf__` locator           | `getByTestId(KONST)`, regex, `[data-testid="foo"]`               | közepes  | javítva                 |
+| greppes (20) kézi időzítés            | `setInterval` pollozás                                           | közepes  | javítva                 |
+| greppes (8) origin                    | `127.0.0.1`, `[::1]`, `:3001`                                    | közepes  | javítva                 |
+| greppes (13) proxy időkorlát          | `proxyTimeout`                                                   | közepes  | javítva                 |
+| greppes (5) `EventSource`             | `new globalThis.EventSource(`                                    | közepes  | javítva                 |
+| greppes (6) Navigation API            | csupasz `navigation.addEventListener`                            | közepes  | javítva                 |
+| greppes (14) dagre opciók             | `ranker`/`align` felülírás                                       | közepes  | javítva (pozitív lista) |
+| greppes (22) kártya méret             | `max-width: 358px` CSS-ben                                       | közepes  | javítva                 |
+| greppes (11), (12) `package.json`     | tiltott függőség a `packages/ui` manifesztjében                  | közepes  | javítva                 |
+| `run-view-layout-band`                | `matchMedia('(min-width: 900px)')` más fájlban                   | közepes  | új (24) invariáns       |
+| `topnav-shell-byte-identity`          | későbbi `@media` felülírja a lánc tulajdonságot                  | közepes  | javítva                 |
+| `*-byte-identity` (hét fájl)          | a jelölő ELÉ tett, erősebb szabály                               | közepes  | javítva                 |
+| `screenshot-pipeline`                 | Chrome headless `--screenshot` shellből és `execFileSync`-ből    | közepes  | javítva                 |
+| `screenshot-pipeline`                 | `page.pdf({ path })`, `--print-to-pdf`                           | alacsony | lezárva: 14. szekció    |
+| greppes (17) görgetési geometria      | `getClientRects()`, `innerHeight`                                | alacsony | javítva                 |
+| greppes (18) `role="alert"`           | `role={'alert'}`                                                 | alacsony | javítva                 |
+| greppes (3) `.parse(`                 | `.parseAsync(`                                                   | alacsony | javítva                 |
+| `e2e-stream-server-free-port`         | `({ port = 4174 } = {})`                                         | alacsony | javítva                 |
+| `node-config-drift-protection`        | a `protocol` szám mezői `z.number()`, a `db` pozitív egészet vár | magas    | nyitott: O-37           |
+| `AgentDefinitionEntryFields.spec.tsx` | a három nem megerősített mezőhöz vezérlő került volna            | közepes  | új unit teszt           |
 
 A szigorítás kimondott, szándékos ára (a független ellenőrzés mérte, ma egyik sem bukik): a (19) a
 `rf__` értéket adó segédfüggvényt, a (24) a `prefers-*` literált tartó konstanst nem engedi, a
@@ -241,8 +241,9 @@ A SPEC-008 14.2 hat tételt tart, mindegyik a "mi a viselkedés addig" és a "mi
 - **O-39** (termékdöntés): a `fan_out`/`loop` tételes lista a csomópontra kattintva.
 
 A szabálykönyv 14. szekciója új, 1. tételt kapott: a 15. szekció tiltja a nyers mért számot, a 11.
-és 12. szekció PLAN-009 alatti bejegyzései hordozzák. A 12. szekció új bejegyzése nyitva hagyja a
-`page.pdf` hatókörét. Termékdöntésként jelezve, de nem felvett tétel: a jóváhagyás panel betöltés
+és 12. szekció PLAN-009 alatti bejegyzései hordozzák. A 12. szekció új bejegyzése nyitva hagyta a
+`page.pdf` hatókörét. **A három termékdöntés (O-37, O-38, O-39), a `page.pdf` és a 14. szekció
+tétele a user 2026-10-17-i döntésével lezárult, lásd a 14. szekciót.** Termékdöntésként jelezve, de nem felvett tétel: a jóváhagyás panel betöltés
 közbeni `ProgressBar value={100}` jelzése a képernyőolvasónak 100 százalékot mond (a design system
 határozatlan változata nincs átemelve).
 
@@ -310,3 +311,25 @@ buktatók a 12. szekcióban állnak); a PLAN-009 T-009-4 történeti `react-wind
 ellenőrzött); az `approval-prompt.spec.ts` 60 pixeles pontos egyenlősége tört magasságnál
 bukhatna (ma zöld); a `form-control-typography.spec.ts` szín állítása a számított `color`-on, nem
 pixelen (bizonytalan).
+
+## 14. A user döntései (2026-10-17) és az átvezetés
+
+A döntések szövege a user szavaival, az átvezetés helye mellettük.
+
+| Tétel                                  | Döntés                       | Átvezetés                                                                                                       |
+| -------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| O-37 szám mezők szabálya               | "Mező alatti hiba."          | SPEC-008 14.1 O-37 és 5.4, PLAN-009 T-009-60                                                                    |
+| O-38 `agents` kötelező mezői           | "Üresen ne legyen menthető." | SPEC-008 14.1 O-38 és 5.4, PLAN-009 T-009-60                                                                    |
+| O-39 tételes lista a csomópontra       | "Épüljön meg most"           | SPEC-008 14.1 O-39 és 6.3, PLAN-009 T-009-61                                                                    |
+| `page.pdf({ path })`, `--print-to-pdf` | "Igen, tiltsuk."             | `screenshot-pipeline.spec.ts`, `2026-09-25-kepernyokep-vedelem-hatokor.md` 8. szekció, szabálykönyv 12.         |
+| Nyers mért számok a szabálykönyvben    | "Research hivatkozásra."     | szabálykönyv 11. és 12. szekció, 14. szekció tétele törölve; a számok a hivatkozott research szekciókban állnak |
+
+**Ami az átvezetés után nyitva maradt.** A T-009-61 (O-39) megvalósítása előtt a megjelenítés módja
+nincs rögzítve (SPEC-008 6.3), ezért a lépés megáll és kérdez. A Playwright CLI `pdf` alparancsa és
+a CDP `Page.printToPDF` metódusa a PDF tiltásban nincs nevesítve (a `2026-09-25-kepernyokep-vedelem-hatokor.md`
+8.4 szekció "Nyitva" bekezdése). A szabálykönyvben bent maradtak: a hivatalos dokumentációból származó értékek (az 5000 ms és a 30000 ms
+alapértelmezés, a futtató gépek hivatalos erőforrás adatai), a CSS és a viewport konfigurációs értékei,
+az azonosítók (futás azonosítók), valamint a `better-sqlite3` és a `@xyflow/react` verziószáma és a
+telepített forrás sorszámai két mérési leírásban (a 12. szekció SQLite elsődleges kulcs és a billentyűs
+törlés bejegyzése). Ezek nem saját mérésből származó nyers számok, de a verziószámok a szabálykönyv 7.
+szekciója szerint sem tartoznak oda; a kiváltásukról a user dönt.
