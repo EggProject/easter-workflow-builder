@@ -1,5 +1,12 @@
 // Regressziós teszt: az e2e lefedettségi küszöb KAPU MARADJON.
 //
+// IDEIGLENES ÁLLAPOT (user kérés 2026-10-17): a CI ki van kapcsolva, a
+// `.github` mappa `_github` néven áll, ezért a teszt a workflow fájlt a
+// `_github/workflows/ci.yml` útvonalon olvassa. Az invariáns (a `ci` job
+// `needs` listája tartalmazza az `e2e` jobot) a visszakapcsolásig is a
+// fájlon őrzi a küszöb kapuvá tételét. Visszakapcsoláskor az útvonalat
+// vissza kell írni `.github`-ra (`.claude/CLAUDE.md` 8. szekció).
+//
 // Megvalósítás fájl nélküli téma (`.claude/CLAUDE.md` 5. szekció, SPEC-002
 // 6.2 5. pont): a konfigurációs invariánst őrzi, nem egy exportált egységet.
 // Ugyanaz a minta, mint a `vite-istanbul-include-invariant` és a
@@ -12,7 +19,7 @@
 //      küszöbbel (enélkül a parancs csak riportál, ahogy 2026-09-05 előtt);
 //   2. az összesítő `ci` job `needs` listája tartalmazza az `e2e` jobot
 //      (enélkül az `e2e` bukása nem bukná meg a ruleset által kötelezőnek
-//      kért egyetlen státuszcsekket, tehát a küszöb nem lenne kapu).
+//      kért `CI` státuszcsekket, tehát a küszöb nem lenne kapu).
 //
 // A számok forrása és a származtatás:
 // `docs/research/2026-09-05-e2e-lefedettsegi-kuszob.md`.
@@ -38,7 +45,7 @@ function readCoverageReportScript(): string {
 }
 
 function readContinuousIntegrationWorkflow(): string {
-  return readFileSync(path.join(repoRoot(), '.github', 'workflows', 'ci.yml'), 'utf8');
+  return readFileSync(path.join(repoRoot(), '_github', 'workflows', 'ci.yml'), 'utf8');
 }
 
 describe('e2e lefedettségi küszöb invariáns', () => {
