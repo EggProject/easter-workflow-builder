@@ -18,8 +18,9 @@
 // összesítő `ci` job `needs` listájában.
 //
 // HATÓKÖR (user döntés, 2026-09-25): a védelem kizárólag a repóba commitolt
-// forráskódot olvassa, és csak a böngésző képernyőkép, a videó és a trace kép
-// lemezre írását tiltja a saját teszt- és segédkódunkban. A termék futását, az
+// forráskódot olvassa, és csak a böngésző képernyőkép, a videó és a trace kép,
+// valamint 2026-10-17 óta (user döntés) az oldal PDF mentésének lemezre írását
+// tiltja a saját teszt- és segédkódunkban. A termék futását, az
 // agentek futásidejű fájlírását (az Agent SDK eszközeivel) és a termékkód egyéb
 // fájlírását nem érinti: a termékkód (a `packages/*/src` és az `apps/*/src`
 // nem teszt fájlja) csak akkor vizsgált, ha Playwright csomagot importál
@@ -172,6 +173,8 @@ const CDP_SCREENCAST_WORD = ['start', 'Screen', 'cast'].join('');
 const SCREENCAST_WORD = ['screen', 'cast'].join('');
 const VIDEO_WORD = ['vid', 'eo'].join('');
 const CONTEXT_VIDEO_WORD = ['record', 'Video'].join('');
+const PDF_WORD = ['p', 'df'].join('');
+const PRINT_TO_PDF_WORD = ['print-to-', PDF_WORD].join('');
 
 /**
  * A `path` OPCIÓ mintája. Ez a pontos, mérhető választóvonal a szentesített
@@ -221,11 +224,15 @@ function hasPathOptionKey(content: string): boolean {
  * <https://chromedevtools.github.io/devtools-protocol/tot/Page/>), és a
  * Playwright oldal screencast objektuma (`SCREENCAST_WORD`, 2026-09-25 óta:
  * `path` opcióval videót ment, a képkocka visszahívása JPEG adatot ad, research
- * 3. szekció). A metódusok neve darabokból áll össze, mert ez a fájl maga is a
- * vizsgált halmazban van.
+ * 3. szekció), valamint 2026-10-17 óta (user döntés) az oldal PDF mentése
+ * (`PDF_WORD` hívás): a Playwright `Page.pdf` metódusa a `path` opcióval a PDF-et
+ * lemezre írja, nélküle csak a puffert adja vissza
+ * (<https://playwright.dev/docs/api/class-page#page-pdf>, research 8. szekció),
+ * tehát a képernyőkép hívással azonos szabály vonatkozik rá. A metódusok neve
+ * darabokból áll össze, mert ez a fájl maga is a vizsgált halmazban van.
  */
 const CAPTURE_CALL_PATTERN = new RegExp(
-  String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]|\b${CDP_CAPTURE_WORD}\b|\b${CDP_SCREENCAST_WORD}\b|\.${SCREENCAST_WORD}\b`,
+  String.raw`${SCREENSHOT_WORD}\(|['"]${SCREENSHOT_WORD}['"]|\b${CDP_CAPTURE_WORD}\b|\b${CDP_SCREENCAST_WORD}\b|\.${SCREENCAST_WORD}\b|\b${PDF_WORD}\(`,
 );
 
 /**
@@ -266,6 +273,23 @@ function isShellCapture(text: string): boolean {
  * ez a kapcsolónév számít, ugyanúgy, mint a `TRACE_FLAG_PATTERN` mintánál.
  */
 const SCREENSHOT_FLAG_PATTERN = new RegExp(String.raw`--${SCREENSHOT_WORD}(?![\w-])`);
+
+/**
+ * A Chrome és a Chromium headless módjának PDF kapcsolója: a `--` előtag a
+ * `PRINT_TO_PDF_WORD` szóval, érték nélkül vagy `=` jel utáni fájlnévvel. A
+ * betöltött oldalt mindig PDF fájlként menti lemezre, érték nélkül a
+ * munkakönyvtárba ("saves the target page as a PDF named output.pdf in the
+ * current working directory",
+ * <https://developer.chrome.com/docs/automation-and-testing/headless-cli>; a
+ * Chromium forrásában a `headless_command_switches.cc` `kPrintToPDF`
+ * kapcsolója és a `headless_command_handler.cc` fájlírása, research 8.
+ * szekció). Kikapcsolt értéke nincs, ezért 2026-10-17 óta (user döntés) minden
+ * előfordulása tiltott, a `SCREENSHOT_FLAG_PATTERN` mintájára: a `playwright`
+ * szótól függetlenül, kódfájlban (egy folyamatindító hívás argumentum
+ * listájában), shell scriptben, GitHub Actions YAML lépésben és `package.json`
+ * scriptben.
+ */
+const PRINT_TO_PDF_FLAG_PATTERN = new RegExp(String.raw`--${PRINT_TO_PDF_WORD}(?![\w-])`);
 
 /**
  * A Playwright `use` beállításának képernyőkép opciója bármely olyan értékkel,
@@ -567,10 +591,11 @@ function reachable(start: Iterable<string>, edges: ReadonlyMap<string, readonly 
  * - Közvetlen író: a Playwright `use` képernyőkép és videó opciója, a
  *   kontextus videó felvétele, a trace képernyőképei, a CLI a shell parancsból
  *   vagy a `package.json` scriptből (`isShellCapture`), a Chrome headless
- *   képernyőkép kapcsolója bármely vizsgált fájlban és `package.json`
- *   scriptben (`SCREENSHOT_FLAG_PATTERN`), vagy a képernyőképet készítő
- *   képösszehasonlító assertion.
- * - A KÉPERNYŐKÉP KÖR: a képernyőképet készítő fájlok, és minden fájl, ami
+ *   képernyőkép és PDF kapcsolója bármely vizsgált fájlban és `package.json`
+ *   scriptben (`SCREENSHOT_FLAG_PATTERN`, `PRINT_TO_PDF_FLAG_PATTERN`), vagy a
+ *   képernyőképet készítő képösszehasonlító assertion.
+ * - A KÉPERNYŐKÉP KÖR: a képernyőképet (2026-10-17 óta az oldal PDF mentését
+ *   is) készítő fájlok, és minden fájl, ami
  *   ezeket (közvetve is) importálja. Ezek egyike sem hivatkozhat lemezre
  *   írni képes modulra vagy hívásra, és a `path` opciót sem használhatja:
  *   a kép a hívótól a hívóig ugyanabban a körben halad.
@@ -609,10 +634,13 @@ function findScreenshotDiskWriters(trackedPaths: readonly string[], read: ReadTr
       SCREENSHOTS_OPTION_PATTERN.test(file.content) ||
       file.content.includes(SCREENSHOT_ASSERTION_CALL) ||
       SCREENSHOT_FLAG_PATTERN.test(file.content) ||
+      PRINT_TO_PDF_FLAG_PATTERN.test(file.content) ||
       (isShellPath(file.trackedPath) && isShellCapture(file.content)),
   );
   const directManifests = manifests.filter((manifest) =>
-    manifest.scriptValues.some((value) => isShellCapture(value) || SCREENSHOT_FLAG_PATTERN.test(value)),
+    manifest.scriptValues.some(
+      (value) => isShellCapture(value) || SCREENSHOT_FLAG_PATTERN.test(value) || PRINT_TO_PDF_FLAG_PATTERN.test(value),
+    ),
   );
   const capturing = files
     .filter((file) => file.trackedPath !== SANCTIONED_CAPTURE_FILE && CAPTURE_CALL_PATTERN.test(file.content))
@@ -749,7 +777,7 @@ function checkSyntheticFiles(
 }
 
 describe('a képernyőkép készítés egyetlen szentesített útja (gépi kényszer)', () => {
-  it('(1) a szentesített fájlon kívül egyetlen commitolt fájl sem ír képernyőképet vagy videót lemezre az ismert írási utakon, az import gráfon át sem', () => {
+  it('(1) a szentesített fájlon kívül egyetlen commitolt fájl sem ír képernyőképet, videót vagy PDF-et lemezre az ismert írási utakon, az import gráfon át sem', () => {
     const root = repoRoot();
     expect(
       findScreenshotDiskWriters(listTrackedFiles(root), (trackedPath) => readTrackedFile(root, trackedPath)),
@@ -1433,6 +1461,149 @@ describe('a képernyőkép készítés egyetlen szentesített útja (gépi kény
           {
             trackedPath: 'docs/headless.md',
             content: `chromium --headless --${SCREENSHOT_WORD}=x.${PNG_EXTENSION} "$URL"`,
+          },
+        ],
+        offenders: [],
+      },
+      // 2026-10-17 (user döntés): az oldal PDF mentése is tiltott lemezre írás.
+      // A Playwright `Page.pdf` hívás a képernyőkép hívás mintáit kapja
+      // (`CAPTURE_CALL_PATTERN`), a Chrome headless PDF kapcsolója a képernyőkép
+      // kapcsolóét (`PRINT_TO_PDF_FLAG_PATTERN`), a hatókörrel együtt.
+      {
+        name: 'a PDF mentés path opcióval (sima, rövidített és idézőjeles kulccsal), Playwrightot importáló termékfájlban is',
+        files: [
+          { trackedPath: 'e2e/a.ts', content: `await page.${PDF_WORD}({ path: 'x.${PDF_WORD}' });` },
+          {
+            trackedPath: 'e2e/b.ts',
+            content: `const path = testInfo.outputPath('x.${PDF_WORD}');\nawait page.${PDF_WORD}({ path, format: 'A4' });`,
+          },
+          { trackedPath: 'e2e/c.mjs', content: `await page.${PDF_WORD}({ 'path': 'x.${PDF_WORD}' });` },
+          {
+            trackedPath: 'packages/x/src/print/print.ts',
+            content: `import { chromium } from 'playwright';\nawait page.${PDF_WORD}({ path: 'x.${PDF_WORD}' });`,
+          },
+        ],
+        offenders: ['e2e/a.ts', 'e2e/b.ts', 'e2e/c.mjs', 'packages/x/src/print/print.ts'],
+      },
+      {
+        name: 'a memóriában kért PDF writeFileSync, Bun.write vagy tesztcsatolmány hívással',
+        files: [
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `${fsImport('writeFileSync')}writeFileSync('x.${PDF_WORD}', await page.${PDF_WORD}());`,
+          },
+          { trackedPath: 'e2e/b.ts', content: `await Bun.write('x.${PDF_WORD}', await page.${PDF_WORD}());` },
+          {
+            trackedPath: 'e2e/c.ts',
+            content: `await testInfo.attach('nyomtatás', { body: await page.${PDF_WORD}(), contentType: 'application/${PDF_WORD}' });`,
+          },
+        ],
+        offenders: ['e2e/a.ts', 'e2e/b.ts', 'e2e/c.ts'],
+      },
+      {
+        name: 'a PDF opció objektuma a path kulccsal és az író segédfüggvény egy másik fájlban',
+        files: [
+          {
+            trackedPath: 'e2e/pdf-options.ts',
+            content: `export const pdfOptions = { format: 'A4', path: 'x.${PDF_WORD}' };`,
+          },
+          {
+            trackedPath: 'e2e/a.ts',
+            content: `import { pdfOptions } from './pdf-options.ts';\nawait page.${PDF_WORD}(pdfOptions);`,
+          },
+          { trackedPath: 'e2e/save.ts', content: `${fsImport('writeFileSync')}export const save = writeFileSync;` },
+          {
+            trackedPath: 'e2e/b.ts',
+            content: `import { save } from './save.ts';\nsave('x.${PDF_WORD}', await page.${PDF_WORD}());`,
+          },
+        ],
+        offenders: ['e2e/pdf-options.ts', 'e2e/save.ts'],
+      },
+      {
+        name: 'a Chrome headless PDF kapcsolója shell, bash, YAML és package.json scriptben, a playwright szó nélkül',
+        files: [
+          {
+            trackedPath: 'tools/print.sh',
+            content: `chromium --headless --${PRINT_TO_PDF_WORD}=editor.${PDF_WORD} "$URL"`,
+          },
+          {
+            trackedPath: 'tools/print.bash',
+            content: `google-chrome --headless --${PRINT_TO_PDF_WORD} --no-${PDF_WORD}-header-footer "$URL"`,
+          },
+          {
+            trackedPath: '.github/workflows/print.yml',
+            content: `      - run: chromium --headless --${PRINT_TO_PDF_WORD}='x.${PDF_WORD}' "$URL"`,
+          },
+          {
+            trackedPath: 'tools/package.json',
+            content: JSON.stringify({ scripts: { print: `chrome --headless --${PRINT_TO_PDF_WORD} "$URL"` } }),
+          },
+        ],
+        offenders: ['.github/workflows/print.yml', 'tools/package.json', 'tools/print.bash', 'tools/print.sh'],
+      },
+      {
+        name: 'a Chrome headless PDF kapcsolója Node-ból, a folyamatindító argumentum listájában, és egy kódfájl kommentjében',
+        files: [
+          {
+            trackedPath: 'tools/print.ts',
+            content: `import { execFileSync } from 'node:child_process';\nexecFileSync('chromium', ['--headless', '--${PRINT_TO_PDF_WORD}=x.${PDF_WORD}', url]);`,
+          },
+          {
+            trackedPath: 'e2e/print.mjs',
+            content: `import { spawnSync } from 'node:child_process';\nspawnSync('chrome', ['--headless', \`--${PRINT_TO_PDF_WORD}=\${name}\`, url]);`,
+          },
+          {
+            trackedPath: 'packages/x/src/print/print.spec.ts',
+            content: `execFileSync('chromium', ['--headless', '--${PRINT_TO_PDF_WORD}', url]);`,
+          },
+          {
+            trackedPath: 'packages/x/src/print/print.ts',
+            content: `import { chromium } from 'playwright';\nexport const flags = ['--headless', '--${PRINT_TO_PDF_WORD}'];`,
+          },
+          {
+            trackedPath: 'e2e/note.ts',
+            content: `// chromium --headless --${PRINT_TO_PDF_WORD} helyett a szentesített út\nexport const note = 1;`,
+          },
+        ],
+        offenders: [
+          'e2e/note.ts',
+          'e2e/print.mjs',
+          'packages/x/src/print/print.spec.ts',
+          'packages/x/src/print/print.ts',
+          'tools/print.ts',
+        ],
+      },
+      {
+        name: 'jogos és hatókörön kívüli: memóriában maradó PDF a lefedettségi fixtúrán át, a hívás és a kapcsoló puszta említése, Playwright import nélküli termékkód, nem vizsgált kiterjesztés',
+        files: [
+          {
+            trackedPath: 'apps/web/e2e/coverage-fixture.ts',
+            content: `${fsImport('writeFileSync')}export const test = 1;`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/pdf.spec.ts',
+            content: `import { test } from './coverage-fixture.ts';\nconst buffer = await page.${PDF_WORD}({ format: 'A4' });\nexpect(buffer.byteLength).toBeGreaterThan(0);`,
+          },
+          { trackedPath: 'apps/web/e2e/print.ts', content: `export const print = async (page) => page.${PDF_WORD}();` },
+          {
+            trackedPath: 'apps/web/e2e/print-size.spec.ts',
+            content: `import { print } from './print.ts';\nexpect((await print(page)).byteLength).toBeGreaterThan(0);`,
+          },
+          {
+            trackedPath: 'apps/web/e2e/note.ts',
+            content: `// a page.${PDF_WORD}() puffert ad, lemezre nem ír\nexport const note = 'application/${PDF_WORD}';`,
+          },
+          {
+            trackedPath: 'tools/dom.sh',
+            content: `chromium --headless --dump-dom "$URL" # ${PRINT_TO_PDF_WORD} nélkül`,
+          },
+          {
+            trackedPath: 'packages/report/src/print/print.ts',
+            content: `export const print = (page) => page.${PDF_WORD}({ path: 'x.${PDF_WORD}' });\nexport const flags = ['--headless', '--${PRINT_TO_PDF_WORD}'];`,
+          },
+          {
+            trackedPath: 'docs/print.md',
+            content: `chromium --headless --${PRINT_TO_PDF_WORD}=x.${PDF_WORD} "$URL"`,
           },
         ],
         offenders: [],

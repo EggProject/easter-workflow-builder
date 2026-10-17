@@ -211,3 +211,101 @@ visszahelyezése a közvetlen mintába: mind a nyolc a (7) invariánson bukik (6
 **Elfogadott korlát (a hatókör következménye).** Egy termékcsomag író függvénye, amit egy teszt
 a képével hív, nem látszik, mert a termékkód fájlírása a hatókörön kívül esik; az eszköz
 csomagban (`tooling/*`, `tools/*`) álló ugyanilyen függvény továbbra is bukik (a (7) esete).
+
+## 8. Az oldal PDF mentése (2026-10-17)
+
+Kiváltó esemény: a PLAN-009 adverzariális átvizsgálása
+(`docs/research/2026-10-17-plan-009-adverzarialis-atvizsgalas.md`) nyitott hatóköri kérdésként
+jelezte, hogy a `page.pdf({ path })` és a Chrome `--print-to-pdf` kapcsolója átmegy a kapun. A user
+2026-10-17-i döntése: "Igen, tiltsuk." Itt a tények és a mérések.
+
+### 8.1 A Playwright `Page.pdf` `path` opciója
+
+- **Doksi:** <https://playwright.dev/docs/api/class-page#page-pdf>: "Returns the PDF buffer.", a
+  használati példa `await page.pdf({ path: 'page.pdf' });`, és a `path` opció (a doksi forrása,
+  <https://github.com/microsoft/playwright/blob/main/docs/src/api/class-page.md>,
+  `option: Page.pdf.path`): "The file path to save the PDF to. [...] If no path is provided, the PDF
+  won't be saved to the disk."
+- **Telepített forrás:** `playwright-core/types/types.d.ts` 4084. sor (ugyanez a leírás), és
+  `playwright-core/lib/coreBundle.js` 61595-61613. sor: a kliens `pdf()` metódusa a kapott puffert
+  `path` megadásakor a 61611. sorban `fs.promises.writeFile(options.path, ...)` hívással lemezre
+  írja, és mindkét esetben visszaadja.
+- **Független megerősítés:** a Checkly Playwright útmutatója
+  (<https://www.checklyhq.com/docs/learn/playwright/generating-pdfs/>): "Note that we need to pass
+  the `path` option to have the PDF file actually saved to disk."
+- **Következmény:** a `page.pdf` a képernyőkép hívással azonos szerepű: `path` nélkül memóriában
+  marad, `path` opcióval vagy egy író hívással együtt lemezre kerül. A hívás a `CAPTURE_CALL_PATTERN`
+  mintába került, tehát a `path` kulcs minden alakja és az író utak rá is vonatkoznak a képernyőkép
+  körben és a függőségeiben. A `76f0b95` fáján a vizsgált fájlokban a `pdf` szó egyszer sem fordul
+  elő (mérve, kis- és nagybetűtől függetlenül), és a módosított spec fájl a tiszta fán zöld, tehát a
+  bővítés ma nulla hamis jelzést ad.
+
+### 8.2 A böngésző megkötése
+
+- **Régi doksi:** a `docs/src/api/class-page.md` `v1.49.0` címkéjén még áll: "Generating a pdf is
+  currently only supported in Chromium headless."; a `v1.50.0` címkén már nem.
+- **A változtatás:** a `microsoft/playwright` #33879 PR
+  (<https://github.com/microsoft/playwright/pull/33879>, "chore: pdf generation now works in headed
+  mode too", 2024-12-06) a megjegyzést törölte, és a saját tesztjében (`tests/library/pdf.spec.ts`,
+  "should be able to save file": `page.pdf({ path: outputFile })` után a fájl mérete nagyobb nullánál)
+  a kihagyási feltételt "only supported in chromium" alakra szűkítette.
+- **Mai doksi:** <https://playwright.dev/mcp/tools/pdf>: "PDF generation is Chromium-only."
+- **Telepített forrás (egy forrás, saját olvasás):** a `coreBundle.js` 53429. sora a megvalósítás
+  nélküli oldalra "PDF generation is only supported for Headless Chromium" hibát dob; megvalósítás
+  a Chromium oldalon (CDP `Page.printToPDF`) és a WebDriver BiDi oldalon (41256. sor,
+  `browsingContext.print`) van.
+- **Következmény:** a "csak Chromium headless alatt működik" állítás a pinelt `1.62.1` verzióra nem
+  igaz: a headless megkötés az `1.50.0` óta nincs. A "csak Chromium" rész a BiDi csatornára **nem
+  ellenőrzött**. A védelem a böngészőtől független, egyik állítástól sem függ.
+
+### 8.3 A Chrome headless `--print-to-pdf` kapcsolója
+
+- **Doksi:** <https://developer.chrome.com/docs/automation-and-testing/headless-cli>,
+  `--print-to-pdf`: "The `--print-to-pdf` flag saves the target page as a PDF named `output.pdf` in
+  the current working directory."
+- **Chromium forrás:** `components/headless/command_handler/headless_command_switches.cc`
+  (<https://chromium.googlesource.com/chromium/src/+/refs/tags/138.0.7158.1/components/headless/command_handler/headless_command_switches.cc>):
+  "Save a PDF file of the loaded page.", `kPrintToPDF[] = "print-to-pdf"`; a
+  `headless_command_handler.cc`
+  (<https://github.com/chromium/chromium/blob/main/components/headless/command_handler/headless_command_handler.cc>)
+  `--print-to-pdf=[output path]` ága üres értéknél az `output.pdf` nevet veszi, és az eredményt a
+  `WriteFile` hívás írja lemezre. Kikapcsolt értéket a forrás nem ismer.
+- **Független megerősítés:** a Stack Overflow #46074235 kérdés válaszai
+  (<https://stackoverflow.com/questions/46074235/headless-chrome-to-print-pdf>): a
+  `--print-to-pdf=<fájl>` alakkal a böngésző a PDF-et a megadott fájlba írja.
+- **Következmény:** a `PRINT_TO_PDF_FLAG_PATTERN` a `SCREENSHOT_FLAG_PATTERN` mintáját követi:
+  minden előfordulás tiltott, a `playwright` szótól függetlenül, kódfájlban, shell scriptben, YAML
+  lépésben és `package.json` scriptben. A kommentben álló, `--` előtagú kapcsoló egy vizsgált
+  fájlban ugyanúgy bukik, mint a `--screenshot` (a minta a teljes tartalmat nézi); az előtag nélküli
+  említés, a nem vizsgált kiterjesztés (`.md`) és a Playwright import nélküli termékkód átmegy.
+
+### 8.4 Mérések (saját, 2026-10-17)
+
+**Módszer.** Egy ideiglenes git indexen (`GIT_INDEX_FILE`, `git read-tree HEAD`, a közös index
+érintetlen) egyenként felvett, nem commitolt fájlok. A régi alak a `76f0b95` spec fájlja, egy
+ideiglenes, nem követett másolatból futtatva; az új alak a módosított spec fájl.
+
+| Injekció                                                               | Régi alak (`76f0b95`) | Új alak                      |
+| ---------------------------------------------------------------------- | --------------------- | ---------------------------- |
+| e2e: `page.pdf({ path: 'x.pdf' })`                                     | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| e2e: rövidített `path` kulcs a `page.pdf` hívásban                     | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| e2e: memóriában kért PDF plusz `writeFileSync`                         | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| shell script: `--print-to-pdf=x.pdf`                                   | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| `package.json` script: `--print-to-pdf`                                | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| workflow YAML lépés: `--print-to-pdf='x.pdf'`                          | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| Node: `execFileSync('chrome', ['--headless', '--print-to-pdf=x.pdf'])` | 7/7 zöld              | az (1) bukik, a fájlt nevezi |
+| jogos: `page.pdf({ format: 'A4' })`, író nélkül                        | 7/7 zöld              | 7/7 zöld                     |
+| jogos: shell komment, `print-to-pdf` említés `--` nélkül               | 7/7 zöld              | 7/7 zöld                     |
+| hatókörön kívül: a kapcsoló Playwright import nélküli termékfájlban    | 7/7 zöld              | 7/7 zöld                     |
+
+Az injekció nélküli fán a régi és az új alak is 7/7 zöld.
+
+**Az új kód gyengítései.** A spec fájl egy-egy pontú módosítása egy ideiglenes másolatban: a
+`page.pdf` hívás kivétele a `CAPTURE_CALL_PATTERN` mintából, a PDF kapcsoló kivétele a közvetlen
+író feltételből, illetve a `package.json` scriptek feltételéből. Mind a három a (7) invariánson
+bukik (6/7).
+
+**Nyitva:** a Playwright CLI `pdf <url> <filename>` alparancsa (a telepített `coreBundle.js` 72993. sora, "save page as pdf") és a CDP `Page.printToPDF` metódusa nincs nevesítve, a hatókörüket
+a 2026-10-17-i döntés nem mondja ki. Addig a kapu mindkettőt átengedi (a CLI alparancsot a shell és a
+`package.json` scriptből, a CDP metódust egy író hívással együtt is). A user hatóköri döntése zárja
+le.
