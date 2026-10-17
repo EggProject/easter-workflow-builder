@@ -401,3 +401,40 @@ test('az elrendezés után a nézet újra a teljes gráfra illeszkedik, egyetlen
     expect(box.y + box.height).toBeLessThanOrEqual(canvas.y + canvas.height);
   }
 });
+
+test('az "Elrendezés" billentyűzettel is elérhető: a nyíl triggeren az ArrowDown a menüpontra fókuszál, az Enter elrendez (AC66)', async ({
+  page,
+}) => {
+  let saveCallCount = 0;
+  await installApiMocks(page, [
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
+    mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('replaceWorkflowGraph', async (route) => {
+      saveCallCount += 1;
+      await route.fulfill(jsonBody(GRAPH));
+    }),
+  ]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(EDITOR_URL);
+  await expect(nodeLocator(page, 'n-start')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toBeHidden();
+  const beforeStart = await requireBoundingBox(nodeLocator(page, 'n-start'));
+
+  // Egér nélkül: a split button nyíl triggere fókuszt kap, az ArrowDown a
+  // packages/ui Menu dokumentált billentyűje szerint az első menüpontra nyit.
+  const trigger = page.getByRole('button', { name: 'További műveletek' });
+  await trigger.focus();
+  await page.keyboard.press('ArrowDown');
+  const layoutItem = page.getByRole('menuitem', { name: 'Elrendezés' });
+  await expect(layoutItem).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByRole('menu')).toBeHidden();
+  await expect(page.getByRole('status').filter({ hasText: UNSAVED_CHANGES_TEXT })).toHaveText(
+    'Mentetlen változtatások',
+  );
+  expect(saveCallCount).toBe(0);
+  const afterStart = await requireBoundingBox(nodeLocator(page, 'n-start'));
+  expect(afterStart.x).not.toBe(beforeStart.x);
+});

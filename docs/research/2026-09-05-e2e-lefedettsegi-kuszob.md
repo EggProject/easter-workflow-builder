@@ -2035,3 +2035,41 @@ buildlogjából: **nyolc fájl, huszonhét előfordulás**, az `app-shell.tsx` m
 `RunEventRow.tsx` egyik új előfordulása nem ternary alakú: a `const title = (<>...</>)` deklaráció
 Istanbul statement számlálója (`(cov().s[n]++, _jsxs(...))`) tolja el a kommentet; az eredmény itt
 is felhasznált, tehát a besorolás változatlan.
+
+## 51. A PLAN-009 T-009-35 kritérium ellenőrzés utáni újramérés (2026-10-18): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A SPEC-008 51. kritériuma szerint a küszöb az újramért, tényleges értéken áll. A 49.
+szekció (T-009-31) mérése óta a `main`-re került a T-009-60 és a T-009-61 (PR #48, #49): mindkettő a
+saját research fájljába vezette a darabszámot, a küszöböt a PLAN-009 F9 szabálya szerint nem mozdította
+(`docs/research/2026-10-17-szam-es-agent-mezok.md`, `docs/research/2026-10-17-ag-iteracio-lista.md` 8. szekció). A T-009-35 ága (`efb7772`) a `main` `184a38c` állapotához képest csak teszteket és
+dokumentációt ad: `git diff 184a38c efb7772 --stat -- apps/web/src packages` kizárólag `.spec.ts` és
+`.spec.tsx` fájlokat mutat (és a `packages/ui/CLAUDE.md`-t), a termékkód azonos.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint: `rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`, az `apps/web` alatt `bun x
+playwright test --shard=<i>/8` nyolc egymás utáni futásban, mindegyik `flock /tmp/playwright-gep.lock`
+alatt, a config `workers: 3` értékével, majd `bun run coverage:e2e:report` (a régi küszöbbel exit 0).
+**621 teszt, mind zöld** (5 x 78 + 3 x 77). A darabszámok a `nyc report --reporter=json-summary`
+kimenetéből:
+
+| Metrika    | Fedett / összes | `nyc` kimenet = új küszöb | Küszöb előtte (49.) | Fedetlen darab, 49. szekció -> most |
+| ---------- | --------------- | ------------------------- | ------------------- | ----------------------------------- |
+| statements | 2112 / 2126     | **99.34**                 | 99.3                | 14 -> 14                            |
+| branches   | 980 / 991       | **98.89**                 | 98.81               | 11 -> 11                            |
+| functions  | 735 / 737       | **99.72**                 | 99.7                | 2 -> 2                              |
+| lines      | 2033 / 2047     | **99.31**                 | 99.27               | 14 -> 14                            |
+
+**Levezetés.** A 49. szekció mérése (1991 / 2005, 918 / 929, 684 / 686, 1920 / 1934) óta az összes és
+a fedett darabszám is +121 / +62 / +51 / +113 tétellel nőtt, tehát a fedetlen darab egyik metrikán sem
+változott. Az összes darabszám a termékkód növekedése: a `42c02ac..efb7772` tartomány `apps/web/src`
+alatti, nem teszt fájlt érintő commitjai a T-009-34, a T-009-60 és a T-009-61 (`git log --oneline
+42c02ac..efb7772 -- apps/web/src ':(exclude)*.spec.ts' ':(exclude)*.spec.tsx'`); a jelen ág termékkódot
+nem ad, tehát az összes darabszámot nem változtatja. A fedetlen tételek ugyanazon az öt fájlon és soron állnak, mint a 49.3 szekcióban (a `coverage-e2e/lcov.info` nulla találatú sorai: `mount-app.tsx`
+16, 21-22; `read-frontend-config.ts` 23, 29, 37, 41, 62, 67, 72, 77; `is-valid-connection.ts`
+36; `perform-route-request.ts` 89; `use-stream-connection.ts` 202), a 49.3 indoklása változatlan. A
+ratchet ezért FELFELÉ mozdul, mind a négy küszöb a mért értékre áll, felfelé kerekítés nélkül, az `nyc`
+két tizedesre lefelé kerekített kimenete szerint (`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
+egy századdal magasabb küszöbbel (99.35 / 98.9 / 99.73 / 99.32) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`, exit 1).
