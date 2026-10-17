@@ -7,16 +7,32 @@ import { useClientRoute, type NavigationGuard, type UseClientRouteResult } from 
 interface FakePort extends HistoryLocationPort {
   readonly emitPopState: () => void;
   readonly setSearchForTest: (nextSearch: string) => void;
+  /**
+   * A böngésző vissza vagy előre lépésének mása: a cím a célra áll, és utána
+   * fut a `popstate` (SPEC-008 M-115).
+   */
+  readonly traverseForTest: (nextPathname: string, nextSearch: string) => void;
+  /**
+   * A `pushState` hívások argumentuma, a hívás sorrendjében.
+   */
+  readonly pushedPaths: readonly string[];
 }
 
 function createFakePort(initialPathname: string, initialSearch = ''): FakePort {
   let pathname = initialPathname;
   let search = initialSearch;
   const listeners = new Set<() => void>();
+  const pushedPaths: string[] = [];
+  const emitPopState = (): void => {
+    for (const listener of listeners) {
+      listener();
+    }
+  };
   return {
     pathname: () => pathname,
     search: () => search,
     pushState: (path) => {
+      pushedPaths.push(path);
       pathname = path;
     },
     addPopStateListener: (listener) => {
@@ -25,14 +41,16 @@ function createFakePort(initialPathname: string, initialSearch = ''): FakePort {
         listeners.delete(listener);
       };
     },
-    emitPopState: () => {
-      for (const listener of listeners) {
-        listener();
-      }
-    },
+    emitPopState,
     setSearchForTest: (nextSearch) => {
       search = nextSearch;
     },
+    traverseForTest: (nextPathname, nextSearch) => {
+      pathname = nextPathname;
+      search = nextSearch;
+      emitPopState();
+    },
+    pushedPaths,
   };
 }
 
@@ -251,6 +269,138 @@ describe('useClientRoute', () => {
       });
 
       expect(latest?.registerNavigationGuard).toBe(first);
+    });
+  });
+
+  /**
+   * A szerkesztő a `?workflowId=w-1` címen, regisztrált őrrel; az őrnek
+   * adott végrehajtások a hívás sorrendjében.
+   */
+  function renderGuardedEditor(): {
+    readonly port: FakePort;
+    readonly guard: ReturnType<typeof vi.fn<NavigationGuard>>;
+    readonly proceeds: (() => void)[];
+  } {
+    const port = createFakePort('/editor', '?workflowId=w-1');
+    act(() => {
+      root.render(<HookHarness port={port} />);
+    });
+    const proceeds: (() => void)[] = [];
+    const guard = vi.fn<NavigationGuard>((proceed) => {
+      proceeds.push(proceed);
+    });
+    act(() => {
+      latest?.registerNavigationGuard(guard);
+    });
+    return { port, guard, proceeds };
+  }
+
+  describe('a böngésző vissza és előre gombja (SPEC-008 5.10, 3. pont)', () => {
+    it('regisztrált őrnél a popstate után a korábbi útvonal és query string íródik vissza, és a megjelenített útvonal nem vált', () => {
+      const { port, guard } = renderGuardedEditor();
+
+      act(() => {
+        port.traverseForTest('/runs', '');
+      });
+
+      expect(port.pushedPaths).toEqual(['/editor?workflowId=w-1']);
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(latest?.routeId).toBe('graphEditor');
+      expect(latest?.search).toBe('?workflowId=w-1');
+    });
+
+    it('az őrnek adott végrehajtás a popstate utáni címre navigál, az őr megkerülésével', () => {
+      const { port, guard, proceeds } = renderGuardedEditor();
+      act(() => {
+        port.traverseForTest('/runs', '?workflowId=w-2');
+      });
+
+      act(() => {
+        proceeds[0]?.();
+      });
+
+      expect(port.pushedPaths).toEqual(['/editor?workflowId=w-1', '/runs?workflowId=w-2']);
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(latest?.routeId).toBe('runHistory');
+      expect(latest?.search).toBe('?workflowId=w-2');
+    });
+
+    it('egy újabb popstate a címet ugyanígy visszaírja, és az őr a legutóbbi célt kapja', () => {
+      const { port, guard, proceeds } = renderGuardedEditor();
+      act(() => {
+        port.traverseForTest('/runs', '');
+      });
+
+      act(() => {
+        port.traverseForTest('/', '');
+      });
+
+      expect(port.pushedPaths).toEqual(['/editor?workflowId=w-1', '/editor?workflowId=w-1']);
+      expect(guard).toHaveBeenCalledTimes(2);
+      act(() => {
+        proceeds[1]?.();
+      });
+      expect(port.pushedPaths.at(-1)).toBe('/');
+      expect(latest?.routeId).toBe('workflowList');
+      expect(latest?.search).toBe('');
+    });
+
+    it('a visszaírt cím a legutóbbi navigáció utáni útvonal, nem a csatoláskori', () => {
+      const port = createFakePort('/');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      act(() => {
+        latest?.navigate('graphEditor', 'workflowId=w-3');
+      });
+      const guard = vi.fn<NavigationGuard>();
+      act(() => {
+        latest?.registerNavigationGuard(guard);
+      });
+
+      act(() => {
+        port.traverseForTest('/', '');
+      });
+
+      expect(port.pushedPaths).toEqual(['/editor?workflowId=w-3', '/editor?workflowId=w-3']);
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(latest?.routeId).toBe('graphEditor');
+      expect(latest?.search).toBe('?workflowId=w-3');
+    });
+
+    it('őr nélkül a popstate a mai módon vált, a cím visszaírása nélkül', () => {
+      const port = createFakePort('/editor', '?workflowId=w-1');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+
+      act(() => {
+        port.traverseForTest('/runs', '?workflowId=w-2');
+      });
+
+      expect(port.pushedPaths).toEqual([]);
+      expect(latest?.routeId).toBe('runHistory');
+      expect(latest?.search).toBe('?workflowId=w-2');
+    });
+
+    it('az eltávolított őr után a popstate a mai módon vált', () => {
+      const port = createFakePort('/editor', '?workflowId=w-1');
+      act(() => {
+        root.render(<HookHarness port={port} />);
+      });
+      const guard = vi.fn<NavigationGuard>();
+      act(() => {
+        const unregister = latest?.registerNavigationGuard(guard);
+        unregister?.();
+      });
+
+      act(() => {
+        port.traverseForTest('/runs', '');
+      });
+
+      expect(guard).not.toHaveBeenCalled();
+      expect(port.pushedPaths).toEqual([]);
+      expect(latest?.routeId).toBe('runHistory');
     });
   });
 
