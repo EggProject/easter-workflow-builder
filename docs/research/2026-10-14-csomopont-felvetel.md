@@ -1892,7 +1892,9 @@ változása nélkül.
   sornak nincs magyarázó szövege. Nem `packages/ui` téma: a minta a lap saját stílusa, nem komponens, és a
   SPEC-008 11.4 szerint a `packages/ui` két új témája a `context-menu` és a `tooltip`.
 - **Saját reszponzív szabály** a `--ep-screen-sm` (640px) alatt: `flex-direction: column` és
-  `align-items: stretch`; a forrás oldal nem reszponzív. A szükségességet a 59.3 mérés adja.
+  `align-items: stretch`; a forrás oldal nem reszponzív (saját olvasás: a `settings.html` egyetlen `@media`
+  blokkja a `forced-colors`, a `preference-row` szabályaihoz nincs reszponzív alak). A szükségességet a 59.3
+  mérés adja; a SPEC-008 11.4 "Jelzés a usernek" bekezdése eltérésként nevezi meg (user döntés 2026-10-17).
 - **A felirat `<label for>`, nem a `SelectField` `label` propja**: a prop a mező fölötti nagybetűs
   `field__label` címkét rajzolja, ami a `preference-row` bal oldali feliratával nem azonos alak.
 - **A tároló**: a képernyő a `GraphEditorScreen` mintájára a `getBrowserLocalStorage` elérést adja a
@@ -1991,17 +1993,17 @@ gyűjtött, tehát a Beállítások lap választása elveszett (+2 sor a `settin
 99.08). Az írás állítása ezért külön, navigáció nélküli teszt. Az `apps/web/package.json` küszöbe nem
 változott.
 
-### 59.6 Nyitott kérdések és nem ellenőrzött pontok
+### 59.6 Lezárt kérdések (user döntés 2026-10-17) és nem ellenőrzött pontok
 
-Három kérdés, amit a spec és a user döntései nem zárnak le; a megvalósítás az első opciót követi:
+Három kérdés, amit a spec és a korábbi user döntések nem zártak le; a megvalósítás az első opciót követte, a user 2026-10-17-én mindháromnál ezt hagyta jóvá:
 
-1. **A kártya változata.** (a) a komponens kártyája, fejléc `<h3>` címmel (a mai állapot); (b) a lap saját,
+1. **A kártya változata. Lezárva: (a).** (a) a komponens kártyája, fejléc `<h3>` címmel (a mai állapot); (b) a lap saját,
    szakaszolt kártyája (`card__header` `<h2>` plusz leírás, `card__body`), a `settings-screen` alá
    hatókörözött szelektorokkal, ami a forrás szabályainak szelektor szintű módosítása; (c) a `packages/ui`
    `Card` bővítése nem `<p>` törzzsel, ami a `packages/ui` hatókörét bővíti.
-2. **A kártya címe.** (a) "Szerkesztő" (a mai állapot, a route tábla felirata); (b) más, a usertől kért szöveg
+2. **A kártya címe. Lezárva: (a).** (a) "Szerkesztő" (a mai állapot, a route tábla felirata); (b) más, a usertől kért szöveg
    (például "Billentyűk"); (c) leírás sor a cím alatt.
-3. **A csonkolt felirat 320 ... 360 pixelen.** (a) elfogadva, a design system ellipszise (a mai állapot; a
+3. **A csonkolt felirat 320 ... 360 pixelen. Lezárva: (a).** (a) elfogadva, a design system ellipszise (a mai állapot; a
    hozzáférhető név teljes); (b) rövidebb opció felirat keskeny kijelzőn (termék szöveg döntés); (c) a
    trigger és a lista szövegének tördelése, ami a design system `select.css` és `menu.css` szabályától
    eltérés.
