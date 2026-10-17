@@ -126,7 +126,12 @@ test('NINCS card in card: a szerkesztő gyökér konténere nem visel kártya ke
     return {
       borderTopWidth: style.borderTopWidth,
       borderLeftWidth: style.borderLeftWidth,
+      borderRightWidth: style.borderRightWidth,
+      borderBottomWidth: style.borderBottomWidth,
       borderTopLeftRadius: style.borderTopLeftRadius,
+      borderTopRightRadius: style.borderTopRightRadius,
+      borderBottomRightRadius: style.borderBottomRightRadius,
+      borderBottomLeftRadius: style.borderBottomLeftRadius,
       backgroundColor: style.backgroundColor,
     };
   });
@@ -136,7 +141,12 @@ test('NINCS card in card: a szerkesztő gyökér konténere nem visel kártya ke
   // ez a kártya recept, amit a fogyasztó oldali felülírás töröl.
   expect(frame.borderTopWidth).toBe('0px');
   expect(frame.borderLeftWidth).toBe('0px');
+  expect(frame.borderRightWidth).toBe('0px');
+  expect(frame.borderBottomWidth).toBe('0px');
   expect(frame.borderTopLeftRadius).toBe('0px');
+  expect(frame.borderTopRightRadius).toBe('0px');
+  expect(frame.borderBottomRightRadius).toBe('0px');
+  expect(frame.borderBottomLeftRadius).toBe('0px');
   // Az `rgba(0, 0, 0, 0)` a `transparent` számított alakja.
   expect(frame.backgroundColor).toBe('rgba(0, 0, 0, 0)');
 });

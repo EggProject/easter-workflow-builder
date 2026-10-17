@@ -479,6 +479,26 @@ describe('GraphEditorCanvas', () => {
     expect(lastEdges[0]).toMatchObject({ sourceNodeId: 'n1', targetNodeId: 'n2', branchKey: null });
   });
 
+  // A hat fenntartott kimeneti kulcs (SPEC-003 7.2, SPEC-004 4.2, M-88): a
+  // sourceHandle a branchKey mezőt is ugyanerre tölti (AC10).
+  it.each(['continue', 'exit', 'approved', 'rejected', 'exhausted', 'on_error'] as const)(
+    'az onConnect a "%s" sourceHandle-t a branchKey mezőbe is átviszi (AC10)',
+    (key) => {
+      const onGraphChange = vi.fn<OnGraphChange>();
+      renderCanvas([START_NODE, FAN_OUT_NODE], [], onGraphChange, vi.fn());
+      act(() => {
+        lastCapturedProperties().onConnect?.({ source: 'n1', target: 'n2', sourceHandle: key, targetHandle: null });
+      });
+      const lastCall = onGraphChange.mock.calls.at(-1);
+      if (lastCall === undefined) {
+        throw new Error('a teszt nem talált onGraphChange hívást');
+      }
+      const [, lastEdges] = lastCall;
+      expect(lastEdges).toHaveLength(1);
+      expect(lastEdges[0]).toMatchObject({ sourceNodeId: 'n1', targetNodeId: 'n2', sourceHandle: key, branchKey: key });
+    },
+  );
+
   it('az új él azonosítója a GraphElementIdGenerator porton át jön, xy-edge__ előtagú azonosító nincs (M-101)', () => {
     const onGraphChange = vi.fn<OnGraphChange>();
     renderCanvas([START_NODE, FAN_OUT_NODE], [], onGraphChange, vi.fn(), undefined, 0, () => 'port-edge-id');

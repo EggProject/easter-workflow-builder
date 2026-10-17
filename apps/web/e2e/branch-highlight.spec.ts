@@ -36,6 +36,7 @@ import type {
   StepRunRecord,
 } from '@easter-workflow-builder/protocol';
 import type { Locator, Page } from '@playwright/test';
+import { API_ORIGIN } from './api-origin.ts';
 import { expect, test } from './coverage-fixture.ts';
 import { measureEdgeClassPaintDifference } from './edge-paint-measurement.ts';
 import { installApiMocks, jsonBody, mockRoute, type MockRoute } from './rest-mock.ts';
@@ -58,6 +59,12 @@ const HIGHLIGHTED_EDGE_CLASS_NAME = 'run-graph-edge--highlighted';
 const MODE_STORAGE_KEY = 'eggRunGraphBranchHighlightMode';
 
 const TOGGLE_NAME = 'Minden bejárt ág kiemelése';
+
+/**
+ * A várakozás jelzés elemei (SPEC-008 9. szekció): a nem async pontok (AC94)
+ * után egyik sem állhat a lapon.
+ */
+const BUSY_INDICATOR_SELECTOR = '[aria-busy="true"], .is-loading, .progress-bar, [role="progressbar"], .skel';
 
 /**
  * Az alsó korlát a kiemelt él osztállyal és osztály nélkül készült képének
@@ -504,6 +511,35 @@ test.describe('a kapcsoló két módja', () => {
     await waitForBranchRun(page, LATEST_DEFAULT);
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect.poll(async () => readHighlightedEdgeIds(page)).toEqual([NO_EDGE_ID]);
+  });
+});
+
+test.describe('a kapcsoló nem async pont (AC94)', () => {
+  test('a kapcsoló megnyomása helyi művelet: nem indít API kérést, és nincs várakozás jelzés', async ({ page }) => {
+    // Újracsatlakozás nélküli mock: a lezárt válasz utáni újrapótlás
+    // `replay_complete` kerete maga is újratöltést (API kérést) váltana ki, és
+    // elfedné, hogy a kérést a kapcsoló indította-e (`sse-mock.ts`).
+    await mockSseFramesWithoutReconnect(page, replayFrames(LATEST_DEFAULT.runId, LATEST_DEFAULT.records));
+    await installApiMocks(page, LATEST_DEFAULT.routes);
+    await openScenario(page, LATEST_DEFAULT);
+
+    const toggle = modeToggle(page);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(async () => readHighlightedEdgeIds(page)).toEqual([NO_EDGE_ID]);
+    await expect(page.locator(BUSY_INDICATOR_SELECTOR)).toHaveCount(0);
+
+    const apiRequestsAfterClick: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().startsWith(`${API_ORIGIN}/api/`)) {
+        apiRequestsAfterClick.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(async () => readHighlightedEdgeIds(page)).toEqual([YES_EDGE_ID, NO_EDGE_ID]);
+
+    expect(apiRequestsAfterClick).toEqual([]);
+    await expect(page.locator(BUSY_INDICATOR_SELECTOR)).toHaveCount(0);
   });
 });
 

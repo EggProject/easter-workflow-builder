@@ -375,6 +375,36 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
     await expect(panel.locator('.card')).toHaveCount(0);
   });
 
+  test('mind a tíz csomópont típus panelén nincs fieldset, legend, .inspector-section és .card elem (AC16b)', async ({
+    page,
+  }) => {
+    const nodeIds = [
+      'n-start',
+      'n-agent',
+      'n-branch',
+      'n-fanout',
+      'n-join',
+      'n-loop',
+      'n-human',
+      'n-error',
+      'n-subworkflow',
+      'n-script',
+    ];
+    // A fixtúra pontosan a tíz típust hordozza: a teszt nem hagyhat ki egyet
+    // azzal, hogy a fixtúra kevesebbet tartalmaz.
+    await expect(page.locator('.react-flow__node')).toHaveCount(nodeIds.length);
+    for (const nodeId of nodeIds) {
+      const panel = await openNode(page, nodeId);
+      // A fejléc a node azonosítóját mutatja: a számlálók a KIVÁLASZTOTT node panelén futnak.
+      await expect(panel.getByText(nodeId, { exact: true })).toBeVisible();
+      await expect(panel.locator('fieldset')).toHaveCount(0);
+      await expect(panel.locator('legend')).toHaveCount(0);
+      await expect(panel.locator('.inspector-section')).toHaveCount(0);
+      await expect(panel.locator('.card')).toHaveCount(0);
+      await closePanel(page);
+    }
+  });
+
   test('a panel TETEJÉN nincs hibaösszesítő, és érintetlen mezőn nincs hibaüzenet', async ({ page }) => {
     const panel = await openNode(page, 'n-error');
     // Séma szerint érvénytelen érték úgy, hogy a mezőhöz nem nyúlunk:

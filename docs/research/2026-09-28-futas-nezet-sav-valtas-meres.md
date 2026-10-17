@@ -1,6 +1,6 @@
 # A futás nézet gráf/transcript sáv-váltási pontjának mérése (O-7 lezárás)
 
-Kapcsolódó: SPEC-008 14.2 O-7 (nyitott kérdés), PLAN-009 T-009-29, `.claude/CLAUDE.md` 4. szekció
+Kapcsolódó: SPEC-008 14.1 O-7 (a mérés óta lezárva; korábban a 14.2 nyitott kérdése), PLAN-009 T-009-29, `.claude/CLAUDE.md` 4. szekció
 (bizonyíték kényszer) és 12. szekció (mérő eszköz a repóba).
 
 ## 1. A kérdés

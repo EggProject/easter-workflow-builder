@@ -796,6 +796,31 @@ describe('GraphEditorScreen', () => {
     expect(log.putBodies).toHaveLength(0);
   });
 
+  // A várakozás jelzés minden alakja (SPEC-008 9. szekció, AC35): az
+  // `aria-busy`, a gomb `.is-loading` osztálya, a folyamatjelző és a skeleton.
+  const WAIT_INDICATOR_SELECTOR = '[aria-busy="true"], .is-loading, .progress-bar, [role="progressbar"], .skel';
+
+  it('az Elrendezés gomb nem aszinkron: a kattintás után nincs várakozás jelzés a képernyőn, és nem indul hálózati kérés (AC35)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    const calls = { count: 0 };
+    await renderScreen('?workflowId=wf-1', countingFetchFunction(log, calls));
+    const callsAfterLoad = calls.count;
+    expect(document.body.querySelectorAll(WAIT_INDICATOR_SELECTOR)).toHaveLength(0);
+
+    const layoutItem = openMoreActionsMenu().find((candidate) => candidate.textContent === 'Elrendezés');
+    if (layoutItem === undefined) {
+      throw new Error('a teszt nem talált "Elrendezés" menüpontot');
+    }
+    act(() => {
+      layoutItem.click();
+    });
+
+    // Az elrendezés lefutott (mentetlen jelző), mégsem látszik várakozás jelzés.
+    expect(container.textContent).toContain('Mentetlen változtatások');
+    expect(document.body.querySelectorAll(WAIT_INDICATOR_SELECTOR)).toHaveLength(0);
+    expect(calls.count).toBe(callsAfterLoad);
+  });
+
   it('hibás gráfra (NaN a maxIterations mezőn) a Mentés nem indít kérést, és megnevezi a hibás mezőt (AC12)', async () => {
     const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
     await renderScreen('?workflowId=wf-1', createFetchFunction(log));
@@ -997,6 +1022,37 @@ describe('GraphEditorScreen', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(log.postBodies).toEqual([JSON.stringify({ input: {} })]);
     expect(navigate).toHaveBeenCalledWith('runView', 'runId=r-7');
+  });
+
+  it('futó indítás alatt (a POST válasza függőben) a "Futás indítása" gomb letiltott és spinneres, navigáció nélkül (AC35)', async () => {
+    const log: StartRunLog = { postBodies: [] };
+    const delegate = createStartRunFetchFunction(log, []);
+    const startedPostUrls: string[] = [];
+    const pendingPostFetchFunction: FetchFunction = (input, init) => {
+      if (init.method === 'POST') {
+        startedPostUrls.push(input);
+        return new Promise<Response>(() => {
+          // Az indítás válasza szándékosan sosem érkezik: a teszt a futó indítás állapotát nézi.
+        });
+      }
+      return delegate(input, init);
+    };
+    await renderScreen('?workflowId=wf-1', pendingPostFetchFunction);
+    expect(startButton().disabled).toBe(false);
+    expect(startButton().classList.contains('is-loading')).toBe(false);
+
+    await act(async () => {
+      startButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(startedPostUrls).toHaveLength(1);
+    expect(startButton().disabled).toBe(true);
+    expect(startButton().classList.contains('is-loading')).toBe(true);
+    expect(startButton().getAttribute('aria-busy')).toBe('true');
+    expect(startButton().querySelector('.btn__loader')).not.toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('NEM ÜRES inputFields lista esetén a modális nyílik meg, kérés nélkül', async () => {

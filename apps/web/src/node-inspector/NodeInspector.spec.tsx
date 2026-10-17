@@ -306,6 +306,10 @@ describe('NodeInspector', () => {
       });
       expect(container.querySelector('.inspector-section')).toBeNull();
       expect(container.querySelector('.card')).toBeNull();
+      // A csoportosító `fieldset` és `legend` elem sincs (AC16b): a mezők
+      // doboz és szegély nélkül, közvetlenül a törzsben állnak.
+      expect(container.querySelectorAll('fieldset')).toHaveLength(0);
+      expect(container.querySelectorAll('legend')).toHaveLength(0);
     }
   });
 
