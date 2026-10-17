@@ -17,8 +17,9 @@ export interface NavigationConfirmationModalProperties {
  * Az elnavigálás megerősítő modálisa mentetlen változásnál (SPEC-008 5.10, 1.
  * pont), a workflow törlés megerősítésének mintájára (`delete-workflow-modal.tsx`):
  * két gomb a lábban, a "Mégse" elöl. Modálisban a gombok nem `sm` méretűek
- * (`.claude/CLAUDE.md` 11. szekció). A hívó csak a megerősítésre váró
- * navigáció idejére rajzolja, tehát a modális mindig nyitva áll.
+ * (`.claude/CLAUDE.md` 11. szekció). A cím és a törzs szövege user döntés
+ * (2026-10-17, SPEC-008 5.10). A hívó csak a megerősítésre váró navigáció
+ * idejére rajzolja, tehát a modális mindig nyitva áll.
  */
 export function NavigationConfirmationModal(properties: Readonly<NavigationConfirmationModalProperties>): ReactElement {
   const { onLeave, onCancel } = properties;
@@ -26,7 +27,7 @@ export function NavigationConfirmationModal(properties: Readonly<NavigationConfi
     <Modal
       open
       onClose={onCancel}
-      title="Mentetlen változtatások"
+      title="Kilépés mentés nélkül?"
       closeButtonLabel="Bezárás"
       footer={
         <>
@@ -38,6 +39,8 @@ export function NavigationConfirmationModal(properties: Readonly<NavigationConfi
           </Button>
         </>
       }
-    />
+    >
+      <p>A mentetlen változtatások elvesznek.</p>
+    </Modal>
   );
 }

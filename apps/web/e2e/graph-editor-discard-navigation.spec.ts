@@ -91,10 +91,11 @@ test('mentetlen változásnál a belső navigáció megerősítést kér: a "Mé
   page,
 }) => {
   await openEditorWithUnsavedNode(page);
-  const dialog = page.getByRole('dialog', { name: 'Mentetlen változtatások' });
+  const dialog = page.getByRole('dialog', { name: 'Kilépés mentés nélkül?' });
 
   await page.locator('.app-tn__navigation').getByRole('link', { name: 'Futás előzmények' }).click();
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('A mentetlen változtatások elvesznek.')).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/editor');
   // Nyitott megerősítő modálisnál a visszavonás billentyű nem hat (5.10, 4.
   // szabály).

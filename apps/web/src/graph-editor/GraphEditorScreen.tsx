@@ -521,7 +521,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   useBeforeUnloadPrompt(isDirty);
 
   // A változtatások elvetése (SPEC-008 5.10): a kiinduló dokumentumra állít,
-  // egy visszavonható lépésként, megerősítés és hálózati kérés nélkül.
+  // egy visszavonható lépésként, megerősítés és hálózati kérés nélkül. A
+  // mentés alatt a menüpont tiltott, a Visszavonás gombhoz hasonlóan (user
+  // döntés 2026-10-16).
   const handleDiscard = useCallback((): void => {
     setHistory(discardGraphEdits);
   }, []);
@@ -815,7 +817,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
             <MenuItem onSelect={handleAutoLayout} disabled={isLoading}>
               Elrendezés
             </MenuItem>
-            <MenuItem onSelect={handleDiscard} disabled={!canDiscardGraphEdits(history)}>
+            <MenuItem onSelect={handleDiscard} disabled={isSaving || !canDiscardGraphEdits(history)}>
               Változtatások elvetése
             </MenuItem>
           </Menu>

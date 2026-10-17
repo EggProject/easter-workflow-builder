@@ -40,13 +40,12 @@ describe('NavigationConfirmationModal', () => {
     });
   }
 
-  it('a dialógus a címével nevezett, a két gomb a "Mégse", majd a "Kilépés mentés nélkül", egyik sem sm méretű', () => {
+  it('a dialógus a címével nevezett, a törzs a figyelmeztetés, a két gomb a "Mégse", majd a "Kilépés mentés nélkül", egyik sem sm méretű (user döntés 2026-10-17)', () => {
     render();
     const dialog = container.querySelector('[role="dialog"]');
     const titleId = dialog?.getAttribute('aria-labelledby') ?? '';
-    expect(container.querySelector(`:scope [id="${CSS.escape(titleId)}"]`)?.textContent).toBe(
-      'Mentetlen változtatások',
-    );
+    expect(container.querySelector(`:scope [id="${CSS.escape(titleId)}"]`)?.textContent).toBe('Kilépés mentés nélkül?');
+    expect(container.querySelector(':scope .modal__body')?.textContent).toBe('A mentetlen változtatások elvesznek.');
 
     const footerButtons = [...container.querySelectorAll(':scope .modal__footer button')];
     expect(footerButtons.map((button) => button.textContent)).toEqual(['Mégse', 'Kilépés mentés nélkül']);

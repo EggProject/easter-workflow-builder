@@ -1530,6 +1530,26 @@ describe('GraphEditorScreen', () => {
       expect(items[1]?.disabled).toBe(true);
     });
 
+    it('a mentés alatt a menüpont tiltott, a Visszavonás gombhoz hasonlóan, és a kattintás nem veti el a változásokat (user döntés 2026-10-16)', async () => {
+      await renderScreen('?workflowId=wf-1', pendingPutFetchFunction);
+      moveStartNode(99);
+      expect(buttonNamed('Visszavonás').disabled).toBe(false);
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+      expect(buttonNamed('Mentés...').disabled).toBe(true);
+      expect(buttonNamed('Visszavonás').disabled).toBe(true);
+
+      const item = discardMenuItem();
+      expect(item.disabled).toBe(true);
+      act(() => {
+        item.click();
+      });
+
+      expect(canvasPositionOf('n-1')).toBe(99);
+      expect(container.textContent).toContain('Mentetlen változtatások');
+    });
+
     it('a kiinduló dokumentumra állít, megerősítés és hálózati kérés nélkül, a mentetlen jelző eltűnik, és egy Visszavonás a változásokat visszahozza (AC104)', async () => {
       const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
       const calls = { count: 0 };

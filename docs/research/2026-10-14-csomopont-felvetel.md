@@ -1609,13 +1609,16 @@ A fedetlen helyek mindkét állapoton ugyanazon a hat fájlon állnak (utasítá
 nélkül a `resolve-undo-shortcut.ts` 4. szabályát fedetlenül hagyta (16/12/3/16); a második teszt
 billentyű lépése ezt zárja. Az `apps/web/package.json` küszöbe nem változott.
 
-### 52.5 Nyitott kérdés: a megerősítő modális címe
+### 52.5 A megerősítő modális címe és törzse (lezárva)
 
-A SPEC-008 5.10 1. pontja a modális két gombját rögzíti ("Kilépés mentés nélkül", "Mégse"), a
-címét nem. A `Modal` hozzáférhető nevét a cím adja (`aria-labelledby`), és a repó minden modálisa
-címet visel. A megvalósításban álló "Mentetlen változtatások" cím a szerkesztő lábléc státuszának
-meglévő szövege; **nem eldöntött**, a user döntésére vár. Ugyanígy nem rögzített, kell-e törzs
-szöveg (alcím) a cím alá; a megvalósításban nincs.
+A SPEC-008 5.10 1. pontja a modális két gombját rögzítette ("Kilépés mentés nélkül", "Mégse"), a
+címét és a törzsét nem; a megvalósítás ideiglenesen a lábléc státuszának "Mentetlen változtatások"
+szövegét használta címként, törzs nélkül. **User döntés (2026-10-17):** a cím "Kilépés mentés
+nélkül?", a törzs "A mentetlen változtatások elvesznek."; a gombok szövege változatlan. A döntés a
+SPEC-008 5.10 1. pontjába és a 105. kritériumba átvezetve; a `NavigationConfirmationModal` a törzset
+a `Modal` gyerekeként, `<p>` elemben rajzolja (a `delete-workflow-modal.tsx` mintája). A unit
+(`NavigationConfirmationModal.spec.tsx`) és az e2e
+(`graph-editor-discard-navigation.spec.ts`) a címet és a törzset állítja.
 
 ### 52.6 Nem ellenőrzött
 
@@ -1624,3 +1627,15 @@ szöveg (alcím) a cím alá; a megvalósításban nincs.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
 - A böngésző vissza és előre gombja mentetlen változásnál: ma megerősítés nélkül vált (a
   `popstate` ág az őrt nem kérdezi), és a T-009-57 lépése.
+
+### 52.7 A változtatások elvetése mentés közben
+
+A review hibát talált: a "Változtatások elvetése" menüpont mentés közben is választható volt, miközben
+a Visszavonás gomb tiltott. A review mérése szerint mentés közben elvetve a `PUT` a régi állapotot
+mentette, a képernyő viszont az elvetett állapotot mutatta "Mentetlen változtatások" jelzéssel. A user
+2026-10-16-i döntése szerint mentés közben se a gomb, se a billentyű nem von vissza (SPEC-008 5.10, a
+billentyűk 5. szabálya); az elvetés ugyanennek a szándéknak felel meg. Javítás: a menüpont `disabled`,
+ha `isSaving`. Unit teszt: `GraphEditorScreen.spec.tsx`, "a mentés alatt a menüpont tiltott...";
+a mentés indítása után a menüpont tiltott, a kattintás nem változtat a dokumentumon. **Rontás
+igazolás:** az `isSaving ||` elhagyásával a fájl tesztjei közül pontosan ez az egy bukik (1 bukott, 57
+sikeres), a javított állapoton mind a 58 zöld.
