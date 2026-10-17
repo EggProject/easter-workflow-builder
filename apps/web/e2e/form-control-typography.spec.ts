@@ -62,8 +62,21 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   onUnhandledError: null,
 };
 
+// A gráfnak Startja is van, mint minden mai workflow-nak (SPEC-008 5.8,
+// O-20): Start nélkül a betöltés egy Startot venne fel az origóra (O-28), ami
+// az ott álló agent kártyát fedné, és a kattintást elfogná.
 const GRAPH: WorkflowGraphDocument = {
   nodes: [
+    {
+      id: 'n-start',
+      type: 'start',
+      label: 'Indítás',
+      positionX: -450,
+      positionY: 0,
+      config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    },
     {
       id: 'n-agent',
       type: 'agent_step',
