@@ -1973,7 +1973,8 @@ PLAN-009 T-009-57 sora a meglévő küszöböt írja elő; a százalékok előtt
 
 ### 57.6 Nem ellenőrzött
 
-- **A böngésző felületének vissza gombja a Chromium előzmény manipulációs beavatkozása mellett.** A
+- **Ismert korlát (user döntés 2026-10-17): a böngésző felületének vissza gombja a Chromium előzmény
+  manipulációs beavatkozása mellett.** A
   visszaíró `pushState` a `popstate` kezelőjében, felhasználói aktiváció nélkül fut, közvetlenül egy
   azonos dokumentumon belüli vissza lépés után; a 57.1 forrása szerint ilyenkor a dokumentum
   bejegyzései kihagyható jelölést kapnak, és csak egy újabb aktiváció törli őket. Ebből az
@@ -1984,5 +1985,10 @@ PLAN-009 T-009-57 sora a meglévő küszöböt írja elő; a százalékok előtt
   párbeszéde kér megerősítést. A Playwright `page.goBack()` a `Page.navigateToHistoryEntry` hívással
   egy adott bejegyzésre lép (57.1), tehát a felület gombjának kihagyó logikáját nem futtatja: ez a
   pont ebben a környezetben nem mérhető. Mérni valódi Chrome-ban, kézzel lehetne.
+  A user döntése szerint ez ismert korlát, nem hárítjuk el: `Esc`-kel zárt modálisnál vagy újabb
+  vissza gombnál a böngésző saját `beforeunload` kérdése jöhet a mi modálisunk helyett, adat
+  kérdés nélkül így sem vész el. A Chromium dokumentuma (57.1) a feltételt (aktiváció nélkül
+  felvett bejegyzés) és a kihagyást egyaránt kimondja; a következmény a mi kódunkra levezetett,
+  nem mért. Rögzítve: SPEC-008 5.10 "Ismert korlát" bekezdés.
 - Firefox és WebKit: az `apps/web/playwright.config.ts` csak chromiumot definiál.
 - A kézzel beírt cím és az újratöltés `beforeunload` párbeszéde a T-009-53 lépése (52.6).
