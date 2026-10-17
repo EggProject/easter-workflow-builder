@@ -15,6 +15,7 @@ import { SubWorkflowNodeFields } from './SubWorkflowNodeFields.tsx';
 import { UnhandledErrorPolicyField } from './UnhandledErrorPolicyField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 import { fieldErrorsFromZodError } from './field-errors-from-zod-error.ts';
+import { findBlankAgentDefinitionFields } from './find-blank-agent-definition-fields.ts';
 import './node-inspector.css';
 
 export interface NodeInspectorProperties {
@@ -152,8 +153,14 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
   // A mezőnkénti hiba a mentési sémán áll (SPEC-008 5.4, O-21): ugyanaz a
   // szabály jelez a mező alatt, ami a mentés előtti ellenőrzést és a szerver
   // `PUT` elutasítását adja, tehát egy üres kötelező szöveg mező is itt jelez.
+  // Mellette az `agents` bejegyzések kötelező mezőinek űrlap oldali szabálya
+  // (O-38), ugyanaz, amit a mentés előtti `validateGraphForSave` is futtat.
   const parsedConfig = NodeConfigSaveSchema.safeParse(node.config);
-  const fieldErrors = parsedConfig.success ? NO_FIELD_ERRORS : fieldErrorsFromZodError(parsedConfig.error);
+  const issues = [
+    ...(parsedConfig.success ? [] : parsedConfig.error.issues),
+    ...findBlankAgentDefinitionFields(node.config),
+  ];
+  const fieldErrors = issues.length === 0 ? NO_FIELD_ERRORS : fieldErrorsFromZodError({ issues });
 
   function handleConfigChange(nextConfig: NodeConfig): void {
     onChange({ ...node, config: nextConfig });

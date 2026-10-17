@@ -623,3 +623,145 @@ describe('NodeConfigSaveSchema: a szabályok a típushiba mellett is lefutnak (S
     expect(issuePaths(parsed.error)).toEqual([['maxIterations']]);
   });
 });
+
+const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
+
+interface PositiveIntegerFieldCase {
+  readonly field: string;
+  readonly path: readonly (string | number)[];
+  readonly build: (value: number) => unknown;
+}
+
+/**
+ * A három pozitív egész szám mező (SPEC-008 5.4, O-37), mezőnként egy
+ * egyébként mentésre kész konfiggal; a `backoffMs` lista minden helyén
+ * külön eset, hogy a szabály minden elemre igazolt legyen.
+ */
+const POSITIVE_INTEGER_FIELD_CASES: readonly PositiveIntegerFieldCase[] = [
+  {
+    field: 'loop maxIterations',
+    path: ['maxIterations'],
+    build: (value) => ({
+      type: 'loop',
+      maxIterations: value,
+      continueExpression: 'i < 3',
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'error_handler maxAttempts',
+    path: ['maxAttempts'],
+    build: (value) => ({
+      type: 'error_handler',
+      maxAttempts: value,
+      backoffMs: [100, 200, 400],
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  ...[0, 1, 2].map((index): PositiveIntegerFieldCase => ({
+    field: `error_handler backoffMs[${String(index)}]`,
+    path: ['backoffMs', index],
+    build: (value) => ({
+      type: 'error_handler',
+      maxAttempts: 3,
+      backoffMs: [100, 200, 400].map((delay, position) => (position === index ? value : delay)),
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    }),
+  })),
+];
+
+describe('NodeConfigSaveSchema: a szám mezők pozitív egészek (SPEC-008 5.4, O-37)', () => {
+  for (const { field, path, build } of POSITIVE_INTEGER_FIELD_CASES) {
+    describe(field, () => {
+      for (const value of [1, 7]) {
+        it(`a(z) ${String(value)} pozitív egész átmegy`, () => {
+          expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        });
+      }
+
+      for (const [description, value] of [
+        ['nulla', 0],
+        ['negatív', -3],
+        ['nem egész', 1.5],
+      ] as const) {
+        it(`a ${description} érték (${String(value)}) elbukik, a hiba a mező útvonalán áll`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) {
+            return;
+          }
+          expect(issuePaths(parsed.error)).toEqual([path]);
+          expect(parsed.error.issues[0]?.message).toBe(NOT_POSITIVE_INTEGER_MESSAGE);
+        });
+
+        it(`a WorkflowNodeInputSchema és a ReplaceGraphRequestSchema a ${description} értéket a teljes útvonalon utasítja el`, () => {
+          const node = WorkflowNodeInputSchema.safeParse(nodeWith(build(value)));
+          const request = ReplaceGraphRequestSchema.safeParse({ nodes: [nodeWith(build(value))], edges: [] });
+
+          expect(node.success).toBe(false);
+          expect(request.success).toBe(false);
+          if (node.success || request.success) {
+            return;
+          }
+          expect(issuePaths(node.error)).toEqual([['config', ...path]]);
+          expect(issuePaths(request.error)).toEqual([['nodes', 0, 'config', ...path]]);
+        });
+
+        it(`az olvasó NodeConfigSchema, WorkflowNodeSchema és WorkflowGraphDocumentSchema a ${description} értéket elfogadja`, () => {
+          const config = build(value);
+          const storedNode = storedNodeWith(config);
+
+          expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+          expect(WorkflowNodeSchema.safeParse(storedNode).success).toBe(true);
+          expect(WorkflowGraphDocumentSchema.safeParse({ nodes: [storedNode], edges: [] }).success).toBe(true);
+        });
+      }
+    });
+  }
+
+  it('a backoffMs több hibás eleme mind külön hibát ad, a saját indexével', () => {
+    const parsed = NodeConfigSaveSchema.safeParse({
+      type: 'error_handler',
+      maxAttempts: 0,
+      backoffMs: [100, 0, -3, 1.5],
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['maxAttempts'], ['backoffMs', 1], ['backoffMs', 2], ['backoffMs', 3]]);
+  });
+
+  it('a nem pozitív egész szám a többi szabály hibája mellett is jelez, egy kísérletben', () => {
+    const parsed = NodeConfigSaveSchema.safeParse({
+      type: 'loop',
+      maxIterations: 0,
+      continueExpression: '',
+      onUnhandledError: null,
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) {
+      return;
+    }
+    expect(issuePaths(parsed.error)).toEqual([['continueExpression'], ['onUnhandledError'], ['maxIterations']]);
+  });
+
+  it('a más típusú szám mező nem tartozik a szabály alá (human_approval timeoutMs)', () => {
+    const config = {
+      type: 'human_approval',
+      title: 'Jóváhagyás',
+      bodyTemplate: 'Engedélyezed?',
+      timeoutMs: 0,
+      onUnhandledError: 'fail_run',
+    };
+
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+  });
+});

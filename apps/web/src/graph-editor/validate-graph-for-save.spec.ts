@@ -106,4 +106,92 @@ describe('validateGraphForSave', () => {
     const outcome = validateGraphForSave([START_NODE], [edgeWithExtraField]);
     expect(outcome.kind).toBe('error');
   });
+
+  it('nem pozitív egész szám mezőre error Outcome-ot ad, ami megnevezi a mező útvonalát (SPEC-008 5.4, O-37)', () => {
+    const errorHandlerNode: WorkflowNodeInput = {
+      id: 'n-4',
+      type: 'error_handler',
+      label: 'Hibakezelő',
+      positionX: 0,
+      positionY: 0,
+      config: {
+        type: 'error_handler',
+        maxAttempts: 0,
+        backoffMs: [100, -3, 1.5],
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_run',
+      },
+    };
+    expect(validateGraphForSave([START_NODE, errorHandlerNode], [])).toEqual({
+      kind: 'error',
+      message:
+        'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.maxAttempts, ' +
+        'nodes.1.config.backoffMs.1, nodes.1.config.backoffMs.2 (invalid_request).',
+    });
+  });
+
+  describe('az agents bejegyzés kötelező mezői (SPEC-008 5.4, O-38)', () => {
+    const AGENT_STEP_SETTINGS = {
+      promptTemplate: 'sablon',
+      providerId: null,
+      modelId: null,
+      effort: null,
+      thinking: null,
+      allowedTools: [],
+      disallowedTools: [],
+      permissionMode: null,
+      maxTurns: null,
+      maxBudgetUsd: null,
+      systemPrompt: null,
+      agents: {},
+      skills: null,
+      mcpServers: {},
+      enabledEngineHooks: [],
+      cwd: null,
+      additionalDirectories: [],
+      sandbox: null,
+      agentTools: [],
+      sessionMode: 'isolated' as const,
+      structuredOutput: null,
+    };
+
+    function agentNodeWith(agents: Readonly<Record<string, unknown>>, promptTemplate = 'sablon'): WorkflowNodeInput {
+      return {
+        id: 'n-agent',
+        type: 'agent_step',
+        label: 'Agent',
+        positionX: 0,
+        positionY: 0,
+        config: { ...AGENT_STEP_SETTINGS, promptTemplate, agents, type: 'agent_step', onUnhandledError: 'fail_run' },
+      };
+    }
+
+    it('az "Agent hozzáadása" által felvett üres bejegyzés a mentést megállítja, és mindkét mező útvonalát megnevezi', () => {
+      expect(validateGraphForSave([START_NODE, agentNodeWith({ uj: { description: '', prompt: '' } })], [])).toEqual({
+        kind: 'error',
+        message:
+          'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.agents.uj.description, ' +
+          'nodes.1.config.agents.uj.prompt (invalid_request).',
+      });
+    });
+
+    it('a séma hibái után az agents mezők útvonalát is megnevezi, egy üzenetben', () => {
+      expect(
+        validateGraphForSave([START_NODE, agentNodeWith({ uj: { description: 'Új', prompt: ' ' } }, '')], []),
+      ).toEqual({
+        kind: 'error',
+        message:
+          'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.promptTemplate, ' +
+          'nodes.1.config.agents.uj.prompt (invalid_request).',
+      });
+    });
+
+    it('kitöltött bejegyzéssel a mentés átmegy', () => {
+      const agentNode = agentNodeWith({ uj: { description: 'Új', prompt: 'Dolgozz.' } });
+      expect(validateGraphForSave([START_NODE, agentNode], [])).toEqual({
+        kind: 'ok',
+        value: { nodes: [START_NODE, agentNode], edges: [] },
+      });
+    });
+  });
 });

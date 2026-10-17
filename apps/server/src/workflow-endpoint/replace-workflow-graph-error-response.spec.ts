@@ -479,4 +479,95 @@ describe('PUT /api/workflows/{workflowId}/graph - öt hibás eset (SPEC-005/006,
       expect(sink.lines()).toHaveLength(0);
     });
   }
+
+  /**
+   * A pozitív egész szám mezők (SPEC-008 5.4, O-37, 116. kritérium): mezőnként a
+   * 0, a -3 és az 1,5 érték, a `backoffMs` lista minden helyén is. A JSON a
+   * három értéket változatlanul viszi át, tehát a kliens és a szerver
+   * ugyanazt az üzenetet adja.
+   */
+  const POSITIVE_INTEGER_FIELD_CASES: readonly {
+    readonly label: string;
+    readonly path: string;
+    readonly build: (value: number) => Record<string, unknown>;
+  }[] = [
+    {
+      label: 'loop maxIterations',
+      path: 'nodes.0.config.maxIterations',
+      build: (value) => ({
+        type: 'loop',
+        maxIterations: value,
+        continueExpression: 'i < 3',
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    {
+      label: 'error_handler maxAttempts',
+      path: 'nodes.0.config.maxAttempts',
+      build: (value) => ({
+        type: 'error_handler',
+        maxAttempts: value,
+        backoffMs: [100, 200, 400],
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_run',
+      }),
+    },
+    ...[0, 1, 2].map((index) => ({
+      label: `error_handler backoffMs[${String(index)}]`,
+      path: `nodes.0.config.backoffMs.${String(index)}`,
+      build: (value: number) => ({
+        type: 'error_handler',
+        maxAttempts: 3,
+        backoffMs: [100, 200, 400].map((delay, position) => (position === index ? value : delay)),
+        handledErrorKinds: [],
+        onUnhandledError: 'fail_run',
+      }),
+    })),
+  ];
+
+  for (const { label, path, build } of POSITIVE_INTEGER_FIELD_CASES) {
+    for (const value of [0, -3, 1.5]) {
+      it(`(k) ${label} = ${String(value)}: 400 invalid_request a mező útvonalával, ugyanazzal az üzenettel, mint a kliens ellenőrzése, a tárolt gráf változatlan, nem naplózva (SPEC-008 5.4, O-37)`, async () => {
+        const { baseUrl, sink, workflowId } = await setup();
+        const stored = await putGraph(baseUrl, workflowId, { nodes: [branchNode('pos')], edges: [] });
+        expect(stored.status).toBe(200);
+        const before = database?.workflows.readGraph(workflowId);
+        const config = build(value);
+        const graph = {
+          nodes: [{ id: 'n-number', type: config['type'], label: '', positionX: 0, positionY: 0, config }],
+          edges: [],
+        };
+        const clientCheck = ReplaceGraphRequestSchema.safeParse(graph);
+        if (clientCheck.success) {
+          throw new Error('a kliens oldali ellenőrzésnek el kell utasítania a nem pozitív egész számot');
+        }
+
+        const response = await putGraph(baseUrl, workflowId, graph);
+
+        expect(response.status).toBe(400);
+        const body: unknown = await response.json();
+        expect(body).toStrictEqual({
+          code: 'invalid_request',
+          message: `A kérés törzse érvénytelen, hibás mező(k): ${path} (invalid_request).`,
+        });
+        expect(body).toStrictEqual(zodErrorToProtocolErrorBody(clientCheck.error));
+        expect(database?.workflows.readGraph(workflowId)).toStrictEqual(before);
+        expect(sink.lines()).toHaveLength(0);
+      });
+    }
+
+    it(`(k) ${label} pozitív egész értékkel: 200, a gráf tárolódik`, async () => {
+      const { baseUrl, workflowId } = await setup();
+      const config = build(5);
+
+      const response = await putGraph(baseUrl, workflowId, {
+        nodes: [{ id: 'n-number', type: config['type'], label: '', positionX: 0, positionY: 0, config }],
+        edges: [],
+      });
+
+      expect(response.status).toBe(200);
+      const graph = database?.workflows.readGraph(workflowId);
+      expect(graph?.kind === 'ok' && graph.value.nodes.map((node) => node.config)).toStrictEqual([config]);
+    });
+  }
 });

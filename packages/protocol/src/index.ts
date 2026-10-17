@@ -221,3 +221,6 @@ export {
 // szigorodik, az olvasó NodeConfigSchema változatlan.
 export { NodeConfigSaveSchema } from './node-config/node-config-save-schema.ts';
 export { REQUIRED_TEXT_FIELD_PATHS } from './node-config/required-text-field-paths.ts';
+// Az üres kötelező mező mondata: az apps/web az agents bejegyzés kötelező mezőire ugyanezt adja
+// (SPEC-008 5.4, O-38), a mentési sémán kívül.
+export { BLANK_FIELD_MESSAGE } from './node-config/blank-field-message.ts';

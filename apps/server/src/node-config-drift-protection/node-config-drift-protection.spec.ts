@@ -330,3 +330,248 @@ describe('a kötelező szöveg mezők mezőnként a protokoll mentési sémájá
     });
   }
 });
+
+interface NumberFieldCase {
+  readonly field: string;
+  readonly path: string;
+  readonly build: (value: number) => unknown;
+}
+
+/**
+ * A pozitív egész szám mezők (SPEC-008 5.4, O-37): a `protocol` mentési
+ * sémájának szabálya a `db` `isNodeConfig` guard pozitív egész szabályának
+ * (`isPositiveInteger`, SPEC-003 4.3) szándékos duplikátuma. A `db` oldalon
+ * nincs mezőtábla, tehát típusszintű ág sem: a védelem mezőnként futásidejű,
+ * a mezők listája itt, a `db` guardjából kiolvasva áll (`loop.maxIterations`,
+ * `error_handler.maxAttempts`, `error_handler.backoffMs` minden eleme). A
+ * szándékosan elrontott próba (a szabály kivétele az egyik oldalon) a
+ * `docs/research/2026-10-17-szam-es-agent-mezok.md` fájlban.
+ */
+const POSITIVE_INTEGER_FIELD_CASES: readonly NumberFieldCase[] = [
+  {
+    field: 'loop: maxIterations',
+    path: 'maxIterations',
+    build: (value) => ({
+      type: 'loop',
+      maxIterations: value,
+      continueExpression: 'i < 3',
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'error_handler: maxAttempts',
+    path: 'maxAttempts',
+    build: (value) => ({
+      type: 'error_handler',
+      maxAttempts: value,
+      backoffMs: [100, 200, 400],
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  ...[0, 1, 2].map((index): NumberFieldCase => ({
+    field: `error_handler: backoffMs.${String(index)}`,
+    path: `backoffMs.${String(index)}`,
+    build: (value) => ({
+      type: 'error_handler',
+      maxAttempts: 3,
+      backoffMs: [100, 200, 400].map((delay, position) => (position === index ? value : delay)),
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    }),
+  })),
+];
+
+/**
+ * A többi szám mező egyik oldalon sem tartozik a pozitív egész szabály alá: ha
+ * a `db` guard egyszer szigorítana rajtuk, ez az ág bukik, és a `protocol`
+ * mentési sémájának is követnie kell.
+ */
+const UNRESTRICTED_NUMBER_FIELD_CASES: readonly NumberFieldCase[] = [
+  {
+    field: 'human_approval: timeoutMs',
+    path: 'timeoutMs',
+    build: (value) => ({
+      type: 'human_approval',
+      title: 'Jóváhagyás',
+      bodyTemplate: 'Engedélyezed?',
+      timeoutMs: value,
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'agent_step: maxTurns',
+    path: 'maxTurns',
+    build: (value) => ({
+      ...VALID_AGENT_STEP_SETTINGS,
+      maxTurns: value,
+      type: 'agent_step',
+      onUnhandledError: 'fail_run',
+    }),
+  },
+  {
+    field: 'agent_step: maxBudgetUsd',
+    path: 'maxBudgetUsd',
+    build: (value) => ({
+      ...VALID_AGENT_STEP_SETTINGS,
+      maxBudgetUsd: value,
+      type: 'agent_step',
+      onUnhandledError: 'fail_run',
+    }),
+  },
+];
+
+const NOT_POSITIVE_INTEGER_VALUES = [
+  ['nulla', 0],
+  ['negatív', -3],
+  ['nem egész', 1.5],
+] as const;
+
+describe('a pozitív egész szám mezők mezőnként a protokoll mentési sémáján és a db isNodeConfig guardján is ugyanúgy döntenek', () => {
+  for (const { field, path, build } of POSITIVE_INTEGER_FIELD_CASES) {
+    describe(field, () => {
+      it('a pozitív egész mindkettőn átmegy', () => {
+        expect(NodeConfigSaveSchema.safeParse(build(5)).success).toBe(true);
+        expect(isNodeConfig(build(5))).toBe(true);
+      });
+
+      for (const [description, value] of NOT_POSITIVE_INTEGER_VALUES) {
+        it(`a ${description} érték (${String(value)}) mindkettőn elbukik, a protokoll a mező útvonalán`, () => {
+          const parsed = NodeConfigSaveSchema.safeParse(build(value));
+
+          expect(parsed.success).toBe(false);
+          expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+          expect(isNodeConfig(build(value))).toBe(false);
+        });
+      }
+    });
+  }
+
+  for (const { field, build } of UNRESTRICTED_NUMBER_FIELD_CASES) {
+    for (const [description, value] of NOT_POSITIVE_INTEGER_VALUES) {
+      it(`${field}: a ${description} érték (${String(value)}) mindkettőn átmegy, a szabály alá nem tartozik`, () => {
+        expect(NodeConfigSaveSchema.safeParse(build(value)).success).toBe(true);
+        expect(isNodeConfig(build(value))).toBe(true);
+      });
+    }
+  }
+});
+
+const SAVABLE_AGENT_STEP = { ...VALID_AGENT_STEP_SETTINGS, type: 'agent_step', onUnhandledError: 'fail_run' };
+
+/**
+ * A mentési séma és a `db` `isNodeConfig` guard egyezése a guard minden
+ * ellenőrzött alakján, a szám mezőkön túl (T-009-60): a szerver `PUT .../graph`
+ * kezelője a `config` mezőt a mentési séma után guard nélkül adja át a `db`-nek,
+ * mert egy ottani `isNodeConfig` hibaág a HTTP úton garantáltan sosem futna
+ * (`docs/research/2026-10-17-szam-es-agent-mezok.md`). Ha egy eset itt eltér, a
+ * két oldal szétvált, és a kezelő a `db`-be a guardon elbukó konfigot írhatna.
+ */
+const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
+  readonly label: string;
+  readonly config: unknown;
+  readonly accepted: boolean;
+}[] = [
+  {
+    label: 'preset rendszer prompt minden mezővel',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: null, excludeDynamicSections: null },
+    },
+    accepted: true,
+  },
+  {
+    label: 'preset rendszer prompt append nélkül',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      systemPrompt: { type: 'preset', preset: 'claude_code', excludeDynamicSections: null },
+    },
+    accepted: false,
+  },
+  {
+    label: 'stdio MCP szerver envNames nélkül',
+    config: { ...SAVABLE_AGENT_STEP, mcpServers: { a: { type: 'stdio', command: 'x', args: [] } } },
+    accepted: false,
+  },
+  {
+    label: 'http MCP szerver authEnvName mezővel',
+    config: { ...SAVABLE_AGENT_STEP, mcpServers: { a: { type: 'http', url: 'u', authEnvName: null } } },
+    accepted: true,
+  },
+  { label: 'skills: all', config: { ...SAVABLE_AGENT_STEP, skills: 'all' }, accepted: true },
+  { label: 'ismeretlen skills szöveg', config: { ...SAVABLE_AGENT_STEP, skills: 'none' }, accepted: false },
+  { label: 'hiányos sandbox', config: { ...SAVABLE_AGENT_STEP, sandbox: { enabled: true } }, accepted: false },
+  {
+    label: 'strukturált kimenet schema kulcs nélkül',
+    config: { ...SAVABLE_AGENT_STEP, structuredOutput: { strategy: 'emit_output_tool' } },
+    accepted: false,
+  },
+  { label: 'szám effort', config: { ...SAVABLE_AGENT_STEP, effort: 3 }, accepted: false },
+  { label: 'tetszőleges effort szöveg', config: { ...SAVABLE_AGENT_STEP, effort: 'whatever' }, accepted: true },
+  { label: 'negatív maxTurns', config: { ...SAVABLE_AGENT_STEP, maxTurns: -1 }, accepted: true },
+  {
+    label: 'start bemeneti mező required nélkül',
+    config: {
+      type: 'start',
+      inputFields: [{ name: 'a', label: 'b', valueKind: 'string' }],
+      onUnhandledError: 'fail_run',
+    },
+    accepted: false,
+  },
+  {
+    label: 'branch defaultBranchKey nélkül',
+    config: { type: 'branch', expression: 'x', branches: [], onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'sub_workflow nem szöveg inputMapping értékkel',
+    config: { type: 'sub_workflow', targetWorkflowId: 'w', inputMapping: { a: 1 }, onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'join merge lista settings értékkel',
+    config: { type: 'join', mode: 'merge', settings: [], onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'human_approval timeoutMs nélkül',
+    config: { type: 'human_approval', title: 't', bodyTemplate: 'b', onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'human_approval végtelen timeoutMs',
+    config: {
+      type: 'human_approval',
+      title: 't',
+      bodyTemplate: 'b',
+      timeoutMs: Infinity,
+      onUnhandledError: 'fail_run',
+    },
+    accepted: false,
+  },
+  {
+    label: 'loop végtelen maxIterations',
+    config: { type: 'loop', maxIterations: Infinity, continueExpression: 'x', onUnhandledError: 'fail_run' },
+    accepted: false,
+  },
+  {
+    label: 'error_handler nagy pozitív egészekkel',
+    config: {
+      type: 'error_handler',
+      maxAttempts: 2 ** 60,
+      backoffMs: [2 ** 60],
+      handledErrorKinds: [],
+      onUnhandledError: 'fail_run',
+    },
+    accepted: true,
+  },
+];
+
+describe('a mentési séma és a db isNodeConfig guard a guard ellenőrzött alakjain ugyanúgy dönt (T-009-60)', () => {
+  for (const { label, config, accepted } of SAVE_SCHEMA_GUARD_AGREEMENT_CASES) {
+    it(label, () => {
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(accepted);
+      expect(isNodeConfig(config)).toBe(accepted);
+    });
+  }
+});
