@@ -512,6 +512,8 @@ test('a null kezeletlen hiba szabály mentési kísérlete PUT nélkül marad, a
   const panel = page.locator('.node-inspector');
   const policySelect = panel.getByRole('combobox', { name: 'Kezeletlen hiba szabálya' });
   await expectSelectedLabel(policySelect, 'Válassz…');
+  // A mező a címkéje szerint is pontosan egy elemként található meg (AC110).
+  await expect(panel.getByLabel('Kezeletlen hiba szabálya')).toHaveCount(1);
 
   await page.getByRole('button', { name: /^Mentés/ }).click();
   await expectFieldError(panel, policySelect);

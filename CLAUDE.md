@@ -85,12 +85,13 @@ Quote the exact code."
 - Ne meséld el mit fogsz csinálni. Csak csináld.
 - Ha nem tudsz valamit, mondd meg szimplán.
 - Te csak kordinálsz és mindig subagentek dolgoznak a megfelelő model és effort beállítással
-- MODEL ROUTING (kötelező, minden subagentnél és workflow agentnél explicit `model` kell):
+- MODEL ROUTING (kötelező, minden subagentnél és workflow agentnél explicit `model` és `effort` kell):
   - webkeresés, dokumentáció-ellenőrzés, forrás-feltérképezés, grep/recon: `sonnet`
-  - kódolás, ha a specifikáció részletes és nem kell hozzá gondolkodni: `sonnet`
-  - `opus` csak akkor, ha tényleg gondolkodni kell: architektúra, tervezés, adverzariális
-    ellenőrzés, hibakeresés, vagy olyan kódolás ahol a megoldást ki kell találni
-  - soha ne hagyd el a `model` mezőt abban a hitben, hogy majd örököl valamit
+  - ahol csak kódolás kell (a specifikáció részletes, nem kell hozzá gondolkodni): `sonnet`,
+    `medium` vagy `high` effort
+  - ahol többet kell gondolkodni (architektúra, tervezés, adverzariális ellenőrzés,
+    hibakeresés, vagy olyan kódolás ahol a megoldást ki kell találni): `opus`, `medium` effort
+  - soha ne hagyd el a `model` és az `effort` mezőt abban a hitben, hogy majd örököl valamit
 - KÖTELEZŐ MINDIG A WEBES VALIDALÁS!
 - SOSEM ajánlasz konkrét konfigurációs értéket, küszöböt, beállítást vagy számot addig,
   amíg le nem ellenőrizted a tényleges forráskódban vagy a hivatalos dokumentációban, hogy

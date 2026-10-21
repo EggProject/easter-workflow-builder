@@ -455,6 +455,22 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(unsavedIndicator(page)).toBeHidden();
     });
 
+    test('egy menüpont választása után a menü bezárul, és a választott csomópont felkerül a vászonra (AC75)', async ({
+      page,
+    }) => {
+      const knownIds = await readNodeIds(page);
+      const clickPoint = emptyPanePoint(await requireBoundingBox(page.getByTestId('rf__wrapper')));
+      const menu = addNodeMenu(page);
+
+      await page.mouse.click(clickPoint.x, clickPoint.y, { button: 'right' });
+      await expect(menu).toBeVisible();
+      await menu.getByRole('menuitem', { name: 'Elágazás', exact: true }).click();
+
+      await expect(menu).toBeHidden();
+      const node = await locateAddedNode(page, knownIds);
+      await expect(node).toHaveClass(/selected/);
+    });
+
     test('csomóponton és élen a jobb klikk nem nyit menüt és nem tiltja a böngésző menüjét, a vászon üres területén ugyanabban a futásban igen', async ({
       page,
     }) => {

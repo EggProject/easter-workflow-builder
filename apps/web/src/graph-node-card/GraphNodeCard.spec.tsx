@@ -305,9 +305,25 @@ describe('GraphNodeCard', () => {
     expect(container.textContent).not.toContain('nincs implementálva');
   });
 
+  // A nyolc magyar felirat literálként (SPEC-008 6.2 táblázat, AC21), nem a
+  // `describeStepRunStatusBadge` hívásából számolva: a teszt így a leképezés
+  // hibáját is észreveszi. A `satisfies` kimerítővé teszi: egy kilencedik
+  // állapot fordítási hibát ad.
+  const STEP_RUN_STATUS_LABELS = {
+    pending: 'várakozik',
+    running: 'fut',
+    waiting_approval: 'jóváhagyásra vár',
+    succeeded: 'sikeres',
+    failed: 'sikertelen',
+    rejected: 'elutasítva',
+    cancelled: 'megszakítva',
+    interrupted: 'félbeszakítva',
+  } satisfies Readonly<Record<StepRunStatus, string>>;
+
   it.each(StepRunStatusSchema.options)('a "%s" StepRunStatus badge felirata megjelenik a kártyán', (status) => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step, status)]);
     expect(container.querySelector('.badge')).not.toBeNull();
+    expect(container.querySelector('.badge')?.textContent).toBe(STEP_RUN_STATUS_LABELS[status]);
   });
 
   it('futás állapot nélkül nincs badge a kártyán', () => {

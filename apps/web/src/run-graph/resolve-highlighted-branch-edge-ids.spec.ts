@@ -96,6 +96,35 @@ describe('resolveHighlightedBranchEdgeIds', () => {
     expect(highlight([chosen(4, 'igen'), defaulted(9)], 'latest')).toEqual(['e-nem']);
   });
 
+  it('a "legutóbbi" mód csomópontonként a saját legnagyobb eventId-jű döntését veszi, a másik csomópont döntése nem nyomja el (AC88)', () => {
+    // Két branch csomópont egymásba ágyazott eventId sorrenddel: az A
+    // csomópont 3 és 9, a B csomópont 5 és 7. A globálisan legnagyobb
+    // eventId (9) az A csomóponté, tehát egy globális "legutóbbi" a B
+    // csomópont élét elnyomná; a csomópontonkénti szabály szerint A a 9-es
+    // ('nem'), B a 7-es ('igen') döntését emeli ki.
+    const decisionsByNodeId = new Map<string, readonly BranchDecision[]>([
+      ['n-a', [chosen(3, 'igen'), chosen(9, 'nem')]],
+      ['n-b', [chosen(5, 'nem'), chosen(7, 'igen')]],
+    ]);
+    const edges: readonly WorkflowEdgeInput[] = [
+      edge('a-igen', 'n-a', 'igen'),
+      edge('a-nem', 'n-a', 'nem'),
+      edge('b-igen', 'n-b', 'igen'),
+      edge('b-nem', 'n-b', 'nem'),
+    ];
+    const highlightedIn = (mode: 'latest' | 'all'): readonly string[] => [
+      ...resolveHighlightedBranchEdgeIds({
+        decisionsByNodeId,
+        nodes: [branchNode('n-a', null), branchNode('n-b', null)],
+        edges,
+        mode,
+      }),
+    ];
+
+    expect(highlightedIn('latest')).toEqual(['a-nem', 'b-igen']);
+    expect(highlightedIn('all')).toEqual(['a-igen', 'a-nem', 'b-igen', 'b-nem']);
+  });
+
   it('a "minden bejárt" mód minden döntés élét kiemeli', () => {
     expect(highlight([chosen(4, 'igen'), defaulted(9)], 'all')).toEqual(['e-igen', 'e-nem']);
   });
