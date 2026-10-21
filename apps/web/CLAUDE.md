@@ -365,7 +365,9 @@ oda-vissza leképezés az él kiválasztását elnyelte: az élre kattintva nem 
 osztály, ezért a React Flow dokumentált `deleteKeyCode` alapértelmezése (`Backspace`) sem
 találhatott törölni valót. Ugyanez igaz a csomópont kiválasztásának megszűnésére, amit a
 könyvtár élre kattintva küld: enélkül a `Backspace` a kiválasztott él helyett a csomópontot
-törölte.
+törölte. Az él kiválasztásának változása az `applyEdgeChanges` segédfüggvényen megy át
+(`mergeEdgeSelection`, SPEC-008 5.5, 15. szekció 9. kritérium); a `remove` az `onDelete` egyetlen
+útján marad (5.9), más élváltozás a szerkesztőben nem keletkezik.
 
 **A React Flow saját CSS-e a `--xy-*` változóin át van témázva** (`graph-canvas-theme.css`), a
 design system `--ep-*` tokenjeire; kitalált szín nincs. A szállított alapértelmezés mellett a
