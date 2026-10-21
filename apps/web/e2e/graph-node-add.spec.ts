@@ -58,7 +58,7 @@ const ADDABLE_NODE_LABELS = [
 
 /**
  * Az API origin minden kérése a betöltéstől kezdve: a felvétel helyi művelet,
- * tehát a három betöltő kérés után egy sem jöhet (SPEC-008 78. kritérium).
+ * tehát a négy betöltő kérés (gráf, workflow, beállítások, provider lista) után egy sem jöhet (SPEC-008 78. kritérium, 9. szekció 4. pont).
  */
 function recordApiRequests(page: Page): readonly string[] {
   const requests: string[] = [];
@@ -86,7 +86,7 @@ test('a "Hozzáadás" gomb menüje kilenc típust ad, és mindegyik felvett csom
   const apiRequests = recordApiRequests(page);
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId('rf__node-n1')).toBeVisible();
-  await expect.poll(() => apiRequests.length).toBe(3);
+  await expect.poll(() => apiRequests.length).toBe(4);
 
   const menuTrigger = page.getByRole('button', { name: 'Hozzáadás', exact: true });
   const menu = page.getByRole('menu', { name: 'Hozzáadás' });
@@ -103,7 +103,7 @@ test('a "Hozzáadás" gomb menüje kilenc típust ad, és mindegyik felvett csom
   }
 
   await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
-  expect(apiRequests).toHaveLength(3);
+  expect(apiRequests).toHaveLength(4);
 });
 
 test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, és a választott csomópont kiválasztva, nyitott panellel kerül fel, kérés nélkül', async ({
@@ -112,7 +112,7 @@ test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, é
   const apiRequests = recordApiRequests(page);
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId('rf__node-n1')).toBeVisible();
-  await expect.poll(() => apiRequests.length).toBe(3);
+  await expect.poll(() => apiRequests.length).toBe(4);
 
   const wrapperBox = await page.getByTestId('rf__wrapper').boundingBox();
   if (wrapperBox === null) {
@@ -128,7 +128,7 @@ test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, é
   await expect(menu).toBeHidden();
   await expect(page.getByRole('complementary', { name: 'Elágazás beállításai' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
-  expect(apiRequests).toHaveLength(3);
+  expect(apiRequests).toHaveLength(4);
 });
 
 // A "Hozzáadás" a lábléc akciósávjában, közvetlenül a "Mentés" split button
