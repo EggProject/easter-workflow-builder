@@ -25,8 +25,9 @@ function collectUnseenTargets(graph: ExecutableGraph, nodeId: string, reachable:
  * elérhetőség kérdése független attól, hogy egy él visszaél-e. A látogatott
  * halmaz zárja le a bejárást, ezért a kör nem okoz végtelen futást.
  *
- * Három helyen ez az egyetlen bejárási primitív: a visszaél keresés a `loop`
- * node-ból, a ciklustörzs kiszámítása a `continue` élek célpontjaiból, és a
+ * Három helyen használt bejárási primitív: a visszaél keresés a `start`
+ * node-ból (a dominancia vizsgálat értelmezési tartománya, `findLoopBackEdges`),
+ * a ciklustörzs kiszámítása a `continue` élek célpontjaiból, és a
  * SPEC-004 4.7 `unreachable_node` ellenőrzése a `start` node-ból. Az utóbbi
  * hibaágát a `run-validation` téma adja (PLAN-005 T-005-15), itt csak a nyers
  * halmaz áll elő.

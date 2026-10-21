@@ -865,6 +865,44 @@ function iterationsSeenFor(seen: readonly SeenIteration[], text: string): readon
   return seen.filter((entry) => entry.text === text).map((entry) => entry.iteration);
 }
 
+// Egy futás `step_run` sorai időrendben, olvasható alakban: `<node> <iteration>`,
+// és a szülő lépés futása ugyanígy, ha van (`<node> <iteration> < <szülő>`).
+function stepRunLabelsOf(database: DatabaseContext, runId: string): readonly string[] {
+  const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
+  const labelById = new Map(rows.map((row) => [row.id, `${row.nodeId} ${String(row.iteration)}`]));
+  return rows.map((row) => {
+    const own = `${row.nodeId} ${String(row.iteration)}`;
+    const parent = row.parentStepRunId === null ? undefined : labelById.get(row.parentStepRunId);
+    return parent === undefined ? own : `${own} < ${parent}`;
+  });
+}
+
+// A `loop_iteration_started` események `<node> <payload iteration>` alakban.
+function loopIterationEventsOf(database: DatabaseContext, runId: string): readonly string[] {
+  const nodeIdByStepRunId = new Map(
+    okOrThrow(database.stepRuns.listStepRuns(runId)).map((row) => [row.id, row.nodeId]),
+  );
+  return okOrThrow(database.events.readEventsSince(runId, 0, 1000))
+    .filter((event) => event.kind === 'loop_iteration_started')
+    .map((event) => {
+      const payloadIteration = isRecord(event.payload) ? event.payload['iteration'] : undefined;
+      return `${String(nodeIdByStepRunId.get(event.stepRunId ?? ''))} ${String(payloadIteration)}`;
+    });
+}
+
+// A 4.6 (b) alakjának node-jai, a külső loop kifejezésével paraméterezve.
+function shapeBNodes(outerExpression: string): readonly WorkflowNodeInput[] {
+  return [
+    startNode('start'),
+    loopNode('kulso', outerExpression, 5),
+    agentNode('elo', 'ELO'),
+    loopNode('belso', 'CIKLUS-2', 5),
+    agentNode('torzs', 'TORZS'),
+    agentNode('koztes', 'KOZTES'),
+    agentNode('vege', 'VEGE'),
+  ];
+}
+
 describe('createEngine', () => {
   it('VÉGPONTTÓL VÉGPONTIG: startRun egy egyszerű start -> agent_step gráfon succeeded futást ad', async () => {
     const harness = openHarness();
@@ -2186,6 +2224,161 @@ describe('createEngine', () => {
       expect(iterationsSeenFor(seen, 'CIKLUS-2')).toStrictEqual([0, 1, 2]);
       expect(loopRows.map((row) => row.iteration)).toStrictEqual([0, 1, 2]);
       expect(iterationsSeenFor(seen, 'TORZS')).toStrictEqual([0, 1]);
+      expect(iterationsSeenFor(seen, 'VEGE')).toStrictEqual([undefined]);
+    });
+  });
+
+  describe('beágyazott loop (SPEC-004 4.6, 6.1, 17. szekció 11b ... 11e)', () => {
+    // A 4.6 (a) alakja: a belső loop `exit` éle közvetlenül a külső loop-ra mutat.
+    const SHAPE_A_EDGES = [
+      edgeOf('e1', 'start', 'kulso'),
+      edgeOf('e2', 'kulso', 'belso', 'continue'),
+      edgeOf('e3', 'belso', 'torzs', 'continue'),
+      edgeOf('e4', 'torzs', 'belso'),
+      edgeOf('e5', 'belso', 'kulso', 'exit'),
+      edgeOf('e6', 'kulso', 'vege', 'exit'),
+    ];
+    // A 4.6 (b) alakja: a belső `exit` egy `koztes` node-on át tér vissza, a
+    // belső loop előtt `elo` áll.
+    const SHAPE_B_EDGES = [
+      edgeOf('e1', 'start', 'kulso'),
+      edgeOf('e2', 'kulso', 'elo', 'continue'),
+      edgeOf('e3', 'elo', 'belso'),
+      edgeOf('e4', 'belso', 'torzs', 'continue'),
+      edgeOf('e5', 'torzs', 'belso'),
+      edgeOf('e6', 'belso', 'koztes', 'exit'),
+      edgeOf('e7', 'koztes', 'kulso'),
+      edgeOf('e8', 'kulso', 'vege', 'exit'),
+    ];
+
+    it('(a) alak: a belső ciklus a várt számban fut, a külső újrafut, a vege a végén fut, a futás succeeded', async () => {
+      const seen: SeenIteration[] = [];
+      const harness = openHarness({ expressionEvaluator: cyclicExpressionEvaluator(seen) });
+      const workflowId = createWorkflow(
+        harness.database,
+        'beagyazott-a',
+        [
+          startNode('start'),
+          loopNode('kulso', 'CIKLUS-1', 5),
+          loopNode('belso', 'CIKLUS-2', 5),
+          agentNode('torzs', 'TORZS'),
+          agentNode('vege', 'VEGE'),
+        ],
+        SHAPE_A_EDGES,
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(stepRunLabelsOf(harness.database, started.run.id)).toStrictEqual([
+        'start 0',
+        'kulso 0',
+        'belso 0 < kulso 0',
+        'torzs 0 < belso 0',
+        'belso 1 < kulso 0',
+        'torzs 1 < belso 1',
+        'belso 2 < kulso 0',
+        'kulso 1',
+        'vege 0',
+      ]);
+      expect(loopIterationEventsOf(harness.database, started.run.id)).toStrictEqual(['kulso 0', 'belso 0', 'belso 1']);
+    });
+
+    it('(b) alak: a várt step_run sorrend start, kulso 0, elo 0, belso 0, 1, 2, torzs 0, 1, koztes 0, kulso 1, vege 0, a futás succeeded', async () => {
+      const harness = openHarness({ expressionEvaluator: cyclicExpressionEvaluator([]) });
+      const workflowId = createWorkflow(harness.database, 'beagyazott-b', shapeBNodes('KULSO-1'), SHAPE_B_EDGES);
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(stepRunLabelsOf(harness.database, started.run.id)).toStrictEqual([
+        'start 0',
+        'kulso 0',
+        'elo 0 < kulso 0',
+        'belso 0 < kulso 0',
+        'torzs 0 < belso 0',
+        'belso 1 < kulso 0',
+        'torzs 1 < belso 1',
+        'belso 2 < kulso 0',
+        'koztes 0 < kulso 0',
+        'kulso 1',
+        'vege 0',
+      ]);
+    });
+
+    it('villa alak: a futás succeeded, minden node lefut, a külső ciklus nem vár a belsőre', async () => {
+      const harness = openHarness({ expressionEvaluator: cyclicExpressionEvaluator([]) });
+      const workflowId = createWorkflow(
+        harness.database,
+        'beagyazott-villa',
+        [
+          startNode('start'),
+          loopNode('kulso', 'CIKLUS-1', 5),
+          agentNode('elo', 'ELO'),
+          loopNode('belso', 'CIKLUS-2', 5),
+          agentNode('torzs', 'TORZS'),
+          agentNode('belso_vege', 'BELSO_VEGE'),
+          agentNode('visszavez', 'VISSZAVEZ'),
+          agentNode('vege', 'VEGE'),
+        ],
+        [
+          edgeOf('e1', 'start', 'kulso'),
+          edgeOf('e2', 'kulso', 'elo', 'continue'),
+          edgeOf('e3', 'elo', 'belso'),
+          edgeOf('e4', 'belso', 'torzs', 'continue'),
+          edgeOf('e5', 'torzs', 'belso'),
+          edgeOf('e6', 'belso', 'belso_vege', 'exit'),
+          edgeOf('e7', 'elo', 'visszavez'),
+          edgeOf('e8', 'visszavez', 'kulso'),
+          edgeOf('e9', 'kulso', 'vege', 'exit'),
+        ],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+      const nodeIds = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).map((row) => row.nodeId);
+
+      expect(status).toBe('succeeded');
+      expect(nodeIds.toSorted((left, right) => left.localeCompare(right))).toStrictEqual([
+        'belso',
+        'belso',
+        'belso',
+        'belso_vege',
+        'elo',
+        'kulso',
+        'kulso',
+        'start',
+        'torzs',
+        'torzs',
+        'vege',
+        'visszavez',
+      ]);
+    });
+
+    it('a belső loop saját kifejezése minden külső iterációban a saját lefutásszámát (0, 1, 2) kapja, nem a külső iterációt; a törzs a belső, az elo és a koztes a külső iterációt látja', async () => {
+      const seen: SeenIteration[] = [];
+      const harness = openHarness({
+        expressionEvaluator: cyclicExpressionEvaluator(seen),
+        templateRenderer: recordingTemplateRenderer(seen),
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'beagyazott-iteration',
+        shapeBNodes('KULSO-2'),
+        SHAPE_B_EDGES,
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(iterationsSeenFor(seen, 'CIKLUS-2')).toStrictEqual([0, 1, 2, 0, 1, 2]);
+      expect(iterationsSeenFor(seen, 'KULSO-2')).toStrictEqual([0, 1, 2]);
+      expect(iterationsSeenFor(seen, 'TORZS')).toStrictEqual([0, 1, 0, 1]);
+      expect(iterationsSeenFor(seen, 'ELO')).toStrictEqual([0, 1]);
+      expect(iterationsSeenFor(seen, 'KOZTES')).toStrictEqual([0, 1]);
       expect(iterationsSeenFor(seen, 'VEGE')).toStrictEqual([undefined]);
     });
   });

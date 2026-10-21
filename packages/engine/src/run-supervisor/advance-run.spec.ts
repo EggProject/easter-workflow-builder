@@ -442,6 +442,10 @@ interface FixtureOptions {
   // A `fail_run` a futás al-workflow futásainak lezárását kéri; megadás
   // nélkül nincs lezárandó gyerek futás.
   readonly cancelChildRunTrees?: ChildWorkflowRunner['cancelChildRunTrees'];
+  // A `RunTopology.loopBackEdgeIds` kézzel megadott halmaza: az elakadt futás
+  // regressziós tesztje ezzel állítja elő a régi, elérhetőség alapú visszaél
+  // halmazt, amit a `validateRun` már nem ad (SPEC-004 4.9).
+  readonly loopBackEdgeIds?: ReadonlySet<string>;
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -511,7 +515,8 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     options.enqueueStart === false ? createSchedulerState() : enqueueStartInstance(createSchedulerState(), 'start');
   const execution: RunExecution = {
     runId: options.runId ?? run.id,
-    topology: validated,
+    topology:
+      options.loopBackEdgeIds === undefined ? validated : { ...validated, loopBackEdgeIds: options.loopBackEdgeIds },
     nodePlans: options.nodePlans ?? plans,
     sessionSourceNodes: collectSessionSourceNodes(validated.nodeConfigsById),
     runInput: {},
@@ -873,5 +878,102 @@ describe('advanceRun', () => {
     const outcome = await advanceRun(fixture.execution, fixture.dependencies);
 
     expect(outcome.kind).toBe('error');
+  });
+});
+
+function keyedEdge(id: string, sourceNodeId: string, targetNodeId: string, branchKey: string): SnapshotEdge {
+  return { id, sourceNodeId, targetNodeId, sourceHandle: null, targetHandle: null, branchKey };
+}
+function loopNode(id: string): SnapshotNode {
+  return node(id, { type: 'loop', maxIterations: 5, continueExpression: 'FOLYTAT', onUnhandledError: 'fail_run' });
+}
+
+// A 4.6 (a) alakja: a belső loop `exit` éle közvetlenül a külső loop-ra mutat.
+function nestedLoopDocument(
+  extraNodes: readonly SnapshotNode[],
+  extraEdges: readonly SnapshotEdge[],
+): GraphSnapshotDocument {
+  return {
+    version: 1,
+    sdkVersionPin: INSTALLED,
+    workflow: { id: 'wf', name: 'teszt', description: null },
+    nodes: [
+      node('start', START),
+      loopNode('kulso'),
+      loopNode('belso'),
+      agentStepNode('torzs'),
+      agentStepNode('vege'),
+      ...extraNodes,
+    ],
+    edges: [
+      edge('e1', 'start', 'kulso'),
+      keyedEdge('e2', 'kulso', 'belso', 'continue'),
+      keyedEdge('e3', 'belso', 'torzs', 'continue'),
+      edge('e4', 'torzs', 'belso'),
+      keyedEdge('e5', 'belso', 'kulso', 'exit'),
+      keyedEdge('e6', 'kulso', 'vege', 'exit'),
+      ...extraEdges,
+    ],
+  };
+}
+
+describe('elakadt futás: run_stalled (SPEC-004 4.9, 17. szekció 44a)', () => {
+  // A régi, "u elérhető v-ből" definíció halmaza az (a) alakon: a belső loop
+  // belépő éle (e2) is visszaél, tehát a belső loop örökre vár (research
+  // 2026-10-21 8.1 szekció).
+  const OLD_REACHABILITY_BACK_EDGES: ReadonlySet<string> = new Set(['e2', 'e4', 'e5']);
+
+  it('a régi visszaél halmazzal bennragadó futás failed, run_stalled, failedBranchCount 0, az üzenet megnevezi a belso node-ot', async () => {
+    const fixture = openFixture({
+      document: nestedLoopDocument([], []),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: () => ({ kind: 'ok', value: true }),
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    const message =
+      'A futás elakadt: a(z) belso node példánya jelölést kapott, de soha nem vált futtathatóvá (run_stalled).';
+    expect(completion).toStrictEqual({
+      status: 'failed',
+      errorKind: 'run_stalled',
+      errorMessage: message,
+      failedBranchCount: 0,
+    });
+    const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+    expect(run.status).toBe('failed');
+    expect(run.errorKind).toBe('run_stalled');
+    expect(run.errorMessage).toBe(message);
+    const finished = okOrThrow(fixture.database.events.readEventsSince(fixture.execution.runId, 0, 100)).filter(
+      (event) => event.kind === 'run_finished',
+    );
+    expect(finished.map((event) => event.payload)).toStrictEqual([
+      { status: 'failed', errorKind: 'run_stalled', errorMessage: message, failedBranchCount: 0 },
+    ]);
+    expect(
+      okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId)).map((row) => row.nodeId),
+    ).toStrictEqual(['start', 'kulso']);
+  });
+
+  it('kezeletlen hibával záró futásnál az elakadás vizsgálata nem írja felül az első kezeletlen hibát', async () => {
+    const failingBranch = node('hibas', {
+      type: 'branch',
+      expression: 'HIBA',
+      branches: [{ key: 'a', label: 'a' }],
+      defaultBranchKey: null,
+      onUnhandledError: 'fail_branch',
+    });
+    const fixture = openFixture({
+      document: nestedLoopDocument([failingBranch], [edge('e7', 'start', 'hibas')]),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: (expression) =>
+        expression === 'HIBA' ? { kind: 'error', message: 'a HIBA kifejezés elhasalt' } : { kind: 'ok', value: true },
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    expect(completion.status).toBe('failed');
+    expect(completion.errorKind).toBe('expression_evaluation_failed');
+    expect(completion.failedBranchCount).toBe(1);
   });
 });

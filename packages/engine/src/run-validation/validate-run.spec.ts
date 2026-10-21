@@ -146,6 +146,20 @@ function validateBase(
   return validateRun(documentOf(nodes, edges), 'minimax', null);
 }
 
+// SPEC-004 4.6 beágyazott `loop` alakjai (17. szekció 10a): mind a három átmegy
+// a teljes ellenőrzésen, a dominancia alapú visszaél halmazzal.
+function loopOf(id: string): SnapshotNode {
+  return node(id, 'loop', {
+    type: 'loop',
+    maxIterations: 5,
+    continueExpression: 'megy',
+    onUnhandledError: 'fail_run',
+  });
+}
+function agentOf(id: string): SnapshotNode {
+  return node(id, 'agent_step', agentStepConfig(null));
+}
+
 describe('validateRun, az érvényes gráf', () => {
   it('minden ellenőrzésen átmegy, és a mellékterméket visszaadja', () => {
     const validated = expectOk(validateBase());
@@ -185,6 +199,98 @@ describe('validateRun, az érvényes gráf', () => {
 
     expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e_tL']));
     expect(validated.fanOutJoinPairing.joinToFanOut).toStrictEqual(new Map());
+  });
+
+  it('beágyazott loop, (a) alak: érvényes, a visszaél halmaz e4 és e5', () => {
+    const nodes = [
+      node('start', 'start', START_CONFIG),
+      loopOf('kulso'),
+      loopOf('belso'),
+      agentOf('torzs'),
+      agentOf('vege'),
+    ];
+    const edges = [
+      edge('e1', 'start', 'kulso'),
+      edge('e2', 'kulso', 'belso', 'continue'),
+      edge('e3', 'belso', 'torzs', 'continue'),
+      edge('e4', 'torzs', 'belso'),
+      edge('e5', 'belso', 'kulso', 'exit'),
+      edge('e6', 'kulso', 'vege', 'exit'),
+    ];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e4', 'e5']));
+  });
+
+  it('beágyazott loop, (b) alak: érvényes, a visszaél halmaz e5 és e7', () => {
+    const nodes = [
+      node('start', 'start', START_CONFIG),
+      loopOf('kulso'),
+      agentOf('elo'),
+      loopOf('belso'),
+      agentOf('torzs'),
+      agentOf('koztes'),
+      agentOf('vege'),
+    ];
+    const edges = [
+      edge('e1', 'start', 'kulso'),
+      edge('e2', 'kulso', 'elo', 'continue'),
+      edge('e3', 'elo', 'belso'),
+      edge('e4', 'belso', 'torzs', 'continue'),
+      edge('e5', 'torzs', 'belso'),
+      edge('e6', 'belso', 'koztes', 'exit'),
+      edge('e7', 'koztes', 'kulso'),
+      edge('e8', 'kulso', 'vege', 'exit'),
+    ];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e5', 'e7']));
+  });
+
+  it('beágyazott loop, villa alak: érvényes, a visszaél halmaz e5 és e8', () => {
+    const nodes = [
+      node('start', 'start', START_CONFIG),
+      loopOf('kulso'),
+      agentOf('elo'),
+      loopOf('belso'),
+      agentOf('torzs'),
+      agentOf('belso_vege'),
+      agentOf('visszavez'),
+      agentOf('vege'),
+    ];
+    const edges = [
+      edge('e1', 'start', 'kulso'),
+      edge('e2', 'kulso', 'elo', 'continue'),
+      edge('e3', 'elo', 'belso'),
+      edge('e4', 'belso', 'torzs', 'continue'),
+      edge('e5', 'torzs', 'belso'),
+      edge('e6', 'belso', 'belso_vege', 'exit'),
+      edge('e7', 'elo', 'visszavez'),
+      edge('e8', 'visszavez', 'kulso'),
+      edge('e9', 'kulso', 'vege', 'exit'),
+    ];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e5', 'e8']));
+  });
+
+  it('több belépésű loop törzs: a törzsből a loop-ra mutató él nem visszaél, a kör graph_cycle_detected', () => {
+    const nodes = [node('start', 'start', START_CONFIG), loopOf('L'), agentOf('t'), agentOf('vege')];
+    const edges = [
+      edge('e1', 'start', 'L'),
+      edge('e2', 'start', 't'),
+      edge('e3', 'L', 't', 'continue'),
+      edge('e4', 't', 'L'),
+      edge('e5', 'L', 'vege', 'exit'),
+    ];
+
+    expect(validateRun(documentOf(nodes, edges), 'minimax', null)).toStrictEqual({
+      kind: 'error',
+      message: 'A gráf kört tartalmaz a következő node-okon át: L, t (graph_cycle_detected).',
+    });
   });
 });
 

@@ -538,6 +538,14 @@ A kérdés: van-e jogos, `succeeded` végállapot, ahol fel nem használt jelöl
 - **Egy téves hipotézis, megcáfolva:** az S1 alak (a törzsből a ciklus utáni node-ra mutató közvetlen él) nem ad csendes kihagyást: a `validateRun` `unbalanced_fan_out_scope` hibával elutasítja (`stall-shape-probe`, `s1_torzs_kozvetlen_el_a_ciklus_utani_nodera`). Az S2 kontroll alak nem ad elakadást. Ezért a `run_stalled` regressziós tesztje a `RunTopology.loopBackEdgeIds` halmazt kézzel adja meg a régi definíció szerint.
 - **Jogos `live` jelöléssel elakadó eset:** a commitolt tesztekben és a vizsgált alakokban nincs. A forrás olvasása szerint minden jogos eset eldönti a jelölt példányt (a nem választott ág `dead`, a `fan_out` N = 0 nem jelöl, a `loop` kilépő lefutás az `exit` ágra `live` jelölést tesz, az `error_handler` halasztott jelölései véglegesülnek; SPEC-004 4.9). **Nem bizonyított, hogy tetszőleges gráfon nincs jogos elakadás** (nem ellenőrzött); a T-010-4b ezért a teljes tesztkészleten megismétli a mérést.
 
+### 8.6 Újramérés a PLAN-010 T-010-4b után (a `run_stalled` bevezetése)
+
+Felállás: a `feat/spec-010-sablon-es-kifejezes` ág T-010-4b munkapéldánya (a `0b91a07` fölött, a dominancia alapú `findLoopBackEdges`, a `markContextOnEdge` a `loop` lefutás lezárásában, a `findStalledInstances` és a `run_stalled` ág bekötve). Eldobható, nem commitolt próba: a `finishRun` a `resolveRunCompletion` után, a leállítás vizsgálata ELŐTT, minden terminális futásnál meghívta a `findStalledInstances` függvényt, és a nem üres eredményt a teszt nevével, a futás záró állapotával és a leállítás jelzőivel egy JSONL fájlba írta (a 8.5 próbájának elve, a jelölés fajtájától függetlenül). Futtatás: `node_modules/.bin/vitest run packages/engine packages/db packages/protocol apps/server --coverage.enabled=false`.
+
+- **A tesztkészlet:** 284 fájl, 2899 teszt, mind zöld.
+- **Találat kettő**, mindkettő az `advance-run.spec.ts` szándékosan bennragadó tesztjeiből (a 4.6 (a) alak a régi, elérhetőség alapú visszaél halmazzal, kézzel megadott `RunTopology.loopBackEdgeIds`): a `run_stalled` regressziós teszt (`succeeded` helyett `failed`, elakadt példány `belso`), és a kezeletlen hibával záró társa (`failed`, a vizsgálat ott nem írja felül az első kezeletlen hibát, elakadt példány `belso`).
+- **Jogos végállapoton nulla találat**, a `failed` és a leállított futásokat is beleértve. A próba a mérés után eltávolítva, a forrás bájtra visszaállítva (`cmp`).
+
 ## 9. A user további döntései (2026-10-21, a mérések után) és az átvezetésük
 
 | #   | Döntés                                                                                                                                                                                                                                                                                  | Átvezetve                                                           |

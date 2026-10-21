@@ -15,6 +15,7 @@ export function createSchedulerState(): SchedulerState {
     fanOutItems: new Map(),
     loopScopeOwners: new Map(),
     loopRunCounts: new Map(),
+    markedInstances: new Map(),
     readyInstances: [],
     runningInstanceKeys: new Set(),
     nextArrivalSequence: 0,
