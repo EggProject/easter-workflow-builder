@@ -1081,7 +1081,8 @@ describe('GraphEditorScreen', () => {
       const button = startButton();
       expect(button.disabled).toBe(true);
       const reasonId = button.getAttribute('aria-describedby');
-      const reason = reasonId === null ? null : container.querySelector(`[id="${reasonId}"]`);
+      const reason = [...container.querySelectorAll('[id]')].find((element) => element.id === reasonId);
+      expect(reasonId).not.toBeNull();
       expect(reason?.textContent).toContain('Szkript');
       expect(reason?.textContent).toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
     });
