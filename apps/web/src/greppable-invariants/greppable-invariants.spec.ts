@@ -524,6 +524,7 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       path.join('protocol-error-message', 'protocol-error-class-message.ts'),
       path.join('protocol-error-message', 'protocol-error-class-message.spec.ts'),
       path.join('rest-client', 'perform-route-request.spec.ts'),
+      path.join('graph-node-card', 'script-unimplemented-error-class.ts'),
       path.join('node-inspector', 'ScriptNodeFields.tsx'),
       path.join('node-inspector', 'ScriptNodeFields.spec.tsx'),
       // A saját listája ennek a tesztnek is tartalmazza a mintákat.

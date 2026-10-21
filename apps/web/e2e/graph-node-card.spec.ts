@@ -359,7 +359,7 @@ test('a script figyelmeztető szövege KIZÁRÓLAG a script típusú kártyán j
   await page.goto(EDITOR_URL);
   await expect(nodeLocator(page, 't-script')).toBeVisible();
 
-  const warningText = 'A motor a futtatáskor elutasítja: nincs implementálva.';
+  const warningText = 'A motor a futtatáskor `unimplemented_node_type` hibával elutasítja: nincs implementálva.';
   await expect(nodeLocator(page, 't-script').getByText(warningText)).toBeVisible();
   // A másik kilenc kártya egyikén sem jelenik meg - pontosan egy előfordulás
   // a teljes vásznon.

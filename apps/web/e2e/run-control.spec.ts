@@ -61,6 +61,30 @@ function graphWithStartConfig(startConfig: NodeConfig): WorkflowGraphDocument {
   };
 }
 
+/**
+ * A `start` mellé egy `script` lépést vesz fel: a motor ilyen gráfot futás
+ * indításkor elutasít (SPEC-008 14. kritérium, user döntés 2026-10-21).
+ */
+function graphWithScriptNode(): WorkflowGraphDocument {
+  const graph = graphWithStartConfig(START_WITHOUT_FIELDS);
+  return {
+    nodes: [
+      ...graph.nodes,
+      {
+        id: 'n2',
+        type: 'script',
+        label: 'Szkript lépés',
+        positionX: 400,
+        positionY: 0,
+        config: { type: 'script', source: 'x + 1', runtime: 'expression', onUnhandledError: null },
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      },
+    ],
+    edges: [],
+  };
+}
+
 const WORKFLOW: WorkflowDetail = {
   id: 'w-alfa',
   name: 'Alfa workflow',
@@ -127,10 +151,15 @@ interface StartRunRecording {
  * `POST /api/workflows/{id}/runs` törzse naplózva, hogy a teszt a
  * `StartRunRequest.input` alakját is mérhesse.
  */
-async function mockEditor(page: Page, startConfig: NodeConfig, recording: StartRunRecording): Promise<void> {
+async function mockEditor(
+  page: Page,
+  startConfig: NodeConfig,
+  recording: StartRunRecording,
+  graph: WorkflowGraphDocument = graphWithStartConfig(startConfig),
+): Promise<void> {
   await mockIdleStream(page);
   await installApiMocks(page, [
-    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(graphWithStartConfig(startConfig)))),
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(graph))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('startRun', async (route) => {
@@ -202,6 +231,35 @@ test('üres inputFields lista esetén a modális nem nyílik meg, a futás közv
   await expect(page).toHaveURL(/\/run\?runId=run-1$/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(recording.bodies).toEqual([JSON.stringify({ input: {} })]);
+});
+
+test('script lépésnél a "Futás indítása" gomb tiltott, az okot a lábléc megnevezi, és az elérhető a felolvasónak (SPEC-008 14. kritérium)', async ({
+  page,
+}) => {
+  const recording: StartRunRecording = { bodies: [] };
+  await mockEditor(page, START_WITHOUT_FIELDS, recording, graphWithScriptNode());
+  await page.goto(EDITOR_URL);
+
+  const startButton = page.getByRole('button', { name: 'Futás indítása', exact: true });
+  await expect(startButton).toBeDisabled();
+  const reason = page.getByText('amit a motor a futtatáskor `unimplemented_node_type` hibával elutasít');
+  await expect(reason).toBeVisible();
+  // Az ok a gomb hozzáférhető leírása: a `disabled` gombra nem érkezik
+  // fókusz, ezért csak az `aria-describedby` hivatkozás juttatja el a
+  // felolvasóhoz.
+  await expect(startButton).toHaveAccessibleDescription(/unimplemented_node_type/);
+  expect(recording.bodies).toEqual([]);
+});
+
+test('script lépés nélkül nincs tiltási ok szöveg, és a gomb nem hordoz leírás hivatkozást', async ({ page }) => {
+  const recording: StartRunRecording = { bodies: [] };
+  await mockEditor(page, START_WITHOUT_FIELDS, recording);
+  await page.goto(EDITOR_URL);
+
+  const startButton = page.getByRole('button', { name: 'Futás indítása', exact: true });
+  await expect(startButton).toBeEnabled();
+  await expect(startButton).not.toHaveAttribute('aria-describedby');
+  await expect(page.getByText('unimplemented_node_type')).toHaveCount(0);
 });
 
 test('nem üres inputFields lista esetén a modális nyílik meg, és a mezők a lista alapján épülnek', async ({ page }) => {

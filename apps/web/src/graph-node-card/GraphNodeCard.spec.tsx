@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GraphNodeCard } from './GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode, RunNodeSummary } from './graph-node-card-data.ts';
+import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from './script-unimplemented-error-class.ts';
 
 const NODE_TYPES = { workflowNode: GraphNodeCard };
 
@@ -298,6 +299,7 @@ describe('GraphNodeCard', () => {
     expect(handleElements('target')).toHaveLength(1);
     expect(sourceHandleIds()).toEqual([undefined]);
     expect(container.textContent).toContain('nincs implementálva');
+    expect(container.textContent).toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
   });
 
   it('a nem script típusok egyike sem jeleníti meg a script figyelmeztetést', () => {
