@@ -73,6 +73,59 @@ describe('validateLoopBackEdgeBody', () => {
     });
   });
 
+  it('REGRESSZIÓ: a kilépő ágról ugyanabba a loop-ba visszatérő él forrása nincs a törzsben, akkor sem, ha a törzs a loop-ra mutat', () => {
+    // A `torzs -> L` él miatt a teljes gráfon számolt elérhetőség a `loop`
+    // node-on és az `exit` élen át a `kivul` node-ot is a törzsbe vette.
+    const graph = graphOf(
+      [node('start', 'start'), node('L', 'loop'), node('torzs', 'agent_step'), node('kivul', 'agent_step')],
+      [
+        edge('belepo', 'start', 'L'),
+        edge('continue', 'L', 'torzs', 'continue'),
+        edge('vissza', 'torzs', 'L'),
+        edge('exit', 'L', 'kivul', 'exit'),
+        edge('kilepo_vissza', 'kivul', 'L'),
+      ],
+    );
+    const loopBackEdgeIds = findLoopBackEdges(graph, 'start');
+
+    expect(loopBackEdgeIds).toStrictEqual(new Set(['vissza', 'kilepo_vissza']));
+    expect(validateLoopBackEdgeBody(graph, loopBackEdgeIds)).toStrictEqual({
+      kind: 'error',
+      message:
+        'A(z) L loop node kilepo_vissza visszaélének forrása (kivul) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+    });
+  });
+
+  it('a loop önmagára mutató continue éle a törzsből érkező visszaél', () => {
+    const graph = graphOf(
+      [node('start', 'start'), node('L', 'loop'), node('utan', 'agent_step')],
+      [edge('belepo', 'start', 'L'), edge('onmaga', 'L', 'L', 'continue'), edge('exit', 'L', 'utan', 'exit')],
+    );
+
+    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
+      kind: 'ok',
+      value: undefined,
+    });
+  });
+
+  it('REGRESSZIÓ: a loop önmagára mutató exit éle nem a törzsből érkezik, akkor sem, ha a törzs a loop-ra mutat', () => {
+    const graph = graphOf(
+      [node('start', 'start'), node('L', 'loop'), node('torzs', 'agent_step')],
+      [
+        edge('belepo', 'start', 'L'),
+        edge('continue', 'L', 'torzs', 'continue'),
+        edge('vissza', 'torzs', 'L'),
+        edge('onmaga', 'L', 'L', 'exit'),
+      ],
+    );
+
+    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
+      kind: 'error',
+      message:
+        'A(z) L loop node onmaga visszaélének forrása (L) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+    });
+  });
+
   it('visszaél nélküli loop node-ra zöld', () => {
     const graph = graphOf(
       [node('start', 'start'), node('L', 'loop'), node('torzs', 'agent_step'), node('utan', 'agent_step')],

@@ -12,7 +12,7 @@ import type { ProtocolErrorClass } from '@easter-workflow-builder/protocol';
  * kizárólag a szerveren fut (SPEC-008 5.4).
  */
 const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>> = {
-  graph_cycle_detected: 'A gráf Ciklus csomópont nélküli kört tartalmaz.',
+  graph_cycle_detected: 'A gráf olyan kört tartalmaz, amely nem egyetlen Ciklus csomóponton keresztül indul.',
   loop_back_edge_outside_body:
     'Egy Ciklus csomópontba visszavezető él olyan csomópontból indul, amely nem a ciklus Folytatás ágán áll.',
   loop_missing_branch_edge: 'Egy Ciklus csomópontnak nincs Folytatás vagy Kilépés kimenő éle.',

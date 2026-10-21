@@ -2383,6 +2383,78 @@ describe('createEngine', () => {
     });
   });
 
+  describe('a loop kilépő ágának köre (SPEC-004 4.6 3. lépés, PR #55 review)', () => {
+    it('REGRESSZIÓ: a kilépő ágon ugyanabba a loop-ba visszatérő gráf futása el sem indul: loop_back_edge_outside_body, workflow_run sor nélkül', async () => {
+      // A javítás előtt ez a gráf elindult, és a loop minden kilépés után
+      // újra lefutott, amíg a maxIterations meg nem állította
+      // (loop_max_iterations_reached, research 2026-10-21 8. szekció).
+      const harness = openHarness({ expressionEvaluator: cyclicExpressionEvaluator([]) });
+      const workflowId = createWorkflow(
+        harness.database,
+        'kilepo-ag-kore',
+        [startNode('start'), loopNode('lp', 'CIKLUS-1', 5), agentNode('torzs', 'TORZS'), agentNode('x', 'X')],
+        [
+          edgeOf('e1', 'start', 'lp'),
+          edgeOf('e2', 'lp', 'torzs', 'continue'),
+          edgeOf('e3', 'torzs', 'lp'),
+          edgeOf('e4', 'lp', 'x', 'exit'),
+          edgeOf('e5', 'x', 'lp'),
+        ],
+      );
+
+      const started = await harness.engine.startRun({ workflowId, input: {} });
+
+      expect(started).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) lp loop node e5 visszaélének forrása (x) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+    });
+
+    it('két egymás utáni loop a szűkített törzzsel is lefut: a második az első kilépése után indul, a futás succeeded', async () => {
+      const harness = openHarness({ expressionEvaluator: cyclicExpressionEvaluator([]) });
+      const workflowId = createWorkflow(
+        harness.database,
+        'ket-loop-egymas-utan',
+        [
+          startNode('start'),
+          loopNode('l1', 'CIKLUS-1', 5),
+          agentNode('t1', 'T1'),
+          loopNode('l2', 'CIKLUS-2', 5),
+          agentNode('t2', 'T2'),
+          agentNode('vege', 'VEGE'),
+        ],
+        [
+          edgeOf('e1', 'start', 'l1'),
+          edgeOf('e2', 'l1', 't1', 'continue'),
+          edgeOf('e3', 't1', 'l1'),
+          edgeOf('e4', 'l1', 'l2', 'exit'),
+          edgeOf('e5', 'l2', 't2', 'continue'),
+          edgeOf('e6', 't2', 'l2'),
+          edgeOf('e7', 'l2', 'vege', 'exit'),
+        ],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+      expect(status).toBe('succeeded');
+      expect(stepRunLabelsOf(harness.database, started.run.id)).toStrictEqual([
+        'start 0',
+        'l1 0',
+        't1 0 < l1 0',
+        'l1 1',
+        'l2 0',
+        't2 0 < l2 0',
+        'l2 1',
+        't2 1 < l2 1',
+        'l2 2',
+        'vege 0',
+      ]);
+    });
+  });
+
   describe('a párhuzamossági korlát lekérdezésének hibaága', () => {
     it('ha a provider_concurrency_limit olvasása hibázik, a szabályozó "nincs korlát" állapotot lát, a lépés lefut', async () => {
       const database = okOrThrow(openDatabase(':memory:'));

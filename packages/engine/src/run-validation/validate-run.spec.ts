@@ -294,6 +294,96 @@ describe('validateRun, az érvényes gráf', () => {
   });
 });
 
+describe('validateRun, a loop kilépő ágának köre (SPEC-004 4.6 3. lépés, PR #55 review)', () => {
+  // A ma jogos alakok közül a fenti describe a K, (a), (b) és villa alakot
+  // fedi; ez a két további alak is érvényes marad a törzs szűkítése után.
+  it('két egymás utáni loop: érvényes, a visszaél halmaz e3 és e6', () => {
+    const nodes = [
+      node('start', 'start', START_CONFIG),
+      loopOf('L1'),
+      agentOf('t1'),
+      loopOf('L2'),
+      agentOf('t2'),
+      agentOf('vege'),
+    ];
+    const edges = [
+      edge('e1', 'start', 'L1'),
+      edge('e2', 'L1', 't1', 'continue'),
+      edge('e3', 't1', 'L1'),
+      edge('e4', 'L1', 'L2', 'exit'),
+      edge('e5', 'L2', 't2', 'continue'),
+      edge('e6', 't2', 'L2'),
+      edge('e7', 'L2', 'vege', 'exit'),
+    ];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e3', 'e6']));
+  });
+
+  it('loop a fan_out törzsében: érvényes, a visszaél halmaz e4', () => {
+    const nodes = [
+      node('start', 'start', START_CONFIG),
+      node('f', 'fan_out', FAN_OUT_CONFIG),
+      loopOf('L'),
+      agentOf('t'),
+      node('j', 'join', JOIN_MERGE_CONFIG),
+      agentOf('vege'),
+    ];
+    const edges = [
+      edge('e1', 'start', 'f'),
+      edge('e2', 'f', 'L'),
+      edge('e3', 'L', 't', 'continue'),
+      edge('e4', 't', 'L'),
+      edge('e5', 'L', 'j', 'exit'),
+      edge('e6', 'j', 'vege'),
+    ];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e4']));
+    expect(validated.fanOutJoinPairing.joinToFanOut).toStrictEqual(new Map([['j', 'f']]));
+  });
+
+  it('a loop önmagára mutató continue éle érvényes visszaél', () => {
+    const nodes = [node('start', 'start', START_CONFIG), loopOf('L'), agentOf('vege')];
+    const edges = [edge('e1', 'start', 'L'), edge('e2', 'L', 'L', 'continue'), edge('e3', 'L', 'vege', 'exit')];
+
+    const validated = expectOk(validateRun(documentOf(nodes, edges), 'minimax', null));
+
+    expect(validated.loopBackEdgeIds).toStrictEqual(new Set(['e2']));
+  });
+
+  it.each([
+    {
+      alak: 'egy node-on át (L -exit-> x -> L)',
+      extraNodes: [agentOf('x')],
+      extraEdges: [edge('e4', 'L', 'x', 'exit'), edge('e5', 'x', 'L')],
+      message: 'A(z) L loop node e5 visszaélének forrása (x) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+    },
+    {
+      alak: 'két node-on át (L -exit-> x -> y -> L)',
+      extraNodes: [agentOf('x'), agentOf('y')],
+      extraEdges: [edge('e4', 'L', 'x', 'exit'), edge('e5', 'x', 'y'), edge('e6', 'y', 'L')],
+      message: 'A(z) L loop node e6 visszaélének forrása (y) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+    },
+    {
+      alak: 'node nélkül (L -exit-> L)',
+      extraNodes: [],
+      extraEdges: [edge('e4', 'L', 'L', 'exit')],
+      message: 'A(z) L loop node e4 visszaélének forrása (L) nincs a ciklus törzsében (loop_back_edge_outside_body).',
+    },
+  ])(
+    'REGRESSZIÓ: a loop kilépő ága $alak ugyanabba a loop-ba tér vissza: loop_back_edge_outside_body',
+    ({ extraNodes, extraEdges, message }) => {
+      const nodes = [node('start', 'start', START_CONFIG), loopOf('L'), agentOf('t'), ...extraNodes];
+      const edges = [edge('e1', 'start', 'L'), edge('e2', 'L', 't', 'continue'), edge('e3', 't', 'L'), ...extraEdges];
+
+      expect(validateRun(documentOf(nodes, edges), 'minimax', null)).toStrictEqual({ kind: 'error', message });
+    },
+  );
+});
+
 describe('validateRun, a SPEC-004 4.7 táblázat tíz ellenőrzése', () => {
   it('két start node esetén invalid_start_node', () => {
     const nodes = [...baseNodes(), node('start2', 'start', START_CONFIG)];

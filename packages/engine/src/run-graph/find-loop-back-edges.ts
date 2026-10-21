@@ -1,53 +1,6 @@
+import { computeReachableAvoiding } from './compute-reachable-avoiding.ts';
 import { computeReachableNodeIds } from './compute-reachable-node-ids.ts';
 import type { ExecutableGraph } from './executable-graph.ts';
-
-// Egy node kimenő élei közül azok a célpontok, amiket a bejárás még nem látott,
-// az `avoidedNodeId` node kivételével (a `computeReachableNodeIds` bejárásának
-// mintája). A `reachable` halmazt menet közben frissíti.
-function collectUnseenTargetsAvoiding(
-  graph: ExecutableGraph,
-  nodeId: string,
-  avoidedNodeId: string,
-  reachable: Set<string>,
-): readonly string[] {
-  const discovered: string[] = [];
-  const outgoing = graph.outgoingEdges.get(nodeId) ?? [];
-
-  for (const edge of outgoing) {
-    if (edge.targetNodeId === avoidedNodeId || reachable.has(edge.targetNodeId)) {
-      continue;
-    }
-    reachable.add(edge.targetNodeId);
-    discovered.push(edge.targetNodeId);
-  }
-
-  return discovered;
-}
-
-// A `startNodeId` node-ból az élek irányában elérhető node azonosítók, az
-// `avoidedNodeId` node-on át vezető utak nélkül: a kihagyott node-ba nem lép
-// be a bejárás, tehát a kimenő élei sem számítanak. Ebből olvasható ki a
-// dominancia: `v` pontosan akkor dominálja a `start`-ból elérhető `u`-t
-// (`u` és `v` különböző), ha `u` nincs ebben a halmazban `avoidedNodeId = v`
-// mellett, mert akkor minden `start` -> `u` út áthalad `v`-n.
-function computeReachableAvoiding(
-  graph: ExecutableGraph,
-  startNodeId: string,
-  avoidedNodeId: string,
-): ReadonlySet<string> {
-  const reachable = new Set<string>([startNodeId]);
-  let frontier: readonly string[] = [startNodeId];
-
-  while (frontier.length > 0) {
-    const nextFrontier: string[] = [];
-    for (const nodeId of frontier) {
-      nextFrontier.push(...collectUnseenTargetsAvoiding(graph, nodeId, avoidedNodeId, reachable));
-    }
-    frontier = nextFrontier;
-  }
-
-  return reachable;
-}
 
 /**
  * A visszaélek azonosítói, a SPEC-004 4.6 szekció dominancia alapú
