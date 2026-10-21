@@ -324,7 +324,7 @@ A típusok zárt listája a `packages/db` `node-type` témájából jön (M-87),
 | `sub_workflow`   | egy           | egy, névtelen                                     | `targetWorkflowId`, `inputMapping`                                  |
 | `script`         | egy           | egy, névtelen                                     | `source`, `runtime`                                                 |
 
-**A `script` csomópont felvehető, de a felület figyelmeztet.** A motor futás indításkor `unimplemented_node_type` hibával elutasítja (M-87), ezért a szerkesztő a `script` node kártyáján és a "Futtatás" gomb tiltásakor is megnevezi ezt, a szerver hibaüzenetére való várakozás nélkül. Ez nem szemantikai validáció újraírása, hanem egy **zárt listából olvasott, egyetlen típusra vonatkozó** tény megjelenítése.
+**A `script` csomópont felvehető, de a felület figyelmeztet.** A motor futás indításkor `unimplemented_node_type` hibával elutasítja (M-87), ezért a szerkesztő a `script` node kártyáján megnevezi a `unimplemented_node_type` hibaosztályt, és a "Futás indítása" gombot tiltja, amíg a gráfban `script` lépés áll (user döntés 2026-10-21, "Letiltás okkal"). **A tiltás oka a lábléc státuszában áll** (a `validationMessage` és a "Mentetlen változtatások" jelző helyén, a meglévő minta szerint), egy mondatban, ami megnevezi a Szkript lépést és a hibaosztályt; a tiltott gomb `aria-describedby` hivatkozása erre a szövegre mutat, így a felolvasó a `disabled` gombon is eléri. A szöveg a hibaosztály nevét a kártya figyelmeztetésével közös konstansból veszi (`graph-node-card/script-unimplemented-error-class.ts`), a feltétel a `graph-editor/has-script-node.ts`. A szerver hibaüzenetére való várakozás nincs. Ez nem szemantikai validáció újraírása, hanem egy **zárt listából olvasott, egyetlen típusra vonatkozó** tény megjelenítése.
 
 **A kimenő handle azonosítója a `branchKey` értéke.** Az `onConnect` a `Connection` `sourceHandle` mezőjéből tölti ki a `WorkflowEdgeInput.branchKey` mezőt, tehát a fenntartott értékek (`continue`, `exit`, `approved`, `rejected`, `exhausted`, `on_error`, M-88) sosem kézzel íródnak: a handle azonosítója maga a forrás.
 
@@ -870,12 +870,12 @@ A gráf a pillanatképből épül, a dekoráció pedig a `GET /api/runs/{runId}/
 
 ### 6.5 A futás vezérlése
 
-| Művelet     | Végpont                             | Mikor aktív                                                     |
-| ----------- | ----------------------------------- | --------------------------------------------------------------- |
-| indítás     | `POST /api/workflows/{id}/runs`     | a szerkesztőből, ha nincs mentetlen változás és a gráf nem üres |
-| megszakítás | `POST /api/runs/{runId}/interrupt`  | `pending` és `running` állapotban                               |
-| újraindítás | `POST /api/runs/{runId}/restart`    | terminális állapotban                                           |
-| jóváhagyás  | `POST /api/approvals/{id}/decision` | ha van függő jóváhagyás a futáshoz (8. szekció)                 |
+| Művelet     | Végpont                             | Mikor aktív                                                                                 |
+| ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| indítás     | `POST /api/workflows/{id}/runs`     | a szerkesztőből, ha nincs mentetlen változás, a gráf nem üres és nincs benne `script` lépés |
+| megszakítás | `POST /api/runs/{runId}/interrupt`  | `pending` és `running` állapotban                                                           |
+| újraindítás | `POST /api/runs/{runId}/restart`    | terminális állapotban                                                                       |
+| jóváhagyás  | `POST /api/approvals/{id}/decision` | ha van függő jóváhagyás a futáshoz (8. szekció)                                             |
 
 **Az indítás bemenete a `start` csomópont `inputFields` listájából épül.** A modális a lista alapján rajzol mezőket, a `required` jelzés szerint kötelezővel, és a `StartRunRequest.input` mezőjébe teszi az összeállított objektumot. Üres `inputFields` esetén a modális nem nyílik meg, a futás azonnal indul.
 
@@ -1458,7 +1458,7 @@ Az utolsó korábbi nyitott tétel, az O-8 (az e2e lefedettségi küszöb új é
 11. Az `isValidConnection` két szabálya (egy handle-ből nem indul két él ugyanabba a célba, a `start` csomópontra nem lehet kötni) tiszta függvény, DOM hivatkozás nélkül; mindkét ágra tartozik teszteset.
 12. Az `apps/web/src` alatt **nincs** gráf szemantikai validáció: greppes teszt igazolja, hogy a `graph_cycle_detected`, a `loop_back_edge_outside_body`, a `loop_missing_branch_edge` és az `unbalanced_fan_out_scope` sztring egyikére sincs saját ellenőrző kód, kizárólag a szerver hibájának megjelenítése (2026-09-26 óta az `errorClass` saját mondatával, SPEC-005 8.5, a `message` mező nélkül, SPEC-007 8.4).
 13. A mentés előtt a `ReplaceGraphRequestSchema` `safeParse` hívása fut; hiba esetén a felület megnevezi, melyik node vagy él melyik mezője hibás, és **nem küld kérést**.
-14. A `script` csomópont felvehető, de a szerkesztő a kártyán és a futtatás tiltásakor megnevezi, hogy a motor `unimplemented_node_type` hibával elutasítaná (M-87).
+14. A `script` csomópont felvehető, de a szerkesztő a kártyán megnevezi, hogy a motor `unimplemented_node_type` hibával elutasítaná (M-87), és ha a gráfban `script` lépés áll, a "Futás indítása" gomb `disabled`, az okot (Szkript lépés, `unimplemented_node_type`) a lábléc státusza nevezi meg, a gomb `aria-describedby` hivatkozásával (user döntés 2026-10-21).
 15. A mentetlen jelző a betöltött és a szerkesztett dokumentum összehasonlításából származik; egy visszavont változtatás után a jelző eltűnik. Futtatott teszt igazolja.
 16. A node beállítás panel a `protocol` `node-config` sémája felett szerkeszt, mezőnkénti hibajelzéssel; a `skills` és az `mcpServers` mező olvasható, de nem szerkeszthető, és a panel ezt ki is mondja (5.2).
 
