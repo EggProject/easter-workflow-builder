@@ -46,7 +46,10 @@ A Todo lista, a commit kötelezettsége, az askuserquestion tool és a "mindig a
 amit a user kér" szabály szó szerint a gyökér `CLAUDE.md` 7. szekciójában áll, itt nem ismételjük.
 
 **Model routing, kötelező.** A feladat -> modell hozzárendelés a gyökér `CLAUDE.md` 6. szekció
-MODEL ROUTING pontja alatt áll szó szerint, itt nem ismételjük.
+MODEL ROUTING pontja alatt áll szó szerint, itt nem ismételjük. Összefoglalva: csak kódolásnál
+(részletes specifikáció) `sonnet`, `medium` vagy `high` effort; ahol többet kell gondolkodni
+(architektúra, tervezés, adverzariális ellenőrzés, hibakeresés, kitalálandó megoldás) `opus`,
+`medium` effort; minden subagentnél explicit `model` és `effort` mező kell.
 
 ---
 
