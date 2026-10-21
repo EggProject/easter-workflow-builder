@@ -565,8 +565,8 @@ for (const operation of OPERATION_CASES) {
     // A betöltés utáni állapot a viszonyítási pont: nincs várakozás jelzés, és a
     // betöltés kérései a lap egyetlen REST kérései.
     const loadedRequestCount = restRequestCount(traffic);
-    // A betöltés három kérése: gráf, workflow, beállítások.
-    expect(loadedRequestCount).toBe(3);
+    // A betöltés négy kérése: gráf, workflow, beállítások, provider lista.
+    expect(loadedRequestCount).toBe(4);
     await expectNoAsyncActivity(page, traffic, loadedRequestCount);
     // Horgony: a mentés törzse a betöltött gráf, tehát a törzs olvasása pontos.
     expect(await readSavedDocument(page, traffic)).toEqual(LOADED_DOCUMENT);

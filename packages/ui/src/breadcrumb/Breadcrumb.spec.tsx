@@ -87,6 +87,32 @@ describe('Breadcrumb', () => {
     expect(renderedNav().querySelectorAll('.breadcrumb__separator')).toHaveLength(2);
   });
 
+  it('betöltő állapotban a szöveg vizuálisan rejtett, a helyén a kapott csontváz áll, az aria-current megmarad', () => {
+    act(() => {
+      root.render(
+        <Breadcrumb
+          ancestors={[{ label: 'Workflow-k', href: '/' }]}
+          current="Szerkesztő"
+          currentLoadingPlaceholder={<span className="skel" />}
+        />,
+      );
+    });
+
+    const current = renderedNav().querySelector('.breadcrumb__item--current');
+    expect(current?.getAttribute('aria-current')).toBe('page');
+    expect(current?.querySelector('.breadcrumb__current-label--hidden')?.textContent).toBe('Szerkesztő');
+    expect(current?.querySelector('.skel')).not.toBeNull();
+  });
+
+  it('betöltő jelzés nélkül nincs csontváz és nincs rejtett szöveg', () => {
+    act(() => {
+      root.render(<Breadcrumb current="Szerkesztő" />);
+    });
+
+    expect(renderedNav().querySelector('.skel')).toBeNull();
+    expect(renderedNav().querySelector('.breadcrumb__current-label--hidden')).toBeNull();
+  });
+
   it('a label prop felülírja a hozzáférhető nevet (két morzsasor egy lapon, W3C APG landmark minta)', () => {
     act(() => {
       root.render(<Breadcrumb current="Gyökér workflow" label="Al-workflow útvonal" />);

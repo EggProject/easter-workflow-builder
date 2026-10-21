@@ -131,6 +131,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built).toHaveLength(1);
@@ -157,6 +158,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built[0]?.status).toBe('running');
@@ -171,6 +173,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built[0]?.runDecoration?.summary).toEqual({ kind: 'loop', iteration: 1, maxIterations: 3 });
@@ -192,6 +195,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: new Map([['s-approval', 4000]]),
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built[0]?.runDecoration?.summary).toEqual({ kind: 'waiting_approval', requestedAtMs: 4000 });
@@ -217,6 +221,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built[0]?.status).toBe('running');
@@ -231,6 +236,7 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
     });
 
     expect(built[0]?.attempt).toBe(1);
@@ -252,6 +258,7 @@ describe('buildRunGraphNodes', () => {
         onOpenSubWorkflowRun,
         pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
         branchDecisionsByNodeId: new Map([['n-branch', decisions]]),
+        isStatusLoading: false,
       });
 
       expect(Object.hasOwn(built[0] ?? {}, 'usedDefaultBranch')).toBe(hasBadge);
@@ -267,8 +274,39 @@ describe('buildRunGraphNodes', () => {
       onOpenSubWorkflowRun,
       pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
       branchDecisionsByNodeId: new Map([['n-branch', [decision(4, true)]]]),
+      isStatusLoading: false,
     });
 
     expect(built.map((node) => node.usedDefaultBranch)).toEqual([true, undefined]);
+  });
+
+  it('az állapot betöltése alatt minden csomópont isStatusLoading jelzőt kap, a rajz megmarad', () => {
+    const built = buildRunGraphNodes({
+      nodes: [AGENT_NODE],
+      nodeStepRuns: new Map(),
+      stepRuns: [],
+      onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
+      branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: true,
+    });
+
+    expect(built).toHaveLength(1);
+    expect(built[0]?.workflowNode.id).toBe('n-agent');
+    expect(built[0]?.isStatusLoading).toBe(true);
+  });
+
+  it('betöltött lépés futásoknál nincs isStatusLoading kulcs', () => {
+    const built = buildRunGraphNodes({
+      nodes: [AGENT_NODE],
+      nodeStepRuns: new Map(),
+      stepRuns: [],
+      onOpenSubWorkflowRun,
+      pendingApprovalRequestedAtByStepRunId: NO_PENDING_APPROVALS,
+      branchDecisionsByNodeId: NO_BRANCH_DECISIONS,
+      isStatusLoading: false,
+    });
+
+    expect(Object.hasOwn(built[0] ?? {}, 'isStatusLoading')).toBe(false);
   });
 });

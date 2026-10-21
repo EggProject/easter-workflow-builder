@@ -56,6 +56,22 @@
   font-weight: 600;
 }
 
+/* A betöltő állapotban (`currentLoadingPlaceholder`) a csontváz áll az aktuális elem
+   helyén, a szöveg pedig vizuálisan rejtett, de a hozzáférhetőségi fában
+   marad: `display: none` helyett, mert az MDN szerint az kivenné onnan. A
+   deklaráció-készlet szó szerint a W3C WAI C7 technika
+   (https://www.w3.org/WAI/WCAG21/Techniques/css/C7), ugyanaz, amit a
+   `data-table.css` és a `topnav-shell.css` is használ. */
+.breadcrumb__current-label--hidden {
+  clip-path: inset(100%);
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .breadcrumb__separator {
   color: var(--ep-fg-faint);
   font: 400 13px var(--ep-font-sans);

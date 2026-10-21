@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { NavigationGuard } from '../history-navigation/use-client-route.ts';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
-import { GraphEditorScreen } from './GraphEditorScreen.tsx';
+import { GraphEditorScreen, type GraphEditorScreenProperties } from './GraphEditorScreen.tsx';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
@@ -125,6 +125,10 @@ const WORKFLOW_DETAIL = {
   updatedAtMs: 0,
 };
 const SETTINGS_RECORD = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
+const PROVIDER_SUMMARIES = [
+  { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
+  { id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: ['MINIMAX_API_KEY'] },
+];
 
 function jsonResponse(body: unknown): Response {
   return Response.json(body);
@@ -166,11 +170,41 @@ function createFetchFunction(log: RouteCallLog): FetchFunction {
     if (pathname === '/api/settings') {
       return Promise.resolve(jsonResponse(SETTINGS_RECORD));
     }
+    if (pathname === '/api/providers') {
+      return Promise.resolve(jsonResponse(PROVIDER_SUMMARIES));
+    }
     return Promise.resolve(jsonResponse(WORKFLOW_DETAIL));
   };
 }
 
 const unreachableFetchFunction: FetchFunction = () => Promise.reject(new Error('kapcsolat megszakadt'));
+
+/**
+ * A kérés szándékosan sosem oldódik fel: a teszt a betöltés alatti állapotot nézi.
+ */
+const neverResolvingFetchFunction: FetchFunction = () =>
+  new Promise<Response>(() => {
+    // szándékosan sosem oldódik fel
+  });
+
+/**
+ * A `GET /api/providers` kérés sosem érkezik meg, minden más kérés az átadott
+ * függvény szerint válaszol: a provider lista betöltés alatti állapotához.
+ */
+function withPendingProviders(fetchFunction: FetchFunction): FetchFunction {
+  return (input, init) =>
+    new URL(input).pathname === '/api/providers'
+      ? new Promise<Response>(() => {
+          // szándékosan sosem oldódik fel
+        })
+      : fetchFunction(input, init);
+}
+
+function openAgentPanel(): void {
+  act(() => {
+    lastCanvasProperties().onSelectNode('n-2');
+  });
+}
 
 const failingPutFetchFunction: FetchFunction = (input, init) => {
   if (init.method === 'PUT') {
@@ -182,6 +216,9 @@ const failingPutFetchFunction: FetchFunction = (input, init) => {
   }
   if (pathname === '/api/settings') {
     return Promise.resolve(jsonResponse(SETTINGS_RECORD));
+  }
+  if (pathname === '/api/providers') {
+    return Promise.resolve(jsonResponse(PROVIDER_SUMMARIES));
   }
   return Promise.resolve(jsonResponse(WORKFLOW_DETAIL));
 };
@@ -394,8 +431,10 @@ describe('GraphEditorScreen', () => {
   let root: Root;
   let userAgentSpy: MockInstance<() => string>;
   const navigate = vi.fn();
+  const onWorkflowNameChange = vi.fn<GraphEditorScreenProperties['onWorkflowNameChange']>();
 
   beforeEach(() => {
+    onWorkflowNameChange.mockClear();
     navigationGuardRegistry.active = undefined;
     navigationGuardRegistry.registrationCount = 0;
     capturedCanvasProperties.length = 0;
@@ -429,6 +468,7 @@ describe('GraphEditorScreen', () => {
           navigate={navigate}
           graphElementIdGenerator={GRAPH_ELEMENT_ID_GENERATOR}
           registerNavigationGuard={registerNavigationGuard}
+          onWorkflowNameChange={onWorkflowNameChange}
         />,
       );
       await Promise.resolve();
@@ -1054,6 +1094,131 @@ describe('GraphEditorScreen', () => {
     expect(startButton().getAttribute('aria-busy')).toBe('true');
     expect(startButton().querySelector('.btn__loader')).not.toBeNull();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  // A 4. pont tesztjeinek segédei: a `container`-t használják, ezért a
+  // `GraphEditorScreen` leírás szintjén állnak.
+  function providerTrigger(): HTMLButtonElement {
+    const trigger = [...container.querySelectorAll<HTMLButtonElement>(':scope .node-inspector button.select')].find(
+      (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === 'Provider felülírás',
+    );
+    if (trigger === undefined) {
+      throw new Error('a teszt nem találta a "Provider felülírás" választót');
+    }
+    return trigger;
+  }
+
+  /**
+   * A választó megnyitott paneljének opciói: a panel a `document.body`-ba
+   * kerül, a triggerhez az `aria-controls` köti.
+   */
+  function openedOptionLabels(): readonly (string | null)[] {
+    act(() => {
+      providerTrigger().click();
+    });
+    const controlsId = providerTrigger().getAttribute('aria-controls');
+    const panel = [...document.querySelectorAll('[role="listbox"]')].find((listbox) => listbox.id === controlsId);
+    return [...(panel?.querySelectorAll('[role="option"]') ?? [])].map((option) => option.textContent);
+  }
+
+  describe('a várakozás jelzései (SPEC-008 9. szekció)', () => {
+    it('1. pont: a gráf betöltése alatt a vászon helyét kitöltő egyetlen csontváz áll, nem sorokból álló', async () => {
+      await renderScreen('?workflowId=wf-1', neverResolvingFetchFunction);
+
+      const loading = container.querySelector('.graph-editor-screen__loading');
+      expect(loading?.querySelectorAll('.skel')).toHaveLength(1);
+      expect(loading?.querySelector('.skel-stack')).toBeNull();
+      expect(container.querySelector('.graph-editor-screen__body')).toBeNull();
+    });
+
+    it('1. pont: a betöltés végén a csontváz eltűnik, a vászon veszi át a helyét', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      expect(container.querySelector('.graph-editor-screen__loading')).toBeNull();
+      expect(container.querySelector('.graph-editor-screen__body')).not.toBeNull();
+    });
+
+    it('2. pont: a morzsasornak jelentett név betöltés alatt loading, utána a workflow neve, leszereléskor ismét loading', async () => {
+      const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+      await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+      expect(onWorkflowNameChange.mock.calls.map(([name]) => name)).toEqual([
+        { kind: 'loading' },
+        { kind: 'ready', name: 'Teszt' },
+      ]);
+
+      onWorkflowNameChange.mockClear();
+      act(() => {
+        root.unmount();
+      });
+      expect(onWorkflowNameChange.mock.calls.map(([name]) => name)).toEqual([{ kind: 'loading' }]);
+      root = createRoot(container);
+    });
+
+    it('2. pont: hibás workflow betöltésnél a név elérhetetlen', async () => {
+      await renderScreen('?workflowId=wf-1', unreachableFetchFunction);
+
+      expect(onWorkflowNameChange.mock.calls.at(-1)?.[0]).toEqual({ kind: 'unavailable' });
+    });
+
+    it('2. pont: workflowId nélkül a név elérhetetlen', async () => {
+      await renderScreen('', unreachableFetchFunction);
+
+      expect(onWorkflowNameChange.mock.calls.at(-1)?.[0]).toEqual({ kind: 'unavailable' });
+    });
+
+    it('3. pont: a mentés alatt a "Mentés" gomb tiltott, spinneres és aria-busy, a végén visszaáll', async () => {
+      await renderScreen('?workflowId=wf-1', pendingPutFetchFunction);
+      expect(buttonNamed('Mentés').classList.contains('is-loading')).toBe(false);
+
+      act(() => {
+        buttonNamed('Mentés').click();
+      });
+
+      const saving = buttonNamed('Mentés...');
+      expect(saving.disabled).toBe(true);
+      expect(saving.classList.contains('is-loading')).toBe(true);
+      expect(saving.getAttribute('aria-busy')).toBe('true');
+      expect(saving.querySelector('.btn__loader')).not.toBeNull();
+    });
+
+    describe('4. pont: a provider lista betöltése a node panelben', () => {
+      it('a lista betöltése alatt a választó letiltva áll, egyetlen "Betöltés…" felirattal', async () => {
+        const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+        await renderScreen('?workflowId=wf-1', withPendingProviders(createFetchFunction(log)));
+        openAgentPanel();
+
+        expect(providerTrigger().disabled).toBe(true);
+        expect(providerTrigger().textContent).toContain('Betöltés…');
+      });
+
+      it('a betöltés után a választó engedélyezett, és a szerver listáját kínálja', async () => {
+        const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+        await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+        openAgentPanel();
+
+        expect(providerTrigger().disabled).toBe(false);
+        expect(providerTrigger().textContent).not.toContain('Betöltés…');
+        expect(openedOptionLabels()).toEqual(['nincs felülírás (öröklés)', 'claude-subscription', 'minimax']);
+      });
+
+      it('hibás betöltés után is használható marad: a protokoll konstansa kínálja a providereket', async () => {
+        const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+        const delegate = createFetchFunction(log);
+        const failingProviders: FetchFunction = (input, init) =>
+          new URL(input).pathname === '/api/providers'
+            ? Promise.resolve(new Response('hiba', { status: 500 }))
+            : delegate(input, init);
+        await renderScreen('?workflowId=wf-1', failingProviders);
+        openAgentPanel();
+
+        expect(providerTrigger().disabled).toBe(false);
+        const optionLabels = openedOptionLabels();
+        expect(optionLabels[0]).toBe('nincs felülírás (öröklés)');
+        expect(optionLabels.length).toBeGreaterThan(1);
+      });
+    });
   });
 
   describe('script lépés a gráfban (SPEC-008 14. kritérium, user döntés 2026-10-21: letiltás okkal)', () => {

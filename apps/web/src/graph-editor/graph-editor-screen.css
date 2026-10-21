@@ -25,16 +25,23 @@
   min-height: 0;
 }
 
-/* A betöltés jelző az egyetlen tartalom, aminek SZÜKSÉGE van oldalsó
-   térközre: a vászon faltól falig megy (lásd a topnav-shell.css
-   `.app-content:has(> .graph-editor-screen)` szabályát, ami az oldal belső
-   margóját nullázza ezen a képernyőn), a csontváz sorok viszont enélkül a
-   képernyő széléhez tapadnának. A --ep-layout-gutter a design system saját,
-   erre a célra szánt "horizontal page padding" tokenje. */
+/* A betöltés jelző a vászon helyét és arányát veszi át (SPEC-008 9. szekció 1.
+   pontja, "a vászon helyén, a leendő elrendezés arányában"): a vászon faltól
+   falig megy (lásd a topnav-shell.css `.app-content:has(> .graph-editor-screen)`
+   szabályát, ami az oldal belső margóját nullázza ezen a képernyőn), a
+   csontváz tehát ugyanúgy tölti ki a törzset, térköz és lekerekítés nélkül,
+   hogy a betöltés végén a kirajzolt vászon ne ugorjon. A `.skel` alapértelmezett
+   14 pixeles magasságát az `auto` magasság és a `flex: 1` írja felül. */
 .graph-editor-screen__loading {
+  display: flex;
   flex: 1;
   min-height: 0;
-  padding: var(--ep-space-6) var(--ep-layout-gutter);
+}
+
+.graph-editor-screen__loading > .skel {
+  flex: 1;
+  height: auto;
+  border-radius: 0;
 }
 
 /* A törzs egyetlen gyereke a `Resizable` osztott elrendezés

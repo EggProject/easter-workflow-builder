@@ -10,6 +10,7 @@ import { useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { CLIENT_ROUTE_TABLE, type ClientRouteId } from '../client-route/client-route-table.ts';
 import { browserGraphElementIdGenerator } from '../graph-editor/browser-graph-element-id-generator.ts';
 import { GraphEditorScreen } from '../graph-editor/GraphEditorScreen.tsx';
+import type { EditorWorkflowName } from '../graph-editor/editor-workflow-name.ts';
 import { browserHistoryLocationPort } from '../history-navigation/browser-history-location-port.ts';
 import { useClientRoute } from '../history-navigation/use-client-route.ts';
 import { NotFoundRoute } from '../not-found-route/not-found-route.tsx';
@@ -20,6 +21,7 @@ import { browserEventSourceFactory } from '../stream-client/browser-event-source
 import { browserStreamIdGenerator } from '../stream-client/browser-stream-id-generator.ts';
 import { useStreamConnection } from '../stream-client/use-stream-connection.ts';
 import { WorkflowListScreen } from '../workflow-list/workflow-list-screen.tsx';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { StreamStatusIndicator } from './StreamStatusIndicator.tsx';
 
 export interface AppShellProperties {
@@ -95,6 +97,10 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     streamIdGenerator: browserStreamIdGenerator,
   });
 
+  // A szerkesztett workflow neve a szerkesztő morzsasorának utolsó eleme
+  // (SPEC-008 9. szekció 2. async pontja): a nevet a szerkesztő képernyő tölti
+  // be és jelenti ide; más útvonalon nem használt.
+  const [editorWorkflowName, setEditorWorkflowName] = useState<EditorWorkflowName>({ kind: 'loading' });
   const [isNavigationMenuOpen, setIsNavigationMenuOpen] = useState(false);
   useEffect(() => {
     setIsNavigationMenuOpen(false);
@@ -108,6 +114,7 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
     search,
     navigate,
     registerNavigationGuard,
+    onWorkflowNameChange: setEditorWorkflowName,
     streamId: streamConnection.streamId,
     subscribeToFrames: streamConnection.subscribeToFrames,
     serverRestartCount: streamConnection.serverRestartCount,
@@ -119,7 +126,16 @@ export function AppShell(properties: Readonly<AppShellProperties>): ReactElement
       breadcrumb={
         <Breadcrumb
           ancestors={buildBreadcrumbAncestors(routeId, navigate)}
-          current={resolveBreadcrumbCurrent(routeId)}
+          current={
+            routeId === 'graphEditor' && editorWorkflowName.kind === 'ready'
+              ? editorWorkflowName.name
+              : resolveBreadcrumbCurrent(routeId)
+          }
+          currentLoadingPlaceholder={
+            routeId === 'graphEditor' && editorWorkflowName.kind === 'loading' ? (
+              <ThemedSkeleton shape="text" w={96} />
+            ) : undefined
+          }
         />
       }
       brand={
@@ -205,6 +221,7 @@ interface RouteContentDependencies {
   readonly search: string;
   readonly navigate: ReturnType<typeof useClientRoute>['navigate'];
   readonly registerNavigationGuard: ReturnType<typeof useClientRoute>['registerNavigationGuard'];
+  readonly onWorkflowNameChange: (name: EditorWorkflowName) => void;
   readonly streamId: string;
   readonly subscribeToFrames: ReturnType<typeof useStreamConnection>['subscribeToFrames'];
   readonly serverRestartCount: number;
@@ -222,6 +239,7 @@ function renderRouteContent(
     search,
     navigate,
     registerNavigationGuard,
+    onWorkflowNameChange,
     streamId,
     subscribeToFrames,
     serverRestartCount,
@@ -262,6 +280,7 @@ function renderRouteContent(
           navigate={navigate}
           graphElementIdGenerator={browserGraphElementIdGenerator}
           registerNavigationGuard={registerNavigationGuard}
+          onWorkflowNameChange={onWorkflowNameChange}
         />
       );
     }
