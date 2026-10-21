@@ -1,0 +1,61 @@
+
+================ (6) ================
+### steps["kötőjeles-azonosító"].mezo
+{
+  ok: true,
+  value: {
+    inspect: "'érték'",
+    typeof: 'string',
+    constructorName: 'String',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### steps["kötőjeles-azonosító"].mező (ékezetes mezőnév szelektorként)
+{
+  ok: false,
+  error: {
+    name: 'ParseError',
+    class: 'ParseError',
+    code: 'unexpected_character',
+    summary: 'Unexpected character: ő',
+    range: { start: 32, end: 33 },
+    message: 'Unexpected character: ő\n\n>    1 | steps["kötőjeles-azonosító"].mező\n                                         ^'
+  }
+}
+### steps["kötőjeles-azonosító"]["mező"]
+{
+  ok: true,
+  value: {
+    inspect: "'ékezetes kulcs'",
+    typeof: 'string',
+    constructorName: 'String',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### steps["llm-1"].text
+{
+  ok: true,
+  value: {
+    inspect: "'válasz'",
+    typeof: 'string',
+    constructorName: 'String',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### steps.llm-1 (kötőjel operátorként)
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_key',
+    summary: 'No such key: llm',
+    range: { start: 6, end: 9 },
+    message: 'No such key: llm\n\n>    1 | steps.llm-1\n               ^'
+  }
+}
+### compile steps["kötőjeles-azonosító"].mezo
+{ ok: true, type: 'dyn' }

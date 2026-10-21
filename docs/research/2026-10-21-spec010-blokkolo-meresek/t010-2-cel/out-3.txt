@@ -1,0 +1,105 @@
+
+================ (3) ================
+### celCtx (a 7.3 leképezés után)
+{
+  input: {
+    tema: 'x',
+    pontszam: 72,
+    darab: 3,
+    elemek: [ { nev: 'alma', aktiv: true }, { nev: 'körte', aktiv: false }, { nev: 'szilva', aktiv: true } ]
+  },
+  steps: {
+    ellenorzes: { kesz: false },
+    'kötőjeles-azonosító': { mezo: 'érték', 'mező': 'ékezetes kulcs' },
+    'llm-1': { text: 'válasz' }
+  },
+  item: null,
+  itemIndex: null,
+  iteration: 2n,
+  joinInputs: null,
+  error: null
+}
+### item == null (leképezéssel, item undefined -> null)
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false }
+}
+### item == null (leképezés NÉLKÜL, item: undefined)
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'unknown_variable',
+    summary: 'Unknown variable: item',
+    range: { start: 0, end: 4 },
+    message: 'Unknown variable: item\n\n>    1 | item == null\n         ^'
+  }
+}
+### iteration + 1 (leképezéssel, 2n)
+{
+  ok: true,
+  value: {
+    inspect: '3n',
+    typeof: 'bigint',
+    constructorName: 'BigInt',
+    prototype: '(primitív)',
+    isPromise: false,
+    safeInteger: true,
+    asNumber: 3
+  }
+}
+### iteration + 1 (leképezés NÉLKÜL, number 2)
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_overload',
+    summary: 'no such overload: dyn<double> + int',
+    range: { start: 0, end: 13 },
+    message: 'no such overload: dyn<double> + int\n\n>    1 | iteration + 1\n         ^'
+  }
+}
+### iteration < 3 (leképezés NÉLKÜL, number 2)
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false }
+}
+### input.darab + 1.0
+{
+  ok: true,
+  value: {
+    inspect: '4',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: true,
+    isNaN: false
+  }
+}
+### input.darab + 1
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_overload',
+    summary: 'no such overload: dyn<double> + int',
+    range: { start: 0, end: 15 },
+    message: 'no such overload: dyn<double> + int\n\n>    1 | input.darab + 1\n         ^'
+  }
+}
+### input.darab > 1
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false }
+}
+### input.darab == 3
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false }
+}
+### compile: input.darab + 1 (dyn mellett a check elfogadja-e)
+{ ok: true, type: 'int' }

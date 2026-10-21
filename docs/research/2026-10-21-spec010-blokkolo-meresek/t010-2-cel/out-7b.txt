@@ -1,0 +1,13 @@
+csak "constructor" saját kulcs, input.tema | input.tema => EvaluationError unsupported_type: Unsupported type: object
+csak "constructor", has(input.tema) | has(input.tema) => EvaluationError unsupported_type: Unsupported type: object
+csak "constructor", input.constructor | input.constructor => EvaluationError unsupported_type: Unsupported type: object
+"constructor" objektum értékkel | input.tema => EvaluationError unsupported_type: Unsupported type: object
+csak "__proto__" saját kulcs (JSON.parse) | input["__proto__"] => 'saját'
+csak "__proto__", input.tema | input.tema => 'x'
+csak "toString" saját kulcs | input.toString => 'saját'
+csak "hasOwnProperty" saját kulcs | input.hasOwnProperty => 'saját'
+másik lépés kimenetében "constructor", érintetlen ág | steps["a"].x => 1
+másik lépés kimenetében "constructor", steps.size() | size(steps) => 2n
+listában elem "constructor" kulccsal, filter | input.l.filter(e, e.n > 1.0).size() => EvaluationError unsupported_type: Unsupported type: object
+null prototípusú objektum | input.tema => 'x'
+null prototípusú objektum az eredményben | input => [Object: null prototype] { tema: 'x' }

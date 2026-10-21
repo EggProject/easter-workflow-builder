@@ -1,0 +1,119 @@
+
+================ (4b) ================
+### compile szintaxis, titok szerű literállal: "SECRET_LITERAL" +
+{
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'unexpected_token',
+  summary: 'Unexpected token: EOF',
+  range: { start: 18, end: 18 },
+  message: 'Unexpected token: EOF\n\n>    1 | "SECRET_LITERAL" +\n                           ^',
+  summaryContainsExprFragment: []
+}
+### compile szintaxis: input.(: input.(
+{
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'expected_token',
+  summary: 'Expected IDENTIFIER, got LPAREN',
+  range: { start: 6, end: 7 },
+  message: 'Expected IDENTIFIER, got LPAREN\n\n>    1 | input.(\n               ^',
+  summaryContainsExprFragment: []
+}
+### compile nem deklarált: step.x: step.x
+{
+  stage: 'check',
+  name: 'TypeError',
+  class: 'cel TypeError',
+  code: 'unknown_variable',
+  summary: 'Unknown variable: step',
+  range: { start: 0, end: 4 },
+  message: 'Unknown variable: step\n\n>    1 | step.x\n         ^',
+  summaryContainsExprFragment: [ 'step' ]
+}
+### compile nem deklarált: titokNeve: titokNeve == "x"
+{
+  stage: 'check',
+  name: 'TypeError',
+  class: 'cel TypeError',
+  code: 'unknown_variable',
+  summary: 'Unknown variable: titokNeve',
+  range: { start: 0, end: 9 },
+  message: 'Unknown variable: titokNeve\n\n>    1 | titokNeve == "x"\n         ^',
+  summaryContainsExprFragment: [ 'titokNeve' ]
+}
+### compile maxDepth: ((((((((((((((((((((...
+{
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'limit_exceeded',
+  summary: 'Exceeded maxDepth (250)',
+  range: { start: 250, end: 250 },
+  message: 'Exceeded maxDepth (250)\n' +
+    '\n' +
+    '>    1 | ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))...[csonkolva a jegyzőkönyvben]',
+  summaryContainsExprFragment: []
+}
+### evaluate hiányzó kulcs: input.TITKOS_KULCS_NEV
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'no_such_key',
+  summary: 'No such key: TITKOS_KULCS_NEV',
+  range: { start: 6, end: 22 },
+  message: 'No such key: TITKOS_KULCS_NEV\n\n>    1 | input.TITKOS_KULCS_NEV\n               ^',
+  summaryContainsExprFragment: [ 'TITKOS_KULCS_NEV' ]
+}
+### evaluate nem illeszkedő overload, string literállal: input.darab + "SECRET_LITERAL"
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'no_such_overload',
+  summary: 'no such overload: dyn<double> + string',
+  range: { start: 0, end: 30 },
+  message: 'no such overload: dyn<double> + string\n\n>    1 | input.darab + "SECRET_LITERAL"\n         ^',
+  summaryContainsExprFragment: []
+}
+### evaluate int + double: input.darab + 1
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'no_such_overload',
+  summary: 'no such overload: dyn<double> + int',
+  range: { start: 0, end: 15 },
+  message: 'no such overload: dyn<double> + int\n\n>    1 | input.darab + 1\n         ^',
+  summaryContainsExprFragment: []
+}
+### evaluate hiányzó kulcs index alakban: steps["nincs-ilyen-SECRET"]
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'no_such_key',
+  summary: 'No such key: nincs-ilyen-SECRET',
+  range: { start: 0, end: 27 },
+  message: 'No such key: nincs-ilyen-SECRET\n\n>    1 | steps["nincs-ilyen-SECRET"]\n         ^',
+  summaryContainsExprFragment: [ 'nincs-ilyen-SECRET' ]
+}
+### evaluate nulla osztó int: 1 / 0
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'division_by_zero',
+  summary: 'division by zero',
+  range: { start: 0, end: 5 },
+  message: 'division by zero\n\n>    1 | 1 / 0\n         ^',
+  summaryContainsExprFragment: []
+}
+### evaluate mező kiválasztás számon: input.darab.x
+{
+  name: 'EvaluationError',
+  class: 'EvaluationError',
+  code: 'no_such_key',
+  summary: 'No such key: x',
+  range: { start: 12, end: 13 },
+  message: 'No such key: x\n\n>    1 | input.darab.x\n                     ^',
+  summaryContainsExprFragment: []
+}
