@@ -29,11 +29,17 @@ export interface PixelRun {
 }
 
 export interface BorderProfile {
-  /** A kártya felső keretén átmenő pixel oszlop futamai, fentről lefelé. */
+  /**
+   * A kártya felső keretén átmenő pixel oszlop futamai, fentről lefelé.
+   */
   readonly column: readonly PixelRun[];
-  /** A legtöbb vonal színű pixelt tartalmazó sor futamai, balról jobbra. */
+  /**
+   * A legtöbb vonal színű pixelt tartalmazó sor futamai, balról jobbra.
+   */
   readonly row: readonly PixelRun[];
-  /** A vonal szín és a kártya háttér legnagyobb csatorna távolsága. */
+  /**
+   * A vonal szín és a kártya háttér legnagyobb csatorna távolsága.
+   */
   readonly lineToCardDistance: number;
   /**
    * A vonalnak besorolt oszlop pixelek közül a várt vonal színhez legközelebbi
@@ -42,7 +48,9 @@ export interface BorderProfile {
    * szám viszont a várt színtől való eltérést közvetlenül méri.
    */
   readonly lineColorDistance: number;
-  /** A rés (a két vonal közti kártya háttér) és a vonal színének legnagyobb csatorna távolsága, ha van rés. */
+  /**
+   * A rés (a két vonal közti kártya háttér) és a vonal színének legnagyobb csatorna távolsága, ha van rés.
+   */
   readonly gapToLineDistance: number | undefined;
 }
 
@@ -51,12 +59,16 @@ type Rgb = readonly [number, number, number];
 const PROBE_STYLE_ID = 'graph-node-card-border-probe';
 const CARD_SELECTOR = '.graph-node-card';
 
-/** A kivágatok: a kártya felső keretéhez képest, képpontban. */
+/**
+ * A kivágatok: a kártya felső keretéhez képest, képpontban.
+ */
 const COLUMN_ABOVE = 8;
 const COLUMN_HEIGHT = 30;
 const ROW_ABOVE = 2;
 const ROW_HEIGHT = 14;
-/** A sor kivágat a kártya szélétől befelé indul, hogy a lekerekítés kívül maradjon. */
+/**
+ * A sor kivágat a kártya szélétől befelé indul, hogy a lekerekítés kívül maradjon.
+ */
 const ROW_INSET = 48;
 const ROW_MAXIMUM_WIDTH = 300;
 
@@ -145,7 +157,9 @@ async function resolveToken(page: Page, nodeId: string, token: string): Promise<
 interface DecodedPixels {
   readonly width: number;
   readonly height: number;
-  /** Sorfolytonosan, [r, g, b, a] négyesekben. */
+  /**
+   * Sorfolytonosan, [r, g, b, a] négyesekben.
+   */
   readonly data: readonly number[];
 }
 
@@ -189,7 +203,7 @@ function pixelAt(pixels: DecodedPixels, index: number): Rgb {
 function classify(pixel: Rgb, palette: Readonly<Record<PixelClass, Rgb>>): PixelClass {
   const kinds: readonly PixelClass[] = ['outside', 'line', 'card'];
   let best: PixelClass = 'outside';
-  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestDistance = Infinity;
   for (const kind of kinds) {
     const distance = sumDistance(pixel, palette[kind]);
     if (distance < bestDistance) {
@@ -213,17 +227,23 @@ function toRuns(classes: readonly PixelClass[]): readonly PixelRun[] {
   return runs;
 }
 
-/** A vonal futamok száma: egy vonalnál 1, kettős vonalnál 2. */
+/**
+ * A vonal futamok száma: egy vonalnál 1, kettős vonalnál 2.
+ */
 export function countLineRuns(runs: readonly PixelRun[]): number {
   return runs.filter((run) => run.kind === 'line').length;
 }
 
-/** Az első vonal futam hossza képpontban, vagy 0, ha nincs vonal. */
+/**
+ * Az első vonal futam hossza képpontban, vagy 0, ha nincs vonal.
+ */
 export function firstLineRunLength(runs: readonly PixelRun[]): number {
   return runs.find((run) => run.kind === 'line')?.length ?? 0;
 }
 
-/** A futamváltások száma egy soron: szaggatott keretnél sok, folytonosnál nulla. */
+/**
+ * A futamváltások száma egy soron: szaggatott keretnél sok, folytonosnál nulla.
+ */
 export function countRunTransitions(runs: readonly PixelRun[]): number {
   return runs.length - 1;
 }

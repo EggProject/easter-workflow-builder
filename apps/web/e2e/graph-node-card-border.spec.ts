@@ -76,7 +76,12 @@ async function readViewportZoom(page: Page): Promise<number> {
     if (viewport === null) {
       throw new Error('a mérés nem talált .react-flow__viewport elemet');
     }
-    return new globalThis.DOMMatrixReadOnly(globalThis.getComputedStyle(viewport).transform).a;
+    // A számított transzform `matrix(a, b, c, d, e, f)` alakú, az `a` a vízszintes nagyítás.
+    const matrix = /^matrix\(([\d.]+),/u.exec(globalThis.getComputedStyle(viewport).transform);
+    if (matrix === null) {
+      throw new Error('a mérés nem tudta értelmezni a rajz transzformját');
+    }
+    return Number(matrix[1]);
   });
 }
 
@@ -100,7 +105,11 @@ const WIDTH_PROPERTY = '--graph-node-card-border-width';
 async function overrideBorderWidth(page: Page, width: string): Promise<void> {
   await page.evaluate(
     (input: { readonly selector: string; readonly property: string; readonly width: string }) => {
-      globalThis.document.querySelector(input.selector)?.style.setProperty(input.property, input.width);
+      const card = globalThis.document.querySelector<HTMLElement>(input.selector);
+      if (card === null) {
+        throw new Error(`a mérés nem találta a kártyát: ${input.selector}`);
+      }
+      card.style.setProperty(input.property, input.width);
     },
     { selector: CARD_SELECTOR, property: WIDTH_PROPERTY, width },
   );

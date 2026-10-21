@@ -354,9 +354,9 @@ describe('GraphNodeCard', () => {
     'a "%s" állapotú kártya gyökere az állapotot és a jelvény variánsát hordozza',
     (status) => {
       renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step, status)]);
-      const card = container.querySelector('.graph-node-card');
-      expect(card?.getAttribute('data-status')).toBe(status);
-      expect(card?.getAttribute('data-badge-variant')).toBe(STEP_RUN_STATUS_BADGE_VARIANTS[status]);
+      const card = container.querySelector<HTMLElement>('.graph-node-card');
+      expect(card?.dataset['status']).toBe(status);
+      expect(card?.dataset['badgeVariant']).toBe(STEP_RUN_STATUS_BADGE_VARIANTS[status]);
       expect(
         container.querySelector('.badge')?.classList.contains(`badge--${STEP_RUN_STATUS_BADGE_VARIANTS[status]}`),
       ).toBe(true);
