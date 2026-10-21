@@ -135,9 +135,10 @@ function renderConfigFields(
  * teszi, tehát a vászon mellette szűkül, és a sáv szélessége húzható
  * (SPEC-008 5.5). A panel `<aside>` elem, saját hozzáférhető névvel, tehát
  * a képernyőolvasó kiegészítő területként (`complementary`) találja meg. A
- * fejléc bezáró gombja a design system panel bezáró vezérlője
- * (`.node-inspector__close`, a Drawer `.drawer__close` szabályaival), aminek
- * a hozzáférhető nevét `aria-label` adja, mert nincs látható szövege.
+ * fejléc bezáró gombja ikon gomb (`Button` `variant="secondary"`,
+ * `.btn--icon`, `.btn--sm`), aminek a hozzáférhető nevét `aria-label` adja,
+ * mert nincs látható szövege (SPEC-008 5.2, 72. kritérium, user döntés
+ * 2026-10-21).
  *
  * A HIBAJELZÉS EGY SZINTŰ: a hibaüzenet KIZÁRÓLAG a hibás mező ALATT áll,
  * `aria-invalid` és `aria-describedby` kötéssel, és csak akkor, ha a mező
@@ -182,13 +183,6 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
           <h2 className="node-inspector__title">{catalogEntry.label}</h2>
           <p className="node-inspector__node-id">{node.id}</p>
         </div>
-        {/* A design system a panel bezáró X-ét NEM a `.btn` gomb valamelyik
-            variánsával oldja meg: a Drawer és a Modal komponensnek is saját,
-            nevesített bezáró vezérlője van (`.drawer__close`,
-            `.modal__close`), mert a `.btn--ghost` szövegszíne az arany
-            `--ep-accent-fg`, tehát a bezárás elsődleges akciónak látszana. A
-            szabályok a `node-inspector.css` `.node-inspector__close`
-            blokkjában állnak, a forrás indoklásával együtt. */}
         <div className="node-inspector__actions">
           {/* A Start nem törölhető (SPEC-008 5.9): a panelén nincs gomb. */}
           {node.type !== 'start' && (
@@ -196,11 +190,11 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
               Törlés
             </Button>
           )}
-          <button type="button" className="node-inspector__close" aria-label="Bezárás" onClick={onClose}>
+          <Button type="button" variant="secondary" size="sm" icon aria-label="Bezárás" onClick={onClose}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
               <path d="M4 4l8 8M12 4l-8 8" />
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
       <div className="node-inspector__body">

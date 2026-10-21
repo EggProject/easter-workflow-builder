@@ -364,7 +364,7 @@ describe('NodeInspector', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('a bezárás a design system panel bezáró vezérlője, aria-label névvel (nincs látható szövege)', () => {
+  it('a bezárás ikon gomb (secondary, sm), aria-label névvel (nincs látható szövege)', () => {
     const startNode = NODES_BY_TYPE[0]?.node;
     if (startNode === undefined) {
       throw new Error('a teszt nem talált start node fixture-t');
@@ -383,12 +383,12 @@ describe('NodeInspector', () => {
       );
     });
     const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
-    expect(closeButton?.className).toBe('node-inspector__close');
+    expect(closeButton?.className).toBe('btn btn--secondary btn--sm btn--icon');
     expect(closeButton?.textContent).toBe('');
     expect(closeButton?.querySelector('svg')).not.toBeNull();
   });
 
-  it('a bezárás gomb egyáltalán nem `.btn` variáns - a bezárás nem elsődleges művelet', () => {
+  it('a bezárás gomb `secondary` variáns, nem `ghost`: a ghost szövegszíne az arany akcentus (SPEC-008 72. kritérium, user döntés 2026-10-21)', () => {
     const startNode = NODES_BY_TYPE[0]?.node;
     if (startNode === undefined) {
       throw new Error('a teszt nem talált start node fixture-t');
@@ -406,14 +406,11 @@ describe('NodeInspector', () => {
         />,
       );
     });
-    // A design system `.btn--ghost` variánsának szövegszíne az arany
-    // `--ep-accent-fg`, tehát a ghost sem semleges: a panel bezárására a
-    // design system saját, `--ep-fg-muted` színű vezérlője jár (Drawer,
-    // Modal). Ez a teszt csak a jelölést állítja; a TÉNYLEGES, számított
-    // színt az `apps/web/e2e/form-control-typography.spec.ts` méri valódi
-    // böngészőben, mert a jelölés önmagában nem bizonyít színt.
+    // A TÉNYLEGES, számított színt az `apps/web/e2e/form-control-typography.spec.ts`
+    // méri valódi böngészőben, mert a jelölés önmagában nem bizonyít színt.
     const closeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Bezárás"]');
-    expect(closeButton?.className).not.toContain('btn');
+    expect(closeButton?.classList.contains('btn--secondary')).toBe(true);
+    expect(closeButton?.classList.contains('btn--ghost')).toBe(false);
   });
 
   const DELETABLE_NODES = NODES_BY_TYPE.filter(({ node }) => node.type !== 'start');

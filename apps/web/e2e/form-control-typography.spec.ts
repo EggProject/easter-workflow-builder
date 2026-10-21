@@ -15,11 +15,11 @@
 //    topnav-shell.css`.
 //
 // 2. A BEZÁRÓ GOMB SZÍNE. A design system `.btn--ghost` variánsának
-//    szövegszíne `var(--ep-accent-fg)`, azaz az arany akcentus. A panel
-//    bezárására a design system NEM a gomb komponenst használja, hanem a
-//    Drawer és a Modal saját, `--ep-fg-muted` színű bezáró vezérlőjét. A
-//    javítás helye: `apps/web/src/node-inspector/node-inspector.css`
-//    `.node-inspector__close`.
+//    szövegszíne `var(--ep-accent-fg)`, azaz az arany akcentus, ezért a
+//    bezárás elsődleges akciónak látszana. A panel bezáró gombja a
+//    `Button` `variant="secondary"` ikon gombja (`.btn--icon`, `.btn--sm`,
+//    user döntés 2026-10-21, SPEC-008 72. kritérium), aminek a szövegszíne
+//    `--ep-fg`.
 //
 // Minden REST hívás `page.route()` mockon megy (rest-mock.ts), az SSE
 // csatorna egyetlen `stream_ready` kerettel (sse-mock.ts).
@@ -190,28 +190,27 @@ test.describe('a design system betűtípusa a natív űrlap vezérlőkön', () =
   });
 });
 
-test.describe('a node inspector bezáró gombjának színe', () => {
-  test('a bezáró gomb a semleges --ep-fg-muted színt viseli, nem az arany akcentust', async ({ page }) => {
+test.describe('a node inspector bezáró gombja', () => {
+  test('a bezáró gomb a secondary variáns --ep-fg színét viseli, nem az arany akcentust', async ({ page }) => {
     const accent = await tokenColor(page, '--ep-accent');
     const accentForeground = await tokenColor(page, '--ep-accent-fg');
-    const mutedForeground = await tokenColor(page, '--ep-fg-muted');
+    const foreground = await tokenColor(page, '--ep-fg');
     // A három token ténylegesen három különböző szín: enélkül az alábbi
     // "nem egyenlő" állítások üresen is teljesülhetnének.
-    expect(new Set([accent, accentForeground, mutedForeground]).size).toBe(3);
+    expect(new Set([accent, accentForeground, foreground]).size).toBe(3);
 
     const closeColor = await computed(page, 'button[aria-label="Bezárás"]', 'color');
     expect(closeColor).not.toBe(accent);
     expect(closeColor).not.toBe(accentForeground);
-    expect(closeColor).toBe(mutedForeground);
+    expect(closeColor).toBe(foreground);
   });
 
-  test('a bezáró gomb a design system Drawer bezáró vezérlőjének alakját viseli', async ({ page }) => {
+  test('a bezáró gomb ikon gomb: 28x28 pixeles sm méret, 14 pixeles ikon, secondary háttér', async ({ page }) => {
     const selector = 'button[aria-label="Bezárás"]';
-    expect(await computed(page, selector, 'width')).toBe('32px');
-    expect(await computed(page, selector, 'height')).toBe('32px');
-    expect(await computed(page, selector, 'background-color')).toBe('rgba(0, 0, 0, 0)');
-    expect(await computed(page, selector, 'border-top-width')).toBe('0px');
-    expect(await computed(page, `${selector} svg`, 'width')).toBe('16px');
-    expect(await computed(page, `${selector} svg`, 'height')).toBe('16px');
+    expect(await computed(page, selector, 'width')).toBe('28px');
+    expect(await computed(page, selector, 'height')).toBe('28px');
+    expect(await computed(page, selector, 'background-color')).toBe(await tokenColor(page, '--ep-bg-elevated'));
+    expect(await computed(page, `${selector} svg`, 'width')).toBe('14px');
+    expect(await computed(page, `${selector} svg`, 'height')).toBe('14px');
   });
 });
