@@ -2,6 +2,9 @@
 import type { StepRunStatus, WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { StepRunStatusSchema } from '@easter-workflow-builder/protocol';
 import { ReactFlow } from '@xyflow/react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -331,6 +334,40 @@ describe('GraphNodeCard', () => {
     expect(container.querySelector('.badge')).toBeNull();
   });
 
+  // A kártya kerete az állapotot is jelöli (SPEC-008 6.2, 21. kritérium): a
+  // gyökér elem az állapotot és a jelvény variánsát hordozza, amiből a stíluslap
+  // a formát és a színt festi. A variáns literál tábla, nem a leképezés hívása.
+  const STEP_RUN_STATUS_BADGE_VARIANTS = {
+    pending: 'outline',
+    running: 'info',
+    waiting_approval: 'warning',
+    succeeded: 'success',
+    failed: 'danger',
+    rejected: 'danger',
+    cancelled: 'ink',
+    interrupted: 'warning',
+  } satisfies Readonly<Record<StepRunStatus, string>>;
+
+  it.each(StepRunStatusSchema.options)(
+    'a "%s" állapotú kártya gyökere az állapotot és a jelvény variánsát hordozza',
+    (status) => {
+      renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step, status)]);
+      const card = container.querySelector('.graph-node-card');
+      expect(card?.getAttribute('data-status')).toBe(status);
+      expect(card?.getAttribute('data-badge-variant')).toBe(STEP_RUN_STATUS_BADGE_VARIANTS[status]);
+      expect(
+        container.querySelector('.badge')?.classList.contains(`badge--${STEP_RUN_STATUS_BADGE_VARIANTS[status]}`),
+      ).toBe(true);
+    },
+  );
+
+  it('futás állapot nélkül a kártya gyökerén nincs állapot attribútum (a szerkesztő keretének alapértéke marad)', () => {
+    renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step)]);
+    const card = container.querySelector('.graph-node-card');
+    expect(card?.hasAttribute('data-status')).toBe(false);
+    expect(card?.hasAttribute('data-badge-variant')).toBe(false);
+  });
+
   function headerBadgeLabels(): (string | null)[] {
     return [...container.querySelectorAll(':scope .graph-node-card__header .badge')].map((badge) => badge.textContent);
   }
@@ -449,5 +486,49 @@ describe('GraphNodeCard', () => {
     const requestedAtMs = new Date(2026, 8, 24, 10, 32, 5).getTime();
     renderNodes([buildDecoratedFlowNode(WORKFLOW_NODES.human_approval, { kind: 'waiting_approval', requestedAtMs })]);
     expect(container.querySelector('.graph-node-card__summary')?.textContent).toBe('10:32:05 óta vár');
+  });
+});
+
+describe('a kártya kerete és a graph-node-card.css', () => {
+  const directory = path.dirname(fileURLToPath(import.meta.url));
+  const stylesheet = readFileSync(path.join(directory, 'graph-node-card.css'), 'utf8');
+
+  function declarationsOf(selector: string): string {
+    const escaped = selector.replaceAll(/[.[\]'=]/g, String.raw`\$&`);
+    const match = new RegExp(String.raw`^${escaped}\s*\{([^}]*)\}`, 'm').exec(stylesheet);
+    expect(match, selector).not.toBeNull();
+    return match?.[1] ?? '';
+  }
+
+  // A keret színe az állapot jelvényének variánsából jön (user döntés
+  // 2026-10-21): a variáns névrokon témázó token, az outline a jelvény
+  // gyűrűjének tokenje, az ink a jelvény háttere.
+  it.each([
+    ['info', '--ep-info'],
+    ['success', '--ep-success'],
+    ['warning', '--ep-warning'],
+    ['danger', '--ep-danger'],
+    ['ink', '--ep-ink-900'],
+    ['outline', '--ep-border'],
+  ])('a "%s" variáns keretszíne a %s token', (variant, token) => {
+    expect(declarationsOf(`.graph-node-card[data-badge-variant='${variant}']`)).toMatch(
+      new RegExp(String.raw`--graph-node-card-border-color:\s*var\(${token}\);`),
+    );
+  });
+
+  it('a pending szaggatott, a running 2.4 pixeles, a failed és a rejected 3 pixeles dupla vonal', () => {
+    expect(declarationsOf(".graph-node-card[data-status='pending']")).toMatch(
+      /--graph-node-card-border-style:\s*dashed;/,
+    );
+    expect(declarationsOf(".graph-node-card[data-status='running']")).toMatch(
+      /--graph-node-card-border-width:\s*2\.4px;/,
+    );
+    const doubleRule =
+      /^\.graph-node-card\[data-status='failed'\],\n\.graph-node-card\[data-status='rejected'\]\s*\{([^}]*)\}/m.exec(
+        stylesheet,
+      );
+    expect(doubleRule).not.toBeNull();
+    expect(doubleRule?.[1]).toMatch(/--graph-node-card-border-width:\s*3px;/);
+    expect(doubleRule?.[1]).toMatch(/--graph-node-card-border-style:\s*double;/);
   });
 });

@@ -126,6 +126,12 @@ function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
  * akkor, ha a csomópont legutóbbi döntése az alapértelmezett ágra lépett
  * (4. döntés, O-24). Az `outline` a státusz nélküli jelölés változata: a
  * színes változatok a lépés állapotát hordozzák, és pontot is rajzolnak.
+ *
+ * **A kártya kerete az állapotot is jelöli** (SPEC-008 6.2, 21. kritérium, user
+ * döntés 2026-10-21): a gyökér elem a `data-status` (a keret formája) és a
+ * `data-badge-variant` (a keret színe, az állapot jelvényének variánsa)
+ * attribútumot viseli, a festést a `graph-node-card.css` adja. Futás nélkül
+ * (a szerkesztőben) egyik attribútum sincs, és a keret a megszokott marad.
  */
 export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNode>>): ReactElement {
   const { data } = properties;
@@ -135,7 +141,7 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
   const outputHandles = resolveOutputHandles(catalogEntry.outputHandles, workflowNode.config);
 
   return (
-    <div className="graph-node-card">
+    <div className="graph-node-card" data-status={status} data-badge-variant={statusBadge?.variant}>
       {catalogEntry.hasInputHandle && <Handle type="target" position={Position.Left} aria-label="Bemenet" />}
       <div className="graph-node-card__header">
         <span className="graph-node-card__type">{catalogEntry.label}</span>
