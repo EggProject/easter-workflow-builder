@@ -210,7 +210,7 @@ Teljes szabályrendszer: SPEC-002 6. szekció. Itt csak a döntési szabályok.
 nélkül, a `tooling/*` és a `tools/*` csomagokat is beleértve (SPEC-002 3.).
 
 **Mikor új csomag, mikor almappa.** A csomagon belül kell tagolni, nem új csomaggal. A workspace
-25 csomagból áll: 19 `packages`, 2 `apps`, 3 `tooling`, 1 `tools` (gyökér `CLAUDE.md`,
+26 csomagból áll: 20 `packages`, 2 `apps`, 3 `tooling`, 1 `tools` (gyökér `CLAUDE.md`,
 SPEC-002 4.).
 
 **Mappaszerkezet.**

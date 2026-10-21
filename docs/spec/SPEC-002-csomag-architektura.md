@@ -148,14 +148,14 @@ Nyolc csomag szűnt meg, a tartalmuk egy befogadó csomag `src/` fájában él t
 
 `@easter-workflow-builder/db`, `@easter-workflow-builder/engine`, `@easter-workflow-builder/agent`, `@easter-workflow-builder/protocol`, `@easter-workflow-builder/logger`, `@easter-workflow-builder/ui`, `@easter-workflow-builder/server`, `@easter-workflow-builder/web`, `@easter-workflow-builder/eslint-config`, `@easter-workflow-builder/tsconfig`, `@easter-workflow-builder/scripts`, `@easter-workflow-builder/wire-probe`. Ezek tartalma nem változik, és a 6. szekció mappa konvenciója rájuk is érvényes, amint valódi tartalmat kapnak. A `@easter-workflow-builder/typeguards` már ma követi a konvenciót.
 
-### Rétegbesorolás, mind a 25 csomagra
+### Rétegbesorolás, mind a 26 csomagra
 
 A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van rétegszáma, a most nem érintett csomagoknak is. A besorolás a `tooling/scripts/src/dependency-graph/package-layer.ts` fájlban áll, és a gráf ellenőrző bemenete. Egy újonnan felvett csomagnak kötelező itt szerepelnie, különben az ellenőrző "hiányzó réteg-hozzárendelés" hibát ad.
 
 | Réteg  | Csomagok                                                                                                                                                  |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | L0     | `typeguards`, `mcp-tool-kit`, `core`, `logger`                                                                                                            |
-| L1     | `provider-capability`, `protocol`                                                                                                                         |
+| L1     | `provider-capability`, `protocol`, `workflow-language`                                                                                                    |
 | L2     | `minimax-client`, `firecrawl-client`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                                      |
 | L3     | `tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `provider-registry`                                               |
 | L4     | `agent-tool-bundle`, `agent`                                                                                                                              |
@@ -163,7 +163,7 @@ A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van réteg
 | L6     | `server`                                                                                                                                                  |
 | eszköz | `eslint-config`, `tsconfig`, `scripts`, `wire-probe`, réteg nélkül, mert nem termékkód és egyetlen termékcsomag sem függhet tőlük futásidejű függőségként |
 
-Összesen 19 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 25 workspace csomag.
+Összesen 20 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 26 workspace csomag.
 
 A `protocol` L1, mert csak L0 csomagoktól függhet: a `core` és a `typeguards` csomagtól (a `typeguards` felvétele a SPEC-005 7.2 szekció és a szabálykönyv 5. szekciója szerint: a `protocol` is használhat belőle guardot ott, ahol a kérdés nem drótszintű alak). A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L5, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert, tehát az `agent` (L4) fölött áll; a `server` emiatt L6, mert az `engine`-től is függ. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
 

@@ -22,6 +22,7 @@ export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   logger: 0,
   // L1
   'provider-capability': 1,
+  'workflow-language': 1,
   protocol: 1,
   // L2
   'minimax-client': 2,
