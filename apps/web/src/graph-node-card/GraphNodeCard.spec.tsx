@@ -10,6 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GraphNodeCard } from './GraphNodeCard.tsx';
 import type { GraphNodeCardFlowNode, RunNodeSummary } from './graph-node-card-data.ts';
+import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from './script-unimplemented-error-class.ts';
 
 const NODE_TYPES = { workflowNode: GraphNodeCard };
 
@@ -301,6 +302,7 @@ describe('GraphNodeCard', () => {
     expect(handleElements('target')).toHaveLength(1);
     expect(sourceHandleIds()).toEqual([undefined]);
     expect(container.textContent).toContain('nincs implementálva');
+    expect(container.textContent).toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
   });
 
   it('a nem script típusok egyike sem jeleníti meg a script figyelmeztetést', () => {
@@ -366,6 +368,24 @@ describe('GraphNodeCard', () => {
     const card = container.querySelector('.graph-node-card');
     expect(card?.hasAttribute('data-status')).toBe(false);
     expect(card?.hasAttribute('data-badge-variant')).toBe(false);
+  });
+
+  it('az állapot betöltése alatt az állapot jelvény helyén Skeleton áll, a szöveg a felolvasónak marad (SPEC-008 9. szekció 8. pont)', () => {
+    const base = buildFlowNode(WORKFLOW_NODES.agent_step);
+    renderNodes([{ ...base, data: { ...base.data, isStatusLoading: true } }]);
+
+    const badge = container.querySelector(':scope .graph-node-card__header .badge');
+    expect(badge?.querySelector('.skel')).not.toBeNull();
+    expect(badge?.querySelector('.graph-node-card__status-loading-text')?.textContent).toBe('állapot betöltése');
+    // A kártya csomópont címkéje és kimenő handle-ja a betöltés alatt is a helyén van.
+    expect(container.textContent).toContain(WORKFLOW_NODES.agent_step.label);
+    expect(sourceHandleIds()).toEqual([undefined]);
+  });
+
+  it('betöltött állapotnál nincs betöltés jelzés a kártyán', () => {
+    renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step, 'running')]);
+    expect(container.querySelector('.skel')).toBeNull();
+    expect(container.querySelector('.graph-node-card__status-loading-text')).toBeNull();
   });
 
   function headerBadgeLabels(): (string | null)[] {

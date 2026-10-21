@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactElement } from 'react';
+import type { MouseEvent, ReactElement, ReactNode } from 'react';
 import './breadcrumb.css';
 
 /**
@@ -28,6 +28,17 @@ export interface BreadcrumbProperties {
    * (<https://www.w3.org/WAI/ARIA/apg/patterns/breadcrumb/>).
    */
   readonly current: string;
+  /**
+   * Betöltő állapot jelzése (SPEC-008 9. szekció 2. async pontja, a szerkesztő
+   * morzsasorának utolsó eleme a workflow neve): ha megadott, a látható
+   * szöveg helyén ez áll (a hívó `Skeleton` eleme), a `current` szöveg pedig
+   * vizuálisan rejtve marad, tehát a képernyőolvasó az elem nevét továbbra is
+   * megkapja. Dokumentált, szándékos kiegészítés a forrás komponenshez
+   * képest, amelynek nincs betöltő állapota. A csontvány a hívóé, mert a
+   * sötét téma `ink` módosítóját az `apps/web` `ThemedSkeleton` komponense
+   * oldja fel, a `packages/ui` pedig nem ismeri a témaválasztót.
+   */
+  readonly currentLoadingPlaceholder?: ReactNode;
   /**
    * A morzsamenü hozzáférhető neve. Elhagyva a `DEFAULT_BREADCRUMB_LABEL`
    * áll, tehát a meglévő hívók viselkedése nem változik.
@@ -79,7 +90,7 @@ const DEFAULT_BREADCRUMB_LABEL = 'Morzsamenü';
  * kizárás nélküli ág lefedettség).
  */
 export function Breadcrumb(properties: Readonly<BreadcrumbProperties>): ReactElement {
-  const { ancestors = [], current, label = DEFAULT_BREADCRUMB_LABEL } = properties;
+  const { ancestors = [], current, currentLoadingPlaceholder, label = DEFAULT_BREADCRUMB_LABEL } = properties;
 
   return (
     <nav className="breadcrumb" aria-label={label}>
@@ -96,7 +107,14 @@ export function Breadcrumb(properties: Readonly<BreadcrumbProperties>): ReactEle
         ))}
         <li className="breadcrumb__listItem">
           <span className="breadcrumb__item breadcrumb__item--current" aria-current="page">
-            {current}
+            {currentLoadingPlaceholder === undefined ? (
+              current
+            ) : (
+              <>
+                <span className="breadcrumb__current-label--hidden">{current}</span>
+                {currentLoadingPlaceholder}
+              </>
+            )}
           </span>
         </li>
       </ol>

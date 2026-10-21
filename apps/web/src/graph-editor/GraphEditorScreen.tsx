@@ -1,9 +1,12 @@
 import type { FetchFunction } from '@easter-workflow-builder/core';
 import {
+  ProviderIdSchema,
+  ProviderSummarySchema,
   SettingsRecordSchema,
   StartedRunResponseSchema,
   WorkflowDetailSchema,
   WorkflowGraphDocumentSchema,
+  type ProviderSummary,
   type StartedRunResponse,
   type WorkflowEdgeInput,
   type WorkflowGraphDocument,
@@ -25,12 +28,16 @@ import {
   useToasts,
 } from '@easter-workflow-builder/ui';
 import { ReactFlowProvider, useStore, type ReactFlowState } from '@xyflow/react';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
+import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { UseClientRouteResult } from '../history-navigation/use-client-route.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
+import type { ProviderOptions } from '../node-inspector/provider-options.ts';
+import { ProviderOptionsContext } from '../node-inspector/provider-options-context.ts';
+import { arraySchema } from '../rest-client/array-schema.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import { useRequestState } from '../request-state/use-request-state.ts';
@@ -39,6 +46,7 @@ import { readStartInputFields } from '../run-control/read-start-input-fields.ts'
 import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import type { AddNodeContextMenuProperties } from './AddNodeContextMenu.tsx';
 import { GraphEditorCanvas } from './GraphEditorCanvas.tsx';
+import type { EditorWorkflowName } from './editor-workflow-name.ts';
 import { NavigationConfirmationModal } from './NavigationConfirmationModal.tsx';
 import { ADDABLE_NODE_MENU_ITEMS } from './addable-node-menu-items.ts';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
@@ -60,10 +68,12 @@ import { workflowEdgeToEdgeInput, workflowNodeToNodeInput } from './graph-editor
 import { readStoredLayoutSizes, storeLayoutSizes } from './graph-editor-layout.ts';
 import type { GraphElementIdGenerator } from './graph-element-id-generator.ts';
 import './graph-editor-screen.css';
+import { hasScriptNode } from './has-script-node.ts';
 import { isGraphDirty } from './is-graph-dirty.ts';
 import { normalizeLoadedGraphDocument } from './normalize-loaded-graph-document.ts';
 import { resolveUndoModifier, type UndoModifier } from './resolve-undo-modifier.ts';
 import type { UndoShortcutAction } from './resolve-undo-shortcut.ts';
+import { toEditorWorkflowName } from './to-editor-workflow-name.ts';
 import { getBrowserLocalStorage, readUndoModifierPreference } from './undo-modifier-storage.ts';
 import { useBeforeUnloadPrompt } from './use-before-unload-prompt.ts';
 import { useIsFooterCompact } from './use-is-footer-compact.ts';
@@ -98,6 +108,14 @@ export interface GraphEditorScreenProperties {
    * modálist nyitja.
    */
   readonly registerNavigationGuard: UseClientRouteResult['registerNavigationGuard'];
+  /**
+   * A szerkesztett workflow nevének jelentése az `app-shell` morzsasorának
+   * (SPEC-008 9. szekció 2. async pontja, user döntés 2026-10-21): a név a
+   * morzsasor utolsó eleme, betöltés alatt `Skeleton`. A képernyő a
+   * csatolásakor és minden változáskor jelent, a leszerelésekor pedig újra
+   * `loading` értéket, hogy a következő megnyitás ne a régi nevet mutassa.
+   */
+  readonly onWorkflowNameChange: (name: EditorWorkflowName) => void;
 }
 
 /**
@@ -231,6 +249,12 @@ function RedoIcon(): ReactElement {
  * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
  * konstans, hogy a kezdő állapot minden renderen ugyanaz az objektum legyen.
  */
+/**
+ * A "Futás indítása" gomb tiltásának okát hordozó lábléc szöveg azonosítója
+ * (`aria-describedby`, SPEC-008 14. kritérium).
+ */
+const SCRIPT_RUN_BLOCK_REASON_DOM_ID = 'graph-editor-script-run-block-reason';
+
 const EMPTY_GRAPH_EDIT_HISTORY: GraphEditHistory = startGraphEditHistory({ nodes: [], edges: [] });
 
 /**
@@ -326,7 +350,15 @@ function AddNodeMenuButton(properties: Readonly<AddNodeMenuButtonProperties>): R
  * következő megnyitáskor visszatölt (`graph-editor-layout.ts`).
  */
 function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperties>): ReactElement {
-  const { apiOrigin, fetchFunction, search, navigate, graphElementIdGenerator, registerNavigationGuard } = properties;
+  const {
+    apiOrigin,
+    fetchFunction,
+    search,
+    navigate,
+    graphElementIdGenerator,
+    registerNavigationGuard,
+    onWorkflowNameChange,
+  } = properties;
   const workflowId = readWorkflowId(search);
 
   const graphState = useRequestState<WorkflowGraphDocument>();
@@ -336,8 +368,11 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // értékéhez, AC17) és a globális beállítás (`defaultProviderId`) - mindkét
   // végpont a SPEC-005 4.2 táblázatában él, a node-inspector panel enélkül
   // nem tudná megnevezni, MELYIK providert örökli a lépés.
-  const workflowState = useRequestState<{ readonly providerId: string | null }>();
+  const workflowState = useRequestState<{ readonly providerId: string | null; readonly name: string }>();
   const settingsState = useRequestState<{ readonly defaultProviderId: string | null }>();
+  // A provider lista a "Provider felülírás" mezőhöz (SPEC-008 9. szekció 4.
+  // async pontja): a mező a betöltés alatt letiltva áll.
+  const providersState = useRequestState<readonly ProviderSummary[]>();
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const isCompactFooter = useIsFooterCompact();
   const isSaving = saveState.state.status === 'pending';
@@ -422,14 +457,39 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         apiOrigin,
       }),
     );
-    // A `graphState.run`/`workflowState.run`/`settingsState.run` szándékosan
-    // nincs a dependency listán: a `useRequestState` saját `useCallback`-je
+    void providersState.run(() =>
+      requestRouteWithoutBody({
+        routeId: 'listProviders',
+        responseSchema: arraySchema(ProviderSummarySchema),
+        fetchFunction,
+        apiOrigin,
+      }),
+    );
+    // A `graphState.run`/`workflowState.run`/`settingsState.run`/
+    // `providersState.run` szándékosan nincs a dependency listán: a `useRequestState` saját `useCallback`-je
     // stabil, de a hívó oldali objektum maga nem az; a betöltésnek a
     // `workflowId`, az `apiOrigin` és a `fetchFunction` tényleges
     // változására kell újrafutnia, nem minden renderen. A projekt ESLint
     // konfigurációja nem tartalmazza a `react-hooks/exhaustive-deps`
     // szabályt.
   }, [workflowId, apiOrigin, fetchFunction]);
+
+  // A morzsasor neve: a jelentés a kérés állapotváltozásaira fut (a `useMemo`
+  // azonos állapotra azonos objektumot ad, tehát az `app-shell` állapotírása
+  // nem körözhet), a leszereléskor pedig visszaáll a betöltő állapotra.
+  const workflowName = useMemo(
+    () => toEditorWorkflowName(workflowId, workflowState.state),
+    [workflowId, workflowState.state],
+  );
+  useEffect(() => {
+    onWorkflowNameChange(workflowName);
+  }, [workflowName, onWorkflowNameChange]);
+  useEffect(
+    () => () => {
+      onWorkflowNameChange({ kind: 'loading' });
+    },
+    [onWorkflowNameChange],
+  );
 
   useEffect(() => {
     if (graphState.state.status !== 'success') {
@@ -457,6 +517,22 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     // szándékosan nincs a listán, mert a változása a történetet nem
     // indíthatja újra.
   }, [graphState.state]);
+
+  // A provider választó opciói: a betöltés alatt a mező letiltva, sikeres
+  // betöltés után a szerver listája, hibás betöltés után a protokoll
+  // konstansa (a kettő ugyanazt az azonosító készletet írja le). A `useMemo`
+  // azonos állapotra azonos objektumot ad, tehát a kontextus fogyasztói nem
+  // renderelődnek újra feleslegesen.
+  const providerOptions = useMemo<ProviderOptions>(
+    () => ({
+      isLoading: providersState.state.status === 'pending',
+      providerIds:
+        providersState.state.status === 'success'
+          ? providersState.state.value.map((provider) => provider.id)
+          : ProviderIdSchema.options,
+    }),
+    [providersState.state],
+  );
 
   const handleGraphChange = useCallback(
     (nodes: readonly WorkflowNodeInput[], edges: readonly WorkflowEdgeInput[], session?: GraphEditSession): void => {
@@ -658,6 +734,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
 
   const isLoading = !isHydrated;
   const isStartingRun = startRunState.state.status === 'pending';
+  const hasScript = hasScriptNode(currentNodes);
   const selectedNode = currentNodes.find((node) => node.id === selectedNodeId);
   const workflowProviderId =
     // eslint-disable-next-line unicorn/no-null -- a `describeInheritedProvider` a drótszintű `string | null` alakot várja.
@@ -671,12 +748,9 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
     <div className="graph-editor-screen">
       {isLoading ? (
         <div className="graph-editor-screen__loading">
-          {/* A `Skeleton` jelzés forrása a SPEC-008 9. szekció 1. pontja; a 4
-              soros darabszámra sem az, sem a SPEC-007 11. szekciója nem ad
-              értéket (a lista, a futás előzmények, a futás nézet és a
-              transcript várakozása is 4 sort használ). Nyitott kérdés:
-              SPEC-008 O-35. */}
-          <ThemedSkeleton shape="text" lines={4} />
+          {/* A betöltés csontváza a vászon helyét tölti ki (SPEC-008 9.
+              szekció 1. pontja), tehát nincs sorszám, amire forrás kéne. */}
+          <ThemedSkeleton shape="block" />
         </div>
       ) : (
         <div
@@ -712,19 +786,21 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
               <>
                 <ResizableHandle beforeIndex={0} aria-label="A beállítás panel szélessége" />
                 <ResizablePanel index={1}>
-                  <NodeInspector
-                    node={selectedNode}
-                    onChange={handleUpdateNode}
-                    onClose={() => {
-                      setSelectedNodeId(undefined);
-                    }}
-                    onDelete={() => {
-                      handleDeleteNode(selectedNode.id);
-                    }}
-                    onFieldBlur={handleFieldBlur}
-                    inheritedProviderDescription={inheritedProviderDescription}
-                    isSaveAttempted={isSaveAttempted}
-                  />
+                  <ProviderOptionsContext.Provider value={providerOptions}>
+                    <NodeInspector
+                      node={selectedNode}
+                      onChange={handleUpdateNode}
+                      onClose={() => {
+                        setSelectedNodeId(undefined);
+                      }}
+                      onDelete={() => {
+                        handleDeleteNode(selectedNode.id);
+                      }}
+                      onFieldBlur={handleFieldBlur}
+                      inheritedProviderDescription={inheritedProviderDescription}
+                      isSaveAttempted={isSaveAttempted}
+                    />
+                  </ProviderOptionsContext.Provider>
                 </ResizablePanel>
               </>
             )}
@@ -742,6 +818,11 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
         status={
           <>
             {isDirty && <span role="status">Mentetlen változtatások</span>}
+            {hasScript && (
+              <p id={SCRIPT_RUN_BLOCK_REASON_DOM_ID}>
+                {`A futás nem indítható: a gráf Szkript lépést tartalmaz, amit a motor a futtatáskor \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\` hibával elutasít.`}
+              </p>
+            )}
             {validationMessage !== undefined && <p role="alert">{validationMessage}</p>}
             {graphState.state.status === 'failure' && <Alert variant="danger">{graphState.state.message}</Alert>}
             {/* Az indítás hibája a lábléc státuszában áll, ha NINCS nyitva a
@@ -755,18 +836,22 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
           </>
         }
       >
-        {/* A futás indítása akkor aktív, ha NINCS mentetlen változás és a gráf
-            nem üres (SPEC-008 6.5 táblázat): mentetlen gráfból indítani azt
-            jelentené, hogy a futás a szerveren tárolt, RÉGI gráfról készít
-            pillanatképet, amit a felhasználó a képernyőn nem is lát. */}
+        {/* A futás indítása akkor aktív, ha NINCS mentetlen változás, a gráf
+            nem üres és nincs benne `script` lépés (SPEC-008 6.5 táblázat, 14.
+            kritérium). Mentetlen gráfból indítani azt jelentené, hogy a futás a
+            szerveren tárolt, RÉGI gráfról készít pillanatképet, amit a
+            felhasználó a képernyőn nem is lát. A `script` lépést a motor
+            futás indításkor elutasítja, ezért a gomb tiltott, és az okot a
+            lábléc státusza nevezi meg, a gomb `aria-describedby` hivatkozásával. */}
         <Button
           type="button"
           size="sm"
           variant="secondary"
           icon={isCompactFooter}
           aria-label={isCompactFooter ? 'Futás indítása' : undefined}
+          aria-describedby={hasScript ? SCRIPT_RUN_BLOCK_REASON_DOM_ID : undefined}
           isLoading={isStartingRun}
-          disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0}
+          disabled={isStartingRun || isLoading || isDirty || currentNodes.length === 0 || hasScript}
           onClick={handleStartRunClick}
         >
           {/* A felirat SZÁNDÉKOSAN nem a puszta "Indítás": az a `start`
@@ -816,7 +901,7 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
             elsődleges művelet a sor végén marad (SPEC-008 5.8, O-19). */}
         <AddNodeMenuButton disabled={isLoading} isCompact={isCompactFooter} onAddNode={handleAddNode} />
         <ButtonGroup aria-label="Gráf műveletek">
-          <Button type="button" size="sm" onClick={handleSave} disabled={isSaving || isLoading}>
+          <Button type="button" size="sm" onClick={handleSave} isLoading={isSaving} disabled={isSaving || isLoading}>
             {isSaving ? 'Mentés...' : 'Mentés'}
           </Button>
           <Menu

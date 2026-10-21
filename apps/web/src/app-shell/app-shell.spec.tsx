@@ -175,6 +175,70 @@ describe('AppShell', () => {
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
   });
 
+  async function renderEditor(): Promise<
+    (name: Parameters<GraphEditorScreenProperties['onWorkflowNameChange']>[0]) => void
+  > {
+    capturedScreenProperties.length = 0;
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return (name) => {
+      const onWorkflowNameChange = capturedScreenProperties.at(-1)?.onWorkflowNameChange;
+      if (onWorkflowNameChange === undefined) {
+        throw new Error('a teszt nem talált rögzített onWorkflowNameChange propot');
+      }
+      act(() => {
+        onWorkflowNameChange(name);
+      });
+    };
+  }
+
+  function currentItem(): Element | null {
+    return container.querySelector(':scope .app-pagehead .breadcrumb__item--current');
+  }
+
+  describe('a szerkesztő morzsasorának utolsó eleme a workflow neve (SPEC-008 9. szekció 2. pont)', () => {
+    it('betöltés alatt Skeleton áll, a szöveg vizuálisan rejtve az útvonal felirata', async () => {
+      // A valódi képernyő workflowId nélkül azonnal `unavailable` értéket
+      // jelent, ezért a töltés állapotát a teszt maga jelenti.
+      const report = await renderEditor();
+      report({ kind: 'loading' });
+
+      expect(currentItem()?.querySelector('.skel')).not.toBeNull();
+      expect(currentItem()?.querySelector('.breadcrumb__current-label--hidden')?.textContent).toBe('Szerkesztő');
+    });
+
+    it('betöltés után a workflow neve áll a helyén, Skeleton nélkül', async () => {
+      const report = await renderEditor();
+      report({ kind: 'ready', name: 'Alfa workflow' });
+
+      expect(currentItem()?.textContent).toBe('Alfa workflow');
+      expect(currentItem()?.querySelector('.skel')).toBeNull();
+    });
+
+    it('elérhetetlen névnél az útvonal felirata marad, Skeleton nélkül', async () => {
+      const report = await renderEditor();
+      report({ kind: 'unavailable' });
+
+      expect(currentItem()?.textContent).toBe('Szerkesztő');
+      expect(currentItem()?.querySelector('.skel')).toBeNull();
+    });
+
+    it('más útvonalon a jelentett név nem látszik, és Skeleton sincs', async () => {
+      const report = await renderEditor();
+      report({ kind: 'ready', name: 'Alfa workflow' });
+      act(() => {
+        findLinkByText(container, 'Futás előzmények').click();
+      });
+
+      expect(currentItem()?.textContent).toBe('Futás előzmények');
+      expect(currentItem()?.querySelector('.skel')).toBeNull();
+    });
+  });
+
   it('a szerkesztőnek a böngésző oldali azonosító generátort fecskendezi be (SPEC-008 5.8)', async () => {
     capturedScreenProperties.length = 0;
     // eslint-disable-next-line unicorn/no-null -- lásd fent.

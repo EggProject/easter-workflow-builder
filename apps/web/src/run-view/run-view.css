@@ -57,10 +57,39 @@
   color: var(--ep-fg-muted);
 }
 
-.run-view-screen__loading {
+/* A fejléc betöltés alatti csontvázának sorai (`RunViewHeaderSkeleton`): a
+   valódi fejléc sorainak mért magassága (morzsasor, megjegyzés; a vezérlő sáv
+   gombja a `btn--sm` 28 pixele), a szöveg csontváz középre igazítva. Mérés:
+   `docs/research/2026-10-21-varakozas-jelzesek.md`. */
+.run-view-screen__header-loading-row {
+  display: flex;
+  align-items: center;
+}
+
+.run-view-screen__header-loading-row--breadcrumb {
+  height: 23px;
+}
+
+.run-view-screen__header-loading-row--note {
+  height: 21px;
+}
+
+/* A gráf panel betöltés alatti csontváza (SPEC-008 9. szekció 6. async pontja):
+   a `RunGraphCanvas` helyén áll (`.run-graph-canvas { flex: 1 }`), tehát ugyanúgy
+   tölti ki a panelt, térköz és lekerekítés nélkül, hogy a betöltés végén a
+   kirajzolt vászon ne ugorjon. A `.skel` alapértelmezett 14 pixeles
+   magasságát az `auto` magasság és a `flex: 1` írja felül. */
+.run-view-screen__graph-loading {
+  display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  padding: var(--ep-space-6) var(--ep-layout-gutter);
+}
+
+.run-view-screen__graph-loading > .skel {
+  flex: 1;
+  height: auto;
+  border-radius: 0;
 }
 
 /* A törzs a sávtól függően EGY gyereket kap (`.resizable-group`) vagy KETTŐT

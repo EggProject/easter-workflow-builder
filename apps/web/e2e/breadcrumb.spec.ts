@@ -62,7 +62,7 @@ test.beforeEach(async ({ page }) => {
 const SCREENS: readonly { readonly url: string; readonly ancestorCount: number; readonly current: string }[] = [
   { url: '/', ancestorCount: 0, current: 'Workflow-k' },
   { url: '/runs', ancestorCount: 1, current: 'Futás előzmények' },
-  { url: '/editor?workflowId=w-alfa', ancestorCount: 1, current: 'Szerkesztő' },
+  { url: '/editor?workflowId=w-alfa', ancestorCount: 1, current: 'Alfa workflow' },
   { url: '/run', ancestorCount: 1, current: 'Futás nézet' },
   { url: '/nincs-ilyen-utvonal', ancestorCount: 1, current: 'Ismeretlen oldal' },
 ];

@@ -62,6 +62,14 @@ export type GraphNodeCardFlowNode = Node<
     readonly attempt?: number;
     readonly runDecoration?: GraphNodeRunDecoration;
     /**
+     * Pontosan akkor áll, amíg a futás lépés futásai még töltődnek (SPEC-008 9.
+     * szekció 8. async pontja, user döntés 2026-10-21): a kártya az állapot
+     * jelvény helyén `Skeleton`-t rajzol, a "állapot betöltése" szöveget pedig
+     * vizuálisan rejtve a képernyőolvasónak hagyja. A rajz addig is látszik, csak
+     * a dekoráció hiányzik.
+     */
+    readonly isStatusLoading?: true;
+    /**
      * Pontosan akkor áll, ha a csomópont legutóbbi (legnagyobb `id`-jű)
      * `branch_taken` döntése `usedDefault: true`; az ág kiemelés módja erre nem
      * hat (SPEC-008 6.6, 4. döntés, O-24, 91.).

@@ -297,6 +297,36 @@ describe('TranscriptPanel', () => {
     expect(container.querySelector('.transcript-panel__loading')).toBeNull();
   });
 
+  function progressBars(): readonly Element[] {
+    return [...container.querySelectorAll('[role="progressbar"]')];
+  }
+
+  describe('a pótlás jelzése ProgressBar-ral (SPEC-008 9. szekció 10. pont, user döntés 2026-10-21)', () => {
+    it('amíg a pótlás tart és már van sor, a lista fölött ProgressBar áll, a sorok megmaradnak', () => {
+      renderPanel(transcriptOf([makeRecord(1)], false));
+
+      expect(progressBars()).toHaveLength(1);
+      expect(progressBars()[0]?.getAttribute('aria-label')).toBe('az előzmények betöltése folyamatban');
+      expect(progressBars()[0]?.nextElementSibling).toBe(listFrame());
+      expect(list().querySelectorAll('.run-event-row')).toHaveLength(1);
+    });
+
+    it('a replay_complete után a ProgressBar eltűnik, a sorok maradnak', () => {
+      renderPanel(transcriptOf([makeRecord(1)], false));
+      renderPanel(transcriptOf([makeRecord(1)], true));
+
+      expect(progressBars()).toHaveLength(0);
+      expect(list().querySelectorAll('.run-event-row')).toHaveLength(1);
+    });
+
+    it('sor nélkül (első lap) a csontváz áll, ProgressBar nélkül', () => {
+      renderPanel(transcriptOf([], false));
+
+      expect(progressBars()).toHaveLength(0);
+      expect(container.querySelectorAll(':scope .transcript-panel__loading .skel')).toHaveLength(4);
+    });
+  });
+
   it('a lista megnevezett, és minden kirajzolt sora egy RunEventRow a sorszámmal', () => {
     renderPanel(transcriptOf(manyRecords(3), true));
 

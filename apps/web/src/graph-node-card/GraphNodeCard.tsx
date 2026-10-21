@@ -4,8 +4,10 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { type GraphNodeOutputHandle, type GraphNodeOutputHandles } from '../graph-node-catalog/graph-node-catalog.ts';
 import { GRAPH_NODE_CATALOG } from '../graph-node-catalog/graph-node-catalog.ts';
+import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { describeWaitingApprovalSince } from './describe-waiting-approval-since.ts';
 import type { GraphNodeCardFlowNode, GraphNodeRunDecoration } from './graph-node-card-data.ts';
+import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from './script-unimplemented-error-class.ts';
 import { describeStepRunStatusBadge } from './step-run-status-badge.ts';
 import './graph-node-card.css';
 
@@ -120,6 +122,12 @@ function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
  * (SPEC-008 12.2): nincs `measured.` és `getBoundingClientRect()` hivatkozás,
  * a kártya mérete a CSS-é (M-57).
  *
+ * **Az állapot betöltése** (SPEC-008 9. szekció 8. async pontja): amíg a lépés
+ * futások töltődnek (`isStatusLoading`), az állapot jelvény helyén egy
+ * `outline` jelvénybe zárt `Skeleton` áll, a jelvény magassága tehát a design
+ * system jelvényéé, és a kártya mérete nem ugrik; a "állapot betöltése" szöveg
+ * vizuálisan rejtve a képernyőolvasónak marad.
+ *
  * **A fejléc jelvényei** (SPEC-008 6.6): az állapot jelvény mellett két
  * `outline` változatú `Badge` állhat. A "`N`. próbálkozás" csak 1 feletti
  * `attempt` értékre jelenik meg (1. döntés), az "alapértelmezett ág" pontosan
@@ -135,7 +143,7 @@ function renderRunSummary(decoration: GraphNodeRunDecoration): ReactElement {
  */
 export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNode>>): ReactElement {
   const { data } = properties;
-  const { workflowNode, status, attempt, usedDefaultBranch, runDecoration } = data;
+  const { workflowNode, status, attempt, usedDefaultBranch, runDecoration, isStatusLoading } = data;
   const catalogEntry = GRAPH_NODE_CATALOG[workflowNode.type];
   const statusBadge = status === undefined ? undefined : describeStepRunStatusBadge(status);
   const outputHandles = resolveOutputHandles(catalogEntry.outputHandles, workflowNode.config);
@@ -146,6 +154,12 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
       <div className="graph-node-card__header">
         <span className="graph-node-card__type">{catalogEntry.label}</span>
         <span className="graph-node-card__badges">
+          {isStatusLoading === true && (
+            <Badge variant="outline">
+              <span className="graph-node-card__status-loading-text">állapot betöltése</span>
+              <ThemedSkeleton shape="text" w={48} />
+            </Badge>
+          )}
           {statusBadge !== undefined && <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>}
           {attempt !== undefined && attempt > 1 && <Badge variant="outline">{`${String(attempt)}. próbálkozás`}</Badge>}
           {usedDefaultBranch === true && <Badge variant="outline">alapértelmezett ág</Badge>}
@@ -154,7 +168,9 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
       <p className="graph-node-card__label">{workflowNode.label}</p>
       {runDecoration !== undefined && renderRunSummary(runDecoration)}
       {workflowNode.type === 'script' && (
-        <p className="graph-node-card__warning">A motor a futtatáskor elutasítja: nincs implementálva.</p>
+        <p className="graph-node-card__warning">
+          {`A motor a futtatáskor \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\` hibával elutasítja: nincs implementálva.`}
+        </p>
       )}
       {outputHandles.map((handle, index) =>
         renderOutputHandle(handle, computeHandleTopPercent(index, outputHandles.length)),

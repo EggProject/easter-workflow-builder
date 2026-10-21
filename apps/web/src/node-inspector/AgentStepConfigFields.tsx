@@ -7,9 +7,10 @@ import {
   type AgentStepConfig,
 } from '@easter-workflow-builder/protocol';
 import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
-import type { ChangeEvent, ReactElement } from 'react';
+import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
 import { InspectorFieldGroup } from './InspectorFieldGroup.tsx';
+import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
 import { SystemPromptField } from './SystemPromptField.tsx';
@@ -102,6 +103,7 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
   const promptTemplateError = useFieldError(`${fieldPathPrefix}promptTemplate`);
   const systemPromptError = useFieldError(`${fieldPathPrefix}systemPrompt`);
   const providerIdError = useFieldError(`${fieldPathPrefix}providerId`);
+  const providerOptions = useContext(ProviderOptionsContext);
   const modelIdError = useFieldError(`${fieldPathPrefix}modelId`);
   const sessionModeError = useFieldError(`${fieldPathPrefix}sessionMode`);
   const maxTurnsError = useFieldError(`${fieldPathPrefix}maxTurns`);
@@ -140,9 +142,13 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
         size="sm"
         label="Provider felülírás"
         error={providerIdError}
+        // A lista betöltése alatt a mező letiltva áll, "Betöltés…" felirattal
+        // (SPEC-008 9. szekció 4. async pontja, user döntés 2026-10-21).
+        loading={providerOptions.isLoading}
+        loadingLabel="Betöltés…"
         options={[
           { value: '', label: 'nincs felülírás (öröklés)' },
-          ...ProviderIdSchema.options.map((option) => ({ value: option, label: option })),
+          ...providerOptions.providerIds.map((option) => ({ value: option, label: option })),
         ]}
         value={config.providerId ?? ''}
         onChange={(nextValue) => {
