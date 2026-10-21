@@ -1,0 +1,12 @@
+import {
+  createCelExpressionEvaluator,
+  createMustacheTemplateRenderer,
+} from '@easter-workflow-builder/workflow-language';
+import { mountApp } from './mount-app.tsx';
+
+// T-010-5 eldobható mérés: a két csomag a böngésző bundle-be kerül.
+const probeTemplate = createMustacheTemplateRenderer().render('{{input.x}}', { input: { x: 'y' } });
+const probeExpression = createCelExpressionEvaluator().evaluate('input.x == "y"', { input: { x: 'y' } });
+document.documentElement.dataset['workflowLanguageProbe'] = `${probeTemplate.kind}:${probeExpression.kind}`;
+
+mountApp();

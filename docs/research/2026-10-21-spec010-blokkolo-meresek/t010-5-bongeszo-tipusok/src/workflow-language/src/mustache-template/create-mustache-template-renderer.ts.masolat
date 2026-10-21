@@ -1,0 +1,39 @@
+import type { Outcome } from '@easter-workflow-builder/core';
+import { OwnPropertyContext } from './own-property-context.ts';
+import { StrictWriter } from './strict-writer.ts';
+
+/**
+ * A sablon port két művelete.
+ */
+export interface MustacheTemplateRenderer {
+  readonly compile: (template: string) => Outcome<true>;
+  readonly render: (template: string, view: unknown) => Outcome<string>;
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * SPEC-010 6.: a Mustache sablon renderelő gyártó függvénye.
+ */
+export function createMustacheTemplateRenderer(): MustacheTemplateRenderer {
+  const writer = new StrictWriter();
+  return {
+    compile(template) {
+      try {
+        const tokens: unknown = writer.parse(template);
+        return Array.isArray(tokens) ? { kind: 'ok', value: true } : { kind: 'error', message: 'nem tömb' };
+      } catch (error) {
+        return { kind: 'error', message: `${describeError(error)} (template_render_failed)` };
+      }
+    },
+    render(template, view) {
+      try {
+        return { kind: 'ok', value: writer.render(template, new OwnPropertyContext(view)) };
+      } catch (error) {
+        return { kind: 'error', message: `${describeError(error)} (template_render_failed)` };
+      }
+    },
+  };
+}

@@ -1,0 +1,582 @@
+
+ RUN  v4.1.11 /sessions/vigilant-clever-mendel/wt/m4
+
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/advance-run.spec.ts (17 tests) 106ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/create-run-supervisor.spec.ts (31 tests) 219ms
+ ✓  @easter-workflow-builder/engine  src/engine-port/create-engine.spec.ts (46 tests) 490ms
+stdout | src/engine-port/nested-loop-dominator-probe.spec.ts > beágyazott loop próba, dominancia alapú visszaél (vi.mock) > k_kontroll_egyszintu_loop
+### k_kontroll_egyszintu_loop
+BACK_EDGES ["e3"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(belso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S7 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(belso)
+EVENT step_finished S2(belso)
+EVENT loop_iteration_started S2(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(torzs)
+EVENT sdk_system S3(torzs)
+EVENT sdk_result S3(torzs)
+EVENT step_finished S3(torzs)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(belso)
+EVENT step_finished S6(belso)
+EVENT step_started S7(vege)
+EVENT sdk_system S7(vege)
+EVENT sdk_result S7(vege)
+EVENT step_finished S7(vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-dominator-probe.spec.ts > beágyazott loop próba, dominancia alapú visszaél (vi.mock) > a_belso_exit_kozvetlenul_a_kulsore
+### a_belso_exit_kozvetlenul_a_kulsore
+BACK_EDGES ["e4","e5"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S3(belso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S5(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"kulso,start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(belso)
+EVENT step_finished S3(belso)
+EVENT loop_iteration_started S3(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S4(torzs)
+EVENT sdk_system S4(torzs)
+EVENT sdk_result S4(torzs)
+EVENT step_finished S4(torzs)
+EVENT step_started S5(belso)
+EVENT step_finished S5(belso)
+EVENT loop_iteration_started S5(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S6(torzs)
+EVENT sdk_system S6(torzs)
+EVENT sdk_result S6(torzs)
+EVENT step_finished S6(torzs)
+EVENT step_started S7(belso)
+EVENT step_finished S7(belso)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-dominator-probe.spec.ts > beágyazott loop próba, dominancia alapú visszaél (vi.mock) > b_belso_exit_koztes_nodeon_at
+### b_belso_exit_koztes_nodeon_at
+BACK_EDGES ["e5","e7"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S6(belso)","errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"koztes","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S10 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S11 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(belso)
+EVENT step_finished S6(belso)
+EVENT loop_iteration_started S6(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S7(torzs)
+EVENT sdk_system S7(torzs)
+EVENT sdk_result S7(torzs)
+EVENT step_finished S7(torzs)
+EVENT step_started S8(belso)
+EVENT step_finished S8(belso)
+EVENT step_started S9(koztes)
+EVENT sdk_system S9(koztes)
+EVENT sdk_result S9(koztes)
+EVENT step_finished S9(koztes)
+EVENT step_started S10(kulso)
+EVENT step_finished S10(kulso)
+EVENT step_started S11(vege)
+EVENT sdk_system S11(vege)
+EVENT sdk_result S11(vege)
+EVENT step_finished S11(vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-dominator-probe.spec.ts > beágyazott loop próba, dominancia alapú visszaél (vi.mock) > c_villa_belso_exit_nem_ter_vissza
+### c_villa_belso_exit_nem_ter_vissza
+BACK_EDGES ["e5","e8"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"visszavez","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S10 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S8(belso)","errorKind":null}
+STEP_RUN S11 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S12 {"nodeId":"belso_vege","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S5(visszavez)
+EVENT sdk_system S5(visszavez)
+EVENT sdk_result S5(visszavez)
+EVENT step_started S6(torzs)
+EVENT sdk_system S6(torzs)
+EVENT sdk_result S6(torzs)
+EVENT step_finished S5(visszavez)
+EVENT step_finished S6(torzs)
+EVENT step_started S7(kulso)
+EVENT step_finished S7(kulso)
+EVENT step_started S8(belso)
+EVENT step_finished S8(belso)
+EVENT loop_iteration_started S8(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S9(vege)
+EVENT sdk_system S9(vege)
+EVENT sdk_result S9(vege)
+EVENT step_started S10(torzs)
+EVENT sdk_system S10(torzs)
+EVENT sdk_result S10(torzs)
+EVENT step_finished S9(vege)
+EVENT step_finished S10(torzs)
+EVENT step_started S11(belso)
+EVENT step_finished S11(belso)
+EVENT step_started S12(belso_vege)
+EVENT sdk_system S12(belso_vege)
+EVENT sdk_result S12(belso_vege)
+EVENT step_finished S12(belso_vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+ ✓  @easter-workflow-builder/engine  src/engine-port/nested-loop-dominator-probe.spec.ts (4 tests) 131ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-sub-workflow.spec.ts (23 tests) 117ms
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > A: legfelső szintű loop, kétszer iterál (FOLYTAT-2)
+### A status=succeeded
+PORT#1 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#5 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#6 {"port":"template","text":"VEGE","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded"}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"succeeded"}
+STEP_RUN {"nodeId":"vege","iteration":0,"status":"succeeded"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":5}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":5}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > B: beágyazott loop (külső FOLYTAT-1, belső BELSO-2): a belső loop saját kifejezése mit lát
+### B status=succeeded errorKind=null
+PORT#1 {"port":"expression","text":"FOLYTAT-1","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"kulso","iteration":0,"status":"succeeded"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":5}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > C-on_error: állandó igaz kifejezés (FOLYTAT-99), maxIterations 2
+### C-on_error status=failed errorKind=retry_attempts_exhausted
+PORT#1 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"failed","errorKind":"loop_max_iterations_reached"}
+STEP_RUN {"nodeId":"eh","iteration":0,"status":"failed","errorKind":"retry_attempts_exhausted"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":2}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":2}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > D-fail_run: állandó igaz kifejezés (FOLYTAT-99), maxIterations 2
+### D-fail_run status=failed errorKind=loop_max_iterations_reached
+PORT#1 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"failed","errorKind":"loop_max_iterations_reached"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":2}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":2}}
+
+ ✓  @easter-workflow-builder/engine  src/engine-port/t010-4-probe.spec.ts (4 tests) 89ms
+stdout | src/engine-port/nested-loop-probe.spec.ts > beágyazott loop próba, valódi motor > k_kontroll_egyszintu_loop
+### k_kontroll_egyszintu_loop
+BACK_EDGES ["e3"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(belso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S7 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(belso)
+EVENT step_finished S2(belso)
+EVENT loop_iteration_started S2(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(torzs)
+EVENT sdk_system S3(torzs)
+EVENT sdk_result S3(torzs)
+EVENT step_finished S3(torzs)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(belso)
+EVENT step_finished S6(belso)
+EVENT step_started S7(vege)
+EVENT sdk_system S7(vege)
+EVENT sdk_result S7(vege)
+EVENT step_finished S7(vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-probe.spec.ts > beágyazott loop próba, valódi motor > a_belso_exit_kozvetlenul_a_kulsore
+### a_belso_exit_kozvetlenul_a_kulsore
+BACK_EDGES ["e2","e4","e5"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-probe.spec.ts > beágyazott loop próba, valódi motor > b_belso_exit_koztes_nodeon_at
+### b_belso_exit_koztes_nodeon_at
+BACK_EDGES ["e3","e5","e7"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/nested-loop-probe.spec.ts > beágyazott loop próba, valódi motor > c_villa_belso_exit_nem_ter_vissza
+### c_villa_belso_exit_nem_ter_vissza
+BACK_EDGES ["e5","e8"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"visszavez","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S10 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S8(belso)","errorKind":null}
+STEP_RUN S11 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S12 {"nodeId":"belso_vege","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S5(visszavez)
+EVENT sdk_system S5(visszavez)
+EVENT sdk_result S5(visszavez)
+EVENT step_started S6(torzs)
+EVENT sdk_system S6(torzs)
+EVENT sdk_result S6(torzs)
+EVENT step_finished S5(visszavez)
+EVENT step_finished S6(torzs)
+EVENT step_started S7(kulso)
+EVENT step_finished S7(kulso)
+EVENT step_started S8(belso)
+EVENT step_finished S8(belso)
+EVENT loop_iteration_started S8(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S9(vege)
+EVENT sdk_system S9(vege)
+EVENT sdk_result S9(vege)
+EVENT step_started S10(torzs)
+EVENT sdk_system S10(torzs)
+EVENT sdk_result S10(torzs)
+EVENT step_finished S9(vege)
+EVENT step_finished S10(torzs)
+EVENT step_started S11(belso)
+EVENT step_finished S11(belso)
+EVENT step_started S12(belso_vege)
+EVENT sdk_system S12(belso_vege)
+EVENT sdk_result S12(belso_vege)
+EVENT step_finished S12(belso_vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+ ✓  @easter-workflow-builder/engine  src/engine-port/nested-loop-probe.spec.ts (4 tests) 91ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-human-approval.spec.ts (15 tests) 73ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/agent-node-lifecycle.spec.ts (19 tests) 74ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/interrupt-run.spec.ts (12 tests) 65ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-node.spec.ts (11 tests) 58ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-fan-out.spec.ts (10 tests) 45ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/run-agent-step.spec.ts (14 tests) 65ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/shutdown-active-runs.spec.ts (8 tests) 52ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-loop.spec.ts (10 tests) 44ms
+stdout | src/engine-port/stall-shape-probe.spec.ts > elakadas alak proba, valodi motor > s2_kontroll_torzs_y_el_nelkul
+### s2_kontroll_torzs_y_el_nelkul
+BACK_EDGES ["e3"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"l","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(l)","errorKind":null}
+STEP_RUN S4 {"nodeId":"l","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S4(l)","errorKind":null}
+STEP_RUN S6 {"nodeId":"l","iteration":2,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S7 {"nodeId":"y","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(l)
+EVENT step_finished S2(l)
+EVENT loop_iteration_started S2(l) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(torzs)
+EVENT sdk_system S3(torzs)
+EVENT sdk_result S3(torzs)
+EVENT step_finished S3(torzs)
+EVENT step_started S4(l)
+EVENT step_finished S4(l)
+EVENT loop_iteration_started S4(l) {"iteration":1,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(l)
+EVENT step_finished S6(l)
+EVENT step_started S7(y)
+EVENT sdk_system S7(y)
+EVENT sdk_result S7(y)
+EVENT step_finished S7(y)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+stdout | src/engine-port/stall-shape-probe.spec.ts > elakadas alak proba, valodi motor > s1_torzs_kozvetlen_el_a_ciklus_utani_nodera
+### s1_torzs_kozvetlen_el_a_ciklus_utani_nodera
+BACK_EDGES ["e3"]
+VALIDATE_RUN A(z) y node két különböző hatókör veremmel érhető el a start node-ból (unbalanced_fan_out_scope).
+REPLACE_GRAPH ok (db mentés elfogadta)
+START_RUN hibaág: A(z) y node két különböző hatókör veremmel érhető el a start node-ból (unbalanced_fan_out_scope).
+
+ ✓  @easter-workflow-builder/engine  src/engine-port/stall-shape-probe.spec.ts (2 tests) 47ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/close-waiting-approval-step-runs.spec.ts (8 tests) 45ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-error-handler.spec.ts (8 tests) 35ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-branch.spec.ts (9 tests) 43ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-join-ai-synthesis.spec.ts (5 tests) 28ms
+ ✓  @easter-workflow-builder/engine  src/engine-port/config-invariants.spec.ts (13 tests) 21ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/restart-run.spec.ts (5 tests) 32ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/finish-step-run-succeeded.spec.ts (5 tests) 29ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-join-merge.spec.ts (6 tests) 36ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/cancel-active-run-tree.spec.ts (3 tests) 33ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/finish-step-run-failed.spec.ts (5 tests) 28ms
+ ✓  @easter-workflow-builder/engine  src/startup-recovery/run-startup-recovery.spec.ts (3 tests) 33ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-agent-step.spec.ts (2 tests) 26ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/begin-step-run.spec.ts (4 tests) 19ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/execute-start.spec.ts (3 tests) 21ms
+ ✓  @easter-workflow-builder/engine  src/startup-recovery/graceful-shutdown-startup-recovery-equivalence.spec.ts (1 test) 22ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/approval-wait-registry.spec.ts (10 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/engine-event/write-engine-event.spec.ts (4 tests) 19ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/emit-engine-event.spec.ts (2 tests) 16ms
+ ✓  @easter-workflow-builder/engine  src/startup-recovery/engine-never-opens-database.spec.ts (1 test) 7ms
+ ✓  @easter-workflow-builder/engine  src/concurrency-gate/create-concurrency-gate.spec.ts (14 tests) 9ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-run.spec.ts (18 tests) 8ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-implemented-node-types.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/advance-scheduler.spec.ts (17 tests) 8ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/stop-and-await-run-tree.spec.ts (7 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/branch-scope/validate-scope-balance.spec.ts (12 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/provider-environment/build-provider-environment-block.spec.ts (7 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-context/build-run-context.spec.ts (10 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/validate-provider-capabilities.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/build-node-plans.spec.ts (5 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/validate-agent-step-capabilities.spec.ts (13 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/agent-query-registry.spec.ts (7 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/resolve-session-binding.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-node-configs.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/build-agent-step-options.spec.ts (9 tests) 5ms
+ ✓  @easter-workflow-builder/engine  src/provider-environment/resolve-required-environment-value.spec.ts (3 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-context/find-visible-step-instance.spec.ts (11 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/enqueue-ready-instance.spec.ts (3 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/detect-graph-cycle.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/collect-terminal-output.spec.ts (6 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/resolve-fork-session.spec.ts (12 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/engine-error/format-engine-error-message.spec.ts (2 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-context/resolve-step-reference.spec.ts (6 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/error-policy/resolve-retry-decision.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/resolve-instance-readiness.spec.ts (12 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/build-stop-hook-matcher.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/build-executable-graph.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/validate-loop-back-edge-body.spec.ts (5 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/active-run-registry.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/validate-forced-tool-choice-risk.spec.ts (8 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-edge-endpoints.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/collect-join-inputs.spec.ts (9 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/build-fan-out-item-context.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/validate-run-input.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/find-loop-back-edges.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/take-next-ready-instance.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-disallowed-server-tools.spec.ts (8 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/build-child-result.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/engine-error/is-engine-error-kind.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/error-policy/resolve-error-route.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/validate-loop-branch-edges.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/build-scoped-key.spec.ts (8 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-graph/compute-reachable-node-ids.spec.ts (5 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/read-result-telemetry.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-branch-edge-keys.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/prepare-run.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/error-policy/resolve-run-completion.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-error-handler-backoff.spec.ts (5 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-reserved-branch-keys.spec.ts (8 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-default-branch-key.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/node-executor/detect-workflow-recursion.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-interrupt/interrupt-live-agent-queries.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-structured-output-strategy.spec.ts (5 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/find-nearest-ancestor-session.spec.ts (6 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-error-handler-edges.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/collect-run-inputs.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/provider-resolution/resolve-effective-provider.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/resolve-fan-out-item.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-supervisor/build-snapshot-document.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-model-wire-identifier.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/resolve-node-providers.spec.ts (6 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/create-scheduler-state.spec.ts (2 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-node-reachability.spec.ts (4 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/executable-node-config.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/require-model-selection.spec.ts (5 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/is-run-terminal.spec.ts (3 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/run-context/collect-ancestor-node-ids.spec.ts (5 tests) 4ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-effort-inclusion.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-start-node.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/agent-step/collect-session-source-nodes.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/validate-max-turns-floor.spec.ts (6 tests) 3ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/validate-model-id.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-thinking-mode.spec.ts (5 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-unhandled-error-policy.spec.ts (2 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/run-validation/validate-join-merge-settings.spec.ts (4 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/enqueue-start-instance.spec.ts (2 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/validate-sdk-version-match.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/rate-limit-retry-policy.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-concurrency-suggestion.spec.ts (2 tests) 1ms
+ ✓  @easter-workflow-builder/engine  src/scheduling/resolve-loop-iteration.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/should-include-partial-messages.spec.ts (3 tests) 2ms
+ ✓  @easter-workflow-builder/engine  src/capability-policy/resolve-connection-test-mode.spec.ts (4 tests) 2ms
+
+ Test Files  117 passed (117)
+      Tests  798 passed (798)
+   Start at  21:40:53
+   Duration  9.29s (transform 2.61s, setup 0ms, import 16.06s, tests 2.50s, environment 6ms)
+

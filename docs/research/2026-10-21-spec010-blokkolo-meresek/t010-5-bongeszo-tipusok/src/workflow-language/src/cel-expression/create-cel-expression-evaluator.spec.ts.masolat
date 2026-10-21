@@ -1,0 +1,20 @@
+import { describe, expect, it } from 'vitest';
+import { createCelExpressionEvaluator } from './create-cel-expression-evaluator.ts';
+
+describe('T-010-5 mérés: CEL hívás TypeScriptben', () => {
+  const evaluator = createCelExpressionEvaluator();
+
+  it('érvényes kifejezés fordul és kiértékel', () => {
+    expect(evaluator.compile('input.x > 1').kind).toBe('ok');
+    expect(evaluator.evaluate('input.x > 1', { input: { x: 2 } })).toStrictEqual({ kind: 'ok', value: true });
+  });
+
+  it('nem deklarált változó és szintaktikai hiba hibaág', () => {
+    expect(evaluator.compile('step.x').kind).toBe('error');
+    expect(evaluator.compile('input.').kind).toBe('error');
+  });
+
+  it('hiányzó kulcs hibaág', () => {
+    expect(evaluator.evaluate('input.nincs', { input: {} }).kind).toBe('error');
+  });
+});

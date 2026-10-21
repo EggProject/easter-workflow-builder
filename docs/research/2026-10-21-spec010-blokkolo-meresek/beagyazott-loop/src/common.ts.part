@@ -1,0 +1,141 @@
+
+// ===== BEÁGYAZOTT LOOP ELDOBHATÓ PRÓBA (nem commitolandó) =====
+import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
+import { findLoopBackEdges } from '../run-graph/find-loop-back-edges.ts';
+import { validateRun } from '../run-validation/validate-run.ts';
+
+// "CIKLUS-n": kifejezés szövegenként számlál, és n igaz után egy hamisat ad,
+// majd elölről (tehát egy belső loop minden külső iterációban n-szer folytat).
+// A döntés NEM a kapott kontextusból jön. A kontextusból az iteration értéket
+// és a steps kulcsait naplózzuk.
+interface Seen { readonly text: string; readonly decision: boolean; readonly iteration: string; readonly stepsKeys: string }
+function cyclicPorts(seen: Seen[]): Pick<EngineDependencies, 'expressionEvaluator' | 'templateRenderer'> {
+  const counts = new Map<string, number>();
+  return {
+    expressionEvaluator: {
+      evaluate: (expression, context) => {
+        const count = counts.get(expression) ?? 0;
+        counts.set(expression, count + 1);
+        const limit = Number(expression.split('-')[1]);
+        const decision = count % (limit + 1) < limit;
+        const record = isRecord(context) ? context : {};
+        const steps = record['steps'];
+        seen.push({ text: expression, decision, iteration: String(record['iteration']), stepsKeys: isRecord(steps) ? Object.keys(steps).join(',') : typeof steps });
+        return { kind: 'ok', value: decision };
+      },
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+    templateRenderer: {
+      render: () => ({ kind: 'ok', value: 'sikeres' }),
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+  };
+}
+function loopNodeOf(id: string, continueExpression: string, maxIterations: number): WorkflowNodeInput {
+  return nodeOf(id, { type: 'loop', maxIterations, continueExpression, onUnhandledError: 'fail_run' });
+}
+interface Shape { readonly label: string; readonly nodes: readonly WorkflowNodeInput[]; readonly edges: readonly WorkflowEdgeInput[] }
+
+function snapshotOf(shape: Shape) {
+  return {
+    version: 1,
+    sdkVersionPin: INSTALLED_AGENT_SDK_VERSION,
+    workflow: { id: 'w', name: shape.label, description: null, providerId: null },
+    nodes: shape.nodes.map((node) => ({ id: node.id, type: node.config.type, label: node.label, position: { x: 0, y: 0 }, config: node.config, effectiveProviderId: 'minimax' })),
+    edges: shape.edges.map((edge) => ({ ...edge })),
+  };
+}
+
+async function runShape(shape: Shape): Promise<void> {
+  const lines: string[] = [`### ${shape.label}`];
+  const document = snapshotOf(shape);
+  const backEdges = [...findLoopBackEdges(buildExecutableGraph(document))].sort();
+  lines.push(`BACK_EDGES ${JSON.stringify(backEdges)}`);
+  const validated = validateRun(document, 'minimax', null);
+  lines.push(`VALIDATE_RUN ${validated.kind === 'ok' ? 'ok' : validated.message}`);
+
+  const seen: Seen[] = [];
+  const harness = openHarness(cyclicPorts(seen));
+  const workflowId = createWorkflow(harness.database, shape.label, shape.nodes, shape.edges);
+  lines.push('REPLACE_GRAPH ok (db mentés elfogadta)');
+  const started = await harness.engine.startRun({ workflowId, input: {} });
+  if (!isOkOutcome(started)) {
+    lines.push(`START_RUN hibaág: ${started.message}`);
+    console.log(lines.join('\n'));
+    return;
+  }
+  const runId = started.value.run.id;
+  const status = await waitForRunStatus(harness.database, runId, TERMINAL_RUN_STATUSES);
+  const run = okOrThrow(harness.database.runs.getRun(runId));
+  lines.push(`RUN status=${status} errorKind=${String(run.errorKind)}`);
+  const stepRuns = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
+  const nodeOfStep = new Map(stepRuns.map((row) => [row.id, row.nodeId]));
+  const short = new Map(stepRuns.map((row, index) => [row.id, `S${String(index + 1)}`]));
+  for (const row of stepRuns) {
+    lines.push(`STEP_RUN ${short.get(row.id)} ${JSON.stringify({ nodeId: row.nodeId, iteration: row.iteration, attempt: row.attempt, status: row.status, parent: row.parentStepRunId === null ? null : `${String(short.get(row.parentStepRunId))}(${String(nodeOfStep.get(row.parentStepRunId))})`, errorKind: row.errorKind })}`);
+  }
+  for (const entry of seen) {
+    lines.push(`EXPR ${JSON.stringify(entry)}`);
+  }
+  for (const event of okOrThrow(harness.database.events.readEventsSince(runId, 0, 1000))) {
+    if (event.kind === 'sdk_message' || event.kind === 'sdk_stream_event') continue;
+    const step = event.stepRunId === null ? '-' : `${String(short.get(event.stepRunId))}(${String(nodeOfStep.get(event.stepRunId))})`;
+    const payload = event.kind === 'loop_iteration_started' || event.kind === 'run_finished' ? ` ${JSON.stringify(event.payload)}` : '';
+    lines.push(`EVENT ${event.kind} ${step}${payload}`);
+  }
+  console.log(lines.join('\n'));
+}
+
+// (a) a T-010-4 B esete: a belső exit éle közvetlenül a külső loopra.
+const SHAPE_A: Shape = {
+  label: 'a_belso_exit_kozvetlenul_a_kulsore',
+  nodes: [startNode('start'), loopNodeOf('kulso', 'CIKLUS-1', 5), loopNodeOf('belso', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('vege', 'VEGE')],
+  edges: [
+    edgeOf('e1', 'start', 'kulso'),
+    edgeOf('e2', 'kulso', 'belso', 'continue'),
+    edgeOf('e3', 'belso', 'torzs', 'continue'),
+    edgeOf('e4', 'torzs', 'belso'),
+    edgeOf('e5', 'belso', 'kulso', 'exit'),
+    edgeOf('e6', 'kulso', 'vege', 'exit'),
+  ],
+};
+// (b) a belső exit éle egy külön node-ra, onnan vissza a külsőre; a külső
+// törzse a belső loop előtt is tartalmaz egy node-ot.
+const SHAPE_B: Shape = {
+  label: 'b_belso_exit_koztes_nodeon_at',
+  nodes: [startNode('start'), loopNodeOf('kulso', 'CIKLUS-1', 5), agentNode('elo', 'ELO'), loopNodeOf('belso', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('koztes', 'KOZTES'), agentNode('vege', 'VEGE')],
+  edges: [
+    edgeOf('e1', 'start', 'kulso'),
+    edgeOf('e2', 'kulso', 'elo', 'continue'),
+    edgeOf('e3', 'elo', 'belso'),
+    edgeOf('e4', 'belso', 'torzs', 'continue'),
+    edgeOf('e5', 'torzs', 'belso'),
+    edgeOf('e6', 'belso', 'koztes', 'exit'),
+    edgeOf('e7', 'koztes', 'kulso'),
+    edgeOf('e8', 'kulso', 'vege', 'exit'),
+  ],
+};
+// (c) az egyetlen alak, ahol a mai definíció szerint a belső loopnak marad
+// belépő éle: a belső loop kilépő ága NEM vezet vissza a külsőre, a külső
+// visszaéle egy párhuzamos ágról jön (villa a külső törzsben).
+const SHAPE_C: Shape = {
+  label: 'c_villa_belso_exit_nem_ter_vissza',
+  nodes: [startNode('start'), loopNodeOf('kulso', 'CIKLUS-1', 5), agentNode('elo', 'ELO'), loopNodeOf('belso', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('belso_vege', 'BELSO_VEGE'), agentNode('visszavez', 'VISSZAVEZ'), agentNode('vege', 'VEGE')],
+  edges: [
+    edgeOf('e1', 'start', 'kulso'),
+    edgeOf('e2', 'kulso', 'elo', 'continue'),
+    edgeOf('e3', 'elo', 'belso'),
+    edgeOf('e4', 'belso', 'torzs', 'continue'),
+    edgeOf('e5', 'torzs', 'belso'),
+    edgeOf('e6', 'belso', 'belso_vege', 'exit'),
+    edgeOf('e7', 'elo', 'visszavez'),
+    edgeOf('e8', 'visszavez', 'kulso'),
+    edgeOf('e9', 'kulso', 'vege', 'exit'),
+  ],
+};
+// Kontroll: egyetlen, legfelső szintű loop, ugyanazzal a CIKLUS-2 porttal.
+const SHAPE_K: Shape = {
+  label: 'k_kontroll_egyszintu_loop',
+  nodes: [startNode('start'), loopNodeOf('belso', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('vege', 'VEGE')],
+  edges: [edgeOf('e1', 'start', 'belso'), edgeOf('e2', 'belso', 'torzs', 'continue'), edgeOf('e3', 'torzs', 'belso'), edgeOf('e4', 'belso', 'vege', 'exit')],
+};

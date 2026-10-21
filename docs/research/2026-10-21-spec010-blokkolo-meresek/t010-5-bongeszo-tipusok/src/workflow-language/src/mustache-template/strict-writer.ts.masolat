@@ -1,0 +1,36 @@
+import Mustache from 'mustache';
+import { MissingTemplateNameError } from './missing-template-name-error.ts';
+import { OwnPropertyContext } from './own-property-context.ts';
+import { toText } from './to-text.ts';
+
+/**
+ * SPEC-010 6.6, 6.7: saját `Mustache.Writer` példány. A sima változó tag két
+ * ága (`escapedValue`, `unescapedValue`) felülírva: a fel nem oldható név
+ * hibát ad, a talált érték a 6.5 szerint szöveggé alakul. A szakasz és a
+ * fordított szakasz a könyvtár útján marad. A gyorsítótár ki van kapcsolva.
+ */
+export class StrictWriter extends Mustache.Writer {
+  // A `@types/mustache` a Writer példány mezőjét nem deklarálja; a
+  // könyvtár konstruktora állítja be, a mező definíció felülírja.
+  templateCache: Mustache.TemplateCache | undefined = undefined;
+
+  #plainValue(token: string[], context: Mustache.Context): string {
+    const name = token[1];
+    if (name === undefined || !(context instanceof OwnPropertyContext)) {
+      throw new TypeError('váratlan token vagy kontextus');
+    }
+    const resolution = context.resolve(name);
+    if (!resolution.found) {
+      throw new MissingTemplateNameError(name);
+    }
+    return toText(resolution.value);
+  }
+
+  override escapedValue(token: string[], context: Mustache.Context): string {
+    return this.#plainValue(token, context);
+  }
+
+  override unescapedValue(token: string[], context: Mustache.Context): string {
+    return this.#plainValue(token, context);
+  }
+}

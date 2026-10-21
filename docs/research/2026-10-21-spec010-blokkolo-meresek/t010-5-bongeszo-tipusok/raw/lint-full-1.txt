@@ -1,0 +1,219 @@
+• turbo 2.10.12
+
+   • Packages in scope: @easter-workflow-builder/agent, @easter-workflow-builder/agent-tool-bundle, @easter-workflow-builder/core, @easter-workflow-builder/db, @easter-workflow-builder/engine, @easter-workflow-builder/eslint-config, @easter-workflow-builder/firecrawl-client, @easter-workflow-builder/logger, @easter-workflow-builder/mcp-tool-kit, @easter-workflow-builder/minimax-client, @easter-workflow-builder/protocol, @easter-workflow-builder/provider-capability, @easter-workflow-builder/provider-claude-subscription, @easter-workflow-builder/provider-minimax, @easter-workflow-builder/provider-registry, @easter-workflow-builder/scripts, @easter-workflow-builder/server, @easter-workflow-builder/tool-firecrawl-web-fetch, @easter-workflow-builder/tool-minimax-understand-image, @easter-workflow-builder/tool-minimax-web-search, @easter-workflow-builder/tsconfig, @easter-workflow-builder/typeguards, @easter-workflow-builder/ui, @easter-workflow-builder/web, @easter-workflow-builder/wire-probe, @easter-workflow-builder/workflow-language
+   • Running lint in 26 packages
+   • Remote caching disabled, using shared worktree cache
+
+@easter-workflow-builder/eslint-config:lint: cache miss, executing 38f47be0d7e446b2
+@easter-workflow-builder/eslint-config:lint: $ eslint .
+@easter-workflow-builder/eslint-config:lint: Dependency "eslint" could not be resolved for catalog "default"
+@easter-workflow-builder/eslint-config:lint: Dependency "eslint-import-resolver-typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/eslint-config:lint: Dependency "eslint-plugin-import-x" could not be resolved for catalog "default"
+@easter-workflow-builder/eslint-config:lint: Dependency "eslint-plugin-sonarjs" could not be resolved for catalog "default"
+@easter-workflow-builder/eslint-config:lint: Dependency "eslint-plugin-unicorn" could not be resolved for catalog "default"
+@easter-workflow-builder/eslint-config:lint: Dependency "typescript-eslint" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-capability:lint: cache miss, executing 094f54ad1291b5d2
+@easter-workflow-builder/provider-capability:lint: $ eslint .
+@easter-workflow-builder/provider-capability:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-capability:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-capability:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/mcp-tool-kit:lint: cache miss, executing 310116661c1649fe
+@easter-workflow-builder/mcp-tool-kit:lint: $ eslint .
+@easter-workflow-builder/mcp-tool-kit:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/mcp-tool-kit:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/mcp-tool-kit:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/mcp-tool-kit:typecheck: cache miss, executing 80cf1a150e4cd26b
+@easter-workflow-builder/mcp-tool-kit:typecheck: $ tsc --noEmit
+@easter-workflow-builder/logger:typecheck: cache miss, executing d47b479042391ff5
+@easter-workflow-builder/logger:typecheck: $ tsc --noEmit
+@easter-workflow-builder/typeguards:typecheck: cache hit, replaying logs 73881ee85367f49f
+@easter-workflow-builder/typeguards:typecheck: $ tsc --noEmit
+@easter-workflow-builder/provider-capability:typecheck: cache miss, executing a2cfeba9a41145f8
+@easter-workflow-builder/provider-capability:typecheck: $ tsc --noEmit
+@easter-workflow-builder/core:lint: cache miss, executing 4e835ab0eefea334
+@easter-workflow-builder/core:lint: $ eslint .
+@easter-workflow-builder/core:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/core:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/core:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/wire-probe:lint: cache miss, executing 2f705152c269ea09
+@easter-workflow-builder/wire-probe:lint: $ eslint .
+@easter-workflow-builder/wire-probe:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/wire-probe:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/wire-probe:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/tsconfig:lint: cache miss, executing 22dc7f42c8681aae
+@easter-workflow-builder/tsconfig:lint: $ eslint .
+@easter-workflow-builder/typeguards:lint: cache miss, executing 81fdd4a8ac0221e1
+@easter-workflow-builder/typeguards:lint: $ eslint .
+@easter-workflow-builder/typeguards:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/logger:lint: cache miss, executing 100122769b5742ec
+@easter-workflow-builder/logger:lint: $ eslint .
+@easter-workflow-builder/logger:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/logger:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/logger:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: cache miss, executing 45d0649d892ebe7c
+@easter-workflow-builder/ui:lint: $ eslint .
+@easter-workflow-builder/ui:lint: Dependency "@tanstack/react-table" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "react" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "@types/react" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "@types/react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/core:typecheck: cache hit, replaying logs 99c4a4a6c4138241
+@easter-workflow-builder/core:typecheck: $ tsc --noEmit
+@easter-workflow-builder/scripts:lint: cache miss, executing 0856ca0fa96cda45
+@easter-workflow-builder/scripts:lint: $ eslint .
+@easter-workflow-builder/scripts:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/scripts:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/ui:typecheck: cache hit, replaying logs f985ce611ec5179c
+@easter-workflow-builder/ui:typecheck: $ tsc --noEmit
+@easter-workflow-builder/provider-claude-subscription:typecheck: cache miss, executing 569fe6888569f530
+@easter-workflow-builder/provider-claude-subscription:typecheck: $ tsc --noEmit
+@easter-workflow-builder/provider-minimax:typecheck: cache miss, executing 12f0f5a71285db86
+@easter-workflow-builder/provider-minimax:typecheck: $ tsc --noEmit
+@easter-workflow-builder/provider-minimax:lint: cache miss, executing 4f37649941013740
+@easter-workflow-builder/provider-minimax:lint: $ eslint .
+@easter-workflow-builder/provider-minimax:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-minimax:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-minimax:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-claude-subscription:lint: cache miss, executing 9a74557c841bf397
+@easter-workflow-builder/provider-claude-subscription:lint: $ eslint .
+@easter-workflow-builder/provider-claude-subscription:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-claude-subscription:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-claude-subscription:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/protocol:typecheck: cache hit, replaying logs 96cb3a446b3a7711
+@easter-workflow-builder/protocol:typecheck: $ tsc --noEmit
+@easter-workflow-builder/firecrawl-client:typecheck: cache miss, executing b3321149747ed9f7
+@easter-workflow-builder/firecrawl-client:typecheck: $ tsc --noEmit
+@easter-workflow-builder/minimax-client:lint: cache miss, executing c9e6011c74cc60a4
+@easter-workflow-builder/minimax-client:lint: $ eslint .
+@easter-workflow-builder/minimax-client:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/minimax-client:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/minimax-client:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: cache hit, replaying logs 7b2c8fe56aab3ac8
+@easter-workflow-builder/workflow-language:lint: $ eslint .
+@easter-workflow-builder/workflow-language:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/db:typecheck: cache miss, executing 67d84b0efcb9321e
+@easter-workflow-builder/db:typecheck: $ tsc --noEmit
+@easter-workflow-builder/db:lint: cache miss, executing f935be04ffc52800
+@easter-workflow-builder/db:lint: $ eslint .
+@easter-workflow-builder/db:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/db:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/db:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/app-setting/app-setting.spec.ts
+@easter-workflow-builder/db:lint:   60:34  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/graph-snapshot/stored-snapshot/graph-snapshot-immutability.spec.ts
+@easter-workflow-builder/db:lint:   43:34  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/provider-concurrency/provider-concurrency-repository.ts
+@easter-workflow-builder/db:lint:   102:30  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/provider-concurrency/provider-concurrency.spec.ts
+@easter-workflow-builder/db:lint:   63:34  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/run-event/event-record/run-event-repository.ts
+@easter-workflow-builder/db:lint:   242:26  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/run-event/event-record/run-event.spec.ts
+@easter-workflow-builder/db:lint:   363:36  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/sqlite-connection/describe-transaction-error.spec.ts
+@easter-workflow-builder/db:lint:   20:23  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint:   25:23  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint:   30:23  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/sqlite-connection/describe-transaction-error.ts
+@easter-workflow-builder/db:lint:   46:24  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint:   49:24  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/db/src/workflow-run/workflow-run.spec.ts
+@easter-workflow-builder/db:lint:   295:34  warning  Caution: `SqliteDatabase` also has a named export `SqliteError`. Check if you meant to write `import {SqliteError} from 'better-sqlite3'` instead  import-x/no-named-as-default-member
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/db:lint: ✖ 12 problems (0 errors, 12 warnings)
+@easter-workflow-builder/db:lint: 
+@easter-workflow-builder/protocol:lint: cache miss, executing 816270ee787f94de
+@easter-workflow-builder/protocol:lint: $ eslint .
+@easter-workflow-builder/protocol:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/protocol:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/protocol:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:typecheck: cache hit, replaying logs 4033c2c49145693e
+@easter-workflow-builder/workflow-language:typecheck: $ tsc --noEmit
+@easter-workflow-builder/minimax-client:typecheck: cache miss, executing f10315ed848f597e
+@easter-workflow-builder/minimax-client:typecheck: $ tsc --noEmit
+@easter-workflow-builder/firecrawl-client:lint: cache miss, executing 4951570b29d23dbb
+@easter-workflow-builder/firecrawl-client:lint: $ eslint .
+@easter-workflow-builder/firecrawl-client:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/firecrawl-client:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/firecrawl-client:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-registry:lint: cache miss, executing 1bff5340a6e2f57c
+@easter-workflow-builder/provider-registry:lint: $ eslint .
+@easter-workflow-builder/provider-registry:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-registry:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-registry:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/provider-registry:typecheck: cache miss, executing 16146dd82e08c3d9
+@easter-workflow-builder/provider-registry:typecheck: $ tsc --noEmit
+@easter-workflow-builder/tool-firecrawl-web-fetch:typecheck: cache miss, executing 317bbbbafff819d0
+@easter-workflow-builder/tool-firecrawl-web-fetch:typecheck: $ tsc --noEmit
+@easter-workflow-builder/tool-firecrawl-web-fetch:lint: cache miss, executing 03948fa265a2d089
+@easter-workflow-builder/tool-firecrawl-web-fetch:lint: $ eslint .
+@easter-workflow-builder/tool-firecrawl-web-fetch:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-firecrawl-web-fetch:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-firecrawl-web-fetch:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: cache hit, replaying logs 1b9088b64573ad4d
+@easter-workflow-builder/web:lint: $ eslint .
+@easter-workflow-builder/web:lint: Dependency "@dagrejs/dagre" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@xyflow/react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react-window" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@playwright/test" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@types/react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@types/react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-understand-image:lint: cache miss, executing 93a79500009abedd
+@easter-workflow-builder/tool-minimax-understand-image:lint: $ eslint .
+@easter-workflow-builder/tool-minimax-understand-image:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-understand-image:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-understand-image:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-understand-image:typecheck: cache miss, executing e17662a587fe0880
+@easter-workflow-builder/tool-minimax-understand-image:typecheck: $ tsc --noEmit
+@easter-workflow-builder/tool-minimax-web-search:typecheck: cache miss, executing 67d858bb2c9687c6
+@easter-workflow-builder/tool-minimax-web-search:typecheck: $ tsc --noEmit
+@easter-workflow-builder/tool-minimax-web-search:lint: cache miss, executing 5cae3d04c5c71cdf
+@easter-workflow-builder/tool-minimax-web-search:lint: $ eslint .
+@easter-workflow-builder/tool-minimax-web-search:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-web-search:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/tool-minimax-web-search:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/agent:lint: cache miss, executing 9bc164fc44ae2999
+@easter-workflow-builder/agent:lint: $ eslint .
+@easter-workflow-builder/agent:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/agent:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/agent:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/agent:typecheck: cache miss, executing 579e67cdea9d791e
+@easter-workflow-builder/agent:typecheck: $ tsc --noEmit
+@easter-workflow-builder/agent-tool-bundle:lint: cache miss, executing 006380e222580a67
+@easter-workflow-builder/agent-tool-bundle:lint: $ eslint .
+@easter-workflow-builder/agent-tool-bundle:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/agent-tool-bundle:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/agent-tool-bundle:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/engine:typecheck: cache miss, executing b05c88bf764b1943
+@easter-workflow-builder/engine:typecheck: $ tsc --noEmit
+@easter-workflow-builder/engine:lint: cache miss, executing 35adc6e9023db40d
+@easter-workflow-builder/engine:lint: $ eslint .
+@easter-workflow-builder/engine:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/engine:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/engine:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/server:lint: cache miss, executing e283de93e283919d
+@easter-workflow-builder/server:lint: $ eslint .
+@easter-workflow-builder/server:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/server:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/server:lint: Dependency "vitest" could not be resolved for catalog "default"
+
+ Tasks:    45 successful, 45 total
+Cached:    7 cached, 45 total
+  Time:    2m20.341s 
+

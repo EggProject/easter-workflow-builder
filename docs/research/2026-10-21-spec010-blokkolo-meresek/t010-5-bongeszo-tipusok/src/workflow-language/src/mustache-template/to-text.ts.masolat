@@ -1,0 +1,14 @@
+/**
+ * SPEC-010 6.5: a behelyettesített érték szöveggé alakítása. A szám, a
+ * logikai érték és a `null` `String(value)`, a tömb és a sima objektum
+ * `JSON.stringify(value)` szerint.
+ */
+export function toText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}

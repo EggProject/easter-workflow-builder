@@ -1,0 +1,12 @@
+/**
+ * SPEC-010 7.1: a CEL környezet hét `dyn` változója.
+ */
+export const RUN_CONTEXT_VARIABLE_NAMES = [
+  'input',
+  'steps',
+  'item',
+  'itemIndex',
+  'iteration',
+  'joinInputs',
+  'error',
+] as const;
