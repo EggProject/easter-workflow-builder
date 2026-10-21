@@ -380,6 +380,8 @@ interface HarnessOptions {
   readonly descriptorLookup?: (providerId: ProviderId) => ProviderCapabilityDescriptor<string, string>;
   readonly database?: DatabaseContext;
   readonly processEnvironment?: EngineDependencies['processEnvironment'];
+  readonly expressionEvaluator?: EngineDependencies['expressionEvaluator'];
+  readonly templateRenderer?: EngineDependencies['templateRenderer'];
 }
 
 interface Harness {
@@ -402,11 +404,11 @@ function openHarness(options: HarnessOptions = {}): Harness {
     database,
     agentQueryRunner: options.agentQueryRunner ?? fakeAgentStepRunner(),
     providerDescriptorLookup: options.descriptorLookup ?? ((providerId) => descriptorOf(providerId)),
-    expressionEvaluator: {
+    expressionEvaluator: options.expressionEvaluator ?? {
       evaluate: (expression) => ({ kind: 'ok', value: JSON.parse(expression) }),
       compile: () => ({ kind: 'ok', value: undefined }),
     },
-    templateRenderer: {
+    templateRenderer: options.templateRenderer ?? {
       render: (template) => ({ kind: 'ok', value: template }),
       compile: () => ({ kind: 'ok', value: undefined }),
     },
@@ -814,6 +816,53 @@ function runRowsOf(
       .filter((event) => event.kind === 'run_finished' || event.kind === 'run_interrupted')
       .map((event) => event.kind),
   }));
+}
+
+// A kifejezés és a sablon port által kapott `iteration` értékek naplója, a
+// kifejezés, illetve a sablon szövegével (SPEC-004 6.1, 17. szekció 11a, 11e).
+interface SeenIteration {
+  readonly text: string;
+  readonly iteration: unknown;
+}
+
+function iterationOfContext(context: unknown): unknown {
+  return isRecord(context) ? context['iteration'] : 'nem-rekord';
+}
+
+// Számláló kifejezés port: a `CIKLUS-<n>` szövegű kifejezés kiértékelésenként
+// körbe jár, n igaz után egy hamisat ad. A döntés NEM függ a kapott
+// `iteration` értéktől, tehát a teszt azt méri, mit kap a port, nem azt, mit
+// számol belőle (a T-010-4 próba elve, research 2026-10-21 4. és 8. szekció).
+function cyclicExpressionEvaluator(seen: SeenIteration[]): EngineDependencies['expressionEvaluator'] {
+  const counts = new Map<string, number>();
+  return {
+    evaluate: (expression, context) => {
+      seen.push({ text: expression, iteration: iterationOfContext(context) });
+      const limit = Number(expression.split('-', 2)[1]);
+      const count = counts.get(expression) ?? 0;
+      counts.set(expression, count + 1);
+      return { kind: 'ok', value: count % (limit + 1) < limit };
+    },
+    compile: () => ({ kind: 'ok', value: undefined }),
+  };
+}
+
+function recordingTemplateRenderer(seen: SeenIteration[]): EngineDependencies['templateRenderer'] {
+  return {
+    render: (template, context) => {
+      seen.push({ text: template, iteration: iterationOfContext(context) });
+      return { kind: 'ok', value: template };
+    },
+    compile: () => ({ kind: 'ok', value: undefined }),
+  };
+}
+
+function loopNode(id: string, continueExpression: string, maxIterations: number): WorkflowNodeInput {
+  return nodeOf(id, { type: 'loop', maxIterations, continueExpression, onUnhandledError: 'fail_run' });
+}
+
+function iterationsSeenFor(seen: readonly SeenIteration[], text: string): readonly unknown[] {
+  return seen.filter((entry) => entry.text === text).map((entry) => entry.iteration);
 }
 
 describe('createEngine', () => {
@@ -2105,6 +2154,39 @@ describe('createEngine', () => {
 
       expect(restarted.run.restartedFromRunId).toBe(original.run.id);
       expect(restarted.run.workflowId).toBe(workflowId);
+    });
+  });
+
+  describe('a loop saját iteration értéke (SPEC-004 4.6 3. pont, 6.1, 17. szekció 11a)', () => {
+    it('a loop saját continueExpression-je az 1., 2. és 3. lefutáskor 0, 1 és 2 iteration értéket kap, a step_run.iteration oszloppal egyezően; a törzs és a loop utáni node kontextusa változatlan', async () => {
+      const seen: SeenIteration[] = [];
+      const harness = openHarness({
+        expressionEvaluator: cyclicExpressionEvaluator(seen),
+        templateRenderer: recordingTemplateRenderer(seen),
+      });
+      const workflowId = createWorkflow(
+        harness.database,
+        'loop-sajat-iteration',
+        [startNode('start'), loopNode('lp', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('vege', 'VEGE')],
+        [
+          edgeOf('e1', 'start', 'lp'),
+          edgeOf('e2', 'lp', 'torzs', 'continue'),
+          edgeOf('e3', 'torzs', 'lp'),
+          edgeOf('e4', 'lp', 'vege', 'exit'),
+        ],
+      );
+
+      const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+      const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+      const loopRows = okOrThrow(harness.database.stepRuns.listStepRuns(started.run.id)).filter(
+        (row) => row.nodeId === 'lp',
+      );
+
+      expect(status).toBe('succeeded');
+      expect(iterationsSeenFor(seen, 'CIKLUS-2')).toStrictEqual([0, 1, 2]);
+      expect(loopRows.map((row) => row.iteration)).toStrictEqual([0, 1, 2]);
+      expect(iterationsSeenFor(seen, 'TORZS')).toStrictEqual([0, 1]);
+      expect(iterationsSeenFor(seen, 'VEGE')).toStrictEqual([undefined]);
     });
   });
 

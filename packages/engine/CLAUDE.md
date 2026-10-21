@@ -639,7 +639,10 @@ végrehajtó a régi, összevont sorrendet helyesen használja.
 négynél a 4.3 szekció általános szabálya szerint (a legfelső `loop` hatókör bejegyzés száma), a
 `loop` node saját sorára viszont a 4.6 1. pontja szerint (a példány addigi lefutásainak száma,
 `resolveLoopIteration`-ből) - ez a téma nem dönti el, melyik jelentés érvényes, csak felhasználja
-a kapott értéket (lásd `execute-loop.ts` doksiját).
+a kapott értéket (lásd `execute-loop.ts` doksiját). **A `loop` saját `continueExpression`-je**
+ugyanezt az `instance.iteration` értéket kapja a kontextus `iteration` mezőjében, a kapott
+`runContext` legbelső keretéből jövő értéket felülírva (SPEC-004 4.6 3. pont, 6.1, SPEC-010 O-11,
+PLAN-010 T-010-4a); a törzs és a `loop` utáni node-ok kontextusa változatlan.
 
 A `NodeExecutionOutcome` (`node-executor-outcome.ts`) a `run-supervisor`-nak szánt kimenet: **nem**
 maga a `SchedulingEvent`, mert a node-executor réteg szándékosan nem kapja meg a teljes
