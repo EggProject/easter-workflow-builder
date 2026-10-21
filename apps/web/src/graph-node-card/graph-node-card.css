@@ -50,6 +50,22 @@
   gap: var(--ep-space-1);
 }
 
+/* Az állapot betöltése alatt a jelvény helyén álló `Skeleton` szövege (SPEC-008
+   9. szekció 8. async pontja) vizuálisan rejtett, de a hozzáférhetőségi fában
+   marad: `display: none` helyett, mert az MDN szerint az kivenné onnan. A
+   deklaráció-készlet szó szerint a W3C WAI C7 technika
+   (https://www.w3.org/WAI/WCAG21/Techniques/css/C7), ugyanaz, amit a
+   `data-table.css` és a `topnav-shell.css` is használ. */
+.graph-node-card__status-loading-text {
+  clip-path: inset(100%);
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 /* A típuscímke a design system `.field__label` receptje
    (`packages/ui/src/text-field/text-field.css`: 12px, 0.04em, nagybetűs,
    `--ep-fg-muted`); a 12px méretre és a 0.04em betűközre nincs önálló token

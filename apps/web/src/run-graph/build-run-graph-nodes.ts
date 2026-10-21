@@ -32,6 +32,11 @@ export interface RunGraphNodesInput {
    * ág jelvény adata a lista utolsó eleméből jön (SPEC-008 6.6, O-24).
    */
   readonly branchDecisionsByNodeId: ReadonlyMap<string, readonly BranchDecision[]>;
+  /**
+   * Igaz, amíg a futás lépés futásai még töltődnek (SPEC-008 9. szekció 8.
+   * async pontja): minden csomópont az "állapot betöltése" jelzést kapja.
+   */
+  readonly isStatusLoading: boolean;
 }
 
 /**
@@ -57,6 +62,7 @@ export function buildRunGraphNodes(input: Readonly<RunGraphNodesInput>): readonl
     onOpenSubWorkflowRun,
     pendingApprovalRequestedAtByStepRunId,
     branchDecisionsByNodeId,
+    isStatusLoading,
   } = input;
 
   return nodes.map((workflowNode) => {
@@ -67,6 +73,7 @@ export function buildRunGraphNodes(input: Readonly<RunGraphNodesInput>): readonl
     return {
       workflowNode,
       ...(displayed !== undefined && { status: displayed.status, attempt: displayed.attempt }),
+      ...(isStatusLoading && { isStatusLoading: true as const }),
       ...(summary !== undefined && { runDecoration: { summary, onOpenSubWorkflowRun } }),
       ...(latestDecision?.usedDefault === true && { usedDefaultBranch: true as const }),
     };

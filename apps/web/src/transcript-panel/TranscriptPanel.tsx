@@ -1,14 +1,14 @@
 import type { RunStatus, StepRunRecord } from '@easter-workflow-builder/protocol';
-import { Button } from '@easter-workflow-builder/ui';
+import { Button, ProgressBar } from '@easter-workflow-builder/ui';
 import { useCallback, useState, type ReactElement } from 'react';
 import { List, useDynamicRowHeight, type RowComponentProps } from 'react-window';
 import { RunEventRow } from '../run-event-row/RunEventRow.tsx';
 import { isRunInterruptible } from '../run-control/run-control-availability.ts';
-import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { COLLAPSED_TRANSCRIPT_ROW_HEIGHT } from './collapsed-transcript-row-height.ts';
 import { isCompactTranscriptList } from './is-compact-transcript-list.ts';
 import { resolveStepProviderId } from './resolve-step-provider-id.ts';
 import type { RunTranscriptState } from './run-transcript-state.ts';
+import { TranscriptPanelSkeleton } from './TranscriptPanelSkeleton.tsx';
 import type { TranscriptRow as TranscriptRowData } from './transcript-row.ts';
 import { transcriptRowKey } from './transcript-row-key.ts';
 import { useTranscriptAutoScroll } from './use-transcript-auto-scroll.ts';
@@ -131,9 +131,12 @@ function TranscriptRow(properties: RowComponentProps<TranscriptRowProperties>): 
  * gomb ugyanaz a design system `Button`, ugyanazzal a szöveggel, és a DOM-ban
  * ugyanúgy a lista előtt áll.
  *
- * **Várakozás jelzése** (SPEC-008 9. szekció 9., 11. és 16. pontja): amíg a
+ * **Várakozás jelzése** (SPEC-008 9. szekció 9., 10., 11. és 16. pontja): amíg a
  * pótlás le nem zárult, a fejlécben "Előzmények betöltése" áll, és ha még
- * egyetlen sor sincs, a lista helyén csontváz. A lezárult pótlás utáni üres
+ * egyetlen sor sincs, a lista helyén csontváz; ha már van sor, a sorok
+ * megmaradnak, és a lista fölött `ProgressBar` jelzi a pótlást (user döntés
+ * 2026-10-21, a transcript "további lapja" a stream pótlásának szakasza, mert
+ * a transcript nem lapozott lekérdezésből épül). A lezárult pótlás utáni üres
  * lista két különböző állapot: ha a futás még tart, az agent első eseményére
  * várunk, és ezt `role="status"` szöveg mondja ki; ha a futás lezárult, a
  * lista véglegesen üres, és ezt egy nem státusz mondat mondja ki.
@@ -182,13 +185,7 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
         </p>
       )}
       {rowCount === 0 && !isReplayComplete ? (
-        // A várakozás csontváza ugyanazzal a sorszámmal, mint a képernyő
-        // saját betöltés jelzése (`RunViewScreen`), hogy a két egymást
-        // követő csontváz ne ugorjon. A sorok számának (4) forrása nincs
-        // igazolva (nyitott kérdés: SPEC-008 O-35).
-        <div className="transcript-panel__loading">
-          <ThemedSkeleton shape="text" lines={4} />
-        </div>
+        <TranscriptPanelSkeleton />
       ) : (
         <>
           {rowCount === 0 &&
@@ -201,6 +198,9 @@ export function TranscriptPanel(properties: Readonly<TranscriptPanelProperties>)
                 {isFiltered ? 'A kiválasztott tételeknek nincs eseménye.' : 'A futásnak nincs eseménye.'}
               </p>
             ))}
+          {isReplayComplete ? undefined : (
+            <ProgressBar size="sm" isLabelVisible={false} ariaLabel="az előzmények betöltése folyamatban" value={100} />
+          )}
           <div
             className={`transcript-panel__list-frame${isCompact ? ' transcript-panel__list-frame--compact' : ''}`}
             // A lista legalább egy összecsukott sornyi magas marad (2026-09-25):

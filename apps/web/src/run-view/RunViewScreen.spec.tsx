@@ -240,6 +240,16 @@ const pendingFetchFunction: FetchFunction = () =>
   });
 
 /**
+ * A megadott végpontú kérések SOSEM oldódnak fel, a többi a `createFetchFunction`
+ * szerint válaszol: egy végpont betöltés alatti állapotának külön
+ * megfigyeléséhez (a `pendingFetchFunction` indokával).
+ */
+function createFetchFunctionPendingOn(isPending: (pathname: string) => boolean): FetchFunction {
+  const base = createFetchFunction();
+  return (input, init) => (isPending(new URL(input).pathname) ? pendingFetchFunction(input, init) : base(input, init));
+}
+
+/**
  * Egy `run_finished` motor esemény élő SSE kerete a megadott futásra
  * (SPEC-004 13. szekció táblázata).
  */
@@ -578,24 +588,77 @@ describe('RunViewScreen', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('runId');
   });
 
-  it('betöltés közben csontvázat mutat', () => {
-    act(() => {
-      root.render(
-        <RunViewScreen
-          apiOrigin={API_ORIGIN}
-          fetchFunction={pendingFetchFunction}
-          search="?runId=r-3"
-          navigate={navigate}
-          streamId={STREAM_ID}
-          subscribeToFrames={subscribeToFrames}
-          streamReplayLimit={STREAM_REPLAY_LIMIT}
-          serverRestartCount={0}
-        />,
-      );
+  // ============================================================
+  // A VÁRAKOZÁS JELZÉSEI (SPEC-008 9. szekció 6., 7., 8. pont, user döntés
+  // 2026-10-21): minden terület a saját végpontját várja, és a saját helyén
+  // jelzi a várakozást, nem egy teljes képernyős csontváz.
+  // ============================================================
+
+  describe('a várakozás jelzései', () => {
+    const isGraphSkeletonShown = (): boolean => container.querySelector('.run-view-screen__graph-loading') !== null;
+    const isHeaderSkeletonShown = (): boolean =>
+      container.querySelector('.run-view-screen__header[aria-busy="true"]') !== null;
+    // A képernyő saját csontváza a panel HELYÉN áll: a panel gyökere
+    // (`.transcript-panel`) ilyenkor nincs a DOM-ban. A panel saját csontváza
+    // (nulla sor, pótlás közben) a panel gyökerén belül áll.
+    const isTranscriptSkeletonShown = (): boolean =>
+      container.querySelector('.transcript-panel__loading') !== null &&
+      container.querySelector('.transcript-panel') === null;
+
+    async function renderWithPending(isPending: (pathname: string) => boolean): Promise<void> {
+      await renderScreen('?runId=r-3', createFetchFunctionPendingOn(isPending));
+    }
+
+    it('minden végpont betöltése közben mindhárom terület a saját csontvázát mutatja, teljes képernyős nélkül', async () => {
+      await renderScreen('?runId=r-3', pendingFetchFunction);
+
+      expect(isGraphSkeletonShown()).toBe(true);
+      expect(isHeaderSkeletonShown()).toBe(true);
+      expect(isTranscriptSkeletonShown()).toBe(true);
+      expect(container.querySelector('.run-view-screen__loading')).toBeNull();
     });
 
-    expect(container.querySelector('[role="status"]')).not.toBeNull();
-    expect(container.querySelectorAll('.skel')).toHaveLength(4);
+    it('a pillanatkép nélkül a rajz és a fejléc csontvázat mutat, a transcript panel a helyén van', async () => {
+      await renderWithPending((pathname) => pathname.endsWith('/snapshot'));
+
+      expect(isGraphSkeletonShown()).toBe(true);
+      expect(isHeaderSkeletonShown()).toBe(true);
+      expect(isTranscriptSkeletonShown()).toBe(false);
+      expect(container.querySelector('.transcript-panel')).not.toBeNull();
+    });
+
+    it('a futás rekordja nélkül a fejléc és a transcript csontvázat mutat, a rajz a helyén van', async () => {
+      await renderWithPending(
+        (pathname) =>
+          !pathname.endsWith('/snapshot') &&
+          !pathname.endsWith('/steps') &&
+          !pathname.endsWith('/approvals') &&
+          !pathname.endsWith('/subscriptions'),
+      );
+
+      expect(isGraphSkeletonShown()).toBe(false);
+      expect(isHeaderSkeletonShown()).toBe(true);
+      expect(isTranscriptSkeletonShown()).toBe(true);
+      expect(lastCanvasProperties().nodes).toHaveLength(1);
+    });
+
+    it('a lépés futások nélkül a rajz megjelenik, a csomópontok állapota betöltés alatt van, a transcript csontvázat mutat', async () => {
+      await renderWithPending((pathname) => pathname.endsWith('/steps'));
+
+      expect(isGraphSkeletonShown()).toBe(false);
+      expect(isHeaderSkeletonShown()).toBe(false);
+      expect(isTranscriptSkeletonShown()).toBe(true);
+      expect(lastCanvasProperties().nodes.every((node) => node.isStatusLoading === true)).toBe(true);
+    });
+
+    it('mindhárom végpont megérkezése után sehol nincs csontváz, és a csomópontok állapota nem tölt', async () => {
+      await renderScreen('?runId=r-3', createFetchFunction());
+
+      expect(isGraphSkeletonShown()).toBe(false);
+      expect(isHeaderSkeletonShown()).toBe(false);
+      expect(isTranscriptSkeletonShown()).toBe(false);
+      expect(lastCanvasProperties().nodes.some((node) => node.isStatusLoading === true)).toBe(false);
+    });
   });
 
   it('a betöltés hibájára a hibaüzenetet mutatja', async () => {
@@ -769,7 +832,7 @@ describe('RunViewScreen', () => {
           />,
         );
       });
-      expect(container.querySelector('.run-view-screen__loading')).not.toBeNull();
+      expect(container.querySelector('.run-view-screen__graph-loading')).not.toBeNull();
       act(() => {
         emitFrame(sdkResultFrame(1, 's-1'));
         emitFrame(sdkResultFrame(2, 's-1'));
@@ -967,7 +1030,8 @@ describe('RunViewScreen', () => {
     });
 
     expect(runDetailUrls).toHaveLength(2);
-    expect(container.querySelector('.run-view-screen__loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__graph-loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__header[aria-busy]')).toBeNull();
     expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
   });
 
@@ -1036,7 +1100,8 @@ describe('RunViewScreen', () => {
     });
 
     expect(stepRunUrls).toHaveLength(2);
-    expect(container.querySelector('.run-view-screen__loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__graph-loading')).toBeNull();
+    expect(container.querySelector('.run-view-screen__header[aria-busy]')).toBeNull();
     expect(container.querySelector('.run-view-screen__header')).not.toBeNull();
   });
 

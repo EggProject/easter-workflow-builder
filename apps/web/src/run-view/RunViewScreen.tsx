@@ -5,6 +5,7 @@ import {
   SubscriptionStateSchema,
   type RunDetail,
   type RunSnapshotResponse,
+  type StepRunRecord,
   type WorkflowNodeInput,
 } from '@easter-workflow-builder/protocol';
 import { Alert, Breadcrumb, type BreadcrumbAncestor } from '@easter-workflow-builder/ui';
@@ -28,7 +29,6 @@ import { useRequestState } from '../request-state/use-request-state.ts';
 import { requestRoute } from '../rest-client/request-route.ts';
 import { requestRouteWithoutBody } from '../rest-client/request-route-without-body.ts';
 import type { RouteFailure } from '../rest-client/route-outcome.ts';
-import { ThemedSkeleton } from '../themed-skeleton/ThemedSkeleton.tsx';
 import { RunControlBar } from '../run-control/RunControlBar.tsx';
 import { RunGraphCanvas } from '../run-graph/RunGraphCanvas.tsx';
 import { UnmatchedStepRunList } from '../run-graph/UnmatchedStepRunList.tsx';
@@ -39,7 +39,10 @@ import { projectSnapshotGraph } from '../run-graph/project-snapshot-graph.ts';
 import { useBranchDecisions } from '../run-graph/use-branch-decisions.ts';
 import type { SubscribeToStreamFrames } from '../stream-client/subscribe-to-stream-frames.ts';
 import { TranscriptPanel } from '../transcript-panel/TranscriptPanel.tsx';
+import { TranscriptPanelSkeleton } from '../transcript-panel/TranscriptPanelSkeleton.tsx';
 import { useRunTranscript } from '../transcript-panel/use-run-transcript.ts';
+import { RunViewGraphSkeleton } from './RunViewGraphSkeleton.tsx';
+import { RunViewHeaderSkeleton } from './RunViewHeaderSkeleton.tsx';
 import { RunViewLayout } from './RunViewLayout.tsx';
 import { RunViewTranscriptSide } from './RunViewTranscriptSide.tsx';
 import { blockingFailureMessage } from './blocking-failure-message.ts';
@@ -108,6 +111,23 @@ interface RunDetailLoad {
 }
 
 const EMPTY_RUN_DETAIL_LOAD: RunDetailLoad = { runDetail: undefined, failure: undefined };
+
+/**
+ * A pillanatkép betöltése alatt a rajz üres gráfja: a lépés futások és a
+ * jóváhagyások számítása ezen üres listákon fut le, a rajz helyén pedig a gráf
+ * panel csontváza áll (`RunViewGraphSkeleton`).
+ */
+const EMPTY_PROJECTED_GRAPH: ReturnType<typeof projectSnapshotGraph> = {
+  kind: 'ok',
+  value: { nodes: [], edges: [] },
+};
+
+/**
+ * A lépés futások betöltése alatt a lépés futások üres listája: a rajz a
+ * lépés futások nélkül is megjelenik, a csomópontok az "állapot betöltése"
+ * jelzést kapják.
+ */
+const NO_STEP_RUNS: readonly StepRunRecord[] = [];
 
 /**
  * Az al-workflow hierarchia morzsasora a `RunDetail.workflowAncestry`
@@ -468,22 +488,19 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
     return <Alert variant="danger">{blockingMessage}</Alert>;
   }
 
-  if (runDetail === undefined || stepRuns === undefined || snapshotState.state.status !== 'success') {
-    // Várakozás jelzése: a betöltés alatt csontváz áll, nem üres képernyő
-    // (`.claude/CLAUDE.md` 11. szekció). A sorok számának (4) forrása nincs
-    // igazolva (nyitott kérdés: SPEC-008 O-35).
-    return (
-      <div className="run-view-screen__loading" role="status">
-        <ThemedSkeleton shape="text" lines={4} />
-      </div>
-    );
-  }
-
-  const snapshot = snapshotState.state.value;
-  const projected = projectSnapshotGraph(snapshot);
+  // Várakozás jelzése (SPEC-008 9. szekció 6., 7., 8. pont, user döntés
+  // 2026-10-21): a betöltés alatt NEM a teljes képernyő helyén áll egy
+  // csontváz, hanem minden terület a saját helyén jelzi a várakozást, a
+  // három végpont egymástól függetlenül érkezhet. A pillanatkép nélkül a
+  // rajz helyén a gráf panel csontváza áll, a lépés futások nélkül a rajz
+  // megjelenik, és a csomópontok állapota helyén csontváz van.
+  const snapshot = snapshotState.state.status === 'success' ? snapshotState.state.value : undefined;
+  const isGraphLoading = snapshot === undefined;
+  const projected = snapshot === undefined ? EMPTY_PROJECTED_GRAPH : projectSnapshotGraph(snapshot);
   if (projected.kind === 'error') {
     return <p role="alert">{projected.message}</p>;
   }
+  const stepRunList = stepRuns ?? NO_STEP_RUNS;
 
   const shownApproval = approvalSelection.shown;
   // A két tárolt arány MINDEN renderen újraolvasódik, nem egyszer,
@@ -499,12 +516,13 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   // döntés 2026-09-25, "a rajz húzódjon össze", SPEC-008 8. szekció 1. pont).
   const storedLayoutSizes = readStoredRunViewLayoutSizes();
   const storedApprovalLayoutSizes = readStoredRunViewApprovalLayoutSizes();
-  const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRuns);
-  const branchDecisionsByNodeId = groupBranchDecisionsByNode(branchDecisions, stepRuns);
+  const merged = mergeSnapshotStepRuns(projected.value.nodes, stepRunList);
+  const branchDecisionsByNodeId = groupBranchDecisionsByNode(branchDecisions, stepRunList);
   const graphNodes = buildRunGraphNodes({
     nodes: projected.value.nodes,
     nodeStepRuns: merged.nodeStepRuns,
-    stepRuns,
+    stepRuns: stepRunList,
+    isStatusLoading: stepRuns === undefined,
     onOpenSubWorkflowRun: navigateToRun,
     pendingApprovalRequestedAtByStepRunId: pendingApprovalRequestedAtByStepRun(listedApprovals),
     branchDecisionsByNodeId,
@@ -523,7 +541,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
   const shownTranscript =
     branchIterationSelection === undefined
       ? transcript
-      : filterTranscriptByStepRuns(transcript, resolveBranchIterationScope(branchIterationSelection, stepRuns));
+      : filterTranscriptByStepRuns(transcript, resolveBranchIterationScope(branchIterationSelection, stepRunList));
   // A transcript panel a szűkítés minden váltásakor tiszta lappal indul (a
   // görgetés követése és a sor magasság gyorsítótára a teljes és a szűkített
   // sorlistára nem ugyanaz): a kulcs a futás azonosítója, plusz a szűkítés.
@@ -534,15 +552,19 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
 
   return (
     <div className="run-view-screen">
-      <RunViewHeader
-        snapshot={snapshot}
-        runDetail={runDetail}
-        navigate={navigate}
-        apiOrigin={apiOrigin}
-        fetchFunction={fetchFunction}
-        onRestarted={navigateToRun}
-        hasPendingApproval={listedApprovals.length > 0}
-      />
+      {runDetail === undefined || snapshot === undefined ? (
+        <RunViewHeaderSkeleton />
+      ) : (
+        <RunViewHeader
+          snapshot={snapshot}
+          runDetail={runDetail}
+          navigate={navigate}
+          apiOrigin={apiOrigin}
+          fetchFunction={fetchFunction}
+          onRestarted={navigateToRun}
+          hasPendingApproval={listedApprovals.length > 0}
+        />
+      )}
       {transientFailure !== undefined && (
         // Várakozás jelzése (`.claude/CLAUDE.md` 11. szekció): a design system
         // kész, tartós állapotjelző `Alert` blokkja, `role="status"` szereppel.
@@ -555,12 +577,16 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
         <RunViewLayout
           band={layoutBand}
           graph={
-            <RunGraphCanvas
-              nodes={graphNodes}
-              edges={projected.value.edges}
-              branchDecisionsByNodeId={branchDecisionsByNodeId}
-              onNodeClick={openBranchIterationList}
-            />
+            isGraphLoading ? (
+              <RunViewGraphSkeleton />
+            ) : (
+              <RunGraphCanvas
+                nodes={graphNodes}
+                edges={projected.value.edges}
+                branchDecisionsByNodeId={branchDecisionsByNodeId}
+                onNodeClick={openBranchIterationList}
+              />
+            )
           }
           // A jóváhagyás felület a transcript sávban áll (PLAN-009 5.
           // szekció F6: "a transcript mellé"), egy CLI engedélykérés
@@ -590,7 +616,7 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                     <BranchIterationList
                       kind={branchIterationSelection.kind}
                       nodeLabel={branchIterationSelection.node.label}
-                      items={buildBranchIterationItems(branchIterationSelection, projected.value.nodes, stepRuns)}
+                      items={buildBranchIterationItems(branchIterationSelection, projected.value.nodes, stepRunList)}
                       selectedStepRunId={branchIterationSelection.stepRunId}
                       onToggleItem={(stepRunId) => {
                         setBranchIterationSelection(toggleBranchIterationItem(branchIterationSelection, stepRunId));
@@ -608,14 +634,18 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
                       isCompact={shownApproval !== undefined}
                     />
                   )}
-                  <TranscriptPanel
-                    key={transcriptPanelKey}
-                    transcript={shownTranscript}
-                    stepRuns={stepRuns}
-                    runStatus={runDetail.status}
-                    persistedStreamDeltas={runDetail.persistedStreamDeltas}
-                    isFiltered={branchIterationSelection !== undefined}
-                  />
+                  {runDetail === undefined || stepRuns === undefined ? (
+                    <TranscriptPanelSkeleton />
+                  ) : (
+                    <TranscriptPanel
+                      key={transcriptPanelKey}
+                      transcript={shownTranscript}
+                      stepRuns={stepRuns}
+                      runStatus={runDetail.status}
+                      persistedStreamDeltas={runDetail.persistedStreamDeltas}
+                      isFiltered={branchIterationSelection !== undefined}
+                    />
+                  )}
                 </>
               }
               // A törzs kulcsa a jóváhagyás azonosítója: lapozáskor a törzs a
@@ -689,7 +719,9 @@ export function RunViewScreen(properties: Readonly<RunViewScreenProperties>): Re
           transcriptContentMinimum={transcriptContentMinimum}
         />
       </div>
-      {merged.unmatchedStepRuns.length > 0 && <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />}
+      {!isGraphLoading && merged.unmatchedStepRuns.length > 0 && (
+        <UnmatchedStepRunList stepRuns={merged.unmatchedStepRuns} />
+      )}
     </div>
   );
 }

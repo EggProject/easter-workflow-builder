@@ -333,6 +333,24 @@ describe('GraphNodeCard', () => {
     expect(container.querySelector('.badge')).toBeNull();
   });
 
+  it('az állapot betöltése alatt az állapot jelvény helyén Skeleton áll, a szöveg a felolvasónak marad (SPEC-008 9. szekció 8. pont)', () => {
+    const base = buildFlowNode(WORKFLOW_NODES.agent_step);
+    renderNodes([{ ...base, data: { ...base.data, isStatusLoading: true } }]);
+
+    const badge = container.querySelector(':scope .graph-node-card__header .badge');
+    expect(badge?.querySelector('.skel')).not.toBeNull();
+    expect(badge?.querySelector('.graph-node-card__status-loading-text')?.textContent).toBe('állapot betöltése');
+    // A kártya csomópont címkéje és kimenő handle-ja a betöltés alatt is a helyén van.
+    expect(container.textContent).toContain(WORKFLOW_NODES.agent_step.label);
+    expect(sourceHandleIds()).toEqual([undefined]);
+  });
+
+  it('betöltött állapotnál nincs betöltés jelzés a kártyán', () => {
+    renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step, 'running')]);
+    expect(container.querySelector('.skel')).toBeNull();
+    expect(container.querySelector('.graph-node-card__status-loading-text')).toBeNull();
+  });
+
   function headerBadgeLabels(): (string | null)[] {
     return [...container.querySelectorAll(':scope .graph-node-card__header .badge')].map((badge) => badge.textContent);
   }
