@@ -689,6 +689,10 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   lezárt válasz, tehát az `EventSource` a keretek után azonnal `error`-t kap, a `readyState`
   kiesik `OPEN`-ből, és a `replaying`/`live` fázis csak egy meg nem figyelhető pillanatra
   áll fenn.
+- **A `node:http` teszt szervert két spec fájl használja:** az `sse-real-server.spec.ts` és a
+  `branch-iteration-list.spec.ts` (az élő jóváhagyás tesztje, a kapcsolat nyitva maradása az
+  előfeltétele); más spec fájl nem indíthat szervert (user döntés 2026-10-21, SPEC-007 13.4,
+  SPEC-008 49. kritérium).
 - **A kivétel útja: célra írt, könnyű `node:http` teszt szerver**, kizárólag a `GET /events`
   végponttal, a DOM végállapotára várva web-first assertionnel. Ez méréssel igazoltan
   működik, és megfelel a kézi timeout tilalmának. A REST hívások ebben az esetben is
@@ -810,7 +814,10 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   hatóköre szigorúan a csomópont, az él és a vászon konténer megtalálására szűkül, minden más
   locator (a kártya felirata, a gombjai, a mezők, a fülek, az elválasztó) a kötött sorrend
   szerinti. Greppes invariáns őrzi: `getByTestId` az `apps/web/e2e` alatt kizárólag `rf__`
-  előtaggal állhat (SPEC-008 12.3).
+  előtaggal állhat (SPEC-008 12.3). **A sorrend többi része gépi ellenőrzés nélkül, code review
+  kérdés** (user döntés 2026-10-21, SPEC-008 45. kritérium): a CSS locator az `apps/web/e2e` alatt
+  a React Flow saját osztályú elemeire, hozzáférhető szerep és név nélküli szerkezeti konténerre
+  és geometriai vagy kiszámított stílus mérés célpontjára áll.
 - **A beállítás panel gyökér elemén a `nokey` osztály áll.** A panel teljes területén (gombon,
   a `SelectField` triggerén) a `Backspace` és a `Delete` nem törölhet csomópontot; a vásznon és
   fókusz nélkül törölhet. A könyvtár beviteli elem szűrője a `.nokey` osztályú őst is kiszűri
@@ -822,7 +829,11 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   alatt sosem rajzolódnak ki (M-53), ezért az él KIRAJZOLÁSÁRA vonatkozó minden állítás e2e
   tesztben áll, unit tesztben egy sem; az él ÁLLAPOTÁRA (a `WorkflowEdgeInput` tömb tartalma, a
   `branchKey` kitöltése) vonatkozó állítás viszont unit teszt, mert az a mi oldalunkon React
-  állapot és tiszta függvény (SPEC-008 47. kritérium, PLAN-009 2. szekció 4. pont).
+  állapot és tiszta függvény (SPEC-008 47. kritérium, PLAN-009 2. szekció 4. pont). **A stíluslap
+  forrásszövegét olvasó unit állítás nem kirajzolási állítás**: a
+  `build-run-graph-flow-edges.spec.ts` stíluslap tesztje a builder által kiosztott osztály és a
+  `run-graph.css` szabály összekötését őrzi, ezért unit tesztben áll; a kirajzolt vonalat az e2e
+  `branch-highlight.spec.ts` méri (user döntés 2026-10-21).
 - **Egyetlen ág sem függhet mért node geometriától.** A `graph-editor`, a `graph-node-card`, a
   `graph-auto-layout` és a `run-graph` témában nem állhat `measured.width`/`measured.height`
   olvasás és `getBoundingClientRect()` hívás, mert az happy-dom alatt sosem futna le, és a 100

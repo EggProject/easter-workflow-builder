@@ -638,8 +638,9 @@ már leszerelt happy-dom környezetben váltott ki React állapotfrissítést: a
 `ReferenceError: window is not defined` kezeletlen hiba, helyben zöld. A lezárást a
 `src/unit-test-network-isolation/` regressziós tesztje őrzi.
 
-Az `e2e/sse-real-server.spec.ts` az **egyetlen** spec fájl, ami valódi hálózati szervert indít, és
-ez nem bővíthető második fájlra. Spec fájlon kívül ugyanezt a közös `run-view-stream.ts` szervert
+Az `e2e/sse-real-server.spec.ts` és az `e2e/branch-iteration-list.spec.ts` (az élő jóváhagyás tesztje, a
+kapcsolat nyitva maradása az előfeltétele) az **egyetlen két** spec fájl, ami valódi hálózati szervert
+indít, és ez nem bővíthető harmadik fájlra (user döntés 2026-10-21). Spec fájlon kívül ugyanezt a közös `run-view-stream.ts` szervert
 indítja a transcript görgetés mérő eszköze (`measurement/transcript-scroll.ts`) és a szentesített
 képkészítés (`e2e/capture-screenshots.ts`, a futás nézet képéhez a fixtúra
 `installShowcaseLiveRunMocks` függvényén át, user döntés 2026-10-14, SPEC-008 12.6); más út nincs, a
