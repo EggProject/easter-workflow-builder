@@ -1,4 +1,4 @@
-import type { EdgeSelectionChange, NodeSelectionChange } from '@xyflow/react';
+import { applyEdgeChanges, type Edge, type EdgeSelectionChange, type NodeSelectionChange } from '@xyflow/react';
 
 /**
  * A vásznon kiválasztott élek azonosítói. Nem domain adat: a
@@ -10,7 +10,10 @@ export type SelectedEdgeIds = ReadonlySet<string>;
 
 /**
  * A React Flow `select` típusú él változásainak beolvasztása a kiválasztott
- * él azonosítók halmazába.
+ * él azonosítók halmazába, az `applyEdgeChanges` segédfüggvényen át (SPEC-008
+ * 5.5, 15. szekció 9. kritérium, M-55): a halmaz a megadott élek `selected`
+ * mezőjére leképezve megy át a könyvtár saját változás alkalmazásán, és a
+ * `selected` élek azonosítói adják az új halmazt.
  *
  * **Miért van egyáltalán szükség erre a halmazra.** A vászon vezérelt
  * (SPEC-008 5.5): az `edges` prop a szülő domain állapotából, a
@@ -26,25 +29,18 @@ export type SelectedEdgeIds = ReadonlySet<string>;
  * alapértelmezése (`Backspace`, `@xyflow/react@12.11.6`) sem tud mit
  * törölni (saját mérés, valós chromium, SPEC-008 5.5 "hatodik állapotdarab").
  *
- * A halmaz szándékosan nem tisztul a törölt élek azonosítóitól: kizárólag a
- * ténylegesen meglévő éleken olvassuk vissza, tehát egy él nélküli
- * azonosítónak nincs megfigyelhető hatása. Ugyanez a
- * `mergeMeasuredNodeSizes` viselkedése is a törölt csomópontok mért
- * méretére.
+ * Az eredmény csak a `flowEdges` között szereplő azonosítókat tartalmazza:
+ * egy már nem létező él kiválasztás változását az `applyEdgeChanges` nem
+ * alkalmazza, és a törölt él azonosítója a halmazból is kikerül.
  */
 export function mergeEdgeSelection(
   previous: SelectedEdgeIds,
   changes: readonly EdgeSelectionChange[],
+  flowEdges: readonly Edge[],
 ): SelectedEdgeIds {
-  const merged = new Set(previous);
-  for (const change of changes) {
-    if (change.selected) {
-      merged.add(change.id);
-    } else {
-      merged.delete(change.id);
-    }
-  }
-  return merged;
+  const markedEdges = flowEdges.map((edge) => ({ ...edge, selected: previous.has(edge.id) }));
+  const changedEdges = applyEdgeChanges([...changes], markedEdges);
+  return new Set(changedEdges.filter((edge) => edge.selected).map((edge) => edge.id));
 }
 
 /**

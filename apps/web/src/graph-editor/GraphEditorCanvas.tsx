@@ -130,8 +130,9 @@ function PaneAddNodeContextMenu(
  * A vezérelt vászon (SPEC-008 5.5, M-55): a `nodes` és az `edges` a szülő
  * állapota, a vászon a React Flow saját dokumentált "Controlled Flow"
  * mintáját követi - a GRÁF állapotát nem duplikálja, minden gráf változás
- * (`applyNodeChanges`, AC9) egy lépésben, közvetlenül az
- * `onGraphChange`-en át jut vissza a szülőhöz. Három saját állapota van, és
+ * (`applyNodeChanges`, AC9) egy lépésben, közvetlenül az `onGraphChange`-en át
+ * jut vissza a szülőhöz; az él kiválasztása az `applyEdgeChanges`-en át a nézeti
+ * halmazba megy. Három saját állapota van, és
  * egyik sem gráf adat, tehát egyik sem mentődik: a mért csomópont méret
  * (`measured-node-sizes.ts`), a kiválasztott élek halmaza
  * (`graph-selection.ts`) és a jobb klikk menü nyitási pontja. Az `onConnect` az `addEdge`
@@ -215,21 +216,27 @@ export function GraphEditorCanvas(properties: Readonly<GraphEditorCanvasProperti
     [flowNodes, edges, onGraphChange, selectedNodeId, onSelectNode],
   );
 
-  const onEdgesChange = useCallback((changes: EdgeChange<Edge>[]) => {
-    // Az él egyetlen saját változása a `select`: kiválasztás, nem gráf
-    // szerkesztés, tehát a saját nézeti állapotba megy, nem a domain alakba
-    // (ahol a `selected` mező úgyis elveszne). A `remove` változást az
-    // `onDelete` kezeli, más élváltozás ebben a szerkesztőben nem keletkezik.
-    const selectionChanges: EdgeSelectionChange[] = [];
-    for (const change of changes) {
-      if (change.type === 'select') {
-        selectionChanges.push(change);
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      // Az él változásai az `applyEdgeChanges`-en mennek át (SPEC-008 5.5,
+      // M-55): a `mergeEdgeSelection` a kiválasztás változását a könyvtár
+      // saját segédfüggvényével alkalmazza. Az él egyetlen saját változása a
+      // `select`: kiválasztás, nem gráf szerkesztés, tehát a saját nézeti
+      // állapotba megy, nem a domain alakba (ahol a `selected` mező úgyis
+      // elveszne). A `remove` változást az `onDelete` kezeli (SPEC-008 5.9),
+      // más élváltozás ebben a szerkesztőben nem keletkezik.
+      const selectionChanges: EdgeSelectionChange[] = [];
+      for (const change of changes) {
+        if (change.type === 'select') {
+          selectionChanges.push(change);
+        }
       }
-    }
-    if (selectionChanges.length > 0) {
-      setSelectedEdgeIds((previous) => mergeEdgeSelection(previous, selectionChanges));
-    }
-  }, []);
+      if (selectionChanges.length > 0) {
+        setSelectedEdgeIds((previous) => mergeEdgeSelection(previous, selectionChanges, flowEdges));
+      }
+    },
+    [flowEdges],
+  );
 
   const onConnect = useCallback(
     (connection: Connection) => {

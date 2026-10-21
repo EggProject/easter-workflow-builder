@@ -20,18 +20,84 @@
    a dagre elrendezés hézagai összezsugorodnának (mérés és számok: a research
    7.1 szekciója). */
 .graph-node-card {
+  --graph-node-card-border-width: 1px;
+  --graph-node-card-border-style: solid;
+  --graph-node-card-border-color: var(--ep-border-subtle);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--ep-space-1);
-  padding: var(--ep-space-3) var(--ep-space-4);
+  /* A vastagabb keret a belső térközből veszi el a különbséget, hogy a
+     tartalom helye ne változzon az állapottal (a szerkesztő 1 pixeles keretéhez
+     képest). */
+  padding: calc(var(--ep-space-3) + 1px - var(--graph-node-card-border-width))
+    calc(var(--ep-space-4) + 1px - var(--graph-node-card-border-width));
   min-width: var(--graph-node-card-width);
   min-height: var(--graph-node-card-height);
   border-radius: var(--ep-radius-md);
-  border: 1px solid var(--ep-border-subtle);
+  border: var(--graph-node-card-border-width) var(--graph-node-card-border-style) var(--graph-node-card-border-color);
   background: var(--ep-bg-elevated);
   color: var(--ep-fg);
   box-shadow: var(--ep-shadow-sm);
+}
+
+/* A KÁRTYA KERETE AZ ÁLLAPOTOT IS JELÖLI (SPEC-008 6.2, 21. kritérium, user
+   döntés 2026-10-21). A szín az állapot jelvényének variánsából jön
+   (`data-badge-variant`), a forma az állapotból (`data-status`), hogy a szín
+   önmagában ne hordozzon információt. Futás nélkül (a szerkesztőben) egyik
+   attribútum sincs, a keret a fenti alapérték.
+
+   SZÍN. A `Badge` variánsai fix színű kapszulák (`badge.css`), a keretnek témázó
+   token kell: az `info`, `success`, `warning` és `danger` a névrokon
+   `--ep-info`, `--ep-success`, `--ep-warning` és `--ep-danger` token, az `outline`
+   a jelvény gyűrűjének tokenje (`--ep-border`), az `ink` a jelvény háttere
+   (`--ep-ink-900`, mindkét témában ugyanaz).
+
+   FORMA. `pending`: szaggatott. `running`: vastagabb, 2.4 pixeles, a kiemelt él
+   vastagsága (`run-graph.css`, a design system `LineChart.jsx` 239. sora).
+   `failed` és `rejected`: 3 pixeles dupla vonal. A 3 pixel a legkisebb
+   vastagság, amin a Chromium két vonalat rajzol: a `BorderEdge::EffectiveStyle`
+   (`border_edge.cc`) a 3 pixelnél vékonyabb `double` keretet `solid`-ra
+   cseréli, a `DrawDoubleBoxSide` (`box_border_painter.cc`) pedig a vastagság
+   harmadát adja a vonalnak és a résnek. A CSS Backgrounds 3 a vonalak
+   vastagságát nem rögzíti. Mérés és források:
+   `docs/research/2026-10-21-kartya-keret-allapot.md`. */
+.graph-node-card[data-badge-variant='info'] {
+  --graph-node-card-border-color: var(--ep-info);
+}
+
+.graph-node-card[data-badge-variant='success'] {
+  --graph-node-card-border-color: var(--ep-success);
+}
+
+.graph-node-card[data-badge-variant='warning'] {
+  --graph-node-card-border-color: var(--ep-warning);
+}
+
+.graph-node-card[data-badge-variant='danger'] {
+  --graph-node-card-border-color: var(--ep-danger);
+}
+
+.graph-node-card[data-badge-variant='ink'] {
+  --graph-node-card-border-color: var(--ep-ink-900);
+}
+
+.graph-node-card[data-badge-variant='outline'] {
+  --graph-node-card-border-color: var(--ep-border);
+}
+
+.graph-node-card[data-status='pending'] {
+  --graph-node-card-border-style: dashed;
+}
+
+.graph-node-card[data-status='running'] {
+  --graph-node-card-border-width: 2.4px;
+}
+
+.graph-node-card[data-status='failed'],
+.graph-node-card[data-status='rejected'] {
+  --graph-node-card-border-width: 3px;
+  --graph-node-card-border-style: double;
 }
 
 .graph-node-card__header {
