@@ -130,22 +130,22 @@ async function heightOf(locator: Locator): Promise<number> {
 
 async function sizeOf(locator: Locator): Promise<string> {
   const box = await locator.boundingBox();
-  return box === null ? 'nincs doboz' : `${Math.round(box.width)}x${Math.round(box.height)}`;
+  return box === null ? 'nincs doboz' : `${String(Math.round(box.width))}x${String(Math.round(box.height))}`;
+}
+
+function editorRoutes(overrides: readonly MockRoute[]): readonly MockRoute[] {
+  // A `find` az ELSŐ illeszkedő bejegyzést használja, ezért a felülírások
+  // állnak elöl.
+  return [
+    ...overrides,
+    mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
+    mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
+    mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('listProviders', async (route) => route.fulfill(jsonBody([]))),
+  ];
 }
 
 test.describe('szerkesztő', () => {
-  function editorRoutes(overrides: readonly MockRoute[]): readonly MockRoute[] {
-    // A `find` az ELSŐ illeszkedő bejegyzést használja, ezért a felülírások
-    // állnak elöl.
-    return [
-      ...overrides,
-      mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
-      mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
-      mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
-      mockRoute('listProviders', async (route) => route.fulfill(jsonBody([]))),
-    ];
-  }
-
   test.beforeEach(async ({ page }) => {
     await mockIdleStream(page);
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -367,12 +367,13 @@ test.describe('futás nézet', () => {
    * megvannak, de a szerver még nem jelezte a pótlás végét.
    */
   async function mockReplay(page: Page, records: readonly RunEventRecord[], isComplete: boolean): Promise<void> {
+    const lastEventId = records.at(-1)?.id;
+    // eslint-disable-next-line unicorn/no-null -- a `replay_complete` keret `throughEventId` mezője a dróton `null`, ha a futásnak nincs eseménye
+    const replayComplete: StreamFrame = { event: 'replay_complete', runId: 'r-1', throughEventId: lastEventId ?? null };
     const frames: readonly StreamFrame[] = [
       { event: 'stream_ready', streamId: 'e2e-stream', serverInstanceId: 'e2e-server', subscriptions: [] },
       ...records.map((runEvent): StreamFrame => ({ event: 'run_event', delivery: 'replayed', runEvent })),
-      ...(isComplete
-        ? [{ event: 'replay_complete', runId: 'r-1', throughEventId: records.at(-1)?.id ?? null } satisfies StreamFrame]
-        : []),
+      ...(isComplete ? [replayComplete] : []),
     ];
     let isServed = false;
     await page.route(`${STREAM_ORIGIN}/events**`, async (route) => {

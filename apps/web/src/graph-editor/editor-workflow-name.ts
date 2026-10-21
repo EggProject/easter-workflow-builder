@@ -13,6 +13,4 @@
  * konvenció).
  */
 export type EditorWorkflowName =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ready'; readonly name: string }
-  | { readonly kind: 'unavailable' };
+  { readonly kind: 'loading' } | { readonly kind: 'ready'; readonly name: string } | { readonly kind: 'unavailable' };

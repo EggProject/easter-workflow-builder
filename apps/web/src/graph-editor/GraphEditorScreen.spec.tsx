@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { NavigationGuard } from '../history-navigation/use-client-route.ts';
 import type { GraphEditorCanvasProperties } from './GraphEditorCanvas.tsx';
-import { GraphEditorScreen } from './GraphEditorScreen.tsx';
+import { GraphEditorScreen, type GraphEditorScreenProperties } from './GraphEditorScreen.tsx';
 import { computeViewportCenterNodePosition } from './compute-viewport-center-node-position.ts';
 import { FOOTER_COMPACT_MEDIA_QUERY } from './footer-compact-media-query.ts';
 import { GRAPH_EDITOR_LAYOUT_STORAGE_KEY } from './graph-editor-layout.ts';
@@ -178,6 +178,33 @@ function createFetchFunction(log: RouteCallLog): FetchFunction {
 }
 
 const unreachableFetchFunction: FetchFunction = () => Promise.reject(new Error('kapcsolat megszakadt'));
+
+/**
+ * A kérés szándékosan sosem oldódik fel: a teszt a betöltés alatti állapotot nézi.
+ */
+const neverResolvingFetchFunction: FetchFunction = () =>
+  new Promise<Response>(() => {
+    // szándékosan sosem oldódik fel
+  });
+
+/**
+ * A `GET /api/providers` kérés sosem érkezik meg, minden más kérés az átadott
+ * függvény szerint válaszol: a provider lista betöltés alatti állapotához.
+ */
+function withPendingProviders(fetchFunction: FetchFunction): FetchFunction {
+  return (input, init) =>
+    new URL(input).pathname === '/api/providers'
+      ? new Promise<Response>(() => {
+          // szándékosan sosem oldódik fel
+        })
+      : fetchFunction(input, init);
+}
+
+function openAgentPanel(): void {
+  act(() => {
+    lastCanvasProperties().onSelectNode('n-2');
+  });
+}
 
 const failingPutFetchFunction: FetchFunction = (input, init) => {
   if (init.method === 'PUT') {
@@ -404,7 +431,7 @@ describe('GraphEditorScreen', () => {
   let root: Root;
   let userAgentSpy: MockInstance<() => string>;
   const navigate = vi.fn();
-  const onWorkflowNameChange = vi.fn();
+  const onWorkflowNameChange = vi.fn<GraphEditorScreenProperties['onWorkflowNameChange']>();
 
   beforeEach(() => {
     onWorkflowNameChange.mockClear();
@@ -1069,12 +1096,32 @@ describe('GraphEditorScreen', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  describe('a várakozás jelzései (SPEC-008 9. szekció)', () => {
-    const neverResolvingFetchFunction: FetchFunction = () =>
-      new Promise<Response>(() => {
-        // A válasz szándékosan sosem érkezik: a teszt a betöltés állapotát nézi.
-      });
+  // A 4. pont tesztjeinek segédei: a `container`-t használják, ezért a
+  // `GraphEditorScreen` leírás szintjén állnak.
+  function providerTrigger(): HTMLButtonElement {
+    const trigger = [...container.querySelectorAll<HTMLButtonElement>(':scope .node-inspector button.select')].find(
+      (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === 'Provider felülírás',
+    );
+    if (trigger === undefined) {
+      throw new Error('a teszt nem találta a "Provider felülírás" választót');
+    }
+    return trigger;
+  }
 
+  /**
+   * A választó megnyitott paneljének opciói: a panel a `document.body`-ba
+   * kerül, a triggerhez az `aria-controls` köti.
+   */
+  function openedOptionLabels(): readonly (string | null)[] {
+    act(() => {
+      providerTrigger().click();
+    });
+    const controlsId = providerTrigger().getAttribute('aria-controls');
+    const panel = [...document.querySelectorAll('[role="listbox"]')].find((listbox) => listbox.id === controlsId);
+    return [...(panel?.querySelectorAll('[role="option"]') ?? [])].map((option) => option.textContent);
+  }
+
+  describe('a várakozás jelzései (SPEC-008 9. szekció)', () => {
     it('1. pont: a gráf betöltése alatt a vászon helyét kitöltő egyetlen csontváz áll, nem sorokból álló', async () => {
       await renderScreen('?workflowId=wf-1', neverResolvingFetchFunction);
 
@@ -1137,46 +1184,9 @@ describe('GraphEditorScreen', () => {
     });
 
     describe('4. pont: a provider lista betöltése a node panelben', () => {
-      function providerTrigger(): HTMLButtonElement {
-        const trigger = [...container.querySelectorAll<HTMLButtonElement>('.node-inspector button.select')].find(
-          (candidate) => candidate.closest('.field')?.querySelector('.field__label')?.textContent === 'Provider felülírás',
-        );
-        if (trigger === undefined) {
-          throw new Error('a teszt nem találta a "Provider felülírás" választót');
-        }
-        return trigger;
-      }
-
-      /**
-       * A választó megnyitott paneljének opciói: a panel a `document.body`-ba
-       * kerül, a triggerhez az `aria-controls` köti.
-       */
-      function openedOptionLabels(): readonly (string | null)[] {
-        act(() => {
-          providerTrigger().click();
-        });
-        const panel = document.getElementById(providerTrigger().getAttribute('aria-controls') ?? '');
-        return [...(panel?.querySelectorAll('[role="option"]') ?? [])].map((option) => option.textContent);
-      }
-
-      function openAgentPanel(): void {
-        act(() => {
-          lastCanvasProperties().onSelectNode('n-2');
-        });
-      }
-
-      function listedProviders(fetchFunction: FetchFunction): FetchFunction {
-        return (input, init) =>
-          new URL(input).pathname === '/api/providers'
-            ? new Promise<Response>(() => {
-                // A provider lista szándékosan sosem érkezik meg.
-              })
-            : fetchFunction(input, init);
-      }
-
       it('a lista betöltése alatt a választó letiltva áll, egyetlen "Betöltés…" felirattal', async () => {
         const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
-        await renderScreen('?workflowId=wf-1', listedProviders(createFetchFunction(log)));
+        await renderScreen('?workflowId=wf-1', withPendingProviders(createFetchFunction(log)));
         openAgentPanel();
 
         expect(providerTrigger().disabled).toBe(true);

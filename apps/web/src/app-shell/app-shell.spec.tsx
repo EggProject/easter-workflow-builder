@@ -175,30 +175,32 @@ describe('AppShell', () => {
     expect(container.querySelector('.app-pagehead')?.textContent).toContain('Szerkesztő');
   });
 
-  describe('a szerkesztő morzsasorának utolsó eleme a workflow neve (SPEC-008 9. szekció 2. pont)', () => {
-    async function renderEditor(): Promise<(name: Parameters<GraphEditorScreenProperties['onWorkflowNameChange']>[0]) => void> {
-      capturedScreenProperties.length = 0;
-      // eslint-disable-next-line unicorn/no-null -- lásd fent.
-      globalThis.history.pushState(null, '', '/editor');
-      render();
-      await act(async () => {
-        await Promise.resolve();
+  async function renderEditor(): Promise<
+    (name: Parameters<GraphEditorScreenProperties['onWorkflowNameChange']>[0]) => void
+  > {
+    capturedScreenProperties.length = 0;
+    // eslint-disable-next-line unicorn/no-null -- lásd fent.
+    globalThis.history.pushState(null, '', '/editor');
+    render();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return (name) => {
+      const onWorkflowNameChange = capturedScreenProperties.at(-1)?.onWorkflowNameChange;
+      if (onWorkflowNameChange === undefined) {
+        throw new Error('a teszt nem talált rögzített onWorkflowNameChange propot');
+      }
+      act(() => {
+        onWorkflowNameChange(name);
       });
-      return (name) => {
-        const onWorkflowNameChange = capturedScreenProperties.at(-1)?.onWorkflowNameChange;
-        if (onWorkflowNameChange === undefined) {
-          throw new Error('a teszt nem talált rögzített onWorkflowNameChange propot');
-        }
-        act(() => {
-          onWorkflowNameChange(name);
-        });
-      };
-    }
+    };
+  }
 
-    function currentItem(): Element | null {
-      return container.querySelector('.app-pagehead .breadcrumb__item--current');
-    }
+  function currentItem(): Element | null {
+    return container.querySelector(':scope .app-pagehead .breadcrumb__item--current');
+  }
 
+  describe('a szerkesztő morzsasorának utolsó eleme a workflow neve (SPEC-008 9. szekció 2. pont)', () => {
     it('betöltés alatt Skeleton áll, a szöveg vizuálisan rejtve az útvonal felirata', async () => {
       // A valódi képernyő workflowId nélkül azonnal `unavailable` értéket
       // jelent, ezért a töltés állapotát a teszt maga jelenti.

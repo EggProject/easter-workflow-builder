@@ -297,11 +297,11 @@ describe('TranscriptPanel', () => {
     expect(container.querySelector('.transcript-panel__loading')).toBeNull();
   });
 
-  describe('a pótlás jelzése ProgressBar-ral (SPEC-008 9. szekció 10. pont, user döntés 2026-10-21)', () => {
-    function progressBars(): readonly Element[] {
-      return [...container.querySelectorAll('[role="progressbar"]')];
-    }
+  function progressBars(): readonly Element[] {
+    return [...container.querySelectorAll('[role="progressbar"]')];
+  }
 
+  describe('a pótlás jelzése ProgressBar-ral (SPEC-008 9. szekció 10. pont, user döntés 2026-10-21)', () => {
     it('amíg a pótlás tart és már van sor, a lista fölött ProgressBar áll, a sorok megmaradnak', () => {
       renderPanel(transcriptOf([makeRecord(1)], false));
 

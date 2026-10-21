@@ -246,7 +246,12 @@ const pendingFetchFunction: FetchFunction = () =>
  */
 function createFetchFunctionPendingOn(isPending: (pathname: string) => boolean): FetchFunction {
   const base = createFetchFunction();
-  return (input, init) => (isPending(new URL(input).pathname) ? pendingFetchFunction(input, init) : base(input, init));
+  return (input, init) =>
+    isPending(new URL(input).pathname)
+      ? new Promise<Response>(() => {
+          // szándékosan sosem oldódik fel (a `pendingFetchFunction` indoka)
+        })
+      : base(input, init);
 }
 
 /**
@@ -594,21 +599,21 @@ describe('RunViewScreen', () => {
   // jelzi a várakozást, nem egy teljes képernyős csontváz.
   // ============================================================
 
+  const isGraphSkeletonShown = (): boolean => container.querySelector('.run-view-screen__graph-loading') !== null;
+  const isHeaderSkeletonShown = (): boolean =>
+    container.querySelector('.run-view-screen__header[aria-busy="true"]') !== null;
+  // A képernyő saját csontváza a panel HELYÉN áll: a panel gyökere
+  // (`.transcript-panel`) ilyenkor nincs a DOM-ban. A panel saját csontváza
+  // (nulla sor, pótlás közben) a panel gyökerén belül áll.
+  const isTranscriptSkeletonShown = (): boolean =>
+    container.querySelector('.transcript-panel__loading') !== null &&
+    container.querySelector('.transcript-panel') === null;
+
+  async function renderWithPending(isPending: (pathname: string) => boolean): Promise<void> {
+    await renderScreen('?runId=r-3', createFetchFunctionPendingOn(isPending));
+  }
+
   describe('a várakozás jelzései', () => {
-    const isGraphSkeletonShown = (): boolean => container.querySelector('.run-view-screen__graph-loading') !== null;
-    const isHeaderSkeletonShown = (): boolean =>
-      container.querySelector('.run-view-screen__header[aria-busy="true"]') !== null;
-    // A képernyő saját csontváza a panel HELYÉN áll: a panel gyökere
-    // (`.transcript-panel`) ilyenkor nincs a DOM-ban. A panel saját csontváza
-    // (nulla sor, pótlás közben) a panel gyökerén belül áll.
-    const isTranscriptSkeletonShown = (): boolean =>
-      container.querySelector('.transcript-panel__loading') !== null &&
-      container.querySelector('.transcript-panel') === null;
-
-    async function renderWithPending(isPending: (pathname: string) => boolean): Promise<void> {
-      await renderScreen('?runId=r-3', createFetchFunctionPendingOn(isPending));
-    }
-
     it('minden végpont betöltése közben mindhárom terület a saját csontvázát mutatja, teljes képernyős nélkül', async () => {
       await renderScreen('?runId=r-3', pendingFetchFunction);
 
