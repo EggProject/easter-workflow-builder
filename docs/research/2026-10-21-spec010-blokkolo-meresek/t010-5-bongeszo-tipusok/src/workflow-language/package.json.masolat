@@ -1,0 +1,22 @@
+{
+  "name": "@easter-workflow-builder/workflow-language",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@easter-workflow-builder/core": "workspace:*",
+    "@marcbachmann/cel-js": "8.0.0",
+    "mustache": "4.2.0"
+  },
+  "devDependencies": {
+    "@types/mustache": "4.2.6",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

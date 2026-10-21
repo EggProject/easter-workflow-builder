@@ -1,0 +1,11 @@
+/**
+ * SPEC-010 6.7: a sima változó tag fel nem oldható neve.
+ */
+export class MissingTemplateNameError extends Error {
+  readonly missingName: string;
+
+  constructor(missingName: string) {
+    super(`hiányzó név a sablonban: ${missingName}`);
+    this.missingName = missingName;
+  }
+}

@@ -1,0 +1,81 @@
+
+================ (2) ================
+### szintaktikai hiba: 1 +
+{
+  ok: false,
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'unexpected_token',
+  summary: 'Unexpected token: EOF',
+  range: { start: 3, end: 3 }
+}
+### szintaktikai hiba: input.(
+{
+  ok: false,
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'expected_token',
+  summary: 'Expected IDENTIFIER, got LPAREN',
+  range: { start: 6, end: 7 }
+}
+### nem deklarált változó: step.x
+{
+  ok: false,
+  stage: 'check',
+  name: 'TypeError',
+  class: 'cel TypeError',
+  code: 'unknown_variable',
+  summary: 'Unknown variable: step',
+  range: { start: 0, end: 4 }
+}
+### nem deklarált változó: stepsx == 1
+{
+  ok: false,
+  stage: 'check',
+  name: 'TypeError',
+  class: 'cel TypeError',
+  code: 'unknown_variable',
+  summary: 'Unknown variable: stepsx',
+  range: { start: 0, end: 6 }
+}
+### maxDepth túllépés: 300 zárójel
+{
+  ok: false,
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'limit_exceeded',
+  summary: 'Exceeded maxDepth (250)',
+  range: { start: 250, end: 250 }
+}
+### maxDepth túllépés: 300 unáris mínusz
+{ ok: true, type: 'int' }
+### maxDepth túllépés: 260 egymásba ágyazott lista
+{
+  ok: false,
+  stage: 'parse',
+  name: 'ParseError',
+  class: 'ParseError',
+  code: 'limit_exceeded',
+  summary: 'Exceeded maxDepth (250)',
+  range: { start: 250, end: 250 }
+}
+### határ alatt: 240 zárójel
+{ ok: true, type: 'int' }
+### határ alatt: 120 egymásba ágyazott lista
+{
+  ok: true,
+  type: 'list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<list<int>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+}
+### érvényes: branch példa
+{ ok: true, type: 'string' }
+### érvényes: fan_out példa
+{ ok: true, type: 'list' }
+### érvényes: loop példa
+{ ok: true, type: 'bool' }
+### érvényes: loop példa 2
+{ ok: true, type: 'bool' }
+### érvényes: has védett
+{ ok: true, type: 'dyn' }

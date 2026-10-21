@@ -29,7 +29,7 @@ function topologyOf(nodes: readonly SnapshotNode[], edges: readonly SnapshotEdge
     nodes,
     edges,
   });
-  const loopBackEdgeIds = findLoopBackEdges(graph);
+  const loopBackEdgeIds = findLoopBackEdges(graph, 'start');
   const balance = validateScopeBalance(graph, 'start', loopBackEdgeIds);
   if (balance.kind === 'error') {
     throw new Error(balance.message);

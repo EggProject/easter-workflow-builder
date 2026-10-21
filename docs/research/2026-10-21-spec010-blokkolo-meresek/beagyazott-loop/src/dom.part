@@ -1,0 +1,50 @@
+
+// A valódi `findLoopBackEdges` helyett egy dominancia alapú változat, CSAK
+// ebben a fájlban (vi.mock): egy u -> v él visszaél, ha v loop, és v dominálja
+// u-t a start node-tól (minden start -> u út átmegy v-n). A motor többi része
+// a valódi kód.
+vi.mock('../run-graph/find-loop-back-edges.ts', () => ({
+  findLoopBackEdges: (graph: { nodesById: ReadonlyMap<string, { type: string }>; outgoingEdges: ReadonlyMap<string, readonly { id: string; sourceNodeId: string; targetNodeId: string }[]>; incomingEdges: ReadonlyMap<string, readonly { id: string; sourceNodeId: string; targetNodeId: string }[]> }) => {
+    const ids = [...graph.nodesById.keys()];
+    const start = ids.find((id) => graph.nodesById.get(id)?.type === 'start');
+    const dom = new Map<string, Set<string>>();
+    for (const id of ids) dom.set(id, id === start ? new Set([id]) : new Set(ids));
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const id of ids) {
+        if (id === start) continue;
+        const preds = (graph.incomingEdges.get(id) ?? []).map((edge) => edge.sourceNodeId);
+        let next: Set<string> | undefined;
+        for (const pred of preds) {
+          const predDom = dom.get(pred) ?? new Set<string>();
+          next = next === undefined ? new Set(predDom) : new Set([...next].filter((value) => predDom.has(value)));
+        }
+        const result = new Set(next ?? []);
+        result.add(id);
+        const old = dom.get(id) ?? new Set<string>();
+        if (result.size !== old.size || [...result].some((value) => !old.has(value))) {
+          dom.set(id, result);
+          changed = true;
+        }
+      }
+    }
+    const back = new Set<string>();
+    for (const [id, node] of graph.nodesById) {
+      if (node.type !== 'loop') continue;
+      for (const edge of graph.incomingEdges.get(id) ?? []) {
+        if (dom.get(edge.sourceNodeId)?.has(id) === true) back.add(edge.id);
+      }
+    }
+    return back;
+  },
+}));
+
+describe('beágyazott loop próba, dominancia alapú visszaél (vi.mock)', () => {
+  for (const shape of [SHAPE_K, SHAPE_A, SHAPE_B, SHAPE_C]) {
+    it(shape.label, async () => {
+      await runShape(shape);
+      expect(true).toBe(true);
+    });
+  }
+});

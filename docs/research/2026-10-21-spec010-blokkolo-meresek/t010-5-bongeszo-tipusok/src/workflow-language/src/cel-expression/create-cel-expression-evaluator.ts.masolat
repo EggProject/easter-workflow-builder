@@ -1,0 +1,51 @@
+import type { Outcome } from '@easter-workflow-builder/core';
+import { Environment, EvaluationError, ParseError, TypeError as CelTypeError } from '@marcbachmann/cel-js';
+import { RUN_CONTEXT_VARIABLE_NAMES } from './run-context-variable-names.ts';
+
+/**
+ * A kifejezés port két művelete.
+ */
+export interface CelExpressionEvaluator {
+  readonly compile: (expression: string) => Outcome<string>;
+  readonly evaluate: (expression: string, context: Readonly<Record<string, unknown>>) => Outcome<unknown>;
+}
+
+function describeCelError(error: unknown): string {
+  if (error instanceof ParseError || error instanceof EvaluationError || error instanceof CelTypeError) {
+    const range = error.range === undefined ? '' : ` [${String(error.range.start)}, ${String(error.range.end)}]`;
+    return `${error.summary}${range}`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * SPEC-010 7.: a CEL kifejezés kiértékelő gyártó függvénye.
+ */
+export function createCelExpressionEvaluator(): CelExpressionEvaluator {
+  const environment = new Environment();
+  for (const name of RUN_CONTEXT_VARIABLE_NAMES) {
+    environment.registerVariable(name, 'dyn');
+  }
+  return {
+    compile(expression) {
+      try {
+        environment.parse(expression);
+      } catch (error) {
+        return { kind: 'error', message: `${describeCelError(error)} (expression_evaluation_failed)` };
+      }
+      const checked = environment.check(expression);
+      if (!checked.valid) {
+        return { kind: 'error', message: `${describeCelError(checked.error)} (expression_evaluation_failed)` };
+      }
+      return { kind: 'ok', value: checked.type ?? 'dyn' };
+    },
+    evaluate(expression, context) {
+      try {
+        const value: unknown = environment.evaluate(expression, context);
+        return { kind: 'ok', value };
+      } catch (error) {
+        return { kind: 'error', message: `${describeCelError(error)} (expression_evaluation_failed)` };
+      }
+    },
+  };
+}

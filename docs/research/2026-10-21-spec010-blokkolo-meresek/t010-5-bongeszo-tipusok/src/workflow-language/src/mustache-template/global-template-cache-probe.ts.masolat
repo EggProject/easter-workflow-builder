@@ -1,0 +1,9 @@
+import Mustache from 'mustache';
+
+/**
+ * T-010-5 eldobható mérés: a globális gyorsítótár kikapcsolása értékadás
+ * nélkül (az `import-x/namespace` az értékadást tiltja).
+ */
+export function didDisableGlobalTemplateCache(): boolean {
+  return Reflect.set(Mustache, 'templateCache', undefined);
+}

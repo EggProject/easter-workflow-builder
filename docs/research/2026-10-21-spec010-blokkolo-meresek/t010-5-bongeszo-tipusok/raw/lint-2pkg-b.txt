@@ -1,0 +1,41 @@
+• turbo 2.10.12
+
+   • Packages in scope: @easter-workflow-builder/web, @easter-workflow-builder/workflow-language
+   • Running lint, typecheck in 2 packages
+   • Remote caching disabled, using shared worktree cache
+
+@easter-workflow-builder/ui:typecheck: cache hit, replaying logs f985ce611ec5179c
+@easter-workflow-builder/ui:typecheck: $ tsc --noEmit
+@easter-workflow-builder/typeguards:typecheck: cache hit, replaying logs 73881ee85367f49f
+@easter-workflow-builder/typeguards:typecheck: $ tsc --noEmit
+@easter-workflow-builder/core:typecheck: cache hit, replaying logs 99c4a4a6c4138241
+@easter-workflow-builder/core:typecheck: $ tsc --noEmit
+@easter-workflow-builder/workflow-language:typecheck: cache miss, executing b8a486d4b5317129
+@easter-workflow-builder/workflow-language:typecheck: $ tsc --noEmit
+@easter-workflow-builder/protocol:typecheck: cache hit, replaying logs 96cb3a446b3a7711
+@easter-workflow-builder/protocol:typecheck: $ tsc --noEmit
+@easter-workflow-builder/workflow-language:lint: cache miss, executing cb96ce90fadf7ae6
+@easter-workflow-builder/workflow-language:lint: $ eslint .
+@easter-workflow-builder/workflow-language:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/create-mustache-template-renderer.spec.ts
+@easter-workflow-builder/workflow-language:lint:   11:5  error  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/global-template-cache-probe.ts
+@easter-workflow-builder/workflow-language:lint:   7:17  error  Boolean name `disableGlobalTemplateCache` should start with `is`, `are`, `has`, `have`, `can`, `should`, `was`, `were`, `did`, `will`, `requires`  unicorn/consistent-boolean-name
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: ✖ 2 problems (2 errors, 0 warnings)
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: error: script "lint" exited with code 1
+@easter-workflow-builder/web:typecheck: cache miss, executing f257b6673c9076df
+@easter-workflow-builder/web:lint: cache miss, executing b0eab1c6f2136e44
+@easter-workflow-builder/workflow-language#lint:  ERROR  command (/sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language) /sessions/vigilant-clever-mendel/.bun/bin/bun run lint exited (1)
+
+ Tasks:    5 successful, 8 total
+Cached:    4 cached, 8 total
+  Time:    4.054s 
+Failed:    @easter-workflow-builder/workflow-language#lint
+
+ ERROR  run failed: command  exited (1)

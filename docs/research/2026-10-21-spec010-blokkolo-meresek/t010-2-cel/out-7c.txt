@@ -1,0 +1,17 @@
+input.tema => 'x' | string
+input.constructor => 'saját' | string
+has(input.constructor) => true | boolean
+has(input.nincs) => false | boolean
+input.nincs => EvaluationError no_such_key: No such key: nincs
+input.l.filter(e, e.n > 1.0).size() => 1n | bigint
+input.l.filter(e, e.aktiv).map(e, e.n) => [ 1 ] | Array
+input.toString => EvaluationError no_such_key: No such key: toString
+input => Map(3) {
+  'tema' => 'x',
+  'constructor' => 'saját',
+  'l' => [
+    Map(2) { 'n' => 1, 'aktiv' => true },
+    Map(3) { 'n' => 2, 'constructor' => 'z', 'aktiv' => false }
+  ]
+} | Map
+{"a": 1} => { a: 1n } | object

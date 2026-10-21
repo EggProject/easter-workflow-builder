@@ -1,0 +1,12 @@
+{1: "a"}[1] => 'a' | proto: - 
+{1: "a"}["1"] => 'a' | proto: - 
+{1: "a"} => { '1': 'a' } | proto: Object 
+{dyn(1): "a", dyn("1"): "b"} => { '1': 'b' } | proto: Object 
+{dyn(1): "a", dyn(1u): "b"} => { '1': 'b' } | proto: Object 
+{dyn(1): "a", dyn(1.0): "b"} => { '1': 'b' } | proto: Object 
+{1: "a"}.size() => 1n | proto: - 
+type({1: "a"}) => Type [Type<map>] {} | proto: Type 
+{1: "a"} == {"1": "a"} => EvaluationError no_such_overload no such overload: map<int, string> == map<string, string>
+{"a": {2: "b"}} => { a: { '2': 'b' } } | proto: Object 
+{1: "a"}.map(k, k) => EvaluationError variable_type_mismatch Variable 'k' is not of type 'int', got 'string'
+{1: "a"}.map(k, type(k)) => EvaluationError variable_type_mismatch Variable 'k' is not of type 'int', got 'string'

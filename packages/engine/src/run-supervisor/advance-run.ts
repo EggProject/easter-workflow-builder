@@ -24,6 +24,7 @@ import { buildScopedKey } from '../scheduling/build-scoped-key.ts';
 import { collectJoinInputs } from '../scheduling/collect-join-inputs.ts';
 import { enqueueReadyInstance } from '../scheduling/enqueue-ready-instance.ts';
 import { resolveFanOutItem } from '../scheduling/resolve-fan-out-item.ts';
+import { findStalledInstances } from '../scheduling/find-stalled-instances.ts';
 import { resolveLoopIteration } from '../scheduling/resolve-loop-iteration.ts';
 import { takeNextReadyInstance } from '../scheduling/take-next-ready-instance.ts';
 import type { NodePlan, RunExecution } from './run-execution.ts';
@@ -700,6 +701,31 @@ function cancelStoppedStepRuns(runId: string, database: DatabaseContext): Outcom
 }
 
 /**
+ * Az elakadt futás szabálya (SPEC-004 4.9, user döntés 2026-10-21): a
+ * kezeletlen hiba nélkül `succeeded` állapotban záró futás `failed`, ha a
+ * terminális ütemező állapotban elakadt példány maradt (`findStalledInstances`).
+ * Kezeletlen hibával záró futásnál a vizsgálat nem fut, mert ott a bukott ág
+ * miatt lerendezetlen példányok várhatók, és az `error_kind` az első
+ * kezeletlen hiba marad (8.4). Az elakadásnak nincs `step_run` sora, ezért a
+ * `failedBranchCount` 0, az üzenet pedig az elakadt node azonosítókat nevezi meg.
+ */
+function withStallCheck(completion: RunCompletion, execution: RunExecution): RunCompletion {
+  if (completion.status === 'failed') {
+    return completion;
+  }
+  const stalled = findStalledInstances(execution.scheduler, execution.topology);
+  if (stalled.length === 0) {
+    return completion;
+  }
+  const nodeIds = [...new Set(stalled.map((instance) => instance.nodeId))].join(', ');
+  const errorMessage = formatEngineErrorMessage(
+    'run_stalled',
+    `A futás elakadt: a(z) ${nodeIds} node példánya jelölést kapott, de soha nem vált futtathatóvá`,
+  );
+  return { status: 'failed', errorKind: 'run_stalled', errorMessage, failedBranchCount: 0 };
+}
+
+/**
  * A futás záró állapotának kiírása (SPEC-004 8.4): `resolveRunCompletion`,
  * majd a megfelelő nevesített állapotváltó és a `run_finished` esemény.
  *
@@ -710,10 +736,11 @@ function cancelStoppedStepRuns(runId: string, database: DatabaseContext): Outcom
  * `run-interrupt/shutdown-active-runs.ts` 4. pont), nem ezé az ágé.
  */
 function finishRun(execution: RunExecution, dependencies: NodeExecutorDependencies): Outcome<RunCompletion> {
-  const completion = resolveRunCompletion(execution.unhandledErrors);
+  const resolved = resolveRunCompletion(execution.unhandledErrors);
   if (execution.stopRequested) {
-    return { kind: 'ok', value: completion };
+    return { kind: 'ok', value: resolved };
   }
+  const completion = withStallCheck(resolved, execution);
 
   const { database } = dependencies.ports;
   if (execution.failRunRequested) {

@@ -1,0 +1,259 @@
+
+================ (7) ================
+### input.constructor
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 6, end: 17 },
+      message: 'No such key: constructor\n\n>    1 | input.constructor\n               ^'
+    }
+  }
+}
+### input.__proto__
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: __proto__',
+      range: { start: 6, end: 15 },
+      message: 'No such key: __proto__\n\n>    1 | input.__proto__\n               ^'
+    }
+  }
+}
+### input.toString
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: toString',
+      range: { start: 6, end: 14 },
+      message: 'No such key: toString\n\n>    1 | input.toString\n               ^'
+    }
+  }
+}
+### input.hasOwnProperty
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: hasOwnProperty',
+      range: { start: 6, end: 20 },
+      message: 'No such key: hasOwnProperty\n\n>    1 | input.hasOwnProperty\n               ^'
+    }
+  }
+}
+### input["constructor"]
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 0, end: 20 },
+      message: 'No such key: constructor\n\n>    1 | input["constructor"]\n         ^'
+    }
+  }
+}
+### input["__proto__"]
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: __proto__',
+      range: { start: 0, end: 18 },
+      message: 'No such key: __proto__\n\n>    1 | input["__proto__"]\n         ^'
+    }
+  }
+}
+### input["toString"]
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: toString',
+      range: { start: 0, end: 17 },
+      message: 'No such key: toString\n\n>    1 | input["toString"]\n         ^'
+    }
+  }
+}
+### has(input.constructor)
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'false',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### has(input.toString)
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'false',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### steps.constructor
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 6, end: 17 },
+      message: 'No such key: constructor\n\n>    1 | steps.constructor\n               ^'
+    }
+  }
+}
+### "constructor" in input
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'false',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### "toString" in input
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'false',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### input.elemek.constructor
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 13, end: 24 },
+      message: 'No such key: constructor\n\n>    1 | input.elemek.constructor\n                      ^'
+    }
+  }
+}
+### input.tema.constructor
+{
+  compile: { ok: true, type: 'dyn' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 11, end: 22 },
+      message: 'No such key: constructor\n\n>    1 | input.tema.constructor\n                    ^'
+    }
+  }
+}
+### {}.constructor
+{
+  compile: { ok: true, type: 'V' },
+  evaluate: {
+    ok: false,
+    error: {
+      name: 'EvaluationError',
+      class: 'EvaluationError',
+      code: 'no_such_key',
+      summary: 'No such key: constructor',
+      range: { start: 3, end: 14 },
+      message: 'No such key: constructor\n\n>    1 | {}.constructor\n            ^'
+    }
+  }
+}
+### saját constructor kulcs (JSON.parse): input.constructor
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'unsupported_type',
+    summary: 'Unsupported type: object',
+    range: undefined,
+    message: 'Unsupported type: object'
+  }
+}
+### saját __proto__ kulcs (JSON.parse): input["__proto__"]
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'unsupported_type',
+    summary: 'Unsupported type: object',
+    range: undefined,
+    message: 'Unsupported type: object'
+  }
+}
+### saját toString kulcs (JSON.parse): input.toString
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'unsupported_type',
+    summary: 'Unsupported type: object',
+    range: undefined,
+    message: 'Unsupported type: object'
+  }
+}

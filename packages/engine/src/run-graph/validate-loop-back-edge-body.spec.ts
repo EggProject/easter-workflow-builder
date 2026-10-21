@@ -36,7 +36,10 @@ describe('validateLoopBackEdgeBody', () => {
       ],
     );
 
-    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph))).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
+      kind: 'ok',
+      value: undefined,
+    });
   });
 
   it('a törzsön kívülről érkező visszaélre loop_back_edge_outside_body hibát ad', () => {
@@ -60,7 +63,7 @@ describe('validateLoopBackEdgeBody', () => {
         edge('vissza', 'kivul', 'L'),
       ],
     );
-    const loopBackEdgeIds = findLoopBackEdges(graph);
+    const loopBackEdgeIds = findLoopBackEdges(graph, 'start');
 
     expect(loopBackEdgeIds).toStrictEqual(new Set(['vissza']));
     expect(validateLoopBackEdgeBody(graph, loopBackEdgeIds)).toStrictEqual({
@@ -76,7 +79,10 @@ describe('validateLoopBackEdgeBody', () => {
       [edge('belepo', 'start', 'L'), edge('continue', 'L', 'torzs', 'continue'), edge('exit', 'L', 'utan', 'exit')],
     );
 
-    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph))).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
+      kind: 'ok',
+      value: undefined,
+    });
   });
 
   it('él nélküli, magányos loop node-ra zöld', () => {
@@ -91,6 +97,9 @@ describe('validateLoopBackEdgeBody', () => {
       [edge('e1', 'start', 'a'), edge('e2', 'a', 'start')],
     );
 
-    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph))).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(validateLoopBackEdgeBody(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
+      kind: 'ok',
+      value: undefined,
+    });
   });
 });

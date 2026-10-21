@@ -1,0 +1,3 @@
+$ bash tooling/scripts/typecheck.sh
+typecheck | 71s
+26/26 sikeres, 0 hibas, 0 cache-bol

@@ -1,0 +1,45 @@
+import Mustache from 'mustache';
+import { resolveOwnProperty } from './resolve-own-property.ts';
+import type { TemplateNameResolution } from './template-name-resolution.ts';
+
+/**
+ * SPEC-010 6.6: a `Mustache.Context` alosztálya. A `lookup` saját adat
+ * tulajdonságra szűkített, függvényt nem hív (a függvény értéket nem
+ * találatnak veszi), és a `push` is ezt az osztályt adja, hogy a szakaszon
+ * belüli feloldás se essen vissza a könyvtár alapértelmezésére.
+ */
+export class OwnPropertyContext extends Mustache.Context {
+  readonly #ownView: unknown;
+  readonly #ownParent: OwnPropertyContext | undefined;
+
+  constructor(view: unknown, parent?: OwnPropertyContext) {
+    super(view, parent);
+    this.#ownView = view;
+    this.#ownParent = parent;
+  }
+
+  override push(view: unknown): OwnPropertyContext {
+    return new OwnPropertyContext(view, this);
+  }
+
+  /**
+   * A név feloldása a kontextus láncon felfelé, a 6.4 táblázat szerint.
+   */
+  resolve(name: string): TemplateNameResolution {
+    if (name === '.') {
+      return this.#ownView === undefined || typeof this.#ownView === 'function'
+        ? { found: false }
+        : { found: true, value: this.#ownView };
+    }
+    const resolution = resolveOwnProperty(this.#ownView, name);
+    if (resolution.found && resolution.value !== undefined && typeof resolution.value !== 'function') {
+      return resolution;
+    }
+    return this.#ownParent === undefined ? { found: false } : this.#ownParent.resolve(name);
+  }
+
+  override lookup(name: string): unknown {
+    const resolution = this.resolve(name);
+    return resolution.found ? resolution.value : undefined;
+  }
+}

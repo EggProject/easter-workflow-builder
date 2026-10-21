@@ -1,0 +1,7 @@
+"------------" 301 parse ok, op: -_ chain depth approx 301 eval: 1
+"------------" 302 parse ok, op: -_ chain depth approx 302 eval: -1
+"!!!!!!!!!!!!" 304 parse ok, op: !_ chain depth approx 301 eval: true
+"------------" 305 EvaluationError no_such_overload no such overload: -map<dyn, dyn>
+"-(-(-(-(-(-(" 781 ParseError limit_exceeded Exceeded maxDepth (250)
+"input.a.a.a." 605 ParseError limit_exceeded Exceeded maxDepth (250)
+"1 + 1 + 1 + " 1201 parse ok, op: + chain depth approx 301 eval: 301
