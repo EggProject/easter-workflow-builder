@@ -2073,3 +2073,38 @@ két tizedesre lefelé kerekített kimenete szerint (`apps/web/package.json`).
 **Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
 egy századdal magasabb küszöbbel (99.35 / 98.9 / 99.73 / 99.32) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`, exit 1).
+
+## 52. A PLAN-009 zárás újramérése (2026-10-21, T-009-36): mind a négy küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A 51. szekció mérése (`main` `184a38c` + `efb7772`) óta a `main` termékkódja nőtt (a
+PLAN-009 D1, D2 és D3 PR-jei), a küszöböt viszont egyik PR sem mozdította. A zárás PR (`feat/plan-009-zaras`)
+a `main` `145c142` fájára épül, termékkód változása egyetlen sor (a `script` kártya figyelmeztetésének
+szövege, SPEC-008 14.1 O-43), plusz egy új e2e teszt.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint: `rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt `bun x playwright test --shard=<i>/8`
+nyolc egymás utáni futásban, mindegyik `flock /tmp/playwright-gep.lock` alatt, `workers: 3` mellett, majd
+`bun run coverage:e2e:report`. **645 teszt, mind zöld** (5 x 81 + 3 x 80). Az 5. shard első futása
+a hívás időkorlátján megszakadt (nulla bukó teszt, részleges nyers adat maradt), ezért ugyanaz a shard
+újra lefutott; a `.nyc_output` az egyesítésnél a lefedettségi uniót adja, a duplikált nyers fájl a
+számokat nem változtatja. A darabszámok a `nyc report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | `nyc` kimenet = új küszöb | Küszöb előtte (51.) | Fedetlen darab, 51. szekció -> most |
+| ---------- | --------------- | ------------------------- | ------------------- | ----------------------------------- |
+| statements | 2145 / 2159     | **99.35**                 | 99.34               | 14 -> 14                            |
+| branches   | 1016 / 1027     | **98.92**                 | 98.89               | 11 -> 11                            |
+| functions  | 750 / 752       | **99.73**                 | 99.72               | 2 -> 2                              |
+| lines      | 2061 / 2075     | **99.32**                 | 99.31               | 14 -> 14                            |
+
+**Levezetés.** A 51. szekció mérése (2112 / 2126, 980 / 991, 735 / 737, 2033 / 2047) óta az összes
+és a fedett darabszám is +33 / +36 / +15 / +28 tétellel nőtt, tehát a fedetlen darab egyik metrikán
+sem változott. A fedetlen tételek ugyanazon az öt fájlon és soron állnak, mint a 51. szekcióban (a
+`coverage-e2e/lcov.info` nulla találatú sorai: `mount-app.tsx` 16, 21, 22; `read-frontend-config.ts` 23,
+29, 37, 41, 62, 67, 72, 77; `is-valid-connection.ts` 36; `perform-route-request.ts` 89;
+`use-stream-connection.ts` 202), az indoklás változatlan. A ratchet ezért FELFELÉ mozdul, mind a négy
+küszöb a mért értékre áll, felfelé kerekítés nélkül, az `nyc` két tizedesre lefelé kerekített kimenete
+szerint (`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
+egy századdal magasabb küszöbbel (99.36 / 98.93 / 99.74 / 99.33) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`, exit 1).

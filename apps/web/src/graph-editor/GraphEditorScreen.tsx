@@ -246,15 +246,15 @@ function RedoIcon(): ReactElement {
 }
 
 /**
- * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
- * konstans, hogy a kezdő állapot minden renderen ugyanaz az objektum legyen.
- */
-/**
  * A "Futás indítása" gomb tiltásának okát hordozó lábléc szöveg azonosítója
  * (`aria-describedby`, SPEC-008 14. kritérium).
  */
 const SCRIPT_RUN_BLOCK_REASON_DOM_ID = 'graph-editor-script-run-block-reason';
 
+/**
+ * A betöltés előtti, üres szerkesztett dokumentum története. Modul szintű
+ * konstans, hogy a kezdő állapot minden renderen ugyanaz az objektum legyen.
+ */
 const EMPTY_GRAPH_EDIT_HISTORY: GraphEditHistory = startGraphEditHistory({ nodes: [], edges: [] });
 
 /**

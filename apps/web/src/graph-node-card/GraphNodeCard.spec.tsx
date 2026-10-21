@@ -301,13 +301,12 @@ describe('GraphNodeCard', () => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.script)]);
     expect(handleElements('target')).toHaveLength(1);
     expect(sourceHandleIds()).toEqual([undefined]);
-    expect(container.textContent).toContain('nincs implementálva');
-    expect(container.textContent).toContain(SCRIPT_UNIMPLEMENTED_ERROR_CLASS);
+    expect(container.textContent).toContain(`Nem futtatható: \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\``);
   });
 
   it('a nem script típusok egyike sem jeleníti meg a script figyelmeztetést', () => {
     renderNodes([buildFlowNode(WORKFLOW_NODES.agent_step)]);
-    expect(container.textContent).not.toContain('nincs implementálva');
+    expect(container.textContent).not.toContain('Nem futtatható');
   });
 
   // A nyolc magyar felirat literálként (SPEC-008 6.2 táblázat, AC21), nem a
