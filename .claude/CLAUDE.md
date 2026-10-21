@@ -835,20 +835,33 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   `run-graph.css` szabály összekötését őrzi, ezért unit tesztben áll; a kirajzolt vonalat az e2e
   `branch-highlight.spec.ts` méri (user döntés 2026-10-21).
 - **Egyetlen ág sem függhet mért node geometriától.** A `graph-editor`, a `graph-node-card`, a
-  `graph-auto-layout` és a `run-graph` témában nem állhat `measured.width`/`measured.height`
-  olvasás és `getBoundingClientRect()` hívás, mert az happy-dom alatt sosem futna le, és a 100
-  százalékos lefedettségi küszöböt sértené; ha a számításnak méretre lenne szüksége, a
-  `packages/ui` `menu` témájának mintáját kell követni, tiszta függvényben, szintetikus
-  bemenettel (SPEC-008 12.2).
-- **A React Flow `nodeTypes` objektuma modul szintű `const`.** A komponensen kívül áll, és
-  regressziós teszt igazolja, hogy a hivatkozás két render között azonos marad; enélkül a
+  `graph-auto-layout` és a `run-graph` témában (a gépi őr az `apps/web/src` teljes termékkódját
+  vizsgálja) nem állhat `measured.`/`measured?.`/`measured[` olvasás és `getBoundingClientRect()`
+  hívás, mert az happy-dom alatt sosem futna le, és a 100 százalékos lefedettségi küszöböt
+  sértené. A `measured` mező ÍRÁSA nem tiltott: a mért méret kizárólag a React Flow saját
+  `dimensions` változásából jut vissza a vászonhoz (`graph-editor/measured-node-sizes.ts`). Ha a
+  számításnak méretre lenne szüksége, a `packages/ui` `menu` témájának mintáját kell követni,
+  tiszta függvényben, szintetikus bemenettel. Greppes invariáns őrzi a `greppable-invariants`
+  témában, a (15) számú (SPEC-008 12.2, 46. kritérium).
+- **A React Flow `nodeTypes` objektuma modul szintű `const`.** A komponensen kívül áll (a
+  `GraphEditorCanvas.tsx` és a `RunGraphCanvas.tsx` fájlban egyaránt `NODE_TYPES`), és a két
+  vászon `.spec.tsx` tesztje igazolja, hogy a hivatkozás két render között azonos marad; enélkül a
   könyvtár minden szülő rendernél újraépítené a teljes vásznat, amit a hivatalos hibaoldal
   nevesített hibaként kezel (SPEC-008 5.5, M-56, PLAN-009 T-009-16).
 - **Az automatikus görgetés predikátuma pixel küszöb nélküli.** A felhasználó akkor "van az
   alján", ha az `onRowsRendered` callback `visibleRows.stopIndex` értéke megegyezik a
-  `rowCount - 1` értékkel, mert egy `scrollTop`/`scrollHeight` alapú küszöbre nincs dokumentált
-  forrás. Greppes invariáns őrzi, hogy az `apps/web/src` alatt nincs görgetési pixel küszöb szám
-  (SPEC-008 7.4, 40. kritérium).
+  `rowCount - 1` értékkel (`transcript-panel/is-last-row-visible.ts`), mert egy
+  `scrollTop`/`scrollHeight` alapú küszöbre nincs dokumentált forrás. Greppes invariáns őrzi, hogy
+  az `apps/web/src` alatt nincs görgetési pixel küszöb szám, és hogy a predikátum ez a sorindex
+  összehasonlítás (`greppable-invariants` (17), SPEC-008 7.4, 40. kritérium).
+- **A fejlesztői port és proxy döntés (lezárt, user termékdöntés).** A szerver portja `3001`, a
+  Vite dev szerver az alapértelmezett `5173` porton marad. A fejlesztői REST hívás a Vite `/api`
+  proxyján megy (egyetlen szabály, a `target` a `VITE_STREAM_ORIGIN` env változóból jön, `timeout`
+  mező nincs, mert nincs rá két független forrás), az SSE csatorna közvetlenül a backend originre
+  kapcsolódik, a proxyt megkerülve; a CORS engedély ezért változatlanul kizárólag a `STREAM_PATH`
+  útvonalra szól. Az `apps/web/src` alatt nincs port szám és origin literál, a `VITE_API_ORIGIN` és
+  a `VITE_STREAM_ORIGIN` kötelező, alapérték nélkül. Védelem: a `greppable-invariants` (8) és (13)
+  (SPEC-008 3., SPEC-006 O-1 és 5.7, SPEC-007 O-4, 14. szekció alább).
 - **Az elrendezés kártya méret konstansának egyetlen forrás szabálya.** A gráf szerkesztő
   csomópont kártyájának mérete (a `@dagrejs/dagre` elrendezés bemenete) egyetlen, mért
   konstansként áll a `graph-node-catalog` témában, amit a kártya CSS-e egy custom propertyn át

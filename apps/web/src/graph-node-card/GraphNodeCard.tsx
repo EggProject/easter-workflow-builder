@@ -168,9 +168,7 @@ export function GraphNodeCard(properties: Readonly<NodeProps<GraphNodeCardFlowNo
       <p className="graph-node-card__label">{workflowNode.label}</p>
       {runDecoration !== undefined && renderRunSummary(runDecoration)}
       {workflowNode.type === 'script' && (
-        <p className="graph-node-card__warning">
-          {`A motor a futtatáskor \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\` hibával elutasítja: nincs implementálva.`}
-        </p>
+        <p className="graph-node-card__warning">{`Nem futtatható: \`${SCRIPT_UNIMPLEMENTED_ERROR_CLASS}\``}</p>
       )}
       {outputHandles.map((handle, index) =>
         renderOutputHandle(handle, computeHandleTopPercent(index, outputHandles.length)),
