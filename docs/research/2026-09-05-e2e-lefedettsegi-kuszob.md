@@ -2108,3 +2108,35 @@ szerint (`apps/web/package.json`).
 **Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
 egy századdal magasabb küszöbbel (99.36 / 98.93 / 99.74 / 99.33) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`, exit 1).
+
+## 53. A PLAN-010 F4 utáni újramérés (2026-10-25, T-010-17 ... T-010-19): a `branches` és a `lines` küszöb FELFELÉ mozdul
+
+**Kiváltó ok.** A PLAN-010 F4 a szerkesztő fordítási ellenőrzését adja (`node-inspector`, `graph-editor`,
+új e2e). A mérés a `feat/spec-010-f4-szerkeszto` ágon készült, a `main` `5a0cb0c` bemergelése után.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint: `rm -rf
+apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt `bun x playwright test --shard=<i>/8`
+nyolc egymás utáni futásban, `flock /tmp/playwright-gep.lock` alatt, `workers: 3` mellett, majd
+`bun run coverage:e2e:report`. **Mind a nyolc shard zöld** (az 1. shard 82, a többi 81 teszt, összesen 649;
+bukó teszt nincs). A darabszámok a `nyc report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | `nyc` kimenet = új küszöb | Küszöb előtte (52.) | Fedetlen darab, 52. szekció -> most |
+| ---------- | --------------- | ------------------------- | ------------------- | ----------------------------------- |
+| statements | 2171 / 2185     | **99.35**                 | 99.35               | 14 -> 14                            |
+| branches   | 1036 / 1047     | **98.94**                 | 98.92               | 11 -> 11                            |
+| functions  | 757 / 759       | **99.73**                 | 99.73               | 2 -> 2                              |
+| lines      | 2086 / 2100     | **99.33**                 | 99.32               | 14 -> 14                            |
+
+**Levezetés.** Az 52. szekció mérése óta az összes és a fedett darabszám is nőtt, a fedetlen darab egyik
+metrikán sem változott. A fedetlen tételek ugyanazon az öt fájlon és soron állnak, mint az 52. szekcióban
+(a `coverage-e2e/lcov.info` nulla találatú sorai: `mount-app.tsx` 16, 21, 22; `read-frontend-config.ts`
+23, 29, 37, 41, 62, 67, 72, 77; `is-valid-connection.ts` 36; `perform-route-request.ts` 89;
+`use-stream-connection.ts` 202). Az F4 új termékkódja (`find-language-field-issues.ts`,
+`to-editor-sentence.ts`, a `validateGraphForSave` bővítése) teljesen fedett, a `to-editor-sentence.ts`
+holt ágai megszűntek. A ratchet FELFELÉ mozdul a `branches` és a `lines` metrikán, a másik kettő
+változatlan; az érték a mért, felfelé kerekítés nélkül, az `nyc` kimenete szerint
+(`apps/web/package.json`).
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
+egy századdal magasabb küszöbbel (99.36 / 98.95 / 99.74 / 99.34) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`).
