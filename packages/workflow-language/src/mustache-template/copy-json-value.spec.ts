@@ -1,3 +1,4 @@
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { describe, expect, it } from 'vitest';
 import { copyJsonValue } from './copy-json-value.ts';
 
@@ -24,6 +25,18 @@ const NON_JSON_VALUES: readonly (readonly [string, unknown])[] = [
   ['pozitív végtelen', Infinity],
   ['negatív végtelen', -Infinity],
 ];
+
+/**
+ * Az `n` szintű duplázott szerkezet: minden szinten `[x, x]`, ahol a két elem
+ * ugyanaz a tömb. A hossza lineáris, a fává bontása 2^n levelű.
+ */
+function doubled(n: number): unknown {
+  let value: unknown = 1;
+  for (let depth = 0; depth < n; depth += 1) {
+    value = [value, value];
+  }
+  return value;
+}
 
 describe('copyJsonValue', () => {
   it('a szöveg, a véges szám, a logikai érték és a null JSON érték', () => {
@@ -127,5 +140,49 @@ describe('copyJsonValue', () => {
     const copy = copyJsonValue(value);
     expect(JSON.stringify(copy)).toBe('{"__proto__":{"x":1}}');
     expect(Object.getPrototypeOf(copy)).toBe(Object.prototype);
+  });
+
+  it('a közös hivatkozás megmarad: ugyanarra a forrásra ugyanaz a másolat (O-16)', () => {
+    const shared = { k: [1] };
+    const copy = copyJsonValue({ a: shared, b: shared, c: [shared, shared] });
+    if (!isRecord(copy) || !Array.isArray(copy['c'])) {
+      throw new TypeError('ok objektum másolatot vártunk');
+    }
+    const first: unknown = copy['c'][0];
+    const second: unknown = copy['c'][1];
+    expect(copy['a']).toBe(copy['b']);
+    expect(copy['a']).toBe(first);
+    expect(first).toBe(second);
+    expect(first).not.toBe(shared);
+  });
+
+  it('két külön hívás nem osztozik a másolaton', () => {
+    const shared = [1];
+    expect(copyJsonValue(shared)).not.toBe(copyJsonValue(shared));
+  });
+
+  // Regresszió (O-16, research 10.2): a duplázott szerkezetet a másolás régen fává
+  // bontotta, ami a szint számával exponenciális időt és memóriát jelentett. A teszt
+  // nem időt mér: a szerkezetet állítja, hogy minden szinten a két testvér ugyanaz a
+  // tömb (a fává bontás minden szinten két külön másolatot adna), és a kis n állítás a
+  // régi kódon már bukik, mielőtt a nagy n másolása elindulna.
+  it.each([3, 200])('a duplázott szerkezet másolása lineáris, a testvérek azonosak (n = %i)', (n) => {
+    let level: unknown = copyJsonValue(doubled(n));
+    for (let depth = 0; depth < n; depth += 1) {
+      if (!Array.isArray(level)) {
+        throw new TypeError(`a(z) ${String(depth)}. szinten listát vártunk`);
+      }
+      expect(level).toHaveLength(2);
+      expect(level[0]).toBe(level[1]);
+      level = level[0];
+    }
+    expect(level).toBe(1);
+  });
+
+  it('a közös hivatkozás mellett a körkörös hivatkozást is felismeri, és a hiba nem kerül a gyorsítótárba', () => {
+    const loop: Record<string, unknown> = {};
+    loop['self'] = loop;
+    expect(copyJsonValue([loop, loop])).toBeUndefined();
+    expect(copyJsonValue({ a: [loop], b: [loop] })).toBeUndefined();
   });
 });

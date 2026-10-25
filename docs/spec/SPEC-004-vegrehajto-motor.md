@@ -380,6 +380,15 @@ felülírja a jelen táblázat hibaágai mögötti, a kód SPEC-010 előtti áll
 értékhez sem illeszkedik ("nincs egyezés"); ekkor a hiányzó bekötés `branch_no_matching_edge`
 hibát ad (user döntés, SPEC-010 O-6, 2026-09-23).
 
+**A `fan_out` kimenet tárolási hibája lépés szintű `expression_evaluation_failed` (user döntés
+2026-10-25, SPEC-010 O-15 kiegészítése).** Ha a normalizált `itemsExpression` eredmény tárolás
+közben szerializálhatatlanul nagy (a `step_run.output` `JSON.stringify` hívása a közös hivatkozást
+kibontja, és `RangeError` kivételt dob, amit a `db` tranzakciója `Outcome` hibaágra visz), a lépés
+az `expression_evaluation_failed` osztállyal bukik, mint bármely más kifejezés hiba: a lépés sora
+lezárul, és az `onUnhandledError` és az `error_handler` ugyanúgy működik. A motornak meg kell
+különböztetnie a tárolási hibát a `db` többi hibaágától, hogy ne a futás szintű
+`run_execution_failed` osztály legyen belőle. A bekötés a PLAN-010 T-010-13 lépésében történik.
+
 ### 5.2 Az `agent_step` életciklusa
 
 1. **Hely kérése a párhuzamossági szabályozótól** (7. szekció). A lépés addig `pending` állapotban áll, amíg helyet nem kap; a `markStepRunning` csak a hely megszerzése után fut le, tehát a `running` állapot azt jelenti, hogy a lépés ténylegesen dolgozik.

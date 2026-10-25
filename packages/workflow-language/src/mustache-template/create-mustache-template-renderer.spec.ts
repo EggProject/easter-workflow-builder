@@ -1,5 +1,5 @@
 import Mustache from 'mustache';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createMustacheTemplateRenderer } from './create-mustache-template-renderer.ts';
 
 // A teszt a valódi `mustache@4.2.0` könyvtáron fut, mock nélkül. A minták a PLAN-010
@@ -322,6 +322,57 @@ describe('createMustacheTemplateRenderer: mélyen szigorú kiírás (SPEC-010 6.
       kind: 'ok',
       value: 'x',
     });
+  });
+});
+
+/**
+ * Az `n` szintű duplázott érték: minden szinten `[x, x]`, ahol a két elem ugyanaz
+ * a tömb. A szerkezet lineáris, a `JSON.stringify` kibontása 2^n hosszú.
+ */
+function doubled(n: number): unknown {
+  let value: unknown = 1;
+  for (let depth = 0; depth < n; depth += 1) {
+    value = [value, value];
+  }
+  return value;
+}
+
+/**
+ * A `doubled` kibontott JSON szövege, szöveg duplázással (lineáris lépésszám).
+ */
+function doubledText(n: number): string {
+  let text = '1';
+  for (let depth = 0; depth < n; depth += 1) {
+    text = `[${text},${text}]`;
+  }
+  return text;
+}
+
+describe('createMustacheTemplateRenderer: közös hivatkozású kiírás (SPEC-010 6.5, O-16, user döntés 2026-10-25)', () => {
+  const renderer = createMustacheTemplateRenderer();
+
+  it('a duplázott érték kiírása a kibontott JSON szöveg, a közös hivatkozás nem hiba', () => {
+    for (const n of [0, 1, 3, 16]) {
+      expect(renderer.render('{{item}}', { item: doubled(n) })).toStrictEqual({ kind: 'ok', value: doubledText(n) });
+    }
+  });
+
+  // Regresszió: a másolás régen fává bontotta a duplázott értéket, n = 200-nál ez soha
+  // nem ért volna véget. A szöveggé alakítás szerializálását itt kicseréljük, mert a
+  // valódi kibontás n = 27-nél `RangeError`-ig 1,8 s és 313 MB (research 10.2), ami
+  // terhelés alatt az 5000 ms-os korlát közelében járna; a `RangeError` kivételt a
+  // valódi könyvtár dobja ugyanilyen alakban, az elkapás útja azonos.
+  it('a túl nagy kiírás RangeError kivétele Outcome hibaág, a tartalék mondattal, kivétel nélkül', () => {
+    const stringify = vi.spyOn(JSON, 'stringify').mockImplementationOnce(() => {
+      throw new RangeError('Invalid string length');
+    });
+    try {
+      const outcome = renderer.render('a {{item}} b', { item: doubled(200) });
+      expect(outcome).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
+      expect(stringify).toHaveBeenCalledTimes(1);
+    } finally {
+      stringify.mockRestore();
+    }
   });
 });
 

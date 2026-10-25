@@ -10,7 +10,12 @@ import { copyJsonValue } from './copy-json-value.ts';
  * A vizsgálat (`copyJsonValue`) a tömb elemeire és az objektum mezőire is
  * rekurzívan kiterjed, a körkörös hivatkozást is elutasítja, és a bejárt adat
  * tiszta másolatát adja: a `JSON.stringify` ezt kapja, nem a bemenetet, ezért
- * nem dobhat kivételt, és a kiírt szöveg a vizsgált adatból áll.
+ * a kiírt szöveg a vizsgált adatból áll, és egy `toJSON` sem futhat le.
+ *
+ * A másolat közös hivatkozása megmarad (user döntés 2026-10-25, O-16), a
+ * `JSON.stringify` viszont újra kibontja: a szöveg mérete a szerkezethez képest
+ * exponenciálisan nőhet, a legnagyobb szöveghossznál `RangeError` kivétellel.
+ * Ezt a hívó (`render`) kapja el, és hibaágra viszi (6.5).
  */
 export function toText(value: unknown): string | undefined {
   const copy = copyJsonValue(value);

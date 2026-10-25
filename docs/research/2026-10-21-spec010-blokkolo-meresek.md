@@ -685,13 +685,44 @@ tranzakció visszagörgetve). A motorban a hibaág a `fan_out` végrehajtóból
 `runSchedulingLoop` útján az `abortRun` hívásig jut, ami a futást `run_execution_failed`
 osztállyal zárja; ezt a láncot motor futással nem mértük, csak a forrásból olvastuk.
 
-**Ugyanez a minta a Mustache kiírásban (mérve, nem javítva).** A `copyJsonValue` a közös
-hivatkozást nem memoizálja, tehát egy közös hivatkozású érték (`{{item}}`, ha az `item` a fenti
-`fan_out` eleme) fává bomlik. A `render('{{item}}', { item })` mérve: n = 16-nál 70 ms (heap 32
-MB), n = 18-nál 238 ms (47 MB), n = 20-nál 883 ms (168 MB), n = 22-nél 3685 ms (560 MB); a
-növekedés exponenciális, nagyobb n-re nem mértük. A `fan_out` a címke sablont
-(`branchLabelTemplate`) a kimenet tárolása előtt rendereli, tehát egy `{{item}}` címke sablon ezen
-az úton a tárolás előtt bontaná ki az értéket.
+**Ugyanez a minta a Mustache kiírásban (mérve; javítva, user döntés 2026-10-25).** A `copyJsonValue`
+a közös hivatkozást nem memoizálta, tehát egy közös hivatkozású érték (`{{item}}`, ha az `item` a
+fenti `fan_out` eleme) fává bomlott. A `render('{{item}}', { item })` mérve a memoizálás nélküli
+kódon: n = 16-nál 70 ms (heap 32 MB), n = 18-nál 238 ms (47 MB), n = 20-nál 883 ms (168 MB),
+n = 22-nél 3685 ms (560 MB); a növekedés exponenciális, nagyobb n-re nem mértük. A `fan_out` a
+címke sablont (`branchLabelTemplate`) a kimenet tárolása előtt rendereli, tehát egy `{{item}}` címke
+sablon ezen az úton a tárolás előtt bontaná ki az értéket.
+
+**A user döntése (2026-10-25): "közös hivatkozás + elkapott hiba", az O-15 mintájára** (SPEC-010
+O-16). A `copyJsonValue` memoizál: egy híváson belül ugyanarra a forrás tömbre vagy objektumra
+ugyanazt a másolatot adja vissza; a gyorsítótárba csak a kész másolat kerül, a körkörös hivatkozás
+felismerése a gyökértől vezető láncon marad (a hibaág a nevet megnevezi). Mérés a javított csomagon
+(a valódi `createMustacheTemplateRenderer`, `render('{{item}}', { item })`, `item` az n szintű `[x, x]`
+duplázás, egy futás, Node 26.7.0, 4 mag, 3,9 GB memória):
+
+| n   | `render`                           | kiírt szöveg hossza | idő (ms) | heap utána (MB) |
+| --- | ---------------------------------- | ------------------- | -------- | --------------- |
+| 16  | `ok`                               | 262 141             | 1        | 9               |
+| 18  | `ok`                               | 1 048 573           | 4        | 11              |
+| 20  | `ok`                               | 4 194 301           | 14       | 15              |
+| 22  | `ok`                               | 16 777 213          | 67       | 32              |
+| 26  | `ok`                               | 268 435 453         | 902      | 300             |
+| 27  | hiba (`a sablon nem renderelhető`) | nincs               | 1705     | 300             |
+
+Az n = 27-nél a `JSON.stringify` `RangeError: Invalid string length` kivételt dob, amit a `render`
+`try` ága `Outcome` hibaágra visz, a közös tartalék mondattal (`describeTemplateError`: a `RangeError`
+üzenete egyik elemzett előtagra sem illik); a folyamat nem áll le. A szerializálás önmagában (a
+másolat nélkül, `JSON.stringify` egy n szintű duplázott értéken, ugyanazon a gépen): n = 26-nál 979 ms,
+n = 27-nél `RangeError` 1787 ms után, n = 28-nál `RangeError` 3525 ms után (314 MB RSS); n = 40-nél a
+mérő folyamatot az operációs rendszer leállította (`Killed`). **Az ok nem ellenőrzött:** az n = 27 és
+n = 28 idejének megkétszerződése arra utal, hogy a bejárás a szöveghossz korlátja után is
+folytatódik, de ezt forrásból nem igazoltuk. **Ezért** a `RangeError` ágat a regressziós teszt nem a
+valódi kibontással váltja ki (n = 27-nél mérve 1,7 és 1,8 s, a nagyobb n ideje és memóriája tovább
+duplázódik, n = 40-nél a folyamat leállt), hanem a `JSON.stringify` első hívását cseréli egy
+`RangeError` kivételt dobóra, miközben az n = 200 szintű duplázott érték másolása a valódi kódon
+fut; ez a másolás a memoizálás nélküli kódon nem ért volna véget (2^200 levél). A teljes szerkezetre állító teszt a `copy-json-value.spec.ts`-ben a másolat minden
+szintjén `toBe` egyezést állít a két testvérre, n = 3 és n = 200 értékre; a memoizálás nélküli
+kódon az n = 3 eset is bukik (a testvérek egyenlők, de nem azonosak).
 
 Mellékmérés: a `["a"]` + n darab `.map(x, x + x)` kifejezés egyetlen, 2^n hosszú szöveget ad; a
 könyvtár ezt rope szövegként tartja (n = 28-nál 268 435 456 karakter, a folyamat RSS értéke 87
