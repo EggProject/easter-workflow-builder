@@ -299,6 +299,24 @@ describe('createMustacheTemplateRenderer: mélyen szigorú kiírás (SPEC-010 6.
     }
   });
 
+  it('a Proxy get csapdája által adott toJSON nem írja felül a vizsgált adatot (review J1)', () => {
+    const v: unknown = new Proxy(
+      { a: 1 },
+      {
+        get(target, key) {
+          if (key === 'toJSON') {
+            return () => 'HAMIS';
+          }
+          const fallback: unknown = Reflect.get(target, key);
+          return fallback;
+        },
+      },
+    );
+    for (const template of TAGS) {
+      expect(renderer.render(template, { input: { v } })).toStrictEqual({ kind: 'ok', value: 'a {"a":1} b' });
+    }
+  });
+
   it('a szakasz a beágyazott nem JSON értéken is a könyvtár útján marad, hiba nélkül', () => {
     expect(renderer.render('{{#input.v}}x{{/input.v}}', { input: { v: [new Map()] } })).toStrictEqual({
       kind: 'ok',

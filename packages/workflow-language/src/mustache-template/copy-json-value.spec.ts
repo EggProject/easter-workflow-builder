@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isJsonValue } from './is-json-value.ts';
+import { copyJsonValue } from './copy-json-value.ts';
 
 // A `unicorn/no-null` miatt a JSON `null` értéket elemzés adja.
 const jsonNull: unknown = JSON.parse('null');
@@ -25,34 +25,37 @@ const NON_JSON_VALUES: readonly (readonly [string, unknown])[] = [
   ['negatív végtelen', -Infinity],
 ];
 
-describe('isJsonValue', () => {
+describe('copyJsonValue', () => {
   it('a szöveg, a véges szám, a logikai érték és a null JSON érték', () => {
     for (const value of ['', 'a<b>', 0, -0.5, 42, true, false, jsonNull]) {
-      expect(isJsonValue(value)).toBe(true);
+      expect(copyJsonValue(value)).toBe(value);
     }
   });
 
   it('a tömb és a sima objektum JSON érték, a null prototípusú is', () => {
-    expect(isJsonValue([])).toBe(true);
-    expect(isJsonValue({})).toBe(true);
+    expect(copyJsonValue([])).toStrictEqual([]);
+    expect(copyJsonValue({})).toStrictEqual({});
     const nullPrototype: unknown = Object.assign(Object.create(null), { a: 1 });
-    expect(isJsonValue(nullPrototype)).toBe(true);
+    expect(copyJsonValue(nullPrototype)).toStrictEqual({ a: 1 });
   });
 
   it('a mélyen beágyazott tiszta JSON átmegy', () => {
-    expect(isJsonValue({ a: [1, { b: ['x', jsonNull, [true, { c: { d: [0.5] } }]] }], e: {} })).toBe(true);
+    const value = { a: [1, { b: ['x', jsonNull, [true, { c: { d: [0.5] } }]] }], e: {} };
+    const copy = copyJsonValue(value);
+    expect(copy).toStrictEqual(value);
+    expect(copy).not.toBe(value);
   });
 
   it.each(NON_JSON_VALUES)('a(z) %s nem JSON érték', (_name, value) => {
-    expect(isJsonValue(value)).toBe(false);
+    expect(copyJsonValue(value)).toBeUndefined();
   });
 
   it.each(NON_JSON_VALUES)(
     'a beágyazott %s a tömbben, az objektumban és több szint mélyen sem JSON',
     (_name, value) => {
-      expect(isJsonValue([value])).toBe(false);
-      expect(isJsonValue({ k: value })).toBe(false);
-      expect(isJsonValue({ a: [1, { b: [[value]] }] })).toBe(false);
+      expect(copyJsonValue([value])).toBeUndefined();
+      expect(copyJsonValue({ k: value })).toBeUndefined();
+      expect(copyJsonValue({ a: [1, { b: [[value]] }] })).toBeUndefined();
     },
   );
 
@@ -64,14 +67,14 @@ describe('isJsonValue', () => {
         return 'x';
       },
     };
-    expect(isJsonValue(value)).toBe(false);
+    expect(copyJsonValue(value)).toBeUndefined();
     expect(getterCalls).toBe(0);
   });
 
   it('a tömb lyuka nem JSON érték', () => {
     const sparse: unknown[] = [1];
     sparse[2] = 3;
-    expect(isJsonValue(sparse)).toBe(false);
+    expect(copyJsonValue(sparse)).toBeUndefined();
   });
 
   it('a körkörös sima objektum és tömb nem JSON érték, közvetve sem', () => {
@@ -84,13 +87,45 @@ describe('isJsonValue', () => {
     if (typeof child === 'object' && child !== null) {
       Object.assign(child, { up: indirect });
     }
-    expect(isJsonValue(circular)).toBe(false);
-    expect(isJsonValue(loop)).toBe(false);
-    expect(isJsonValue(indirect)).toBe(false);
+    expect(copyJsonValue(circular)).toBeUndefined();
+    expect(copyJsonValue(loop)).toBeUndefined();
+    expect(copyJsonValue(indirect)).toBeUndefined();
   });
 
   it('ugyanaz a konténer két testvér ágon nem körkörös', () => {
     const shared = { k: [1] };
-    expect(isJsonValue({ a: shared, b: shared, c: [shared, shared] })).toBe(true);
+    expect(copyJsonValue({ a: shared, b: shared, c: [shared, shared] })).toStrictEqual({
+      a: { k: [1] },
+      b: { k: [1] },
+      c: [{ k: [1] }, { k: [1] }],
+    });
+  });
+
+  it('a Proxy get csapdája nem jut a másolatba: a másolat a tulajdonság leíró adata (review J1)', () => {
+    const lying: unknown = new Proxy(
+      { a: 1, l: [2] },
+      {
+        get(target, key) {
+          if (key === 'toJSON') {
+            return () => 'HAMIS';
+          }
+          if (key === 'a') {
+            return 999;
+          }
+          const fallback: unknown = Reflect.get(target, key);
+          return fallback;
+        },
+      },
+    );
+    const copy = copyJsonValue(lying);
+    expect(copy).toStrictEqual({ a: 1, l: [2] });
+    expect(JSON.stringify(copy)).toBe('{"a":1,"l":[2]}');
+  });
+
+  it('a __proto__ saját kulcs a másolatban is saját adat kulcs, nem prototípus', () => {
+    const value: unknown = JSON.parse('{"__proto__":{"x":1}}');
+    const copy = copyJsonValue(value);
+    expect(JSON.stringify(copy)).toBe('{"__proto__":{"x":1}}');
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype);
   });
 });

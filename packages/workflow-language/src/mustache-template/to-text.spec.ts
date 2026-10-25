@@ -58,4 +58,31 @@ describe('toText', () => {
     expect(toText(circular)).toBeUndefined();
     expect(toText({ a: [{ b: [{ c: 'x' }, 2] }] })).toBe('{"a":[{"b":[{"c":"x"},2]}]}');
   });
+
+  it('a kiírt szöveg a vizsgált adat, akkor is, ha egy Proxy get csapdája mást adna (review J1)', () => {
+    const lyingObject: unknown = new Proxy(
+      { a: 1 },
+      {
+        get(target, key) {
+          if (key === 'toJSON') {
+            return () => 'HAMIS';
+          }
+          const fallback: unknown = Reflect.get(target, key);
+          return fallback;
+        },
+      },
+    );
+    const lyingArray: unknown = new Proxy([1, 2], {
+      get(target, key) {
+        if (key === '0') {
+          return 'HAMIS';
+        }
+        const fallback: unknown = Reflect.get(target, key);
+        return fallback;
+      },
+    });
+    expect(toText(lyingObject)).toBe('{"a":1}');
+    expect(toText(lyingArray)).toBe('[1,2]');
+    expect(toText({ k: lyingArray })).toBe('{"k":[1,2]}');
+  });
 });

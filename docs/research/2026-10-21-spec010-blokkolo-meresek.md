@@ -594,3 +594,70 @@ A "megszakításnál és szabályos leállásnál a vizsgálat nem fut" részt k
 | 14  | Az O-12: marad a mai szabály (SPEC-004 6.2), a user a "csak körszám" opciót választotta.                                                                                                                                                                                                | SPEC-010 7.5, 15. (O-12)                                            |
 | 15  | A `graph_cycle_detected` felhasználói mondata általánosabb: "A gráf olyan kört tartalmaz, amely nem egyetlen Ciklus csomóponton keresztül indul." (PR #55 review).                                                                                                                      | SPEC-007 8.4; `apps/web` `protocol-error-message`                   |
 | 16  | A `loop` kilépő ágáról ugyanabba a `loop`-ba visszatérő gráfot a futás indítási ellenőrzés elutasítja, most javítjuk (PR #55 review, 8.7).                                                                                                                                              | SPEC-004 4.6, 17. (10)                                              |
+
+## 10. PR #56 review: a Mustache kiírás és a CEL közös hivatkozás (2026-10-25)
+
+Saját, eldobható próbák a repón kívül, a csomag forrását importálva (Node v26.7.0, aarch64, 4
+vCPU, 3906 MB memória, a V8 `heap_size_limit` értéke kapcsoló nélkül 2149 MB).
+
+### 10.1 J1: a `JSON.stringify` mást írt ki, mint amit a vizsgálat bejárt (javítva)
+
+A vizsgálat a mezőket tulajdonság leírón át olvasta, a `JSON.stringify` viszont a `[[Get]]` úton
+(és a `toJSON` függvényt is így keresi). A saját `toJSON` függvény mező és getter már a vizsgálaton
+bukott, a null prototípusú objektum nem örököl. Átment viszont, és mást írt ki:
+
+| Bemenet                                                        | Vizsgálat | Kiírt szöveg (javítás előtt)  |
+| -------------------------------------------------------------- | --------- | ----------------------------- |
+| `Proxy` `{ a: 1 }` körül, `get` csapda `toJSON` és `a` kulcsra | átment    | `"HAMIS"`                     |
+| `Proxy` `[1, 2]` körül, `get` csapda a `0` indexre             | átment    | `["HAMIS",2]`                 |
+| `Object.prototype.toJSON` globális felülírása (szennyezés)     | átment    | a felülíró függvény eredménye |
+| `Array.prototype.toJSON` globális felülírása, beágyazva        | átment    | `{"l":"SZENNYEZETT_TOMB"}`    |
+
+A javítás: a vizsgálat (`copyJsonValue`) a bejárt adat tiszta másolatát építi, és a
+`JSON.stringify` azt kapja; a két `Proxy` sor utána a vizsgált adatot írja ki (`{"a":1}`,
+`[1,2]`), és a regressziós tesztek a régi kiíráson bukik. A globális prototípus felülírása nem
+bemenet, hanem a futtatókörnyezet módosítása; a másolat új tömbjei és objektumai ettől
+változatlanul örökölnek, tehát erre a javítás nem vonatkozik.
+
+### 10.2 J2: a közös hivatkozású CEL eredmény normalizálása (mérve, nem javítva)
+
+A `[1]` + n darab `.map(x, [x, x])` kifejezés hossza lineáris (n = 22-nél 333 karakter), a
+könyvtár eredménye közös hivatkozású szerkezet (a két testvér ugyanaz a tömb), és a kiértékelés a
+könyvtárban 1 ms alatt marad. A `normalizeCelResult` memoizálás nélkül fává bontja:
+
+| n   | `evaluate` (ms) | JSON szöveg hossza | heap utána (MB) |
+| --- | --------------- | ------------------ | --------------- |
+| 18  | 34              | 1 048 575          | 61              |
+| 20  | 127             | 4 194 303          | 109             |
+| 22  | 556             | 16 777 215         | 441             |
+| 23  | 1083            | nem mérve          | maxRSS 671      |
+| 24  | 2273            | nem mérve          | maxRSS 1206     |
+| 25  | folyamat leáll  | nincs              | maxRSS 2092     |
+
+n = 25-nél a folyamat `FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed -
+JavaScript heap out of memory` üzenettel, 6-os szignállal áll le: nem `Outcome` hibaág, a `try`
+nem fogja.
+
+Memoizálással (próba: a már normalizált konténer visszaadása egy `Map` alapján) a normalizálás
+n = 200-nál is 1 ms alatt fut, és a közös hivatkozás megmarad. A kimenet viszont a motor és a
+`db` útján `JSON.stringify` hívást kap (`step_run.output`, M-106; `run_event.payload`), ami a
+közös hivatkozást újra kibontja: n = 26-nál 268 435 455 karakteres szöveg 890 ms alatt, n = 27-nél
+`RangeError: Invalid string length` (elkapható kivétel, nem leállás). A memoizálás tehát a
+normalizálás leállását megszünteti, a tárolás méretét nem.
+
+Mellékmérés: a `["a"]` + n darab `.map(x, x + x)` kifejezés egyetlen, 2^n hosszú szöveget ad; a
+könyvtár ezt rope szövegként tartja (n = 28-nál 268 435 456 karakter, a folyamat RSS értéke 87
+MB), n = 29-nél pedig a közös hibamondatot adja (`a kifejezés nem dolgozható fel`), tehát a
+szöveg hosszának határa `Outcome` hibaágon jön.
+
+### 10.3 J3: a Mustache greppes invariánsok destrukturálással megkerülhetők voltak (javítva)
+
+Egy nem commitolt termékkód fájlba injektált `const { render } = Mustache`, `const {
+templateCache } = Mustache` plusz `templateCache?.clear()`, `const { escape } = Mustache`, és a
+saját `Writer` destrukturált `render` hívása `call`-lal, `partials` argumentummal: az akkori 18
+teszt mind zöld maradt. A javítás után a `Mustache` azonosító csak a `Writer`, `Context` és
+`TemplateCache` tagra mutathat, a `render` név csak metódushívás, tulajdonság vagy metódus
+definíció lehet; a fenti öt, plusz az álnév (`const M = Mustache`), a közvetlen `Mustache.render`,
+`Mustache.escape =`, `Mustache['parse']`, `writer.render.call`, a harmadik argumentum és a
+`writer.render?.(` injekció egyenként bukik, a meglévő kód zöld. A futásidejű összerakás
+(számított kulcs, a név szövegből építése) továbbra is elfogadott korlát.

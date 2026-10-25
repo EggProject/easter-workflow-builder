@@ -12,10 +12,14 @@
 //      hivatkozás (29.);
 //  (4) a termékkód a `mustache` csomagot kizárólag `import Mustache from 'mustache'`
 //      alakban importálja, hogy az (5) és (6) minták a könyvtár minden elérését lássák;
-//  (5) a termékkód nem hívja a globális `Mustache.render` és `Mustache.parse`
-//      függvényt, nem ír a `Mustache.templateCache` és a `Mustache.escape` értékébe
-//      (11., 63.);
-//  (6) a `render` hívás nem ad `partials` (harmadik) argumentumot (30.);
+//  (5) a `Mustache` azonosító a termékkódban kizárólag a `Mustache.Writer`,
+//      `Mustache.Context` és `Mustache.TemplateCache` alakban állhat, tehát a globális
+//      `render`, `parse`, `templateCache` és `escape` semmilyen alakban (hívás,
+//      értékadás, szögletes zárójel, destrukturálás, álnév) nem érhető el (11., 63.);
+//  (6) a `render` név a termékkódban kizárólag metódushívásként (`.render(`), a
+//      `MustacheTemplateRenderer` tulajdonságaként vagy metódus definícióként állhat,
+//      és a hívás nem ad `partials` (harmadik) argumentumot (30.); a destrukturált,
+//      álnéven vagy `call`/`apply`/`bind` útján hívott `render` így bukik;
 //  (7) a barrel csak nevesített újraexportot tartalmaz, és a két könyvtárból nem
 //      exportál sem típust, sem értéket (3.).
 //
@@ -64,6 +68,11 @@ const NODE_IMPORT_PATTERN = new RegExp(`${MODULE_SPECIFIER_PREFIX}['"](node:[^'"
  * A termékkódban egyetlen megengedett `mustache` import alak (4).
  */
 const ALLOWED_MUSTACHE_IMPORT = /import\s+Mustache\s+from\s*'mustache'\s*;?/g;
+/**
+ * A `Mustache` azonosító egyetlen megengedett használata a termékkódban (5): az
+ * osztály bázis (`Writer`, `Context`) és a gyorsítótár típusa (`TemplateCache`).
+ */
+const ALLOWED_MUSTACHE_MEMBER = /^\s*\.\s*(?:Writer|Context|TemplateCache)\b/;
 
 interface SourceFile {
   readonly relativePath: string;
@@ -206,34 +215,47 @@ describe('a Mustache modul szintű állapotához a csomag nem nyúl (SPEC-010 16
     expect(offendersOf(remaining, /['"]mustache['"]/g)).toStrictEqual([]);
   });
 
-  it.each([
-    ['Mustache.render hívás', /\bMustache\s*\.\s*render\s*\(/g],
-    ['Mustache.parse hívás', /\bMustache\s*\.\s*parse\s*\(/g],
-    [
-      'Mustache.templateCache értékadás vagy módosítás',
-      /\bMustache\s*\.\s*templateCache\s*(?:=(?!=)|\??\.\s*(?:set|clear|delete)\s*\()/g,
-    ],
-    ['Mustache.escape értékadás', /\bMustache\s*\.\s*escape\s*=(?!=)/g],
-    [
-      'szögletes zárójeles hozzáférés a render, parse, templateCache, escape tagra',
-      /\bMustache\s*\[\s*['"`](?:render|parse|templateCache|escape)['"`]\s*\]/g,
-    ],
-  ])('nincs %s', (_name, pattern) => {
-    expect(offendersOf(productFiles(), pattern)).toStrictEqual([]);
-  });
-
-  it('a render hívás legfeljebb két argumentumot kap, partials nélkül', () => {
-    const calls = productFiles().flatMap((file) =>
+  it('a Mustache azonosító kizárólag a Writer, Context és TemplateCache tagra mutat', () => {
+    const files = productFiles().map((file) => ({
+      ...file,
+      content: file.content.replaceAll(ALLOWED_MUSTACHE_IMPORT, ''),
+    }));
+    const usages = files.flatMap((file) =>
       file.content
-        .matchAll(/\.render\(/g)
+        .matchAll(/\bMustache\b/g)
         .map((match) => ({
           file: file.relativePath,
-          argumentCount: topLevelArgumentCount(file.content, match.index + match[0].length),
+          rest: file.content.slice(match.index + match[0].length, match.index + match[0].length + 40),
         }))
         .toArray(),
     );
-    expect(calls.length).toBeGreaterThan(0);
-    expect(calls.filter((call) => call.argumentCount > 2)).toStrictEqual([]);
+    expect(usages.length).toBeGreaterThan(0);
+    expect(usages.filter((usage) => !ALLOWED_MUSTACHE_MEMBER.test(usage.rest))).toStrictEqual([]);
+  });
+
+  it('a render név csak metódushívás, tulajdonság vagy metódus definíció, a hívás partials nélkül', () => {
+    const occurrences = productFiles().flatMap((file) =>
+      file.content
+        .matchAll(/\brender\b/g)
+        .map((match) => {
+          const before = file.content.slice(0, match.index);
+          const after = file.content.slice(match.index + match[0].length);
+          const isCall = before.endsWith('.') && after.startsWith('(');
+          return {
+            file: file.relativePath,
+            isCall,
+            isAllowed:
+              isCall ||
+              (/\breadonly\s+$/.test(before) && /^\s*:/.test(after)) ||
+              (/(?:^|\n)[ \t]*$/.test(before) && /^\([^)]*\)\s*\{/.test(after)),
+            argumentCount: isCall ? topLevelArgumentCount(file.content, match.index + match[0].length + 1) : 0,
+          };
+        })
+        .toArray(),
+    );
+    expect(occurrences.filter((occurrence) => occurrence.isCall).length).toBeGreaterThan(0);
+    expect(occurrences.filter((occurrence) => !occurrence.isAllowed)).toStrictEqual([]);
+    expect(occurrences.filter((occurrence) => occurrence.argumentCount > 2)).toStrictEqual([]);
   });
 });
 

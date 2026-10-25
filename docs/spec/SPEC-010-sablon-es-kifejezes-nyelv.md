@@ -444,8 +444,11 @@ getteres tulajdonság szintén nem JSON adat; a mezőket a tulajdonság leíró 
 vizsgálat alatt sem fut le (6.6 mintája). **A körkörös hivatkozás (sima objektum vagy tömb, amely
 közvetve vagy közvetlenül önmagát tartalmazza) is ugyanezt a hibát adja**, mert nem ábrázolható
 JSON-ban; a felismerést a gyökértől az aktuális értékig vezető lánc adja, ezért ugyanaz a
-konténer két testvér ágon (közös hivatkozás) nem körkörös, és átmegy. A `JSON.stringify` így csak
-olyan értéket kap, aminél nem dobhat kivételt; a közös tartalék mondat (`a sablon nem
+konténer két testvér ágon (közös hivatkozás) nem körkörös, és átmegy. A vizsgálat a bejárt adat
+tiszta másolatát építi (új tömbök és sima objektumok a tulajdonság leírók értékéből), és a
+`JSON.stringify` ezt kapja, nem a bemenetet: így csak olyan értéket kap, aminél nem dobhat
+kivételt, és a kiírt szöveg pontosan a vizsgált adat, akkor is, ha a bemenet egy `Proxy`, aminek a
+`get` csapdája mást adna (például egy `toJSON` függvényt; PR #56 review, research `2026-10-21-spec010-blokkolo-meresek.md` 10.1); a közös tartalék mondat (`a sablon nem
 renderelhető`, `template_render_failed`) már csak az előre nem látott kivételt fedi (például egy
 vizsgálat közben dobó `Proxy`), a körkörös hivatkozást és a beágyazott `BigInt` értéket nem. A mi
 kontextusunkon a beágyazott hiba ettől függetlenül nem fordul elő: a `RunContext` adata a
