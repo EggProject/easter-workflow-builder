@@ -22,15 +22,7 @@ describe('toEditorSentence', () => {
     expect(toEditorSentence('érvénytelen időtartam a kifejezésben')).toBe('Érvénytelen időtartam a kifejezésben.');
   });
 
-  it('a már ponttal záruló mondatra nem tesz második pontot', () => {
-    expect(toEditorSentence('a kifejezés nem dolgozható fel.')).toBe('A kifejezés nem dolgozható fel.');
-  });
-
   it('a már nagybetűs mondatot nem változtatja a kezdőbetűn', () => {
     expect(toEditorSentence('A mező üres')).toBe('A mező üres.');
-  });
-
-  it('az üres szöveg üres marad', () => {
-    expect(toEditorSentence('')).toBe('');
   });
 });

@@ -47,7 +47,7 @@ function runContext(overrides: Readonly<Record<string, unknown>> = {}): Record<s
 }
 
 function missing(name: string): { readonly kind: 'error'; readonly message: string } {
-  return { kind: 'error', message: `hiányzó név a sablonban: ${name}` };
+  return { kind: 'error', message: `hiányzó név a sablonban: "${name}"` };
 }
 
 describe('createMustacheTemplateRenderer: escape és szöveggé alakítás (SPEC-010 6.1, 6.5)', () => {
@@ -191,7 +191,7 @@ class Szerzo {
 }
 
 function nonJson(name: string): { readonly kind: 'error'; readonly message: string } {
-  return { kind: 'error', message: `nem JSON értékre mutató név a sablonban: ${name}` };
+  return { kind: 'error', message: `nem JSON értékre mutató név a sablonban: "${name}"` };
 }
 
 // Saját mező nélküli objektum, aminek a prototípusa egy másik sima objektum.
