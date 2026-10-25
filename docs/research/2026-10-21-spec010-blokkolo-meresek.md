@@ -619,7 +619,7 @@ A javítás: a vizsgálat (`copyJsonValue`) a bejárt adat tiszta másolatát é
 bemenet, hanem a futtatókörnyezet módosítása; a másolat új tömbjei és objektumai ettől
 változatlanul örökölnek, tehát erre a javítás nem vonatkozik.
 
-### 10.2 J2: a közös hivatkozású CEL eredmény normalizálása (mérve, nem javítva)
+### 10.2 J2: a közös hivatkozású CEL eredmény normalizálása (mérve; a normalizálás javítva, user döntés 2026-10-25)
 
 A `[1]` + n darab `.map(x, [x, x])` kifejezés hossza lineáris (n = 22-nél 333 karakter), a
 könyvtár eredménye közös hivatkozású szerkezet (a két testvér ugyanaz a tömb), és a kiértékelés a
@@ -644,6 +644,54 @@ n = 200-nál is 1 ms alatt fut, és a közös hivatkozás megmarad. A kimenet vi
 közös hivatkozást újra kibontja: n = 26-nál 268 435 455 karakteres szöveg 890 ms alatt, n = 27-nél
 `RangeError: Invalid string length` (elkapható kivétel, nem leállás). A memoizálás tehát a
 normalizálás leállását megszünteti, a tárolás méretét nem.
+
+**A user döntése (2026-10-25): "közös hivatkozás + elkapott hiba"** (SPEC-010 O-15). A
+`normalizeCelResult` memoizál: egy híváson belül ugyanarra a forrás tömbre vagy objektumra ugyanazt
+a normalizált értéket adja, a gyorsítótárba csak a kész érték kerül. Mérés a javított csomagon
+(a valódi `createCelExpressionEvaluator`, ugyanazon a gépen, egy futás):
+
+| n    | kifejezés hossza | `evaluate`                                                  | idő (ms) | szerkezet mélysége |
+| ---- | ---------------- | ----------------------------------------------------------- | -------- | ------------------ |
+| 3    | 48               | `ok`                                                        | 1,2      | 4                  |
+| 25   | 378              | `ok`                                                        | 1,3      | 26                 |
+| 27   | 408              | `ok`                                                        | 0,9      | 28                 |
+| 200  | 3003             | `ok`                                                        | 4,3      | 201                |
+| 1000 | 15003            | hiba: a nyelv beépített szerkezeti korlátja (pozíció: 3717) | 1,9      | nincs              |
+
+A regressziós teszt (`create-cel-expression-evaluator.spec.ts`, n = 3 és n = 200) nem időt mér: azt
+állítja, hogy minden szinten a két testvér ugyanaz a tömb. A régi kódra visszaállítva az n = 3
+eset és a `normalize-cel-result.spec.ts` közös hivatkozás tesztje bukik (a testvérek egyenlők, de
+nem azonosak), tehát a hiba a nagy n kiértékelése előtt jelez. A körkörös kontextus (`input`
+önmagára mutató mezővel) a javítás után is a közös hibamondatot adja (`a kifejezés nem dolgozható
+fel`), a meglévő teszt változatlanul zöld; CEL kifejezés körkörös értéket nem épít.
+
+**A tároláskori szerializálás, a forrás olvasásával és eldobható próbával (`openDatabase(':memory:')`,
+a repón kívül, a csomag forrását importálva).** A CEL eredmény ma nem jut a motorba: az `apps/server`
+az elutasító kifejezés portot köti be (`apps/server/src/engine-assembly/create-rejecting-expression-evaluator.ts`),
+a szállított port bekötése a PLAN-010 T-010-13. A bekötés után az egyetlen út, ahol a CEL eredmény
+maga tárolódik, a `fan_out` kimenete: `packages/engine/src/node-executor/execute-fan-out.ts` a lista
+elemeit `finishStepRunSucceeded` hívással a `markStepSucceeded` `output` mezőjébe adja; a `branch`
+és a `loop` kimenete `null`, a `fan_out_expanded` esemény payloadja csak az elemszám. A
+`step_run.output` oszlop Drizzle `mode: 'json'` (`packages/db/src/step-run/step-run.ts`), a
+szerializálás a `markStepSucceeded` `transaction(...)` hívásán belül fut, és a
+`packages/db/src/sqlite-connection/open-database.ts` `transaction` függvényének `catch` ága a
+kivételt `Outcome` hibaágra viszi (`describeTransactionError`, ami erre a hibára a nyers üzenetet
+adja, zárójeles hibaosztály nélkül). A `run_event.payload` útja (`insert-engine-event-row.ts`, a
+`run-event-repository.ts` `appendEngineEvent` tranzakciójában) ugyanígy. Mért eredmény n = 27
+közös hivatkozású értékkel: a `markStepSucceeded` `kind: 'error'`, üzenet `Invalid string length`,
+3048 ms alatt; az `appendEngineEvent` ugyanígy; a lépés sora `running` állapotban marad (a
+tranzakció visszagörgetve). A motorban a hibaág a `fan_out` végrehajtóból
+(`finished.kind === 'error'`) a `run-supervisor/advance-run.ts` `applyCompletion` és
+`runSchedulingLoop` útján az `abortRun` hívásig jut, ami a futást `run_execution_failed`
+osztállyal zárja; ezt a láncot motor futással nem mértük, csak a forrásból olvastuk.
+
+**Ugyanez a minta a Mustache kiírásban (mérve, nem javítva).** A `copyJsonValue` a közös
+hivatkozást nem memoizálja, tehát egy közös hivatkozású érték (`{{item}}`, ha az `item` a fenti
+`fan_out` eleme) fává bomlik. A `render('{{item}}', { item })` mérve: n = 16-nál 70 ms (heap 32
+MB), n = 18-nál 238 ms (47 MB), n = 20-nál 883 ms (168 MB), n = 22-nél 3685 ms (560 MB); a
+növekedés exponenciális, nagyobb n-re nem mértük. A `fan_out` a címke sablont
+(`branchLabelTemplate`) a kimenet tárolása előtt rendereli, tehát egy `{{item}}` címke sablon ezen
+az úton a tárolás előtt bontaná ki az értéket.
 
 Mellékmérés: a `["a"]` + n darab `.map(x, x + x)` kifejezés egyetlen, 2^n hosszú szöveget ad; a
 könyvtár ezt rope szövegként tartja (n = 28-nál 268 435 456 karakter, a folyamat RSS értéke 87

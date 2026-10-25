@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { normalizeCelResult } from './normalize-cel-result.ts';
 
 // A `unicorn/no-null` miatt a JSON `null` értéket elemzés adja.
@@ -57,6 +58,36 @@ describe('normalizeCelResult (SPEC-010 7.4)', () => {
     expect(outcome).toStrictEqual({ kind: 'ok', value: [1, { a: 2, b: ['x', jsonNull] }] });
     expect(outcome.kind === 'ok' && outcome.value).not.toBe(input);
     expect(input[0]).toBe(1n);
+  });
+
+  it('a közös hivatkozás megmarad: ugyanarra a forrásra ugyanaz a normalizált érték (O-15)', () => {
+    const shared = [1n, { a: 2n }];
+    const outcome = normalizeCelResult({ x: shared, y: [shared, shared] });
+    expect(outcome).toStrictEqual({
+      kind: 'ok',
+      value: {
+        x: [1, { a: 2 }],
+        y: [
+          [1, { a: 2 }],
+          [1, { a: 2 }],
+        ],
+      },
+    });
+    if (outcome.kind !== 'ok' || !isRecord(outcome.value) || !Array.isArray(outcome.value['y'])) {
+      throw new TypeError('ok objektum eredményt vártunk');
+    }
+    const first: unknown = outcome.value['y'][0];
+    const second: unknown = outcome.value['y'][1];
+    expect(outcome.value['x']).toBe(first);
+    expect(first).toBe(second);
+    expect(first).not.toBe(shared);
+  });
+
+  it('két külön hívás nem osztozik a normalizált értéken', () => {
+    const shared = [1n];
+    const first = normalizeCelResult(shared);
+    const second = normalizeCelResult(shared);
+    expect(first.kind === 'ok' && first.value).not.toBe(second.kind === 'ok' && second.value);
   });
 
   it('a null prototípusú objektum sima objektum', () => {

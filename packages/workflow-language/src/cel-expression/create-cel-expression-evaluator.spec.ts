@@ -240,6 +240,30 @@ describe('createCelExpressionEvaluator: evaluate, a 7.4 normalizálás a valódi
       expect(evaluator.evaluate(`{"${key}": 1, "a": 2}`, runContext())).toStrictEqual(ok({ a: 2 }));
     }
   });
+
+  // Regresszió (O-15, research 10.2): a `[1]` + n darab `.map(x, [x, x])` eredménye a
+  // könyvtárban közös hivatkozású szerkezet. A normalizálás régen fává bontotta, ami
+  // n = 25-nél a folyamatot leállította. A teszt nem időt mér: a szerkezet állítja,
+  // hogy a két testvér ugyanaz a tömb (a fává bontás minden szinten két külön
+  // másolatot adna), és az első, kis n állítás a régi kódon már bukik, mielőtt a nagy
+  // n kiértékelése elindulna.
+  it.each([3, 200])('a közös hivatkozás megmarad, nincs exponenciális kibontás (n = %i)', (n) => {
+    const outcome = evaluator.evaluate(`[1]${'.map(x, [x, x])'.repeat(n)}`, runContext());
+    if (outcome.kind !== 'ok' || !Array.isArray(outcome.value)) {
+      throw new TypeError('ok lista eredményt vártunk');
+    }
+    expect(outcome.value).toHaveLength(1);
+    let level: unknown = outcome.value[0];
+    for (let depth = 0; depth < n; depth += 1) {
+      if (!Array.isArray(level)) {
+        throw new TypeError(`a(z) ${String(depth)}. szinten listát vártunk`);
+      }
+      expect(level).toHaveLength(2);
+      expect(level[0]).toBe(level[1]);
+      level = level[0];
+    }
+    expect(level).toBe(1);
+  });
 });
 
 describe('createCelExpressionEvaluator: evaluate, a 7.5 három példa valós alakú RunContext értéken (16. szekció 26.)', () => {
