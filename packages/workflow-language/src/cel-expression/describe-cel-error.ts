@@ -1,11 +1,12 @@
 import { isCelError } from './is-cel-error.ts';
 
 /**
- * A fordítás (`parse` és `check`) hibakódjai saját magyar mondatra képezve
- * (SPEC-010 7.2, 9.5, O-9). A kódok a telepített csomag forrásából jönnek
- * (`lib/parser.js`, `lib/macros.js`, `lib/operators.js`, `lib/type-checker.js`);
- * a mondat a kifejezés darabját (azonosítót, mezőnevet, literált) nem idézi.
- * A futásidejű kódok a T-010-10 lépésben kerülnek ide.
+ * A fordítás (`parse` és `check`) és a kiértékelés (`evaluate`) hibakódjai saját
+ * magyar mondatra képezve (SPEC-010 7.2, 9.5, O-7, O-9). A kódok a telepített
+ * csomag forrásából jönnek (`lib/parser.js`, `lib/macros.js`, `lib/operators.js`,
+ * `lib/type-checker.js`, `lib/registry.js`, `lib/functions.js`,
+ * `lib/overloads.js`, `lib/optional.js`); a mondat a kifejezés darabját
+ * (azonosítót, mezőnevet, literált) és a futás adatát nem idézi.
  */
 const SENTENCES: ReadonlyMap<string, string> = new Map([
   ['unexpected_character', 'váratlan karakter a kifejezésben'],
@@ -41,21 +42,50 @@ const SENTENCES: ReadonlyMap<string, string> = new Map([
   ['invalid_index_type', 'érvénytelen index típus a kifejezésben'],
   ['cannot_index_type', 'ez az érték nem indexelhető'],
   ['invalid_comprehension_range', 'a makró listát vagy mapet vár'],
+  ['no_such_key', 'a hivatkozott kulcs nem létezik'],
+  [
+    'unsupported_type',
+    'az adat egy értékének típusa a kifejezésben nem kezelhető (például saját constructor kulcsú objektum)',
+  ],
+  ['division_by_zero', 'nullával osztás a kifejezésben'],
+  ['modulo_by_zero', 'nullával vett maradék a kifejezésben'],
+  ['numeric_overflow', 'a számítás túllépi a számtípus tartományát'],
+  ['index_out_of_bounds', 'a lista index a lista tartományán kívül esik'],
+  ['index_out_of_range', 'a szöveg index a szöveg tartományán kívül esik'],
+  ['int_conversion_error', 'az érték nem alakítható int típusra'],
+  ['uint_conversion_error', 'az érték nem alakítható uint típusra'],
+  ['double_conversion_error', 'az érték nem alakítható double típusra'],
+  ['bool_conversion_error', 'az érték nem alakítható bool típusra'],
+  ['invalid_timestamp', 'érvénytelen időbélyeg a kifejezésben'],
+  ['invalid_duration', 'érvénytelen időtartam a kifejezésben'],
+  ['invalid_regular_expression', 'érvénytelen reguláris kifejezés'],
+  ['invalid_comparison_type', 'ezek az értékek nem hasonlíthatók össze'],
+  ['invalid_list_element_type', 'a lista elemei nem megfelelő típusúak'],
+  ['list_item_type_mismatch', 'a lista eleme nem a várt típusú'],
+  ['field_type_mismatch', 'a mező értéke nem a várt típusú'],
+  ['variable_type_mismatch', 'a változó értéke nem a várt típusú'],
+  ['incompatible_argument_type', 'a függvény argumentumai nem összeillő típusúak'],
+  ['invalid_optional_argument', 'a függvény opcionális értéket vár'],
+  ['optional_expected', 'a kifejezés opcionális értéket vár'],
+  ['optional_value_missing', 'az opcionális érték hiányzik'],
+  ['invalid_context', 'a kiértékelés kontextusa nem objektum'],
 ]);
 
-// A nem ismert kód és a nem CEL kivétel leírása: a könyvtár szövege ekkor sem kerül ki.
+// A nem CEL kivétel leírása: a könyvtár szövege ekkor sem kerül ki.
 const FALLBACK_SENTENCE = 'a kifejezés nem dolgozható fel';
 
 /**
  * A CEL hiba saját magyar leírása (SPEC-010 9.5): a `code` mező szerinti mondat,
- * plusz a `range` mezőből vett karakter eltolás, ahol van. A könyvtár `summary`
- * és `message` szövege nem kerül ki, mert a kifejezés darabját idézi (research
- * 2. szekció (4b)). A hibaosztály nevét a hívó teszi hozzá (6.2).
+ * plusz a `range` mezőből vett karakter eltolás, ahol van. A táblában nem álló
+ * kód a közös mondatot kapja a kóddal (user döntés 2026-10-25); a kód a könyvtár
+ * azonosítója, nem a kifejezés darabja. A könyvtár `summary` és `message`
+ * szövege nem kerül ki, mert a kifejezés darabját idézi (research 2. szekció
+ * (4b)). A hibaosztály nevét a hívó teszi hozzá (6.2).
  */
 export function describeCelError(error: unknown): string {
   if (!isCelError(error)) {
     return FALLBACK_SENTENCE;
   }
-  const sentence = SENTENCES.get(error.code) ?? FALLBACK_SENTENCE;
+  const sentence = SENTENCES.get(error.code) ?? `${FALLBACK_SENTENCE} (kód: ${error.code})`;
   return error.range === undefined ? sentence : `${sentence} (pozíció: ${String(error.range.start)})`;
 }

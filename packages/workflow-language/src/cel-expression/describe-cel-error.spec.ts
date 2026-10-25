@@ -28,13 +28,32 @@ describe('describeCelError (SPEC-010 9.5)', () => {
     );
   });
 
-  it('az ismeretlen kód, a prototípus nevű kód és a nem CEL kivétel közös mondatot kap, a könyvtár szövege nélkül', () => {
+  it('a táblában nem álló kód a közös mondatot kapja a kóddal, a könyvtár szövege nélkül (user döntés 2026-10-25)', () => {
     expect(describeCelError(new ParseError({ code: 'ismeretlen_kod', message: 'TITKOS' }))).toBe(
-      'a kifejezés nem dolgozható fel',
+      'a kifejezés nem dolgozható fel (kód: ismeretlen_kod)',
     );
+    expect(
+      describeCelError(new EvaluationError({ code: 'ismeretlen_kod', message: 'TITKOS', range: { start: 2, end: 3 } })),
+    ).toBe('a kifejezés nem dolgozható fel (kód: ismeretlen_kod) (pozíció: 2)');
     expect(describeCelError(new ParseError({ code: 'constructor', message: 'TITKOS' }))).toBe(
-      'a kifejezés nem dolgozható fel',
+      'a kifejezés nem dolgozható fel (kód: constructor)',
     );
+    expect(describeCelError(new EvaluationError('TITKOS'))).toBe(
+      'a kifejezés nem dolgozható fel (kód: evaluation_error)',
+    );
+  });
+
+  it('a futásidejű kódok saját mondatot kapnak', () => {
+    const range = { start: 6, end: 13 };
+    expect(describeCelError(new EvaluationError({ code: 'no_such_key', message: 'No such key: TITKOS', range }))).toBe(
+      'a hivatkozott kulcs nem létezik (pozíció: 6)',
+    );
+    expect(
+      describeCelError(new EvaluationError({ code: 'unsupported_type', message: 'Unsupported type: object' })),
+    ).toBe('az adat egy értékének típusa a kifejezésben nem kezelhető (például saját constructor kulcsú objektum)');
+  });
+
+  it('a nem CEL kivétel kód nélkül, a közös mondatot kapja', () => {
     expect(describeCelError(new Error('TITKOS'))).toBe('a kifejezés nem dolgozható fel');
     expect(describeCelError(undefined)).toBe('a kifejezés nem dolgozható fel');
   });

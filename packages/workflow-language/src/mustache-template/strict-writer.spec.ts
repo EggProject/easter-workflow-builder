@@ -1,6 +1,7 @@
 import Mustache from 'mustache';
 import { describe, expect, it } from 'vitest';
 import { MissingTemplateNameError } from './missing-template-name-error.ts';
+import { NonJsonTemplateValueError } from './non-json-template-value-error.ts';
 import { OwnPropertyContext } from './own-property-context.ts';
 import { StrictWriter } from './strict-writer.ts';
 
@@ -27,6 +28,12 @@ describe('StrictWriter', () => {
     const writer = new StrictWriter();
     expect(() => writer.render('{{nincs}}', new OwnPropertyContext({}))).toThrow(MissingTemplateNameError);
     expect(() => writer.render('{{{nincs}}}', new OwnPropertyContext({}))).toThrow(MissingTemplateNameError);
+  });
+
+  it('a nem JSON értékre mutató név NonJsonTemplateValueError', () => {
+    const writer = new StrictWriter();
+    expect(() => writer.render('{{v}}', new OwnPropertyContext({ v: new Map() }))).toThrow(NonJsonTemplateValueError);
+    expect(() => writer.render('{{& v}}', new OwnPropertyContext({ v: 1n }))).toThrow(NonJsonTemplateValueError);
   });
 
   it('a szakasz és a fordított szakasz hiányzó névvel hiba nélküli', () => {

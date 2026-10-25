@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { describeTemplateError } from './describe-template-error.ts';
 import { MissingTemplateNameError } from './missing-template-name-error.ts';
+import { NonJsonTemplateValueError } from './non-json-template-value-error.ts';
 
 describe('describeTemplateError', () => {
   it('a hiányzó név hibája a kért nevet idézi', () => {
     expect(describeTemplateError(new MissingTemplateNameError('input.x'))).toBe('hiányzó név a sablonban: input.x');
+  });
+
+  it('a nem JSON értékre mutató név hibája a kért nevet idézi', () => {
+    expect(describeTemplateError(new NonJsonTemplateValueError('input.szerzo'))).toBe(
+      'nem JSON értékre mutató név a sablonban: input.szerzo',
+    );
   });
 
   it.each([

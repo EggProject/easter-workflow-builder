@@ -186,17 +186,67 @@ describe('createMustacheTemplateRenderer: a hiányzó név (SPEC-010 6.7, O-4, O
   });
 });
 
+class Szerzo {
+  readonly nev = 'Anna';
+}
+
+function nonJson(name: string): { readonly kind: 'error'; readonly message: string } {
+  return { kind: 'error', message: `nem JSON értékre mutató név a sablonban: ${name}` };
+}
+
+// Saját mező nélküli objektum, aminek a prototípusa egy másik sima objektum.
+const inheritedOnly: unknown = Object.create({ nev: 'Anna' });
+
+describe('createMustacheTemplateRenderer: szigorú kiírás (SPEC-010 6.5, user döntés 2026-10-25)', () => {
+  const renderer = createMustacheTemplateRenderer();
+
+  it.each([
+    ['Map', new Map([['nev', 'Anna']])],
+    ['Date', new Date(0)],
+    ['osztálypéldány', new Szerzo()],
+    ['BigInt', 1n],
+    ['Symbol', Symbol('x')],
+    ['Uint8Array', new Uint8Array([1])],
+    ['nem sima prototípusú objektum', inheritedOnly],
+  ])('a %s érték mindhárom változó tag alakon a nevet megnevező hibát ad', (_name, value) => {
+    const view = { input: { szerzo: value } };
+    for (const template of ['a {{input.szerzo}} b', 'a {{{input.szerzo}}} b', 'a {{& input.szerzo}} b']) {
+      expect(renderer.render(template, view)).toStrictEqual(nonJson('input.szerzo'));
+    }
+  });
+
+  it('a pont név és a szakasz belseje is a kért nevet nevezi meg', () => {
+    expect(renderer.render('{{.}}', new Map())).toStrictEqual(nonJson('.'));
+    expect(
+      renderer.render('{{#input.elemek}}{{.}}{{/input.elemek}}', { input: { elemek: [new Date(0)] } }),
+    ).toStrictEqual(nonJson('.'));
+  });
+
+  it('a null prototípusú objektum sima objektum, JSON szövegként íródik', () => {
+    const szerzo: unknown = Object.assign(Object.create(null), { nev: 'Anna' });
+    expect(renderer.render('{{input.szerzo}}', { input: { szerzo } })).toStrictEqual({
+      kind: 'ok',
+      value: '{"nev":"Anna"}',
+    });
+  });
+
+  it('a szakasz a nem JSON értéken a könyvtár útján marad, hiba nélkül', () => {
+    expect(renderer.render('{{#input.szerzo}}x{{/input.szerzo}}', { input: { szerzo: new Map() } })).toStrictEqual({
+      kind: 'ok',
+      value: 'x',
+    });
+  });
+});
+
 describe('createMustacheTemplateRenderer: kivétel nem hagyja el a függvényt (SPEC-010 6.2)', () => {
   const renderer = createMustacheTemplateRenderer();
 
-  it('a nem JSON érték kivétele saját leírással jön vissza, a könyvtár szövege nélkül', () => {
+  it('a JSON.stringify kivétele (körkörös sima objektum, beágyazott BigInt) a tartalék mondat, a könyvtár szövege nélkül', () => {
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
-    expect(renderer.render('{{v}}', { v: 1n })).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
-    expect(renderer.render('{{v}}', { v: circular })).toStrictEqual({
-      kind: 'error',
-      message: 'a sablon nem renderelhető',
-    });
+    for (const view of [{ v: circular }, { v: [1n] }, { v: { n: 1n } }]) {
+      expect(renderer.render('{{v}}', view)).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
+    }
   });
 
   it('nem objektum nézeten a sima tag hiányzó név, a szakasz üres', () => {

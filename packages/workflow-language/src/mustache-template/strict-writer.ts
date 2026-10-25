@@ -1,5 +1,6 @@
 import Mustache from 'mustache';
 import { MissingTemplateNameError } from './missing-template-name-error.ts';
+import { NonJsonTemplateValueError } from './non-json-template-value-error.ts';
 import type { OwnPropertyContext } from './own-property-context.ts';
 import { toText } from './to-text.ts';
 
@@ -14,7 +15,8 @@ type VariableToken = [string, string, ...string[]];
 /**
  * Saját `Mustache.Writer` (SPEC-010 6.1, 6.3, 6.7). A sima változó tag két ága
  * (`escapedValue`, `unescapedValue`) felülírva: a fel nem oldható név hibát ad,
- * a talált érték a 6.5 szerint szöveggé alakul, escape nélkül. A szakasz és a
+ * a talált érték a 6.5 szerint szöveggé alakul, escape nélkül, a nem JSON
+ * érték pedig a nevet idéző hibát ad (user döntés 2026-10-25). A szakasz és a
  * fordított szakasz a könyvtár útján marad, tehát hiányzó névvel hiba nélküli.
  *
  * A `context` paraméter típusa szintén csak típusszinten szűkebb a bázisénál:
@@ -34,7 +36,11 @@ export class StrictWriter extends Mustache.Writer {
     if (value === undefined) {
       throw new MissingTemplateNameError(name);
     }
-    return toText(value);
+    const text = toText(value);
+    if (text === undefined) {
+      throw new NonJsonTemplateValueError(name);
+    }
+    return text;
   }
 
   override escapedValue(token: VariableToken, context: OwnPropertyContext): string {

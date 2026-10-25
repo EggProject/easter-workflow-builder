@@ -13,6 +13,7 @@ export { isNil } from './is-nil/is-nil.ts';
 export { isNumber } from './is-number/is-number.ts';
 export { isNumeric } from './is-numeric/is-numeric.ts';
 export { isObject } from './is-object/is-object.ts';
+export { isPlainObject } from './is-plain-object/is-plain-object.ts';
 export { isString } from './is-string/is-string.ts';
 export { isStringArray } from './is-string-array/is-string-array.ts';
 export { isStringResolver } from './is-string-resolver/is-string-resolver.ts';

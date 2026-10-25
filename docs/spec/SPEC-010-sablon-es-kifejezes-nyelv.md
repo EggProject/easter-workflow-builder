@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Státusz  | jóváhagyva, 2026-09-27 (user döntés: "Jóváhagyom, korlát később"); a PLAN-010 F0 három blokkoló mérésének eredménye és a user 2026-10-21-i hét döntése átvezetve (15. szekció: O-1 ... O-12 mind lezárva; az O-1, O-2 és O-3 "most nincs korlát" döntés, később újranyitható)                                                                                                                                                                                                                                                        |
+| Státusz  | jóváhagyva, 2026-09-27 (user döntés: "Jóváhagyom, korlát később"); a PLAN-010 F0 három blokkoló mérésének eredménye és a user 2026-10-21-i hét döntése átvezetve (15. szekció: O-1 ... O-12 mind lezárva; az O-1, O-2 és O-3 "most nincs korlát" döntés, később újranyitható); a user 2026-10-25-i két döntése (O-13 szigorú Mustache kiírás, O-14 ismeretlen CEL hibakód) átvezetve, a 6.5 mélység kérdése nyitva                                                                                                                   |
 | Dátum    | 2026-09-23                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Előzmény | [`SPEC-004-vegrehajto-motor.md`](SPEC-004-vegrehajto-motor.md) (a két port szerződése, 3.2; az O-1 tétel, 15.), [`SPEC-006-szerver-alkalmazas.md`](SPEC-006-szerver-alkalmazas.md) (az `engine-assembly`), [`SPEC-008-graf-szerkeszto-es-futas-nezet.md`](SPEC-008-graf-szerkeszto-es-futas-nezet.md) (a szerkesztő)                                                                                                                                                                                                                 |
 | Bemenet  | [`../research/2026-09-23-sablon-es-kifejezes-nyelv.md`](../research/2026-09-23-sablon-es-kifejezes-nyelv.md) (a nyelvek összevetése), [`../research/2026-09-23-sablon-es-kifejezes-csomagok.md`](../research/2026-09-23-sablon-es-kifejezes-csomagok.md) (a csomagok), [`../research/2026-09-23-megszakitas-leallas-meres.md`](../research/2026-09-23-megszakitas-leallas-meres.md) 4. szekció, [`2026-10-21-spec010-blokkolo-meresek.md`](../research/2026-10-21-spec010-blokkolo-meresek.md) (a PLAN-010 F0 három blokkoló mérése) |
@@ -424,11 +424,26 @@ mezőre van szükség.
 
 **Mérve (research 3. szekció (2), (3)):** a `null` érték a könyvtár alapviselkedésében üres szöveg (az escape függvény `null` értékre meg sem hívódik), a `Writer` alosztállyal `null` szöveg (`a{{input.semmi}}b` kimenete `anullb`); a tömb és az objektum a nyers alakban is a 6.5 szerinti JSON szöveg, mindhárom alakban és mind a tíz mért értéktípusra.
 
-**Miért nem dobhat kivételt a `JSON.stringify`.** A sablon kontextusa kizárólag a `RunContext`
-adata (5.1), ami a `step_run.output` JSON kerekútján (M-106) vagy közvetlenül a futás bemenetéből
-származik, tehát nem tartalmazhat `BigInt`, `Map` vagy más nem JSON értéket (M-129); a CEL
-kifejezés eredménye is a 7.4 szerint már JSON-ra normalizálva kerül a `steps` rekordba, mielőtt a
-sablon látná. A `JSON.stringify` a sablon kontextusán emiatt kivétel nélkül fut.
+**Szigorú kiírás: a nem JSON érték hiba (user döntés 2026-10-25).** A feloldott érték, ami se
+szöveg, se szám, se logikai érték, se `null`, se tömb, se sima objektum (például `Map`, `Date`,
+osztálypéldány, `BigInt`, `Symbol`), nem íródik ki: a sima változó tag mindhárom alakja
+(`{{név}}`, `{{{név}}}`, `{{& név}}`) **`template_render_failed`** hibát ad, és a hibaleírás a
+hiányzó név hibájához hasonlóan a teljes, kért nevet nevezi meg, a sablon többi szövege nélkül:
+`nem JSON értékre mutató név a sablonban: input.szerzo` (6.7, O-4). A függvény érték ide nem
+jut el, mert a 6.6 feloldás nem találatnak veszi, tehát hiányzó név. A szakasz és a fordított
+szakasz a nem JSON értéken a könyvtár útján marad, hiba nélkül.
+
+**A mélység: csak a feloldott érték vizsgált (nyitott kérdés).** A tömb elemeit és az objektum
+mezőit a renderelő nem vizsgálja; a beágyazott érték sorsáról a `JSON.stringify` saját szabálya
+dönt. _Mi a viselkedés addig:_ a beágyazott `Map`, osztálypéldány és `Uint8Array` csendben `{}`
+lesz, a beágyazott `Date` ISO szöveg (a `toJSON` metódusán át), a beágyazott `NaN` és végtelen
+`null`; a beágyazott `BigInt` és a körkörös hivatkozás kivételt dob, amit a renderelő a közös
+tartalék mondatra képez (`a sablon nem renderelhető`, `template_render_failed`). A mi
+kontextusunkon ez nem fordul elő: a `RunContext` adata a `step_run.output` JSON kerekútján
+(M-106) vagy közvetlenül a futás bemenetéből származik, tehát nem tartalmazhat `BigInt`, `Map`
+vagy más nem JSON értéket (M-129), és a CEL kifejezés eredménye is a 7.4 szerint már JSON-ra
+normalizálva kerül a `steps` rekordba. _Mi zárná le:_ user döntés arról, hogy a szigorú kiírás a
+tömb elemeire és az objektum mezőire mélyen is vonatkozzon-e.
 
 ### 6.6 A név feloldás szűkítése saját adat tulajdonságra
 
@@ -710,6 +725,10 @@ viszont a kifejezés vagy a sablon darabját idézi (mérve):
   eltolás) veszi, ahol van (az `unsupported_type` hibának nincs `range` értéke). Az
   `unsupported_type` kód (a 7.3 saját `constructor` kulcsú adat korlátja) saját magyar mondatot
   kap.
+- **Az ismeretlen CEL hibakód (user döntés 2026-10-25).** A `cel-expression` téma táblájában nem
+  álló kód a közös mondatot kapja a kóddal: `a kifejezés nem dolgozható fel (kód: <kód>)`, plusz a
+  pozíció, ahol van. A kód a könyvtár azonosítója, nem a kifejezés darabja. A nem CEL kivétel kód
+  nélkül, a közös mondatot kapja (`a kifejezés nem dolgozható fel`).
 - **Mustache (research 3. szekció (4)).** A `Mustache.parse` négy hibája sima `Error` kivétel,
   egyedi hibaosztály nélkül; az üzenet előtagja különbözteti meg őket: `Unclosed tag at <pozíció>`,
   `Unopened section "<név>" at <pozíció>`, `Unclosed section "<név>" at <pozíció>`,
@@ -856,6 +875,8 @@ Egyik sem zárható le tippeléssel.
 | O-10 | A primitív érték beépített tulajdonsága a Mustache-ban (`{{input.tema.length}}`)    | **Lezárva, 2026-10-21, a user döntésével: hiányzó név marad.** Csak a nézet adatának saját tulajdonsága olvasható (6.6; research 3. szekció (7))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | lezárva     |
 | O-11 | A `loop` saját `continueExpression`-jében az `iteration`                            | **Lezárva, 2026-10-21, a user döntésével: a motor adja át a körszámot.** A `loop` saját kontextusában az `iteration` a lefutásszám (0, 1, 2 ...); motor módosítás, SPEC-004 és a 7.5 átvezetve, PLAN-010 T-010-4a (research 4. szekció)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | lezárva     |
 | O-12 | A `loop` saját kifejezése nem látja a törzs kimenetét                               | **Lezárva, 2026-10-21, a user döntésével: marad a mai szabály** (SPEC-004 6.2; a user a "csak körszám" opciót választotta): a `loop` saját `continueExpression`-je az `input` mezőit, a `loop` előtti ősök kimenetét és az `iteration` értékét látja; a törzs kimenetére hivatkozó kifejezés (`steps["<törzs node>"]...`) `No such key` hibával, `expression_evaluation_failed` osztállyal bukik (mérve, research 4. szekció). A "ciklus addig, amíg a törzs kimenete nem jelzi, hogy kész" minta ezért nem fejezhető ki; ez ismert, vállalt korlát                                                                                                                                                                                                                                                                         | lezárva     |
+| O-13 | A nem JSON érték a sablon sima változó tagjában                                     | **User döntés 2026-10-25: szigorú kiírás.** A feloldott `Map`, `Date`, osztálypéldány, `BigInt`, `Symbol` és minden más nem JSON érték `template_render_failed` hibát ad, a nevet megnevezve (6.5); a beágyazott értékek mélysége nyitva (6.5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | lezárva     |
+| O-14 | Az ismeretlen CEL hibakód leírása                                                   | **User döntés 2026-10-25:** a táblában nem álló kód `a kifejezés nem dolgozható fel (kód: <kód>)` mondatot kap, plusz pozíciót; a nem CEL kivétel kód nélkül marad (9.5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | lezárva     |
 
 ## 16. Elfogadási kritériumok
 
@@ -937,7 +958,7 @@ Egyik sem zárható le tippeléssel.
 
 51. A SPEC-004 15. szekciójában az O-1 lezárva, a user döntésére és a SPEC-010-re hivatkozva, és a 13. szekció táblázatának minden "a jelen spec commitjában" sora átvezetve.
 52. A `docs/research/2026-08-26-toolchain.md` a `mustache`, a `@types/mustache` és a `@marcbachmann/cel-js` verzióját két független forrással rögzíti.
-53. A 15. szekció mind a tizenkét kérdése vagy a user válaszával, illetve méréssel lezárva és átvezetve, a 2026-10-21-i hét user döntéssel mind lezárva (az O-1, O-2 és O-3 "most nincs korlát" döntés, később újranyitható). Tippeléssel lezárt pont nincs.
+53. A 15. szekció mind a tizennégy kérdése vagy a user válaszával, illetve méréssel lezárva és átvezetve, a 2026-10-21-i hét és a 2026-10-25-i két user döntéssel mind lezárva (az O-1, O-2 és O-3 "most nincs korlát" döntés, később újranyitható). Tippeléssel lezárt pont nincs.
 54. A `packages/workflow-language/src`, az `apps/server/src` és az `apps/web/src` alatt nincs `any`, `as` típuskényszerítés (az `as const` kivételével) és új `eslint-disable` sor a két könyvtár típusai miatt.
 55. A lefedettség mind a négy metrikán 100 százalék, a `coverage.exclude` lista nem bővült; az e2e fedetlen tételek száma egyik metrikán sem nőtt.
 56. Mind a kilenc minőségi kapu nulla kilépési kóddal fut a teljes workspace-en; a kapuk mérvadó listája a `.claude/CLAUDE.md` 8. szekciója.
@@ -954,6 +975,11 @@ Egyik sem zárható le tippeléssel.
 61. A CEL `{1: "a"}` map literál kulcsa string a normalizált eredményben, és a `{"constructor": 1, "a": 2}` eredménye csak az `a` kulcsot tartalmazza (O-8); futtatott teszt.
 62. A `loop` saját `continueExpression`-jének kontextusában az `iteration` a lefutásszám: a kifejezés port az 1., 2. és 3. lefutáskor 0, 1, 2 értéket kap (O-11); a motor tesztjét a SPEC-004 17. szekció 11a. kritériuma írja elő.
 63. A `packages/workflow-language/src` nem hívja a globális `Mustache.render` és `Mustache.parse` függvényt, és nem ír a `Mustache.templateCache` értékébe (a gyorsítótárat csak a saját `Writer` példány mezője kapcsolja ki, 6.3; user döntés 2026-10-21); ezt greppes invariáns teszt őrzi, a teszt fájlokat leszámítva.
+
+### A 2026-10-25-i user döntések
+
+64. A `render` egy sima változó tag (`{{név}}`, `{{{név}}}`, `{{& név}}`) nem JSON értékre (`Map`, `Date`, osztálypéldány, `BigInt`, `Symbol`) feloldott nevére `Outcome` hibaágat ad, a kért nevet megnevezve, a sablon többi szövege nélkül; a null prototípusú objektum sima objektumként JSON szöveg. Futtatott teszt mindhárom alakra a valódi könyvtáron (6.5).
+65. A CEL hibaleírás a táblában nem álló kódra `a kifejezés nem dolgozható fel (kód: <kód>)` mondatot ad, pozícióval, ahol van; a nem CEL kivétel kód nélkül, a közös mondatot kapja. Futtatott teszt mindkét ágra (9.5).
 
 ## 17. Kapcsolódó dokumentumok
 

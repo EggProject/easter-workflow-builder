@@ -1,5 +1,6 @@
 import { describeError } from '@easter-workflow-builder/core';
 import { MissingTemplateNameError } from './missing-template-name-error.ts';
+import { NonJsonTemplateValueError } from './non-json-template-value-error.ts';
 
 /**
  * Az üzenet végi szám: a `parseTemplate` pozíciót hordozó hibái ` at <szám>`
@@ -37,11 +38,13 @@ const PARSE_ERROR_SENTENCES = [
 /**
  * A sablon fordításának vagy renderelésének kivétele saját magyar leírásra
  * képezve (SPEC-010 6.2, 9.5). A könyvtár üzenete nem kerül ki; a hiányzó név
- * hibája a kért nevet idézi (6.7). A hibaosztály nevét nem a csomag, hanem a
- * hívó teszi hozzá (6.2).
+ * hibája (6.7) és a nem JSON értékre mutató név hibája (6.5) a kért nevet
+ * idézi. Minden más kivétel (például a `JSON.stringify` körkörös hivatkozásra
+ * dobott hibája) a közös tartalék mondatot kapja. A hibaosztály nevét nem a
+ * csomag, hanem a hívó teszi hozzá (6.2).
  */
 export function describeTemplateError(error: unknown): string {
-  if (error instanceof MissingTemplateNameError) {
+  if (error instanceof MissingTemplateNameError || error instanceof NonJsonTemplateValueError) {
     return error.message;
   }
   const message = describeError(error);
