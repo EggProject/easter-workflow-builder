@@ -714,10 +714,6 @@ ki, hanem a futás eseményein. A SPEC-005 8.3 táblázatának "gráf validáci�
 ezzel a két osztállyal bővül. **Végrehajtva: PLAN-010 T-010-14** (a `create-http-server.spec.ts` két
 regressziós tesztje a valódi motorral `422` választ igazol; előtte a válasz `500 internal` volt).
 
-### 9.6 A felület mondata az indítási hibára (user döntés 2026-10-25, O-17)
-
-A két osztály a `packages/protocol` `ProtocolErrorClass` zárt szótárának tagja (SPEC-005 8.5), a szerver a `422` törzs `errorClass` mezőjében adja (9.3), az `apps/server` `error-class-drift-protection` tesztje lefedi, és az `apps/web` `protocol-error-class-message.ts` saját mondatot rendel hozzájuk: `template_render_failed`: "A workflow egyik sablonja hibás, ezért a futás nem indítható.", `expression_evaluation_failed`: "A workflow egyik kifejezése hibás, ezért a futás nem indítható." A kliens leképezése csak a REST hibaágon fut (SPEC-007 8.4), a lépés futásakori hiba a futás eseményein jut a felületre, ahol ez a mondat nem jelenik meg.
-
 ### 9.4 Az `expression_evaluator_unavailable` sorsa, és az eltérés a feladat szövegétől
 
 **A feladat a meglévő `expression_evaluator_unavailable` osztályt is a követendő hibaosztályok
@@ -780,6 +776,10 @@ viszont a kifejezés vagy a sablon darabját idézi (mérve):
 
 A szerkesztő mezőhibája (10. szekció) hibaosztályt nem hordoz, csak ugyanezt a leírást egy magyar
 előtaggal, mert az mezőhiba, nem `Outcome` a motorból.
+
+### 9.6 A felület mondata az indítási hibára (user döntés 2026-10-25, O-17)
+
+A két osztály a `packages/protocol` `ProtocolErrorClass` zárt szótárának tagja (SPEC-005 8.5), a szerver a `422` törzs `errorClass` mezőjében adja (9.3), az `apps/server` `error-class-drift-protection` tesztje lefedi, és az `apps/web` `protocol-error-class-message.ts` saját mondatot rendel hozzájuk: `template_render_failed`: "A workflow egyik sablonja hibás, ezért a futás nem indítható.", `expression_evaluation_failed`: "A workflow egyik kifejezése hibás, ezért a futás nem indítható." A kliens leképezése csak a REST hibaágon fut (SPEC-007 8.4), a lépés futásakori hiba a futás eseményein jut a felületre, ahol ez a mondat nem jelenik meg.
 
 ## 10. A mentés előtti ellenőrzés a szerkesztőben
 

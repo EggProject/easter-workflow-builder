@@ -803,3 +803,137 @@ együtt) a `bun run test` kétszer, egymás után, a `flock /tmp/kapu-gep.lock` 
 61,94 s. A `build-engine-dependencies.spec.ts` 27 szintű `.map(x, [x, x])` tesztje 1739 ms és 1724 ms, a
 `screenshot-pipeline.spec.ts` 7 tesztje zöld. A korábbi bukás ezen a két futáson nem jött elő, tehát a
 gyökéroka (a nehéz teszt memóriája vagy ideje párhuzamos terhelés alatt, vagy más) **nem ellenőrzött**.
+
+## 12. A tárolandó kimenet méretkorlátjának mérése (PR #57 review, 2026-10-25)
+
+A user döntése (2026-10-25): "méretkorlát, szám mérés után"; a tárolandó kimenet JSON hosszára
+korlát kerül, fölötte a lépés `expression_evaluation_failed` hibával zár, a számot a user dönti el.
+Ez a szekció a mérés; a korlát nincs megvalósítva.
+
+### 12.1 A gép és a felállás
+
+Gép: `aarch64`, 4 mag, 3906 MB RAM, swap nincs; Node `v26.7.0`;
+`v8.getHeapStatistics().heap_size_limit` = 2 149 056 512 bájt (2050 MB), alapértelmezett kapcsolókkal.
+Hogy a V8 ezt az értéket miből számolja (a gép memóriájából vagy rögzített értékből), **nem
+ellenőrzött**; egy másik gépen az összeomlási pont ezért eltolódhat.
+
+Felállás: eldobható, repón kívüli script (`/tmp/meret/measure.ts`, nem commitolt), a
+`build-engine-dependencies.spec.ts` nehéz tesztjének gráfja (`start -> fan_out -> join merge`, a
+`fan_out` kifejezése `[1]` + n darab `.map(x, [x, x])`), a valódi `buildEngineDependencies` portjaival,
+`createEngine`, `openDatabase(':memory:')`, a fej `e063b7b`. Szintenként külön Node folyamat,
+`flock /tmp/kapu-gep.lock` alatt, `/usr/bin/time -v` a csúcs RSS-hez. A script a `JSON.parse` és a
+`JSON.stringify` hívást az 1 000 000 karakternél hosszabb szövegre naplózó burokkal veszi körül
+(hívási verem az első futásokon), és a `database.stepRuns.markStepSucceeded` hívást be- és kilépéskor
+naplózza. Valódi provider hívás nincs (a gráfban nincs agent lépés).
+
+### 12.2 A kimenet hossza
+
+A kimenet `JSON.stringify` hossza n szinten 2^(n+2) - 1 karakter; a szöveg ASCII, tehát a UTF-8
+bájtszám egyenlő a karakterszámmal (`Buffer.byteLength`, külön folyamatban mérve):
+
+| n   | karakter = UTF-8 bájt               |
+| --- | ----------------------------------- |
+| 18  | 1 048 575                           |
+| 19  | 2 097 151                           |
+| 20  | 4 194 303                           |
+| 21  | 8 388 607                           |
+| 22  | 16 777 215                          |
+| 23  | 33 554 431                          |
+| 24  | 67 108 863                          |
+| 25  | 134 217 727                         |
+| 26  | 268 435 455                         |
+| 27  | `RangeError: Invalid string length` |
+
+A `join merge` kimenete ugyanez a lista egy tömbbe csomagolva, 2 karakterrel hosszabb, és szintén
+tárolódik.
+
+### 12.3 A valódi út (a `db` visszaolvasásával)
+
+| n   | kimenetel                                                             | futás (ms, `startRun` -> `run_finished`) | csúcs RSS (MB) | heap a végén (MB) |
+| --- | --------------------------------------------------------------------- | ---------------------------------------- | -------------- | ----------------- |
+| 18  | `succeeded`                                                           | 60                                       | 221            | 63                |
+| 19  | `succeeded`                                                           | 122                                      | 258            | 101               |
+| 20  | `succeeded`                                                           | 201                                      | 342            | 162               |
+| 21  | `succeeded`                                                           | 399                                      | 497            | 313               |
+| 22  | `succeeded`                                                           | 856                                      | 829            | 569               |
+| 23  | `succeeded`                                                           | 1818                                     | 1389           | 1109              |
+| 24  | folyamat leáll (a `join` visszaolvasásában)                           | (7,2 s fali idő a leállásig)             | 2258           | (limit)           |
+| 25  | folyamat leáll (a `fan_out` visszaolvasásában)                        | (7,3 s fali idő a leállásig)             | 2267           | (limit)           |
+| 26  | folyamat leáll (a `fan_out` visszaolvasásában)                        | (7,7 s fali idő a leállásig)             | 2397           | (limit)           |
+| 27  | `failed`, `expression_evaluation_failed` (a `canSerializeOutput` ága) | 1727                                     | 709            | 36                |
+
+A leállás minden esetben `FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed -
+JavaScript heap out of memory`, 6-os szignál, 134-es kilépési kód; a `--report-on-fatalerror`
+jelentésben a heap 2 047 734 576 / 2 149 056 512 bájt, JavaScript verem nem érhető el, ezért a hely a
+naplóból jön. n = 24-nél a `fan_out` `markStepSucceeded` hívása még lefut (a visszaolvasás után a heap
+1177 MB), és a `join` `markStepSucceeded` visszaolvasásának `JSON.parse` hívásában áll le, miközben a
+`fan_out` kifejtett fája még él. n = 25 és 26 már a `fan_out` visszaolvasásában áll le.
+
+A visszaolvasás `JSON.parse` hívásának heap növekménye (a `fan_out` sor, egyetlen hívás):
+
+| n   | szöveg (karakter) | heap növekmény (MB) | idő (ms) |
+| --- | ----------------- | ------------------- | -------- |
+| 21  | 8 388 607         | 110                 | 138      |
+| 22  | 16 777 215        | 252                 | 281      |
+| 23  | 33 554 431        | 508                 | 651      |
+| 24  | 67 108 863        | 1020                | 1226     |
+
+Ez karakterenként kb. 15 bájt heap. **Ez az arány ennek az alaknak (egymásba ágyazott kételemű
+tömbök) a mért értéke; más alakú kimenetre (például hosszú szövegekre) nem mértük**, és nem
+ellenőrzött, hogy ez a legrosszabb alak.
+
+### 12.4 Hol bomlik ki a memória (forráshelyek)
+
+A CEL eredmény a memóriában közös hivatkozású (10.2), a tárolás szövege viszont a kibontott fa, és a
+visszaolvasás ebből a szövegből teljes, közös hivatkozás nélküli fát épít. A lánc (hívási verem az
+n = 18 futás naplójából):
+
+1. `packages/db/src/step-run/step-run.ts:70`: `output: text('output', { mode: 'json' })`.
+2. Írás: `drizzle-orm@0.45.2` `sqlite-core/columns/text.js:52`, `SQLiteTextJson.mapToDriverValue` =
+   `JSON.stringify(value)`. A szöveg mérete egyenlő a 12.2 táblázatéval; ez önmagában a mért
+   tartományban nem állította le a folyamatot.
+3. Visszaolvasás: `packages/db/src/step-run/step-run-repository.ts:461` `.returning()` a
+   `markStepSucceeded` `UPDATE` utasításán, a `drizzle-orm` `better-sqlite3/session.js:94` és `:101`
+   (`stmt.raw().get(...)`, majd `mapResultRow`), `utils.js:30` (`decoder.mapFromDriverValue`), és
+   `sqlite-core/columns/text.js:49`, `SQLiteTextJson.mapFromDriverValue` = `JSON.parse(value)`. **Itt
+   bomlik ki a memória**: a 12.3 táblázat szerint a heap ennél a hívásnál nő, és a leállás ebben a
+   hívásban történik.
+4. A visszaolvasott rekord (a kifejtett fával) a motorban tovább él, ezért egy futás egymás után
+   tárolt kimenetei összeadódnak (n = 24: a `fan_out` fája él, amikor a `join` visszaolvasása elfogy).
+
+**A visszaolvasás nem az egyetlen olvasó.** A `listStepRuns` (`step-run-repository.ts:363`) ugyanazon a
+`mode: 'json'` oszlopon olvas, tehát a REST lépés lista és minden más olvasó ugyanígy kifejti a
+szöveget: a mérő script n = 18 ... 21 futásán a `listStepRuns` két további, ugyanakkora `JSON.parse`
+hívást adott.
+
+**Mérés a visszaolvasás nélkül** (eldobható módosítás, nem commitolva, utána `git checkout`): a
+`markStepSucceeded` `.returning()` hívása az `output` oszlop nélküli oszlopkészletet kérte, a rekord
+`output` mezője a bemenet memóriabeli értéke lett:
+
+| n   | kimenetel                                | futás (ms) | csúcs RSS (MB) |
+| --- | ---------------------------------------- | ---------- | -------------- |
+| 18  | `succeeded`                              | 24         | 218            |
+| 22  | `succeeded`                              | 220        | 292            |
+| 23  | `succeeded`                              | 407        | 359            |
+| 24  | `succeeded`                              | 824        | 524            |
+| 25  | `succeeded`                              | 1602       | 855            |
+| 26  | `succeeded`                              | 3130       | 1512           |
+| 27  | `failed`, `expression_evaluation_failed` | 1683       | 719            |
+
+A visszaolvasás nélkül a motor a V8 szöveg korlátjáig (n = 26) végigfut. A tárolt sort később olvasó
+`listStepRuns` viszont ugyanazt a kifejtést végezné, tehát a visszaolvasás elhagyása önmagában a
+leállást csak a futásból a későbbi olvasásba tolja (ezt a mérést nem futtattuk le n = 24 fölött).
+
+### 12.5 Dokumentált korlátok
+
+| Korlát                                                          | Érték                                         | Forrás                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite `SQLITE_MAX_LENGTH` alapértéke (TEXT vagy BLOB, bájtban) | 1 000 000 000                                 | <https://www.sqlite.org/limits.html> ("The default value of this macro is 1 billion"); a telepített `better-sqlite3@13.0.3` `deps/sqlite3/sqlite3.c:14715` (`# define SQLITE_MAX_LENGTH 1000000000`, SQLite 3.53.4); a `deps/defines.gypi` nem írja felül                                                                                            |
+| A futásidejű korlát nem emelhető a fordítási felső korlát fölé  |                                               | <https://www.sqlite.org/c3ref/limit.html> ("Attempts to increase a limit above its hard upper bound are silently truncated")                                                                                                                                                                                                                         |
+| A `better-sqlite3` futásidejű `SQLITE_LIMIT_LENGTH` beállítása  | (1 << 29) - 24 = 536 870 888 bájt             | `better-sqlite3@13.0.3` `src/objects/database.cpp:7-8` és `:168` (a forrás kommentje szerint azért, hogy a túl nagy érték SQLite `SQLITE_TOOBIG` hibával bukjon, ne az átalakításkor)                                                                                                                                                                |
+| V8 maximális szöveghossz 64 bites gépen                         | (1 << 29) - 24 = 536 870 888 UTF-16 kódegység | a telepített Node `include/node/v8-primitive.h:126-127` (`String::kMaxLength`); <https://nodejs.org/api/buffer.html> (`buffer.constants.MAX_STRING_LENGTH`, "may depend on the JS engine"); <https://github.com/nodejs/node/issues/33960> (`536870888` 64 bites buildön); saját mérés: `require('buffer').constants.MAX_STRING_LENGTH` = 536 870 888 |
+
+Mindkét dokumentált korlát (536 870 888) a mért összeomlási pont (67 108 863 karakter, n = 24) fölött
+van, tehát a korlát számához egyik sem ad forrást: a valódi úton a visszaolvasás heapje fogy el előbb.
+A SQLite korlát bájtban, a V8 korlát UTF-16 kódegységben számol; a `JSON.stringify` eredmény `length`
+mezője kódegység, ami nem ASCII szövegnél eltér a UTF-8 bájtszámtól.

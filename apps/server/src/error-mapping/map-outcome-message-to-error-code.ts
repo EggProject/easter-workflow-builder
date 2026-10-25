@@ -32,8 +32,8 @@ const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
  * kifejezés fordítási ellenőrzése (`template_render_failed`,
  * `expression_evaluation_failed`, SPEC-010 9.3). A két utóbbi osztály a REST
  * válaszban csak a futás indításából érkezhet, mert a lépés futásának hibája
- * a futás eseményein megy ki. Az `expression_evaluator_unavailable` a SPEC-010
- * 9.4 döntésével megszűnt. A `satisfies` a sodródás
+ * a futás eseményein megy ki. A kiértékelő hiányát jelző korábbi hibaosztály a
+ * SPEC-010 9.4 döntésével megszűnt. A `satisfies` a sodródás
  * védelem típusszintű ága: egy átnevezett vagy elvett hibaosztály a
  * `typecheck` kapun bukik, ahelyett hogy csendben `internal` kódra esne.
  *
