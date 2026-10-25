@@ -952,13 +952,16 @@ számot a user döntötte el, nem a mérés vezette le. A korlát a 12.2 és 12.
 (16 777 215): ott a mért futás `succeeded`, 856 ms, csúcs RSS 829 MB.
 
 **A megvalósítás.** `packages/engine/src/node-executor/max-stored-output-length.ts` (a konstans),
-`is-storable-output.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
+`output-storability.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
 szerializálás nem dob kivételt), a `fan_out` végrehajtó a `failFanOut` úton zár
 `expression_evaluation_failed` osztállyal. A szerializálás kivétele (`RangeError`, a 12.4 szerinti V8
 szöveghossz-korlát) mindig a méretkorlát fölötti méret, ezért a kivétel ága valódi, nem halott út, és
-ugyanúgy nemet ad. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
+ugyanúgy nemet ad. **Pontosítás (2026-10-25, PLAN-010 T-010-21 A-8):** a kivétel nem csak a
+szöveghossz-korlátból jöhet (például `toJSON` hiba vagy körkörös hivatkozás), ezért a függvény ma
+`outputStorabilityOf` néven háromállapotú (`storable`, `too_large`, `not_serializable`), és a kivétel
+ága a `nem tárolható, mert nem alakítható JSON szöveggé` mondatot kapja. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
 
-**Határ tesztek.** Az `is-storable-output.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
+**Határ tesztek.** Az `output-storability.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
 elemmel (`[` + `"` + szöveg + `"` + `]`, a JSON hossza a szöveg hossza plusz négy) a pontosan a
 korláttal egyenlő hosszra igent, eggyel hosszabbra nemet állít; a kivétel ágát a dobó `toJSON` értékes
 teszt váltja ki.
@@ -972,4 +975,4 @@ tooling/scripts/test.sh`, 6265 teszt zöld, 100 százalék lefedettség mind a n
 teszt 51 ms (a régi 27 szintű teszt 1724 ... 1739 ms, 11. szekció). Szándékos rontás: a `<=
 MAX_STORED_OUTPUT_LENGTH` feltétel `<= MAX_STORED_OUTPUT_LENGTH * 100` alakra cserélve a
 végponttól végpontig teszt, az `execute-fan-out.spec.ts` korlát feletti tesztje és az
-`is-storable-output.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.
+`output-storability.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.

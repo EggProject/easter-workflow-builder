@@ -3,7 +3,7 @@ import type { Outcome } from '@easter-workflow-builder/core';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded, type FinishStepRunSucceededInput } from './finish-step-run-succeeded.ts';
-import { isStorableOutput } from './is-storable-output.ts';
+import { outputStorabilityOf } from './output-storability.ts';
 import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
@@ -44,7 +44,8 @@ export function finishStepRunWithOutput(
   ports: NodeExecutorPorts,
 ): Outcome<FinishedStepRunWithOutput> {
   const { nodeId, ...succeededInput } = input;
-  if (isStorableOutput(input.output)) {
+  const storability = outputStorabilityOf(input.output);
+  if (storability === 'storable') {
     const succeeded = finishStepRunSucceeded(succeededInput, ports);
     if (succeeded.kind === 'error') {
       return succeeded;
@@ -53,10 +54,11 @@ export function finishStepRunWithOutput(
   }
 
   const errorKind = 'step_output_not_storable';
-  const errorMessage = formatEngineErrorMessage(
-    errorKind,
-    `A(z) "${nodeId}" node kimenete túl nagy a tároláshoz (legfeljebb ${String(MAX_STORED_OUTPUT_LENGTH)} karakter)`,
-  );
+  const reason =
+    storability === 'too_large'
+      ? `túl nagy a tároláshoz (legfeljebb ${String(MAX_STORED_OUTPUT_LENGTH)} karakter)`
+      : 'nem tárolható, mert nem alakítható JSON szöveggé';
+  const errorMessage = formatEngineErrorMessage(errorKind, `A(z) "${nodeId}" node kimenete ${reason}`);
   const failed = finishStepRunFailed(
     {
       runId: input.runId,

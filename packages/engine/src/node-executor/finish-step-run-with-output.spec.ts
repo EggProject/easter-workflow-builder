@@ -160,6 +160,27 @@ describe('finishStepRunWithOutput', () => {
     ]);
   });
 
+  it('REGRESSZIÓ: a szerializáláskor kivételt dobó kimenet a nem tárolható mondatot kapja, nem a méretét (PLAN-010 T-010-21 A-8)', () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRunningStep(database);
+    const output = {
+      toJSON: (): never => {
+        throw new TypeError('TITOK');
+      },
+    };
+
+    const finished = okOrThrow(
+      finishStepRunWithOutput({ nodeId: 'start', runId, stepRunId, startedAtMs: 0, output }, portsOf(database, [])),
+    );
+
+    expect(finished).toMatchObject({
+      kind: 'failed',
+      errorKind: 'step_output_not_storable',
+      errorMessage:
+        'A(z) "start" node kimenete nem tárolható, mert nem alakítható JSON szöveggé (step_output_not_storable).',
+    });
+  });
+
   it('a sikeres zárás hibáját továbbadja', () => {
     const database = openMemoryDatabase();
     const { runId, stepRunId } = seedRunningStep(database);

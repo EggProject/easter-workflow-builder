@@ -391,10 +391,13 @@ lezárul, és az `onUnhandledError` és az `error_handler` ugyanúgy működik. 
 különböztetnie a tárolási hibát a `db` többi hibaágától, hogy ne a futás szintű
 `run_execution_failed` osztály legyen belőle. A bekötés a PLAN-010 T-010-13 lépésében történt: a
 `fan_out` végrehajtó a listát a tárolás és a címkék renderelése ELŐTT maga szerializálja
-(`node-executor/is-storable-output.ts`, a korlát a `max-stored-output-length.ts` konstansa), és a
+(`node-executor/output-storability.ts`, a korlát a `max-stored-output-length.ts` konstansa), és a
 korlát túllépése vagy kivétel esetén a lépést a fenti osztállyal zárja, az üzenet a csomópontot és
 a korlát számát nevezi meg, a kifejezés szövegét nem; a `db` hibaága így erről az útról nem érhető
-el, a `db` hibaosztály szótára nem bővült.
+el, a `db` hibaosztály szótára nem bővült. **Pontosítás (PLAN-010 T-010-21 A-8, 2026-10-25):** a
+szerializálás kivétele nem mindig méret (például `toJSON` hiba, körkörös hivatkozás), ezért a két ág
+külön mondatot kap: a korlát fölötti hossz `túl nagy a tároláshoz (legfeljebb ... karakter)`, a
+kivétel `nem tárolható, mert nem alakítható JSON szöveggé`; az osztály mindkettőnél ugyanaz.
 
 **Minden más tárolt lépés kimenet: `step_output_not_storable` (user döntés 2026-10-25, SPEC-010
 O-21).** A `fan_out` korlátja egyedül nem elég: a közvetlenül `join`-ba kötött `fan_out` után a `join`
@@ -411,7 +414,7 @@ idézi. Az `onUnhandledError` és az `error_handler` ugyanúgy működik rá, mi
 `missing_structured_output`, `approval_timed_out`), a `run_` előtag futás szintű állapotot jelöl
 (`run_execution_failed`, `run_stalled`); ez lépés szintű hiba, ezért `step_` előtagú, és `not_storable`,
 nem `too_large`, mert a szerializálás kivétele (például egy `toJSON` hiba) is ide tartozik, ugyanaz a
-kettősség, mint az `isStorableOutput` nevében. Futás közbeni hiba, REST hibatörzsben nem jelenik meg,
+kettősség, mint az `outputStorabilityOf` két hibaágában (`too_large`, `not_serializable`). Futás közbeni hiba, REST hibatörzsben nem jelenik meg,
 ezért nem tagja a `ProtocolErrorClass` szótárnak (`.claude/CLAUDE.md` 5. szekció). Az egyetlen pontot
 az `engine-port/config-invariants.spec.ts` gyűjtő teszt őrzi.
 

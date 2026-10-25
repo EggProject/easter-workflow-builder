@@ -207,7 +207,9 @@ describe('executeFanOut', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
-    expect(outcome.kind === 'failed' && outcome.errorMessage).toContain('túl nagy a tároláshoz');
+    expect(outcome.kind === 'failed' && outcome.errorMessage).toBe(
+      'A(z) "fan_out" fan_out node kimenete nem tárolható, mert nem alakítható JSON szöveggé (expression_evaluation_failed).',
+    );
     expect(rendered).toHaveLength(0);
     const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
     expect(rows.map((row) => row.status)).toStrictEqual(['failed']);
