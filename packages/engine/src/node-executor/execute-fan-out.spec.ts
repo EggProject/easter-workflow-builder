@@ -176,6 +176,36 @@ describe('executeFanOut', () => {
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
   });
 
+  it('REGRESSZIÓ: a tároláskor szerializálhatatlan lista a lépést expression_evaluation_failed hibaosztállyal zárja, a sor nem marad running (SPEC-010 O-15)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const rendered: unknown[] = [];
+    const tooLarge = {
+      toJSON: (): never => {
+        throw new RangeError('Invalid string length');
+      },
+    };
+    const ports = portsOf(
+      database,
+      published,
+      () => ({ kind: 'ok', value: [tooLarge] }),
+      (template, context) => {
+        rendered.push(context);
+        return { kind: 'ok', value: template };
+      },
+    );
+
+    const outcome = okOrThrow(executeFanOut(inputOf(runId), ports));
+
+    expect(outcome.kind).toBe('failed');
+    expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
+    expect(outcome.kind === 'failed' && outcome.errorMessage).toContain('tároláskor nem szerializálható');
+    expect(rendered).toHaveLength(0);
+    const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
+    expect(rows.map((row) => row.status)).toStrictEqual(['failed']);
+  });
+
   it('nem lista eredmény esetén fan_out_items_not_a_list hibaosztállyal zárja', () => {
     const database = openMemoryDatabase();
     const { runId } = seedRun(database);

@@ -1,9 +1,11 @@
 import type { ClockPort, DatabaseContext, EngineDependencies } from '@easter-workflow-builder/engine';
+import {
+  createCelExpressionEvaluator,
+  createMustacheTemplateRenderer,
+} from '@easter-workflow-builder/workflow-language';
 import type { StreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { buildAgentQueryRunner } from './build-agent-query-runner.ts';
 import { buildProviderDescriptorLookup } from './build-provider-descriptor-lookup.ts';
-import { createRejectingExpressionEvaluator } from './create-rejecting-expression-evaluator.ts';
-import { createRejectingTemplateRenderer } from './create-rejecting-template-renderer.ts';
 import { createRealEventPublisher } from './create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from './create-process-environment-reader.ts';
@@ -18,8 +20,10 @@ import { createProcessEnvironmentReader } from './create-process-environment-rea
  * példánya: az `eventPublisher` port ezen keresztül szól a nyitott `/events`
  * kapcsolatoknak (SPEC-006 6.5 "jelzés és lecsapolás" minta).
  *
- * Az `expressionEvaluator` és a `templateRenderer` a SPEC-004 O-1 szerinti,
- * kimondottan elutasító burkoló (lásd a saját fájljuk doksiját).
+ * Az `expressionEvaluator` a CEL, a `templateRenderer` a Mustache port a
+ * `workflow-language` csomagból (SPEC-010 3.1). A két csomagbeli alak és a
+ * motor portja szerkezetileg egyezik: az értékadás itt, `as` nélkül fordul,
+ * tehát egy eltérést a `typecheck` kapu jelez.
  */
 export function buildEngineDependencies(
   database: DatabaseContext,
@@ -30,8 +34,8 @@ export function buildEngineDependencies(
     database,
     agentQueryRunner: buildAgentQueryRunner(),
     providerDescriptorLookup: buildProviderDescriptorLookup(),
-    expressionEvaluator: createRejectingExpressionEvaluator(),
-    templateRenderer: createRejectingTemplateRenderer(),
+    expressionEvaluator: createCelExpressionEvaluator(),
+    templateRenderer: createMustacheTemplateRenderer(),
     eventPublisher: createRealEventPublisher(registry, clock),
     clock,
     idGenerator: createRandomUuidIdGenerator(),

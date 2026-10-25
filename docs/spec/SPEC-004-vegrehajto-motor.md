@@ -387,7 +387,10 @@ kibontja, és `RangeError` kivételt dob, amit a `db` tranzakciója `Outcome` hi
 az `expression_evaluation_failed` osztállyal bukik, mint bármely más kifejezés hiba: a lépés sora
 lezárul, és az `onUnhandledError` és az `error_handler` ugyanúgy működik. A motornak meg kell
 különböztetnie a tárolási hibát a `db` többi hibaágától, hogy ne a futás szintű
-`run_execution_failed` osztály legyen belőle. A bekötés a PLAN-010 T-010-13 lépésében történik.
+`run_execution_failed` osztály legyen belőle. A bekötés a PLAN-010 T-010-13 lépésében történt: a
+`fan_out` végrehajtó a listát a tárolás és a címkék renderelése ELŐTT maga szerializálja
+(`node-executor/can-serialize-output.ts`), és kivétel esetén a lépést a fenti osztállyal zárja;
+a `db` hibaága így erről az útról nem érhető el, a `db` hibaosztály szótára nem bővült.
 
 ### 5.2 Az `agent_step` életciklusa
 

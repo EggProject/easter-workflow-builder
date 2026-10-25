@@ -729,6 +729,16 @@ könyvtár ezt rope szövegként tartja (n = 28-nál 268 435 456 karakter, a fol
 MB), n = 29-nél pedig a közös hibamondatot adja (`a kifejezés nem dolgozható fel`), tehát a
 szöveg hosszának határa `Outcome` hibaágon jön.
 
+**A motor bekötése (PLAN-010 T-010-13, 2026-10-25).** A `fan_out` végrehajtó a listát a tárolás és a
+címkék renderelése előtt maga szerializálja (`packages/engine/src/node-executor/can-serialize-output.ts`),
+és kivétel esetén a lépést `expression_evaluation_failed` osztállyal zárja. Mérve ugyanezen a gépen, a
+javítás előtt (a valódi `createCelExpressionEvaluator`, `[1]` + 27 darab `.map(x, [x, x])`, három futás):
+az `evaluate` 2 ms, a `JSON.stringify` `RangeError` kivétele 1677 ... 1695 ms után, RSS 92 ... 93 MB. A
+regressziós teszt (`apps/server/src/engine-assembly/build-engine-dependencies.spec.ts`) a valódi motoron,
+a szerver összeállításával fut, a végét a `run_finished` eseményből olvassa; egyedül futtatva 1711 ms, a
+javítás előtti motoron 1730 ms alatt bukik (a futás `run_execution_failed` osztállyal zárt). A motor
+egység tesztje (`execute-fan-out.spec.ts`) a kivételt egy dobó `toJSON` értékkel váltja ki.
+
 ### 10.3 J3: a Mustache greppes invariánsok destrukturálással megkerülhetők voltak (javítva)
 
 Egy nem commitolt termékkód fájlba injektált `const { render } = Mustache`, `const {
