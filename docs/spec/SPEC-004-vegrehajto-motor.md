@@ -357,7 +357,7 @@ Közös szabályok minden végrehajtóra:
 
 - A lépés indulásakor `createStepRun`, majd `markStepRunning`, és egy `step_started` motor esemény.
 - A lépés zárásakor a megfelelő nevesített állapotváltó (`markStepSucceeded`, `markStepFailed`, `markStepRejected`, `markStepCancelled`), és egy `step_finished` motor esemény.
-- Minden hibaüzenet az F-24 konvenciója szerint zárójelben tartalmazza a hibaosztály nevét, és ugyanaz a név kerül a `step_run.error_kind` oszlopba.
+- Minden hibaüzenet az F-24 konvenciója szerint zárójelben tartalmazza a hibaosztály nevét, és ugyanaz a név kerül a `step_run.error_kind` oszlopba. A kifejezés és a sablon hibájának üzenete a csomópontot és a mező nevét mondja, a kifejezés vagy a sablon szövegét nem idézi (user döntés 2026-10-25, SPEC-010 9.5).
 - Kivétel nem hagyja el a végrehajtót: minden ág `Outcome` értéket ad.
 - Minden tárolt lépés kimenet a tárolás előtt a 16 777 215 karakteres korlát alá esik (a `JSON.stringify` eredményének hossza, SPEC-010 O-18); a korlát fölötti vagy nem szerializálható kimenet a lépést `step_output_not_storable` osztállyal zárja, a `fan_out` kivételével, ami `expression_evaluation_failed` osztállyal zár (user döntés 2026-10-25, SPEC-010 O-21, lásd a táblázat utáni bekezdést).
 

@@ -106,7 +106,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (evaluated.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" fan_out node "${config.itemsExpression}" kifejezésének kiértékelése sikertelen: ${evaluated.message}`,
+      `A(z) "${nodeId}" fan_out node itemsExpression mezőjének kiértékelése sikertelen: ${evaluated.message}`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }
@@ -114,7 +114,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (!Array.isArray(evaluated.value)) {
     const errorMessage = formatEngineErrorMessage(
       'fan_out_items_not_a_list',
-      `A(z) "${nodeId}" fan_out node "${config.itemsExpression}" kifejezésének eredménye nem lista`,
+      `A(z) "${nodeId}" fan_out node itemsExpression mezőjének eredménye nem lista`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'fan_out_items_not_a_list', errorMessage, ports);
   }
@@ -135,7 +135,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (rendered.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'template_render_failed',
-      `A(z) "${nodeId}" fan_out node "${config.branchLabelTemplate}" címke sablonjának renderelése sikertelen: ${rendered.message}`,
+      `A(z) "${nodeId}" fan_out node branchLabelTemplate mezőjének renderelése sikertelen: ${rendered.message}`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'template_render_failed', errorMessage, ports);
   }

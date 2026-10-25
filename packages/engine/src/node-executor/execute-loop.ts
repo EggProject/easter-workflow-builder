@@ -113,14 +113,14 @@ export function executeLoop(input: ExecuteLoopInput, ports: NodeExecutorPorts): 
   if (evaluated.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" loop node "${config.continueExpression}" kifejezésének kiértékelése sikertelen: ${evaluated.message}`,
+      `A(z) "${nodeId}" loop node continueExpression mezőjének kiértékelése sikertelen: ${evaluated.message}`,
     );
     return failLoop(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }
   if (!isBoolean(evaluated.value)) {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" loop node "${config.continueExpression}" kifejezésének eredménye nem logikai érték`,
+      `A(z) "${nodeId}" loop node continueExpression mezőjének eredménye nem logikai érték`,
     );
     return failLoop(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }

@@ -117,6 +117,12 @@ function cancelRunningStep(database: DatabaseContext, runId: string): void {
   }
 }
 
+/**
+ * A kifejezés vagy sablon szövegébe tett jelölő: a lépés hibaüzenete a csomópontot és a
+ * mező nevét mondja, a szöveget nem idézi (PLAN-010 T-010-21 A-2, user döntés 2026-10-25).
+ */
+const SECRET_MARKER = 'TITOK_JELOLO_8f3a';
+
 describe('executeLoop', () => {
   it('maxIterations elérésekor kifejezés kiértékelés nélkül loop_max_iterations_reached hibaosztállyal zár', () => {
     const database = openMemoryDatabase();
@@ -205,6 +211,36 @@ describe('executeLoop', () => {
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
   });
+
+  it.each([
+    [
+      'a kiértékelési hiba',
+      (): Outcome<unknown> => ({ kind: 'error', message: 'teszt kiértékelési hiba' }),
+      'loop node continueExpression mezőjének kiértékelése sikertelen',
+    ],
+    [
+      'a nem logikai eredmény',
+      (): Outcome<unknown> => ({ kind: 'ok', value: 'nem logikai' }),
+      'loop node continueExpression mezőjének eredménye nem logikai érték',
+    ],
+  ])(
+    'REGRESSZIÓ: %s üzenete a csomópontot és a mezőt nevezi meg, a kifejezés szövegét nem idézi (PLAN-010 T-010-21 A-2)',
+    (_name, evaluate, expected) => {
+      const database = openMemoryDatabase();
+      const { runId } = seedRun(database);
+      const base = inputOf(runId);
+
+      const outcome = okOrThrow(
+        executeLoop(
+          { ...base, config: { ...base.config, continueExpression: `input.${SECRET_MARKER}` } },
+          portsOf(database, [], evaluate),
+        ),
+      );
+
+      expect(outcome.stepRun.errorMessage).toContain(expected);
+      expect(outcome.stepRun.errorMessage).not.toContain(SECRET_MARKER);
+    },
+  );
 
   it('a begin fázis hibáját továbbadja (nem létező runId)', () => {
     const database = openMemoryDatabase();

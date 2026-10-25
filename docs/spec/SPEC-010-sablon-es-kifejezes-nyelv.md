@@ -773,6 +773,13 @@ viszont a kifejezés vagy a sablon darabját idézi (mérve):
   (2026-10-21): marad.** A CEL futásidejű hibája a kulcs nevét nem idézi, a Mustache hiányzó név hibája a
   kért nevet idézi; az utóbbi a futás eseményein megy ki, a szerkesztő felületre és a `POST .../runs`
   válaszba nem jut (15. szekció, O-9).
+- **A motor futás közbeni hibaüzenete (user döntés 2026-10-25, PLAN-010 T-010-21 A-2).** A lépés
+  futás közbeni hibaüzenete (`step_run.error_message`, a `branch`, a `fan_out`, a `loop` és a
+  `human_approval` kifejezés és sablon hibája) a csomópontot és a mező nevét mondja
+  (`A(z) "<csomópont>" fan_out node itemsExpression mezőjének kiértékelése sikertelen: ...`), a
+  kifejezés vagy a sablon szövegét nem idézi, ugyanúgy, mint az `agent_step` prompt hibája és a
+  futás indításának ellenőrzése. A csomag leírása (a fenti pontok, a hiányzó név idézésével) változatlanul
+  a mondat végére kerül.
 
 A szerkesztő mezőhibája (10. szekció) hibaosztályt nem hordoz, csak ugyanezt a leírást, előtag
 nélkül, nagy kezdőbetűvel és ponttal zárva (10. szekció, O-19), mert az mezőhiba, nem `Outcome` a
@@ -973,7 +980,7 @@ Egyik sem zárható le tippeléssel.
 ### A motor
 
 32. A motor futás indítási ellenőrzése a 9.2 mind a hét mezőjére meghívja a megfelelő port `compile` metódusát; minden mezőre külön teszteset igazolja, hogy a hibás mező elutasítja az indítást a megfelelő osztállyal, és egyetlen adatbázis sor sem keletkezik.
-33. Az elutasító üzenet megnevezi a csomópont azonosítóját és a mező nevét, és a F-24 konvenció szerint a végén zárójelben a hibaosztályt; a sablon vagy a kifejezés teljes szövegét nem idézi, a CEL hibánál sem a `message`, sem a `summary` mezőt (a leírás hibakódonként saját magyar mondat plusz pozíció, 9.5). Futtatott teszt egy hosszú, egyedi jelölő szöveget tartalmazó hibás kifejezéssel és sablonnal igazolja, hogy a jelölő nem szerepel az üzenetben; a `workflow-language` csomag tesztje ugyanezt a CEL `unknown_variable`, `no_such_key` és `unexpected_character` kódra, valamint a Mustache `Unopened section`, `Unclosed section` és `Invalid tags` hibára is igazolja.
+33. Az elutasító üzenet megnevezi a csomópont azonosítóját és a mező nevét, és a F-24 konvenció szerint a végén zárójelben a hibaosztályt; a sablon vagy a kifejezés teljes szövegét nem idézi, a CEL hibánál sem a `message`, sem a `summary` mezőt (a leírás hibakódonként saját magyar mondat plusz pozíció, 9.5). Futtatott teszt egy hosszú, egyedi jelölő szöveget tartalmazó hibás kifejezéssel és sablonnal igazolja, hogy a jelölő nem szerepel az üzenetben; a `workflow-language` csomag tesztje ugyanezt a CEL `unknown_variable`, `no_such_key` és `unexpected_character` kódra, valamint a Mustache `Unopened section`, `Unclosed section` és `Invalid tags` hibára is igazolja. A futás közbeni lépés hibaüzenetre ugyanez áll (9.5, A-2): a `branch`, a `fan_out` (kiértékelés, nem lista, címke sablon), a `loop` (kiértékelés, nem logikai) és a `human_approval` végrehajtó tesztje jelölővel igazolja.
 34. A gyerek futás indítása (`sub_workflow`) ugyanezt az ellenőrzést futtatja a gyerek gráfján; futtatott teszt igazolja.
 35. A `packages/engine` port típusai (`TemplateRendererPort`, `ExpressionEvaluatorPort`) változatlanok.
 36. A három csomópont eredmény kezelése változatlan (M-102), és a meglévő tesztjeik változatlanul zöldek.
