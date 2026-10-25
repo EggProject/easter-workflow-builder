@@ -58,7 +58,8 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'thinking_mode_unsupported',
     'effort_unsupported',
     'provider_descriptor_sdk_mismatch',
-    'expression_evaluator_unavailable',
+    'template_render_failed',
+    'expression_evaluation_failed',
   ] as const)('a motor %s validációs hibaosztályát unprocessable kódra képezi', (kind) => {
     expect(mapOutcomeMessageToErrorCode(formatEngineErrorMessage(kind, 'A futás nem indítható'))).toBe('unprocessable');
   });

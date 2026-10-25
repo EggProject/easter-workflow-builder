@@ -711,7 +711,8 @@ A `apps/server` `error-mapping` témájának `unprocessable` halmaza a `template
 kapna (SPEC-006 5.5: a be nem sorolt osztály `internal`). A két osztály a REST válaszban csak a
 futás indításából érkezhet, mert a lépés futásának hibája nem a `startRun` `Outcome` értékén megy
 ki, hanem a futás eseményein. A SPEC-005 8.3 táblázatának "gráf validációs hibaosztályai" sora
-ezzel a két osztállyal bővül.
+ezzel a két osztállyal bővül. **Végrehajtva: PLAN-010 T-010-14** (a `create-http-server.spec.ts` két
+regressziós tesztje a valódi motorral `422` választ igazol; előtte a válasz `500 internal` volt).
 
 ### 9.4 Az `expression_evaluator_unavailable` sorsa, és az eltérés a feladat szövegétől
 
@@ -729,7 +730,8 @@ elutasító port állította elő (M-104), ami a bekötés cseréjével megszűn
 **Lezárva, 2026-09-23, a user döntésével: a törlés jóváhagyva.** Mindkét pont változatlanul
 végrehajtandó: a két `create-rejecting-*.ts` fájl és a tesztje törlődik, és az
 `expression_evaluator_unavailable` érték kikerül az `EngineErrorKind` unióból, az
-`isEngineErrorKind` guardból és a szerver `unprocessable` halmazából.
+`isEngineErrorKind` guardból és a szerver `unprocessable` halmazából. **Végrehajtva:** az 1. pont a
+PLAN-010 T-010-13, a 2. pont a T-010-14 lépésben.
 
 ### 9.5 Az üzenet alakja
 

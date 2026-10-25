@@ -1,12 +1,15 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
-import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
+import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@easter-workflow-builder/db';
+import { createEngine } from '@easter-workflow-builder/engine';
 import type { RouteId } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
-import { isRecord } from '@easter-workflow-builder/typeguards';
+import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createSystemClock } from '../engine-assembly/create-system-clock.ts';
+import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
+import { createStartRunHandler } from '../run-endpoint/start-run.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import type { StreamConnectionDependencies } from '../stream-connection/handle-stream-connection.ts';
 import { createHttpServer, readLastEventIdHeader, type HttpServerOptions } from './create-http-server.ts';
@@ -117,6 +120,56 @@ function buildOptions(
     idGenerator: createRandomUuidIdGenerator(),
   };
 }
+
+/* eslint-disable unicorn/no-null -- a leírás és az él kezelő és ág kulcs mezői valódi NULL értéket tárolnak (SPEC-003 4.4) */
+function edgeOf(id: string, sourceNodeId: string, targetNodeId: string): WorkflowEdgeInput {
+  return { id, sourceNodeId, targetNodeId, sourceHandle: null, targetHandle: null, branchKey: null };
+}
+
+/**
+ * Egy `start -> fan_out -> join` workflow a valódi adatbázisban, a `fan_out`
+ * két mezőjének kívülről adott szövegével: így egy fordíthatatlan sablon vagy
+ * kifejezés a motor indítási ellenőrzésén (SPEC-010 9.2) bukik.
+ */
+function seedFanOutWorkflow(
+  database: DatabaseContext,
+  fields: { readonly itemsExpression: string; readonly branchLabelTemplate: string },
+): string {
+  const workflow = okOrThrow(
+    database.workflows.createWorkflow({ name: 'forditas', description: null, providerId: 'claude-subscription' }),
+  );
+  okOrThrow(
+    database.workflows.replaceGraph(
+      workflow.id,
+      [
+        {
+          id: 'start',
+          label: 'start',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
+        },
+        {
+          id: 'fo',
+          label: 'fo',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'fan_out', ...fields, onUnhandledError: 'fail_run' },
+        },
+        {
+          id: 'j',
+          label: 'j',
+          positionX: 0,
+          positionY: 0,
+          config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
+        },
+      ],
+      [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'j')],
+    ),
+  );
+  return workflow.id;
+}
+/* eslint-enable unicorn/no-null */
 
 async function startTestServer(options: HttpServerOptions): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = createHttpServer(options);
@@ -262,6 +315,45 @@ describe('createHttpServer', () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toStrictEqual({ code: 'unprocessable', message, errorClass: 'no_default_provider' });
   });
+
+  // SPEC-010 9.3, 39. kritérium: a T-010-12 óta a motor a fordíthatatlan
+  // sablont és kifejezést a futás indításakor elutasítja, de a két osztály a
+  // leképezésben nem szerepelt, tehát a válasz 500 internal volt.
+  it.each([
+    {
+      errorClass: 'template_render_failed',
+      fields: { itemsExpression: '[1]', branchLabelTemplate: '{{#nyitott}}elem' },
+    },
+    {
+      errorClass: 'expression_evaluation_failed',
+      fields: { itemsExpression: '[1,', branchLabelTemplate: 'elem {{itemIndex}}' },
+    },
+  ])(
+    'REGRESSZIÓ: a valódi motor $errorClass indítási elutasítása 422 unprocessable, futás sor nélkül (SPEC-010 9.3)',
+    async ({ errorClass, fields }) => {
+      const database = okOrThrow(openDatabase(':memory:'));
+      const registry = createStreamRegistry(createRandomUuidIdGenerator());
+      const engine = createEngine(buildEngineDependencies(database, registry, createSystemClock()));
+      const workflowId = seedFanOutWorkflow(database, fields);
+      const { baseUrl, close } = await startTestServer(
+        buildOptions({ startRun: createStartRunHandler(engine) }, undefined),
+      );
+      closeServer = close;
+
+      const response = await fetch(`${baseUrl}/api/workflows/${workflowId}/runs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: {} }),
+      });
+
+      expect(response.status).toBe(422);
+      const payload: unknown = await response.json();
+      expect(payload).toMatchObject({ code: 'unprocessable' });
+      const message = isRecord(payload) ? payload['message'] : undefined;
+      expect(isString(message) && message.endsWith(`(${errorClass}).`)).toBe(true);
+      expect(okOrThrow(database.runs.listRuns())).toStrictEqual([]);
+    },
+  );
 
   it('a kezelő invalid_request hibaágát 400-ra képezi, nem 500-ra (regresszió, 2026-09-26)', async () => {
     const message = 'A kérés törzse érvénytelen, hibás mező(k): name (invalid_request).';
