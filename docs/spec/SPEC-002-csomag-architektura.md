@@ -1,12 +1,12 @@
 # SPEC-002: Csomag architektúra és mappa konvenció
 
-|          |                                                                                                                                           |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | tervezet                                                                                                                                  |
-| Dátum    | 2026-08-27                                                                                                                                |
-| Előzmény | [`SPEC-001-monorepo-toolchain.md`](SPEC-001-monorepo-toolchain.md), 3. szekció csomagtérkép és 13. szekció mappaszerkezet                 |
-| Bemenet  | [`../research/2026-08-26-agent-tools.md`](../research/2026-08-26-agent-tools.md), a `packages/typeguards` bemásolt kód mappa konvenciója  |
-| Kimenet  | 19 termékcsomag a `packages/` alatt, 25 workspace csomag összesen, repóra kiterjesztett `src/<téma>/` konvenció, `.spec.ts` tesztvégződés |
+|          |                                                                                                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Státusz  | tervezet                                                                                                                                                                                                                    |
+| Dátum    | 2026-08-27                                                                                                                                                                                                                  |
+| Előzmény | [`SPEC-001-monorepo-toolchain.md`](SPEC-001-monorepo-toolchain.md), 3. szekció csomagtérkép és 13. szekció mappaszerkezet                                                                                                   |
+| Bemenet  | [`../research/2026-08-26-agent-tools.md`](../research/2026-08-26-agent-tools.md), a `packages/typeguards` bemásolt kód mappa konvenciója                                                                                    |
+| Kimenet  | 20 termékcsomag a `packages/` alatt, 26 workspace csomag összesen (a spec lezárásakor 19 és 25; a `workflow-language` a SPEC-010 szerint került be), repóra kiterjesztett `src/<téma>/` konvenció, `.spec.ts` tesztvégződés |
 
 ---
 
@@ -148,14 +148,14 @@ Nyolc csomag szűnt meg, a tartalmuk egy befogadó csomag `src/` fájában él t
 
 `@easter-workflow-builder/db`, `@easter-workflow-builder/engine`, `@easter-workflow-builder/agent`, `@easter-workflow-builder/protocol`, `@easter-workflow-builder/logger`, `@easter-workflow-builder/ui`, `@easter-workflow-builder/server`, `@easter-workflow-builder/web`, `@easter-workflow-builder/eslint-config`, `@easter-workflow-builder/tsconfig`, `@easter-workflow-builder/scripts`, `@easter-workflow-builder/wire-probe`. Ezek tartalma nem változik, és a 6. szekció mappa konvenciója rájuk is érvényes, amint valódi tartalmat kapnak. A `@easter-workflow-builder/typeguards` már ma követi a konvenciót.
 
-### Rétegbesorolás, mind a 25 csomagra
+### Rétegbesorolás, mind a 26 csomagra
 
 A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van rétegszáma, a most nem érintett csomagoknak is. A besorolás a `tooling/scripts/src/dependency-graph/package-layer.ts` fájlban áll, és a gráf ellenőrző bemenete. Egy újonnan felvett csomagnak kötelező itt szerepelnie, különben az ellenőrző "hiányzó réteg-hozzárendelés" hibát ad.
 
 | Réteg  | Csomagok                                                                                                                                                  |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | L0     | `typeguards`, `mcp-tool-kit`, `core`, `logger`                                                                                                            |
-| L1     | `provider-capability`, `protocol`                                                                                                                         |
+| L1     | `provider-capability`, `protocol`, `workflow-language`                                                                                                    |
 | L2     | `minimax-client`, `firecrawl-client`, `provider-minimax`, `provider-claude-subscription`, `db`, `ui`                                                      |
 | L3     | `tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `provider-registry`                                               |
 | L4     | `agent-tool-bundle`, `agent`                                                                                                                              |
@@ -163,7 +163,7 @@ A 13. elfogadási kritérium gépi ellenőrzéséhez minden csomagnak van réteg
 | L6     | `server`                                                                                                                                                  |
 | eszköz | `eslint-config`, `tsconfig`, `scripts`, `wire-probe`, réteg nélkül, mert nem termékkód és egyetlen termékcsomag sem függhet tőlük futásidejű függőségként |
 
-Összesen 19 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 25 workspace csomag.
+Összesen 20 termékcsomag a `packages/` alatt, 2 alkalmazás az `apps/` alatt, 3 eszköz a `tooling/` alatt és 1 mérőeszköz a `tools/` alatt: 26 workspace csomag.
 
 A `protocol` L1, mert csak L0 csomagoktól függhet: a `core` és a `typeguards` csomagtól (a `typeguards` felvétele a SPEC-005 7.2 szekció és a szabálykönyv 5. szekciója szerint: a `protocol` is használhat belőle guardot ott, ahol a kérdés nem drótszintű alak). A `db` és a `ui` L2, mert a `protocol`, a `core` és a `logger` fölött áll. Az `engine` L5, mert a végrehajtó motor ütemezi a lépéseket és hívja az Agent SDK adaptert, tehát az `agent` (L4) fölött áll; a `server` emiatt L6, mert az `engine`-től is függ. A besorolás azt a szabályt kényszeríti ki, hogy egy csomag csak nála szigorúan kisebb rétegszámú csomagtól függhet, és az eszköz csomagok csak `devDependencies` helyen jelenhetnek meg.
 
@@ -761,7 +761,7 @@ A `config` tiltása a **puszta** névre vonatkozik. A `minimax-config/` és a `f
 
 **Fő szabály.** A csoportosítás legfeljebb kétszintű: `src/<téma>/` egy tárgykörű csomagban, `src/<tárgykör>/<téma>/` több tárgykörűben (6.1 pont 8. szabálya). Harmadik szint nincs. Ha egy csomagban a tárgykörök fölé is csoportosítani kellene, az azt jelenti, hogy a csomag két csomag, és a szétbontást kell mérlegelni.
 
-A 19 termékcsomagból 16 egy tárgykörű, tehát lapos, `src/<téma>/` szintű. Három kétszintű: a `core` és a `provider-capability`, mert a user döntése szerint több, korábban önálló tárgykört fognak össze, és a `db`, mert három téma mappája (`workflow-graph`, `graph-snapshot`, `run-event`) önmaga több fogalmat hordozott, és a 6.1 pont 8. szabályának második oka szerint tárgykör mappává vált ([`../plan/PLAN-004-csomag-belso-szerkezet.md`](../plan/PLAN-004-csomag-belso-szerkezet.md)).
+A 20 termékcsomagból 17 egy tárgykörű, tehát lapos, `src/<téma>/` szintű. Három kétszintű: a `core` és a `provider-capability`, mert a user döntése szerint több, korábban önálló tárgykört fognak össze, és a `db`, mert három téma mappája (`workflow-graph`, `graph-snapshot`, `run-event`) önmaga több fogalmat hordozott, és a 6.1 pont 8. szabályának második oka szerint tárgykör mappává vált ([`../plan/PLAN-004-csomag-belso-szerkezet.md`](../plan/PLAN-004-csomag-belso-szerkezet.md)).
 
 ### 6.6 A csomag publikus felülete
 
@@ -887,7 +887,7 @@ Amit **nem** kell megnevezni: a szolgáltatófüggetlen csomagokat (`core`, `typ
 | A `scrapePage` kiemelése megváltoztatja a `web_fetch` hibaüzeneteit                                        | az agent más szöveget kap, a teszt elvárások elcsúsznak                           | a `scrapePage` szerződése `Outcome<unknown>`, a szűkítés a hívónál marad, tehát a két hibaág és a két üzenet változatlan (5.11)                                                                                                                                                                                             |
 | A `docs:check` egy új csomag gyökerének hiányzó `CLAUDE.md`-je miatt pirosra vált                          | a kapu elbukik, a lépés nem zárható le                                            | a `CLAUDE.md` a csomag gyökerével **együtt**, ugyanabban a lépésben keletkezik, nem utólag                                                                                                                                                                                                                                  |
 | A `@easter-workflow-builder/` névtér átírása kimarad egy `dependencies` kulcsból                           | `bun install` hibázik, vagy egy import registry csomagra oldódik fel              | a névtér átírás önálló, atomi lépés, a végén `bun install --frozen-lockfile` plusz mind a hét kapu                                                                                                                                                                                                                          |
-| A 25 csomagos gráf lelassítja a Turborepo futást                                                           | lassabb helyi és CI futás                                                         | dokumentált felső korlát vagy teljesítmény-figyelmeztetés a csomagszámra a Turborepo dokumentációjában **nincs**, ezért számot itt nem rögzítünk; a lépések végén mért `turbo run typecheck` idő a tény                                                                                                                     |
+| A 26 csomagos gráf lelassítja a Turborepo futást                                                           | lassabb helyi és CI futás                                                         | dokumentált felső korlát vagy teljesítmény-figyelmeztetés a csomagszámra a Turborepo dokumentációjában **nincs**, ezért számot itt nem rögzítünk; a lépések végén mért `turbo run typecheck` idő a tény                                                                                                                     |
 | A `packages/typeguards` csomagon párhuzamosan dolgozik egy másik agent                                     | ütköző szerkesztés                                                                | a typeguards érintő lépés a terv legvégén áll, és csak akkor indul, ha a párhuzamos munka lezárult                                                                                                                                                                                                                          |
 | A tisztán típus-only csomagok (`agent-tool-id`, `provider-capability`) barrelje futásidőben üres modult ad | a Vitest projekt vagy a Node type stripping nem tudja betölteni a csomagot        | a `verbatimModuleSyntax` mellett az `export type { X } from '...'` alak érvényes modult képez, tehát nem üres fájl. A `passWithNoTests: true` már ma be van állítva a gyökér configban, tehát a teszt nélküli projekt nem bukik el. Ha a betöltés mégis hibázna, a barrelbe egyetlen `export {}` sor kerül, kizárás helyett |
 
