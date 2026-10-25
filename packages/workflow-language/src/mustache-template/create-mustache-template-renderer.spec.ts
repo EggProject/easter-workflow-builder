@@ -238,15 +238,90 @@ describe('createMustacheTemplateRenderer: szigorú kiírás (SPEC-010 6.5, user 
   });
 });
 
+const circularObject: Record<string, unknown> = {};
+circularObject['self'] = circularObject;
+
+const circularArray: unknown[] = [];
+circularArray.push({ back: circularArray });
+
+describe('createMustacheTemplateRenderer: mélyen szigorú kiírás (SPEC-010 6.5, user döntés 2026-10-25)', () => {
+  const renderer = createMustacheTemplateRenderer();
+  const TAGS = ['a {{input.v}} b', 'a {{{input.v}}} b', 'a {{& input.v}} b'] as const;
+
+  // Minden alak, ami a beágyazott értéknél hibát ad: a nem JSON típusok, a nem véges szám és a körkörösség.
+  const NESTED_VALUES: readonly (readonly [string, unknown])[] = [
+    ['Map', new Map()],
+    ['Date', new Date(0)],
+    ['osztálypéldány', new Szerzo()],
+    ['BigInt', 1n],
+    ['Symbol', Symbol('x')],
+    ['függvény', () => 1],
+    ['Uint8Array', new Uint8Array([1])],
+    ['undefined', undefined],
+    ['NaN', NaN],
+    ['végtelen', Infinity],
+  ];
+
+  it.each(NESTED_VALUES)(
+    'a tömbben, az objektumban és több szint mélyen álló %s a nevet megnevező hibát ad',
+    (_name, nested) => {
+      for (const v of [[nested], { k: nested }, { a: [1, { b: [[nested]] }] }]) {
+        for (const template of TAGS) {
+          expect(renderer.render(template, { input: { v } })).toStrictEqual(nonJson('input.v'));
+        }
+      }
+    },
+  );
+
+  it.each([NaN, Infinity, -Infinity])('a felső szintű %s is a nevet megnevező hibát ad', (v) => {
+    for (const template of TAGS) {
+      expect(renderer.render(template, { input: { v } })).toStrictEqual(nonJson('input.v'));
+    }
+  });
+
+  it.each([
+    ['körkörös sima objektum', circularObject],
+    ['körkörös tömb', circularArray],
+  ])('a %s a nevet megnevező hibát ad, tartalék mondat nélkül', (_name, v) => {
+    for (const template of TAGS) {
+      expect(renderer.render(template, { input: { v } })).toStrictEqual(nonJson('input.v'));
+    }
+  });
+
+  it('a mélyen beágyazott tiszta JSON és a közös hivatkozás átmegy (ellenpélda)', () => {
+    const shared = { k: [1] };
+    const v = { a: [1, { b: [['x', jsonNull, true, { c: { d: [0.5] } }]] }], x: shared, y: shared };
+    for (const template of TAGS) {
+      expect(renderer.render(template, { input: { v } })).toStrictEqual({
+        kind: 'ok',
+        value: 'a {"a":[1,{"b":[["x",null,true,{"c":{"d":[0.5]}}]]}],"x":{"k":[1]},"y":{"k":[1]}} b',
+      });
+    }
+  });
+
+  it('a szakasz a beágyazott nem JSON értéken is a könyvtár útján marad, hiba nélkül', () => {
+    expect(renderer.render('{{#input.v}}x{{/input.v}}', { input: { v: [new Map()] } })).toStrictEqual({
+      kind: 'ok',
+      value: 'x',
+    });
+  });
+});
+
 describe('createMustacheTemplateRenderer: kivétel nem hagyja el a függvényt (SPEC-010 6.2)', () => {
   const renderer = createMustacheTemplateRenderer();
 
-  it('a JSON.stringify kivétele (körkörös sima objektum, beágyazott BigInt) a tartalék mondat, a könyvtár szövege nélkül', () => {
-    const circular: Record<string, unknown> = {};
-    circular['self'] = circular;
-    for (const view of [{ v: circular }, { v: [1n] }, { v: { n: 1n } }]) {
-      expect(renderer.render('{{v}}', view)).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
-    }
+  it('az ismeretlen kivétel (a vizsgálat közben dobó Proxy) a tartalék mondat, a szöveg nélkül', () => {
+    const throwing: unknown = new Proxy(
+      {},
+      {
+        getPrototypeOf() {
+          throw new TypeError('TITKOS a proxy hibája');
+        },
+      },
+    );
+    const outcome = renderer.render('{{v}}', { v: throwing });
+    expect(outcome).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
+    expect(JSON.stringify(outcome)).not.toContain('TITKOS');
   });
 
   it('nem objektum nézeten a sima tag hiányzó név, a szakasz üres', () => {

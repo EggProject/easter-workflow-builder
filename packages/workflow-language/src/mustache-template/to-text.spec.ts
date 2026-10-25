@@ -39,8 +39,23 @@ describe('toText', () => {
     }
   });
 
-  it('a beágyazott értéket nem vizsgálja, a JSON.stringify szabálya dönt', () => {
-    expect(toText([new Map()])).toBe('[{}]');
-    expect(() => toText([1n])).toThrow(TypeError);
+  it('a nem véges szám a felső szinten is undefined', () => {
+    for (const value of [NaN, Infinity, -Infinity]) {
+      expect(toText(value)).toBeUndefined();
+    }
+  });
+
+  it('a beágyazott nem JSON érték is undefined, kivétel nélkül (user döntés 2026-10-25: mélyen szigorú)', () => {
+    for (const value of [new Map(), new Date(0), new Pelda(), 1n, Symbol('x'), new Uint8Array([1]), NaN]) {
+      expect(toText([value])).toBeUndefined();
+      expect(toText({ a: [{ b: value }] })).toBeUndefined();
+    }
+  });
+
+  it('a körkörös sima objektum undefined, a mélyen beágyazott tiszta JSON átmegy', () => {
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    expect(toText(circular)).toBeUndefined();
+    expect(toText({ a: [{ b: [{ c: 'x' }, 2] }] })).toBe('{"a":[{"b":[{"c":"x"},2]}]}');
   });
 });

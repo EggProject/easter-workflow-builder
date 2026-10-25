@@ -39,8 +39,9 @@ const PARSE_ERROR_SENTENCES = [
  * A sablon fordításának vagy renderelésének kivétele saját magyar leírásra
  * képezve (SPEC-010 6.2, 9.5). A könyvtár üzenete nem kerül ki; a hiányzó név
  * hibája (6.7) és a nem JSON értékre mutató név hibája (6.5) a kért nevet
- * idézi. Minden más kivétel (például a `JSON.stringify` körkörös hivatkozásra
- * dobott hibája) a közös tartalék mondatot kapja. A hibaosztály nevét nem a
+ * idézi. Minden más, előre nem látott kivétel a közös tartalék mondatot kapja
+ * (a körkörös hivatkozás és a beágyazott nem JSON érték nem ide tartozik: azt a
+ * szöveggé alakítás előre elutasítja, a 6.5 szerint). A hibaosztály nevét nem a
  * csomag, hanem a hívó teszi hozzá (6.2).
  */
 export function describeTemplateError(error: unknown): string {
