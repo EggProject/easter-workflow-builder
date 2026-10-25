@@ -61,7 +61,7 @@ const NODES_BY_TYPE: readonly { readonly node: WorkflowNodeInput; readonly legen
       label: 'Elágazás',
       positionX: 0,
       positionY: 0,
-      config: { type: 'branch', expression: 'x', branches: [], defaultBranchKey: null, onUnhandledError: null },
+      config: { type: 'branch', expression: 'input.x', branches: [], defaultBranchKey: null, onUnhandledError: null },
     },
     legend: 'Feltétel kifejezés',
   },
@@ -72,7 +72,12 @@ const NODES_BY_TYPE: readonly { readonly node: WorkflowNodeInput; readonly legen
       label: 'Szétosztás',
       positionX: 0,
       positionY: 0,
-      config: { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
+      config: {
+        type: 'fan_out',
+        itemsExpression: 'input.items',
+        branchLabelTemplate: '{{item}}',
+        onUnhandledError: null,
+      },
     },
     legend: 'Elemek kifejezés (itemsExpression)',
   },
@@ -94,7 +99,7 @@ const NODES_BY_TYPE: readonly { readonly node: WorkflowNodeInput; readonly legen
       label: 'Ciklus',
       positionX: 0,
       positionY: 0,
-      config: { type: 'loop', maxIterations: 5, continueExpression: 'i < 5', onUnhandledError: null },
+      config: { type: 'loop', maxIterations: 5, continueExpression: 'iteration < 5', onUnhandledError: null },
     },
     legend: 'Max. iterációk száma',
   },
@@ -569,7 +574,12 @@ describe('NodeInspector', () => {
       label: 'Ciklus',
       positionX: 0,
       positionY: 0,
-      config: { type: 'loop', maxIterations: Number('nem szám'), continueExpression: 'i < 5', onUnhandledError: null },
+      config: {
+        type: 'loop',
+        maxIterations: Number('nem szám'),
+        continueExpression: 'iteration < 5',
+        onUnhandledError: null,
+      },
     };
     act(() => {
       root.render(
@@ -595,7 +605,12 @@ describe('NodeInspector', () => {
       label: 'Ciklus',
       positionX: 0,
       positionY: 0,
-      config: { type: 'loop', maxIterations: Number('nem szám'), continueExpression: 'i < 5', onUnhandledError: null },
+      config: {
+        type: 'loop',
+        maxIterations: Number('nem szám'),
+        continueExpression: 'iteration < 5',
+        onUnhandledError: null,
+      },
     };
     act(() => {
       root.render(
@@ -621,7 +636,12 @@ describe('NodeInspector', () => {
       label: 'Ciklus',
       positionX: 0,
       positionY: 0,
-      config: { type: 'loop', maxIterations: Number('nem szám'), continueExpression: 'i < 5', onUnhandledError: null },
+      config: {
+        type: 'loop',
+        maxIterations: Number('nem szám'),
+        continueExpression: 'iteration < 5',
+        onUnhandledError: null,
+      },
     };
     act(() => {
       root.render(
@@ -660,7 +680,12 @@ describe('NodeInspector', () => {
       label: 'Ciklus',
       positionX: 0,
       positionY: 0,
-      config: { type: 'loop', maxIterations: Number('nem szám'), continueExpression: 'i < 5', onUnhandledError: null },
+      config: {
+        type: 'loop',
+        maxIterations: Number('nem szám'),
+        continueExpression: 'iteration < 5',
+        onUnhandledError: null,
+      },
     };
     act(() => {
       root.render(
@@ -780,7 +805,7 @@ describe('NodeInspector', () => {
       positionY: 0,
       config: {
         type: 'branch',
-        expression: 'x > 0',
+        expression: 'input.x > 0',
         branches: [{ key: 'pos', label: 'Pozitív' }],
         defaultBranchKey: null,
         onUnhandledError: 'fail_run',
@@ -845,7 +870,7 @@ describe('NodeInspector', () => {
   for (const { description, config, expectedLabels } of [
     {
       description: 'a ciklus nulla iterációszáma',
-      config: { type: 'loop', maxIterations: 0, continueExpression: 'i < 3', onUnhandledError: 'fail_run' },
+      config: { type: 'loop', maxIterations: 0, continueExpression: 'iteration < 3', onUnhandledError: 'fail_run' },
       expectedLabels: ['Max. iterációk száma'],
     },
     {
@@ -968,5 +993,177 @@ describe('NodeInspector', () => {
     });
 
     expect(container.querySelector('[aria-invalid="true"]')).toBeNull();
+  });
+});
+
+describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPEC-010 10., AC43, AC46)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  // A két nyelv egy-egy mezője: a `branch` kifejezése (CEL) és a
+  // `human_approval` törzs sablonja (Mustache), a valódi csomag mondatával.
+  const LANGUAGE_CASES = [
+    {
+      language: 'CEL kifejezés',
+      label: 'Feltétel kifejezés',
+      message: 'Nem deklarált változó a kifejezésben (pozíció: 0).',
+      node: {
+        id: 'n-branch-cel',
+        type: 'branch',
+        label: 'Elágazás',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'branch',
+          expression: 'titokNeve > 1',
+          branches: [],
+          defaultBranchKey: null,
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+    {
+      language: 'Mustache sablon',
+      label: 'Törzs sablon (bodyTemplate)',
+      message: 'Le nem zárt szakasz a sablonban (pozíció: 10).',
+      node: {
+        id: 'n-approval-mustache',
+        type: 'human_approval',
+        label: 'Jóváhagyás',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'human_approval',
+          title: 'Cím',
+          bodyTemplate: '{{#titok}}',
+          timeoutMs: null,
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+  ] as const satisfies readonly {
+    readonly language: string;
+    readonly label: string;
+    readonly message: string;
+    readonly node: WorkflowNodeInput;
+  }[];
+
+  function renderInspector(node: WorkflowNodeInput, isSaveAttempted: boolean): void {
+    act(() => {
+      root.render(
+        <NodeInspector
+          node={node}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          onDelete={vi.fn()}
+          onFieldBlur={vi.fn()}
+          inheritedProviderDescription="nincs"
+          isSaveAttempted={isSaveAttempted}
+        />,
+      );
+    });
+  }
+
+  function fieldControl(label: string): HTMLTextAreaElement {
+    const field = [...container.querySelectorAll('.field')].find(
+      (candidate) => candidate.querySelector('.field__label')?.textContent === label,
+    );
+    const control = field?.querySelector('textarea');
+    if (control === null || control === undefined) {
+      throw new Error(`a teszt nem találta a(z) "${label}" mezőt`);
+    }
+    return control;
+  }
+
+  function expectErrorUnder(control: HTMLTextAreaElement, message: string): void {
+    expect(control.getAttribute('aria-invalid')).toBe('true');
+    const errorElement = container.querySelector(`#${control.getAttribute('aria-describedby') ?? ''}`);
+    expect(errorElement?.textContent).toBe(message);
+    expect(errorElement?.getAttribute('role')).toBe('alert');
+    // A hibaüzenet a mező UTÁN áll a DOM-ban, tehát alatta jelenik meg.
+    expect(control.compareDocumentPosition(errorElement ?? control)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it.each(LANGUAGE_CASES)(
+    '$language: érintetlen mezőn, mentési kísérlet nélkül nincs hibaüzenet',
+    ({ node, label }) => {
+      renderInspector(node, false);
+      const control = fieldControl(label);
+      expect(control.getAttribute('aria-invalid')).toBeNull();
+      expect(container.querySelector('.field__error')).toBeNull();
+    },
+  );
+
+  it.each(LANGUAGE_CASES)(
+    '$language: az érintett, fordíthatatlan mező alatt a csomag mondata áll, aria kötéssel',
+    ({ node, label, message }) => {
+      renderInspector(node, false);
+      const control = fieldControl(label);
+      act(() => {
+        control.focus();
+        control.blur();
+      });
+      expectErrorUnder(control, message);
+    },
+  );
+
+  it.each(LANGUAGE_CASES)(
+    '$language: sikertelen mentési kísérlet után az érintetlen, fordíthatatlan mező is jelez',
+    ({ node, label, message }) => {
+      renderInspector(node, true);
+      expectErrorUnder(fieldControl(label), message);
+    },
+  );
+
+  it.each([
+    {
+      language: 'CEL kifejezés',
+      label: 'Feltétel kifejezés',
+      node: {
+        ...LANGUAGE_CASES[0].node,
+        config: { ...LANGUAGE_CASES[0].node.config, expression: 'input.x > 0' },
+      },
+    },
+    {
+      language: 'Mustache sablon',
+      label: 'Törzs sablon (bodyTemplate)',
+      node: {
+        ...LANGUAGE_CASES[1].node,
+        config: { ...LANGUAGE_CASES[1].node.config, bodyTemplate: 'Szia {{input.nev}}' },
+      },
+    },
+  ] satisfies readonly { readonly language: string; readonly label: string; readonly node: WorkflowNodeInput }[])(
+    '$language: a lefordítható mező a mentési kísérlet után sem jelez',
+    ({ node, label }) => {
+      renderInspector(node, true);
+      expect(fieldControl(label).getAttribute('aria-invalid')).toBeNull();
+      expect(container.querySelector('.field__error')).toBeNull();
+    },
+  );
+
+  it('a séma hibájú mező alatt a séma hibája áll, nem a fordítási hiba (AC46)', () => {
+    // A csak szóközös kifejezés a mentési séma szerint üres, és a CEL
+    // fordítás is elbuktatná: a mező alatt a séma mondata marad.
+    renderInspector(
+      {
+        ...LANGUAGE_CASES[0].node,
+        config: { ...LANGUAGE_CASES[0].node.config, expression: ' '.repeat(3) },
+      },
+      true,
+    );
+    expectErrorUnder(fieldControl('Feltétel kifejezés'), 'A mező nem lehet üres.');
   });
 });

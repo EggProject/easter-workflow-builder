@@ -52,6 +52,7 @@
         "@easter-workflow-builder/protocol": "workspace:*",
         "@easter-workflow-builder/typeguards": "workspace:*",
         "@easter-workflow-builder/ui": "workspace:*",
+        "@easter-workflow-builder/workflow-language": "workspace:*",
         "@xyflow/react": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",

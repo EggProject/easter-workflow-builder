@@ -70,7 +70,7 @@ const AGENT_STEP_CONFIG: NodeConfig = {
 const LOOP_CONFIG: NodeConfig = {
   type: 'loop',
   maxIterations: 3,
-  continueExpression: 'i < 3',
+  continueExpression: 'iteration < 3',
   onUnhandledError: 'fail_run',
 };
 

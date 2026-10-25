@@ -341,7 +341,8 @@ test('a felvett ciklus kezdő NaN értéke a szám mezőben üresen látszik, é
   await saveButton(page).click();
   expect(putBodies).toHaveLength(0);
 
-  await continueExpression.fill('i < 3');
+  // A kifejezés a CEL fordításon is átmegy (SPEC-010 10.): az `iteration` deklarált változó.
+  await continueExpression.fill('iteration < 3');
   await chooseSelectOption(page, policySelect, 'fail_run');
   await expectNoFieldError(continueExpression);
   await expectNoFieldError(policySelect);
@@ -351,7 +352,7 @@ test('a felvett ciklus kezdő NaN értéke a szám mezőben üresen látszik, é
   expect(parseSavedGraph(putBodies[0]).nodes[2]?.config).toEqual({
     type: 'loop',
     maxIterations: 3,
-    continueExpression: 'i < 3',
+    continueExpression: 'iteration < 3',
     onUnhandledError: 'fail_run',
   });
 });
