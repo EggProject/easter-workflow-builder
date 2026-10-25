@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import { createEngine } from '@easter-workflow-builder/engine';
-import { createServerLogger, type DestinationStream } from '@easter-workflow-builder/logger';
+import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
 import { buildEngineDependencies } from '../engine-assembly/build-engine-dependencies.ts';
@@ -31,6 +31,13 @@ function noopSink(): DestinationStream {
   };
 }
 
+/**
+ * A motor összeállításának naplózója: ez a teszt a naplót nem vizsgálja.
+ */
+function silentLogger(): ServerLogger {
+  return createServerLogger({ secretValues: [] }, noopSink());
+}
+
 function listen(server: Server): Promise<void> {
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
@@ -44,7 +51,7 @@ describe('createIdempotentShutdownHandler', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
     const logger = createServerLogger({ secretValues: [] }, noopSink());
     const server = createHttpServer({
       handlers: buildRouteHandlers(database, engine, streamRegistry),

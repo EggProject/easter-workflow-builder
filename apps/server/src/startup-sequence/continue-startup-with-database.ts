@@ -46,7 +46,7 @@ export async function continueStartupWithDatabase(
   const clock = createSystemClock();
   const idGenerator = createRandomUuidIdGenerator();
   const streamRegistry = createStreamRegistry(idGenerator);
-  const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+  const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, logger));
 
   // 6. HTTP szerver összeállítása és a jelkezelők felvétele
   const server = createHttpServer({

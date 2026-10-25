@@ -19,14 +19,14 @@ export function createMustacheTemplateRenderer(): MustacheTemplateRenderer {
         writer.parse(template);
         return { kind: 'ok', value: undefined };
       } catch (error) {
-        return { kind: 'error', message: describeTemplateError(error) };
+        return describeTemplateError(error);
       }
     },
     render(template, context) {
       try {
         return { kind: 'ok', value: writer.render(template, new OwnPropertyContext(context)) };
       } catch (error) {
-        return { kind: 'error', message: describeTemplateError(error) };
+        return describeTemplateError(error);
       }
     },
   };

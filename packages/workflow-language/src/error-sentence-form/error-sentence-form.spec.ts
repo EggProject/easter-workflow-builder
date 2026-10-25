@@ -29,19 +29,19 @@ describe('a hibamondatok alakja (SPEC-010 10., O-19)', () => {
     expect(TABLE_CODES.length).toBeGreaterThan(50);
     for (const code of TABLE_CODES) {
       for (const range of [{}, { range: { start: 3, end: 4 } }]) {
-        const message = describeCelError(new ParseError({ code, message: 'x', ...range }));
+        const message = describeCelError(new ParseError({ code, message: 'x', ...range })).message;
         expect(message, code).not.toContain('(kód:');
         expectEditorReadyForm(message);
-        expectEditorReadyForm(describeCelError(new EvaluationError({ code, message: 'x', ...range })));
+        expectEditorReadyForm(describeCelError(new EvaluationError({ code, message: 'x', ...range })).message);
       }
     }
   });
 
   it('a CEL tartalék mondatai (nem CEL kivétel, ismeretlen kód) pont nélküliek', () => {
-    expectEditorReadyForm(describeCelError(new Error('x')));
-    expectEditorReadyForm(describeCelError(new ParseError({ code: 'ismeretlen.', message: 'x' })));
+    expectEditorReadyForm(describeCelError(new Error('x')).message);
+    expectEditorReadyForm(describeCelError(new ParseError({ code: 'ismeretlen.', message: 'x' })).message);
     expectEditorReadyForm(
-      describeCelError(new ParseError({ code: 'ismeretlen', message: 'x', range: { start: 1, end: 2 } })),
+      describeCelError(new ParseError({ code: 'ismeretlen', message: 'x', range: { start: 1, end: 2 } })).message,
     );
   });
 
@@ -81,9 +81,9 @@ describe('a hibamondatok alakja (SPEC-010 10., O-19)', () => {
       'Invalid tags: x',
       'valami más',
     ]) {
-      expectEditorReadyForm(describeTemplateError(new Error(libraryMessage)));
+      expectEditorReadyForm(describeTemplateError(new Error(libraryMessage)).message);
     }
-    expectEditorReadyForm(describeTemplateError(undefined));
+    expectEditorReadyForm(describeTemplateError(undefined).message);
   });
 
   it('a sablon renderelés név megnevező hibája ponttal záruló névnél is pont nélküli', () => {

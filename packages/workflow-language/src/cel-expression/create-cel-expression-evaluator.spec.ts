@@ -394,9 +394,15 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
         expect(() => evaluator.evaluate(expression, context)).not.toThrow();
       }
     }
-    expect(evaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual(
-      failure('a kifejezés nem dolgozható fel'),
-    );
-    expect(evaluator.evaluate('input', throwingGetter)).toStrictEqual(failure('a kifejezés nem dolgozható fel'));
+    expect(evaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
+    expect(evaluator.evaluate('input', throwingGetter)).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'Error',
+    });
   });
 });

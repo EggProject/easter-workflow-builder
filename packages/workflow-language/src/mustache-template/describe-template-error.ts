@@ -1,4 +1,4 @@
-import { describeError } from '@easter-workflow-builder/core';
+import { describeError, describeErrorType, type OutcomeWithErrorType } from '@easter-workflow-builder/core';
 import { MissingTemplateNameError } from './missing-template-name-error.ts';
 import { NonJsonTemplateValueError } from './non-json-template-value-error.ts';
 
@@ -42,13 +42,19 @@ const PARSE_ERROR_SENTENCES = [
  * idézi. Minden más, előre nem látott kivétel a közös tartalék mondatot kapja
  * (a körkörös hivatkozás és a beágyazott nem JSON érték nem ide tartozik: azt a
  * szöveggé alakítás előre elutasítja, a 6.5 szerint). A hibaosztály nevét nem a
- * csomag, hanem a hívó teszi hozzá (6.2).
+ * csomag, hanem a hívó teszi hozzá (6.2). A tartalék mondat mellé a kivétel
+ * típusneve kerül (`unexpectedErrorType`, az üzenete nem), hogy a szerver
+ * naplózhassa (SPEC-010 O-22).
  */
-export function describeTemplateError(error: unknown): string {
+export function describeTemplateError(
+  error: unknown,
+): Extract<OutcomeWithErrorType<never>, { readonly kind: 'error' }> {
   if (error instanceof MissingTemplateNameError || error instanceof NonJsonTemplateValueError) {
-    return error.message;
+    return { kind: 'error', message: error.message };
   }
   const message = describeError(error);
   const sentence = PARSE_ERROR_SENTENCES.find((candidate) => message.startsWith(candidate.prefix));
-  return sentence === undefined ? 'a sablon nem renderelhető' : sentence.describe(message);
+  return sentence === undefined
+    ? { kind: 'error', message: 'a sablon nem renderelhető', unexpectedErrorType: describeErrorType(error) }
+    : { kind: 'error', message: sentence.describe(message) };
 }

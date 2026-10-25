@@ -5,7 +5,7 @@ import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
 import { createEngine } from '@easter-workflow-builder/engine';
 import { decodeStreamFrame, type StreamFrame } from '@easter-workflow-builder/protocol';
-import { createServerLogger, type DestinationStream } from '@easter-workflow-builder/logger';
+import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { createHttpServer } from '../http-server/create-http-server.ts';
 import { buildRouteHandlers } from '../route-registry/build-route-handlers.ts';
@@ -36,6 +36,13 @@ function collectingSink(): { readonly sink: DestinationStream; readonly lines: s
     },
     lines,
   };
+}
+
+/**
+ * A motor összeállításának naplózója: ez a teszt a naplót nem vizsgálja.
+ */
+function silentLogger(): ServerLogger {
+  return createServerLogger({ secretValues: [] }, collectingSink().sink);
 }
 
 function listen(server: Server): Promise<void> {
@@ -299,7 +306,7 @@ describe('runShutdownSequence', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
@@ -324,7 +331,7 @@ describe('runShutdownSequence', () => {
     // A valódi összeállítás, eltérés nélkül: a `human_approval` lépés a
     // szállított Mustache renderelővel várakozó futást ad, amit a leállás
     // megszakíthat.
-    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock, silentLogger()));
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
@@ -372,7 +379,7 @@ describe('runShutdownSequence', () => {
     // gazdagép env változói ne döntsenek). A sablon renderelő a szállított
     // Mustache port.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
@@ -442,7 +449,7 @@ describe('runShutdownSequence', () => {
     // Ugyanaz a két, tesztelhetőségi eltérés, mint az indító kérés
     // regressziós tesztjében.
     const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock),
+      ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
@@ -539,7 +546,7 @@ describe('runShutdownSequence', () => {
     };
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    const engine = createEngine(buildEngineDependencies(racyDatabase, streamRegistry, clock));
+    const engine = createEngine(buildEngineDependencies(racyDatabase, streamRegistry, clock, silentLogger()));
     const { sink, lines } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({

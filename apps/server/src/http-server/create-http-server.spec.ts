@@ -333,7 +333,9 @@ describe('createHttpServer', () => {
     async ({ errorClass, fields }) => {
       const database = okOrThrow(openDatabase(':memory:'));
       const registry = createStreamRegistry(createRandomUuidIdGenerator());
-      const engine = createEngine(buildEngineDependencies(database, registry, createSystemClock()));
+      const engine = createEngine(
+        buildEngineDependencies(database, registry, createSystemClock(), buildCapturingLogger().logger),
+      );
       const workflowId = seedFanOutWorkflow(database, fields);
       const { baseUrl, close } = await startTestServer(
         buildOptions({ startRun: createStartRunHandler(engine) }, undefined),

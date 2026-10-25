@@ -3,6 +3,7 @@
 
 // result: a kétállapotú eredménytípus és a rá szűkítő typeguard.
 export type { Outcome } from './result/outcome/outcome.ts';
+export type { OutcomeWithErrorType } from './result/outcome/outcome-with-error-type.ts';
 export { isOkOutcome } from './result/outcome/is-ok-outcome.ts';
 
 // env-reader: típusos környezeti változó olvasás.
@@ -17,6 +18,7 @@ export { postJson } from './http-client/request/post-json.ts';
 export type { PostJsonRequest } from './http-client/request/post-json.ts';
 export { getBinary } from './http-client/request/get-binary.ts';
 export { describeError } from './http-client/error-description/describe-error.ts';
+export { describeErrorType } from './http-client/error-description/describe-error-type.ts';
 
 // image-source: kép feloldása base64 data URL alakra.
 export type { ImageMediaType } from './image-source/media-type/image-media-type.ts';

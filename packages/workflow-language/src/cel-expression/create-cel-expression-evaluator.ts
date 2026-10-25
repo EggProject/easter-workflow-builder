@@ -21,19 +21,17 @@ export function createCelExpressionEvaluator(): CelExpressionEvaluator {
       try {
         environment.parse(expression);
       } catch (error) {
-        return { kind: 'error', message: describeCelError(error) };
+        return describeCelError(error);
       }
       const checked = environment.check(expression);
-      return checked.valid
-        ? { kind: 'ok', value: undefined }
-        : { kind: 'error', message: describeCelError(checked.error) };
+      return checked.valid ? { kind: 'ok', value: undefined } : describeCelError(checked.error);
     },
     evaluate(expression, context) {
       try {
         const result: unknown = environment.evaluate(expression, toCelContext(context));
         return normalizeCelResult(result);
       } catch (error) {
-        return { kind: 'error', message: describeCelError(error) };
+        return describeCelError(error);
       }
     },
   };
