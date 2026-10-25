@@ -1,8 +1,10 @@
 // Megvalósítás nélküli, greppel ellenőrizhető invariáns tesztek a `workflow-language`
 // csomag határairól (PLAN-010 T-010-11, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit őriz). Az
-// `apps/web` `greppable-invariants` témájának mintáját követi: a forrásfát nyers
-// szövegként olvassa vissza, statikus elemzés nélkül.
+// `apps/web` `greppable-invariants` témájának mintáját követi: a forrásfát szövegként
+// olvassa vissza, és a mintákat szövegen keresi. A kommenteket a TypeScript elemző
+// komment tartományai alapján távolítja el (PLAN-010 T-010-21 A-3): egy sor- vagy
+// szöveg kommentben, string vagy regex literálban álló `/*` így nem vág ki valódi kódot.
 //
 // Hét invariáns:
 //  (1) a `mustache` és a `@marcbachmann/cel-js` csomagot a workspace-ben kizárólag a
@@ -33,6 +35,15 @@ import { fileURLToPath } from 'node:url';
 import * as celModule from '@marcbachmann/cel-js';
 import * as mustacheModule from 'mustache';
 import { describe, expect, it } from 'vitest';
+import {
+  createSourceFile,
+  getLeadingCommentRanges,
+  getTrailingCommentRanges,
+  ScriptKind,
+  ScriptTarget,
+  SyntaxKind,
+  type Node,
+} from 'typescript';
 import * as barrel from '../index.ts';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -82,19 +93,69 @@ interface SourceFile {
   readonly content: string;
 }
 
-/**
- * A kommentek kiszűrése, mielőtt egy minta jelenlétét vizsgáljuk: egy magyarázó
- * mondat, ami magát a tiltott hívást idézi, nem termékkód.
- */
-function stripComments(content: string): string {
-  return content
-    .replaceAll(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('//'))
-    .join('\n');
+function scriptKindOf(fileName: string): ScriptKind {
+  if (fileName.endsWith('.tsx')) {
+    return ScriptKind.TSX;
+  }
+  if (fileName.endsWith('.jsx')) {
+    return ScriptKind.JSX;
+  }
+  return /\.[cm]?js$/.test(fileName) ? ScriptKind.JS : ScriptKind.TS;
 }
 
-function listSourceFiles(root: string): readonly SourceFile[] {
+/**
+ * A kommentek kiszűrése, mielőtt egy minta jelenlétét vizsgáljuk: egy magyarázó
+ * mondat, ami magát a tiltott hívást idézi, nem termékkód. A komment tartományokat a
+ * TypeScript elemző adja (minden token előtti és utáni komment), tehát string, regex
+ * és template literál belseje sosem számít kommentnek; a JSX szöveg belsejében
+ * kezdődő tartomány sem, mert az a JSX szöveg része. A komment karakterei szóközre
+ * cserélődnek, a sortörés marad, így a sorszám és a többi kód változatlan. A tartományok
+ * UTF-16 eltolások, ezért a csere `slice` hívással megy, nem kódpontonkénti bontással.
+ */
+function stripComments(content: string, fileName: string): string {
+  const sourceFile = createSourceFile(fileName, content, ScriptTarget.Latest, true, scriptKindOf(fileName));
+  const jsxTextRanges: { readonly pos: number; readonly end: number }[] = [];
+  const commentRanges: { readonly pos: number; readonly end: number }[] = [];
+  const visit = (node: Node): void => {
+    if (node.kind >= SyntaxKind.FirstJSDocNode && node.kind <= SyntaxKind.LastJSDocNode) {
+      return;
+    }
+    if (node.kind === SyntaxKind.JsxText) {
+      jsxTextRanges.push({ pos: node.pos, end: node.end });
+      return;
+    }
+    commentRanges.push(
+      ...(getLeadingCommentRanges(content, node.pos) ?? []),
+      ...(getTrailingCommentRanges(content, node.end) ?? []),
+    );
+    for (const child of node.getChildren(sourceFile)) {
+      visit(child);
+    }
+  };
+  visit(sourceFile);
+  const kept = commentRanges
+    .filter((range) => jsxTextRanges.every((text) => range.pos < text.pos || range.pos >= text.end))
+    .toSorted((left, right) => left.pos - right.pos);
+  let result = '';
+  let cursor = 0;
+  for (const range of kept) {
+    if (range.pos < cursor) {
+      continue;
+    }
+    result += content.slice(cursor, range.pos) + content.slice(range.pos, range.end).replaceAll(/[^\n]/g, ' ');
+    cursor = range.end;
+  }
+  return result + content.slice(cursor);
+}
+
+/**
+ * A `prefilter` nélküli bejárás minden fájlt elemez; a `prefilter` mellett csak azt,
+ * aminek a nyers szövege illeszkedik rá. A komment eltávolítása találatot csak elvehet,
+ * nem adhat, tehát az előszűrés nem rejt el egyetlen találatot sem, a teljes
+ * workspace elemzése viszont a teszt idejét a korlát közelébe vinné (`.claude/CLAUDE.md`
+ * 12. szekció, a `casing` téma előszűrője).
+ */
+function listSourceFiles(root: string, prefilter?: RegExp): readonly SourceFile[] {
   const files: SourceFile[] = [];
   function walk(current: string): void {
     const entries = readdirSync(current, { withFileTypes: true });
@@ -105,10 +166,10 @@ function listSourceFiles(root: string): readonly SourceFile[] {
           walk(fullPath);
         }
       } else if (SOURCE_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) {
-        files.push({
-          relativePath: path.relative(REPO_ROOT, fullPath),
-          content: stripComments(readFileSync(fullPath, 'utf8')),
-        });
+        const raw = readFileSync(fullPath, 'utf8');
+        if (prefilter === undefined || new RegExp(prefilter.source).test(raw)) {
+          files.push({ relativePath: path.relative(REPO_ROOT, fullPath), content: stripComments(raw, entry.name) });
+        }
       }
     }
   }
@@ -120,8 +181,8 @@ function isSpecFile(file: SourceFile): boolean {
   return /\.spec\.tsx?$/.test(file.relativePath);
 }
 
-function workspaceFiles(): readonly SourceFile[] {
-  return WORKSPACE_ROOTS.flatMap((workspaceRoot) => listSourceFiles(path.join(REPO_ROOT, workspaceRoot)));
+function workspaceFiles(prefilter: RegExp): readonly SourceFile[] {
+  return WORKSPACE_ROOTS.flatMap((workspaceRoot) => listSourceFiles(path.join(REPO_ROOT, workspaceRoot), prefilter));
 }
 
 /**
@@ -168,7 +229,7 @@ describe('a mustache és a cel-js csomagot kizárólag a workflow-language/src i
   const allowedRoot = path.join('packages', 'workflow-language', 'src') + path.sep;
 
   it('a csomag saját forrása importálja őket (a vizsgálat nem üres)', () => {
-    const importers = workspaceFiles()
+    const importers = workspaceFiles(LIBRARY_IMPORT_PATTERN)
       .filter((file) => offendersOf([file], LIBRARY_IMPORT_PATTERN).length > 0)
       .map((file) => file.relativePath);
     expect(importers).toContain(
@@ -180,7 +241,7 @@ describe('a mustache és a cel-js csomagot kizárólag a workflow-language/src i
   });
 
   it('a workspace többi fájlja egyiket sem importálja', () => {
-    const outside = workspaceFiles().filter((file) => !file.relativePath.startsWith(allowedRoot));
+    const outside = workspaceFiles(LIBRARY_IMPORT_PATTERN).filter((file) => !file.relativePath.startsWith(allowedRoot));
     expect(offendersOf(outside, LIBRARY_IMPORT_PATTERN)).toStrictEqual([]);
   });
 });
@@ -260,7 +321,7 @@ describe('a Mustache modul szintű állapotához a csomag nem nyúl (SPEC-010 16
 });
 
 describe('a barrel nem szivárogtat a két könyvtárból (SPEC-010 16. szekció 3.)', () => {
-  const barrelContent = stripComments(readFileSync(BARREL_PATH, 'utf8'));
+  const barrelContent = stripComments(readFileSync(BARREL_PATH, 'utf8'), BARREL_PATH);
   const statements = barrelContent
     .split(';')
     .map((statement) => statement.trim())
@@ -282,7 +343,7 @@ describe('a barrel nem szivárogtat a két könyvtárból (SPEC-010 16. szekció
       const fullPath = path.join(PACKAGE_SRC, source);
       return {
         relativePath: path.relative(REPO_ROOT, fullPath),
-        content: stripComments(readFileSync(fullPath, 'utf8')),
+        content: stripComments(readFileSync(fullPath, 'utf8'), fullPath),
       };
     });
     expect(offendersOf(files, LIBRARY_IMPORT_PATTERN)).toStrictEqual([]);
@@ -297,5 +358,44 @@ describe('a barrel nem szivárogtat a két könyvtárból (SPEC-010 16. szekció
     const barrelValues = Object.entries(barrel);
     expect(barrelValues.length).toBeGreaterThan(0);
     expect(barrelValues.filter(([, value]) => libraryValues.has(value)).map(([name]) => name)).toStrictEqual([]);
+  });
+});
+
+describe('a komment szűrő valódi kódot nem vág ki (PLAN-010 T-010-21 A-3)', () => {
+  const importLine = "import Mustache from 'mustache';";
+
+  it.each([
+    [
+      'sor komment, benne blokk komment nyitó',
+      `// a 'tooling/*' minta\n${importLine}\n/** vége */\nconst x = 1;\n`,
+      'x.ts',
+    ],
+    ['string literál, benne blokk komment nyitó', `const glob = 'tooling/*';\n${importLine}\n`, 'x.ts'],
+    ['regex literál, benne komment jelek', `const r = /\\/\\*/g;\n${importLine}\n// */\n`, 'x.ts'],
+    ['template literál, benne komment jelek', `const t = \`/* \${1} //\`;\n${importLine}\n`, 'x.mjs'],
+    ['JSX szöveg, benne sor komment jel', `const a = <p>// {render(1)}</p>;\n${importLine}\n`, 'x.tsx'],
+  ])('REGRESSZIÓ: %s után a kód megmarad', (_name, source, fileName) => {
+    expect(stripComments(source, fileName)).toContain(importLine);
+  });
+
+  it('a sor és a blokk kommentet eltávolítja, a sortörést megtartja', () => {
+    const stripped = stripComments(
+      `/* import Mustache from 'mustache'; */\nconst a = 1; // render(x)\n/** render */\n`,
+      'x.ts',
+    );
+    expect(stripped).not.toContain('mustache');
+    expect(stripped).not.toContain('render');
+    expect(stripped).toContain('const a = 1;');
+    expect(stripped.split('\n')).toHaveLength(4);
+  });
+
+  it('a UTF-16 eltolást a kódpontnál hosszabb karakter után is pontosan követi', () => {
+    const stripped = stripComments("const e = '\u{1F600}'; // render(x)\nimport Mustache from 'mustache';\n", 'x.ts');
+    expect(stripped).not.toContain('render');
+    expect(stripped).toContain("import Mustache from 'mustache';");
+  });
+
+  it('a JSX szövegben álló render szó JSX kifejezése megmarad', () => {
+    expect(stripComments('const a = <p>// {render(1)}</p>;\n', 'x.tsx')).toContain('render(1)');
   });
 });
