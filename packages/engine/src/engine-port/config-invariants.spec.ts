@@ -8,7 +8,7 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
  * PLAN-005 T-005-29, konfigurációs invariáns regressziós tesztek: a
  * paraméterezhetőség és a token takarékosság gépi őrzése.
  *
- * Hat, egymástól független invariánst őriz a `packages/engine/src` alatti
+ * Hét, egymástól független invariánst őriz a `packages/engine/src` alatti
  * TERMÉKKÓD `.ts` fájljain, a `.spec.ts` fájlok KIVÉTELÉVEL - azok
  * fixture/teszt célból jogosan tartalmazhatnak provider azonosítót,
  * `Date.now` hamisítást stb. (`.claude/CLAUDE.md` 8. szekció
@@ -25,7 +25,14 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
  * 6. a `packages/engine/package.json` nem listázza sem a
  *    `@easter-workflow-builder/provider-registry`, sem az
  *    `@anthropic-ai/claude-agent-sdk` csomagot (57. és 58. elfogadási
- *    kritérium).
+ *    kritérium),
+ * 7. a lépés kimenete kizárólag a tárolási korlátot futtató úton tárolódik
+ *    (SPEC-010 O-21, user döntés 2026-10-25, PLAN-010 T-010-21 A-1): a
+ *    `markStepSucceeded` hívás csak a `finishStepRunSucceeded` segédben áll,
+ *    az pedig `null` kimenettel, vagy a korlátot maga futtató két fájlban
+ *    (`finish-step-run-with-output.ts`, és a saját
+ *    `expression_evaluation_failed` ellenőrzésével záró `execute-fan-out.ts`).
+ *    A `join` `merge` korábban a korlát nélkül tárolt.
  *
  * **Miért az `engine-port` témában áll, és nem egy 19. téma mappában.** A
  * SPEC-004 12. szekció (17. szekció 1. elfogadási kritériuma) a
@@ -172,5 +179,36 @@ describe('packages/engine/src konfigurációs invariánsai (PLAN-005 T-005-29)',
 
   it("a package.json NEM listázza az Agent SDK ('@anthropic-ai/claude-agent-sdk') csomagot (SPEC-004 58. elfogadási kritérium)", () => {
     expect(hasPackageJsonDependency('@anthropic-ai/claude-agent-sdk')).toBe(false);
+  });
+
+  describe('a lépés kimenete csak a tárolási korláton át tárolódik (SPEC-010 O-21)', () => {
+    const relativeOf = (file: string): string => path.relative(SRC_ROOT, file);
+    const LIMIT_CHECKING_CALLERS = new Set([
+      path.join('node-executor', 'finish-step-run-with-output.ts'),
+      path.join('node-executor', 'execute-fan-out.ts'),
+    ]);
+
+    it('a markStepSucceeded hívás kizárólag a finishStepRunSucceeded segédben áll', () => {
+      const callers = findOffenders(PRODUCTION_SOURCE_FILES, (content) => content.includes('markStepSucceeded(')).map(
+        (file) => relativeOf(file),
+      );
+      expect(callers).toStrictEqual([path.join('node-executor', 'finish-step-run-succeeded.ts')]);
+    });
+
+    it('a finishStepRunSucceeded hívás null kimenettel, vagy a korlátot futtató két fájlban áll', () => {
+      const calls = PRODUCTION_SOURCE_FILES.flatMap((file) =>
+        fs
+          .readFileSync(file, 'utf8')
+          .matchAll(/(?<!function )\bfinishStepRunSucceeded\(([^)]*)\)/g)
+          .map((match) => ({ file: relativeOf(file), arguments: match[1] ?? '' }))
+          .toArray(),
+      );
+      expect(
+        new Set(calls.filter((call) => LIMIT_CHECKING_CALLERS.has(call.file)).map((call) => call.file)),
+      ).toStrictEqual(LIMIT_CHECKING_CALLERS);
+      expect(
+        calls.filter((call) => !LIMIT_CHECKING_CALLERS.has(call.file) && !call.arguments.includes('output: null')),
+      ).toStrictEqual([]);
+    });
   });
 });

@@ -24,6 +24,15 @@ describe('isStorableOutput', () => {
     expect(isStorableOutput([item])).toBe(false);
   });
 
+  it('az undefined kimenetre igaz, mert a db azt nem írja', () => {
+    expect(isStorableOutput(undefined)).toBe(true);
+  });
+
+  it('nem lista kimenetre is a JSON hosszat méri', () => {
+    expect(isStorableOutput('a'.repeat(MAX_STORED_OUTPUT_LENGTH - 2))).toBe(true);
+    expect(isStorableOutput('a'.repeat(MAX_STORED_OUTPUT_LENGTH - 1))).toBe(false);
+  });
+
   it('a szerializáláskor kivételt dobó értékre hamis', () => {
     const tooLarge = {
       toJSON: (): never => {

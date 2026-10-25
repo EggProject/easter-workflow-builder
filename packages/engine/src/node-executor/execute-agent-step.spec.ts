@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type {
   AgentStepConfig,
   DatabaseContext,
@@ -21,6 +22,7 @@ import type { TemplateRendererPort } from '../engine-port/template-renderer-port
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { ExecutableNodeConfig } from '../run-validation/executable-node-config.ts';
 import { executeAgentStep } from './execute-agent-step.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
@@ -342,6 +344,49 @@ describe('executeAgentStep', () => {
     expect(outcome.kind).toBe('succeeded');
     expect(outcome.stepRun.nodeType).toBe('agent_step');
     expect(calls).toStrictEqual([`request:minimax:${outcome.stepRun.id}`, `release:${outcome.stepRun.id}`]);
+
+    database.close();
+  });
+
+  it('REGRESSZIÓ: a tárolási korlátnál nagyobb strukturált kimenet a lépést step_output_not_storable osztállyal zárja, a tokenekkel, és a hely felszabadul (SPEC-010 O-21)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const { gate, calls } = recordingGate();
+    const messages = fixtureMessages('sikeres').map((message) =>
+      isRecord(message) && message['type'] === 'result'
+        ? { ...message, structured_output: { szoveg: 'a'.repeat(MAX_STORED_OUTPUT_LENGTH) } }
+        : message,
+    );
+    const dependencies = dependenciesOf(database, fakeRunner(messages));
+
+    const outcome = settledOrThrow(
+      await executeAgentStep(
+        {
+          instance: instanceOf(runId),
+          config: agentStepConfig(),
+          descriptor: descriptor(),
+          runContext: {
+            input: {},
+            steps: {},
+            item: undefined,
+            itemIndex: undefined,
+            iteration: undefined,
+            joinInputs: undefined,
+            error: undefined,
+          },
+          graph,
+          sessionSourceNodes: { sourceNodeIds: new Set(['a']), continuedNodeIds: new Set() },
+          sessionInstances: [],
+        },
+        dependencies,
+        gate,
+        createAgentQueryRegistry(),
+      ),
+    );
+
+    expect(outcome).toMatchObject({ kind: 'failed', errorKind: 'step_output_not_storable' });
+    expect(outcome.stepRun).toMatchObject({ status: 'failed', output: null, inputTokens: 11, numTurns: 3 });
+    expect(calls.some((call) => call.startsWith('release:'))).toBe(true);
 
     database.close();
   });

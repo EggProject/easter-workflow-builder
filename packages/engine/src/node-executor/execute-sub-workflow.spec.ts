@@ -12,6 +12,7 @@ import type { ExecutableGraph } from '../run-graph/executable-graph.ts';
 import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
 import type { ChildWorkflowRunner, ChildWorkflowRunRequest } from './child-workflow-runner.ts';
 import { executeSubWorkflow, type ExecuteSubWorkflowInput } from './execute-sub-workflow.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
@@ -277,6 +278,22 @@ describe('executeSubWorkflow', () => {
     expect(published[1]).toMatchObject({ kind: 'sub_workflow_started' });
     expect(published[2]).toMatchObject({ kind: 'sub_workflow_finished' });
     expect(published[3]).toMatchObject({ kind: 'step_finished' });
+  });
+
+  it('REGRESSZIÓ: a tárolási korlátnál nagyobb gyerek kimenet a lépést step_output_not_storable osztállyal zárja (SPEC-010 O-21)', async () => {
+    const database = openMemoryDatabase();
+    const parentWorkflowId = createWorkflow(database, 'szülő', 'minimax');
+    const targetWorkflowId = createWorkflow(database, 'gyerek', 'claude-subscription');
+    const { runs } = seedRunChain(database, [parentWorkflowId]);
+    const parentRun = runs[0] ?? notCalled();
+    const { runner } = fakeRunner(database, { output: { szoveg: 'a'.repeat(MAX_STORED_OUTPUT_LENGTH) } });
+
+    const outcome = okOrThrow(
+      await executeSubWorkflow(inputOf(parentRun.id, targetWorkflowId), portsOf(database, []), runner),
+    );
+
+    expect(outcome).toMatchObject({ kind: 'failed', errorKind: 'step_output_not_storable' });
+    expect(outcome.stepRun).toMatchObject({ status: 'failed', output: null });
   });
 
   it('a targetWorkflowId és a leképezett bemenet változatlanul jut el a futtatóhoz', async () => {

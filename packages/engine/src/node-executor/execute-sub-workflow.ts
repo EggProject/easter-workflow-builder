@@ -12,7 +12,7 @@ import type { ChildWorkflowRunner } from './child-workflow-runner.ts';
 import { detectWorkflowRecursion } from './detect-workflow-recursion.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
-import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
+import { finishStepRunWithOutput } from './finish-step-run-with-output.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
@@ -278,11 +278,17 @@ export async function executeSubWorkflow(
     return failSubWorkflow(runId, stepRunId, startedAtMs, 'sub_workflow_failed', errorMessage, ports);
   }
 
-  const finished = finishStepRunSucceeded({ runId, stepRunId, startedAtMs, output: finishedChild.value.output }, ports);
+  const finished = finishStepRunWithOutput(
+    { nodeId, runId, stepRunId, startedAtMs, output: finishedChild.value.output },
+    ports,
+  );
   if (finished.kind === 'error') {
     return finished;
   }
+  if (finished.value.kind === 'failed') {
+    return { kind: 'ok', value: finished.value };
+  }
 
   // eslint-disable-next-line unicorn/no-null -- a `NodeExecutionOutcome.selectedBranchKey` `null` értéke a "minden nem `on_error` kimenő él live" jelentés (node-executor-outcome.ts)
-  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value, selectedBranchKey: null } };
+  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value.stepRun, selectedBranchKey: null } };
 }

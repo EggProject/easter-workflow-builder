@@ -113,6 +113,14 @@ function publisherWithRunFinished(publisher: EventPublisherPort): {
  */
 const OVER_LIMIT_DOUBLING_COUNT = 24;
 
+/**
+ * A T-010-21 A-1 megkerülés olcsó alakja: három, 2^22 karakteres szöveg elem
+ * (a lista JSON hossza a korlát alatt marad), és a `join` mindhárom ágtól a
+ * teljes listát kapja, tehát a `join` kimenete a lista háromszorosa, a korlát
+ * fölött.
+ */
+const JOIN_BYPASS_ITEMS_EXPRESSION = `${longStringItemExpression(22)}.map(s, [s, s, s])[0]`;
+
 describe('buildEngineDependencies', () => {
   it('a kapott database és clock referenciát változatlanul adja tovább, a nyolc portot pedig felépíti', () => {
     const database = openMemoryDatabase();
@@ -170,6 +178,31 @@ describe('buildEngineDependencies', () => {
     expect(fanOutRow?.status).toBe('failed');
     expect(fanOutRow?.errorKind).toBe('expression_evaluation_failed');
     expect(stepRuns.some((row) => row.status === 'running')).toBe(false);
+  });
+
+  it('REGRESSZIÓ: a közvetlenül join-ba kötött fan_out korlát alatti listájából a join korlát fölötti kimenete nem tárolódik, a join lépés step_output_not_storable hibával zár (SPEC-010 O-21, PLAN-010 T-010-21 A-1)', async () => {
+    const database = openMemoryDatabase();
+    const clock = createSystemClock();
+    const dependencies = buildEngineDependencies(database, createStreamRegistry(createRandomUuidIdGenerator()), clock);
+    const watched = publisherWithRunFinished(dependencies.eventPublisher);
+    const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
+    const workflowId = seedFanOutWorkflow(database, JOIN_BYPASS_ITEMS_EXPRESSION);
+
+    const started = okOrThrow(await engine.startRun({ workflowId, input: {} }));
+    await watched.runFinished;
+
+    const stepRuns = okOrThrow(database.stepRuns.listStepRuns(started.run.id));
+    const fanOutRow = stepRuns.find((row) => row.nodeId === 'fo');
+    expect(fanOutRow?.status).toBe('succeeded');
+    const joinRow = stepRuns.find((row) => row.nodeId === 'j');
+    expect(joinRow?.status).toBe('failed');
+    expect(joinRow?.errorKind).toBe('step_output_not_storable');
+    expect(joinRow?.output).toBeNull();
+    const events = okOrThrow(database.events.readEventsSince(started.run.id, 0, 1000));
+    expect(events.find((event) => event.kind === 'run_finished')?.payload).toMatchObject({
+      status: 'failed',
+      errorKind: 'step_output_not_storable',
+    });
   });
 
   it('az összeállított kilenc port a motor createEngine hívásának valódi bemenete lehet', () => {

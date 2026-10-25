@@ -668,8 +668,11 @@ fel`), a meglévő teszt változatlanul zöld; CEL kifejezés körkörös érté
 **A tároláskori szerializálás, a forrás olvasásával és eldobható próbával (`openDatabase(':memory:')`,
 a repón kívül, a csomag forrását importálva).** A CEL eredmény ma nem jut a motorba: az `apps/server`
 az elutasító kifejezés portot köti be (`apps/server/src/engine-assembly/create-rejecting-expression-evaluator.ts`),
-a szállított port bekötése a PLAN-010 T-010-13. A bekötés után az egyetlen út, ahol a CEL eredmény
-maga tárolódik, a `fan_out` kimenete: `packages/engine/src/node-executor/execute-fan-out.ts` a lista
+a szállított port bekötése a PLAN-010 T-010-13. A bekötés után a CEL eredmény közvetlenül a `fan_out`
+kimenetében tárolódik (**pontosítás 2026-10-25:** nem ez az egyetlen út; a közvetlenül `join`-ba kötött
+`fan_out` után a `join` `merge` ágonként újra tárolja a teljes listát, PLAN-010 T-010-21 A-1,
+`2026-10-25-plan-010-adverzarialis-atvizsgalas.md`; a korlát azóta minden tárolt lépés kimenetére fut,
+SPEC-010 O-21): `packages/engine/src/node-executor/execute-fan-out.ts` a lista
 elemeit `finishStepRunSucceeded` hívással a `markStepSucceeded` `output` mezőjébe adja; a `branch`
 és a `loop` kimenete `null`, a `fan_out_expanded` esemény payloadja csak az elemszám. A
 `step_run.output` oszlop Drizzle `mode: 'json'` (`packages/db/src/step-run/step-run.ts`), a

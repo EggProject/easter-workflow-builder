@@ -6,6 +6,7 @@ import { openDatabase } from '@easter-workflow-builder/db';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import { executeStart } from './execute-start.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
@@ -101,6 +102,22 @@ describe('executeStart', () => {
     expect(published).toHaveLength(2);
     expect(published[0]).toMatchObject({ kind: 'step_started' });
     expect(published[1]).toMatchObject({ kind: 'step_finished' });
+  });
+
+  it('REGRESSZIÓ: a tárolási korlátnál nagyobb bemenet a lépést step_output_not_storable osztállyal zárja (SPEC-010 O-21)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+
+    const outcome = okOrThrow(
+      executeStart(
+        { instance: instanceOf(runId), input: { szoveg: 'a'.repeat(MAX_STORED_OUTPUT_LENGTH) } },
+        portsOf(database, published),
+      ),
+    );
+
+    expect(outcome).toMatchObject({ kind: 'failed', errorKind: 'step_output_not_storable' });
+    expect(outcome.stepRun).toMatchObject({ status: 'failed', errorKind: 'step_output_not_storable', output: null });
   });
 
   it('a begin fázis hibáját továbbadja (nem létező runId)', () => {

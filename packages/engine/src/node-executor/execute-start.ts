@@ -1,6 +1,6 @@
 import type { Outcome } from '@easter-workflow-builder/core';
 import { beginStepRun } from './begin-step-run.ts';
-import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
+import { finishStepRunWithOutput } from './finish-step-run-with-output.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
@@ -17,7 +17,9 @@ export interface ExecuteStartInput {
 
 /**
  * A `start` node végrehajtója: azonnal `succeeded`, a kimenete maga a
- * bemenet, és nincs saját hibaága (SPEC-004 5. szekció 1. sora). Nincs
+ * bemenet, és nincs saját hibaága (SPEC-004 5. szekció 1. sora); a közös
+ * tárolási korlát (`finishStepRunWithOutput`, SPEC-010 O-21) a túl nagy bemenetet
+ * `step_output_not_storable` osztállyal zárja. Nincs
  * kimenő él választás sem - a `selectedBranchKey: null` azt jelenti a
  * hívónak, hogy minden `on_error`-tól különböző kimenő él `live` jelölést kap
  * (`node-executor-outcome.ts` dokumentációja).
@@ -47,8 +49,9 @@ export function executeStart(input: ExecuteStartInput, ports: NodeExecutorPorts)
     return began;
   }
 
-  const finished = finishStepRunSucceeded(
+  const finished = finishStepRunWithOutput(
     {
+      nodeId: instance.instance.nodeId,
       runId: instance.runId,
       stepRunId: began.value.stepRun.id,
       startedAtMs: began.value.startedAtMs,
@@ -59,7 +62,10 @@ export function executeStart(input: ExecuteStartInput, ports: NodeExecutorPorts)
   if (finished.kind === 'error') {
     return finished;
   }
+  if (finished.value.kind === 'failed') {
+    return { kind: 'ok', value: finished.value };
+  }
 
   // eslint-disable-next-line unicorn/no-null -- a `NodeExecutionOutcome.selectedBranchKey` `null` értéke a "minden nem `on_error` kimenő él live" jelentés (node-executor-outcome.ts)
-  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value, selectedBranchKey: null } };
+  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value.stepRun, selectedBranchKey: null } };
 }
