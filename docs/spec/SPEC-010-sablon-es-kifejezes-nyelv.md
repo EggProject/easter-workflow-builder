@@ -851,7 +851,8 @@ az `agentQueryRunner` portot cserélve** egy hamis agentre, ami rögzített, a S
 alakú üzenetsorozatot ad, és rögzíti a kapott promptot. Valódi API hívás nincs. A próba a REST
 felületen hozza létre a workflow-t, menti a gráfot, beállítja az alapértelmezett providert, és
 indítja a futást; a futás végét a futás eseményéből olvassa, kézi időzítés nélkül. A pontos
-elvárások a 16. szekció 48 ... 50. kritériumában állnak.
+elvárások a 16. szekció 48 ... 50. kritériumában állnak. **Végrehajtva: PLAN-010 T-010-16**
+(`apps/server/src/workflow-language-end-to-end/`, mérés: `docs/research/2026-10-21-spec010-blokkolo-meresek.md` 11. szekció).
 
 ### 12.4 A szerkesztő
 

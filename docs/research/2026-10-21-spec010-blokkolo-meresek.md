@@ -750,3 +750,56 @@ definíció lehet; a fenti öt, plusz az álnév (`const M = Mustache`), a közv
 `Mustache.escape =`, `Mustache['parse']`, `writer.render.call`, a harmadik argumentum és a
 `writer.render?.(` injekció egyenként bukik, a meglévő kód zöld. A futásidejű összerakás
 (számított kulcs, a név szövegből építése) továbbra is elfogadott korlát.
+
+## 11. PLAN-010 T-010-16: végponttól végpontig próba valódi szerver ellen (2026-10-25)
+
+A SPEC-010 12.3 és a 16. szekció 48 ... 50. kritériuma egy commitolt tesztben:
+`apps/server/src/workflow-language-end-to-end/workflow-language-end-to-end.spec.ts`. Kiinduló fej
+`ab5975d`. A próba a valódi `createHttpServer` szervert `127.0.0.1` címen, `port: 0` értékkel
+indítja, a valódi útvonal kezelőkkel, stream nyilvántartással, motorral és `:memory:` adatbázissal (a
+commitolt migrációk), a szállított `createMustacheTemplateRenderer` és `createCelExpressionEvaluator`
+porttal. Kizárólag az `agentQueryRunner` hamis: a commitolt
+`agent-step-messages-fixture.json` sorozatát adja (`system`/`init`, `assistant`, `result`/`success`,
+az F-3 táblázat szerinti értékekkel), hívásonként egyedi `uuid` és `session_id` utótaggal, és rögzíti
+a kapott promptot. Valódi provider hívás nem történt; a fixture sem kulcsot, sem szolgáltatói
+szöveget nem tartalmaz. A workflow a REST felületen jön létre (`POST /api/workflows`,
+`PUT .../graph`, `PUT /api/settings` `defaultProviderId: claude-subscription`, `POST .../runs`). A
+futás végét a `GET /events` folyam `run_finished` eseménye adja (a `stream_ready` után
+`PUT /api/streams/{streamId}/subscriptions`, 0 padlóval); `setTimeout` és `sleep` nincs.
+
+A gráf: `start` -> `tema` (`agent_step`, `Téma: {{input.tema}}`) -> `valaszto` (`branch`,
+`input.mod == "reszletes" ? "reszletes" : "rovid"`) -> `reszletes` ágon `szetoszt` (`fan_out`,
+`input.elemek`) -> `elem` (`Elem {{itemIndex}}: {{item}}`) -> `osszezar` (`join` `merge`) ->
+`ciklus` (`loop`, `continueExpression: iteration < 2`, `maxIterations: 3`) -> `continue` ágon `kor`
+(`Kör {{iteration}}`), `exit` ágon `vege` (`Vége: {{input.tema}}`); a `rovid` ágon
+`nem_valasztott`. Bemenet: `{ tema: "kert", mod: "reszletes", elemek: ["alma", "körte", "szilva"] }`.
+
+Eredmény (a teszt állításai, mind zöld):
+
+| Pont | Mért                                                                                                                                                                                                                                                                           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 48.  | a `run_finished` payload `status` és a `GET /api/runs/{runId}` `status` értéke `succeeded`; minden `step_run` `succeeded`                                                                                                                                                      |
+| 49.  | 7 prompt: `Téma: kert`; a három `fan_out` példány (sorrendje kötetlen) `Elem 0: alma`, `Elem 1: körte`, `Elem 2: szilva`; majd `Kör 0`, `Kör 1`, `Vége: kert`                                                                                                                  |
+| 49.  | `branch_taken` payload pontosan egy: `{ branchKey: "reszletes", usedDefault: false }`; a `nem_valasztott` csomópontnak nincs `step_run` sora                                                                                                                                   |
+| 49.  | `fan_out_expanded` payload pontosan egy: `{ itemCount: 3 }`; az `elem` csomópontnak 3 `step_run` sora van                                                                                                                                                                      |
+| 49.  | `loop_iteration_started` pontosan 2, a payload `iteration` értéke `0` és `1` (7.5, O-11)                                                                                                                                                                                       |
+| 50.  | `branch` `expression: input.mod ==`: a `POST .../runs` válasza `422`, `code: unprocessable`, `errorClass: expression_evaluation_failed`, az üzenet tartalmazza a `valaszto` és az `expression` nevet; a `GET /api/runs?workflowId=...` üres, a hamis agent nem kapott promptot |
+
+Szándékos rontások (egyenként, a teszt fájlban, utána visszaállítva), mind az első tesztet buktatta, a
+422 eset zöld maradt:
+
+| Rontás                                                   | Bukás                                                                                     |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `continueExpression: iteration < 3` (`maxIterations: 3`) | `expected 'failed' to be 'succeeded'`                                                     |
+| a `branch` kifejezés a `rovid` kulcsot adja              | `expected [ 'Téma: kert', 'Rövid: kert' ] to have a length of 7 but got 2`                |
+| `elem` sablon `Elem {{item}}` (`itemIndex` nélkül)       | `expected [ 'Elem alma', 'Elem körte', …(1) ] to strictly equal [ 'Elem 0: alma', …(2) ]` |
+
+A fájl két tesztje egyedül futtatva 124 ms alatt fut le.
+
+**A teljes `test` kapu kétszer (mellékes ellenőrzés).** Egy korábbi futáson párhuzamos terhelés mellett
+3 bukó teszt látszott (a `screenshot-pipeline` (2) fejléce), újrafuttatva zöld. Ezen a fán (az új próbával
+együtt) a `bun run test` kétszer, egymás után, a `flock /tmp/kapu-gep.lock` alatt: mindkétszer kilépési kód
+0, 625 teszt fájl, 6257 teszt zöld, a lefedettség mind a négy metrikán 100 százalék; a futásidő 63,33 s és
+61,94 s. A `build-engine-dependencies.spec.ts` 27 szintű `.map(x, [x, x])` tesztje 1739 ms és 1724 ms, a
+`screenshot-pipeline.spec.ts` 7 tesztje zöld. A korábbi bukás ezen a két futáson nem jött elő, tehát a
+gyökéroka (a nehéz teszt memóriája vagy ideje párhuzamos terhelés alatt, vagy más) **nem ellenőrzött**.
