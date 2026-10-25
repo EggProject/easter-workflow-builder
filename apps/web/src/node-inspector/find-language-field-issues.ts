@@ -4,6 +4,7 @@ import {
   createMustacheTemplateRenderer,
 } from '@easter-workflow-builder/workflow-language';
 import type { ZodIssueLike } from './field-errors-from-zod-error.ts';
+import { toEditorSentence } from './to-editor-sentence.ts';
 
 /**
  * A szerverrel és a motorral azonos csomag két fordítója (SPEC-010 3.1, 10.).
@@ -67,7 +68,8 @@ function languageFieldsOf(config: NodeConfig): readonly LanguageField[] {
  * mezőnkénti hibatérkép bemenetének alakjában (SPEC-010 10., AC43): a sablon
  * a `mustache-template`, a kifejezés a `cel-expression` `compile` hívásával
  * fordul. Az üzenet a csomag saját magyar leírása, ami a mező szövegét nem
- * idézi (SPEC-010 9.5).
+ * idézi (SPEC-010 9.5); a szerkesztőben nagy kezdőbetűvel és ponttal zárva
+ * jelenik meg (`toEditorSentence`, SPEC-010 15. O-17).
  *
  * A fordítás csak sémahelyes mezőn fut (SPEC-010 10. "sorrend", AC46): ha a
  * `schemaFieldErrors` térképen a mező útvonalán már áll hiba (például az üres
@@ -84,7 +86,7 @@ export function findLanguageFieldIssues(
     }
     const compiled = language === 'template' ? TEMPLATE_RENDERER.compile(source) : EXPRESSION_EVALUATOR.compile(source);
     if (compiled.kind === 'error') {
-      issues.push({ path, message: compiled.message });
+      issues.push({ path, message: toEditorSentence(compiled.message) });
     }
   }
   return issues;

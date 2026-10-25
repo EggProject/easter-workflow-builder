@@ -1019,7 +1019,7 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
     {
       language: 'CEL kifejezés',
       label: 'Feltétel kifejezés',
-      message: 'nem deklarált változó a kifejezésben (pozíció: 0)',
+      message: 'Nem deklarált változó a kifejezésben (pozíció: 0).',
       node: {
         id: 'n-branch-cel',
         type: 'branch',
@@ -1038,7 +1038,7 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
     {
       language: 'Mustache sablon',
       label: 'Törzs sablon (bodyTemplate)',
-      message: 'le nem zárt szakasz a sablonban (pozíció: 10)',
+      message: 'Le nem zárt szakasz a sablonban (pozíció: 10).',
       node: {
         id: 'n-approval-mustache',
         type: 'human_approval',

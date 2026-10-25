@@ -6,8 +6,8 @@ import { findLanguageFieldIssues } from './find-language-field-issues.ts';
 
 // A valódi `workflow-language` csomag fut, mock nélkül (SPEC-010 12.4): a
 // mondatok a csomag saját magyar leírásai, a telepített csomagon mérve.
-const UNCLOSED_SECTION = 'le nem zárt szakasz a sablonban (pozíció: 10)';
-const UNDECLARED_VARIABLE = 'nem deklarált változó a kifejezésben (pozíció: 0)';
+const UNCLOSED_SECTION = 'Le nem zárt szakasz a sablonban (pozíció: 10).';
+const UNDECLARED_VARIABLE = 'Nem deklarált változó a kifejezésben (pozíció: 0).';
 const BROKEN_TEMPLATE = '{{#titok}}';
 const BROKEN_EXPRESSION = 'titokNeve > 1';
 const NO_SCHEMA_ERRORS: ReadonlyMap<string, string> = new Map<string, string>();
