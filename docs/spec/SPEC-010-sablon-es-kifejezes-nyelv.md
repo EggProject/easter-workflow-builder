@@ -814,7 +814,10 @@ A `RUN_CONTEXT_VARIABLE_NAMES` a `RunContext` mezőlistájának szándékos dupl
 megvalósítás nélküli regressziós téma az `apps/server` alatt, ahol a két csomag egyszerre látszik,
 típusszintű kétirányú egyezéssel a `typecheck` kapun: a konstans elemeinek uniója pontosan a
 `keyof RunContext`. Ha a motor a `RunContext` alakját bővíti, a `typecheck` bukik, amíg a lista nem
-követi. A védelmet szándékos elrontással kell igazolni, ahogy a meglévő két minta.
+követi. A védelmet szándékos elrontással kell igazolni, ahogy a meglévő két minta. **Végrehajtva:**
+`apps/server/src/run-context-drift-protection/` (PLAN-010 T-010-15), a típusszintű ág mellett a motor
+`buildRunContext` kimenetén futó ággal; a konstans egy elemének törlése és a `RunContext` bővítése
+egyaránt a `typecheck` kapun bukott.
 
 ## 12. Tesztelés
 
