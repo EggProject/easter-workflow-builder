@@ -174,6 +174,46 @@ test('a futás indításának malformed_node_config hibája a lábléc danger Al
   await expectNoInternalText(page, 'malformed_node_config');
 });
 
+// A sablon és a kifejezés fordítási hibáját a motor a futás indításakor adja
+// (SPEC-010 9.2, 9.3); a lépés futás közbeni hibája a futás eseményein megy
+// ki, nem REST válaszban, tehát a mondat "a futás nem indítható" tagja igaz
+// (user döntés 2026-10-25).
+const LANGUAGE_FIELD_CASES = [
+  {
+    errorClass: 'template_render_failed',
+    sentence: 'A workflow egyik sablonja hibás, ezért a futás nem indítható.',
+  },
+  {
+    errorClass: 'expression_evaluation_failed',
+    sentence: 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.',
+  },
+] as const satisfies readonly { readonly errorClass: ProtocolErrorBody['errorClass']; readonly sentence: string }[];
+
+for (const { errorClass, sentence } of LANGUAGE_FIELD_CASES) {
+  test(`a futás indításának ${errorClass} hibája a lábléc danger Alert blokkjában a saját mondatával áll`, async ({
+    page,
+  }) => {
+    await mockEditor(
+      page,
+      START_WITHOUT_FIELDS,
+      {
+        code: 'unprocessable',
+        message: internalMessage(errorClass),
+        errorClass,
+      } satisfies ProtocolErrorBody,
+      422,
+    );
+    await page.goto(EDITOR_URL);
+
+    await page.getByRole('button', { name: 'Futás indítása', exact: true }).click();
+
+    const alert = page.locator('.page-footer').getByRole('alert');
+    await expect(alert).toHaveText(sentence);
+    await expect(alert).toHaveClass(/\balert--danger\b/);
+    await expectNoInternalText(page, errorClass);
+  });
+}
+
 // A mentés `invalid_request` hibájának mezője nem nevezhető meg a felület
 // nyelvén (SPEC-007 8.4, O-10 lezárás): a szerver ugyanazzal a protokoll
 // sémával ellenőriz, amivel a kliens a küldés előtt, tehát a mezőút csak

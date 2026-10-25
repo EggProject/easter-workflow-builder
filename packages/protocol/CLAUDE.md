@@ -47,7 +47,7 @@ duplikált Zod felsorolásként újra deklarálva él, ugyanazon okból, mint a 
 duplikált felsorolás - a sodródás védelmét ott az `apps/server` `node-config-drift-protection`
 regressziós tesztje adja. **Ugyanígy a `protocol-error` téma `ProtocolErrorClass` szótára**
 (SPEC-005 8.5): a motor `EngineErrorKind` uniójának szándékos részhalmaza, plusz a `db`
-`already_decided` ága, amit az L1 réteg nem importálhat; a sodródás védelmét az `apps/server`
+`already_decided` ága, amit az L1 réteg nem importálhat (2026-10-25 óta a SPEC-010 `template_render_failed` és `expression_evaluation_failed` osztályával is, SPEC-010 9.6); a sodródás védelmét az `apps/server`
 `error-class-drift-protection` regressziós tesztje adja. Az `errorClass` mező elhagyható (nem
 `null`), és csak a REST hiba törzsben áll, a `protocol_error` SSE keretben nem (SPEC-005 8.1).
 **A kötelező szöveg mezők mentési szabálya** (SPEC-008 5.4, O-21) kizárólag az írás oldalán áll: a

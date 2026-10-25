@@ -16,6 +16,18 @@ describe('ProtocolErrorBodySchema', () => {
     expect(outcome.success && outcome.data.errorClass).toBe('no_default_provider');
   });
 
+  it.each(['template_render_failed', 'expression_evaluation_failed'])(
+    'elfogadja a SPEC-010 9.3 szerinti %s errorClass mezőt (user döntés 2026-10-25)',
+    (errorClass) => {
+      const outcome = ProtocolErrorBodySchema.safeParse({
+        code: 'unprocessable',
+        message: `A futás nem indítható (${errorClass}).`,
+        errorClass,
+      });
+      expect(outcome.success && outcome.data.errorClass).toBe(errorClass);
+    },
+  );
+
   it('a mező nélküli törzsben az errorClass hiányzik (a mező előtti szerver válasz is érvényes)', () => {
     const outcome = ProtocolErrorBodySchema.safeParse({ code: 'unprocessable', message: 'hiba' });
     expect(outcome.success && Object.hasOwn(outcome.data, 'errorClass')).toBe(false);

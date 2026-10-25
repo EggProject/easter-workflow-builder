@@ -351,6 +351,8 @@ describe('createHttpServer', () => {
       expect(payload).toMatchObject({ code: 'unprocessable' });
       const message = isRecord(payload) ? payload['message'] : undefined;
       expect(isString(message) && message.endsWith(`(${errorClass}).`)).toBe(true);
+      // A zárt szótár tagja (SPEC-005 8.5, user döntés 2026-10-25): a törzs `errorClass` mezőt is hordoz.
+      expect(payload).toMatchObject({ errorClass });
       expect(okOrThrow(database.runs.listRuns())).toStrictEqual([]);
     },
   );
