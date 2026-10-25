@@ -1,0 +1,5 @@
+"{{> x}}"                    spec="" strict="" stock=""
+"a{{>x}}b"                   spec="ab" strict="ab" stock="ab"
+"{{> ../../etc/passwd}}"     spec="" strict="" stock=""
+"{{> input}}"                spec="" strict="" stock=""
+"  {{> x}}\nsor"             spec="sor" strict="sor" stock="sor"

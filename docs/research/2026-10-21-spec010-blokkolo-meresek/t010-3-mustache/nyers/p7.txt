@@ -1,0 +1,151 @@
+AZONOS  6.4/1 pontozott név
+    sablon="{{input.tema}}"
+    stock="Kód: <a href=\"x\">'&/`="
+    spec  ="Kód: <a href=\"x\">'&/`="
+    strict="Kód: <a href=\"x\">'&/`="
+AZONOS  6.4/2 szakasz tömbön
+    sablon="{{#input.elemek}}- {{.}}{{/input.elemek}}"
+    stock="- x- y"
+    spec  ="- x- y"
+    strict="- x- y"
+AZONOS  6.4/3 fordított szakasz, nem üres tömb
+    sablon="{{^input.elemek}}nincs{{/input.elemek}}"
+    stock=""
+    spec  =""
+    strict=""
+AZONOS  6.4/3 fordított szakasz, üres tömb
+    sablon="{{^input.elemek}}nincs{{/input.elemek}}"
+    stock="nincs"
+    spec  ="nincs"
+    strict="nincs"
+AZONOS  6.4/3 fordított szakasz, hiányzó
+    sablon="{{^input.elemek}}nincs{{/input.elemek}}"
+    stock="nincs"
+    spec  ="nincs"
+    strict="nincs"
+AZONOS  6.4/3 szakasz, hiányzó
+    sablon="{{#input.elemek}}- {{.}}{{/input.elemek}}"
+    stock=""
+    spec  =""
+    strict=""
+AZONOS  6.4/4 partial
+    sablon="{{> név}}"
+    stock=""
+    spec  =""
+    strict=""
+AZONOS  6.4/5 határoló csere
+    sablon="{{=<% %>=}}<% input.tema %>|<%#input.elemek%><%.%><%/input.elemek%>"
+    stock="Kód: <a href=\"x\">'&/`=|xy"
+    spec  ="Kód: <a href=\"x\">'&/`=|xy"
+    strict="Kód: <a href=\"x\">'&/`=|xy"
+AZONOS  beágyazott szakasz
+    sablon="{{#input.csoportok}}{{nev}}:[{{#tagok}}{{.}},{{/tagok}}{{^tagok}}ures{{/tagok}}];{{/input.csoportok}}"
+    stock="g1:[t1,t2,];g2:[ures];"
+    spec  ="g1:[t1,t2,];g2:[ures];"
+    strict="g1:[t1,t2,];g2:[ures];"
+AZONOS  szakasz objektumon
+    sablon="{{#input.szerzo}}{{nev}}/{{kor}}{{/input.szerzo}}"
+    stock="Anna/30"
+    spec  ="Anna/30"
+    strict="Anna/30"
+AZONOS  szülő kontextus bejárás szakaszban
+    sablon="{{#input.elemek}}{{.}}={{input.szam}};{{/input.elemek}}"
+    stock="x=42;y=42;"
+    spec  ="x=42;y=42;"
+    strict="x=42;y=42;"
+AZONOS  pontozott név szakaszban, szülőből
+    sablon="{{#input.csoportok}}{{nev}}-{{input.szerzo.nev}};{{/input.csoportok}}"
+    stock="g1-Anna;g2-Anna;"
+    spec  ="g1-Anna;g2-Anna;"
+    strict="g1-Anna;g2-Anna;"
+AZONOS  mély pontozott név
+    sablon="{{input.beagyazott.a.b.c}}"
+    stock="mely"
+    spec  ="mely"
+    strict="mely"
+AZONOS  . név a gyökéren (objektum)
+    sablon="{{#input.szerzo}}{{.}}{{/input.szerzo}}"
+    stock="{\"nev\":\"Anna\",\"kor\":30}"
+    spec  ="{\"nev\":\"Anna\",\"kor\":30}"
+    strict="{\"nev\":\"Anna\",\"kor\":30}"
+AZONOS  szakasz szövegen
+    sablon="{{#input.tema}}[{{.}}]{{/input.tema}}"
+    stock="[Kód: <a href=\"x\">'&/`=]"
+    spec  ="[Kód: <a href=\"x\">'&/`=]"
+    strict="[Kód: <a href=\"x\">'&/`=]"
+AZONOS  szakasz számon
+    sablon="{{#input.szam}}[{{.}}]{{/input.szam}}"
+    stock="[42]"
+    spec  ="[42]"
+    strict="[42]"
+AZONOS  szakasz igaz/hamis
+    sablon="{{#input.igaz}}I{{/input.igaz}}{{#input.hamis}}H{{/input.hamis}}{{^input.hamis}}nemH{{/input.hamis}}"
+    stock="InemH"
+    spec  ="InemH"
+    strict="InemH"
+AZONOS  szakasz null/0/üres szöveg
+    sablon="{{#input.semmi}}a{{/input.semmi}}{{^input.semmi}}N{{/input.semmi}}{{#input.nulla}}b{{/input.nulla}}{{^input.nulla}}Z{{/input.nulla}}{{^input.szoveg_ures}}E{{/input.szoveg_ures}}"
+    stock="NZE"
+    spec  ="NZE"
+    strict="NZE"
+AZONOS  steps hivatkozás
+    sablon="{{steps.node-1.summary}} {{#steps.node-1.tags}}{{.}} {{/steps.node-1.tags}}"
+    stock="kesz t1 t2 "
+    spec  ="kesz t1 t2 "
+    strict="kesz t1 t2 "
+AZONOS  steps teljes objektum
+    sablon="{{steps.node-1}}"
+    stock="{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]}"
+    spec  ="{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]}"
+    strict="{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]}"
+AZONOS  tömb index pontozva
+    sablon="{{input.elemek.0}}{{input.elemek.1}}"
+    stock="xy"
+    spec  ="xy"
+    strict="xy"
+AZONOS  tömb length (saját adat tulajdonság)
+    sablon="{{input.elemek.length}}"
+    stock="2"
+    spec  ="2"
+    strict="2"
+ELTÉR   szöveg length (primitív tulajdonság)
+    sablon="{{input.tema.length}}"
+    stock="22"
+    spec  =""
+    strict=HIBA: hiányzó név a sablonban: input.tema.length
+AZONOS  fan_out item és itemIndex
+    sablon="{{item.nev}}#{{itemIndex}} {{#item.tagok}}{{.}}{{/item.tagok}}"
+    stock="elem-1#0 pq"
+    spec  ="elem-1#0 pq"
+    strict="elem-1#0 pq"
+AZONOS  fan_out item szakasz
+    sablon="{{#item}}{{nev}}{{/item}}"
+    stock="elem-1"
+    spec  ="elem-1"
+    strict="elem-1"
+AZONOS  loop iteration
+    sablon="kör {{iteration}}"
+    stock="kör 2"
+    spec  ="kör 2"
+    strict="kör 2"
+AZONOS  joinInputs
+    sablon="{{#joinInputs}}{{r}};{{/joinInputs}}"
+    stock="A;B;"
+    spec  ="A;B;"
+    strict="A;B;"
+AZONOS  error
+    sablon="{{error.kind}}: {{error.message}}"
+    stock="agent_failed: hiba <x>"
+    spec  ="agent_failed: hiba <x>"
+    strict="agent_failed: hiba <x>"
+AZONOS  hiányzó item nem fan_out-ban, szakasz
+    sablon="{{#item}}x{{/item}}{{^item}}nincs{{/item}}"
+    stock="nincs"
+    spec  ="nincs"
+    strict="nincs"
+eltérő sorok száma: 1
+--- push felülírás: minden szakasz belsejében OwnPropertyContext áll ---
+[["input.csoportok","Probe",true],["tagok","Probe",true],[".","Probe",true],[".","Probe",true],["nev","Probe",true],["tagok","Probe",true],["nev","Probe",true]]
+--- push felülírás NÉLKÜL (ellenpróba): a szakasz belseje alap Context, a szűkítés elvész ---
+"{{#input.elemek}}{{constructor.name}}{{/input.elemek}}" push nélkül= "StringString"  push-sal= ""
+"{{#input.szerzo}}{{constructor.name}}|{{toString}}{{/input.szerzo}}" push nélkül= "Object|[object Object]"  push-sal= "|"

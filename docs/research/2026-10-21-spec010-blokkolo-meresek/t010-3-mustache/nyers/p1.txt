@@ -1,0 +1,47 @@
+{
+  "{{input.s}}": {
+    "specPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "strictPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "stockConfigEscape": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    }
+  },
+  "{{{input.s}}}": {
+    "specPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "strictPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "stockConfigEscape": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    }
+  },
+  "{{& input.s}}": {
+    "specPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "strictPath": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    },
+    "stockConfigEscape": {
+      "ok": true,
+      "value": "&<>\"'/`="
+    }
+  },
+  "globalEscapeSameRef": true,
+  "globalEscapeStillHtml": "&amp;&lt;&gt;&quot;&#39;&#x2F;&#x60;&#x3D;",
+  "defaultRenderWithoutConfig": "&amp;&lt;&gt;&quot;&#39;&#x2F;&#x60;&#x3D;"
+}

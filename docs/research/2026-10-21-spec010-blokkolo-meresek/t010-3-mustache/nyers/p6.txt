@@ -1,0 +1,9 @@
+alapból templateCache típusa: object kulcsok: 0
+cache BE: parse(t) === parse(t): true  cache kulcsok: ["Szia {{input.tema}} {{#input.elemek}}{{.}}{{/input.elemek}}:{{:}}"]
+beállítás után Mustache.templateCache: undefined
+cache KI: parse(t) === parse(t): false  tokenek egyenlők tartalomra: true
+render után Mustache.templateCache: undefined
+a régi gyorsítótár objektum kulcsai (nem nő tovább): 1
+új Mustache.Writer példány templateCache kulcsai (a globális kikapcsolás NEM hat rá): 2
+StrictWriter példány templateCache: undefined  new StrictWriter(): undefined
+StrictWriter parse(t) === parse(t): false

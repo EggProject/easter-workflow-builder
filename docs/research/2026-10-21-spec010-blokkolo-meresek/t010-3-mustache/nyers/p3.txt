@@ -1,0 +1,49 @@
+--- A) a lookup hívás argumentumai a Mustache.render úton (SPEC 6.2 szó szerinti út) ---
+{{nemletezik}}                     kimenet="" lookup hívások=[{"arg":"nemletezik","hivo":"at Writer.escapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:665:23)"}]
+{{{nemletezik}}}                   kimenet="" lookup hívások=[{"arg":"nemletezik","hivo":"at Writer.unescapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:658:23)"}]
+{{& nemletezik}}                   kimenet="" lookup hívások=[{"arg":"nemletezik","hivo":"at Writer.unescapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:658:23)"}]
+{{#nemletezik}}x{{/nemletezik}}    kimenet="" lookup hívások=[{"arg":"nemletezik","hivo":"at Writer.renderSection (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:588:23)"}]
+{{^nemletezik}}y{{/nemletezik}}    kimenet="y" lookup hívások=[{"arg":"nemletezik","hivo":"at Writer.renderInverted (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:620:23)"}]
+--- A2) a lookup paraméterlistája (Function.length) ---
+Mustache.Context.prototype.lookup.length = 1
+--- B) Writer alosztály út: sima változó tag hiba, szakasz alapértelmezett ---
+{{nemletezik}}                                       HIBA: hiányzó név a sablonban: nemletezik missingName=nemletezik
+{{{nemletezik}}}                                     HIBA: hiányzó név a sablonban: nemletezik missingName=nemletezik
+{{& nemletezik}}                                     HIBA: hiányzó név a sablonban: nemletezik missingName=nemletezik
+{{input.nemletezik}}                                 HIBA: hiányzó név a sablonban: input.nemletezik missingName=input.nemletezik
+{{input.szerzo.nemletezik}}                          HIBA: hiányzó név a sablonban: input.szerzo.nemletezik missingName=input.szerzo.nemletezik
+{{item}}                                             HIBA: hiányzó név a sablonban: item missingName=item
+{{itemIndex}}                                        HIBA: hiányzó név a sablonban: itemIndex missingName=itemIndex
+{{error.kind}}                                       HIBA: hiányzó név a sablonban: error.kind missingName=error.kind
+{{#nemletezik}}x{{/nemletezik}}                      "" 
+{{^nemletezik}}y{{/nemletezik}}                      "y" 
+{{#input.nemletezik}}x{{/input.nemletezik}}          "" 
+{{^input.nemletezik}}y{{/input.nemletezik}}          "y" 
+{{#item}}x{{/item}}                                  "" 
+{{^item}}nincs elem{{/item}}                         "nincs elem" 
+a{{input.semmi}}b                                    "anullb" 
+{{#input.elemek}}{{nincs}}{{/input.elemek}}          HIBA: hiányzó név a sablonban: nincs missingName=nincs
+{{#input.elemek}}{{input.tema}}|{{/input.elemek}}    "Kód: <a href=\"x\">'&/`=|Kód: <a href=\"x\">'&/`=|" 
+--- C) ugyanez a Mustache.render úton (Context alosztály egyedül) ---
+{{nemletezik}}                                       ""
+{{{nemletezik}}}                                     ""
+{{& nemletezik}}                                     ""
+{{input.nemletezik}}                                 ""
+{{input.szerzo.nemletezik}}                          ""
+{{item}}                                             ""
+{{itemIndex}}                                        ""
+{{error.kind}}                                       ""
+{{#nemletezik}}x{{/nemletezik}}                      ""
+{{^nemletezik}}y{{/nemletezik}}                      "y"
+{{#input.nemletezik}}x{{/input.nemletezik}}          ""
+{{^input.nemletezik}}y{{/input.nemletezik}}          "y"
+{{#item}}x{{/item}}                                  ""
+{{^item}}nincs elem{{/item}}                         "nincs elem"
+a{{input.semmi}}b                                    "ab"
+{{#input.elemek}}{{nincs}}{{/input.elemek}}          ""
+{{#input.elemek}}{{input.tema}}|{{/input.elemek}}    "Kód: <a href=\"x\">'&/`=|Kód: <a href=\"x\">'&/`=|"
+--- D) stack alapú megkülönböztetés próbája a Context-en belül (csak bizonyításként) ---
+{{nemletezik}}                     HIBA: hiányzó név: nemletezik (hívó: at Writer.escapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:665:23))
+{{& nemletezik}}                   HIBA: hiányzó név: nemletezik (hívó: at Writer.unescapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:658:23))
+{{#nemletezik}}x{{/nemletezik}}    ""
+{{^nemletezik}}y{{/nemletezik}}    "y"

@@ -1,0 +1,216 @@
+===== node p8-run.mjs stock nolistener notraps =====
+{{toString}}                                                                   -> "[object Object]"
+{{constructor}}                                                                -> "{}"
+{{input.constructor.name}}                                                     -> "Object"
+{{input.constructor.constructor.name}}                                         -> "Function"
+{{#constructor}}x{{/constructor}}                                              -> "x"
+{{input.__proto__}}                                                            -> "{}"
+{{input.tema.constructor.name}}                                                -> "String"
+{{steps.x.map}}                                                                -> ""
+{{input.items.constructor.fromAsync}}                                          -> "[object Promise]"
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> "x"
+{{input.items.map}}                                                            -> HIBA: undefined is not a function
+{{#input.items.map}}x{{/input.items.map}}                                      -> HIBA: undefined is not a function
+{{{input.constructor}}}                                                        -> "[object Object]"
+{{& input.toString}}                                                           -> "[object Object]"
+{{input.hasOwnProperty}}                                                       -> "false"
+{{input.valueOf}}                                                              -> "{\"input\":{\"tema\":\"Kód: <a href=\\\"x\\\">'&/`=\",\"items\":[\"a\",\"b\"],\"elemek\":[\"x\",\"y\"],\"ures\":[],\"szam\":42,\"nulla\":0,\"igaz\":true,\"hamis\":false,\"semmi\":null,\"szoveg_ures\":\"\",\"szerzo\":{\"nev\":\"Anna\",\"kor\":30},\"csoportok\":[{\"nev\":\"g1\",\"tagok\":[\"t1\",\"t2\"]},{\"nev\":\"g2\",\"tagok\":[]}],\"beagyazott\":{\"a\":{\"b\":{\"c\":\"mely\"}}}},\"steps\":{\"node-1\":{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]},\"start\":{\"tema\":\"start tema\"}}}"
+{{input.__proto__.constructor.name}}                                           -> "Object"
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""
+{{#input}}{{constructor.name}}{{/input}}                                       -> "Object"
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> "StringString"
+{{#input.items}}{{length}}{{/input.items}}                                     -> ""
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> ""
+{{steps.node-1.constructor.name}}                                              -> "Object"
+{{item.constructor}}                                                           -> ""
+{{input.trapFn}}                                                               -> ""
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> ""
+{{{input.trapFn}}}                                                             -> ""
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> "[object Object]{\"nev\":\"Anna\",\"kor\":30}"
+{{input.items.constructor.from}}                                               -> HIBA: undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+{{input.constructor.keys}}                                                     -> HIBA: Cannot convert undefined or null to object
+file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:471
+    value = value.call(this.view);
+                  ^
+
+TypeError: Cannot read properties of undefined (reading 'Symbol(Symbol.asyncIterator)')
+    at Object.fromAsync (<anonymous>)
+    at Context.lookup (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:471:19)
+    at Writer.escapedValue (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:665:23)
+    at Writer.renderTokens (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:575:46)
+    at Writer.render (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:550:15)
+    at Object.render (file:///sessions/vigilant-clever-mendel/meres/t010-3/node_modules/mustache/mustache.mjs:752:24)
+    at renderStock (file:///sessions/vigilant-clever-mendel/meres/t010-3/src/lib.mjs:160:40)
+    at file:///sessions/vigilant-clever-mendel/meres/t010-3/src/p8-run.mjs:44:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+
+Node.js v26.7.0
+kilépési kód: 1
+===== node p8-run.mjs stock listener traps =====
+{{toString}}                                                                   -> "[object Object]"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.toString
+{{constructor}}                                                                -> "{}"   HÍVOTT: Object.prototype.hasOwnProperty
+{{input.constructor.name}}                                                     -> "Object"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{input.constructor.constructor.name}}                                         -> "Function"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#constructor}}x{{/constructor}}                                              -> "x"   HÍVOTT: Object.prototype.hasOwnProperty
+{{input.__proto__}}                                                            -> "{}"   HÍVOTT: Object.prototype.hasOwnProperty
+{{input.tema.constructor.name}}                                                -> "String"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{steps.x.map}}                                                                -> ""   HÍVOTT: Object.prototype.hasOwnProperty
+{{input.items.constructor.fromAsync}}                                          -> "[object Promise]"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Array.fromAsync,Object.prototype.toString
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> "x"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Array.fromAsync
+{{input.items.map}}                                                            -> HIBA: undefined is not a function   HÍVOTT: Object.prototype.hasOwnProperty,Array.prototype.map
+{{#input.items.map}}x{{/input.items.map}}                                      -> HIBA: undefined is not a function   HÍVOTT: Object.prototype.hasOwnProperty,Array.prototype.map
+{{{input.constructor}}}                                                        -> "[object Object]"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.valueOf,Object.prototype.toString
+{{& input.toString}}                                                           -> "[object Object]"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.toString
+{{input.hasOwnProperty}}                                                       -> "false"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{input.valueOf}}                                                              -> "{\"input\":{\"tema\":\"Kód: <a href=\\\"x\\\">'&/`=\",\"items\":[\"a\",\"b\"],\"elemek\":[\"x\",\"y\"],\"ures\":[],\"szam\":42,\"nulla\":0,\"igaz\":true,\"hamis\":false,\"semmi\":null,\"szoveg_ures\":\"\",\"szerzo\":{\"nev\":\"Anna\",\"kor\":30},\"csoportok\":[{\"nev\":\"g1\",\"tagok\":[\"t1\",\"t2\"]},{\"nev\":\"g2\",\"tagok\":[]}],\"beagyazott\":{\"a\":{\"b\":{\"c\":\"mely\"}}}},\"steps\":{\"node-1\":{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]},\"start\":{\"tema\":\"start tema\"}}}"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.valueOf
+{{input.__proto__.constructor.name}}                                           -> "Object"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#input}}{{constructor.name}}{{/input}}                                       -> "Object"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> "StringString"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#input.items}}{{length}}{{/input.items}}                                     -> ""   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> ""   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{steps.node-1.constructor.name}}                                              -> "Object"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty
+{{item.constructor}}                                                           -> ""   HÍVOTT: Object.prototype.hasOwnProperty
+{{input.trapFn}}                                                               -> "TRAP"   HÍVOTT: Object.prototype.hasOwnProperty,input.trapFn
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> "x"   HÍVOTT: Object.prototype.hasOwnProperty,input.trapFn
+{{{input.trapFn}}}                                                             -> "TRAP"   HÍVOTT: Object.prototype.hasOwnProperty,input.trapFn
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> "[object Object]{\"nev\":\"Anna\",\"kor\":30}"   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.prototype.toString,Object.prototype.hasOwnProperty,Object.prototype.valueOf
+{{input.items.constructor.from}}                                               -> HIBA: undefined is not iterable (cannot read property Symbol(Symbol.iterator))   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Array.from
+{{input.constructor.keys}}                                                     -> HIBA: Cannot convert undefined or null to object   HÍVOTT: Object.prototype.hasOwnProperty,Object.prototype.hasOwnProperty,Object.keys
+UNHANDLED_REJECTION: TypeError: Cannot read properties of undefined (reading 'Symbol(Symbol.asyncIterator)')
+UNHANDLED_REJECTION: TypeError: Cannot read properties of undefined (reading 'Symbol(Symbol.asyncIterator)')
+ÖSSZESEN: mód=stock figyelő=listener csapdák=traps függvényhívás=69 kezeletlen_elutasítás=2
+kilépési kód: 0
+===== node p8-run.mjs spec nolistener notraps =====
+{{toString}}                                                                   -> ""
+{{constructor}}                                                                -> ""
+{{input.constructor.name}}                                                     -> ""
+{{input.constructor.constructor.name}}                                         -> ""
+{{#constructor}}x{{/constructor}}                                              -> ""
+{{input.__proto__}}                                                            -> ""
+{{input.tema.constructor.name}}                                                -> ""
+{{steps.x.map}}                                                                -> ""
+{{input.items.constructor.fromAsync}}                                          -> ""
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> ""
+{{input.items.map}}                                                            -> ""
+{{#input.items.map}}x{{/input.items.map}}                                      -> ""
+{{{input.constructor}}}                                                        -> ""
+{{& input.toString}}                                                           -> ""
+{{input.hasOwnProperty}}                                                       -> ""
+{{input.valueOf}}                                                              -> ""
+{{input.__proto__.constructor.name}}                                           -> ""
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""
+{{#input}}{{constructor.name}}{{/input}}                                       -> ""
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> ""
+{{#input.items}}{{length}}{{/input.items}}                                     -> ""
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> ""
+{{steps.node-1.constructor.name}}                                              -> ""
+{{item.constructor}}                                                           -> ""
+{{input.trapFn}}                                                               -> ""
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> ""
+{{{input.trapFn}}}                                                             -> ""
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> ""
+{{input.items.constructor.from}}                                               -> ""
+{{input.constructor.keys}}                                                     -> ""
+ÖSSZESEN: mód=spec figyelő=nolistener csapdák=notraps függvényhívás=0 kezeletlen_elutasítás=0
+kilépési kód: 0
+===== node p8-run.mjs spec listener traps =====
+{{toString}}                                                                   -> ""
+{{constructor}}                                                                -> ""
+{{input.constructor.name}}                                                     -> ""
+{{input.constructor.constructor.name}}                                         -> ""
+{{#constructor}}x{{/constructor}}                                              -> ""
+{{input.__proto__}}                                                            -> ""
+{{input.tema.constructor.name}}                                                -> ""
+{{steps.x.map}}                                                                -> ""
+{{input.items.constructor.fromAsync}}                                          -> ""
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> ""
+{{input.items.map}}                                                            -> ""
+{{#input.items.map}}x{{/input.items.map}}                                      -> ""
+{{{input.constructor}}}                                                        -> ""
+{{& input.toString}}                                                           -> ""
+{{input.hasOwnProperty}}                                                       -> ""
+{{input.valueOf}}                                                              -> ""
+{{input.__proto__.constructor.name}}                                           -> ""
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""
+{{#input}}{{constructor.name}}{{/input}}                                       -> ""
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> ""
+{{#input.items}}{{length}}{{/input.items}}                                     -> ""
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> ""
+{{steps.node-1.constructor.name}}                                              -> ""
+{{item.constructor}}                                                           -> ""
+{{input.trapFn}}                                                               -> ""
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> ""
+{{{input.trapFn}}}                                                             -> ""
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> ""
+{{input.items.constructor.from}}                                               -> ""
+{{input.constructor.keys}}                                                     -> ""
+ÖSSZESEN: mód=spec figyelő=listener csapdák=traps függvényhívás=0 kezeletlen_elutasítás=0
+kilépési kód: 0
+===== node p8-run.mjs strict nolistener notraps =====
+{{toString}}                                                                   -> HIBA: hiányzó név a sablonban: toString
+{{constructor}}                                                                -> HIBA: hiányzó név a sablonban: constructor
+{{input.constructor.name}}                                                     -> HIBA: hiányzó név a sablonban: input.constructor.name
+{{input.constructor.constructor.name}}                                         -> HIBA: hiányzó név a sablonban: input.constructor.constructor.name
+{{#constructor}}x{{/constructor}}                                              -> ""
+{{input.__proto__}}                                                            -> HIBA: hiányzó név a sablonban: input.__proto__
+{{input.tema.constructor.name}}                                                -> HIBA: hiányzó név a sablonban: input.tema.constructor.name
+{{steps.x.map}}                                                                -> HIBA: hiányzó név a sablonban: steps.x.map
+{{input.items.constructor.fromAsync}}                                          -> HIBA: hiányzó név a sablonban: input.items.constructor.fromAsync
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> ""
+{{input.items.map}}                                                            -> HIBA: hiányzó név a sablonban: input.items.map
+{{#input.items.map}}x{{/input.items.map}}                                      -> ""
+{{{input.constructor}}}                                                        -> HIBA: hiányzó név a sablonban: input.constructor
+{{& input.toString}}                                                           -> HIBA: hiányzó név a sablonban: input.toString
+{{input.hasOwnProperty}}                                                       -> HIBA: hiányzó név a sablonban: input.hasOwnProperty
+{{input.valueOf}}                                                              -> HIBA: hiányzó név a sablonban: input.valueOf
+{{input.__proto__.constructor.name}}                                           -> HIBA: hiányzó név a sablonban: input.__proto__.constructor.name
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""
+{{#input}}{{constructor.name}}{{/input}}                                       -> HIBA: hiányzó név a sablonban: constructor.name
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> HIBA: hiányzó név a sablonban: constructor.name
+{{#input.items}}{{length}}{{/input.items}}                                     -> HIBA: hiányzó név a sablonban: length
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> HIBA: hiányzó név a sablonban: length
+{{steps.node-1.constructor.name}}                                              -> HIBA: hiányzó név a sablonban: steps.node-1.constructor.name
+{{item.constructor}}                                                           -> HIBA: hiányzó név a sablonban: item.constructor
+{{input.trapFn}}                                                               -> HIBA: hiányzó név a sablonban: input.trapFn
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> ""
+{{{input.trapFn}}}                                                             -> HIBA: hiányzó név a sablonban: input.trapFn
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> HIBA: hiányzó név a sablonban: toString
+{{input.items.constructor.from}}                                               -> HIBA: hiányzó név a sablonban: input.items.constructor.from
+{{input.constructor.keys}}                                                     -> HIBA: hiányzó név a sablonban: input.constructor.keys
+ÖSSZESEN: mód=strict figyelő=nolistener csapdák=notraps függvényhívás=0 kezeletlen_elutasítás=0
+kilépési kód: 0
+===== node p8-run.mjs strict listener traps =====
+{{toString}}                                                                   -> HIBA: hiányzó név a sablonban: toString
+{{constructor}}                                                                -> HIBA: hiányzó név a sablonban: constructor
+{{input.constructor.name}}                                                     -> HIBA: hiányzó név a sablonban: input.constructor.name
+{{input.constructor.constructor.name}}                                         -> HIBA: hiányzó név a sablonban: input.constructor.constructor.name
+{{#constructor}}x{{/constructor}}                                              -> ""
+{{input.__proto__}}                                                            -> HIBA: hiányzó név a sablonban: input.__proto__
+{{input.tema.constructor.name}}                                                -> HIBA: hiányzó név a sablonban: input.tema.constructor.name
+{{steps.x.map}}                                                                -> HIBA: hiányzó név a sablonban: steps.x.map
+{{input.items.constructor.fromAsync}}                                          -> HIBA: hiányzó név a sablonban: input.items.constructor.fromAsync
+{{#input.items.constructor.fromAsync}}x{{/input.items.constructor.fromAsync}}  -> ""
+{{input.items.map}}                                                            -> HIBA: hiányzó név a sablonban: input.items.map
+{{#input.items.map}}x{{/input.items.map}}                                      -> ""
+{{{input.constructor}}}                                                        -> HIBA: hiányzó név a sablonban: input.constructor
+{{& input.toString}}                                                           -> HIBA: hiányzó név a sablonban: input.toString
+{{input.hasOwnProperty}}                                                       -> HIBA: hiányzó név a sablonban: input.hasOwnProperty
+{{input.valueOf}}                                                              -> HIBA: hiányzó név a sablonban: input.valueOf
+{{input.__proto__.constructor.name}}                                           -> HIBA: hiányzó név a sablonban: input.__proto__.constructor.name
+{{#input.constructor.constructor}}return 1{{/input.constructor.constructor}}   -> ""
+{{#input}}{{constructor.name}}{{/input}}                                       -> HIBA: hiányzó név a sablonban: constructor.name
+{{#input.items}}{{constructor.name}}{{/input.items}}                           -> HIBA: hiányzó név a sablonban: constructor.name
+{{#input.items}}{{length}}{{/input.items}}                                     -> HIBA: hiányzó név a sablonban: length
+{{#input.tema}}{{length}}{{/input.tema}}                                       -> HIBA: hiányzó név a sablonban: length
+{{steps.node-1.constructor.name}}                                              -> HIBA: hiányzó név a sablonban: steps.node-1.constructor.name
+{{item.constructor}}                                                           -> HIBA: hiányzó név a sablonban: item.constructor
+{{input.trapFn}}                                                               -> HIBA: hiányzó név a sablonban: input.trapFn
+{{#input.trapFn}}x{{/input.trapFn}}                                            -> ""
+{{{input.trapFn}}}                                                             -> HIBA: hiányzó név a sablonban: input.trapFn
+{{#input.szerzo}}{{toString}}{{valueOf}}{{/input.szerzo}}                      -> HIBA: hiányzó név a sablonban: toString
+{{input.items.constructor.from}}                                               -> HIBA: hiányzó név a sablonban: input.items.constructor.from
+{{input.constructor.keys}}                                                     -> HIBA: hiányzó név a sablonban: input.constructor.keys
+ÖSSZESEN: mód=strict figyelő=listener csapdák=traps függvényhívás=0 kezeletlen_elutasítás=0
+kilépési kód: 0
