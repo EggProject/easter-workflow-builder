@@ -100,4 +100,10 @@ export type EngineErrorKind =
   // Ugyanezzel utasítja el a leállás alatt érkező felhasználói megszakítást
   // is, írás nélkül: a futás a leállás szerint zár (9. szekció, user döntés
   // 2026-09-24).
-  | 'engine_shutting_down';
+  | 'engine_shutting_down'
+  // 4.9: az elakadt futás. Kezeletlen hiba nélkül terminálissá vált futás,
+  // amelyben jelölést kapott, de soha futtathatóvá nem vált példány maradt
+  // (user döntés 2026-10-21). Csak a `run_finished` payloadban és a
+  // `workflow_run.error_kind` oszlopban jelenik meg, REST hibatörzsben soha,
+  // ezért nem tagja a `ProtocolErrorClass` szótárnak.
+  | 'run_stalled';

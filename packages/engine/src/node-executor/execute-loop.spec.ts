@@ -148,6 +148,26 @@ describe('executeLoop', () => {
     );
   });
 
+  it('a kifejezés kontextusában az iteration a saját lefutásszám, a kapott külső iterációt felülírja, a többi mező változatlan', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const seen: unknown[] = [];
+    const ports = portsOf(database, [], (_expression, context) => {
+      seen.push(context);
+      return { kind: 'ok', value: false };
+    });
+    const outerContext: RunContext = {
+      ...emptyRunContext,
+      input: { tema: 'x' },
+      steps: { elo: 'kimenet' },
+      iteration: 7,
+    };
+
+    okOrThrow(executeLoop({ ...inputOf(runId, 2), runContext: outerContext }, ports));
+
+    expect(seen).toStrictEqual([{ ...outerContext, iteration: 2 }]);
+  });
+
   it('hamis eredménynél loop_advanced shouldContinue hamis, és nem ír loop_iteration_started eseményt', () => {
     const database = openMemoryDatabase();
     const { runId } = seedRun(database);

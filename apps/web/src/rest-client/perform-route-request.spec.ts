@@ -154,7 +154,12 @@ describe('performRouteRequest', () => {
   it.each([
     [409, 'conflict', 'already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
     [422, 'unprocessable', 'no_default_provider', 'Nincs alapértelmezett provider beállítva.'],
-    [422, 'unprocessable', 'graph_cycle_detected', 'A gráf Ciklus csomópont nélküli kört tartalmaz.'],
+    [
+      422,
+      'unprocessable',
+      'graph_cycle_detected',
+      'A gráf olyan kört tartalmaz, amely nem egyetlen Ciklus csomóponton keresztül indul.',
+    ],
   ] as const)(
     'HTTP %i %s hibára az errorClass (%s) saját mondatát adja, a szerver üzenete nélkül',
     async (status, code, errorClass, expected) => {

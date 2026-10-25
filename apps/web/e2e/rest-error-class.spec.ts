@@ -142,7 +142,7 @@ test('a futás indításának graph_cycle_detected hibája a modálisban a sajá
   await dialog.getByRole('button', { name: 'Indítás', exact: true }).click();
 
   const alert = dialog.getByRole('alert');
-  await expect(alert).toHaveText('A gráf Ciklus csomópont nélküli kört tartalmaz.');
+  await expect(alert).toHaveText('A gráf olyan kört tartalmaz, amely nem egyetlen Ciklus csomóponton keresztül indul.');
   await expect(alert).toHaveClass(/\balert--danger\b/);
   await expectNoInternalText(page, 'graph_cycle_detected');
 });

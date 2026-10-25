@@ -67,7 +67,7 @@ describe('detectGraphCycle', () => {
       [edge('e1', 'start', 'a'), edge('e2', 'a', 'b'), edge('e3', 'b', 'a')],
     );
 
-    expect(detectGraphCycle(graph, findLoopBackEdges(graph))).toStrictEqual({
+    expect(detectGraphCycle(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({
       kind: 'error',
       message: 'A gráf kört tartalmaz a következő node-okon át: a, b (graph_cycle_detected).',
     });
@@ -76,7 +76,7 @@ describe('detectGraphCycle', () => {
   it('a loop node visszaélének elhagyása után az egyébként ciklikus gráf átmegy', () => {
     const graph = loopGraph();
 
-    expect(detectGraphCycle(graph, findLoopBackEdges(graph))).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(detectGraphCycle(graph, findLoopBackEdges(graph, 'start'))).toStrictEqual({ kind: 'ok', value: undefined });
   });
 
   it('ugyanaz a loop gráf visszaél jelölés nélkül kört jelez', () => {

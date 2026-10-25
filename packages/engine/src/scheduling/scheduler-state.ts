@@ -1,3 +1,4 @@
+import type { StepInstanceReference } from '../run-context/step-instance-reference.ts';
 import type { EdgeMark } from './edge-mark.ts';
 import type { FanOutExpansion } from './fan-out-expansion.ts';
 import type { ReadyInstance } from './ready-instance.ts';
@@ -7,7 +8,7 @@ import type { ReadyInstance } from './ready-instance.ts';
  * Adatbázist nem érint, portot nem hív: minden reducer tiszta függvény, ami
  * egy új állapotot ad vissza, a kapottat érintetlenül hagyva.
  *
- * A négy térkép kulcsát a `buildScopedKey` állítja elő, mert a nyilvántartás
+ * A térképek kulcsát a `buildScopedKey` állítja elő, mert a nyilvántartás
  * egysége mindenhol az `(azonosító, ág kontextus)` pár (4.3), amit sem az
  * élazonosító, sem a node azonosító önmagában nem határoz meg.
  *
@@ -28,6 +29,10 @@ import type { ReadyInstance } from './ready-instance.ts';
  * - `loopRunCounts`: `(loop node, ág kontextus)` -> a példány addigi
  *   lefutásainak száma, ami egyben a következő lefutás `iteration` értéke
  *   (4.6 1. pont).
+ * - `markedInstances`: `(node, ág kontextus)` -> a példány, amelyik legalább
+ *   egy bejövő élén jelölést kapott (`live` vagy `dead`, visszaélen is). Az
+ *   elakadás vizsgálatának bemenete (4.9, `findStalledInstances`): a
+ *   `edgeMarks` kulcsából a kontextus nem olvasható vissza.
  * - `readyInstances`: a futtathatóvá vált, még el nem indított példányok,
  *   szigorúan érkezési sorrendben (7.1).
  * - `runningInstanceKeys`: az elindított, még nem zárt példányok kulcsai. A
@@ -41,6 +46,7 @@ export interface SchedulerState {
   readonly fanOutItems: ReadonlyMap<string, readonly unknown[]>;
   readonly loopScopeOwners: ReadonlyMap<string, string>;
   readonly loopRunCounts: ReadonlyMap<string, number>;
+  readonly markedInstances: ReadonlyMap<string, StepInstanceReference>;
   readonly readyInstances: readonly ReadyInstance[];
   readonly runningInstanceKeys: ReadonlySet<string>;
   readonly nextArrivalSequence: number;

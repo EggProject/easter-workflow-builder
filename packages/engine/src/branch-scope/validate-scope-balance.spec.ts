@@ -176,7 +176,7 @@ describe('validateScopeBalance', () => {
     // A `torzs` node egyetlen kimenő éle a visszaél, tehát a visszaél nélküli
     // gráfban terminálisnak látszik, nyitott `fan_out` kerettel. Mégsem
     // kiegyensúlyozatlan: a visszaél futásidőben valódi folytatás.
-    expect(validateScopeBalance(graph, 'start', findLoopBackEdges(graph))).toStrictEqual({
+    expect(validateScopeBalance(graph, 'start', findLoopBackEdges(graph, 'start'))).toStrictEqual({
       kind: 'ok',
       value: { joinToFanOut: new Map([['j', 'f']]) },
     });
