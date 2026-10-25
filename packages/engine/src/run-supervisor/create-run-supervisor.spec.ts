@@ -166,10 +166,24 @@ function compileUnlessUncompilable(source: string): Outcome<void> {
 }
 
 /**
+ * A `TAROLHATATLAN` kifejezés eredménye egy olyan elemet tartalmazó lista,
+ * aminek a `toJSON` metódusa a túl nagy CEL eredmény `RangeError` kivételét
+ * dobja: a legkönnyebb bemenet, amin a `fan_out` tárolási hibája
+ * (`isStorableOutput`) előáll (SPEC-010 O-15).
+ */
+const UNSTORABLE = 'TAROLHATATLAN';
+const unstorableItem = {
+  toJSON: (): never => {
+    throw new RangeError('Invalid string length');
+  },
+};
+
+/**
  * A hamis kifejezés kiértékelő: a kifejezés maga JSON literál, tehát a teszt
- * gráf közvetlenül írja le a döntést. Két különleges érték van: a `HIBA`
- * kiértékelési hibát ad, a `MEG-EGYSZER` pedig egy visszaszámlálót, ami
- * pontosan egy ciklus lefutást enged.
+ * gráf közvetlenül írja le a döntést. Három különleges érték van: a `HIBA`
+ * kiértékelési hibát ad, a `TAROLHATATLAN` tárolhatatlan listát (lásd fent), a
+ * `MEG-EGYSZER` pedig egy visszaszámlálót, ami pontosan egy ciklus lefutást
+ * enged.
  */
 function fakeEvaluator(): ExpressionEvaluatorPort {
   let remainingIterations = 2;
@@ -177,6 +191,9 @@ function fakeEvaluator(): ExpressionEvaluatorPort {
     evaluate: (expression) => {
       if (expression === 'HIBA') {
         return { kind: 'error', message: 'a kifejezés kiértékelése elhasalt' };
+      }
+      if (expression === UNSTORABLE) {
+        return { kind: 'ok', value: [unstorableItem] };
       }
       if (expression === 'MEG-EGYSZER') {
         remainingIterations -= 1;
@@ -430,8 +447,12 @@ function branchNode(id: string, expression: string, keys: readonly string[]): Wo
     onUnhandledError: 'fail_run',
   });
 }
-function fanOutNode(id: string, itemsExpression: string): WorkflowNodeInput {
-  return nodeOf(id, { type: 'fan_out', itemsExpression, branchLabelTemplate: 'elem', onUnhandledError: 'fail_run' });
+function fanOutNode(
+  id: string,
+  itemsExpression: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, { type: 'fan_out', itemsExpression, branchLabelTemplate: 'elem', onUnhandledError });
 }
 function joinMergeNode(id: string): WorkflowNodeInput {
   return nodeOf(id, { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' });
@@ -1088,6 +1109,88 @@ describe('createRunSupervisor', () => {
       expect(rows.filter((row) => row.nodeId === 'mentes' && row.status === 'succeeded')).toHaveLength(1);
       expect(statusOf(harness.database, runId)).toBe('succeeded');
     });
+  });
+
+  describe('a fan_out tárolási hibája más kifejezés hibával azonosan kezelt (SPEC-010 O-15, 8.1 ... 8.4)', () => {
+    // A `HIBA` a kiértékelés hibája, a `TAROLHATATLAN` a tárolás előtti
+    // szerializálás hibája; mindkettő `expression_evaluation_failed`, tehát a
+    // hibakezelés útja sem térhet el.
+    it.each(['HIBA', UNSTORABLE])(
+      'fail_branch (%s): a testvér ág végigfut, a futás failed, expression_evaluation_failed osztállyal',
+      async (itemsExpression) => {
+        const harness = openHarness();
+        const workflowId = createWorkflow(
+          harness.database,
+          'fan-out-fail-branch',
+          [
+            startNode('start'),
+            fanOutNode('fo', itemsExpression, 'fail_branch'),
+            agentNode('elem', 'sikeres'),
+            joinMergeNode('j'),
+            agentNode('ok1', 'sikeres'),
+            agentNode('ok2', 'sikeres'),
+          ],
+          [
+            edgeOf('e1', 'start', 'fo'),
+            edgeOf('e2', 'fo', 'elem'),
+            edgeOf('e3', 'elem', 'j'),
+            edgeOf('e4', 'start', 'ok1'),
+            edgeOf('e5', 'ok1', 'ok2'),
+          ],
+        );
+
+        const runId = await runToEnd(harness, workflowId);
+
+        const run = okOrThrow(harness.database.runs.getRun(runId));
+        expect(run.status).toBe('failed');
+        expect(run.errorKind).toBe('expression_evaluation_failed');
+        expect(run.errorMessage).toContain('elhalt ágak száma: 1');
+        const rows = stepRunsOf(harness.database, runId);
+        expect(rows.filter((row) => row.nodeId === 'fo').map((row) => row.errorKind)).toStrictEqual([
+          'expression_evaluation_failed',
+        ]);
+        expect(rows.filter((row) => row.nodeId === 'ok2' && row.status === 'succeeded')).toHaveLength(1);
+        expect(rows.some((row) => row.nodeId === 'elem' || row.nodeId === 'j')).toBe(false);
+      },
+    );
+
+    it.each(['HIBA', UNSTORABLE])(
+      'error_handler (%s): a fan_out újrapróbálódik, a kísérletek elfogyása után az exhausted él viszi tovább',
+      async (itemsExpression) => {
+        const harness = openHarness();
+        const workflowId = createWorkflow(
+          harness.database,
+          'fan-out-error-handler',
+          [
+            startNode('start'),
+            fanOutNode('fo', itemsExpression),
+            agentNode('elem', 'sikeres'),
+            joinMergeNode('j'),
+            errorHandlerNode('eh', 2, [7]),
+            agentNode('mentes', 'sikeres'),
+          ],
+          [
+            edgeOf('e1', 'start', 'fo'),
+            edgeOf('e2', 'fo', 'elem'),
+            edgeOf('e3', 'elem', 'j'),
+            edgeOf('e4', 'fo', 'eh', 'on_error'),
+            edgeOf('e5', 'eh', 'mentes', 'exhausted'),
+          ],
+        );
+
+        const runId = await runToEnd(harness, workflowId);
+
+        const rows = stepRunsOf(harness.database, runId);
+        const attempts = rows.filter((row) => row.nodeId === 'fo');
+        expect(attempts.map((row) => `${String(row.attempt)}:${row.status}:${String(row.errorKind)}`)).toStrictEqual([
+          '1:failed:expression_evaluation_failed',
+          '2:failed:expression_evaluation_failed',
+        ]);
+        expect(harness.sleepCalls).toStrictEqual([{ ms: 7 }]);
+        expect(rows.filter((row) => row.nodeId === 'mentes' && row.status === 'succeeded')).toHaveLength(1);
+        expect(statusOf(harness.database, runId)).toBe('succeeded');
+      },
+    );
   });
 
   describe('human_approval (5.8)', () => {

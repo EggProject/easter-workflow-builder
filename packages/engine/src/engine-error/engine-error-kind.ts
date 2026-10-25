@@ -1,7 +1,7 @@
 /**
  * A motor hibaosztályainak zárt szótára. Minden tag a SPEC-004 dokumentum
  * végigfésülésével gyűlt össze (4.2, 4.5, 4.6, 4.7, 4.8, 5., 6.2, 6.3, 8.2,
- * 8.3, 11.1, 11.3 és 15. szekció O-1 sora), plusz a `missing_provider_env`,
+ * 8.3, 11.1 és 11.3 szekció), plusz a `missing_provider_env`,
  * ami csak a PLAN-005 T-005-14 elfogadási kritériumában szerepel névvel.
  *
  * **Nyitott unió.** Ez a lista a jelen lépés (T-005-8) idején teljes, de a
@@ -67,8 +67,6 @@ export type EngineErrorKind =
   | 'thinking_mode_unsupported'
   | 'effort_unsupported'
   | 'provider_descriptor_sdk_mismatch'
-  // 15. O-1: a kifejezés port hiánya
-  | 'expression_evaluator_unavailable'
   // PLAN-005 T-005-14: a `provider-environment` téma, hiányzó kötelező env változó
   | 'missing_provider_env'
   // 7.: a párhuzamossági szabályozó, ismeretlen azonosító felszabadítása

@@ -28,9 +28,12 @@ const CONFLICT_ERROR_CLASSES: ReadonlySet<string> = new Set([
  * A motor futás indítási validációjának hibaosztályai (SPEC-005 8.3 táblázat
  * "minden motor eredetű validációs hibaosztály" sora): a SPEC-004 4.2, 4.5,
  * 4.6, 4.7, 4.8 és 8.2 gráf, config és bemenet ellenőrzései, a 11.1 provider
- * feloldás és a 11.3 leíró alapú ellenőrzések, plusz az
- * `expression_evaluator_unavailable` (SPEC-004 O-1, a motor kimondottan
- * elutasító kifejezés/sablon port implementációja). A `satisfies` a sodródás
+ * feloldás és a 11.3 leíró alapú ellenőrzések, plusz a SPEC-010 9.2 sablon és
+ * kifejezés fordítási ellenőrzése (`template_render_failed`,
+ * `expression_evaluation_failed`, SPEC-010 9.3). A két utóbbi osztály a REST
+ * válaszban csak a futás indításából érkezhet, mert a lépés futásának hibája
+ * a futás eseményein megy ki. A kiértékelő hiányát jelző korábbi hibaosztály a
+ * SPEC-010 9.4 döntésével megszűnt. A `satisfies` a sodródás
  * védelem típusszintű ága: egy átnevezett vagy elvett hibaosztály a
  * `typecheck` kapun bukik, ahelyett hogy csendben `internal` kódra esne.
  *
@@ -64,7 +67,8 @@ const ENGINE_VALIDATION_ERROR_CLASSES = [
   'thinking_mode_unsupported',
   'effort_unsupported',
   'provider_descriptor_sdk_mismatch',
-  'expression_evaluator_unavailable',
+  'template_render_failed',
+  'expression_evaluation_failed',
 ] satisfies readonly EngineErrorKind[];
 
 /**

@@ -1,0 +1,30 @@
+{
+  "megjegyzes": "Commitolt SDK uzenet sorozat a SPEC-010 12.3 vegponttol vegpontig probajahoz (48 ... 50. kriterium). A `type` es a `subtype` ertekek szo szerint a SPEC-004 2. szekcio F-3 tablazatabol valok. A hamis agent hivasonkent a `session_id` es az `uuid` ertekhez a hivas sorszamat fuzi, mert a `run_event` (run_id, sdk_uuid) parja egyedi. A fajl sem kulcsot, sem valos szolgaltatoi valaszszoveget nem tartalmaz.",
+  "sikeres": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "session-vegpont",
+      "uuid": "fixture-vegpont-1"
+    },
+    {
+      "type": "assistant",
+      "session_id": "session-vegpont",
+      "uuid": "fixture-vegpont-2",
+      "message": { "content": [] }
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "session_id": "session-vegpont",
+      "uuid": "fixture-vegpont-3",
+      "num_turns": 1,
+      "usage": {
+        "input_tokens": 1,
+        "output_tokens": 1,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0
+      }
+    }
+  ]
+}

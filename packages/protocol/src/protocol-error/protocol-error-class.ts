@@ -5,7 +5,8 @@ import { z } from 'zod';
  * mondattal nevez meg (SPEC-005 8.5, user döntés 2026-09-26, "Ismert okokra
  * saját mondat"). A tagok a szerver hibaosztályainak szándékos részhalmaza:
  * a futás indításának minden validációs hibaosztálya (SPEC-004 4.2, 4.5,
- * 4.6, 4.7, 4.8, 8.2 és 11.3, a motor `validateRun` és `prepareRun` útja),
+ * 4.6, 4.7, 4.8, 8.2 és 11.3, a motor `validateRun` és `prepareRun` útja,
+ * plusz a SPEC-010 9.2 sablon és kifejezés fordítási ellenőrzése),
  * plusz a jóváhagyás `already_decided` ága (`packages/db`
  * `human-approval-repository.ts`). A felsorolás a
  * `protocol` saját deklarációja, mert az L1 réteg a motor `EngineErrorKind`
@@ -36,6 +37,9 @@ export const ProtocolErrorClassSchema = z.enum([
   'missing_required_input',
   // SPEC-004 11.1: a provider feloldás
   'no_default_provider',
+  // SPEC-010 9.2 és 9.3: a sablon és a kifejezés mezők fordítása (user döntés 2026-10-25)
+  'template_render_failed',
+  'expression_evaluation_failed',
   // SPEC-004 11.3: a leírótól függő validációk
   'structured_output_strategy_unsupported',
   'insufficient_max_turns',

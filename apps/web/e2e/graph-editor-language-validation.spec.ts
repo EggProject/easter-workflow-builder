@@ -87,7 +87,7 @@ const EDITOR_URL = '/editor?workflowId=w-alfa';
 /**
  * A két nyelv egy-egy mezője: a `branch` feltétele (CEL, `cel-expression`) és
  * a `human_approval` törzs sablonja (Mustache, `mustache-template`). A mondat a
- * csomag saját leírása a szerkesztő írásmódjában (SPEC-010 10., O-17).
+ * csomag saját leírása a szerkesztő írásmódjában (SPEC-010 10., O-19).
  */
 const LANGUAGE_CASES = [
   {

@@ -9,6 +9,7 @@ import type { ExpressionEvaluatorPort } from '../engine-port/expression-evaluato
 import type { TemplateRendererPort } from '../engine-port/template-renderer-port.ts';
 import type { RunContext } from '../run-context/run-context.ts';
 import { executeFanOut, type ExecuteFanOutInput } from './execute-fan-out.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
@@ -200,10 +201,38 @@ describe('executeFanOut', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
-    expect(outcome.kind === 'failed' && outcome.errorMessage).toContain('tároláskor nem szerializálható');
+    expect(outcome.kind === 'failed' && outcome.errorMessage).toContain('túl nagy a tároláshoz');
     expect(rendered).toHaveLength(0);
     const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
     expect(rows.map((row) => row.status)).toStrictEqual(['failed']);
+  });
+
+  it('a korlátnál egy karakterrel hosszabb tárolandó lista expression_evaluation_failed hibával zár, az üzenet a node-ot és a korlátot nevezi meg, a kifejezést nem (SPEC-010 O-18)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const overLimit = 'a'.repeat(MAX_STORED_OUTPUT_LENGTH - 3);
+    const ports = portsOf(database, published, () => ({ kind: 'ok', value: [overLimit] }));
+
+    const outcome = okOrThrow(executeFanOut(inputOf(runId), ports));
+
+    expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
+    const message = outcome.kind === 'failed' ? outcome.errorMessage : '';
+    expect(message).toContain('"fan_out"');
+    expect(message).toContain(String(MAX_STORED_OUTPUT_LENGTH));
+    expect(message).not.toContain('elemek');
+  });
+
+  it('a pontosan a korláttal egyenlő hosszú tárolandó lista átmegy, a lépés succeeded (SPEC-010 O-18)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const atLimit = 'a'.repeat(MAX_STORED_OUTPUT_LENGTH - 4);
+    const ports = portsOf(database, published, () => ({ kind: 'ok', value: [atLimit] }));
+
+    const outcome = okOrThrow(executeFanOut(inputOf(runId), ports));
+
+    expect(outcome.kind).toBe('fan_out_expanded');
   });
 
   it('nem lista eredmény esetén fan_out_items_not_a_list hibaosztállyal zárja', () => {

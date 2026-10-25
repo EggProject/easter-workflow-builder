@@ -69,7 +69,7 @@ function languageFieldsOf(config: NodeConfig): readonly LanguageField[] {
  * a `mustache-template`, a kifejezés a `cel-expression` `compile` hívásával
  * fordul. Az üzenet a csomag saját magyar leírása, ami a mező szövegét nem
  * idézi (SPEC-010 9.5); a szerkesztőben nagy kezdőbetűvel és ponttal zárva
- * jelenik meg (`toEditorSentence`, SPEC-010 15. O-17).
+ * jelenik meg (`toEditorSentence`, SPEC-010 15. O-19).
  *
  * A fordítás csak sémahelyes mezőn fut (SPEC-010 10. "sorrend", AC46): ha a
  * `schemaFieldErrors` térképen a mező útvonalán már áll hiba (például az üres

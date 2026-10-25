@@ -136,7 +136,8 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   típusszintű ág egyirányú (`Exclude<ProtocolErrorClass, EngineErrorKind>` pontosan
   `'already_decided'`), a futásidejű ág a motor `isEngineErrorKind` guardja. Helye az
   `apps/server` `error-class-drift-protection` témája (user döntés 2026-09-26, "Ismert okokra
-  saját mondat").
+  saját mondat"). A szótár a SPEC-010 `template_render_failed` és `expression_evaluation_failed`
+  osztályával bővült (user döntés 2026-10-25, SPEC-010 9.6).
 - **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
@@ -795,7 +796,8 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   `warning` jelzése és a soronkénti műveletek `Toast` értesítése nem tartozik ide. Részletek és
   határok: SPEC-007 8.4. **Ismert okokra saját mondat** (user döntés 2026-09-26, SPEC-007 O-10
   lezárva): a SPEC-005 8.5 zárt szótárába eső hibaosztályt a szerver a törzs `errorClass`
-  mezőjében adja, a kliens ehhez saját magyar mondatot rendel, és a `message` szövegét nem elemzi;
+  mezőjében adja, a kliens ehhez saját magyar mondatot rendel (2026-10-25 óta a futás indításának
+  sablon és kifejezés hibájára is, SPEC-010 9.6), és a `message` szövegét nem elemzi;
   hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
   akciósáv magassága 1440x600-on a kérdés szövegét levágja, a szöveg a törzsben görgethető
   (SPEC-008 14.1 O-17, user döntés 2026-09-26: elfogadva). Védelem:

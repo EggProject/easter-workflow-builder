@@ -1,7 +1,7 @@
 // Megvalósítás nélküli regressziós teszt (SPEC-002 6.2 5. pont mintája): a csomag
 // minden hibamondatának alakját őrzi. A szerkesztő (`apps/web` `toEditorSentence`)
 // feltétel nélkül nagy kezdőbetűt és záró pontot tesz a mondatra (SPEC-010 10.,
-// O-17), ezért a csomag vállalja: a `compile`, `evaluate` és `render` hibamondata
+// O-19), ezért a csomag vállalja: a `compile`, `evaluate` és `render` hibamondata
 // nem üres, nem szóközzel kezdődik vagy zárul, és nem zárul ponttal.
 import { readFileSync } from 'node:fs';
 import { EvaluationError, ParseError } from '@marcbachmann/cel-js';
@@ -24,7 +24,7 @@ const TABLE_CODES = TABLE_BLOCK.matchAll(/\[\s*'([a-z_]+)',\s*'/g)
   .map((match) => match[1] ?? '')
   .toArray();
 
-describe('a hibamondatok alakja (SPEC-010 10., O-17)', () => {
+describe('a hibamondatok alakja (SPEC-010 10., O-19)', () => {
   it('a CEL mondattábla minden kódja saját, pont nélküli mondatot ad, pozícióval és anélkül', () => {
     expect(TABLE_CODES.length).toBeGreaterThan(50);
     for (const code of TABLE_CODES) {
