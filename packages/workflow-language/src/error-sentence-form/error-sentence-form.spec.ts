@@ -45,6 +45,14 @@ describe('a hibamondatok alakja (SPEC-010 10., O-19)', () => {
     );
   });
 
+  it('az optional névtér elutasításának mondata pont nélküli (O-23)', () => {
+    const outcome = createCelExpressionEvaluator().compile('optional.none()');
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind === 'error') {
+      expectEditorReadyForm(outcome.message);
+    }
+  });
+
   it('az eredmény normalizálás három hibamondata pont nélküli', () => {
     class Pelda {
       readonly mezo = 1;

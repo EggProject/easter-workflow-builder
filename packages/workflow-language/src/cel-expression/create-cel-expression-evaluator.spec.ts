@@ -104,6 +104,14 @@ describe('createCelExpressionEvaluator: compile (SPEC-010 7.2, 16. szekció 18.)
       expect(() => evaluator.compile(expression)).not.toThrow();
     }
   });
+
+  it('REGRESSZIÓ: az optional névtérre épülő kifejezést elutasítja, a mezőnevet és a szöveg literált nem (O-23, PLAN-010 T-010-21 A-5)', () => {
+    const sentence = 'az optional névtér nem használható, mert az opcionális típusok ki vannak kapcsolva (pozíció: 0)';
+    expect(evaluator.compile('optional.of(1)')).toStrictEqual({ kind: 'error', message: sentence });
+    expect(evaluator.compile('optional.none()')).toStrictEqual({ kind: 'error', message: sentence });
+    expect(evaluator.compile('input.optional')).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(evaluator.compile('"optional"')).toStrictEqual({ kind: 'ok', value: undefined });
+  });
 });
 
 // A `unicorn/no-null` miatt a JSON `null` értéket elemzés adja.
