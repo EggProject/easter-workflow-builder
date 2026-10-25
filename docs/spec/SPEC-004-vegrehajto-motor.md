@@ -381,16 +381,19 @@ felülírja a jelen táblázat hibaágai mögötti, a kód SPEC-010 előtti áll
 hibát ad (user döntés, SPEC-010 O-6, 2026-09-23).
 
 **A `fan_out` kimenet tárolási hibája lépés szintű `expression_evaluation_failed` (user döntés
-2026-10-25, SPEC-010 O-15 kiegészítése).** Ha a normalizált `itemsExpression` eredmény tárolás
-közben szerializálhatatlanul nagy (a `step_run.output` `JSON.stringify` hívása a közös hivatkozást
-kibontja, és `RangeError` kivételt dob, amit a `db` tranzakciója `Outcome` hibaágra visz), a lépés
+2026-10-25, SPEC-010 O-15 kiegészítése és O-18).** Ha a normalizált `itemsExpression` eredmény
+tárolandó alakja, a `JSON.stringify` eredménye hosszabb 16 777 215 karakternél (UTF-16 kódegység,
+user döntés 2026-10-25, SPEC-010 O-18), vagy a szerializálás kivételt dob (a `step_run.output`
+`JSON.stringify` hívása a közös hivatkozást kibontja, és `RangeError` kivételt dob), a lépés
 az `expression_evaluation_failed` osztállyal bukik, mint bármely más kifejezés hiba: a lépés sora
 lezárul, és az `onUnhandledError` és az `error_handler` ugyanúgy működik. A motornak meg kell
 különböztetnie a tárolási hibát a `db` többi hibaágától, hogy ne a futás szintű
 `run_execution_failed` osztály legyen belőle. A bekötés a PLAN-010 T-010-13 lépésében történt: a
 `fan_out` végrehajtó a listát a tárolás és a címkék renderelése ELŐTT maga szerializálja
-(`node-executor/can-serialize-output.ts`), és kivétel esetén a lépést a fenti osztállyal zárja;
-a `db` hibaága így erről az útról nem érhető el, a `db` hibaosztály szótára nem bővült.
+(`node-executor/is-storable-output.ts`, a korlát a `max-stored-output-length.ts` konstansa), és a
+korlát túllépése vagy kivétel esetén a lépést a fenti osztállyal zárja, az üzenet a csomópontot és
+a korlát számát nevezi meg, a kifejezés szövegét nem; a `db` hibaága így erről az útról nem érhető
+el, a `db` hibaosztály szótára nem bővült.
 
 ### 5.2 Az `agent_step` életciklusa
 

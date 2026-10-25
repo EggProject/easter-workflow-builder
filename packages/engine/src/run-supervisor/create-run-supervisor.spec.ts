@@ -169,7 +169,7 @@ function compileUnlessUncompilable(source: string): Outcome<void> {
  * A `TAROLHATATLAN` kifejezés eredménye egy olyan elemet tartalmazó lista,
  * aminek a `toJSON` metódusa a túl nagy CEL eredmény `RangeError` kivételét
  * dobja: a legkönnyebb bemenet, amin a `fan_out` tárolási hibája
- * (`canSerializeOutput`) előáll (SPEC-010 O-15).
+ * (`isStorableOutput`) előáll (SPEC-010 O-15).
  */
 const UNSTORABLE = 'TAROLHATATLAN';
 const unstorableItem = {

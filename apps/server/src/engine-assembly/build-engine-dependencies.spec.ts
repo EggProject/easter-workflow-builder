@@ -20,19 +20,29 @@ function openMemoryDatabase(): DatabaseContext {
 }
 
 /**
- * Egy `start -> fan_out -> join` workflow: a `fan_out` kifejezése a `[1]` után
- * `doublingCount` darab `.map(x, [x, x])`, ami közös hivatkozású listát ad
- * (SPEC-010 O-15, research `2026-10-21-spec010-blokkolo-meresek.md` 10.2).
+ * A `fan_out` kifejezése: egy egyelemű lista, amiben a szöveg elem a `"a"` után
+ * `doublingCount` darab `x + x` összefűzéssel 2^doublingCount karakter hosszú.
+ * A könyvtár ezt rope szövegként tartja, tehát a kiértékelés és a tárolás előtti
+ * szerializálás olcsó (SPEC-010 O-18, research
+ * `2026-10-21-spec010-blokkolo-meresek.md` 12. szekció).
+ */
+function longStringItemExpression(doublingCount: number): string {
+  return `["a"]${'.map(x, x + x)'.repeat(doublingCount)}`;
+}
+
+/**
+ * Egy `start -> fan_out -> join` workflow, a megadott `itemsExpression`
+ * kifejezéssel.
  */
 /* eslint-disable unicorn/no-null -- a leírás és az él kezelő és ág kulcs mezői valódi NULL értéket tárolnak (SPEC-003 4.4) */
 function edgeOf(id: string, sourceNodeId: string, targetNodeId: string): WorkflowEdgeInput {
   return { id, sourceNodeId, targetNodeId, sourceHandle: null, targetHandle: null, branchKey: null };
 }
 
-function seedDoublingFanOutWorkflow(database: DatabaseContext, doublingCount: number): string {
+function seedFanOutWorkflow(database: DatabaseContext, itemsExpression: string): string {
   const workflow = okOrThrow(
     database.workflows.createWorkflow({
-      name: 'fan-out-duplazas',
+      name: 'fan-out-nagy-kimenet',
       description: null,
       providerId: 'claude-subscription',
     }),
@@ -55,7 +65,7 @@ function seedDoublingFanOutWorkflow(database: DatabaseContext, doublingCount: nu
           positionY: 0,
           config: {
             type: 'fan_out',
-            itemsExpression: `[1]${'.map(x, [x, x])'.repeat(doublingCount)}`,
+            itemsExpression,
             branchLabelTemplate: 'elem {{itemIndex}}',
             onUnhandledError: 'fail_run',
           },
@@ -97,6 +107,12 @@ function publisherWithRunFinished(publisher: EventPublisherPort): {
   };
 }
 
+/**
+ * A `"a"` 24 duplázása 2^24 karakteres szöveget ad, a lista JSON hossza ennél
+ * négy karakterrel több: a `MAX_STORED_OUTPUT_LENGTH` (2^24 - 1) fölött van.
+ */
+const OVER_LIMIT_DOUBLING_COUNT = 24;
+
 describe('buildEngineDependencies', () => {
   it('a kapott database és clock referenciát változatlanul adja tovább, a nyolc portot pedig felépíti', () => {
     const database = openMemoryDatabase();
@@ -135,13 +151,13 @@ describe('buildEngineDependencies', () => {
     });
   });
 
-  it('REGRESSZIÓ: a tároláskor szerializálhatatlanul nagy fan_out eredmény a lépést expression_evaluation_failed hibával zárja, nem a futást run_execution_failed hibával (SPEC-010 O-15, user döntés 2026-10-25)', async () => {
+  it('REGRESSZIÓ: a korlátnál nagyobb tárolandó fan_out eredmény a lépést expression_evaluation_failed hibával zárja, nem a futást run_execution_failed hibával (SPEC-010 O-15 és O-18, user döntés 2026-10-25)', async () => {
     const database = openMemoryDatabase();
     const clock = createSystemClock();
     const dependencies = buildEngineDependencies(database, createStreamRegistry(createRandomUuidIdGenerator()), clock);
     const watched = publisherWithRunFinished(dependencies.eventPublisher);
     const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
-    const workflowId = seedDoublingFanOutWorkflow(database, 27);
+    const workflowId = seedFanOutWorkflow(database, longStringItemExpression(OVER_LIMIT_DOUBLING_COUNT));
 
     const started = okOrThrow(await engine.startRun({ workflowId, input: {} }));
     await watched.runFinished;

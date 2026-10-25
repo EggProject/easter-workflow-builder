@@ -739,6 +739,8 @@ a szerver összeállításával fut, a végét a `run_finished` eseményből olv
 javítás előtti motoron 1730 ms alatt bukik (a futás `run_execution_failed` osztállyal zárt). A motor
 egység tesztje (`execute-fan-out.spec.ts`) a kivételt egy dobó `toJSON` értékkel váltja ki.
 
+**Felülírva a 12.6 szekcióval (2026-10-25):** a nehéz, 27 szintű teszt helyére a méretkorlát és egy olcsó, a korlát fölötti bemenet lépett; a szerializálás kivétele ága változatlanul él.
+
 ### 10.3 J3: a Mustache greppes invariánsok destrukturálással megkerülhetők voltak (javítva)
 
 Egy nem commitolt termékkód fájlba injektált `const { render } = Mustache`, `const {
@@ -808,7 +810,7 @@ gyökéroka (a nehéz teszt memóriája vagy ideje párhuzamos terhelés alatt, 
 
 A user döntése (2026-10-25): "méretkorlát, szám mérés után"; a tárolandó kimenet JSON hosszára
 korlát kerül, fölötte a lépés `expression_evaluation_failed` hibával zár, a számot a user dönti el.
-Ez a szekció a mérés; a korlát nincs megvalósítva.
+Ez a szekció a mérés; a döntés és a megvalósítás a 12.6 szekcióban áll.
 
 ### 12.1 A gép és a felállás
 
@@ -937,3 +939,34 @@ Mindkét dokumentált korlát (536 870 888) a mért összeomlási pont (67 108 8
 van, tehát a korlát számához egyik sem ad forrást: a valódi úton a visszaolvasás heapje fogy el előbb.
 A SQLite korlát bájtban, a V8 korlát UTF-16 kódegységben számol; a `JSON.stringify` eredmény `length`
 mezője kódegység, ami nem ASCII szövegnél eltér a UTF-8 bájtszámtól.
+
+### 12.6 A döntés és a megvalósítás (PR #57, 2026-10-25)
+
+**A user döntése (2026-10-25): a korlát 16 777 215 karakter** (SPEC-010 O-18). Az érték a tárolandó
+lista `JSON.stringify` eredményének `length` mezője (UTF-16 kódegység), és a 12.3 táblázat mért
+összeomlási pontjának (n = 24, 67 108 863 karakter) negyede. A mérés gép és alak függő (12.1, 12.3), a
+számot a user döntötte el, nem a mérés vezette le. A korlát a 12.2 és 12.3 táblázat n = 22 sorával egyezik
+(16 777 215): ott a mért futás `succeeded`, 856 ms, csúcs RSS 829 MB.
+
+**A megvalósítás.** `packages/engine/src/node-executor/max-stored-output-length.ts` (a konstans),
+`is-storable-output.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
+szerializálás nem dob kivételt), a `fan_out` végrehajtó a `failFanOut` úton zár
+`expression_evaluation_failed` osztállyal. A szerializálás kivétele (`RangeError`, a 12.4 szerinti V8
+szöveghossz-korlát) mindig a méretkorlát fölötti méret, ezért a kivétel ága valódi, nem halott út, és
+ugyanúgy nemet ad. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
+
+**Határ tesztek.** Az `is-storable-output.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
+elemmel (`[` + `"` + szöveg + `"` + `]`, a JSON hossza a szöveg hossza plusz négy) a pontosan a
+korláttal egyenlő hosszra igent, eggyel hosszabbra nemet állít; a kivétel ágát a dobó `toJSON` értékes
+teszt váltja ki.
+
+**A végponttól végpontig teszt átalakítása.** A `build-engine-dependencies.spec.ts` a korábbi,
+27 szintű `[1]` + `.map(x, [x, x])` kifejezés helyett a `["a"]` után 24 darab `.map(x, x + x)`
+kifejezést használja: egy 2^24 karakter hosszú szöveg elem, a lista JSON hossza 16 777 220 karakter, a
+korlát fölött négy karakterrel. A könyvtár az összefűzést rope szövegként tartja (10.2 mellékmérés), a
+kiértékelés és a szerializálás olcsó. Ugyanezen a gépen, a teljes suite alatt (`bash
+tooling/scripts/test.sh`, 6265 teszt zöld, 100 százalék lefedettség mind a négy metrikán, 63 s): a
+teszt 51 ms (a régi 27 szintű teszt 1724 ... 1739 ms, 11. szekció). Szándékos rontás: a `<=
+MAX_STORED_OUTPUT_LENGTH` feltétel `<= MAX_STORED_OUTPUT_LENGTH * 100` alakra cserélve a
+végponttól végpontig teszt, az `execute-fan-out.spec.ts` korlát feletti tesztje és az
+`is-storable-output.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.
