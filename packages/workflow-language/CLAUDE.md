@@ -10,11 +10,11 @@ nem függ (SPEC-010 3.1).
 
 ## Fájlok
 
-| Mappa                    | Tartalom                                                                                                                   |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `src/mustache-template/` | a Mustache sablon renderelő és ellenőrző (T-010-8); egyelőre nem létezik                                                   |
-| `src/cel-expression/`    | a CEL kifejezés kiértékelő és ellenőrző (T-010-9 ... T-010-11); egyelőre nem létezik                                       |
-| `src/index.ts`           | barrel, csak nevesített újraexport; az `IS_WORKFLOW_LANGUAGE_PLACEHOLDER` az első valódi exportnál törlendő (SPEC-002 6.6) |
+| Mappa                    | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/mustache-template/` | a Mustache sablon renderelő (T-010-8): a `createMustacheTemplateRenderer()` gyártó függvény, a `StrictWriter` (saját `Writer`: escape nélküli szöveggé alakítás, hiányzó név hiba, kikapcsolt saját gyorsítótár), az `OwnPropertyContext` (saját adat tulajdonságra szűkített, függvényt nem hívó név feloldás), a feloldó, a szöveggé alakító és a hibaleíró függvény, a hiányzó név hibaosztálya; a `mustache-template-renderer.ts` típus-only (a gyártó függvény eredményének alakja), ezért nincs `.spec.ts` párja |
+| `src/cel-expression/`    | a CEL kifejezés kiértékelő és ellenőrző (T-010-9 ... T-010-11); egyelőre nem létezik                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `src/index.ts`           | barrel, csak nevesített újraexport (SPEC-002 6.6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## Függőségi irány
 
@@ -33,8 +33,19 @@ a `docs/research/2026-08-26-toolchain.md`. A `packages/engine` ettől a csomagt�
 A `mustache` és a `@marcbachmann/cel-js` csomagot a workspace-ben kizárólag ez a csomag
 importálhatja (SPEC-010 16. szekció 7. kritérium).
 
+**A Mustache modul szintű állapotához a csomag nem nyúl.** A renderelés saját `StrictWriter`
+példányon fut, kikapcsolt gyorsítótárral; a modul szintű render és parse függvény, a modul
+gyorsítótára és escape függvénye érintetlen (SPEC-010 6.1, 6.3, 16. szekció 63. kritérium).
+
+**A `StrictWriter` és az `OwnPropertyContext` a könyvtár forrásszintű viselkedésére épül** (a
+`render` a kapott `Context` példányt változatlanul használja, M-134), nem dokumentált bővítési
+pontra. A `StrictWriter` két felülírt metódusának paraméter típusa ezért csak típusszinten szűkebb
+a bázisénál, futásidejű őr nélkül; a könyvtár frissítése előtt a PLAN-010 F0 Mustache mérése
+regresszióként fut (SPEC-010 6.6).
+
 ## Kapcsolódó dokumentumok
 
 - [`../../docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md`](../../docs/spec/SPEC-010-sablon-es-kifejezes-nyelv.md), 3. és 4. szekció
-- [`../../docs/plan/PLAN-010-sablon-es-kifejezes-nyelv.md`](../../docs/plan/PLAN-010-sablon-es-kifejezes-nyelv.md), T-010-7
+- [`../../docs/plan/PLAN-010-sablon-es-kifejezes-nyelv.md`](../../docs/plan/PLAN-010-sablon-es-kifejezes-nyelv.md), T-010-7, T-010-8
+- [`../../docs/research/2026-10-21-spec010-blokkolo-meresek.md`](../../docs/research/2026-10-21-spec010-blokkolo-meresek.md), 3. és 7. szekció
 - [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4., 5. és 6. szekció
