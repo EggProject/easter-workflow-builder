@@ -24,6 +24,15 @@ describe('buildProtocolErrorBody', () => {
     });
   });
 
+  it.each(['template_render_failed', 'expression_evaluation_failed'] as const)(
+    'a motor %s üzenetéből unprocessable kódot és errorClass mezőt ad (SPEC-010 9.3, user döntés 2026-10-25)',
+    (errorClass) => {
+      const message = formatEngineErrorMessage(errorClass, 'A mező nem fordítható');
+
+      expect(buildProtocolErrorBody(message)).toStrictEqual({ code: 'unprocessable', message, errorClass });
+    },
+  );
+
   it('az already_decided hibaosztályból conflict kódot és errorClass mezőt ad', () => {
     const message = 'A(z) "s1" lépés futáshoz tartozó jóváhagyás már el van döntve (already_decided).';
 

@@ -729,6 +729,18 @@ könyvtár ezt rope szövegként tartja (n = 28-nál 268 435 456 karakter, a fol
 MB), n = 29-nél pedig a közös hibamondatot adja (`a kifejezés nem dolgozható fel`), tehát a
 szöveg hosszának határa `Outcome` hibaágon jön.
 
+**A motor bekötése (PLAN-010 T-010-13, 2026-10-25).** A `fan_out` végrehajtó a listát a tárolás és a
+címkék renderelése előtt maga szerializálja (`packages/engine/src/node-executor/can-serialize-output.ts`),
+és kivétel esetén a lépést `expression_evaluation_failed` osztállyal zárja. Mérve ugyanezen a gépen, a
+javítás előtt (a valódi `createCelExpressionEvaluator`, `[1]` + 27 darab `.map(x, [x, x])`, három futás):
+az `evaluate` 2 ms, a `JSON.stringify` `RangeError` kivétele 1677 ... 1695 ms után, RSS 92 ... 93 MB. A
+regressziós teszt (`apps/server/src/engine-assembly/build-engine-dependencies.spec.ts`) a valódi motoron,
+a szerver összeállításával fut, a végét a `run_finished` eseményből olvassa; egyedül futtatva 1711 ms, a
+javítás előtti motoron 1730 ms alatt bukik (a futás `run_execution_failed` osztállyal zárt). A motor
+egység tesztje (`execute-fan-out.spec.ts`) a kivételt egy dobó `toJSON` értékkel váltja ki.
+
+**Felülírva a 12.6 szekcióval (2026-10-25):** a nehéz, 27 szintű teszt helyére a méretkorlát és egy olcsó, a korlát fölötti bemenet lépett; a szerializálás kivétele ága változatlanul él.
+
 ### 10.3 J3: a Mustache greppes invariánsok destrukturálással megkerülhetők voltak (javítva)
 
 Egy nem commitolt termékkód fájlba injektált `const { render } = Mustache`, `const {
@@ -740,3 +752,221 @@ definíció lehet; a fenti öt, plusz az álnév (`const M = Mustache`), a közv
 `Mustache.escape =`, `Mustache['parse']`, `writer.render.call`, a harmadik argumentum és a
 `writer.render?.(` injekció egyenként bukik, a meglévő kód zöld. A futásidejű összerakás
 (számított kulcs, a név szövegből építése) továbbra is elfogadott korlát.
+
+## 11. PLAN-010 T-010-16: végponttól végpontig próba valódi szerver ellen (2026-10-25)
+
+A SPEC-010 12.3 és a 16. szekció 48 ... 50. kritériuma egy commitolt tesztben:
+`apps/server/src/workflow-language-end-to-end/workflow-language-end-to-end.spec.ts`. Kiinduló fej
+`ab5975d`. A próba a valódi `createHttpServer` szervert `127.0.0.1` címen, `port: 0` értékkel
+indítja, a valódi útvonal kezelőkkel, stream nyilvántartással, motorral és `:memory:` adatbázissal (a
+commitolt migrációk), a szállított `createMustacheTemplateRenderer` és `createCelExpressionEvaluator`
+porttal. Kizárólag az `agentQueryRunner` hamis: a commitolt
+`agent-step-messages-fixture.json` sorozatát adja (`system`/`init`, `assistant`, `result`/`success`,
+az F-3 táblázat szerinti értékekkel), hívásonként egyedi `uuid` és `session_id` utótaggal, és rögzíti
+a kapott promptot. Valódi provider hívás nem történt; a fixture sem kulcsot, sem szolgáltatói
+szöveget nem tartalmaz. A workflow a REST felületen jön létre (`POST /api/workflows`,
+`PUT .../graph`, `PUT /api/settings` `defaultProviderId: claude-subscription`, `POST .../runs`). A
+futás végét a `GET /events` folyam `run_finished` eseménye adja (a `stream_ready` után
+`PUT /api/streams/{streamId}/subscriptions`, 0 padlóval); `setTimeout` és `sleep` nincs.
+
+A gráf: `start` -> `tema` (`agent_step`, `Téma: {{input.tema}}`) -> `valaszto` (`branch`,
+`input.mod == "reszletes" ? "reszletes" : "rovid"`) -> `reszletes` ágon `szetoszt` (`fan_out`,
+`input.elemek`) -> `elem` (`Elem {{itemIndex}}: {{item}}`) -> `osszezar` (`join` `merge`) ->
+`ciklus` (`loop`, `continueExpression: iteration < 2`, `maxIterations: 3`) -> `continue` ágon `kor`
+(`Kör {{iteration}}`), `exit` ágon `vege` (`Vége: {{input.tema}}`); a `rovid` ágon
+`nem_valasztott`. Bemenet: `{ tema: "kert", mod: "reszletes", elemek: ["alma", "körte", "szilva"] }`.
+
+Eredmény (a teszt állításai, mind zöld):
+
+| Pont | Mért                                                                                                                                                                                                                                                                           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 48.  | a `run_finished` payload `status` és a `GET /api/runs/{runId}` `status` értéke `succeeded`; minden `step_run` `succeeded`                                                                                                                                                      |
+| 49.  | 7 prompt: `Téma: kert`; a három `fan_out` példány (sorrendje kötetlen) `Elem 0: alma`, `Elem 1: körte`, `Elem 2: szilva`; majd `Kör 0`, `Kör 1`, `Vége: kert`                                                                                                                  |
+| 49.  | `branch_taken` payload pontosan egy: `{ branchKey: "reszletes", usedDefault: false }`; a `nem_valasztott` csomópontnak nincs `step_run` sora                                                                                                                                   |
+| 49.  | `fan_out_expanded` payload pontosan egy: `{ itemCount: 3 }`; az `elem` csomópontnak 3 `step_run` sora van                                                                                                                                                                      |
+| 49.  | `loop_iteration_started` pontosan 2, a payload `iteration` értéke `0` és `1` (7.5, O-11)                                                                                                                                                                                       |
+| 50.  | `branch` `expression: input.mod ==`: a `POST .../runs` válasza `422`, `code: unprocessable`, `errorClass: expression_evaluation_failed`, az üzenet tartalmazza a `valaszto` és az `expression` nevet; a `GET /api/runs?workflowId=...` üres, a hamis agent nem kapott promptot |
+
+Szándékos rontások (egyenként, a teszt fájlban, utána visszaállítva), mind az első tesztet buktatta, a
+422 eset zöld maradt:
+
+| Rontás                                                   | Bukás                                                                                     |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `continueExpression: iteration < 3` (`maxIterations: 3`) | `expected 'failed' to be 'succeeded'`                                                     |
+| a `branch` kifejezés a `rovid` kulcsot adja              | `expected [ 'Téma: kert', 'Rövid: kert' ] to have a length of 7 but got 2`                |
+| `elem` sablon `Elem {{item}}` (`itemIndex` nélkül)       | `expected [ 'Elem alma', 'Elem körte', …(1) ] to strictly equal [ 'Elem 0: alma', …(2) ]` |
+
+A fájl két tesztje egyedül futtatva 124 ms alatt fut le.
+
+**A teljes `test` kapu kétszer (mellékes ellenőrzés).** Egy korábbi futáson párhuzamos terhelés mellett
+3 bukó teszt látszott (a `screenshot-pipeline` (2) fejléce), újrafuttatva zöld. Ezen a fán (az új próbával
+együtt) a `bun run test` kétszer, egymás után, a `flock /tmp/kapu-gep.lock` alatt: mindkétszer kilépési kód
+0, 625 teszt fájl, 6257 teszt zöld, a lefedettség mind a négy metrikán 100 százalék; a futásidő 63,33 s és
+61,94 s. A `build-engine-dependencies.spec.ts` 27 szintű `.map(x, [x, x])` tesztje 1739 ms és 1724 ms, a
+`screenshot-pipeline.spec.ts` 7 tesztje zöld. A korábbi bukás ezen a két futáson nem jött elő, tehát a
+gyökéroka (a nehéz teszt memóriája vagy ideje párhuzamos terhelés alatt, vagy más) **nem ellenőrzött**.
+
+## 12. A tárolandó kimenet méretkorlátjának mérése (PR #57 review, 2026-10-25)
+
+A user döntése (2026-10-25): "méretkorlát, szám mérés után"; a tárolandó kimenet JSON hosszára
+korlát kerül, fölötte a lépés `expression_evaluation_failed` hibával zár, a számot a user dönti el.
+Ez a szekció a mérés; a döntés és a megvalósítás a 12.6 szekcióban áll.
+
+### 12.1 A gép és a felállás
+
+Gép: `aarch64`, 4 mag, 3906 MB RAM, swap nincs; Node `v26.7.0`;
+`v8.getHeapStatistics().heap_size_limit` = 2 149 056 512 bájt (2050 MB), alapértelmezett kapcsolókkal.
+Hogy a V8 ezt az értéket miből számolja (a gép memóriájából vagy rögzített értékből), **nem
+ellenőrzött**; egy másik gépen az összeomlási pont ezért eltolódhat.
+
+Felállás: eldobható, repón kívüli script (`/tmp/meret/measure.ts`, nem commitolt), a
+`build-engine-dependencies.spec.ts` nehéz tesztjének gráfja (`start -> fan_out -> join merge`, a
+`fan_out` kifejezése `[1]` + n darab `.map(x, [x, x])`), a valódi `buildEngineDependencies` portjaival,
+`createEngine`, `openDatabase(':memory:')`, a fej `e063b7b`. Szintenként külön Node folyamat,
+`flock /tmp/kapu-gep.lock` alatt, `/usr/bin/time -v` a csúcs RSS-hez. A script a `JSON.parse` és a
+`JSON.stringify` hívást az 1 000 000 karakternél hosszabb szövegre naplózó burokkal veszi körül
+(hívási verem az első futásokon), és a `database.stepRuns.markStepSucceeded` hívást be- és kilépéskor
+naplózza. Valódi provider hívás nincs (a gráfban nincs agent lépés).
+
+### 12.2 A kimenet hossza
+
+A kimenet `JSON.stringify` hossza n szinten 2^(n+2) - 1 karakter; a szöveg ASCII, tehát a UTF-8
+bájtszám egyenlő a karakterszámmal (`Buffer.byteLength`, külön folyamatban mérve):
+
+| n   | karakter = UTF-8 bájt               |
+| --- | ----------------------------------- |
+| 18  | 1 048 575                           |
+| 19  | 2 097 151                           |
+| 20  | 4 194 303                           |
+| 21  | 8 388 607                           |
+| 22  | 16 777 215                          |
+| 23  | 33 554 431                          |
+| 24  | 67 108 863                          |
+| 25  | 134 217 727                         |
+| 26  | 268 435 455                         |
+| 27  | `RangeError: Invalid string length` |
+
+A `join merge` kimenete ugyanez a lista egy tömbbe csomagolva, 2 karakterrel hosszabb, és szintén
+tárolódik.
+
+### 12.3 A valódi út (a `db` visszaolvasásával)
+
+| n   | kimenetel                                                             | futás (ms, `startRun` -> `run_finished`) | csúcs RSS (MB) | heap a végén (MB) |
+| --- | --------------------------------------------------------------------- | ---------------------------------------- | -------------- | ----------------- |
+| 18  | `succeeded`                                                           | 60                                       | 221            | 63                |
+| 19  | `succeeded`                                                           | 122                                      | 258            | 101               |
+| 20  | `succeeded`                                                           | 201                                      | 342            | 162               |
+| 21  | `succeeded`                                                           | 399                                      | 497            | 313               |
+| 22  | `succeeded`                                                           | 856                                      | 829            | 569               |
+| 23  | `succeeded`                                                           | 1818                                     | 1389           | 1109              |
+| 24  | folyamat leáll (a `join` visszaolvasásában)                           | (7,2 s fali idő a leállásig)             | 2258           | (limit)           |
+| 25  | folyamat leáll (a `fan_out` visszaolvasásában)                        | (7,3 s fali idő a leállásig)             | 2267           | (limit)           |
+| 26  | folyamat leáll (a `fan_out` visszaolvasásában)                        | (7,7 s fali idő a leállásig)             | 2397           | (limit)           |
+| 27  | `failed`, `expression_evaluation_failed` (a `canSerializeOutput` ága) | 1727                                     | 709            | 36                |
+
+A leállás minden esetben `FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed -
+JavaScript heap out of memory`, 6-os szignál, 134-es kilépési kód; a `--report-on-fatalerror`
+jelentésben a heap 2 047 734 576 / 2 149 056 512 bájt, JavaScript verem nem érhető el, ezért a hely a
+naplóból jön. n = 24-nél a `fan_out` `markStepSucceeded` hívása még lefut (a visszaolvasás után a heap
+1177 MB), és a `join` `markStepSucceeded` visszaolvasásának `JSON.parse` hívásában áll le, miközben a
+`fan_out` kifejtett fája még él. n = 25 és 26 már a `fan_out` visszaolvasásában áll le.
+
+A visszaolvasás `JSON.parse` hívásának heap növekménye (a `fan_out` sor, egyetlen hívás):
+
+| n   | szöveg (karakter) | heap növekmény (MB) | idő (ms) |
+| --- | ----------------- | ------------------- | -------- |
+| 21  | 8 388 607         | 110                 | 138      |
+| 22  | 16 777 215        | 252                 | 281      |
+| 23  | 33 554 431        | 508                 | 651      |
+| 24  | 67 108 863        | 1020                | 1226     |
+
+Ez karakterenként kb. 15 bájt heap. **Ez az arány ennek az alaknak (egymásba ágyazott kételemű
+tömbök) a mért értéke; más alakú kimenetre (például hosszú szövegekre) nem mértük**, és nem
+ellenőrzött, hogy ez a legrosszabb alak.
+
+### 12.4 Hol bomlik ki a memória (forráshelyek)
+
+A CEL eredmény a memóriában közös hivatkozású (10.2), a tárolás szövege viszont a kibontott fa, és a
+visszaolvasás ebből a szövegből teljes, közös hivatkozás nélküli fát épít. A lánc (hívási verem az
+n = 18 futás naplójából):
+
+1. `packages/db/src/step-run/step-run.ts:70`: `output: text('output', { mode: 'json' })`.
+2. Írás: `drizzle-orm@0.45.2` `sqlite-core/columns/text.js:52`, `SQLiteTextJson.mapToDriverValue` =
+   `JSON.stringify(value)`. A szöveg mérete egyenlő a 12.2 táblázatéval; ez önmagában a mért
+   tartományban nem állította le a folyamatot.
+3. Visszaolvasás: `packages/db/src/step-run/step-run-repository.ts:461` `.returning()` a
+   `markStepSucceeded` `UPDATE` utasításán, a `drizzle-orm` `better-sqlite3/session.js:94` és `:101`
+   (`stmt.raw().get(...)`, majd `mapResultRow`), `utils.js:30` (`decoder.mapFromDriverValue`), és
+   `sqlite-core/columns/text.js:49`, `SQLiteTextJson.mapFromDriverValue` = `JSON.parse(value)`. **Itt
+   bomlik ki a memória**: a 12.3 táblázat szerint a heap ennél a hívásnál nő, és a leállás ebben a
+   hívásban történik.
+4. A visszaolvasott rekord (a kifejtett fával) a motorban tovább él, ezért egy futás egymás után
+   tárolt kimenetei összeadódnak (n = 24: a `fan_out` fája él, amikor a `join` visszaolvasása elfogy).
+
+**A visszaolvasás nem az egyetlen olvasó.** A `listStepRuns` (`step-run-repository.ts:363`) ugyanazon a
+`mode: 'json'` oszlopon olvas, tehát a REST lépés lista és minden más olvasó ugyanígy kifejti a
+szöveget: a mérő script n = 18 ... 21 futásán a `listStepRuns` két további, ugyanakkora `JSON.parse`
+hívást adott.
+
+**Mérés a visszaolvasás nélkül** (eldobható módosítás, nem commitolva, utána `git checkout`): a
+`markStepSucceeded` `.returning()` hívása az `output` oszlop nélküli oszlopkészletet kérte, a rekord
+`output` mezője a bemenet memóriabeli értéke lett:
+
+| n   | kimenetel                                | futás (ms) | csúcs RSS (MB) |
+| --- | ---------------------------------------- | ---------- | -------------- |
+| 18  | `succeeded`                              | 24         | 218            |
+| 22  | `succeeded`                              | 220        | 292            |
+| 23  | `succeeded`                              | 407        | 359            |
+| 24  | `succeeded`                              | 824        | 524            |
+| 25  | `succeeded`                              | 1602       | 855            |
+| 26  | `succeeded`                              | 3130       | 1512           |
+| 27  | `failed`, `expression_evaluation_failed` | 1683       | 719            |
+
+A visszaolvasás nélkül a motor a V8 szöveg korlátjáig (n = 26) végigfut. A tárolt sort később olvasó
+`listStepRuns` viszont ugyanazt a kifejtést végezné, tehát a visszaolvasás elhagyása önmagában a
+leállást csak a futásból a későbbi olvasásba tolja (ezt a mérést nem futtattuk le n = 24 fölött).
+
+### 12.5 Dokumentált korlátok
+
+| Korlát                                                          | Érték                                         | Forrás                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite `SQLITE_MAX_LENGTH` alapértéke (TEXT vagy BLOB, bájtban) | 1 000 000 000                                 | <https://www.sqlite.org/limits.html> ("The default value of this macro is 1 billion"); a telepített `better-sqlite3@13.0.3` `deps/sqlite3/sqlite3.c:14715` (`# define SQLITE_MAX_LENGTH 1000000000`, SQLite 3.53.4); a `deps/defines.gypi` nem írja felül                                                                                            |
+| A futásidejű korlát nem emelhető a fordítási felső korlát fölé  |                                               | <https://www.sqlite.org/c3ref/limit.html> ("Attempts to increase a limit above its hard upper bound are silently truncated")                                                                                                                                                                                                                         |
+| A `better-sqlite3` futásidejű `SQLITE_LIMIT_LENGTH` beállítása  | (1 << 29) - 24 = 536 870 888 bájt             | `better-sqlite3@13.0.3` `src/objects/database.cpp:7-8` és `:168` (a forrás kommentje szerint azért, hogy a túl nagy érték SQLite `SQLITE_TOOBIG` hibával bukjon, ne az átalakításkor)                                                                                                                                                                |
+| V8 maximális szöveghossz 64 bites gépen                         | (1 << 29) - 24 = 536 870 888 UTF-16 kódegység | a telepített Node `include/node/v8-primitive.h:126-127` (`String::kMaxLength`); <https://nodejs.org/api/buffer.html> (`buffer.constants.MAX_STRING_LENGTH`, "may depend on the JS engine"); <https://github.com/nodejs/node/issues/33960> (`536870888` 64 bites buildön); saját mérés: `require('buffer').constants.MAX_STRING_LENGTH` = 536 870 888 |
+
+Mindkét dokumentált korlát (536 870 888) a mért összeomlási pont (67 108 863 karakter, n = 24) fölött
+van, tehát a korlát számához egyik sem ad forrást: a valódi úton a visszaolvasás heapje fogy el előbb.
+A SQLite korlát bájtban, a V8 korlát UTF-16 kódegységben számol; a `JSON.stringify` eredmény `length`
+mezője kódegység, ami nem ASCII szövegnél eltér a UTF-8 bájtszámtól.
+
+### 12.6 A döntés és a megvalósítás (PR #57, 2026-10-25)
+
+**A user döntése (2026-10-25): a korlát 16 777 215 karakter** (SPEC-010 O-18). Az érték a tárolandó
+lista `JSON.stringify` eredményének `length` mezője (UTF-16 kódegység), és a 12.3 táblázat mért
+összeomlási pontjának (n = 24, 67 108 863 karakter) negyede. A mérés gép és alak függő (12.1, 12.3), a
+számot a user döntötte el, nem a mérés vezette le. A korlát a 12.2 és 12.3 táblázat n = 22 sorával egyezik
+(16 777 215): ott a mért futás `succeeded`, 856 ms, csúcs RSS 829 MB.
+
+**A megvalósítás.** `packages/engine/src/node-executor/max-stored-output-length.ts` (a konstans),
+`is-storable-output.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
+szerializálás nem dob kivételt), a `fan_out` végrehajtó a `failFanOut` úton zár
+`expression_evaluation_failed` osztállyal. A szerializálás kivétele (`RangeError`, a 12.4 szerinti V8
+szöveghossz-korlát) mindig a méretkorlát fölötti méret, ezért a kivétel ága valódi, nem halott út, és
+ugyanúgy nemet ad. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
+
+**Határ tesztek.** Az `is-storable-output.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
+elemmel (`[` + `"` + szöveg + `"` + `]`, a JSON hossza a szöveg hossza plusz négy) a pontosan a
+korláttal egyenlő hosszra igent, eggyel hosszabbra nemet állít; a kivétel ágát a dobó `toJSON` értékes
+teszt váltja ki.
+
+**A végponttól végpontig teszt átalakítása.** A `build-engine-dependencies.spec.ts` a korábbi,
+27 szintű `[1]` + `.map(x, [x, x])` kifejezés helyett a `["a"]` után 24 darab `.map(x, x + x)`
+kifejezést használja: egy 2^24 karakter hosszú szöveg elem, a lista JSON hossza 16 777 220 karakter, a
+korlát fölött négy karakterrel. A könyvtár az összefűzést rope szövegként tartja (10.2 mellékmérés), a
+kiértékelés és a szerializálás olcsó. Ugyanezen a gépen, a teljes suite alatt (`bash
+tooling/scripts/test.sh`, 6265 teszt zöld, 100 százalék lefedettség mind a négy metrikán, 63 s): a
+teszt 51 ms (a régi 27 szintű teszt 1724 ... 1739 ms, 11. szekció). Szándékos rontás: a `<=
+MAX_STORED_OUTPUT_LENGTH` feltétel `<= MAX_STORED_OUTPUT_LENGTH * 100` alakra cserélve a
+végponttól végpontig teszt, az `execute-fan-out.spec.ts` korlát feletti tesztje és az
+`is-storable-output.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.

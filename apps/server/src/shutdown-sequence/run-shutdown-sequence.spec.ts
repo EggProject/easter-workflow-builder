@@ -3,7 +3,7 @@ import { IncomingMessage, request as httpRequest, type Server } from 'node:http'
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
-import { createEngine, type TemplateRendererPort } from '@easter-workflow-builder/engine';
+import { createEngine } from '@easter-workflow-builder/engine';
 import { decodeStreamFrame, type StreamFrame } from '@easter-workflow-builder/protocol';
 import { createServerLogger, type DestinationStream } from '@easter-workflow-builder/logger';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
@@ -53,11 +53,6 @@ function baseUrlOf(server: Server): string {
   }
   return `http://127.0.0.1:${String(address.port)}`;
 }
-
-const PASS_THROUGH_TEMPLATE_RENDERER: TemplateRendererPort = {
-  render: (template) => ({ kind: 'ok', value: template }),
-  compile: () => ({ kind: 'ok', value: undefined }),
-};
 
 /**
  * Egy `start -> human_approval` workflow, korlátlan várakozással: a futás a
@@ -326,14 +321,10 @@ describe('runShutdownSequence', () => {
     const database = openMemoryDatabase();
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
-    // Az átengedő sablon renderelő az egyetlen eltérés a valódi
-    // összeállítástól: a szállított, elutasító renderelő mellett a
-    // `human_approval` lépés azonnal elbukna (SPEC-004 O-1), tehát nem lenne
-    // várakozó futás, amit a leállás megszakíthat.
-    const engine = createEngine({
-      ...buildEngineDependencies(database, streamRegistry, clock),
-      templateRenderer: PASS_THROUGH_TEMPLATE_RENDERER,
-    });
+    // A valódi összeállítás, eltérés nélkül: a `human_approval` lépés a
+    // szállított Mustache renderelővel várakozó futást ad, amit a leállás
+    // megszakíthat.
+    const engine = createEngine(buildEngineDependencies(database, streamRegistry, clock));
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
     const server = createHttpServer({
@@ -376,14 +367,13 @@ describe('runShutdownSequence', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const agent = holdingAgentRunner();
-    // A valódi összeállítástól három eltérés van, mindhárom a tesztelhetőségé:
-    // hamis agent futtató (valós API hívás nincs), átengedő sablon renderelő
-    // (a szállított elutasító mellett az agent lépés el sem indulna, SPEC-004
-    // O-1), és üres környezet olvasó (a gazdagép env változói ne döntsenek).
+    // A valódi összeállítástól két eltérés van, mindkettő a tesztelhetőségé:
+    // hamis agent futtató (valós API hívás nincs) és üres környezet olvasó (a
+    // gazdagép env változói ne döntsenek). A sablon renderelő a szállított
+    // Mustache port.
     const engine = createEngine({
       ...buildEngineDependencies(database, streamRegistry, clock),
       agentQueryRunner: agent.runner,
-      templateRenderer: PASS_THROUGH_TEMPLATE_RENDERER,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
     });
@@ -449,12 +439,11 @@ describe('runShutdownSequence', () => {
     const streamRegistry = createStreamRegistry(createRandomUuidIdGenerator());
     const clock = createSystemClock();
     const agent = holdingAgentRunner();
-    // Ugyanaz a három, tesztelhetőségi eltérés, mint az indító kérés
+    // Ugyanaz a két, tesztelhetőségi eltérés, mint az indító kérés
     // regressziós tesztjében.
     const engine = createEngine({
       ...buildEngineDependencies(database, streamRegistry, clock),
       agentQueryRunner: agent.runner,
-      templateRenderer: PASS_THROUGH_TEMPLATE_RENDERER,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
       processEnvironment: { read: () => null },
     });

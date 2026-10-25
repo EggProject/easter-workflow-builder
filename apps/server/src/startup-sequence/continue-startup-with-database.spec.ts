@@ -6,10 +6,12 @@ import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db'
 import { createServerLogger, type DestinationStream } from '@easter-workflow-builder/logger';
 import { createEngine } from '@easter-workflow-builder/engine';
 import type { AgentQueryRunner } from '@easter-workflow-builder/agent';
+import {
+  createCelExpressionEvaluator,
+  createMustacheTemplateRenderer,
+} from '@easter-workflow-builder/workflow-language';
 import type { ServerConfig } from '../server-config/server-config.ts';
 import { buildProviderDescriptorLookup } from '../engine-assembly/build-provider-descriptor-lookup.ts';
-import { createRejectingExpressionEvaluator } from '../engine-assembly/create-rejecting-expression-evaluator.ts';
-import { createRejectingTemplateRenderer } from '../engine-assembly/create-rejecting-template-renderer.ts';
 import { createRealEventPublisher } from '../engine-assembly/create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from '../engine-assembly/create-process-environment-reader.ts';
@@ -160,8 +162,8 @@ describe('continueStartupWithDatabase', () => {
       database,
       agentQueryRunner: fakeAgentQueryRunner,
       providerDescriptorLookup: buildProviderDescriptorLookup(),
-      expressionEvaluator: createRejectingExpressionEvaluator(),
-      templateRenderer: createRejectingTemplateRenderer(),
+      expressionEvaluator: createCelExpressionEvaluator(),
+      templateRenderer: createMustacheTemplateRenderer(),
       eventPublisher: createRealEventPublisher(streamRegistry, clock),
       clock,
       idGenerator: createRandomUuidIdGenerator(),

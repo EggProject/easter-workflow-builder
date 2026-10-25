@@ -7,6 +7,8 @@ import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
+import { isStorableOutput } from './is-storable-output.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
@@ -41,8 +43,8 @@ function failFanOut(
  * tárolja"). **A séma nem tárolja a renderelt címkéket**: sem a
  * `FanOutExpandedPayload` (csak `itemCount`), sem a `step_run` tábla nem
  * hordoz erre oszlopot, tehát a renderelt szöveg eldobódik - ez tudatos
- * döntés, nem hiányosság: a `templateRenderer.compile` már a futás indítási
- * validáció szakaszában (jövőbeli lépés) ellenőrizhetné a sablon szintaxist,
+ * döntés, nem hiányosság: a sablon szintaxisát a `templateRenderer.compile`
+ * már a futás indításakor ellenőrzi (SPEC-010 9.2, `validateLanguageFields`),
  * ez a téma csak az elemenkénti renderelés sikerét kényszeríti ki.
  */
 function renderItemLabels(
@@ -62,7 +64,8 @@ function renderItemLabels(
 
 /**
  * A `fan_out` node végrehajtója (SPEC-004 5. szekció 4. sora, 4.5 szekció).
- * Kiértékeli az `itemsExpression`-t, listára szűkíti, minden elemre
+ * Kiértékeli az `itemsExpression`-t, listára szűkíti, ellenőrzi, hogy a
+ * lista tárolható-e (`isStorableOutput`), minden elemre
  * lerenderli a `branchLabelTemplate`-et, majd `fan_out_expanded` eseményt ír.
  * **N = 0 nem hiba** (4.5 szekció): üres tömb esetén nincs mit renderelni, a
  * kimenet üres lista. A node kimenete a kiértékelt elemlista - ez az egyetlen
@@ -116,6 +119,17 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
     return failFanOut(runId, stepRunId, startedAtMs, 'fan_out_items_not_a_list', errorMessage, ports);
   }
   const items: readonly unknown[] = evaluated.value;
+
+  // A lista a lépés kimenete, tehát tárolódik; a túl nagy eredmény kifejezés
+  // hiba, nem futás szintű hiba (SPEC-010 O-15 és O-18, user döntés
+  // 2026-10-25), ezért a tárolás előtt, a címkék renderelése előtt dől el.
+  if (!isStorableOutput(items)) {
+    const errorMessage = formatEngineErrorMessage(
+      'expression_evaluation_failed',
+      `A(z) "${nodeId}" fan_out node kimenete túl nagy a tároláshoz (legfeljebb ${String(MAX_STORED_OUTPUT_LENGTH)} karakter)`,
+    );
+    return failFanOut(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
+  }
 
   const rendered = renderItemLabels(config.branchLabelTemplate, items, runContext, ports);
   if (rendered.kind === 'error') {

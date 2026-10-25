@@ -48,6 +48,8 @@ describe('protocolErrorClassMessage', () => {
     ['thinking_mode_unsupported', 'Egy lépés thinking módját a választott modell nem támogatja.'],
     ['effort_unsupported', 'Egy lépés effort beállítását a választott provider nem támogatja.'],
     ['provider_descriptor_sdk_mismatch', 'A provider leírója nem a telepített Agent SDK verzióhoz készült.'],
+    ['template_render_failed', 'A workflow egyik sablonja hibás, ezért a futás nem indítható.'],
+    ['expression_evaluation_failed', 'A workflow egyik kifejezése hibás, ezért a futás nem indítható.'],
     ['already_decided', 'Ezt a jóváhagyást már eldöntötték.'],
   ];
 
