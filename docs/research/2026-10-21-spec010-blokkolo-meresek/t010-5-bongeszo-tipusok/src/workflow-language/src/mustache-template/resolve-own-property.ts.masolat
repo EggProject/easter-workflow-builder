@@ -1,0 +1,18 @@
+import type { TemplateNameResolution } from './template-name-resolution.ts';
+
+/**
+ * SPEC-010 6.6: egy (pontozott) név feloldása kizárólag saját adat
+ * tulajdonságon át. Konténer csak nem `null` objektum lehet, tehát a
+ * primitív érték tulajdonsága (például `'abc'.length`) nem találat, és a
+ * prototípus lánc (`constructor`, `__proto__`, `toString`) sem.
+ */
+export function resolveOwnProperty(view: unknown, name: string): TemplateNameResolution {
+  let current: unknown = view;
+  for (const segment of name.split('.')) {
+    if (typeof current !== 'object' || current === null || !Object.hasOwn(current, segment)) {
+      return { found: false };
+    }
+    current = Reflect.get(current, segment);
+  }
+  return { found: true, value: current };
+}

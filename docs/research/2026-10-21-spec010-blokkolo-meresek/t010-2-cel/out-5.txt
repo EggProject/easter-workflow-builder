@@ -1,0 +1,87 @@
+
+================ (5) ================
+### input.hianyzo
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_key',
+    summary: 'No such key: hianyzo',
+    range: { start: 6, end: 13 },
+    message: 'No such key: hianyzo\n\n>    1 | input.hianyzo\n               ^'
+  }
+}
+### steps["nincs"].x
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_key',
+    summary: 'No such key: nincs',
+    range: { start: 0, end: 14 },
+    message: 'No such key: nincs\n\n>    1 | steps["nincs"].x\n         ^'
+  }
+}
+### has(input.hianyzo)
+{
+  ok: true,
+  value: {
+    inspect: 'false',
+    typeof: 'boolean',
+    constructorName: 'Boolean',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### has(input.tema)
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false }
+}
+### has(input.prioritas) ? input.prioritas : "normal"
+{
+  ok: true,
+  value: {
+    inspect: "'normal'",
+    typeof: 'string',
+    constructorName: 'String',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### has(steps.nincs)
+{
+  ok: true,
+  value: {
+    inspect: 'false',
+    typeof: 'boolean',
+    constructorName: 'Boolean',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}
+### item.x (item null)
+{
+  ok: false,
+  error: {
+    name: 'EvaluationError',
+    class: 'EvaluationError',
+    code: 'no_such_key',
+    summary: 'No such key: x',
+    range: { start: 5, end: 6 },
+    message: 'No such key: x\n\n>    1 | item.x\n              ^'
+  }
+}
+### has(item.x) (item null)
+{
+  ok: true,
+  value: {
+    inspect: 'false',
+    typeof: 'boolean',
+    constructorName: 'Boolean',
+    prototype: '(primitív)',
+    isPromise: false
+  }
+}

@@ -88,7 +88,7 @@ export function validateRun(
     return startNode;
   }
   const startNodeId = startNode.value;
-  const loopBackEdgeIds = findLoopBackEdges(graph);
+  const loopBackEdgeIds = findLoopBackEdges(graph, startNodeId);
 
   const shape = firstError([
     () => validateEdgeEndpoints(graph),

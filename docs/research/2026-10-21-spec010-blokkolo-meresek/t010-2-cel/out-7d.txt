@@ -1,0 +1,5 @@
+{"constructor": 1, "a": 2} => { a: 2n }
+{"__proto__": 1, "a": 2} => { a: 2n }
+{"prototype": 1, "a": 2} => { a: 2n }
+{"constructor": 1}.size() => 0n
+size({"constructor": 1, "a": 2}) => 1n

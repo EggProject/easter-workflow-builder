@@ -1,0 +1,941 @@
+/* eslint-disable unicorn/no-null -- a node configok, a `WorkflowEdgeInput` és a `Fact<T | null>` nullázható mezői (SPEC-003 4.3, 4.7, SPEC-000 5.) a tárolt/mért alakban valódi `null` értéket hordoznak, a teszt fixture ezt másolja */
+import { describe, expect, it } from 'vitest';
+import { INSTALLED_AGENT_SDK_VERSION, type AgentQuery, type AgentQueryRunner } from '@easter-workflow-builder/agent';
+import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
+import type {
+  AgentStepConfig,
+  DatabaseContext,
+  NodeConfig,
+  UnhandledErrorPolicy,
+  WorkflowEdgeInput,
+  WorkflowNodeInput,
+} from '@easter-workflow-builder/db';
+import { openDatabase } from '@easter-workflow-builder/db';
+import type {
+  EnvironmentRequirement,
+  Fact,
+  ModelDescriptor,
+  ProviderCapabilityDescriptor,
+  ProviderId,
+} from '@easter-workflow-builder/provider-capability';
+import { isRecord } from '@easter-workflow-builder/typeguards';
+import { runStartupRecovery } from '../startup-recovery/run-startup-recovery.ts';
+import { createEngine } from './create-engine.ts';
+import type { EngineDependencies } from './engine-dependencies.ts';
+import type { EventPublisherPort } from './event-publisher-port.ts';
+
+function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
+  if (!isOkOutcome(outcome)) {
+    throw new Error(`váratlan hibaág: ${outcome.message}`);
+  }
+  return outcome.value;
+}
+
+function messageIterable(messages: readonly unknown[]): AsyncIterable<unknown> {
+  return {
+    [Symbol.asyncIterator]: () => {
+      let index = 0;
+      return {
+        next: (): Promise<IteratorResult<unknown>> => {
+          const value = messages[index];
+          index += 1;
+          return Promise.resolve(value === undefined ? { done: true, value: undefined } : { done: false, value });
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Egy `init` üzenet után a `release()` hívásig felfüggesztett üzenetfolyam
+ * (`agent-step/run-agent-step.spec.ts` `controlledMessageIterable` mintája).
+ * Az `interruptRun`/`shutdown` teszteknek egy TÉNYLEGESEN folyamatban lévő
+ * `agent_step` példányra van szükségük, amit a SPEC-004 9. szekció 3. pontja
+ * szerint az `AgentQuery.interrupt()` hívása enged tovább - egy
+ * `human_approval` lépés `timeoutMs: null` várakozása erre NEM alkalmas,
+ * mert ahhoz nem tartozik `AgentQuery` (`execute-human-approval.ts` doksija:
+ * a node nem foglal helyet és nincs SDK hívása), tehát a megszakítás
+ * jelzése sosem érné el a döntésre váró promise-t.
+ */
+function controlledMessageIterable(sessionId: string): {
+  readonly messages: AsyncIterable<unknown>;
+  readonly release: () => void;
+} {
+  const { promise: gate, resolve: releaseGate } = Promise.withResolvers<undefined>();
+
+  async function* generate(): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await gate;
+    yield {
+      type: 'result',
+      subtype: 'success',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  return {
+    messages: generate(),
+    release: () => {
+      releaseGate(undefined);
+    },
+  };
+}
+
+/**
+ * Egy `result: success` SDK üzenetsorozat, session azonosítóval a `system`
+ * `init` üzenetben (SPEC-004 F-3). Az `uuid` hívásonként egyedivé alakul,
+ * mert a `run_event` tábla `sdk_uuid` idempotencia oszlopa futásonként
+ * egyedi értéket vár (SPEC-003 6.5).
+ */
+function successMessages(callIndex: number): readonly unknown[] {
+  return [
+    { type: 'system', subtype: 'init', session_id: `session-${String(callIndex)}`, uuid: `u-${String(callIndex)}-1` },
+    {
+      type: 'result',
+      subtype: 'success',
+      session_id: `session-${String(callIndex)}`,
+      uuid: `u-${String(callIndex)}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    },
+  ];
+}
+
+/**
+ * Minden agent lépést sikeresre fut a teljes életciklus tesztjeihez
+ * (`startRun`/`decideApproval`/`interruptRun`/`shutdown`/`restartRun`
+ * összeállítás-szintű ellenőrzésére); a `testProviderConnection` saját,
+ * elemenként vezérelt hamis futtatót kap, lásd lent.
+ */
+function fakeAgentStepRunner(): AgentQueryRunner {
+  let callIndex = 0;
+  return {
+    run: () => {
+      callIndex += 1;
+      return {
+        kind: 'ok',
+        value: { messages: messageIterable(successMessages(callIndex)), interrupt: () => Promise.resolve() },
+      };
+    },
+  };
+}
+
+/**
+ * A `published` tömb egy adott `kind` és `stepRunId` szűrésű eseményének
+ * `payload.status` mezőjét adja vissza, az `isRecord` typeguardjával
+ * szűkítve (nem `expect.objectContaining` egymásba ágyazva, mert az
+ * `@typescript-eslint/no-unsafe-assignment` nem engedi a tetszőleges alakú
+ * `unknown` payloadot közvetlenül `objectContaining` bemenetként adni).
+ */
+function findEventPayloadStatus(published: readonly unknown[], kind: string, stepRunId: string): unknown {
+  const event = published.find(
+    (candidate) => isRecord(candidate) && candidate['kind'] === kind && candidate['stepRunId'] === stepRunId,
+  );
+  if (!isRecord(event) || !isRecord(event['payload'])) {
+    return undefined;
+  }
+  return event['payload']['status'];
+}
+
+/**
+ * Kiadott-e a motor adott `kind` és `stepRunId` eseményt. A `step_started`
+ * payloadjának nincs `status` mezője, ezért annak hiányát nem a
+ * `findEventPayloadStatus` `undefined` értéke bizonyítja, hanem ez.
+ */
+function hasPublishedEvent(published: readonly unknown[], kind: string, stepRunId: string): boolean {
+  return published.some(
+    (candidate) => isRecord(candidate) && candidate['kind'] === kind && candidate['stepRunId'] === stepRunId,
+  );
+}
+
+/**
+ * Egy hamis agent hívás viselkedése a `scriptedRunner` forgatókönyvében:
+ *
+ * - `fails_when_released`: az `init` után a `releaseFailure()` hívásig vár,
+ *   utána nem sikeres `result` üzenettel zár (`agent_result_not_success`);
+ * - `runs_until_interrupt`: magától SOSEM ér véget, csak az `interrupt()`
+ *   után, sikeres `result` üzenettel (a megszakított, futó lépés a meglévő
+ *   úton, a saját eredménye szerint zár, SPEC-004 9. szekció 4. pont);
+ * - `drains_until_released`: az `interrupt()` után sem ér véget, csak a
+ *   `releaseDrain()` hívásra, sikeres `result` üzenettel. Ez a leállási ablak:
+ *   a folyam kimerülése alatt a futás még nem terminális (SPEC-004 9. szekció
+ *   4. pont), és a teszt ebben az ablakban cselekedhet;
+ * - `succeeds`: azonnal sikeres.
+ */
+type ScriptedCall = 'fails_when_released' | 'runs_until_interrupt' | 'drains_until_released' | 'succeeds';
+
+/**
+ * Hívásonként előre megírt hamis agent futtató a `fail_run` tesztekhez. A
+ * hívások sorrendje a hely kiosztásának sorrendje, nem a node azonosítóé,
+ * ezért a forgatókönyv hívás sorszám szerint szól; a forgatókönyvön túli
+ * hívás `succeeds`. A számlálók a teszt fő mérőszámai: hány agent hívás
+ * történt, és hányszor futott `interrupt()`.
+ */
+function scriptedRunner(script: readonly ScriptedCall[]): {
+  readonly runner: AgentQueryRunner;
+  readonly releaseFailure: () => void;
+  readonly releaseDrain: () => void;
+  readonly calls: { run: number; interrupt: number };
+} {
+  const { promise: failureGate, resolve: openFailureGate } = Promise.withResolvers<undefined>();
+  const { promise: drainGate, resolve: openDrainGate } = Promise.withResolvers<undefined>();
+  const calls = { run: 0, interrupt: 0 };
+
+  async function* failingMessages(sessionId: string): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await failureGate;
+    yield {
+      type: 'result',
+      subtype: 'error_max_turns',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  async function* drainingMessages(sessionId: string): AsyncGenerator {
+    yield { type: 'system', subtype: 'init', session_id: sessionId, uuid: `${sessionId}-1` };
+    await drainGate;
+    yield {
+      type: 'result',
+      subtype: 'success',
+      session_id: sessionId,
+      uuid: `${sessionId}-2`,
+      num_turns: 1,
+      usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    };
+  }
+
+  const runner: AgentQueryRunner = {
+    run: () => {
+      calls.run += 1;
+      const sessionId = `hivas-${String(calls.run)}`;
+      const behaviour = script[calls.run - 1] ?? 'succeeds';
+      if (behaviour === 'succeeds') {
+        return {
+          kind: 'ok',
+          value: { messages: messageIterable(successMessages(calls.run)), interrupt: () => Promise.resolve() },
+        };
+      }
+      if (behaviour === 'drains_until_released') {
+        return {
+          kind: 'ok',
+          value: {
+            messages: drainingMessages(sessionId),
+            interrupt: () => {
+              calls.interrupt += 1;
+              return Promise.resolve();
+            },
+          },
+        };
+      }
+      const controlled = controlledMessageIterable(sessionId);
+      return {
+        kind: 'ok',
+        value: {
+          messages: behaviour === 'fails_when_released' ? failingMessages(sessionId) : controlled.messages,
+          interrupt: () => {
+            calls.interrupt += 1;
+            controlled.release();
+            return Promise.resolve();
+          },
+        },
+      };
+    },
+  };
+  return {
+    runner,
+    releaseFailure: () => {
+      openFailureGate(undefined);
+    },
+    releaseDrain: () => {
+      openDrainGate(undefined);
+    },
+    calls,
+  };
+}
+
+function agentQueryOf(messages: AsyncIterable<unknown>): AgentQuery {
+  return { messages, interrupt: () => Promise.resolve() };
+}
+
+function runnerReturning(query: Outcome<AgentQuery>): AgentQueryRunner {
+  return { run: () => query };
+}
+
+function knownFact<TValue>(value: TValue): Fact<TValue> {
+  return { state: 'known', value, evidence: [{ kind: 'measurement', id: 'M-01' }] };
+}
+
+function unknownFact<TValue>(): Fact<TValue> {
+  return { state: 'unknown', reason: 'teszt: nincs mérés', blockedBy: ['M-99'] };
+}
+
+function model(id: string): ModelDescriptor<string, string> {
+  return {
+    id,
+    family: 'csalad-1',
+    clientModelIdentifier: knownFact(`${id}-kliens`),
+    contextWindow: knownFact(1000),
+    effectiveContextWindowOnWire: knownFact(1000),
+    maxOutputTokensRecommended: knownFact(100),
+    maxOutputTokensHard: knownFact(200),
+    maxOutputTokensWireCeiling: knownFact(200),
+    imageInput: knownFact(false),
+    videoInput: knownFact(false),
+    listedByModelsEndpoint: knownFact(false),
+  };
+}
+
+interface DescriptorOverrides {
+  readonly requiredEnv?: readonly EnvironmentRequirement[];
+  readonly calledBySdk?: Fact<boolean>;
+  readonly measuredMaxConcurrentSteps?: Fact<number>;
+}
+
+function descriptorOf(
+  id: ProviderId,
+  overrides: DescriptorOverrides = {},
+): ProviderCapabilityDescriptor<string, string> {
+  return {
+    id,
+    displayName: `leíró: ${id}`,
+    // A `createEngine` a valódi `INSTALLED_AGENT_SDK_VERSION` konstanst adja
+    // a `RunSupervisor`-nak (nem egy teszt-only értéket, mint a többi, a
+    // `RunSupervisor`-t közvetlenül példányosító spec fájl), ezért a leíró
+    // `sdkVersionPin` mezőjének is ezt kell hordoznia, különben minden
+    // `agent_step` `provider_descriptor_sdk_mismatch` hibával bukna
+    // (`validate-provider-capabilities.ts`).
+    sdkVersionPin: INSTALLED_AGENT_SDK_VERSION,
+    measuredAt: '2026-08-28',
+    requiredEnv: overrides.requiredEnv ?? [],
+    disallowedEnv: [],
+    models: [model('modell-1')],
+    thinking: {
+      byModelFamily: { 'csalad-1': knownFact(['adaptive', 'disabled']) },
+      wireShape: knownFact('{"type":"adaptive"}'),
+      sendsBudgetTokens: knownFact(false),
+      interleavedSignatureRequired: knownFact(false),
+      streamEventTypes: knownFact([]),
+    },
+    effort: { accepted: knownFact(true), wireField: knownFact(null) },
+    toolChoice: {
+      accepted: knownFact(['auto', 'none']),
+      rejectionBehaviour: knownFact('silently_dropped'),
+      sdkSendsForcedChoice: knownFact(false),
+    },
+    structuredOutput: {
+      strategies: [
+        {
+          id: 'emit_output_tool',
+          usable: knownFact(true),
+          blockingWireDetail: knownFact(null),
+          observedRoundTrips: knownFact([3]),
+        },
+      ],
+      defaultStrategy: knownFact('emit_output_tool'),
+      outputConfigAlwaysSent: knownFact(false),
+      outputConfigWireField: knownFact(null),
+    },
+    serverTools: knownFact([]),
+    streaming: {
+      sse: knownFact(true),
+      toolInputDelta: knownFact('input_json_delta'),
+      sdkReassemblesToolInput: knownFact(true),
+      fineGrainedToolStreaming: knownFact(false),
+      streamDisableable: knownFact(false),
+    },
+    promptCaching: {
+      mode: knownFact('none'),
+      explicitBreakpointLimit: knownFact(0),
+      ttlSeconds: knownFact(0),
+      minimumInputTokens: knownFact(0),
+      usageFields: knownFact([]),
+      disableEnvVar: knownFact(null),
+      callerBreakpointSurvivesDisable: knownFact(false),
+    },
+    recommendedAgentTools: knownFact([]),
+    modelsEndpoint: {
+      directHttpReachable: knownFact(false),
+      calledBySdk: overrides.calledBySdk ?? knownFact(false),
+      listedModelCount: knownFact(0),
+    },
+    rateLimits: { buckets: [], retryAfterHeader: knownFact(null), rateLimitHeaders: knownFact([]) },
+    concurrency: {
+      subagentCapEnvVar: knownFact(null),
+      measuredSubagentCap: knownFact(1),
+      observedMaxConcurrentRequests: knownFact(1),
+      measuredMaxConcurrentSteps: overrides.measuredMaxConcurrentSteps ?? knownFact(20),
+    },
+    anthropicBetaHeaders: knownFact([]),
+  };
+}
+
+interface HarnessOptions {
+  readonly agentQueryRunner?: AgentQueryRunner;
+  readonly descriptorLookup?: (providerId: ProviderId) => ProviderCapabilityDescriptor<string, string>;
+  readonly database?: DatabaseContext;
+  readonly processEnvironment?: EngineDependencies['processEnvironment'];
+  readonly expressionEvaluator?: EngineDependencies['expressionEvaluator'];
+  readonly templateRenderer?: EngineDependencies['templateRenderer'];
+}
+
+interface Harness {
+  readonly database: DatabaseContext;
+  readonly dependencies: EngineDependencies;
+  readonly engine: ReturnType<typeof createEngine>;
+  readonly published: unknown[];
+}
+
+function openHarness(options: HarnessOptions = {}): Harness {
+  const database = options.database ?? okOrThrow(openDatabase(':memory:'));
+  const published: unknown[] = [];
+  let nextId = 0;
+  const publisher: EventPublisherPort = {
+    publish: (event) => {
+      published.push(event);
+    },
+  };
+  const dependencies: EngineDependencies = {
+    database,
+    agentQueryRunner: options.agentQueryRunner ?? fakeAgentStepRunner(),
+    providerDescriptorLookup: options.descriptorLookup ?? ((providerId) => descriptorOf(providerId)),
+    expressionEvaluator: options.expressionEvaluator ?? {
+      evaluate: (expression) => ({ kind: 'ok', value: JSON.parse(expression) }),
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+    templateRenderer: options.templateRenderer ?? {
+      render: (template) => ({ kind: 'ok', value: template }),
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+    eventPublisher: publisher,
+    clock: (() => {
+      let now = 0;
+      return {
+        nowMs: () => {
+          now += 1;
+          return now;
+        },
+        sleep: () => Promise.resolve(),
+      };
+    })(),
+    idGenerator: {
+      nextId: () => {
+        nextId += 1;
+        return `id-${String(nextId)}`;
+      },
+    },
+    processEnvironment: options.processEnvironment ?? { read: () => null },
+  };
+  return { database, dependencies, engine: createEngine(dependencies), published };
+}
+
+function nodeOf(id: string, config: NodeConfig): WorkflowNodeInput {
+  return { id, label: id, positionX: 0, positionY: 0, config };
+}
+function edgeOf(
+  id: string,
+  sourceNodeId: string,
+  targetNodeId: string,
+  branchKey: string | null = null,
+): WorkflowEdgeInput {
+  return { id, sourceNodeId, targetNodeId, sourceHandle: null, targetHandle: null, branchKey };
+}
+function startNode(id: string): WorkflowNodeInput {
+  return nodeOf(id, { type: 'start', inputFields: [], onUnhandledError: 'fail_run' });
+}
+function agentStepConfig(promptTemplate: string): AgentStepConfig {
+  return {
+    promptTemplate,
+    providerId: null,
+    modelId: 'modell-1',
+    effort: null,
+    thinking: null,
+    allowedTools: [],
+    disallowedTools: [],
+    permissionMode: null,
+    maxTurns: null,
+    maxBudgetUsd: null,
+    systemPrompt: null,
+    agents: {},
+    skills: null,
+    mcpServers: {},
+    enabledEngineHooks: [],
+    cwd: null,
+    additionalDirectories: [],
+    sandbox: null,
+    agentTools: [],
+    sessionMode: 'isolated',
+    structuredOutput: null,
+  };
+}
+function agentNode(
+  id: string,
+  promptTemplate: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, { type: 'agent_step', onUnhandledError, ...agentStepConfig(promptTemplate) });
+}
+function approvalNode(id: string, timeoutMs: number | null): WorkflowNodeInput {
+  return nodeOf(id, {
+    type: 'human_approval',
+    title: 'döntés',
+    bodyTemplate: 'szöveg',
+    timeoutMs,
+    onUnhandledError: 'fail_run',
+  });
+}
+
+function createWorkflow(
+  database: DatabaseContext,
+  name: string,
+  nodes: readonly WorkflowNodeInput[],
+  edges: readonly WorkflowEdgeInput[],
+): string {
+  const workflow = okOrThrow(database.workflows.createWorkflow({ name, description: null, providerId: null }));
+  okOrThrow(database.workflows.replaceGraph(workflow.id, nodes, edges));
+  okOrThrow(database.settings.setDefaultProvider('minimax'));
+  return workflow.id;
+}
+
+async function waitForRunStatus(
+  database: DatabaseContext,
+  runId: string,
+  terminal: readonly string[],
+): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const status = okOrThrow(database.runs.getRun(runId)).status;
+    if (terminal.includes(status)) {
+      return status;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${runId} futás nem érte el a várt állapotot`);
+}
+
+// A `runId` megadásával csak az adott futás jóváhagyását várja: két futás
+// egyidejű várakozásánál a lista első eleme nem feltétlenül az övé.
+async function waitForPendingApproval(database: DatabaseContext, runId?: string): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const pending = okOrThrow(database.approvals.listPendingApprovals()).find(
+      (approval) => runId === undefined || approval.runId === runId,
+    );
+    if (pending !== undefined) {
+      return pending.stepRunId;
+    }
+    await Promise.resolve();
+  }
+  throw new Error('nem érkezett jóváhagyási kérés');
+}
+
+/**
+ * Megvárja, amíg egy adott node példánya `running` állapotba kerül -
+ * `interruptRun`/`shutdown` teszteknek kell, hogy a megszakítás TÉNYLEGESEN
+ * egy folyamatban lévő `agent_step` példányt érjen, ne a még el sem indultat.
+ */
+async function waitForStepRunning(database: DatabaseContext, runId: string, nodeId: string): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+    if (step?.status === 'running') {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés nem indult el`);
+}
+
+/**
+ * Megvárja, amíg egy adott node példányának `pending` sora létrejön: a
+ * korlátozott szabályozó mellett ez a sorban álló, helyre váró lépés.
+ */
+async function waitForStepQueued(database: DatabaseContext, runId: string, nodeId: string): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+    if (step?.status === 'pending') {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés nem állt sorba`);
+}
+
+async function waitForStepStatus(
+  database: DatabaseContext,
+  runId: string,
+  nodeId: string,
+  status: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+    if (step?.status === status) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés nem érte el a(z) ${status} állapotot`);
+}
+
+/**
+ * Megvárja, amíg a futás agent lépéseiből pontosan `runningCount` fut és
+ * `queuedCount` sorban áll (korlátozott szabályozó mellett), és visszaadja a
+ * futó lépések node azonosítóját: a kiosztás sorrendje a futtathatóvá válás
+ * sorrendje, amit a teszt nem köt ki.
+ */
+async function waitForRunningAndQueued(
+  database: DatabaseContext,
+  runId: string,
+  runningCount: number,
+  queuedCount: number,
+): Promise<readonly string[]> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const agentSteps = okOrThrow(database.stepRuns.listStepRuns(runId)).filter((row) => row.nodeType === 'agent_step');
+    const running = agentSteps.filter((row) => row.status === 'running');
+    const pendingCount = agentSteps.filter((row) => row.status === 'pending').length;
+    if (pendingCount === queuedCount && running.length === runningCount) {
+      return running.map((row) => row.nodeId);
+    }
+    await Promise.resolve();
+  }
+  throw new Error(
+    `a(z) ${runId} futásban nem állt be ${String(runningCount)} futó és ${String(queuedCount)} sorban álló lépés`,
+  );
+}
+
+/**
+ * Megvárja, amíg a hamis futtató `interrupt()` hívásainak száma eléri a
+ * `count` értéket. A `fail_run` és a megszakítás a döntésre váró jóváhagyás
+ * várakozását ugyanabban a szinkron menetben zárja le, amiben az
+ * `interrupt()`-ot hívja, tehát a számláló a leállási ablak kezdetének
+ * megfigyelhető jele.
+ */
+async function waitForInterruptCalls(calls: { readonly interrupt: number }, count: number): Promise<void> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    if (calls.interrupt === count) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`az interrupt() hívások száma nem érte el a(z) ${String(count)} értéket`);
+}
+
+const TERMINAL_RUN_STATUSES = ['succeeded', 'failed', 'cancelled', 'interrupted'] as const;
+
+/**
+ * Három párhuzamos agent lépés a `start` után, a `fail_run` tesztekhez.
+ * Mindhárom ugyanazzal a politikával, mert a helyet elsőként megkapó (tehát a
+ * forgatókönyv első hívását kapó) lépés kiléte a futtathatóvá válás
+ * sorrendjén múlik, amit a teszt nem köt ki.
+ */
+function threeParallelAgentSteps(
+  database: DatabaseContext,
+  name: string,
+  onUnhandledError: UnhandledErrorPolicy,
+): string {
+  return createWorkflow(
+    database,
+    name,
+    [
+      startNode('start'),
+      agentNode('a1', 'egy', onUnhandledError),
+      agentNode('a2', 'ketto', onUnhandledError),
+      agentNode('a3', 'harom', onUnhandledError),
+    ],
+    [edgeOf('e1', 'start', 'a1'), edgeOf('e2', 'start', 'a2'), edgeOf('e3', 'start', 'a3')],
+  );
+}
+
+function subWorkflowNode(
+  id: string,
+  targetWorkflowId: string,
+  onUnhandledError: UnhandledErrorPolicy = 'fail_run',
+): WorkflowNodeInput {
+  return nodeOf(id, { type: 'sub_workflow', targetWorkflowId, inputMapping: {}, onUnhandledError });
+}
+
+/**
+ * Egy gyerek workflow, aminek egyetlen lépése egy korlátlan várakozású
+ * jóváhagyás: a futása magától sosem ér véget, csak döntésre vagy
+ * megszakításra.
+ */
+function waitingChildWorkflow(database: DatabaseContext, name: string, prefix: string): string {
+  return createWorkflow(
+    database,
+    name,
+    [startNode(`${prefix}-start`), approvalNode(`${prefix}-jov`, null)],
+    [edgeOf(`${prefix}-e1`, `${prefix}-start`, `${prefix}-jov`)],
+  );
+}
+
+/**
+ * Egy gyerek workflow, aminek egyetlen lépése egy agent lépés: a
+ * `scriptedRunner` `drains_until_released` hívásával a folyama az `interrupt()`
+ * után is a `releaseDrain()` hívásig nyitva marad, tehát a gyerek leállásának
+ * vége a teszt kezében van.
+ */
+function drainingChildWorkflow(database: DatabaseContext, name: string, prefix: string): string {
+  return createWorkflow(
+    database,
+    name,
+    [startNode(`${prefix}-start`), agentNode(`${prefix}-agent`, 'gyerek')],
+    [edgeOf(`${prefix}-e1`, `${prefix}-start`, `${prefix}-agent`)],
+  );
+}
+
+/**
+ * Megvárja, amíg a futás `sub_workflow` lépésének sora megkapja a gyerek
+ * futás azonosítóját (SPEC-004 5.9 3. pont), és visszaadja.
+ */
+async function waitForChildRunId(database: DatabaseContext, runId: string, nodeId: string): Promise<string> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const childRunId = okOrThrow(database.stepRuns.listStepRuns(runId)).find(
+      (row) => row.nodeId === nodeId,
+    )?.subWorkflowRunId;
+    if (typeof childRunId === 'string') {
+      return childRunId;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`a(z) ${nodeId} lépés gyerek futása nem indult el`);
+}
+
+// Egy futás élőben kiadott `run_finished` eseményének `payload.status` mezője.
+function findRunFinishedStatus(published: readonly unknown[], runId: string): unknown {
+  const event = published.find(
+    (candidate) => isRecord(candidate) && candidate['kind'] === 'run_finished' && candidate['runId'] === runId,
+  );
+  if (!isRecord(event) || !isRecord(event['payload'])) {
+    return undefined;
+  }
+  return event['payload']['status'];
+}
+
+/**
+ * Három szintű fa a `sub_workflow_finished` tesztekhez: a szülő `sub` lépése a
+ * gyereket, a gyerek `c-sub` lépése az unokát indítja, az unoka korlátlan
+ * várakozású jóváhagyáson áll, tehát a fa magától csak döntésre ér véget. A
+ * `siblings` a szülő `start` utáni testvér lépései. A `grandchildWorkflowId`
+ * az unoka workflow-ja, ha a teszt nem a jóváhagyáson álló unokát kéri.
+ */
+function subWorkflowTree(
+  database: DatabaseContext,
+  siblings: readonly WorkflowNodeInput[],
+  grandchildWorkflowId: string = waitingChildWorkflow(database, 'unoka', 'u'),
+): string {
+  const childWorkflowId = createWorkflow(
+    database,
+    'gyerek',
+    [startNode('c-start'), subWorkflowNode('c-sub', grandchildWorkflowId)],
+    [edgeOf('c-e1', 'c-start', 'c-sub')],
+  );
+  return createWorkflow(
+    database,
+    'szulo',
+    [startNode('start'), subWorkflowNode('sub', childWorkflowId), ...siblings],
+    [edgeOf('e-sub', 'start', 'sub'), ...siblings.map((sibling) => edgeOf(`e-${sibling.id}`, 'start', sibling.id))],
+  );
+}
+
+/**
+ * Egy `sub_workflow` lépés zárása, ahogy a `db` őrzi: a lépés végállapota, a
+ * `sub_workflow_finished` események `status` mezője, a lépés hibaüzenetében
+ * megnevezett gyerek állapot, és a gyerek futás sora a fa zárása után.
+ */
+function subWorkflowClosingOf(
+  database: DatabaseContext,
+  runId: string,
+  nodeId: string,
+): {
+  readonly step: readonly unknown[];
+  readonly finishedStatuses: readonly unknown[];
+  readonly messageStatus: string | undefined;
+  readonly childStatus: string;
+} {
+  const step = okOrThrow(database.stepRuns.listStepRuns(runId)).find((row) => row.nodeId === nodeId);
+  if (step?.subWorkflowRunId === undefined || step.subWorkflowRunId === null) {
+    throw new Error(`a(z) ${nodeId} lépésnek nincs gyerek futása`);
+  }
+  const finishedStatuses = okOrThrow(database.events.readEventsForStep(step.id, 100))
+    .filter((event) => event.kind === 'sub_workflow_finished')
+    .map((event) => (isRecord(event.payload) ? event.payload['status'] : undefined));
+  return {
+    step: [step.status, step.errorKind],
+    finishedStatuses,
+    messageStatus: /"(\w+)" állapotban zárt/u.exec(step.errorMessage ?? '')?.[1],
+    childStatus: okOrThrow(database.runs.getRun(step.subWorkflowRunId)).status,
+  };
+}
+
+/**
+ * A `subWorkflowTree` gyerekének (a szülő `sub` lépése) és unokájának (a
+ * gyerek `c-sub` lépése) zárása egyetlen értékben, hogy egy eltérés mindkét
+ * szintet mutassa.
+ */
+function treeClosingOf(
+  database: DatabaseContext,
+  rootRunId: string,
+  childRunId: string,
+): Readonly<Record<'gyerek' | 'unoka', ReturnType<typeof subWorkflowClosingOf>>> {
+  return {
+    gyerek: subWorkflowClosingOf(database, rootRunId, 'sub'),
+    unoka: subWorkflowClosingOf(database, childRunId, 'c-sub'),
+  };
+}
+
+/**
+ * A `treeClosingOf` elvárt értéke, ha a gyerek és az unoka futás `status`
+ * állapotban zár: a `sub` lépés `failed`, és az esemény, az üzenet és a sor
+ * ugyanazt az állapotot mondja.
+ */
+function closingFor(status: string): ReturnType<typeof treeClosingOf> {
+  const closing = {
+    step: ['failed', 'sub_workflow_failed'],
+    finishedStatuses: [status],
+    messageStatus: status,
+    childStatus: status,
+  };
+  return { gyerek: closing, unoka: closing };
+}
+
+/**
+ * A futások sora, ahogy a `db` őrzi: az állapot, a lépések állapota és a futás
+ * záró eseményeinek (`run_finished`, `run_interrupted`) `kind` értéke. Egy
+ * kérés előtt és után véve megmutatja, írt-e a kérés.
+ */
+function runRowsOf(
+  database: DatabaseContext,
+  runIds: readonly string[],
+): readonly { readonly status: string; readonly steps: readonly string[]; readonly closing: readonly string[] }[] {
+  return runIds.map((runId) => ({
+    status: okOrThrow(database.runs.getRun(runId)).status,
+    steps: okOrThrow(database.stepRuns.listStepRuns(runId)).map((step) => step.status),
+    closing: okOrThrow(database.events.readEventsSince(runId, 0, 1000))
+      .filter((event) => event.kind === 'run_finished' || event.kind === 'run_interrupted')
+      .map((event) => event.kind),
+  }));
+}
+
+
+
+// ===== BEÁGYAZOTT LOOP ELDOBHATÓ PRÓBA (nem commitolandó) =====
+import { buildExecutableGraph } from '../run-graph/build-executable-graph.ts';
+import { findLoopBackEdges } from '../run-graph/find-loop-back-edges.ts';
+import { validateRun } from '../run-validation/validate-run.ts';
+
+// "CIKLUS-n": kifejezés szövegenként számlál, és n igaz után egy hamisat ad,
+// majd elölről (tehát egy belső loop minden külső iterációban n-szer folytat).
+// A döntés NEM a kapott kontextusból jön. A kontextusból az iteration értéket
+// és a steps kulcsait naplózzuk.
+interface Seen { readonly text: string; readonly decision: boolean; readonly iteration: string; readonly stepsKeys: string }
+function cyclicPorts(seen: Seen[]): Pick<EngineDependencies, 'expressionEvaluator' | 'templateRenderer'> {
+  const counts = new Map<string, number>();
+  return {
+    expressionEvaluator: {
+      evaluate: (expression, context) => {
+        const count = counts.get(expression) ?? 0;
+        counts.set(expression, count + 1);
+        const limit = Number(expression.split('-')[1]);
+        const decision = count % (limit + 1) < limit;
+        const record = isRecord(context) ? context : {};
+        const steps = record['steps'];
+        seen.push({ text: expression, decision, iteration: String(record['iteration']), stepsKeys: isRecord(steps) ? Object.keys(steps).join(',') : typeof steps });
+        return { kind: 'ok', value: decision };
+      },
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+    templateRenderer: {
+      render: () => ({ kind: 'ok', value: 'sikeres' }),
+      compile: () => ({ kind: 'ok', value: undefined }),
+    },
+  };
+}
+function loopNodeOf(id: string, continueExpression: string, maxIterations: number): WorkflowNodeInput {
+  return nodeOf(id, { type: 'loop', maxIterations, continueExpression, onUnhandledError: 'fail_run' });
+}
+interface Shape { readonly label: string; readonly nodes: readonly WorkflowNodeInput[]; readonly edges: readonly WorkflowEdgeInput[] }
+
+function snapshotOf(shape: Shape) {
+  return {
+    version: 1,
+    sdkVersionPin: INSTALLED_AGENT_SDK_VERSION,
+    workflow: { id: 'w', name: shape.label, description: null, providerId: null },
+    nodes: shape.nodes.map((node) => ({ id: node.id, type: node.config.type, label: node.label, position: { x: 0, y: 0 }, config: node.config, effectiveProviderId: 'minimax' })),
+    edges: shape.edges.map((edge) => ({ ...edge })),
+  };
+}
+
+async function runShape(shape: Shape): Promise<void> {
+  const lines: string[] = [`### ${shape.label}`];
+  const document = snapshotOf(shape);
+  const backEdges = [...findLoopBackEdges(buildExecutableGraph(document))].sort();
+  lines.push(`BACK_EDGES ${JSON.stringify(backEdges)}`);
+  const validated = validateRun(document, 'minimax', null);
+  lines.push(`VALIDATE_RUN ${validated.kind === 'ok' ? 'ok' : validated.message}`);
+
+  const seen: Seen[] = [];
+  const harness = openHarness(cyclicPorts(seen));
+  const workflowId = createWorkflow(harness.database, shape.label, shape.nodes, shape.edges);
+  lines.push('REPLACE_GRAPH ok (db mentés elfogadta)');
+  const started = await harness.engine.startRun({ workflowId, input: {} });
+  if (!isOkOutcome(started)) {
+    lines.push(`START_RUN hibaág: ${started.message}`);
+    console.log(lines.join('\n'));
+    return;
+  }
+  const runId = started.value.run.id;
+  const status = await waitForRunStatus(harness.database, runId, TERMINAL_RUN_STATUSES);
+  const run = okOrThrow(harness.database.runs.getRun(runId));
+  lines.push(`RUN status=${status} errorKind=${String(run.errorKind)}`);
+  const stepRuns = okOrThrow(harness.database.stepRuns.listStepRuns(runId));
+  const nodeOfStep = new Map(stepRuns.map((row) => [row.id, row.nodeId]));
+  const short = new Map(stepRuns.map((row, index) => [row.id, `S${String(index + 1)}`]));
+  for (const row of stepRuns) {
+    lines.push(`STEP_RUN ${short.get(row.id)} ${JSON.stringify({ nodeId: row.nodeId, iteration: row.iteration, attempt: row.attempt, status: row.status, parent: row.parentStepRunId === null ? null : `${String(short.get(row.parentStepRunId))}(${String(nodeOfStep.get(row.parentStepRunId))})`, errorKind: row.errorKind })}`);
+  }
+  for (const entry of seen) {
+    lines.push(`EXPR ${JSON.stringify(entry)}`);
+  }
+  for (const event of okOrThrow(harness.database.events.readEventsSince(runId, 0, 1000))) {
+    if (event.kind === 'sdk_message' || event.kind === 'sdk_stream_event') continue;
+    const step = event.stepRunId === null ? '-' : `${String(short.get(event.stepRunId))}(${String(nodeOfStep.get(event.stepRunId))})`;
+    const payload = event.kind === 'loop_iteration_started' || event.kind === 'run_finished' ? ` ${JSON.stringify(event.payload)}` : '';
+    lines.push(`EVENT ${event.kind} ${step}${payload}`);
+  }
+  console.log(lines.join('\n'));
+}
+
+
+// S1: a torzs node kozvetlen elt ad a ciklus utani node-ra is (megkerulve az exit elt).
+const SHAPE_S1: Shape = {
+  label: 's1_torzs_kozvetlen_el_a_ciklus_utani_nodera',
+  nodes: [startNode('start'), loopNodeOf('l', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('y', 'Y')],
+  edges: [
+    edgeOf('e1', 'start', 'l'),
+    edgeOf('e2', 'l', 'torzs', 'continue'),
+    edgeOf('e3', 'torzs', 'l'),
+    edgeOf('e4', 'l', 'y', 'exit'),
+    edgeOf('e5', 'torzs', 'y'),
+  ],
+};
+// S2: kontroll, ugyanez a gráf a torzs->y él nélkül.
+const SHAPE_S2: Shape = {
+  label: 's2_kontroll_torzs_y_el_nelkul',
+  nodes: [startNode('start'), loopNodeOf('l', 'CIKLUS-2', 5), agentNode('torzs', 'TORZS'), agentNode('y', 'Y')],
+  edges: [
+    edgeOf('e1', 'start', 'l'),
+    edgeOf('e2', 'l', 'torzs', 'continue'),
+    edgeOf('e3', 'torzs', 'l'),
+    edgeOf('e4', 'l', 'y', 'exit'),
+  ],
+};
+describe('elakadas alak proba, valodi motor', () => {
+  for (const shape of [SHAPE_S2, SHAPE_S1]) {
+    it(shape.label, async () => {
+      await runShape(shape);
+      expect(true).toBe(true);
+    });
+  }
+});

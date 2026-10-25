@@ -257,3 +257,14 @@ frissül.
 | `actions/cache`             | v6.1.0 |
 | `actions/upload-artifact`   | v7.0.1 |
 | `actions/download-artifact` | v8.0.1 |
+
+### Élő `latest` újraellenőrzés (2026-10-21, PLAN-010 T-010-1)
+
+Élő lekérdezés két független forrásból: a registry `/<csomag>/latest` végpontja és a jsDelivr
+csomag adata. Egyik csomag sem mozdult, a pin marad.
+
+| Csomag                 | Pin     | `latest` (registry)                                                | `latest` (jsDelivr)                                                        |
+| ---------------------- | ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `mustache`             | `4.2.0` | `4.2.0` (`https://registry.npmjs.org/mustache/latest`)             | `4.2.0` (`https://data.jsdelivr.com/v1/packages/npm/mustache`)             |
+| `@types/mustache`      | `4.2.6` | `4.2.6` (`https://registry.npmjs.org/@types/mustache/latest`)      | `4.2.6` (`https://data.jsdelivr.com/v1/packages/npm/@types/mustache`)      |
+| `@marcbachmann/cel-js` | `8.0.0` | `8.0.0` (`https://registry.npmjs.org/@marcbachmann/cel-js/latest`) | `8.0.0` (`https://data.jsdelivr.com/v1/packages/npm/@marcbachmann/cel-js`) |

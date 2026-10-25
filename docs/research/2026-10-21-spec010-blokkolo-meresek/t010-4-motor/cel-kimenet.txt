@@ -1,0 +1,8 @@
+loop saját | iteration < 3 | HIBA EvaluationError: no such overload: dyn<null> < int
+loop saját | iteration < 2 | HIBA EvaluationError: no such overload: dyn<null> < int
+loop saját | iteration == null | OK boolean true
+loop saját | iteration != null && iteration < 2 | OK boolean false
+loop saját | has(steps.torzs) | OK boolean false
+loop saját | steps["ellenorzes"].kesz == false | HIBA EvaluationError: No such key: ellenorzes
+loop saját | false | OK boolean false
+törzs (iteration=1n) | iteration < 3 | OK boolean true

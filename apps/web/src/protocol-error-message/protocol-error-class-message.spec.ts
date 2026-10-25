@@ -5,7 +5,7 @@ import { protocolErrorMessage } from './protocol-error-message.ts';
 
 describe('protocolErrorClassMessage', () => {
   const cases: readonly (readonly [ProtocolErrorClass, string])[] = [
-    ['graph_cycle_detected', 'A gráf Ciklus csomópont nélküli kört tartalmaz.'],
+    ['graph_cycle_detected', 'A gráf olyan kört tartalmaz, amely nem egyetlen Ciklus csomóponton keresztül indul.'],
     [
       'loop_back_edge_outside_body',
       'Egy Ciklus csomópontba visszavezető él olyan csomópontból indul, amely nem a ciklus Folytatás ágán áll.',

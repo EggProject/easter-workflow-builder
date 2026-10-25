@@ -1,0 +1,9 @@
+
+describe('beágyazott loop próba, valódi motor', () => {
+  for (const shape of [SHAPE_K, SHAPE_A, SHAPE_B, SHAPE_C]) {
+    it(shape.label, async () => {
+      await runShape(shape);
+      expect(true).toBe(true);
+    });
+  }
+});

@@ -54,7 +54,9 @@ function failLoop(
  *    nélkül** (4.6 2. pont: a túllépés hiba, nem a `continueExpression`
  *    eredménye).
  * 2. Egyébként kiértékeli a `continueExpression`-t, logikai értékre
- *    szűkíti; nem logikai eredmény `expression_evaluation_failed`.
+ *    szűkíti; nem logikai eredmény `expression_evaluation_failed`. A
+ *    kifejezés kontextusában az `iteration` az `instance.iteration`, a többi
+ *    mező a kapott `runContext`-é.
  * 3. A `loop_iteration_started` esemény **csak folytatás esetén** íródik
  *    (4.6 4. pont, SPEC-004 5.8 elve szerinti explicit "csak akkor" - itt a
  *    4.6 szó szerint mondja ki).
@@ -102,7 +104,12 @@ export function executeLoop(input: ExecuteLoopInput, ports: NodeExecutorPorts): 
     return failLoop(runId, stepRunId, startedAtMs, 'loop_max_iterations_reached', errorMessage, ports);
   }
 
-  const evaluated = ports.expressionEvaluator.evaluate(config.continueExpression, runContext);
+  // A `loop` saját kifejezése a saját lefutásszámát látja `iteration` mezőben
+  // (SPEC-004 4.6 3. pont, 6.1 kivétel; SPEC-010 O-11): a kapott `runContext`
+  // `iteration` értéke a legbelső `loop` keretből jön, ami beágyazásnál a külső
+  // ciklusé, saját keret pedig ekkor még nincs a veremben.
+  const ownContext: RunContext = { ...runContext, iteration: instance.iteration };
+  const evaluated = ports.expressionEvaluator.evaluate(config.continueExpression, ownContext);
   if (evaluated.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',

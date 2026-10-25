@@ -1,0 +1,79 @@
+import Mustache from 'mustache';
+import { describe, expect, it } from 'vitest';
+import { createMustacheTemplateRenderer } from './create-mustache-template-renderer.ts';
+import { StrictWriter } from './strict-writer.ts';
+
+// A `unicorn/no-null` miatt a JSON `null` értéket elemzés adja.
+const jsonNull: unknown = JSON.parse('null');
+
+const view = {
+  input: {
+    tema: 'a<b>&"',
+    items: ['x', 'y'],
+    szam: 42,
+    semmi: jsonNull,
+    szerzo: { nev: 'Anna' },
+  },
+  steps: { 'node-1': { summary: 'kesz' } },
+};
+
+describe('T-010-5 mérés: Mustache alosztályok TypeScriptben', () => {
+  const renderer = createMustacheTemplateRenderer();
+
+  it('escape nélkül, szöveggé alakítva renderel', () => {
+    expect(
+      renderer.render('{{input.tema}}|{{{input.tema}}}|{{& input.szam}}|{{input.semmi}}|{{input.szerzo}}', view),
+    ).toStrictEqual({
+      kind: 'ok',
+      value: 'a<b>&"|a<b>&"|42|null|{"nev":"Anna"}',
+    });
+  });
+
+  it('szakasz, fordított szakasz, pont név', () => {
+    expect(
+      renderer.render('{{#input.items}}[{{.}}]{{/input.items}}{{^input.nincs}}ures{{/input.nincs}}', view),
+    ).toStrictEqual({
+      kind: 'ok',
+      value: '[x][y]ures',
+    });
+  });
+
+  it('a sima változó tag hiányzó neve hibaág', () => {
+    expect(renderer.render('{{input.nincs}}', view)).toStrictEqual({
+      kind: 'error',
+      message: 'hiányzó név a sablonban: input.nincs (template_render_failed)',
+    });
+  });
+
+  it.each([
+    '{{toString}}',
+    '{{constructor}}',
+    '{{input.constructor.name}}',
+    '{{input.__proto__}}',
+    '{{steps.x.map}}',
+    '{{input.items.constructor.fromAsync}}',
+  ])('támadó sablon %s nem old fel semmit', (template) => {
+    expect(renderer.render(template, view).kind).toBe('error');
+  });
+
+  it('a szakasz alakú támadó sablon üres', () => {
+    expect(renderer.render('{{#constructor}}x{{/constructor}}', view)).toStrictEqual({ kind: 'ok', value: '' });
+  });
+
+  it('a parseTemplate hiba hibaág', () => {
+    expect(renderer.compile('{{#a}}').kind).toBe('error');
+  });
+
+  it('a saját Writer gyorsítótára ki van kapcsolva, a globális érintetlen', () => {
+    expect(new StrictWriter().templateCache).toBeUndefined();
+    expect(Mustache.templateCache).toBeDefined();
+  });
+});
+
+describe('T-010-5 mérés: globális gyorsítótár Reflect.set útján', () => {
+  it('a Reflect.set kikapcsolja, a Mustache.render ezután nem tárol', async () => {
+    const { didDisableGlobalTemplateCache } = await import('./global-template-cache-probe.ts');
+    expect(didDisableGlobalTemplateCache()).toBe(true);
+    expect(Mustache.templateCache).toBeUndefined();
+  });
+});

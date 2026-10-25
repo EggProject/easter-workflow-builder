@@ -1,0 +1,20 @@
+diff --git a/packages/engine/src/run-supervisor/advance-run.ts b/packages/engine/src/run-supervisor/advance-run.ts
+index 8f349a4..58cddd7 100644
+--- a/packages/engine/src/run-supervisor/advance-run.ts
++++ b/packages/engine/src/run-supervisor/advance-run.ts
+@@ -7,6 +7,7 @@ import { formatEngineErrorMessage } from '../engine-error/format-engine-error-me
+ import type { FailureEscapeKey } from '../error-policy/resolve-error-route.ts';
+ import { resolveErrorRoute } from '../error-policy/resolve-error-route.ts';
+ import { resolveRunCompletion } from '../error-policy/resolve-run-completion.ts';
++import { probeStall } from './stall-probe.ts';
+ import type { RunCompletion } from '../error-policy/run-completion.ts';
+ import { emitEngineEvent } from '../node-executor/emit-engine-event.ts';
+ import { executeNode } from '../node-executor/execute-node.ts';
+@@ -711,6 +712,7 @@ function cancelStoppedStepRuns(runId: string, database: DatabaseContext): Outcom
+  */
+ function finishRun(execution: RunExecution, dependencies: NodeExecutorDependencies): Outcome<RunCompletion> {
+   const completion = resolveRunCompletion(execution.unhandledErrors);
++  probeStall(execution.scheduler, execution.topology, { status: completion.status, stopRequested: execution.stopRequested, failRunRequested: execution.failRunRequested, runId: execution.runId });
+   if (execution.stopRequested) {
+     return { kind: 'ok', value: completion };
+   }

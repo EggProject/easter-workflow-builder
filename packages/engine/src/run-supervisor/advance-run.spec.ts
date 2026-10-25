@@ -24,10 +24,14 @@ import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
 import type { ChildWorkflowRunner } from '../node-executor/child-workflow-runner.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
+import type { RunCompletion } from '../error-policy/run-completion.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
+import { shutdownActiveRuns } from '../run-interrupt/shutdown-active-runs.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
+import { findStalledInstances } from '../scheduling/find-stalled-instances.ts';
+import type { ActiveRunHandle } from './active-run-registry.ts';
 import { advanceRun } from './advance-run.ts';
 import { buildNodePlans } from './build-node-plans.ts';
 import type { NodePlan, RunExecution } from './run-execution.ts';
@@ -442,6 +446,10 @@ interface FixtureOptions {
   // A `fail_run` a futás al-workflow futásainak lezárását kéri; megadás
   // nélkül nincs lezárandó gyerek futás.
   readonly cancelChildRunTrees?: ChildWorkflowRunner['cancelChildRunTrees'];
+  // A `RunTopology.loopBackEdgeIds` kézzel megadott halmaza: az elakadt futás
+  // regressziós tesztje ezzel állítja elő a régi, elérhetőség alapú visszaél
+  // halmazt, amit a `validateRun` már nem ad (SPEC-004 4.9).
+  readonly loopBackEdgeIds?: ReadonlySet<string>;
 }
 
 function openFixture(options: FixtureOptions = {}): Fixture {
@@ -511,7 +519,8 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     options.enqueueStart === false ? createSchedulerState() : enqueueStartInstance(createSchedulerState(), 'start');
   const execution: RunExecution = {
     runId: options.runId ?? run.id,
-    topology: validated,
+    topology:
+      options.loopBackEdgeIds === undefined ? validated : { ...validated, loopBackEdgeIds: options.loopBackEdgeIds },
     nodePlans: options.nodePlans ?? plans,
     sessionSourceNodes: collectSessionSourceNodes(validated.nodeConfigsById),
     runInput: {},
@@ -873,5 +882,192 @@ describe('advanceRun', () => {
     const outcome = await advanceRun(fixture.execution, fixture.dependencies);
 
     expect(outcome.kind).toBe('error');
+  });
+});
+
+function keyedEdge(id: string, sourceNodeId: string, targetNodeId: string, branchKey: string): SnapshotEdge {
+  return { id, sourceNodeId, targetNodeId, sourceHandle: null, targetHandle: null, branchKey };
+}
+function loopNode(id: string): SnapshotNode {
+  return node(id, { type: 'loop', maxIterations: 5, continueExpression: 'FOLYTAT', onUnhandledError: 'fail_run' });
+}
+
+// A 4.6 (a) alakja: a belső loop `exit` éle közvetlenül a külső loop-ra mutat.
+function nestedLoopDocument(
+  extraNodes: readonly SnapshotNode[],
+  extraEdges: readonly SnapshotEdge[],
+): GraphSnapshotDocument {
+  return {
+    version: 1,
+    sdkVersionPin: INSTALLED,
+    workflow: { id: 'wf', name: 'teszt', description: null },
+    nodes: [
+      node('start', START),
+      loopNode('kulso'),
+      loopNode('belso'),
+      agentStepNode('torzs'),
+      agentStepNode('vege'),
+      ...extraNodes,
+    ],
+    edges: [
+      edge('e1', 'start', 'kulso'),
+      keyedEdge('e2', 'kulso', 'belso', 'continue'),
+      keyedEdge('e3', 'belso', 'torzs', 'continue'),
+      edge('e4', 'torzs', 'belso'),
+      keyedEdge('e5', 'belso', 'kulso', 'exit'),
+      keyedEdge('e6', 'kulso', 'vege', 'exit'),
+      ...extraEdges,
+    ],
+  };
+}
+
+describe('elakadt futás: run_stalled (SPEC-004 4.9, 17. szekció 44a)', () => {
+  // A régi, "u elérhető v-ből" definíció halmaza az (a) alakon: a belső loop
+  // belépő éle (e2) is visszaél, tehát a belső loop örökre vár (research
+  // 2026-10-21 8.1 szekció).
+  const OLD_REACHABILITY_BACK_EDGES: ReadonlySet<string> = new Set(['e2', 'e4', 'e5']);
+
+  it('a régi visszaél halmazzal bennragadó futás failed, run_stalled, failedBranchCount 0, az üzenet megnevezi a belso node-ot', async () => {
+    const fixture = openFixture({
+      document: nestedLoopDocument([], []),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: () => ({ kind: 'ok', value: true }),
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    const message =
+      'A futás elakadt: a(z) belso node példánya jelölést kapott, de soha nem vált futtathatóvá (run_stalled).';
+    expect(completion).toStrictEqual({
+      status: 'failed',
+      errorKind: 'run_stalled',
+      errorMessage: message,
+      failedBranchCount: 0,
+    });
+    const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+    expect(run.status).toBe('failed');
+    expect(run.errorKind).toBe('run_stalled');
+    expect(run.errorMessage).toBe(message);
+    const finished = okOrThrow(fixture.database.events.readEventsSince(fixture.execution.runId, 0, 100)).filter(
+      (event) => event.kind === 'run_finished',
+    );
+    expect(finished.map((event) => event.payload)).toStrictEqual([
+      { status: 'failed', errorKind: 'run_stalled', errorMessage: message, failedBranchCount: 0 },
+    ]);
+    expect(
+      okOrThrow(fixture.database.stepRuns.listStepRuns(fixture.execution.runId)).map((row) => row.nodeId),
+    ).toStrictEqual(['start', 'kulso']);
+  });
+
+  it('kezeletlen hibával záró futásnál az elakadás vizsgálata nem írja felül az első kezeletlen hibát', async () => {
+    const failingBranch = node('hibas', {
+      type: 'branch',
+      expression: 'HIBA',
+      branches: [{ key: 'a', label: 'a' }],
+      defaultBranchKey: null,
+      onUnhandledError: 'fail_branch',
+    });
+    const fixture = openFixture({
+      document: nestedLoopDocument([failingBranch], [edge('e7', 'start', 'hibas')]),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: (expression) =>
+        expression === 'HIBA' ? { kind: 'error', message: 'a HIBA kifejezés elhasalt' } : { kind: 'ok', value: true },
+    });
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    expect(completion.status).toBe('failed');
+    expect(completion.errorKind).toBe('expression_evaluation_failed');
+    expect(completion.failedBranchCount).toBe(1);
+  });
+
+  // A 44a kritérium második fele: megszakításnál és szabályos leállásnál a
+  // vizsgálat nem fut, mert a záró állapotot a leállító fél írja (4.9 "Mikor
+  // nem vizsgál"). A külső leállítás a `kulso` lefutása KÖZBEN érkezik, tehát a
+  // belső loop jelölése (e2) már megvan, és a terminális ponton tényleg van
+  // elakadt példány; üres ütemezőn ez nem lenne mérhető.
+  it('REGRESSZIÓ: megszakításnál (stopRequested) a bennragadt gráfon sem run_stalled, a hurok nem ír záró állapotot', async () => {
+    const holder: { execution?: RunExecution } = {};
+    const fixture = openFixture({
+      document: nestedLoopDocument([], []),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: () => {
+        if (holder.execution !== undefined) {
+          holder.execution.stopRequested = true;
+        }
+        return { kind: 'ok', value: true };
+      },
+    });
+    holder.execution = fixture.execution;
+
+    const completion = okOrThrow(await advanceRun(fixture.execution, fixture.dependencies));
+
+    expect(findStalledInstances(fixture.execution.scheduler, fixture.execution.topology)).not.toStrictEqual([]);
+    expect(completion).toStrictEqual({
+      status: 'succeeded',
+      errorKind: null,
+      errorMessage: null,
+      failedBranchCount: 0,
+    });
+    expect(okOrThrow(fixture.database.runs.getRun(fixture.execution.runId)).status).toBe('running');
+    expect(
+      okOrThrow(fixture.database.events.readEventsSince(fixture.execution.runId, 0, 100)).filter(
+        (event) => event.kind === 'run_finished',
+      ),
+    ).toStrictEqual([]);
+  });
+
+  it('REGRESSZIÓ: szabályos leállásnál (shutdownActiveRuns) a bennragadt gráfon sem run_stalled, a futás interrupted', async () => {
+    const holder: { shutdown?: Promise<Outcome<unknown>> } = {};
+    const { promise: completion, resolve: resolveCompletion } = Promise.withResolvers<Outcome<RunCompletion>>();
+    const fixture = openFixture({
+      document: nestedLoopDocument([], []),
+      loopBackEdgeIds: OLD_REACHABILITY_BACK_EDGES,
+      evaluate: () => {
+        holder.shutdown ??= shutdownActiveRuns({
+          database: fixture.database,
+          // eslint-disable-next-line @typescript-eslint/no-empty-function -- a teszt az adatbázis sorait vizsgálja, nem az élő eseményeket
+          eventPublisher: { publish: () => {} },
+          runSupervisor: {
+            listActiveRuns: () => [handle],
+            // eslint-disable-next-line @typescript-eslint/no-empty-function -- ebben a tesztben nem indul új futás
+            stopAcceptingRuns: () => {},
+          },
+          concurrencyGate: fixture.dependencies.concurrencyGate,
+          agentQueryRegistry: fixture.dependencies.agentQueryRegistry,
+          approvalRegistry: fixture.dependencies.approvalRegistry,
+        });
+        return { kind: 'ok', value: true };
+      },
+    });
+    const handle: ActiveRunHandle = {
+      runId: fixture.execution.runId,
+      rootRunId: fixture.execution.runId,
+      workflowId: 'wf',
+      completion,
+      requestStop: () => {
+        fixture.execution.stopRequested = true;
+      },
+      stopTargetStatus: () => 'interrupted',
+    };
+
+    const outcome = await advanceRun(fixture.execution, fixture.dependencies);
+    resolveCompletion(outcome);
+    okOrThrow(await (holder.shutdown ?? Promise.reject(new Error('a leállás nem indult el'))));
+
+    expect(findStalledInstances(fixture.execution.scheduler, fixture.execution.topology)).not.toStrictEqual([]);
+    expect(okOrThrow(outcome)).toStrictEqual({
+      status: 'succeeded',
+      errorKind: null,
+      errorMessage: null,
+      failedBranchCount: 0,
+    });
+    const run = okOrThrow(fixture.database.runs.getRun(fixture.execution.runId));
+    expect([run.status, run.errorKind]).toStrictEqual(['interrupted', null]);
+    expect(
+      okOrThrow(fixture.database.events.readEventsSince(fixture.execution.runId, 0, 100))
+        .map((event) => event.kind)
+        .filter((kind) => kind === 'run_finished' || kind === 'run_interrupted'),
+    ).toStrictEqual(['run_interrupted']);
   });
 });

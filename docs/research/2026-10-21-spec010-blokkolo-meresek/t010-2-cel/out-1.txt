@@ -1,0 +1,58 @@
+
+================ (1) ================
+### input.pontszam >= 50.0 ? "magas" : "alacsony"
+{
+  compile: { ok: true, type: 'string' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: "'magas'",
+      typeof: 'string',
+      constructorName: 'String',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### input.elemek.filter(e, e.aktiv).map(e, e.nev)
+{
+  compile: { ok: true, type: 'list' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: "[ 'alma', 'szilva' ]",
+      typeof: 'object',
+      constructorName: 'Array',
+      prototype: 'Array.prototype',
+      isPromise: false
+    }
+  }
+}
+### iteration < 3
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'true',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}
+### steps["ellenorzes"].kesz == false
+{
+  compile: { ok: true, type: 'bool' },
+  evaluate: {
+    ok: true,
+    value: {
+      inspect: 'true',
+      typeof: 'boolean',
+      constructorName: 'Boolean',
+      prototype: '(primitív)',
+      isPromise: false
+    }
+  }
+}

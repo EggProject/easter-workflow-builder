@@ -1,0 +1,399 @@
+
+================ (4) ================
+### string: "szöveg"
+{
+  ok: true,
+  value: {
+    inspect: "'szöveg'",
+    typeof: 'string',
+    constructorName: 'String',
+    prototype: '(primitív)',
+    isPromise: false
+  },
+  plainJsonStringify: '"szöveg"'
+}
+### boolean: true
+{
+  ok: true,
+  value: { inspect: 'true', typeof: 'boolean', constructorName: 'Boolean', prototype: '(primitív)', isPromise: false },
+  plainJsonStringify: 'true'
+}
+### null: null
+{
+  ok: true,
+  value: { inspect: 'null', typeof: 'object', constructorName: undefined, prototype: '(primitív)', isPromise: false },
+  plainJsonStringify: 'null'
+}
+### double véges: 1.5 + 2.5
+{
+  ok: true,
+  value: {
+    inspect: '4',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: true,
+    isNaN: false
+  },
+  plainJsonStringify: '4'
+}
+### NaN (0.0/0.0): 0.0 / 0.0
+{
+  ok: true,
+  value: {
+    inspect: 'NaN',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: false,
+    isNaN: true
+  },
+  plainJsonStringify: 'null'
+}
+### Infinity (1.0/0.0): 1.0 / 0.0
+{
+  ok: true,
+  value: {
+    inspect: 'Infinity',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: false,
+    isNaN: false
+  },
+  plainJsonStringify: 'null'
+}
+### -Infinity (-1.0/0.0): -1.0 / 0.0
+{
+  ok: true,
+  value: {
+    inspect: '-Infinity',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: false,
+    isNaN: false
+  },
+  plainJsonStringify: 'null'
+}
+### NaN double("NaN"): double("NaN")
+{
+  ok: true,
+  value: {
+    inspect: 'NaN',
+    typeof: 'number',
+    constructorName: 'Number',
+    prototype: '(primitív)',
+    isPromise: false,
+    finite: false,
+    isNaN: true
+  },
+  plainJsonStringify: 'null'
+}
+### int (BigInt): 1 + 2
+{
+  ok: true,
+  value: {
+    inspect: '3n',
+    typeof: 'bigint',
+    constructorName: 'BigInt',
+    prototype: '(primitív)',
+    isPromise: false,
+    safeInteger: true,
+    asNumber: 3
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}
+### int nem biztonságos (2^53+1): 9007199254740993
+{
+  ok: true,
+  value: {
+    inspect: '9007199254740993n',
+    typeof: 'bigint',
+    constructorName: 'BigInt',
+    prototype: '(primitív)',
+    isPromise: false,
+    safeInteger: false,
+    asNumber: 9007199254740992
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}
+### int max: 9223372036854775807
+{
+  ok: true,
+  value: {
+    inspect: '9223372036854775807n',
+    typeof: 'bigint',
+    constructorName: 'BigInt',
+    prototype: '(primitív)',
+    isPromise: false,
+    safeInteger: false,
+    asNumber: 9223372036854776000
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}
+### uint (UnsignedInt): 1u
+{
+  ok: true,
+  value: {
+    inspect: 'UnsignedInteger { value: 1 }',
+    typeof: 'object',
+    constructorName: 'UnsignedInt',
+    prototype: 'UnsignedInt.prototype',
+    isPromise: false
+  },
+  extra: { isMap: false, isArray: false, ownKeys: [], keyTypes: undefined, elems: undefined, sameRefAsContext: false },
+  plainJsonStringify: '{}'
+}
+### bytes (Uint8Array): b"abc"
+{
+  ok: true,
+  value: {
+    inspect: 'Uint8Array(3) [ 97, 98, 99 ]',
+    typeof: 'object',
+    constructorName: 'Uint8Array',
+    prototype: 'Uint8Array.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ '0', '1', '2' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: false
+  },
+  plainJsonStringify: '{"0":97,"1":98,"2":99}'
+}
+### időbélyeg: timestamp("2026-01-01T00:00:00Z")
+{
+  ok: true,
+  value: {
+    inspect: '2026-01-01T00:00:00.000Z',
+    typeof: 'object',
+    constructorName: 'Date',
+    prototype: 'Date.prototype',
+    isPromise: false
+  },
+  extra: { isMap: false, isArray: false, ownKeys: [], keyTypes: undefined, elems: undefined, sameRefAsContext: false },
+  plainJsonStringify: '"2026-01-01T00:00:00.000Z"'
+}
+### időtartam: duration("1s")
+{
+  ok: true,
+  value: {
+    inspect: 'google.protobuf.Duration { seconds: 1, nanos: 0 }',
+    typeof: 'object',
+    constructorName: 'Duration',
+    prototype: 'Duration.prototype',
+    isPromise: false
+  },
+  extra: { isMap: false, isArray: false, ownKeys: [], keyTypes: undefined, elems: undefined, sameRefAsContext: false },
+  plainJsonStringify: '{}'
+}
+### típus érték: type(1)
+{
+  ok: true,
+  value: {
+    inspect: 'Type [Type<int>] {}',
+    typeof: 'object',
+    constructorName: 'Type',
+    prototype: 'Type.prototype',
+    isPromise: false
+  },
+  extra: { isMap: false, isArray: false, ownKeys: [], keyTypes: undefined, elems: undefined, sameRefAsContext: false },
+  plainJsonStringify: '{}'
+}
+### lista literál: [1, 2, 3]
+{
+  ok: true,
+  value: {
+    inspect: '[ 1n, 2n, 3n ]',
+    typeof: 'object',
+    constructorName: 'Array',
+    prototype: 'Array.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: true,
+    ownKeys: [ '0', '1', '2', 'length' ],
+    keyTypes: undefined,
+    elems: [ 'bigint/(primitív)', 'bigint/(primitív)', 'bigint/(primitív)' ],
+    sameRefAsContext: false
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}
+### lista makróból (filter/map): input.elemek.filter(e, e.aktiv).map(e, e.nev)
+{
+  ok: true,
+  value: {
+    inspect: "[ 'alma', 'szilva' ]",
+    typeof: 'object',
+    constructorName: 'Array',
+    prototype: 'Array.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: true,
+    ownKeys: [ '0', '1', 'length' ],
+    keyTypes: undefined,
+    elems: [ 'string/(primitív)', 'string/(primitív)' ],
+    sameRefAsContext: false
+  },
+  plainJsonStringify: '["alma","szilva"]'
+}
+### lista a kontextusból változatlanul: input.elemek
+{
+  ok: true,
+  value: {
+    inspect: "[\n  { nev: 'alma', aktiv: true },\n  { nev: 'körte', aktiv: false },\n  { nev: 'szilva', aktiv: true }\n]",
+    typeof: 'object',
+    constructorName: 'Array',
+    prototype: 'Array.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: true,
+    ownKeys: [ '0', '1', '2', 'length' ],
+    keyTypes: undefined,
+    elems: [ 'object/Object.prototype', 'object/Object.prototype', 'object/Object.prototype' ],
+    sameRefAsContext: true
+  },
+  plainJsonStringify: '[{"nev":"alma","aktiv":true},{"nev":"körte","aktiv":false},{"nev":"szilva","aktiv":true}]'
+}
+### map literál, string kulcs: {"a": 1, "b": 2}
+{
+  ok: true,
+  value: {
+    inspect: '{ a: 1n, b: 2n }',
+    typeof: 'object',
+    constructorName: 'Object',
+    prototype: 'Object.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ 'a', 'b' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: false
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}
+### map a kontextusból változatlanul: input
+{
+  ok: true,
+  value: {
+    inspect: '{\n' +
+      "  tema: 'x',\n" +
+      '  pontszam: 72,\n' +
+      '  darab: 3,\n' +
+      '  elemek: [\n' +
+      "    { nev: 'alma', aktiv: true },\n" +
+      "    { nev: 'körte', aktiv: false },\n" +
+      "    { nev: 'szilva', aktiv: true }\n" +
+      '  ]\n' +
+      '}',
+    typeof: 'object',
+    constructorName: 'Object',
+    prototype: 'Object.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ 'tema', 'pontszam', 'darab', 'elemek' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: true
+  },
+  plainJsonStringify: '{"tema":"x","pontszam":72,"darab":3,"elemek":[{"nev":"alma","aktiv":true},{"nev":"körte","aktiv":false},{"nev":"szilva","aktiv":true}]}'
+}
+### map nem string kulcs (int): {1: "a", 2: "b"}
+{
+  ok: true,
+  value: {
+    inspect: "{ '1': 'a', '2': 'b' }",
+    typeof: 'object',
+    constructorName: 'Object',
+    prototype: 'Object.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ '1', '2' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: false
+  },
+  plainJsonStringify: '{"1":"a","2":"b"}'
+}
+### map nem string kulcs (bool): {true: "a"}
+{
+  ok: true,
+  value: {
+    inspect: "{ true: 'a' }",
+    typeof: 'object',
+    constructorName: 'Object',
+    prototype: 'Object.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ 'true' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: false
+  },
+  plainJsonStringify: '{"true":"a"}'
+}
+### map nem string kulcs (uint): {1u: "a"}
+{
+  ok: true,
+  value: {
+    inspect: "{ '1': 'a' }",
+    typeof: 'object',
+    constructorName: 'Object',
+    prototype: 'Object.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: false,
+    ownKeys: [ '1' ],
+    keyTypes: undefined,
+    elems: undefined,
+    sameRefAsContext: false
+  },
+  plainJsonStringify: '{"1":"a"}'
+}
+### lista vegyes elemmel (dyn): [dyn(1), dyn("a"), dyn(1u)]
+{
+  ok: true,
+  value: {
+    inspect: "[ 1n, 'a', UnsignedInteger { value: 1 } ]",
+    typeof: 'object',
+    constructorName: 'Array',
+    prototype: 'Array.prototype',
+    isPromise: false
+  },
+  extra: {
+    isMap: false,
+    isArray: true,
+    ownKeys: [ '0', '1', '2', 'length' ],
+    keyTypes: undefined,
+    elems: [ 'bigint/(primitív)', 'string/(primitív)', 'object/UnsignedInt.prototype' ],
+    sameRefAsContext: false
+  },
+  plainJsonStringify: 'throws TypeError: Do not know how to serialize a BigInt'
+}

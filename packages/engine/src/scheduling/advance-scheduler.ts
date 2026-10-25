@@ -23,6 +23,7 @@ interface SchedulerDraft {
   readonly fanOutItems: Map<string, readonly unknown[]>;
   readonly loopScopeOwners: Map<string, string>;
   readonly loopRunCounts: Map<string, number>;
+  readonly markedInstances: Map<string, StepInstanceReference>;
   readonly readyInstances: ReadyInstance[];
   readonly runningInstanceKeys: Set<string>;
   nextArrivalSequence: number;
@@ -53,6 +54,7 @@ function toDraft(state: SchedulerState): SchedulerDraft {
     fanOutItems: new Map(state.fanOutItems),
     loopScopeOwners: new Map(state.loopScopeOwners),
     loopRunCounts: new Map(state.loopRunCounts),
+    markedInstances: new Map(state.markedInstances),
     readyInstances: [...state.readyInstances],
     runningInstanceKeys: new Set(state.runningInstanceKeys),
     nextArrivalSequence: state.nextArrivalSequence,
@@ -147,14 +149,21 @@ function targetInstanceOf(
 // érkező `dead` jelölés a már lefutott `loop` példányon nem jelent új
 // iterációt, és a példányt halottá sem teheti, hiszen a belépő élein `live`
 // jelölés áll.
+//
+// **A cél példány a jelölés fajtájától függetlenül nyilvántartásba kerül**
+// (`markedInstances`), a halott visszaélen is: az elakadás vizsgálata
+// (`findStalledInstances`, SPEC-004 4.9) minden jelölést kapott példányt
+// megnéz, nem csak a kiértékelésre felvetteket.
 function placeMark(batch: MarkBatch, edge: SnapshotEdge, context: BranchContext, mark: EdgeMark): void {
   batch.draft.edgeMarks.set(buildScopedKey(edge.id, context), mark);
+  const target = targetInstanceOf(batch.topology, edge, context);
+  batch.draft.markedInstances.set(instanceKeyOf(target), target);
 
   if (mark === 'dead' && batch.topology.loopBackEdgeIds.has(edge.id)) {
     return;
   }
 
-  batch.touched.push(targetInstanceOf(batch.topology, edge, context));
+  batch.touched.push(target);
 }
 
 // Az az él, ami a forrás node lefutásakor **új hatókört nyit**: a `fan_out`
@@ -304,6 +313,14 @@ function applyFanOutExpanded(
 // `exit` élek `live`, a maradék (`on_error`) `dead` jelölést kap a `loop`
 // példány saját kontextusában.
 //
+// **A jelölés kontextusa itt is a visszaél szabályt követi** (SPEC-004 4.6, "A
+// `loop` kimenő éleinek jelölése a visszaél szabályt követi"): ha a kimenő él
+// egy másik `loop` visszaéle (beágyazott `loop`, amelynek `exit` éle a külső
+// `loop`-ra mutat), a jelölés a cél `loop` külső kontextusába kerül
+// (`markContextOnEdge`). Enélkül a belső `loop` kilépő jelölése a külső törzs
+// kontextusában maradna, és a külső `loop` nem kapna újabb lefutást (mérve,
+// `docs/research/2026-10-21-spec010-blokkolo-meresek.md` 8.3 szekció 3. pont).
+//
 // A 4.6 4. és 5. pontja az adott iteráció **nem választott** ágára `dead`
 // jelölést mond, de az iterációnkénti jelölés nem végleges, a `dead` jelölés
 // viszont a 4.4 3. pontja szerint azonnal halottá tenné a cél példányt:
@@ -332,7 +349,12 @@ function applyLoopAdvanced(
   if (!shouldContinue) {
     for (const edge of outgoing) {
       if (edge.branchKey !== 'continue') {
-        placeMark(batch, edge, instance.branchContext, edge.branchKey === 'exit' ? 'live' : 'dead');
+        placeMark(
+          batch,
+          edge,
+          markContextOnEdge(batch, instance.branchContext, edge),
+          edge.branchKey === 'exit' ? 'live' : 'dead',
+        );
       }
     }
     return;
@@ -344,7 +366,7 @@ function applyLoopAdvanced(
 
   for (const edge of outgoing) {
     if (edge.branchKey === 'continue') {
-      placeMark(batch, edge, bodyContext, 'live');
+      placeMark(batch, edge, markContextOnEdge(batch, bodyContext, edge), 'live');
     }
   }
 }

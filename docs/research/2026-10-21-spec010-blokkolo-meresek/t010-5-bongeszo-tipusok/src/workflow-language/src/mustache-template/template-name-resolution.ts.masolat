@@ -1,0 +1,4 @@
+/**
+ * Egy Mustache név feloldásának eredménye: talált érték vagy nincs találat.
+ */
+export type TemplateNameResolution = { readonly found: true; readonly value: unknown } | { readonly found: false };

@@ -1,0 +1,66 @@
+
+ RUN  v4.1.11 /sessions/vigilant-clever-mendel/wt/m4
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > A: legfelső szintű loop, kétszer iterál (FOLYTAT-2)
+### A status=succeeded
+PORT#1 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#5 {"port":"expression","text":"FOLYTAT-2","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#6 {"port":"template","text":"VEGE","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{\"tema\":\"x\"},\"steps\":{\"lp\":null,\"start\":{\"tema\":\"x\"}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded"}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded"}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"succeeded"}
+STEP_RUN {"nodeId":"vege","iteration":0,"status":"succeeded"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":5}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":5}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > B: beágyazott loop (külső FOLYTAT-1, belső BELSO-2): a belső loop saját kifejezése mit lát
+### B status=succeeded errorKind=null
+PORT#1 {"port":"expression","text":"FOLYTAT-1","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded"}
+STEP_RUN {"nodeId":"kulso","iteration":0,"status":"succeeded"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":5}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > C-on_error: állandó igaz kifejezés (FOLYTAT-99), maxIterations 2
+### C-on_error status=failed errorKind=retry_attempts_exhausted
+PORT#1 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"failed","errorKind":"loop_max_iterations_reached"}
+STEP_RUN {"nodeId":"eh","iteration":0,"status":"failed","errorKind":"retry_attempts_exhausted"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":2}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":2}}
+
+stdout | src/engine-port/t010-4-probe.spec.ts > T-010-4 próba > D-fail_run: állandó igaz kifejezés (FOLYTAT-99), maxIterations 2
+### D-fail_run status=failed errorKind=loop_max_iterations_reached
+PORT#1 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#2 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"0","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":0,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#3 {"port":"expression","text":"FOLYTAT-99","iterationPresent":true,"iterationType":"undefined","iterationValue":"undefined","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"start","contextJson":"{\"input\":{},\"steps\":{\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":\"<undefined>\",\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+PORT#4 {"port":"template","text":"TORZS","iterationPresent":true,"iterationType":"number","iterationValue":"1","itemIndexType":"undefined","keys":"input,steps,item,itemIndex,iteration,joinInputs,error","stepsKeys":"lp,start","contextJson":"{\"input\":{},\"steps\":{\"lp\":null,\"start\":{}},\"item\":\"<undefined>\",\"itemIndex\":\"<undefined>\",\"iteration\":1,\"joinInputs\":\"<undefined>\",\"error\":\"<undefined>\"}"}
+STEP_RUN {"nodeId":"start","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":0,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"torzs","iteration":1,"status":"succeeded","errorKind":null}
+STEP_RUN {"nodeId":"lp","iteration":2,"status":"failed","errorKind":"loop_max_iterations_reached"}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":0,"maxIterations":2}}
+EVENT {"kind":"loop_iteration_started","payload":{"iteration":1,"maxIterations":2}}
+
+ ✓  @easter-workflow-builder/engine  src/engine-port/t010-4-probe.spec.ts (4 tests) 72ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  19:56:06
+   Duration  1.05s (transform 567ms, setup 0ms, import 898ms, tests 72ms, environment 0ms)
+

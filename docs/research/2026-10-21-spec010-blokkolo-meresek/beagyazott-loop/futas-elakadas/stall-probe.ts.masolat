@@ -1,0 +1,56 @@
+// MERO PROBA (eldobhato, nem commitolt): terminalis futasnal keresi az elakadt peldanyokat.
+import { appendFileSync } from 'node:fs';
+import { expect } from 'vitest';
+import type { BranchContext, BranchScope } from '../branch-scope/branch-scope.ts';
+import { resolveInstanceReadiness } from '../scheduling/resolve-instance-readiness.ts';
+import type { RunTopology } from '../scheduling/run-topology.ts';
+import type { SchedulerState } from '../scheduling/scheduler-state.ts';
+
+function decodeKey(key: string): { id: string; ctx: BranchContext } {
+  const parsed: unknown = JSON.parse(key);
+  const [id, scopes] = parsed as [string, [string, string, number][]];
+  const ctx: BranchContext = scopes.map(([kind, stepRunId, n]): BranchScope =>
+    kind === 'fan_out' ? { kind: 'fan_out', stepRunId, itemIndex: n } : { kind: 'loop', stepRunId, iteration: n },
+  );
+  return { id, ctx };
+}
+
+export function probeStall(
+  state: SchedulerState,
+  topology: RunTopology,
+  meta: { status: string; stopRequested: boolean; failRunRequested: boolean; runId: string },
+): void {
+  const edgesById = new Map<string, { id: string; targetNodeId: string }>();
+  for (const edges of topology.graph.outgoingEdges.values()) {
+    for (const e of edges) edgesById.set(e.id, e);
+  }
+  const live: string[] = [];
+  const any: string[] = [];
+  for (const [key, mark] of state.edgeMarks) {
+    const { id, ctx } = decodeKey(key);
+    const edge = edgesById.get(id);
+    if (edge === undefined) continue;
+    const targetType = topology.graph.nodesById.get(edge.targetNodeId)?.type;
+    const instance = {
+      nodeId: edge.targetNodeId,
+      branchContext: targetType === 'join' ? ctx.slice(0, -1) : ctx,
+    };
+    const readiness = resolveInstanceReadiness(state, topology, instance);
+    if (readiness === 'waiting') {
+      const desc = `${id}:${mark}->${edge.targetNodeId}@${ctx.length}`;
+      any.push(desc);
+      if (mark === 'live') live.push(desc);
+    }
+  }
+  if (any.length === 0) return;
+  const line = JSON.stringify({
+    test: expect.getState().currentTestName,
+    file: expect.getState().testPath?.split('/').slice(-3).join('/'),
+    status: meta.status,
+    stop: meta.stopRequested,
+    failRun: meta.failRunRequested,
+    liveStalled: live,
+    anyStalled: any,
+  });
+  appendFileSync('/tmp/stallprobe/out.jsonl', line + '\n');
+}

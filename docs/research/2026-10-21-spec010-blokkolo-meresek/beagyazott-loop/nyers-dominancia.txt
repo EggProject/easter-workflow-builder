@@ -1,0 +1,217 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/sessions/vigilant-clever-mendel/wt/m4[39m
+
+[90mstdout[2m | src/engine-port/nested-loop-dominator-probe.spec.ts[2m > [22m[2mbeágyazott loop próba, dominancia alapú visszaél (vi.mock)[2m > [22m[2mk_kontroll_egyszintu_loop
+[22m[39m### k_kontroll_egyszintu_loop
+BACK_EDGES ["e3"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(belso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S7 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(belso)
+EVENT step_finished S2(belso)
+EVENT loop_iteration_started S2(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(torzs)
+EVENT sdk_system S3(torzs)
+EVENT sdk_result S3(torzs)
+EVENT step_finished S3(torzs)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(belso)
+EVENT step_finished S6(belso)
+EVENT step_started S7(vege)
+EVENT sdk_system S7(vege)
+EVENT sdk_result S7(vege)
+EVENT step_finished S7(vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+[90mstdout[2m | src/engine-port/nested-loop-dominator-probe.spec.ts[2m > [22m[2mbeágyazott loop próba, dominancia alapú visszaél (vi.mock)[2m > [22m[2ma_belso_exit_kozvetlenul_a_kulsore
+[22m[39m### a_belso_exit_kozvetlenul_a_kulsore
+BACK_EDGES ["e4","e5"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S3(belso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S5(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"kulso,start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(belso)
+EVENT step_finished S3(belso)
+EVENT loop_iteration_started S3(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S4(torzs)
+EVENT sdk_system S4(torzs)
+EVENT sdk_result S4(torzs)
+EVENT step_finished S4(torzs)
+EVENT step_started S5(belso)
+EVENT step_finished S5(belso)
+EVENT loop_iteration_started S5(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S6(torzs)
+EVENT sdk_system S6(torzs)
+EVENT sdk_result S6(torzs)
+EVENT step_finished S6(torzs)
+EVENT step_started S7(belso)
+EVENT step_finished S7(belso)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+[90mstdout[2m | src/engine-port/nested-loop-dominator-probe.spec.ts[2m > [22m[2mbeágyazott loop próba, dominancia alapú visszaél (vi.mock)[2m > [22m[2mb_belso_exit_koztes_nodeon_at
+[22m[39m### b_belso_exit_koztes_nodeon_at
+BACK_EDGES ["e5","e7"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S6(belso)","errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"koztes","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S10 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S11 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S5(torzs)
+EVENT sdk_system S5(torzs)
+EVENT sdk_result S5(torzs)
+EVENT step_finished S5(torzs)
+EVENT step_started S6(belso)
+EVENT step_finished S6(belso)
+EVENT loop_iteration_started S6(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S7(torzs)
+EVENT sdk_system S7(torzs)
+EVENT sdk_result S7(torzs)
+EVENT step_finished S7(torzs)
+EVENT step_started S8(belso)
+EVENT step_finished S8(belso)
+EVENT step_started S9(koztes)
+EVENT sdk_system S9(koztes)
+EVENT sdk_result S9(koztes)
+EVENT step_finished S9(koztes)
+EVENT step_started S10(kulso)
+EVENT step_finished S10(kulso)
+EVENT step_started S11(vege)
+EVENT sdk_system S11(vege)
+EVENT sdk_result S11(vege)
+EVENT step_finished S11(vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+[90mstdout[2m | src/engine-port/nested-loop-dominator-probe.spec.ts[2m > [22m[2mbeágyazott loop próba, dominancia alapú visszaél (vi.mock)[2m > [22m[2mc_villa_belso_exit_nem_ter_vissza
+[22m[39m### c_villa_belso_exit_nem_ter_vissza
+BACK_EDGES ["e5","e8"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"visszavez","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S10 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S8(belso)","errorKind":null}
+STEP_RUN S11 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S12 {"nodeId":"belso_vege","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EVENT run_started -
+EVENT step_started S1(start)
+EVENT step_finished S1(start)
+EVENT step_started S2(kulso)
+EVENT step_finished S2(kulso)
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT step_started S3(elo)
+EVENT sdk_system S3(elo)
+EVENT sdk_result S3(elo)
+EVENT step_finished S3(elo)
+EVENT step_started S4(belso)
+EVENT step_finished S4(belso)
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT step_started S5(visszavez)
+EVENT sdk_system S5(visszavez)
+EVENT sdk_result S5(visszavez)
+EVENT step_started S6(torzs)
+EVENT sdk_system S6(torzs)
+EVENT sdk_result S6(torzs)
+EVENT step_finished S5(visszavez)
+EVENT step_finished S6(torzs)
+EVENT step_started S7(kulso)
+EVENT step_finished S7(kulso)
+EVENT step_started S8(belso)
+EVENT step_finished S8(belso)
+EVENT loop_iteration_started S8(belso) {"iteration":1,"maxIterations":5}
+EVENT step_started S9(vege)
+EVENT sdk_system S9(vege)
+EVENT sdk_result S9(vege)
+EVENT step_started S10(torzs)
+EVENT sdk_system S10(torzs)
+EVENT sdk_result S10(torzs)
+EVENT step_finished S9(vege)
+EVENT step_finished S10(torzs)
+EVENT step_started S11(belso)
+EVENT step_finished S11(belso)
+EVENT step_started S12(belso_vege)
+EVENT sdk_system S12(belso_vege)
+EVENT sdk_result S12(belso_vege)
+EVENT step_finished S12(belso_vege)
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+
+ [32m✓[39m [30m[42m @easter-workflow-builder/engine [49m[39m src/engine-port/nested-loop-dominator-probe.spec.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 20:37:36
+[2m   Duration [22m 1.48s[2m (transform 886ms, setup 0ms, import 1.29s, tests 103ms, environment 0ms)[22m
+

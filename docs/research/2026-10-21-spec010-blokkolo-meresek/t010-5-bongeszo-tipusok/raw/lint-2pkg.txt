@@ -1,0 +1,64 @@
+• turbo 2.10.12
+
+   • Packages in scope: @easter-workflow-builder/web, @easter-workflow-builder/workflow-language
+   • Running lint in 2 packages
+   • Remote caching disabled, using shared worktree cache
+
+@easter-workflow-builder/typeguards:typecheck: cache miss, executing 73881ee85367f49f
+@easter-workflow-builder/typeguards:typecheck: $ tsc --noEmit
+@easter-workflow-builder/ui:typecheck: cache miss, executing f985ce611ec5179c
+@easter-workflow-builder/ui:typecheck: $ tsc --noEmit
+@easter-workflow-builder/core:typecheck: cache miss, executing 99c4a4a6c4138241
+@easter-workflow-builder/core:typecheck: $ tsc --noEmit
+@easter-workflow-builder/protocol:typecheck: cache miss, executing 96cb3a446b3a7711
+@easter-workflow-builder/protocol:typecheck: $ tsc --noEmit
+@easter-workflow-builder/workflow-language:typecheck: cache miss, executing 87bc400289cef756
+@easter-workflow-builder/workflow-language:typecheck: $ tsc --noEmit
+@easter-workflow-builder/workflow-language:lint: cache miss, executing 67f767fc049bf661
+@easter-workflow-builder/workflow-language:lint: $ eslint .
+@easter-workflow-builder/workflow-language:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/cel-expression/create-cel-expression-evaluator.ts
+@easter-workflow-builder/workflow-language:lint:    5:1  error  Use a multiline block comment  unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint:   19:1  error  Use a multiline block comment  unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/cel-expression/run-context-variable-names.ts
+@easter-workflow-builder/workflow-language:lint:   1:1  error  Use a multiline block comment  unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/create-mustache-template-renderer.spec.ts
+@easter-workflow-builder/workflow-language:lint:   7:64  error  Use `undefined` instead of `null`  unicorn/no-null
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/create-mustache-template-renderer.ts
+@easter-workflow-builder/workflow-language:lint:    6:1  error  Use a multiline block comment                 unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint:   16:1  error  Use a multiline block comment                 unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint:   18:3  error  Assignment to member of namespace 'Mustache'  import-x/namespace
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/missing-template-name-error.ts
+@easter-workflow-builder/workflow-language:lint:   1:1  error  Use a multiline block comment  unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/own-property-context.ts
+@easter-workflow-builder/workflow-language:lint:   25:3   error  Use a multiline block comment                    unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint:   32:14  error  Do not assign `this` to `context`                unicorn/no-this-assignment
+@easter-workflow-builder/workflow-language:lint:   32:14  error  Unexpected aliasing of 'this' to local variable  @typescript-eslint/no-this-alias
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/strict-writer.ts
+@easter-workflow-builder/workflow-language:lint:   25:3  error  Expected private method `#plainValue` to come before public method `unescapedValue`  unicorn/consistent-class-member-order
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: /sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language/src/mustache-template/template-name-resolution.ts
+@easter-workflow-builder/workflow-language:lint:   1:1  error  Use a multiline block comment  unicorn/single-line-block-comment-style
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: ✖ 13 problems (13 errors, 0 warnings)
+@easter-workflow-builder/workflow-language:lint:   8 errors and 0 warnings potentially fixable with the `--fix` option.
+@easter-workflow-builder/workflow-language:lint: 
+@easter-workflow-builder/workflow-language:lint: error: script "lint" exited with code 1
+@easter-workflow-builder/web:lint: cache miss, executing f9b87abc888cc1cb
+@easter-workflow-builder/workflow-language#lint:  ERROR  command (/sessions/vigilant-clever-mendel/wt/m2/packages/workflow-language) /sessions/vigilant-clever-mendel/.bun/bin/bun run lint exited (1)
+
+ Tasks:    5 successful, 7 total
+Cached:    0 cached, 7 total
+  Time:    14.94s 
+Failed:    @easter-workflow-builder/workflow-language#lint
+
+ ERROR  run failed: command  exited (1)

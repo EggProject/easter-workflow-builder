@@ -35,7 +35,7 @@ function topologyOf(nodes: readonly SnapshotNode[], edges: readonly SnapshotEdge
     nodes,
     edges,
   });
-  const loopBackEdgeIds = findLoopBackEdges(graph);
+  const loopBackEdgeIds = findLoopBackEdges(graph, 'start');
   const balance = validateScopeBalance(graph, 'start', loopBackEdgeIds);
   if (balance.kind === 'error') {
     throw new Error(balance.message);
@@ -591,6 +591,74 @@ describe('advanceScheduler', () => {
     });
 
     expect(executed).toStrictEqual(['start', 'lo', 'li@l0', 'other@l0', 'ib@l0/l0', 'lo', 'li@l0', 'vege', 'lifin@l0']);
+  });
+
+  // SPEC-004 4.6 (a) alak, 17. szekció 11b: a belső loop `exit` éle a külső
+  // loop visszaéle, tehát a kilépő jelölés a külső loop külső kontextusába kerül,
+  // és a külső loop újabb lefutást kap.
+  it('a belső loop kilépő lefutásának exit jelölése, ha az a külső loop visszaéle, a külső loop külső kontextusába kerül', () => {
+    const topology = topologyOf(
+      [
+        node('start', 'start'),
+        node('kulso', 'loop'),
+        node('belso', 'loop'),
+        node('torzs', 'agent_step'),
+        node('vege', 'agent_step'),
+      ],
+      [
+        edge('e1', 'start', 'kulso'),
+        edge('e2', 'kulso', 'belso', 'continue'),
+        edge('e3', 'belso', 'torzs', 'continue'),
+        edge('e4', 'torzs', 'belso'),
+        edge('e5', 'belso', 'kulso', 'exit'),
+        edge('e6', 'kulso', 'vege', 'exit'),
+      ],
+    );
+
+    const { executed, state } = playRun(topology, (instance, current) => {
+      if (instance.nodeId !== 'kulso' && instance.nodeId !== 'belso') {
+        return completeAll(topology, instance);
+      }
+      const iteration = resolveLoopIteration(current, instance);
+      const limit = instance.nodeId === 'kulso' ? 1 : 2;
+      return {
+        kind: 'loop_advanced',
+        instance,
+        stepRunId: `sr-${instance.nodeId}-${String(iteration)}`,
+        shouldContinue: iteration < limit,
+      };
+    });
+
+    expect(topology.loopBackEdgeIds).toStrictEqual(new Set(['e4', 'e5']));
+    expect(executed).toStrictEqual([
+      'start',
+      'kulso',
+      'belso@l0',
+      'torzs@l0/l0',
+      'belso@l0',
+      'torzs@l0/l1',
+      'belso@l0',
+      'kulso',
+      'vege',
+    ]);
+    expect(state.edgeMarks.get(buildScopedKey('e5', ROOT))).toBe('live');
+  });
+
+  it('a loop önmagára mutató continue éle a loop saját kontextusában indít újabb lefutást', () => {
+    const topology = topologyOf(
+      [node('start', 'start'), node('l', 'loop'), node('vege', 'agent_step')],
+      [edge('e1', 'start', 'l'), edge('e2', 'l', 'l', 'continue'), edge('e3', 'l', 'vege', 'exit')],
+    );
+
+    const { executed } = playRun(topology, (instance, current) => {
+      if (instance.nodeId !== 'l') {
+        return completeAll(topology, instance);
+      }
+      const iteration = resolveLoopIteration(current, instance);
+      return { kind: 'loop_advanced', instance, stepRunId: `sr-l-${String(iteration)}`, shouldContinue: iteration < 2 };
+    });
+
+    expect(executed).toStrictEqual(['start', 'l', 'l', 'l', 'vege']);
   });
 
   it('outgoing_marks_deferred esetén a jelöletlen élen álló leszármazott vár, akkor is, ha másik éle live', () => {

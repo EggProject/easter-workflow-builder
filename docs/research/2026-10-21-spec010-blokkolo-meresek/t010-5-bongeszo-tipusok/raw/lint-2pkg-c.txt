@@ -1,0 +1,39 @@
+• turbo 2.10.12
+
+   • Packages in scope: @easter-workflow-builder/web, @easter-workflow-builder/workflow-language
+   • Running lint, typecheck in 2 packages
+   • Remote caching disabled, using shared worktree cache
+
+@easter-workflow-builder/ui:typecheck: cache hit, replaying logs f985ce611ec5179c
+@easter-workflow-builder/ui:typecheck: $ tsc --noEmit
+@easter-workflow-builder/typeguards:typecheck: cache hit, replaying logs 73881ee85367f49f
+@easter-workflow-builder/typeguards:typecheck: $ tsc --noEmit
+@easter-workflow-builder/core:typecheck: cache hit, replaying logs 99c4a4a6c4138241
+@easter-workflow-builder/core:typecheck: $ tsc --noEmit
+@easter-workflow-builder/protocol:typecheck: cache hit, replaying logs 96cb3a446b3a7711
+@easter-workflow-builder/protocol:typecheck: $ tsc --noEmit
+@easter-workflow-builder/workflow-language:lint: cache miss, executing 7b2c8fe56aab3ac8
+@easter-workflow-builder/workflow-language:lint: $ eslint .
+@easter-workflow-builder/workflow-language:lint: Dependency "@types/node" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "typescript" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:lint: Dependency "vitest" could not be resolved for catalog "default"
+@easter-workflow-builder/workflow-language:typecheck: cache miss, executing 4033c2c49145693e
+@easter-workflow-builder/workflow-language:typecheck: $ tsc --noEmit
+@easter-workflow-builder/web:typecheck: cache miss, executing d7a552c245980d42
+@easter-workflow-builder/web:typecheck: $ tsc --noEmit && tsc --noEmit -p e2e && tsc --noEmit -p measurement
+@easter-workflow-builder/web:lint: cache miss, executing 1b9088b64573ad4d
+@easter-workflow-builder/web:lint: $ eslint .
+@easter-workflow-builder/web:lint: Dependency "@dagrejs/dagre" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@xyflow/react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "react-window" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@playwright/test" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@types/react" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "@types/react-dom" could not be resolved for catalog "default"
+@easter-workflow-builder/web:lint: Dependency "vitest" could not be resolved for catalog "default"
+
+ Tasks:    8 successful, 8 total
+Cached:    4 cached, 8 total
+  Time:    1m3.451s 
+

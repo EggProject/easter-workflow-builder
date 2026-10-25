@@ -1,0 +1,93 @@
+### k_kontroll_egyszintu_loop
+BACK_EDGES ["e3"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(belso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S7 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT loop_iteration_started S2(belso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S4(belso) {"iteration":1,"maxIterations":5}
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+### a_belso_exit_kozvetlenul_a_kulsore
+BACK_EDGES ["e4","e5"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S3(belso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S5(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"kulso,start"}
+EVENT run_started -
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S3(belso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S5(belso) {"iteration":1,"maxIterations":5}
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+### b_belso_exit_koztes_nodeon_at
+BACK_EDGES ["e5","e7"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S6(belso)","errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"koztes","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S10 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S11 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EVENT run_started -
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S6(belso) {"iteration":1,"maxIterations":5}
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}
+### c_villa_belso_exit_nem_ter_vissza
+BACK_EDGES ["e5","e8"]
+VALIDATE_RUN ok
+REPLACE_GRAPH ok (db mentés elfogadta)
+RUN status=succeeded errorKind=null
+STEP_RUN S1 {"nodeId":"start","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S2 {"nodeId":"kulso","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S3 {"nodeId":"elo","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S4 {"nodeId":"belso","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S5 {"nodeId":"visszavez","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S6 {"nodeId":"torzs","iteration":0,"attempt":1,"status":"succeeded","parent":"S4(belso)","errorKind":null}
+STEP_RUN S7 {"nodeId":"kulso","iteration":1,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S8 {"nodeId":"belso","iteration":1,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S9 {"nodeId":"vege","iteration":0,"attempt":1,"status":"succeeded","parent":null,"errorKind":null}
+STEP_RUN S10 {"nodeId":"torzs","iteration":1,"attempt":1,"status":"succeeded","parent":"S8(belso)","errorKind":null}
+STEP_RUN S11 {"nodeId":"belso","iteration":2,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+STEP_RUN S12 {"nodeId":"belso_vege","iteration":0,"attempt":1,"status":"succeeded","parent":"S2(kulso)","errorKind":null}
+EXPR {"text":"CIKLUS-1","decision":true,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start"}
+EXPR {"text":"CIKLUS-1","decision":false,"iteration":"undefined","stepsKeys":"start"}
+EXPR {"text":"CIKLUS-2","decision":true,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EXPR {"text":"CIKLUS-2","decision":false,"iteration":"0","stepsKeys":"elo,kulso,start,visszavez"}
+EVENT run_started -
+EVENT loop_iteration_started S2(kulso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S4(belso) {"iteration":0,"maxIterations":5}
+EVENT loop_iteration_started S8(belso) {"iteration":1,"maxIterations":5}
+EVENT run_finished - {"status":"succeeded","errorKind":null,"errorMessage":null,"failedBranchCount":0}

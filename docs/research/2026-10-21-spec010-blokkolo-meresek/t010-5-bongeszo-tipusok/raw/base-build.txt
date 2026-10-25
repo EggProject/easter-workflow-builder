@@ -1,0 +1,15 @@
+../../../../../../tmp/t5-base/assets/roboto-latin-900-normal-lk0O8k6m.woff2               21.91 kB
+../../../../../../tmp/t5-base/assets/roboto-latin-300-normal-CCzlftfr.woff2               22.07 kB
+../../../../../../tmp/t5-base/assets/roboto-latin-500-normal-7RbcRiD8.woff2               22.20 kB
+../../../../../../tmp/t5-base/assets/jetbrains-mono-latin-400-italic-B9rkokqX.woff2       22.22 kB
+../../../../../../tmp/t5-base/assets/roboto-latin-700-normal-BZpUvMxY.woff2               22.24 kB
+../../../../../../tmp/t5-base/assets/roboto-latin-400-italic-CSuqwwKr.woff2               23.67 kB
+../../../../../../tmp/t5-base/assets/index-CWWraUjQ.css                                  110.12 kB │ gzip:  17.54 kB
+../../../../../../tmp/t5-base/assets/index-C0PH5FwK.js                                   712.19 kB │ gzip: 217.56 kB │ map: 3,600.26 kB
+
+✓ built in 352ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
