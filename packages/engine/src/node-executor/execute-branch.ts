@@ -42,19 +42,19 @@ interface BranchTarget {
 }
 
 /**
- * A kiértékelt kifejezés eredményét a bekötött élekhez illeszti (SPEC-004
- * 5. szekció 3. sora). Ha az eredmény nem string, az sosem illeszkedhet
- * kulcshoz - ez nem külön hibaeset, hanem "nincs egyezés", ugyanúgy, mintha
- * egy string eredmény nem szerepelne az élek között; a spec csak azt mondja
- * ki, hogy az eredmény "várhatóan string", nem nevez meg külön hibaosztályt a
- * típuseltérésre.
+ * A kiértékelt, már stringre szűkített kifejezés eredményét a bekötött
+ * élekhez illeszti (SPEC-004 5. szekció 3. sora). A nem string eredmény ide
+ * el sem jut: az `expression_evaluation_failed` hibával bukik (SPEC-010 7.5,
+ * O-6 lezárva, user döntés 2026-09-23). A string, de egyetlen élhez sem
+ * illeszkedő eredményre változatlanul a `defaultBranchKey` dönt, ennek
+ * hiányában a hívó `branch_no_matching_edge` hibát ad.
  */
 function resolveBranchTarget(
-  evaluated: unknown,
+  evaluated: string,
   config: BranchNodeConfig,
   availableBranchKeys: readonly string[],
 ): BranchTarget | undefined {
-  if (isString(evaluated) && availableBranchKeys.includes(evaluated)) {
+  if (availableBranchKeys.includes(evaluated)) {
     return { key: evaluated, usedDefault: false };
   }
   if (config.defaultBranchKey !== null && availableBranchKeys.includes(config.defaultBranchKey)) {
@@ -127,6 +127,14 @@ export function executeBranch(input: ExecuteBranchInput, ports: NodeExecutorPort
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
       `A(z) "${nodeId}" branch node "${config.expression}" kifejezésének kiértékelése sikertelen: ${evaluated.message}`,
+    );
+    return failBranch(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
+  }
+
+  if (!isString(evaluated.value)) {
+    const errorMessage = formatEngineErrorMessage(
+      'expression_evaluation_failed',
+      `A(z) "${nodeId}" branch node kifejezésének eredménye nem szöveg, ezért nem illeszthető egyetlen ág kulcsához sem`,
     );
     return failBranch(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }

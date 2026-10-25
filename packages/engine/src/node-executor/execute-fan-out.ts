@@ -41,8 +41,8 @@ function failFanOut(
  * tárolja"). **A séma nem tárolja a renderelt címkéket**: sem a
  * `FanOutExpandedPayload` (csak `itemCount`), sem a `step_run` tábla nem
  * hordoz erre oszlopot, tehát a renderelt szöveg eldobódik - ez tudatos
- * döntés, nem hiányosság: a `templateRenderer.compile` már a futás indítási
- * validáció szakaszában (jövőbeli lépés) ellenőrizhetné a sablon szintaxist,
+ * döntés, nem hiányosság: a sablon szintaxisát a `templateRenderer.compile`
+ * már a futás indításakor ellenőrzi (SPEC-010 9.2, `validateLanguageFields`),
  * ez a téma csak az elemenkénti renderelés sikerét kényszeríti ki.
  */
 function renderItemLabels(

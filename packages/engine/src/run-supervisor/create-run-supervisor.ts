@@ -7,6 +7,7 @@ import type { ValidatedRun } from '../run-validation/validated-run.ts';
 import type { NodeExecutorDependencies } from '../node-executor/node-executor-dependencies.ts';
 import { resolveEffectiveProvider } from '../provider-resolution/resolve-effective-provider.ts';
 import { cancelActiveRunTree } from '../run-interrupt/cancel-active-run-tree.ts';
+import { validateLanguageFields } from '../run-validation/validate-language-fields.ts';
 import { validateRun } from '../run-validation/validate-run.ts';
 import { createSchedulerState } from '../scheduling/create-scheduler-state.ts';
 import { enqueueStartInstance } from '../scheduling/enqueue-start-instance.ts';
@@ -157,6 +158,13 @@ export function createRunSupervisor(dependencies: RunSupervisorDependencies): Ru
     );
     if (validated.kind === 'error') {
       return validated;
+    }
+
+    // 3. (a sablon és a kifejezés mezők fordítása, SPEC-010 9.2). A két portot
+    //    a `validateRun` nem kapja meg, ezért fut itt, közvetlenül utána.
+    const languageFields = validateLanguageFields(validated.value.nodeConfigsById, ports);
+    if (languageFields.kind === 'error') {
+      return languageFields;
     }
 
     // 3. (provider validáció, 11.2) és 4. (a bemenet ellenőrzése).

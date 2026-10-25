@@ -188,6 +188,41 @@ describe('executeBranch', () => {
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('branch_no_matching_edge');
   });
 
+  it('nem string eredményre expression_evaluation_failed hibaosztállyal zár, alapértelmezett ág mellett is (SPEC-010 O-6)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const ports = portsOf(database, published, () => ({ kind: 'ok', value: 42 }));
+    const baseInput = inputOf(runId);
+    const request = inputOf(runId, { config: { ...baseInput.config, defaultBranchKey: 'a' } });
+
+    const outcome = okOrThrow(executeBranch(request, ports));
+
+    expect(outcome.kind).toBe('failed');
+    expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
+    expect(outcome.kind === 'failed' ? outcome.errorMessage : '').toBe(
+      'A(z) "branch" branch node kifejezésének eredménye nem szöveg, ezért nem illeszthető egyetlen ág kulcsához sem (expression_evaluation_failed).',
+    );
+    expect(published).not.toContainEqual(expect.objectContaining({ kind: 'branch_taken' }));
+  });
+
+  it('string, de nem illeszkedő eredményre alapértelmezett ág nélkül változatlanul branch_no_matching_edge (SPEC-010 O-6)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const ports = portsOf(database, published, () => ({ kind: 'ok', value: 'b' }));
+    const baseInput = inputOf(runId);
+    const request = inputOf(runId, {
+      availableBranchKeys: ['a'],
+      config: { ...baseInput.config, branches: [...baseInput.config.branches, { key: 'b', label: 'B' }] },
+    });
+
+    const outcome = okOrThrow(executeBranch(request, ports));
+
+    expect(outcome.kind).toBe('failed');
+    expect(outcome.kind === 'failed' && outcome.errorKind).toBe('branch_no_matching_edge');
+  });
+
   it('a begin fázis hibáját továbbadja (nem létező runId)', () => {
     const database = openMemoryDatabase();
     const published: unknown[] = [];

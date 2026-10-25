@@ -155,6 +155,17 @@ function fakeRunner(interruptedPrompts: string[]): AgentQueryRunner {
 }
 
 /**
+ * A két hamis port közös `compile` metódusa: a `FORDITHATATLAN` szöveget
+ * fordítási hibával utasítja el, minden mást elfogad.
+ */
+const UNCOMPILABLE = 'FORDITHATATLAN';
+function compileUnlessUncompilable(source: string): Outcome<void> {
+  return source === UNCOMPILABLE
+    ? { kind: 'error', message: 'a csomag hibaleírása' }
+    : { kind: 'ok', value: undefined };
+}
+
+/**
  * A hamis kifejezés kiértékelő: a kifejezés maga JSON literál, tehát a teszt
  * gráf közvetlenül írja le a döntést. Két különleges érték van: a `HIBA`
  * kiértékelési hibát ad, a `MEG-EGYSZER` pedig egy visszaszámlálót, ami
@@ -174,7 +185,7 @@ function fakeEvaluator(): ExpressionEvaluatorPort {
       const value: unknown = JSON.parse(expression);
       return { kind: 'ok', value };
     },
-    compile: () => ({ kind: 'ok', value: undefined }),
+    compile: compileUnlessUncompilable,
   };
 }
 
@@ -322,7 +333,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
     expressionEvaluator: fakeEvaluator(),
     templateRenderer: {
       render: (template) => ({ kind: 'ok', value: template }),
-      compile: () => ({ kind: 'ok', value: undefined }),
+      compile: compileUnlessUncompilable,
     },
     eventPublisher: publisher,
     clock: fakeClock(sleepCalls),
@@ -703,6 +714,165 @@ describe('createRunSupervisor', () => {
 
       expect(outcome.kind === 'error' ? outcome.message : '').toContain('provider_descriptor_sdk_mismatch');
       expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+    });
+  });
+
+  describe('a sablon és a kifejezés mezők fordítása az indításkor (SPEC-010 9.2)', () => {
+    const START_EDGE = edgeOf('e1', 'start', 'cel');
+    const FAN_OUT_EDGES = [edgeOf('e1', 'start', 'cel'), edgeOf('e2', 'cel', 'elem'), edgeOf('e3', 'elem', 'j')];
+
+    it.each([
+      {
+        nodeId: 'cel',
+        field: 'promptTemplate',
+        errorKind: 'template_render_failed',
+        nodes: [startNode('start'), agentNode('cel', UNCOMPILABLE)],
+        edges: [START_EDGE],
+      },
+      {
+        nodeId: 'j',
+        field: 'settings.promptTemplate',
+        errorKind: 'template_render_failed',
+        nodes: [
+          startNode('start'),
+          fanOutNode('cel', '[1,2]'),
+          agentNode('elem', 'sikeres'),
+          nodeOf('j', {
+            type: 'join',
+            mode: 'ai_synthesis',
+            settings: agentStepConfig(UNCOMPILABLE),
+            onUnhandledError: 'fail_run',
+          }),
+        ],
+        edges: FAN_OUT_EDGES,
+      },
+      {
+        nodeId: 'cel',
+        field: 'bodyTemplate',
+        errorKind: 'template_render_failed',
+        nodes: [
+          startNode('start'),
+          nodeOf('cel', {
+            type: 'human_approval',
+            title: 'Kell egy döntés',
+            bodyTemplate: UNCOMPILABLE,
+            timeoutMs: null,
+            onUnhandledError: 'fail_run',
+          }),
+        ],
+        edges: [START_EDGE],
+      },
+      {
+        nodeId: 'cel',
+        field: 'branchLabelTemplate',
+        errorKind: 'template_render_failed',
+        nodes: [
+          startNode('start'),
+          nodeOf('cel', {
+            type: 'fan_out',
+            itemsExpression: '[1,2]',
+            branchLabelTemplate: UNCOMPILABLE,
+            onUnhandledError: 'fail_run',
+          }),
+          agentNode('elem', 'sikeres'),
+          joinMergeNode('j'),
+        ],
+        edges: FAN_OUT_EDGES,
+      },
+      {
+        nodeId: 'cel',
+        field: 'expression',
+        errorKind: 'expression_evaluation_failed',
+        nodes: [startNode('start'), branchNode('cel', UNCOMPILABLE, ['bal']), agentNode('bal', 'sikeres')],
+        edges: [START_EDGE, edgeOf('e2', 'cel', 'bal', 'bal')],
+      },
+      {
+        nodeId: 'cel',
+        field: 'itemsExpression',
+        errorKind: 'expression_evaluation_failed',
+        nodes: [startNode('start'), fanOutNode('cel', UNCOMPILABLE), agentNode('elem', 'sikeres'), joinMergeNode('j')],
+        edges: FAN_OUT_EDGES,
+      },
+      {
+        nodeId: 'cel',
+        field: 'continueExpression',
+        errorKind: 'expression_evaluation_failed',
+        nodes: [
+          startNode('start'),
+          loopNode('cel', UNCOMPILABLE, 5),
+          agentNode('torzs', 'sikeres'),
+          agentNode('vege', 'sikeres'),
+        ],
+        edges: [
+          START_EDGE,
+          edgeOf('e2', 'cel', 'torzs', 'continue'),
+          edgeOf('e3', 'torzs', 'cel'),
+          edgeOf('e4', 'cel', 'vege', 'exit'),
+        ],
+      },
+    ])(
+      'a(z) $field mező fordítási hibája $errorKind osztállyal elutasítja az indítást, és nem jön létre workflow_run sor',
+      ({ nodeId, field, errorKind, nodes, edges }) => {
+        const harness = openHarness();
+        const workflowId = createWorkflow(harness.database, `forditas-${field}`, nodes, edges);
+
+        const outcome = harness.supervisor.startRun({ workflowId, input: {} });
+
+        expect(outcome).toStrictEqual({
+          kind: 'error',
+          message: `A(z) ${nodeId} csomópont ${field} mezője nem fordítható le: a csomag hibaleírása (${errorKind}).`,
+        });
+        expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+        expect(harness.published).toStrictEqual([]);
+      },
+    );
+
+    it('a gyerek futás indítása ugyanezt az ellenőrzést futtatja: közvetlenül hívva elutasít, workflow_run sor nélkül', async () => {
+      const harness = openHarness();
+      const childId = createWorkflow(
+        harness.database,
+        'gyerek-fordithatatlan',
+        [startNode('start'), agentNode('cel', UNCOMPILABLE)],
+        [START_EDGE],
+      );
+
+      const child = await harness.supervisor.startChildRun({
+        targetWorkflowId: childId,
+        input: {},
+        parent: { rootRunId: 'szulo', depth: 0, workflowAncestry: [] },
+        parentRunId: 'szulo',
+      });
+
+      expect(child).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) cel csomópont promptTemplate mezője nem fordítható le: a csomag hibaleírása (template_render_failed).',
+      });
+      expect(okOrThrow(harness.database.runs.listRuns())).toStrictEqual([]);
+    });
+
+    it('a fordíthatatlan gyerek workflow a szülő sub_workflow lépését sub_workflow_failed osztállyal bukatja, gyerek futás sor nélkül', async () => {
+      const harness = openHarness();
+      const childId = createWorkflow(
+        harness.database,
+        'gyerek-fordithatatlan',
+        [startNode('gy-start'), agentNode('gy-ac', UNCOMPILABLE)],
+        [edgeOf('gy-e1', 'gy-start', 'gy-ac')],
+      );
+      const parentId = createWorkflow(
+        harness.database,
+        'szulo-fordithatatlan-gyerekkel',
+        [startNode('sz-start'), subWorkflowNode('sz-sw', childId)],
+        [edgeOf('sz-e1', 'sz-start', 'sz-sw')],
+      );
+
+      const runId = await runToEnd(harness, parentId);
+
+      const subRow = stepRunsOf(harness.database, runId).find((row) => row.nodeId === 'sz-sw');
+      expect(subRow?.status).toBe('failed');
+      expect(subRow?.errorKind).toBe('sub_workflow_failed');
+      expect(subRow?.errorMessage).toContain('(template_render_failed)');
+      expect(okOrThrow(harness.database.runs.listRuns()).map((run) => run.id)).toStrictEqual([runId]);
     });
   });
 
