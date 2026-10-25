@@ -16,6 +16,7 @@ import { UnhandledErrorPolicyField } from './UnhandledErrorPolicyField.tsx';
 import { FieldErrorsContext } from './field-errors-context.ts';
 import { fieldErrorsFromZodError } from './field-errors-from-zod-error.ts';
 import { findBlankAgentDefinitionFields } from './find-blank-agent-definition-fields.ts';
+import { findLanguageFieldIssues } from './find-language-field-issues.ts';
 import './node-inspector.css';
 
 export interface NodeInspectorProperties {
@@ -156,10 +157,16 @@ export function NodeInspector(properties: Readonly<NodeInspectorProperties>): Re
   // `PUT` elutasítását adja, tehát egy üres kötelező szöveg mező is itt jelez.
   // Mellette az `agents` bejegyzések kötelező mezőinek űrlap oldali szabálya
   // (O-38), ugyanaz, amit a mentés előtti `validateGraphForSave` is futtat.
+  // Utánuk a sablon és kifejezés mezők fordítási hibája (SPEC-010 10.), csak a
+  // sémahelyes mezőkön, hogy a séma hibájú mező alatt a séma hibája álljon.
   const parsedConfig = NodeConfigSaveSchema.safeParse(node.config);
-  const issues = [
+  const schemaIssues = [
     ...(parsedConfig.success ? [] : parsedConfig.error.issues),
     ...findBlankAgentDefinitionFields(node.config),
+  ];
+  const issues = [
+    ...schemaIssues,
+    ...findLanguageFieldIssues(node.config, fieldErrorsFromZodError({ issues: schemaIssues })),
   ];
   const fieldErrors = issues.length === 0 ? NO_FIELD_ERRORS : fieldErrorsFromZodError({ issues });
 

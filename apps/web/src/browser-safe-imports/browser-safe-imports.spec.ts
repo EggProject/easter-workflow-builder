@@ -201,13 +201,15 @@ function nodeBuiltinOffenders(): readonly string[] {
 }
 
 describe('a böngészőbe kerülő kódút Node beépített modul mentes', () => {
-  it('az apps/web futásidejű workspace zárt halmaza a core, a protocol, a typeguards és a ui csomagot is tartalmazza', () => {
+  it('az apps/web futásidejű workspace zárt halmaza a core, a protocol, a typeguards, a ui és a workflow-language csomagot is tartalmazza', () => {
     const directories = browserReachablePackageDirectories().map((entry) => path.relative(REPO_ROOT, entry));
     expect(directories).toContain(path.join('apps', 'web'));
     expect(directories).toContain(path.join('packages', 'core'));
     expect(directories).toContain(path.join('packages', 'protocol'));
     expect(directories).toContain(path.join('packages', 'typeguards'));
     expect(directories).toContain(path.join('packages', 'ui'));
+    // A szerkesztő a sablon és kifejezés mezőket a böngészőben fordítja (SPEC-010 10., 16. szekció 8.).
+    expect(directories).toContain(path.join('packages', 'workflow-language'));
   });
 
   it('egyetlen termékkód fájl sem importál node: előtagú modult', () => {

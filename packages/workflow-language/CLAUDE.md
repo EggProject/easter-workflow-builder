@@ -22,18 +22,18 @@ nem függ (SPEC-010 3.1).
 L1 réteg (SPEC-002 4. szekció). Workspace függőség: `core` és `typeguards` (mindkettő L0).
 Külső függőség: `mustache` és `@marcbachmann/cel-js`, pontos verzióval, tartomány nélkül, a
 `@types/mustache` pedig `devDependencies` helyen (SPEC-010 3.4, 4.). A verziók egyetlen forrása
-a `docs/research/2026-08-26-toolchain.md`. A `packages/engine` ettől a csomagtól nem függ. Ma
-egyetlen workspace csomag sem függ tőle; az `apps/server` a PLAN-010 T-010-13, az `apps/web` a
-T-010-17 lépésében veszi fel (SPEC-010 3.4).
+a `docs/research/2026-08-26-toolchain.md`. A `packages/engine` ettől a csomagtól nem függ. Két
+workspace csomag függ tőle: az `apps/server` (PLAN-010 T-010-13) és az `apps/web` (T-010-17)
+(SPEC-010 3.4).
 
 ## Szabályok
 
 **Node beépített modult (`node:*`) egyetlen termékkód fájl sem importálhat** (a `.spec.ts` fájlok
 igen, a `src/greppable-invariants/` téma is `node:fs` modullal olvas). A csomagot az `apps/web`
-érték szinten fogja importálni, tehát a barrel minden modulja a böngésző modulgráfjába kerül
-(SPEC-010 16. szekció 8. kritérium). Ma a `src/greppable-invariants/` téma őrzi; az
-`apps/web/src/browser-safe-imports/` regressziós teszt az `apps/web` függőségi zárt halmazát
-vizsgálja, tehát a csomagot attól a lépéstől fedi, amelyben az `apps/web` felveszi.
+érték szinten importálja, tehát a barrel minden modulja a böngésző modulgráfjába kerül
+(SPEC-010 16. szekció 8. kritérium). A `src/greppable-invariants/` téma és az
+`apps/web/src/browser-safe-imports/` regressziós teszt is őrzi: az utóbbi az `apps/web` függőségi
+zárt halmazát vizsgálja, és a T-010-17 óta a csomagot is.
 
 A `mustache` és a `@marcbachmann/cel-js` csomagot a workspace-ben kizárólag ez a csomag
 importálhatja (SPEC-010 16. szekció 7. kritérium); a `src/greppable-invariants/` téma őrzi.
