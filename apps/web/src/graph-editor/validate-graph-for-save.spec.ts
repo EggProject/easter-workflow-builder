@@ -1,6 +1,7 @@
 /* eslint-disable unicorn/no-null -- a szintetikus WorkflowNodeInput fixture-ök nullázható mezői a dróton ténylegesen `null` értéket hordoznak */
 import type { WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_AGENT_STEP_SETTINGS } from '../node-inspector/default-agent-step-settings.ts';
 import { validateGraphForSave } from './validate-graph-for-save.ts';
 
 const START_NODE: WorkflowNodeInput = {
@@ -11,6 +12,10 @@ const START_NODE: WorkflowNodeInput = {
   positionY: 0,
   config: { type: 'start', inputFields: [], onUnhandledError: 'fail_run' },
 };
+
+function nodeWith(id: string, config: WorkflowNodeInput['config']): WorkflowNodeInput {
+  return { id, type: config.type, label: id, positionX: 0, positionY: 0, config };
+}
 
 describe('validateGraphForSave', () => {
   it('érvényes gráfra ok Outcome-ot ad, a ReplaceGraphRequestSchema szerint felparszolt törzzsel', () => {
@@ -213,6 +218,130 @@ describe('validateGraphForSave', () => {
       expect(validateGraphForSave([START_NODE, agentNode], [])).toEqual({
         kind: 'ok',
         value: { nodes: [START_NODE, agentNode], edges: [] },
+      });
+    });
+  });
+
+  // A valódi `workflow-language` csomag fut, mock nélkül (SPEC-010 12.4).
+  describe('a sablon és kifejezés mezők fordítási hibája (SPEC-010 10., AC44)', () => {
+    const BROKEN_TEMPLATE = '{{#titok}}';
+    const BROKEN_EXPRESSION = 'titokNeve > 1';
+
+    it('a hibás Mustache sablon a mentést megállítja, és a csomópont és a mező útvonalát megnevezi', () => {
+      const agentNode = nodeWith('n-agent', {
+        ...DEFAULT_AGENT_STEP_SETTINGS,
+        promptTemplate: BROKEN_TEMPLATE,
+        type: 'agent_step',
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, agentNode], [])).toEqual({
+        kind: 'error',
+        message: 'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.promptTemplate (invalid_request).',
+      });
+    });
+
+    it('a hibás CEL kifejezés a mentést megállítja, és a csomópont és a mező útvonalát megnevezi', () => {
+      const branchNode = nodeWith('n-branch', {
+        type: 'branch',
+        expression: BROKEN_EXPRESSION,
+        branches: [],
+        defaultBranchKey: null,
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, branchNode], [])).toEqual({
+        kind: 'error',
+        message: 'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.expression (invalid_request).',
+      });
+    });
+
+    it('a join ai_synthesis módjának hibás settings.promptTemplate mezője a beágyazott útvonalon jelez', () => {
+      const joinNode = nodeWith('n-join', {
+        type: 'join',
+        mode: 'ai_synthesis',
+        settings: { ...DEFAULT_AGENT_STEP_SETTINGS, promptTemplate: BROKEN_TEMPLATE },
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, joinNode], [])).toEqual({
+        kind: 'error',
+        message: 'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.settings.promptTemplate (invalid_request).',
+      });
+    });
+
+    it('több csomópont és mező hibáját egy üzenetben, a csomópont sorrendjében nevezi meg', () => {
+      const fanOutNode = nodeWith('n-fan', {
+        type: 'fan_out',
+        itemsExpression: BROKEN_EXPRESSION,
+        branchLabelTemplate: BROKEN_TEMPLATE,
+        onUnhandledError: 'fail_run',
+      });
+      const approvalNode = nodeWith('n-approval', {
+        type: 'human_approval',
+        title: 'Cím',
+        bodyTemplate: BROKEN_TEMPLATE,
+        timeoutMs: null,
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, fanOutNode, approvalNode], [])).toEqual({
+        kind: 'error',
+        message:
+          'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.itemsExpression, ' +
+          'nodes.1.config.branchLabelTemplate, nodes.2.config.bodyTemplate (invalid_request).',
+      });
+    });
+
+    it('a séma hibájú mezőt nem fordítja, tehát az üzenet egyszer nevezi meg (SPEC-010 10. "sorrend", AC46)', () => {
+      const loopNode = nodeWith('n-loop', {
+        type: 'loop',
+        maxIterations: 3,
+        continueExpression: ' ',
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, loopNode], [])).toEqual({
+        kind: 'error',
+        message: 'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.continueExpression (invalid_request).',
+      });
+    });
+
+    it('egy másik csomópont séma hibája nem hagyja ki a saját csomópont mezőjének fordítását', () => {
+      const loopWithBlank = nodeWith('n-loop', {
+        type: 'loop',
+        maxIterations: 3,
+        continueExpression: ' ',
+        onUnhandledError: 'fail_run',
+      });
+      const branchNode = nodeWith('n-branch', {
+        type: 'branch',
+        expression: BROKEN_EXPRESSION,
+        branches: [],
+        defaultBranchKey: null,
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, loopWithBlank, branchNode], [])).toEqual({
+        kind: 'error',
+        message:
+          'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.continueExpression, ' +
+          'nodes.2.config.expression (invalid_request).',
+      });
+    });
+
+    it('a hibátlan sablon és kifejezés mezőkkel a mentés átmegy', () => {
+      const branchNode = nodeWith('n-branch', {
+        type: 'branch',
+        expression: 'input.tema',
+        branches: [],
+        defaultBranchKey: null,
+        onUnhandledError: 'fail_run',
+      });
+      const approvalNode = nodeWith('n-approval', {
+        type: 'human_approval',
+        title: 'Cím',
+        bodyTemplate: '{{input.tema}}',
+        timeoutMs: null,
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, branchNode, approvalNode], [])).toEqual({
+        kind: 'ok',
+        value: { nodes: [START_NODE, branchNode, approvalNode], edges: [] },
       });
     });
   });

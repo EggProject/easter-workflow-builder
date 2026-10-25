@@ -73,7 +73,7 @@ function graphWith(agentConfig: NodeConfig): WorkflowGraphDocument {
       storedNode('n3', 'loop', 'Ciklus', 1000, {
         type: 'loop',
         maxIterations: 3,
-        continueExpression: 'i < 3',
+        continueExpression: 'iteration < 3',
         onUnhandledError: 'fail_run',
       }),
       storedNode('n4', 'error_handler', 'Hibakezelő', 1500, {
