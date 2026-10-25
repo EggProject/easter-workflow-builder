@@ -324,6 +324,29 @@ describe('validateGraphForSave', () => {
       });
     });
 
+    it('két azonos típusú csomópont közül csak a saját séma hibája zárja ki a saját mező fordítását', () => {
+      // A csomópont szűrője (`issue.path[1] === index`) nélkül az első `loop`
+      // séma hibája a másodikat is elérné, és annak fordítási hibája kimaradna.
+      const loopWithBlank = nodeWith('n-loop-1', {
+        type: 'loop',
+        maxIterations: 3,
+        continueExpression: ' ',
+        onUnhandledError: 'fail_run',
+      });
+      const loopWithBrokenExpression = nodeWith('n-loop-2', {
+        type: 'loop',
+        maxIterations: 3,
+        continueExpression: BROKEN_EXPRESSION,
+        onUnhandledError: 'fail_run',
+      });
+      expect(validateGraphForSave([START_NODE, loopWithBlank, loopWithBrokenExpression], [])).toEqual({
+        kind: 'error',
+        message:
+          'A kérés törzse érvénytelen, hibás mező(k): nodes.1.config.continueExpression, ' +
+          'nodes.2.config.continueExpression (invalid_request).',
+      });
+    });
+
     it('a hibátlan sablon és kifejezés mezőkkel a mentés átmegy', () => {
       const branchNode = nodeWith('n-branch', {
         type: 'branch',
