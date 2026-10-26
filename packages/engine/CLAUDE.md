@@ -327,10 +327,11 @@ A három értelmezési döntés, mindegyik a spec szövegéből vezetve:
   következmény: a motor egyetlen hálózati kapcsolatot sem nyit (7. elfogadási kritérium), tehát
   egy közvetlen, SDK-n kívüli HTTP út járhatósága a motornak nem választható menet. A mező a
   kapcsolat teszt diagnosztikájának marad, a döntést egyedül a `calledBySdk` viszi.
-- **Az 1. sor akkor is `structured_output_strategy_unsupported` hibát ad, ha a leíró a kért
-  stratégiát egyáltalán nem írja le.** A táblázat mezője (`structuredOutput.strategies[].usable`)
-  indexelést tartalmaz, tehát a kiválasztás ennek a viselkedésnek a része, és bizonyíték nélkül a
-  motor nem állíthatja, hogy a stratégia működik ezzel a providerrel (11.2, a tippelés tilalma).
+- **Az 1. sor akkor is `structured_output_strategy_unsupported` hibát ad, ha a leíró a
+  stratégiát egyáltalán nem írja le (üres `strategies` lista).** A táblázat mezője
+  (`structuredOutput.strategies[].usable`) listát tartalmaz, és mivel a stratégia unió egy tagú, a
+  kiválasztás az első bejegyzés (`strategies[0]`, SPEC-011 12.3); bizonyíték nélkül a motor nem
+  állíthatja, hogy a stratégia működik ezzel a providerrel (11.2, a tippelés tilalma).
 
 A `StepStartedPayload` három opcionális jelölő mezője (`strategyUnproven`,
 `modelIdentifierUnproven`, `serverToolAvailabilityUnproven`) ennek a témának az `unknown` ágaiból
@@ -1232,7 +1233,7 @@ dokumentál (11. szekció, gyökér `.claude/CLAUDE.md`).
 - [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 3.1, 3.2, 3.3 és 12. szekció
 - [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 11.2 és 11.3 szekció
 - [`../../docs/spec/SPEC-004-vegrehajto-motor.md`](../../docs/spec/SPEC-004-vegrehajto-motor.md), 5.2, 6.3 és 6.4 szekció
-- [`../../docs/research/2026-08-26-agent-sdk-minimax.md`](../../docs/research/2026-08-26-agent-sdk-minimax.md), 1. szekció (az `Options` mezői, a `Stop` hook és a `HookCallbackMatcher` alakja)
+- [`../../docs/research/2026-08-26-agent-sdk-minimax.md`](../../docs/research/2026-08-26-agent-sdk-minimax.md), 1. szekció (az `Options` mezői)
 - [`../../docs/plan/PLAN-005-vegrehajto-motor.md`](../../docs/plan/PLAN-005-vegrehajto-motor.md), T-005-8
 - [`../../docs/spec/SPEC-002-csomag-architektura.md`](../../docs/spec/SPEC-002-csomag-architektura.md), 4. és 6. szekció
 - [`../../docs/spec/SPEC-001-monorepo-toolchain.md`](../../docs/spec/SPEC-001-monorepo-toolchain.md), 3. szekció

@@ -498,3 +498,27 @@ lefutva **52 bukó teszt, 4 fájlban**:
 | `apps/server` `node-config-drift-protection.spec.ts` | 23         |
 
 A visszaállítás után mind zöld.
+
+## 6. A törölt kódra hivatkozó tsconfig kommentek (PLAN-011 T-011-9, 2026-10-26)
+
+A mérés a T-011-8 utáni fán (`0654542`) készült, saját futtatás.
+
+| Hely                         | A komment mire hivatkozott                                                                                         | A mellette álló beállítás                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `apps/web/tsconfig.json`     | a `core` törölt `image-source` tárgykörének `node:buffer` importja (a Node típusok nélkül ez `TS2591` hibát adott) | `"types": ["node"]`                      |
+| `tooling/tsconfig/base.json` | a `core` törölt `resolve-image-data-url.ts` fájlja, ami a `Uint8Array.prototype.toBase64()` metódust használta     | `"target": "esnext"` (a `lib` ebből jön) |
+
+**Az `apps/web` próbája.** A `types` sor és a komment törlése után: `bun run typecheck` 19/19 sikeres (az
+`apps/web` háromszoros ellenőrzése, `tsc --noEmit`, `tsc --noEmit -p e2e`, `tsc --noEmit -p measurement` is),
+`bun x turbo run lint --concurrency=1` 32/32 sikeres, `bun run test` 608 tesztfájl és 6315 teszt sikeres, a
+100 százalékos lefedettségi küszöb teljesül, `bun run build` 1/1 sikeres, `bun run format:check`, `docs:check`,
+`check:casing`, `check:graph` és `check:db-drift` nulla kilépési kóddal. A beállítás nélkül is a program 82
+`@types/node` fájlt tartalmaz (`bun x tsc --noEmit --listFilesOnly | grep -c "@types/node"` az `apps/web`
+alatt), mert a Node típusok a `@types/ws` és az `undici-types` típushivatkozásain át is bekerülnek (`bun x tsc --noEmit --explainFiles`, az `apps/web` alatt). **Eredmény:** a beállítás
+egyetlen indoka a törölt kód volt, a beállítás és a komment törölve.
+
+**A `base.json` kommentje.** A `target: esnext` első indoka (soha nem emittálunk `.js`-t, a futtatókörnyezet Node
+és a mai böngészők) a törölt kódtól független, és a beállítás ezen áll; a `toBase64()` mondat volt az egyetlen
+törölt kódra hivatkozó rész. A beállítás tehát marad, a komment a `toBase64()` mondat nélkül áll. A `toBase64`,
+`fromBase64` és `node:buffer` szavakra a termékkódban (`git grep`, `docs/` nélkül) nincs más találat; az egyetlen
+megmaradó hivatkozás az `apps/web` `browser-safe-imports.spec.ts` történeti fejléce, ami a mért hibát írja le.

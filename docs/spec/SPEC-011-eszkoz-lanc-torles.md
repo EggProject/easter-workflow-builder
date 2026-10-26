@@ -525,7 +525,7 @@ packages/firecrawl-client packages/mcp-tool-kit packages/agent-tool-bundle` kime
 19. Gondolatjel (em dash) a módosított fájlokban nincs: `git diff --name-only 6009603 | xargs grep -lP "\x{2014}"` üres.
 20. Gépi őr nincs (O-16): a PR leírása tartalmazza a 4., 6., 7. és 11. kritérium futtatott
     parancsát és a kimenetét (nulla találat a megnevezett kivételekkel), a fej SHA-jával;
-    `git diff 6009603 --stat -- tooling/scripts` kizárólag a `package-layer.ts` módosítását mutatja.
+    `git diff 6009603 --stat -- tooling/scripts` kizárólag a `package-layer.ts` módosítását és a két, szó szerint elavult csomagszám komment javítását (`check-dependency-graph.sh:3`, `find-dependency-graph-violations.spec.ts:2`, "mind a 26 csomagra" helyett "mind a 19 csomagra") mutatja.
 
 ---
 
@@ -585,6 +585,13 @@ Ezek az O-9 és O-3 döntések következményei, a spec ezeket így vezeti le; h
    az nem NodeConfig guard, a döntés a `NodeConfig` guardot nevezi meg.
 4. **A `StructuredOutputCapability` további mezői** (`blockingWireDetail`, `observedRoundTrips`) nem
    egyszerűsödnek (3.3).
+5. **A `resolveStructuredOutputStrategy` az első bejegyzést választja** (technikai döntés, nem user döntés;
+   PLAN-011 T-011-7). A stratégia unió egy tagú, tehát a leíró minden bejegyzésének azonosítója a kért
+   azonosító: a korábbi `strategies.find((candidate) => candidate.id === requestedStrategyId)` összevetés típusszinten
+   mindig igaz lett, és a `no-unnecessary-condition` lint szabály hibát adott rá. Az
+   `strategies[0]` kiválasztás ugyanazt a viselkedést adja (üres lista esetén a leíró nem írja le a
+   stratégiát: `structured_output_strategy_unsupported`), halott ág és `eslint-disable` nélkül. Ha a
+   unió újra több tagú lesz, a kiválasztásnak vissza kell kerülnie az azonosító szerinti keresésre.
 
 ---
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Token takarekos ellenorzo: a workspace fuggosegi grafja aciklikus-e, es
-# minden ele a SPEC-002 4. szekcio "Retegbesorolas, mind a 26 csomagra"
+# minden ele a SPEC-002 4. szekcio "Retegbesorolas, mind a 19 csomagra"
 # tablazata szerint szigoruan csokkeno retegszam fele mutat-e (T-002-24).
 #
 # A tenyleges ellenorzest a `tooling/scripts/src/dependency-graph/

@@ -42,9 +42,9 @@ közvetlenül `string`-et használ.
 
 ## Függőségi irány
 
-A `typeguards` a workspace futásidejű függőségei közül semmitől nem függhet, L0 réteg (SPEC-002 4. szekció), hasonlóan a `core` csomaghoz. A `@easter-workflow-builder/minimax-client` és a
-`@easter-workflow-builder/firecrawl-client` importál innen (ismeretlen alakú JSON válaszok
-szűkítéséhez), ez nem okoz kört, mert ez a csomag semmitől nem függ.
+A `typeguards` a workspace futásidejű függőségei közül semmitől nem függhet, L0 réteg (SPEC-002 4. szekció), hasonlóan a `core` csomaghoz. Az `agent`, a `db`, az `engine`, a `protocol`, a `workflow-language`, az
+`apps/server` és az `apps/web` importál innen (ismeretlen alakú értékek szűkítéséhez), ez nem okoz
+kört, mert ez a csomag semmitől nem függ.
 
 ## Szabályok
 

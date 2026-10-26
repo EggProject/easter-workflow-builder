@@ -37,16 +37,13 @@ fájlját (mérés: a csomag `exports` mezője hat bejegyzést sorol, `./package
 
 ## Függőségi irány
 
-Az `agent` a `core`, a `logger`, a `provider-registry` és az `agent-tool-bundle` csomagtól
-függhet (SPEC-002 4. szekció), L4 réteg. A `package.json` ma a `core`, a `logger`, a
-`provider-registry` és a `typeguards` workspace csomagot listázza, plusz külső függőségként az
-Agent SDK-t. A `typeguards` (L0) felvétele az `sdk-message-shape/` téma typeguardjaihoz kellett
+Az `agent` a `core`, a `logger` és a `provider-registry` csomagtól függhet (SPEC-002 4.
+szekció), L4 réteg. A `package.json` ma a `core`, a `logger`, a `provider-registry` és a
+`typeguards` workspace csomagot listázza, plusz külső függőségként az Agent SDK-t. A `typeguards` (L0) felvétele az `sdk-message-shape/` téma typeguardjaihoz kellett
 (`isRecord`, `isString`); ugyanez a minta a `packages/db` csomagban is áll, ami szintén nem
 szerepelt a SPEC-002 4. szekció "cél csomagtérkép" pillanatképében, mégis felvette a `typeguards`
 függőséget, mert a "kötelező a meglévő typeguardot használni, nem újraírni" szabály (gyökér
-`CLAUDE.md` 7., `.claude/CLAUDE.md` 5.) erősebb, mint egy tervezési pillanatkép. Az
-`agent-tool-bundle` felvétele a naplózási és eszközkötési tárgykör későbbi specifikációjának a
-feladata.
+`CLAUDE.md` 7., `.claude/CLAUDE.md` 5.) erősebb, mint egy tervezési pillanatkép.
 
 ## Szabályok
 
