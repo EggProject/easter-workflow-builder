@@ -258,7 +258,7 @@ A `NodeType` unió a felhasználó által jóváhagyott tíz típus:
 | `sub_workflow`   | másik workflow hívása, rekurzióvédelemmel         | `targetWorkflowId: string`, `inputMapping: Readonly<Record<string, string>>`                     |
 | `script`         | nem AI transzformáció, **később implementálandó** | `source: string`, `runtime: 'expression'`                                                        |
 
-A `join` `ai_synthesis` módja **teljes értékű agent lépés**: az alobjektuma pontosan az `AgentStepConfig` (4.4). A `merge` mód alobjektuma a bemenő ágak összefűzési szabálya, a `script` mód alobjektuma ugyanaz a `ScriptConfig`, mint a `script` node-é.
+A `join` `ai_synthesis` módja **teljes értékű agent lépés**: az alobjektuma pontosan az `AgentStepConfig` (4.4). A `merge` módnak nincs alobjektuma (user döntés 2026-10-26: a `settings` mező kikerült, a mód a bemenetek listáját adja), a `script` mód alobjektuma ugyanaz a `ScriptConfig`, mint a `script` node-é.
 
 **A `script` node és a `join` `script` módja tárolható, de nem futtatható.** A séma felkészül rá, a felület kiválaszthatóvá teszi, és modal ablakban "Később implementálandó" jelzést ad. A futás indításakor a validáció elutasítja azt a workflow-t, amiben `script` típusú node vagy `script` módú `join` van, `unimplemented_node_type` hibával. Ez a DB-ben nem `CHECK` constraint, mert a node mentése megengedett, csak a futás indítása nem.
 

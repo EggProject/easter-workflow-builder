@@ -75,11 +75,10 @@ describe('NodeConfigSchema', () => {
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
   });
 
-  it('elfogadja a join node merge módját, tetszőleges settings alakkal', () => {
+  it('elfogadja a join node merge módját settings mező nélkül', () => {
     const config = {
       type: 'join',
       mode: 'merge',
-      settings: { strategy: 'bármi', extra: [1, 2, 3] },
       onUnhandledError: null,
     };
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
@@ -112,6 +111,11 @@ describe('NodeConfigSchema', () => {
 
   it('a választatlan join ág settings mezőt nem fogad (strictObject)', () => {
     const config = { type: 'join', mode: null, settings: {}, onUnhandledError: null };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('a join merge mód settings mezőt nem fogad (strictObject, user döntés 2026-10-26)', () => {
+    const config = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null };
     expect(NodeConfigSchema.safeParse(config).success).toBe(false);
   });
 

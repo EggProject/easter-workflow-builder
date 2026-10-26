@@ -516,7 +516,6 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       'invalid_error_handler_edge',
       'malformed_node_config',
       'unhandled_error_policy_missing',
-      'unsupported_join_merge_setting',
     ];
     // A megjelenítő leképezés (nem validáció) és a hozzá tartozó teszt, egy
     // REST hiba fixtúra teszt, és a szerkesztő statikus figyelmeztető szövege

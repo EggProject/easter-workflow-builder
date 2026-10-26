@@ -90,7 +90,7 @@ function instanceOf(runId: string): NodeExecutionInstance {
 function inputOf(runId: string, joinInputs: readonly unknown[] = ['a', 'b']): ExecuteJoinMergeInput {
   return {
     instance: instanceOf(runId),
-    config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
+    config: { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' },
     joinInputs,
   };
 }

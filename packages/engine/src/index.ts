@@ -101,7 +101,6 @@ export { validateErrorHandlerEdges } from './run-validation/validate-error-handl
 // `insufficient_backoff_list`, PLAN-005 T-005-24).
 export { validateErrorHandlerBackoff } from './run-validation/validate-error-handler-backoff.ts';
 export { validateUnhandledErrorPolicy } from './run-validation/validate-unhandled-error-policy.ts';
-export { validateJoinMergeSettings } from './run-validation/validate-join-merge-settings.ts';
 export { validateReservedBranchKeys } from './run-validation/validate-reserved-branch-keys.ts';
 export { resolveNodeProviders } from './run-validation/resolve-node-providers.ts';
 

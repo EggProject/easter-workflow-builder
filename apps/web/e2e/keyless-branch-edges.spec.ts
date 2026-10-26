@@ -167,7 +167,7 @@ const LEGACY_SNAPSHOT: RunSnapshotResponse = {
       type: 'join',
       label: 'Összefésülés',
       position: { x: 1350, y: 0 },
-      config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
+      config: { type: 'join', mode: 'merge', onUnhandledError: null },
       effectiveProviderId: 'claude-subscription',
     },
   ],

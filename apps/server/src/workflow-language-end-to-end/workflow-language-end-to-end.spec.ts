@@ -369,7 +369,7 @@ const PROBE_NODES: readonly WorkflowNodeInput[] = [
     label: 'osszezar',
     positionX: 0,
     positionY: 0,
-    config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
+    config: { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' },
   },
   {
     id: 'ciklus',

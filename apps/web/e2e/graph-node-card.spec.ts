@@ -121,7 +121,7 @@ function buildTenTypeNodes(): WorkflowNode[] {
       label: 'Válaszok egyesítése',
       positionX: 0,
       positionY: 300,
-      config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
+      config: { type: 'join', mode: 'merge', onUnhandledError: null },
     },
     {
       ...base,

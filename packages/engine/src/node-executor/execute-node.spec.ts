@@ -411,7 +411,6 @@ describe('executeNode', () => {
     const request = plainRequest(runId, 'osszefuzes', {
       type: 'join',
       mode: 'merge',
-      settings: {},
       onUnhandledError: 'fail_run',
     });
 

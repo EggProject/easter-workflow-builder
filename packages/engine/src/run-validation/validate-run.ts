@@ -14,7 +14,6 @@ import { validateEdgeEndpoints } from './validate-edge-endpoints.ts';
 import { validateErrorHandlerBackoff } from './validate-error-handler-backoff.ts';
 import { validateErrorHandlerEdges } from './validate-error-handler-edges.ts';
 import { validateImplementedNodeTypes } from './validate-implemented-node-types.ts';
-import { validateJoinMergeSettings } from './validate-join-merge-settings.ts';
 import { validateNodeConfigs } from './validate-node-configs.ts';
 import { validateNodeReachability } from './validate-node-reachability.ts';
 import { validateReservedBranchKeys } from './validate-reserved-branch-keys.ts';
@@ -124,7 +123,6 @@ export function validateRun(
     () => validateReservedBranchKeys(nodeConfigsById),
     () => validateErrorHandlerEdges(graph),
     () => validateErrorHandlerBackoff(nodeConfigsById),
-    () => validateJoinMergeSettings(nodeConfigsById),
   ]);
   if (semantics.kind === 'error') {
     return semantics;
