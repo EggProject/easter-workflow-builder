@@ -24,7 +24,11 @@ export {
   DOC_STREAMING,
   DOC_VISION,
 } from './evidence-sources/measurement-document/document-url.ts';
-export { RESEARCH_MINIMAX, RESEARCH_GATEWAY } from './evidence-sources/measurement-document/research-section.ts';
+export {
+  RESEARCH_MINIMAX,
+  RESEARCH_GATEWAY,
+  RESEARCH_AUTH_PRECEDENCE,
+} from './evidence-sources/measurement-document/research-section.ts';
 export type { MeasurementDocumentAnchor } from './evidence-sources/measurement-document/measurement-document.ts';
 export { measurementDocument } from './evidence-sources/measurement-document/measurement-document.ts';
 

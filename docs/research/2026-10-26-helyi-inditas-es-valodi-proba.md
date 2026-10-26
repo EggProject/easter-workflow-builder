@@ -544,3 +544,12 @@ implementációja a `process.env` `undefined` nélküli pillanatképe; a `provid
 függvénye, a `buildOutgoingEnvironment` (alap, szűrés, ráírás), amit a `run-agent-step.ts` és a
 `create-engine.ts` kapcsolat teszt ága hív. A két regressziós teszt a javítás után zöld. A `minimax` leíró
 `ANTHROPIC_AUTH_TOKEN` követelményének `purpose` szövege az O-1 szerint átírva.
+
+### 14.3 T-013-4: a tiltott listák
+
+A tiltott listák a SPEC-012 3.2 táblái szerint bővültek (`claude-subscription`: tizenegy név, `minimax`: tizenhárom
+név). Minden új bejegyzés `reason` és nem üres `evidence` mezőt hordoz; az új bizonyíték konstans a
+`RESEARCH_AUTH_PRECEDENCE` (a 4. és 12. szekcióra). Az `ANTHROPIC_AWS` és `MANTLE` bejegyzések `reason`
+szövege a rang "nem ellenőrzött" voltát kimondja. A `CLAUDE_CODE_OAUTH_TOKEN` a `claude-subscription` mellett
+átmegy (O-3). Az őrök: `apps/server/src/provider-outgoing-environment/` (a két valódi leíró, minden név
+tételesen) és `apps/server/src/provider-environment-drift-protection/` (az O-5 szabály mindkét irányban).
