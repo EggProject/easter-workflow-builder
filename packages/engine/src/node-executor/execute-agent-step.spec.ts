@@ -283,7 +283,7 @@ function dependenciesOf(
       return { nowMs: () => (now += 5), sleep: notCalled };
     })(),
     idGenerator: { nextId: notCalled },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
 }
 

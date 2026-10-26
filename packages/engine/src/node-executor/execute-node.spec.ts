@@ -137,7 +137,7 @@ function enginePorts(database: DatabaseContext, published: unknown[], runner: Ag
       sleep: () => Promise.resolve(),
     },
     idGenerator: { nextId: notCalled },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
 }
 

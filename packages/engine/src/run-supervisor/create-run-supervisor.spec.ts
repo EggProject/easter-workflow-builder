@@ -359,7 +359,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
         return `id-${String(nextId)}`;
       },
     },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
   const concurrencyGate = createConcurrencyGate(() => null);
   const supervisor = createRunSupervisor({

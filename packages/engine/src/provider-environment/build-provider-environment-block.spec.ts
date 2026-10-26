@@ -12,6 +12,7 @@ const FAKE_EVIDENCE = [{ kind: 'measurement', id: 'M-99' }] as const;
 function buildProcessEnvironment(values: Readonly<Record<string, string>>): ProcessEnvironmentPort {
   return {
     read: (name) => values[name] ?? null,
+    readAll: () => values,
   };
 }
 

@@ -380,7 +380,7 @@ describe('runShutdownSequence', () => {
       ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
-      processEnvironment: { read: () => null },
+      processEnvironment: { read: () => null, readAll: () => ({}) },
     });
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);
@@ -450,7 +450,7 @@ describe('runShutdownSequence', () => {
       ...buildEngineDependencies(database, streamRegistry, clock, silentLogger()),
       agentQueryRunner: agent.runner,
       // eslint-disable-next-line unicorn/no-null -- a `ProcessEnvironmentPort.read` szerződése szerint a `null` a "nincs ilyen env változó" érték
-      processEnvironment: { read: () => null },
+      processEnvironment: { read: () => null, readAll: () => ({}) },
     });
     const { sink } = collectingSink();
     const logger = createServerLogger({ secretValues: [] }, sink);

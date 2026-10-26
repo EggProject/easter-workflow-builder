@@ -526,3 +526,21 @@ Kiinduló fej: `b1cf92c` (`feat/spec-012-inditas-es-valodi-proba`, a `origin/mai
 munkakönyvtár. A kilenc kapu a kiinduló fejen nulla kilépési kóddal futott: `format:check`, `typecheck`
 (`TURBO_CONCURRENCY=1`), `lint` (`bun x turbo run lint --concurrency=1`), `test` (100 százalék mind a
 négy metrikán), `build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
+
+### 14.2 T-013-2 és T-013-3: a regressziós teszt bukása és a javítás
+
+**A bukás a javítás előtti kódon (T-013-2).** Két új regressziós teszt, a mai (csak a blokk) kimenő `env`
+ellen futtatva (`bun run vitest run`, a `b1cf92c` termékkódján, a teszt `readAll` portot stubol):
+
+- `packages/engine/src/agent-step/run-agent-step.spec.ts`, "a kimenő env a folyamat környezetéből épül:
+  a PATH és a HOME átmegy, a tiltott név nem (SPEC-012 2.1 hiba)": bukott, `AssertionError: expected {} to
+strictly equal { PATH: '/usr/bin', HOME: '/home/teszt' }`; a kapott érték `{}`, tehát a `PATH` és a `HOME`
+  hiányzik.
+- `packages/engine/src/engine-port/create-engine.spec.ts`, `testProviderConnection`, "a kimenő env a lépésével
+  azonos szabállyal épül: a PATH és a HOME átmegy (SPEC-012 2.1 hiba)": bukott, ugyanazzal a `{}` értékkel.
+
+**A javítás (T-013-3).** A `ProcessEnvironmentPort` új `readAll` metódusa; az `apps/server` valódi
+implementációja a `process.env` `undefined` nélküli pillanatképe; a `provider-environment` téma új tiszta
+függvénye, a `buildOutgoingEnvironment` (alap, szűrés, ráírás), amit a `run-agent-step.ts` és a
+`create-engine.ts` kapcsolat teszt ága hív. A két regressziós teszt a javítás után zöld. A `minimax` leíró
+`ANTHROPIC_AUTH_TOKEN` követelményének `purpose` szövege az O-1 szerint átírva.

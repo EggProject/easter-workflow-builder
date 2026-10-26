@@ -164,6 +164,7 @@ describe('buildEngineDependencies', () => {
     expect(typeof dependencies.eventPublisher.publish).toBe('function');
     expect(typeof dependencies.idGenerator.nextId).toBe('function');
     expect(typeof dependencies.processEnvironment.read).toBe('function');
+    expect(typeof dependencies.processEnvironment.readAll).toBe('function');
   });
 
   it('a bekötött sablon és kifejezés port érvényes sablonra és kifejezésre ok eredményt ad (SPEC-010 3.1)', () => {

@@ -7,7 +7,7 @@ describe('ProviderSummarySchema', () => {
       id: 'minimax',
       displayName: 'MiniMax',
       models: ['MiniMax-M3'],
-      requiredEnvNames: ['MINIMAX_API_KEY'],
+      requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'],
     });
     expect(outcome.success).toBe(true);
   });

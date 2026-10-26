@@ -17,7 +17,8 @@ export const minimaxRequiredEnvironment: readonly EnvironmentRequirement[] = [
     name: 'ANTHROPIC_AUTH_TOKEN',
     source: 'process_env_passthrough',
     secret: true,
-    purpose: 'A MINIMAX_API_KEY process env változó értéke megy Bearer tokenként, az adatbázis csak a NEVET tárolja.',
+    purpose:
+      'Az ANTHROPIC_AUTH_TOKEN process env változó értéke megy Bearer tokenként, az adatbázis csak a NEVET tárolja.',
     evidence: [
       { kind: 'research', section: RESEARCH_MINIMAX },
       { kind: 'research', section: RESEARCH_GATEWAY },

@@ -431,7 +431,7 @@ function openHarness(options: HarnessOptions = {}): Harness {
         return `id-${String(nextId)}`;
       },
     },
-    processEnvironment: options.processEnvironment ?? { read: () => null },
+    processEnvironment: options.processEnvironment ?? { read: () => null, readAll: () => ({}) },
   };
   return { database, dependencies, engine: createEngine(dependencies), published };
 }
@@ -1118,6 +1118,26 @@ describe('createEngine', () => {
 
       expect(outcome.succeeded).toBe(false);
       expect(outcome.errorMessage).toContain('missing_provider_env');
+    });
+
+    it('a kimenő env a lépésével azonos szabállyal épül: a PATH és a HOME átmegy (SPEC-012 2.1 hiba)', async () => {
+      let capturedOptions: Readonly<Record<string, unknown>> | undefined;
+      const harness = openHarness({
+        agentQueryRunner: {
+          run: (request) => {
+            capturedOptions = request.options;
+            return {
+              kind: 'ok',
+              value: agentQueryOf(messageIterable([{ type: 'result', subtype: 'success' }])),
+            };
+          },
+        },
+        processEnvironment: { read: () => null, readAll: () => ({ PATH: '/usr/bin', HOME: '/home/teszt' }) },
+      });
+
+      okOrThrow(await harness.engine.testProviderConnection('minimax'));
+
+      expect(capturedOptions?.['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
     });
 
     it('az agentQueryRunner.run hibaágát succeeded: false eredménnyé alakítja', async () => {
