@@ -2,7 +2,7 @@
 
 |               |                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------ |
-| Státusz       | jóváhagyott, végrehajtásra kész (2026-10-26); az O-17 lezárva                                          |
+| Státusz       | végrehajtva (2026-10-26); az O-17 lezárva                                                              |
 | Dátum         | 2026-10-26                                                                                             |
 | Spec          | [`../spec/SPEC-011-eszkoz-lanc-torles.md`](../spec/SPEC-011-eszkoz-lanc-torles.md)                     |
 | Mérési forrás | [`../research/2026-10-26-eszkoz-lanc-torles.md`](../research/2026-10-26-eszkoz-lanc-torles.md)         |
