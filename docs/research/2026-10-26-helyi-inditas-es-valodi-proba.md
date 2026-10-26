@@ -681,3 +681,25 @@ A teszt nevek a telepített fák fájljai. Az "kézi" jelölés a 14.5 és a 14.
 | 21        | nyitva   | a T-013-10 (a valódi futás) a user engedélyére vár; ezen a branchen nem futott                                                                                                                                                                                                                                                                                                |
 | 22, 23    | jelzés   | a SPEC-012 10. szekciója a gazdát és az átvezetés helyét (`feat/spec-009-beallitasok`) kimondja; itt nem változik                                                                                                                                                                                                                                                             |
 | 24        | teljesül | SPEC-004 11.3 10. és 11. sor, `packages/engine` `CLAUDE.md`, szabálykönyv 9. szekció, SPEC-000 leíró tábla sora átvezetve (a 11. szekció átvezetése a T-013-7 commitban); a SPEC-000 és a szabálykönyv 9. szekció egyezik: a maszkolt érték az `ANTHROPIC_AUTH_TOKEN`                                                                                                         |
+
+### 14.9 A merge kapu (2026-10-26)
+
+A kapu a `3a64107` fején futott; az ezt követő egyetlen commit kizárólag ezt a szekciót adja hozzá, ezért a
+`format:check` és a `docs:check` azon is újra lefutott.
+
+- **Kilenc kapu, kilépési kód 0 mindegyikre:** `format:check`, `typecheck` (a turbo gyorsítótárból, a bemenetek
+  azonosak a `c4493ce` utáni futással), `lint` (`bun x turbo run lint --concurrency=1`, 32/32 feladat),
+  `test` (`vitest run --coverage`: 616 tesztfájl, 6452 teszt, 100 százalék mind a négy metrikán),
+  `build`, `docs:check` (20/20), `check:casing`, `check:graph`, `check:db-drift`.
+- **Teljes e2e, nyolc shard**, egymás után, `flock /tmp/playwright-gep.lock` alatt, `--workers=3`, tiszta
+  `e2e/.nyc_output` és `coverage-e2e` mellett: 82, 81, 81, 81, 81, 81, 81, 81 sikeres teszt, összesen 649,
+  mind a nyolc shard kilépési kódja 0.
+- **`bun run coverage:e2e:report`: kilépési kód 0.** A mért érték: utasítás 99,53, ág 99,04, függvény 99,86,
+  sor 99,51 százalék, a küszöbök (99,35, 98,94, 99,73, 99,32) fölött; **a küszöb változatlan**. A fedetlen
+  tételek száma: 10 utasítás, 10 ág, 1 függvény, 10 sor; az alapvonal 14, 11, 2, 14, tehát egyik metrikán
+  sem nőtt (a `read-frontend-config.ts` négy fedetlen sora szándékos: az e2e `webServer.env` mind a négy
+  `VITE_` változót megadja, az alapérték ág unit teszttel fedett).
+- **Nem futott:** a `main` mozgásának ellenőrzése a sandboxban csak névtelen GitHub API lekérdezéssel
+  lehetséges (a `git fetch` SSH kulcs hiányában nem fut): `origin/main` = `cbaff94`, azonos a branch bázisával,
+  tehát bemergelni való nincs. A branch nincs a GitHubon (a push a user dolga), ezért PR és squash merge nem
+  történt.
