@@ -161,6 +161,10 @@ scriptből indított szerver tehát az `apps/server/.data/` alá nyitná az adat
   (`docs/spec/SPEC-000-provider-wire-measurement.md:720`).
 - A user munkapéldányának `.env` fájljában (csak a változónevek olvasva, érték nélkül) egyetlen név
   áll: `MINIMAX_API_KEY`.
+- **A `tools/wire-probe` ugyanezt a nevet olvassa** (`tools/wire-probe/src/harness/environment.ts:13-33`,
+  `src/proxy.ts:39`). **Lezárva (SPEC-012 O-20, user döntés 2026-10-26):** a mérő eszköz is az
+  `ANTHROPIC_AUTH_TOKEN` nevet olvassa, a `.env` fájlban egyetlen név marad; a `tools/wire-probe/**` a
+  lefedettségből kizárt mérő eszköz (`vitest.config.ts:109`). A végrehajtás a PLAN-013 T-013-12 lépése.
 
 ## 8. A kapcsolat teszt kimenő opciói
 
@@ -182,8 +186,10 @@ stop if this budget is exceeded", sdk.d.ts:1727-1730), tehát az első kört nem
 ## 10. A forrásolt alapértékek (SPEC-012 O-10, user döntés 2026-10-26)
 
 A user döntése: "de akkor keress forrást! legyen default érték beállítva!". Minden változóhoz elsődleges
-forrást kerestem az alapértékre; a keresés eredménye az alábbi táblázat. **Ahol a forrás hiányzik, szám
-nincs**, a változó kötelező marad (11.2 a SPEC-012-ben). A források elérése: 2026-10-26.
+forrást kerestem az alapértékre; a keresés eredménye az alábbi táblázat. **Ahol a forrás hiányzott, szám
+nem született** (10.5 ... 10.7); a hat ilyen változót a user második döntése ("webes keresés! mi az
+ajánlás!") a 13. szekció iparági ajánlásaival zárta le, a táblázat ezt tükrözi. A források elérése:
+2026-10-26.
 
 | Változó                                | Alapérték               | Forrás                                                                  | Megerősítések száma |
 | -------------------------------------- | ----------------------- | ----------------------------------------------------------------------- | ------------------- |
@@ -191,12 +197,12 @@ nincs**, a változó kötelező marad (11.2 a SPEC-012-ben). A források eléré
 | `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés (10.2)                                                | belső, user döntés  |
 | `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` és `server.port` alapértéke, user port döntés (10.3) | elsődleges plusz 1  |
 | `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe a kódban, user port döntés (10.2, 10.4) | belső               |
-| `EASTER_LOG_ROTATION_SIZE`             | nincs forrás            | 10.5                                                                    | nincs               |
-| `EASTER_LOG_ROTATION_FREQUENCY`        | nincs forrás            | 10.5                                                                    | nincs               |
-| `EASTER_LOG_RETAINED_FILE_COUNT`       | nincs forrás            | 10.5                                                                    | nincs               |
-| `EASTER_LOG_DIRECTORY`                 | nincs külső forrás      | 10.7                                                                    | nincs               |
-| `VITE_LIST_LIMIT`                      | nincs forrás            | 10.6                                                                    | nincs               |
-| `VITE_STREAM_REPLAY_LIMIT`             | nincs forrás            | 10.6                                                                    | nincs               |
+| `EASTER_LOG_ROTATION_SIZE`             | `10m`                   | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_ROTATION_FREQUENCY`        | `604800000`             | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_RETAINED_FILE_COUNT`       | `4`                     | 13.1 (10.5: a `pino-roll` nem ad alapértéket)                           | elsődleges plusz 2  |
+| `EASTER_LOG_DIRECTORY`                 | `.data/logs/server`     | user döntés 2026-10-26 (13.1; 10.7: nincs külső forrás)                 | belső, user döntés  |
+| `VITE_LIST_LIMIT`                      | `100`                   | 13.2 (10.6: szabvány nincs)                                             | elsődleges plusz 2  |
+| `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | 13.3 (10.6: szabvány nincs)                                             | elsődleges plusz 2  |
 
 ### 10.1 Az SSE életben tartó komment időköze: 15 másodperc
 
@@ -256,7 +262,7 @@ címhez igazodik, nem erre a mondatra.
   (a 4.0.0 npm README nem). A `server-config.ts` doc kommentje a `'weekly'` értéket is felsorolja
   (`apps/server/src/server-config/server-config.ts`, `readRotationFrequency` fölött): ez a telepített
   verzióra **nem ellenőrzött**, és a forrás szerint nem igaz. A SPEC-012 nem érinti, jelzés a usernek.
-- **Eredmény:** nincs forrás szám vagy elnevezett érték alapértéknek.
+- **Eredmény:** a `pino-roll` nem ad alapértéket. **Lezárva a 13.1 szekcióban** (user döntés 2026-10-26: iparági ajánlás, forrással).
 
 ### 10.6 A lista és a visszajátszás lapmérete: nincs forrás
 
@@ -276,14 +282,14 @@ címhez igazodik, nem erre a mondatra.
 - **Miért nem választunk belőlük:** a `GET /api/workflows` kezelő a `limit` darabszámnál levágja a listát
   (`apps/server/src/workflow-endpoint/list-workflows.ts:35`), nincs lapozás; egy indoklás nélküli kis szám
   csendben elrejtene munkafolyamatokat.
-- **Eredmény:** nincs forrás. A `VITE_LIST_LIMIT` és a `VITE_STREAM_REPLAY_LIMIT` kötelező marad.
+- **Eredmény:** szabvány vagy hivatalos ajánlás nincs. **Lezárva a 13.2 és 13.3 szekcióban** (user döntés 2026-10-26: iparági ajánlás, forrással).
 
 ### 10.7 A napló útvonal előtag: nincs külső forrás
 
 A `pino-roll` `file` mezőjének nincs alapértéke (10.5, a README szerint a `file` a kötelező mező). A projekt
 belső precedense az adatbázis fejlesztői alapértéke a gitből kizárt `.data/` alatt (SPEC-003 10.1,
 `packages/db/src/database-file/default-database-file-path.ts`); ez termékdöntés volt, nem külső forrás,
-és a naplóra nem terjed ki. Szám nincs, de az érték sem forrásolt: a user adja meg (SPEC-012 11.2).
+és a naplóra nem terjed ki. **Lezárva (user döntés 2026-10-26):** `.data/logs/server`, lásd 13.1.
 
 ## 11. M-145: a Node `--watch` a szerveren (SPEC-012 O-6)
 
@@ -332,3 +338,178 @@ takes precedence"). A `--watch` nem kombinálható `--check`, `--eval`, `--inter
   which rank above your /login credential" (env-vars lap, és az authentication lap táblázata: "Above").
 - Az `apiKeyHelper` beállítás fájl, nem env változó, tehát a kimenő környezet szűrése nem érinti.
 - Független megerősítés a sorrendre: 4. szekció (llm-gateway-connect, claude-code #39126).
+
+## 13. Iparági alapértékek a hat forrás nélküli változóra (SPEC-012 11.2, user döntés 2026-10-26)
+
+A user döntése: "webes keresés! mi az ajánlás! nehogy már én találjak ki mindent, amikor ezeket az ipar
+már kitalálta!" A 10.5 ... 10.7 szekció azt találta, hogy a `pino-roll` nem ad alapértéket, és a
+lapméretre nincs szabvány. Ez a szekció az iparági bevett gyakorlatot keresi: a nagy rendszerek
+**szállított alapértékét vagy kimondott ajánlását** (nem példaértéket), elsődleges forrással és legalább
+két független megerősítéssel. A keresés Exa eszközzel, a források elérése: 2026-10-26.
+
+**A választás szabálya.** Ahol a források ugyanazt a számot adják, az az érték. Ahol eltérnek, a döntő
+szempont kimondva, és a nem választott érték a táblában marad. Példaérték (például egy `daemon.json`
+minta) nem számít alapértéknek.
+
+### 13.1 Napló forgatás
+
+**A jelöltek, szállított alapértékkel:**
+
+| Rendszer                                | Méret                      | Gyakoriság                             | Megőrzés                                       | Forrás                                                                                                                                                                      |
+| --------------------------------------- | -------------------------- | -------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logrotate` szállított `logrotate.conf` | nincs                      | `weekly`                               | `rotate 4`                                     | upstream példa: <https://github.com/logrotate/logrotate/blob/master/examples/logrotate.conf>                                                                                |
+| Debian, Ubuntu (a csomag configja)      | nincs                      | `weekly`                               | `rotate 4`                                     | <https://ubuntumanual.org/configuring-log-rotation-of-apache2-and-other-logs/>; <https://askubuntu.com/questions/443232/log-file-rotation-setting>                          |
+| Red Hat Enterprise Linux                | nincs                      | `weekly`                               | `rotate 4`                                     | <https://docs.redhat.com/en/documentation/Red_Hat_Enterprise_Linux/6/html/deployment_guide/s2-log_rotation>; RHEL 4 útmutató: "rotate every week and keep four weeks worth" |
+| Kubernetes `kubelet`                    | `containerLogMaxSize` 10Mi | nincs                                  | `containerLogMaxFiles` 5 (az aktívval együtt)  | <https://kubernetes.io/docs/concepts/cluster-administration/logging/>; <https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/>                            |
+| Docker `local` driver                   | `max-size` 20m             | nincs                                  | `max-file` 5 (az aktívval együtt)              | <https://docs.docker.com/engine/logging/drivers/local/>                                                                                                                     |
+| `pm2-logrotate` (Node)                  | `max_size` 10M             | `rotateInterval` `0 0 * * *` (naponta) | `retain` 30 (forgatott fájl, az aktív mellett) | <https://github.com/keymetrics/pm2-logrotate/blob/master/README.md>; <https://www.npmjs.com/package/pm2-logrotate>                                                          |
+| Spring Boot (Log4j2 rolling policy)     | `max-file-size` 10MB       | nincs megnevezve                       | `max-history` 7                                | <https://docs.spring.io/spring-boot/reference/features/logging.html>                                                                                                        |
+
+**Idézetek (rövid):**
+
+- logrotate példa config: "rotate log files weekly / weekly", "keep 4 weeks worth of backlogs / rotate 4".
+  A RHEL 6 útmutató ugyanezt a két sort mutatja, és kimondja: "rotated log files are kept for four weeks".
+  A `logrotate(8)` oldal a `rotate` direktívára: "Log files are rotated count times before being removed"
+  (<https://manpages.debian.org/bookworm/logrotate/logrotate.8.en.html>), vagyis a `count` a forgatott
+  példányok száma, az aktív fájlon felül.
+- Kubernetes: "`containerLogMaxSize` (default 10Mi) and `containerLogMaxFiles` (default 5)"; a kubelet
+  config referencia: `containerLogMaxFiles` "Defines the maximum number of container log files that can be
+  present for a container ... The default value is 5", `containerLogMaxSize` "The default value is 10Mi".
+- Docker `local`: "`max-size` ... Defaults to 20m", "`max-file` ... The maximum number of log files that can
+  be present ... Defaults to 5"; a lap összegzése: "a 20M default size for each file and a default count of
+  5".
+- `pm2-logrotate`: "`max_size` (Defaults to `10M`)", "`retain` (Defaults to `30` file logs) ... if you have
+  retain = 7 you will have at most 7 rotated logs and your current one", "`rotateInterval` (Defaults to
+  `0 0 * * *` everyday at midnight)".
+- Spring Boot: "`logging.log4j2.rollingpolicy.max-file-size` ... (defaults to 10MB)",
+  "`logging.log4j2.rollingpolicy.max-history` ... (defaults to 7)".
+
+**Megvizsgált, de nem használható jelöltek:**
+
+- Docker `json-file`: `max-size` alapértéke -1 (korlátlan), `max-file` alapértéke 1 és csak `max-size`
+  mellett hat (<https://docs.docker.com/engine/logging/drivers/json-file/>); a `daemon.json` minta
+  `10m` / `3` értéke példa, nem alapérték.
+- `winston-daily-rotate-file`: `maxSize` és `maxFiles` alapértéke `null`, "If not set, no logs will be
+  removed" (<https://github.com/winstonjs/winston-daily-rotate-file/blob/master/README.md>); a
+  `rotating-file-stream` `size`, `interval`, `maxFiles`, `maxSize` alapértéke `null`
+  (<https://www.npmjs.com/package/rotating-file-stream>). Egyik sem ad számot.
+- `systemd-journald`: a határok a fájlrendszer százalékában állnak (`SystemMaxUse` 10 százalék, legfeljebb
+  4G; `MaxFileSec` egy hónap; `SystemMaxFiles` 100), tehát a méretet nem fordítják le egy fájl
+  méretére (<https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html>). A `pino-roll`
+  nem ismeri a hónapot.
+- OWASP Logging Cheat Sheet: nem ad megőrzési számot. A "Disposal of logs" szakasz szerint a naplót nem
+  szabad "destroyed before the duration of the required data retention period", és nem szabad tovább
+  tartani; "Legal, regulatory and contractual obligations may impact on these periods"; a "Verification"
+  szakasz kéri: "Ensure logging cannot be used to deplete system resources, for example by filling up disk
+  space" (<https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Logging_Cheat_Sheet.md>).
+  Ebből a korlát megléte következik (méret és darabszám), a szám nem.
+- `pino-roll` README és a telepített forrás: nincs alapérték (10.5). Az npm legfrissebb kiadása
+  `4.0.0` (<https://registry.npmjs.org/pino-roll/latest>, 2026-10-26), tehát a GitHub `main` README-jében
+  szereplő `weekly` kiadott verzióban nincs.
+
+**A választás.**
+
+| Változó                          | Érték                                 | Indok                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EASTER_LOG_ROTATION_SIZE`       | `10m`                                 | Három független rendszer szállított alapértéke ugyanaz a 10 mebibájt: kubelet (10Mi), `pm2-logrotate` (10M), Spring Boot (10MB). A `pino-roll` `m` utótagja 1024 négyzet bájt (`lib/utils.js:11-27`, M-146: `parseSize('10m')` = 10485760), azaz pontosan a kubelet 10Mi értéke. A Docker `local` 20m értéke egyetlen forrás, ezért nem döntő.                                                                                                                  |
+| `EASTER_LOG_RETAINED_FILE_COUNT` | `4`                                   | A forgatott példányok száma a `logrotate` `rotate 4` értéke (Debian, Ubuntu, RHEL, upstream), és ugyanaz a kubelet és a Docker `local` "5 fájl az aktívval együtt" értéke is (4 forgatott plusz 1 aktív). A `pino-roll` `limit.count` jelentése is "in addition to the active file" (README), tehát a számok közvetlenül megfelelnek. A `pm2-logrotate` 30 és a Spring 7 értéke egymásnak ellentmond, ezért a darabszámot nem döntik el.                        |
+| `EASTER_LOG_ROTATION_FREQUENCY`  | `604800000` (7 nap ezredmásodpercben) | A rendszer szintű szabvány a `weekly` (három disztribúció és az upstream példa, egyező `rotate 4` mellett). A `pino-roll` `4.0.0` a `weekly` értéket nem ismeri (`lib/utils.js:29-46`, a kiadott README sem), ezért a hét ezredmásodpercben. Az alkalmazás szintű `daily` (`pm2-logrotate`, Spring dátum minta) nem választott: a hozzájuk tartozó darabszám (30, illetve 7) nem egyezik, a `logrotate` és a kubelet viszont a `weekly` mellett egyező 4-et ad. |
+| `EASTER_LOG_DIRECTORY`           | `.data/logs/server`                   | **Nem iparági érték, user döntés 2026-10-26** ("a repo gyökerének `.data/logs/` mappája"). A `.data/` kizárt a gitből (`.gitignore:44`), és a `db` alapértelmezett fájlja is ott áll (`default-database-file-path.ts`). A változó fájl útvonal előtag (M-142): a napló `.data/logs/server.1.log`.                                                                                                                                                               |
+
+**M-146 (saját mérés, 2026-10-26).** A telepített `pino-roll@4.0.0` a választott értékekkel
+(`file: '.data/logs/server'`, `size: '10m'`, `frequency: 604800000`, `mkdir: true`, `limit.count: 4`), üres
+ideiglenes könyvtárban, Node `v26.7.0`. Eredmény: a `.data/logs` könyvtár létrejött (`mkdir: true`), a fájl
+`server.1.log`; `parseSize('10m')` = 10485760 bájt. **A hét határa:** `parseFrequency(604800000)` a hét
+elejét `2026-10-22T00:00:00.000Z`, a következőt `2026-10-29T00:00:00.000Z` értékre számolta; a forrás
+(`lib/utils.js:36-38`, `:56-58`) az időpontot `now - now % frequency` alakban számolja, tehát a határ az
+**Unix epochtól számolt hétszeres többszörös, UTC szerint csütörtök 00:00**, nem hétfő és nem helyi idő.
+A rotáció hetente tehát igaz, de csütörtök éjfélre (UTC) esik. A méret és az idő együtt is él: "Can be
+combined with frequency" (README), bármelyik előbb eléri a határát, forgat. A legrosszabb lemezigény:
+(4 forgatott plusz 1 aktív) szorozva 10 MiB, azaz 50 MiB.
+
+**Lelet, nem módosítottam (javaslat, nem döntés).** A `limit.count` a README szerint alapból csak a
+**jelenlegi folyamat** által létrehozott fájlokra érvényes ("When `false` or `undefined`, the `count`
+limit only applies to files generated by the current process"), a telepített forrásban
+`removeOldFiles` a `createdFileNames` listát törli (`lib/utils.js:205-211`). A
+`buildLogRotationOptions` (`packages/logger/src/log-rotation/build-log-rotation-options.ts`) nem állítja
+a `limit.removeOtherLogFiles` mezőt, tehát egy szerver újraindítás után a korábbi futások fájljai nem
+törlődnek: a darabszám korlát futásonként érvényes, nem a könyvtárra. Ha a korlátnak a könyvtárra kell
+szólnia, a `removeOtherLogFiles: true` mezőt kell beállítani; ez a SPEC-006 döntése, ezért itt nem
+nyúltam hozzá.
+
+### 13.2 `VITE_LIST_LIMIT`: 100
+
+A `GET /api/workflows` kezelő a `limit` darabszámnál levágja a listát, nincs lapozás
+(`apps/server/src/workflow-endpoint/list-workflows.ts:35`); a protokoll `limit` mezője pozitív egész, felső
+korlát nélkül (`packages/protocol/src/workflow/workflow-record.ts:66`, `run/run-record.ts:61`). A web
+a workflow listát és a futás előzményeket ugyanezzel az egy értékkel kéri.
+
+| Rendszer                             | Alapérték        | Felső korlát      | Forrás                                                                                                                                                                                                                    |
+| ------------------------------------ | ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stripe `limit`                       | 10               | 100               | <https://docs.stripe.com/api/pagination> ("default is 10", "ranging between 1 and 100")                                                                                                                                   |
+| GitLab `per_page`                    | 20               | 100               | <https://docs.gitlab.com/api/rest/> ("default: `20`, max: `100`")                                                                                                                                                         |
+| Spring Data `size`                   | 20               | 2000              | <https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions-web.html> ("Defaults to 20"); a forrás `DEFAULT_MAX_PAGE_SIZE = 2000`                                                                  |
+| GitHub REST `per_page`               | 30               | 100               | <https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api> ("For most endpoints, the maximum value of `per_page` is `100`"); <https://docs.github.com/en/rest/issues/issues> ("Default: `30`") |
+| Jira Cloud `maxResults`              | 50               | végpontonként más | <https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/>; az Atlassian kimondja, hogy az alapérték és a maximum "not considered part of the API"                                                              |
+| Google AIP-158 `page_size`           | az API választja | az API választja  | <https://google.aip.dev/158> ("the API chooses an appropriate default, which the API should document"); a példában 50 és 1000                                                                                             |
+| Slack `limit` (`conversations.list`) | 100              | 1000 alatt        | <https://docs.slack.dev/reference/methods/conversations.list> ("Default: `100`"); <https://docs.slack.dev/apis/web-api/pagination> ("We recommend `100`-`200` results at a time")                                         |
+
+**Következtetés.** Alapértékre nincs egyetlen iparági szám: a szállított alapértékek 10 és 100 között
+szórnak (10, 20, 20, 30, 50, 100), tehát az "alapérték" nem dönt. Két dolog viszont egyezik:
+
+1. **A felső korlát.** A három legelterjedtebb REST API (GitHub, Stripe, GitLab) mind **100**-nál
+   korlátoz, a Slack alapértéke 100, és kimondott ajánlása "100-200".
+2. **A lapozás hiánya a mi oldalunkon.** A Google AIP-158 hátrányként nevezi meg, hogy egy kis alapértékkel
+   (példa: 50) bevezetett lapozás eltöri azt a klienst, amely mindent vár ("it was getting all resources,
+   and now is only getting the first 50"). A mi kezelőnk csendben levág, tehát minden, a gyűjtemény
+   méreténél kisebb érték sorokat rejt el.
+
+**Választás: 100.** A Slack alapértéke és ajánlásának alsó határa, a GitHub, Stripe és GitLab közös
+felső korlátja, vagyis a legnagyobb érték, amit a legelterjedtebb API-k módosítás nélkül elfogadnak. **Mennyire
+közeli:** ez nem egy "leggyakoribb alapérték" (azok 10 és 50 közt vannak), hanem a közös felső korlát és egy
+dokumentált ajánlás; a lapozás hiánya miatt a nagyobb érték az iparági minta szerinti óvatos irány. **A
+hatása nem szűnik meg:** 100 felett a lista továbbra is csendben levágódik, amit az érték nem old meg,
+csak a lapozás (nem ennek a specnek a hatóköre).
+
+### 13.3 `VITE_STREAM_REPLAY_LIMIT`: 100
+
+**Mit csinál a kódban.** A `replayLimit` a pótlás **lapmérete**, nem plafon: a szerver
+`readEventsSince(runId, kurzor, replayLimit)` hívást ismétel, amíg a lap tele jön vissza
+(`apps/server/src/stream-connection/handle-stream-connection.ts:131-153`), és az élő lecsapolás is így
+lapoz (`:185-198`). A web `fromEventId: 0` értékkel és ezzel a számmal iratkozik fel
+(`apps/web/src/run-view/RunViewScreen.tsx:455`). Egy futás teljes története tehát mindig újrajátszódik,
+a szám csak azt dönti el, hány sor jön egy adatbázis olvasásra. A protokoll mezője pozitív egész, felső
+korlát nélkül (`packages/protocol/src/event-stream/stream-subscription.ts:13`).
+
+**Közvetlenül alkalmazható iparági alapérték nincs.** Amit találtam:
+
+- **SSE hubok újrajátszása.** A Mercure a `Last-Event-ID` után mindent újrajátszik, lapozás nélkül; a Bolt
+  tároló megőrzési határának alapértéke "`size 0` default disables automatic retention limits"
+  (<https://mercure.rocks/docs/concepts/reconnection-and-history>, a specifikáció:
+  <https://mercure.rocks/spec>: "the hub SHOULD send all events published after the one bearing this
+  identifier"). Ez a mi "mindent újrajátszunk" viselkedésünkkel egyezik, de lapméretet nem ad, tehát
+  **számra nem használható**. Más hubot (Nchan, Pusher) nem vizsgáltam.
+- **Eseménynapló lapok, kurzoros olvasás.** Ugyanaz a művelet (időrendi, append-only napló egy lapja),
+  szállított alapértékkel: Slack `conversations.history` `limit` alapértéke 100, maximuma 999, ajánlása
+  "100-200" (<https://docs.slack.dev/reference/methods/conversations.history>,
+  <https://docs.slack.dev/apis/web-api/pagination>); Ably csatorna előzmény `limit` alapértéke 100,
+  maximuma 1000 (<https://ably.com/docs/pub-sub/api/javascript/rest/channel>: "Default: 100. Maximum:
+  1000"); Grafana Loki `query_range` `limit` alapértéke 100 ("The max number of entries to return. It
+  defaults to `100`", <https://grafana.com/docs/loki/latest/reference/loki-http-api>).
+
+**Választás: 100.** Három független, nagy rendszer ugyanazt a számot adja a legközelebbi analóg
+műveletre. **Mennyire közeli:** közepesen. A művelet ugyanaz (egy lap egy időrendi eseménynaplóból, kurzorral),
+a szerep is (sorok száma olvasásonként), de azok a kliens által lapozott REST hívások, a miénk szerver oldali
+ciklus egy SSE csatorna mögött; SSE specifikus lapméret iparági forrásban nem található. Mivel a szám
+nem plafon, a rossz érték nem veszít eseményt, csak olvasások számát változtatja.
+
+### 13.4 Összegzés
+
+| Változó                          | Érték               | Forrás típusa                                                                 | Közelség                                             |
+| -------------------------------- | ------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `EASTER_LOG_ROTATION_SIZE`       | `10m`               | három szállított alapérték (kubelet, pm2-logrotate, Spring)                   | közeli (fájlnapló forgatás)                          |
+| `EASTER_LOG_RETAINED_FILE_COUNT` | `4`                 | `logrotate` `rotate 4` (három disztribúció), kubelet és Docker `local` 5 fájl | közeli                                               |
+| `EASTER_LOG_ROTATION_FREQUENCY`  | `604800000`         | `logrotate` `weekly` (három disztribúció), ezredmásodpercben                  | közeli, a `weekly` név hiánya miatt számként         |
+| `EASTER_LOG_DIRECTORY`           | `.data/logs/server` | user döntés (nem iparági)                                                     | nem értelmezhető                                     |
+| `VITE_LIST_LIMIT`                | `100`               | Slack alapérték és ajánlás, GitHub, Stripe, GitLab közös maximuma             | közepes: közös korlát, nem közös alapérték           |
+| `VITE_STREAM_REPLAY_LIMIT`       | `100`               | Slack, Ably, Loki előzmény alapértéke                                         | közepes: ugyanaz a művelet, de kliens oldali lapozás |

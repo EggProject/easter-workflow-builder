@@ -2,7 +2,7 @@
 
 |          |                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz  | jóváhagyott, végrehajtásra kész (a user döntései 2026-10-26, 11. szekció). Két dolog marad nyitva, egyik sem blokkolja a végrehajtást: a 11.2 forrás nélküli értékei (a user adja meg) és az O-20 (a `tools/wire-probe` kulcsneve, addig változatlan).                                                                                                                                                            |
+| Státusz  | jóváhagyott, végrehajtásra kész (a user döntései 2026-10-26, 11. szekció). Minden tétel lezárva: a forrás nélküli értékekre a user a webes keresést kérte, az iparági ajánlás lett az alapérték (11.2, research 13.), az O-20 pedig a (b) opció (11.3: a `tools/wire-probe` is az `ANTHROPIC_AUTH_TOKEN` nevet olvassa).                                                                                          |
 | Dátum    | 2026-10-26                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Előzmény | [`SPEC-000-provider-wire-measurement.md`](SPEC-000-provider-wire-measurement.md) (a leírók, a titokkezelés), [`SPEC-004-vegrehajto-motor.md`](SPEC-004-vegrehajto-motor.md) (11.3, 10. és 11. sor: a kimenő env), [`SPEC-006-szerver-alkalmazas.md`](SPEC-006-szerver-alkalmazas.md) (3.2, 6.6, 7.3, O-1 ... O-8), [`SPEC-007-frontend-alkalmazas.md`](SPEC-007-frontend-alkalmazas.md) (O-4, O-6, 45. kritérium) |
 | Bemenet  | [`../research/2026-10-26-helyi-inditas-es-valodi-proba.md`](../research/2026-10-26-helyi-inditas-es-valodi-proba.md) (M-141 ... M-145, a források és a 10. szekció forrásolt alapértékei); a hatókör hiányleltár H-40 és H-42 tétele (`docs/research/2026-10-26-hatokor-hianyleltar.md`, a `feat/spec-009-beallitasok` branchen)                                                                                  |
@@ -30,19 +30,19 @@ változók. A kapcsolat teszt is ugyanezen az úton megy.
    indítási leírása (4.).
 3. A valódi provider próba alakja, helye, korlátai és a futtatás engedélyhez kötése (5.).
 
-**A user döntései (2026-10-26)** a 11. szekció mind a tizenkilenc tételére megszülettek (a táblában
+**A user döntései (2026-10-26)** a 11. szekció mind a húsz tételére megszülettek (a táblában
 "Lezárva" jelöléssel); a legfontosabbak: a MiniMax kulcs neve a szerver környezetében
 `ANTHROPIC_AUTH_TOKEN` (O-1), a tiltott listák a hivatalos hitelesítési sorrend szerint bővülnek (O-2,
 O-4), a `CLAUDE_CODE_OAUTH_TOKEN` nem tiltott (O-3), a szerverre figyelő módú `dev` script kell (O-6),
-és ahol a konfigurációs számra **van elsődleges forrás, ott az alapérték a kódban áll** (O-10, "de akkor
-keress forrást! legyen default érték beállítva!").
+és a konfigurációs számok alapértéke a kódban áll (O-10, "de akkor keress forrást! legyen default érték
+beállítva!"). Ahol a keresés elsődleges forrást talált, az a forrás; ahol a `pino-roll` és a szabványok nem
+adtak számot, a user második döntése ("webes keresés! mi az ajánlás! nehogy már én találjak ki mindent,
+amikor ezeket az ipar már kitalálta!") alapján az **iparági bevett gyakorlat** (11.2, research 13.), a
+`tools/wire-probe` pedig szintén az `ANTHROPIC_AUTH_TOKEN` nevet olvassa (O-20, 11.3).
 
 ### Amit NEM dönt el (nem cél)
 
 - Éles telepítés, folyamatfelügyelet, HTTPS, hitelesítés a szerver előtt.
-- A **forrás nélküli** konfigurációs számok értéke (napló rotáció, megőrzés, napló útvonal, lista és
-  visszajátszás lapméret): rájuk a keresés nem talált elsődleges forrást (research 10.), és ez a spec
-  sem talál ki értéket; a 11.2 listában a user adja meg őket.
 - A SPEC-009 egyéb tárgyai (`mcpServers`, `settingSources`, skill, Beállítások képernyő).
 - A `MiniMax-M3`-on kívüli modell. Más MiniMax modellt ez a spec nem említ és nem próbál.
 
@@ -222,23 +222,31 @@ alapértelmezett adatbázis a megszokott `.data/easter-workflow-builder.sqlite` 
   változatlan marad; az indítási leírás nem erre épül. A `bun run --filter <név>` csomag nevére szűrése a
   T-013-6 lépésben igazolandó (M-144 a `--filter` munkakönyvtárát mérte, a csomag név alakot nem).
 - **`turbo.json`.** Az `ANTHROPIC_AUTH_TOKEN` már szerepel a `globalPassThroughEnv` listában (a kódban
-  változás nem kell); a `MINIMAX_API_KEY` sor sorsa az O-20 döntésétől függ (11.3).
+  változás nem kell); a `MINIMAX_API_KEY` sor **kikerül** (O-20 (b), user döntés 2026-10-26: a
+  `tools/wire-probe` is az `ANTHROPIC_AUTH_TOKEN` nevet olvassa, 11.3; PLAN-013 T-013-12).
 
-### 4.2 Alapértékek a kódban (O-10, user döntés 2026-10-26: forrásolt alapérték)
+### 4.2 Alapértékek a kódban (O-10, user döntés 2026-10-26: forrásolt alapérték, ahol nincs, iparági ajánlás)
 
-**A szabály.** Ahol a konfigurációs értékre **van elsődleges forrás** (research 10.), az érték alapértékként
-a kódban áll: a szerver és a web config olvasója az env változó hiányában (nincs beállítva, vagy üres)
-az alapértéket használja. **Megadott, de érvénytelen értékre továbbra is hibaág jön** (a mai
-`invalid_env_variable`), nem csendes visszaesés az alapértékre. Ahol nincs forrás (11.2), a változó
-kötelező marad, alapérték nélkül. Ez a SPEC-006 O-1 ... O-4 és a SPEC-007 O-4, O-6 "alapérték nélkül"
-döntéseinek szűkítése: csak a forrásolt értékekre (a két spec jelzést kapott).
+**A szabály.** Minden konfigurációs értéknek **alapértéke van a kódban**: a szerver és a web config olvasója
+az env változó hiányában (nincs beállítva, vagy üres) az alapértéket használja. **Megadott, de érvénytelen
+értékre továbbra is hibaág jön** (a mai `invalid_env_variable`), nem csendes visszaesés az alapértékre. Az
+alapérték forrása háromféle: elsődleges forrás (research 10.), iparági ajánlás (user döntés 2026-10-26:
+"webes keresés! mi az ajánlás!", research 13.), vagy kimondott user döntés (a port, a napló útvonal). Ez a
+SPEC-006 O-1 ... O-4 és a SPEC-007 O-4, O-6 "alapérték nélkül" döntéseit **teljesen felülírja** (a két spec
+jelzést kapott).
 
-| Változó                                | Alapérték               | Forrás (research 10.)                                                                                          | Hol áll a kódban                                                 |
-| -------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11., SPEC-008 3.)                                            | `apps/server/src/server-config/`, új `default-server-config.ts`  |
-| `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` | `15000`                 | WHATWG HTML 9.2.7 "every 15 seconds or so"; axum `KeepAlive` és `sse-starlette` alapértéke 15 másodperc (10.1) | ugyanott                                                         |
-| `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` `'localhost'` és `server.port` `5173` alapértéke, user port döntés (10.3)                   | `apps/web/src/frontend-config/`, új `default-frontend-config.ts` |
-| `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe (`continue-startup-with-database.ts:74`) és a user port döntés (10.2, 10.4)    | ugyanott                                                         |
+| Változó                                | Alapérték               | Forrás (research 10.)                                                                                                                                                                                                                                | Hol áll a kódban                                                 |
+| -------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11., SPEC-008 3.)                                                                                                                                                                                  | `apps/server/src/server-config/`, új `default-server-config.ts`  |
+| `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` | `15000`                 | WHATWG HTML 9.2.7 "every 15 seconds or so"; axum `KeepAlive` és `sse-starlette` alapértéke 15 másodperc (10.1)                                                                                                                                       | ugyanott                                                         |
+| `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` `'localhost'` és `server.port` `5173` alapértéke, user port döntés (10.3)                                                                                                                                                         | `apps/web/src/frontend-config/`, új `default-frontend-config.ts` |
+| `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe (`continue-startup-with-database.ts:74`) és a user port döntés (10.2, 10.4)                                                                                                                                          | ugyanott                                                         |
+| `EASTER_LOG_DIRECTORY`                 | `.data/logs/server`     | user döntés 2026-10-26: a repo gyökerének `.data/logs/` mappája (a `.data/` kizárt a gitből, `.gitignore:44`); **fájl útvonal előtag**, a napló `.data/logs/server.1.log` (M-142, M-146)                                                             | ugyanott                                                         |
+| `EASTER_LOG_ROTATION_SIZE`             | `10m`                   | user döntés 2026-10-26: iparági ajánlás, forrással. Szállított alapérték: kubelet `containerLogMaxSize` 10Mi, `pm2-logrotate` `max_size` 10M, Spring Boot `max-file-size` 10MB (research 13.1); a `pino-roll` `m` utótagja 1024 négyzet bájt (M-146) | ugyanott                                                         |
+| `EASTER_LOG_ROTATION_FREQUENCY`        | `604800000`             | user döntés 2026-10-26: iparági ajánlás, forrással. A `logrotate` `weekly` (Debian, Ubuntu, RHEL, upstream), ezredmásodpercben, mert a `pino-roll` 4.0.0 a `weekly` nevet nem ismeri; a határ UTC csütörtök 00:00 (research 13.1, M-146)             | ugyanott                                                         |
+| `EASTER_LOG_RETAINED_FILE_COUNT`       | `4`                     | user döntés 2026-10-26: iparági ajánlás, forrással. A `logrotate` `rotate 4` (forgatott példányok, az aktív fájlon felül), kubelet és Docker `local`: 5 fájl az aktívval együtt; a `pino-roll` `limit.count` jelentése ugyanez (research 13.1)       | ugyanott                                                         |
+| `VITE_LIST_LIMIT`                      | `100`                   | user döntés 2026-10-26: iparági ajánlás, forrással. Slack alapérték és ajánlás ("100-200"), a GitHub, Stripe és GitLab közös maximuma (research 13.2)                                                                                                | ugyanott                                                         |
+| `VITE_STREAM_REPLAY_LIMIT`             | `100`                   | user döntés 2026-10-26: iparági ajánlás, forrással. Ugyanaz a művelet (esemény napló lapja): Slack `conversations.history`, Ably history, Loki `query_range` alapértéke 100; **lapméret, nem plafon** (research 13.3)                                | ugyanott                                                         |
 
 - **Egy fájl, egy exportált egység.** A szerver oldali fájl egyetlen csak olvasható objektumot exportál
   (`as const satisfies`, `as` nélkül), a web oldali is. Mindkettő kommentje a research szekció azonosítóját
@@ -247,14 +255,28 @@ döntéseinek szűkítése: csak a forrásolt értékekre (a két spec jelzést 
   ugyanebből a fájlból veszi (importálja), így a literál nem duplázódik, és a `vite.config.ts` továbbra sem
   tartalmaz origin literált. A `greppable-invariants` (8) kapuja ennek megfelelően szűkül: a
   `localhost|127.0.0.1|:5173|:3001` minta tiltott marad minden termékfájlban, **kivéve** a
-  `default-frontend-config.ts` fájlt; a `?? <szám>` tiltás a `read-frontend-config.ts` fájlban marad. A (13)
-  változatlan. Ez a szabálykönyv 11. szekciójának és a SPEC-007 45. kritériumának szűkítése (user döntés
+  `default-frontend-config.ts` fájlt; a `?? <szám>` tiltás a `read-frontend-config.ts` fájlban marad. A
+  `listLimit` és a `streamReplayLimit` alapértéke is a `default-frontend-config.ts` fájlban áll, az olvasó
+  onnan veszi, `?? <szám>` alak nélkül; a (8) idő szám ága (`*Ms`, `duration`, `setTimeout`) ezeket a
+  kulcsokat nem érinti. A (13) változatlan. Ez a szabálykönyv 11. szekciójának és a SPEC-007 45. kritériumának szűkítése (user döntés
   2026-10-26); a szabálykönyv szövege a kóddal együtt változik (6., 10.).
 - **Kockázat, kimondva.** A web alapérték elfedi a hiányzó build konfigurációt: egy éles build `VITE_*`
   nélkül csendben a helyi címekre mutat. Éles telepítés nem cél (1.), a döntést a user hozta (11.).
+- **A lista levágás kockázata, kimondva.** A `VITE_LIST_LIMIT` értéke 100, de a `GET /api/workflows`
+  kezelő a `limit` darabszámnál csendben levág (`list-workflows.ts:35`), nincs lapozás: 100 workflow
+  fölött a lista elrejti a többit. Az iparági ajánlás a számot adja, a lapozás hiányát nem oldja meg
+  (research 13.2); a lapozás nem ennek a specnek a hatóköre.
+- **A `pino-roll` darabszám korlát futásonként érvényes (lelet, nem módosítottam; javaslat, nem döntés).**
+  A `limit.count` alapból csak a jelenlegi folyamat fájljait törli (`removeOtherLogFiles` nincs beállítva a
+  `buildLogRotationOptions` függvényben), tehát egy újraindítás után a korábbi futások fájljai
+  megmaradnak. Ha a korlátnak a könyvtárra kell szólnia, a `removeOtherLogFiles: true` mező kell; ez a
+  SPEC-006 döntése (research 13.1).
 - **Az `EASTER_STREAM_DEV_ORIGIN` opcionális marad, alapérték nélkül** (levezetett pont, 11.4): a hiánya a
   "nincs CORS" biztonsági állapot (SPEC-006 5.7 1. pont), azt alapértékkel nem kapcsoljuk be.
-- **A kódban kitett forrás nélküli értékek** (11.2) nem kapnak alapértéket.
+- **A `EASTER_LOG_ROTATION_FREQUENCY` kódbeli alapértéke szám** (`604800000`), az env változó numerikus
+  sztringje a mai olvasó szerint számmá alakul (`readRotationFrequency`); egy névvel megadott `daily` vagy
+  `hourly` változatlanul átmegy. A `server-config.ts` doc kommentje a 4.0.0-ban nem létező `'weekly'` értéket
+  is felsorolja (research 10.5): a megvalósítás ezt a kommentet a `daily` és `hourly` értékre javítja.
 
 ### 4.3 Env minta (O-9: két fájl)
 
@@ -263,17 +285,22 @@ döntéseinek szűkítése: csak a forrásolt értékekre (a két spec jelzést 
   folyamatba (research 5.); egy közös fájl a szerver titkát is a Vite folyamatba vinné. A `.gitignore` a
   `.env` és `.env.*` fájlokat kizárja, a `.env.example` kivétel (minden mélységben).
 - Csak változónevek és forrással alátámasztott, nem titkos értékek; titok értéke soha (`.claude/CLAUDE.md` 7. és 9.).
-- **Forrásolt értékek, az alapértékkel egyezően** (a minta ezt mutatja, 4.2): `EASTER_SERVER_PORT=3001`,
-  `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS=15000`, `VITE_API_ORIGIN`, `VITE_STREAM_ORIGIN`. Az
+- **Minden érték az alapértékkel egyezően** (a minta ezt mutatja, 4.2): `EASTER_SERVER_PORT=3001`,
+  `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS=15000`, `EASTER_LOG_DIRECTORY=.data/logs/server`,
+  `EASTER_LOG_ROTATION_SIZE=10m`, `EASTER_LOG_ROTATION_FREQUENCY=604800000`,
+  `EASTER_LOG_RETAINED_FILE_COUNT=4`, `VITE_API_ORIGIN`, `VITE_STREAM_ORIGIN`, `VITE_LIST_LIMIT=100`,
+  `VITE_STREAM_REPLAY_LIMIT=100`. Az
   `EASTER_STREAM_DEV_ORIGIN` mintaértéke a böngészőben megnyitott web origin (`http://localhost:5173`); a
   `localhost` és a `127.0.0.1` eltérő origin, a végleges literált a T-013-7 a futó dev szerveren mért
   `Origin` fejléccel igazolja.
-- **Forrás nélküli értékek üresen**, "kitöltendő" megjegyzéssel (11.2): `EASTER_LOG_DIRECTORY`,
-  `EASTER_LOG_ROTATION_SIZE`, `EASTER_LOG_ROTATION_FREQUENCY`, `EASTER_LOG_RETAINED_FILE_COUNT`,
-  `VITE_LIST_LIMIT`, `VITE_STREAM_REPLAY_LIMIT`. Az üres érték a config olvasó szerint hiányzónak számít.
+- **Megjegyzések a mintában:** minden sor megjegyzése megnevezi a forrást (research 13.). Az
+  `EASTER_LOG_ROTATION_FREQUENCY` megjegyzése kimondja, hogy 7 nap ezredmásodpercben, mert a `pino-roll`
+  4.0.0 a `weekly` nevet nem ismeri, és hogy a határ UTC csütörtök 00:00 (M-146). A `VITE_STREAM_REPLAY_LIMIT`
+  megjegyzése kimondja, hogy lapméret, nem plafon. A `VITE_LIST_LIMIT` megjegyzése kimondja, hogy 100 fölött
+  a lista levágódik.
 - Az `EASTER_LOG_DIRECTORY` megjegyzése kimondja, hogy **fájl útvonal előtag**, nem könyvtár: a napló a
-  `<érték>.1.log` fájlba kerül (M-142, O-19: a név félrevezető, csak a minta és a `README.md` magyarázza,
-  átnevezés nincs).
+  `<érték>.1.log` fájlba kerül, tehát `.data/logs/server.1.log` (M-142, M-146, O-19: a név félrevezető, csak
+  a minta és a `README.md` magyarázza, átnevezés nincs).
 - **Provider változók:** a `minimax` kulcs `ANTHROPIC_AUTH_TOKEN` néven (üresen, a megjegyzés kimondja:
   a MiniMax kulcs; a user `.env` fájljában a régi `MINIMAX_API_KEY` név helyett); a `claude-subscription`
   nem kér env változót (a `/login` hitelesítését használja). A mintában az `EASTER_DB_FILE` és az
@@ -285,7 +312,7 @@ Előfeltételek (Node, Bun, a pinelt verziók a `docs/research/2026-08-26-toolch
 szám nélkül), `bun install --frozen-lockfile`, az env minták másolása (`.env.example` -> `.env`,
 `apps/web/.env.example` -> `apps/web/.env`), a három script (4.1), a böngésző címe, a `claude-subscription`
 előfeltétele (Claude Code bejelentkezés), a **kulcs átnevezése** (a `.env` fájlban a `MINIMAX_API_KEY` helyett
-`ANTHROPIC_AUTH_TOKEN`), a forrás nélküli értékek kitöltése (11.2), és a valódi próba (5.) leírása a
+`ANTHROPIC_AUTH_TOKEN`), az alapértékek és a felülírásuk (4.2, 11.2: a napló, a lista és a visszajátszás értékei), és a valódi próba (5.) leírása a
 figyelmeztetéssel, hogy valódi tokenbe kerül. Kimondja: a szerver környezete az agenté is (8.), a
 `dev:server` újraindítása futó lépéssel nem mért, és az `EASTER_LOG_DIRECTORY` fájl útvonal előtag.
 
@@ -299,7 +326,8 @@ dev szerver, a SPEC-006 O-8 szerinti "nincs statikus kiszolgálás" változatlan
 - A kilenc kapu és az e2e nem olvas `.env` fájlt: a Playwright `webServer.env` mind a négy `VITE_`
   változót beállítja (`apps/web/playwright.config.ts:77-81`), és a Vite szerint a már létező
   változó nyer a `.env` fájl ellen (research 5.). Egy helyi `apps/web/.env` tehát az e2e buildet
-  nem változtatja meg, és a 4.2 web alapértékek sem érvényesülnek az e2e-ben; a PLAN-013 egy
+  nem változtatja meg, és a 4.2 web alapértékek sem érvényesülnek az e2e-ben (a `VITE_LIST_LIMIT` és a
+  `VITE_STREAM_REPLAY_LIMIT` sem); a PLAN-013 egy
   regressziós teszttel rögzíti, hogy a `webServer.env` mind a négy változót megadja.
 - Az új scriptek a `test` kapu lefedettségébe nem kerülnek. Az új `default-*-config.ts` fájlok `src/` alatti
   TypeScript, a tesztjük a 7. szerinti.
@@ -319,8 +347,9 @@ bizonyíték előállító eszköz a repóba tartozik).
 - **Saját szerver (O-13):** a próba saját szervert indít (gyermek folyamat, `apps/server/src/main.ts`),
   **ideiglenes adatbázissal és napló útvonallal** (az `EASTER_DB_FILE` és az `EASTER_LOG_DIRECTORY` egy
   ideiglenes könyvtárra mutat, a futás végén törlődik), szabad porton. A user adatbázisa érintetlen, a
-  próba megismételhető. A gyermek folyamat környezete a próba folyamaté (3.1 "teljes környezet"), a
-  forrás nélküli kötelező szerver változók a `.env` fájlból jönnek (11.2).
+  próba megismételhető. A gyermek folyamat környezete a próba folyamaté (3.1 "teljes környezet"); a napló
+  rotáció értékei a 4.2 alapértékekből jönnek, a próba csak az `EASTER_DB_FILE` és az `EASTER_LOG_DIRECTORY`
+  értékét írja felül (a user `.data/` mappája érintetlen).
 - **Lépései:**
   1. A szerver indítása; várakozás a `GET /api/providers` `200` válaszra.
   2. `PUT /api/settings` (a vizsgált provider mint alapértelmezett), `POST /api/workflows`,
@@ -373,24 +402,25 @@ találatot ad. A próba nem készít képernyőképet, videót, trace-t vagy PDF
 
 ## 6. Hova kerül a kód
 
-| Hely                                                                                                                                                   | Változás                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/engine` `engine-port`                                                                                                                        | a `ProcessEnvironmentPort` felsoroló metódusa                                                                                                                                                     |
-| `packages/engine` `provider-environment`                                                                                                               | a teljes kimenő környezet tiszta függvénye és tesztje                                                                                                                                             |
-| `packages/engine` `agent-step`, `engine-port`                                                                                                          | a hívás helye (`run-agent-step.ts`, `create-engine.ts`)                                                                                                                                           |
-| `packages/provider-claude-subscription`, `packages/provider-minimax`                                                                                   | a `disallowed-environment.ts` bővítése a 3.2 szerint; a `minimax` `required-environment.ts` `purpose` szövege (`ANTHROPIC_AUTH_TOKEN`, a `MINIMAX_API_KEY` név kivezetése)                        |
-| `packages/provider-capability`                                                                                                                         | új bizonyíték konstans a hitelesítési precedenciára; típusváltozás nincs (O-1 (b))                                                                                                                |
-| `apps/server` `engine-assembly`                                                                                                                        | a port valódi implementációja                                                                                                                                                                     |
-| `apps/server` új drift védelem téma                                                                                                                    | a 3.2 O-5 szabály mindkét irányú regressziós tesztje (a két leíró együtt csak itt látszik)                                                                                                        |
-| `apps/server` `server-config`                                                                                                                          | új `default-server-config.ts`; a `server-config.ts` olvasója a port és az életben tartás hiányában az alapértéket használja; az `environment-variable-name.ts` megjegyzései a forrásokra mutatnak |
-| `apps/web` `frontend-config`, `vite.config.ts`, `greppable-invariants`                                                                                 | új `default-frontend-config.ts`; az olvasó és a `vite.config.ts` onnan veszi az origin alapértéket; a (8) invariáns kivétele a 4.2 szerint                                                        |
-| gyökér `package.json`                                                                                                                                  | `start:server`, `dev:server`, `dev:web`, `probe:real-provider` (4.1, 5.1)                                                                                                                         |
-| `turbo.json`                                                                                                                                           | az `ANTHROPIC_AUTH_TOKEN` már szerepel; a `MINIMAX_API_KEY` sor sorsa az O-20 szerint                                                                                                             |
-| gyökér `.env.example`, `apps/web/.env.example`                                                                                                         | env minták (4.3)                                                                                                                                                                                  |
-| `README.md`                                                                                                                                            | indítási leírás, a kulcs átnevezése (4.4)                                                                                                                                                         |
-| `apps/server/measurement/`                                                                                                                             | a valódi próba eszköze (5.1)                                                                                                                                                                      |
-| `docs/research/`                                                                                                                                       | a próba eredménye, a mérések (T-013-1, T-013-5, T-013-6, T-013-7)                                                                                                                                 |
-| `packages/protocol` `provider-summary.spec.ts`, `apps/web` `GraphEditorScreen.spec.tsx`, `create-workflow-modal.spec.tsx`, `e2e/workflow-list.spec.ts` | a tesztfixtúrák `requiredEnvNames: ['MINIMAX_API_KEY']` sora `ANTHROPIC_AUTH_TOKEN`-re (a termék env neve; a teszt viselkedése nem változik)                                                      |
+| Hely                                                                                                                                                           | Változás                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/engine` `engine-port`                                                                                                                                | a `ProcessEnvironmentPort` felsoroló metódusa                                                                                                                                                                 |
+| `packages/engine` `provider-environment`                                                                                                                       | a teljes kimenő környezet tiszta függvénye és tesztje                                                                                                                                                         |
+| `packages/engine` `agent-step`, `engine-port`                                                                                                                  | a hívás helye (`run-agent-step.ts`, `create-engine.ts`)                                                                                                                                                       |
+| `packages/provider-claude-subscription`, `packages/provider-minimax`                                                                                           | a `disallowed-environment.ts` bővítése a 3.2 szerint; a `minimax` `required-environment.ts` `purpose` szövege (`ANTHROPIC_AUTH_TOKEN`, a `MINIMAX_API_KEY` név kivezetése)                                    |
+| `packages/provider-capability`                                                                                                                                 | új bizonyíték konstans a hitelesítési precedenciára; típusváltozás nincs (O-1 (b))                                                                                                                            |
+| `apps/server` `engine-assembly`                                                                                                                                | a port valódi implementációja                                                                                                                                                                                 |
+| `apps/server` új drift védelem téma                                                                                                                            | a 3.2 O-5 szabály mindkét irányú regressziós tesztje (a két leíró együtt csak itt látszik)                                                                                                                    |
+| `apps/server` `server-config`                                                                                                                                  | új `default-server-config.ts`; a `server-config.ts` olvasója a port és az életben tartás hiányában az alapértéket használja; az `environment-variable-name.ts` megjegyzései a forrásokra mutatnak             |
+| `apps/web` `frontend-config`, `vite.config.ts`, `greppable-invariants`                                                                                         | új `default-frontend-config.ts`; az olvasó és a `vite.config.ts` onnan veszi az origin alapértéket; a (8) invariáns kivétele a 4.2 szerint                                                                    |
+| gyökér `package.json`                                                                                                                                          | `start:server`, `dev:server`, `dev:web`, `probe:real-provider` (4.1, 5.1)                                                                                                                                     |
+| `tools/wire-probe` (`src/harness/environment.ts`, `src/proxy.ts`, a `proxy/mask.ts`, `probe.ts`, `cases/m-32.ts`, `harness/runner.ts` kommentjei, `CLAUDE.md`) | a mérő eszköz a kulcsot `ANTHROPIC_AUTH_TOKEN` néven olvassa (a `process.env`-ből, majd a gyökér `.env` fájlból), és ennek értékét maszkolja; a `MINIMAX_API_KEY` név kivezetve (O-20 (b), PLAN-013 T-013-12) |
+| `turbo.json`                                                                                                                                                   | az `ANTHROPIC_AUTH_TOKEN` már szerepel; a `MINIMAX_API_KEY` sor kikerül (O-20 (b))                                                                                                                            |
+| gyökér `.env.example`, `apps/web/.env.example`                                                                                                                 | env minták (4.3)                                                                                                                                                                                              |
+| `README.md`                                                                                                                                                    | indítási leírás, a kulcs átnevezése (4.4)                                                                                                                                                                     |
+| `apps/server/measurement/`                                                                                                                                     | a valódi próba eszköze (5.1)                                                                                                                                                                                  |
+| `docs/research/`                                                                                                                                               | a próba eredménye, a mérések (T-013-1, T-013-5, T-013-6, T-013-7)                                                                                                                                             |
+| `packages/protocol` `provider-summary.spec.ts`, `apps/web` `GraphEditorScreen.spec.tsx`, `create-workflow-modal.spec.tsx`, `e2e/workflow-list.spec.ts`         | a tesztfixtúrák `requiredEnvNames: ['MINIMAX_API_KEY']` sora `ANTHROPIC_AUTH_TOKEN`-re (a termék env neve; a teszt viselkedése nem változik)                                                                  |
 
 ---
 
@@ -408,13 +438,14 @@ találatot ad. A próba nem készít képernyőképet, videót, trace-t vagy PDF
 - **Az O-5 szabály (apps/server, futásidejű ág nélkül):** minden provider `p`-re és minden más provider
   `q` minden `secret: true` forrásnevére: a név `p` tiltott nevei közt van, vagy `p` saját `requiredEnv[]`
   nevei közt. Mindkét irányban fut; egy új provider vagy titok felvétele ezen bukik.
-- **Alapértékek (SPEC-012 4.2):** a `server-config.spec.ts` az `EASTER_SERVER_PORT` és az
-  `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` hiányára (nincs beállítva, üres) a `3001` és a `15000` értéket
-  várja; megadott érvénytelen értékre (`0`, `abc`) `invalid_env_variable` hibaágat; a forrás nélküli
-  kötelező változók (`EASTER_LOG_DIRECTORY`, `EASTER_LOG_ROTATION_SIZE`,
-  `EASTER_LOG_ROTATION_FREQUENCY`, `EASTER_LOG_RETAINED_FILE_COUNT`) hiányára továbbra is
-  `missing_env_variable` hibaágat. A `read-frontend-config.spec.ts` ugyanígy: az origin alapértékek, a
-  `VITE_LIST_LIMIT` és a `VITE_STREAM_REPLAY_LIMIT` hiányára hibaág. A `greppable-invariants` (8)
+- **Alapértékek (SPEC-012 4.2):** a `server-config.spec.ts` az `EASTER_SERVER_PORT`, az
+  `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS`, az `EASTER_LOG_DIRECTORY`, az `EASTER_LOG_ROTATION_SIZE`, az
+  `EASTER_LOG_ROTATION_FREQUENCY` és az `EASTER_LOG_RETAINED_FILE_COUNT` hiányára (nincs beállítva, üres) a
+  4.2 táblázat értékeit várja (`3001`, `15000`, `.data/logs/server`, `10m`, `604800000`, `4`; a
+  gyakoriság szám); megadott érvénytelen értékre (`0`, `abc`, a pozitív egész mezőkre) `invalid_env_variable`
+  hibaágat; a felülírás (megadott érvényes érték) az alapértéket váltja. A `read-frontend-config.spec.ts`
+  ugyanígy: az origin alapértékek, a `VITE_LIST_LIMIT` és a `VITE_STREAM_REPLAY_LIMIT` (`100`) hiányára az
+  alapérték, megadott érvénytelen értékre hibaág. A `greppable-invariants` (8)
   kivétele pozitív és negatív esettel (a literál a `default-frontend-config.ts` fájlban átmegy, máshol
   bukik).
 - **A `webServer.env` őr:** a `apps/web/playwright.config.ts` mind a négy `VITE_` változót megadja
@@ -464,8 +495,9 @@ találatot ad. A próba nem készít képernyőképet, videót, trace-t vagy PDF
    bejegyzések `reason` szövege a rang "nem ellenőrzött" voltát kimondja.
 7. A kimenő `env` értéke nem jelenik meg a `run_event` táblában és a naplóban (teszt).
 8. Az O-5 szabály mindkét irányú drift tesztje (7.) az `apps/server` alatt zöld.
-9. A termékkódban (a `tools/wire-probe` kivételével, O-20) a `MINIMAX_API_KEY` név nem szerepel: greppel
-   ellenőrizve, a kivételek megnevezve a PR leírásban.
+9. A termékkódban és a `tools/wire-probe` alatt (O-20 (b)) a `MINIMAX_API_KEY` név nem szerepel: greppel
+   ellenőrizve (a `docs/research/` mérési jegyzőkönyvei és a lezárt `PLAN-000` történeti hivatkozásai
+   kivételek, megnevezve a PR leírásban).
 
 ### Helyi indítás
 
@@ -473,17 +505,18 @@ találatot ad. A próba nem készít képernyőképet, videót, trace-t vagy PDF
     nélkül; a `dev:server` figyelő módban fut; a `dev:web` a webet indítja (4.1).
 11. A web és a szerver két külön parancs; a böngészőből a workflow lista betölt, az SSE kapcsolat
     él (kézi ellenőrzés, a lépés leírásával a research fájlban).
-12. A commitolt env minták titkot nem tartalmaznak; a forrásolt értékek a 4.2 táblával egyeznek, a forrás
-    nélküli számokhoz értéket nem adnak (üresek).
+12. A commitolt env minták titkot nem tartalmaznak; minden érték a 4.2 táblával egyezik, a megjegyzések a
+    forrást megnevezik.
 13. A `README.md` leírja az indítást, a kulcs átnevezését, a `claude-subscription` előfeltételét, a
-    forrás nélküli értékek kitöltését és a próbát.
+    az alapértékek felülírását (napló, lista, visszajátszás) és a próbát.
 14. A kilenc kapu és az e2e változatlanul zöld; a `webServer.env` négy változóját regressziós teszt őrzi.
 15. Az `EASTER_SERVER_PORT` hiányában a szerver `3001`-en, az `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS`
-    hiányában `15000`-rel indul; megadott érvénytelen érték hibaág; a forrás nélküli kötelező változók
-    hiánya továbbra is hibaág (unit, 7.).
+    hiányában `15000`-rel indul; a napló értékei hiányában a 4.2 táblázat szerint (`.data/logs/server`, `10m`,
+    `604800000`, `4`); megadott érvénytelen érték hibaág (unit, 7.).
 16. A web `VITE_API_ORIGIN` és `VITE_STREAM_ORIGIN` hiányában a 4.2 literálokat használja; a literálok
     egyetlen fájlban állnak, a `vite.config.ts` onnan importál, a `greppable-invariants` (8) kivétele
-    pozitív és negatív esettel tesztelt; a `VITE_LIST_LIMIT` és `VITE_STREAM_REPLAY_LIMIT` hiánya hibaág.
+    pozitív és negatív esettel tesztelt; a `VITE_LIST_LIMIT` és a `VITE_STREAM_REPLAY_LIMIT` hiányában a `100`
+    az alapérték (ugyanabban a fájlban), megadott érvénytelen érték hibaág.
 17. A T-013-7 a literálok helyességét a futó dev szerveren mért `Origin` fejléccel igazolja, az eredmény a
     research fájlban áll.
 
@@ -528,15 +561,16 @@ hivatkozása a SPEC-012 research 3. szekciójára (M-143) egészül ki.
 
 ### 10.2 A döntések átvezetése a többi dokumentumba
 
-| Dokumentum                                                               | Mi változik                                                                                                                                                 | Mikor                              |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| SPEC-006 (3.2, 6.6, 7.3, O-1 ... O-4)                                    | jelzés: "user döntés 2026-10-26: forrásolt alapérték" a port, az életben tartás időközére; a napló rotációra és útvonalra a "nincs forrás" állítás megmarad | ebben a commitban                  |
-| SPEC-007 ("Amit NEM dönt el", 9.3, O-4, O-6, 45. kritérium)              | jelzés: az origin alapértékek forrásoltak; a lapméret és a visszajátszás limit "nincs forrás"; a 45. kritérium szűkítése                                    | ebben a commitban                  |
-| SPEC-000 leíró tábla (`requiredEnv[ANTHROPIC_AUTH_TOKEN]` sor, 720. sor) | "`process_env_passthrough` az `ANTHROPIC_AUTH_TOKEN` néven álló szerver env változóból" (a `MINIMAX_API_KEY` név helyett)                                   | PLAN-013 T-013-11                  |
-| SPEC-000 / szabálykönyv 9. szekció titokkezelési mondatai                | a termék oldalán a maszkolt érték az `ANTHROPIC_AUTH_TOKEN` értéke; a `tools/wire-probe` saját mérési változójára vonatkozó mondatok az O-20 szerint        | PLAN-013 T-013-11                  |
-| SPEC-004 11.3 (10. és 11. sor), `packages/engine` `CLAUDE.md`            | a kimenő `env` a 3.1 szerint                                                                                                                                | PLAN-013 T-013-11                  |
-| szabálykönyv 11. (port és proxy döntés, `greppable-invariants` (8))      | a forrásolt alapérték kivétele, a (8) szűkítése                                                                                                             | PLAN-013 T-013-7 (a kóddal együtt) |
-| `turbo.json`                                                             | a `MINIMAX_API_KEY` sor sorsa az O-20 szerint                                                                                                               | az O-20 döntése után               |
+| Dokumentum                                                               | Mi változik                                                                                                                                                                                                                                 | Mikor                              |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| SPEC-006 (3.2, 6.6, 7.3, O-1 ... O-4)                                    | jelzés: "user döntés 2026-10-26: forrásolt alapérték" a port, az életben tartás időközére; a napló rotációra és útvonalra "user döntés 2026-10-26: iparági ajánlás, forrással" (research 13.1)                                              | ebben a commitban                  |
+| SPEC-007 ("Amit NEM dönt el", 9.3, O-4, O-6, 45. kritérium)              | jelzés: az origin alapértékek forrásoltak; a lapméret és a visszajátszás limit "user döntés 2026-10-26: iparági ajánlás, forrással" (research 13.2, 13.3); a 45. kritérium szűkítése                                                        | ebben a commitban                  |
+| SPEC-000 leíró tábla (`requiredEnv[ANTHROPIC_AUTH_TOKEN]` sor, 720. sor) | "`process_env_passthrough` az `ANTHROPIC_AUTH_TOKEN` néven álló szerver env változóból" (a `MINIMAX_API_KEY` név helyett)                                                                                                                   | PLAN-013 T-013-11                  |
+| SPEC-000 / szabálykönyv 9. szekció titokkezelési mondatai                | a maszkolt érték (a termék oldalán és a `tools/wire-probe` mérő eszközén is) az `ANTHROPIC_AUTH_TOKEN` értéke (O-20 (b)); a SPEC-000 3. szekció maszkolás mondata, a 133. sor env minta, a 763. sor ellenőrzés, a szabálykönyv 9. szekciója | PLAN-013 T-013-11, T-013-12        |
+| SPEC-004 11.3 (10. és 11. sor), `packages/engine` `CLAUDE.md`            | a kimenő `env` a 3.1 szerint                                                                                                                                                                                                                | PLAN-013 T-013-11                  |
+| szabálykönyv 11. (port és proxy döntés, `greppable-invariants` (8))      | a forrásolt alapérték kivétele, a (8) szűkítése                                                                                                                                                                                             | PLAN-013 T-013-7 (a kóddal együtt) |
+| `tools/wire-probe` `CLAUDE.md` (76., 115., 118. sor)                     | a kulcs neve `ANTHROPIC_AUTH_TOKEN` (O-20 (b))                                                                                                                                                                                              | PLAN-013 T-013-12                  |
+| `turbo.json`                                                             | a `MINIMAX_API_KEY` sor kikerül (O-20 (b))                                                                                                                                                                                                  | PLAN-013 T-013-12                  |
 
 **Miért nem minden azonnal.** A szabálykönyv, a SPEC-000 és a SPEC-004 szövege olyan állapotot ír le, amit
 ma a kód és egy kapu még tart (például a `greppable-invariants` (8) a literálokat tiltja); a szöveg a kóddal
@@ -548,69 +582,84 @@ együtt, ugyanabban a commitban változik, különben a szabálykönyv ellentmon
 
 ### 11.1 A tételek
 
-Minden tétel a user 2026-10-26-i döntésével **lezárva**, kivéve ahol más áll. Az O-10 részben lezárt
-(a forrásolt értékek igen, a forrás nélküliek a 11.2 szerint nyitva), az O-20 új és nyitott (11.3).
+Minden tétel a user 2026-10-26-i döntésével **lezárva**. Az O-10 a forrás nélküli értékekkel együtt lezárt
+(a user második döntése: iparági ajánlás, 11.2), az O-20 a (b) opcióval lezárt (11.3).
 
-| ID   | Kérdés                                                                              | Döntés (user döntés 2026-10-26)                                                                                                                                                                                                                                                                                                          | Hol valósul meg |
-| ---- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| O-1  | Milyen néven álljon a MiniMax kulcs a szerver környezetében?                        | **Lezárva.** `ANTHROPIC_AUTH_TOKEN` (a (b) opció, a `MINIMAX_API_KEY` helyett); a kód változatlan. A usernek át kell neveznie a `.env` fájl bejegyzését. Következmények: 3.2, 3.4, 6., 10.2                                                                                                                                              | 2.4, 3.4, 4.3   |
-| O-2  | A `claude-subscription` tiltott listája a minimumon túl mit tartalmazzon?           | **Lezárva.** Minden, a hivatalos hitelesítési sorrendben a `/login` fölött álló env forrás (az `ANTHROPIC_PROFILE`, a két federációs név, a felhő provider választók), plusz az `ANTHROPIC_AWS`/`MANTLE` választók **"nem ellenőrzött" rang** jelöléssel                                                                                 | 3.2             |
-| O-3  | A `CLAUDE_CODE_OAUTH_TOKEN` tiltott legyen-e a `claude-subscription` providernél?   | **Lezárva.** Nem tiltott, átmegy: claude.ai előfizetéses hitelesítés                                                                                                                                                                                                                                                                     | 3.2             |
-| O-4  | A `minimax` tiltott listája bővüljön-e a teljes környezet miatt?                    | **Lezárva.** Igen: a felhő provider választók, az `ANTHROPIC_API_KEY`, a `CLAUDE_CODE_OAUTH_TOKEN`, a profil és a federációs nevek                                                                                                                                                                                                       | 3.2             |
-| O-5  | A kimenő környezetből kerüljenek-e ki a MÁSIK provider titok változói?              | **Lezárva.** Igen: minden lépés csak a saját providere titkait kapja. A megvalósítás a leírók tiltott listája és egy drift teszt, nem futásidejű gyűjtés (levezetett pont, 11.4)                                                                                                                                                         | 3.2, 7.         |
-| O-6  | Kapjon-e a szerver figyelő módú `dev` scriptet?                                     | **Lezárva.** Igen (a (b) opció): `dev:server`, a Node beépített `--watch` kapcsolójával és az `--env-file-if-exists`-szel, új függőség nélkül. Forrás: research 11. (M-145)                                                                                                                                                              | 4.1             |
-| O-7  | Honnan induljon a szerver?                                                          | **Lezárva.** A repo gyökeréből, gyökér `package.json` script (az (a) opció); az adatbázis a megszokott `.data/` alatt                                                                                                                                                                                                                    | 4.1             |
-| O-8  | Egy paranccsal induljon-e a web és a szerver?                                       | **Lezárva.** Két parancs, két terminál (az (a) opció); a turbo `strict` módja nem érinti, mert a scriptek nem turbo alatt futnak                                                                                                                                                                                                         | 4.1             |
-| O-9  | Egy vagy két env minta fájl?                                                        | **Lezárva.** Kettő: gyökér `.env.example` a szervernek, `apps/web/.env.example` a webnek (az (a) opció)                                                                                                                                                                                                                                  | 4.3             |
-| O-10 | A forrás nélküli konfigurációs számok kapjanak-e értéket a mintában?                | **Részben lezárva ("de akkor keress forrást! legyen default érték beállítva!").** Ahol van elsődleges forrás, az érték alapértékként a kódban áll, a minta ezt mutatja, a regressziós teszt őrzi (4.2); ez a SPEC-006 és SPEC-007 "alapérték nélkül" döntéseit szűkíti. Forrás: research 10. Ahol nincs forrás, szám nem született: 11.2 | 4.2, 11.2       |
-| O-11 | Szolgálja-e ki a szerver az épített webet (SPEC-006 O-8)?                           | **Lezárva.** Nem (az (a) opció): a helyi út a Vite dev szerver                                                                                                                                                                                                                                                                           | 4.5             |
-| O-12 | Hol éljen a valódi próba eszköze?                                                   | **Lezárva.** `apps/server/measurement/` (az (a) opció), gyökér script `probe:real-provider`                                                                                                                                                                                                                                              | 5.1             |
-| O-13 | A próba saját szervert indítson-e ideiglenes adatbázissal?                          | **Lezárva.** Igen: saját szerver, ideiglenes adatbázis és napló (az (a) opció)                                                                                                                                                                                                                                                           | 5.1             |
-| O-14 | A próba lépésének `maxTurns` értéke?                                                | **Lezárva.** `1`                                                                                                                                                                                                                                                                                                                         | 5.1             |
-| O-15 | A próba `maxBudgetUsd` értéke és a `run_finished` várakozás időkorlátja?            | **Lezárva.** Költségkeret nincs, időkorlát nincs (user döntés): a korlát a `maxTurns: 1`. A kockázat kimondva (8.)                                                                                                                                                                                                                       | 5.1, 8.         |
-| O-16 | Tiltsa-e a próba lépése az eszközöket?                                              | **Lezárva.** Nem, csak rövid, eszközt nem kérő prompt                                                                                                                                                                                                                                                                                    | 5.1             |
-| O-17 | Hívja-e a próba a kapcsolat tesztet is?                                             | **Lezárva.** Nem                                                                                                                                                                                                                                                                                                                         | 5.1             |
-| O-18 | Hol és mikor vezetjük át a SPEC-009 7.2, O-21 és M-137 tételét?                     | **Lezárva.** A `feat/spec-009-beallitasok` branchen történik; ezen a branchen nem; a spec itt csak jelzi (10.1)                                                                                                                                                                                                                          | 10.1            |
-| O-19 | Az `EASTER_LOG_DIRECTORY` név és a fájl útvonal jelentés eltérése (M-142)           | **Lezárva.** Most csak a minta és a `README.md` magyarázza (az (a) opció); átnevezés nincs                                                                                                                                                                                                                                               | 4.3, 4.4        |
-| O-20 | A `tools/wire-probe` saját mérési kulcsa (`MINIMAX_API_KEY`) mi legyen az O-1 után? | **NYITOTT**, lásd 11.3                                                                                                                                                                                                                                                                                                                   | 11.3            |
+| ID   | Kérdés                                                                              | Döntés (user döntés 2026-10-26)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Hol valósul meg |
+| ---- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| O-1  | Milyen néven álljon a MiniMax kulcs a szerver környezetében?                        | **Lezárva.** `ANTHROPIC_AUTH_TOKEN` (a (b) opció, a `MINIMAX_API_KEY` helyett); a kód változatlan. A usernek át kell neveznie a `.env` fájl bejegyzését. Következmények: 3.2, 3.4, 6., 10.2                                                                                                                                                                                                                                                                                                                               | 2.4, 3.4, 4.3   |
+| O-2  | A `claude-subscription` tiltott listája a minimumon túl mit tartalmazzon?           | **Lezárva.** Minden, a hivatalos hitelesítési sorrendben a `/login` fölött álló env forrás (az `ANTHROPIC_PROFILE`, a két federációs név, a felhő provider választók), plusz az `ANTHROPIC_AWS`/`MANTLE` választók **"nem ellenőrzött" rang** jelöléssel                                                                                                                                                                                                                                                                  | 3.2             |
+| O-3  | A `CLAUDE_CODE_OAUTH_TOKEN` tiltott legyen-e a `claude-subscription` providernél?   | **Lezárva.** Nem tiltott, átmegy: claude.ai előfizetéses hitelesítés                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 3.2             |
+| O-4  | A `minimax` tiltott listája bővüljön-e a teljes környezet miatt?                    | **Lezárva.** Igen: a felhő provider választók, az `ANTHROPIC_API_KEY`, a `CLAUDE_CODE_OAUTH_TOKEN`, a profil és a federációs nevek                                                                                                                                                                                                                                                                                                                                                                                        | 3.2             |
+| O-5  | A kimenő környezetből kerüljenek-e ki a MÁSIK provider titok változói?              | **Lezárva.** Igen: minden lépés csak a saját providere titkait kapja. A megvalósítás a leírók tiltott listája és egy drift teszt, nem futásidejű gyűjtés (levezetett pont, 11.4)                                                                                                                                                                                                                                                                                                                                          | 3.2, 7.         |
+| O-6  | Kapjon-e a szerver figyelő módú `dev` scriptet?                                     | **Lezárva.** Igen (a (b) opció): `dev:server`, a Node beépített `--watch` kapcsolójával és az `--env-file-if-exists`-szel, új függőség nélkül. Forrás: research 11. (M-145)                                                                                                                                                                                                                                                                                                                                               | 4.1             |
+| O-7  | Honnan induljon a szerver?                                                          | **Lezárva.** A repo gyökeréből, gyökér `package.json` script (az (a) opció); az adatbázis a megszokott `.data/` alatt                                                                                                                                                                                                                                                                                                                                                                                                     | 4.1             |
+| O-8  | Egy paranccsal induljon-e a web és a szerver?                                       | **Lezárva.** Két parancs, két terminál (az (a) opció); a turbo `strict` módja nem érinti, mert a scriptek nem turbo alatt futnak                                                                                                                                                                                                                                                                                                                                                                                          | 4.1             |
+| O-9  | Egy vagy két env minta fájl?                                                        | **Lezárva.** Kettő: gyökér `.env.example` a szervernek, `apps/web/.env.example` a webnek (az (a) opció)                                                                                                                                                                                                                                                                                                                                                                                                                   | 4.3             |
+| O-10 | A forrás nélküli konfigurációs számok kapjanak-e értéket a mintában?                | **Lezárva.** Első döntés ("de akkor keress forrást! legyen default érték beállítva!"): ahol van elsődleges forrás, az érték alapértékként a kódban áll, a minta ezt mutatja, a regressziós teszt őrzi (4.2); forrás: research 10. Második döntés ("webes keresés! mi az ajánlás! nehogy már én találjak ki mindent, amikor ezeket az ipar már kitalálta!"): ahol nincs, az **iparági bevett gyakorlat** az alapérték, forrással (research 13.); ez a SPEC-006 és SPEC-007 "alapérték nélkül" döntéseit teljesen felülírja | 4.2, 11.2       |
+| O-11 | Szolgálja-e ki a szerver az épített webet (SPEC-006 O-8)?                           | **Lezárva.** Nem (az (a) opció): a helyi út a Vite dev szerver                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 4.5             |
+| O-12 | Hol éljen a valódi próba eszköze?                                                   | **Lezárva.** `apps/server/measurement/` (az (a) opció), gyökér script `probe:real-provider`                                                                                                                                                                                                                                                                                                                                                                                                                               | 5.1             |
+| O-13 | A próba saját szervert indítson-e ideiglenes adatbázissal?                          | **Lezárva.** Igen: saját szerver, ideiglenes adatbázis és napló (az (a) opció)                                                                                                                                                                                                                                                                                                                                                                                                                                            | 5.1             |
+| O-14 | A próba lépésének `maxTurns` értéke?                                                | **Lezárva.** `1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 5.1             |
+| O-15 | A próba `maxBudgetUsd` értéke és a `run_finished` várakozás időkorlátja?            | **Lezárva.** Költségkeret nincs, időkorlát nincs (user döntés): a korlát a `maxTurns: 1`. A kockázat kimondva (8.)                                                                                                                                                                                                                                                                                                                                                                                                        | 5.1, 8.         |
+| O-16 | Tiltsa-e a próba lépése az eszközöket?                                              | **Lezárva.** Nem, csak rövid, eszközt nem kérő prompt                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 5.1             |
+| O-17 | Hívja-e a próba a kapcsolat tesztet is?                                             | **Lezárva.** Nem                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 5.1             |
+| O-18 | Hol és mikor vezetjük át a SPEC-009 7.2, O-21 és M-137 tételét?                     | **Lezárva.** A `feat/spec-009-beallitasok` branchen történik; ezen a branchen nem; a spec itt csak jelzi (10.1)                                                                                                                                                                                                                                                                                                                                                                                                           | 10.1            |
+| O-19 | Az `EASTER_LOG_DIRECTORY` név és a fájl útvonal jelentés eltérése (M-142)           | **Lezárva.** Most csak a minta és a `README.md` magyarázza (az (a) opció); átnevezés nincs                                                                                                                                                                                                                                                                                                                                                                                                                                | 4.3, 4.4        |
+| O-20 | A `tools/wire-probe` saját mérési kulcsa (`MINIMAX_API_KEY`) mi legyen az O-1 után? | **Lezárva (user döntés 2026-10-26): (b).** A `tools/wire-probe` is az `ANTHROPIC_AUTH_TOKEN` nevet olvassa, a `.env` fájlban egyetlen név marad. A végrehajtás (kód, SPEC-000, szabálykönyv 9., `tools/wire-probe` `CLAUDE.md`, `turbo.json`) a PLAN-013 T-013-12 lépése                                                                                                                                                                                                                                                  | 11.3            |
 
-### 11.2 A forrás nélküli értékek (a user adja meg)
+### 11.2 Az iparági alapértékek (user döntés 2026-10-26: iparági ajánlás, forrással)
 
-A keresés (research 10.) ezekre nem talált elsődleges forrást, ezért a spec **nem ad számot** (`.claude/CLAUDE.md` 4. 1. pont). Mind kötelező marad, alapérték nélkül; a minta üresen hagyja; a szerver illetve a web ezek
-nélkül nem indul (M-141). **Mi a viselkedés addig:** a `README.md` kimondja, hogy ezeket a usernek kell
-kitöltenie; a próba és a helyi indítás is ezekre vár.
+A 10.5 ... 10.7 research szekció szerint a `pino-roll` nem ad alapértéket, és a lapméretre nincs szabvány.
+**A user döntése (2026-10-26):** "webes keresés! mi az ajánlás! nehogy már én találjak ki mindent, amikor
+ezeket az ipar már kitalálta!" Ezért a hat változó alapértéke az iparági bevett gyakorlat, a döntést a
+legtekintélyesebb, legszélesebb körben használt szállított alapérték vagy kimondott ajánlás alapján
+a forrás alapján megszületett, nem maradt a userre; a források, az idézetek és az indok a research 13.
+szekciójában állnak (elsődleges forrás plusz két független megerősítés értékenként, a napló útvonal
+kivételével, ami user döntés). Az értékek a 4.2 táblában vannak a
+kódbeli alapértékkel; itt a döntés összegzése:
 
-| Változó                          | Miért nincs forrás                                                                                                                                 | Opciók a usernek                                                                                                                                                                                            |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EASTER_LOG_ROTATION_SIZE`       | a `pino-roll` README-je és a telepített forrás sem ad alapértéket (research 10.5); elhagyva a méret szerinti rotáció nem indul                     | (a) a user megad egy értéket (formátum: szám vagy `k`/`m`/`g` utótaggal, a szám MB); (b) a mező elhagyható lesz, elhagyva nincs méret szerinti rotáció (a `pino-roll` dokumentált viselkedése, szám nélkül) |
-| `EASTER_LOG_ROTATION_FREQUENCY`  | ugyanígy; a README `frequency: 'daily'` értéke használati példa, nem alapérték (research 10.5)                                                     | (a) a user megad egy értéket (`daily`, `hourly` vagy ezredmásodperc; a telepített 4.0.0 a `weekly` értéket nem ismeri); (b) elhagyható, elhagyva nincs idő szerinti rotáció                                 |
-| `EASTER_LOG_RETAINED_FILE_COUNT` | ugyanígy                                                                                                                                           | (a) a user megad egy pozitív egészet; (b) elhagyható, elhagyva nincs régi fájl törlés                                                                                                                       |
-| `EASTER_LOG_DIRECTORY`           | a `pino-roll` `file` mezőjének nincs alapértéke; belső precedens (a `.data/`) van, de az termékdöntés volt (research 10.7)                         | (a) a user megad egy fájl útvonal előtagot; (b) a user jóváhagy egy a `db` mintájára kimondott konvenciót (például a gitből kizárt `.data/` alatt)                                                          |
-| `VITE_LIST_LIMIT`                | semmilyen szabvány nem ír elő számot, a szervezeti útmutatók ellentmondanak (10, 20, 50), és a `GET /api/workflows` csendben levág (research 10.6) | (a) a user megad egy pozitív egészet; (b) előbb mérés a valós workflow és futás darabszámra (SPEC-007 O-6 eredeti javaslata)                                                                                |
-| `VITE_STREAM_REPLAY_LIMIT`       | nincs szabvány és nincs mérés (SPEC-003 O-2: az eseményméret eloszlás mérése nem készült el)                                                       | (a) a user megad egy pozitív egészet; (b) előbb mérés egy valós futás eseményméret eloszlására                                                                                                              |
+| Változó                          | Érték               | Forrás (rövid)                                                                                        | Indok egy mondatban                                                                                                                            |
+| -------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EASTER_LOG_ROTATION_SIZE`       | `10m`               | kubelet 10Mi, `pm2-logrotate` 10M, Spring Boot 10MB (research 13.1)                                   | Három független rendszer szállított alapértéke egyezik, és a `pino-roll` `m` utótagja pontosan 10 MiB (M-146).                                 |
+| `EASTER_LOG_RETAINED_FILE_COUNT` | `4`                 | `logrotate` `rotate 4` (Debian, Ubuntu, RHEL, upstream); kubelet és Docker `local` 5 fájl az aktívval | A forgatott példányok száma a `logrotate` és a kubelet szerint egyezik (4 plusz az aktív), a `pino-roll` `limit.count` jelentése ugyanez.      |
+| `EASTER_LOG_ROTATION_FREQUENCY`  | `604800000`         | `logrotate` `weekly` (három disztribúció és az upstream példa)                                        | A rendszer szintű szabvány a heti; a `pino-roll` 4.0.0 a `weekly` nevet nem ismeri, ezért 7 nap ezredmásodpercben (UTC csütörtök 00:00 határ). |
+| `EASTER_LOG_DIRECTORY`           | `.data/logs/server` | **user döntés** (nem iparági): a repo gyökerének `.data/logs/` mappája; a `.data/` kizárt a gitből    | Fájl útvonal előtag (M-142), a napló `.data/logs/server.1.log`; a `db` fájl mintáját követi.                                                   |
+| `VITE_LIST_LIMIT`                | `100`               | Slack alapérték és ajánlás, a GitHub, Stripe és GitLab közös maximuma (research 13.2)                 | Alapértékben nincs egyezés (10 és 50 között szórnak), a közös felső korlát és egy kimondott ajánlás igen, és a kezelő 100 fölött levág.        |
+| `VITE_STREAM_REPLAY_LIMIT`       | `100`               | Slack `conversations.history`, Ably history, Loki `query_range` alapértéke (research 13.3)            | Három nagy rendszer ugyanazt adja a legközelebbi analóg műveletre (közepes közelség); a szám lapméret, nem plafon.                             |
 
-A (b) opciók a log rotációs mezőkre a SPEC-006 O-4 döntését változtatnák (kötelező -> opcionális), ezért
-külön user döntést kérnek. A böngésző `VITE_` változóira az opcionálissá tétel nem alkalmazható (a
-protokoll a `limit` és `replayLimit` mezőt kötelezőnek kéri, SPEC-005 F-19).
+**Mennyire közeli az analógia.** A naplóra az analógia közeli (ugyanaz a fájl forgatás). A lista és a
+visszajátszás lapmérete **közepesen** közeli: a `VITE_LIST_LIMIT` esetén nincs egyező iparági alapérték, a 100
+a közös felső korlát és egy ajánlás; a `VITE_STREAM_REPLAY_LIMIT` esetén SSE specifikus lapméret iparági
+forrásban nincs, a legközelebbi analógia az eseménynapló lapjának alapértéke. Mindkettő kimondva a research
+13.2 és 13.3 szekciójában.
 
-### 11.3 O-20: a `tools/wire-probe` kulcsa
+**A felülírás útja.** Mindegyik érték env változóval felülírható (4.3 minta); megadott érvénytelen érték
+hibaág, nem csendes visszaesés.
 
-**A helyzet.** A `tools/wire-probe` (a SPEC-000 mérő eszköze) a **saját** mérési kulcsát `MINIMAX_API_KEY`
-néven olvassa a `process.env`-ből, vagy a gyökér `.env` fájlból
-(`tools/wire-probe/src/harness/environment.ts:13-33`, `proxy.ts:39`), és ennek értékét maszkolja a lemezre
-írás előtt (`mask.ts`); a SPEC-000 3. szekciója és a szabálykönyv 9. szekciója ezt a nevet nevezi. Ha a user a
-`.env` fájlban a `MINIMAX_API_KEY` sort `ANTHROPIC_AUTH_TOKEN`-re nevezi át (O-1), a wire-probe a kulcsot nem
-találja, és a SPEC-000 regressziós mérései (SDK verzió frissítés előtt kötelezők, szabálykönyv 9.) nem
-indulnak.
+### 11.3 O-20: a `tools/wire-probe` kulcsa (lezárva, user döntés 2026-10-26: (b))
 
-| Opció | Tartalom                                                                                                                                                                                                                                                     | Ajánlott, indokkal                                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| (a)   | A wire-probe változatlan, `MINIMAX_API_KEY` a saját mérési változója; a `.env` fájlban a két név egymás mellett áll (ugyanaz az érték). A SPEC-000 és a szabálykönyv 9. szekciójának wire-probe mondatai változatlanok, a termékre vonatkozók az O-1 szerint | (a): a mérő eszköz a SPEC-000 regressziós mérésének része, a kód- és tesztváltozás nélkül marad, a szétválasztás kimondott |
-| (b)   | A wire-probe is az `ANTHROPIC_AUTH_TOKEN` nevet olvassa (kód, teszt, a SPEC-000 és a szabálykönyv 9. szekciója, `tools/wire-probe` `CLAUDE.md`, `turbo.json` átírva)                                                                                         | (b) csak ha a user egyetlen nevet akar a `.env` fájlban                                                                    |
+**A helyzet.** A `tools/wire-probe` (a SPEC-000 mérő eszköze) a saját mérési kulcsát korábban
+`MINIMAX_API_KEY` néven olvasta a `process.env`-ből, vagy a gyökér `.env` fájlból
+(`tools/wire-probe/src/harness/environment.ts:13-33`, `proxy.ts:39`), és ennek értékét maszkolta a lemezre
+írás előtt (`mask.ts`); a SPEC-000 3. szekciója és a szabálykönyv 9. szekciója ezt a nevet nevezi. Az O-1
+szerint a user a `.env` fájlban a `MINIMAX_API_KEY` sort `ANTHROPIC_AUTH_TOKEN`-re nevezi át, ezért a
+wire-probe a kulcsot nem találta volna.
 
-**Mi a viselkedés addig:** a wire-probe és minden rá vonatkozó dokumentum szöveg változatlan (az (a)
-opció hatása); a `turbo.json` `MINIMAX_API_KEY` sora marad. A termék a `MINIMAX_API_KEY` nevet nem
-olvassa. **Mi zárná le:** a user választása (a) vagy (b). Nem blokkolja a PLAN-013 egyetlen lépését sem.
+**A döntés (b).** A `tools/wire-probe` is az `ANTHROPIC_AUTH_TOKEN` nevet olvassa, a `.env` fájlban
+**egyetlen név** marad (a user korábbi döntése: a kulcs neve `ANTHROPIC_AUTH_TOKEN`). A régi (a) opció (két
+név egymás mellett) elvetve.
+
+**Mit érint (PLAN-013 T-013-12).** A kód: `tools/wire-probe/src/harness/environment.ts` (a `process.env`
+olvasás, a `.env` sor előtagja, a két hibaüzenet), `src/proxy.ts:39`, valamint a `MINIMAX_API_KEY`-t említő
+kommentek (`proxy/mask.ts`, `probe.ts`, `cases/m-32.ts`, `harness/runner.ts`). A dokumentumok: SPEC-000 3.
+szekció maszkolás mondata, a mérési configot bemutató blokk és az ellenőrzési pont, a szabálykönyv 9.
+szekció titokkezelési mondata, a `tools/wire-probe` `CLAUDE.md` (76., 115., 118. sor). A `turbo.json`
+`MINIMAX_API_KEY` sora kikerül (az `ANTHROPIC_AUTH_TOKEN` már szerepel). A `tools/wire-probe/**` a
+lefedettségből kizárt mérő eszköz (`vitest.config.ts`), ezért az átnevezés védelme egy greppes regressziós
+teszt a `wire-probe-regression` projektben és az AC9 grep. Valódi MiniMax hívás ehhez nem kell. A
+`docs/research/` mérési jegyzőkönyvei és a lezárt `PLAN-000` a történeti nevet megtartják (a mérés akkori
+állapotát írják le).
 
 ### 11.4 Levezetett pontok, amelyeket a user nem nevezett meg
 
@@ -626,8 +675,8 @@ Ezek a döntések következményei; ha a user mást akar, jelezze.
 4. **A web alapérték helye és a (8) invariáns kivétele** (4.2): a forrásolt alapérték csak így fér el a
    meglévő gépi őr mellett.
 5. **Az `ANTHROPIC_AWS`/`MANTLE` választók a tiltott listában** vannak, "nem ellenőrzött" rang jelöléssel.
-6. **Az üres env érték hiányzónak számít** (a mai config olvasó szabálya), a mintában az üres sor tehát
-   "kitöltendő".
+6. **Az üres env érték hiányzónak számít** (a mai config olvasó szabálya), tehát az üres sor az
+   alapértékre esik vissza (4.2); a mintában az `ANTHROPIC_AUTH_TOKEN` áll üresen (titok, értéket nem hordoz).
 7. **A `dev:server` az env fájl változására is újraindít** (M-145), a `README.md` kimondja.
 8. **A figyelő módú újraindítás hatása futó lépéssel nem mért**; a spec nem állít róla semmit.
 
