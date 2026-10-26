@@ -263,9 +263,9 @@ nevezni, előbb a szolgáltató, utána a funkció: `provider-minimax`, `minimax
 `firecrawl-client`, `tool-minimax-web-search`, `tool-firecrawl-web-fetch`,
 `tool-minimax-understand-image`. A próba: ha holnap egy második implementáció érkezik ugyanarra a
 funkcióra, megkülönböztethető marad-e a kettő. A szolgáltatófüggetlen csomagokat (`core`,
-`typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`) és a saját domain
-fogalmukról szólókat (`provider-capability`, `provider-registry`, `agent-tool-bundle`) nem kell
-megnevezni. **Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) nem változnak**,
+`typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`, `workflow-language`) és a
+saját domain fogalmukról szólókat (`provider-capability`, `provider-registry`,
+`agent-tool-bundle`) nem kell megnevezni. **Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) nem változnak**,
 azok az agent felé kimenő szerződés (SPEC-002 6.9).
 
 **Publikus felület.** A csomag felülete kizárólag a `src/index.ts` barrel, csak nevesített
