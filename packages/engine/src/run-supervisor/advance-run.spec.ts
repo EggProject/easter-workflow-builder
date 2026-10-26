@@ -529,6 +529,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     retryAttempts: new Map(),
     failRunRequested: false,
     stopRequested: false,
+    stopController: new AbortController(),
   };
   return { database, execution, dependencies };
 }

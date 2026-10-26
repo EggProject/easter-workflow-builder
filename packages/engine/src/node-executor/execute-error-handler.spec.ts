@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import type { CreateStepRunInput, DatabaseContext, ErrorHandlerNodeConfig } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
 import { executeErrorHandler, type ExecuteErrorHandlerInput } from './execute-error-handler.ts';
@@ -64,6 +65,20 @@ function fakeClock(sleepCalls: SleepCall[], onSleep?: () => void): ClockPort {
   };
 }
 
+// A valódi óra viselkedése (`create-system-clock.ts`): a várakozás addig tart,
+// amíg a jel meg nem szakad, akkor elutasít.
+function abortableClock(): ClockPort {
+  return {
+    nowMs: () => 0,
+    sleep: (_ms, signal) =>
+      new Promise<void>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(new Error('megszakítva'));
+        });
+      }),
+  };
+}
+
 function portsOf(database: DatabaseContext, published: unknown[], clock: ClockPort): NodeExecutorPorts {
   const publisher: EventPublisherPort = {
     publish: (event) => {
@@ -113,6 +128,7 @@ interface HandlerCase {
   readonly backoffMs: readonly number[];
   readonly handledErrorKinds?: readonly string[];
   readonly failedAttempt?: number;
+  readonly stopSignal?: AbortSignal;
 }
 
 // A config mezőit közvetlenül veszi át (nem egy külön `configOf` hívásból),
@@ -131,6 +147,7 @@ function inputOf(runId: string, handlerCase: HandlerCase): ExecuteErrorHandlerIn
     config,
     failedErrorKind: 'provider_call_failed',
     failedAttempt: handlerCase.failedAttempt ?? 1,
+    stopSignal: handlerCase.stopSignal ?? new AbortController().signal,
   };
 }
 
@@ -285,5 +302,51 @@ describe('executeErrorHandler', () => {
     );
 
     expect(outcome.kind).toBe('error');
+  });
+
+  describe('a backoff várakozás megszakítása (SPEC-004 9. szekció, 10.2 szekció, user döntés 2026-10-26)', () => {
+    it('REGRESSZIÓ: a várakozás közben leállított futásnál (a sleep elutasít) interrupted a kimenet, a kezelő sora running marad, és nem íródik step_finished', async () => {
+      const database = openMemoryDatabase();
+      const { runId } = seedRun(database);
+      const published: unknown[] = [];
+      const controller = new AbortController();
+      const ports = portsOf(database, published, abortableClock());
+
+      const pending = executeErrorHandler(
+        inputOf(runId, { maxAttempts: 3, backoffMs: [3_600_000, 3_600_000], stopSignal: controller.signal }),
+        ports,
+      );
+      controller.abort();
+      const outcome = okOrThrow(await pending);
+
+      expect(outcome.kind).toBe('interrupted');
+      const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
+      expect(rows.map((row) => row.status)).toStrictEqual(['running']);
+      const kinds = published.map((event) => (isRecord(event) ? event['kind'] : undefined));
+      expect(kinds).toStrictEqual(['step_started']);
+    });
+
+    it('a jel megszakadása akkor is interrupted kimenetet ad, ha a sleep feloldódik (nem utasít el)', async () => {
+      const database = openMemoryDatabase();
+      const { runId } = seedRun(database);
+      const controller = new AbortController();
+      const ports = portsOf(
+        database,
+        [],
+        fakeClock([], () => {
+          controller.abort();
+        }),
+      );
+
+      const outcome = okOrThrow(
+        await executeErrorHandler(
+          inputOf(runId, { maxAttempts: 3, backoffMs: [100, 200], stopSignal: controller.signal }),
+          ports,
+        ),
+      );
+
+      expect(outcome.kind).toBe('interrupted');
+      expect(okOrThrow(database.stepRuns.listStepRuns(runId)).map((row) => row.status)).toStrictEqual(['running']);
+    });
   });
 });

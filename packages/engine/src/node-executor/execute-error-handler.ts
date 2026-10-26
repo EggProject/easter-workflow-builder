@@ -8,7 +8,7 @@ import { beginStepRun } from './begin-step-run.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
-import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
+import type { NodeExecutionResult } from './node-executor-result.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
 /**
@@ -29,6 +29,10 @@ import type { NodeExecutorPorts } from './node-executor-ports.ts';
  *   jön a kísérletszám ellenőrzés és a `backoffMs[attempt - 1]` index (8.2 2.
  *   és 3. pont).
  *
+ * A `stopSignal` a futás külső leállításának jele (`ActiveRunHandle
+ * .requestStop`: felhasználói megszakítás vagy szabályos leállás): ezen
+ * szakad meg a backoff várakozás.
+ *
  * **A megismételt lépés `step_run` sorát ez a végrehajtó NEM hozza létre**
  * (T-005-25 lezárta a T-005-24 óta nyitva állt szerkezeti kérdést): a
  * `retry_scheduled` kimenet csak a `nextAttempt` sorszámot adja vissza, a
@@ -42,6 +46,7 @@ export interface ExecuteErrorHandlerInput {
   readonly config: ErrorHandlerNodeConfig;
   readonly failedErrorKind: EngineErrorKind;
   readonly failedAttempt: number;
+  readonly stopSignal: AbortSignal;
 }
 
 interface HandlerFailure {
@@ -111,18 +116,22 @@ function describeHandlerFailure(
  *    ágat szolgálják. Ezt a `NodeExecutionOutcome` két új ága
  *    (`retry_scheduled`, `retry_exhausted`) mondja ki a hívónak.
  *
- * **A backoff várakozás `AbortSignal`-ja ma egy soha meg nem szakított
- * vezérlő jele.** A `ClockPort.sleep` szerződése kötelezően kér jelet, a
- * futás megszakítása viszont a `run-interrupt` téma dolga (9. szekció,
- * T-005-26), ami ebben a lépésben még nem létezik. A jelet ezért a végrehajtó
- * hozza létre; amikor a megszakítás megérkezik, a jel forrása a futás
- * megszakítási vezérlője lesz. Ez megnevezett hiány, nem elfogadott
- * végállapot.
+ * **A backoff várakozás a futás leállításának jelével szakad meg** (SPEC-004
+ * 9. szekció, 10.2 szekció, user döntés 2026-10-26). A `ClockPort.sleep`
+ * megszakításkor elutasíthat (a valódi óra így tesz) vagy feloldódhat; a
+ * végrehajtó mindkettőt egységesen kezeli: a várakozás után a jelet nézi.
+ * Megszakított várakozásnál az `interrupted` kimenettel tér vissza, `step_run`
+ * állapotváltás és esemény írás NÉLKÜL, ugyanúgy, mint a `human_approval`
+ * (`node-executor-result.ts`): a kezelő `running` sorát a leállítást kérő fél
+ * zárja (`cancelled` a megszakításnál, `interrupted` a szabályos leállásnál).
+ * A futás saját `fail_run` bukása ezt a jelet nem állítja: a testvér ágon
+ * álló kezelő várakozása ott a természetes végéig tart (megnevezett hiány,
+ * `packages/engine/CLAUDE.md`).
  */
 export async function executeErrorHandler(
   input: ExecuteErrorHandlerInput,
   ports: NodeExecutorPorts,
-): Promise<Outcome<NodeExecutionOutcome>> {
+): Promise<Outcome<NodeExecutionResult>> {
   const { instance, config } = input;
 
   /* eslint-disable unicorn/no-null -- az `error_handler` node nem agent lépés, nincs modellje, session módja, strukturált kimenet stratégiája vagy al-workflow futása (SPEC-003 9.2) */
@@ -157,7 +166,15 @@ export async function executeErrorHandler(
   });
 
   if (decision.kind === 'retry') {
-    await ports.clock.sleep(decision.backoffMs, new AbortController().signal);
+    try {
+      await ports.clock.sleep(decision.backoffMs, input.stopSignal);
+    } catch {
+      // A `ClockPort.sleep` csak a jel megszakítására utasít el, az pedig a
+      // lenti `aborted` ágon kezelt: a kivétel értéke ilyenkor eldobódik.
+    }
+    if (input.stopSignal.aborted) {
+      return { kind: 'ok', value: { kind: 'interrupted' } };
+    }
 
     /* eslint-disable-next-line unicorn/no-null -- az `error_handler` node kimenete szándékosan `null`, ugyanazzal az indokkal, mint a `branch` és a `loop` node-nál: vezérlést hordoz, adatot nem */
     const finished = finishStepRunSucceeded({ runId, stepRunId, startedAtMs, output: null }, ports);
