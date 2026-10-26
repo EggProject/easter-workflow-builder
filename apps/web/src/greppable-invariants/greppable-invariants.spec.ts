@@ -1,4 +1,4 @@
-// Huszonnégy, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
+// Huszonöt, megvalósítás nélküli, greppel ellenőrizhető invariáns teszt egy
 // csoportban (T-008-31, SPEC-002 6.2 5. pont mintája: konfigurációs
 // invariáns saját téma mappában, a mappa neve annak a dolognak a neve, amit
 // őriz). Mindegyik a forrásfát olvassa vissza nyers szövegként, statikus
@@ -16,7 +16,9 @@
 // `crypto.randomUUID(` hívás kizárólag a két böngésző oldali azonosító generátor fájlban áll. A
 // (24) a PLAN-009 T-009-34 adverzariális átvizsgálásával érkezett (szabálykönyv 11. szekció): a
 // `matchMedia(` hívás csak `prefers-*`/`forced-colors` literállal vagy token kötött töréspont
-// konstanssal áll; ugyanez a lépés a meglévő invariánsok jóhiszemű kerülő alakjait is lezárta.
+// konstanssal áll; ugyanez a lépés a meglévő invariánsok jóhiszemű kerülő alakjait is lezárta. A
+// (25) a PLAN-010 T-010-20 lépésével érkezett (SPEC-010 6.1, 16. szekció 31.): a React nyers HTML
+// beszúró prop neve sem az `apps/web/src`, sem a `packages/ui/src` alatt nem áll.
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -630,5 +632,26 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('(25) a React nyers HTML beszúró prop neve nem áll sem az apps/web/src, sem a packages/ui/src alatt (SPEC-010 6.1, 16. szekció 31.)', () => {
+    // A sablon kimenete (a jóváhagyás panel `bodyTemplate` szövege) csak JSX gyerekként, a React
+    // escape-elő útján jelenhet meg (M-130). A tiltott nevet a teszt darabokból rakja össze, és a
+    // doksi sorokat kiszűri (mint a (23)), különben a saját forrása illeszkedne rá. A teszt fájlokat
+    // is vizsgálja: a tiltás a két könyvtár teljes forrásfájlára szól.
+    const forbiddenName = ['dangerously', 'SetInnerHTML'].join('');
+    const extensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+    const scanRoots = [path.join('apps', 'web', 'src'), path.join('packages', 'ui', 'src')];
+    const scannedFiles = scanRoots.flatMap((scanRoot) =>
+      listSourceFiles(path.join(REPO_ROOT, scanRoot), extensions).map((file) => ({
+        label: path.join(scanRoot, file.relativePath),
+        content: stripCommentLines(file.content),
+      })),
+    );
+    // A pozitív oldal: a bejárás mindkét gyökeret eléri.
+    for (const scanRoot of scanRoots) {
+      expect(scannedFiles.some((file) => file.label.startsWith(scanRoot))).toBe(true);
+    }
+    expect(scannedFiles.filter((file) => file.content.includes(forbiddenName)).map((file) => file.label)).toEqual([]);
   });
 });

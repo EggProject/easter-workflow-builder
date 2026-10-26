@@ -125,6 +125,12 @@ function cancelRunningStep(database: DatabaseContext, runId: string): void {
   }
 }
 
+/**
+ * A kifejezés vagy sablon szövegébe tett jelölő: a lépés hibaüzenete a csomópontot és a
+ * mező nevét mondja, a szöveget nem idézi (PLAN-010 T-010-21 A-2, user döntés 2026-10-25).
+ */
+const SECRET_MARKER = 'TITOK_JELOLO_8f3a';
+
 describe('executeBranch', () => {
   it('közvetlen egyezésnél a kiértékelt kulcsot választja, usedDefault hamis', () => {
     const database = openMemoryDatabase();
@@ -174,6 +180,20 @@ describe('executeBranch', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
+  });
+
+  it('REGRESSZIÓ: a kiértékelési hiba üzenete a csomópontot és a mezőt nevezi meg, a kifejezés szövegét nem idézi (PLAN-010 T-010-21 A-2)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const ports = portsOf(database, [], () => ({ kind: 'error', message: 'teszt kiértékelési hiba' }));
+    const base = inputOf(runId);
+
+    const outcome = okOrThrow(
+      executeBranch({ ...base, config: { ...base.config, expression: `input.${SECRET_MARKER}` } }, ports),
+    );
+
+    expect(outcome.stepRun.errorMessage).toContain('branch node expression mezőjének kiértékelése sikertelen');
+    expect(outcome.stepRun.errorMessage).not.toContain(SECRET_MARKER);
   });
 
   it('nincs egyező él és nincs alapértelmezett ág esetén branch_no_matching_edge hibaosztállyal zárja', () => {

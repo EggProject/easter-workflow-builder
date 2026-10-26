@@ -1,0 +1,8 @@
+spec   {{{input.szerzo}}}   -> "[object Object]"  HÍVOTT: Array.prototype.join,Object.prototype.valueOf,Object.prototype.toString
+strict {{{input.szerzo}}}   -> "{\"nev\":\"Anna\",\"kor\":30}"  HÍVOTT: Array.prototype.join
+spec   {{& input.elemek}}   -> "x,y"  HÍVOTT: Array.prototype.join,Object.prototype.valueOf,Array.prototype.toString,Array.prototype.join
+strict {{& input.elemek}}   -> "[\"x\",\"y\"]"  HÍVOTT: Array.prototype.join
+spec   {{{steps.node-1}}}   -> "[object Object]"  HÍVOTT: Array.prototype.join,Object.prototype.valueOf,Object.prototype.toString
+strict {{{steps.node-1}}}   -> "{\"summary\":\"kesz\",\"score\":0.9,\"tags\":[\"t1\",\"t2\"]}"  HÍVOTT: Array.prototype.join
+spec   {{input.szerzo}}     -> "{\"nev\":\"Anna\",\"kor\":30}"  HÍVOTT: Array.prototype.join
+strict {{input.szerzo}}     -> "{\"nev\":\"Anna\",\"kor\":30}"  HÍVOTT: Array.prototype.join

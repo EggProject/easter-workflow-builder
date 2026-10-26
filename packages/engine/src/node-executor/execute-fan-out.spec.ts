@@ -125,6 +125,12 @@ function cancelRunningStep(database: DatabaseContext, runId: string): void {
   }
 }
 
+/**
+ * A kifejezés vagy sablon szövegébe tett jelölő: a lépés hibaüzenete a csomópontot és a
+ * mező nevét mondja, a szöveget nem idézi (PLAN-010 T-010-21 A-2, user döntés 2026-10-25).
+ */
+const SECRET_MARKER = 'TITOK_JELOLO_8f3a';
+
 describe('executeFanOut', () => {
   it('N elemre bontja a listát, minden elemre lerenderli a címkét, és fan_out_expanded eseményt ír', () => {
     const database = openMemoryDatabase();
@@ -201,7 +207,9 @@ describe('executeFanOut', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('expression_evaluation_failed');
-    expect(outcome.kind === 'failed' && outcome.errorMessage).toContain('túl nagy a tároláshoz');
+    expect(outcome.kind === 'failed' && outcome.errorMessage).toBe(
+      'A(z) "fan_out" fan_out node kimenete nem tárolható, mert nem alakítható JSON szöveggé (expression_evaluation_failed).',
+    );
     expect(rendered).toHaveLength(0);
     const rows = okOrThrow(database.stepRuns.listStepRuns(runId));
     expect(rows.map((row) => row.status)).toStrictEqual(['failed']);
@@ -262,6 +270,57 @@ describe('executeFanOut', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' && outcome.errorKind).toBe('template_render_failed');
+  });
+
+  it.each([
+    [
+      'a kiértékelési hiba',
+      (): Outcome<unknown> => ({ kind: 'error', message: 'teszt kiértékelési hiba' }),
+      'fan_out node itemsExpression mezőjének kiértékelése sikertelen',
+    ],
+    [
+      'a nem lista eredmény',
+      (): Outcome<unknown> => ({ kind: 'ok', value: 'nem lista' }),
+      'fan_out node itemsExpression mezőjének eredménye nem lista',
+    ],
+  ])(
+    'REGRESSZIÓ: %s üzenete a csomópontot és a mezőt nevezi meg, a kifejezés szövegét nem idézi (PLAN-010 T-010-21 A-2)',
+    (_name, evaluate, expected) => {
+      const database = openMemoryDatabase();
+      const { runId } = seedRun(database);
+      const base = inputOf(runId);
+
+      const outcome = okOrThrow(
+        executeFanOut(
+          { ...base, config: { ...base.config, itemsExpression: `input.${SECRET_MARKER}` } },
+          portsOf(database, [], evaluate),
+        ),
+      );
+
+      expect(outcome.stepRun.errorMessage).toContain(expected);
+      expect(outcome.stepRun.errorMessage).not.toContain(SECRET_MARKER);
+    },
+  );
+
+  it('REGRESSZIÓ: a címke sablon hibájának üzenete a csomópontot és a mezőt nevezi meg, a sablon szövegét nem idézi (PLAN-010 T-010-21 A-2)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const base = inputOf(runId);
+
+    const outcome = okOrThrow(
+      executeFanOut(
+        { ...base, config: { ...base.config, branchLabelTemplate: `${SECRET_MARKER} {{item}}` } },
+        portsOf(
+          database,
+          [],
+          () => ({ kind: 'ok', value: ['a'] }),
+          () => ({ kind: 'error', message: 'teszt renderelési hiba' }),
+        ),
+      ),
+    );
+
+    expect(outcome.stepRun.errorMessage).toContain('fan_out node branchLabelTemplate mezőjének renderelése sikertelen');
+    expect(outcome.stepRun.errorMessage).not.toContain(SECRET_MARKER);
   });
 
   it('a begin fázis hibáját továbbadja (nem létező runId)', () => {

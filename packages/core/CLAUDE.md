@@ -12,17 +12,17 @@ A csomag négy tárgykörre tagolódik, tárgykörönként egy `src/` alatti map
 
 ## Fájlok
 
-| Mappa                                | Tartalom                                                                         |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
-| `src/result/outcome/`                | a kétállapotú `Outcome<TValue>` típus és az `isOkOutcome` szűkítő guard          |
-| `src/env-reader/environment-reader/` | az `EnvironmentReader` típus, a `readBaseUrl` és a `readTimeoutMs` olvasó        |
-| `src/http-client/request/`           | a befecskendezett `fetch` típusa, a JSON POST, a bináris GET és a bináris válasz |
-| `src/http-client/error-description/` | hibaüzenet előállítása egy elbukott hívásból, a kérésküldéstől függetlenül is    |
-| `src/image-source/media-type/`       | a kép média típusa `Content-Type` fejlécből és fájlkiterjesztésből               |
-| `src/image-source/data-url/`         | a befecskendezett fájlolvasó típusa és a kép feloldása base64 data URL alakra    |
-| `src/index.ts`                       | barrel, csak nevesített újraexport                                               |
+| Mappa                                | Tartalom                                                                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/result/outcome/`                | a kétállapotú `Outcome<TValue>` típus, a hibaágon opcionális kivétel típusnevet hordozó `OutcomeWithErrorType<TValue>` és az `isOkOutcome` szűkítő guard |
+| `src/env-reader/environment-reader/` | az `EnvironmentReader` típus, a `readBaseUrl` és a `readTimeoutMs` olvasó                                                                                |
+| `src/http-client/request/`           | a befecskendezett `fetch` típusa, a JSON POST, a bináris GET és a bináris válasz                                                                         |
+| `src/http-client/error-description/` | hibaüzenet előállítása egy elbukott hívásból, a kérésküldéstől függetlenül is, és egy kivétel típusneve naplózáshoz (`describeErrorType`, üzenet nélkül) |
+| `src/image-source/media-type/`       | a kép média típusa `Content-Type` fejlécből és fájlkiterjesztésből                                                                                       |
+| `src/image-source/data-url/`         | a befecskendezett fájlolvasó típusa és a kép feloldása base64 data URL alakra                                                                            |
+| `src/index.ts`                       | barrel, csak nevesített újraexport                                                                                                                       |
 
-Típus-only fájlok, nincs hozzájuk `.spec.ts` (SPEC-002 6.3): `outcome.ts`,
+Típus-only fájlok, nincs hozzájuk `.spec.ts` (SPEC-002 6.3): `outcome.ts`, `outcome-with-error-type.ts`,
 `environment-reader.ts`, `fetch-function.ts`, `binary-payload.ts`, `image-media-type.ts`,
 `read-file-function.ts`.
 

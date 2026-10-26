@@ -221,7 +221,7 @@ export async function executeHumanApproval(
   if (rendered.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'template_render_failed',
-      `A(z) "${nodeId}" human_approval node "${config.bodyTemplate}" szöveg sablonjának renderelése sikertelen: ${rendered.message}`,
+      `A(z) "${nodeId}" human_approval node bodyTemplate mezőjének renderelése sikertelen: ${rendered.message}`,
     );
     return failApproval(runId, stepRunId, startedAtMs, 'template_render_failed', errorMessage, ports);
   }

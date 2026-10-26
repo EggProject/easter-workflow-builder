@@ -5,7 +5,9 @@ import type { DatabaseContext } from '@easter-workflow-builder/db';
 import { openDatabase } from '@easter-workflow-builder/db';
 import type { ClockPort } from '../engine-port/clock-port.ts';
 import type { EventPublisherPort } from '../engine-port/event-publisher-port.ts';
+import { isRecord } from '@easter-workflow-builder/typeguards';
 import { executeJoinMerge, type ExecuteJoinMergeInput } from './execute-join-merge.ts';
+import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutorPorts } from './node-executor-ports.ts';
 
@@ -126,6 +128,21 @@ describe('executeJoinMerge', () => {
     expect(published).toContainEqual(
       expect.objectContaining({ kind: 'join_resolved', payload: { mode: 'merge', inputCount: 0 } }),
     );
+  });
+
+  it('REGRESSZIÓ: a fan_out korlátja alatti elemekből álló, de a korlátnál nagyobb lista a lépést step_output_not_storable osztállyal zárja, join_resolved esemény nélkül (SPEC-010 O-21, PLAN-010 T-010-21 A-1)', () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const published: unknown[] = [];
+    const branchOutput = ['a'.repeat(Math.floor(MAX_STORED_OUTPUT_LENGTH / 2))];
+
+    const outcome = okOrThrow(
+      executeJoinMerge(inputOf(runId, [branchOutput, branchOutput]), portsOf(database, published)),
+    );
+
+    expect(outcome).toMatchObject({ kind: 'failed', errorKind: 'step_output_not_storable' });
+    expect(outcome.stepRun).toMatchObject({ status: 'failed', errorKind: 'step_output_not_storable', output: null });
+    expect(published.filter((event) => isRecord(event) && event['kind'] === 'join_resolved')).toStrictEqual([]);
   });
 
   it('a begin fázis hibáját továbbadja (nem létező runId)', () => {

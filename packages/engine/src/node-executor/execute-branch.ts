@@ -126,7 +126,7 @@ export function executeBranch(input: ExecuteBranchInput, ports: NodeExecutorPort
   if (evaluated.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" branch node "${config.expression}" kifejezésének kiértékelése sikertelen: ${evaluated.message}`,
+      `A(z) "${nodeId}" branch node expression mezőjének kiértékelése sikertelen: ${evaluated.message}`,
     );
     return failBranch(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }

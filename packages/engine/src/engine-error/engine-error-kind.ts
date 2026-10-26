@@ -45,6 +45,12 @@ export type EngineErrorKind =
   // 5.: `branch` és `fan_out` saját hibaágai
   | 'branch_no_matching_edge'
   | 'fan_out_items_not_a_list'
+  // 5.: a lépés kimenete nem tárolható (túl nagy, vagy a szerializálás
+  // kivételt dob), minden kimenetet tároló lépésnél a `fan_out` kivételével,
+  // ami a saját kifejezés hibájaként zár (SPEC-010 O-21, user döntés
+  // 2026-10-25). Futás közbeni, lépés szintű hiba, REST hibatörzsben soha nem
+  // jelenik meg, ezért nem tagja a `ProtocolErrorClass` szótárnak.
+  | 'step_output_not_storable'
   // 5.8: a `human_approval` várakozás
   | 'approval_timed_out'
   | 'approval_rejected'

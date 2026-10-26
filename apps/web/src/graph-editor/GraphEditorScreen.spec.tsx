@@ -891,6 +891,36 @@ describe('GraphEditorScreen', () => {
     expect(container.textContent).toContain('maxIterations');
   });
 
+  it('a fordíthatatlan kifejezésű gráfra a Mentés nem indít kérést, és a mező útvonalát nevezi meg (SPEC-010 AC44)', async () => {
+    const log: RouteCallLog = { putBodies: [], graphGetCount: 0 };
+    await renderScreen('?workflowId=wf-1', createFetchFunction(log));
+
+    // A séma szerint hibátlan node: egyedül a CEL fordítás buktatja.
+    const uncompilableLoopNode: WorkflowNodeInput = {
+      id: 'n-3',
+      type: 'loop',
+      label: 'Ciklus',
+      positionX: 0,
+      positionY: 0,
+      config: { type: 'loop', maxIterations: 3, continueExpression: 'titokNeve > 1', onUnhandledError: 'fail_run' },
+    };
+    act(() => {
+      lastCanvasProperties().onGraphChange([START_NODE, uncompilableLoopNode], []);
+    });
+
+    const saveButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Mentés');
+    if (saveButton === undefined) {
+      throw new Error('a teszt nem talált "Mentés" gombot');
+    }
+    await act(async () => {
+      saveButton.click();
+      await Promise.resolve();
+    });
+
+    expect(log.putBodies).toHaveLength(0);
+    expect(container.textContent).toContain('nodes.1.config.continueExpression');
+  });
+
   it(
     'sikertelen mentési kísérlet után az ÉRINTETLEN, érvénytelen mező is kiírja a hibáját a ' +
       'node-inspectorban (isSaveAttempted wiring)',

@@ -1,0 +1,45 @@
+Unclosed tag
+  sablon : "Szia {{input.tema"
+  osztály: Error
+  üzenet : "Unclosed tag at 17"
+Unclosed tag, titok jellegű szöveggel
+  sablon : "TITKOS-PROMPT-SZOVEG-123 {{input.tema TITKOS-UTANA-456"
+  osztály: Error
+  üzenet : "Unclosed tag at 54"
+Unopened section
+  sablon : "eleje {{/input.elemek}} vége"
+  osztály: Error
+  üzenet : "Unopened section \"input.elemek\" at 6"
+Unopened section, hosszú szöveg a záró tagban
+  sablon : "x {{/ez itt egy hosszu TITKOS mondat a sablonbol 789}} y"
+  osztály: Error
+  üzenet : "Unopened section \"ez itt egy hosszu TITKOS mondat a sablonbol 789\" at 2"
+Unclosed section (eltérő záró)
+  sablon : "{{#input.elemek}}a{{/input.masik}}"
+  osztály: Error
+  üzenet : "Unclosed section \"input.elemek\" at 18"
+Unclosed section (eltérő záró, hosszú nyitó név)
+  sablon : "{{#TITKOS nyito szoveg 111}}a{{/x}}"
+  osztály: Error
+  üzenet : "Unclosed section \"TITKOS nyito szoveg 111\" at 29"
+Unclosed section (vége, nincs záró)
+  sablon : "{{#input.elemek}}a"
+  osztály: Error
+  üzenet : "Unclosed section \"input.elemek\" at 18"
+Unclosed section (vége, hosszú nyitó név)
+  sablon : "elotte {{#TITKOS nyito szoveg 222}}a"
+  osztály: Error
+  üzenet : "Unclosed section \"TITKOS nyito szoveg 222\" at 36"
+Invalid tags (egy elem)
+  sablon : "{{=TITKOS-HATAROLO-333=}}"
+  osztály: Error
+  üzenet : "Invalid tags: TITKOS-HATAROLO-333"
+Invalid tags (üres)
+  sablon : "{{==}}"
+  osztály: Error
+  üzenet : "Invalid tags: "
+Invalid tags, hosszabb szöveg szóközök nélkül
+  sablon : "{{=ez_a_teljes_TITKOS_szoveg_444_idezve_lesz=}}"
+  osztály: Error
+  üzenet : "Invalid tags: ez_a_teljes_TITKOS_szoveg_444_idezve_lesz"
+Érvényes: három szóval (split 2) - NEM hiba: NINCS KIVÉTEL

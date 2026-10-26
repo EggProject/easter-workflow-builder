@@ -104,6 +104,15 @@ describe('createCelExpressionEvaluator: compile (SPEC-010 7.2, 16. szekció 18.)
       expect(() => evaluator.compile(expression)).not.toThrow();
     }
   });
+
+  it('REGRESSZIÓ: az optional névtérre épülő kifejezést elutasítja, a mezőnevet és a szöveg literált nem (O-23, PLAN-010 T-010-21 A-5)', () => {
+    const sentence = 'az optional névtér nem használható, mert az opcionális típusok ki vannak kapcsolva (pozíció: 0)';
+    expect(evaluator.compile('optional.of(1)')).toStrictEqual({ kind: 'error', message: sentence });
+    expect(evaluator.compile('optional.none()')).toStrictEqual({ kind: 'error', message: sentence });
+    expect(evaluator.compile('optional')).toStrictEqual({ kind: 'error', message: sentence });
+    expect(evaluator.compile('input.optional')).toStrictEqual({ kind: 'ok', value: undefined });
+    expect(evaluator.compile('"optional"')).toStrictEqual({ kind: 'ok', value: undefined });
+  });
 });
 
 // A `unicorn/no-null` miatt a JSON `null` értéket elemzés adja.
@@ -363,15 +372,17 @@ describe('createCelExpressionEvaluator: evaluate, a futásidejű hibakódok saj�
 
   it('a hibaleírás a kifejezés és az adat darabját nem idézi (16. szekció 33.)', () => {
     const context = runContext({ input: { TITKOS_ADAT: 'TITKOS_ERTEK' } });
-    for (const expression of [
-      'TITKOS_VALTOZO == 1',
-      'input.TITKOS_KULCS_NEV',
-      'steps["nincs-ilyen-TITKOS"]',
-      'steps["TITKOS-azonosító"].mező',
-      'input.TITKOS_ADAT + 1',
-    ]) {
+    // A második elem a kód saját mondata: így az eset a 33. kritérium kódjaihoz kötött
+    // (unknown_variable, no_such_key, unexpected_character).
+    for (const [expression, codeSentence] of [
+      ['TITKOS_VALTOZO == 1', 'nem deklarált változó a kifejezésben'],
+      ['input.TITKOS_KULCS_NEV', 'a hivatkozott kulcs nem létezik'],
+      ['steps["nincs-ilyen-TITKOS"]', 'a hivatkozott kulcs nem létezik'],
+      ['steps["TITKOS-azonosító"].mező', 'váratlan karakter a kifejezésben'],
+      ['input.TITKOS_ADAT + 1', 'a művelet ezekre az operandus típusokra nem értelmezett'],
+    ] as const) {
       const outcome = evaluator.evaluate(expression, context);
-      expect(outcome.kind).toBe('error');
+      expect(outcome.kind === 'error' ? outcome.message.startsWith(`${codeSentence} (pozíció: `) : false).toBe(true);
       expect(JSON.stringify(outcome)).not.toContain('TITKOS');
     }
   });
@@ -394,9 +405,15 @@ describe('createCelExpressionEvaluator: evaluate egyetlen bemenetre sem dob kiv�
         expect(() => evaluator.evaluate(expression, context)).not.toThrow();
       }
     }
-    expect(evaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual(
-      failure('a kifejezés nem dolgozható fel'),
-    );
-    expect(evaluator.evaluate('input', throwingGetter)).toStrictEqual(failure('a kifejezés nem dolgozható fel'));
+    expect(evaluator.evaluate('input', runContext({ input: circular }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
+    expect(evaluator.evaluate('input', throwingGetter)).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'Error',
+    });
   });
 });

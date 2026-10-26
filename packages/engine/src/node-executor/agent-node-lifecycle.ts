@@ -17,7 +17,7 @@ import type { RunContext } from '../run-context/run-context.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
-import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
+import { finishStepRunWithOutput } from './finish-step-run-with-output.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
 import type { NodeExecutionResult } from './node-executor-result.ts';
@@ -206,8 +206,9 @@ async function runAfterSlotGranted(
     );
   }
 
-  const finished = finishStepRunSucceeded(
+  const finished = finishStepRunWithOutput(
     {
+      nodeId,
       runId,
       stepRunId,
       startedAtMs,
@@ -221,8 +222,11 @@ async function runAfterSlotGranted(
   if (finished.kind === 'error') {
     return finished;
   }
+  if (finished.value.kind === 'failed') {
+    return { kind: 'ok', value: finished.value };
+  }
   // eslint-disable-next-line unicorn/no-null -- a `NodeExecutionOutcome.selectedBranchKey` `null` értéke a "minden nem `on_error` kimenő él live" jelentés (node-executor-outcome.ts), az agent lépés nem elágazó node
-  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value, selectedBranchKey: null } };
+  return { kind: 'ok', value: { kind: 'succeeded', stepRun: finished.value.stepRun, selectedBranchKey: null } };
 }
 
 /**

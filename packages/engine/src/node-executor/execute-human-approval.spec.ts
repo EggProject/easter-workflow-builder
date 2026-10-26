@@ -243,6 +243,12 @@ function registryTrackingCancelWait(calls: string[]): ApprovalWaitRegistry {
   };
 }
 
+/**
+ * A kifejezés vagy sablon szövegébe tett jelölő: a lépés hibaüzenete a csomópontot és a
+ * mező nevét mondja, a szöveget nem idézi (PLAN-010 T-010-21 A-2, user döntés 2026-10-25).
+ */
+const SECRET_MARKER = 'TITOK_JELOLO_8f3a';
+
 describe('executeHumanApproval', () => {
   it('korlátlan várakozás (timeoutMs: null): a döntésig vár, nincs sleep hívás, approved eredmény', async () => {
     const database = openMemoryDatabase();
@@ -401,6 +407,25 @@ describe('executeHumanApproval', () => {
 
     expect(outcome.kind).toBe('failed');
     expect(outcome.kind === 'failed' ? outcome.errorKind : 'nincs-hiba').toBe('template_render_failed');
+  });
+
+  it('REGRESSZIÓ: a bodyTemplate hibájának üzenete a csomópontot és a mezőt nevezi meg, a sablon szövegét nem idézi (PLAN-010 T-010-21 A-2)', async () => {
+    const database = openMemoryDatabase();
+    const { runId } = seedRun(database);
+    const ports = portsOf(database, [], () => ({ kind: 'error', message: 'teszt renderelési hiba' }));
+    const base = inputOf(runId);
+
+    const outcome = okOrThrow(
+      await executeHumanApproval(
+        { ...base, config: { ...base.config, bodyTemplate: `${SECRET_MARKER} {{nincs}}` } },
+        ports,
+        createApprovalWaitRegistry(),
+      ),
+    );
+
+    const errorMessage = outcome.kind === 'failed' ? outcome.stepRun.errorMessage : 'nincs-hiba';
+    expect(errorMessage).toContain('human_approval node bodyTemplate mezőjének renderelése sikertelen');
+    expect(errorMessage).not.toContain(SECRET_MARKER);
   });
 
   it('a hiba lezárásának Outcome hibáját továbbadja, ha a sor időközben más állapotba kerül', async () => {

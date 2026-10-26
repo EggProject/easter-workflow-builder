@@ -263,9 +263,9 @@ nevezni, előbb a szolgáltató, utána a funkció: `provider-minimax`, `minimax
 `firecrawl-client`, `tool-minimax-web-search`, `tool-firecrawl-web-fetch`,
 `tool-minimax-understand-image`. A próba: ha holnap egy második implementáció érkezik ugyanarra a
 funkcióra, megkülönböztethető marad-e a kettő. A szolgáltatófüggetlen csomagokat (`core`,
-`typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`) és a saját domain
-fogalmukról szólókat (`provider-capability`, `provider-registry`, `agent-tool-bundle`) nem kell
-megnevezni. **Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) nem változnak**,
+`typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`, `workflow-language`) és a
+saját domain fogalmukról szólókat (`provider-capability`, `provider-registry`,
+`agent-tool-bundle`) nem kell megnevezni. **Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) nem változnak**,
 azok az agent felé kimenő szerződés (SPEC-002 6.9).
 
 **Publikus felület.** A csomag felülete kizárólag a `src/index.ts` barrel, csak nevesített
@@ -310,7 +310,7 @@ A rögzített verziók egyetlen forrása: `docs/research/2026-08-26-toolchain.md
 React, Vite, `@xyflow/react`, Drizzle ORM + `better-sqlite3`, `ws`, `pino` + `pino-roll`, Vitest,
 Playwright, ESLint flat config (gyökér `CLAUDE.md`). A workflow sablon nyelve Mustache
 (`mustache`), a kifejezés nyelve CEL (`@marcbachmann/cel-js`); a bevezetésük a PLAN-010 szerint
-történik (user döntés 2026-09-23, SPEC-010).
+történt, a `packages/workflow-language` csomagban (user döntés 2026-09-23, SPEC-010).
 
 **Miért ezek, röviden**
 

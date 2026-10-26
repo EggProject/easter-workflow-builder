@@ -488,4 +488,52 @@ describe('végponttól végpontig próba valódi szerver ellen (SPEC-010 12.3, 4
     expect(runs.body).toStrictEqual([]);
     expect(prompts).toStrictEqual([]);
   });
+
+  // 33.: a valódi portok elutasító üzenete a csomópontot, a mezőt és zárójelben az osztályt
+  // nevezi meg, a hibás szöveg egyedi jelölőjét viszont nem idézi (SPEC-010 9.5).
+  it.each([
+    {
+      name: 'sablon',
+      marker: 'HOSSZU_EGYEDI_JELOLO_SABLON_7c1e9b_a_szoveg_nem_kerulhet_az_uzenetbe',
+      nodes: (marker: string): readonly WorkflowNodeInput[] => [
+        START_NODE,
+        agentStepNode('ir', `Szia {{#${marker}}} vége`),
+      ],
+      edges: [edge('e1', 'start', 'ir')],
+      nodeId: 'ir',
+      field: 'promptTemplate',
+      errorClass: 'template_render_failed',
+    },
+    {
+      name: 'kifejezés',
+      marker: 'HOSSZU_EGYEDI_JELOLO_KIFEJEZES_3f8a2d_a_szoveg_nem_kerulhet_az_uzenetbe',
+      nodes: (marker: string): readonly WorkflowNodeInput[] => [
+        START_NODE,
+        branchNode('valaszto', `input.${marker} +`),
+        agentStepNode('nem_valasztott', 'Rövid'),
+      ],
+      edges: [edge('e1', 'start', 'valaszto'), edge('e2', 'valaszto', 'nem_valasztott', 'rovid')],
+      nodeId: 'valaszto',
+      field: 'expression',
+      errorClass: 'expression_evaluation_failed',
+    },
+  ])(
+    'a fordíthatatlan $name elutasító üzenete a csomópontot, a mezőt és az osztályt nevezi meg, a hosszú egyedi jelölőt nem (33. kritérium)',
+    async ({ marker, nodes, edges, nodeId, field, errorClass }) => {
+      running = await startServer(recordingAgentQueryRunner([]));
+      const { baseUrl } = running;
+      const workflowId = await createWorkflowWithGraph(baseUrl, `jelolo-${field}`, nodes(marker), edges);
+
+      const started = await requestJson(baseUrl, 'POST', `/api/workflows/${workflowId}/runs`, { input: {} });
+
+      expect(started.status).toBe(422);
+      const error = parsedOrThrow(ProtocolErrorBodySchema.safeParse(started.body));
+      expect(error.errorClass).toBe(errorClass);
+      expect(error.message).toContain(nodeId);
+      expect(error.message).toContain(field);
+      expect(error.message.endsWith(`(${errorClass}).`)).toBe(true);
+      expect(error.message).not.toContain(marker);
+      expect(error.message).not.toContain('HOSSZU_EGYEDI_JELOLO');
+    },
+  );
 });

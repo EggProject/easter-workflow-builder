@@ -1,4 +1,5 @@
 import type { ClockPort, DatabaseContext, EngineDependencies } from '@easter-workflow-builder/engine';
+import type { ServerLogger } from '@easter-workflow-builder/logger';
 import {
   createCelExpressionEvaluator,
   createMustacheTemplateRenderer,
@@ -9,6 +10,7 @@ import { buildProviderDescriptorLookup } from './build-provider-descriptor-looku
 import { createRealEventPublisher } from './create-real-event-publisher.ts';
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
 import { createProcessEnvironmentReader } from './create-process-environment-reader.ts';
+import { reportUnexpectedLanguageError } from './report-unexpected-language-error.ts';
 
 /**
  * A motor kilenc kötelező portjának összeállítása a szerver indulásakor
@@ -23,19 +25,34 @@ import { createProcessEnvironmentReader } from './create-process-environment-rea
  * Az `expressionEvaluator` a CEL, a `templateRenderer` a Mustache port a
  * `workflow-language` csomagból (SPEC-010 3.1). A két csomagbeli alak és a
  * motor portja szerkezetileg egyezik: az értékadás itt, `as` nélkül fordul,
- * tehát egy eltérést a `typecheck` kapu jelez.
+ * tehát egy eltérést a `typecheck` kapu jelez. Mindkét port a
+ * `reportUnexpectedLanguageError` burkolón át jut a motorhoz: a csomag tartalék
+ * ágának kivétel típusát a `logger` naplózza (SPEC-010 O-22).
  */
 export function buildEngineDependencies(
   database: DatabaseContext,
   registry: StreamRegistry,
   clock: ClockPort,
+  logger: ServerLogger,
 ): EngineDependencies {
+  const celEvaluator = createCelExpressionEvaluator();
+  const mustacheRenderer = createMustacheTemplateRenderer();
   return {
     database,
     agentQueryRunner: buildAgentQueryRunner(),
     providerDescriptorLookup: buildProviderDescriptorLookup(),
-    expressionEvaluator: createCelExpressionEvaluator(),
-    templateRenderer: createMustacheTemplateRenderer(),
+    expressionEvaluator: {
+      compile: (expression) =>
+        reportUnexpectedLanguageError(celEvaluator.compile(expression), 'expression_compile', logger),
+      evaluate: (expression, context) =>
+        reportUnexpectedLanguageError(celEvaluator.evaluate(expression, context), 'expression_evaluate', logger),
+    },
+    templateRenderer: {
+      compile: (template) =>
+        reportUnexpectedLanguageError(mustacheRenderer.compile(template), 'template_compile', logger),
+      render: (template, context) =>
+        reportUnexpectedLanguageError(mustacheRenderer.render(template, context), 'template_render', logger),
+    },
     eventPublisher: createRealEventPublisher(registry, clock),
     clock,
     idGenerator: createRandomUuidIdGenerator(),

@@ -9,52 +9,70 @@ describe('describeCelError (SPEC-010 9.5)', () => {
       message: 'Unknown variable: titokNeve',
       range: { start: 3, end: 12 },
     });
-    expect(describeCelError(error)).toBe('nem deklarált változó a kifejezésben (pozíció: 3)');
+    expect(describeCelError(error).message).toBe('nem deklarált változó a kifejezésben (pozíció: 3)');
   });
 
   it('range nélkül csak a mondat', () => {
-    expect(describeCelError(new ParseError({ code: 'limit_exceeded', message: 'Exceeded maxDepth (250)' }))).toBe(
-      'a kifejezés túllépi a nyelv beépített szerkezeti korlátját',
-    );
+    expect(
+      describeCelError(new ParseError({ code: 'limit_exceeded', message: 'Exceeded maxDepth (250)' })).message,
+    ).toBe('a kifejezés túllépi a nyelv beépített szerkezeti korlátját');
   });
 
   it('mindhárom hibaosztályt a kód szerint írja le', () => {
     const range = { start: 0, end: 1 };
-    expect(describeCelError(new ParseError({ code: 'unexpected_token', message: 'x', range }))).toBe(
+    expect(describeCelError(new ParseError({ code: 'unexpected_token', message: 'x', range })).message).toBe(
       'váratlan jel a kifejezésben (pozíció: 0)',
     );
-    expect(describeCelError(new EvaluationError({ code: 'cannot_index_type', message: 'x', range }))).toBe(
+    expect(describeCelError(new EvaluationError({ code: 'cannot_index_type', message: 'x', range })).message).toBe(
       'ez az érték nem indexelhető (pozíció: 0)',
     );
   });
 
   it('a táblában nem álló kód a közös mondatot kapja a kóddal, a könyvtár szövege nélkül (user döntés 2026-10-25)', () => {
-    expect(describeCelError(new ParseError({ code: 'ismeretlen_kod', message: 'TITKOS' }))).toBe(
+    expect(describeCelError(new ParseError({ code: 'ismeretlen_kod', message: 'TITKOS' })).message).toBe(
       'a kifejezés nem dolgozható fel (kód: ismeretlen_kod)',
     );
     expect(
-      describeCelError(new EvaluationError({ code: 'ismeretlen_kod', message: 'TITKOS', range: { start: 2, end: 3 } })),
+      describeCelError(new EvaluationError({ code: 'ismeretlen_kod', message: 'TITKOS', range: { start: 2, end: 3 } }))
+        .message,
     ).toBe('a kifejezés nem dolgozható fel (kód: ismeretlen_kod) (pozíció: 2)');
-    expect(describeCelError(new ParseError({ code: 'constructor', message: 'TITKOS' }))).toBe(
+    expect(describeCelError(new ParseError({ code: 'constructor', message: 'TITKOS' })).message).toBe(
       'a kifejezés nem dolgozható fel (kód: constructor)',
     );
-    expect(describeCelError(new EvaluationError('TITKOS'))).toBe(
+    expect(describeCelError(new EvaluationError('TITKOS')).message).toBe(
       'a kifejezés nem dolgozható fel (kód: evaluation_error)',
     );
   });
 
   it('a futásidejű kódok saját mondatot kapnak', () => {
     const range = { start: 6, end: 13 };
-    expect(describeCelError(new EvaluationError({ code: 'no_such_key', message: 'No such key: TITKOS', range }))).toBe(
-      'a hivatkozott kulcs nem létezik (pozíció: 6)',
-    );
     expect(
-      describeCelError(new EvaluationError({ code: 'unsupported_type', message: 'Unsupported type: object' })),
+      describeCelError(new EvaluationError({ code: 'no_such_key', message: 'No such key: TITKOS', range })).message,
+    ).toBe('a hivatkozott kulcs nem létezik (pozíció: 6)');
+    expect(
+      describeCelError(new EvaluationError({ code: 'unsupported_type', message: 'Unsupported type: object' })).message,
     ).toBe('az adat egy értékének típusa a kifejezésben nem kezelhető (például saját constructor kulcsú objektum)');
   });
 
   it('a nem CEL kivétel kód nélkül, a közös mondatot kapja', () => {
-    expect(describeCelError(new Error('TITKOS'))).toBe('a kifejezés nem dolgozható fel');
-    expect(describeCelError(undefined)).toBe('a kifejezés nem dolgozható fel');
+    expect(describeCelError(new Error('TITKOS')).message).toBe('a kifejezés nem dolgozható fel');
+    expect(describeCelError(undefined).message).toBe('a kifejezés nem dolgozható fel');
+  });
+
+  it('a két tartalék ág a kivétel típusnevét is hordozza, az üzenetét nem; az ismert kód nem (SPEC-010 O-22)', () => {
+    expect(describeCelError(new TypeError('TITKOS'))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+      unexpectedErrorType: 'TypeError',
+    });
+    expect(describeCelError(new ParseError({ code: 'ismeretlen_kod', message: 'TITKOS' }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel (kód: ismeretlen_kod)',
+      unexpectedErrorType: 'ParseError',
+    });
+    expect(describeCelError(new ParseError({ code: 'limit_exceeded', message: 'TITKOS' }))).toStrictEqual({
+      kind: 'error',
+      message: 'a kifejezés túllépi a nyelv beépített szerkezeti korlátját',
+    });
   });
 });

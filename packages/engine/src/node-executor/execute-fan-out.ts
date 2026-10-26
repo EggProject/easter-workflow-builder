@@ -7,7 +7,7 @@ import { beginStepRun } from './begin-step-run.ts';
 import { emitEngineEvent } from './emit-engine-event.ts';
 import { finishStepRunFailed } from './finish-step-run-failed.ts';
 import { finishStepRunSucceeded } from './finish-step-run-succeeded.ts';
-import { isStorableOutput } from './is-storable-output.ts';
+import { outputStorabilityOf } from './output-storability.ts';
 import { MAX_STORED_OUTPUT_LENGTH } from './max-stored-output-length.ts';
 import type { NodeExecutionInstance } from './node-executor-instance.ts';
 import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
@@ -65,7 +65,7 @@ function renderItemLabels(
 /**
  * A `fan_out` node végrehajtója (SPEC-004 5. szekció 4. sora, 4.5 szekció).
  * Kiértékeli az `itemsExpression`-t, listára szűkíti, ellenőrzi, hogy a
- * lista tárolható-e (`isStorableOutput`), minden elemre
+ * lista tárolható-e (`outputStorabilityOf`), minden elemre
  * lerenderli a `branchLabelTemplate`-et, majd `fan_out_expanded` eseményt ír.
  * **N = 0 nem hiba** (4.5 szekció): üres tömb esetén nincs mit renderelni, a
  * kimenet üres lista. A node kimenete a kiértékelt elemlista - ez az egyetlen
@@ -106,7 +106,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (evaluated.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" fan_out node "${config.itemsExpression}" kifejezésének kiértékelése sikertelen: ${evaluated.message}`,
+      `A(z) "${nodeId}" fan_out node itemsExpression mezőjének kiértékelése sikertelen: ${evaluated.message}`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }
@@ -114,7 +114,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (!Array.isArray(evaluated.value)) {
     const errorMessage = formatEngineErrorMessage(
       'fan_out_items_not_a_list',
-      `A(z) "${nodeId}" fan_out node "${config.itemsExpression}" kifejezésének eredménye nem lista`,
+      `A(z) "${nodeId}" fan_out node itemsExpression mezőjének eredménye nem lista`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'fan_out_items_not_a_list', errorMessage, ports);
   }
@@ -123,10 +123,15 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   // A lista a lépés kimenete, tehát tárolódik; a túl nagy eredmény kifejezés
   // hiba, nem futás szintű hiba (SPEC-010 O-15 és O-18, user döntés
   // 2026-10-25), ezért a tárolás előtt, a címkék renderelése előtt dől el.
-  if (!isStorableOutput(items)) {
+  const storability = outputStorabilityOf(items);
+  if (storability !== 'storable') {
+    const reason =
+      storability === 'too_large'
+        ? `túl nagy a tároláshoz (legfeljebb ${String(MAX_STORED_OUTPUT_LENGTH)} karakter)`
+        : 'nem tárolható, mert nem alakítható JSON szöveggé';
     const errorMessage = formatEngineErrorMessage(
       'expression_evaluation_failed',
-      `A(z) "${nodeId}" fan_out node kimenete túl nagy a tároláshoz (legfeljebb ${String(MAX_STORED_OUTPUT_LENGTH)} karakter)`,
+      `A(z) "${nodeId}" fan_out node kimenete ${reason}`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'expression_evaluation_failed', errorMessage, ports);
   }
@@ -135,7 +140,7 @@ export function executeFanOut(input: ExecuteFanOutInput, ports: NodeExecutorPort
   if (rendered.kind === 'error') {
     const errorMessage = formatEngineErrorMessage(
       'template_render_failed',
-      `A(z) "${nodeId}" fan_out node "${config.branchLabelTemplate}" címke sablonjának renderelése sikertelen: ${rendered.message}`,
+      `A(z) "${nodeId}" fan_out node branchLabelTemplate mezőjének renderelése sikertelen: ${rendered.message}`,
     );
     return failFanOut(runId, stepRunId, startedAtMs, 'template_render_failed', errorMessage, ports);
   }

@@ -1,3 +1,4 @@
+import { describeErrorType, type OutcomeWithErrorType } from '@easter-workflow-builder/core';
 import { isCelError } from './is-cel-error.ts';
 
 /**
@@ -80,12 +81,22 @@ const FALLBACK_SENTENCE = 'a kifejezés nem dolgozható fel';
  * kód a közös mondatot kapja a kóddal (user döntés 2026-10-25); a kód a könyvtár
  * azonosítója, nem a kifejezés darabja. A könyvtár `summary` és `message`
  * szövege nem kerül ki, mert a kifejezés darabját idézi (research 2. szekció
- * (4b)). A hibaosztály nevét a hívó teszi hozzá (6.2).
+ * (4b)). A hibaosztály nevét a hívó teszi hozzá (6.2). A két tartalék ág (nem
+ * CEL kivétel, a táblában nem álló kód) mellé a kivétel típusneve kerül
+ * (`unexpectedErrorType`, az üzenete nem), hogy a szerver naplózhassa
+ * (SPEC-010 O-22).
  */
-export function describeCelError(error: unknown): string {
+export function describeCelError(error: unknown): Extract<OutcomeWithErrorType<never>, { readonly kind: 'error' }> {
   if (!isCelError(error)) {
-    return FALLBACK_SENTENCE;
+    return { kind: 'error', message: FALLBACK_SENTENCE, unexpectedErrorType: describeErrorType(error) };
   }
-  const sentence = SENTENCES.get(error.code) ?? `${FALLBACK_SENTENCE} (kód: ${error.code})`;
-  return error.range === undefined ? sentence : `${sentence} (pozíció: ${String(error.range.start)})`;
+  const position = error.range === undefined ? '' : ` (pozíció: ${String(error.range.start)})`;
+  const sentence = SENTENCES.get(error.code);
+  return sentence === undefined
+    ? {
+        kind: 'error',
+        message: `${FALLBACK_SENTENCE} (kód: ${error.code})${position}`,
+        unexpectedErrorType: describeErrorType(error),
+      }
+    : { kind: 'error', message: `${sentence}${position}` };
 }

@@ -18,7 +18,7 @@ A három mérés eldobható, repón kívüli munkakönyvtárban futott a pinelt 
   - `mustache@4.2.0` és `@types/mustache@4.2.6` (ugyanott). A Node `import Mustache from 'mustache'` a csomag `exports.import` mezője szerint a `mustache.mjs` fájlt tölti be, ezért a lent megadott forráshely mind ennek a fájlnak a sora. Lenyomat: `mustache.mjs` sha256 `0f6041f0...c0ac61f2`, `mustache.js` sha256 `a80aca79...af590b90`. Bun `1.4.0`.
   - A mérő mappák `package.json`, `bun.lock`, `tsconfig.json`, `index.ts` fájljai (a `bun init` termékei) **nem kerülnek a repóba**: a `bun run docs:check` a `git ls-files '*/package.json'` alapján minden `package.json` mellé `CLAUDE.md`-t követelne, a többi fájl nem mérő eszköz.
 - **A forráshelyek.** A mérő jelentése adta őket; a research írásakor a telepített fájlban újra elolvastam és egyeznek: `lib/index.d.ts` 338, 555, 575, 594; `lib/parser.js` 678, 778, 802; `lib/operators.js` 44 ... 56, 345 ... 353, 471 ... 476, 491, 509; `lib/registry.js` 197, 252, 1384; `lib/evaluator.js` 74 ... 116, 158; `lib/functions.js` 6, 53, 438 ... 439; `lib/globals.js` 1; `lib/options.js` 3 ... 9; `lib/errors.js`; `mustache.mjs` 39 ... 45, 60 ... 75, 141, 211, 246, 375 ... 394, 468 ... 472, 481 ... 493, 509 ... 520, 548 ... 551, 575 ... 580, 586 ... 589, 640, 655 ... 668, 711 ... 713, 757. A motor forráshelyei a `69bf35c` fa sorai; a `a964bb9` (a T-010-1 commit) a `packages/engine` alatt nem módosít, a hivatkozott sorokat ott is újraolvastam.
-- **A scriptek formázása.** A repóban a `bun run format:check` kapu a `.mjs` fájlokat is ellenőrzi, ezért a másolatokat Prettier formázta (`prettier --write`); szemantikájuk nem változott. Ellenőrzés: a formázott scriptek újrafuttatva a CEL mérés (1) ... (7) pontjára, az `m2b`, `m4b`, `m7b`, `m7c`, `m7d` scriptre és a Mustache `p1` ... `p7`, `p8b` scriptre bájtra azonos kimenetet adtak a mellékelt `out-*.txt` és `out/*.txt` fájlokkal; a `p8` kimenetében kizárólag a verem sorszámai (`lib.mjs:160:40`, `p8-run.mjs:44:13`) tértek el, a formázás miatt. A (8) futásidők nem futottak újra (időmérés, nem determinisztikus).
+- **A scriptek formázása.** A repóban a `bun run format:check` kapu a `.mjs` fájlokat is ellenőrzi, ezért a másolatokat Prettier formázta (`prettier --write`); szemantikájuk nem változott. Ellenőrzés: a formázott scriptek újrafuttatva a CEL mérés (1) ... (7) pontjára, az `m2b`, `m4b`, `m7b`, `m7c`, `m7d` scriptre és a Mustache `p1` ... `p7`, `p8b` scriptre bájtra azonos kimenetet adtak a mellékelt `out-*.txt` és `nyers/*.txt` fájlokkal; a `p8` kimenetében kizárólag a verem sorszámai (`lib.mjs:160:40`, `p8-run.mjs:44:13`) tértek el, a formázás miatt. A (8) futásidők nem futottak újra (időmérés, nem determinisztikus).
 - **A `cel-probe.mjs` abszolút importja.** A `t010-4-motor/cel-probe.mjs` a T-010-2 repón kívüli telepítéséből importál (`/sessions/.../t010-2/node_modules/...`), hogy semmi ne települjön újra. Máshol futtatva az importot a saját telepítésre kell igazítani.
 - **Titok, kulcs, env érték nincs** a scriptekben és a kimenetekben (keresve: `api key`, `password`, `MINIMAX`, `ANTHROPIC`, `sk-`; a `SECRET_LITERAL`, `TITKOS-...` szövegek jelölő karakterláncok, nem értékek). **Képet egyik script sem ír.**
 
@@ -207,7 +207,7 @@ Megfigyelés: a futásidő a beágyazási szinttel a lista méretének hatványa
 
 ## 3. T-010-3: a Mustache (`mustache@4.2.0`)
 
-Mérő eszköz: `2026-10-21-spec010-blokkolo-meresek/t010-3-mustache/`: a közös segédek `src/lib.mjs`, a pontonkénti scriptek `src/p1.mjs` ... `src/p8b.mjs`, a (8) hat folyamatos futtatása `src/p8.sh`; a nyers kimenetek `out/p1.txt` ... `out/p8b.txt`. A nézet minden ponton valós alakú `RunContext`: a `packages/engine/src/run-context/run-context.ts` hét kulcsa, a `buildRunContext` kimenetének alakjában (minden kulcs jelen van, a nem érvényes mező értéke `undefined`), az `input` és a `steps` JSON kerekúton (M-106).
+Mérő eszköz: `2026-10-21-spec010-blokkolo-meresek/t010-3-mustache/`: a közös segédek `src/lib.mjs`, a pontonkénti scriptek `src/p1.mjs` ... `src/p8b.mjs`, a (8) hat folyamatos futtatása `src/p8.sh`; a nyers kimenetek `nyers/p1.txt` ... `nyers/p8b.txt` (a mappa eredetileg `out/` volt, amit a gyökér `.gitignore` `out/` sora kizárt, tehát a fájlok nem kerültek a repóba; 2026-10-25-én a mérés idején mentett, bájtra azonos példányból `nyers/` néven felvéve, PLAN-010 T-010-21 A-4). A nézet minden ponton valós alakú `RunContext`: a `packages/engine/src/run-context/run-context.ts` hét kulcsa, a `buildRunContext` kimenetének alakjában (minden kulcs jelen van, a nem érvényes mező értéke `undefined`), az `input` és a `steps` JSON kerekúton (M-106).
 
 **A mért három renderelési út** (`src/lib.mjs`):
 
@@ -255,11 +255,11 @@ Az `OwnPropertyContext` (a 6.6 szerinti alosztály: `lookup` és `push` felülí
 
 ### (1) A nyolc escape karakter a `config.escape` mellett; a globális `Mustache.escape` érintetlen
 
-Kód: `src/p1.mjs`: `&<>"'/`=`bemenet a`{{input.s}}`, `{{{input.s}}}`, `{{& input.s}}`alakra, mindhárom úton;`Mustache.escape === originalEscape`. Nyers kimenet: `out/p1.txt`. Mindhárom alak, mindhárom úton a nyolc karaktert változatlanul adja (`&<>"'/`=`); `globalEscapeSameRef: true`; a `Mustache.escape('&<>"\'/`=')` továbbra is HTML escape-el (`&amp;&lt;&gt;&quot;&#39;&#x2F;&#x60;&#x3D;`), config nélkül is. Összevetés a SPEC-010 6.1-gyel: **egyezik.** Forrás: `mustache.mjs` 60 ... 75 (`entityMap`, `escapeHtml`), 663 ... 667 (`escapedValue`), 757 (`mustache.escape = escapeHtml`).
+Kód: `src/p1.mjs`: `&<>"'/`=`bemenet a`{{input.s}}`, `{{{input.s}}}`, `{{& input.s}}`alakra, mindhárom úton;`Mustache.escape === originalEscape`. Nyers kimenet: `nyers/p1.txt`. Mindhárom alak, mindhárom úton a nyolc karaktert változatlanul adja (`&<>"'/`=`); `globalEscapeSameRef: true`; a `Mustache.escape('&<>"\'/`=')` továbbra is HTML escape-el (`&amp;&lt;&gt;&quot;&#39;&#x2F;&#x60;&#x3D;`), config nélkül is. Összevetés a SPEC-010 6.1-gyel: **egyezik.** Forrás: `mustache.mjs` 60 ... 75 (`entityMap`, `escapeHtml`), 663 ... 667 (`escapedValue`), 757 (`mustache.escape = escapeHtml`).
 
 ### (2) Szám, logikai érték, `null`, tömb, objektum szöveggé alakítása (6.5, O-5)
 
-Kód: `src/p2.mjs`: tíz érték (`szam`, `tort`, `nulla`, `igaz`, `hamis`, `semmi: null`, `tomb`, `obj`, `uresTomb`, `uresObj`) mindhárom alakban, mindhárom úton. Nyers kimenet: `out/p2.txt`. A lényegi sorok:
+Kód: `src/p2.mjs`: tíz érték (`szam`, `tort`, `nulla`, `igaz`, `hamis`, `semmi: null`, `tomb`, `obj`, `uresTomb`, `uresObj`) mindhárom alakban, mindhárom úton. Nyers kimenet: `nyers/p2.txt`. A lényegi sorok:
 
 ```
 {{input.semmi}}        spec=""                          strict="null"                       stock=""
@@ -279,7 +279,7 @@ Kód: `src/p2.mjs`: tíz érték (`szam`, `tort`, `nulla`, `igaz`, `hamis`, `sem
 
 ### (3) A hiányzó név: megkülönböztethető-e a sima változó és a szakasz (6.7, O-4)
 
-Kód: `src/p3.mjs`: A) a `lookup` hívás argumentumai a `Mustache.render` úton, a hívó verem sorával; A2) a `lookup` paraméterlistája; B) `Writer` alosztály út, 17 sablonon; C) ugyanez a `Context` alosztállyal egyedül; D) veremalapú megkülönböztetés (csak bizonyításként). Nyers kimenet: `out/p3.txt`.
+Kód: `src/p3.mjs`: A) a `lookup` hívás argumentumai a `Mustache.render` úton, a hívó verem sorával; A2) a `lookup` paraméterlistája; B) `Writer` alosztály út, 17 sablonon; C) ugyanez a `Context` alosztállyal egyedül; D) veremalapú megkülönböztetés (csak bizonyításként). Nyers kimenet: `nyers/p3.txt`.
 
 - **A blokk:** a `lookup` mindig egyetlen argumentumot, a nevet kapja (`Mustache.Context.prototype.lookup.length` = 1; `mustache.mjs` 393; `@types/mustache` `lookup(name: string): any`), a sima változó (`escapedValue`, `mustache.mjs` 665), a nyers változó (`unescapedValue`, 658), a szakasz (`renderSection`, 588) és a fordított szakasz (`renderInverted`, 620) **ugyanazzal az argumentummal** hívja. A `Context`-en belül az egyetlen megkülönböztető információ a hívási verem (D blokk: működik, de a könyvtár belső függvényneveitől függ, és minifikált vagy átcsomagolt build alatt csendben elromlik; nem javasolt, csak bizonyításként mértük).
 - **C blokk** (`Context` alosztály egyedül, `Mustache.render` út): a hiányzó név mindhárom változó alakon csendben üres; a szakasz üres, a fordított szakasz renderel.
@@ -289,7 +289,7 @@ Kód: `src/p3.mjs`: A) a `lookup` hívás argumentumai a `Mustache.render` úton
 
 ### (4) A négy `parseTemplate` hiba, és mit idéz a sablonból (9.5)
 
-Kód: `src/p4.mjs`: 12 sablon (a négy hiba több alakban, titok jellegű szöveggel és egy érvényes ellenpélda). Nyers kimenet: `out/p4.txt`.
+Kód: `src/p4.mjs`: 12 sablon (a négy hiba több alakban, titok jellegű szöveggel és egy érvényes ellenpélda). Nyers kimenet: `nyers/p4.txt`.
 
 | Sablon                                                     | Osztály | Üzenet                                                                    |
 | ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------- |
@@ -310,11 +310,11 @@ Kód: `src/p4.mjs`: 12 sablon (a négy hiba több alakban, titok jellegű szöve
 
 ### (5) A `{{> x}}` üres
 
-Kód: `src/p5.mjs`: `{{> x}}`, `a{{>x}}b`, `{{> ../../etc/passwd}}`, `{{> input}}`, `  {{> x}}\nsor`. Nyers kimenet: `out/p5.txt`: mind a három úton üres (a standalone sor eleji szóköz és sortörés a könyvtár szokásos szabálya szerint eltűnik). Összevetés a SPEC-010 6.4-gyel és az M-117-tel: **egyezik.** Forrás: `mustache.mjs` 640 (`if (!partials) return;`).
+Kód: `src/p5.mjs`: `{{> x}}`, `a{{>x}}b`, `{{> ../../etc/passwd}}`, `{{> input}}`, `  {{> x}}\nsor`. Nyers kimenet: `nyers/p5.txt`: mind a három úton üres (a standalone sor eleji szóköz és sortörés a könyvtár szokásos szabálya szerint eltűnik). Összevetés a SPEC-010 6.4-gyel és az M-117-tel: **egyezik.** Forrás: `mustache.mjs` 640 (`if (!partials) return;`).
 
 ### (6) A gyorsítótár kikapcsolása
 
-Kód: `src/p6.mjs`. Nyers kimenet: `out/p6.txt`.
+Kód: `src/p6.mjs`. Nyers kimenet: `nyers/p6.txt`.
 
 ```
 alapból templateCache típusa: object kulcsok: 0
@@ -330,7 +330,7 @@ StrictWriter parse(t) === parse(t): false
 
 ### (7) A 6.6 szerinti `Context` alosztály a 6.4 táblázat minden során
 
-Kód: `src/p7.mjs`: 29 sablon a három úton (`stock`, `spec`, `strict`), plusz a `push` felülírásának próbája. Nyers kimenet: `out/p7.txt`.
+Kód: `src/p7.mjs`: 29 sablon a három úton (`stock`, `spec`, `strict`), plusz a `push` felülírásának próbája. Nyers kimenet: `nyers/p7.txt`.
 
 - A 6.4 táblázat mind az öt sora (pontozott név, szakasz tömbön, fordított szakasz üres és hiányzó értékre, partial, határoló csere), a beágyazott szakasz, a `.` név, a szülő kontextus bejárása, a pontozott név szakaszban, a `fan_out`/`loop`/`join`/`error` kontextus: a `spec` és a `strict` út kimenete **bájtra azonos** a könyvtár gyári kimenetével (28 sor a 29-ből; a 29. a `{{input.tema.length}}`, lásd lent). **Egyezik.** A `steps.node-1.summary` (kötőjeles azonosító) működik; a pont az egyetlen névelválasztó.
 - A `push` felülírása szükséges és hat: a szonda minden `lookup` hívásnál `OwnPropertyContext` példányt lát; felülírás nélkül a szakasz belseje alap `Context` lesz (`mustache.mjs` 385 ... 387), és `{{#input.elemek}}{{constructor.name}}{{/input.elemek}}` kimenete `StringString`. **Egyezik** az M-134-gyel és a 6.6 2. pontjával.
@@ -338,7 +338,7 @@ Kód: `src/p7.mjs`: 29 sablon a három úton (`stock`, `spec`, `strict`), plusz 
 
 ### (8) Támadó sablon lista, csapda függvényekkel és `unhandledRejection` figyelővel
 
-Kód: `src/p8-run.mjs` (30 támadó sablon: a terv kötelező 9 eleme plusz 21 bővítés), `src/p8.sh` (hat külön folyamat), `src/p8b.mjs` (jogos nyers tag a `spec` és `strict` úton). A csapdák a beépített metódusokat (`Array.fromAsync`, `Array.from`, `Array.prototype.map`, `Array.prototype.toString`, `Object.prototype.toString`, `valueOf`, `hasOwnProperty`, `Object.keys`, `String.prototype.toString`, `valueOf`) és egy saját tulajdonságként a nézetbe tett `input.trapFn` függvényt számlálóval burkolják, és csak a `render` hívás idejére élesek. Nyers kimenet: `out/p8.txt`, `out/p8b.txt`.
+Kód: `src/p8-run.mjs` (30 támadó sablon: a terv kötelező 9 eleme plusz 21 bővítés), `src/p8.sh` (hat külön folyamat), `src/p8b.mjs` (jogos nyers tag a `spec` és `strict` úton). A csapdák a beépített metódusokat (`Array.fromAsync`, `Array.from`, `Array.prototype.map`, `Array.prototype.toString`, `Object.prototype.toString`, `valueOf`, `hasOwnProperty`, `Object.keys`, `String.prototype.toString`, `valueOf`) és egy saját tulajdonságként a nézetbe tett `input.trapFn` függvényt számlálóval burkolják, és csak a `render` hívás idejére élesek. Nyers kimenet: `nyers/p8.txt`, `nyers/p8b.txt`.
 
 | Út                                | Támadó sablonok kimenete                                                             | Függvényhívás | Kezeletlen elutasítás | Kilépési kód                                      |
 | --------------------------------- | ------------------------------------------------------------------------------------ | ------------- | --------------------- | ------------------------------------------------- |
@@ -668,8 +668,11 @@ fel`), a meglévő teszt változatlanul zöld; CEL kifejezés körkörös érté
 **A tároláskori szerializálás, a forrás olvasásával és eldobható próbával (`openDatabase(':memory:')`,
 a repón kívül, a csomag forrását importálva).** A CEL eredmény ma nem jut a motorba: az `apps/server`
 az elutasító kifejezés portot köti be (`apps/server/src/engine-assembly/create-rejecting-expression-evaluator.ts`),
-a szállított port bekötése a PLAN-010 T-010-13. A bekötés után az egyetlen út, ahol a CEL eredmény
-maga tárolódik, a `fan_out` kimenete: `packages/engine/src/node-executor/execute-fan-out.ts` a lista
+a szállított port bekötése a PLAN-010 T-010-13. A bekötés után a CEL eredmény közvetlenül a `fan_out`
+kimenetében tárolódik (**pontosítás 2026-10-25:** nem ez az egyetlen út; a közvetlenül `join`-ba kötött
+`fan_out` után a `join` `merge` ágonként újra tárolja a teljes listát, PLAN-010 T-010-21 A-1,
+`2026-10-25-plan-010-adverzarialis-atvizsgalas.md`; a korlát azóta minden tárolt lépés kimenetére fut,
+SPEC-010 O-21): `packages/engine/src/node-executor/execute-fan-out.ts` a lista
 elemeit `finishStepRunSucceeded` hívással a `markStepSucceeded` `output` mezőjébe adja; a `branch`
 és a `loop` kimenete `null`, a `fan_out_expanded` esemény payloadja csak az elemszám. A
 `step_run.output` oszlop Drizzle `mode: 'json'` (`packages/db/src/step-run/step-run.ts`), a
@@ -949,13 +952,16 @@ számot a user döntötte el, nem a mérés vezette le. A korlát a 12.2 és 12.
 (16 777 215): ott a mért futás `succeeded`, 856 ms, csúcs RSS 829 MB.
 
 **A megvalósítás.** `packages/engine/src/node-executor/max-stored-output-length.ts` (a konstans),
-`is-storable-output.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
+`output-storability.ts` (tiszta függvény: a `JSON.stringify` eredménye legfeljebb a korlát hosszú, és a
 szerializálás nem dob kivételt), a `fan_out` végrehajtó a `failFanOut` úton zár
 `expression_evaluation_failed` osztállyal. A szerializálás kivétele (`RangeError`, a 12.4 szerinti V8
 szöveghossz-korlát) mindig a méretkorlát fölötti méret, ezért a kivétel ága valódi, nem halott út, és
-ugyanúgy nemet ad. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
+ugyanúgy nemet ad. **Pontosítás (2026-10-25, PLAN-010 T-010-21 A-8):** a kivétel nem csak a
+szöveghossz-korlátból jöhet (például `toJSON` hiba vagy körkörös hivatkozás), ezért a függvény ma
+`outputStorabilityOf` néven háromállapotú (`storable`, `too_large`, `not_serializable`), és a kivétel
+ága a `nem tárolható, mert nem alakítható JSON szöveggé` mondatot kapja. Az üzenet a csomópontot és a korlát számát nevezi meg, a kifejezés szövegét nem.
 
-**Határ tesztek.** Az `is-storable-output.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
+**Határ tesztek.** Az `output-storability.spec.ts` és az `execute-fan-out.spec.ts` egy hosszú szöveg
 elemmel (`[` + `"` + szöveg + `"` + `]`, a JSON hossza a szöveg hossza plusz négy) a pontosan a
 korláttal egyenlő hosszra igent, eggyel hosszabbra nemet állít; a kivétel ágát a dobó `toJSON` értékes
 teszt váltja ki.
@@ -969,4 +975,4 @@ tooling/scripts/test.sh`, 6265 teszt zöld, 100 százalék lefedettség mind a n
 teszt 51 ms (a régi 27 szintű teszt 1724 ... 1739 ms, 11. szekció). Szándékos rontás: a `<=
 MAX_STORED_OUTPUT_LENGTH` feltétel `<= MAX_STORED_OUTPUT_LENGTH * 100` alakra cserélve a
 végponttól végpontig teszt, az `execute-fan-out.spec.ts` korlát feletti tesztje és az
-`is-storable-output.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.
+`output-storability.spec.ts` korlát feletti tesztje egyaránt elbukik; a visszaállítás után zöld.

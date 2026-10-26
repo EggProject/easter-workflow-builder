@@ -368,7 +368,11 @@ describe('createMustacheTemplateRenderer: közös hivatkozású kiírás (SPEC-0
     });
     try {
       const outcome = renderer.render('a {{item}} b', { item: doubled(200) });
-      expect(outcome).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
+      expect(outcome).toStrictEqual({
+        kind: 'error',
+        message: 'a sablon nem renderelhető',
+        unexpectedErrorType: 'RangeError',
+      });
       expect(stringify).toHaveBeenCalledTimes(1);
     } finally {
       stringify.mockRestore();
@@ -389,7 +393,11 @@ describe('createMustacheTemplateRenderer: kivétel nem hagyja el a függvényt (
       },
     );
     const outcome = renderer.render('{{v}}', { v: throwing });
-    expect(outcome).toStrictEqual({ kind: 'error', message: 'a sablon nem renderelhető' });
+    expect(outcome).toStrictEqual({
+      kind: 'error',
+      message: 'a sablon nem renderelhető',
+      unexpectedErrorType: 'TypeError',
+    });
     expect(JSON.stringify(outcome)).not.toContain('TITKOS');
   });
 

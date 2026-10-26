@@ -3,6 +3,7 @@ import type { WorkflowNodeInput } from '@easter-workflow-builder/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_AGENT_STEP_SETTINGS } from './default-agent-step-settings.ts';
 import { NodeInspector } from './NodeInspector.tsx';
 
 type OnChange = (updatedNode: WorkflowNodeInput) => void;
@@ -1061,6 +1062,103 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
     readonly node: WorkflowNodeInput;
   }[];
 
+  // A 9.2 lista többi öt mezője (AC43): a fenti kettővel együtt mind a hét sablon és
+  // kifejezés mező alatt a csomag mondata jelenik meg.
+  const UNCLOSED_SECTION = 'Le nem zárt szakasz a sablonban (pozíció: 10).';
+  const UNDECLARED_VARIABLE = 'Nem deklarált változó a kifejezésben (pozíció: 0).';
+  const REMAINING_LANGUAGE_CASES = [
+    {
+      field: 'agent_step promptTemplate',
+      label: 'Prompt sablon',
+      message: UNCLOSED_SECTION,
+      node: {
+        id: 'n-agent-mustache',
+        type: 'agent_step',
+        label: 'Agent',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          ...DEFAULT_AGENT_STEP_SETTINGS,
+          type: 'agent_step',
+          promptTemplate: '{{#titok}}',
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+    {
+      field: 'join settings.promptTemplate',
+      label: 'Prompt sablon',
+      message: UNCLOSED_SECTION,
+      node: {
+        id: 'n-join-mustache',
+        type: 'join',
+        label: 'Összefésülés',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'join',
+          mode: 'ai_synthesis',
+          settings: { ...DEFAULT_AGENT_STEP_SETTINGS, promptTemplate: '{{#titok}}' },
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+    {
+      field: 'fan_out itemsExpression',
+      label: 'Elemek kifejezés (itemsExpression)',
+      message: UNDECLARED_VARIABLE,
+      node: {
+        id: 'n-fan-out-cel',
+        type: 'fan_out',
+        label: 'Szétosztás',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'fan_out',
+          itemsExpression: 'titokNeve',
+          branchLabelTemplate: '{{item}}',
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+    {
+      field: 'fan_out branchLabelTemplate',
+      label: 'Ág címke sablon (branchLabelTemplate)',
+      message: UNCLOSED_SECTION,
+      node: {
+        id: 'n-fan-out-mustache',
+        type: 'fan_out',
+        label: 'Szétosztás',
+        positionX: 0,
+        positionY: 0,
+        config: {
+          type: 'fan_out',
+          itemsExpression: 'input.items',
+          branchLabelTemplate: '{{#titok}}',
+          onUnhandledError: 'fail_run',
+        },
+      },
+    },
+    {
+      field: 'loop continueExpression',
+      label: 'Folytatás feltétel (continueExpression)',
+      message: UNDECLARED_VARIABLE,
+      node: {
+        id: 'n-loop-cel',
+        type: 'loop',
+        label: 'Ciklus',
+        positionX: 0,
+        positionY: 0,
+        config: { type: 'loop', maxIterations: 3, continueExpression: 'titokNeve > 1', onUnhandledError: 'fail_run' },
+      },
+    },
+  ] satisfies readonly {
+    readonly field: string;
+    readonly label: string;
+    readonly message: string;
+    readonly node: WorkflowNodeInput;
+  }[];
+
   function renderInspector(node: WorkflowNodeInput, isSaveAttempted: boolean): void {
     act(() => {
       root.render(
@@ -1122,6 +1220,27 @@ describe('NodeInspector: a sablon és kifejezés mezők fordítási hibája (SPE
 
   it.each(LANGUAGE_CASES)(
     '$language: sikertelen mentési kísérlet után az érintetlen, fordíthatatlan mező is jelez',
+    ({ node, label, message }) => {
+      renderInspector(node, true);
+      expectErrorUnder(fieldControl(label), message);
+    },
+  );
+
+  it.each(REMAINING_LANGUAGE_CASES)(
+    '$field: az érintett, fordíthatatlan mező alatt a csomag mondata áll, aria kötéssel (AC43)',
+    ({ node, label, message }) => {
+      renderInspector(node, false);
+      const control = fieldControl(label);
+      act(() => {
+        control.focus();
+        control.blur();
+      });
+      expectErrorUnder(control, message);
+    },
+  );
+
+  it.each(REMAINING_LANGUAGE_CASES)(
+    '$field: sikertelen mentési kísérlet után az érintetlen, fordíthatatlan mező is jelez (AC43)',
     ({ node, label, message }) => {
       renderInspector(node, true);
       expectErrorUnder(fieldControl(label), message);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@easter-workflow-builder/db';
 import { createEngine, type EventPublisherPort } from '@easter-workflow-builder/engine';
+import { createServerLogger, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord } from '@easter-workflow-builder/typeguards';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { createRandomUuidIdGenerator } from './create-random-uuid-id-generator.ts';
@@ -13,6 +14,28 @@ function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
     throw new Error(`váratlan hibaág: ${outcome.message}`);
   }
   return outcome.value;
+}
+
+/**
+ * Valódi naplózó, ami a sorokat egy tömbbe gyűjti.
+ */
+function collectingLogger(): { readonly logger: ServerLogger; readonly lines: string[] } {
+  const lines: string[] = [];
+  return {
+    logger: createServerLogger(
+      { secretValues: [] },
+      {
+        write: (line: string) => {
+          lines.push(line);
+        },
+      },
+    ),
+    lines,
+  };
+}
+
+function silentLogger(): ServerLogger {
+  return collectingLogger().logger;
 }
 
 function openMemoryDatabase(): DatabaseContext {
@@ -113,11 +136,24 @@ function publisherWithRunFinished(publisher: EventPublisherPort): {
  */
 const OVER_LIMIT_DOUBLING_COUNT = 24;
 
+/**
+ * A T-010-21 A-1 megkerülés olcsó alakja: három, 2^22 karakteres szöveg elem
+ * (a lista JSON hossza a korlát alatt marad), és a `join` mindhárom ágtól a
+ * teljes listát kapja, tehát a `join` kimenete a lista háromszorosa, a korlát
+ * fölött.
+ */
+const JOIN_BYPASS_ITEMS_EXPRESSION = `${longStringItemExpression(22)}.map(s, [s, s, s])[0]`;
+
 describe('buildEngineDependencies', () => {
   it('a kapott database és clock referenciát változatlanul adja tovább, a nyolc portot pedig felépíti', () => {
     const database = openMemoryDatabase();
     const clock = createSystemClock();
-    const dependencies = buildEngineDependencies(database, createStreamRegistry(createRandomUuidIdGenerator()), clock);
+    const dependencies = buildEngineDependencies(
+      database,
+      createStreamRegistry(createRandomUuidIdGenerator()),
+      clock,
+      silentLogger(),
+    );
 
     expect(dependencies.database).toBe(database);
     expect(dependencies.clock).toBe(clock);
@@ -135,6 +171,7 @@ describe('buildEngineDependencies', () => {
       openMemoryDatabase(),
       createStreamRegistry(createRandomUuidIdGenerator()),
       createSystemClock(),
+      silentLogger(),
     );
 
     expect(dependencies.templateRenderer.compile('Szia {{input.nev}}!')).toStrictEqual({
@@ -154,7 +191,12 @@ describe('buildEngineDependencies', () => {
   it('REGRESSZIÓ: a korlátnál nagyobb tárolandó fan_out eredmény a lépést expression_evaluation_failed hibával zárja, nem a futást run_execution_failed hibával (SPEC-010 O-15 és O-18, user döntés 2026-10-25)', async () => {
     const database = openMemoryDatabase();
     const clock = createSystemClock();
-    const dependencies = buildEngineDependencies(database, createStreamRegistry(createRandomUuidIdGenerator()), clock);
+    const dependencies = buildEngineDependencies(
+      database,
+      createStreamRegistry(createRandomUuidIdGenerator()),
+      clock,
+      silentLogger(),
+    );
     const watched = publisherWithRunFinished(dependencies.eventPublisher);
     const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
     const workflowId = seedFanOutWorkflow(database, longStringItemExpression(OVER_LIMIT_DOUBLING_COUNT));
@@ -172,11 +214,81 @@ describe('buildEngineDependencies', () => {
     expect(stepRuns.some((row) => row.status === 'running')).toBe(false);
   });
 
+  it('REGRESSZIÓ: a közvetlenül join-ba kötött fan_out korlát alatti listájából a join korlát fölötti kimenete nem tárolódik, a join lépés step_output_not_storable hibával zár (SPEC-010 O-21, PLAN-010 T-010-21 A-1)', async () => {
+    const database = openMemoryDatabase();
+    const clock = createSystemClock();
+    const dependencies = buildEngineDependencies(
+      database,
+      createStreamRegistry(createRandomUuidIdGenerator()),
+      clock,
+      silentLogger(),
+    );
+    const watched = publisherWithRunFinished(dependencies.eventPublisher);
+    const engine = createEngine({ ...dependencies, eventPublisher: watched.publisher });
+    const workflowId = seedFanOutWorkflow(database, JOIN_BYPASS_ITEMS_EXPRESSION);
+
+    const started = okOrThrow(await engine.startRun({ workflowId, input: {} }));
+    await watched.runFinished;
+
+    const stepRuns = okOrThrow(database.stepRuns.listStepRuns(started.run.id));
+    const fanOutRow = stepRuns.find((row) => row.nodeId === 'fo');
+    expect(fanOutRow?.status).toBe('succeeded');
+    const joinRow = stepRuns.find((row) => row.nodeId === 'j');
+    expect(joinRow?.status).toBe('failed');
+    expect(joinRow?.errorKind).toBe('step_output_not_storable');
+    expect(joinRow?.output).toBeNull();
+    const events = okOrThrow(database.events.readEventsSince(started.run.id, 0, 1000));
+    expect(events.find((event) => event.kind === 'run_finished')?.payload).toMatchObject({
+      status: 'failed',
+      errorKind: 'step_output_not_storable',
+    });
+  });
+
+  it('REGRESSZIÓ: a csomag tartalék ágára futó sablon és kifejezés hiba a naplóba a kivétel típusával kerül, az üzenete nélkül (SPEC-010 O-22, PLAN-010 T-010-21 A-7)', () => {
+    const { logger, lines } = collectingLogger();
+    const dependencies = buildEngineDependencies(
+      openMemoryDatabase(),
+      createStreamRegistry(createRandomUuidIdGenerator()),
+      createSystemClock(),
+      logger,
+    );
+    const throwingProxy: unknown = new Proxy(
+      {},
+      {
+        getPrototypeOf() {
+          throw new TypeError('TITOK_JELOLO_8f3a');
+        },
+      },
+    );
+    const throwingContext = {
+      get input(): unknown {
+        throw new RangeError('TITOK_JELOLO_8f3a');
+      },
+    };
+
+    expect(dependencies.templateRenderer.render('{{v}}', { v: throwingProxy })).toMatchObject({
+      kind: 'error',
+      message: 'a sablon nem renderelhető',
+    });
+    expect(dependencies.expressionEvaluator.evaluate('input', throwingContext)).toMatchObject({
+      kind: 'error',
+      message: 'a kifejezés nem dolgozható fel',
+    });
+    expect(dependencies.expressionEvaluator.compile('input.x')).toStrictEqual({ kind: 'ok', value: undefined });
+
+    const entries = lines.map((line): unknown => JSON.parse(line));
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ level: 50, operation: 'template_render', errorType: 'TypeError' });
+    expect(entries[1]).toMatchObject({ level: 50, operation: 'expression_evaluate', errorType: 'RangeError' });
+    expect(lines.join('\n')).not.toContain('TITOK_JELOLO_8f3a');
+  });
+
   it('az összeállított kilenc port a motor createEngine hívásának valódi bemenete lehet', () => {
     const dependencies = buildEngineDependencies(
       openMemoryDatabase(),
       createStreamRegistry(createRandomUuidIdGenerator()),
       createSystemClock(),
+      silentLogger(),
     );
     const engine = createEngine(dependencies);
 
