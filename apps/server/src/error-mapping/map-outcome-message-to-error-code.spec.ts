@@ -47,7 +47,6 @@ describe('mapOutcomeMessageToErrorCode', () => {
     'invalid_error_handler_edge',
     'malformed_node_config',
     'unhandled_error_policy_missing',
-    'unsupported_join_merge_setting',
     'insufficient_backoff_list',
     'missing_required_input',
     'structured_output_strategy_unsupported',

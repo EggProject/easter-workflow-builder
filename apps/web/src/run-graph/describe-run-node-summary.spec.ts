@@ -67,7 +67,7 @@ const JOIN_NODE: WorkflowNodeInput = {
   label: 'Összefésülés',
   positionX: 0,
   positionY: 0,
-  config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
+  config: { type: 'join', mode: 'merge', onUnhandledError: null },
 };
 
 const APPROVAL_NODE: WorkflowNodeInput = {

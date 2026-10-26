@@ -96,7 +96,7 @@ describe('findBlankAgentDefinitionFields (SPEC-008 5.4, O-38)', () => {
   });
 
   it('agents mező nélküli típusnál és join módnál nincs hiba', () => {
-    expect(pathsOf({ type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' })).toEqual([]);
+    expect(pathsOf({ type: 'join', mode: 'merge', onUnhandledError: 'fail_run' })).toEqual([]);
     expect(pathsOf({ type: 'join', mode: null, onUnhandledError: 'fail_run' })).toEqual([]);
     expect(pathsOf({ type: 'script', source: 'x', runtime: 'expression', onUnhandledError: 'fail_run' })).toEqual([]);
   });

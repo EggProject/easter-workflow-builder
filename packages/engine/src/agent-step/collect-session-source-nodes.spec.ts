@@ -39,7 +39,6 @@ function aiSynthesisJoinNode(sessionMode: AgentStepConfig['sessionMode']): Execu
 const mergeJoinNode: ExecutableNodeConfig = {
   type: 'join',
   mode: 'merge',
-  settings: {},
   onUnhandledError: 'fail_run',
 };
 

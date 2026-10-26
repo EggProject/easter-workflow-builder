@@ -2140,3 +2140,39 @@ változatlan; az érték a mért, felfelé kerekítés nélkül, az `nyc` kimene
 **Igazolás.** Ugyanazon a nyers adaton a beállított küszöbbel a `nyc report --check-coverage` exit 0;
 egy századdal magasabb küszöbbel (99.36 / 98.95 / 99.74 / 99.34) mind a négy metrika `ERROR` sorral
 bukik (négy `ERROR`).
+
+## 54. A `join` `merge` `settings` mező törlése utáni újramérés (2026-10-26): a `lines` küszöb LEFELÉ követi a mért értéket
+
+**Kiváltó ok.** A `fix/hianylista-kis-javitasok` ág második commitja (`9b5c689`) törli a `join` `merge`
+módjának `settings` mezőjét (user döntés 2026-10-26, SPEC-004 O-6). Az e2e kapu (`bun run
+coverage:e2e:report`) a `lines` metrikán elbukott: `ERROR: Coverage for lines (99.32%) does not meet
+global threshold (99.33%)`, miközben mind a nyolc shard zöld.
+
+**A mérés** a 29. szekció tiszta eljárásával, a 47. szekció sandbox módja szerint, kétszer, ugyanazzal az
+eljárással: a `ba6d424` (a `main` az ág elágazásakor) és az ág feje (`9c79033`) ellen. Mindkét esetben
+`rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt `bun x playwright test
+--shard=<i>/8` nyolc egymás utáni futásban, `flock /tmp/playwright-gep.lock` alatt, `workers: 3` mellett,
+majd `nyc report --reporter=json-summary`. **Mind a 16 shard futás zöld** (az 1. shard 82, a többi 81 teszt).
+
+| Metrika    | `ba6d424`: fedett / összes | ág feje: fedett / összes | Fedetlen darab, előtte -> utána | `nyc` kimenet az ág fején |
+| ---------- | -------------------------- | ------------------------ | ------------------------------- | ------------------------- |
+| statements | 2163 / 2177                | 2158 / 2172              | 14 -> 14                        | 99.35                     |
+| branches   | 1032 / 1043                | 1032 / 1043              | 11 -> 11                        | 98.94                     |
+| functions  | 750 / 752                  | 749 / 751                | 2 -> 2                          | 99.73                     |
+| lines      | 2078 / 2092                | 2073 / 2087              | 14 -> 14                        | 99.32                     |
+
+**Levezetés.** A fedetlen darab egyik metrikán sem változott. A `coverage-e2e/lcov.info` fájlok
+fájlonkénti összevetése (`LF`, `LH`, `FNF`, `FNH`, `BRF`, `BRH`) pontosan egy fájlban talál eltérést:
+`src/node-inspector/JoinNodeFields.tsx`, `LF` és `LH` is -5, `FNF` és `FNH` is -1, az ágak száma
+változatlan. Ez a törölt `settings` JSON mező kezelője: öt FEDETT sor és egy FEDETT függvény tűnt el, a
+nevező zsugorodott, a számláló nem. A fedetlen tételek ugyanazon az öt fájlon és soron állnak, mint az 53.
+szekcióban (nulla találatú sorok: `mount-app.tsx` 16, 21, 22; `read-frontend-config.ts` 23, 29, 37, 41, 62,
+67, 72, 77; `is-valid-connection.ts` 36; `perform-route-request.ts` 89; `use-stream-connection.ts`
+202). Ez a szabálykönyv 8. szekciójának a fedetlen sorok számára vonatkozó ratchet olvasata (user döntés
+2026-09-09, 15. szekció precedens): a százalék csökkenését kizárólag fedett kód törlése okozza, a
+fedetlen tételek darabszáma előtte és utána azonos. A küszöb ezért a `lines` metrikán 99.33-ról 99.32-re
+áll (`apps/web/package.json`), a másik három változatlan; az érték a mért, felfelé kerekítés nélkül.
+
+**Igazolás.** Ugyanazon a nyers adaton a beállított küszöbökkel a `nyc report --check-coverage` exit 0;
+egy századdal magasabb küszöbökkel (99.36 / 98.95 / 99.74 / 99.33) mind a négy metrika `ERROR` sorral
+bukik (négy `ERROR`).

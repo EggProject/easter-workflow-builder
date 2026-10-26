@@ -14,9 +14,8 @@ import { ScriptConfigSchema } from './script-config.ts';
  * Mind a tíz ág `z.strictObject`, nincs alapérték- vagy transzformáló
  * séma-metódus hívás, minden kimenő alak `.readonly()`, az unió
  * `z.discriminatedUnion`
- * (SPEC-005 7.2, 7.3, 7.4). Az `AgentStepConfig.agents` és a
- * `JoinMergeNodeConfig.settings` alakja **nem szűkíthető**
- * `Record<string, unknown>`-nál szűkebbre, különben a `db` oldali,
+ * (SPEC-005 7.2, 7.3, 7.4). Az `AgentStepConfig.agents` alakja **nem
+ * szűkíthető** `Record<string, unknown>`-nál szűkebbre, különben a `db` oldali,
  * szándékosan nyitott rekorddal szemben a típusszintű egyenlőség megbukna.
  */
 export const UnhandledErrorPolicySchema = z.enum(['fail_run', 'fail_branch']);
@@ -94,20 +93,10 @@ export const FanOutNodeConfigSchema = z
 
 export type FanOutNodeConfig = z.infer<typeof FanOutNodeConfigSchema>;
 
-/**
- * A `merge` mód alobjektuma: a bemenő ágak összefűzési szabálya. A `db`
- * `JoinMergeSettings` szándékosan nyitott rekord marad (mezőt kitalálni
- * tilos), a séma sem szűkíti szűkebbre.
- */
-export const JoinMergeSettingsSchema = z.record(z.string(), z.unknown()).readonly();
-
-export type JoinMergeSettings = z.infer<typeof JoinMergeSettingsSchema>;
-
 export const JoinMergeNodeConfigSchema = z
   .strictObject({
     type: z.literal('join'),
     mode: z.literal('merge'),
-    settings: JoinMergeSettingsSchema,
     onUnhandledError: UnhandledErrorPolicySchema.nullable(),
   })
   .readonly();

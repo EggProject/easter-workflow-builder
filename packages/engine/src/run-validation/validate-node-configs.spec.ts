@@ -70,7 +70,7 @@ describe('validateNodeConfigs', () => {
   });
 
   it('a kiválasztott módú join node átmegy', () => {
-    const joinMergeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+    const joinMergeConfig = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
     const graph = graphOf([node('j', 'join', joinMergeConfig)]);
 
     expect(validateNodeConfigs(graph)).toStrictEqual({ kind: 'ok', value: new Map([['j', joinMergeConfig]]) });

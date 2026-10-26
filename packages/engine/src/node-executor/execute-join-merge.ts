@@ -11,9 +11,9 @@ type JoinMergeNodeConfig = Extract<ExecutableNodeConfig, { readonly type: 'join'
 
 /**
  * A `join` node `merge` módjának bemenete (SPEC-004 5. szekció 5. sora, 5.6
- * szekció). A `config.settings` üressége futás indításkor már ellenőrzött
- * (`validateJoinMergeSettings`, T-005-15, `unsupported_join_merge_setting`),
- * ez a téma nem ellenőrzi újra. A `joinInputs` a beérkezett ág kimenetek
+ * szekció). A `merge` módnak nincs `settings` mezője (user döntés
+ * 2026-10-26), a `config` alakját a futás indításkor a `validateNodeConfigs`
+ * már ellenőrizte. A `joinInputs` a beérkezett ág kimenetek
  * listája, **elem sorrendben**: a hívó (`run-supervisor`) a `scheduling`
  * téma `collectJoinInputs`-ával gyűjti össze, ez a függvény készen kapja.
  */

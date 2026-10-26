@@ -1,9 +1,8 @@
-import { JoinMergeSettingsSchema, type JoinNodeConfig } from '@easter-workflow-builder/protocol';
+import type { JoinNodeConfig } from '@easter-workflow-builder/protocol';
 import { SelectField, TextAreaField } from '@easter-workflow-builder/ui';
 import type { ChangeEvent, ReactElement } from 'react';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
 import { DEFAULT_AGENT_STEP_SETTINGS } from './default-agent-step-settings.ts';
-import { JsonTextAreaField } from './JsonTextAreaField.tsx';
 import { useFieldError } from './use-field-error.ts';
 
 export interface JoinNodeFieldsProperties {
@@ -37,18 +36,18 @@ const MODE_OPTIONS = [
 
 /**
  * A `join` node szerkesztett mezői: `mode` és a módhoz tartozó `settings`
- * (SPEC-008 5.1). A `merge` mód beállítása `Record<string, unknown>`
- * (nincs Zod sémája a mezőin), tehát nyers JSON szerkesztőn megy; a
- * `script` mód a közös `ScriptConfig` alakot hordozza; az `ai_synthesis`
- * mód a teljes `AgentStepConfig`-ot, a `agent_step` node-dal AZONOS
+ * (SPEC-008 5.1). A `merge` módnak nincs beállítása (user döntés
+ * 2026-10-26: a `settings` mező kikerült); a `script` mód a közös
+ * `ScriptConfig` alakot hordozza; az `ai_synthesis` mód a teljes
+ * `AgentStepConfig`-ot, a `agent_step` node-dal AZONOS
  * `AgentStepConfigFields` komponensen át.
  *
  * CSOPORTOSÍTÁS: a mód választó és a módhoz tartozó egyetlen beállítás
- * elöl áll, panel nélkül - a `merge` és a `script` módnak összesen két
- * mezője van. Az `ai_synthesis` mód a saját panelezését az
+ * elöl áll, panel nélkül - a `script` módnak összesen két mezője van, a
+ * `merge` módnál csak a mód választó áll. Az `ai_synthesis` mód a saját panelezését az
  * `AgentStepConfigFields`-től örökli, tehát a mód választó után ugyanaz a
  * "elöl a prompt, panelben a felülírások" tagolás jelenik meg. A
- * választatlan (`mode: null`) állapotban csak a mód választó áll, mert a
+ * választatlan (`mode: null`) állapotban is csak a mód választó áll, mert a
  * beállítás a módtól függ; a mentési séma a mező alatt jelez (SPEC-008 5.4,
  * O-33).
  */
@@ -61,7 +60,7 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
     const { onUnhandledError } = config;
     switch (nextMode) {
       case 'merge': {
-        onChange({ type: 'join', mode: 'merge', settings: {}, onUnhandledError });
+        onChange({ type: 'join', mode: 'merge', onUnhandledError });
         break;
       }
       case 'script': {
@@ -87,26 +86,8 @@ export function JoinNodeFields(properties: Readonly<JoinNodeFieldsProperties>): 
     />
   );
 
-  if (config.mode === null) {
+  if (config.mode === null || config.mode === 'merge') {
     return modeSelect;
-  }
-
-  if (config.mode === 'merge') {
-    return (
-      <>
-        {modeSelect}
-        <JsonTextAreaField
-          label="Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)"
-          value={config.settings}
-          onChange={(nextValue) => {
-            const parsed = JoinMergeSettingsSchema.safeParse(nextValue);
-            if (parsed.success) {
-              onChange({ ...config, settings: parsed.data });
-            }
-          }}
-        />
-      </>
-    );
   }
 
   if (config.mode === 'script') {

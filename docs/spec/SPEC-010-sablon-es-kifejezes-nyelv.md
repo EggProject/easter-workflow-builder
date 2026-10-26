@@ -705,7 +705,7 @@ változóneveket ellenőrzi, az adatot nem látja: a hiányzó map kulcs (5.4), 
 ### 9.2 Az új indítási ellenőrzés a motorban
 
 Az ellenőrzés a SPEC-004 4.7 listáját bővíti; a SPEC-004 4.7 táblázata után álló bekezdés erre
-hivatkozik, a táblázat maga nem kap új sort, hogy a SPEC-004 8. kritériumának "tíz ellenőrzés"
+hivatkozik, a táblázat maga nem kap új sort, hogy a SPEC-004 8. kritériumának "kilenc ellenőrzés"
 száma érvényes maradjon. Az ellenőrzés a SPEC-004 4.8 szerinti 3. lépésben (gráf validáció) fut, tehát
 **egyetlen adatbázis sort sem ír** (SPEC-004 4.8 utolsó bekezdése):
 

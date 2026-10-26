@@ -569,7 +569,6 @@ test('a választatlan join mód mentési kísérlete PUT nélkül marad, a hiba 
   expect(saved.success && saved.data.nodes.find((node) => node.id === 'n-join')?.config).toEqual({
     type: 'join',
     mode: 'merge',
-    settings: {},
     onUnhandledError: 'fail_run',
   });
 });

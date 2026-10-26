@@ -135,7 +135,7 @@ describe('findLanguageFieldIssues', () => {
     { type: 'error_handler', maxAttempts: 3, backoffMs: [100], handledErrorKinds: [], onUnhandledError: null },
     { type: 'sub_workflow', targetWorkflowId: 'wf-2', inputMapping: {}, onUnhandledError: null },
     { type: 'script', source: 'return 1;', runtime: 'expression', onUnhandledError: null },
-    { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null },
+    { type: 'join', mode: 'merge', onUnhandledError: null },
     { type: 'join', mode: 'script', settings: { source: 'return 1;', runtime: 'expression' }, onUnhandledError: null },
     { type: 'join', mode: null, onUnhandledError: null },
   ] satisfies readonly NodeConfig[])(

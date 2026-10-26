@@ -3,7 +3,7 @@ import type { WellFormedNodeConfig } from './well-formed-node-config.ts';
 import { validateImplementedNodeTypes } from './validate-implemented-node-types.ts';
 
 const START: WellFormedNodeConfig = { type: 'start', inputFields: [], onUnhandledError: 'fail_run' };
-const JOIN_MERGE: WellFormedNodeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' };
+const JOIN_MERGE: WellFormedNodeConfig = { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' };
 const SCRIPT: WellFormedNodeConfig = {
   type: 'script',
   source: 'ertek',

@@ -127,7 +127,7 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   meglévő `enum-drift-protection` téma mintája: megvalósítás nélküli regressziós teszt,
   típusszintű kétirányú kölcsönös értékadhatóság a `typecheck` kapun, plusz futásidejű ág ott,
   ahol a `db` guardot exportál. **Ami a `db` oldalon `Record<string, unknown>`, azt a séma sem
-  szűkíti** (`AgentStepConfig.agents`, `JoinMergeNodeConfig.settings`), különben a védelem
+  szűkíti** (`AgentStepConfig.agents`), különben a védelem
   megbukna. Ez a SPEC-005 egy eredeti döntésének kimondott felülírása (SPEC-005 7.7,
   SPEC-008 5.3, user döntés 2026-09-05).
 - **A `protocol` a motor hibaosztályainak részhalmazát is duplikálhatja, ugyanezzel a
@@ -183,7 +183,7 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   pillanatkép node `config` ellenőrzése közös szabálya; a `protocol` olvasó és mentési sémái
   `z.strictObject` alapúak, tehát a két oldal ugyanarra az ismeretlen kulcs szabályra áll (user döntés
   2026-10-26, SPEC-011 5.2). Szabadon marad, mert a típus nyitott: `AgentStepConfig.agents`,
-  `JoinMergeNodeConfig.settings`, `StructuredOutputConfig.schema`, a `SandboxConfig` öt nyitott
+  `StructuredOutputConfig.schema`, a `SandboxConfig` öt nyitott
   mezőjének értéke, a `sub_workflow.inputMapping` és az `mcpServers` kulcsai. A védelem helye az
   `apps/server` `node-config-drift-protection` témája: a futásidejű ág a tíz típusra, a `join` négy
   ágára és a beágyazott objektumokra egy ismeretlen kulcsot mindkét oldalon elutasít, a szabadon maradó
