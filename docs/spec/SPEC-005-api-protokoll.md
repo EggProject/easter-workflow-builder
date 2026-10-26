@@ -170,6 +170,8 @@ A "Motor vagy repository" oszlop mondja meg, mire képződik le a végpont. Ahol
 
 **A 14. végpont két alakja egy sémaunió, nem feltételes mező.** A query string vagy `{ limit, afterEventId }`, vagy `{ limit, stepRunId }`; a két `z.strictObject` kizárja egymást, mert mindegyik elutasítja a másik kulcsát. Így nem keletkezik olyan kombináció, aminek a jelentése nem meghatározott, és a szerver oldalon nincs elágazás azon, hogy "melyik mező van kitöltve", csak azon, hogy a unió melyik ága illeszkedett. A `readEventsForStep` bemenete nem tartalmaz kurzort (SPEC-003 9.2), ezért a `stepRunId` ágon `afterEventId` sem küldhető: a séma ezt kizárja, nem a szerver.
 
+**A 14. végpont (`readRunEvents`) nem felületi útvonal** (user döntés 2026-10-26). A felület a futás eseményeit az SSE csatornán (5. szekció) kapja, nem ezen a végponton olvassa, ezért a végpont nem a felület szerződése: külső és diagnosztikai használatra áll rendelkezésre (például egy futás eseményeinek utólagos lekérdezése a felületen kívülről).
+
 **C. Jóváhagyás (2 végpont)**
 
 | #   | Metódus és útvonal                          | Kérés                                                             | Válasz                         | Motor vagy repository                            | Saját hibaágai                             |
