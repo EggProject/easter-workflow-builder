@@ -1,5 +1,4 @@
 import type { Fact } from '../evidence/fact/fact.ts';
-import type { AgentToolRecommendation } from '../tool-support/agent-tool-recommendation.ts';
 import type { ConcurrencyCapability } from '../limits/concurrency-capability.ts';
 import type { DisallowedEnvironmentRequirement } from '../environment/disallowed-environment-requirement.ts';
 import type { EffortCapability } from '../request-shaping/effort-capability.ts';
@@ -37,10 +36,6 @@ export interface ProviderCapabilityDescriptor<TModelId extends string, TFamilyId
   readonly promptCaching: PromptCachingCapability;
   readonly streaming: StreamingCapability;
   readonly serverTools: Fact<readonly ServerToolDescriptor[]>;
-  /**
-  Mely saját folyamatban futó eszközt ajánlott bekapcsolni ennél a providernél.
-  */
-  readonly recommendedAgentTools: Fact<readonly AgentToolRecommendation[]>;
   readonly models: readonly ModelDescriptor<TModelId, TFamilyId>[];
   readonly modelsEndpoint: ModelsEndpointCapability;
   readonly rateLimits: RateLimitCapability<TModelId>;

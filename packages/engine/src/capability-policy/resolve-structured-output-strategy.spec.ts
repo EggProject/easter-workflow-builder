@@ -15,7 +15,7 @@ function unknownFact<TValue>(): Fact<TValue> {
 
 function buildStrategy(usable: Fact<boolean>): StructuredOutputStrategy {
   return {
-    id: 'emit_output_tool',
+    id: 'sdk_output_format',
     usable,
     blockingWireDetail: unknownFact<string | null>(),
     observedRoundTrips: knownFact<readonly number[]>([3]),
@@ -26,7 +26,7 @@ describe('resolveStructuredOutputStrategy', () => {
   it('known igaz: a stratégia használható, és nincs jelölés', () => {
     const strategy = buildStrategy(knownFact(true));
 
-    expect(resolveStructuredOutputStrategy([strategy], 'emit_output_tool')).toStrictEqual({
+    expect(resolveStructuredOutputStrategy([strategy], 'sdk_output_format')).toStrictEqual({
       kind: 'ok',
       value: { strategy, strategyUnproven: false },
     });
@@ -35,39 +35,29 @@ describe('resolveStructuredOutputStrategy', () => {
   it('known hamis: structured_output_strategy_unsupported hibát ad', () => {
     const strategy = buildStrategy(knownFact(false));
 
-    expect(resolveStructuredOutputStrategy([strategy], 'emit_output_tool')).toStrictEqual({
+    expect(resolveStructuredOutputStrategy([strategy], 'sdk_output_format')).toStrictEqual({
       kind: 'error',
       message:
-        'A(z) emit_output_tool strukturált kimenet stratégia a provider leírója szerint nem használható (structured_output_strategy_unsupported).',
+        'A(z) sdk_output_format strukturált kimenet stratégia a provider leírója szerint nem használható (structured_output_strategy_unsupported).',
     });
   });
 
   it('unknown: használható, de strategyUnproven jelölést kap', () => {
     const strategy = buildStrategy(unknownFact<boolean>());
 
-    expect(resolveStructuredOutputStrategy([strategy], 'emit_output_tool')).toStrictEqual({
+    expect(resolveStructuredOutputStrategy([strategy], 'sdk_output_format')).toStrictEqual({
       kind: 'ok',
       value: { strategy, strategyUnproven: true },
     });
   });
 
   it('a leíró nem írja le a kért stratégiát: ugyanaz a hibaosztály, más indoklással', () => {
-    const strategy = buildStrategy(knownFact(true));
-
-    expect(resolveStructuredOutputStrategy([strategy], 'sdk_output_format')).toStrictEqual({
+    // Az unió egy tagú (SPEC-011 O-9), ezért a "nem írja le" esetet a
+    // stratégia nélküli leíró adja, nem egy második azonosító.
+    expect(resolveStructuredOutputStrategy([], 'sdk_output_format')).toStrictEqual({
       kind: 'error',
       message:
         'A(z) sdk_output_format strukturált kimenet stratégiát a provider leírója nem írja le (structured_output_strategy_unsupported).',
-    });
-  });
-
-  it('több stratégia közül a kért azonosítójút választja ki', () => {
-    const usable = buildStrategy(knownFact(true));
-    const other: StructuredOutputStrategy = { ...buildStrategy(knownFact(false)), id: 'sdk_output_format' };
-
-    expect(resolveStructuredOutputStrategy([other, usable], 'emit_output_tool')).toStrictEqual({
-      kind: 'ok',
-      value: { strategy: usable, strategyUnproven: false },
     });
   });
 });

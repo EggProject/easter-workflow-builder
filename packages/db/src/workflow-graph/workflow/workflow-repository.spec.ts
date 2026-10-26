@@ -180,11 +180,9 @@ const agentStepSettings: AgentStepConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -709,6 +707,71 @@ describe('createWorkflowRepository', () => {
 
       sqlite.close();
     });
+
+    it('corrupt_node_config hibaágat ad, ha egy tárolt node config ismeretlen kulcsot hordoz (SPEC-011 5.2)', () => {
+      const { sqlite, database, repository } = openRepository();
+      const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+      database
+        .insert(workflowNodeTable)
+        .values({
+          id: 'unknown-key-node',
+          workflowId: workflow.id,
+          type: 'agent_step',
+          label: 'Ismeretlen kulcs',
+          positionX: 0,
+          positionY: 0,
+          config: { ...agentStepSettings, type: 'agent_step', onUnhandledError: null, ismeretlenKulcs: [] },
+          createdAtMs: new Date(0),
+          updatedAtMs: new Date(0),
+        })
+        .run();
+
+      const message = errorOrThrow(repository.readGraph(workflow.id));
+      expect(message).toContain('corrupt_node_config');
+      expect(message).toContain('"unknown-key-node"');
+
+      sqlite.close();
+    });
+  });
+
+  describe('replaceGraph: az ismeretlen kulcs elutasítása (SPEC-011 5.2)', () => {
+    // A típus nem ismeri a kulcsot, ezért a próba érték egy szétterített,
+    // nem friss objektumból kapja: a fordító így nem jelez többlet mezőt, és
+    // `as` sem kell.
+    const unknownKey = { ismeretlenKulcs: true };
+    const unknownKeyConfigs: readonly (readonly [string, NodeConfig])[] = [
+      ['az agent_step gyökerén', { ...agentStepSettings, ...unknownKey, type: 'agent_step', onUnhandledError: null }],
+      [
+        'a join ai_synthesis settings alobjektumán',
+        {
+          type: 'join',
+          mode: 'ai_synthesis',
+          settings: { ...agentStepSettings, ...unknownKey },
+          onUnhandledError: null,
+        },
+      ],
+    ];
+
+    for (const [description, config] of unknownKeyConfigs) {
+      it(`${description} malformed_node_config hibaágat ad, sort nem ír, a korábbi gráf változatlan`, () => {
+        const { sqlite, database, repository } = openRepository();
+        const workflow = okOrThrow(repository.createWorkflow({ name: 'Gráf', description: null, providerId: null }));
+        const { nodes, edges } = twoNodesOneEdge();
+        okOrThrow(repository.replaceGraph(workflow.id, nodes, edges));
+        const before = okOrThrow(repository.readGraph(workflow.id));
+        const node: WorkflowNodeInput = { id: 'node-x', label: '', positionX: 0, positionY: 0, config };
+
+        const message = errorOrThrow(repository.replaceGraph(workflow.id, [node], []));
+
+        expect(message).toContain('(malformed_node_config)');
+        expect(message).toContain('"node-x"');
+        expect(okOrThrow(repository.readGraph(workflow.id))).toStrictEqual(before);
+        expect(database.select().from(workflowNodeTable).where(eq(workflowNodeTable.id, 'node-x')).all()).toHaveLength(
+          0,
+        );
+        sqlite.close();
+      });
+    }
   });
 
   describe('replaceGraph: a kötelező szöveg mezők írás oldali szabálya (SPEC-008 5.4, O-21)', () => {

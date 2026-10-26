@@ -1,0 +1,32 @@
+agent max: save=true read=true db=true dbAfterParse=true 
+agent max systemPrompt string skills all: save=true read=true db=true dbAfterParse=true 
+agent default: save=true read=true db=true dbAfterParse=true 
+join ai max: save=true read=true db=true dbAfterParse=true 
+join merge: save=true read=true db=true dbAfterParse=true 
+join script: save=true read=true db=true dbAfterParse=true 
+start: save=true read=true db=true dbAfterParse=true 
+branch: save=true read=true db=true dbAfterParse=true 
+fan_out: save=true read=true db=true dbAfterParse=true 
+loop: save=true read=true db=true dbAfterParse=true 
+human: save=true read=true db=true dbAfterParse=true 
+err: save=true read=true db=true dbAfterParse=true 
+sub: save=true read=true db=true dbAfterParse=true 
+script: save=true read=true db=true dbAfterParse=true 
+initial agent_step: save=false read=true db=true dbAfterParse=true ["promptTemplate:custom","onUnhandledError:custom"]
+initial branch: save=false read=true db=true dbAfterParse=true ["expression:custom","onUnhandledError:custom"]
+initial fan_out: save=false read=true db=true dbAfterParse=true ["itemsExpression:custom","branchLabelTemplate:custom","onUnhandledError:custom"]
+initial join: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom","mode:custom"]
+initial loop: save=false read=false db=false dbAfterParse=n/a ["maxIterations:invalid_type","continueExpression:custom","onUnhandledError:custom"]
+initial human_approval: save=false read=true db=true dbAfterParse=true ["title:custom","bodyTemplate:custom","onUnhandledError:custom"]
+initial error_handler: save=false read=false db=false dbAfterParse=n/a ["maxAttempts:invalid_type","onUnhandledError:custom"]
+initial sub_workflow: save=false read=true db=true dbAfterParse=true ["targetWorkflowId:custom","onUnhandledError:custom"]
+initial script: save=false read=true db=true dbAfterParse=true ["source:custom","onUnhandledError:custom"]
+showcase n-start: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-branch: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-fanout: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-agent: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-script: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-approval: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-loop: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+showcase n-join: save=false read=true db=true dbAfterParse=true ["onUnhandledError:custom"]
+ELTERES 0

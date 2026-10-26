@@ -95,7 +95,7 @@ const FULL_ENTRY: Readonly<Record<string, unknown>> = {
   effort: 'high',
   permissionMode: 'default',
   background: true,
-  tools: ['web_search'],
+  tools: ['WebSearch'],
   disallowedTools: ['bash'],
   memory: 'project',
   initialPrompt: 'szia',
@@ -249,15 +249,15 @@ describe('AgentDefinitionEntryFields', () => {
       );
     });
     const toolsTextarea = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(
-      (textarea) => textarea.value === 'web_search',
+      (textarea) => textarea.value === 'WebSearch',
     );
     if (toolsTextarea === undefined) {
       throw new Error('a teszt nem találta a tools mezőt');
     }
     act(() => {
-      typeInto(toolsTextarea, 'web_search\nweb_fetch');
+      typeInto(toolsTextarea, 'WebSearch\nWebFetch');
     });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ tools: ['web_search', 'web_fetch'] }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ tools: ['WebSearch', 'WebFetch'] }));
   });
 
   it('a zárt lista (memory) kiválasztása frissíti a mezőt', () => {

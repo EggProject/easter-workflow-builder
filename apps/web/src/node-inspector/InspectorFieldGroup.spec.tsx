@@ -23,7 +23,7 @@ describe('InspectorFieldGroup', () => {
   it('a csoport role="group" szerepet kap, a címére mutató aria-labelledby kötéssel', () => {
     act(() => {
       root.render(
-        <InspectorFieldGroup title="Bekapcsolt motor hookok">
+        <InspectorFieldGroup title="reviewer">
           <input aria-label="mező" />
         </InspectorFieldGroup>,
       );
@@ -33,7 +33,7 @@ describe('InspectorFieldGroup', () => {
     const titleId = group?.getAttribute('aria-labelledby');
     expect(titleId).toBeTruthy();
     const title = titleId === null || titleId === undefined ? undefined : document.querySelector(`#${titleId}`);
-    expect(title?.textContent).toBe('Bekapcsolt motor hookok');
+    expect(title?.textContent).toBe('reviewer');
   });
 
   it('NINCS kártya alakú doboz: a design system .field__label címkéje és egy tiszta elrendezés csoport', () => {

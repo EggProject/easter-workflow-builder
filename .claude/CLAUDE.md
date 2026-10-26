@@ -142,10 +142,12 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
   `as const satisfies` táblában; a védelem az `apps/server` `node-config-drift-protection` témájában a
-  két tábla típusszintű egyenlősége plusz mezőnkénti futásidejű ág. **Csak az írás oldala szigorodik:**
+  két tábla típusszintű egyenlősége plusz mezőnkénti futásidejű ág. **A kötelező szöveg mezőnél csak az írás oldala szigorodik:**
   az olvasó sémák (`NodeConfigSchema`, `WorkflowGraphDocumentSchema`) és a `db` `readGraph` guardja
-  változatlan, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és egy régi, üres mezőt
-  hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28, SPEC-008 5.4, O-21).
+  az üres mezőt továbbra is elfogadja, mert a pillanatkép megváltoztathatatlan (10. szekció 2. pont), és
+  egy régi, üres mezőt hordozó gráfnak és futásnak olvashatónak kell maradnia (user döntés 2026-09-28,
+  SPEC-008 5.4, O-21). Az ismeretlen kulcs szabálya viszont az olvasó utat is szigorítja (lásd a
+  "minden ismeretlen kulcsot elutasít" pontot lejjebb).
   **Az `onUnhandledError` és a `join` `mode` mentési szabálya ezzel szemben nem duplikátum:**
   kizárólag a `protocol` `NodeConfigSaveSchema` `superRefine` hívásában áll, a kötelező szöveg mezők
   szabálya mellett: mind a tíz típusnál a `null` `onUnhandledError`, `join` típusnál a `null` `mode`
@@ -169,6 +171,24 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
   `isNodeConfig` guard ezért a `db` `replaceGraph` hívásában fut** (`malformed_node_config`, a meglévő
   hibaleképezésen, user döntés 2026-10-17): a szám invariáns nincs típusszinten, tehát az ág nem
   halott, és típushelyesen, `as` nélkül tesztelhető valós `:memory:` adatbázison.
+
+- **A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, és a `protocol` ugyanazt a szabályt
+  duplikálja, ugyanezzel a védelemmel.** Az `isNodeConfig` és az `isAgentStepConfig` objektumonként zárt
+  kulcslistával dolgozik: a tíz `NodeConfig` típus (a `join` mind a négy ága), az `AgentStepConfig`, a
+  `StartInputField`, a `BranchOption`, a `ScriptConfig`, a `PresetSystemPrompt`, a
+  `StructuredOutputConfig`, a `SandboxConfig` és a három `StorableMcpServer` variáns. A lista
+  `Readonly<Record<keyof T, true>>` alakú, tehát a típus bővülésekor a `typecheck` kapu jelez, ha a lista
+  nem; az ellenőrzést a `typeguards` `isRecordWithKnownKeys` guardja végzi. A szabály a `replaceGraph`
+  (`malformed_node_config`), a `readGraph` (`corrupt_node_config`), a futás indításának ellenőrzése és a
+  pillanatkép node `config` ellenőrzése közös szabálya; a `protocol` olvasó és mentési sémái
+  `z.strictObject` alapúak, tehát a két oldal ugyanarra az ismeretlen kulcs szabályra áll (user döntés
+  2026-10-26, SPEC-011 5.2). Szabadon marad, mert a típus nyitott: `AgentStepConfig.agents`,
+  `JoinMergeNodeConfig.settings`, `StructuredOutputConfig.schema`, a `SandboxConfig` öt nyitott
+  mezőjének értéke, a `sub_workflow.inputMapping` és az `mcpServers` kulcsai. A védelem helye az
+  `apps/server` `node-config-drift-protection` témája: a futásidejű ág a tíz típusra, a `join` négy
+  ágára és a beágyazott objektumokra egy ismeretlen kulcsot mindkét oldalon elutasít, a szabadon maradó
+  mezők tetszőleges kulcsát mindkét oldalon elfogadja. Új, nyitott belsejű mező felvételekor a két
+  oldal kulcslistája és ez a teszt együtt változik.
 
 **Fájlok és tesztek**
 
@@ -211,7 +231,7 @@ Teljes szabályrendszer: SPEC-002 6. szekció. Itt csak a döntési szabályok.
 nélkül, a `tooling/*` és a `tools/*` csomagokat is beleértve (SPEC-002 3.).
 
 **Mikor új csomag, mikor almappa.** A csomagon belül kell tagolni, nem új csomaggal. A workspace
-26 csomagból áll: 20 `packages`, 2 `apps`, 3 `tooling`, 1 `tools` (gyökér `CLAUDE.md`,
+19 csomagból áll: 13 `packages`, 2 `apps`, 3 `tooling`, 1 `tools` (gyökér `CLAUDE.md`,
 SPEC-002 4.).
 
 **Mappaszerkezet.**
@@ -229,7 +249,7 @@ SPEC-002 4.).
   (`<x>/<x>/` tilos).
 - **Tiltott mappanevek:** `types/`, `interfaces/`, `models/`, `utils/`, `helpers/`, `lib/`,
   `common/`, `shared/`, `internal/`, `private/`, `config/`. A tiltás a puszta névre vonatkozik: a
-  `minimax-config/` és a `firecrawl-config/` helyes, mert megnevezi a szolgáltatást.
+  `server-config/` és a `frontend-config/` helyes, mert megnevezi, mit konfigurál.
 - Két kivétel a hatókör alól: `apps/web/src/vite-env.d.ts` és a `tools/wire-probe` csomag
   (SPEC-002 6.8). Az előbbi a korábbi `apps/web/src/main.ts` kivétel helyére lépett, miután a
   valódi UI belépési pont felállt (SPEC-007 12.2, T-008-30).
@@ -259,14 +279,12 @@ Egy fájl akkor áll egyedül egy mappában, ha a fogalomnak ténylegesen egy f�
 mert máshova nem fért be.
 
 **Elnevezési elv.** Ami egy konkrét külső szolgáltatóhoz köthető, azt a csomag nevében meg kell
-nevezni, előbb a szolgáltató, utána a funkció: `provider-minimax`, `minimax-client`,
-`firecrawl-client`, `tool-minimax-web-search`, `tool-firecrawl-web-fetch`,
-`tool-minimax-understand-image`. A próba: ha holnap egy második implementáció érkezik ugyanarra a
+nevezni, előbb a szolgáltató, utána a funkció: `provider-minimax`,
+`provider-claude-subscription`. A próba: ha holnap egy második implementáció érkezik ugyanarra a
 funkcióra, megkülönböztethető marad-e a kettő. A szolgáltatófüggetlen csomagokat (`core`,
-`typeguards`, `mcp-tool-kit`, `protocol`, `logger`, `db`, `engine`, `ui`, `workflow-language`) és a
-saját domain fogalmukról szólókat (`provider-capability`, `provider-registry`,
-`agent-tool-bundle`) nem kell megnevezni. **Az MCP eszköznevek (`web_search`, `web_fetch`, `understand_image`) nem változnak**,
-azok az agent felé kimenő szerződés (SPEC-002 6.9).
+`typeguards`, `protocol`, `logger`, `db`, `engine`, `ui`, `workflow-language`) és a
+saját domain fogalmukról szólókat (`provider-capability`, `provider-registry`) nem kell
+megnevezni.
 
 **Publikus felület.** A csomag felülete kizárólag a `src/index.ts` barrel, csak nevesített
 újraexporttal; `export *` tilos. Ami nincs a barrelben, az kívülről nem használható. A barrel a
@@ -1440,15 +1458,6 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   CLAUDE.md). Védelem: a `node-config-save-schema.spec.ts` típushibás esetei és a
   `graph-node-required-fields.spec.ts` kilenc típusos e2e-je (research
   `2026-10-14-csomopont-felvetel.md` 45.5, user döntés 2026-10-16).
-
-**Provider**
-
-- **A MiniMax hibajelzés nem a HTTP státuszban van.** Hibás API kulcsra is HTTP 200 érkezik, a hiba
-  csak a `base_resp.status_code` mezőben látszik. Ezért minden válasz először a burkolón megy át
-  (`packages/minimax-client` CLAUDE.md).
-- **A `web_search` tool sémája lapos**, mert a mérés szerint a MiniMax a tool sémát nem utasítja
-  vissza újrapróbálkozással, tehát egy bonyolultabb séma azonnali, javíthatatlan hibát okozna
-  (`packages/tool-minimax-web-search` CLAUDE.md).
 
 ---
 

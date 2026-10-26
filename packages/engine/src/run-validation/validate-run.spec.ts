@@ -55,11 +55,9 @@ const AGENT_SETTINGS = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 } as const;

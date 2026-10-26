@@ -14,7 +14,7 @@ az `@easter-workflow-builder/provider-registry` feladata.
 | `descriptor/`      | az összefogó `claudeSubscriptionProvider` érték, minden mezője a többi téma egy-egy exportjára hivatkozik                                                                                        |
 | `model-catalog/`   | `ClaudeFamilyId`, `ClaudeModelId`, `claudeSubscriptionModels`                                                                                                                                    |
 | `environment/`     | `claudeSubscriptionRequiredEnvironment`, `claudeSubscriptionDisallowedEnvironment`                                                                                                               |
-| `tool-support/`    | `claudeSubscriptionServerTools`, `claudeSubscriptionRecommendedAgentTools`                                                                                                                       |
+| `tool-support/`    | `claudeSubscriptionServerTools`                                                                                                                                                                  |
 | `limits/`          | `claudeSubscriptionConcurrency`, `claudeSubscriptionRateLimits`                                                                                                                                  |
 | `request-shaping/` | `claudeSubscriptionEffort`, `claudeSubscriptionThinking`, `claudeSubscriptionStructuredOutput`, `claudeSubscriptionToolChoice`, `claudeSubscriptionStreaming`, `claudeSubscriptionPromptCaching` |
 

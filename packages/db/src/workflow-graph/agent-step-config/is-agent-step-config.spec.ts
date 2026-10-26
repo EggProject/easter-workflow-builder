@@ -19,11 +19,9 @@ const minimalConfig: AgentStepConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -49,7 +47,6 @@ const fullConfig: AgentStepConfig = {
     remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
     web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
   },
-  enabledEngineHooks: ['emit_output_tool_stop'],
   cwd: '/workspace',
   additionalDirectories: ['/workspace/docs'],
   sandbox: {
@@ -59,9 +56,8 @@ const fullConfig: AgentStepConfig = {
     excludedCommands: ['git'],
     enableWeakerNestedSandbox: false,
   },
-  agentTools: ['web_search'],
   sessionMode: 'continued',
-  structuredOutput: { strategy: 'emit_output_tool', schema: { type: 'object' } },
+  structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object' } },
 };
 
 /**
@@ -112,15 +108,9 @@ describe('isAgentStepConfig', () => {
     ['agents', ['reviewer']],
     ['skills', 7],
     ['mcpServers', 'local'],
-    ['enabledEngineHooks', 'emit_output_tool_stop'],
-    ['enabledEngineHooks', ['unknown_hook']],
-    ['enabledEngineHooks', [7]],
     ['cwd', 7],
     ['additionalDirectories', '/workspace'],
     ['sandbox', 7],
-    ['agentTools', 'web_search'],
-    ['agentTools', ['browse']],
-    ['agentTools', [7]],
     ['sessionMode', 'resumed'],
     ['sessionMode', 7],
     ['structuredOutput', 7],
@@ -246,9 +236,88 @@ describe('isAgentStepConfig', () => {
     });
   }
 
-  it('elfogadja mindkét strukturált kimenet stratégiát, tetszőleges sémával', () => {
+  it('elfogadja az egyetlen strukturált kimenet stratégiát, tetszőleges sémával', () => {
     expect(isAgentStepConfig(withField('structuredOutput', { strategy: 'sdk_output_format', schema: null }))).toBe(
       true,
     );
+  });
+
+  // SPEC-011 5.2: minden ellenőrzött objektum zárt kulcslistájú, egy
+  // ismeretlen kulcs az egyébként érvényes alakot is elbuktatja.
+  const UNKNOWN_KEY = 'ismeretlenKulcs';
+
+  const unknownKeyCases: readonly (readonly [string, unknown])[] = [
+    ['a config gyökere', { ...fullConfig, [UNKNOWN_KEY]: true }],
+    [
+      'a preset systemPrompt',
+      withField('systemPrompt', {
+        type: 'preset',
+        preset: 'claude_code',
+        append: null,
+        excludeDynamicSections: null,
+        [UNKNOWN_KEY]: true,
+      }),
+    ],
+    [
+      'a structuredOutput',
+      withField('structuredOutput', { strategy: 'sdk_output_format', schema: {}, [UNKNOWN_KEY]: true }),
+    ],
+    [
+      'a sandbox',
+      withField('sandbox', {
+        enabled: true,
+        failIfUnavailable: false,
+        autoAllowBashIfSandboxed: true,
+        excludedCommands: [],
+        enableWeakerNestedSandbox: false,
+        [UNKNOWN_KEY]: true,
+      }),
+    ],
+    [
+      'a stdio MCP szerver',
+      withField('mcpServers', {
+        one: { type: 'stdio', command: 'node', args: [], envNames: [], [UNKNOWN_KEY]: true },
+      }),
+    ],
+    [
+      'az sse MCP szerver',
+      withField('mcpServers', {
+        one: { type: 'sse', url: 'https://example.test', authEnvName: null, [UNKNOWN_KEY]: 1 },
+      }),
+    ],
+    [
+      'a http MCP szerver',
+      withField('mcpServers', {
+        one: { type: 'http', url: 'https://example.test', authEnvName: null, [UNKNOWN_KEY]: 1 },
+      }),
+    ],
+  ];
+
+  for (const [label, value] of unknownKeyCases) {
+    it(`hamisat ad, ha ${label} ismeretlen kulcsot hordoz`, () => {
+      expect(isAgentStepConfig(value)).toBe(false);
+    });
+  }
+
+  it('a szabad mezők belsejében tetszőleges kulcs átmegy (agents, mcpServers nevek, schema, a sandbox öt nyitott mezője)', () => {
+    const value = {
+      ...fullConfig,
+      agents: { barmilyenNev: { tetszolegesMezo: { melyen: [1, 'ketto'] } } },
+      mcpServers: { tetszoleges_szerver_nev: { type: 'http', url: 'https://example.test', authEnvName: null } },
+      structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object', [UNKNOWN_KEY]: { x: 1 } } },
+      sandbox: {
+        enabled: true,
+        failIfUnavailable: false,
+        autoAllowBashIfSandboxed: true,
+        excludedCommands: [],
+        enableWeakerNestedSandbox: false,
+        network: { [UNKNOWN_KEY]: true },
+        filesystem: { [UNKNOWN_KEY]: [1] },
+        ripgrep: { [UNKNOWN_KEY]: 'x' },
+        ignoreViolations: { [UNKNOWN_KEY]: null },
+        allowUnsandboxedCommands: { [UNKNOWN_KEY]: false },
+      },
+    };
+    expect(isAgentStepConfig(value)).toBe(true);
   });
 });

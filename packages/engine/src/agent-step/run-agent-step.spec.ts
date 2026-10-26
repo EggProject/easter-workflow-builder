@@ -88,11 +88,9 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
     ...overrides,
@@ -397,7 +395,7 @@ describe('runAgentStep', () => {
     const request = requestOf({
       runId,
       stepRunId,
-      config: agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
+      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
     });
     const dependencies = dependenciesOf({
       database,

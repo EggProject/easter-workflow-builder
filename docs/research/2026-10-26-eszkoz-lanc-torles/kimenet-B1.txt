@@ -1,0 +1,9 @@
+PROBE B1 db readGraph: {"kind":"ok","storedConfigHasAgentTools":true}
+PROBE B1 protocol WorkflowGraphDocumentSchema (szerkesztő betöltés): [{"code":"unrecognized_keys","path":["nodes",0,"config"],"keys":["agentTools"]}]
+PROBE B1 engine isNodeConfig (futás indítás, validate-node-configs): true
+PROBE B1 db readSnapshot: "ok"
+PROBE B1 protocol RunSnapshotResponseSchema: "ok"
+PROBE B1 protocol NodeConfigSchema a pillanatkép node-on (futás nézet rajza, project-snapshot-graph): [{"code":"unrecognized_keys","path":[],"keys":["agentTools"]}]
+PROBE B1 protocol ReplaceGraphRequestSchema régi kliens agentTools kulccsal: [{"code":"unrecognized_keys","path":["nodes",0,"config"],"keys":["agentTools"]}]
+PROBE B1 db replaceGraph agentTools kulccsal (új kód): "ok"
+PROBE B1 db readGraph az újraírás után: megmaradt-e a kulcs: true

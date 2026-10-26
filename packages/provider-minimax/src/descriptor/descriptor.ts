@@ -11,7 +11,6 @@ import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
 import { minimaxModels } from '../model-catalog/models.ts';
 import { minimaxPromptCaching } from '../request-shaping/prompt-caching.ts';
 import { minimaxRateLimits } from '../limits/rate-limits.ts';
-import { minimaxRecommendedAgentTools } from '../tool-support/recommended-agent-tools.ts';
 import { minimaxRequiredEnvironment } from '../environment/required-environment.ts';
 import { minimaxServerTools } from '../tool-support/server-tools.ts';
 import { minimaxStreaming } from '../request-shaping/streaming.ts';
@@ -59,7 +58,6 @@ export const minimaxProvider = {
   promptCaching: minimaxPromptCaching,
   streaming: minimaxStreaming,
   serverTools: minimaxServerTools,
-  recommendedAgentTools: minimaxRecommendedAgentTools,
   models: minimaxModels,
   modelsEndpoint: {
     directHttpReachable: {

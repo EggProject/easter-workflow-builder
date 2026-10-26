@@ -1,10 +1,166 @@
-import { isBoolean, isInt, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
-import type { BranchOption, NodeConfig, StartInputField, UnhandledErrorPolicy } from './node-config.ts';
+import {
+  isBoolean,
+  isInt,
+  isNumber,
+  isRecord,
+  isRecordWithKnownKeys,
+  isString,
+  isStringArray,
+} from '@easter-workflow-builder/typeguards';
+import type {
+  AgentStepNodeConfig,
+  BranchNodeConfig,
+  BranchOption,
+  ErrorHandlerNodeConfig,
+  FanOutNodeConfig,
+  HumanApprovalNodeConfig,
+  JoinAiSynthesisNodeConfig,
+  JoinMergeNodeConfig,
+  JoinScriptNodeConfig,
+  JoinUnselectedNodeConfig,
+  LoopNodeConfig,
+  NodeConfig,
+  ScriptNodeConfig,
+  StartInputField,
+  StartNodeConfig,
+  SubWorkflowNodeConfig,
+  UnhandledErrorPolicy,
+} from './node-config.ts';
 import type { ScriptConfig } from './script-config.ts';
+import type { AgentStepConfig } from '../agent-step-config/agent-step-config.ts';
 import { isAgentStepConfig } from '../agent-step-config/is-agent-step-config.ts';
 import { isNodeType } from '../node-type/is-node-type.ts';
 
 type UnknownRecord = Readonly<Record<string, unknown>>;
+
+// Az ellenőrzött objektumok zárt kulcslistái (SPEC-011 5.2): minden más kulcs
+// ismeretlen, és a guard elutasítja. A `Record<keyof T, true>` annotáció miatt
+// a fordító hibát ad, ha a típus egy mezővel bővül, de a lista nem. Ami szabad
+// marad: a `join` `merge` módjának `settings` belseje és a `sub_workflow`
+// `inputMapping` kulcsai (mindkettő nyitott rekord a típusban).
+const START_NODE_CONFIG_KEYS: Readonly<Record<keyof StartNodeConfig, true>> = {
+  type: true,
+  inputFields: true,
+  onUnhandledError: true,
+};
+
+const START_INPUT_FIELD_KEYS: Readonly<Record<keyof StartInputField, true>> = {
+  name: true,
+  label: true,
+  valueKind: true,
+  required: true,
+};
+
+const BRANCH_NODE_CONFIG_KEYS: Readonly<Record<keyof BranchNodeConfig, true>> = {
+  type: true,
+  expression: true,
+  branches: true,
+  defaultBranchKey: true,
+  onUnhandledError: true,
+};
+
+const BRANCH_OPTION_KEYS: Readonly<Record<keyof BranchOption, true>> = {
+  key: true,
+  label: true,
+};
+
+const FAN_OUT_NODE_CONFIG_KEYS: Readonly<Record<keyof FanOutNodeConfig, true>> = {
+  type: true,
+  itemsExpression: true,
+  branchLabelTemplate: true,
+  onUnhandledError: true,
+};
+
+const JOIN_MERGE_NODE_CONFIG_KEYS: Readonly<Record<keyof JoinMergeNodeConfig, true>> = {
+  type: true,
+  mode: true,
+  settings: true,
+  onUnhandledError: true,
+};
+
+const JOIN_SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof JoinScriptNodeConfig, true>> = {
+  type: true,
+  mode: true,
+  settings: true,
+  onUnhandledError: true,
+};
+
+const JOIN_AI_SYNTHESIS_NODE_CONFIG_KEYS: Readonly<Record<keyof JoinAiSynthesisNodeConfig, true>> = {
+  type: true,
+  mode: true,
+  settings: true,
+  onUnhandledError: true,
+};
+
+const JOIN_UNSELECTED_NODE_CONFIG_KEYS: Readonly<Record<keyof JoinUnselectedNodeConfig, true>> = {
+  type: true,
+  mode: true,
+  onUnhandledError: true,
+};
+
+const LOOP_NODE_CONFIG_KEYS: Readonly<Record<keyof LoopNodeConfig, true>> = {
+  type: true,
+  maxIterations: true,
+  continueExpression: true,
+  onUnhandledError: true,
+};
+
+const HUMAN_APPROVAL_NODE_CONFIG_KEYS: Readonly<Record<keyof HumanApprovalNodeConfig, true>> = {
+  type: true,
+  title: true,
+  bodyTemplate: true,
+  timeoutMs: true,
+  onUnhandledError: true,
+};
+
+const ERROR_HANDLER_NODE_CONFIG_KEYS: Readonly<Record<keyof ErrorHandlerNodeConfig, true>> = {
+  type: true,
+  maxAttempts: true,
+  backoffMs: true,
+  handledErrorKinds: true,
+  onUnhandledError: true,
+};
+
+const SUB_WORKFLOW_NODE_CONFIG_KEYS: Readonly<Record<keyof SubWorkflowNodeConfig, true>> = {
+  type: true,
+  targetWorkflowId: true,
+  inputMapping: true,
+  onUnhandledError: true,
+};
+
+const SCRIPT_CONFIG_KEYS: Readonly<Record<keyof ScriptConfig, true>> = {
+  source: true,
+  runtime: true,
+};
+
+const SCRIPT_NODE_CONFIG_KEYS: Readonly<Record<keyof ScriptNodeConfig, true>> = {
+  type: true,
+  source: true,
+  runtime: true,
+  onUnhandledError: true,
+};
+
+/**
+ * Az `agent_step` node burkolata: a kulcsok, amik a node configon állnak, de a
+ * megosztott `AgentStepConfig` alakban nem. A típus a két interfész kulcsainak
+ * különbsége, tehát egy új burkoló mezőnél a fordító jelez.
+ */
+const AGENT_STEP_NODE_ENVELOPE_KEYS: Readonly<Record<Exclude<keyof AgentStepNodeConfig, keyof AgentStepConfig>, true>> =
+  {
+    type: true,
+    onUnhandledError: true,
+  };
+
+/**
+ * Az `agent_step` node configja a burkoló kulcsok nélkül: ez az a rész, amit az
+ * `isAgentStepConfig` a saját zárt kulcslistájával ellenőriz, így a burkolón
+ * kívüli ismeretlen kulcs ott bukik el.
+ */
+function withoutAgentStepNodeEnvelope(value: UnknownRecord): UnknownRecord {
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !Object.hasOwn(AGENT_STEP_NODE_ENVELOPE_KEYS, key)),
+  );
+}
 
 /**
  * Iterációszám és retry darabszám: a SPEC-003 4.3 szerint az egyetlen séma
@@ -34,50 +190,58 @@ function isStringRecord(value: unknown): value is Readonly<Record<string, string
   return isRecord(value) && Object.values(value).every((entry: unknown) => isString(entry));
 }
 
-function isScriptConfig(value: unknown): value is ScriptConfig {
-  return isRecord(value) && isString(value['source']) && value['runtime'] === 'expression';
+/**
+ * A `ScriptConfig` alak, a hívó által megadott zárt kulcslistával: a `join`
+ * `script` módjának `settings` alobjektuma a saját két kulcsával, a `script`
+ * node a burkolóval (`type`, `onUnhandledError`) bővített listával hívja.
+ */
+function isScriptConfig(value: unknown, knownKeys: Readonly<Record<keyof ScriptConfig, true>>): value is ScriptConfig {
+  return isRecordWithKnownKeys(value, knownKeys) && isString(value.source) && value.runtime === 'expression';
 }
 
 function isStartInputField(value: unknown): value is StartInputField {
   return (
-    isRecord(value) &&
-    isString(value['name']) &&
-    isString(value['label']) &&
-    isString(value['valueKind']) &&
-    isBoolean(value['required'])
+    isRecordWithKnownKeys(value, START_INPUT_FIELD_KEYS) &&
+    isString(value.name) &&
+    isString(value.label) &&
+    isString(value.valueKind) &&
+    isBoolean(value.required)
   );
 }
 
 function isStartConfig(value: UnknownRecord): boolean {
   const inputFields = value['inputFields'];
   return (
+    isRecordWithKnownKeys(value, START_NODE_CONFIG_KEYS) &&
     Array.isArray(inputFields) &&
     inputFields.every((field: unknown) => isStartInputField(field)) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
 function isBranchOption(value: unknown): value is BranchOption {
-  return isRecord(value) && isString(value['key']) && isString(value['label']);
+  return isRecordWithKnownKeys(value, BRANCH_OPTION_KEYS) && isString(value.key) && isString(value.label);
 }
 
 function isBranchConfig(value: UnknownRecord): boolean {
   const branches = value['branches'];
   const defaultBranchKey = value['defaultBranchKey'];
   return (
-    isString(value['expression']) &&
+    isRecordWithKnownKeys(value, BRANCH_NODE_CONFIG_KEYS) &&
+    isString(value.expression) &&
     Array.isArray(branches) &&
     branches.every((option: unknown) => isBranchOption(option)) &&
     (defaultBranchKey === null || isString(defaultBranchKey)) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
 function isFanOutConfig(value: UnknownRecord): boolean {
   return (
-    isString(value['itemsExpression']) &&
-    isString(value['branchLabelTemplate']) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isRecordWithKnownKeys(value, FAN_OUT_NODE_CONFIG_KEYS) &&
+    isString(value.itemsExpression) &&
+    isString(value.branchLabelTemplate) &&
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
@@ -93,17 +257,26 @@ function isJoinConfig(value: UnknownRecord): boolean {
   const isOnUnhandledErrorValid = isNullableUnhandledErrorPolicy(value['onUnhandledError']);
   switch (value['mode']) {
     case 'merge': {
-      return isRecord(settings) && isOnUnhandledErrorValid;
+      // A `settings` nyitott rekord (`JoinMergeSettings`): a kulcsai szabadok.
+      return isRecordWithKnownKeys(value, JOIN_MERGE_NODE_CONFIG_KEYS) && isRecord(settings) && isOnUnhandledErrorValid;
     }
     case 'script': {
-      return isScriptConfig(settings) && isOnUnhandledErrorValid;
+      return (
+        isRecordWithKnownKeys(value, JOIN_SCRIPT_NODE_CONFIG_KEYS) &&
+        isScriptConfig(settings, SCRIPT_CONFIG_KEYS) &&
+        isOnUnhandledErrorValid
+      );
     }
     case 'ai_synthesis': {
-      return isAgentStepConfig(settings) && isOnUnhandledErrorValid;
+      return (
+        isRecordWithKnownKeys(value, JOIN_AI_SYNTHESIS_NODE_CONFIG_KEYS) &&
+        isAgentStepConfig(settings) &&
+        isOnUnhandledErrorValid
+      );
     }
     // eslint-disable-next-line unicorn/no-null -- a választatlan join tárolt JSON-jában a `mode` ténylegesen `null` (SPEC-008 O-33).
     case null: {
-      return isOnUnhandledErrorValid;
+      return isRecordWithKnownKeys(value, JOIN_UNSELECTED_NODE_CONFIG_KEYS) && isOnUnhandledErrorValid;
     }
     default: {
       return false;
@@ -113,9 +286,10 @@ function isJoinConfig(value: UnknownRecord): boolean {
 
 function isLoopConfig(value: UnknownRecord): boolean {
   return (
-    isPositiveInteger(value['maxIterations']) &&
-    isString(value['continueExpression']) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isRecordWithKnownKeys(value, LOOP_NODE_CONFIG_KEYS) &&
+    isPositiveInteger(value.maxIterations) &&
+    isString(value.continueExpression) &&
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
@@ -125,29 +299,32 @@ function isLoopConfig(value: UnknownRecord): boolean {
 function isHumanApprovalConfig(value: UnknownRecord): boolean {
   const timeoutMs = value['timeoutMs'];
   return (
-    isString(value['title']) &&
-    isString(value['bodyTemplate']) &&
+    isRecordWithKnownKeys(value, HUMAN_APPROVAL_NODE_CONFIG_KEYS) &&
+    isString(value.title) &&
+    isString(value.bodyTemplate) &&
     (timeoutMs === null || isNumber(timeoutMs)) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
 function isErrorHandlerConfig(value: UnknownRecord): boolean {
   const backoffMs = value['backoffMs'];
   return (
-    isPositiveInteger(value['maxAttempts']) &&
+    isRecordWithKnownKeys(value, ERROR_HANDLER_NODE_CONFIG_KEYS) &&
+    isPositiveInteger(value.maxAttempts) &&
     Array.isArray(backoffMs) &&
     backoffMs.every((delay: unknown) => isPositiveInteger(delay)) &&
-    isStringArray(value['handledErrorKinds']) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isStringArray(value.handledErrorKinds) &&
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
 function isSubWorkflowConfig(value: UnknownRecord): boolean {
   return (
-    isString(value['targetWorkflowId']) &&
-    isStringRecord(value['inputMapping']) &&
-    isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+    isRecordWithKnownKeys(value, SUB_WORKFLOW_NODE_CONFIG_KEYS) &&
+    isString(value.targetWorkflowId) &&
+    isStringRecord(value.inputMapping) &&
+    isNullableUnhandledErrorPolicy(value.onUnhandledError)
   );
 }
 
@@ -175,7 +352,12 @@ export function isNodeConfig(value: unknown): value is NodeConfig {
       // ellenőrzi, amit a `join` `ai_synthesis` módja is használ; az az alak
       // nem tartalmazza az `onUnhandledError` mezőt, ezért itt, a hívási
       // helyen kell hozzáadni a feltételt (node-config.ts elhelyezési szabály).
-      return isAgentStepConfig(value) && isNullableUnhandledErrorPolicy(value['onUnhandledError']);
+      // A burkoló két kulcsa nélkül az `isAgentStepConfig` zárt kulcslistája
+      // dönt minden más kulcsról.
+      return (
+        isAgentStepConfig(withoutAgentStepNodeEnvelope(value)) &&
+        isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+      );
     }
     case 'branch': {
       return isBranchConfig(value);
@@ -203,7 +385,9 @@ export function isNodeConfig(value: unknown): value is NodeConfig {
       // amit a `join` `script` módja is használ (annak `settings` alobjektuma
       // marad `ScriptConfig`, `onUnhandledError` nélkül); a hívási helyen kell
       // hozzáadni a feltételt, ugyanúgy, mint az `agent_step` ágnál.
-      return isScriptConfig(value) && isNullableUnhandledErrorPolicy(value['onUnhandledError']);
+      return (
+        isScriptConfig(value, SCRIPT_NODE_CONFIG_KEYS) && isNullableUnhandledErrorPolicy(value['onUnhandledError'])
+      );
     }
   }
 }

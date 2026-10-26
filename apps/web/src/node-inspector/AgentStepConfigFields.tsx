@@ -1,15 +1,12 @@
 import {
-  EngineHookIdSchema,
   ProviderIdSchema,
   SessionModeSchema,
   ThinkingModeSchema,
-  AgentToolIdSchema,
   type AgentStepConfig,
 } from '@easter-workflow-builder/protocol';
-import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
-import { InspectorFieldGroup } from './InspectorFieldGroup.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
@@ -44,31 +41,6 @@ export interface AgentStepConfigFieldsProperties {
   readonly inheritedProviderDescription: string;
 }
 
-function MultiCheckboxSelector<TOption extends string>(
-  properties: Readonly<{
-    title: string;
-    options: readonly TOption[];
-    selected: readonly TOption[];
-    onToggle: (option: TOption, isChecked: boolean) => void;
-  }>,
-): ReactElement {
-  const { title, options, selected, onToggle } = properties;
-  return (
-    <InspectorFieldGroup title={title}>
-      {options.map((option) => (
-        <Checkbox
-          key={option}
-          label={option}
-          checked={selected.includes(option)}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => {
-            onToggle(option, event.target.checked);
-          }}
-        />
-      ))}
-    </InspectorFieldGroup>
-  );
-}
-
 /**
  * Az `AgentStepConfig` teljes szerkesztő felülete: az `agent_step` node és a
  * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` és az
@@ -86,12 +58,11 @@ function MultiCheckboxSelector<TOption extends string>(
  *   **provider felülírás** az örökölt provider megnevezésével. Ez a három
  *   dönti el, hogy egyáltalán mit csinál a lépés.
  * - "Modell és futási korlátok" panel: modell azonosító, session mód, max.
- *   körök, max. büdzsé, effort, thinking mód, jogosultsági mód, motor
- *   hookok. **Mind felülírás**, a séma szerint `null`/üres alapértékkel,
- *   tehát a lépések többségén érintetlen marad.
+ *   körök, max. büdzsé, effort, thinking mód, jogosultsági mód. **Mind
+ *   felülírás**, a séma szerint `null`/üres alapértékkel, tehát a lépések
+ *   többségén érintetlen marad.
  * - "Eszközök és környezet" panel: engedélyezett és tiltott eszközök,
- *   beépített agent eszközök, munkakönyvtár, további könyvtárak, sandbox,
- *   strukturált kimenet. Szintén mind felülírás, és a két JSON szerkesztő
+ *   munkakönyvtár, további könyvtárak, sandbox, strukturált kimenet. Szintén mind felülírás, és a két JSON szerkesztő
  *   (sandbox, kimenet séma) különösen ritkán nyúlt.
  * - "Al-agentek (agents)" panel: saját, kulcsonkénti szerkesztő, ami
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
@@ -240,20 +211,6 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
                 setField('permissionMode', fromTextFieldValue(event.target.value));
               }}
             />
-            <MultiCheckboxSelector
-              title="Bekapcsolt motor hookok"
-              options={EngineHookIdSchema.options}
-              selected={config.enabledEngineHooks}
-              onToggle={(option, isChecked) => {
-                setField(
-                  'enabledEngineHooks',
-                  isChecked
-                    ? [...config.enabledEngineHooks, option]
-                    : // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- az `EngineHookId` ma egyetlen elemű enum, a típusrendszer ezért mindig hamisnak látja az összehasonlítást; érték szinten helyes és egy jövőbeli második elemre értelmes marad.
-                      config.enabledEngineHooks.filter((existing) => existing !== option),
-                );
-              }}
-            />
           </div>
         </AccordionItem>
 
@@ -275,19 +232,6 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               error={disallowedToolsError}
               onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
                 setField('disallowedTools', fromStringListFieldValue(event.target.value));
-              }}
-            />
-            <MultiCheckboxSelector
-              title="Beépített agent eszközök"
-              options={AgentToolIdSchema.options}
-              selected={config.agentTools}
-              onToggle={(option, isChecked) => {
-                setField(
-                  'agentTools',
-                  isChecked
-                    ? [...config.agentTools, option]
-                    : config.agentTools.filter((existing) => existing !== option),
-                );
               }}
             />
             <TextField

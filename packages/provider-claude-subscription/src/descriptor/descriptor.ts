@@ -11,7 +11,6 @@ import type { ClaudeModelId } from '../model-catalog/model-id.ts';
 import { claudeSubscriptionModels } from '../model-catalog/models.ts';
 import { claudeSubscriptionPromptCaching } from '../request-shaping/prompt-caching.ts';
 import { claudeSubscriptionRateLimits } from '../limits/rate-limits.ts';
-import { claudeSubscriptionRecommendedAgentTools } from '../tool-support/recommended-agent-tools.ts';
 import { claudeSubscriptionRequiredEnvironment } from '../environment/required-environment.ts';
 import { claudeSubscriptionServerTools } from '../tool-support/server-tools.ts';
 import { claudeSubscriptionStreaming } from '../request-shaping/streaming.ts';
@@ -50,7 +49,6 @@ export const claudeSubscriptionProvider = {
   promptCaching: claudeSubscriptionPromptCaching,
   streaming: claudeSubscriptionStreaming,
   serverTools: claudeSubscriptionServerTools,
-  recommendedAgentTools: claudeSubscriptionRecommendedAgentTools,
   models: claudeSubscriptionModels,
   modelsEndpoint: {
     // A Messages API mellett a GET /v1/models végpont dokumentált és listáz.

@@ -1,0 +1,6 @@
+PROBE B2 db readGraph: {"kind":"ok","storedConfigHasAgentTools":false}
+PROBE B2 protocol WorkflowGraphDocumentSchema (szerkesztő betöltés): "ok"
+PROBE B2 engine isNodeConfig (futás indítás, validate-node-configs): true
+PROBE B2 db readSnapshot: "ok"
+PROBE B2 protocol RunSnapshotResponseSchema: "ok"
+PROBE B2 protocol NodeConfigSchema a pillanatkép node-on (futás nézet rajza, project-snapshot-graph): [{"code":"unrecognized_keys","path":[],"keys":["agentTools"]}]

@@ -199,7 +199,6 @@ export { createConcurrencyGate } from './concurrency-gate/create-concurrency-gat
 export type { SessionBearingInstance } from './agent-step/session-bearing-instance.ts';
 export type { SessionSourceNodes } from './agent-step/session-source-nodes.ts';
 export type { SessionBinding } from './agent-step/session-binding.ts';
-export type { StopHookMatcher } from './agent-step/stop-hook-matcher.ts';
 export type { AgentStepOptions } from './agent-step/agent-step-options.ts';
 export type { AgentStepCapabilityDecisions } from './agent-step/agent-step-capability-decisions.ts';
 export type { AgentStepOutcome } from './agent-step/agent-step-outcome.ts';
@@ -217,7 +216,6 @@ export type {
   AgentStepDescriptorFields,
 } from './agent-step/validate-agent-step-capabilities.ts';
 export { validateAgentStepCapabilities } from './agent-step/validate-agent-step-capabilities.ts';
-export { buildStopHookMatcher } from './agent-step/build-stop-hook-matcher.ts';
 export type { BuildAgentStepOptionsInput } from './agent-step/build-agent-step-options.ts';
 export { buildAgentStepOptions } from './agent-step/build-agent-step-options.ts';
 export { readResultTelemetry } from './agent-step/read-result-telemetry.ts';

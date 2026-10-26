@@ -84,11 +84,9 @@ const VALID_AGENT_STEP_SETTINGS = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -503,7 +501,7 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
   { label: 'hiányos sandbox', config: { ...SAVABLE_AGENT_STEP, sandbox: { enabled: true } }, accepted: false },
   {
     label: 'strukturált kimenet schema kulcs nélkül',
-    config: { ...SAVABLE_AGENT_STEP, structuredOutput: { strategy: 'emit_output_tool' } },
+    config: { ...SAVABLE_AGENT_STEP, structuredOutput: { strategy: 'sdk_output_format' } },
     accepted: false,
   },
   { label: 'szám effort', config: { ...SAVABLE_AGENT_STEP, effort: 3 }, accepted: false },
@@ -572,6 +570,192 @@ describe('a mentési séma és a db isNodeConfig guard a guard ellenőrzött ala
     it(label, () => {
       expect(NodeConfigSaveSchema.safeParse(config).success).toBe(accepted);
       expect(isNodeConfig(config)).toBe(accepted);
+    });
+  }
+});
+
+/**
+ * Az ismeretlen kulcs szabálya mindkét oldalon (SPEC-011 5.2, user döntés
+ * 2026-10-26, O-3): a `protocol` olvasó és mentési sémája `z.strictObject`
+ * alapú, a `db` `isNodeConfig` guardja zárt kulcslistákkal dolgozik. Ha egy
+ * eset itt eltér, a két oldal ismeretlen kulcs szabálya szétvált: a `db` egy
+ * olyan konfigot is tárolna (vagy elutasítana), amit a protokoll nem.
+ */
+const UNKNOWN_KEY = 'ismeretlenKulcs';
+
+function describeCandidate(config: unknown): string {
+  const parsed = NodeConfigSchema.safeParse(config);
+  return parsed.success ? describeVariant(parsed.data) : 'ismeretlen';
+}
+
+const UNKNOWN_KEY_CASES: readonly { readonly label: string; readonly config: unknown }[] = [
+  ...REPRESENTATIVE_NODE_CONFIGS.map((config) => ({
+    label: `${describeCandidate(config)} gyökere`,
+    config: isRecord(config) ? { ...config, [UNKNOWN_KEY]: true } : config,
+  })),
+  {
+    label: 'start bemeneti mezője',
+    config: {
+      type: 'start',
+      inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'string', required: true, [UNKNOWN_KEY]: true }],
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'branch opciója',
+    config: {
+      type: 'branch',
+      expression: 'x > 0',
+      branches: [{ key: 'pos', label: 'Pozitív', [UNKNOWN_KEY]: true }],
+      defaultBranchKey: null,
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'join script settings alobjektuma',
+    config: {
+      type: 'join',
+      mode: 'script',
+      settings: { source: 'x + 1', runtime: 'expression', [UNKNOWN_KEY]: true },
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'join ai_synthesis settings alobjektuma',
+    config: {
+      type: 'join',
+      mode: 'ai_synthesis',
+      settings: { ...VALID_AGENT_STEP_SETTINGS, [UNKNOWN_KEY]: true },
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'preset rendszer prompt',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: null,
+        excludeDynamicSections: null,
+        [UNKNOWN_KEY]: 1,
+      },
+    },
+  },
+  {
+    label: 'strukturált kimenet',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      structuredOutput: { strategy: 'sdk_output_format', schema: {}, [UNKNOWN_KEY]: 1 },
+    },
+  },
+  {
+    label: 'sandbox',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      sandbox: {
+        enabled: true,
+        failIfUnavailable: false,
+        autoAllowBashIfSandboxed: true,
+        excludedCommands: [],
+        enableWeakerNestedSandbox: false,
+        [UNKNOWN_KEY]: 1,
+      },
+    },
+  },
+  {
+    label: 'stdio MCP szerver',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      mcpServers: { a: { type: 'stdio', command: 'x', args: [], envNames: [], [UNKNOWN_KEY]: 1 } },
+    },
+  },
+  {
+    label: 'sse MCP szerver',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      mcpServers: { a: { type: 'sse', url: 'u', authEnvName: null, [UNKNOWN_KEY]: 1 } },
+    },
+  },
+  {
+    label: 'http MCP szerver',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      mcpServers: { a: { type: 'http', url: 'u', authEnvName: null, [UNKNOWN_KEY]: 1 } },
+    },
+  },
+];
+
+describe('egy ismeretlen kulcs a protokoll sémáin és a db isNodeConfig guardján is elbukik (SPEC-011 5.2)', () => {
+  it('az esetek a tíz típust, a join mind a négy ágát és a beágyazott objektumokat lefedik', () => {
+    expect(UNKNOWN_KEY_CASES).toHaveLength(REPRESENTATIVE_NODE_CONFIGS.length + 10);
+  });
+
+  for (const { label, config } of UNKNOWN_KEY_CASES) {
+    it(label, () => {
+      expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+      expect(isNodeConfig(config)).toBe(false);
+    });
+  }
+});
+
+const FREE_FIELD_CASES: readonly { readonly label: string; readonly config: unknown }[] = [
+  {
+    label: 'agents: tetszőleges név és belső kulcs',
+    config: { ...SAVABLE_AGENT_STEP, agents: { barmi: { [UNKNOWN_KEY]: { melyen: [1] } } } },
+  },
+  {
+    label: 'join merge settings: tetszőleges kulcs',
+    config: {
+      type: 'join',
+      mode: 'merge',
+      settings: { [UNKNOWN_KEY]: { melyen: true } },
+      onUnhandledError: 'fail_run',
+    },
+  },
+  {
+    label: 'structuredOutput.schema: tetszőleges kulcs',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object', [UNKNOWN_KEY]: 1 } },
+    },
+  },
+  {
+    label: 'sandbox öt nyitott mezője: tetszőleges belső kulcs',
+    config: {
+      ...SAVABLE_AGENT_STEP,
+      sandbox: {
+        enabled: true,
+        failIfUnavailable: false,
+        autoAllowBashIfSandboxed: true,
+        excludedCommands: [],
+        enableWeakerNestedSandbox: false,
+        allowUnsandboxedCommands: { [UNKNOWN_KEY]: 1 },
+        network: { [UNKNOWN_KEY]: 1 },
+        filesystem: { [UNKNOWN_KEY]: 1 },
+        ignoreViolations: { [UNKNOWN_KEY]: 1 },
+        ripgrep: { [UNKNOWN_KEY]: 1 },
+      },
+    },
+  },
+  {
+    label: 'sub_workflow inputMapping: tetszőleges kulcs',
+    config: {
+      type: 'sub_workflow',
+      targetWorkflowId: 'wf-1',
+      inputMapping: { [UNKNOWN_KEY]: 'parent.topic' },
+      onUnhandledError: 'fail_run',
+    },
+  },
+];
+
+describe('a szabadon maradó mezők tetszőleges kulcsa mindkét oldalon átmegy (SPEC-011 5.2)', () => {
+  for (const { label, config } of FREE_FIELD_CASES) {
+    it(label, () => {
+      expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+      expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
+      expect(isNodeConfig(config)).toBe(true);
     });
   }
 });

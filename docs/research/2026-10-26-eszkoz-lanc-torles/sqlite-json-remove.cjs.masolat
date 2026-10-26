@@ -1,0 +1,12 @@
+// Eldobható próba (2026-10-26): a json_remove a workflow_node configon és a
+// megváltoztathatatlan graph_snapshot soron. A futtatás a packages/db mappából
+// történt, a phase A adatbázis másolatán.
+const D = require('better-sqlite3');
+const db = new D('/tmp/agenttools-probe/M/probe.db');
+console.log('SQLITE', db.prepare('select sqlite_version() v').get().v, 'better-sqlite3', require('better-sqlite3/package.json').version);
+const q = "select count(*) c from workflow_node where json_type(config,'$.agentTools') is not null";
+const before = db.prepare(q).get().c;
+const r = db.prepare("update workflow_node set config = json_remove(config,'$.agentTools') where json_type(config,'$.agentTools') is not null").run();
+console.log('MIG workflow_node agentTools előtte', before, 'módosított sor', r.changes, 'utána', db.prepare(q).get().c);
+try { const u = db.prepare("update graph_snapshot set document = json_remove(document,'$.nodes[1].config.agentTools')").run(); console.log('MIG snapshot update: ok', u.changes); } catch (e) { console.log('MIG snapshot update hiba:', e.code, e.message); }
+console.log('SNAPSHOT agentTools megvan', db.prepare("select count(*) c from graph_snapshot where instr(document,'agentTools')>0").get().c);

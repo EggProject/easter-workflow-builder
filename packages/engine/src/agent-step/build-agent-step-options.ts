@@ -1,7 +1,6 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
 import type { AgentStepOptions } from './agent-step-options.ts';
-import { buildStopHookMatcher } from './build-stop-hook-matcher.ts';
 import type { SessionBinding } from './session-binding.ts';
 
 /**
@@ -31,39 +30,21 @@ function sessionFields(
 }
 
 /**
- * A strukturált kimenet stratégiából következő mezők (SPEC-004 11.3 táblázat
- * 2. sora, F-7):
+ * A strukturált kimenet mezője (SPEC-004 11.3 táblázat 2. sora, F-7): az
+ * egyetlen stratégia, az `sdk_output_format` (SPEC-011 O-9), a kérés SDK
+ * `outputFormat` mezőjén viszi a JSON Schema dokumentumot
+ * (`{ type: 'json_schema', schema }`, agent-sdk research 1. szekció).
  *
- * - `sdk_output_format`: a kérés az SDK `outputFormat` mezőjén viszi a JSON
- *   Schema dokumentumot (`{ type: 'json_schema', schema }`, agent-sdk research
- *   1. szekció).
- * - `emit_output_tool`: a kimenetet egy kötelező eszköz hívása adja, amit a
- *   `Stop` hook kényszerít ki. A hook **csak akkor** kerül ki, ha a lépés
- *   configja be is kapcsolta (`enabledEngineHooks`), mert az `EngineHookId`
- *   éppen erre a lépésenkénti kapcsolásra való (SPEC-003 4.4).
- *
- * Ha a lépés nem vár strukturált kimenetet, egyik mező sem kerül ki. **A
- * stratégia azonosítója a lépés configjából jön, nem a leíró döntéséből**: a
- * kettő ugyanaz az érték (a `resolveStructuredOutputStrategy` a kért
- * stratégiát keresi meg), és a configból olvasva nem keletkezik olyan
- * ellenőrzés, ami logikailag sosem bukik el.
+ * Ha a lépés nem vár strukturált kimenetet, a mező nem kerül ki.
  */
 function structuredOutputFields(
   config: AgentStepConfig,
-):
-  | Record<string, never>
-  | { readonly outputFormat: NonNullable<AgentStepOptions['outputFormat']> }
-  | { readonly hooks: NonNullable<AgentStepOptions['hooks']> } {
+): Record<string, never> | { readonly outputFormat: NonNullable<AgentStepOptions['outputFormat']> } {
   const structuredOutput = config.structuredOutput;
   if (structuredOutput === null) {
     return {};
   }
-  if (structuredOutput.strategy === 'sdk_output_format') {
-    return { outputFormat: { type: 'json_schema', schema: structuredOutput.schema } };
-  }
-  return config.enabledEngineHooks.includes('emit_output_tool_stop')
-    ? { hooks: { Stop: [buildStopHookMatcher()] } }
-    : {};
+  return { outputFormat: { type: 'json_schema', schema: structuredOutput.schema } };
 }
 
 /**
@@ -83,13 +64,10 @@ function structuredOutputFields(
  *    kiküldött `null`-t, hanem **hiányzó mezőt** jelent.
  * 3. **A session és a strukturált kimenet mezői**, a két segédfüggvény szerint.
  *
- * **Ami szándékosan kimarad: az `mcpServers` és az `agentTools`.** A tárolt
- * `StorableMcpServer` alak titok helyett env változó **nevet** hordoz, az
- * `agentTools` pedig saját folyamatban futó eszközöket kapcsol be, amiknek a
- * példányosítása a tool csomagokban él; a motor egyiktől sem függ, és nem is
- * függhet (SPEC-004 12. szekció függőségi iránya). A két mező bekötése az
- * összeállítás (`apps/server`) dolga lesz; a motorban kitalált alakot nem
- * építünk (`.claude/CLAUDE.md` 4.).
+ * **Ami szándékosan kimarad: az `mcpServers`.** A tárolt `StorableMcpServer`
+ * alak titok helyett env változó **nevet** hordoz; a mező bekötése a SPEC-009
+ * hatóköre (SPEC-011 3.2), a motorban kitalált alakot nem építünk
+ * (`.claude/CLAUDE.md` 4.).
  */
 export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentStepOptions {
   const config = input.config;

@@ -1,6 +1,5 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { ThinkingMode } from '@easter-workflow-builder/provider-capability';
-import type { StopHookMatcher } from './stop-hook-matcher.ts';
 
 /**
  * A kimenő Agent SDK `Options` objektum **típusos** alakja, amit a motor
@@ -51,5 +50,4 @@ export type AgentStepOptions = {
   readonly resume?: string;
   readonly forkSession?: boolean;
   readonly outputFormat?: { readonly type: 'json_schema'; readonly schema: unknown };
-  readonly hooks?: { readonly Stop: readonly StopHookMatcher[] };
 };
