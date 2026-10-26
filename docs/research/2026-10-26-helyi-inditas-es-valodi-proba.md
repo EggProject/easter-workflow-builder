@@ -513,3 +513,16 @@ nem plafon, a rossz érték nem veszít eseményt, csak olvasások számát vál
 | `EASTER_LOG_DIRECTORY`           | `.data/logs/server` | user döntés (nem iparági)                                                     | nem értelmezhető                                     |
 | `VITE_LIST_LIMIT`                | `100`               | Slack alapérték és ajánlás, GitHub, Stripe, GitLab közös maximuma             | közepes: közös korlát, nem közös alapérték           |
 | `VITE_STREAM_REPLAY_LIMIT`       | `100`               | Slack, Ably, Loki előzmény alapértéke                                         | közepes: ugyanaz a művelet, de kliens oldali lapozás |
+
+## 14. A PLAN-013 végrehajtása: mérések és eredmények
+
+A szekció a PLAN-013 lépéseinek saját, a végrehajtás közben futtatott méréseit tartalmazza. **Valódi
+provider hívás (MiniMax, Anthropic) egyik lépésben sem történt**; a T-013-10 (a valódi próba) a user
+engedélyére vár.
+
+### 14.1 T-013-1: a kiinduló fej
+
+Kiinduló fej: `b1cf92c` (`feat/spec-012-inditas-es-valodi-proba`, a `origin/main` `cbaff94` fölött). Tiszta
+munkakönyvtár. A kilenc kapu a kiinduló fejen nulla kilépési kóddal futott: `format:check`, `typecheck`
+(`TURBO_CONCURRENCY=1`), `lint` (`bun x turbo run lint --concurrency=1`), `test` (100 százalék mind a
+négy metrikán), `build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
