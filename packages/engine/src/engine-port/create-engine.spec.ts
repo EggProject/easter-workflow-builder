@@ -984,6 +984,65 @@ describe('createEngine', () => {
     ]);
   });
 
+  it('a kimenő env értékei nem kerülnek sem a kiadott eseményekbe, sem a tárolt run_event sorokba (SPEC-012 3.3, AC7)', async () => {
+    const providerSecret = 'TITKOS-SZOLGALTATOI-KULCS-7f3a';
+    const otherSecret = 'TITKOS-MASIK-VALTOZO-91bc';
+    let outgoingEnvironment: unknown;
+    const harness = openHarness({
+      processEnvironment: {
+        read: (name) => (name === 'ANTHROPIC_AUTH_TOKEN' ? providerSecret : null),
+        readAll: () => ({ PATH: '/usr/bin', ANTHROPIC_AUTH_TOKEN: providerSecret, MASIK_TITOK: otherSecret }),
+      },
+      descriptorLookup: (id) =>
+        descriptorOf(id, {
+          requiredEnv: [
+            {
+              name: 'ANTHROPIC_AUTH_TOKEN',
+              source: 'process_env_passthrough',
+              secret: true,
+              purpose: 'teszt',
+              evidence: [{ kind: 'measurement', id: 'M-01' }],
+            },
+          ],
+        }),
+      agentQueryRunner: {
+        run: (request) => {
+          outgoingEnvironment = request.options['env'];
+          return {
+            kind: 'ok',
+            value: { messages: messageIterable(successMessages(1)), interrupt: () => Promise.resolve() },
+          };
+        },
+      },
+    });
+    const workflowId = createWorkflow(
+      harness.database,
+      'env-titok',
+      [startNode('start'), agentNode('a1', 'sikeres')],
+      [edgeOf('e1', 'start', 'a1')],
+    );
+
+    const started = okOrThrow(await harness.engine.startRun({ workflowId, input: {} }));
+    const status = await waitForRunStatus(harness.database, started.run.id, TERMINAL_RUN_STATUSES);
+
+    // Pozitív kontroll: a titok tényleg kiment a runnernek, a kereső tehát nem vak.
+    expect(status).toBe('succeeded');
+    expect(outgoingEnvironment).toStrictEqual({
+      PATH: '/usr/bin',
+      ANTHROPIC_AUTH_TOKEN: providerSecret,
+      MASIK_TITOK: otherSecret,
+    });
+
+    const publishedText = JSON.stringify(harness.published);
+    const storedText = JSON.stringify(okOrThrow(harness.database.events.readEventsSince(started.run.id, 0, 1000)));
+    expect(publishedText.length).toBeGreaterThan(0);
+    expect(storedText.length).toBeGreaterThan(0);
+    for (const text of [publishedText, storedText]) {
+      expect(text).not.toContain(providerSecret);
+      expect(text).not.toContain(otherSecret);
+    }
+  });
+
   describe('decideApproval', () => {
     it('a db.approvals.decideApproval sikere UTÁN feloldja a várakozást: a lépés succeeded, a futás succeeded', async () => {
       const harness = openHarness();

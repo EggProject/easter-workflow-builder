@@ -553,3 +553,21 @@ név). Minden új bejegyzés `reason` és nem üres `evidence` mezőt hordoz; az
 szövege a rang "nem ellenőrzött" voltát kimondja. A `CLAUDE_CODE_OAUTH_TOKEN` a `claude-subscription` mellett
 átmegy (O-3). Az őrök: `apps/server/src/provider-outgoing-environment/` (a két valódi leíró, minden név
 tételesen) és `apps/server/src/provider-environment-drift-protection/` (az O-5 szabály mindkét irányban).
+
+### 14.4 T-013-5: a kimenő env értéke nem szivárog, az alfolyamat szintű teszt
+
+**Az értékek nem jutnak eseménybe.** A `create-engine.spec.ts` új tesztje a port csonkban két ismert titok
+értéket ad (a `minimax` kulcsát és egy másik változót), lefuttat egy `start -> agent_step` futást, és a kiadott
+eseményeket (`harness.published`) valamint a tárolt `run_event` sorokat (`readEventsSince`) szövegként keresi;
+egyik érték sem fordul elő. Pozitív kontroll: a futtatóhoz kimenő `env` mindkét értéket tartalmazta. A
+`packages/engine` csomagnak nincs napló portja (`rg logger packages/engine/src` nulla találat), tehát a naplóban
+a motor oldalról nincs mit keresni; a szerver oldali napló maszkolását a `collect-secret-environment-values`
+meglévő tesztjei őrzik.
+
+**Az alfolyamat szintű teszt (M-143 mintája).** Időmérés a teszt megírása előtt: a `claude-subscription` valódi
+leírójából épült kimenő `env` mellett a valódi SDK `query()` hívás hamis CLI végrehajtható ellen ötször futott
+egymás után, hívásonként 26, 17, 17, 17 és 19 ms (a pillanatkép: Node `v26.7.0`, a `process.env` 36 változóval,
+az `ANTHROPIC_API_KEY` beállítva); az alfolyamat 35 nevet kapott, köztük a `PATH`-ot és a `HOME`-ot, az
+`ANTHROPIC_API_KEY` nélkül. A mért idő a teszt korlát (5000 ms) kétszázad része, ezért a teszt elkészült:
+`apps/server/src/provider-outgoing-environment/provider-outgoing-environment-subprocess.spec.ts`; egy teszt
+futása a vitest kimenete szerint 23 ms.
