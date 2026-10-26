@@ -307,7 +307,6 @@ function agentStepNode(id: string): SnapshotNode {
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   });

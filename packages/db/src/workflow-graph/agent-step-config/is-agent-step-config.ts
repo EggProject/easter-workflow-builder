@@ -1,6 +1,5 @@
 import { isProviderId } from '@easter-workflow-builder/provider-capability';
 import type {
-  AgentToolId,
   ProviderId,
   StructuredOutputStrategyId,
   ThinkingMode,
@@ -18,12 +17,6 @@ const THINKING_MODE_KEYS: Readonly<Record<ThinkingMode, true>> = {
   disabled: true,
   adaptive: true,
   always_on: true,
-};
-
-const AGENT_TOOL_ID_KEYS: Readonly<Record<AgentToolId, true>> = {
-  web_search: true,
-  web_fetch: true,
-  understand_image: true,
 };
 
 const ENGINE_HOOK_ID_KEYS: Readonly<Record<EngineHookId, true>> = {
@@ -60,13 +53,6 @@ function isEngineHookIdArray(value: unknown): value is readonly EngineHookId[] {
   return (
     Array.isArray(value) &&
     value.every((element: unknown) => isString(element) && Object.hasOwn(ENGINE_HOOK_ID_KEYS, element))
-  );
-}
-
-function isAgentToolIdArray(value: unknown): value is readonly AgentToolId[] {
-  return (
-    Array.isArray(value) &&
-    value.every((element: unknown) => isString(element) && Object.hasOwn(AGENT_TOOL_ID_KEYS, element))
   );
 }
 
@@ -190,7 +176,6 @@ export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
     isNullableString(value['cwd']) &&
     isStringArray(value['additionalDirectories']) &&
     isNullableSandboxConfig(value['sandbox']) &&
-    isAgentToolIdArray(value['agentTools']) &&
     isSessionMode(value['sessionMode']) &&
     isNullableStructuredOutputConfig(value['structuredOutput'])
   );

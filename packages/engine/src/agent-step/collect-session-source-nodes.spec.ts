@@ -24,7 +24,6 @@ function agentStepConfig(sessionMode: AgentStepConfig['sessionMode']): AgentStep
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode,
     structuredOutput: null,
   };

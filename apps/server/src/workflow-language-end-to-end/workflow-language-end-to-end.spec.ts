@@ -297,7 +297,6 @@ function agentStepNode(id: string, promptTemplate: string): WorkflowNodeInput {
       cwd: null,
       additionalDirectories: [],
       sandbox: null,
-      agentTools: [],
       sessionMode: 'isolated',
       structuredOutput: null,
     },

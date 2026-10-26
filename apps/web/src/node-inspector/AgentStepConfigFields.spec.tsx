@@ -95,7 +95,6 @@ const BASE_CONFIG: AgentStepConfig = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -246,9 +245,9 @@ describe('AgentStepConfigFields', () => {
       throw new Error('a teszt nem talált "Engedélyezett eszközök" mezőt');
     }
     act(() => {
-      typeInto(allowedTextarea, 'web_search\nweb_fetch');
+      typeInto(allowedTextarea, 'WebSearch\nWebFetch');
     });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ allowedTools: ['web_search', 'web_fetch'] }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ allowedTools: ['WebSearch', 'WebFetch'] }));
 
     const disallowedTextarea = [...textareas].find((textarea) =>
       textarea.closest('label')?.textContent.includes('Tiltott eszközök'),
@@ -260,23 +259,6 @@ describe('AgentStepConfigFields', () => {
       typeInto(disallowedTextarea, 'bash');
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ disallowedTools: ['bash'] }));
-  });
-
-  it('a beépített agent eszközök jelölőnégyzete hozzáadja, majd eltávolítja az elemet', () => {
-    const onChange = vi.fn();
-    render(BASE_CONFIG, onChange);
-    const checkbox = checkboxByLabel(container, 'web_search');
-    act(() => {
-      checkbox.click();
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ agentTools: ['web_search'] }));
-
-    render({ ...BASE_CONFIG, agentTools: ['web_search'] }, onChange);
-    const checkedCheckbox = checkboxByLabel(container, 'web_search');
-    act(() => {
-      checkedCheckbox.click();
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ agentTools: [] }));
   });
 
   it('a munkakönyvtár mező szerkeszthető', () => {

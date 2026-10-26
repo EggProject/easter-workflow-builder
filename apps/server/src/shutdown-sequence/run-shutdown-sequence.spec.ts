@@ -161,7 +161,6 @@ function seedAgentStepWorkflow(database: DatabaseContext): string {
             cwd: null,
             additionalDirectories: [],
             sandbox: null,
-            agentTools: [],
             sessionMode: 'isolated',
             structuredOutput: null,
           },

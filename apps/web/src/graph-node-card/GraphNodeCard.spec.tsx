@@ -80,7 +80,6 @@ const AGENT_STEP_SETTINGS = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated' as const,
   structuredOutput: null,
 };

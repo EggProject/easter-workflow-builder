@@ -59,7 +59,6 @@ const AGENT_SETTINGS = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 } as const;

@@ -1,5 +1,4 @@
 import type {
-  AgentToolId,
   ProviderId,
   StructuredOutputStrategyId,
   ThinkingMode,
@@ -79,10 +78,6 @@ export interface AgentStepConfig {
   readonly cwd: string | null;
   readonly additionalDirectories: readonly string[];
   readonly sandbox: SandboxConfig | null;
-  /**
-  Lépésenként kapcsolható in-process MCP eszközök.
-  */
-  readonly agentTools: readonly AgentToolId[];
   readonly sessionMode: SessionMode;
   readonly structuredOutput: StructuredOutputConfig | null;
 }

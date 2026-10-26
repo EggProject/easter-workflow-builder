@@ -28,7 +28,6 @@ describe('DEFAULT_AGENT_STEP_SETTINGS', () => {
       cwd: null,
       additionalDirectories: [],
       sandbox: null,
-      agentTools: [],
       sessionMode: 'isolated',
       structuredOutput: null,
     });

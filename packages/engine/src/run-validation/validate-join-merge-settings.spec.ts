@@ -30,7 +30,6 @@ const JOIN_AI_SYNTHESIS: ExecutableNodeConfig = {
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   },

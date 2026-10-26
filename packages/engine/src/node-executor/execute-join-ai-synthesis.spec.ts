@@ -220,7 +220,6 @@ function joinAiSynthesisConfig(overrides: Partial<AgentStepConfig> = {}): JoinAi
       cwd: null,
       additionalDirectories: [],
       sandbox: null,
-      agentTools: [],
       sessionMode: 'isolated',
       structuredOutput: null,
       ...overrides,

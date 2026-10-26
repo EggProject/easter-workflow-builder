@@ -216,7 +216,6 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepNod
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
     ...overrides,

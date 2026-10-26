@@ -28,7 +28,6 @@ export const DEFAULT_AGENT_STEP_SETTINGS: AgentStepConfig = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };

@@ -3,7 +3,6 @@ import {
   ProviderIdSchema,
   SessionModeSchema,
   ThinkingModeSchema,
-  AgentToolIdSchema,
   type AgentStepConfig,
 } from '@easter-workflow-builder/protocol';
 import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
@@ -275,19 +274,6 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               error={disallowedToolsError}
               onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
                 setField('disallowedTools', fromStringListFieldValue(event.target.value));
-              }}
-            />
-            <MultiCheckboxSelector
-              title="Beépített agent eszközök"
-              options={AgentToolIdSchema.options}
-              selected={config.agentTools}
-              onToggle={(option, isChecked) => {
-                setField(
-                  'agentTools',
-                  isChecked
-                    ? [...config.agentTools, option]
-                    : config.agentTools.filter((existing) => existing !== option),
-                );
               }}
             />
             <TextField

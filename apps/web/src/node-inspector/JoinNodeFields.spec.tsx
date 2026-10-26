@@ -101,7 +101,6 @@ const AI_SYNTHESIS_CONFIG: JoinNodeConfig = {
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   },

@@ -51,7 +51,6 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
   onUnhandledError: 'fail_run',

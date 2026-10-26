@@ -52,7 +52,6 @@
         "cwd": null,
         "additionalDirectories": [],
         "sandbox": null,
-        "agentTools": ["web_search"],
         "sessionMode": "isolated",
         "structuredOutput": null
       },

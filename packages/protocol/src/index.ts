@@ -145,8 +145,6 @@ export type { ProviderId } from './node-config/provider-id.ts';
 export { ProviderIdSchema } from './node-config/provider-id.ts';
 export type { ThinkingMode } from './node-config/thinking-mode.ts';
 export { ThinkingModeSchema } from './node-config/thinking-mode.ts';
-export type { AgentToolId } from './node-config/agent-tool-id.ts';
-export { AgentToolIdSchema } from './node-config/agent-tool-id.ts';
 export type { StructuredOutputStrategyId } from './node-config/structured-output-strategy-id.ts';
 export { StructuredOutputStrategyIdSchema } from './node-config/structured-output-strategy-id.ts';
 export type { EngineHookId } from './node-config/engine-hook-id.ts';

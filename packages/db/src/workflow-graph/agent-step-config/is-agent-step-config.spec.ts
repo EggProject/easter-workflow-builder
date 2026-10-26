@@ -23,7 +23,6 @@ const minimalConfig: AgentStepConfig = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -59,7 +58,6 @@ const fullConfig: AgentStepConfig = {
     excludedCommands: ['git'],
     enableWeakerNestedSandbox: false,
   },
-  agentTools: ['web_search'],
   sessionMode: 'continued',
   structuredOutput: { strategy: 'emit_output_tool', schema: { type: 'object' } },
 };
@@ -118,9 +116,6 @@ describe('isAgentStepConfig', () => {
     ['cwd', 7],
     ['additionalDirectories', '/workspace'],
     ['sandbox', 7],
-    ['agentTools', 'web_search'],
-    ['agentTools', ['browse']],
-    ['agentTools', [7]],
     ['sessionMode', 'resumed'],
     ['sessionMode', 7],
     ['structuredOutput', 7],

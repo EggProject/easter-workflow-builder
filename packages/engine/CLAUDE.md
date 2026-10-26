@@ -428,12 +428,9 @@ végrehajtásáról szól, és szándékosan **nem** ismer sem node típust, sem
   a fork az eredeti sessiont érintetlenül hagyja, a fork elmaradása viszont két párhuzamos
   folytatót engedne ugyanarra a sessionre.
 
-**Amit az `agent-step` téma szándékosan nem tesz az `Options` objektumba: az `mcpServers` és az
-`agentTools`.** A tárolt `StorableMcpServer` alak titok helyett env változó **nevet** hordoz, az
-`agentTools` pedig saját folyamatban futó eszközöket kapcsol be, amiknek a példányosítása a tool
-csomagokban él; a motor egyiktől sem függ, és nem is függhet (SPEC-004 12. szekció függőségi
-iránya). A két mező bekötése az összeállítás (`apps/server`) dolga lesz; a motorban kitalált alakot
-nem építünk. Ugyanígy nyitva marad a strukturált kimenet **séma szerinti** ellenőrzése (SPEC-004 17. szekció 21. kritérium "illeszkedik a sémára" fordulata): a motorban nincs JSON Schema
+**Amit az `agent-step` téma szándékosan nem tesz az `Options` objektumba: az `mcpServers`.** A
+tárolt `StorableMcpServer` alak titok helyett env változó **nevet** hordoz; a mező bekötése a
+SPEC-009 hatóköre (SPEC-011 3.2), a motorban kitalált alakot nem építünk. Ugyanígy nyitva marad a strukturált kimenet **séma szerinti** ellenőrzése (SPEC-004 17. szekció 21. kritérium "illeszkedik a sémára" fordulata): a motorban nincs JSON Schema
 validátor, és a portlista zárt (3.2), tehát a `runAgentStep` ma a kimenet **meglétét** ellenőrzi
 (`hasStructuredOutput`, F-6). Ez nem elfogadott végállapot, hanem megnevezett hiány.
 

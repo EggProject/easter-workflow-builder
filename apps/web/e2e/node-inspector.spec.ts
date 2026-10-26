@@ -54,7 +54,6 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
   onUnhandledError: null,
@@ -711,13 +710,8 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     await group.getByLabel('Engedélyezett eszközök').fill('Read\nWrite');
     await group.getByLabel('Tiltott eszközök').fill('Bash');
 
-    const agentTools = group.getByRole('group', { name: 'Beépített agent eszközök' });
-    await agentTools.getByText('web_search').click();
-    await expect(agentTools.getByRole('checkbox', { name: 'web_search' })).toBeChecked();
-    // A `agentTools.filter` ág: ki is kapcsolható.
-    await agentTools.getByText('web_fetch').click();
-    await agentTools.getByText('web_fetch').click();
-    await expect(agentTools.getByRole('checkbox', { name: 'web_fetch' })).not.toBeChecked();
+    // Gyári eszköz választó nincs (SPEC-011 O-5): a csoport nincs a DOM-ban.
+    await expect(group.getByRole('group', { name: 'Beépített agent eszközök' })).toBeAttached({ attached: false });
 
     await group.getByLabel('Munkakönyvtár (cwd)').fill('/workspace/repo');
     await group.getByLabel('További engedélyezett könyvtárak').fill('/tmp\n/var/data');
@@ -759,8 +753,6 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     const reopenedGroup = await openAccordion(reopened, 'Eszközök és környezet');
     await expect(reopenedGroup.getByLabel('Engedélyezett eszközök')).toHaveValue('Read\nWrite');
     await expect(reopenedGroup.getByLabel('Tiltott eszközök')).toHaveValue('Bash');
-    await expect(reopenedGroup.getByRole('checkbox', { name: 'web_search' })).toBeChecked();
-    await expect(reopenedGroup.getByRole('checkbox', { name: 'web_fetch' })).not.toBeChecked();
     await expect(reopenedGroup.getByLabel('Munkakönyvtár (cwd)')).toHaveValue('/workspace/repo');
     await expect(reopenedGroup.getByLabel('További engedélyezett könyvtárak')).toHaveValue('/tmp\n/var/data');
     // A séma szerint érvényes, módosított JSON íródott vissza (a korábbi,

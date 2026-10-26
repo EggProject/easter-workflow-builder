@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { AgentToolIdSchema } from './agent-tool-id.ts';
 import { EngineHookIdSchema } from './engine-hook-id.ts';
 import { ProviderIdSchema } from './provider-id.ts';
 import { SandboxConfigSchema } from './sandbox-config.ts';
@@ -71,7 +70,6 @@ export const AgentStepConfigSchema = z
     cwd: z.string().nullable(),
     additionalDirectories: z.array(z.string()).readonly(),
     sandbox: SandboxConfigSchema.nullable(),
-    agentTools: z.array(AgentToolIdSchema).readonly(),
     sessionMode: SessionModeSchema,
     structuredOutput: StructuredOutputConfigSchema.nullable(),
   })

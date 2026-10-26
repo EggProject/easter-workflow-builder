@@ -87,7 +87,6 @@ const AGENT_NODE: WorkflowNodeInput = {
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
     onUnhandledError: 'fail_run',

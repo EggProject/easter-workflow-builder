@@ -4,8 +4,7 @@
  *
  * A research 1. szekciója négy variánst nevez meg (`stdio`, `sse`, `http`,
  * `sdk`); az `sdk` variáns **nem tárolható**, mert élő szerverpéldányt hordoz,
- * tehát nem szerializálható. Az in-process eszközöket az
- * `AgentStepConfig.agentTools` lista kapcsolja be.
+ * tehát nem szerializálható.
  *
  * A titkot hordozó mezők helyén kizárólag env változó **név** áll: a `stdio`
  * variáns `env` értékrekordja helyett `envNames`, az `sse` és a `http` variáns

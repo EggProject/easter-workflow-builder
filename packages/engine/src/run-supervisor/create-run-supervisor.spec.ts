@@ -405,7 +405,6 @@ function agentStepConfig(promptTemplate: string): AgentStepConfig {
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   };

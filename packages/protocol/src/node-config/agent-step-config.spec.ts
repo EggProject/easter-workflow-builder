@@ -21,7 +21,6 @@ const VALID_AGENT_STEP_CONFIG = {
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
 };
@@ -47,7 +46,6 @@ describe('AgentStepConfigSchema', () => {
       skills: 'all',
       cwd: '/workspace',
       additionalDirectories: ['/data'],
-      agentTools: ['web_search'],
       structuredOutput: { strategy: 'emit_output_tool', schema: { type: 'object' } },
     });
     expect(result.success).toBe(true);
