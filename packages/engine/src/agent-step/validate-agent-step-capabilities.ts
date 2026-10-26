@@ -101,8 +101,8 @@ function resolveStructuredOutput(
  *
  * A SPEC-004 11.3 táblázat sorai közül ide a lépéshez kötött tíz tartozik:
  * 1., 3., 4., 5., 6., 7., 8., 9., 12. és 13. A többi hat sor szándékosan
- * máshol áll: a 2. sor (`Stop` hook) az `Options` összeállításának része
- * (`buildStopHookMatcher`), a 10. és 11. sor a `provider-environment` témáé, a
+ * máshol áll: a 2. sor (a strukturált kimenet mezője) az `Options`
+ * összeállításának része (`buildAgentStepOptions`), a 10. és 11. sor a `provider-environment` témáé, a
  * 14. sor a beállítás felület javaslata, a 15. sor konstans döntés
  * (`RATE_LIMIT_RETRY_POLICY`), a 17. sor pedig a **telepített** SDK verziót
  * hasonlítja, ami nem a lépés bemenete: a motor nem függ az Agent SDK

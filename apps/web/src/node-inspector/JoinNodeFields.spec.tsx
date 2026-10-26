@@ -97,7 +97,6 @@ const AI_SYNTHESIS_CONFIG: JoinNodeConfig = {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,

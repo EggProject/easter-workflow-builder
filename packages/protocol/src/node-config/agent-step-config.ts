@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { EngineHookIdSchema } from './engine-hook-id.ts';
 import { ProviderIdSchema } from './provider-id.ts';
 import { SandboxConfigSchema } from './sandbox-config.ts';
 import { SessionModeSchema } from './session-mode.ts';
@@ -66,7 +65,6 @@ export const AgentStepConfigSchema = z
     agents: z.record(z.string(), z.unknown()).readonly(),
     skills: z.union([SkillsListSchema, z.literal('all')]).nullable(),
     mcpServers: z.record(z.string(), StorableMcpServerSchema).readonly(),
-    enabledEngineHooks: z.array(EngineHookIdSchema).readonly(),
     cwd: z.string().nullable(),
     additionalDirectories: z.array(z.string()).readonly(),
     sandbox: SandboxConfigSchema.nullable(),

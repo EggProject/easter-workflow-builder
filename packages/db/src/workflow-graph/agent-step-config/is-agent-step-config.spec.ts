@@ -19,7 +19,6 @@ const minimalConfig: AgentStepConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
@@ -48,7 +47,6 @@ const fullConfig: AgentStepConfig = {
     remote: { type: 'sse', url: 'https://example.test/sse', authEnvName: 'MCP_AUTH' },
     web: { type: 'http', url: 'https://example.test/mcp', authEnvName: null },
   },
-  enabledEngineHooks: ['emit_output_tool_stop'],
   cwd: '/workspace',
   additionalDirectories: ['/workspace/docs'],
   sandbox: {
@@ -59,7 +57,7 @@ const fullConfig: AgentStepConfig = {
     enableWeakerNestedSandbox: false,
   },
   sessionMode: 'continued',
-  structuredOutput: { strategy: 'emit_output_tool', schema: { type: 'object' } },
+  structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object' } },
 };
 
 /**
@@ -110,9 +108,6 @@ describe('isAgentStepConfig', () => {
     ['agents', ['reviewer']],
     ['skills', 7],
     ['mcpServers', 'local'],
-    ['enabledEngineHooks', 'emit_output_tool_stop'],
-    ['enabledEngineHooks', ['unknown_hook']],
-    ['enabledEngineHooks', [7]],
     ['cwd', 7],
     ['additionalDirectories', '/workspace'],
     ['sandbox', 7],

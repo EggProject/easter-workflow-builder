@@ -93,13 +93,13 @@ function descriptorOf(id: ProviderId): ProviderCapabilityDescriptor<string, stri
     structuredOutput: {
       strategies: [
         {
-          id: 'emit_output_tool',
+          id: 'sdk_output_format',
           usable: knownFact(true),
           blockingWireDetail: knownFact(null),
           observedRoundTrips: knownFact([3]),
         },
       ],
-      defaultStrategy: knownFact('emit_output_tool'),
+      defaultStrategy: knownFact('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact(null),
     },
@@ -302,7 +302,6 @@ function agentStepNode(id: string): SnapshotNode {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,

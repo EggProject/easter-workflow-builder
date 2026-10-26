@@ -157,7 +157,6 @@ function seedAgentStepWorkflow(database: DatabaseContext): string {
             agents: {},
             skills: null,
             mcpServers: {},
-            enabledEngineHooks: [],
             cwd: null,
             additionalDirectories: [],
             sandbox: null,

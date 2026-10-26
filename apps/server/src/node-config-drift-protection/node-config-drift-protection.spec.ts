@@ -84,7 +84,6 @@ const VALID_AGENT_STEP_SETTINGS = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
@@ -502,7 +501,7 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
   { label: 'hiányos sandbox', config: { ...SAVABLE_AGENT_STEP, sandbox: { enabled: true } }, accepted: false },
   {
     label: 'strukturált kimenet schema kulcs nélkül',
-    config: { ...SAVABLE_AGENT_STEP, structuredOutput: { strategy: 'emit_output_tool' } },
+    config: { ...SAVABLE_AGENT_STEP, structuredOutput: { strategy: 'sdk_output_format' } },
     accepted: false,
   },
   { label: 'szám effort', config: { ...SAVABLE_AGENT_STEP, effort: 3 }, accepted: false },

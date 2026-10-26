@@ -20,7 +20,6 @@ function agentStepConfig(sessionMode: AgentStepConfig['sessionMode']): AgentStep
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,

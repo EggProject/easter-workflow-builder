@@ -6,7 +6,6 @@ import type {
 } from '@easter-workflow-builder/provider-capability';
 import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
 import type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './agent-step-config.ts';
-import type { EngineHookId } from './engine-hook-id.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
 import type { StorableMcpServer } from './storable-mcp-server.ts';
@@ -19,17 +18,12 @@ const THINKING_MODE_KEYS: Readonly<Record<ThinkingMode, true>> = {
   always_on: true,
 };
 
-const ENGINE_HOOK_ID_KEYS: Readonly<Record<EngineHookId, true>> = {
-  emit_output_tool_stop: true,
-};
-
 const SESSION_MODE_KEYS: Readonly<Record<SessionMode, true>> = {
   isolated: true,
   continued: true,
 };
 
 const STRUCTURED_OUTPUT_STRATEGY_KEYS: Readonly<Record<StructuredOutputStrategyId, true>> = {
-  emit_output_tool: true,
   sdk_output_format: true,
 };
 
@@ -47,13 +41,6 @@ function isNullableNumber(value: unknown): value is number | null {
 
 function isSessionMode(value: unknown): value is SessionMode {
   return isString(value) && Object.hasOwn(SESSION_MODE_KEYS, value);
-}
-
-function isEngineHookIdArray(value: unknown): value is readonly EngineHookId[] {
-  return (
-    Array.isArray(value) &&
-    value.every((element: unknown) => isString(element) && Object.hasOwn(ENGINE_HOOK_ID_KEYS, element))
-  );
 }
 
 function isNullableThinkingMode(value: unknown): value is ThinkingMode | null {
@@ -172,7 +159,6 @@ export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
     isRecord(value['agents']) &&
     isSkills(value['skills']) &&
     isMcpServerRecord(value['mcpServers']) &&
-    isEngineHookIdArray(value['enabledEngineHooks']) &&
     isNullableString(value['cwd']) &&
     isStringArray(value['additionalDirectories']) &&
     isNullableSandboxConfig(value['sandbox']) &&

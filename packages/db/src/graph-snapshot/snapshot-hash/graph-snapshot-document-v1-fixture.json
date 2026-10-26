@@ -48,7 +48,6 @@
             "authEnvName": "EASTER_MCP_TOKEN"
           }
         },
-        "enabledEngineHooks": [],
         "cwd": null,
         "additionalDirectories": [],
         "sandbox": null,

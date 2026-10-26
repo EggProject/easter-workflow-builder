@@ -3,7 +3,6 @@ import type {
   StructuredOutputStrategyId,
   ThinkingMode,
 } from '@easter-workflow-builder/provider-capability';
-import type { EngineHookId } from './engine-hook-id.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
 import type { StorableMcpServer } from './storable-mcp-server.ts';
@@ -71,10 +70,6 @@ export interface AgentStepConfig {
   readonly agents: Readonly<Record<string, unknown>>;
   readonly skills: readonly string[] | 'all' | null;
   readonly mcpServers: Readonly<Record<string, StorableMcpServer>>;
-  /**
-  A motor beépített hookjai, NEM az SDK `hooks` callback mapje.
-  */
-  readonly enabledEngineHooks: readonly EngineHookId[];
   readonly cwd: string | null;
   readonly additionalDirectories: readonly string[];
   readonly sandbox: SandboxConfig | null;

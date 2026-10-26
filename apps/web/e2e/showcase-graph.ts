@@ -83,7 +83,6 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   agents: { kutato: { description: 'Kutat a weben.', prompt: 'Kutass alaposan.', skills: 'all' } },
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,

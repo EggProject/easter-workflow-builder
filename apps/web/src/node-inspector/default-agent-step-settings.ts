@@ -24,7 +24,6 @@ export const DEFAULT_AGENT_STEP_SETTINGS: AgentStepConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,

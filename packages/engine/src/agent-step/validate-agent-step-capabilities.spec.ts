@@ -35,7 +35,6 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
@@ -63,7 +62,7 @@ function model(id: string, clientModelIdentifier: Fact<string>): ModelDescriptor
 
 function strategy(overrides: Partial<StructuredOutputStrategy> = {}): StructuredOutputStrategy {
   return {
-    id: 'emit_output_tool',
+    id: 'sdk_output_format',
     usable: knownFact(true),
     blockingWireDetail: knownFact<string | null>(null),
     observedRoundTrips: knownFact<readonly number[]>([3]),
@@ -99,7 +98,7 @@ function descriptor(overrides: Partial<AgentStepDescriptorFields> = {}): AgentSt
     },
     structuredOutput: {
       strategies: [strategy()],
-      defaultStrategy: knownFact('emit_output_tool'),
+      defaultStrategy: knownFact('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact<string | null>(null),
     },
@@ -120,7 +119,7 @@ describe('validateAgentStepCapabilities', () => {
     const config = agentStepConfig({
       thinking: 'adaptive',
       effort: 'high',
-      structuredOutput: { strategy: 'emit_output_tool', schema: {} },
+      structuredOutput: { strategy: 'sdk_output_format', schema: {} },
     });
 
     const outcome = validateAgentStepCapabilities(config, descriptor());
@@ -203,11 +202,11 @@ describe('validateAgentStepCapabilities', () => {
     const strategies = [strategy({ usable: knownFact(false) })];
     const structuredOutput = {
       strategies,
-      defaultStrategy: knownFact<'emit_output_tool' | 'sdk_output_format'>('emit_output_tool'),
+      defaultStrategy: knownFact<'sdk_output_format'>('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact<string | null>(null),
     };
-    const config = agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } });
+    const config = agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } });
 
     const outcome = validateAgentStepCapabilities(config, descriptor({ structuredOutput }));
 
@@ -216,7 +215,7 @@ describe('validateAgentStepCapabilities', () => {
 
   it('a megfigyelt körszám alatti maxTurns insufficient_max_turns hibát ad', () => {
     const outcome = validateAgentStepCapabilities(
-      agentStepConfig({ maxTurns: 1, structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
+      agentStepConfig({ maxTurns: 1, structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
       descriptor(),
     );
 

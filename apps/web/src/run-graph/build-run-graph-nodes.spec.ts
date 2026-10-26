@@ -57,7 +57,6 @@ const AGENT_NODE: WorkflowNodeInput = {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,

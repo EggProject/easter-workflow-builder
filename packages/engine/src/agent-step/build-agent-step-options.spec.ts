@@ -21,7 +21,6 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
@@ -140,11 +139,10 @@ describe('buildAgentStepOptions', () => {
     expect(options.disallowedTools).toStrictEqual(['Bash', 'KliensKereses']);
   });
 
-  it('sdk_output_format stratégiánál outputFormat megy ki, Stop hook nélkül', () => {
+  it('sdk_output_format stratégiánál outputFormat megy ki, hooks mező nélkül', () => {
     const options = buildAgentStepOptions({
       config: agentStepConfig({
         structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object' } },
-        enabledEngineHooks: ['emit_output_tool_stop'],
       }),
       decisions: decisions(),
       environmentBlock: {},
@@ -152,34 +150,7 @@ describe('buildAgentStepOptions', () => {
     });
 
     expect(options.outputFormat).toStrictEqual({ type: 'json_schema', schema: { type: 'object' } });
-    expect(options.hooks).toBeUndefined();
-  });
-
-  it('emit_output_tool stratégiánál a bekapcsolt Stop hook megy ki, outputFormat nélkül', () => {
-    const options = buildAgentStepOptions({
-      config: agentStepConfig({
-        structuredOutput: { strategy: 'emit_output_tool', schema: {} },
-        enabledEngineHooks: ['emit_output_tool_stop'],
-      }),
-      decisions: decisions(),
-      environmentBlock: {},
-      sessionBinding: isolated,
-    });
-
-    expect(options.outputFormat).toBeUndefined();
-    expect(options.hooks?.Stop).toHaveLength(1);
-  });
-
-  it('emit_output_tool stratégia bekapcsolt hook nélkül egyik mezőt sem küldi ki', () => {
-    const options = buildAgentStepOptions({
-      config: agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
-      decisions: decisions(),
-      environmentBlock: {},
-      sessionBinding: isolated,
-    });
-
-    expect(options.outputFormat).toBeUndefined();
-    expect(options.hooks).toBeUndefined();
+    expect(Object.hasOwn(options, 'hooks')).toBe(false);
   });
 
   it('ugyanaz a lépés két eltérő leíró döntéssel eltérő Options objektumot ad', () => {

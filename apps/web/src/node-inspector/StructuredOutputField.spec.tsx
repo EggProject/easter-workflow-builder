@@ -101,13 +101,13 @@ describe('StructuredOutputField', () => {
     act(() => {
       checkbox.click();
     });
-    expect(onChange).toHaveBeenCalledWith({ strategy: 'emit_output_tool', schema: {} });
+    expect(onChange).toHaveBeenCalledWith({ strategy: 'sdk_output_format', schema: {} });
   });
 
   it('a jelölőnégyzet kikapcsolására `null`-t ad', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'emit_output_tool', schema: {} }} onChange={onChange} />);
+      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
     });
     const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (checkbox === null) {
@@ -121,10 +121,10 @@ describe('StructuredOutputField', () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it('a stratégia váltása frissíti a mezőt', () => {
+  it('a stratégia választó az egyetlen stratégiát kínálja, és a választás a mezőt írja', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'emit_output_tool', schema: {} }} onChange={onChange} />);
+      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
     });
     chooseOption(container, STRATEGY_LABEL, 'sdk_output_format');
     expect(onChange).toHaveBeenCalledWith({ strategy: 'sdk_output_format', schema: {} });
@@ -133,7 +133,7 @@ describe('StructuredOutputField', () => {
   it('a séma JSON szerkesztése frissíti a schema mezőt', () => {
     const onChange = vi.fn();
     act(() => {
-      root.render(<StructuredOutputField value={{ strategy: 'emit_output_tool', schema: {} }} onChange={onChange} />);
+      root.render(<StructuredOutputField value={{ strategy: 'sdk_output_format', schema: {} }} onChange={onChange} />);
     });
     const textarea = container.querySelector('textarea');
     if (textarea === null) {
@@ -142,6 +142,6 @@ describe('StructuredOutputField', () => {
     act(() => {
       typeInto(textarea, '{"type":"object"}');
     });
-    expect(onChange).toHaveBeenCalledWith({ strategy: 'emit_output_tool', schema: { type: 'object' } });
+    expect(onChange).toHaveBeenCalledWith({ strategy: 'sdk_output_format', schema: { type: 'object' } });
   });
 });

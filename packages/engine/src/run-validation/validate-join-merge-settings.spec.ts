@@ -26,7 +26,6 @@ const JOIN_AI_SYNTHESIS: ExecutableNodeConfig = {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,

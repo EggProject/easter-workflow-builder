@@ -17,7 +17,6 @@ const VALID_AGENT_STEP_CONFIG = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
@@ -46,7 +45,7 @@ describe('AgentStepConfigSchema', () => {
       skills: 'all',
       cwd: '/workspace',
       additionalDirectories: ['/data'],
-      structuredOutput: { strategy: 'emit_output_tool', schema: { type: 'object' } },
+      structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object' } },
     });
     expect(result.success).toBe(true);
   });

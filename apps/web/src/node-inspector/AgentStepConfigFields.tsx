@@ -1,14 +1,12 @@
 import {
-  EngineHookIdSchema,
   ProviderIdSchema,
   SessionModeSchema,
   ThinkingModeSchema,
   type AgentStepConfig,
 } from '@easter-workflow-builder/protocol';
-import { Accordion, AccordionItem, Checkbox, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
+import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
-import { InspectorFieldGroup } from './InspectorFieldGroup.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
@@ -41,31 +39,6 @@ export interface AgentStepConfigFieldsProperties {
    * globális beállítás alapján.
    */
   readonly inheritedProviderDescription: string;
-}
-
-function MultiCheckboxSelector<TOption extends string>(
-  properties: Readonly<{
-    title: string;
-    options: readonly TOption[];
-    selected: readonly TOption[];
-    onToggle: (option: TOption, isChecked: boolean) => void;
-  }>,
-): ReactElement {
-  const { title, options, selected, onToggle } = properties;
-  return (
-    <InspectorFieldGroup title={title}>
-      {options.map((option) => (
-        <Checkbox
-          key={option}
-          label={option}
-          checked={selected.includes(option)}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => {
-            onToggle(option, event.target.checked);
-          }}
-        />
-      ))}
-    </InspectorFieldGroup>
-  );
 }
 
 /**
@@ -237,20 +210,6 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
               error={permissionModeError}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
                 setField('permissionMode', fromTextFieldValue(event.target.value));
-              }}
-            />
-            <MultiCheckboxSelector
-              title="Bekapcsolt motor hookok"
-              options={EngineHookIdSchema.options}
-              selected={config.enabledEngineHooks}
-              onToggle={(option, isChecked) => {
-                setField(
-                  'enabledEngineHooks',
-                  isChecked
-                    ? [...config.enabledEngineHooks, option]
-                    : // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- az `EngineHookId` ma egyetlen elemű enum, a típusrendszer ezért mindig hamisnak látja az összehasonlítást; érték szinten helyes és egy jövőbeli második elemre értelmes marad.
-                      config.enabledEngineHooks.filter((existing) => existing !== option),
-                );
               }}
             />
           </div>

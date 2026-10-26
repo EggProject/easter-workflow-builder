@@ -58,7 +58,6 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,

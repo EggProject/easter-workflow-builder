@@ -25,7 +25,7 @@ import type { StructuredOutputStrategyDecision } from './structured-output-strat
  * hibaosztály: bizonyíték nélkül a motor nem állíthatja, hogy a stratégia
  * működik ezzel a providerrel (SPEC-004 11.2, a tippelés tilalma).
  *
- * A `Stop` hook összeállítása (a táblázat 2. sora) szándékosan **nem** itt áll:
+ * Az `outputFormat` mező összeállítása (a táblázat 2. sora) szándékosan **nem** itt áll:
  * az nem önálló leíró mező, hanem a most kiválasztott stratégia következménye,
  * és az `Options` összeállításához tartozik (`agent-step` téma, T-005-19).
  */
@@ -33,7 +33,11 @@ export function resolveStructuredOutputStrategy(
   strategies: readonly StructuredOutputStrategy[],
   requestedStrategyId: StructuredOutputStrategyId,
 ): Outcome<StructuredOutputStrategyDecision> {
-  const strategy = strategies.find((candidate) => candidate.id === requestedStrategyId);
+  // A stratégia unió egy tagú (SPEC-011 O-9), tehát a leíró minden bejegyzése
+  // a kért azonosítót hordozza: az azonosító összevetése típusszinten mindig
+  // igaz volna, ezért a kiválasztás az első bejegyzés. Üres lista esetén a
+  // leíró nem írja le a stratégiát.
+  const strategy = strategies[0];
 
   if (strategy === undefined) {
     return {

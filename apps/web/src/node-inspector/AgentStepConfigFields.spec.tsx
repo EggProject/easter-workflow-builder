@@ -91,7 +91,6 @@ const BASE_CONFIG: AgentStepConfig = {
   agents: {},
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
@@ -215,23 +214,9 @@ describe('AgentStepConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ thinking: null }));
   });
 
-  it('a bekapcsolt motor hookok jelölőnégyzete hozzáadja, majd eltávolítja az elemet', () => {
-    const onChange = vi.fn();
-    render(BASE_CONFIG, onChange);
-    const checkbox = checkboxByLabel(container, 'emit_output_tool_stop');
-    act(() => {
-      checkbox.click();
-    });
-    expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ enabledEngineHooks: ['emit_output_tool_stop'] }),
-    );
-
-    render({ ...BASE_CONFIG, enabledEngineHooks: ['emit_output_tool_stop'] }, onChange);
-    const checkedCheckbox = checkboxByLabel(container, 'emit_output_tool_stop');
-    act(() => {
-      checkedCheckbox.click();
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ enabledEngineHooks: [] }));
+  it('a motor hookok csoportja nincs a felületen (SPEC-011 O-17)', () => {
+    render(BASE_CONFIG, vi.fn());
+    expect(container.textContent).not.toContain('motor hook');
   });
 
   it('az engedélyezett és a tiltott eszközök lista szerkesztő listává bontva menti', () => {
@@ -318,7 +303,7 @@ describe('AgentStepConfigFields', () => {
       structuredOutputCheckbox.click();
     });
     expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
+      expect.objectContaining({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
     );
   });
 

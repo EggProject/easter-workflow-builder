@@ -293,7 +293,6 @@ function agentStepNode(id: string, promptTemplate: string): WorkflowNodeInput {
       agents: {},
       skills: null,
       mcpServers: {},
-      enabledEngineHooks: [],
       cwd: null,
       additionalDirectories: [],
       sandbox: null,

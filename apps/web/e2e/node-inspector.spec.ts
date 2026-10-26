@@ -50,7 +50,6 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   },
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
@@ -655,8 +654,8 @@ test.describe('agent_step node: prompt, provider öröklés, rendszer prompt', (
   });
 });
 
-test.describe('agent_step node: futási korlátok és motor hookok', () => {
-  test('a modell, a session mód, a számláló mezők és a motor hook checkbox szerkeszthető és megmarad', async ({
+test.describe('agent_step node: futási korlátok', () => {
+  test('a modell, a session mód és a számláló mezők szerkeszthetők és megmaradnak, motor hook csoport nincs', async ({
     page,
   }) => {
     const panel = await openNode(page, 'n-agent');
@@ -676,13 +675,8 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await limits.getByLabel('Jogosultsági mód').fill('acceptEdits');
 
-    const hooks = limits.getByRole('group', { name: 'Bekapcsolt motor hookok' });
-    await hooks.getByText('emit_output_tool_stop').click();
-    await expect(hooks.getByRole('checkbox')).toBeChecked();
-    // Ki is kapcsolható (a `filter` ág).
-    await hooks.getByText('emit_output_tool_stop').click();
-    await expect(hooks.getByRole('checkbox')).not.toBeChecked();
-    await hooks.getByText('emit_output_tool_stop').click();
+    // A motor hookok csoportja törölve (SPEC-011 O-17): nincs a DOM-ban.
+    await expect(limits.getByRole('group', { name: 'Bekapcsolt motor hookok' })).toBeAttached({ attached: false });
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
@@ -695,9 +689,6 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     await expect(reopenedLimits.getByLabel('Effort')).toHaveValue('high');
     await expectSelectedLabel(reopenedLimits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await expect(reopenedLimits.getByLabel('Jogosultsági mód')).toHaveValue('acceptEdits');
-    await expect(
-      reopenedLimits.getByRole('group', { name: 'Bekapcsolt motor hookok' }).getByRole('checkbox'),
-    ).toBeChecked();
   });
 });
 
@@ -741,6 +732,11 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
 
     // Strukturált kimenet: bekapcsolás, stratégia váltás, séma JSON szerkesztés.
     await group.getByText('Strukturált kimenet felülírás megadva').click();
+    // Az alapérték az egyetlen stratégia (SPEC-011 AC12).
+    await expectSelectedLabel(
+      group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),
+      'sdk_output_format',
+    );
     await chooseSelectOption(
       page,
       group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),

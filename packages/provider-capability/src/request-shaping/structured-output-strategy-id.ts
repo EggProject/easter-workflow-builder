@@ -1,4 +1,4 @@
 /**
-A projekt két strukturált kimenet stratégiája.
+A projekt egyetlen strukturált kimenet stratégiája (SPEC-011 O-9).
 */
-export type StructuredOutputStrategyId = 'emit_output_tool' | 'sdk_output_format';
+export type StructuredOutputStrategyId = 'sdk_output_format';

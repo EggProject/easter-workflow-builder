@@ -8,26 +8,6 @@ import {
 export const claudeSubscriptionStructuredOutput: StructuredOutputCapability = {
   strategies: [
     {
-      id: 'emit_output_tool',
-      usable: {
-        state: 'unknown',
-        // A prózai mérési narratíva a docs alá tartozik, a hivatkozást a
-        // `blockedBy` hordozza (SPEC-001 13. szekció, 35. elfogadási kritérium).
-        reason: 'Nincs drótszintű mérés ehhez a providerhez.',
-        blockedBy: ['M-10'],
-      },
-      blockingWireDetail: {
-        state: 'unknown',
-        reason: 'Nincs drótszintű mérés ehhez a providerhez.',
-        blockedBy: ['M-10'],
-      },
-      observedRoundTrips: {
-        state: 'unknown',
-        reason: 'Nincs drótszintű mérés ehhez a providerhez.',
-        blockedBy: ['M-10'],
-      },
-    },
-    {
       id: 'sdk_output_format',
       // Az Anthropic Messages API natívan támogatja a strukturált kimenetet.
       usable: {

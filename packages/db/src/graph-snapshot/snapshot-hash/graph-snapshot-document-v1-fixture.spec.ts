@@ -13,7 +13,7 @@ import { readGraphSnapshot } from '../snapshot-document/read-graph-snapshot.ts';
  * megváltozik**. Ütközés esetén a kanonizálót kell visszaállítani, a literált
  * nem szabad felülírni (PLAN-003 kockázat táblázat).
  */
-const FIXTURE_HASH = 'a66efb108909b5f8c43b75adbcc207650bd7f0b0a3107b2110366c1fff457d43';
+const FIXTURE_HASH = 'cc6a5a4fee8b8dce20228df51500969ef0662686a1d18dc3c001031984daa68c';
 
 function readFixture(): unknown {
   const text = readFileSync(new URL('graph-snapshot-document-v1-fixture.json', import.meta.url), 'utf8');
