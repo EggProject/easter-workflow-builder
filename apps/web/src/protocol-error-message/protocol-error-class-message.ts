@@ -27,7 +27,6 @@ const PROTOCOL_ERROR_CLASS_MESSAGES: Readonly<Record<ProtocolErrorClass, string>
   invalid_error_handler_edge: 'Egy Hiba esetén él nem Hibakezelő csomópontra mutat.',
   malformed_node_config: 'Egy csomópont beállításai hibásak.',
   unhandled_error_policy_missing: 'Egy csomópontnál nincs beállítva, mi történjen kezeletlen hiba esetén.',
-  unsupported_join_merge_setting: 'Egy Összefésülés csomópont összefésülés módja ismeretlen beállítást tartalmaz.',
   insufficient_backoff_list:
     'Egy Hibakezelő csomópont várakozási listája rövidebb, mint amit a próbálkozások száma megkövetel.',
   missing_required_input: 'A futás egy kötelező bemeneti mezője hiányzik.',

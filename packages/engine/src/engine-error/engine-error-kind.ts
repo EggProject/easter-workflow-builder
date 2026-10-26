@@ -30,7 +30,6 @@ export type EngineErrorKind =
   | 'invalid_error_handler_edge'
   | 'malformed_node_config'
   | 'unhandled_error_policy_missing'
-  | 'unsupported_join_merge_setting'
   // 4.8: a futás indításának validációja
   | 'missing_required_input'
   // 5.: a kifejezés és a sablon port hibaágai, minden node típusnál közösek

@@ -43,7 +43,7 @@ function allConfigs(): ReadonlyMap<string, ExecutableNodeConfig> {
       'szintezis',
       { type: 'join', mode: 'ai_synthesis', settings: agentStepConfig('sablon-join'), onUnhandledError: 'fail_run' },
     ],
-    ['osszefuzes', { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' }],
+    ['osszefuzes', { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' }],
     [
       'jovahagyas',
       {

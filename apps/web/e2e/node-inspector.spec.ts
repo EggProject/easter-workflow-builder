@@ -73,7 +73,7 @@ const FAN_OUT_CONFIG: NodeConfig = {
   onUnhandledError: null,
 };
 
-const JOIN_CONFIG: NodeConfig = { type: 'join', mode: 'merge', settings: {}, onUnhandledError: null };
+const JOIN_CONFIG: NodeConfig = { type: 'join', mode: 'merge', onUnhandledError: null };
 
 const LOOP_CONFIG: NodeConfig = {
   type: 'loop',
@@ -713,7 +713,15 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     await group.getByText('Sandbox felülírás megadva').click();
     const sandboxJson = group.getByLabel('Sandbox beállítás (nyers JSON - öt mezője dokumentálatlan, unknown alakú)');
     await expect(sandboxJson).toHaveValue(/"enabled": true/);
+    // Szintaktikai JSON hiba: a szerkesztő saját hibaüzenete jelenik meg,
+    // de csak a mező ELHAGYÁSA után (érintett + érvénytelen szabály).
+    await sandboxJson.fill('{ez nem json');
+    await sandboxJson.blur();
+    await expect(group.getByText('Érvénytelen JSON - a változtatás egyelőre nem kerül mentésre.')).toBeVisible();
     await sandboxJson.fill('{}');
+    await expect(group.getByText('Érvénytelen JSON - a változtatás egyelőre nem kerül mentésre.')).toBeAttached({
+      attached: false,
+    });
     // Séma szerint érvényes, MÓDOSÍTOTT JSON: ez sikeresen visszaíródik (a
     // `SandboxConfigSchema.safeParse` sikeres ága).
     await sandboxJson.fill(
@@ -950,30 +958,8 @@ test.describe('join node', () => {
     const panel = await openNode(page, 'n-join');
     const modeSelect = panel.getByRole('combobox', { name: 'Összefésülés módja' });
     await expectSelectedLabel(modeSelect, 'összefésülés');
-    const jsonField = panel.getByLabel('Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)');
-    await expect(jsonField).toHaveValue('{}');
-
-    // Szintaktikai JSON hiba: a szerkesztő saját hibaüzenete jelenik meg,
-    // de csak a mező ELHAGYÁSA után (érintett + érvénytelen szabály).
-    await jsonField.fill('{ez nem json');
-    await jsonField.blur();
-    await expect(panel.getByText('Érvénytelen JSON - a változtatás egyelőre nem kerül mentésre.')).toBeVisible();
-
-    // Szemantikailag érvénytelen (de szintaktikusan helyes) JSON: a
-    // `JoinMergeSettingsSchema.safeParse` elutasítja, az `onChange` nem fut le.
-    await jsonField.fill('42');
-    await expect(panel.getByText('Érvénytelen JSON - a változtatás egyelőre nem kerül mentésre.')).toBeAttached({
-      attached: false,
-    });
-
-    // Séma szerint érvényes JSON: ez sikeresen visszaíródik (a `Locator` a
-    // panel bezárása/újranyitása után is ugyanarra a `.node-inspector`
-    // szelektorra kérdez rá újra, tehát a `panel`/`jsonField` továbbra is
-    // érvényes marad).
-    await jsonField.fill('{"strategy": "concat"}');
-    await closePanel(page);
-    await openNode(page, 'n-join');
-    await expect(jsonField).toHaveValue('{\n  "strategy": "concat"\n}');
+    // Az összefésülés módnak nincs beállítás mezője (user döntés 2026-10-26).
+    await expect(panel.getByRole('textbox')).toHaveCount(0);
 
     await chooseSelectOption(page, modeSelect, 'szkript');
     await expect(panel.getByLabel('Forrás (source)')).toHaveValue('');
@@ -988,8 +974,7 @@ test.describe('join node', () => {
     await panel.getByLabel('Prompt sablon').fill('Szintetizáld az ágak kimenetét.');
 
     await chooseSelectOption(page, modeSelect, 'összefésülés');
-    // Mód váltáskor a `settings` mindig visszaáll az alapértelmezettre.
-    await expect(panel.getByLabel('Összefésülési beállítás (nyers JSON - nincs sémája a mezőin)')).toHaveValue('{}');
+    await expect(panel.getByRole('textbox')).toHaveCount(0);
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-join');

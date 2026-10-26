@@ -70,7 +70,6 @@ const MODE_LABEL = 'Összefésülés módja';
 const MERGE_CONFIG: JoinNodeConfig = {
   type: 'join',
   mode: 'merge',
-  settings: { strategy: 'concat' },
   onUnhandledError: null,
 };
 const SCRIPT_CONFIG: JoinNodeConfig = {
@@ -123,34 +122,12 @@ describe('JoinNodeFields', () => {
     container.remove();
   });
 
-  it('"merge" módra a beállítás nyers JSON-ként szerkeszthető, érvényes objektumra frissít', () => {
-    const onChange = vi.fn();
+  it('"merge" módra csak a mód választó áll, beállítás mező nincs (user döntés 2026-10-26)', () => {
     act(() => {
-      root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />);
+      root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={vi.fn()} inheritedProviderDescription="nincs" />);
     });
-    const textarea = container.querySelector('textarea');
-    if (textarea === null) {
-      throw new Error('a teszt nem találta a settings textarea-t');
-    }
-    act(() => {
-      typeInto(textarea, JSON.stringify({ strategy: 'last' }));
-    });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ settings: { strategy: 'last' } }));
-  });
-
-  it('"merge" módra egy nem objektum alakú JSON-ra nem hívja az onChange-et', () => {
-    const onChange = vi.fn();
-    act(() => {
-      root.render(<JoinNodeFields config={MERGE_CONFIG} onChange={onChange} inheritedProviderDescription="nincs" />);
-    });
-    const textarea = container.querySelector('textarea');
-    if (textarea === null) {
-      throw new Error('a teszt nem találta a settings textarea-t');
-    }
-    act(() => {
-      typeInto(textarea, JSON.stringify([1, 2, 3]));
-    });
-    expect(onChange).not.toHaveBeenCalled();
+    expect(container.querySelectorAll('.field')).toHaveLength(1);
+    expect(container.querySelector('textarea')).toBeNull();
   });
 
   it('"script" módra a forrás szerkeszthető', () => {
@@ -233,7 +210,6 @@ describe('JoinNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith({
       type: 'join',
       mode: 'merge',
-      settings: {},
       onUnhandledError: 'fail_run',
     });
   });
@@ -259,7 +235,6 @@ describe('JoinNodeFields', () => {
     expect(onChange).toHaveBeenLastCalledWith({
       type: 'join',
       mode: 'merge',
-      settings: {},
       onUnhandledError: 'fail_branch',
     });
   });

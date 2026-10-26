@@ -30,7 +30,6 @@ export const ProtocolErrorClassSchema = z.enum([
   'invalid_error_handler_edge',
   'malformed_node_config',
   'unhandled_error_policy_missing',
-  'unsupported_join_merge_setting',
   // SPEC-004 8.2 3. pont: a hibakezelő várakozási listája
   'insufficient_backoff_list',
   // SPEC-004 4.8 4. lépés: a futás bemenete

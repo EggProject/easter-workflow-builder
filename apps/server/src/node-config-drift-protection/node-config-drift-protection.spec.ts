@@ -42,10 +42,9 @@ import {
  * protokoll oldalra a `bun run typecheck` valóban `TS2344`-es hibával
  * bukott, majd az eredeti tartalom visszaállítása után újra zöld lett.
  *
- * **Az `AgentStepConfig.agents` és a `JoinMergeNodeConfig.settings` mező**
- * mindkét oldalon szándékosan nyitott `Record<string, unknown>` marad
- * (`.claude/CLAUDE.md` 5. szekció): ha bármelyik oldal ezt szűkítené, a
- * típusszintű egyenlőség itt megbukna.
+ * **Az `AgentStepConfig.agents` mező** mindkét oldalon szándékosan nyitott
+ * `Record<string, unknown>` marad (`.claude/CLAUDE.md` 5. szekció): ha
+ * bármelyik oldal ezt szűkítené, a típusszintű egyenlőség itt megbukna.
  */
 describe('a protokoll és a db NodeConfig uniója kétirányban megegyezik', () => {
   it('NodeConfig', () => {
@@ -113,7 +112,7 @@ const REPRESENTATIVE_NODE_CONFIGS: readonly unknown[] = [
     onUnhandledError: null,
   },
   { type: 'fan_out', itemsExpression: 'items', branchLabelTemplate: '{{item}}', onUnhandledError: null },
-  { type: 'join', mode: 'merge', settings: { strategy: 'bármi' }, onUnhandledError: null },
+  { type: 'join', mode: 'merge', onUnhandledError: null },
   { type: 'join', mode: 'script', settings: { source: 'x + 1', runtime: 'expression' }, onUnhandledError: null },
   { type: 'join', mode: 'ai_synthesis', settings: VALID_AGENT_STEP_SETTINGS, onUnhandledError: null },
   { type: 'join', mode: null, onUnhandledError: null },
@@ -527,8 +526,8 @@ const SAVE_SCHEMA_GUARD_AGREEMENT_CASES: readonly {
     accepted: false,
   },
   {
-    label: 'join merge lista settings értékkel',
-    config: { type: 'join', mode: 'merge', settings: [], onUnhandledError: 'fail_run' },
+    label: 'join merge settings kulccsal (a mező kikerült, user döntés 2026-10-26)',
+    config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
     accepted: false,
   },
   {
@@ -704,15 +703,6 @@ const FREE_FIELD_CASES: readonly { readonly label: string; readonly config: unkn
   {
     label: 'agents: tetszőleges név és belső kulcs',
     config: { ...SAVABLE_AGENT_STEP, agents: { barmi: { [UNKNOWN_KEY]: { melyen: [1] } } } },
-  },
-  {
-    label: 'join merge settings: tetszőleges kulcs',
-    config: {
-      type: 'join',
-      mode: 'merge',
-      settings: { [UNKNOWN_KEY]: { melyen: true } },
-      onUnhandledError: 'fail_run',
-    },
   },
   {
     label: 'structuredOutput.schema: tetszőleges kulcs',

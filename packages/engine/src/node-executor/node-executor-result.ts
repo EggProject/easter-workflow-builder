@@ -14,8 +14,9 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
  * egyen, ahol a megszakítás egyáltalán előfordulhat - a hívóknak olyan
  * helyeken is szűkíteniük kellene, ahol az ág típusilag sosem áll elő. A
  * szélesebb típus ezért csak ott jelenik meg, ahol tényleges jelentése van: a
- * `human_approval` és a két agent lépés (`agent_step`, `join` `ai_synthesis`)
- * végrehajtójánál, a diszpécsernél és a léptető huroknál.
+ * `human_approval`, az `error_handler` és a két agent lépés (`agent_step`,
+ * `join` `ai_synthesis`) végrehajtójánál, a diszpécsernél és a léptető
+ * huroknál.
  *
  * **Az `interrupted` ág nem hordoz `stepRun` rekordot**, mert a sor ilyenkor
  * nem feltétlenül terminális (`waiting_approval`, illetve `pending`), és a
@@ -30,8 +31,12 @@ import type { NodeExecutionOutcome } from './node-executor-outcome.ts';
  * vagy a `failRunRequested` jelzés alatt áll, tehát a hurok nem indít több
  * lépést (`ActiveRunHandle.requestStop` doksija, SPEC-004 8.3).
  *
- * Két helyen keletkezhet az `interrupted` ág:
+ * Három helyen keletkezhet az `interrupted` ág:
  *
+ * - az `error_handler` végrehajtójában (`execute-error-handler.ts`): a backoff
+ *   várakozása a futás leállításának jelén (`requestStop`) szakad meg, a
+ *   kezelő `running` sorát a leállítást kérő fél zárja (SPEC-004 8.2 3.
+ *   pont, user döntés 2026-10-26);
  * - a `human_approval` végrehajtójában (`execute-human-approval.ts`): egy
  *   korlátlan várakozású jóváhagyásnak nincs `AgentQuery`-je, amin
  *   `interrupt()`-et lehetne hívni, ezért a várakozását az

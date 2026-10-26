@@ -7,7 +7,6 @@ const FAIL_RUN: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhan
 const FAIL_BRANCH: ExecutableNodeConfig = {
   type: 'join',
   mode: 'merge',
-  settings: {},
   onUnhandledError: 'fail_branch',
 };
 const MISSING: ExecutableNodeConfig = { type: 'start', inputFields: [], onUnhandledError: null };

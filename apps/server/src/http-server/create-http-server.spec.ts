@@ -161,7 +161,7 @@ function seedFanOutWorkflow(
           label: 'j',
           positionX: 0,
           positionY: 0,
-          config: { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' },
+          config: { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' },
         },
       ],
       [edgeOf('e1', 'start', 'fo'), edgeOf('e2', 'fo', 'j')],

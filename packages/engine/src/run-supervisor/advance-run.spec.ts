@@ -254,7 +254,7 @@ function retryDocument(handler: NodeConfig): GraphSnapshotDocument {
         branchLabelTemplate: '{{item}}',
         onUnhandledError: 'fail_run',
       }),
-      node('jn', { type: 'join', mode: 'merge', settings: {}, onUnhandledError: 'fail_run' }),
+      node('jn', { type: 'join', mode: 'merge', onUnhandledError: 'fail_run' }),
     ],
     edges: [
       edge('e1', 'start', 'br'),
@@ -529,6 +529,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     retryAttempts: new Map(),
     failRunRequested: false,
     stopRequested: false,
+    stopController: new AbortController(),
   };
   return { database, execution, dependencies };
 }
