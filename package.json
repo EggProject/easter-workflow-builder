@@ -61,7 +61,8 @@
     "dev": "turbo run dev",
     "start:server": "node --env-file-if-exists=.env apps/server/src/main.ts",
     "dev:server": "node --watch --env-file-if-exists=.env apps/server/src/main.ts",
-    "dev:web": "bun run --filter @easter-workflow-builder/web dev"
+    "dev:web": "bun run --filter @easter-workflow-builder/web dev",
+    "probe:real-provider": "node --env-file-if-exists=.env apps/server/measurement/real-provider-probe.ts"
   },
   "devDependencies": {
     "@easter-workflow-builder/eslint-config": "workspace:*",

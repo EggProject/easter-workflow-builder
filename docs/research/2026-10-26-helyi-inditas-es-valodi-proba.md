@@ -610,3 +610,44 @@ without it.`" (az `--env-file-if-exists` hiányzó fájlnál nem hiba); `SIGINT`
   `read` metódusa `process.env[name] ?? null` alakú, tehát egy üres sztring (`ANTHROPIC_AUTH_TOKEN=`) nem hiányzó,
   hanem üres értékként jutna a `minimax` provider kulcsába. A minta ezért nem tartalmaz üres hozzárendelést. A
   függvény doc kommentje a "hiányzó/üres" esetet említi, a kód csak a hiányzót kezeli: lelet, nem módosítottam.
+
+### 14.7 T-013-9: a valódi provider próba eszköze, ellenőrzés valódi provider nélkül
+
+Az eszköz az `apps/server/measurement/` alatt áll (O-12), indítása `bun run probe:real-provider -- <providerId>
+[modelId]` (`node --env-file-if-exists=.env`). **Valódi provider hívás nem történt.** Az ellenőrzés három
+rétegű.
+
+- **Hamis ágenses szerver (a teszt kapun).** A `run-probe.spec.ts` a `stub-agent-server.ts` ellen fut: a
+  valódi `apps/server` HTTP réteg, útvonalak, stream nyilvántartás, motor és fájl adatbázis, kizárólag az
+  `agentQueryRunner` port hamis (a commitolt fixture üzenetsora, a `result` üzenethez hozzáadott szöveggel).
+  A próba a szerver gyermek folyamatot szabad porton, ideiglenes `EASTER_DB_FILE` és `EASTER_LOG_DIRECTORY`
+  mellett indította; a `minimax` futás összegzése: `runStatus: succeeded`, `stepStatus: succeeded`,
+  `resultSubtype: success`, `numTurns: 1`, `outputTextLength` a hamis szöveg hossza. A hamis ágens rögzítette
+  kérése: `maxTurns: 1`, nincs `maxBudgetUsd`, a `model` értéke `MiniMax-M3[1m]` (a leíró
+  `clientModelIdentifier` mezője, M-11, M-29, M-32). A teszt egy futásának ideje 0,54 és 0,60 s között volt
+  (hét teszt, összesen 2,9 s), a 5000 ms-os alapkorlát alatt, ezért időkorlát nem módosult. Hibás ágensre a
+  futás `failed`, az összegzés hibaosztályt hordoz; megszakított jelre a szerver leáll és az ideiglenes
+  könyvtár nem marad vissza; a korán kilépő szerver stderr szövegében a titok `REDACTED`.
+- **Valódi `src/main.ts` szerver, provider nélkül (kézi, 2026-10-26).** `ANTHROPIC_AUTH_TOKEN`,
+  `ANTHROPIC_API_KEY` és `MINIMAX_API_KEY` nélküli környezetben `node
+apps/server/measurement/real-provider-probe.ts minimax`: a szerver elindult, a `GET /api/providers` `200`
+  lett, a beállítás, a workflow és a gráf mentése lefutott, a stream feliratkozás és a futás indítása
+  lefutott, a futás `failed` lett `missing_provider_env` hibaosztállyal. A hiányzó kulcs miatt a motor a
+  `query()` hívás előtt megáll, tehát hálózati hívás nem volt. Kilépési kód 0, az összegzés a kimenet.
+  `SIGINT` a szerver indítása közben: a kimenet "A próba megszakadt: This operation was aborted", kilépési
+  kód 1, ideiglenes könyvtár és gyermek folyamat nem maradt. Érvénytelen provider azonosítóra a használati
+  üzenet és a 2-es kilépési kód jön.
+- **Leletek, amiket a stub elleni futás hozott felszínre.**
+  1. **A `claude-subscription` modell nélkül nem indítható.** A SPEC-012 5.1 táblázata szerint a lépésnek
+     ennél a providernél `modelId` mezője nincs, a motor viszont a három modellt író leírónál a futás
+     indításakor `422 model_not_selected` hibával elutasít. A próba ezért opcionális második argumentumot
+     (`modelId`) fogad; modell nélkül a hiba a próbában látszik, költség nélkül. A modell kiválasztása
+     termékdöntés, nyitott kérdés (a jelentésben).
+  2. **A lépés `output` mezője szöveges kimenetnél üres.** A motor `run-agent-step.ts` fájlja a
+     `structured_output` mezőt adja `output`-ként, ezért a SPEC-012 5.1 4. lépés "kimeneti szöveg hossza"
+     értéke az `sdk_result` esemény payloadjának `result` szövegéből jön (a payload a teljes SDK üzenet,
+     `normalize-sdk-message.ts`).
+- **Titokkezelés.** A kulcs értéke csak a folyamat környezetében van; a hibaüzenetek és a kimenet
+  `maskSecrets` függvényen mennek át; a gyermek szerver stderr-je memóriában gyűlik, lemezre nem kerül; az
+  ideiglenes könyvtár a futás végén törlődik. A commit előtti keresés a kulcs értékére: lásd a PLAN-013
+  T-013-11 lépését.
