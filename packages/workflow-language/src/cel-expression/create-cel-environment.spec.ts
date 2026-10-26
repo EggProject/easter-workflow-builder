@@ -1,5 +1,5 @@
 import { Environment } from '@marcbachmann/cel-js';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCelEnvironment } from './create-cel-environment.ts';
 
 // A teszt a valódi `@marcbachmann/cel-js@8.0.0` könyvtáron fut, mock nélkül. Az
@@ -31,6 +31,28 @@ describe('createCelEnvironment (SPEC-010 7.1)', () => {
 
   it('saját függvényt és operátort nem regisztrál', () => {
     expect(environment.getDefinitions().functions).toStrictEqual(baseline.getDefinitions().functions);
+  });
+
+  describe('a regisztráló hívások (SPEC-010 16. szekció 17.)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    // A definíciós lista egy saját típus regisztrációját nem mutatja, ezért a hívásokat a
+    // prototípuson figyeljük: a gyártó függvény csak a hét változót regisztrálhatja.
+    it('saját típust, függvényt, operátort és konstanst nem regisztrál, csak a hét változót', () => {
+      const registerType = vi.spyOn(Environment.prototype, 'registerType');
+      const registerFunction = vi.spyOn(Environment.prototype, 'registerFunction');
+      const registerOperator = vi.spyOn(Environment.prototype, 'registerOperator');
+      const registerConstant = vi.spyOn(Environment.prototype, 'registerConstant');
+      const registerVariable = vi.spyOn(Environment.prototype, 'registerVariable');
+      createCelEnvironment();
+      expect(registerType).not.toHaveBeenCalled();
+      expect(registerFunction).not.toHaveBeenCalled();
+      expect(registerOperator).not.toHaveBeenCalled();
+      expect(registerConstant).not.toHaveBeenCalled();
+      expect(registerVariable).toHaveBeenCalledTimes(7);
+    });
   });
 
   it('minden opció, a limits is, a csomag alapértékén marad', () => {
