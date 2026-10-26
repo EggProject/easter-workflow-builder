@@ -5,8 +5,13 @@ import { RUN_CONTEXT_VARIABLE_NAMES } from './run-context-variable-names.ts';
 // a CEL-ben a `null` érték, az `undefined` nem (research 2. szekció (3)).
 const CEL_NULL: unknown = JSON.parse('null');
 
-// A két egész számláló, ami CEL `int` értékként érkezik (SPEC-010 7.3).
-const INTEGER_COUNTER_NAMES: ReadonlySet<string> = new Set(['itemIndex', 'iteration']);
+// A két egész számláló, ami CEL `int` értékként érkezik (SPEC-010 7.3). A
+// `satisfies` a neveket a hét deklarált változóhoz köti: egy elírás vagy egy
+// átnevezés fordítási hiba (PLAN-010 T-010-21 A-10).
+const INTEGER_COUNTER_NAMES: ReadonlySet<string> = new Set([
+  'itemIndex',
+  'iteration',
+] as const satisfies readonly (typeof RUN_CONTEXT_VARIABLE_NAMES)[number][]);
 
 /**
  * A porton `unknown` típussal érkező kontextus leképezése a CEL felé (SPEC-010
