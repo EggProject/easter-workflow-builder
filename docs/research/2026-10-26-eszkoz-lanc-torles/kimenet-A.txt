@@ -1,0 +1,4 @@
+PROBE A fixture agentTools: ["web_search"]
+PROBE A replaceGraph (régi kód): "ok"
+PROBE A startRun (régi kód): "ok"
+PROBE_IDS deb19f0e-c302-475a-9b77-0d6275ae5488 5e1a2c5f-fc30-4eda-9e45-cffe72fac45c

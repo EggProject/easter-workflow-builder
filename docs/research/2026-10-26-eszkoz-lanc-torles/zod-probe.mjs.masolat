@@ -1,0 +1,8 @@
+import { z } from 'zod';
+const input = { a: 1, agentTools: ['web_search'] };
+const show = (n, s) => { const r = s.safeParse(input); console.log('ZOD', n, r.success ? JSON.stringify(r.data) : JSON.stringify(r.error.issues.map(i=>i.code))); };
+show('strictObject', z.strictObject({ a: z.number() }));
+show('object', z.object({ a: z.number() }));
+show('looseObject', z.looseObject({ a: z.number() }));
+show('strictObject+agentTools:z.unknown().optional()', z.strictObject({ a: z.number(), agentTools: z.unknown().optional() }));
+console.log('ZOD version', (await import('zod/package.json', { with: { type: 'json' } })).default.version);

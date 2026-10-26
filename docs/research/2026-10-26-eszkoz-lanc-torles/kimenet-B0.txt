@@ -1,0 +1,9 @@
+PROBE B0 db readGraph: {"kind":"ok","storedConfigHasAgentTools":true}
+PROBE B0 protocol WorkflowGraphDocumentSchema (szerkesztő betöltés): "ok"
+PROBE B0 engine isNodeConfig (futás indítás, validate-node-configs): true
+PROBE B0 db readSnapshot: "ok"
+PROBE B0 protocol RunSnapshotResponseSchema: "ok"
+PROBE B0 protocol NodeConfigSchema a pillanatkép node-on (futás nézet rajza, project-snapshot-graph): "ok"
+PROBE B0 protocol ReplaceGraphRequestSchema régi kliens agentTools kulccsal: "ok"
+PROBE B0 db replaceGraph agentTools kulccsal (új kód): "ok"
+PROBE B0 db readGraph az újraírás után: megmaradt-e a kulcs: true

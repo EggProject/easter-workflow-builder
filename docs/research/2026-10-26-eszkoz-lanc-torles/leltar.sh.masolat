@@ -1,0 +1,4 @@
+#!/bin/bash
+# A SPEC-011 leltár mintája; a repó gyökeréből futtatandó.
+P='tool-minimax-web-search|tool-minimax-understand-image|tool-firecrawl-web-fetch|minimax-client|firecrawl-client|mcp-tool-kit|agent-tool-bundle|agentTools|AgentToolId|AgentToolRecommendation|recommendedAgentTools|RecommendedAgentTools|agent-tool-id|recommended-agent-tools|agent-tool-recommendation|understand_image|web_fetch|[Ff]irecrawl|FIRECRAWL|MINIMAX_API_BASE_URL|MINIMAX_TIMEOUT_MS|agent-tools|mcp__agent-tools|tool-web-search|tool-web-fetch|tool-understand-image'
+git grep -n -E "$P" -- ':!bun.lock' "$@" | awk -F: '{f=$1; l=$2; c[f]++; if (s[f]=="") s[f]=l; else s[f]=s[f]", "l} END {for (f in c) printf "| `%s` | %d | %s |\n", f, c[f], s[f]}' | sort

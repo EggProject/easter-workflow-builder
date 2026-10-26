@@ -1,0 +1,36 @@
+diff --git a/packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts b/packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts
+index eedeb24..6ecdfa8 100644
+--- a/packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts
++++ b/packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts
+@@ -82,7 +82,6 @@ export interface AgentStepConfig {
+   /**
+   Lépésenként kapcsolható in-process MCP eszközök.
+   */
+-  readonly agentTools: readonly AgentToolId[];
+   readonly sessionMode: SessionMode;
+   readonly structuredOutput: StructuredOutputConfig | null;
+ }
+diff --git a/packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts b/packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts
+index 31f257c..8237910 100644
+--- a/packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts
++++ b/packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts
+@@ -190,7 +190,6 @@ export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
+     isNullableString(value['cwd']) &&
+     isStringArray(value['additionalDirectories']) &&
+     isNullableSandboxConfig(value['sandbox']) &&
+-    isAgentToolIdArray(value['agentTools']) &&
+     isSessionMode(value['sessionMode']) &&
+     isNullableStructuredOutputConfig(value['structuredOutput'])
+   );
+diff --git a/packages/protocol/src/node-config/agent-step-config.ts b/packages/protocol/src/node-config/agent-step-config.ts
+index f430d3b..6e95ed3 100644
+--- a/packages/protocol/src/node-config/agent-step-config.ts
++++ b/packages/protocol/src/node-config/agent-step-config.ts
+@@ -71,7 +71,6 @@ export const AgentStepConfigSchema = z
+     cwd: z.string().nullable(),
+     additionalDirectories: z.array(z.string()).readonly(),
+     sandbox: SandboxConfigSchema.nullable(),
+-    agentTools: z.array(AgentToolIdSchema).readonly(),
+     sessionMode: SessionModeSchema,
+     structuredOutput: StructuredOutputConfigSchema.nullable(),
+   })

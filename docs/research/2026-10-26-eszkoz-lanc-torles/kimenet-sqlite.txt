@@ -1,0 +1,13 @@
+SQLITE 3.53.4 better-sqlite3 13.0.3
+TABLES __drizzle_migrations,app_setting,graph_snapshot,graph_snapshot_no_update,human_approval,provider_concurrency_limit,run_event,sqlite_sequence,step_run,workflow,workflow_edge,workflow_node,workflow_run
+MIG workflow_node agentTools előtte 1 módosított sor 1 utána 0
+MIG snapshot update hiba: SQLITE_CONSTRAINT_TRIGGER graph_snapshot is immutable
+SNAPSHOT agentTools megvan 1
+NESTED changes 1 {"type":"join","mode":"ai_synthesis","settings":{"a":1}}
+TOP on nested row changes 0
+KEYORDER {"b":1,"a":3}
+ZOD strictObject ["unrecognized_keys"]
+ZOD object {"a":1}
+ZOD looseObject {"a":1,"agentTools":["web_search"]}
+ZOD strictObject+agentTools:z.unknown().optional() {"a":1,"agentTools":["web_search"]}
+ZOD version 4.4.3

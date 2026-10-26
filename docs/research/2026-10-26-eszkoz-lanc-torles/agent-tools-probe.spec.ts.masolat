@@ -1,0 +1,62 @@
+/* eldobható próba, nem a repó része */
+import { readFileSync, existsSync, rmSync } from 'node:fs';
+import { openDatabase, isNodeConfig } from '@easter-workflow-builder/db';
+import { NodeConfigSchema, WorkflowGraphDocumentSchema, ReplaceGraphRequestSchema, RunSnapshotResponseSchema } from '@easter-workflow-builder/protocol';
+import { toWorkflowGraphDocument } from '../workflow-endpoint/to-workflow-graph-document.ts';
+import { it } from 'vitest';
+
+const FILE = '/tmp/agenttools-probe/probe.db';
+const PHASE = process.env['PROBE_PHASE'];
+const FIXTURE = '../../../../packages/db/src/graph-snapshot/snapshot-hash/graph-snapshot-document-v1-fixture.json';
+
+function log(label: string, value: unknown) {
+  console.log(`PROBE ${PHASE} ${label}: ${JSON.stringify(value)}`);
+}
+
+it('probe', () => {
+  const doc = JSON.parse(readFileSync(new URL(FIXTURE, import.meta.url), 'utf8'));
+  const agentNode = doc.nodes.find((n: { type: string }) => n.type === 'agent_step');
+  agentNode.config = { ...agentNode.config, onUnhandledError: 'fail_run' };
+  if (PHASE === 'A') {
+    if (existsSync(FILE)) rmSync(FILE);
+    const db = openDatabase(FILE);
+    if (db.kind === 'error') throw new Error(db.message);
+    const wf = db.value.workflows.createWorkflow({ name: 'probe', description: null, providerId: null });
+    if (wf.kind === 'error') throw new Error(wf.message);
+    log('fixture agentTools', agentNode.config.agentTools);
+    const rep = db.value.workflows.replaceGraph(wf.value.id, [{ id: 'n-agent', label: 'A', positionX: 0, positionY: 0, config: agentNode.config }], []);
+    log('replaceGraph (régi kód)', rep.kind === 'ok' ? 'ok' : rep.message);
+    const run = db.value.runs.startRun({ workflowId: wf.value.id, input: {}, providerId: 'claude-subscription', graphSnapshotDocument: { ...doc, workflow: { ...doc.workflow, id: wf.value.id } } });
+    log('startRun (régi kód)', run.kind === 'ok' ? 'ok' : run.message);
+    console.log(`PROBE_IDS ${wf.value.id} ${run.kind === 'ok' ? run.value.id : ''}`);
+    return;
+  }
+  const [wfId, runId] = (process.env['PROBE_IDS'] ?? '').split(' ');
+  const db = openDatabase(FILE);
+  if (db.kind === 'error') throw new Error(db.message);
+  const graph = db.value.workflows.readGraph(wfId ?? '');
+  log('db readGraph', graph.kind === 'ok' ? { kind: 'ok', storedConfigHasAgentTools: Object.hasOwn(graph.value.nodes[0]?.config ?? {}, 'agentTools') } : graph.message);
+  if (graph.kind === 'ok') {
+    const wire = toWorkflowGraphDocument(graph.value);
+    const parsed = WorkflowGraphDocumentSchema.safeParse(JSON.parse(JSON.stringify(wire)));
+    log('protocol WorkflowGraphDocumentSchema (szerkesztő betöltés)', parsed.success ? 'ok' : parsed.error.issues.map((i) => ({ code: i.code, path: i.path, keys: 'keys' in i ? i.keys : undefined })));
+    log('engine isNodeConfig (futás indítás, validate-node-configs)', isNodeConfig(graph.value.nodes[0]?.config));
+  }
+  const snap = db.value.runs.readSnapshot(runId ?? '');
+  log('db readSnapshot', snap.kind === 'ok' ? 'ok' : snap.message);
+  if (snap.kind === 'ok') {
+    const wireSnap = RunSnapshotResponseSchema.safeParse(JSON.parse(JSON.stringify(snap.value)));
+    log('protocol RunSnapshotResponseSchema', wireSnap.success ? 'ok' : wireSnap.error.issues);
+    const agentSnapNode = snap.value.nodes.find((n) => n.type === 'agent_step');
+    const nodeParsed = NodeConfigSchema.safeParse(agentSnapNode?.config);
+    log('protocol NodeConfigSchema a pillanatkép node-on (futás nézet rajza, project-snapshot-graph)', nodeParsed.success ? 'ok' : nodeParsed.error.issues.map((i) => ({ code: i.code, path: i.path, keys: 'keys' in i ? i.keys : undefined })));
+  }
+  const save = ReplaceGraphRequestSchema.safeParse({ nodes: [{ id: 'n-agent', type: 'agent_step', label: 'A', positionX: 0, positionY: 0, config: { ...agentNode.config, onUnhandledError: agentNode.config.onUnhandledError ?? 'fail_run' } }], edges: [] });
+  log('protocol ReplaceGraphRequestSchema régi kliens agentTools kulccsal', save.success ? 'ok' : save.error.issues.map((i) => ({ code: i.code, path: i.path, keys: 'keys' in i ? i.keys : undefined })));
+  if (graph.kind === 'ok') {
+    const rewrite = db.value.workflows.replaceGraph(wfId ?? '', [{ id: 'n-agent2', label: 'A', positionX: 0, positionY: 0, config: agentNode.config }], []);
+    log('db replaceGraph agentTools kulccsal (új kód)', rewrite.kind === 'ok' ? 'ok' : rewrite.message);
+    const again = db.value.workflows.readGraph(wfId ?? '');
+    log('db readGraph az újraírás után: megmaradt-e a kulcs', again.kind === 'ok' ? Object.hasOwn(again.value.nodes[0]?.config ?? {}, 'agentTools') : again.message);
+  }
+});
