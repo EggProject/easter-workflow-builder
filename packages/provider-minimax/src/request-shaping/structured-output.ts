@@ -26,7 +26,7 @@ export const minimaxStructuredOutput: StructuredOutputCapability = {
       },
     },
   ],
-  // Alapértelmezés sdk_output_format, mert nem igényel Stop hookot és nem kell plusz modellkör.
+  // Az egyetlen stratégia az sdk_output_format (M-19 bizonyíték), ezért ez az alapértelmezés is.
   defaultStrategy: {
     state: 'known',
     value: 'sdk_output_format',
