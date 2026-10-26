@@ -1,5 +1,6 @@
 import { isOkOutcome, type EnvironmentReader } from '@easter-workflow-builder/core';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_FRONTEND_CONFIG } from './default-frontend-config.ts';
 import { readFrontendConfig } from './read-frontend-config.ts';
 
 // A teszt fixture értékei szándékosan NEM URL alakúak és nem tartalmaznak
@@ -42,34 +43,46 @@ describe('readFrontendConfig', () => {
     expect(isOkOutcome(outcome) ? outcome.value.apiOrigin : undefined).toBe(ORIGIN_VALUE);
   });
 
-  it('hiányzó API origin esetén hibaágat ad, a változó nevével', () => {
+  it('hiányzó API origin esetén az alapértéket adja', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_API_ORIGIN: undefined }));
 
-    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_API_ORIGIN.' });
+    expect(isOkOutcome(outcome) ? outcome.value.apiOrigin : undefined).toBe(DEFAULT_FRONTEND_CONFIG.apiOrigin);
   });
 
-  it('üres API origin esetén ugyanaz a hibaág fut, alapérték nélkül', () => {
+  it('üres API origin esetén ugyanaz az alapérték jár, mint a hiányzónál', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_API_ORIGIN: ' '.repeat(3) }));
 
-    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_API_ORIGIN.' });
+    expect(isOkOutcome(outcome) ? outcome.value.apiOrigin : undefined).toBe(DEFAULT_FRONTEND_CONFIG.apiOrigin);
   });
 
-  it('hiányzó stream origin esetén hibaágat ad, a változó nevével', () => {
+  it('hiányzó stream origin esetén az alapértéket adja', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_STREAM_ORIGIN: undefined }));
 
-    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_STREAM_ORIGIN.' });
+    expect(isOkOutcome(outcome) ? outcome.value.streamOrigin : undefined).toBe(DEFAULT_FRONTEND_CONFIG.streamOrigin);
   });
 
-  it('hiányzó lista lapméret esetén hibaágat ad, a változó nevével', () => {
+  it('hiányzó lista lapméret esetén az alapértéket adja', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_LIST_LIMIT: undefined }));
 
-    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_LIST_LIMIT.' });
+    expect(isOkOutcome(outcome) ? outcome.value.listLimit : undefined).toBe(DEFAULT_FRONTEND_CONFIG.listLimit);
   });
 
-  it('hiányzó stream pótlási lapméret esetén hibaágat ad, a változó nevével', () => {
+  it('üres lista lapméret esetén az alapértéket adja', () => {
+    const outcome = readFrontendConfig(environmentWith({ VITE_LIST_LIMIT: '' }));
+
+    expect(isOkOutcome(outcome) ? outcome.value.listLimit : undefined).toBe(DEFAULT_FRONTEND_CONFIG.listLimit);
+  });
+
+  it('hiányzó stream pótlási lapméret esetén az alapértéket adja', () => {
     const outcome = readFrontendConfig(environmentWith({ VITE_STREAM_REPLAY_LIMIT: undefined }));
 
-    expect(outcome).toEqual({ kind: 'error', message: 'Hiányzó kötelező konfiguráció: VITE_STREAM_REPLAY_LIMIT.' });
+    expect(isOkOutcome(outcome) ? outcome.value.streamReplayLimit : undefined).toBe(
+      DEFAULT_FRONTEND_CONFIG.streamReplayLimit,
+    );
+  });
+
+  it('teljesen üres környezetre a négy alapértéket adja', () => {
+    expect(readFrontendConfig({})).toEqual({ kind: 'ok', value: DEFAULT_FRONTEND_CONFIG });
   });
 
   const invalidNumbers: readonly string[] = ['nem-szam', '2.5', '0', '-3'];
@@ -81,5 +94,14 @@ describe('readFrontendConfig', () => {
       message: 'A(z) VITE_LIST_LIMIT konfiguráció értéke nem pozitív egész szám.',
     });
     expect(isOkOutcome(outcome) ? '' : outcome.message).not.toContain(rawValue);
+  });
+
+  it('a megadott érvénytelen stream pótlási lapméretre hibaágat ad, nem az alapértékre esik vissza', () => {
+    const outcome = readFrontendConfig(environmentWith({ VITE_STREAM_REPLAY_LIMIT: 'nem-szam' }));
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: 'A(z) VITE_STREAM_REPLAY_LIMIT konfiguráció értéke nem pozitív egész szám.',
+    });
   });
 });

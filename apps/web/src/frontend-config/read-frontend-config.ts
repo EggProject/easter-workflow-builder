@@ -1,8 +1,9 @@
 import { isOkOutcome, type EnvironmentReader, type Outcome } from '@easter-workflow-builder/core';
+import { DEFAULT_FRONTEND_CONFIG } from './default-frontend-config.ts';
 import type { FrontendConfig } from './frontend-config.ts';
 
 /**
- * A négy kötelező környezeti változó neve. A Vite kizárólag a `VITE_`
+ * A négy környezeti változó neve. A Vite kizárólag a `VITE_`
  * előtagú változókat teszi elérhetővé a kliens kódnak
  * (https://vite.dev/guide/env-and-mode, SPEC-007 M-11). A `streamOrigin` a
  * SPEC-008 3.3 szekció szerinti port döntés miatt vált külön az `apiOrigin`
@@ -16,27 +17,32 @@ const LIST_LIMIT_VARIABLE = 'VITE_LIST_LIMIT';
 const STREAM_REPLAY_LIMIT_VARIABLE = 'VITE_STREAM_REPLAY_LIMIT';
 
 /**
- * A hibaüzenet kizárólag a változó NEVÉT nevezi meg, az értékét soha
- * (SPEC-007 16. szekció 46. kritérium, `.claude/CLAUDE.md` 9. szekció).
+ * Az env változó levágott értéke, vagy `undefined`, ha nincs beállítva vagy
+ * üres: mindkettő az alapértéket jelenti (SPEC-012 4.2).
  */
-function missingVariableMessage(variableName: string): string {
-  return `Hiányzó kötelező konfiguráció: ${variableName}.`;
+function readGivenText(environment: EnvironmentReader, variableName: string): string | undefined {
+  const rawValue = environment[variableName]?.trim();
+  return rawValue === undefined || rawValue.length === 0 ? undefined : rawValue;
 }
 
-function readRequiredText(environment: EnvironmentReader, variableName: string): Outcome<string> {
-  const rawValue = environment[variableName];
-  if (rawValue === undefined || rawValue.trim().length === 0) {
-    return { kind: 'error', message: missingVariableMessage(variableName) };
-  }
-  return { kind: 'ok', value: rawValue.trim() };
+function readTextOrDefault(environment: EnvironmentReader, variableName: string, defaultValue: string): string {
+  return readGivenText(environment, variableName) ?? defaultValue;
 }
 
-function readRequiredPositiveInteger(environment: EnvironmentReader, variableName: string): Outcome<number> {
-  const text = readRequiredText(environment, variableName);
-  if (!isOkOutcome(text)) {
-    return text;
+/**
+ * Az alapérték csak a hiányra jár; a megadott, de nem pozitív egész érték
+ * hibaág, az értéket meg nem nevezve (`.claude/CLAUDE.md` 9. szekció).
+ */
+function readPositiveIntegerOrDefault(
+  environment: EnvironmentReader,
+  variableName: string,
+  defaultValue: number,
+): Outcome<number> {
+  const text = readGivenText(environment, variableName);
+  if (text === undefined) {
+    return { kind: 'ok', value: defaultValue };
   }
-  const parsed = Number(text.value);
+  const parsed = Number(text);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     return {
       kind: 'error',
@@ -47,32 +53,28 @@ function readRequiredPositiveInteger(environment: EnvironmentReader, variableNam
 }
 
 /**
- * A felület kötelező konfigurációjának beolvasása `Outcome` alakban, ALAPÉRTÉK
- * NÉLKÜL (SPEC-007 O-4, O-6, PLAN-008 T-008-17). Ha bármelyik változó hiányzik
- * vagy értelmezhetetlen, a hívó hibaágat kap, és a felület konfigurációs
- * hibaképernyőt rajzol; találgatás nincs.
+ * A felület konfigurációjának beolvasása `Outcome` alakban. Minden változónak
+ * van alapértéke a `default-frontend-config.ts` fájlban (SPEC-012 4.2, user
+ * döntés 2026-10-26, ami a SPEC-007 O-4 és O-6 "alapérték nélkül" döntését
+ * felülírja): a hiányzó vagy üres változó az alapértéket adja, a megadott,
+ * de értelmezhetetlen lapméret hibaág, és a felület konfigurációs
+ * hibaképernyőt rajzol; csendes visszaesés nincs.
  *
  * A bemenet az `import.meta.env` objektum, ami a `vite-env.d.ts` szerint
  * `string | undefined` értékű, csak olvasható rekord, tehát megfelel a `core`
  * csomag `EnvironmentReader` típusának.
  */
 export function readFrontendConfig(environment: EnvironmentReader): Outcome<FrontendConfig> {
-  const apiOrigin = readRequiredText(environment, API_ORIGIN_VARIABLE);
-  if (!isOkOutcome(apiOrigin)) {
-    return apiOrigin;
-  }
-
-  const streamOrigin = readRequiredText(environment, STREAM_ORIGIN_VARIABLE);
-  if (!isOkOutcome(streamOrigin)) {
-    return streamOrigin;
-  }
-
-  const listLimit = readRequiredPositiveInteger(environment, LIST_LIMIT_VARIABLE);
+  const listLimit = readPositiveIntegerOrDefault(environment, LIST_LIMIT_VARIABLE, DEFAULT_FRONTEND_CONFIG.listLimit);
   if (!isOkOutcome(listLimit)) {
     return listLimit;
   }
 
-  const streamReplayLimit = readRequiredPositiveInteger(environment, STREAM_REPLAY_LIMIT_VARIABLE);
+  const streamReplayLimit = readPositiveIntegerOrDefault(
+    environment,
+    STREAM_REPLAY_LIMIT_VARIABLE,
+    DEFAULT_FRONTEND_CONFIG.streamReplayLimit,
+  );
   if (!isOkOutcome(streamReplayLimit)) {
     return streamReplayLimit;
   }
@@ -80,8 +82,8 @@ export function readFrontendConfig(environment: EnvironmentReader): Outcome<Fron
   return {
     kind: 'ok',
     value: {
-      apiOrigin: apiOrigin.value,
-      streamOrigin: streamOrigin.value,
+      apiOrigin: readTextOrDefault(environment, API_ORIGIN_VARIABLE, DEFAULT_FRONTEND_CONFIG.apiOrigin),
+      streamOrigin: readTextOrDefault(environment, STREAM_ORIGIN_VARIABLE, DEFAULT_FRONTEND_CONFIG.streamOrigin),
       listLimit: listLimit.value,
       streamReplayLimit: streamReplayLimit.value,
     },

@@ -139,6 +139,7 @@ export { validateSdkVersionMatch } from './capability-policy/validate-sdk-versio
 // `requiredEnv` és a `disallowedEnv` feldolgozása a `processEnvironment`
 // porton át, a lépés kimenő `Options.env` blokkjának összeállítása
 // (PLAN-005 T-005-14).
+export { buildOutgoingEnvironment } from './provider-environment/build-outgoing-environment.ts';
 export { buildProviderEnvironmentBlock } from './provider-environment/build-provider-environment-block.ts';
 export { resolveRequiredEnvironmentValue } from './provider-environment/resolve-required-environment-value.ts';
 

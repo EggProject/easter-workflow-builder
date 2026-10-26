@@ -254,7 +254,7 @@ function dependenciesOf(parts: DependencyParts): EngineDependencies {
     eventPublisher: parts.eventPublisher ?? publisher,
     clock: { nowMs: () => 0, sleep: notCalled },
     idGenerator: { nextId: notCalled },
-    processEnvironment: parts.processEnvironment ?? { read: () => null },
+    processEnvironment: parts.processEnvironment ?? { read: () => null, readAll: () => ({}) },
   };
 }
 
@@ -548,6 +548,37 @@ describe('runAgentStep', () => {
 
     expect(failure.kind).toBe('missing_provider_env');
     expect(failure.message).toContain('PROVIDER_KULCS');
+
+    database.close();
+  });
+
+  it('a kimenő env a folyamat környezetéből épül: a PATH és a HOME átmegy, a tiltott név nem (SPEC-012 2.1 hiba)', async () => {
+    const database = openMemoryDatabase();
+    const { runId, stepRunId } = seedRun(database);
+    const captured = newCapture();
+    const request = requestOf({
+      runId,
+      stepRunId,
+      // A `claude-subscription` leíró alakja: nincs kötelező env, van tiltott név.
+      descriptor: {
+        requiredEnv: [],
+        disallowedEnv: [
+          { name: 'ANTHROPIC_API_KEY', reason: 'teszt', evidence: [{ kind: 'measurement', id: 'M-01' }] },
+        ],
+      },
+    });
+    const dependencies = dependenciesOf({
+      database,
+      agentQueryRunner: fakeRunner(fixtureMessages('sikeres'), captured),
+      processEnvironment: {
+        read: () => null,
+        readAll: () => ({ PATH: '/usr/bin', HOME: '/home/teszt', ANTHROPIC_API_KEY: 'nem-jut-ki' }),
+      },
+    });
+
+    okOrThrow(await runAgentStep(request, dependencies, agentQueryRegistry));
+
+    expect(captured.request?.options['env']).toStrictEqual({ PATH: '/usr/bin', HOME: '/home/teszt' });
 
     database.close();
   });

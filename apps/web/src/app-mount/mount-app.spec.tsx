@@ -50,7 +50,8 @@ describe('mountApp', () => {
     }).toThrow('A #root elem hiányzik a dokumentumból.');
   });
 
-  it('hiányzó kötelező konfigurációra a hibaüzenetet írja a #root szövegébe', () => {
+  it('megadott, de érvénytelen konfigurációra a hibaüzenetet írja a #root szövegébe', () => {
+    vi.stubEnv('VITE_LIST_LIMIT', 'nem-szam');
     const root = document.createElement('div');
     root.id = 'root';
     document.body.append(root);
@@ -59,7 +60,7 @@ describe('mountApp', () => {
       mountApp();
     });
 
-    expect(root.textContent).toContain('Hiányzó kötelező konfiguráció');
+    expect(root.textContent).toContain('A(z) VITE_LIST_LIMIT konfiguráció értéke nem pozitív egész szám.');
   });
 
   it('érvényes konfigurációval a WorkflowListScreen tartalmát rajzolja a #root alá', async () => {

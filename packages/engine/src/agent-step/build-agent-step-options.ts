@@ -7,7 +7,7 @@ import type { SessionBinding } from './session-binding.ts';
  * A `buildAgentStepOptions` bemenete. A négy mező négy, egymástól független
  * forrásból jön, és mind a négy **készen** érkezik: a lépés tárolt configja,
  * a leírótól függő döntések (`validateAgentStepCapabilities`), a kimenő env
- * blokk (`buildProviderEnvironmentBlock`, a `processEnvironment` porton át) és
+ * blokk (`buildOutgoingEnvironment`, a `processEnvironment` porton át) és
  * a session kötés (`resolveSessionBinding`). Így az összeállítás maga tiszta
  * függvény marad: sem portot, sem adatbázist nem érint.
  */

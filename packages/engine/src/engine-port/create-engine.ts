@@ -7,7 +7,7 @@ import type { ConnectionTestMode } from '../capability-policy/connection-test-mo
 import { createConcurrencyGate } from '../concurrency-gate/create-concurrency-gate.ts';
 import type { ConcurrencyLimitLookup } from '../concurrency-gate/concurrency-limit-lookup.ts';
 import { createApprovalWaitRegistry } from '../node-executor/approval-wait-registry.ts';
-import { buildProviderEnvironmentBlock } from '../provider-environment/build-provider-environment-block.ts';
+import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
 import { createAgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import { interruptRun as interruptRunTree } from '../run-interrupt/interrupt-run.ts';
 import { shutdownActiveRuns } from '../run-interrupt/shutdown-active-runs.ts';
@@ -183,7 +183,7 @@ export function createEngine(dependencies: EngineDependencies): Engine {
     const descriptor = dependencies.providerDescriptorLookup(providerId);
     const mode = resolveConnectionTestMode(descriptor.modelsEndpoint);
 
-    const environmentBlock = buildProviderEnvironmentBlock(
+    const environmentBlock = buildOutgoingEnvironment(
       descriptor.requiredEnv,
       descriptor.disallowedEnv,
       dependencies.processEnvironment,

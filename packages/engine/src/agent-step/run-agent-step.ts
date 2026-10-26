@@ -6,7 +6,7 @@ import { describeError } from '@easter-workflow-builder/core';
 import type { EngineDependencies } from '../engine-port/engine-dependencies.ts';
 import type { EngineErrorKind } from '../engine-error/engine-error-kind.ts';
 import { formatEngineErrorMessage } from '../engine-error/format-engine-error-message.ts';
-import { buildProviderEnvironmentBlock } from '../provider-environment/build-provider-environment-block.ts';
+import { buildOutgoingEnvironment } from '../provider-environment/build-outgoing-environment.ts';
 import type { AgentQueryRegistry } from '../run-interrupt/agent-query-registry.ts';
 import type { AgentStepExecution } from './agent-step-execution.ts';
 import type { AgentStepOutcome } from './agent-step-outcome.ts';
@@ -247,7 +247,7 @@ export async function runAgentStep(
     );
   }
 
-  const environmentBlock = buildProviderEnvironmentBlock(
+  const environmentBlock = buildOutgoingEnvironment(
     request.descriptor.requiredEnv,
     request.descriptor.disallowedEnv,
     dependencies.processEnvironment,

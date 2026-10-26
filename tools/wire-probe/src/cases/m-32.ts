@@ -8,7 +8,7 @@
  * nélküli Options.model esetén az ANTHROPIC_MODEL dönt).
  *
  * A Coding Plan tokent nem kapjuk meg -- ANTHROPIC_AUTH_TOKEN helyett a
- * proxyn átmenő .env-beli MINIMAX_API_KEY megy ki, ez a SPEC-000 4. szekció
+ * proxyn átmenő .env-beli ANTHROPIC_AUTH_TOKEN megy ki, ez a SPEC-000 4. szekció
  * "Közös alapbeállítás" szerint elfogadott, mert a mért env hatások
  * kliens oldaliak.
  */

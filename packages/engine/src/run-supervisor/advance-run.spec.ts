@@ -497,7 +497,7 @@ function openFixture(options: FixtureOptions = {}): Fixture {
     eventPublisher: { publish: () => {} },
     clock,
     idGenerator: { nextId: notCalled },
-    processEnvironment: { read: () => null },
+    processEnvironment: { read: () => null, readAll: () => ({}) },
   };
   const dependencies: NodeExecutorDependencies = {
     ports,
