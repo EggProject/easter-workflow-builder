@@ -18,7 +18,7 @@ láncot alkot: három eszköz (`web_search` a MiniMax `coding_plan` keresőjéve
 MiniMax képértelmezőjével, `web_fetch` a Firecrawllal), a két HTTP kliens, a közös MCP segéd és a
 lépésenkénti köteg. A lánc a SPEC-000 mérése nyomán készült: a MiniMax a szerver oldali
 `web_search` eszközt csendben eldobja (M-17, M-25), a kép content blokkot nem látja (M-16, M-23)
-(`docs/research/2026-08-26-agent-tools.md` 1. szekció). A futó termék a láncból semmit nem
+(`docs/research/2026-08-26-agent-tools.md` 1. szekció; a fájl az O-12 szerint törölve, a `6009603` fán olvasható). A futó termék a láncból semmit nem
 importál (2.1), a lépés `agentTools` mezője tárolódik, a szerkesztőben szerkeszthető, de a motor nem
 köti be (`build-agent-step-options.ts:86-92`). A strukturált kimenet `emit_output_tool` stratégiája
 ugyanerre a gondolatra épül: egy in-process `emit_output` eszközt és egy `Stop` hookot feltételez.

@@ -58,12 +58,11 @@ export interface AgentStepConfigFieldsProperties {
  *   **provider felülírás** az örökölt provider megnevezésével. Ez a három
  *   dönti el, hogy egyáltalán mit csinál a lépés.
  * - "Modell és futási korlátok" panel: modell azonosító, session mód, max.
- *   körök, max. büdzsé, effort, thinking mód, jogosultsági mód, motor
- *   hookok. **Mind felülírás**, a séma szerint `null`/üres alapértékkel,
- *   tehát a lépések többségén érintetlen marad.
+ *   körök, max. büdzsé, effort, thinking mód, jogosultsági mód. **Mind
+ *   felülírás**, a séma szerint `null`/üres alapértékkel, tehát a lépések
+ *   többségén érintetlen marad.
  * - "Eszközök és környezet" panel: engedélyezett és tiltott eszközök,
- *   beépített agent eszközök, munkakönyvtár, további könyvtárak, sandbox,
- *   strukturált kimenet. Szintén mind felülírás, és a két JSON szerkesztő
+ *   munkakönyvtár, további könyvtárak, sandbox, strukturált kimenet. Szintén mind felülírás, és a két JSON szerkesztő
  *   (sandbox, kimenet séma) különösen ritkán nyúlt.
  * - "Al-agentek (agents)" panel: saját, kulcsonkénti szerkesztő, ami
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
