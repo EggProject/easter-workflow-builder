@@ -1,5 +1,5 @@
 /**
-A MINIMAX_API_KEY betöltése: elsőként process.env-ből, másodikként a repo gyökér .env fájljából.
+A MiniMax kulcs betöltése (az ANTHROPIC_AUTH_TOKEN néven, SPEC-012 O-20 (b)): elsőként process.env-ből, másodikként a repo gyökér .env fájljából.
 */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -10,7 +10,7 @@ const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(moduleDirectory, '..', '..', '..', '..');
 
 export function loadMinimaxApiKey(): string {
-  const fromEnvironment = process.env['MINIMAX_API_KEY'];
+  const fromEnvironment = process.env['ANTHROPIC_AUTH_TOKEN'];
   if (fromEnvironment !== undefined && fromEnvironment.length > 0) {
     return fromEnvironment;
   }
@@ -19,16 +19,16 @@ export function loadMinimaxApiKey(): string {
   try {
     content = readFileSync(environmentFilePath, 'utf8');
   } catch {
-    throw new Error(`MINIMAX_API_KEY nincs a process.env-ben, és a ${environmentFilePath} sem olvasható.`);
+    throw new Error(`ANTHROPIC_AUTH_TOKEN nincs a process.env-ben, és a ${environmentFilePath} sem olvasható.`);
   }
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
-    if (trimmed.startsWith('MINIMAX_API_KEY=')) {
-      const value = trimmed.slice('MINIMAX_API_KEY='.length).trim();
+    if (trimmed.startsWith('ANTHROPIC_AUTH_TOKEN=')) {
+      const value = trimmed.slice('ANTHROPIC_AUTH_TOKEN='.length).trim();
       if (value.length > 0) {
         return value;
       }
     }
   }
-  throw new Error(`MINIMAX_API_KEY nem található sem a process.env-ben, sem a ${environmentFilePath} fájlban.`);
+  throw new Error(`ANTHROPIC_AUTH_TOKEN nem található sem a process.env-ben, sem a ${environmentFilePath} fájlban.`);
 }

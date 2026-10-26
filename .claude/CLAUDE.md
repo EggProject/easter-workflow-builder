@@ -533,7 +533,7 @@ eredményét (gyökér `CLAUDE.md`).
 **SDK verzió frissítés előtt** a SPEC-000 mérései regresszióként futtatandók (gyökér `CLAUDE.md`).
 
 **Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként.
-Az `authorization` és `x-api-key` header maszkolt, a `MINIMAX_API_KEY` értékének minden
+Az `authorization` és `x-api-key` header maszkolt, az `ANTHROPIC_AUTH_TOKEN` értékének minden
 előfordulása `REDACTED`-re cserélődik még a lemezre írás előtt, memóriában. Nyers, maszkolatlan
 artefaktum sosem íródik lemezre. Commit előtt kötelező ellenőrzés: a kulcs értékére futtatott
 keresés nulla találatot ad (SPEC-000 3., `tools/wire-probe` CLAUDE.md).

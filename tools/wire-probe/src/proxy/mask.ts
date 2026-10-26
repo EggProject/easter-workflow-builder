@@ -7,7 +7,7 @@
  *   melyik kulcsról van szó, de a titok ne szivárogjon;
  *   ez a titok tényleges ÉRTÉKÉNEK ismerete nélkül is működik.
  * - emellett a teljes rögzített szöveget átfésüljük a ténylegesen ismert
- *   titkokra (pl. a MINIMAX_API_KEY env érték), és minden előfordulást
+ *   titkokra (pl. az ANTHROPIC_AUTH_TOKEN env érték), és minden előfordulást
  *   simán "REDACTED"-re cserélünk, biztonsági hálóként, ha a titok
  *   véletlenül máshol (pl. a body-ban) is megjelenne.
  */

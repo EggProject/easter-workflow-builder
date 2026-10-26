@@ -36,7 +36,7 @@ const artifactsDirectory = process.env['WIRE_PROBE_ARTIFACTS_DIR'] ?? path.join(
 const upstreamUrl = new URL(upstream);
 const upstreamOrigin = `${upstreamUrl.protocol}//${upstreamUrl.host}`;
 
-const secretEnvironmentValue = process.env['MINIMAX_API_KEY'];
+const secretEnvironmentValue = process.env['ANTHROPIC_AUTH_TOKEN'];
 const recorder = new TransactionRecorder(artifactsDirectory, secretEnvironmentValue ? [secretEnvironmentValue] : []);
 
 /**

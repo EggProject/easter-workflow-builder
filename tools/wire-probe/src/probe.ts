@@ -7,7 +7,7 @@
  *   node src/probe.ts M-01 M-02 M-03
  *   node src/probe.ts --all
  *
- * Előfeltétel: a proxy fusson (`bun run proxy`), és a MINIMAX_API_KEY elérhető
+ * Előfeltétel: a proxy fusson (`bun run proxy`), és az ANTHROPIC_AUTH_TOKEN elérhető
  * legyen (process.env vagy a repo gyökér .env fájlja).
  */
 import path from 'node:path';

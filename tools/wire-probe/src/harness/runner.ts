@@ -116,7 +116,7 @@ export async function executeQuery(parameters: ExecuteQueryParameters): Promise<
   // A meta.json az Options.env-et is szó szerint kiírja (describeOptions), az
   // pedig a teljes process.env-et tartalmazza (buildBaseOptions) -- emiatt a
   // futtató környezet egyéb titkai (pl. GITHUB_TOKEN, GH_TOKEN a .cc-env-ből)
-  // is a lemezre kerülnének a MINIMAX_API_KEY mellett, ha nem fésülnénk át.
+  // is a lemezre kerülnének az ANTHROPIC_AUTH_TOKEN mellett, ha nem fésülnénk át.
   const otherKnownSecrets = [process.env['GITHUB_TOKEN'], process.env['GH_TOKEN']].filter(
     (value): value is string => typeof value === 'string' && value.length > 0,
   );
