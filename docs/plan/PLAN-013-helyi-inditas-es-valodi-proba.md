@@ -1,12 +1,12 @@
 # PLAN-013: A helyi indítás és a valódi provider próba végrehajtási terve
 
-|               |                                                                                                                                                                                                |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Státusz       | jóváhagyott, végrehajtásra kész (a SPEC-012 minden kérdését a user lezárta 2026-10-26-án: a forrás nélküli értékekre iparági ajánlás, forrással, SPEC-012 11.2; az O-20 a (b) opció, T-013-12) |
-| Dátum         | 2026-10-26                                                                                                                                                                                     |
-| Spec          | [`../spec/SPEC-012-helyi-inditas-es-valodi-proba.md`](../spec/SPEC-012-helyi-inditas-es-valodi-proba.md)                                                                                       |
-| Mérési forrás | [`../research/2026-10-26-helyi-inditas-es-valodi-proba.md`](../research/2026-10-26-helyi-inditas-es-valodi-proba.md)                                                                           |
-| Branch        | `feat/spec-012-inditas-es-valodi-proba`                                                                                                                                                        |
+|               |                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Státusz       | végrehajtva, a T-013-10 (valódi próba) a user engedélyére vár                                                        |
+| Dátum         | 2026-10-26                                                                                                           |
+| Spec          | [`../spec/SPEC-012-helyi-inditas-es-valodi-proba.md`](../spec/SPEC-012-helyi-inditas-es-valodi-proba.md)             |
+| Mérési forrás | [`../research/2026-10-26-helyi-inditas-es-valodi-proba.md`](../research/2026-10-26-helyi-inditas-es-valodi-proba.md) |
+| Branch        | `feat/spec-012-inditas-es-valodi-proba`                                                                              |
 
 Ez a terv a SPEC-012-t egyenként ellenőrizhető lépésekre bontja. A számozás: a PLAN-011 a
 SPEC-011-é, a PLAN-012 a SPEC-009-é (a `feat/spec-009-beallitasok` branchen), ezért ez a PLAN-013.

@@ -532,7 +532,7 @@ eredményét (gyökér `CLAUDE.md`).
 
 **SDK verzió frissítés előtt** a SPEC-000 mérései regresszióként futtatandók (gyökér `CLAUDE.md`).
 
-**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként.
+**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként. A megadott `Options.env` az alfolyamat teljes környezete (SPEC-012 2.1, M-143), ezért a lépés és a kapcsolat teszt kimenő környezete a szerver folyamat teljes környezete a provider tiltott neveinek levételével és a kötelező blokk ráírásával; a termék oldali titok az `ANTHROPIC_AUTH_TOKEN` (SPEC-012 3.1, O-1).
 Az `authorization` és `x-api-key` header maszkolt, az `ANTHROPIC_AUTH_TOKEN` értékének minden
 előfordulása `REDACTED`-re cserélődik még a lemezre írás előtt, memóriában. Nyers, maszkolatlan
 artefaktum sosem íródik lemezre. Commit előtt kötelező ellenőrzés: a kulcs értékére futtatott
