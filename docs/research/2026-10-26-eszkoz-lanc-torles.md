@@ -315,7 +315,7 @@ az egyetlen érték.
 
 **Az `enabledEngineHooks` egyetlen értéke** az `emit_output_tool_stop` (`db` `engine-hook-id.ts:15`,
 `protocol` `engine-hook-id.ts:9`); törlése után az `EngineHookId` unió üres lenne, ennek kezelése a
-SPEC-011 O-17 nyitott kérdése.
+SPEC-011 O-17 kérdése, amit a user lezárt: a mező egésze törlődik.
 
 | Fájl                                                                                             | Találat | Sorok                        |
 | ------------------------------------------------------------------------------------------------ | ------- | ---------------------------- |

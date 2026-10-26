@@ -2,7 +2,7 @@
 
 |               |                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------ |
-| Státusz       | jóváhagyott, végrehajtásra kész (2026-10-26); kivétel a T-011-7: az O-17 válaszáig nem indul           |
+| Státusz       | jóváhagyott, végrehajtásra kész (2026-10-26); az O-17 lezárva                                          |
 | Dátum         | 2026-10-26                                                                                             |
 | Spec          | [`../spec/SPEC-011-eszkoz-lanc-torles.md`](../spec/SPEC-011-eszkoz-lanc-torles.md)                     |
 | Mérési forrás | [`../research/2026-10-26-eszkoz-lanc-torles.md`](../research/2026-10-26-eszkoz-lanc-torles.md)         |
@@ -17,7 +17,7 @@ tartozik, a SPEC-011 11. szekciójának kritérium számára hivatkozva (`ACn`).
 
 | Feltétel                  | Elvárt érték                                          | Ellenőrzés                        |
 | ------------------------- | ----------------------------------------------------- | --------------------------------- |
-| SPEC-011 nyitott kérdései | O-1 ... O-16 lezárva; az O-17 a T-011-7 lépés előtt   | a SPEC-011 12. szekciója          |
+| SPEC-011 nyitott kérdései | O-1 ... O-17 lezárva                                  | a SPEC-011 12. szekciója          |
 | Feature branch            | `feat/spec-011-eszkoz-lanc-torles` a friss `main`-ről | `git rev-parse --abbrev-ref HEAD` |
 | A mai állapot zöld        | a kilenc kapu a kiinduló fejen                        | a T-011-1 kimenete                |
 | Tiszta munkakönyvtár      | nincs uncommitted változás                            | `git status --porcelain` üres     |
@@ -37,11 +37,11 @@ fej SHA-jával a PR leírásában (szabálykönyv 8. szekció).
 
 ## 3. Modell hozzárendelés
 
-| Modell, effort     | Mikor                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sonnet`, `medium` | részletes leírás szerinti törlés és fixtúra javítás: csomag törlés, réteg térkép, `turbo.json`, a fixtúrák sorai, dokumentum átvezetés a megadott sorlistával                                           |
-| `sonnet`, `high`   | a T-011-4 atomi lépése, mert sok csomagot érint egy commitban, de a megoldás meghatározott                                                                                                              |
-| `opus`, `medium`   | az `emit_output_tool` törlés (a fixtúrák átírása egy stratégiára, az O-17 szerinti mező), a `db` guard szigorítása (a hatás felmérése), az adverzariális átvizsgálás, a kritériumok tételes ellenőrzése |
+| Modell, effort     | Mikor                                                                                                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sonnet`, `medium` | részletes leírás szerinti törlés és fixtúra javítás: csomag törlés, réteg térkép, `turbo.json`, a fixtúrák sorai, dokumentum átvezetés a megadott sorlistával                                                          |
+| `sonnet`, `high`   | a T-011-4 atomi lépése, mert sok csomagot érint egy commitban, de a megoldás meghatározott                                                                                                                             |
+| `opus`, `medium`   | az `emit_output_tool` törlés (a fixtúrák átírása egy stratégiára, az `enabledEngineHooks` mező törlése), a `db` guard szigorítása (a hatás felmérése), az adverzariális átvizsgálás, a kritériumok tételes ellenőrzése |
 
 A `model` és az `effort` mező soha nem hagyható üresen (gyökér `CLAUDE.md` 6. szekció).
 
@@ -70,9 +70,9 @@ A `model` és az `effort` mező soha nem hagyható üresen (gyökér `CLAUDE.md`
 
 ### F3 fázis: az `emit_output_tool` stratégia
 
-| ID      | Leírás                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Függőség                 | Modell           | Elfogadási kritérium                                                                                                                                                                                                                        |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T-011-7 | **Atomi lépés, az O-17 válaszáig nem indul.** Az `emit_output_tool` tag törlése a `StructuredOutputStrategyId` unióból a `provider-capability`, a `protocol` és a `db` oldalon; a két provider leírójának `emit_output_tool` bejegyzése; a `db` guard `STRUCTURED_OUTPUT_STRATEGY_KEYS` bejegyzése; a szerkesztő `StructuredOutputField` alapértéke `sdk_output_format`; a motor `build-stop-hook-matcher.ts` (fájl és teszt), a `hooks` ág a `build-agent-step-options.ts`-ben, az `index.ts` export; az `enabledEngineHooks` kezelése az O-17 válasza szerint; a tesztfixtúrák átírása az egy stratégiára (15 `engine` `.spec.ts`, a két stratégiát használó tesztek szintetikus esettel), `apps/web`, `packages/db`, `packages/protocol`, `apps/server`. A `wire-probe` M-10, M-19 és a mérési dokumentumok változatlanok (SPEC-011 7.3). | T-011-6, az O-17 válasza | `opus`, `medium` | AC11, AC12, AC13; a `resolve-structured-output-strategy`, `validate-agent-step-capabilities`, `validate-max-turns-floor` tesztek az egy stratégiás állapotra; a lefedettség 100 százalék, a `coverage.exclude` nem bővül; kilenc kapu zöld. |
+| ID      | Leírás                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Függőség | Modell           | Elfogadási kritérium                                                                                                                                                                                                                                                |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-011-7 | **Atomi lépés.** Az `emit_output_tool` tag törlése a `StructuredOutputStrategyId` unióból a `provider-capability`, a `protocol` és a `db` oldalon; a két provider leírójának `emit_output_tool` bejegyzése; a `db` guard `STRUCTURED_OUTPUT_STRATEGY_KEYS` bejegyzése; a szerkesztő `StructuredOutputField` alapértéke `sdk_output_format`; a motor `build-stop-hook-matcher.ts` (fájl és teszt), a `hooks` ág a `build-agent-step-options.ts`-ben, az `index.ts` export; az `enabledEngineHooks` mező teljes törlése (O-17: "A mező is törlődik"): a `db` típus, guard és `engine-hook-id.ts`, a `protocol` `EngineHookIdSchema` és mező, a szerkesztő csoportja és alapértéke, a fixtúrák, a lenyomat literál újraszámolása; a tesztfixtúrák átírása az egy stratégiára (15 `engine` `.spec.ts`, a két stratégiát használó tesztek szintetikus esettel), `apps/web`, `packages/db`, `packages/protocol`, `apps/server`. A `wire-probe` M-10, M-19 és a mérési dokumentumok változatlanok (SPEC-011 7.3). | T-011-6  | `opus`, `medium` | AC11, AC12, AC13 (a mező teljes törlése); a `resolve-structured-output-strategy`, `validate-agent-step-capabilities`, `validate-max-turns-floor` tesztek az egy stratégiás állapotra; a lefedettség 100 százalék, a `coverage.exclude` nem bővül; kilenc kapu zöld. |
 
 ### F4 fázis: a `db` guard szigorítása
 
@@ -91,17 +91,17 @@ A `model` és az `effort` mező soha nem hagyható üresen (gyökér `CLAUDE.md`
 
 ## 5. Fázis függőségek
 
-| Fázis | Függ ettől          | Miért                                                                                                                                                                               |
-| ----- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F0    | nincs               | a user döntései a SPEC-011 12. szekciójában lezártak                                                                                                                                |
-| F1    | F0                  | a hét csomagot termékkód nem importálja, tehát a többi lépéstől függetlenül törölhető                                                                                               |
-| F2    | F1                  | a T-011-4 a `protocol` és a `db` oldalt egy commitban változtatja, mert a sodródás védelem a kettő kölcsönös értékadhatóságát őrzi; a T-011-6 csak a T-011-4 és T-011-5 után fordul |
-| F3    | F2, az O-17 válasza | a T-011-7 ugyanazt az `AgentStepConfig` típust érinti a `protocol` és a `db` oldalon, mint a T-011-4, ezért utána fut; az `enabledEngineHooks` kezelése a user döntése              |
-| F4    | F3                  | a szigorítás a végleges kulcskészletre épül; előbb az összes mező törlődik, különben a kulcslista kétszer íródna                                                                    |
-| F5    | F4                  | a dokumentáció a végleges fájlkészletet írja le                                                                                                                                     |
+| Fázis | Függ ettől | Miért                                                                                                                                                                               |
+| ----- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F0    | nincs      | a user döntései a SPEC-011 12. szekciójában lezártak                                                                                                                                |
+| F1    | F0         | a hét csomagot termékkód nem importálja, tehát a többi lépéstől függetlenül törölhető                                                                                               |
+| F2    | F1         | a T-011-4 a `protocol` és a `db` oldalt egy commitban változtatja, mert a sodródás védelem a kettő kölcsönös értékadhatóságát őrzi; a T-011-6 csak a T-011-4 és T-011-5 után fordul |
+| F3    | F2         | a T-011-7 ugyanazt az `AgentStepConfig` típust érinti a `protocol` és a `db` oldalon, mint a T-011-4, ezért utána fut                                                               |
+| F4    | F3         | a szigorítás a végleges kulcskészletre épül; előbb az összes mező törlődik, különben a kulcslista kétszer íródna                                                                    |
+| F5    | F4         | a dokumentáció a végleges fájlkészletet írja le                                                                                                                                     |
 
 A T-011-3 a T-011-4-gyel párhuzamosítható, mert más csomagot érint; a T-011-9 és a T-011-10
-párhuzamosítható, mert más fájlokat érint. A F1 és F2 az O-17-től függetlenül elvégezhető.
+párhuzamosítható, mert más fájlokat érint.
 
 ## 6. Kockázat kezelés a végrehajtás alatt
 
@@ -122,7 +122,7 @@ párhuzamosítható, mert más fájlokat érint. A F1 és F2 az O-17-től függe
 2. A `core` árva exportjai nincsenek a fán (T-011-3).
 3. Az `agentTools` fogalom nincs a fán, migráció és tűrés nélkül (T-011-4, T-011-5, T-011-6).
 4. Az `emit_output_tool` stratégia nincs a fán a SPEC-011 11. szekciójának megnevezett kivételeivel,
-   az `enabledEngineHooks` az O-17 szerint kezelt (T-011-7).
+   az `enabledEngineHooks` mező nincs a fán, az O-17 szerint (T-011-7).
 5. A `db` `NodeConfig` guard minden ismeretlen kulcsot elutasít, mindkét oldalon tesztelve, a
    rontás igazolva (T-011-8).
 6. A dokumentáció a user döntései szerint átvezetve, a szabálykönyv csomagszáma 19 (T-011-9,
