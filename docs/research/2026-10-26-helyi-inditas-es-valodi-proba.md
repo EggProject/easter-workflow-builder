@@ -178,3 +178,157 @@ díjtételével számolt becslés, előfizetésnél listaáras becslés
 `0.213 USD` becsült értéket jelentett (`docs/research/2026-08-26-spec000-kiertekeles.md:783-784`).
 A `maxBudgetUsd` a d.ts szerint akkor állítja meg a futást, ha a keret már túllépve ("The query will
 stop if this budget is exceeded", sdk.d.ts:1727-1730), tehát az első kört nem előzi meg.
+
+## 10. A forrásolt alapértékek (SPEC-012 O-10, user döntés 2026-10-26)
+
+A user döntése: "de akkor keress forrást! legyen default érték beállítva!". Minden változóhoz elsődleges
+forrást kerestem az alapértékre; a keresés eredménye az alábbi táblázat. **Ahol a forrás hiányzik, szám
+nincs**, a változó kötelező marad (11.2 a SPEC-012-ben). A források elérése: 2026-10-26.
+
+| Változó                                | Alapérték               | Forrás                                                                  | Megerősítések száma |
+| -------------------------------------- | ----------------------- | ----------------------------------------------------------------------- | ------------------- |
+| `EASTER_STREAM_KEEP_ALIVE_INTERVAL_MS` | `15000`                 | 10.1                                                                    | elsődleges plusz 2  |
+| `EASTER_SERVER_PORT`                   | `3001`                  | user termékdöntés (10.2)                                                | belső, user döntés  |
+| `VITE_API_ORIGIN`                      | `http://localhost:5173` | Vite `server.host` és `server.port` alapértéke, user port döntés (10.3) | elsődleges plusz 1  |
+| `VITE_STREAM_ORIGIN`                   | `http://127.0.0.1:3001` | a szerver `127.0.0.1` bind címe a kódban, user port döntés (10.2, 10.4) | belső               |
+| `EASTER_LOG_ROTATION_SIZE`             | nincs forrás            | 10.5                                                                    | nincs               |
+| `EASTER_LOG_ROTATION_FREQUENCY`        | nincs forrás            | 10.5                                                                    | nincs               |
+| `EASTER_LOG_RETAINED_FILE_COUNT`       | nincs forrás            | 10.5                                                                    | nincs               |
+| `EASTER_LOG_DIRECTORY`                 | nincs külső forrás      | 10.7                                                                    | nincs               |
+| `VITE_LIST_LIMIT`                      | nincs forrás            | 10.6                                                                    | nincs               |
+| `VITE_STREAM_REPLAY_LIMIT`             | nincs forrás            | 10.6                                                                    | nincs               |
+
+### 10.1 Az SSE életben tartó komment időköze: 15 másodperc
+
+- **Elsődleges:** WHATWG HTML Living Standard, 9.2.7 "Authoring notes" (Last Updated 26 October 2026,
+  <https://html.spec.whatwg.org/multipage/server-sent-events.html>): "Legacy proxy servers are known to,
+  in certain cases, drop HTTP connections after a short timeout. To protect against such proxy servers,
+  authors can include a comment line (one starting with a ':' character) every 15 seconds or so."
+- **Megerősítés 1:** az `axum` `KeepAlive::interval` dokumentációja: "Customize the interval between
+  keep-alive messages. Default is 15 seconds."
+  (<https://docs.rs/axum/latest/axum/response/sse/struct.KeepAlive.html>).
+- **Megerősítés 2:** az `sse-starlette` `EventSourceResponse` `ping` paraméterének alapértéke 15
+  másodperc (`DEFAULT_PING_INTERVAL = 15`, <https://github.com/sysid/sse-starlette/blob/main/sse_starlette/sse.py>,
+  <https://pypi.org/project/sse-starlette/3.6.0/>).
+- **Pontosítás.** A szabvány mondata irányérték ("or so"), nem kötelező szám; a `15000` ezredmásodperc a
+  szabvány szövegének szó szerinti átírása. A SPEC-006 M-13 és M-14 a Node időkorlátairól szól, erre a
+  kérdésre nem felel, ezért a SPEC-006 "nincs forrásunk" állítása a WHATWG szakasz nélkül született.
+  A szabvány a "legacy proxy" esetre ajánlja; hogy a helyi (proxy nélküli) használatban szükséges-e, nem
+  állítjuk.
+
+### 10.2 A szerver portja: 3001
+
+User termékdöntés 2026-09-05 (`.claude/CLAUDE.md` 11. szekció, SPEC-008 3., SPEC-006 O-1). Külső forrás
+nincs, és nem is kell: a döntés maga a forrás.
+
+### 10.3 A Vite dev szerver origin: `http://localhost:5173`
+
+- **Elsődleges:** <https://vite.dev/config/server-options>: `server.host` "Default: `'localhost'`",
+  `server.port` "Default: `5173`".
+- **Megerősítés (a telepített forrás):** `vite@8.2.2`, `dist/node/chunks/node.js:691` (`const
+DEFAULT_DEV_PORT = 5173;`) és `:26727-26729` (`port: DEFAULT_DEV_PORT`, `host: "localhost"`).
+- **Nem ellenőrzött:** a Vite dokumentáció szerint a `localhost` feloldott címe eltérhet attól, amire a
+  böngésző csatlakozik; az `Origin` fejlécet a böngésző a címsorban álló gazdanévből képezi. A literál
+  végső értékét a T-013-7 a futó dev szerveren mért `Origin` fejléccel igazolja.
+
+### 10.4 A szerver bind címe
+
+`apps/server/src/startup-sequence/continue-startup-with-database.ts:74`:
+`server.listen(config.port, '127.0.0.1', ...)`; a SPEC-006 3.5 2. pontja kimondja. A `VITE_STREAM_ORIGIN`
+alapértéke ezért `127.0.0.1`, nem `localhost`: a Node 17 óta a `localhost` feloldási sorrendje a rendszer
+szerinti, és egy csak IPv4 címre kötő szerverhez az IPv6 elsőbbség hibát adhat. Ez utóbbi mondat
+**nem ellenőrzött** ebben a környezetben (a Vite dokumentációja a `dns.setDefaultResultOrder` hatását
+említi, <https://vite.dev/config/server-options> "server.host" megjegyzése); a `127.0.0.1` választás a bind
+címhez igazodik, nem erre a mondatra.
+
+### 10.5 A `pino-roll` nem ad alapértéket a `size`, a `frequency` és a `limit.count` mezőre
+
+- **Elsődleges:** <https://github.com/mcollina/pino-roll/blob/main/README.md>: a `size?`, `frequency?`,
+  `limit?` mező opcionális, "Default:" sor csak az `extension` (`.log`) és a `symlink` (`false`) mellett
+  áll. A README `frequency: 'daily'` értéke a használati példában áll, nem alapérték.
+- **Megerősítés 1:** <https://www.npmjs.com/package/pino-roll> (4.0.0), ugyanaz a README.
+- **Megerősítés 2 (a telepített forrás, `pino-roll@4.0.0`):** `lib/utils.js:11-14` a `parseSize(undefined)`
+  `null`-t ad, `:29-46` a `parseFrequency(undefined)` `null`-t ad, `pino-roll.js:86` a `validateLimitOptions`
+  csak megadott `limit`-et ellenőriz, `:111` (`if (frequencySpec)`) az időalapú ütemezés, `:119` (`if (maxSize)`)
+  a méret figyelés és `:157` (`if (limit)`) a régi fájlok törlése csak megadott értéknél fut. **Elhagyott mező tehát "nincs ilyen szempontú rotáció, nincs törlés"**, szám nélkül.
+- **Mellékes lelet.** A telepített `parseFrequency` (`lib/utils.js:29-46`) csak a `daily`, `hourly` és szám
+  értéket ismeri, a `weekly` értékre kivételt dob; a GitHub `main` README-je már említi a `weekly` értéket
+  (a 4.0.0 npm README nem). A `server-config.ts` doc kommentje a `'weekly'` értéket is felsorolja
+  (`apps/server/src/server-config/server-config.ts`, `readRotationFrequency` fölött): ez a telepített
+  verzióra **nem ellenőrzött**, és a forrás szerint nem igaz. A SPEC-012 nem érinti, jelzés a usernek.
+- **Eredmény:** nincs forrás szám vagy elnevezett érték alapértéknek.
+
+### 10.6 A lista és a visszajátszás lapmérete: nincs forrás
+
+- **A projekt saját forrásai:** SPEC-005 F-19 és O-2 ("a számot a kliens nevezi meg; a szerverben és a
+  protokollban nincs szállított érték"), SPEC-003 O-2 ("egy valós futás eseményméret eloszlásának mérése"),
+  SPEC-007 O-6. Egyik sem ad számot, a mérés nem készült el.
+- **Szabvány vagy hivatalos ajánlás:** nem találtam olyat, ami lapméretet ír elő. A JSON:API cursor
+  pagination profil kimondja, hogy a szerver választja az alapértelmezett lapméretet
+  (<https://jsonapi.org/profiles/ethanresnick/cursor-pagination/>: "the server MUST choose a 'default page
+  size'"); a Google AIP-158 ugyanezt ("the API chooses an appropriate default, which the API should
+  document", a példában 50, maximum 1000, <https://google.aip.dev/158>); a belgif minta sémája "minimum,
+  maximum and default values should be determined during API design", példa érték 20
+  (<https://github.com/belgif/openapi-common/blob/main/src/test/openapi/Pagination.yaml>). A szervezeti
+  útmutatók eltérő számokat adnak (api.gov.au `limit` 10, <https://api.gov.au/sections/pagination.html>;
+  NationalBankBelgium `limit` 10, <https://github.com/NationalBankBelgium/REST-API-Design-Guide/wiki/Pagination-Rules-and-metadata>).
+  Ezek más szolgáltatások saját döntései, egymásnak ellentmondanak, és nem a mi adatméretünkre szólnak.
+- **Miért nem választunk belőlük:** a `GET /api/workflows` kezelő a `limit` darabszámnál levágja a listát
+  (`apps/server/src/workflow-endpoint/list-workflows.ts:35`), nincs lapozás; egy indoklás nélküli kis szám
+  csendben elrejtene munkafolyamatokat.
+- **Eredmény:** nincs forrás. A `VITE_LIST_LIMIT` és a `VITE_STREAM_REPLAY_LIMIT` kötelező marad.
+
+### 10.7 A napló útvonal előtag: nincs külső forrás
+
+A `pino-roll` `file` mezőjének nincs alapértéke (10.5, a README szerint a `file` a kötelező mező). A projekt
+belső precedense az adatbázis fejlesztői alapértéke a gitből kizárt `.data/` alatt (SPEC-003 10.1,
+`packages/db/src/database-file/default-database-file-path.ts`); ez termékdöntés volt, nem külső forrás,
+és a naplóra nem terjed ki. Szám nincs, de az érték sem forrásolt: a user adja meg (SPEC-012 11.2).
+
+## 11. M-145: a Node `--watch` a szerveren (SPEC-012 O-6)
+
+**Módszer.** A worktree gyökeréből, `env -i` alapon (`PATH`, `HOME`, `EASTER_SERVER_PORT=3012`), ideiglenes
+`s.env` fájllal (`EASTER_SERVER_PORT=3011` és az öt másik kötelező változó, ideiglenes `EASTER_DB_FILE` és
+napló útvonal): `node --watch --env-file-if-exists=<s.env> apps/server/src/main.ts`, háttérben. Utána
+`touch` a `apps/server/src/main.ts`, a `packages/core/src/index.ts` és az `s.env` fájlon (tartalom változás
+nélkül), minden `touch` után 5-6 másodperc várakozás és `GET /api/providers`. Valódi provider hívás nincs.
+
+**Eredmény.**
+
+- A környezetben megadott `EASTER_SERVER_PORT=3012` nyert a fájlbeli `3011` ellen (a `3012` portra
+  `200`, a `3011` portra nincs kapcsolat): a környezet erősebb, mint az `--env-file-if-exists` fájl.
+- Mindhárom `touch` után a Node `Change detected in '<fájl>'` és `Restarting 'apps/server/src/main.ts'`
+  sort írt, és a szerver a következő kérésre ismét `200`-at adott.
+- Tehát a figyelő mód újraindítja a szervert a szerver forrás, egy workspace csomag forrása
+  (`packages/core`, szimbolikus linkelt csomag) **és az env fájl** változására is.
+- **Nem mértem:** mit tesz az újraindítás egy futó lépéssel (a Node `--watch-kill-signal` kapcsolója
+  Stability 1.1; a szerver `SIGTERM` kezelője 3 másodperces leállítási ablakkal fut, SPEC-006 8.2). A
+  figyelő mód ezért fejlesztői kényelem, nem a futó lépések megőrzésének eszköze.
+
+**Források.** <https://nodejs.org/docs/latest-v26.x/api/cli.html> (`--watch`: "By default, watch mode
+will watch the entry point and any required or imported module"; Added in v18.11.0, "Watch mode is now
+stable" v22.0.0); <https://nodejs.org/en/blog/announcements/v22-release-announce> ("From this release Watch
+Mode is considered stable"); <https://github.com/nodejs/node/commit/5a922232da> ("watch: mark as stable",
+Stability 1 -> 2). Az `--env-file-if-exists` leírása: <https://nodejs.org/api/cli.md> ("Behavior is the same
+as `--env-file`, but an error is not thrown if the file does not exist"; "the value from the environment
+takes precedence"). A `--watch` nem kombinálható `--check`, `--eval`, `--interactive` kapcsolóval, fájl
+útvonal argumentum kell (ugyanott).
+
+## 12. A hitelesítési precedencia újraolvasása (SPEC-012 O-2, O-3, O-4)
+
+Újraolvasva 2026-10-26-án (<https://code.claude.com/docs/en/authentication>, "Authentication precedence";
+<https://code.claude.com/docs/en/env-vars>). A 4. szekció sorrendje szó szerint megegyezik. További tények:
+
+- A `CLAUDE_CODE_OAUTH_TOKEN` az 5. szinten áll, a `/login` (7.) fölött, és a lap szerint "This token
+  authenticates with your Claude subscription and requires a Pro, Max, Team, or Enterprise plan", az
+  env-vars lap szerint "OAuth access token for claude.ai authentication. Alternative to /login for SDK and
+  automated environments". Ezért előfizetéses út: a `claude-subscription` providernél **nem tiltott** (O-3).
+- A `CLAUDE_CODE_USE_ANTHROPIC_AWS` ("Use Claude Platform on AWS") és a `CLAUDE_CODE_USE_MANTLE` ("Use the
+  Amazon Bedrock Mantle endpoint") az env-vars lapon provider választóként áll; a **precedencia listában
+  nem szerepelnek**, a rangjuk a `/login` mellett **nem ellenőrzött**. A tiltott listába a leírásuk
+  (provider választó) miatt kerülnek, nem igazolt rang alapján.
+- A `ANTHROPIC_PROFILE` ("Name of the Anthropic profile to authenticate with"), valamint az
+  `ANTHROPIC_FEDERATION_RULE_ID` és az `ANTHROPIC_ORGANIZATION_ID` együtt állítva "federation credentials,
+  which rank above your /login credential" (env-vars lap, és az authentication lap táblázata: "Above").
+- Az `apiKeyHelper` beállítás fájl, nem env változó, tehát a kimenő környezet szűrése nem érinti.
+- Független megerősítés a sorrendre: 4. szekció (llm-gateway-connect, claude-code #39126).
