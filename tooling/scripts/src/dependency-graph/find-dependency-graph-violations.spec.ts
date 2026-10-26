@@ -1,5 +1,5 @@
 // Regressziós teszt a T-002-24 gráf ellenőrzőhöz (SPEC-002 4. szekció,
-// "Rétegbesorolás, mind a 32 csomagra" táblázata). Szintetikus, kézzel
+// "Rétegbesorolás, mind a 26 csomagra" táblázata). Szintetikus, kézzel
 // összeállított csomaglistákkal dolgozik, NEM a valós repó gráfjával -
 // ezért a teszt eredménye független attól, hogy a repóban éppen áll-e
 // megoldatlan rétegzési kérdés (lásd `packages/engine/CLAUDE.md`,
