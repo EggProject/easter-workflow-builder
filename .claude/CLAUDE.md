@@ -310,7 +310,7 @@ A rögzített verziók egyetlen forrása: `docs/research/2026-08-26-toolchain.md
 React, Vite, `@xyflow/react`, Drizzle ORM + `better-sqlite3`, `ws`, `pino` + `pino-roll`, Vitest,
 Playwright, ESLint flat config (gyökér `CLAUDE.md`). A workflow sablon nyelve Mustache
 (`mustache`), a kifejezés nyelve CEL (`@marcbachmann/cel-js`); a bevezetésük a PLAN-010 szerint
-történik (user döntés 2026-09-23, SPEC-010).
+történt, a `packages/workflow-language` csomagban (user döntés 2026-09-23, SPEC-010).
 
 **Miért ezek, röviden**
 

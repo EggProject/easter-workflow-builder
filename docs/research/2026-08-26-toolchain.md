@@ -244,8 +244,8 @@ Mindhárom **pontos verzióval** kerül a `packages/workflow-language` `package.
 tartomány nélkül (SPEC-010 4. szekció). A `@marcbachmann/cel-js` fiatal csomag, sűrű főverzió
 lépéssel; a frissítése külön, forrásolt lépés, a PLAN-010 F0 mérésének regressziós
 megismétlésével. A `mustache` utolsó kiadása 2021-03-28-i; a kockázat kezelése a SPEC-010 4.1
-szekciójában áll. A csomagok még nincsenek telepítve: a `bun.lock` a PLAN-010 T-010-7 lépésében
-frissül.
+szekciójában áll. A csomagok a PLAN-010 T-010-7 lépésében települtek: a `bun.lock` és a
+`packages/workflow-language/package.json` ugyanezt a három pontos verziót rögzíti.
 
 ## GitHub Actions verziók
 
@@ -268,3 +268,10 @@ csomag adata. Egyik csomag sem mozdult, a pin marad.
 | `mustache`             | `4.2.0` | `4.2.0` (`https://registry.npmjs.org/mustache/latest`)             | `4.2.0` (`https://data.jsdelivr.com/v1/packages/npm/mustache`)             |
 | `@types/mustache`      | `4.2.6` | `4.2.6` (`https://registry.npmjs.org/@types/mustache/latest`)      | `4.2.6` (`https://data.jsdelivr.com/v1/packages/npm/@types/mustache`)      |
 | `@marcbachmann/cel-js` | `8.0.0` | `8.0.0` (`https://registry.npmjs.org/@marcbachmann/cel-js/latest`) | `8.0.0` (`https://data.jsdelivr.com/v1/packages/npm/@marcbachmann/cel-js`) |
+
+### Zárás utáni újraellenőrzés (2026-10-26, PLAN-010 T-010-23)
+
+Élő lekérdezés ugyanabból a két forrásból, a PLAN-010 zárásakor (`curl`, a `latest` címke): a registry
+`/<csomag>/latest` végpontja és a jsDelivr csomag adata. Mindhárom csomagnál mindkét forrás a pinelt
+verziót adta (`mustache` `4.2.0`, `@types/mustache` `4.2.6`, `@marcbachmann/cel-js` `8.0.0`), a pin
+marad.
