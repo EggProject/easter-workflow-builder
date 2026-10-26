@@ -571,3 +571,19 @@ az `ANTHROPIC_API_KEY` beállítva); az alfolyamat 35 nevet kapott, köztük a `
 `ANTHROPIC_API_KEY` nélkül. A mért idő a teszt korlát (5000 ms) kétszázad része, ezért a teszt elkészült:
 `apps/server/src/provider-outgoing-environment/provider-outgoing-environment-subprocess.spec.ts`; egy teszt
 futása a vitest kimenete szerint 23 ms.
+
+### 14.5 T-013-6: a három script kézi ellenőrzése
+
+Saját mérés 2026-10-26-án, Node `v26.7.0`, Bun `1.4.0`, ideiglenes adatbázissal és naplóval, a szerver a `3011`
+porton (a hat kötelező változót a hívó adta, mert az alapértékek a T-013-7 tárgya), valódi provider hívás nélkül.
+
+- `bun run start:server`: `GET /api/providers` HTTP `200`; a script kimenete "`.env not found. Continuing
+without it.`" (az `--env-file-if-exists` hiányzó fájlnál nem hiba); `SIGINT`-re leáll.
+- `bun run dev:server`: `GET /api/providers` HTTP `200`; az `apps/server/src/main.ts` `touch`-olása után a Node
+  kiírta a "`Restarting 'apps/server/src/main.ts'`" sort, és a szerver újraindulva ismét `200`-at adott. A
+  figyelő mód futó lépéssel való viselkedése továbbra sem mért.
+- `bun run dev:web` (azaz `bun run --filter @easter-workflow-builder/web dev`): a csomag nevére szűrve elindult a
+  Vite (`VITE v8.2.2`, `http://localhost:5173/`). A böngészős ellenőrzés a telepített Chromium headless shell
+  ellen futott (Playwright, `http://localhost:5173/`): a `GET /api/workflows?limit=100` kérés a Vite proxyn át
+  lefutott, a lap a "Workflow-k" listát és az "Még nincs workflow." üres állapotot rajzolta ki, az SSE
+  kapcsolat jelzője "élő" volt.
