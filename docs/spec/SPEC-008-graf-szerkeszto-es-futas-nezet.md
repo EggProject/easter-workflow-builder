@@ -18,7 +18,7 @@
 - A vizuális gráf szerkesztőt: az `@xyflow/react` vászon vezérelt módban, a tíz csomópont típus megjelenítése, az élek kötése, a mentés és a betöltés.
 - **A csomópont `config` mezőjének drótszintű alakját**: a `protocol` csomag `node-config` téma mappáját a tíz ág Zod sémájával, a sodródás védelmével együtt, ami a SPEC-005 egy kimondott döntését felülírja (5.3, SPEC-005 7.7).
 - **Az automatikus elrendezést**: egy gomb, ami a gráfot a `@dagrejs/dagre` könyvtárral rendezi el, dokumentált alapértelmezett távolságokkal (5.7).
-- A lépés szintű beállítások felületét: hol és hogyan jelenik meg az `AgentStepConfig` huszonegy mezője, **beleértve az `agents` mező űrlapját a mért, dokumentált `AgentDefinition` alakra**, és melyik mező marad a SPEC-009 hatókörében.
+- A lépés szintű beállítások felületét: hol és hogyan jelenik meg az `AgentStepConfig` tizenkilenc mezője, **beleértve az `agents` mező űrlapját a mért, dokumentált `AgentDefinition` alakra**, és melyik mező marad a SPEC-009 hatókörében.
 - A mentés előtti validáció határvonalát: mit ellenőriz a kliens, és mit hagy a szerverre, indoklással.
 - A szerkesztő és a futáshoz tartozó gráf pillanatkép viszonyát.
 - Az élő futás nézetet: az osztott elrendezést húzható elválasztóval, a futás állapotának megjelenítését a rajzon, a párhuzamos ágakat, a hibát és a megszakítást.
@@ -379,13 +379,13 @@ Az `agents` bejegyzés űrlapja ugyanezt az elvet követi eggyel lejjebb: elöl 
 
 Az `agent_step` és a `join` `ai_synthesis` módja a teljes `AgentStepConfig` alakot szerkeszti, a fenti elv szerint:
 
-| Hely                                              | Mezők                                                                                                              | Vezérlő                                                   |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| elöl, panel nélkül                                | `promptTemplate`, `systemPrompt`, `providerId`                                                                     | `TextAreaField`, mód választó plusz szöveg, `SelectField` |
-| "Modell és futási korlátok" panel                 | `modelId`, `sessionMode`, `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `permissionMode`, `enabledEngineHooks` | szövegmező, szám mező és `SelectField`, a zárt listákból  |
-| "Eszközök és környezet" panel                     | `allowedTools`, `disallowedTools`, `agentTools`, `cwd`, `additionalDirectories`, `sandbox`, `structuredOutput`     | lista szerkesztő, jelölőnégyzet és nyers JSON szerkesztő  |
-| "Al-agentek (agents)" panel                       | `agents`                                                                                                           | kulcsonkénti lista, saját szerkesztővel                   |
-| "Skillek és MCP szerverek (csak olvasható)" panel | `skills`, `mcpServers`                                                                                             | olvasható érték, megnevezett okkal                        |
+| Hely                                              | Mezők                                                                                            | Vezérlő                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| elöl, panel nélkül                                | `promptTemplate`, `systemPrompt`, `providerId`                                                   | `TextAreaField`, mód választó plusz szöveg, `SelectField` |
+| "Modell és futási korlátok" panel                 | `modelId`, `sessionMode`, `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `permissionMode`     | szövegmező, szám mező és `SelectField`, a zárt listákból  |
+| "Eszközök és környezet" panel                     | `allowedTools`, `disallowedTools`, `cwd`, `additionalDirectories`, `sandbox`, `structuredOutput` | lista szerkesztő, jelölőnégyzet és nyers JSON szerkesztő  |
+| "Al-agentek (agents)" panel                       | `agents`                                                                                         | kulcsonkénti lista, saját szerkesztővel                   |
+| "Skillek és MCP szerverek (csak olvasható)" panel | `skills`, `mcpServers`                                                                           | olvasható érték, megnevezett okkal                        |
 
 **Minden többsoros mező a design system `.textarea` komponensét viseli** (`packages/ui` `textarea` téma), nem az egysoros `.input` osztályt. A komponens korábban sosem lett átemelve, és a panel egyetlen saját komponense (`TextAreaField`) adta az `.input` osztályt a `<textarea>` elemre, egy saját `resize: vertical` toldással, és az audit szerint tizenhat fájl használta; ez volt a felhasználó input panaszának oka (`docs/research/2026-09-08-design-system-audit.md` 4.4).
 

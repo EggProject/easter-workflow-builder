@@ -1,4 +1,4 @@
-# SPEC-002 F5-F7 zárás: mért tények
+# SPEC-002 F6-F7 zárás: mért tények
 
 Mérés dátuma: 2026-08-27, a `feat/spec-001-monorepo` ágon, a T-002-24 (`check-dependency-graph.sh`)
 commit után, közvetlenül a T-002-25 lépésben. Minden szám ezen a futtatáson mérve, becslés
@@ -50,48 +50,7 @@ Time:    486ms >>> FULL TURBO
 ```
 
 A második futás teljes cache találatot ad (`FULL TURBO`, mind a 32 taskra). Ez igazolja a
-SPEC-002 34. elfogadási kritérium első felét.
-
-## Cache invalidáció pontossága, egy `result` fájl módosításával (SPEC-002 34. kritérium)
-
-A `packages/result/src/outcome/outcome.ts` fájl végére egy komment sort fűzve (tartalmi
-változás, nem csak `mtime`, mert a Turborepo a fájl tartalmát hasheli, nem az időbélyeget - ezt
-egy önmagában végzett `touch` próba igazolta: puszta `touch` mellett a második futás továbbra is
-`FULL TURBO` maradt), majd a fájlt visszaállítva (`git checkout --`), a `turbo run typecheck`
-újrafuttatása:
-
-```
-Tasks:    32 successful, 32 total
-Cached:    22 cached, 32 total
-Time:    36.894s
-```
-
-A 10, frissen lefutott (nem cache-ből jövő) csomag, a turbo run JSON összegzőjéből
-(`jq -r '.tasks[] | select(.cache.status != "HIT") | .package'`):
-
-```
-@easter-workflow-builder/agent-tool-bundle
-@easter-workflow-builder/env-reader
-@easter-workflow-builder/firecrawl-client
-@easter-workflow-builder/http-client
-@easter-workflow-builder/image-source
-@easter-workflow-builder/minimax-client
-@easter-workflow-builder/result
-@easter-workflow-builder/tool-understand-image
-@easter-workflow-builder/tool-web-fetch
-@easter-workflow-builder/tool-web-search
-```
-
-Ez pontosan a `result` csomag (SPEC-002 4. szekció) tranzitív függő halmaza, plusz maga a
-`result`: az `env-reader` és a `http-client` (L1, közvetlenül függ), a `minimax-client`, a
-`firecrawl-client`, az `image-source` (L2, az előző háromtól függ), a `tool-web-search`, a
-`tool-web-fetch`, a `tool-understand-image` (L3, ezekből építkezik), és az `agent-tool-bundle`
-(L4, mindhárom eszköz csomagból és az `env-reader`/`http-client`/`image-source`-ből is függ). A
-`provider-registry`, az `agent` és a `server` **nem** futott újra, mert egyikük `package.json`-ja
-sem deklarálja ténylegesen az érintett csomagok egyikét sem (az `agent-tool-bundle` az `agent`
-csomag `package.json`-jában még nincs felvéve, lásd `packages/agent/CLAUDE.md`). Ez igazolja a
-SPEC-002 34. elfogadási kritérium második felét: pontosan a függő csomagok taskja fut újra, sem
-kevesebb, sem több.
+meleg cache találatot (SPEC-002 34. elfogadási kritérium).
 
 ## Normalizált JSON diff (a `providerRegistry` szétbontás tartalmi azonossága)
 
@@ -143,7 +102,7 @@ felbontást a fenti két lehetőség közül a második irányban, azzal a kül�
 `engine` L5-re tolása önmagában volt a lépés, hanem az, hogy a rá épülő `apps/server` is
 szigorúan magasabb rétegre került, mert a `server` az `engine`-től is függ.
 
-A mért tényeken (csomagszám, `turbo run typecheck` idő, cache invalidáció, `providerRegistry`
+A mért tényeken (csomagszám, `turbo run typecheck` idő, `providerRegistry`
 JSON diff) ez a lezárás nem változtat, azok a fenti, eredeti méréskor rögzített állapotot
 tükrözik. Ami változott: a `tooling/scripts/src/dependency-graph/package-layer.ts` térképében
 az `engine` L4-ről L5-re, az `apps/server` L5-ről L6-ra került (az `agent` L4 rétegen maradt,

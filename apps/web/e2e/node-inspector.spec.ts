@@ -50,11 +50,9 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   },
   skills: null,
   mcpServers: {},
-  enabledEngineHooks: [],
   cwd: null,
   additionalDirectories: [],
   sandbox: null,
-  agentTools: [],
   sessionMode: 'isolated',
   structuredOutput: null,
   onUnhandledError: null,
@@ -656,8 +654,8 @@ test.describe('agent_step node: prompt, provider öröklés, rendszer prompt', (
   });
 });
 
-test.describe('agent_step node: futási korlátok és motor hookok', () => {
-  test('a modell, a session mód, a számláló mezők és a motor hook checkbox szerkeszthető és megmarad', async ({
+test.describe('agent_step node: futási korlátok', () => {
+  test('a modell, a session mód és a számláló mezők szerkeszthetők és megmaradnak, motor hook csoport nincs', async ({
     page,
   }) => {
     const panel = await openNode(page, 'n-agent');
@@ -677,13 +675,8 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     await chooseSelectOption(page, limits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await limits.getByLabel('Jogosultsági mód').fill('acceptEdits');
 
-    const hooks = limits.getByRole('group', { name: 'Bekapcsolt motor hookok' });
-    await hooks.getByText('emit_output_tool_stop').click();
-    await expect(hooks.getByRole('checkbox')).toBeChecked();
-    // Ki is kapcsolható (a `filter` ág).
-    await hooks.getByText('emit_output_tool_stop').click();
-    await expect(hooks.getByRole('checkbox')).not.toBeChecked();
-    await hooks.getByText('emit_output_tool_stop').click();
+    // A motor hookok csoportja törölve (SPEC-011 O-17): nincs a DOM-ban.
+    await expect(limits.getByRole('group', { name: 'Bekapcsolt motor hookok' })).toBeAttached({ attached: false });
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');
@@ -696,9 +689,6 @@ test.describe('agent_step node: futási korlátok és motor hookok', () => {
     await expect(reopenedLimits.getByLabel('Effort')).toHaveValue('high');
     await expectSelectedLabel(reopenedLimits.getByRole('combobox', { name: 'Thinking mód' }), 'adaptive');
     await expect(reopenedLimits.getByLabel('Jogosultsági mód')).toHaveValue('acceptEdits');
-    await expect(
-      reopenedLimits.getByRole('group', { name: 'Bekapcsolt motor hookok' }).getByRole('checkbox'),
-    ).toBeChecked();
   });
 });
 
@@ -711,13 +701,8 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     await group.getByLabel('Engedélyezett eszközök').fill('Read\nWrite');
     await group.getByLabel('Tiltott eszközök').fill('Bash');
 
-    const agentTools = group.getByRole('group', { name: 'Beépített agent eszközök' });
-    await agentTools.getByText('web_search').click();
-    await expect(agentTools.getByRole('checkbox', { name: 'web_search' })).toBeChecked();
-    // A `agentTools.filter` ág: ki is kapcsolható.
-    await agentTools.getByText('web_fetch').click();
-    await agentTools.getByText('web_fetch').click();
-    await expect(agentTools.getByRole('checkbox', { name: 'web_fetch' })).not.toBeChecked();
+    // Gyári eszköz választó nincs (SPEC-011 O-5): a csoport nincs a DOM-ban.
+    await expect(group.getByRole('group', { name: 'Beépített agent eszközök' })).toBeAttached({ attached: false });
 
     await group.getByLabel('Munkakönyvtár (cwd)').fill('/workspace/repo');
     await group.getByLabel('További engedélyezett könyvtárak').fill('/tmp\n/var/data');
@@ -747,6 +732,11 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
 
     // Strukturált kimenet: bekapcsolás, stratégia váltás, séma JSON szerkesztés.
     await group.getByText('Strukturált kimenet felülírás megadva').click();
+    // Az alapérték az egyetlen stratégia (SPEC-011 AC12).
+    await expectSelectedLabel(
+      group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),
+      'sdk_output_format',
+    );
     await chooseSelectOption(
       page,
       group.getByRole('combobox', { name: 'Strukturált kimenet stratégiája' }),
@@ -759,8 +749,6 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
     const reopenedGroup = await openAccordion(reopened, 'Eszközök és környezet');
     await expect(reopenedGroup.getByLabel('Engedélyezett eszközök')).toHaveValue('Read\nWrite');
     await expect(reopenedGroup.getByLabel('Tiltott eszközök')).toHaveValue('Bash');
-    await expect(reopenedGroup.getByRole('checkbox', { name: 'web_search' })).toBeChecked();
-    await expect(reopenedGroup.getByRole('checkbox', { name: 'web_fetch' })).not.toBeChecked();
     await expect(reopenedGroup.getByLabel('Munkakönyvtár (cwd)')).toHaveValue('/workspace/repo');
     await expect(reopenedGroup.getByLabel('További engedélyezett könyvtárak')).toHaveValue('/tmp\n/var/data');
     // A séma szerint érvényes, módosított JSON íródott vissza (a korábbi,

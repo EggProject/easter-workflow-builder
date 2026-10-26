@@ -1,8 +1,8 @@
 /**
  * A workspace csomagok réteg-hozzárendelése, a SPEC-002 4. szekció
- * "Rétegbesorolás, mind a 26 csomagra" táblázata szerint
+ * "Rétegbesorolás, mind a 19 csomagra" táblázata szerint
  * (`docs/spec/SPEC-002-csomag-architektura.md`). A térkép a teljes workspace-t
- * lefedi: 26 bejegyzés, 22 termékcsomag rétegszámmal és 4 eszköz csomag
+ * lefedi: 19 bejegyzés, 15 termékcsomag rétegszámmal és 4 eszköz csomag
  * (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`). A számok nem sorszámok: egy
  * csomag csak nála szigorúan KISEBB számú rétegből függhet, azonos rétegen
  * belüli él tilos. Az "eszköz" csomagoknak (`'tool'`) nincs rétegszámuk, ők
@@ -19,7 +19,6 @@ export type PackageLayer = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 'tool';
 export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   // L0
   typeguards: 0,
-  'mcp-tool-kit': 0,
   core: 0,
   logger: 0,
   // L1
@@ -27,19 +26,13 @@ export const PACKAGE_LAYER: Readonly<Record<string, PackageLayer>> = {
   'workflow-language': 1,
   protocol: 1,
   // L2
-  'minimax-client': 2,
-  'firecrawl-client': 2,
   'provider-minimax': 2,
   'provider-claude-subscription': 2,
   db: 2,
   ui: 2,
   // L3
-  'tool-minimax-web-search': 3,
-  'tool-firecrawl-web-fetch': 3,
-  'tool-minimax-understand-image': 3,
   'provider-registry': 3,
   // L4
-  'agent-tool-bundle': 4,
   agent: 4,
   // L5
   engine: 5,

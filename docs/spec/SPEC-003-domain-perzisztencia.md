@@ -281,18 +281,14 @@ Az agent lépés beállításai. Minden mező forrása az Agent SDK `Options` t�
 | `agents`                          | `Readonly<Record<string, AgentDefinition>>`                | `Options.agents`, programozott subagentek               |
 | `skills`                          | `readonly string[] \| 'all' \| null`                       | `Options.skills`                                        |
 | `mcpServers`                      | `Readonly<Record<string, StorableMcpServer>>`              | csak a szerializálható variánsok, lásd lent             |
-| `enabledEngineHooks`              | `readonly EngineHookId[]`                                  | **nem** az SDK `hooks` map, lásd lent                   |
 | `cwd`, `additionalDirectories`    | `string \| null`, `readonly string[]`                      | `Options.cwd`, `Options.additionalDirectories`          |
 | `sandbox`                         | `SandboxConfig \| null`                                    | `Options.sandbox` mezői a research 1. szekciója szerint |
-| `agentTools`                      | `readonly AgentToolId[]`                                   | lépésenként kapcsolható in-process MCP eszközök         |
 | `sessionMode`                     | `'isolated' \| 'continued'`                                | lásd 4.5                                                |
 | `structuredOutput`                | `{ strategy: StructuredOutputStrategyId, schema } \| null` | lásd 4.6                                                |
 
 **A `modelId` a wire azonosító.** A research 5.1 szekciója szerint a leíró két azonosítót tart külön: a dróton megjelenő `models[].id` és a kliensnek átadott `models[].clientModelIdentifier`. "A UI és a perzisztencia a wire azonosítót mutatja, a kliensnek a suffixes alak megy." A DB tehát a wire azonosítót tárolja, a suffixes alakot a provider leíróból oldja fel a motor.
 
-**Az `mcpServers` nem tartalmazhat titkot.** A tárolható variánsok a `stdio`, `sse` és `http` (research 1. szekció). Az in-process `sdk` variáns nem szerializálható, ezért nem tárolható; az in-process eszközöket az `agentTools` lista adja. A `stdio` variáns `env` mezője helyett a séma **kizárólag `envNames: readonly string[]` értéket tárol**, a `sse` és `http` variáns fejléc értéke helyett `authEnvName: string | null` mezőt. A tényleges értéket a motor a process környezetéből olvassa ki indításkor. Ez a gyökér `CLAUDE.md` "Titok soha nem kerül adatbázisba" szabályának mechanikus megvalósítása.
-
-**Az `enabledEngineHooks` nem az SDK `hooks` mezője.** Az SDK `hooks` opciója callback map (research 1. szekció), tehát nem szerializálható. A DB azt tárolja, hogy a motor melyik saját, beépített hookját kapcsolja be a lépéshez; a motor ebből állítja elő az SDK `hooks` objektumot. Az első verzióban ezt a listát pontosan egy dolog vezérli: az `emit_output_tool` stratégiához tartozó `Stop` hook (4.6).
+**Az `mcpServers` nem tartalmazhat titkot.** A tárolható variánsok a `stdio`, `sse` és `http` (research 1. szekció). Az in-process `sdk` variáns nem szerializálható, ezért nem tárolható. A `stdio` variáns `env` mezője helyett a séma **kizárólag `envNames: readonly string[]` értéket tárol**, a `sse` és `http` variáns fejléc értéke helyett `authEnvName: string | null` mezőt. A tényleges értéket a motor a process környezetéből olvassa ki indításkor. Ez a gyökér `CLAUDE.md` "Titok soha nem kerül adatbázisba" szabályának mechanikus megvalósítása.
 
 ### 4.5 Session modell
 
@@ -307,11 +303,11 @@ A tényleges session azonosítót a lépés futás rögzíti, nem a node config:
 
 ### 4.6 Strukturált kimenet
 
-A `structuredOutput.strategy` értékkészlete a meglévő `StructuredOutputStrategyId` típus a `@easter-workflow-builder/provider-capability` csomagból: `sdk_output_format` és `emit_output_tool`. A séma nem definiál újat.
+A `structuredOutput.strategy` értékkészlete a meglévő `StructuredOutputStrategyId` típus a `@easter-workflow-builder/provider-capability` csomagból: egyetlen értéke `sdk_output_format`. A séma nem definiál újat.
 
 A `schema` mező JSON Schema dokumentum, `unknown` a séma szintjén, typeguarddal szűkítve.
 
-**Mért kísérő megkötés, ami validációként épül be.** A `maxTurns` alsó korlátja stratégiánként a `ProviderCapabilityDescriptor` `structuredOutput.strategies[].observedRoundTrips` mezőjéből jön, nem a domain rétegben tárolt számból (SPEC-004 11.3 táblázat 3. sora). A mérési eredet megmarad: a research 5.2 szekciója szerint az `sdk_output_format` ágon az M-02 futás `maxTurns: 1` mellett `error_max_turns`-be esett, az `emit_output_tool` ág igénye pedig M-19 mérésből jön. A futás indítási validáció (a motor `capability-policy` témája) ezt a leíróból olvasott minimumot ellenőrzi, és `insufficient_max_turns` hibával utasít el. Ez a szám **mérésből** jön, nem becslésből, és nincs beégetve a domain rétegbe.
+**Mért kísérő megkötés, ami validációként épül be.** A `maxTurns` alsó korlátja a `ProviderCapabilityDescriptor` `structuredOutput.strategies[].observedRoundTrips` mezőjéből jön, nem a domain rétegben tárolt számból (SPEC-004 11.3 táblázat 3. sora). A mérési eredet megmarad: a research 5.2 szekciója szerint az `sdk_output_format` ágon az M-02 futás `maxTurns: 1` mellett `error_max_turns`-be esett. A futás indítási validáció (a motor `capability-policy` témája) ezt a leíróból olvasott minimumot ellenőrzi, és `insufficient_max_turns` hibával utasít el. Ez a szám **mérésből** jön, nem becslésből, és nincs beégetve a domain rétegbe.
 
 ### 4.7 `workflow_edge`
 
@@ -920,9 +916,9 @@ A táblázat a `workflow-graph`, a `graph-snapshot` és a `run-event` sorát a t
 
 **Fájlnév konvenció.** Egy fájl egy exportált egység, a téma mappán belül. A tábla definíciója a tábla nevét viseli kebab-case alakban (`workflow-node.ts`), a repository a `-repository.ts` végződést (`workflow-repository.ts`), a typeguard az `is-` előtagot (`is-node-config.ts`). A teszt fájlok `.spec.ts` végződésűek, a megvalósítás mellett, azonos mappában.
 
-**Függőségi irány.** A `db` L2 réteg. A jelen spec után a `dependencies` mezője: `@easter-workflow-builder/core` (az `Outcome` és az `isOkOutcome` miatt), `@easter-workflow-builder/logger`, `@easter-workflow-builder/typeguards` és **újként** `@easter-workflow-builder/provider-capability` (L1), a `ProviderId`, az `AgentToolId`, a `ThinkingMode` és a `StructuredOutputStrategyId` típus miatt. Minden él szigorúan csökkenő rétegszám felé mutat, tehát a `bun run check:graph` zöld marad.
+**Függőségi irány.** A `db` L2 réteg. A jelen spec után a `dependencies` mezője: `@easter-workflow-builder/core` (az `Outcome` és az `isOkOutcome` miatt), `@easter-workflow-builder/logger`, `@easter-workflow-builder/typeguards` és **újként** `@easter-workflow-builder/provider-capability` (L1), a `ProviderId`, a `ThinkingMode` és a `StructuredOutputStrategyId` típus miatt. Minden él szigorúan csökkenő rétegszám felé mutat, tehát a `bun run check:graph` zöld marad.
 
-**Új típus a `provider-capability` csomagban.** A `ProviderId` unió ma nem létezik: a provider azonosítók a `provider-registry` (L3) `ProviderRegistry` interfészének kulcsaiként állnak, ahonnan a `db` (L2) nem importálhat. Ezért a `provider-capability` csomag új téma mappát kap, `provider-id/provider-id.ts` néven, egyetlen típussal. Ez pontosan az `agent-tool-id` téma bevált mintája (SPEC-002 5.4, a duplikált mappaszint tilalmával együtt), és a `provider-registry` `ProviderRegistry` interfésze ugyanezt a uniót használja kulcsként, tehát nem keletkezik második igazságforrás.
+**Új típus a `provider-capability` csomagban.** A `ProviderId` unió ma nem létezik: a provider azonosítók a `provider-registry` (L3) `ProviderRegistry` interfészének kulcsaiként állnak, ahonnan a `db` (L2) nem importálhat. Ezért a `provider-capability` csomag új téma mappát kap, `provider-id/provider-id.ts` néven, egyetlen típussal. A `provider-registry` `ProviderRegistry` interfésze ugyanezt a uniót használja kulcsként, tehát nem keletkezik második igazságforrás.
 
 **Nyitott, szándékosan halasztott lépés.** Amikor a `@easter-workflow-builder/protocol` csomag valódi tartalmat kap, a megosztott domain típusok (node típus unió, node config unió, állapotok, esemény típusok) oda kerülnek, és a `db` onnan importálja őket, mert az `@easter-workflow-builder/ui` (L2) nem függhet a `db` csomagtól (azonos réteg), az `@easter-workflow-builder/web` pedig a SPEC-002 4. szekciója szerint kifejezetten nem függhet tőle. A lépés előfeltétele, hogy a `provider-capability` L1-ről L0-ra kerüljön a réteg térképen, ami megengedett, mert nincs kifelé mutató éle. **Ezt a lépést a SPEC-003 nem hajtja végre**, mert sem az `ui`, sem a `web` csomag nincs a hatókörében, és a mozgatás a `db` barreljén belüli átírás lesz.
 

@@ -460,7 +460,7 @@ describe('summarizeRunEventRow', () => {
       const summary = summarizeRunEventRow(
         makeRecord({
           kind: 'sdk_assistant',
-          toolName: 'mcp__agent-tools__web_search',
+          toolName: 'WebSearch',
           toolUseId: 'toolu_01T1x1fJ34qAmk2tNTrN7Up6',
           inputTokens: 5,
           outputTokens: 87,
@@ -469,17 +469,10 @@ describe('summarizeRunEventRow', () => {
         }),
         'claude-subscription',
       );
-      expect(codeTextsOf(summary)).toEqual([
-        'mcp__agent-tools__web_search',
-        'toolu_01T1x1fJ34qAmk2tNTrN7Up6',
-        '5',
-        '87',
-        '2803',
-        '0',
-      ]);
-      expect(summary.bodySegments[0]).toEqual({ kind: 'code', text: 'mcp__agent-tools__web_search' });
+      expect(codeTextsOf(summary)).toEqual(['WebSearch', 'toolu_01T1x1fJ34qAmk2tNTrN7Up6', '5', '87', '2803', '0']);
+      expect(summary.bodySegments[0]).toEqual({ kind: 'code', text: 'WebSearch' });
       expect(bodyTextOf(summary)).toBe(
-        'mcp__agent-tools__web_search (toolu_01T1x1fJ34qAmk2tNTrN7Up6), tokenek: bemenet: 5, kimenet: 87, ' +
+        'WebSearch (toolu_01T1x1fJ34qAmk2tNTrN7Up6), tokenek: bemenet: 5, kimenet: 87, ' +
           'gyorsítótár olvasás: 2803, gyorsítótár írás: 0',
       );
     });

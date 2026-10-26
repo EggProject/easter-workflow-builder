@@ -198,7 +198,7 @@ describe('createStepRunRepository', () => {
         providerId: 'claude-subscription',
         modelId: 'claude-opus-4',
         sessionMode: 'continued',
-        structuredOutputStrategy: 'emit_output_tool',
+        structuredOutputStrategy: 'sdk_output_format',
         subWorkflowRunId: 'run-sub',
       });
 
@@ -210,7 +210,7 @@ describe('createStepRunRepository', () => {
       expect(step.providerId).toBe('claude-subscription');
       expect(step.modelId).toBe('claude-opus-4');
       expect(step.sessionMode).toBe('continued');
-      expect(step.structuredOutputStrategy).toBe('emit_output_tool');
+      expect(step.structuredOutputStrategy).toBe('sdk_output_format');
       expect(step.subWorkflowRunId).toBe('run-sub');
 
       sqlite.close();
@@ -445,7 +445,7 @@ describe('createStepRunRepository', () => {
       const { sqlite, database, repository } = openRepository();
       insertWorkflow(database, 'w1');
       insertRun(database, 'w1', 'run-1');
-      const step = create(repository, 'run-1', { structuredOutputStrategy: 'emit_output_tool' });
+      const step = create(repository, 'run-1', { structuredOutputStrategy: 'sdk_output_format' });
       okOrThrow(repository.markStepRunning(step.id));
 
       const succeeded = okOrThrow(repository.markStepSucceeded(step.id, { output: { ok: true } }));

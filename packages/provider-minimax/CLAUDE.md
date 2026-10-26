@@ -14,7 +14,7 @@ egyetlen rekordba: az az `@easter-workflow-builder/provider-registry` feladata.
 | `descriptor/`      | az összefogó `minimaxProvider` érték, minden mezője a többi téma egy-egy exportjára hivatkozik                                 |
 | `model-catalog/`   | `MiniMaxFamilyId`, `MiniMaxModelId`, `minimaxModels`                                                                           |
 | `environment/`     | `minimaxRequiredEnvironment`, `minimaxDisallowedEnvironment`                                                                   |
-| `tool-support/`    | `minimaxServerTools`, `minimaxRecommendedAgentTools`                                                                           |
+| `tool-support/`    | `minimaxServerTools`                                                                                                           |
 | `limits/`          | `minimaxConcurrency`, `minimaxRateLimits`                                                                                      |
 | `request-shaping/` | `minimaxEffort`, `minimaxThinking`, `minimaxStructuredOutput`, `minimaxToolChoice`, `minimaxStreaming`, `minimaxPromptCaching` |
 

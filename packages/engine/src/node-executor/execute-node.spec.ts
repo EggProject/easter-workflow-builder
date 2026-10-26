@@ -244,13 +244,13 @@ function descriptor(): ProviderCapabilityDescriptor<string, string> {
     structuredOutput: {
       strategies: [
         {
-          id: 'emit_output_tool',
+          id: 'sdk_output_format',
           usable: knownFact(true),
           blockingWireDetail: knownFact(null),
           observedRoundTrips: knownFact([3]),
         },
       ],
-      defaultStrategy: knownFact('emit_output_tool'),
+      defaultStrategy: knownFact('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact(null),
     },
@@ -271,7 +271,6 @@ function descriptor(): ProviderCapabilityDescriptor<string, string> {
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: knownFact(false),
@@ -304,11 +303,9 @@ function agentStepConfig(): AgentStepConfig {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   };

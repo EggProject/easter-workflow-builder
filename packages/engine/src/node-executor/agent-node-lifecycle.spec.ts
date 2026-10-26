@@ -183,13 +183,13 @@ function descriptor(
     structuredOutput: {
       strategies: [
         {
-          id: 'emit_output_tool',
+          id: 'sdk_output_format',
           usable: knownFact(true),
           blockingWireDetail: knownFact(null),
           observedRoundTrips: knownFact([3]),
         },
       ],
-      defaultStrategy: knownFact('emit_output_tool'),
+      defaultStrategy: knownFact('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact(null),
     },
@@ -210,7 +210,6 @@ function descriptor(
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: knownFact(false),
@@ -244,11 +243,9 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
     ...overrides,
@@ -477,18 +474,18 @@ describe('runAgentNodeLifecycle', () => {
       },
     });
     const input = inputOf(runId, {
-      config: agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
+      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
       descriptor: descriptor({
         structuredOutput: {
           strategies: [
             {
-              id: 'emit_output_tool',
+              id: 'sdk_output_format',
               usable: unknownFact(),
               blockingWireDetail: knownFact(null),
               observedRoundTrips: knownFact([3]),
             },
           ],
-          defaultStrategy: knownFact('emit_output_tool'),
+          defaultStrategy: knownFact('sdk_output_format'),
           outputConfigAlwaysSent: knownFact(false),
           outputConfigWireField: knownFact(null),
         },
@@ -524,7 +521,7 @@ describe('runAgentNodeLifecycle', () => {
       },
     });
     const input = inputOf(runId, {
-      config: agentStepConfig({ structuredOutput: { strategy: 'emit_output_tool', schema: {} } }),
+      config: agentStepConfig({ structuredOutput: { strategy: 'sdk_output_format', schema: {} } }),
     });
 
     await runAgentNodeLifecycle(input, dependencies, gate, agentQueryRegistry);

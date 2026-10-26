@@ -4,7 +4,7 @@ import type { ChangeEvent, ReactElement } from 'react';
 import { JsonTextAreaField } from './JsonTextAreaField.tsx';
 
 const DEFAULT_STRUCTURED_OUTPUT_CONFIG: StructuredOutputConfig = {
-  strategy: 'emit_output_tool',
+  strategy: 'sdk_output_format',
   schema: {},
 };
 

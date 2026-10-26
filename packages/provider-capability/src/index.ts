@@ -28,9 +28,6 @@ export { RESEARCH_MINIMAX, RESEARCH_GATEWAY } from './evidence-sources/measureme
 export type { MeasurementDocumentAnchor } from './evidence-sources/measurement-document/measurement-document.ts';
 export { measurementDocument } from './evidence-sources/measurement-document/measurement-document.ts';
 
-// agent-tool-id: a workflow lépéshez kapcsolható in-process MCP eszközök közös szótára.
-export type { AgentToolId } from './agent-tool-id/agent-tool-id.ts';
-
 // provider-id: a két támogatott provider azonosítója és a hozzá tartozó guard.
 export type { ProviderId } from './provider-id/provider-id.ts';
 export { isProviderId } from './provider-id/is-provider-id.ts';
@@ -44,7 +41,6 @@ export type { EnvironmentRequirement } from './environment/environment-requireme
 export type { DisallowedEnvironmentRequirement } from './environment/disallowed-environment-requirement.ts';
 
 export type { ServerToolDescriptor } from './tool-support/server-tool-descriptor.ts';
-export type { AgentToolRecommendation } from './tool-support/agent-tool-recommendation.ts';
 
 export type { ConcurrencyCapability } from './limits/concurrency-capability.ts';
 export type { RateLimitCapability } from './limits/rate-limit-capability.ts';

@@ -1,0 +1,50 @@
+const W = '/sessions/vigilant-clever-mendel/wt/s11';
+const { NodeConfigSaveSchema, NodeConfigSchema } = await import(`${W}/packages/protocol/src/index.ts`);
+const { isNodeConfig } = await import(`${W}/packages/db/src/index.ts`);
+const { DEFAULT_AGENT_STEP_SETTINGS } = await import(`${W}/apps/web/src/node-inspector/default-agent-step-settings.ts`);
+const { createInitialNodeConfig } = await import(`${W}/apps/web/src/graph-editor/create-initial-node-config.ts`);
+const { SHOWCASE_GRAPH } = await import(`${W}/apps/web/e2e/showcase-graph.ts`);
+const maxAgent = {
+  promptTemplate: 'p {{x}}', providerId: 'minimax', modelId: 'MiniMax-M3', effort: 'high', thinking: 'adaptive',
+  allowedTools: ['WebSearch','WebFetch'], disallowedTools: ['Bash'], permissionMode: 'default', maxTurns: 3, maxBudgetUsd: 1.5,
+  systemPrompt: { type: 'preset', preset: 'claude_code', append: 'x', excludeDynamicSections: true },
+  agents: { rev: { description: 'd', prompt: 'p', tools: ['Read'], model: 'sonnet', anything: 1 } },
+  skills: ['s1'],
+  mcpServers: { a: { type: 'stdio', command: 'c', args: ['x'], envNames: ['E'] }, b: { type: 'sse', url: 'https://x', authEnvName: 'T' }, c: { type: 'http', url: 'https://y', authEnvName: null } },
+  cwd: '/tmp', additionalDirectories: ['/a'],
+  sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: true, excludedCommands: ['rm'], enableWeakerNestedSandbox: false,
+    allowUnsandboxedCommands: true, network: { allowUnixSockets: ['/x'], foo: 1 }, filesystem: { a: 1 }, ignoreViolations: { b: ['c'] }, ripgrep: { command: 'rg' } },
+  sessionMode: 'continued',
+  structuredOutput: { strategy: 'sdk_output_format', schema: { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false } },
+};
+const cases: [string, unknown][] = [];
+cases.push(['agent max', { type: 'agent_step', onUnhandledError: 'fail_run', ...maxAgent }]);
+cases.push(['agent max systemPrompt string skills all', { type: 'agent_step', onUnhandledError: 'fail_branch', ...maxAgent, systemPrompt: 'sys', skills: 'all', sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false, excludedCommands: [], enableWeakerNestedSandbox: false } }]);
+cases.push(['agent default', { type: 'agent_step', onUnhandledError: 'fail_run', ...DEFAULT_AGENT_STEP_SETTINGS, promptTemplate: 'x' }]);
+cases.push(['join ai max', { type: 'join', mode: 'ai_synthesis', settings: maxAgent, onUnhandledError: 'fail_run' }]);
+cases.push(['join merge', { type: 'join', mode: 'merge', settings: { strategy: 'concat', nested: { a: 1 } }, onUnhandledError: 'fail_run' }]);
+cases.push(['join script', { type: 'join', mode: 'script', settings: { source: 'a', runtime: 'expression' }, onUnhandledError: 'fail_run' }]);
+cases.push(['start', { type: 'start', inputFields: [{ name: 'a', label: 'A', valueKind: 'string', required: true }], onUnhandledError: 'fail_run' }]);
+cases.push(['branch', { type: 'branch', expression: 'true', branches: [{ key: 'a', label: 'A' }], defaultBranchKey: 'a', onUnhandledError: 'fail_run' }]);
+cases.push(['fan_out', { type: 'fan_out', itemsExpression: '[1]', branchLabelTemplate: '{{x}}', onUnhandledError: 'fail_run' }]);
+cases.push(['loop', { type: 'loop', maxIterations: 2, continueExpression: 'false', onUnhandledError: 'fail_run' }]);
+cases.push(['human', { type: 'human_approval', title: 't', bodyTemplate: 'b', timeoutMs: 1000, onUnhandledError: 'fail_run' }]);
+cases.push(['err', { type: 'error_handler', maxAttempts: 2, backoffMs: [10, 20], handledErrorKinds: ['x'], onUnhandledError: 'fail_run' }]);
+cases.push(['sub', { type: 'sub_workflow', targetWorkflowId: 'w', inputMapping: { 'a.b': 'c', 'any key': 'd' }, onUnhandledError: 'fail_run' }]);
+cases.push(['script', { type: 'script', source: 'a', runtime: 'expression', onUnhandledError: 'fail_run' }]);
+for (const t of ['agent_step','branch','fan_out','join','loop','human_approval','error_handler','sub_workflow','script']) {
+  try { cases.push([`initial ${t}`, createInitialNodeConfig(t)]); } catch (e) { console.log('initial fail', t, String(e)); }
+}
+for (const n of SHOWCASE_GRAPH.nodes) cases.push([`showcase ${n.id}`, n.config]);
+let bad = 0;
+for (const [name, cfg] of cases) {
+  const wire = JSON.parse(JSON.stringify(cfg));
+  const save = NodeConfigSaveSchema.safeParse(wire);
+  const read = NodeConfigSchema.safeParse(wire);
+  const db = isNodeConfig(wire);
+  const dbParsed = read.success ? isNodeConfig(JSON.parse(JSON.stringify(read.data))) : 'n/a';
+  const flag = read.success && (!db || dbParsed !== true) ? '  <-- ELTERES' : (!read.success && db ? '  <-- db enged, protocol nem' : '');
+  if (flag) bad++;
+  console.log(`${name}: save=${save.success} read=${read.success} db=${db} dbAfterParse=${dbParsed}${flag}`, save.success ? '' : JSON.stringify(save.error.issues.map(i=>i.path.join('.')+':'+i.code)));
+}
+console.log('ELTERES', bad);

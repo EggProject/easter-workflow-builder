@@ -117,8 +117,7 @@ teljesíthető `^4.9.0` tartománnyal pedig hibával áll meg ("No version match
 (kilépési kód nulla, a fájl változatlan), tehát az ellenőrzés bizonyító ereje a bájtazonos
 előállításon áll, nem a frozen kapcsolón.
 
-**A többi `zod` fogyasztó `^4.0.0`-n marad:** a `packages/tool-firecrawl-web-fetch`,
-`packages/tool-minimax-understand-image`, `packages/tool-minimax-web-search` és `tools/wire-probe`
+**A többi `zod` fogyasztó `^4.0.0`-n marad:** a `tools/wire-probe`
 nem használ `when` opciót. Bizonyíték (`grep -rn "when:" packages/*/src tools/*/src apps/*/src
 tooling/*/src`, 2026-10-17; a kimenet a spec fájlok nélkül, a regressziós teszt saját,
 `when:` szót tartalmazó sorai kiszűrve):

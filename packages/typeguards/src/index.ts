@@ -1,5 +1,6 @@
 // Barrel: csak ujraexport, a csomag publikus felulete a typeguardok.
 export { isRecord } from './is-record/is-record.ts';
+export { isRecordWithKnownKeys } from './is-record-with-known-keys/is-record-with-known-keys.ts';
 export { isNonEmptyString } from './is-non-empty-string/is-non-empty-string.ts';
 export { isBoolean } from './is-boolean/is-boolean.ts';
 export { isConstructor } from './is-constructor/is-constructor.ts';

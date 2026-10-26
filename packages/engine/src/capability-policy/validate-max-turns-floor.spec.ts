@@ -15,7 +15,7 @@ function unknownFact<TValue>(): Fact<TValue> {
 // többi mező a `StructuredOutputStrategy` alakjának kitöltése.
 function buildStrategy(observedRoundTrips: Fact<readonly number[]>): StructuredOutputStrategy {
   return {
-    id: 'emit_output_tool',
+    id: 'sdk_output_format',
     usable: knownFact(true),
     blockingWireDetail: unknownFact<string | null>(),
     observedRoundTrips,
@@ -33,7 +33,7 @@ describe('validateMaxTurnsFloor', () => {
     expect(validateMaxTurnsFloor(observed, 4)).toStrictEqual({
       kind: 'error',
       message:
-        'A lépés maxTurns értéke (4) kisebb, mint a(z) emit_output_tool stratégia megfigyelt körszámainak maximuma (5) (insufficient_max_turns).',
+        'A lépés maxTurns értéke (4) kisebb, mint a(z) sdk_output_format stratégia megfigyelt körszámainak maximuma (5) (insufficient_max_turns).',
     });
   });
 

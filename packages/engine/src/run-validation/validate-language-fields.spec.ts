@@ -23,11 +23,9 @@ function agentStepConfig(promptTemplate: string): AgentStepConfig {
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
   };

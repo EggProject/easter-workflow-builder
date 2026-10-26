@@ -50,10 +50,9 @@ Ami nincs: gyökér `package.json`, `turbo.json`, lint, formázó, teszt futtat�
 ## 3. Csomagtérkép és függőségi irány
 
 **Frissítve a SPEC-002-vel (T-002-25).** Az alábbi csomagtérkép és függőségi tábla a
-SPEC-002 végrehajtása előtti, 16 csomagos állapotot rögzíti (13 eredeti csomag, plusz a
-két utólag felvett `typeguards` és `agent-tools`). A `packages/providers` és a
-`packages/agent-tools` csomag azóta 18 új csomagra bomlott, a workspace 32 csomagból áll,
-és minden csomag rétegszámot kapott. Az aktuális csomagtérkép és a rétegzett függőségi
+SPEC-002 végrehajtása előtti, 15 csomagos állapotot rögzíti (az utólag felvett
+`typeguards` csomaggal együtt). A `packages/providers` csomag azóta új csomagokra
+bomlott, a workspace 19 csomagból áll, és minden csomag rétegszámot kapott. Az aktuális csomagtérkép és a rétegzett függőségi
 irány a
 [`SPEC-002-csomag-architektura.md`](SPEC-002-csomag-architektura.md) 4. szekciója. Ez a
 szekció itt, lent, változatlanul marad történeti dokumentumként.
@@ -73,7 +72,6 @@ szekció itt, lent, változatlanul marad történeti dokumentumként.
 | `packages/logger`       | könyvtár   | pino és pino-roll, rotációval                           |
 | `packages/ui`           | könyvtár   | eggproject-design alapú komponensek                     |
 | `packages/typeguards`   | könyvtár   | általános, újrahasznosítható typeguardok, üres váz      |
-| `packages/agent-tools`  | könyvtár   | saját folyamatban futó MCP eszközök az Agent SDK-hoz    |
 | `tooling/eslint-config` | eszköz     | megosztott flat config                                  |
 | `tooling/tsconfig`      | eszköz     | megosztott TypeScript alapok                            |
 | `tooling/scripts`       | eszköz     | token takarékos wrapper scriptek                        |
@@ -81,20 +79,19 @@ szekció itt, lent, változatlanul marad történeti dokumentumként.
 
 ### Megengedett függőségi irány
 
-| Csomag        | Amitől függhet                                                     |
-| ------------- | ------------------------------------------------------------------ |
-| `core`        | semmitől a futásidejű függőségek közül                             |
-| `logger`      | semmitől a workspace csomagok közül                                |
-| `protocol`    | `core`                                                             |
-| `providers`   | `core`                                                             |
-| `db`          | `core`, `logger`                                                   |
-| `agent`       | `core`, `providers`, `logger`                                      |
-| `engine`      | `core`, `db`, `agent`, `logger`                                    |
-| `ui`          | `core`, `protocol`                                                 |
-| `typeguards`  | semmitől a futásidejű függőségek közül                             |
-| `agent-tools` | `providers`, `typeguards`                                          |
-| `server`      | `core`, `protocol`, `db`, `engine`, `agent`, `providers`, `logger` |
-| `web`         | `core`, `protocol`, `ui`                                           |
+| Csomag       | Amitől függhet                                                     |
+| ------------ | ------------------------------------------------------------------ |
+| `core`       | semmitől a futásidejű függőségek közül                             |
+| `logger`     | semmitől a workspace csomagok közül                                |
+| `protocol`   | `core`                                                             |
+| `providers`  | `core`                                                             |
+| `db`         | `core`, `logger`                                                   |
+| `agent`      | `core`, `providers`, `logger`                                      |
+| `engine`     | `core`, `db`, `agent`, `logger`                                    |
+| `ui`         | `core`, `protocol`                                                 |
+| `typeguards` | semmitől a futásidejű függőségek közül                             |
+| `server`     | `core`, `protocol`, `db`, `engine`, `agent`, `providers`, `logger` |
+| `web`        | `core`, `protocol`, `ui`                                           |
 
 Tiltott: bármely visszafelé mutató él, bármely kör, és az `apps/web` függése a `db`, `engine`, `agent` vagy `server` csomagtól. A `packages/protocol` a kontraktus egyetlen forrása, tehát a `server` és a `web` ugyanabból a csomagból veszi a típusokat, nem duplikálja őket.
 
@@ -103,16 +100,6 @@ sorolt fel; a `typeguards` egy utólagos, a user által kért kiegészítés (á
 újrahasznosítható typeguardok gyűjtőhelye, a `packages/core` mintájára üres vázként
 felállítva). A `core`-hoz hasonlóan semmilyen workspace futásidejű függőségtől nem függ,
 tehát bármelyik más csomag függhet tőle anélkül, hogy ez kört okozna.
-
-**A `packages/agent-tools`, utólag felvéve.** A user kérésére készült, önálló csomagként:
-három saját folyamatban futó (in-process) MCP eszköz az Agent SDK-hoz (web keresés, oldal
-letöltés Firecrawllal, képértelmezés). Azért külön csomag és nem a `packages/agent` része,
-mert az eszközök **lépésenként kapcsolhatók**, tehát a workflow lépés modelljétől független,
-önmagában használható egységet alkotnak. A `providers` csomagtól függ, mert az `AgentToolId`
-szótár a képességleíró része (a leíró mondja meg, melyik providernél ajánlott bekapcsolni egy
-eszközt), és a `typeguards` csomagtól, mert az ismeretlen alakú JSON válaszokat `as`
-kényszerítés nélkül kell szűkíteni. A fordított irány tilos: a `providers` nem függhet az
-`agent-tools` csomagtól.
 
 ### A függőségi irány kikényszerítése
 
@@ -970,7 +957,7 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 1. A gyökérben van `package.json`, `private: true`, `type: "module"`, `workspaces: ["apps/*", "packages/*", "tooling/*", "tools/*"]` és csomagkezelő deklaráció. A `bun install --frozen-lockfile` hibátlanul lefut.
 2. A gyökérben egyetlen `bun.lock` van, `tools/wire-probe/bun.lock` nem létezik, és a `bun.lockb` alak sehol nem fordul elő.
 3. A `research` fájlban rögzített, több csomagban használt verziók (TypeScript, ESLint és pluginjei, Prettier, Vitest, React, `@types/node`) Bun katalógusban vannak, és a csomagok `"catalog:"` hivatkozással veszik át. Egyetlen csomag sem tartalmaz ezekhez literál verziót.
-4. A 3. szekció mind a 15 csomagja (a `packages/typeguards` és a `packages/agent-tools` csomaggal együtt) létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. **[SPEC-002-vel elavult, T-002-25.]** A `packages/agent-tools` és a `packages/providers` csomag megszűnt, a csomagszám 32-re nőtt. Ezt a kritériumot a SPEC-002 2. elfogadási kritériuma (a 18 új csomag létezése) és a Definition of Done 3. pontja (32 csomag, mindegyiknek `package.json`, `tsconfig.json`, `CLAUDE.md`) váltja ki.
+4. A 3. szekció mind a 14 csomagja (a `packages/typeguards` csomaggal együtt) létezik a megadott útvonalon, mindegyiknek van `package.json`, `tsconfig.json` és `CLAUDE.md` fájlja. **[SPEC-002-vel elavult, T-002-25.]** A `packages/providers` csomag megszűnt, a csomagszám 19-re változott. Ezt a kritériumot a SPEC-002 2. elfogadási kritériuma (az új csomagok léte) és a Definition of Done 3. pontja (19 csomag, mindegyiknek `package.json`, `tsconfig.json`, `CLAUDE.md`) váltja ki.
 5. A `turbo.json` gyökérkulcsa `tasks`. Nincs benne `pipeline` kulcs. A 7 task (`build`, `typecheck`, `lint`, `format:check`, `test`, `test:e2e`, `dev`) definiált a megadott `dependsOn` és `outputs` értékekkel; a `test` a `//#test` gyökér-szkópolt taskként létezik, `dependsOn: []` értékkel (lásd 5. szekció "A `test` task, utólag igazítva a végrehajtáshoz" és V-18).
 6. A `turbo run typecheck` kétszer futtatva másodszorra teljes cache találatot ad, és a wrapper script kimenete ezt sorban jelzi.
 7. Egy `packages/core` fájl módosítása után a `turbo run typecheck` újrafuttatja a `core`-tól függő csomagok taskját, és nem futtatja újra a tőle független csomagokét. Ezt a wrapper kimenete igazolja.
@@ -1017,12 +1004,6 @@ maga helyesen áll, csak ebben a konkrét sandboxban nem futtatható végig.
 48. A `tooling/scripts/casing.sh` (`check:casing` script) létezik, a 11. szekció három blokkos kimeneti szerződését teljesíti, és a `git ls-files` alapján ellenőrzi a git index fájlnevek és a rájuk hivatkozó relatív import specifikátorok betűzésének egyezését. Ezt a `tooling/scripts/src/casing/*.test.ts` Vitest regressziós teszt igazolja, ami egy valós, a git index és a lemez betűzése közötti eltérésen alapuló esetet reprodukál.
 49. A `packages/typeguards` csomag (utólag felvéve, 3. szekció) létezik `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájllal, a `packages/*` workspace glob automatikusan felveszi. A csomag üres váz: nincs benne kitalált guard. A `CLAUDE.md` rögzíti, hogy ide csak általános, újrahasznosítható typeguard kerül, hogy fájlonként egy guard a szabály, hogy minden guardhoz kötelező unit teszt, és hogy a domain-specifikus guard a saját csomagjába tartozik, nem ide.
 50. Az `e2e` job `needs: build` a `ci.yml`-ben (12. szekció), a user döntése alapján, felülírva a korábbi elemzést, ami szerint ez felesleges lenne. A `turbo.json` `test:e2e` taskjának `dependsOn: ["build"]` mezője már ezt megelőzően is fennállt; élő méréssel igazolt (`turbo run test:e2e --dry=json --filter=web` három egymást követő futása azonos task hasht ad), hogy ez a feladatgráf-szintű függőség nem instabil, tehát a job szintű `needs` felvétele nem rontja el a Turborepo cache viselkedését.
-
-51. A `packages/agent-tools` csomag (utólag felvéve, 3. szekció) létezik `package.json`, `tsconfig.json`, `src/index.ts` és `CLAUDE.md` fájllal, és mind a hét `src/` alkönyvtárában van `CLAUDE.md`. A csomag három MCP eszközt ad (`web_search`, `web_fetch`, `understand_image`), mindegyiket az Agent SDK `tool` helperjével és Zod sémával, és a `createAgentToolBundle` függvény a lépés által kiválasztott azonosítókból állítja elő az `mcpServers` és az `allowedTools` értéket. Ismétlődő azonosító nem duplikálja az eszközt. **[SPEC-002-vel elavult, T-002-25.]** A `packages/agent-tools` könyvtár nem létezik többé: 11 fájlja négy csomagra bomlott (`tool-minimax-web-search`, `tool-firecrawl-web-fetch`, `tool-minimax-understand-image`, `agent-tool-bundle`), a SPEC-002 5.14-5.17 szekciója szerint. A csomag létezésének tilalmát a SPEC-002 1. elfogadási kritériuma váltja ki, a viselkedés (három eszköz, `createAgentToolBundle`, dedupe) változatlan, ezt a T-002-18 .. T-002-21 lépések tesztjei igazolják.
-52. A `packages/agent-tools` minden forrásfájlja a 100 százalékos lefedettségi küszöb hatókörében van, **kizárás nélkül**, és a küszöb teljesül. A hálózati hívást minden teszt befecskendezett `fetch` függvénnyel váltja ki, élő API hívás egyetlen tesztben sincs. Le van fedve mindhárom eszköz hibaága is: hiányzó környezeti változó, nem elérhető szolgáltatás, hibás bemenet és ismeretlen válasz alak.
-53. Az eszközök egyetlen hibaága sem dob kivételt a hívó felé: minden hiba `isError: true` jelzésű, magyarázó szöveges MCP válasz, hogy az agent dönthessen a folytatásról. Ezt eszközönként külön teszt igazolja.
-54. A `ProviderCapabilityDescriptor` típus `recommendedAgentTools` mezővel bővült, és mindkét provider leírója ki van töltve: a `minimax` esetén `known` állapot mérési bizonyítékkal, a `claude-subscription` esetén `unknown`, mert ehhez a providerhez nincs drótszintű mérés. Bizonyíték nélküli érték egyik leíróban sincs. **[Útvonal SPEC-002-vel elavult, tartalom változatlan, T-002-25.]** A `ProviderCapabilityDescriptor` típus a `packages/providers/src/capability/` helyett a `@easter-workflow-builder/provider-capability` csomag `tool-support/agent-tool-recommendation.ts` fájljában van, a két leíró kitöltött `recommendedAgentTools` mezője a `@easter-workflow-builder/provider-minimax` és a `@easter-workflow-builder/provider-claude-subscription` csomag `tool-support/recommended-agent-tools.ts` fájljában. A tartalmi azonosságot a SPEC-002 30. elfogadási kritériuma (bitre azonos `Fact` értékek, normalizált JSON összehasonlítással) váltja ki.
-55. Az `agent-tools` csomag által használt hat környezeti változó mindegyike szerepel a `turbo.json` `globalPassThroughEnv` listájában, és mindegyik alapértelmezése mellett a kódban megjelölve áll, hogy dokumentált forrásból származik-e vagy önkényes. Az önkényes érték kötelezően felülírható környezeti változóval. **[SPEC-002-vel elavult, T-002-25.]** A `MINIMAX_CODING_PLAN_API_KEY` megszűnt (SPEC-002 5.10 szekció, a user döntése), a környezeti változók száma hatról ötre csökkent. Ezt a SPEC-002 27. elfogadási kritériuma váltja ki.
 
 ## 17. Kockázatok
 

@@ -58,13 +58,13 @@ function descriptorOf(id: ProviderId): ProviderCapabilityDescriptor<string, stri
     structuredOutput: {
       strategies: [
         {
-          id: 'emit_output_tool',
+          id: 'sdk_output_format',
           usable: knownFact(true),
           blockingWireDetail: knownFact(null),
           observedRoundTrips: knownFact([3]),
         },
       ],
-      defaultStrategy: knownFact('emit_output_tool'),
+      defaultStrategy: knownFact('sdk_output_format'),
       outputConfigAlwaysSent: knownFact(false),
       outputConfigWireField: knownFact(null),
     },
@@ -85,7 +85,6 @@ function descriptorOf(id: ProviderId): ProviderCapabilityDescriptor<string, stri
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: knownFact(false),
@@ -118,11 +117,9 @@ function agentStepConfig(overrides: Partial<AgentStepConfig> = {}): AgentStepCon
     agents: {},
     skills: null,
     mcpServers: {},
-    enabledEngineHooks: [],
     cwd: null,
     additionalDirectories: [],
     sandbox: null,
-    agentTools: [],
     sessionMode: 'isolated',
     structuredOutput: null,
     ...overrides,

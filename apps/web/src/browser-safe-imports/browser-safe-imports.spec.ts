@@ -1,7 +1,7 @@
 // Regressziós teszt, megvalósítás fájl nélkül (SPEC-002 6.2 5. pont).
 //
 // A MÉRT HIBA, ami ezt a fájlt indokolja (2026-09-05). A
-// `packages/core/src/image-source/data-url/resolve-image-data-url.ts` első
+// `core` csomag képforrás feloldó fájljának (azóta törölve, SPEC-011) első
 // sora a `node:buffer` modult importálta. A `core` csomag felülete egyetlen
 // barrel (`src/index.ts`, SPEC-002 6.6), az `apps/web` pedig érték szinten
 // importál belőle (`isOkOutcome`), tehát a barrel MINDEN modulja bekerül a

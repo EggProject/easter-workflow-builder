@@ -298,8 +298,8 @@ perzisztált sor 53 pixel, a cím sordoboza pontosan 21 pixel; a 3 átmeneti sor
 
 **Ami a 400 pixeles panelen nem fér ki, mérve.** (1) Az eszközhívás azonosítója: a teljes
 láthatósághoz a cím szlotnak 657 pixel kell (`web_search`, előtte 890), a MiniMax sorban 633
-(`understand_image`, előtte 860), az eszköz eredmény sorban 626 (előtte 910). (2) Az eszköznév
-teljes egészében: 409 pixel kell (`web_search`), illetve 457 (`understand_image`). (3) Az
+(előtte 860), az eszköz eredmény sorban 626 (előtte 910). (2) Az eszköznév
+teljes egészében: 409 pixel kell (`web_search`). (3) Az
 eredmény sor törzse: a költség meta 180 pixelt foglal, a cím szlotnak 142 marad, a címke teljes
 láthatóságához 164 kellene. A cím és a meta szerkezete a design system `accordion.css` szerinti,
 a belső margó és a meta mérete nem változott.
