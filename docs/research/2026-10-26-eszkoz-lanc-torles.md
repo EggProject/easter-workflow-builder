@@ -367,3 +367,41 @@ SPEC-011 O-17 kérdése, amit a user lezárt: a mező egésze törlődik.
 | `packages/provider-minimax/src/request-shaping/structured-output.ts`                             | 1       | 6                            |
 
 A `measurement-document.ts:43` sor az M-19 mérési szakasz címét tükrözi, a mérés megmarad, ezért a sor is (SPEC-011 7.3).
+
+## 4. A kiinduló mérés (PLAN-011 T-011-1, 2026-10-26)
+
+**A fej:** `6ae506a` (a `0de333c` tartalma plusz a SPEC-011 O-17 lezárása, kizárólag dokumentum változás). A
+munkakönyvtár tiszta, a branch `feat/spec-011-eszkoz-lanc-torles`.
+
+**A kilenc kapu a kiinduló fejen** (a helyi futtatás módja: a `typecheck`, a `lint` és a `build` a Turborepo
+gyorsítótárából tért vissza, mert a bemenetük a `0de333c` óta nem változott):
+
+| Parancs                  | Kilépési kód | Kimenet                                                    |
+| ------------------------ | ------------ | ---------------------------------------------------------- |
+| `bun run format:check`   | 0            | minden fájl formázott                                      |
+| `bun run typecheck`      | 0            | 26/26 sikeres, 0 hibás                                     |
+| `bun x turbo run lint`   | 0            | 45/45 sikeres, 0 hibás                                     |
+| `bun run test`           | 0            | 6425/6425 teszt sikeres, 100 százalék mind a négy metrikán |
+| `bun run build`          | 0            | 1/1 sikeres                                                |
+| `bun run docs:check`     | 0            | 27/27 kötelező helyen van `CLAUDE.md`                      |
+| `bun run check:casing`   | 0            | 0 eltérés                                                  |
+| `bun run check:graph`    | 0            | 0 eltérés                                                  |
+| `bun run check:db-drift` | 0            | a DB séma és a migrációk szinkronban                       |
+
+**Az e2e a kiinduló fejen.** `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e`, az `apps/web` alatt
+`bun x playwright test --shard=<i>/8` nyolc egymás utáni futásban, `flock /tmp/playwright-gep.lock` alatt,
+majd `bun run coverage:e2e:report`. **Mind a nyolc shard zöld** (az 1. shard 82, a többi 81 teszt, összesen
+649; bukó teszt nincs), a `coverage:e2e:report` kilépési kódja 0. A darabszámok a `nyc report
+--reporter=json-summary` kimenetéből:
+
+| Metrika    | Fedett / összes | `nyc` kimenet | Küszöb (`apps/web/package.json`) | Fedetlen darab |
+| ---------- | --------------- | ------------- | -------------------------------- | -------------- |
+| statements | 2171 / 2185     | 99.35         | 99.35                            | 14             |
+| branches   | 1036 / 1047     | 98.94         | 98.94                            | 11             |
+| functions  | 757 / 759       | 99.73         | 99.73                            | 2              |
+| lines      | 2086 / 2100     | 99.33         | 99.33                            | 14             |
+
+A számok bájtra egyeznek a `2026-09-05-e2e-lefedettsegi-kuszob.md` 53. szekciójával, a fedetlen darabszám
+14 / 11 / 2 / 14. Ez a PLAN-011 e2e lefedettségi összehasonlításának kiindulása: a fedetlen darabszám egyik
+metrikán sem nőhet; a százalék csak fedett kód törlése miatt csökkenhet, a szabálykönyv 8. szekciója szerinti
+tételes levezetéssel.
