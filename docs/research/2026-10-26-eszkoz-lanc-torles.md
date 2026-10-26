@@ -6,6 +6,12 @@ pontosítva: "csak a gyári claude tool-ok maradnak". Minden szám ebben a fájl
 futtatott mérésből vagy a commitolt fa `git grep` kimenetéből jön; a kiinduló fej a `main`
 `6009603` commitja.
 
+A user további döntései (2026-10-26, a SPEC-011 12. szekciójában): "nincs még adatbázis, nincs mit
+migrálni", "nincs régi rajz", ezért az 1. szekció mérései **nem migrációt és nem tűrést**
+alapoznak meg, hanem a `db` guard szigorításának (SPEC-011 5.2) kiinduló tényét adják: a `db` guard az
+ismeretlen kulcsot ma elfogadja, a `protocol` olvasó sémái elutasítják. A strukturált kimenet
+`emit_output_tool` stratégiája szintén törlődik; a leltára a 3.5 szekcióban áll.
+
 A mérés eldobható, repón kívüli munkakönyvtárban futott (`git worktree`, leválasztott fej a
 `6009603`-on); a repó munkapéldányához és a `bun.lock` fájlhoz nem nyúlt. Valódi API hívás nem
 történt. A próbák és a kimenetek másolata a
@@ -288,6 +294,76 @@ A tábla a 3.1 minta kimenete a hét csomag kizárásával (`leltar.sh.masolat`,
   `FIRECRAWL_TIMEOUT_MS` egyetlen olvasója a két kliens csomag.
 - `bun.lock:88, 150, 176, 185, 259, 275, 291`: a hét csomag workspace bejegyzése.
 - A strukturált kimenet `emit_output_tool` stratégiája egy in-process `emit_output` eszközt feltételez
-  (SPEC-000 M-10, M-19; `build-agent-step-options.ts:40-43`), a `mcpServers` mező pedig külső MCP
-  szervert tárol (`storable-mcp-server.ts`); egyik sem tagja a hét csomagnak, de a "csak a gyári
-  claude tool-ok maradnak" mondat hatókörét érinti (SPEC-011 nyitott kérdései).
+  (SPEC-000 M-10, M-19; `build-agent-step-options.ts:40-43`): a user döntése szerint törlődik, a
+  leltára a 3.5 szekcióban áll. A `mcpServers` mező külső MCP szervert tárol
+  (`storable-mcp-server.ts`), a user döntése szerint marad (SPEC-009).
+
+### 3.5 Az `emit_output_tool` stratégia leltára (`6009603`, `git grep -n -E`)
+
+A minta: `emit_output|emit_output_tool_stop|buildStopHookMatcher|build-stop-hook-matcher|EngineHookId|EngineHookIdSchema|engine-hook-id`,
+a `docs/` és a `tools/` nélkül (a `tools/wire-probe` M-10, M-19 esetei és a mérési dokumentumok a SPEC-011 7.3
+szerint megmaradnak). Összesen 46 fájl, 120 találat. Az `enabledEngineHooks` mező fixtúra sorai ezen
+felül: 62 fájl, 75 találat (`apps/web` 29 fájl és 35 találat, `packages/engine` 18 és 21, `packages/db` 8 és 12,
+`packages/protocol` 4 és 4, `apps/server` 3 és 3); a két minta uniója 85 fájl, 184 találat.
+
+**A megmaradó stratégia.** A `StructuredOutputStrategyId` unió a törlés után egy tagú
+(`'sdk_output_format'`). Mindkét provider leírója ezt jelöli alapértelmezésnek, és mindkettőnél
+`usable: known true`: `provider-minimax/src/request-shaping/structured-output.ts` (bizonyíték M-02, M-03),
+`provider-claude-subscription/src/request-shaping/structured-output.ts` (bizonyíték `DOC_STRUCTURED`).
+A szerkesztő mezőjének mai alapértéke `emit_output_tool` (`StructuredOutputField.tsx:7`), az új alapérték
+az egyetlen érték.
+
+**Az `enabledEngineHooks` egyetlen értéke** az `emit_output_tool_stop` (`db` `engine-hook-id.ts:15`,
+`protocol` `engine-hook-id.ts:9`); törlése után az `EngineHookId` unió üres lenne, ennek kezelése a
+SPEC-011 O-17 nyitott kérdése.
+
+| Fájl                                                                                             | Találat | Sorok                        |
+| ------------------------------------------------------------------------------------------------ | ------- | ---------------------------- |
+| `apps/server/src/node-config-drift-protection/node-config-drift-protection.spec.ts`              | 1       | 506                          |
+| `apps/web/e2e/node-inspector.spec.ts`                                                            | 3       | 681, 684, 686                |
+| `apps/web/src/node-inspector/AgentStepConfigFields.spec.tsx`                                     | 5       | 222, 227, 230, 231, 339      |
+| `apps/web/src/node-inspector/AgentStepConfigFields.tsx`                                          | 3       | 2, 245, 252                  |
+| `apps/web/src/node-inspector/StructuredOutputField.spec.tsx`                                     | 5       | 104, 110, 127, 136, 145      |
+| `apps/web/src/node-inspector/StructuredOutputField.tsx`                                          | 1       | 7                            |
+| `packages/db/CLAUDE.md`                                                                          | 2       | 20, 59                       |
+| `packages/db/src/step-run/step-run-repository.spec.ts`                                           | 3       | 201, 213, 448                |
+| `packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts`                          | 2       | 7, 78                        |
+| `packages/db/src/workflow-graph/agent-step-config/engine-hook-id.ts`                             | 4       | 8, 11, 12, 15                |
+| `packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.spec.ts`                  | 3       | 52, 64, 115                  |
+| `packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts`                       | 6       | 10, 29, 30, 39, 59, 189      |
+| `packages/engine/CLAUDE.md`                                                                      | 1       | 78                           |
+| `packages/engine/src/agent-step/build-agent-step-options.spec.ts`                                | 6       | 148, 159, 162, 163, 174, 176 |
+| `packages/engine/src/agent-step/build-agent-step-options.ts`                                     | 5       | 4, 40, 42, 64, 65            |
+| `packages/engine/src/agent-step/build-stop-hook-matcher.spec.ts`                                 | 5       | 2, 5, 12, 14, 24             |
+| `packages/engine/src/agent-step/build-stop-hook-matcher.ts`                                      | 2       | 12, 46                       |
+| `packages/engine/src/agent-step/run-agent-step.spec.ts`                                          | 1       | 400                          |
+| `packages/engine/src/agent-step/validate-agent-step-capabilities.spec.ts`                        | 6       | 67, 103, 124, 207, 211, 220  |
+| `packages/engine/src/agent-step/validate-agent-step-capabilities.ts`                             | 1       | 105                          |
+| `packages/engine/src/capability-policy/resolve-structured-output-strategy.spec.ts`               | 6       | 18, 29, 38, 41, 48, 68       |
+| `packages/engine/src/capability-policy/validate-max-turns-floor.spec.ts`                         | 2       | 18, 36                       |
+| `packages/engine/src/engine-port/create-engine.spec.ts`                                          | 2       | 334, 340                     |
+| `packages/engine/src/index.ts`                                                                   | 1       | 220                          |
+| `packages/engine/src/node-executor/agent-node-lifecycle.spec.ts`                                 | 6       | 186, 192, 480, 485, 491, 527 |
+| `packages/engine/src/node-executor/execute-agent-step.spec.ts`                                   | 2       | 153, 159                     |
+| `packages/engine/src/node-executor/execute-join-ai-synthesis.spec.ts`                            | 2       | 155, 161                     |
+| `packages/engine/src/node-executor/execute-node.spec.ts`                                         | 2       | 247, 253                     |
+| `packages/engine/src/run-supervisor/advance-run.spec.ts`                                         | 2       | 96, 102                      |
+| `packages/engine/src/run-supervisor/build-node-plans.spec.ts`                                    | 2       | 68, 74                       |
+| `packages/engine/src/run-supervisor/create-run-supervisor.spec.ts`                               | 2       | 271, 277                     |
+| `packages/engine/src/run-supervisor/prepare-run.spec.ts`                                         | 2       | 75, 81                       |
+| `packages/engine/src/run-supervisor/restart-run.spec.ts`                                         | 2       | 218, 224                     |
+| `packages/engine/src/run-supervisor/validate-provider-capabilities.spec.ts`                      | 2       | 61, 67                       |
+| `packages/engine/src/startup-recovery/run-startup-recovery.spec.ts`                              | 2       | 113, 119                     |
+| `packages/protocol/src/index.ts`                                                                 | 2       | 152, 153                     |
+| `packages/protocol/src/node-config/agent-step-config.spec.ts`                                    | 1       | 51                           |
+| `packages/protocol/src/node-config/agent-step-config.ts`                                         | 2       | 3, 70                        |
+| `packages/protocol/src/node-config/engine-hook-id.spec.ts`                                       | 4       | 2, 4, 6, 10                  |
+| `packages/protocol/src/node-config/engine-hook-id.ts`                                            | 3       | 5, 9, 11                     |
+| `packages/protocol/src/node-config/structured-output-strategy-id.spec.ts`                        | 1       | 6                            |
+| `packages/protocol/src/node-config/structured-output-strategy-id.ts`                             | 1       | 7                            |
+| `packages/provider-capability/src/evidence-sources/measurement-document/measurement-document.ts` | 1       | 43                           |
+| `packages/provider-capability/src/request-shaping/structured-output-strategy-id.ts`              | 1       | 4                            |
+| `packages/provider-claude-subscription/src/request-shaping/structured-output.ts`                 | 1       | 11                           |
+| `packages/provider-minimax/src/request-shaping/structured-output.ts`                             | 1       | 6                            |
+
+A `measurement-document.ts:43` sor az M-19 mérési szakasz címét tükrözi, a mérés megmarad, ezért a sor is (SPEC-011 7.3).
