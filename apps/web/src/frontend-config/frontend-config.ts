@@ -1,9 +1,10 @@
 /**
- * A felület kötelező konfigurációja (SPEC-007 12.2). Minden mezőnek van egy
- * `VITE_` előtagú környezeti változó párja, és egyiknek sincs alapértéke: a
- * SPEC-007 O-4 és O-6 nyitott kérdése szerint sem az API originre, sem a
- * lapméretekre nincs forrásunk, tehát a szám a konfigurációban dől el, nem a
- * kódban (SPEC-007 16. szekció 45. kritérium).
+ * A felület konfigurációja (SPEC-007 12.2). Minden mezőnek van egy `VITE_`
+ * előtagú környezeti változó párja és egy alapértéke a
+ * `default-frontend-config.ts` fájlban (SPEC-012 4.2, user döntés
+ * 2026-10-26, ami a SPEC-007 O-4 és O-6 "alapérték nélkül" döntését
+ * felülírta): a hiányzó változó az alapértéket adja, a megadott érvénytelen
+ * érték hibaág.
  */
 export interface FrontendConfig {
   /**

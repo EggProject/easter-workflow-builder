@@ -266,11 +266,13 @@ jelzést kapott).
   kezelő a `limit` darabszámnál csendben levág (`list-workflows.ts:35`), nincs lapozás: 100 workflow
   fölött a lista elrejti a többit. Az iparági ajánlás a számot adja, a lapozás hiányát nem oldja meg
   (research 13.2); a lapozás nem ennek a specnek a hatóköre.
-- **A `pino-roll` darabszám korlát futásonként érvényes (lelet, nem módosítottam; javaslat, nem döntés).**
-  A `limit.count` alapból csak a jelenlegi folyamat fájljait törli (`removeOtherLogFiles` nincs beállítva a
-  `buildLogRotationOptions` függvényben), tehát egy újraindítás után a korábbi futások fájljai
-  megmaradnak. Ha a korlátnak a könyvtárra kell szólnia, a `removeOtherLogFiles: true` mező kell; ez a
-  SPEC-006 döntése (research 13.1).
+- **A `pino-roll` darabszám korlát a könyvtárra szól (lezárva, user technikai döntés 2026-10-26).** A
+  `limit.count` alapból csak a jelenlegi folyamat fájljait törölte (`removeOtherLogFiles` nem volt beállítva a
+  `buildLogRotationOptions` függvényben), tehát egy újraindítás után a korábbi futások fájljai megmaradtak. A
+  függvény ezért mindig `limit.removeOtherLogFiles: true` mezőt ad, így a darabszám a könyvtárra érvényes, mint a
+  `logrotate` `rotate` szabálya (forrás: a telepített `pino-roll` 4.0.0 `lib/utils.js` 205-211. sora és a README
+  `limit` szakasza, research 13.1 és 14.6). A SPEC-006 9.2 szakasza ezzel egyezően módosult; a
+  `build-log-rotation-options.spec.ts` regressziós teszt őrzi.
 - **Az `EASTER_STREAM_DEV_ORIGIN` opcionális marad, alapérték nélkül** (levezetett pont, 11.4): a hiánya a
   "nincs CORS" biztonsági állapot (SPEC-006 5.7 1. pont), azt alapértékkel nem kapcsoljuk be.
 - **A `EASTER_LOG_ROTATION_FREQUENCY` kódbeli alapértéke szám** (`604800000`), az env változó numerikus

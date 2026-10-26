@@ -587,3 +587,26 @@ without it.`" (az `--env-file-if-exists` hiányzó fájlnál nem hiba); `SIGINT`
   ellen futott (Playwright, `http://localhost:5173/`): a `GET /api/workflows?limit=100` kérés a Vite proxyn át
   lefutott, a lap a "Workflow-k" listát és az "Még nincs workflow." üres állapotot rajzolta ki, az SSE
   kapcsolat jelzője "élő" volt.
+
+### 14.6 T-013-7: az alapértékek, a böngésző `Origin` fejléce, a `pino-roll` könyvtár szintű korlátja
+
+- **Alapértékek a kódban.** A szerver oldali `default-server-config.ts` és a web oldali
+  `default-frontend-config.ts` egy-egy csak olvasható objektum; az olvasók a hiányzó vagy üres változóra az
+  alapértéket adják, a megadott érvénytelen értékre hibaágat (`invalid_env_variable`, illetve a "nem pozitív egész
+  szám" hiba). Az e2e `webServer.env` blokkja változatlanul mind a négy `VITE_` változót megadja; ezt a
+  `playwright-web-server-environment` téma őrzi, a hiányzó kulcsra bukó negatív esettel.
+- **A böngésző `Origin` fejléce (saját mérés, 2026-10-26).** A futó Vite dev szerverre (`http://localhost:5173`)
+  headless Chromiummal navigálva, a szerveren `EASTER_STREAM_DEV_ORIGIN=http://localhost:5173` mellett, az SSE
+  (`GET /events`) kérés `Origin` fejléce `http://localhost:5173` volt, és a CORS ellenőrzés átment. A
+  `http://127.0.0.1:5173` cím eltérő origin: arra a szerver nem küld engedélyt, és a kapcsolat CORS hibával
+  elbukik. A `VITE_API_ORIGIN` alapértéke ezért `localhost`, és az `.env.example` `EASTER_STREAM_DEV_ORIGIN`
+  mintaértéke ugyanez. A 10.3 "nem ellenőrzött" jelölése ezzel lezárul az `Origin` fejléc tekintetében.
+- **`removeOtherLogFiles: true`.** A telepített `pino-roll` 4.0.0 `lib/utils.js` `removeOldFiles` függvénye
+  (205-211. sor) a `removeOtherLogFiles` hamis értékénél csak a `createdFileNames` listát (a jelenlegi folyamat
+  fájljait) vágja `count` darabra; igaz értéknél a könyvtár `baseFile` mintájú fájljait olvassa be. A README
+  `limit.removeOtherLogFiles` leírása: "When `true`, will remove files not created by the current process."
+  A `buildLogRotationOptions` ezért mindig igaz értéket ad; védelem: `build-log-rotation-options.spec.ts`.
+- **Az `.env.example` `ANTHROPIC_AUTH_TOKEN` sora kikommentelt.** A szerver `createProcessEnvironmentReader`
+  `read` metódusa `process.env[name] ?? null` alakú, tehát egy üres sztring (`ANTHROPIC_AUTH_TOKEN=`) nem hiányzó,
+  hanem üres értékként jutna a `minimax` provider kulcsába. A minta ezért nem tartalmaz üres hozzárendelést. A
+  függvény doc kommentje a "hiányzó/üres" esetet említi, a kód csak a hiányzót kezeli: lelet, nem módosítottam.

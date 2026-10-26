@@ -879,9 +879,16 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   proxyján megy (egyetlen szabály, a `target` a `VITE_STREAM_ORIGIN` env változóból jön, `timeout`
   mező nincs, mert nincs rá két független forrás), az SSE csatorna közvetlenül a backend originre
   kapcsolódik, a proxyt megkerülve; a CORS engedély ezért változatlanul kizárólag a `STREAM_PATH`
-  útvonalra szól. Az `apps/web/src` alatt nincs port szám és origin literál, a `VITE_API_ORIGIN` és
-  a `VITE_STREAM_ORIGIN` kötelező, alapérték nélkül. Védelem: a `greppable-invariants` (8) és (13)
-  (SPEC-008 3., SPEC-006 O-1 és 5.7, SPEC-007 O-4, 14. szekció alább).
+  útvonalra szól. Az `apps/web/src` alatt nincs port szám és origin literál, **egyetlen fájl
+  kivételével**: a `frontend-config/default-frontend-config.ts` a négy `VITE_` változó forrásolt
+  alapértékét hordozza (`VITE_API_ORIGIN` és `VITE_STREAM_ORIGIN` origin literál, `VITE_LIST_LIMIT` és
+  `VITE_STREAM_REPLAY_LIMIT` lapméret), a hiányzó vagy üres változóra ezt adja az olvasó, a megadott
+  érvénytelen lapméretre hibaágat. A `vite.config.ts` a proxy célját onnan importálja, tehát nem
+  tartalmaz literált. Ez a korábbi "kötelező, alapérték nélkül" szabály szűkítése (user döntés
+  2026-10-26, SPEC-012 4.2, a SPEC-007 45. kritériuma szerint). Védelem: a `greppable-invariants` (8)
+  (a kivétel útvonalra szól, pozitív és negatív esettel tesztelt) és (13), a `playwright-web-server-environment`
+  téma (a `webServer.env` mind a négy változót megadja, SPEC-012 4.6; SPEC-008 3., SPEC-006 O-1 és
+  5.7, SPEC-007 O-4, 14. szekció alább).
 - **Az elrendezés kártya méret konstansának egyetlen forrás szabálya.** A gráf szerkesztő
   csomópont kártyájának mérete (a `@dagrejs/dagre` elrendezés bemenete) egyetlen, mért
   konstansként áll a `graph-node-catalog` témában, amit a kártya CSS-e egy custom propertyn át

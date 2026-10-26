@@ -11,11 +11,11 @@ témájában - a `logger` csomag egyetlen tesztje sem hoz létre fájlt a lemeze
 
 ## Fájlok
 
-| Mappa               | Felelősség                                                                                    |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `pino-logger/`      | a `ServerLogger` felület és a `createServerLogger` factory, befecskendezett nyelővel          |
-| `secret-redaction/` | a `redact` útvonal lista, és az érték szintű törlő, ami a napló sorban cseréli a titkot       |
-| `log-rotation/`     | a `pino-roll` transport opció objektumát felépítő tiszta függvény, worker szál indítás nélkül |
+| Mappa               | Felelősség                                                                                                                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pino-logger/`      | a `ServerLogger` felület és a `createServerLogger` factory, befecskendezett nyelővel                                                                                                     |
+| `secret-redaction/` | a `redact` útvonal lista, és az érték szintű törlő, ami a napló sorban cseréli a titkot                                                                                                  |
+| `log-rotation/`     | a `pino-roll` transport opció objektumát felépítő tiszta függvény, worker szál indítás nélkül; a `limit.removeOtherLogFiles` mindig `true`, a darabszám a könyvtárra szól (SPEC-012 4.2) |
 
 ## Függőségi irány
 

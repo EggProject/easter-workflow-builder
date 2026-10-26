@@ -18,7 +18,9 @@
 // `matchMedia(` hívás csak `prefers-*`/`forced-colors` literállal vagy token kötött töréspont
 // konstanssal áll; ugyanez a lépés a meglévő invariánsok jóhiszemű kerülő alakjait is lezárta. A
 // (25) a PLAN-010 T-010-20 lépésével érkezett (SPEC-010 6.1, 16. szekció 31.): a React nyers HTML
-// beszúró prop neve sem az `apps/web/src`, sem a `packages/ui/src` alatt nem áll.
+// beszúró prop neve sem az `apps/web/src`, sem a `packages/ui/src` alatt nem áll. A (8) a SPEC-012
+// 4.2 szerint egyetlen fájlra, a `frontend-config/default-frontend-config.ts` fájlra nem vonatkozik
+// (user döntés 2026-10-26: forrásolt alapérték).
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -174,6 +176,21 @@ const ALL_FILES = listSourceFiles(WEB_SRC, ['.ts', '.tsx']);
 const WORKSPACE_PACKAGE_JSON_PATHS = listWorkspacePackageJsonPaths();
 
 /**
+ * A (8) origin és port literál mintája, és az EGYETLEN fájl, ahol a literál
+ * állhat: a forrásolt alapértékek helye (SPEC-012 4.2, user döntés
+ * 2026-10-26). A kivétel útvonalra szól, nem tartalomra, hogy máshová tett
+ * ugyanilyen literál bukjon.
+ */
+const ORIGIN_LITERAL_PATTERN = /localhost|127\.0\.0\.1|\[::1\]|:4173|:4174|:5173|:3000|:3001|:8080/;
+const ORIGIN_LITERAL_EXCEPTION_PATH = path.join('frontend-config', 'default-frontend-config.ts');
+
+function findOriginLiteralOffenders(files: readonly SourceFile[]): readonly string[] {
+  return files
+    .filter((file) => file.relativePath !== ORIGIN_LITERAL_EXCEPTION_PATH && ORIGIN_LITERAL_PATTERN.test(file.content))
+    .map((file) => file.relativePath);
+}
+
+/**
  * A (11) és a (12) hatókörének pozitív oldala: a bejárás ténylegesen eléri
  * a workspace csomagjait.
  */
@@ -243,13 +260,10 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
     expect(offenders.map((file) => file.relativePath)).toEqual([]);
   });
 
-  it('(8) nincs kitalált port, origin, lapméret vagy időkorlát szám (readFrontendConfig alapérték nélkül olvas)', () => {
+  it('(8) nincs kitalált port, origin, lapméret vagy időkorlát szám a default-frontend-config.ts fájlon kívül (a readFrontendConfig nem `?? <szám>` alakkal olvas)', () => {
     const configSource = readFileSync(path.join(WEB_SRC, 'frontend-config', 'read-frontend-config.ts'), 'utf8');
     expect(configSource).not.toMatch(/\?\?\s*\d/);
-    const offenders = PRODUCT_FILES.filter((file) =>
-      /localhost|127\.0\.0\.1|\[::1\]|:4173|:4174|:5173|:3000|:3001|:8080/.test(file.content),
-    );
-    expect(offenders.map((file) => file.relativePath)).toEqual([]);
+    expect(findOriginLiteralOffenders(PRODUCT_FILES)).toEqual([]);
     // Kitalált idő szám (pl. toast `duration: 5000`) - a `use-toasts.ts`
     // csak a hívó által átadott `duration` VÁLTOZÓT olvassa, számliterált
     // sosem ír; termékkódban `pushToast`/`setTimeout` mellett numerikus
@@ -321,6 +335,26 @@ describe('greppes invariáns tesztek (T-008-31)', () => {
       readFileSync(packageJsonPath, 'utf8').includes('@vitejs/plugin-react'),
     );
     expect(offenders.map((packageJsonPath) => path.relative(REPO_ROOT, packageJsonPath))).toEqual([]);
+  });
+
+  it('(8) kivétel: az origin literál a default-frontend-config.ts fájlban átmegy, máshol bukik (SPEC-012 4.2)', () => {
+    const literalContent = "export const ORIGIN = 'http://localhost:5173';";
+    // Pozitív eset: a kivétel valódi, a fájl ténylegesen hordozza a literált (különben a kivétel halott).
+    const defaultFile = PRODUCT_FILES.find((file) => file.relativePath === ORIGIN_LITERAL_EXCEPTION_PATH);
+    expect(defaultFile).toBeDefined();
+    expect(ORIGIN_LITERAL_PATTERN.test(defaultFile?.content ?? '')).toBe(true);
+    expect(
+      findOriginLiteralOffenders([{ relativePath: ORIGIN_LITERAL_EXCEPTION_PATH, content: literalContent }]),
+    ).toEqual([]);
+    // Negatív esetek: ugyanaz a literál bármely más fájlban (akár hasonló nevűben) bukik.
+    const otherPath = path.join('frontend-config', 'read-frontend-config.ts');
+    const lookalikePath = path.join('graph-editor', 'default-frontend-config.ts');
+    expect(
+      findOriginLiteralOffenders([
+        { relativePath: otherPath, content: literalContent },
+        { relativePath: lookalikePath, content: literalContent },
+      ]),
+    ).toEqual([otherPath, lookalikePath]);
   });
 
   it('(12) nincs @testing-library függőség a workspace package.json fájljaiban (SPEC-007 56. kritérium)', () => {

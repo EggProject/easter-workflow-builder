@@ -464,6 +464,8 @@ A szintek a pino dokumentált értékei (M-26). A `level` alapértéket **nem á
 
 **Nincs szállított rotációs méret és nincs szállított retenció.** A `pino-roll` sem ad dokumentált alapértéket a `size` és a `limit.count` mezőre (M-28), tehát nem tudunk hivatkozni értékre, és nem is találunk ki egyet. Mindkettő **kötelező konfiguráció**, alapérték nélkül (O-4). A `frequency` mezőre ugyanez áll. **Lezárva (user döntés 2026-10-26: iparági ajánlás, forrással, SPEC-012 4.2 és 11.2):** a `pino-roll` továbbra sem ad alapértéket (research 10.5), a három érték alapértéke viszont az iparági bevett gyakorlat: `10m`, `4` forgatott példány, `604800000` ezredmásodperc (hetente, a `logrotate` `weekly` értéke); források és indok: research 13.1. A fenti "kötelező konfiguráció, alapérték nélkül" szabály ezzel megszűnt.
 
+**Technikai döntés (user, 2026-10-26, SPEC-012 4.2): a retenció a könyvtárra szól.** A `buildLogRotationOptions` mindig `limit.removeOtherLogFiles: true` mezőt ad a `limit.count` mellé, különben a darabszám korlát csak a jelenlegi folyamat fájljaira vonatkozna, és újraindítások után a korábbi futások fájljai megmaradnának (a telepített `pino-roll` 4.0.0 `lib/utils.js` `removeOldFiles` függvénye és README `limit` szakasza, research 13.1). Regressziós teszt: `packages/logger/src/log-rotation/build-log-rotation-options.spec.ts`.
+
 **A napló könyvtár útvonala kötelező env változó**, alapérték nélkül (O-2). Az adatbázis fájllal ellentétben itt nincs olyan dokumentált fejlesztői alapérték, amire hivatkozhatnánk. **Lezárva (user döntés 2026-10-26, SPEC-012 4.2 és 11.2):** az alapérték `.data/logs/server` (fájl útvonal előtag; a repo gyökerének gitből kizárt `.data/` mappája); külső forrás nincs (research 10.7, 13.1), a döntés a usert illeti.
 
 **A worker szálas transport ára kimondva.** A `pino.transport()` worker szálban fut (M-23), és a `process.exit()` hívás naplóvesztést okoz (M-24). Ez a második, független érv amellett, hogy a szerver soha nem hívja a `process.exit()` függvényt (4.4), és hogy a leállás menetében a napló ürítése az utolsó lépés (8.2).
@@ -645,7 +647,7 @@ packages/logger/
 **Ez kikényszerített, nem ígéret.**
 
 - Az `agentQueryRunner` **befecskendezett port** (SPEC-004 3.2), tehát a teszt a saját, memóriabeli futtatóját adja. Valós Agent SDK hívás sosem történik.
-- A `MINIMAX_API_KEY` és bármely más titkot hordozó env változó neve az `apps/server/src` alatt kizárólag a maszkolási listában fordulhat elő, értékként soha. Greppel ellenőrizhető kritérium.
+- Az `ANTHROPIC_AUTH_TOKEN` (a MiniMax kulcs neve, a korábbi `MINIMAX_API_KEY` helyett, SPEC-012 O-1) és bármely más titkot hordozó env változó neve az `apps/server/src` alatt kizárólag a maszkolási listában fordulhat elő, értékként soha. Greppel ellenőrizhető kritérium.
 - **Hálózat mégis van, és ez szándékos:** a HTTP szerver tesztje valódi `node:http` szervert indít a `127.0.0.1` címen, `port: 0` értékkel, tehát az operációs rendszer oszt ki szabad portot (M-12). Ez nem külső hálózat: nincs DNS, nincs kimenő kapcsolat, és a párhuzamos tesztfuttatás sem ütközik, mert nincs rögzített portszám.
 
 ### 10.2 Determinisztikus HTTP teszt
@@ -802,7 +804,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 ### Tesztelés és kapuk
 
-47. Az `apps/server` és a `packages/logger` egyetlen tesztje sem hív valós Agent SDK-t és nem nyit külső hálózati kapcsolatot; a `MINIMAX_API_KEY` és minden más titkot hordozó env változó neve kizárólag a maszkolási listában fordulhat elő.
+47. Az `apps/server` és a `packages/logger` egyetlen tesztje sem hív valós Agent SDK-t és nem nyit külső hálózati kapcsolatot; az `ANTHROPIC_AUTH_TOKEN` (a MiniMax kulcs neve, a korábbi `MINIMAX_API_KEY` helyett, SPEC-012 O-1) és minden más titkot hordozó env változó neve kizárólag a maszkolási listában fordulhat elő.
 48. A stream tesztek befecskendezett nyelőre írnak, és a kapott bájtsorozatot karakterre hasonlítják össze; az idő a `clock` porton léptethető, valós várakozás nélkül.
 49. Az adatbázis minden tesztben valódi `better-sqlite3` példány, `:memory:` adatbázison, a commitolt migrációkkal; mockolt adatbázis nincs.
 50. A `bun run test` nulla kilépési kóddal fut, és a lefedettség mind a négy metrikán 100 százalék. A `vitest.config.ts` `coverage.exclude` listája **egyetlen sorral sem bővült**, és az `apps/server/src/main.ts` **nem** került rá.

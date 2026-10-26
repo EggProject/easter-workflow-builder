@@ -18,8 +18,8 @@ describe('main belépési pont', () => {
     Reflect.deleteProperty(process.env, 'EASTER_SERVER_PORT');
   });
 
-  it('egyetlen hívást tesz a runStartupSequence-re: hiányzó konfigurációra a folyamat kilépési kódja 1 lesz', async () => {
-    Reflect.deleteProperty(process.env, 'EASTER_SERVER_PORT');
+  it('egyetlen hívást tesz a runStartupSequence-re: érvénytelen konfigurációra a folyamat kilépési kódja 1 lesz', async () => {
+    process.env['EASTER_SERVER_PORT'] = 'nem-szam';
 
     await import('./main.ts');
 

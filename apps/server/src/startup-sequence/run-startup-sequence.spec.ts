@@ -61,8 +61,10 @@ describe('runStartupSequence', () => {
     process.exitCode = undefined;
   });
 
-  it('hiányzó kötelező env változóra a szabványos hibakimenetre ír és 1-re állítja a kilépési kódot', async () => {
-    await runStartupSequence({}, process.cwd());
+  it('megadott érvénytelen env változóra a szabványos hibakimenetre ír és 1-re állítja a kilépési kódot', async () => {
+    // Az üres környezet az alapértékekkel érvényes konfiguráció (SPEC-012 4.2),
+    // ezért a hibaágat egy megadott, de érvénytelen érték váltja ki.
+    await runStartupSequence({ EASTER_SERVER_PORT: 'nem-szam' }, process.cwd());
 
     expect(process.exitCode).toBe(1);
   });

@@ -15,7 +15,7 @@ describe('buildLogRotationOptions', () => {
       size: '10m',
       frequency: 'daily',
       mkdir: true,
-      limit: { count: 5 },
+      limit: { count: 5, removeOtherLogFiles: true },
     });
   });
 
@@ -29,6 +29,17 @@ describe('buildLogRotationOptions', () => {
     });
 
     expect(options.dateFormat).toBe('yyyy-MM-dd');
+  });
+
+  it('a darabszám korlát a könyvtárra szól: removeOtherLogFiles mindig true (SPEC-012 4.2)', () => {
+    const options = buildLogRotationOptions({
+      logDirectory: '/var/log/easter/server',
+      size: '10m',
+      frequency: 604_800_000,
+      retainedFileCount: 4,
+    });
+
+    expect(options.limit).toEqual({ count: 4, removeOtherLogFiles: true });
   });
 
   it('nem indít worker szálat és nem hoz létre fájlt: csak tiszta objektumot ad vissza', () => {
