@@ -405,3 +405,96 @@ A számok bájtra egyeznek a `2026-09-05-e2e-lefedettsegi-kuszob.md` 53. szekci�
 14 / 11 / 2 / 14. Ez a PLAN-011 e2e lefedettségi összehasonlításának kiindulása: a fedetlen darabszám egyik
 metrikán sem nőhet; a százalék csak fedett kód törlése miatt csökkenhet, a szabálykönyv 8. szekciója szerinti
 tételes levezetéssel.
+
+## 5. A `db` NodeConfig guard szigorításának hatása (PLAN-011 T-011-8, 2026-10-26)
+
+A felmérés a T-011-7 utáni fán (`fd58398`) készült, a szigorítás bevezetése előtt és közben. Minden szám saját,
+ezen a napon futtatott mérésből jön.
+
+### 5.1 A kulcslisták referenciája: a `protocol` sémák mezőlistája
+
+A `protocol` mind a 23 érintett sémájának kulcslistáját a telepített sémákból olvastuk ki (`shape` kulcsai és a
+`catchall` típusa, egyszeri, repón kívüli `bun` script az `apps/server` alól). Mind a 23 séma `catchall` típusa
+`never`, tehát `z.strictObject` alapú: az `AgentStepNodeConfigSchema` és a `ScriptNodeConfigSchema` is, amelyek
+`.unwrap().extend()` hívással épülnek.
+
+| Objektum                                        | Kulcsok (a `protocol` sémából)                                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`                                         | `type`, `inputFields`, `onUnhandledError`                                                                                                                                                                                                                                        |
+| `StartInputField`                               | `name`, `label`, `valueKind`, `required`                                                                                                                                                                                                                                         |
+| `AgentStepConfig`                               | `promptTemplate`, `providerId`, `modelId`, `effort`, `thinking`, `allowedTools`, `disallowedTools`, `permissionMode`, `maxTurns`, `maxBudgetUsd`, `systemPrompt`, `agents`, `skills`, `mcpServers`, `cwd`, `additionalDirectories`, `sandbox`, `sessionMode`, `structuredOutput` |
+| `agent_step`                                    | az `AgentStepConfig` kulcsai, plusz `type`, `onUnhandledError`                                                                                                                                                                                                                   |
+| `PresetSystemPrompt`                            | `type`, `preset`, `append`, `excludeDynamicSections`                                                                                                                                                                                                                             |
+| `StructuredOutputConfig`                        | `strategy`, `schema`                                                                                                                                                                                                                                                             |
+| `SandboxConfig`                                 | `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`, `excludedCommands`, `enableWeakerNestedSandbox`, `allowUnsandboxedCommands`, `network`, `filesystem`, `ignoreViolations`, `ripgrep`                                                                                  |
+| `StorableStdioMcpServer`                        | `type`, `command`, `args`, `envNames`                                                                                                                                                                                                                                            |
+| `StorableSseMcpServer`, `StorableHttpMcpServer` | `type`, `url`, `authEnvName`                                                                                                                                                                                                                                                     |
+| `branch`                                        | `type`, `expression`, `branches`, `defaultBranchKey`, `onUnhandledError`                                                                                                                                                                                                         |
+| `BranchOption`                                  | `key`, `label`                                                                                                                                                                                                                                                                   |
+| `fan_out`                                       | `type`, `itemsExpression`, `branchLabelTemplate`, `onUnhandledError`                                                                                                                                                                                                             |
+| `join` `merge`, `script`, `ai_synthesis`        | `type`, `mode`, `settings`, `onUnhandledError`                                                                                                                                                                                                                                   |
+| `join` `mode: null`                             | `type`, `mode`, `onUnhandledError`                                                                                                                                                                                                                                               |
+| `ScriptConfig`                                  | `source`, `runtime`                                                                                                                                                                                                                                                              |
+| `script`                                        | `source`, `runtime`, `type`, `onUnhandledError`                                                                                                                                                                                                                                  |
+| `loop`                                          | `type`, `maxIterations`, `continueExpression`, `onUnhandledError`                                                                                                                                                                                                                |
+| `human_approval`                                | `type`, `title`, `bodyTemplate`, `timeoutMs`, `onUnhandledError`                                                                                                                                                                                                                 |
+| `error_handler`                                 | `type`, `maxAttempts`, `backoffMs`, `handledErrorKinds`, `onUnhandledError`                                                                                                                                                                                                      |
+| `sub_workflow`                                  | `type`, `targetWorkflowId`, `inputMapping`, `onUnhandledError`                                                                                                                                                                                                                   |
+
+A `db` oldal kulcslistái (`is-node-config.ts`, `is-agent-step-config.ts`) `Readonly<Record<keyof T, true>>`
+annotációval a `db` típusokból következnek; a `typecheck` kapu ezért egy hiányzó vagy fölösleges kulcsot
+fordítási hibával jelez. A két oldal kulcskészlete a táblával objektumonként egyezik, és ugyanezt a
+kölcsönös értékadhatóság (`node-config-drift-protection`, típusszintű ág) is őrzi.
+
+### 5.2 A szabadon maradó belsők
+
+A SPEC-011 5.2 táblázatának öt helye, a két oldalon egyformán nyitott:
+
+| Hely                                | `protocol`                          | `db`                                  |
+| ----------------------------------- | ----------------------------------- | ------------------------------------- |
+| `AgentStepConfig.agents`            | `z.record(z.string(), z.unknown())` | `isRecord`, az érték nem vizsgált     |
+| `JoinMergeNodeConfig.settings`      | `z.record(z.string(), z.unknown())` | `isRecord`                            |
+| `StructuredOutputConfig.schema`     | `z.unknown()`                       | csak a kulcs megléte                  |
+| a `SandboxConfig` öt nyitott mezője | `z.unknown().optional()`            | a kulcs ismert, az érték nem vizsgált |
+| `sub_workflow.inputMapping` kulcsai | `z.record(z.string(), z.string())`  | `isRecord`, minden érték szöveg       |
+
+Az `mcpServers` rekord kulcsai (a szerver neve) mindkét oldalon szabadok, a variánsok kulcskészlete zárt. Olyan
+nyitott belsőt, amit a lista nem nevez meg, a felmérés nem talált.
+
+### 5.3 Mely meglévő teszt és fixtúra hordozott ismeretlen kulcsot
+
+**A módszer.** Az új `isRecordWithKnownKeys` guardot ideiglenesen úgy módosítottuk, hogy minden ismeretlen
+kulcsot a hívó `.spec.` veremkeretével a kimenetre írjon, és lefuttattuk a `packages/db`, a `packages/engine`,
+az `apps/server` és a `packages/typeguards` teljes Vitest készletét. A módosítás utána visszaállt (a fájl
+bájtra azonos a commitolttal).
+
+**Az eredmény.** A guard saját tesztjén kívül egyetlen találat: a `is-agent-step-config.spec.ts` "elutasítja az
+env ÉRTÉKET hordozó MCP szerver alakot" tesztje, ami az `env` kulcsot szándékosan hordozza, és már a
+szigorítás előtt is hamisat várt (az `envNames` hiánya miatt). Igazítani egyetlen meglévő tesztet vagy
+fixtúrát sem kellett: a teljes Vitest készlet a szigorított guarddal változtatás nélkül zöld volt (607/607
+tesztfájl).
+
+**Ami a mérésen kívül esik, és miért nem érintett.**
+
+- A lenyomat fixtúra (`graph-snapshot-document-v1-fixture.json`) tesztje a `readGraphSnapshot` és a lenyomat
+  képzés útját futtatja, az `isNodeConfig` guardot nem (a pillanatkép burkolata, `isGraphSnapshotDocumentV1`, a
+  `config` mezőt `unknown` alakban hagyja, és a SPEC-011 12.3 3. pontja szerint a szigorításon kívül marad). Az
+  agent csomópontja a T-011-4 és a T-011-7 után ismeretlen kulcsot nem hordoz; az `onUnhandledError` hiánya
+  (1.5) változatlan, nem része a feladatnak.
+- Az `apps/web` e2e mockjai és fixtúrái (`showcase-graph.ts`) a böngészőben a `protocol` szigorú sémáin
+  mennek át, a `db` guardot nem érik el.
+
+### 5.4 A rontásos igazolás
+
+A szigorítás visszavonása (`isRecordWithKnownKeys` törzse ideiglenesen `isRecord(value)` eredményét adja, a
+kulcsokat nem nézi) mellett a `packages/db` és az `apps/server` `node-config-drift-protection` tesztjei
+lefutva **52 bukó teszt, 4 fájlban**:
+
+| Fájl                                                 | Bukó teszt |
+| ---------------------------------------------------- | ---------- |
+| `db` `is-agent-step-config.spec.ts`                  | 7          |
+| `db` `is-node-config.spec.ts`                        | 19         |
+| `db` `workflow-repository.spec.ts`                   | 3          |
+| `apps/server` `node-config-drift-protection.spec.ts` | 23         |
+
+A visszaállítás után mind zöld.

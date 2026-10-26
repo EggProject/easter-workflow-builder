@@ -4,11 +4,23 @@ import type {
   StructuredOutputStrategyId,
   ThinkingMode,
 } from '@easter-workflow-builder/provider-capability';
-import { isBoolean, isNumber, isRecord, isString, isStringArray } from '@easter-workflow-builder/typeguards';
+import {
+  isBoolean,
+  isNumber,
+  isRecord,
+  isRecordWithKnownKeys,
+  isString,
+  isStringArray,
+} from '@easter-workflow-builder/typeguards';
 import type { AgentStepConfig, PresetSystemPrompt, StructuredOutputConfig } from './agent-step-config.ts';
 import type { SandboxConfig } from './sandbox-config.ts';
 import type { SessionMode } from './session-mode.ts';
-import type { StorableMcpServer } from './storable-mcp-server.ts';
+import type {
+  StorableHttpMcpServer,
+  StorableMcpServer,
+  StorableSseMcpServer,
+  StorableStdioMcpServer,
+} from './storable-mcp-server.ts';
 
 // A zárt értékkészletek kulcsonként. A `Record<Unió, true>` annotáció miatt a
 // fordító hibát ad, ha az unió bővül, de a lista nem.
@@ -25,6 +37,78 @@ const SESSION_MODE_KEYS: Readonly<Record<SessionMode, true>> = {
 
 const STRUCTURED_OUTPUT_STRATEGY_KEYS: Readonly<Record<StructuredOutputStrategyId, true>> = {
   sdk_output_format: true,
+};
+
+// Az ellenőrzött objektumok zárt kulcslistái (SPEC-011 5.2): minden más kulcs
+// ismeretlen, és a guard elutasítja. A `Record<keyof T, true>` annotáció miatt
+// a fordító hibát ad, ha a típus egy mezővel bővül, de a lista nem. Ami szabad
+// marad: az `agents` és a `mcpServers` rekord kulcsai, az `agents` értékei, a
+// `structuredOutput.schema` belseje és a `SandboxConfig` öt nyitott mezőjének
+// értéke (a kulcsuk ismert).
+const AGENT_STEP_CONFIG_KEYS: Readonly<Record<keyof AgentStepConfig, true>> = {
+  promptTemplate: true,
+  providerId: true,
+  modelId: true,
+  effort: true,
+  thinking: true,
+  allowedTools: true,
+  disallowedTools: true,
+  permissionMode: true,
+  maxTurns: true,
+  maxBudgetUsd: true,
+  systemPrompt: true,
+  agents: true,
+  skills: true,
+  mcpServers: true,
+  cwd: true,
+  additionalDirectories: true,
+  sandbox: true,
+  sessionMode: true,
+  structuredOutput: true,
+};
+
+const PRESET_SYSTEM_PROMPT_KEYS: Readonly<Record<keyof PresetSystemPrompt, true>> = {
+  type: true,
+  preset: true,
+  append: true,
+  excludeDynamicSections: true,
+};
+
+const STRUCTURED_OUTPUT_CONFIG_KEYS: Readonly<Record<keyof StructuredOutputConfig, true>> = {
+  strategy: true,
+  schema: true,
+};
+
+const SANDBOX_CONFIG_KEYS: Readonly<Record<keyof SandboxConfig, true>> = {
+  enabled: true,
+  failIfUnavailable: true,
+  autoAllowBashIfSandboxed: true,
+  excludedCommands: true,
+  enableWeakerNestedSandbox: true,
+  allowUnsandboxedCommands: true,
+  network: true,
+  filesystem: true,
+  ignoreViolations: true,
+  ripgrep: true,
+};
+
+const STDIO_MCP_SERVER_KEYS: Readonly<Record<keyof StorableStdioMcpServer, true>> = {
+  type: true,
+  command: true,
+  args: true,
+  envNames: true,
+};
+
+const SSE_MCP_SERVER_KEYS: Readonly<Record<keyof StorableSseMcpServer, true>> = {
+  type: true,
+  url: true,
+  authEnvName: true,
+};
+
+const HTTP_MCP_SERVER_KEYS: Readonly<Record<keyof StorableHttpMcpServer, true>> = {
+  type: true,
+  url: true,
+  authEnvName: true,
 };
 
 function isNullableString(value: unknown): value is string | null {
@@ -60,11 +144,11 @@ function isSkills(value: unknown): value is readonly string[] | 'all' | null {
 
 function isPresetSystemPrompt(value: unknown): value is PresetSystemPrompt {
   return (
-    isRecord(value) &&
-    value['type'] === 'preset' &&
-    value['preset'] === 'claude_code' &&
-    isNullableString(value['append']) &&
-    isNullableBoolean(value['excludeDynamicSections'])
+    isRecordWithKnownKeys(value, PRESET_SYSTEM_PROMPT_KEYS) &&
+    value.type === 'preset' &&
+    value.preset === 'claude_code' &&
+    isNullableString(value.append) &&
+    isNullableBoolean(value.excludeDynamicSections)
   );
 }
 
@@ -86,11 +170,22 @@ function isStorableMcpServer(value: unknown): value is StorableMcpServer {
   }
   switch (value['type']) {
     case 'stdio': {
-      return isString(value['command']) && isStringArray(value['args']) && isStringArray(value['envNames']);
+      return (
+        isRecordWithKnownKeys(value, STDIO_MCP_SERVER_KEYS) &&
+        isString(value.command) &&
+        isStringArray(value.args) &&
+        isStringArray(value.envNames)
+      );
     }
-    case 'sse':
+    case 'sse': {
+      return (
+        isRecordWithKnownKeys(value, SSE_MCP_SERVER_KEYS) && isString(value.url) && isNullableString(value.authEnvName)
+      );
+    }
     case 'http': {
-      return isString(value['url']) && isNullableString(value['authEnvName']);
+      return (
+        isRecordWithKnownKeys(value, HTTP_MCP_SERVER_KEYS) && isString(value.url) && isNullableString(value.authEnvName)
+      );
     }
     default: {
       return false;
@@ -104,17 +199,18 @@ function isMcpServerRecord(value: unknown): value is Readonly<Record<string, Sto
 
 /**
  * Az `Options.sandbox` öt, forrásból levezethető alakú mezőjét ellenőrzi. A
- * másik öt mező alakja nyitott (lásd `sandbox-config.ts`), ezért azokat a
- * guard szándékosan nem szűkíti: tippelni tilos.
+ * másik öt mező alakja nyitott (lásd `sandbox-config.ts`), ezért azok értékét a
+ * guard szándékosan nem szűkíti: tippelni tilos. A kulcsuk viszont ismert,
+ * tehát a tíz kulcson kívül minden más elutasított.
  */
 function isSandboxConfig(value: unknown): value is SandboxConfig {
   return (
-    isRecord(value) &&
-    isBoolean(value['enabled']) &&
-    isBoolean(value['failIfUnavailable']) &&
-    isBoolean(value['autoAllowBashIfSandboxed']) &&
-    isBoolean(value['enableWeakerNestedSandbox']) &&
-    isStringArray(value['excludedCommands'])
+    isRecordWithKnownKeys(value, SANDBOX_CONFIG_KEYS) &&
+    isBoolean(value.enabled) &&
+    isBoolean(value.failIfUnavailable) &&
+    isBoolean(value.autoAllowBashIfSandboxed) &&
+    isBoolean(value.enableWeakerNestedSandbox) &&
+    isStringArray(value.excludedCommands)
   );
 }
 
@@ -123,10 +219,10 @@ function isNullableSandboxConfig(value: unknown): value is SandboxConfig | null 
 }
 
 function isStructuredOutputConfig(value: unknown): value is StructuredOutputConfig {
-  if (!isRecord(value)) {
+  if (!isRecordWithKnownKeys(value, STRUCTURED_OUTPUT_CONFIG_KEYS)) {
     return false;
   }
-  const strategy = value['strategy'];
+  const strategy = value.strategy;
   // A `schema` JSON Schema dokumentum, `unknown` a séma szintjén (4.6), ezért
   // csak a kulcs meglétét követeljük meg, az alakját nem.
   return isString(strategy) && Object.hasOwn(STRUCTURED_OUTPUT_STRATEGY_KEYS, strategy) && 'schema' in value;
@@ -140,29 +236,32 @@ function isNullableStructuredOutputConfig(value: unknown): value is StructuredOu
  * Typeguard az `AgentStepConfig` alakra (SPEC-003 4.4 és 9.4 szekció). A
  * bemenet `unknown`, mert az adatbázisból jövő JSON nem bizonyíték a típusra.
  * Az ellenőrzés minden mezőre kiterjed, a beágyazott rekordokra (`mcpServers`)
- * és objektumokra (`sandbox`, `systemPrompt`, `structuredOutput`) is.
+ * és objektumokra (`sandbox`, `systemPrompt`, `structuredOutput`) is, és
+ * minden szinten elutasítja az ismeretlen kulcsot (SPEC-011 5.2). Az
+ * `agent_step` node `type` és `onUnhandledError` kulcsát a hívó választja le
+ * (`is-node-config.ts`), mert az a node config burkolata, nem ez az alak.
  */
 export function isAgentStepConfig(value: unknown): value is AgentStepConfig {
   return (
-    isRecord(value) &&
-    isString(value['promptTemplate']) &&
-    isNullableProviderId(value['providerId']) &&
-    isNullableString(value['modelId']) &&
-    isNullableString(value['effort']) &&
-    isNullableThinkingMode(value['thinking']) &&
-    isStringArray(value['allowedTools']) &&
-    isStringArray(value['disallowedTools']) &&
-    isNullableString(value['permissionMode']) &&
-    isNullableNumber(value['maxTurns']) &&
-    isNullableNumber(value['maxBudgetUsd']) &&
-    isSystemPrompt(value['systemPrompt']) &&
-    isRecord(value['agents']) &&
-    isSkills(value['skills']) &&
-    isMcpServerRecord(value['mcpServers']) &&
-    isNullableString(value['cwd']) &&
-    isStringArray(value['additionalDirectories']) &&
-    isNullableSandboxConfig(value['sandbox']) &&
-    isSessionMode(value['sessionMode']) &&
-    isNullableStructuredOutputConfig(value['structuredOutput'])
+    isRecordWithKnownKeys(value, AGENT_STEP_CONFIG_KEYS) &&
+    isString(value.promptTemplate) &&
+    isNullableProviderId(value.providerId) &&
+    isNullableString(value.modelId) &&
+    isNullableString(value.effort) &&
+    isNullableThinkingMode(value.thinking) &&
+    isStringArray(value.allowedTools) &&
+    isStringArray(value.disallowedTools) &&
+    isNullableString(value.permissionMode) &&
+    isNullableNumber(value.maxTurns) &&
+    isNullableNumber(value.maxBudgetUsd) &&
+    isSystemPrompt(value.systemPrompt) &&
+    isRecord(value.agents) &&
+    isSkills(value.skills) &&
+    isMcpServerRecord(value.mcpServers) &&
+    isNullableString(value.cwd) &&
+    isStringArray(value.additionalDirectories) &&
+    isNullableSandboxConfig(value.sandbox) &&
+    isSessionMode(value.sessionMode) &&
+    isNullableStructuredOutputConfig(value.structuredOutput)
   );
 }

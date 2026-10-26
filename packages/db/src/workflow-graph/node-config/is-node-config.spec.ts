@@ -276,4 +276,90 @@ describe('isNodeConfig', () => {
       expect(isNodeConfig(config)).toBe(false);
     });
   }
+
+  // SPEC-011 5.2: minden ellenőrzött objektum zárt kulcslistájú. A tíz típus
+  // (a `join` mind a négy ága) egy-egy érvényes példánya egyetlen ismeretlen
+  // kulccsal bővítve elbukik; a beágyazott objektumok ugyanígy.
+  const UNKNOWN_KEY = 'ismeretlenKulcs';
+
+  for (const config of validConfigs) {
+    const label = config.type === 'join' ? `join ${String(config.mode)}` : config.type;
+    it(`hamisat ad, ha a(z) ${label} config gyökere ismeretlen kulcsot hordoz`, () => {
+      expect(isNodeConfig({ ...config, [UNKNOWN_KEY]: true })).toBe(false);
+    });
+  }
+
+  const nestedUnknownKeyCases: readonly (readonly [string, unknown])[] = [
+    [
+      'a start bemeneti mezője',
+      {
+        type: 'start',
+        inputFields: [{ name: 'topic', label: 'Téma', valueKind: 'text', required: true, [UNKNOWN_KEY]: true }],
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a branch opciója',
+      {
+        type: 'branch',
+        expression: 'x',
+        branches: [{ key: 'high', label: 'Magas', [UNKNOWN_KEY]: true }],
+        defaultBranchKey: null,
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a join script módjának settings alobjektuma',
+      {
+        type: 'join',
+        mode: 'script',
+        settings: { source: 'a + b', runtime: 'expression', [UNKNOWN_KEY]: true },
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a join ai_synthesis módjának settings alobjektuma',
+      {
+        type: 'join',
+        mode: 'ai_synthesis',
+        settings: { ...agentStepConfig, [UNKNOWN_KEY]: true },
+        onUnhandledError: null,
+      },
+    ],
+    [
+      'a join ai_synthesis settings alobjektuma a node burkoló kulcsával',
+      {
+        type: 'join',
+        mode: 'ai_synthesis',
+        settings: { ...agentStepConfig, type: 'agent_step' },
+        onUnhandledError: null,
+      },
+    ],
+    ['a választatlan join settings kulccsal', { type: 'join', mode: null, settings: {}, onUnhandledError: null }],
+  ];
+
+  for (const [description, config] of nestedUnknownKeyCases) {
+    it(`hamisat ad, ha ${description} ismeretlen kulcsot hordoz`, () => {
+      expect(isNodeConfig(config)).toBe(false);
+    });
+  }
+
+  it('a szabad mezők kulcsai tetszőlegesek: a join merge settings és a sub_workflow inputMapping', () => {
+    expect(
+      isNodeConfig({
+        type: 'join',
+        mode: 'merge',
+        settings: { [UNKNOWN_KEY]: { melyen: [1] }, masik: 'x' },
+        onUnhandledError: null,
+      }),
+    ).toBe(true);
+    expect(
+      isNodeConfig({
+        type: 'sub_workflow',
+        targetWorkflowId: 'workflow-1',
+        inputMapping: { [UNKNOWN_KEY]: 'input.a', 'tetszőleges név': 'input.b' },
+        onUnhandledError: null,
+      }),
+    ).toBe(true);
+  });
 });
