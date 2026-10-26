@@ -1,7 +1,9 @@
 /**
  * A workspace csomagok réteg-hozzárendelése, a SPEC-002 4. szekció
- * "Rétegbesorolás, mind a 32 csomagra" táblázata szerint
- * (`docs/spec/SPEC-002-csomag-architektura.md`). A számok nem sorszámok: egy
+ * "Rétegbesorolás, mind a 26 csomagra" táblázata szerint
+ * (`docs/spec/SPEC-002-csomag-architektura.md`). A térkép a teljes workspace-t
+ * lefedi: 26 bejegyzés, 22 termékcsomag rétegszámmal és 4 eszköz csomag
+ * (`eslint-config`, `tsconfig`, `scripts`, `wire-probe`). A számok nem sorszámok: egy
  * csomag csak nála szigorúan KISEBB számú rétegből függhet, azonos rétegen
  * belüli él tilos. Az "eszköz" csomagoknak (`'tool'`) nincs rétegszámuk, ők
  * kizárólag `devDependencies` helyen jelenhetnek meg bármely termékcsomagban.
