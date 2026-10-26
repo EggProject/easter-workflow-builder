@@ -379,13 +379,13 @@ Az `agents` bejegyzés űrlapja ugyanezt az elvet követi eggyel lejjebb: elöl 
 
 Az `agent_step` és a `join` `ai_synthesis` módja a teljes `AgentStepConfig` alakot szerkeszti, a fenti elv szerint:
 
-| Hely                                              | Mezők                                                                                                              | Vezérlő                                                   |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| elöl, panel nélkül                                | `promptTemplate`, `systemPrompt`, `providerId`                                                                     | `TextAreaField`, mód választó plusz szöveg, `SelectField` |
-| "Modell és futási korlátok" panel                 | `modelId`, `sessionMode`, `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `permissionMode`, `enabledEngineHooks` | szövegmező, szám mező és `SelectField`, a zárt listákból  |
-| "Eszközök és környezet" panel                     | `allowedTools`, `disallowedTools`, `agentTools`, `cwd`, `additionalDirectories`, `sandbox`, `structuredOutput`     | lista szerkesztő, jelölőnégyzet és nyers JSON szerkesztő  |
-| "Al-agentek (agents)" panel                       | `agents`                                                                                                           | kulcsonkénti lista, saját szerkesztővel                   |
-| "Skillek és MCP szerverek (csak olvasható)" panel | `skills`, `mcpServers`                                                                                             | olvasható érték, megnevezett okkal                        |
+| Hely                                              | Mezők                                                                                            | Vezérlő                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| elöl, panel nélkül                                | `promptTemplate`, `systemPrompt`, `providerId`                                                   | `TextAreaField`, mód választó plusz szöveg, `SelectField` |
+| "Modell és futási korlátok" panel                 | `modelId`, `sessionMode`, `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `permissionMode`     | szövegmező, szám mező és `SelectField`, a zárt listákból  |
+| "Eszközök és környezet" panel                     | `allowedTools`, `disallowedTools`, `cwd`, `additionalDirectories`, `sandbox`, `structuredOutput` | lista szerkesztő, jelölőnégyzet és nyers JSON szerkesztő  |
+| "Al-agentek (agents)" panel                       | `agents`                                                                                         | kulcsonkénti lista, saját szerkesztővel                   |
+| "Skillek és MCP szerverek (csak olvasható)" panel | `skills`, `mcpServers`                                                                           | olvasható érték, megnevezett okkal                        |
 
 **Minden többsoros mező a design system `.textarea` komponensét viseli** (`packages/ui` `textarea` téma), nem az egysoros `.input` osztályt. A komponens korábban sosem lett átemelve, és a panel egyetlen saját komponense (`TextAreaField`) adta az `.input` osztályt a `<textarea>` elemre, egy saját `resize: vertical` toldással, és az audit szerint tizenhat fájl használta; ez volt a felhasználó input panaszának oka (`docs/research/2026-09-08-design-system-audit.md` 4.4).
 

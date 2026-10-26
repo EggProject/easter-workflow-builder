@@ -510,7 +510,7 @@ A mérés a T-011-8 utáni fán (`0654542`) készült, saját futtatás.
 
 **Az `apps/web` próbája.** A `types` sor és a komment törlése után: `bun run typecheck` 19/19 sikeres (az
 `apps/web` háromszoros ellenőrzése, `tsc --noEmit`, `tsc --noEmit -p e2e`, `tsc --noEmit -p measurement` is),
-`bun x turbo run lint --concurrency=1` 32/32 sikeres, `bun run test` 608 tesztfájl és 6315 teszt sikeres, a
+`bun x turbo run lint --concurrency=1` 32/32 sikeres, `bun run test` 607 tesztfájl és 6361 teszt sikeres (a T-011-10 futásban újramérve, a kód azonos), a
 100 százalékos lefedettségi küszöb teljesül, `bun run build` 1/1 sikeres, `bun run format:check`, `docs:check`,
 `check:casing`, `check:graph` és `check:db-drift` nulla kilépési kóddal. A beállítás nélkül is a program 82
 `@types/node` fájlt tartalmaz (`bun x tsc --noEmit --listFilesOnly | grep -c "@types/node"` az `apps/web`
@@ -522,3 +522,30 @@ egyetlen indoka a törölt kód volt, a beállítás és a komment törölve.
 törölt kódra hivatkozó rész. A beállítás tehát marad, a komment a `toBase64()` mondat nélkül áll. A `toBase64`,
 `fromBase64` és `node:buffer` szavakra a termékkódban (`git grep`, `docs/` nélkül) nincs más találat; az egyetlen
 megmaradó hivatkozás az `apps/web` `browser-safe-imports.spec.ts` történeti fejléce, ami a mért hibát írja le.
+
+## 7. A SPEC-011 11. szekció ellenőrző keresései (PLAN-011 T-011-10, 2026-10-26)
+
+Saját futtatás az `HEAD` fán a T-011-10 munkapéldánnyal. A pathspec (K kivételek):
+`-- . ':!docs/research/2026-10-21-spec010-blokkolo-meresek' ':!docs/spec/SPEC-011-*' ':!docs/plan/PLAN-011-*' ':!docs/research/2026-10-26-eszkoz-lanc-torles*'`
+
+| Kritérium | Parancs (a pathspec a fenti, ahol jelölve)                                                                                                                                                                                                                      | Találat |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1         | `git ls-files packages/tool-minimax-web-search packages/tool-minimax-understand-image packages/tool-firecrawl-web-fetch packages/minimax-client packages/firecrawl-client packages/mcp-tool-kit packages/agent-tool-bundle \| wc -l`                            | 0       |
+| 2         | `git ls-files '*/package.json' \| grep -v '^package.json$' \| wc -l`                                                                                                                                                                                            | 19      |
+| 3         | a `package-layer.ts` bejegyzései (`sed -n 9,60p tooling/scripts/src/dependency-graph/package-layer.ts \| grep -E ": ([0-9]\|'tool')" \| wc -l`)                                                                                                                 | 19      |
+| 4         | `git grep -n -i -E "tool-minimax-web-search\|tool-minimax-understand-image\|tool-firecrawl-web-fetch\|minimax-client\|firecrawl-client\|mcp-tool-kit\|agent-tool-bundle\|firecrawl\|MINIMAX_API_BASE_URL\|MINIMAX_TIMEOUT_MS" <pathspec>`                       | 0       |
+| 6         | `git grep -n -E "agentTools\|AgentToolId\|AgentToolRecommendation\|recommendedAgentTools\|RecommendedAgentTools\|agent-tool-id\|recommended-agent-tools\|agent-tool-recommendation" <pathspec>`                                                                 | 0       |
+| 7         | `git grep -n -E "understand_image\|web_fetch\|mcp__agent-tools" <pathspec> ':!docs/research/2026-09-23-transcript-panel-meresek.md'`; a kivett fájlra külön `understand_image\|web_fetch` (a K kivétel csak a `mcp__agent-tools` mintára szól)                  | 0 és 0  |
+| 11        | `git grep -n -E "emit_output\|buildStopHookMatcher\|build-stop-hook-matcher" <pathspec>`, a 7.3 szerint megtartott hét hely (`m-10.ts`, `m-19.ts`, `measurement-document.ts`, SPEC-000, PLAN-000, `spec000-kiertekeles`, `spec000-meresi-jegyzokonyv`) kiszűrve | 0       |
+| 13        | `git grep -n -E "enabledEngineHooks\|EngineHookId\|EngineHookIdSchema\|engine-hook-id" <pathspec>`                                                                                                                                                              | 0       |
+| 19        | `git diff --name-only 6009603 --diff-filter=d \| xargs grep -lP "\x{2014}"`                                                                                                                                                                                     | üres    |
+
+**A T-011-10 dokumentum döntései.** A törölt fogalmakra hivatkozó szakaszok és sorok törlődtek (O-11, O-12), a
+számozott listák és lépések azonosítói nem tolódtak el (a SPEC-001 51 ... 55. kritériuma és a PLAN-002 T-002-12,
+14 ... 21 lépése törölve, a többi száma változatlan). A PLAN-004 leltára a törölt csomagok és a `db`
+`engine-hook-id.ts` fájlja nélkül számol (a `workflow-graph` 24 helyett 23 fájl, a `db` 107 helyett 106, a
+mozduló fájlok 57 helyett 56, a többi csomag 24 helyett 17). A SPEC-002 és a PLAN-002 mérésből származó nyers
+kimenetei (a `2026-08-27-spec002-migracio-zaras.md` 32 csomagos `turbo` futása) a mérés idején érvényes állapotot
+rögzítik, ezeket nem írtuk át. A `2026-09-23-transcript-panel-meresek.md` fájlból csak a törölt eszköz nevét
+tartalmazó mérési értékek (`understand_image` 457 pixel) kerültek ki, a `web_search` mérések és a
+`mcp__agent-tools` minta (O-15) megmaradt.

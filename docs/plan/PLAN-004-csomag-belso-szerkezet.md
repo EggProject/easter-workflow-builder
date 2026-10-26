@@ -6,7 +6,7 @@
 | Dátum    | 2026-08-28                                                                                                                                                                                         |
 | Ág       | `feat/spec-003-domain-perzisztencia`                                                                                                                                                               |
 | Előzmény | [`../spec/SPEC-002-csomag-architektura.md`](../spec/SPEC-002-csomag-architektura.md) 6. szekció, [`../spec/SPEC-003-domain-perzisztencia.md`](../spec/SPEC-003-domain-perzisztencia.md) 8. szekció |
-| Kimenet  | 57 fájl mozdul, mind a `packages/db` csomagon belül, három téma mappából tíz lesz; a többi 24 csomag szerkezete változatlan                                                                        |
+| Kimenet  | 56 fájl mozdul, mind a `packages/db` csomagon belül, három téma mappából tíz lesz; a többi 17 csomag szerkezete változatlan                                                                        |
 
 ---
 
@@ -27,7 +27,7 @@
 ### Amit ez a terv eldönt
 
 - Egy írott, alkalmazható **bontási kritériumot**, ami nem darabszám küszöb (3. szekció).
-- A repo mind a 25 csomagjának minden téma mappájára, hogy bontjuk-e vagy marad, és miért (2. és 5. szekció).
+- A repo mind a 18 csomagjának minden téma mappájára, hogy bontjuk-e vagy marad, és miért (2. és 5. szekció).
 - A `packages/db` csomag három nagy téma mappájának fájlszintű átrendezését (4. szekció).
 - A végrehajtás fázisait úgy, hogy minden fázis után mind a nyolc minőségi kapu zöld (7. szekció).
 - Azt, hogy a SPEC-002 rögzített konvenciójából mit kell átvezetni (8. szekció).
@@ -52,7 +52,7 @@ szerepel.
 | Csomag                | Mappa                    | Fájl | Bontandó                                   |
 | --------------------- | ------------------------ | ---- | ------------------------------------------ |
 | `tools/wire-probe`    | `src/cases/`             | 37   | nem, hatókörön kívül (SPEC-002 6.8)        |
-| `packages/db`         | `src/workflow-graph/`    | 24   | **igen**, négy témára                      |
+| `packages/db`         | `src/workflow-graph/`    | 23   | **igen**, négy témára                      |
 | `packages/db`         | `src/graph-snapshot/`    | 18   | **igen**, három témára                     |
 | `packages/db`         | `src/run-event/`         | 15   | **igen**, három témára                     |
 | `provider-capability` | `src/request-shaping/`   | 11   | nem, a fájlnevek megnevezik a csoportot    |
@@ -62,11 +62,11 @@ szerepel.
 | `packages/db`         | `src/database-file/`     | 6    | nem                                        |
 | `packages/db`         | `src/sqlite-connection/` | 6    | nem, egy fájl mégis rossz helyen van (4.4) |
 
-### 2.2 A `packages/db` teljes leltára, 107 fájl plusz a barrel
+### 2.2 A `packages/db` teljes leltára, 106 fájl plusz a barrel
 
 | Mappa                   | Fájl | Tartalom, egy mondatban                                                                                                     |
 | ----------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------- |
-| `workflow-graph/`       | 24   | három tábla, a `WorkflowRepository`, a `NodeType` unió, a node config unió, az `AgentStepConfig` és mind a négy typeguardja |
+| `workflow-graph/`       | 23   | három tábla, a `WorkflowRepository`, a `NodeType` unió, a node config unió, az `AgentStepConfig` és mind a négy typeguardja |
 | `graph-snapshot/`       | 18   | a `graph_snapshot` tábla, a dokumentum típus és verzió unió, a kanonizáló, a `sha256` lenyomat, a fixture, a visszaolvasó   |
 | `run-event/`            | 15   | a `run_event` tábla, a 25 értékű `RunEventKind` unió, az SDK üzenet normalizálás, a `RunEventRepository`                    |
 | `step-run/`             | 9    | a `step_run` tábla, a `StepRunStatus` és az átmeneti szabály, a `StepRunRepository`                                         |
@@ -79,33 +79,26 @@ szerepel.
 | `migration/`            | 3    | a migrációs mappa útvonala és a `migrate()` hívás `Outcome` burkolása                                                       |
 | `run-recovery/`         | 2    | a `RunRecovery` és a tesztje, nincs saját tábla                                                                             |
 
-### 2.3 A többi 24 csomag leltára
+### 2.3 A többi 17 csomag leltára
 
-| Csomag                                                 | Téma mappák, fájlszámmal                                                                                                                                                                                                                  | Összesen |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `packages/typeguards`                                  | 17 mappa, `is-function` 4, `is-constructor` 3, `is-string-resolver` 3, `test-constants` 1, a maradék 13 mind 2                                                                                                                            | 37       |
-| `packages/provider-capability`                         | `request-shaping` 11, `evidence/fact` 5, `evidence/evidence-reference` 3, `evidence-sources/measurement-document` 3, `limits` 3, `provider-id` 3, `environment` 2, `model-catalog` 2, `tool-support` 2, `descriptor` 1, `agent-tool-id` 1 | 36       |
-| `packages/core`                                        | `http-client/request` 6, `env-reader/environment-reader` 5, `image-source/media-type` 5, `image-source/data-url` 3, `result/outcome` 3, `http-client/error-description` 2                                                                 | 24       |
-| `packages/minimax-client`                              | `minimax-config` 5, `search` 5, `call-minimax` 3, `envelope` 3, `vlm` 3                                                                                                                                                                   | 19       |
-| `packages/provider-minimax`                            | `request-shaping` 6, `model-catalog` 3, `environment` 2, `limits` 2, `tool-support` 2, `descriptor` 1                                                                                                                                     | 16       |
-| `packages/provider-claude-subscription`                | ugyanaz a hat téma, ugyanazokkal a darabszámokkal                                                                                                                                                                                         | 16       |
-| `packages/firecrawl-client`                            | `firecrawl-config` 5, `scrape-document` 5, `scrape-call` 3                                                                                                                                                                                | 13       |
-| `packages/agent-tool-bundle`                           | `tool-bundle` 3, `tool-dependencies` 3, `tool-reference` 3, `tool-factory` 2                                                                                                                                                              | 11       |
-| `packages/mcp-tool-kit`                                | `tool-call-result` 5                                                                                                                                                                                                                      | 5        |
-| `packages/tool-minimax-web-search`                     | `web-search-tool` 3                                                                                                                                                                                                                       | 3        |
-| `packages/tool-firecrawl-web-fetch`                    | `web-fetch-tool` 3                                                                                                                                                                                                                        | 3        |
-| `packages/tool-minimax-understand-image`               | `understand-image-tool` 3                                                                                                                                                                                                                 | 3        |
-| `packages/provider-registry`                           | `provider-registry` 2                                                                                                                                                                                                                     | 2        |
-| `packages/agent`, `engine`, `logger`, `protocol`, `ui` | nincs téma mappa, csak placeholder `index.ts`                                                                                                                                                                                             | 0        |
-| `apps/server`                                          | csak `index.ts`                                                                                                                                                                                                                           | 0        |
-| `apps/web`                                             | csak `index.ts` és a 6.8 szerinti `main.ts`                                                                                                                                                                                               | 1        |
-| `tooling/scripts`                                      | `dependency-graph` 5, `casing` 4, `turbo-e2e-coverage-outputs` 1                                                                                                                                                                          | 10       |
-| `tooling/eslint-config`                                | `eslint-preset` 4                                                                                                                                                                                                                         | 4        |
-| `tooling/tsconfig`                                     | csak `index.ts`                                                                                                                                                                                                                           | 0        |
-| `tools/wire-probe`                                     | `cases` 37, `harness` 4, `proxy` 3, plusz 4 fájl a `src/` tetején                                                                                                                                                                         | 48       |
+| Csomag                                                 | Téma mappák, fájlszámmal                                                                                                                                                                                               | Összesen |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `packages/typeguards`                                  | 17 mappa, `is-function` 4, `is-constructor` 3, `is-string-resolver` 3, `test-constants` 1, a maradék 13 mind 2                                                                                                         | 37       |
+| `packages/provider-capability`                         | `request-shaping` 11, `evidence/fact` 5, `evidence/evidence-reference` 3, `evidence-sources/measurement-document` 3, `limits` 3, `provider-id` 3, `environment` 2, `model-catalog` 2, `tool-support` 2, `descriptor` 1 | 35       |
+| `packages/core`                                        | `http-client/request` 6, `env-reader/environment-reader` 5, `result/outcome` 3, `http-client/error-description` 2                                                                                                      | 16       |
+| `packages/provider-minimax`                            | `request-shaping` 6, `model-catalog` 3, `environment` 2, `limits` 2, `tool-support` 2, `descriptor` 1                                                                                                                  | 16       |
+| `packages/provider-claude-subscription`                | ugyanaz a hat téma, ugyanazokkal a darabszámokkal                                                                                                                                                                      | 16       |
+| `packages/provider-registry`                           | `provider-registry` 2                                                                                                                                                                                                  | 2        |
+| `packages/agent`, `engine`, `logger`, `protocol`, `ui` | nincs téma mappa, csak placeholder `index.ts`                                                                                                                                                                          | 0        |
+| `apps/server`                                          | csak `index.ts`                                                                                                                                                                                                        | 0        |
+| `apps/web`                                             | csak `index.ts` és a 6.8 szerinti `main.ts`                                                                                                                                                                            | 1        |
+| `tooling/scripts`                                      | `dependency-graph` 5, `casing` 4, `turbo-e2e-coverage-outputs` 1                                                                                                                                                       | 10       |
+| `tooling/eslint-config`                                | `eslint-preset` 4                                                                                                                                                                                                      | 4        |
+| `tooling/tsconfig`                                     | csak `index.ts`                                                                                                                                                                                                        | 0        |
+| `tools/wire-probe`                                     | `cases` 37, `harness` 4, `proxy` 3, plusz 4 fájl a `src/` tetején                                                                                                                                                      | 48       |
 
-**Amit a leltár mutat.** A repo 25 csomagjából **egyetlen egyben** van valódi probléma: a
-`packages/db` csomagban. Ott három mappa (24, 18 és 15 fájl) fog össze egymástól jól
+**Amit a leltár mutat.** A repo 18 csomagjából **egyetlen egyben** van valódi probléma: a
+`packages/db` csomagban. Ott három mappa (23, 18 és 15 fájl) fog össze egymástól jól
 elkülönülő fogalmakat úgy, hogy a fájlnevekből nem derül ki a hovatartozás. A második
 legnagyobb mappa a `tools/wire-probe/src/cases` 37 mérési eset fájllal, de az egy fogalom
 egy mappában (`m-01.ts` ... `m-36.ts`), és a SPEC-002 6.8 pontja szerint a csomag a
@@ -127,7 +120,7 @@ próbát; a döntést a próba hozza meg, nem a szám.
    `thinking-mode.ts`, `step-run-status.ts` és `is-step-run-status.ts`), akkor a mappa
    önmagát dokumentálja, és a bontás nulla információt tenne hozzá. Bontani akkor kell, ha
    van olyan fájl, aminek a nevéből egy junior nem tudja megmondani, melyik csoporthoz
-   tartozik (`session-mode.ts`, `engine-hook-id.ts`, `sandbox-config.ts` a 24 fájlos
+   tartozik (`session-mode.ts`, `sandbox-config.ts` a 23 fájlos
    `workflow-graph/` mappában).
 3. **Az irány körmentes.** A csoportok között az import irány egyirányú. Ha két csoport
    oda-vissza hivatkozik, akkor az egy fogalom volt, nem kettő.
@@ -155,26 +148,26 @@ kilenc érintetlen továbbra is **téma** mappa marad közvetlenül a `src/` ala
 alak megengedett: a `provider-capability` csomag ma pontosan így áll (SPEC-002 6.1, "A
 `provider-capability` a vegyes eset"), csak eggyel feljebb, a `src/` szintjén.
 
-### 4.1 `src/workflow-graph/`, 24 fájl, négy téma
+### 4.1 `src/workflow-graph/`, 23 fájl, négy téma
 
 **Miért bontjuk.** A mappa négy, egymástól jól elkülönülő fogalmat fog össze: a tárolt
 gráfot (három tábla plusz a repository), a node típus szótárát, a node config uniót és az
-agent lépés beállításait. A junior teszt itt élesen bukik: a `session-mode.ts`, az
-`engine-hook-id.ts`, a `sandbox-config.ts` és a `storable-mcp-server.ts` névből semmi nem
+agent lépés beállításait. A junior teszt itt élesen bukik: a `session-mode.ts`, a
+`sandbox-config.ts` és a `storable-mcp-server.ts` névből semmi nem
 mondja meg, hogy ezek mind az `AgentStepConfig` mezőalakjai.
 
-Jelenlegi fa (lapos, 24 fájl egymás mellett):
+Jelenlegi fa (lapos, 23 fájl egymás mellett):
 
 ```
 src/workflow-graph/
   agent-step-config.ts        is-node-config.spec.ts      storable-mcp-server.ts
-  engine-hook-id.ts           is-node-config.ts           workflow-edge.spec.ts
-  is-agent-step-config.spec.ts is-node-type.spec.ts       workflow-edge.ts
-  is-agent-step-config.ts     is-node-type.ts             workflow-node.spec.ts
-  is-string-array.spec.ts     node-config.ts              workflow-node.ts
-  is-string-array.ts          node-type.ts                workflow-repository.spec.ts
-  sandbox-config.ts           script-config.ts            workflow-repository.ts
-  session-mode.ts             workflow.spec.ts            workflow.ts
+  is-agent-step-config.spec.tsis-node-config.ts           workflow-edge.spec.ts
+  is-agent-step-config.ts     is-node-type.spec.ts        workflow-edge.ts
+  is-string-array.spec.ts     is-node-type.ts             workflow-node.spec.ts
+  is-string-array.ts          node-config.ts              workflow-node.ts
+  sandbox-config.ts           node-type.ts                workflow-repository.spec.ts
+  session-mode.ts             script-config.ts            workflow-repository.ts
+                              workflow.spec.ts            workflow.ts
 ```
 
 Javasolt fa:
@@ -184,7 +177,7 @@ src/workflow-graph/
   workflow/            8 fajl   a workflow sor es a graf sorai, meg az egyetlen repository
   node-type/           3 fajl   a tiz node tipus szotara es a guardja
   node-config/         6 fajl   a workflow_node.config unio es a guardja
-  agent-step-config/   7 fajl   az agent lepes SDK beallitasai es a guardja
+  agent-step-config/   6 fajl   az agent lepes SDK beallitasai es a guardja
 ```
 
 Fájlszintű leképezés:
@@ -214,7 +207,6 @@ Fájlszintű leképezés:
 | `sandbox-config.ts`            | `agent-step-config/` | az `AgentStepConfig.sandbox` mező alakja                                                          |
 | `storable-mcp-server.ts`       | `agent-step-config/` | az `AgentStepConfig.mcpServers` mező alakja                                                       |
 | `session-mode.ts`              | `agent-step-config/` | az `AgentStepConfig.sessionMode` mező alakja                                                      |
-| `engine-hook-id.ts`            | `agent-step-config/` | az `AgentStepConfig.enabledEngineHooks` mező alakja                                               |
 
 Import irány a témák között: `workflow` -> `node-config`, `node-type`; `node-config` ->
 `agent-step-config`, `node-type`. Körmentes, egy kivétellel, amit a 4.5 szekció külön kezel.
@@ -353,25 +345,24 @@ készült. Egy hívóval a "hol lakik" kérdés nem áll fenn.
 A user kifejezetten megengedte, hogy ne mindent alakítsunk át. Az alábbi mappák a 3. szekció
 próbáján **átmennek**, tehát változatlanul maradnak.
 
-| Csomag, mappa                                                                                   | Fájl            | Melyik próbán bukik a bontás                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `provider-capability/src/request-shaping/`                                                      | 11              | 2. próba: a tizenegy fájl hat, előtaggal megnevezett párra esik (`effort-`, `thinking-`, `tool-choice-`, `structured-output-`, `streaming-`, `prompt-cach`), a név maga megmondja a csoportot. A SPEC-002 5.5 szekció ezt a mappát a `ProviderCapabilityDescriptor` egy mezőcsoportjaként indokolja, és a típus szerkezete a mappaszerkezet. |
-| `provider-minimax/src/request-shaping/`                                                         | 6               | ugyanaz, plusz a két leíró csomag mappanevei szándékosan tükrözik a típuscsomagét (SPEC-002 5.6)                                                                                                                                                                                                                                             |
-| `provider-claude-subscription/src/request-shaping/`                                             | 6               | ugyanaz                                                                                                                                                                                                                                                                                                                                      |
-| `db/src/step-run/`                                                                              | 9               | 2. próba: `step-run.ts`, `step-run-repository.ts` és `step-run-status.ts` plusz a hozzájuk tartozó `is-` és `can-transition-` fájlok; minden név megmondja a csoportot                                                                                                                                                                       |
-| `db/src/workflow-run/`                                                                          | 9               | ugyanaz a minta, `workflow-run` és `run-status` előtaggal                                                                                                                                                                                                                                                                                    |
-| `db/src/human-approval/`                                                                        | 7               | 2. próba: `human-approval`, `human-approval-repository`, `approval-decision` plusz a guard                                                                                                                                                                                                                                                   |
-| `db/src/database-file/`                                                                         | 6               | 2. próba: mind a hat fájl az adatbázis fájl útvonalának egy lépése                                                                                                                                                                                                                                                                           |
-| `db/src/sqlite-connection/`                                                                     | 6               | 1. próba: egy fogalom, a kapcsolat megnyitása és a tranzakció; a hatodik fájlra a 4.4 tesz külön javaslatot                                                                                                                                                                                                                                  |
-| `db/src/app-setting/`, `provider-concurrency/`, `migration/`, `run-recovery/`                   | 4, 4, 3, 2      | 1. próba: egy fogalom mappánként                                                                                                                                                                                                                                                                                                             |
-| `core/src/**` (hat téma, 2 és 6 fájl között)                                                    | 24              | 1. és 2. próba: a csomag már ma kétszintű, tárgykörönként egy vagy két témával                                                                                                                                                                                                                                                               |
-| `minimax-client/src/**`, `firecrawl-client/src/**`                                              | 19, 13          | 1. próba: mappánként egy fogalom, a SPEC-002 5.10 és 5.11 szekció szerint                                                                                                                                                                                                                                                                    |
-| `agent-tool-bundle/src/**`, `mcp-tool-kit/src/**`, a három `tool-*` csomag, `provider-registry` | 11, 5, 3+3+3, 2 | 1. próba, mind a legfeljebb 5 fájlos mappák                                                                                                                                                                                                                                                                                                  |
-| `typeguards/src/**` (17 mappa)                                                                  | 37              | SPEC-002 6.1 utolsó bekezdése kimondja: "A `packages/typeguards` jelenlegi szerkezete helyes és marad", mert ott **egy typeguard típus maga egy téma**                                                                                                                                                                                       |
-| `tooling/scripts/src/**`, `tooling/eslint-config/src/**`                                        | 10, 4           | 1. próba; a `casing/` mappa útvonalára a SPEC-002 35. kritériuma külön garanciát ad, hogy nem változik                                                                                                                                                                                                                                       |
-| `tools/wire-probe/src/**`                                                                       | 48              | Hatókörön kívül, SPEC-002 6.8: nem termékkód, az npm scriptek konkrét fájlutakat hívnak, és a `src/cases/` 37 fájlja egy fogalom egy mappában                                                                                                                                                                                                |
-| `apps/web/src/main.ts`                                                                          | 1               | Hatókörön kívül, SPEC-002 6.8: a Vite belépési pontját három, egymástól független dolog rögzíti ezen az útvonalon                                                                                                                                                                                                                            |
-| `apps/*`, `agent`, `engine`, `logger`, `protocol`, `ui`                                         | 0               | nincs mit rendezni, placeholder `index.ts` áll bennük                                                                                                                                                                                                                                                                                        |
+| Csomag, mappa                                                                 | Fájl       | Melyik próbán bukik a bontás                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider-capability/src/request-shaping/`                                    | 11         | 2. próba: a tizenegy fájl hat, előtaggal megnevezett párra esik (`effort-`, `thinking-`, `tool-choice-`, `structured-output-`, `streaming-`, `prompt-cach`), a név maga megmondja a csoportot. A SPEC-002 5.5 szekció ezt a mappát a `ProviderCapabilityDescriptor` egy mezőcsoportjaként indokolja, és a típus szerkezete a mappaszerkezet. |
+| `provider-minimax/src/request-shaping/`                                       | 6          | ugyanaz, plusz a két leíró csomag mappanevei szándékosan tükrözik a típuscsomagét (SPEC-002 5.6)                                                                                                                                                                                                                                             |
+| `provider-claude-subscription/src/request-shaping/`                           | 6          | ugyanaz                                                                                                                                                                                                                                                                                                                                      |
+| `db/src/step-run/`                                                            | 9          | 2. próba: `step-run.ts`, `step-run-repository.ts` és `step-run-status.ts` plusz a hozzájuk tartozó `is-` és `can-transition-` fájlok; minden név megmondja a csoportot                                                                                                                                                                       |
+| `db/src/workflow-run/`                                                        | 9          | ugyanaz a minta, `workflow-run` és `run-status` előtaggal                                                                                                                                                                                                                                                                                    |
+| `db/src/human-approval/`                                                      | 7          | 2. próba: `human-approval`, `human-approval-repository`, `approval-decision` plusz a guard                                                                                                                                                                                                                                                   |
+| `db/src/database-file/`                                                       | 6          | 2. próba: mind a hat fájl az adatbázis fájl útvonalának egy lépése                                                                                                                                                                                                                                                                           |
+| `db/src/sqlite-connection/`                                                   | 6          | 1. próba: egy fogalom, a kapcsolat megnyitása és a tranzakció; a hatodik fájlra a 4.4 tesz külön javaslatot                                                                                                                                                                                                                                  |
+| `db/src/app-setting/`, `provider-concurrency/`, `migration/`, `run-recovery/` | 4, 4, 3, 2 | 1. próba: egy fogalom mappánként                                                                                                                                                                                                                                                                                                             |
+| `core/src/**` (négy téma, 2 és 6 fájl között)                                 | 16         | 1. és 2. próba: a csomag már ma kétszintű, tárgykörönként egy vagy két témával                                                                                                                                                                                                                                                               |
+| `provider-registry/src/**`                                                    | 2          | 1. próba, legfeljebb 5 fájlos mappa                                                                                                                                                                                                                                                                                                          |
+| `typeguards/src/**` (17 mappa)                                                | 37         | SPEC-002 6.1 utolsó bekezdése kimondja: "A `packages/typeguards` jelenlegi szerkezete helyes és marad", mert ott **egy typeguard típus maga egy téma**                                                                                                                                                                                       |
+| `tooling/scripts/src/**`, `tooling/eslint-config/src/**`                      | 10, 4      | 1. próba; a `casing/` mappa útvonalára a SPEC-002 35. kritériuma külön garanciát ad, hogy nem változik                                                                                                                                                                                                                                       |
+| `tools/wire-probe/src/**`                                                     | 48         | Hatókörön kívül, SPEC-002 6.8: nem termékkód, az npm scriptek konkrét fájlutakat hívnak, és a `src/cases/` 37 fájlja egy fogalom egy mappában                                                                                                                                                                                                |
+| `apps/web/src/main.ts`                                                        | 1          | Hatókörön kívül, SPEC-002 6.8: a Vite belépési pontját három, egymástól független dolog rögzíti ezen az útvonalon                                                                                                                                                                                                                            |
+| `apps/*`, `agent`, `engine`, `logger`, `protocol`, `ui`                       | 0          | nincs mit rendezni, placeholder `index.ts` áll bennük                                                                                                                                                                                                                                                                                        |
 
 ## 6. Kockázat és költség
 
@@ -379,8 +370,8 @@ próbáján **átmennek**, tehát változatlanul maradnak.
 
 | Amit mértem                                         | Érték | Hogyan                                                                                                                                                                                                                            |
 | --------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| mozduló fájl                                        | 57    | 24 + 18 + 15, a három érintett mappa teljes tartalma                                                                                                                                                                              |
-| érintetlen fájl a `db` csomagban                    | 51    | 107 mínusz 57, plusz a barrel                                                                                                                                                                                                     |
+| mozduló fájl                                        | 56    | 23 + 18 + 15, a három érintett mappa teljes tartalma                                                                                                                                                                              |
+| érintetlen fájl a `db` csomagban                    | 51    | 106 mínusz 56, plusz a barrel                                                                                                                                                                                                     |
 | érintett csomag                                     | 1     | `packages/db`                                                                                                                                                                                                                     |
 | átírandó import sor a három mappán **belül**        | 64    | ebből 18 új téma közti hivatkozás, 46 egy `../` szinttel mélyebb lesz                                                                                                                                                             |
 | változatlan import sor a három mappán belül         | 72    | témán belül maradó `./` hivatkozás                                                                                                                                                                                                |
@@ -467,9 +458,9 @@ miatt ehhez **kilencedikként a `bun run check:db-drift`** is minden fázis vég
 | F1    | SPEC-002 átvezetése a 8. szekció szerint, plusz a gyökér `CLAUDE.md` egy bekezdése. Csak dokumentum, kód nem                                                    | F0       | 0            | `opus`   | `format:check` és `docs:check` zöld, a SPEC-002 6.1, 6.2, 6.5 és a 10. kritérium a kétszintű `db` csomaggal is igaz |
 | F2    | `src/run-event/` -> `event-record/`, `event-kind/`, `sdk-message/`. `git mv`, importok, barrel két sora, `drizzle.config.ts` egy sora, `CLAUDE.md` egy sora     | F1       | 15           | `sonnet` | mind a kilenc kapu zöld, a teszt darabszám azonos az F0 méréssel, a lefedettség 100 százalék mind a négy metrikán   |
 | F3    | `src/graph-snapshot/` -> `stored-snapshot/`, `snapshot-document/`, `snapshot-hash/`. `drizzle.config.ts` egy sora, `CLAUDE.md` egy sora                         | F2       | 18           | `sonnet` | ugyanaz, plusz a fixture lenyomat spec változatlan literállal zöld                                                  |
-| F4    | `src/workflow-graph/` -> `workflow/`, `node-type/`, `node-config/`, `agent-step-config/`. `drizzle.config.ts` három sora, barrel egy sora, `CLAUDE.md` egy sora | F3       | 24           | `sonnet` | ugyanaz                                                                                                             |
+| F4    | `src/workflow-graph/` -> `workflow/`, `node-type/`, `node-config/`, `agent-step-config/`. `drizzle.config.ts` három sora, barrel egy sora, `CLAUDE.md` egy sora | F3       | 23           | `sonnet` | ugyanaz                                                                                                             |
 | F5    | A 4.4 két külön eldöntendő javaslata, **csak ha a user jóváhagyta**: `barrel-exports.spec.ts` saját mappába, `isStringArray` a `typeguards` csomagba            | F4, user | 3            | `sonnet` | ugyanaz, plusz a `typeguards` barrel és `CLAUDE.md` bővült, és a `db` három importja csomagnév szerintire váltott   |
-| F6    | Zárás: `packages/db/CLAUDE.md` `## Fájlok` táblájának végső átolvasása, a terv és a valóság összevetése fájlonként                                              | F5       | 0            | `opus`   | mind a 107 `db` fájl elszámolt, egyetlen fájl sem maradt leképezés nélkül, mind a kilenc kapu zöld                  |
+| F6    | Zárás: `packages/db/CLAUDE.md` `## Fájlok` táblájának végső átolvasása, a terv és a valóság összevetése fájlonként                                              | F5       | 0            | `opus`   | mind a 106 `db` fájl elszámolt, egyetlen fájl sem maradt leképezés nélkül, mind a kilenc kapu zöld                  |
 
 **Végrehajtás állapota.** F1: kész (a SPEC-002, a SPEC-003 és a `.claude/CLAUDE.md` átvezetve).
 F2: kész (`run-event/` -> `event-record/`, `event-kind/`, `sdk-message/`, 15 fájl, mind a
@@ -477,16 +468,16 @@ kilenc kapu zöld, 912 teszt, 100% lefedettség).
 F3: kész (`graph-snapshot/` -> `stored-snapshot/`, `snapshot-document/`, `snapshot-hash/`,
 18 fájl, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
 F4: kész (`workflow-graph/` -> `workflow/`, `node-type/`, `node-config/`, `agent-step-config/`,
-24 fájl, az `is-string-array.ts` egyelőre a `node-config/` alatt, a 4.5 szekció szerinti
+23 fájl, az `is-string-array.ts` egyelőre a `node-config/` alatt, a 4.5 szekció szerinti
 fallback helyen, mind a kilenc kapu zöld, 912 teszt, 100% lefedettség).
 F5: részlegesen kész, csak a 4.5 szekció szerinti javaslat: `isStringArray` átkerült a
 `packages/typeguards/src/is-string-array/` alá, a három hívó csomagnév szerint importál.
 A 4.4 szekció első javaslata (`barrel-exports.spec.ts` külön mappába) NEM hajtódott végre:
 a user jóváhagyása nem terjedt ki rá explicit módon, a plan 4.4 szekciója ezt "user külön
 döntését igénylő" tételként jelöli. Mind a kilenc kapu zöld, 912 teszt, 100% lefedettség.
-F6: kész, zárás. Fájlonkénti elszámolás: a `packages/db/src` 106 fájlt tartalmaz (105 plusz az
+F6: kész, zárás. Fájlonkénti elszámolás: a `packages/db/src` 105 fájlt tartalmaz (104 plusz az
 `index.ts` barrel), pontosan 12 mappa közvetlenül a `src/` alatt (9 lapos téma, 3 tárgykör 10
-téma alkönyvtárral), ez a 108 fájlos kiindulási állapot (107 plusz a barrel) mínusz a 2, F5-ben
+téma alkönyvtárral), ez a 107 fájlos kiindulási állapot (106 plusz a barrel) mínusz a 2, F5-ben
 a `typeguards` csomagba költözött fájl. A `packages/typeguards/src` fájlszáma 37-ről 39-re nőtt
 (plusz a barrel, 40 összesen), az új mappa `is-string-array/`. Sem `docs/research/`, sem az
 `apps/`, sem a többi `packages/` alatt nem maradt hivatkozás a régi lapos útvonalakra
@@ -494,7 +485,7 @@ a `typeguards` csomagba költözött fájl. A `packages/typeguards/src` fájlsz�
 `typecheck`, `lint` (`--concurrency=2`-vel), `test` (99 fájl, 912 teszt, 100% lefedettség mind
 a négy metrikán), `build`, `docs:check`, `check:casing`, `check:graph`, `check:db-drift`.
 
-**Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 24),
+**Miért ebben a sorrendben.** A három bontás növekvő méretben követi egymást (15, 18, 23),
 és a legkisebbnek a legkevesebb kifelé mutató éle van, tehát ott derül ki legolcsóbban, ha
 egy lépés hibás. A SPEC-002 átvezetése azért előzi meg a mozgatást, mert a spec a szerződés:
 kód nem állhat olyan alakban, amit a saját specje tilt.

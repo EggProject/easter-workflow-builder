@@ -189,7 +189,6 @@ munkakönyvtár érintetlen). A régi alak futtatásához a repóbeli spec fájl
 | MIME térkép `video` kulcsa a `packages/core` egy fájljában                    | az (1) bukik          | 7/7     |
 | Vitest pillanatkép assertion egy termékfájlban                                | az (1) bukik          | 7/7     |
 | Vitest pillanatkép assertion egy `packages/logger` unit tesztben              | az (1) bukik          | 7/7     |
-| `'screenshot'` literál a `tool-minimax-understand-image` egy fájljában        | az (1) bukik, 2 fájl  | 7/7     |
 | képernyőkép hívás egy kommentben a `packages/core/src/index.ts` fájlban       | az (1) bukik, 31 fájl | 7/7     |
 | workflow lépés: `bun x playwright test --trace on` a `ci.yml` fájlban         | 9/9                   | az (1)  |
 | `package.json` script: `bun run test:e2e -- --trace=on`                       | 9/9                   | az (1)  |

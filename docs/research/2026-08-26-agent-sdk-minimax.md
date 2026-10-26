@@ -144,7 +144,6 @@ közös `decision` / `reason` / `continue` mezőkkel.
 
 **A `Stop` hook `decision: "block"` + `reason` kombinációval visszaküldi az agentet dolgozni.**
 A `stop_hook_active` input mező jelzi, ha már egy blokkolás miatt fut, ezzel védhető a loop.
-Ez a mechanizmus a projektben a kötelező `emit_output` tool kikényszerítésére szolgál.
 
 **A `HookCallbackMatcher` alakja** (2026-08-28-i kiegészítés, a motor `agent-step` témájához). Az
 `Options.hooks` értéke eseménynév szerinti rekord, aminek az értéke matcher objektumok **tömbje**.
@@ -162,20 +161,6 @@ https://code.claude.com/docs/en/agent-sdk/hooks ("Configure hooks", "Matchers" t
 not firing" szakasz, ami a `Stop` matcher figyelmen kívül hagyását kimondja),
 https://platform.claude.com/docs/en/agent-sdk/typescript (`HookCallbackMatcher`),
 https://code.claude.com/docs/en/hooks (a `Stop` esemény JSON kimenete, `decision` és `reason`).
-
-### In-process MCP tool
-
-```ts
-const t = tool('name', 'desc', { arg: z.string() }, async ({ arg }) => ({
-  content: [{ type: 'text', text: '...' }],
-}));
-const server = createSdkMcpServer({ name: 'my-tools', tools: [t] });
-// options: { mcpServers: { "my-tools": server }, allowedTools: ["mcp__my-tools__name"] }
-```
-
-Tool név minta: `mcp__<szerver>__<tool>`, wildcard: `"mcp__github__*"`.
-Az MCP kliens oldalon csatlakozik, **nem** a Messages API `mcp_servers` mezőjén keresztül,
-ezért a MiniMax `mcp_servers` eldobása minket nem érint.
 
 ### Skillek
 
