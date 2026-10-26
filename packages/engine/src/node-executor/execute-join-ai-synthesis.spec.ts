@@ -179,7 +179,6 @@ function descriptor(): ProviderCapabilityDescriptor<string, string> {
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: knownFact(false),

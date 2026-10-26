@@ -358,7 +358,6 @@ function descriptorOf(
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: overrides.calledBySdk ?? knownFact(false),

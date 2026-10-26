@@ -92,7 +92,6 @@ function descriptorOf(id: ProviderId): ProviderCapabilityDescriptor<string, stri
       disableEnvVar: knownFact(null),
       callerBreakpointSurvivesDisable: knownFact(false),
     },
-    recommendedAgentTools: knownFact([]),
     modelsEndpoint: {
       directHttpReachable: knownFact(false),
       calledBySdk: knownFact(false),
