@@ -436,7 +436,7 @@ A 9. szekció első bekezdésében a `minimax` provider leírása nem nevez mode
 
 ### Valódi próba (nyitva, a merge után, külön lépés)
 
-18. A `minimax` próba `succeeded` állapotú futást ad a Flash-sel; az eredmény a research új szekciójában.
+18. A `minimax` próba `succeeded` állapotú futást ad a Flash-sel; az eredmény a research új szekciójában. **Lezárva (2026-10-27):** `succeeded`, research 13. szekció; a dróton kiment azonosító, a thinking és az effort alakja, a token és a költség nem mért.
 19. A `claude-subscription` próba `succeeded` állapotú futást ad a `claude-haiku-4-5`-tel; az eredmény a
     research új szekciójában.
 

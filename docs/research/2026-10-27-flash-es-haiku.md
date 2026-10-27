@@ -259,23 +259,67 @@ javított tételek:
 
 **Kritérium tábla.**
 
-| AC         | Bizonyíték                                                                                                                                                       |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC1        | `git grep -n "MiniMax-M3" -- packages apps tooling`: a `MiniMax-M3.1-Flash`-en kívül egyetlen találat, a v1 pillanatkép fixtúra (3.6 kivétel)                    |
-| AC2        | `packages/provider-minimax/src/descriptor/descriptor.spec.ts` "pontosan egy modell, a Flash azonosítóval és családdal"                                           |
-| AC3        | `descriptor.spec.ts` known és unknown blokkja; `packages/provider-registry` `provider-registry.spec.ts` (bizonyíték kényszer, mérési azonosító nélküli `reason`) |
-| AC4        | `apps/server/src/minimax-flash-capabilities/minimax-flash-capabilities.spec.ts` (AC4)                                                                            |
-| AC5        | ugyanott (AC5); `apps/server/measurement/run-probe.spec.ts` minimax kérés: `MiniMax-M3.1-Flash[1m]`                                                              |
-| AC6        | `provider-outgoing-environment.spec.ts` (AC6); `build-outgoing-environment.spec.ts` alternatív név eset                                                          |
-| AC7        | `provider-outgoing-environment.spec.ts` (AC7); `resolve-required-environment-value.spec.ts` "mindkettő áll: a name nyer"                                         |
-| AC8        | `provider-outgoing-environment.spec.ts` (AC8); `resolve-required-environment-value.spec.ts` "egyik sem áll"                                                      |
-| AC9        | `provider-outgoing-environment.spec.ts` claude-subscription tiltott nevek                                                                                        |
-| AC10       | `collect-secret-environment-values.spec.ts` két új esete                                                                                                         |
-| AC11       | `provider-environment-drift-protection.spec.ts` (AC11)                                                                                                           |
-| AC12       | `create-workflow-modal.spec.tsx`, `list-providers.spec.ts`, `provider-summary.spec.ts`, `apps/web/e2e/workflow-list.spec.ts`                                     |
-| AC13       | `build-agent-step-options.spec.ts` (a régi kódon bukott), `apps/server/src/engine-assembly/build-agent-query-runner.spec.ts` (`Options['thinking']` típus)       |
-| AC14       | `build-probe-graph.spec.ts`, `run-probe.spec.ts`                                                                                                                 |
-| AC15       | `.claude/CLAUDE.md` 9. szekció                                                                                                                                   |
-| AC16       | ez a fájl, `README.md`, a két `.env.example`, a csomag `CLAUDE.md`-k                                                                                             |
-| AC17       | a merge kapu a PR leírásában                                                                                                                                     |
-| AC18, AC19 | a valódi próba, a merge után, külön lépés                                                                                                                        |
+| AC   | Bizonyíték                                                                                                                                                       |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1  | `git grep -n "MiniMax-M3" -- packages apps tooling`: a `MiniMax-M3.1-Flash`-en kívül egyetlen találat, a v1 pillanatkép fixtúra (3.6 kivétel)                    |
+| AC2  | `packages/provider-minimax/src/descriptor/descriptor.spec.ts` "pontosan egy modell, a Flash azonosítóval és családdal"                                           |
+| AC3  | `descriptor.spec.ts` known és unknown blokkja; `packages/provider-registry` `provider-registry.spec.ts` (bizonyíték kényszer, mérési azonosító nélküli `reason`) |
+| AC4  | `apps/server/src/minimax-flash-capabilities/minimax-flash-capabilities.spec.ts` (AC4)                                                                            |
+| AC5  | ugyanott (AC5); `apps/server/measurement/run-probe.spec.ts` minimax kérés: `MiniMax-M3.1-Flash[1m]`                                                              |
+| AC6  | `provider-outgoing-environment.spec.ts` (AC6); `build-outgoing-environment.spec.ts` alternatív név eset                                                          |
+| AC7  | `provider-outgoing-environment.spec.ts` (AC7); `resolve-required-environment-value.spec.ts` "mindkettő áll: a name nyer"                                         |
+| AC8  | `provider-outgoing-environment.spec.ts` (AC8); `resolve-required-environment-value.spec.ts` "egyik sem áll"                                                      |
+| AC9  | `provider-outgoing-environment.spec.ts` claude-subscription tiltott nevek                                                                                        |
+| AC10 | `collect-secret-environment-values.spec.ts` két új esete                                                                                                         |
+| AC11 | `provider-environment-drift-protection.spec.ts` (AC11)                                                                                                           |
+| AC12 | `create-workflow-modal.spec.tsx`, `list-providers.spec.ts`, `provider-summary.spec.ts`, `apps/web/e2e/workflow-list.spec.ts`                                     |
+| AC13 | `build-agent-step-options.spec.ts` (a régi kódon bukott), `apps/server/src/engine-assembly/build-agent-query-runner.spec.ts` (`Options['thinking']` típus)       |
+| AC14 | `build-probe-graph.spec.ts`, `run-probe.spec.ts`                                                                                                                 |
+| AC15 | `.claude/CLAUDE.md` 9. szekció                                                                                                                                   |
+| AC16 | ez a fájl, `README.md`, a két `.env.example`, a csomag `CLAUDE.md`-k                                                                                             |
+| AC17 | a merge kapu a PR leírásában                                                                                                                                     |
+| AC18 | a 13. szekció (lezárva, `succeeded`)                                                                                                                             |
+| AC19 | nyitva: a Claude próba nem futott (user döntés: "minimaxxal próbáld")                                                                                            |
+
+---
+
+## 13. A valódi MiniMax próba eredménye (SPEC-013 AC18, 2026-10-27)
+
+**Engedély.** A user kifejezett engedélye, csak a `minimax` provider, egyetlen futás; a
+`claude-subscription` próba (AC19) nem futott, a user döntése szerint ("minimaxxal próbáld") nyitva marad.
+
+**Parancs.** A repó gyökeréből a `package.json` `probe:real-provider` scriptjének tényleges parancsa, a
+`--env-file-if-exists=.env` helyett a user `.env` fájljára mutató `--env-file=<útvonal>` kapcsolóval (a fájl
+tartalmát nem nyitottuk meg; egyetlen kulcsot tartalmaz, `ANTHROPIC_AUTH_TOKEN`):
+`node --env-file=<a user .env útvonala> apps/server/measurement/real-provider-probe.ts minimax`. Modell és
+effort a `build-probe-graph.ts` alapértéke (`MiniMax-M3.1-Flash`, `effort: 'low'`). Fej: `7b96c20`.
+
+**Eredmény (a próba maszkolt összegzése, változatlanul).**
+
+| Mező               | Érték       |
+| ------------------ | ----------- |
+| `providerId`       | `minimax`   |
+| `runStatus`        | `succeeded` |
+| `stepStatus`       | `succeeded` |
+| `resultSubtype`    | `success`   |
+| `numTurns`         | 1           |
+| `outputTextLength` | 130         |
+
+Kilépési kód 0, a falióra idő 8,5 másodperc (`time`, a szerver indításától a leállásig). Hiba nem történt,
+újrapróbálkozás nem volt, összesen egy futás.
+
+**Amit a próba összegzése nem tartalmaz, ezért NEM ELLENŐRZÖTT:** a dróton kiment modellazonosító (hogy a pinelt
+CLI a `MiniMax-M3.1-Flash[1m]` azonosítóból utótag nélkülit küldött-e, 9. szekció 1. pont), a `thinking` és az
+`effort` mező kimenő alakja (9. szekció 2. pont és 10.2), a token felhasználás és a költség. A `runProbe`
+összegzése ezeket nem adja ki, és a próba a kimenő kérés törzsét nem naplózza (10.2). Annyi igazolt, hogy a
+`MiniMax-M3.1-Flash` modellel, `effort: 'low'` mellett, alacsony tokennel a teljes lánc (szerver indítás,
+futás, `agent_step` egy fordulóval) hiba nélkül lefutott, tehát a MiniMax a kérést `400` nélkül fogadta (a
+`thinking: disabled` és a nem ismert modellazonosító kockázata, SPEC-013 9., ebben az egy futásban nem
+jelentkezett).
+
+**A `clientModelIdentifier` és a `[1m]` utótag.** A leíró `known` mezője ettől nem változik; hogy a próba a
+dróton mit küldött, az továbbra is nem mért.
+
+**Titok keresés a futás után.** A user `.env` fájljában álló token értékére a worktree-ben (`node_modules`
+nélkül), a próba teljes kimenetében és a git történetben (`git log -S`) futtatott keresés: 0 találat mindhárom
+helyen. Az érték sehová nem íródott ki.
