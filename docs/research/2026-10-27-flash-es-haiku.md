@@ -249,7 +249,7 @@ javított tételek:
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A `thinking.interleavedSignatureRequired` `known` értékének nincs forrásolt sora a 2. szekcióban                                                                      | `unknown` lett (M-05), a SPEC-013 3.2 sora átvezetve                                                                                                                          |
 | A `tools/wire-probe` harness a teljes `process.env`-et adta a CLI-nek, így egy `ANTHROPIC_API_KEY` is kimehetett, és a `meta.json` maszkolása ezt a nevet nem ismerte | a CLI környezetéből mindkét név kikerül, a `meta.json` mindkét név értékét maszkolja; greppes teszt az `environment.spec.ts`-ben                                              |
-| A `tools/wire-probe` az üres értéket hiányzónak veszi, a szerver beállítottnak                                                                                        | az eltérés kimondva a SPEC-013 4.7-ben, a kódban és a csomag `CLAUDE.md`-jében                                                                                                |
+| A `tools/wire-probe` az üres értéket hiányzónak veszi, a szerver beállítottnak                                                                                        | a szerver is hiányzónak veszi (második review, lásd 14. szekció); SPEC-013 4.3 és 4.7 átírva                                                                                  |
 | A szabálykönyv 9. szekciójának képesség mondata és titok mondata az előző modell és egy kulcsnév szerint állt                                                         | átírva a SPEC-013 3.2, 3.3, 4. szerint                                                                                                                                        |
 | A `packages/engine` `CLAUDE.md` típusfájl száma és a `provider-environment` sor elavult                                                                               | javítva                                                                                                                                                                       |
 | A `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` indoklása a forrásnál többet állított (a `budget_tokens` elutasítása)                                                       | a mondat a dokumentált részre szűkítve                                                                                                                                        |
@@ -323,3 +323,50 @@ dróton mit küldött, az továbbra is nem mért.
 **Titok keresés a futás után.** A user `.env` fájljában álló token értékére a worktree-ben (`node_modules`
 nélkül), a próba teljes kimenetében és a git történetben (`git log -S`) futtatott keresés: 0 találat mindhárom
 helyen. Az érték sehová nem íródott ki.
+
+---
+
+## 14. A második review javításai (2026-10-27)
+
+**Módszer.** Exa keresés és letöltés (2026-10-27), a lapok szövegét olvasva. A gyökér `CLAUDE.md` 1. szabálya
+szerint egy `known` mezőhöz elsődleges forrás plusz két, a MiniMaxtól független megerősítés kell. A
+függetlenség itt a **kiadó** szerinti: a 7minai, a Wokey és a FounderMag saját szövege szerint a MiniMax
+dokumentációját olvasta, tehát a **származás** nem független. A Cloudflare AI docs lapja egy hosztoló szolgáltató
+saját modell lapja, a TypingMind és az LLMTR katalógus lap. Erősebb függetlenséget (például saját mérést) egyik
+forrás sem ad.
+
+### 14.1 A `known` Flash mezők megerősítései
+
+| Mező                                   | Érték                  | Független megerősítés (2 / mező)                                                                                                 | Mit olvastam a lapokon                                                                                                                                                     |
+| -------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextWindow`                        | 1 000 000              | <https://developers.cloudflare.com/ai/models/minimax/m3.1-flash/>, <https://www.typingmind.com/guide/minimax/MiniMax-M3.1-Flash> | Cloudflare: "Context Window 1,000,000 tokens"; TypingMind: "Context Window 1,000,000 tokens"                                                                               |
+| `maxOutputTokensRecommended`           | 131 072                | <https://7minai.com/how-to-use-minimax-m3-1-flash/>, <https://wokey.ai/models/MiniMax-M3.1-Flash>                                | 7minai: "524,288 tokens (131,072 recommended)"; Wokey: "recommends a 131,072-token output budget and permits up to 524,288"                                                |
+| `maxOutputTokensHard`                  | 524 288                | <https://wokey.ai/models/MiniMax-M3.1-Flash>, <https://www.typingmind.com/guide/minimax/MiniMax-M3.1-Flash>                      | Wokey: "Max output 524,288 tokens"; TypingMind: "Max Output 524,288 tokens" (az LLMTR lapja is: "at most 524,288 tokens")                                                  |
+| `thinking.byModelFamily['M3.1-Flash']` | `['adaptive']`         | <https://wokey.ai/models/MiniMax-M3.1-Flash>, <https://7minai.com/how-to-use-minimax-m3-1-flash/>                                | Wokey: "The upstream rejects none and thinking.type=disabled"; 7minai: "Trying to disable thinking returns HTTP 400" (az LLMTR lapja is, `thinking: disabled` `400`)       |
+| `effort.accepted`                      | `true`                 | <https://developers.cloudflare.com/ai/models/minimax/m3.1-flash/>, <https://wokey.ai/models/MiniMax-M3.1-Flash>                  | Cloudflare: `reasoning_effort` enum `low, medium, high, xhigh, max`; Wokey: "Effort accepts low, medium, high, xhigh and max"                                              |
+| `effort.wireField`                     | `output_config.effort` | <https://7minai.com/how-to-use-minimax-m3-1-flash/>, <https://foundermag.co/tutorials/minimax-m3-1-flash-api-getting-started/>   | 7minai: táblázat és curl példa az Anthropic-kompatibilis úton `output_config.effort`; FounderMag: "`output_config.effort` takes `low`, `medium`, `high`, `xhigh` or `max`" |
+
+A `clientModelIdentifier` két független megerősítése a 2. szekcióban áll, változatlanul. A
+`fineGrainedToolStreaming` és a `subagentCapEnvVar` kliens oldali mező, a PR előtt is így állt, nem érintett.
+
+### 14.2 Amit a keresés nem erősített meg, vagy ütközik
+
+1. **A Vercel AI Gateway lapja** (<https://vercel.com/ai-gateway/models/minimax-m3.1-flash>) 1 048 576 kontextus
+   ablakot és 1 048 576 maximális kimenetet ír. Ez a gateway több szolgáltatóját összefogó érték, nem a MiniMax API
+   limitje, és a MiniMax lapjai, a Cloudflare, a TypingMind, a Wokey és az LLMTR 1 000 000 / 524 288 értéket adnak.
+   A leíró értéke a MiniMax API-ra vonatkozik, ezért nem változik; az eltérés itt rögzítve van.
+2. **Az Alibaba Cloud Model Studio lapja** 1 000 000 token kontextust ad, de saját szolgáltatásra, nem a MiniMax API-ra
+   (a rate limit sornál ugyanez az érv, 2. szekció).
+3. A rate limit mezők (`requestsPerMinute`, `tokensPerMinute`) a 2. szekció szerint `unknown` maradnak: független
+   forrás nincs. **Újdonság:** a `blockedBy` üres lett, mert az M-18 és az M-36 header leltár mérés, nem az RPM és a
+   TPM értékét zárja le; a `reason` kimondja, hogy független forrás hiányzik (SPEC-013 3.2).
+4. **Nem ellenőrzött** marad a `MAX_THINKING_TOKENS=0` hatása a Flash-re (a MiniMax Claude Code lapja szerint nincs
+   hatása, második forrás nincs), és az, hogy az M-06, M-07, M-08 és M-21 mérés eredménye a Flash-re is igaz-e (az
+   M3-ra mérték). A `disallowedEnv` és a `requiredEnv` indoklásai ezt kimondják.
+
+### 14.3 Az üres kulcs érték (hiba, javítva)
+
+Egy üres `ANTHROPIC_AUTH_TOKEN=` `.env` sor és egy érvényes `ANTHROPIC_API_KEY` mellett a szerver az üres sztringet
+vette beállított értéknek, és üres Bearer tokent küldött. A `resolveRequiredEnvironmentValue` ma a `null` mellett az
+üres sztringet is átlépi, ahogy a `tools/wire-probe` is. Regressziós teszt: a
+`resolve-required-environment-value.spec.ts` három új esete (a régi kódon mind a három elbukott).

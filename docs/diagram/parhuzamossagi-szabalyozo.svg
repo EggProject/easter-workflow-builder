@@ -66,6 +66,6 @@
   <line x1="340" y1="330" x2="340" y2="364" stroke="#5F5E5A" stroke-width="0.5" marker-end="url(#arrow)" />
 
   <rect x="190" y="366" width="300" height="54" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5" />
-  <text x="340" y="388" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#712B13">MiniMax M3</text>
-  <text x="340" y="406" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#993C1D">200 kérés / perc, dokumentált</text>
+  <text x="340" y="388" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="500" fill="#712B13">MiniMax-M3.1-Flash</text>
+  <text x="340" y="406" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#993C1D">kérés / perc korlát: nem ellenőrzött</text>
 </svg>

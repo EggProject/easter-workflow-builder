@@ -28,7 +28,10 @@ a bizonyítékok forráskatalógusa mind ott áll), L2 réteg (SPEC-002 4. szekc
 
 **Az előző modellre végzett mérés a Flash-re nem vihető át** (SPEC-013 3.2). Egy mező akkor
 `known`, ha egy Flash-re vonatkozó vagy modelltől független hivatalos forrás magát az értéket
-állítja; minden más mező `unknown`, a `blockedBy` mezőben a megismétlendő mérés azonosítójával.
+állítja, és két, a MiniMaxtól független forrás megerősíti; minden más mező `unknown`, a `blockedBy`
+mezőben a megismétlendő mérés azonosítójával. Ha nincs mérési eset, ami a mezőt lezárná (a rate limit
+`requestsPerMinute` és `tokensPerMinute`), a `blockedBy` üres, és a `reason` kimondja, hogy független
+forrás hiányzik.
 
 **A mérési próza nem ide tartozik.** A kódban csak stabil azonosító (`M-01` ... `M-36`), doksi
 URL vagy research szekció azonosító marad. A mérés leírása a `docs/research/` alatt van.

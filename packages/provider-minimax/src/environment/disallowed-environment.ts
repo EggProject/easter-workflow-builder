@@ -29,7 +29,7 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'MAX_THINKING_TOKENS',
     reason:
-      'A 0 érték a thinking kikapcsolását kéri, a MiniMax-M3.1-Flash a kikapcsolt thinkinget 400 hibával elutasítja; a mérés szerint a 0 érték a thinking és context_management body mezőket leveszi, a hozzájuk tartozó anthropic-beta headereket viszont a headerben hagyja.',
+      'A 0 érték a thinking kikapcsolását kéri, a MiniMax-M3.1-Flash a kikapcsolt thinkinget a dokumentáció szerint 400 hibával elutasítja. Az M-06 és M-08 mérés az előző modellre (M3) vonatkozik: ott a 0 érték a thinking és context_management body mezőket levette, a hozzájuk tartozó anthropic-beta headereket a headerben hagyta. A MAX_THINKING_TOKENS=0 hatása a Flash-re nem ellenőrzött (a MiniMax Claude Code lapja szerint nincs hatása, második forrás nincs); a tiltás óvatossági.',
     evidence: [
       { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
       { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },

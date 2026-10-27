@@ -29,3 +29,12 @@ export const DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS =
   'https://pchalasani.github.io/claude-code-tools/integrations/alt-llm-providers/';
 export const DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE =
   'https://www.digitalapplied.com/blog/run-minimax-m3-1-flash-inside-claude-code-setup';
+
+// A Flash modell szintű mezőinek (kontextus ablak, kimenő token, thinking, effort) két-két, a MiniMaxtól független
+// megerősítése (research `2026-10-27-flash-es-haiku.md` 2. szekció, 2026-10-27, Exa letöltés).
+export const DOC_7MINAI_MINIMAX_M31_FLASH = 'https://7minai.com/how-to-use-minimax-m3-1-flash/';
+export const DOC_WOKEY_MINIMAX_M31_FLASH = 'https://wokey.ai/models/MiniMax-M3.1-Flash';
+export const DOC_TYPINGMIND_MINIMAX_M31_FLASH = 'https://www.typingmind.com/guide/minimax/MiniMax-M3.1-Flash';
+export const DOC_CLOUDFLARE_MINIMAX_M31_FLASH = 'https://developers.cloudflare.com/ai/models/minimax/m3.1-flash/';
+export const DOC_FOUNDERMAG_MINIMAX_M31_FLASH =
+  'https://foundermag.co/tutorials/minimax-m3-1-flash-api-getting-started/';

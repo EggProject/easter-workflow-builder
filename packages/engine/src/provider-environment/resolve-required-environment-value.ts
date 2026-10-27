@@ -11,8 +11,12 @@ import { formatEngineErrorMessage } from '../engine-error/format-engine-error-me
  * `acceptedEnvironmentNames` sorrendjében, az első beállított nyer (SPEC-013
  * 4.3: a `name` az elsőbbségi).
  *
- * Ha egyik név sincs beállítva (a port `null`-t ad), `missing_provider_env`
- * hibát ad. A hibaüzenet **kizárólag a változók nevét** tartalmazza, sosem az
+ * Az üres érték (`ANTHROPIC_AUTH_TOKEN=` egy `.env` sorban) hiányzónak számít,
+ * ahogy a `tools/wire-probe` mérő eszközben is (SPEC-013 4.3): különben a
+ * kulcs üres Bearer tokenként menne ki, miközben az alternatív név érvényes.
+ *
+ * Ha egyik név sincs beállítva (a port `null`-t vagy üres értéket ad),
+ * `missing_provider_env` hibát ad. A hibaüzenet **kizárólag a változók nevét** tartalmazza, sosem az
  * értéket, `secret: false` esetén sem (SPEC-004 17. szekció 33. és 64.
  * kritérium).
  *
@@ -33,7 +37,7 @@ export function resolveRequiredEnvironmentValue(
   const names = acceptedEnvironmentNames(requirement);
   for (const name of names) {
     const value = processEnvironment.read(name);
-    if (value !== null) {
+    if (value !== null && value !== '') {
       return { kind: 'ok', value };
     }
   }

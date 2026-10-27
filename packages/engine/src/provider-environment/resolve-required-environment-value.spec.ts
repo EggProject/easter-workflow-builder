@@ -65,6 +65,23 @@ describe('resolveRequiredEnvironmentValue', () => {
     expect(result.kind === 'error' ? result.message : '').not.toMatch(/fake-secret-value/);
   });
 
+  it('process_env_passthrough forrásnál az üres érték hiányzónak számít', () => {
+    const requirement: EnvironmentRequirement = {
+      name: 'ANTHROPIC_AUTH_TOKEN',
+      source: 'process_env_passthrough',
+      secret: true,
+      purpose: 'fake purpose',
+      evidence: FAKE_EVIDENCE,
+    };
+
+    expect(
+      resolveRequiredEnvironmentValue(requirement, buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: '' })),
+    ).toStrictEqual({
+      kind: 'error',
+      message: 'A(z) ANTHROPIC_AUTH_TOKEN kötelező provider env változó nincs beállítva (missing_provider_env).',
+    });
+  });
+
   describe('process_env_alternatives forrás (SPEC-013 4.4)', () => {
     const requirement: EnvironmentRequirement = {
       name: 'ANTHROPIC_AUTH_TOKEN',
@@ -94,6 +111,28 @@ describe('resolveRequiredEnvironmentValue', () => {
           buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: 'elso-ertek', ANTHROPIC_API_KEY: 'masodik-ertek' }),
         ),
       ).toStrictEqual({ kind: 'ok', value: 'elso-ertek' });
+    });
+
+    it('az üres name nem számít beállítottnak: az alternatív név értékét adja (üres Bearer token regresszió)', () => {
+      expect(
+        resolveRequiredEnvironmentValue(
+          requirement,
+          buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: '', ANTHROPIC_API_KEY: 'masodik-ertek' }),
+        ),
+      ).toStrictEqual({ kind: 'ok', value: 'masodik-ertek' });
+    });
+
+    it('mindkét név üres: missing_provider_env, nem üres Bearer token', () => {
+      const result = resolveRequiredEnvironmentValue(
+        requirement,
+        buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: '', ANTHROPIC_API_KEY: '' }),
+      );
+
+      expect(result).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY kötelező provider env változó nincs beállítva (missing_provider_env).',
+      });
     });
 
     it('egyik sem áll: missing_provider_env, minden névvel, érték nélkül', () => {

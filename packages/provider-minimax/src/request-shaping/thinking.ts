@@ -1,7 +1,9 @@
 import {
+  DOC_7MINAI_MINIMAX_M31_FLASH,
   DOC_MINIMAX_ANTHROPIC_API,
   DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
   DOC_MINIMAX_OPENAI_API,
+  DOC_WOKEY_MINIMAX_M31_FLASH,
   type ThinkingCapability,
 } from '@easter-workflow-builder/provider-capability';
 import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
@@ -17,6 +19,8 @@ export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {
         { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
         { kind: 'doc', url: DOC_MINIMAX_OPENAI_API },
         { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
+        { kind: 'doc', url: DOC_WOKEY_MINIMAX_M31_FLASH },
+        { kind: 'doc', url: DOC_7MINAI_MINIMAX_M31_FLASH },
       ],
     },
   },

@@ -8,13 +8,15 @@ export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
       // A számokat csak a MiniMax saját lapjai állítják, a Flash-re független megerősítés nincs (research 2. szekció).
       requestsPerMinute: {
         state: 'unknown',
-        reason: 'A Flash limitjét csak a MiniMax lapjai állítják, két független megerősítés nincs (SPEC-013 3.2).',
-        blockedBy: ['M-18', 'M-36'],
+        reason:
+          'A Flash limitjét csak a MiniMax lapjai állítják, független forrás hiányzik, és nincs olyan mérési eset, ami a limit értékét lezárná (SPEC-013 3.2).',
+        blockedBy: [],
       },
       tokensPerMinute: {
         state: 'unknown',
-        reason: 'A Flash limitjét csak a MiniMax lapjai állítják, két független megerősítés nincs (SPEC-013 3.2).',
-        blockedBy: ['M-18', 'M-36'],
+        reason:
+          'A Flash limitjét csak a MiniMax lapjai állítják, független forrás hiányzik, és nincs olyan mérési eset, ami a limit értékét lezárná (SPEC-013 3.2).',
+        blockedBy: [],
       },
     },
   ],

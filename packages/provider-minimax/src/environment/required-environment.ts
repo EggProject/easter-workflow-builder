@@ -35,7 +35,7 @@ export const minimaxRequiredEnvironment: readonly EnvironmentRequirement[] = [
     literalValue: '1',
     secret: false,
     purpose:
-      'Levágja a session cím generáló háttérkérést és a DesignSync toolt, csökkentve a kérésszámot és a token felhasználást.',
+      'Levágja a session cím generáló háttérkérést és a DesignSync toolt, csökkentve a kérésszámot és a token felhasználást. A hatást az M-07, M-08 és M-21 mérés az előző modellre (M3) igazolta; a Flash-re nem ellenőrzött.',
     evidence: [
       { kind: 'measurement', id: 'M-07' },
       { kind: 'measurement', id: 'M-08' },

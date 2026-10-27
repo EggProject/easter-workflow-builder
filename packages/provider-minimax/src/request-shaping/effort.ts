@@ -1,6 +1,10 @@
 import {
+  DOC_7MINAI_MINIMAX_M31_FLASH,
+  DOC_CLOUDFLARE_MINIMAX_M31_FLASH,
+  DOC_FOUNDERMAG_MINIMAX_M31_FLASH,
   DOC_MINIMAX_ANTHROPIC_API,
   DOC_MINIMAX_TEXT_GENERATION,
+  DOC_WOKEY_MINIMAX_M31_FLASH,
   type EffortCapability,
 } from '@easter-workflow-builder/provider-capability';
 
@@ -12,6 +16,8 @@ export const minimaxEffort: EffortCapability = {
     evidence: [
       { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
       { kind: 'doc', url: DOC_MINIMAX_TEXT_GENERATION },
+      { kind: 'doc', url: DOC_CLOUDFLARE_MINIMAX_M31_FLASH },
+      { kind: 'doc', url: DOC_WOKEY_MINIMAX_M31_FLASH },
     ],
   },
   wireField: {
@@ -20,6 +26,8 @@ export const minimaxEffort: EffortCapability = {
     evidence: [
       { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
       { kind: 'doc', url: DOC_MINIMAX_TEXT_GENERATION },
+      { kind: 'doc', url: DOC_7MINAI_MINIMAX_M31_FLASH },
+      { kind: 'doc', url: DOC_FOUNDERMAG_MINIMAX_M31_FLASH },
     ],
   },
 };

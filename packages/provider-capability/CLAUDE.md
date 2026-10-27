@@ -42,7 +42,8 @@ az `@easter-workflow-builder/provider-minimax`, az
 ## Szabályok
 
 **Tilos bizonyíték nélküli értéket beírni.** Minden képességmező vagy `known` egy nem üres
-`evidence` listával, vagy `unknown` indoklással és a blokkoló mérési esettel. Ezt az
+`evidence` listával, vagy `unknown` indoklással és a blokkoló mérési esettel (üres `blockedBy` csak a
+"független forrás hiányzik" indoklással, SPEC-013 3.2). Ezt az
 `evidence/fact/` téma `Fact<T>` típusa kényszeríti ki.
 
 **Az `EnvironmentRequirement` a `source` mezőn diszkriminált unió.** A `literalValue` kizárólag a
