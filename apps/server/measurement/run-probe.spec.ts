@@ -81,7 +81,7 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
     const request = readRequest();
     expect(request['maxTurns']).toBe(1);
     // A leíró `clientModelIdentifier` mezője a kliensnek átadott alak (M-11, M-29, M-32).
-    expect(request['model']).toBe('MiniMax-M3[1m]');
+    expect(request['model']).toBe('MiniMax-M3.1-Flash[1m]');
     expect(request['hasMaxBudgetUsd']).toBe(false);
     expect(JSON.stringify(summary)).not.toContain(FAKE_SECRET);
   });

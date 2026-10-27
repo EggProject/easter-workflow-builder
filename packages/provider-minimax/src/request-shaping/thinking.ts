@@ -1,45 +1,32 @@
-import { RESEARCH_MINIMAX, type ThinkingCapability } from '@easter-workflow-builder/provider-capability';
+import {
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+  DOC_MINIMAX_OPENAI_API,
+  type ThinkingCapability,
+} from '@easter-workflow-builder/provider-capability';
+import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 import type { MiniMaxFamilyId } from '../model-catalog/family-id.ts';
 
 export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {
+  // A Flash mindig gondolkodik: a disabled mód 400 választ kap, ezért csak az adaptive engedett (SPEC-013 3.3).
   byModelFamily: {
-    M3: {
+    'M3.1-Flash': {
       state: 'known',
-      value: ['disabled', 'adaptive'],
+      value: ['adaptive'],
       evidence: [
-        { kind: 'research', section: RESEARCH_MINIMAX },
-        { kind: 'measurement', id: 'M-05' },
-        { kind: 'measurement', id: 'M-06' },
+        { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+        { kind: 'doc', url: DOC_MINIMAX_OPENAI_API },
+        { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
       ],
     },
   },
-  wireShape: {
-    state: 'known',
-    value: '{"type":"adaptive"}',
-    evidence: [
-      { kind: 'measurement', id: 'M-01' },
-      { kind: 'measurement', id: 'M-05' },
-    ],
-  },
-  sendsBudgetTokens: {
-    state: 'known',
-    value: false,
-    evidence: [
-      { kind: 'measurement', id: 'M-05' },
-      { kind: 'measurement', id: 'M-06' },
-    ],
-  },
+  wireShape: notMeasuredOnFlash(['M-01', 'M-05']),
+  sendsBudgetTokens: notMeasuredOnFlash(['M-05', 'M-06']),
+  // A thinking blokkot a későbbi körökben változatlanul vissza kell adni.
   interleavedSignatureRequired: {
     state: 'known',
     value: true,
-    evidence: [
-      { kind: 'research', section: RESEARCH_MINIMAX },
-      { kind: 'measurement', id: 'M-05' },
-    ],
+    evidence: [{ kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API }],
   },
-  streamEventTypes: {
-    state: 'known',
-    value: ['content_block_start', 'thinking_delta', 'signature_delta', 'content_block_stop'],
-    evidence: [{ kind: 'measurement', id: 'M-05' }],
-  },
+  streamEventTypes: notMeasuredOnFlash(['M-05']),
 };

@@ -1,76 +1,55 @@
 import {
-  DOC_ENV_VARS,
-  DOC_MODEL_CONFIG,
-  RESEARCH_MINIMAX,
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_CHAT_OPENAI,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+  DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
+  DOC_MINIMAX_TEXT_GENERATION,
   type ModelDescriptor,
 } from '@easter-workflow-builder/provider-capability';
+import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 import type { MiniMaxFamilyId } from './family-id.ts';
 import type { MiniMaxModelId } from './model-id.ts';
 
 export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFamilyId>[] = [
   {
-    id: 'MiniMax-M3',
-    family: 'M3',
-    // A dróton a modell azonosító suffix nélküli, a kliensnek viszont a suffixes alakot kell átadni.
+    id: 'MiniMax-M3.1-Flash',
+    family: 'M3.1-Flash',
+    // A Claude Code kliensnek a suffixes alakot kell átadni, a MiniMax Claude Code lapjai szerint.
     clientModelIdentifier: {
       state: 'known',
-      value: 'MiniMax-M3[1m]',
+      value: 'MiniMax-M3.1-Flash[1m]',
       evidence: [
-        { kind: 'measurement', id: 'M-11' },
-        { kind: 'measurement', id: 'M-29' },
-        { kind: 'measurement', id: 'M-32' },
-        { kind: 'doc', url: DOC_MODEL_CONFIG },
+        { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
+        { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN },
       ],
     },
     contextWindow: {
       state: 'known',
       value: 1_000_000,
-      evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+      evidence: [
+        { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+        { kind: 'doc', url: DOC_MINIMAX_TEXT_GENERATION },
+      ],
     },
-    // Mért alsó korlát, nem a pontos határ, [1m] suffixes modellazonosítóval mérve.
-    effectiveContextWindowOnWire: {
-      state: 'known',
-      value: 1_046_827,
-      evidence: [{ kind: 'measurement', id: 'M-20' }],
-    },
+    effectiveContextWindowOnWire: notMeasuredOnFlash(['M-20']),
     maxOutputTokensRecommended: {
       state: 'known',
       value: 131_072,
-      evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+      evidence: [{ kind: 'doc', url: DOC_MINIMAX_CHAT_OPENAI }],
     },
     maxOutputTokensHard: {
       state: 'known',
       value: 524_288,
-      evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+      evidence: [{ kind: 'doc', url: DOC_MINIMAX_CHAT_OPENAI }],
     },
-    // A kliens a nagyobb kért értékeket a saját modelltáblájának plafonjára vágja.
-    maxOutputTokensWireCeiling: {
-      state: 'known',
-      value: 128_000,
-      evidence: [
-        { kind: 'measurement', id: 'M-22' },
-        { kind: 'doc', url: DOC_ENV_VARS },
-      ],
-    },
-    // A kép kimegy a dróton, a szolgáltatás dobja el, nem az SDK vagy a kliens.
-    imageInput: {
-      state: 'known',
-      value: false,
-      evidence: [
-        { kind: 'measurement', id: 'M-23' },
-        { kind: 'measurement', id: 'M-16' },
-      ],
-    },
+    maxOutputTokensWireCeiling: notMeasuredOnFlash(['M-22']),
+    // A dokumentáció támogatottnak írja, az előző modellre végzett mérés az ellenkezőjét adta.
+    imageInput: notMeasuredOnFlash(['M-23', 'M-16']),
     videoInput: {
       state: 'unknown',
       reason: 'A blokkoló a telepített SDK típusfelülete: a ContentBlockParam unió nem tartalmaz videó variánst.',
       blockedBy: ['M-16', 'M-23'],
     },
-    // A modell szerepel a szolgáltatás saját modell-listájában.
-    listedByModelsEndpoint: {
-      state: 'known',
-      value: true,
-      evidence: [{ kind: 'measurement', id: 'M-35' }],
-    },
+    listedByModelsEndpoint: notMeasuredOnFlash(['M-35']),
   },
 ];

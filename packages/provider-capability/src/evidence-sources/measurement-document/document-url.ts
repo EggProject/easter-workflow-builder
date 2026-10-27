@@ -15,3 +15,12 @@ export const DOC_THINKING_STEER = 'https://platform.claude.com/docs/en/build-wit
 export const DOC_CACHING = 'https://platform.claude.com/docs/en/build-with-claude/prompt-caching';
 export const DOC_STREAMING = 'https://platform.claude.com/docs/en/build-with-claude/streaming';
 export const DOC_VISION = 'https://platform.claude.com/docs/en/build-with-claude/vision';
+
+// A MiniMax-M3.1-Flash forrásai (SPEC-013 3.2, research `2026-10-27-flash-es-haiku.md` 2. szekció).
+export const DOC_MINIMAX_ANTHROPIC_API = 'https://platform.minimax.io/docs/api-reference/text-anthropic-api';
+export const DOC_MINIMAX_OPENAI_API = 'https://platform.minimax.io/docs/api-reference/text-openai-api';
+export const DOC_MINIMAX_CHAT_OPENAI = 'https://platform.minimax.io/docs/api-reference/text-chat-openai';
+export const DOC_MINIMAX_TEXT_GENERATION = 'https://platform.minimax.io/docs/guides/text-generation';
+export const DOC_MINIMAX_RATE_LIMITS = 'https://platform.minimax.io/docs/guides/rate-limits';
+export const DOC_MINIMAX_CLAUDE_CODE_M_PLAN = 'https://platform.minimax.io/docs/m-plan/claude-code';
+export const DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN = 'https://platform.minimax.io/docs/token-plan/claude-code';

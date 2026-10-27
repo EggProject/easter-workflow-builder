@@ -16,10 +16,10 @@ describe('buildProbeGraph (SPEC-012 5.1 táblázat)', () => {
     expect(graph.edges).toHaveLength(1);
   });
 
-  it('minimax esetén MiniMax-M3 modell, maxTurns 1, költségkeret és eszköz tiltás nélkül', () => {
+  it('minimax esetén MiniMax-M3.1-Flash modell, maxTurns 1, költségkeret és eszköz tiltás nélkül', () => {
     const config = agentStepConfig('minimax');
     expect(config['providerId']).toBe('minimax');
-    expect(config['modelId']).toBe('MiniMax-M3');
+    expect(config['modelId']).toBe('MiniMax-M3.1-Flash');
     expect(config['maxTurns']).toBe(1);
 
     expect(config['maxBudgetUsd']).toBeNull();

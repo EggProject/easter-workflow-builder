@@ -1,19 +1,29 @@
-import { RESEARCH_MINIMAX, type RateLimitCapability } from '@easter-workflow-builder/provider-capability';
+import {
+  DOC_MINIMAX_RATE_LIMITS,
+  RESEARCH_MINIMAX_FLASH,
+  type RateLimitCapability,
+} from '@easter-workflow-builder/provider-capability';
 import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
 
 export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
   buckets: [
     {
-      appliesTo: ['MiniMax-M3'],
+      appliesTo: ['MiniMax-M3.1-Flash'],
       requestsPerMinute: {
         state: 'known',
         value: 200,
-        evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+        evidence: [
+          { kind: 'doc', url: DOC_MINIMAX_RATE_LIMITS },
+          { kind: 'research', section: RESEARCH_MINIMAX_FLASH },
+        ],
       },
       tokensPerMinute: {
         state: 'known',
         value: 10_000_000,
-        evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+        evidence: [
+          { kind: 'doc', url: DOC_MINIMAX_RATE_LIMITS },
+          { kind: 'research', section: RESEARCH_MINIMAX_FLASH },
+        ],
       },
     },
   ],

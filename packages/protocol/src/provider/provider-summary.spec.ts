@@ -6,7 +6,7 @@ describe('ProviderSummarySchema', () => {
     const outcome = ProviderSummarySchema.safeParse({
       id: 'minimax',
       displayName: 'MiniMax',
-      models: ['MiniMax-M3'],
+      models: ['MiniMax-M3.1-Flash'],
       requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'],
     });
     expect(outcome.success).toBe(true);

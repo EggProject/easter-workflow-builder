@@ -67,7 +67,7 @@ const COST_FIELD_EXPLANATION =
  * költség mező helyén (a mező maga sehol nem jelenik meg).
  */
 const COST_HIDDEN_FOR_MINIMAX_EXPLANATION =
-  'A MiniMax-M3 modellre az Agent SDK nem ismer valós árat, ezért a költség becslése ennél a providernél nem jelenik meg.';
+  'A MiniMax-M3.1-Flash modellre az Agent SDK nem ismer valós árat, ezért a költség becslése ennél a providernél nem jelenik meg.';
 
 /**
  * A kinyitott sorban megjelenő magyarázat, ha a lépés providere nem oldható

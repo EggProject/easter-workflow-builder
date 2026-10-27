@@ -1,21 +1,25 @@
-import type { EffortCapability } from '@easter-workflow-builder/provider-capability';
+import {
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_TEXT_GENERATION,
+  type EffortCapability,
+} from '@easter-workflow-builder/provider-capability';
 
+// A Flash az `output_config.effort` mezőt fogadja (low ... max), a dokumentáció szerint.
 export const minimaxEffort: EffortCapability = {
-  // Az effort minden mért beállítás mellett kimegy, a kényszerítő env kapcsoló hatástalan.
   accepted: {
     state: 'known',
     value: true,
     evidence: [
-      { kind: 'measurement', id: 'M-04' },
-      { kind: 'measurement', id: 'M-26' },
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+      { kind: 'doc', url: DOC_MINIMAX_TEXT_GENERATION },
     ],
   },
   wireField: {
     state: 'known',
     value: 'output_config.effort',
     evidence: [
-      { kind: 'measurement', id: 'M-04' },
-      { kind: 'measurement', id: 'M-26' },
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+      { kind: 'doc', url: DOC_MINIMAX_TEXT_GENERATION },
     ],
   },
 };

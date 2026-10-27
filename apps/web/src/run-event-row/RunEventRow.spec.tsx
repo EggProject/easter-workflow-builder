@@ -286,7 +286,7 @@ describe('RunEventRow', () => {
         });
         expect(body().textContent).not.toContain('$0.2131');
         expect(body().textContent).not.toContain('Költség (SDK becslés)');
-        expect(body().textContent).toContain('A MiniMax-M3 modellre az Agent SDK nem ismer valós árat');
+        expect(body().textContent).toContain('A MiniMax-M3.1-Flash modellre az Agent SDK nem ismer valós árat');
         // A nyers payload (a szám maga, mezőnévvel együtt) továbbra is a JSON blokkban áll,
         // de ez nem a felület saját "Költség" szövege, hanem a menekülőút a nyers adathoz.
         expect(body().textContent).toContain('"total_cost_usd": 0.213108');

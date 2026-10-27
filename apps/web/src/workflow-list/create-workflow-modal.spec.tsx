@@ -40,7 +40,12 @@ const twoProvidersFetchFunction: FetchFunction = () =>
   Promise.resolve(
     Response.json([
       { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
-      { id: 'minimax', displayName: 'MiniMax', models: ['MiniMax-M3'], requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'] },
+      {
+        id: 'minimax',
+        displayName: 'MiniMax',
+        models: ['MiniMax-M3.1-Flash'],
+        requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'],
+      },
     ]),
   );
 

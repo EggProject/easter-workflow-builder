@@ -23,11 +23,19 @@ export {
   DOC_CACHING,
   DOC_STREAMING,
   DOC_VISION,
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_OPENAI_API,
+  DOC_MINIMAX_CHAT_OPENAI,
+  DOC_MINIMAX_TEXT_GENERATION,
+  DOC_MINIMAX_RATE_LIMITS,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+  DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
 } from './evidence-sources/measurement-document/document-url.ts';
 export {
   RESEARCH_MINIMAX,
   RESEARCH_GATEWAY,
   RESEARCH_AUTH_PRECEDENCE,
+  RESEARCH_MINIMAX_FLASH,
 } from './evidence-sources/measurement-document/research-section.ts';
 export type { MeasurementDocumentAnchor } from './evidence-sources/measurement-document/measurement-document.ts';
 export { measurementDocument } from './evidence-sources/measurement-document/measurement-document.ts';

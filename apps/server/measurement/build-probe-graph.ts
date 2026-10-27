@@ -4,7 +4,7 @@ import type { ProviderId } from '@easter-workflow-builder/provider-capability';
 /**
 A próba lépésének modellje `minimax` providernél (SPEC-012 5.1 táblázat, O-14 ... O-17).
 */
-const MINIMAX_MODEL_ID = 'MiniMax-M3';
+const MINIMAX_MODEL_ID = 'MiniMax-M3.1-Flash';
 
 /**
 Rövid, eszközt nem kérő prompt: a pontos szöveg a próba kódjában áll, nem döntés (SPEC-012 5.1 táblázat).
@@ -21,7 +21,7 @@ export interface ProbeGraph {
  * A minimális gráf: Start és egyetlen `agent_step` (SPEC-012 5.1 2. lépés).
  * A lépés beállításai az 5.1 táblázat szerintiek: `maxTurns: 1`, nincs
  * `maxBudgetUsd`, nincs eszköz tiltás, nincs időkorlát. `minimax` esetén a
- * modell `MiniMax-M3`; `claude-subscription` esetén alapból nincs `modelId`
+ * modell `MiniMax-M3.1-Flash`; `claude-subscription` esetén alapból nincs `modelId`
  * (a SPEC-012 5.1 táblázata szerint), de a motor több modellű leírónál
  * `model_not_selected` hibával elutasítja a futást, ezért a hívó a
  * `modelIdOverride` paraméterrel adhat modellt (nyitott kérdés, lásd a

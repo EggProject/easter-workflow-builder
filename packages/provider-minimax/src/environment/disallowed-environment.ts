@@ -1,7 +1,8 @@
 import {
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
   RESEARCH_AUTH_PRECEDENCE,
   RESEARCH_GATEWAY,
-  RESEARCH_MINIMAX,
   type DisallowedEnvironmentRequirement,
 } from '@easter-workflow-builder/provider-capability';
 
@@ -19,17 +20,19 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING',
     reason:
-      'Fix budget alakú thinking mezőt kényszerít ki, a MiniMax sémája viszont csak disabled és adaptive értéket ismer, budget_tokens kulcs nélkül.',
+      'Fix budget alakú thinking mezőt kényszerít ki, a MiniMax-M3.1-Flash viszont csak az adaptív vagy elhagyott thinking mezőt fogadja el, budget_tokens kulcs nélkül.',
     evidence: [
       { kind: 'research', section: RESEARCH_GATEWAY },
-      { kind: 'research', section: RESEARCH_MINIMAX },
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
     ],
   },
   {
     name: 'MAX_THINKING_TOKENS',
     reason:
-      'A 0 érték leveszi a thinking és context_management body mezőket, de a hozzájuk tartozó anthropic-beta headereket a headerben hagyja, és kikapcsolja az M3 adaptív thinkingjét.',
+      'A 0 érték a thinking kikapcsolását kéri, a MiniMax-M3.1-Flash a kikapcsolt thinkinget 400 hibával elutasítja; a mérés szerint a 0 érték a thinking és context_management body mezőket leveszi, a hozzájuk tartozó anthropic-beta headereket viszont a headerben hagyja.',
     evidence: [
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+      { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
       { kind: 'measurement', id: 'M-06' },
       { kind: 'measurement', id: 'M-08' },
     ],
