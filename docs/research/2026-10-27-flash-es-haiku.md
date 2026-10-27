@@ -1,4 +1,4 @@
-# A MiniMax-M3.1-Flash csere, a két kulcsnév és a claude-haiku-5-5: források és tények
+# A MiniMax-M3.1-Flash csere, a két kulcsnév és a thinking átadás: források és tények
 
 |              |                                                                                                                                                      |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,6 +19,11 @@ kell. Ahol a megerősítés ugyanattól a kiadótól jön (MiniMax saját lapjai
    ("Mindkettő működjön").
 3. A Claude próbához a legolcsóbb modell kell: `claude-haiku-5-5`, a Claude katalógusba felvéve.
 4. Utána valódi próba fut mindkét providerrel (`bun run probe:real-provider`), alacsony tokennel.
+
+**A 2026-10-27-i második döntéskör** (a SPEC-013 11. szekciója): a `claude-haiku-5-5` kikerült a
+hatókörből (a user: "miert kell a haiku"; a Claude próba előfizetéssel fut, nem tokenár alapon), nincs SDK
+frissítés, a Claude próba a katalógusban álló `claude-haiku-4-5`-tel fut. A 3. és 4. szekció a
+`claude-haiku-5-5`-ről megállapításként marad, a hatókörbe nem tartozik.
 
 ---
 
@@ -44,7 +49,7 @@ kell. Ahol a megerősítés ugyanattól a kiadótól jön (MiniMax saját lapjai
 
 ---
 
-## 3. claude-haiku-5-5
+## 3. claude-haiku-5-5 (megállapítás, a hatókörön kívül)
 
 | Tény                   | Érték                                                                                                                  | Elsődleges forrás                                                          | Megerősítés                                                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -60,7 +65,7 @@ kell. Ahol a megerősítés ugyanattól a kiadótól jön (MiniMax saját lapjai
 
 ---
 
-## 4. A pinelt SDK által csomagolt Claude Code verzió (blokkoló a claude-haiku-5-5-re)
+## 4. A pinelt SDK által csomagolt Claude Code verzió (megállapítás: blokkoló lenne a claude-haiku-5-5-re)
 
 **Telepített forrás olvasása (2026-10-27).** A repó a `@anthropic-ai/claude-agent-sdk@0.3.245`-öt pineli.
 A telepített csomag `manifest.json` fájljának `version` mezője `2.1.245`, a natív bináris
@@ -83,7 +88,8 @@ Agent SDK csomagba ágyazott CLI-t az SDK csomag frissítése cseréli).
 **Következmény.** A pinelt `0.3.245` mellett egy `claude-haiku-5-5` lépés a szerver oldali `400`
 miatt nem futhat le. A legkisebb SDK verzió, ami legalább `2.1.293`-as Claude Code-ot csomagol, a
 `0.3.293`. A szabálykönyv 9. szekciója szerint SDK frissítés előtt a SPEC-000 mérései regresszióként
-futnak, ami valódi MiniMax hívás. Ez user döntés (SPEC-013 O-1).
+futnak, ami valódi MiniMax hívás. A user döntése (SPEC-013 O-1): nincs SDK frissítés, a
+`claude-haiku-5-5` nem kerül be.
 
 ---
 
@@ -115,8 +121,9 @@ futnak, ami valódi MiniMax hívás. Ez user döntés (SPEC-013 O-1).
 2. **Mellékes lelet: a motor szöveget ad át.** A `packages/engine` `AgentStepOptions.thinking` mezője
    `ThinkingMode` szöveg (`'adaptive'`), amit a `build-agent-step-options.ts` változatlanul tesz az
    `Options.thinking` mezőbe. Egy szöveg `.type` mezője `undefined`, tehát az SDK egyik ágba sem lép, és
-   a lépés thinking beállítása **nem jut el a CLI-ig**. Ez a SPEC-013 hatókörén kívüli hiba (SPEC-013
-   O-5); a valódi próbát nem érinti, mert ott a lépés `thinking` mezője `null`.
+   a lépés thinking beállítása **nem jut el a CLI-ig**. A user döntése szerint ebben a körben javítandó
+   (SPEC-013 O-5, 5. szekció, a forrás pontos helye a 10.3 alatt); a valódi próbát nem érinti, mert ott a
+   lépés `thinking` mezője `null`.
 3. **A CLI alapértéke.** A natív bináris beágyazott forrása szerint thinking beállítás nélkül a CLI
    `{type:"adaptive"}` konfigurációval indul; egy beállítás hamis értékénél `disabled`-del (a minifikált
    kódból a beállítás neve nem állapítható meg; a MiniMax lap az `alwaysThinkingEnabled`-et nevezi meg,
@@ -172,3 +179,59 @@ magyarázó mondatának cseréjét támasztja alá (SPEC-013 3.5).
    párhuzamosság a Flash-nél (az M3 mérései nem vihetők át, SPEC-013 3.2).
 4. A CLI viselkedése, ha `ANTHROPIC_API_KEY` és `ANTHROPIC_AUTH_TOKEN` egyszerre áll a környezetében.
 5. A Claude Code alap effort értéke a pinelt CLI-n (a MiniMax lap `high`-ot ír).
+
+---
+
+## 10. A második döntéskör forrásai (2026-10-27)
+
+### 10.1 A pinelt CLI ismeri a `claude-haiku-4-5` azonosítót
+
+Telepített forrás olvasása, `grep -a` a pinelt natív binárison
+(`@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.245`, `claude` fájl, beágyazott `VERSION` `2.1.245`, 4.
+szekció): a `claude-haiku-4-5` karakterlánc 93-szor fordul elő (57 sorban), köztük a modell választó
+listájában (`value:"haiku",label:"Haiku",description:"Haiku 4.5 ..."`), a modell azonosító leképezésben
+(`claude-haiku-4-5` -> `claude-haiku-4-5-20251001`) és az ismert modellek halmazában. A
+`claude-haiku-5` karakterlánc nulla találat (a 4. szekció megállapításával egyezik). A katalógus
+bejegyzés (`packages/provider-claude-subscription`) már tartalmazza a `claude-haiku-4-5`-öt, tehát a
+Claude próba ehhez nem igényel kódváltozást a leíróban.
+
+### 10.2 A `claude-haiku-4-5` az effort paramétert nem támogatja (SPEC-013 O-6)
+
+| Forrás                                                                                                                                          | Állítás                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <https://platform.claude.com/docs/en/build-with-claude/effort> (elsődleges; a lap `supportedModels` listája, `.md` alakban letöltve 2026-10-27) | a támogatott modellek listájában a Haiku családból csak a `claude-haiku-5-5` áll, a `claude-haiku-4-5` nem                                                                            |
+| <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5>                                           | "Claude Haiku 5.5 is the first Haiku model with effort levels", és az effort "replaces the thinking budget (`budget_tokens`) that Claude Haiku 4.5 used"                              |
+| a pinelt CLI bináris (10.1), saját olvasás                                                                                                      | az effort támogatást eldöntő függvény a `claude-haiku-4-5` azonosítóra `false` értéket ad (`n==="claude-haiku-4-5")return!1`, a `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` ellenőrzése előtt) |
+
+Következmény: a `claude-subscription` próba lépése `effort` nélkül fut (SPEC-013 6.). A
+`claude-subscription` leíró `effort.accepted` mezője provider szintű `known` `true` (a `DOC_EFFORT`
+bizonyítékkal), modellre nem bont; ez a SPEC-013 9. szekciójában javaslatként áll, nem e spec hatóköre.
+Hogy a pinelt CLI egy `claude-haiku-4-5` lépés effort beállítását elhagyja-e vagy elküldi, **nem mért**.
+
+A MiniMax próba `effort: 'low'` értékének forrása a 2. szekció "Effort" sora (text-anthropic-api
+"Thinking Depth Control": `low`, `medium`, `high`, `xhigh`, `max`), a leíró `effort.accepted` mezője a
+Flash-re `known` `true` (SPEC-013 3.2). Hogy a pinelt CLI a `MiniMax-M3.1-Flash[1m]` azonosítóra kiküldi-e
+az effortot, **nem mért** (az M3-ra az M-04 és az M-26 mérte); a valódi próba ezt nem rögzíti, mert a
+próba a kimenő kérés törzsét nem naplózza.
+
+### 10.3 A thinking átadás helyes alakja (SPEC-013 O-5)
+
+Telepített forrás olvasása, `@anthropic-ai/claude-agent-sdk@0.3.245`:
+
+- `sdk.d.ts` 1698. sor: `thinking?: ThinkingConfig;` az `Options` típusban; 8116. sor:
+  `export declare type ThinkingConfig = ThinkingAdaptive | ThinkingEnabled | ThinkingDisabled;`, ahol
+  `ThinkingAdaptive = { type: 'adaptive'; display?: 'summarized' | 'omitted' }`,
+  `ThinkingDisabled = { type: 'disabled' }`, `ThinkingEnabled = { type: 'enabled'; budgetTokens?: number; ... }`.
+- `sdk.mjs`: a `thinking` opciót `switch(rt.type){case"adaptive":...case"enabled":...case"disabled":...}`
+  ágakkal olvassa (egy találat); szöveg értéknél egyik ág sem fut, és a `maxThinkingTokens` ágra sem
+  lép, mert az csak a `thinking` hiányában fut.
+
+A motor leképezése ezért: `adaptive` -> `{ type: 'adaptive' }`, `disabled` -> `{ type: 'disabled' }`; az
+`always_on`-nak nincs SDK ága, a mező elmarad (SPEC-013 5.2).
+
+---
+
+## 11. Kiinduló állapot (PLAN-014 T-014-1)
+
+- A branch `feat/spec-013-flash-es-haiku`, a kiinduló fej `cbd9583`, ami a friss `origin/main`
+  (`986399a`) leszármazottja; a munkakönyvtár tiszta.
