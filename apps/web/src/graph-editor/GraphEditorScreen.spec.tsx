@@ -125,7 +125,12 @@ const WORKFLOW_DETAIL = {
 const SETTINGS_RECORD = { defaultProviderId: 'claude-subscription', persistStreamDeltas: false };
 const PROVIDER_SUMMARIES = [
   { id: 'claude-subscription', displayName: 'Claude előfizetés', models: [], requiredEnvNames: [] },
-  { id: 'minimax', displayName: 'MiniMax', models: [], requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'] },
+  {
+    id: 'minimax',
+    displayName: 'MiniMax',
+    models: [],
+    requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY']],
+  },
 ];
 
 function jsonResponse(body: unknown): Response {

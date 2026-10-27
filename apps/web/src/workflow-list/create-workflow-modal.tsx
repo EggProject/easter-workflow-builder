@@ -133,11 +133,14 @@ export function CreateWorkflowModal(properties: Readonly<CreateWorkflowModalProp
           // (SPEC-005 4.2 D, `.claude/CLAUDE.md` 9.), és a felület is
           // kizárólag a nevet írja ki (SPEC-007 10.1, 16. szekció 49.
           // kritérium): a felhasználó így látja, melyik változót kell
-          // beállítania a szerver környezetében.
+          // beállítania a szerver környezetében. Egy követelmény több
+          // elfogadott neve " vagy " kötőszóval áll (SPEC-013 4.8).
           <p>
             {selectedProvider.requiredEnvNames.length === 0
               ? 'Ehhez a providerhez nem kell környezeti változó.'
-              : `Szükséges környezeti változók: ${selectedProvider.requiredEnvNames.join(', ')}`}
+              : `Szükséges környezeti változók: ${selectedProvider.requiredEnvNames
+                  .map((names) => names.join(' vagy '))
+                  .join(', ')}`}
           </p>
         )}
       </form>

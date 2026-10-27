@@ -139,7 +139,7 @@ test('a kiválasztott provider szükséges környezeti változóit a modális ki
             id: 'minimax',
             displayName: 'MiniMax',
             models: [],
-            requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL'],
+            requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'], ['ANTHROPIC_BASE_URL']],
           },
         ]),
       ),
@@ -152,10 +152,10 @@ test('a kiválasztott provider szükséges környezeti változóit a modális ki
   const dialog = page.getByRole('dialog', { name: 'Új workflow' });
   await chooseSelectOption(page, dialog.getByRole('combobox', { name: 'Provider' }), 'MiniMax');
 
-  // Kizárólag a változó NEVE jelenik meg, az értéke soha
-  // (SPEC-007 16. szekció 49. kritérium).
+  // Kizárólag a változó NEVE jelenik meg, az értéke soha (SPEC-007 16. szekció
+  // 49. kritérium); egy követelmény elfogadott nevei " vagy " kötőszóval (SPEC-013 4.8).
   await expect(
-    dialog.getByText('Szükséges környezeti változók: ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL'),
+    dialog.getByText('Szükséges környezeti változók: ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL'),
   ).toBeVisible();
 });
 

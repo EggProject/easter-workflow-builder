@@ -44,7 +44,7 @@ const twoProvidersFetchFunction: FetchFunction = () =>
         id: 'minimax',
         displayName: 'MiniMax',
         models: ['MiniMax-M3.1-Flash'],
-        requiredEnvNames: ['ANTHROPIC_AUTH_TOKEN'],
+        requiredEnvNames: [['ANTHROPIC_BASE_URL'], ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY']],
       },
     ]),
   );
@@ -206,7 +206,9 @@ describe('CreateWorkflowModal', () => {
 
     chooseOption(container, 'Provider', 'MiniMax');
 
-    expect(container.textContent).toContain('Szükséges környezeti változók: ANTHROPIC_AUTH_TOKEN');
+    expect(container.textContent).toContain(
+      'Szükséges környezeti változók: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY',
+    );
   });
 
   it('env változót nem igénylő providerre ezt mondja ki, nem hagyja üresen', async () => {

@@ -1,5 +1,8 @@
 import { providerRegistry } from '@easter-workflow-builder/provider-registry';
-import type { ProviderCapabilityDescriptor } from '@easter-workflow-builder/provider-capability';
+import {
+  acceptedEnvironmentNames,
+  type ProviderCapabilityDescriptor,
+} from '@easter-workflow-builder/provider-capability';
 import type { RouteHandler } from '../route-dispatch/route-handler.ts';
 
 /**
@@ -13,7 +16,7 @@ function toProviderSummary(descriptor: ProviderCapabilityDescriptor<string, stri
     id: descriptor.id,
     displayName: descriptor.displayName,
     models: descriptor.models.map((model) => model.id),
-    requiredEnvNames: descriptor.requiredEnv.map((requirement) => requirement.name),
+    requiredEnvNames: descriptor.requiredEnv.map((requirement) => acceptedEnvironmentNames(requirement)),
   };
 }
 
