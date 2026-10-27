@@ -24,3 +24,8 @@ export const DOC_MINIMAX_TEXT_GENERATION = 'https://platform.minimax.io/docs/gui
 export const DOC_MINIMAX_RATE_LIMITS = 'https://platform.minimax.io/docs/guides/rate-limits';
 export const DOC_MINIMAX_CLAUDE_CODE_M_PLAN = 'https://platform.minimax.io/docs/m-plan/claude-code';
 export const DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN = 'https://platform.minimax.io/docs/token-plan/claude-code';
+// A `MiniMax-M3.1-Flash[1m]` kliens azonosító két, a MiniMaxtól független megerősítése (research 2. szekció).
+export const DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS =
+  'https://pchalasani.github.io/claude-code-tools/integrations/alt-llm-providers/';
+export const DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE =
+  'https://www.digitalapplied.com/blog/run-minimax-m3-1-flash-inside-claude-code-setup';

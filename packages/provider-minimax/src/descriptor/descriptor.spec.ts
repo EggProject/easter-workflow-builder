@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS,
+  DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE,
   DOC_ENV_VARS,
   DOC_MINIMAX_ANTHROPIC_API,
   DOC_MINIMAX_CHAT_OPENAI,
   DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
   DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
   DOC_MINIMAX_OPENAI_API,
-  DOC_MINIMAX_RATE_LIMITS,
   DOC_MINIMAX_TEXT_GENERATION,
   RESEARCH_GATEWAY,
   RESEARCH_MINIMAX_FLASH,
@@ -54,7 +55,13 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
       'clientModelIdentifier',
       model?.clientModelIdentifier,
       'MiniMax-M3.1-Flash[1m]',
-      [DOC_MINIMAX_CLAUDE_CODE_M_PLAN, DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN],
+      [
+        DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+        DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
+        DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS,
+        DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE,
+        RESEARCH_MINIMAX_FLASH,
+      ],
     ],
     ['contextWindow', model?.contextWindow, 1_000_000, [DOC_MINIMAX_ANTHROPIC_API, DOC_MINIMAX_TEXT_GENERATION]],
     ['maxOutputTokensRecommended', model?.maxOutputTokensRecommended, 131_072, [DOC_MINIMAX_CHAT_OPENAI]],
@@ -88,18 +95,6 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
       minimaxProvider.concurrency.subagentCapEnvVar,
       'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
       [DOC_ENV_VARS],
-    ],
-    [
-      'rateLimits RPM',
-      minimaxProvider.rateLimits.buckets[0]?.requestsPerMinute,
-      200,
-      [DOC_MINIMAX_RATE_LIMITS, RESEARCH_MINIMAX_FLASH],
-    ],
-    [
-      'rateLimits TPM',
-      minimaxProvider.rateLimits.buckets[0]?.tokensPerMinute,
-      10_000_000,
-      [DOC_MINIMAX_RATE_LIMITS, RESEARCH_MINIMAX_FLASH],
     ],
   ] as const)('%s', (_name, fact, value, sources) => {
     expect(fact?.state).toBe('known');
@@ -163,6 +158,8 @@ describe('az előző modellre mért mezők unknown állapotúak, a megismétlend
     ['modelsEndpoint.directHttpReachable', minimaxProvider.modelsEndpoint.directHttpReachable, ['M-35']],
     ['modelsEndpoint.calledBySdk', minimaxProvider.modelsEndpoint.calledBySdk, ['M-12', 'M-36']],
     ['modelsEndpoint.listedModelCount', minimaxProvider.modelsEndpoint.listedModelCount, ['M-35']],
+    ['rateLimits RPM', minimaxProvider.rateLimits.buckets[0]?.requestsPerMinute, ['M-18', 'M-36']],
+    ['rateLimits TPM', minimaxProvider.rateLimits.buckets[0]?.tokensPerMinute, ['M-18', 'M-36']],
     ['rateLimits.retryAfterHeader', minimaxProvider.rateLimits.retryAfterHeader, ['M-18', 'M-36']],
     ['rateLimits.rateLimitHeaders', minimaxProvider.rateLimits.rateLimitHeaders, ['M-18', 'M-36']],
     ['concurrency.measuredSubagentCap', minimaxProvider.concurrency.measuredSubagentCap, ['M-31']],

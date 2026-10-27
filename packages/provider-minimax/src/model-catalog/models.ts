@@ -1,9 +1,12 @@
 import {
+  DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS,
+  DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE,
   DOC_MINIMAX_ANTHROPIC_API,
   DOC_MINIMAX_CHAT_OPENAI,
   DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
   DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN,
   DOC_MINIMAX_TEXT_GENERATION,
+  RESEARCH_MINIMAX_FLASH,
   type ModelDescriptor,
 } from '@easter-workflow-builder/provider-capability';
 import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
@@ -14,13 +17,16 @@ export const minimaxModels: readonly ModelDescriptor<MiniMaxModelId, MiniMaxFami
   {
     id: 'MiniMax-M3.1-Flash',
     family: 'M3.1-Flash',
-    // A Claude Code kliensnek a suffixes alakot kell átadni, a MiniMax Claude Code lapjai szerint.
+    // A Claude Code kliensnek a suffixes alakot kell átadni: a MiniMax Claude Code lapjai és két független megerősítés szerint.
     clientModelIdentifier: {
       state: 'known',
       value: 'MiniMax-M3.1-Flash[1m]',
       evidence: [
         { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
         { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_TOKEN_PLAN },
+        { kind: 'doc', url: DOC_CLAUDE_CODE_TOOLS_ALT_PROVIDERS },
+        { kind: 'doc', url: DOC_DIGITALAPPLIED_MINIMAX_FLASH_CLAUDE_CODE },
+        { kind: 'research', section: RESEARCH_MINIMAX_FLASH },
       ],
     },
     contextWindow: {
