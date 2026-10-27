@@ -1,4 +1,6 @@
 import {
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
+  RESEARCH_AUTH_PRECEDENCE,
   RESEARCH_GATEWAY,
   RESEARCH_MINIMAX,
   type EnvironmentRequirement,
@@ -15,13 +17,16 @@ export const minimaxRequiredEnvironment: readonly EnvironmentRequirement[] = [
   },
   {
     name: 'ANTHROPIC_AUTH_TOKEN',
-    source: 'process_env_passthrough',
+    source: 'process_env_alternatives',
+    alternativeNames: ['ANTHROPIC_API_KEY'],
     secret: true,
     purpose:
-      'Az ANTHROPIC_AUTH_TOKEN process env változó értéke megy Bearer tokenként, az adatbázis csak a NEVET tárolja.',
+      'A kulcs az ANTHROPIC_AUTH_TOKEN vagy az ANTHROPIC_API_KEY process env változóból jön (ha mindkettő áll, az ANTHROPIC_AUTH_TOKEN nyer), és ANTHROPIC_AUTH_TOKEN néven megy ki Bearer tokenként; az adatbázis csak a NEVET tárolja.',
     evidence: [
       { kind: 'research', section: RESEARCH_MINIMAX },
       { kind: 'research', section: RESEARCH_GATEWAY },
+      { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
+      { kind: 'research', section: RESEARCH_AUTH_PRECEDENCE },
     ],
   },
   {

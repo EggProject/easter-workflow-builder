@@ -64,4 +64,50 @@ describe('resolveRequiredEnvironmentValue', () => {
     });
     expect(result.kind === 'error' ? result.message : '').not.toMatch(/fake-secret-value/);
   });
+
+  describe('process_env_alternatives forrás (SPEC-013 4.4)', () => {
+    const requirement: EnvironmentRequirement = {
+      name: 'ANTHROPIC_AUTH_TOKEN',
+      source: 'process_env_alternatives',
+      alternativeNames: ['ANTHROPIC_API_KEY'],
+      secret: true,
+      purpose: 'fake purpose',
+      evidence: FAKE_EVIDENCE,
+    };
+
+    it('csak a name áll: annak az értékét adja', () => {
+      expect(
+        resolveRequiredEnvironmentValue(requirement, buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: 'elso-ertek' })),
+      ).toStrictEqual({ kind: 'ok', value: 'elso-ertek' });
+    });
+
+    it('csak az alternatív név áll: annak az értékét adja', () => {
+      expect(
+        resolveRequiredEnvironmentValue(requirement, buildProcessEnvironment({ ANTHROPIC_API_KEY: 'masodik-ertek' })),
+      ).toStrictEqual({ kind: 'ok', value: 'masodik-ertek' });
+    });
+
+    it('mindkettő áll: a name nyer (SPEC-013 4.3)', () => {
+      expect(
+        resolveRequiredEnvironmentValue(
+          requirement,
+          buildProcessEnvironment({ ANTHROPIC_AUTH_TOKEN: 'elso-ertek', ANTHROPIC_API_KEY: 'masodik-ertek' }),
+        ),
+      ).toStrictEqual({ kind: 'ok', value: 'elso-ertek' });
+    });
+
+    it('egyik sem áll: missing_provider_env, minden névvel, érték nélkül', () => {
+      const result = resolveRequiredEnvironmentValue(
+        requirement,
+        buildProcessEnvironment({ MAS: 'fake-secret-value' }),
+      );
+
+      expect(result).toStrictEqual({
+        kind: 'error',
+        message:
+          'A(z) ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY kötelező provider env változó nincs beállítva (missing_provider_env).',
+      });
+      expect(result.kind === 'error' ? result.message : '').not.toMatch(/fake-secret-value/);
+    });
+  });
 });

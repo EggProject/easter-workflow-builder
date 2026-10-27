@@ -51,6 +51,7 @@ export type { ModelsEndpointCapability } from './model-catalog/models-endpoint-c
 
 export type { EnvironmentRequirement } from './environment/environment-requirement.ts';
 export type { DisallowedEnvironmentRequirement } from './environment/disallowed-environment-requirement.ts';
+export { acceptedEnvironmentNames } from './environment/accepted-environment-names.ts';
 
 export type { ServerToolDescriptor } from './tool-support/server-tool-descriptor.ts';
 

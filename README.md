@@ -24,8 +24,9 @@ cp apps/web/.env.example apps/web/.env
 A két `.env` fájl kizárt a gitből, titok csak oda kerül. A minták minden értéke egyezik a kódbeli
 alapértékkel, tehát a másolás nélkül is ugyanezek érvényesek (lásd "Alapértékek és felülírásuk").
 
-**Ha a `.env` fájlodban a `MINIMAX_API_KEY` sor áll, nevezd át `ANTHROPIC_AUTH_TOKEN`-re.** A MiniMax
-kulcs ezen a néven érkezik a szerverhez (SPEC-012 2.4, O-1); a régi nevet a szerver már nem olvassa.
+**Ha a `.env` fájlodban a `MINIMAX_API_KEY` sor áll, nevezd át `ANTHROPIC_AUTH_TOKEN`-re vagy
+`ANTHROPIC_API_KEY`-re.** A MiniMax kulcs e két név bármelyikén érkezhet a szerverhez (SPEC-013 4.1); a
+régi nevet a szerver már nem olvassa.
 
 ## Indítás (két terminál)
 
@@ -78,8 +79,12 @@ fejlécet; a minta `http://localhost:5173`), `EASTER_DB_FILE` (hiányában
 - **`claude-subscription`**: nem kér env változót, a Claude Code `/login` bejelentkezését használja.
   A szerver környezetében álló, hitelesítést felülíró változók (köztük az `ANTHROPIC_AUTH_TOKEN` és az
   `ANTHROPIC_API_KEY`) nem jutnak el ehhez a lépéshez.
-- **`minimax`**: a kulcs az `ANTHROPIC_AUTH_TOKEN` változóból jön, a `.env` fájlból vagy a környezetből.
-  A kulcsot soha ne írd a `.env.example` fájlba vagy a gitbe.
+- **`minimax`** (modell: `MiniMax-M3.1-Flash`): a kulcs az `ANTHROPIC_AUTH_TOKEN` vagy az
+  `ANTHROPIC_API_KEY` változóból jön, a `.env` fájlból vagy a környezetből; ha mindkettő áll, az
+  `ANTHROPIC_AUTH_TOKEN` nyer, és a lépés felé a kulcs mindig `ANTHROPIC_AUTH_TOKEN` néven megy ki
+  (SPEC-013 4.). **Figyelem:** egy `ANTHROPIC_API_KEY` néven tárolt Anthropic kulcs is a MiniMaxhoz
+  menne, ha `ANTHROPIC_AUTH_TOKEN` nincs beállítva (SPEC-013 9.). A kulcsot soha ne írd a
+  `.env.example` fájlba vagy a gitbe.
 
 **A szerver környezete az agenté is.** A lépés alfolyamata a szerver teljes környezetét örökli (a
 `PATH`, a `HOME` és a többi változó átmegy), a saját provider kulcsával kiegészítve, a másik provider

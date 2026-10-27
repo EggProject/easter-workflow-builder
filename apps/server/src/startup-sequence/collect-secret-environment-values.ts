@@ -1,15 +1,18 @@
 import type { EnvironmentReader } from '@easter-workflow-builder/core';
-import type { EnvironmentRequirement } from '@easter-workflow-builder/provider-capability';
+import { acceptedEnvironmentNames, type EnvironmentRequirement } from '@easter-workflow-builder/provider-capability';
 import { providerRegistry } from '@easter-workflow-builder/provider-registry';
 
 function collectSecretEnvironmentNamesFor(requiredEnvironment: readonly EnvironmentRequirement[]): readonly string[] {
-  return requiredEnvironment.filter((requirement) => requirement.secret).map((requirement) => requirement.name);
+  return requiredEnvironment
+    .filter((requirement) => requirement.secret)
+    .flatMap((requirement) => acceptedEnvironmentNames(requirement));
 }
 
 /**
  * A két rögzített provider leírójának `requiredEnv` listájából a titkot
- * hordozó (`secret: true`) bejegyzések ÉRTÉKE, a jelenlegi process env-ből
- * olvasva (SPEC-006 7.4 2. pont). A logger ezt kapja `secretValues` gyanánt,
+ * hordozó (`secret: true`) bejegyzések minden elfogadott bemeneti nevének
+ * ÉRTÉKE, a jelenlegi process env-ből olvasva (SPEC-006 7.4 2. pont, SPEC-013
+ * 4.6: egy `ANTHROPIC_API_KEY` néven érkezett kulcs is maszkolt). A logger ezt kapja `secretValues` gyanánt,
  * hogy egy hibaüzenet SZÖVEGÉBEN megjelenő titkot is kimaszkoljon, nem csak a
  * `redact` mezőnév alapú útvonalakat. A két provider közvetlenül, névvel
  * címzett - nem `Object.keys` iteráció -, mert a `.claude/CLAUDE.md` 9.

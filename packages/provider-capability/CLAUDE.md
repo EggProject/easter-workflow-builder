@@ -19,7 +19,7 @@ az `evidence-sources` tárgykör megtartotta a saját téma mappáit, ezért ké
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `descriptor/`                            | az összefogó `ProviderCapabilityDescriptor` típus, minden mezője a többi téma egy-egy exportjára hivatkozik                                                                                                                                                                                                 |
 | `model-catalog/`                         | `ModelDescriptor`, `ModelsEndpointCapability`: a modelltábla és a `GET /v1/models` végpont                                                                                                                                                                                                                  |
-| `environment/`                           | `EnvironmentRequirement`, `DisallowedEnvironmentRequirement`: kötelező és tiltott env változók                                                                                                                                                                                                              |
+| `environment/`                           | `EnvironmentRequirement`, `DisallowedEnvironmentRequirement`: kötelező és tiltott env változók; az `acceptedEnvironmentNames` egy követelmény elfogadott bemeneti neveit adja elsőbbségi sorrendben (SPEC-013 4.4)                                                                                          |
 | `tool-support/`                          | `ServerToolDescriptor`: a szerver oldali eszközök                                                                                                                                                                                                                                                           |
 | `limits/`                                | `ConcurrencyCapability`, `RateLimitCapability`, `RateLimitBucket`: kliens oldali párhuzamosság és rate limit                                                                                                                                                                                                |
 | `request-shaping/`                       | a kimenő kérés alakját meghatározó mezőcsoport: `EffortCapability`, `ThinkingCapability`/`ThinkingMode`, `ToolChoiceCapability`/`ToolChoiceValue`, `StructuredOutputCapability`/`StructuredOutputStrategy`/`StructuredOutputStrategyId`, `StreamingCapability`, `PromptCachingCapability`/`PromptCacheMode` |
@@ -28,10 +28,10 @@ az `evidence-sources` tárgykör megtartotta a saját téma mappáit, ezért ké
 | `evidence-sources/measurement-document/` | a bizonyítékok nevesített forráskatalógusa: doksi URL-ek, research szekciók, `MeasurementId` feloldás                                                                                                                                                                                                       |
 | `provider-id/`                           | a `ProviderId` union, a két támogatott provider azonosítója (SPEC-003 8. szekció)                                                                                                                                                                                                                           |
 
-A hat képességleíró téma mappa mind a 20 fájlja típus-only, ahogy az `evidence-reference/`, a
-`fact/fact.ts` is, nincs hozzájuk `.spec.ts` (SPEC-002 6.3 pont). A
-`fact/` két guardját és az `evidence-sources/` `measurementDocument` leképezését viszont
-futásidejű sor teszi tesztelendővé.
+A hat képességleíró téma mappa fájljai, az `environment/accepted-environment-names.ts` kivételével,
+típus-only, ahogy az `evidence-reference/`, a `fact/fact.ts` is, nincs hozzájuk `.spec.ts` (SPEC-002
+6.3 pont). A `fact/` két guardját, az `acceptedEnvironmentNames` függvényt és az `evidence-sources/`
+`measurementDocument` leképezését viszont futásidejű sor teszi tesztelendővé.
 
 ## Függőségi irány
 
@@ -46,7 +46,9 @@ az `@easter-workflow-builder/provider-minimax`, az
 `evidence/fact/` téma `Fact<T>` típusa kényszeríti ki.
 
 **Az `EnvironmentRequirement` a `source` mezőn diszkriminált unió.** A `literalValue` kizárólag a
-`literal` ágon létezik, és ott **kötelező**; a `process_env_passthrough` ág nem is ismeri a mezőt.
+`literal` ágon létezik, és ott **kötelező**; a `process_env_passthrough` ág nem is ismeri a mezőt. A
+harmadik, `process_env_alternatives` ág (SPEC-013 4.4) kötelező `alternativeNames` listát hordoz: a
+`name` a kimenő név és az első bemeneti név, az alternatív nevek utána következnek.
 Korábban egyetlen, opcionális `literalValue` mezős interfész állt itt, és emiatt a fogyasztó
 oldalon (`packages/engine` `resolveRequiredEnvironmentValue`) csendes üres string ág keletkezett a
 hiányzó literál értékre - olyan ág, ami a leírók tényleges alakján sosem futott, tehát a

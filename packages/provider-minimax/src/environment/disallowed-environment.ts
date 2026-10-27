@@ -70,7 +70,7 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'ANTHROPIC_API_KEY',
     reason:
-      'A hitelesítési sorrend 3. szintje, az ANTHROPIC_AUTH_TOKEN alatt: óvatossági tiltás, hogy Anthropic hitelesítő ne kerüljön a MiniMax endpointhoz. Hogy a CLI elküldené-e, nem ellenőrzött.',
+      'A kulcs elfogadott bemeneti neve (SPEC-013 4.1), de a kimenő környezetbe nem kerül: a kimenő név az ANTHROPIC_AUTH_TOKEN, így X-Api-Key fejléc nem megy a MiniMax felé, és a CLI kettős beállítás esete sosem áll elő.',
     evidence: AUTH_PRECEDENCE_EVIDENCE,
   },
   {
