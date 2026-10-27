@@ -7,7 +7,7 @@
 // `EASTER_DB_FILE`, `SIGTERM`).
 //
 // A `STUB_AGENT_REQUEST_FILE` útvonalra a hamis ágens a kapott kérés
-// ellenőrizhető részét írja (prompt, `maxTurns`, `model`,
+// ellenőrizhető részét írja (prompt, `maxTurns`, `model`, `effort`,
 // `maxBudgetUsd` jelenléte, az adatbázis és a napló útvonala): az env ÉRTÉKEI nem, mert titkot hordozhatnak. A `STUB_AGENT_BEHAVIOR=fail` esetén a hamis ágens hibaágat ad.
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
@@ -79,6 +79,7 @@ function describeRequest(prompt: string, options: Readonly<Record<string, unknow
     logDirectory: process.env['EASTER_LOG_DIRECTORY'],
     maxTurns: options['maxTurns'],
     model: options['model'],
+    effort: options['effort'],
     hasMaxBudgetUsd: Object.hasOwn(options, 'maxBudgetUsd'),
   });
 }

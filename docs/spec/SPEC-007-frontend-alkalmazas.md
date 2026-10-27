@@ -1121,7 +1121,7 @@ Egyik sem zárható le tippeléssel. Mindegyiknél áll, mi a viselkedés addig,
 
 47. A 11. szekció mind a tizenhét async pontjához tartozik a táblázatban megnevezett jelzés, és mindegyikhez futtatott teszt, ami a jelzés megjelenését igazolja. **Jelzés nélküli async pont nincs.**
 48. A workflow törlés megerősítő modálisa a `DeletionSummarySchema` **mind a három mezőjét** megnevezi (`runCount` futás, `eventCount` esemény, `snapshotCount` gráf pillanatkép), és a megerősítés jelölőnégyzethez kötött; a `DELETE` kérés törzse az `acknowledgeIrreversible: true` literált hordozza. Futtatott teszt igazolja. A mezőlista forrása a `packages/protocol` sémája, nem a jelen spec korábbi, négyes prózai felsorolása (10.1).
-49. A provider választó a `GET /api/providers` válaszából épül, és a kiválasztott provider `requiredEnvNames` listájából env változó **nevet** jelenít meg, értéket soha; üres listára külön mondat áll, nem üres hely. Futtatott teszt igazolja mind a három ágat (nincs kiválasztva, van kötelező változó, nincs kötelező változó).
+49. A provider választó a `GET /api/providers` válaszából épül, és a kiválasztott provider `requiredEnvNames` listájából env változó **nevet** jelenít meg (SPEC-013 4.8 óta egy elem egy követelmény elfogadott neveinek csoportja, " vagy " kötőszóval), értéket soha; üres listára külön mondat áll, nem üres hely. Futtatott teszt igazolja mind a három ágat (nincs kiválasztva, van kötelező változó, nincs kötelező változó).
 50. A futás előzmények képernyő a nem lezárt futásokra feliratkozik, és az állapot badge élőben frissül egy `run_event` keret hatására. Futtatott e2e teszt igazolja.
 51. Az ismeretlen útvonal a "nem található" képernyőre visz, és a böngésző címsora **nem** íródik át.
 

@@ -44,7 +44,7 @@ amikor ezeket az ipar már kitalálta!") alapján az **iparági bevett gyakorlat
 
 - Éles telepítés, folyamatfelügyelet, HTTPS, hitelesítés a szerver előtt.
 - A SPEC-009 egyéb tárgyai (`mcpServers`, `settingSources`, skill, Beállítások képernyő).
-- A `MiniMax-M3`-on kívüli modell. Más MiniMax modellt ez a spec nem említ és nem próbál.
+- A `MiniMax-M3`-on kívüli modell. Más MiniMax modellt ez a spec nem említ és nem próbál. **SPEC-013 felülírja** (a modell a `MiniMax-M3.1-Flash`, SPEC-013 1. és 3.).
 
 ---
 
@@ -364,22 +364,22 @@ bizonyíték előállító eszköz a repóba tartozik).
      ér).
 - **A lépés beállításai (O-14 ... O-17, user döntés 2026-10-26):**
 
-| Beállítás       | Érték                                                                                                                                                                |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| lépés típusa    | `agent_step`                                                                                                                                                         |
-| `providerId`    | a próba paramétere; `minimax` esetén `modelId`: `MiniMax-M3`, `claude-subscription` esetén `modelId` nincs                                                           |
-| `maxTurns`      | `1` (O-14)                                                                                                                                                           |
-| prompt          | rövid, eszközt nem kérő; a pontos szöveg a próba kódjában áll, nem döntés                                                                                            |
-| `maxBudgetUsd`  | **nincs beállítva** (O-15): a `maxBudgetUsd` csak túllépés után állít meg (sdk.d.ts:1727-1730), és a `minimax` költsége tartalék díjtételű becslés (research 9.)     |
-| időkorlát       | **nincs** (O-15, user döntés): a `run_finished` várakozásnak nincs felső korlátja; a próba megszakítása a user dolga (`Ctrl-C`), ami a gyermek szervert is leállítja |
-| eszköz tiltás   | nincs (O-16): `maxTurns: 1` mellett egy eszközhívás `error_max_turns` zárást ad, ami a próbában hibaként látszik                                                     |
-| kapcsolat teszt | **nem hívódik** (O-17): a kapcsolat teszt `model` és `maxTurns` nélkül hívja a `query()`-t (research 8.), költsége nem korlátos; a valódi útja a SPEC-009 témája     |
+| Beállítás       | Érték                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| lépés típusa    | `agent_step`                                                                                                                                                                                   |
+| `providerId`    | a próba paramétere; `minimax` esetén `modelId`: `MiniMax-M3`, `claude-subscription` esetén `modelId` nincs (SPEC-013 felülírja: `MiniMax-M3.1-Flash`, illetve `claude-haiku-4-5`, SPEC-013 6.) |
+| `maxTurns`      | `1` (O-14)                                                                                                                                                                                     |
+| prompt          | rövid, eszközt nem kérő; a pontos szöveg a próba kódjában áll, nem döntés                                                                                                                      |
+| `maxBudgetUsd`  | **nincs beállítva** (O-15): a `maxBudgetUsd` csak túllépés után állít meg (sdk.d.ts:1727-1730), és a `minimax` költsége tartalék díjtételű becslés (research 9.)                               |
+| időkorlát       | **nincs** (O-15, user döntés): a `run_finished` várakozásnak nincs felső korlátja; a próba megszakítása a user dolga (`Ctrl-C`), ami a gyermek szervert is leállítja                           |
+| eszköz tiltás   | nincs (O-16): `maxTurns: 1` mellett egy eszközhívás `error_max_turns` zárást ad, ami a próbában hibaként látszik                                                                               |
+| kapcsolat teszt | **nem hívódik** (O-17): a kapcsolat teszt `model` és `maxTurns` nélkül hívja a `query()`-t (research 8.), költsége nem korlátos; a valódi útja a SPEC-009 témája                               |
 
 - **Két futás:** egyszer `minimax` providerrel `MiniMax-M3` modellel, egyszer `claude-subscription`
   providerrel. A `claude-subscription` futás egyben a 2.1 hiba valódi igazolása: a javítás előtti fejen
   (ha a user engedi) és utána. A `.env` fájlban álló `ANTHROPIC_AUTH_TOKEN` a `claude-subscription`
   futásban a 3.2 tiltott lista miatt nem juthat a lépéshez; ezt a futás igazolja (a tárolt események
-  keresése a kulcs értékére).
+  keresése a kulcs értékére). **SPEC-013 felülírja** (a `MiniMax-M3.1-Flash` az M3 helyén, a `claude-subscription` próba alapmodellje `claude-haiku-4-5`, az effort providerenként; SPEC-013 3., 6.).
 
 ### 5.2 Titokkezelés
 
