@@ -1,0 +1,174 @@
+# A MiniMax-M3.1-Flash csere, a két kulcsnév és a claude-haiku-5-5: források és tények
+
+|              |                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dátum        | 2026-10-27                                                                                                                                           |
+| Kimenet      | [`../spec/SPEC-013-flash-es-haiku.md`](../spec/SPEC-013-flash-es-haiku.md)                                                                           |
+| Módszer      | hivatalos dokumentáció (Exa keresés és letöltés, plusz `curl` a `.md` alakra), a telepített, pinelt SDK forrásának olvasása, npm registry lekérdezés |
+| Valódi hívás | **nem történt.** Minden állítás dokumentumból vagy a telepített forrásból származik; ahol ez kevés, a sor "nem ellenőrzött" jelölést kap             |
+
+A szabálykönyv 4. szekciója szerint minden tény mellé elsődleges forrás és két független megerősítés
+kell. Ahol a megerősítés ugyanattól a kiadótól jön (MiniMax saját lapjai), az az oszlopban így áll.
+
+---
+
+## 1. A user döntései (2026-10-27), szó szerint
+
+1. "megváltozott a model név": a MiniMax modell a `MiniMax-M3.1-Flash`, a `MiniMax-M3` HELYÉRE lép.
+2. A MiniMax kulcs a `.env` fájlban `ANTHROPIC_API_KEY` és `ANTHROPIC_AUTH_TOKEN` néven is működjön
+   ("Mindkettő működjön").
+3. A Claude próbához a legolcsóbb modell kell: `claude-haiku-5-5`, a Claude katalógusba felvéve.
+4. Utána valódi próba fut mindkét providerrel (`bun run probe:real-provider`), alacsony tokennel.
+
+---
+
+## 2. MiniMax-M3.1-Flash
+
+| Tény                                                         | Érték                                                                                                                              | Elsődleges forrás                                                                           | Megerősítés                                                                                                                                                                                 |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Megjelenés                                                   | 2026-10-19                                                                                                                         | <https://www.minimax.io/blog/minimax-m31f>                                                  | <https://7minai.com/how-to-use-minimax-m3-1-flash/>, <https://www.typingmind.com/guide/minimax/MiniMax-M3.1-Flash>                                                                          |
+| API azonosító                                                | `MiniMax-M3.1-Flash`                                                                                                               | <https://platform.minimax.io/docs/api-reference/text-anthropic-api> ("Supported Models")    | <https://platform.minimax.io/docs/guides/text-generation>, <https://wokey.ai/models/MiniMax-M3.1-Flash>                                                                                     |
+| Claude Code kliens azonosító                                 | `MiniMax-M3.1-Flash[1m]` (`ANTHROPIC_MODEL` és a három `ANTHROPIC_DEFAULT_*_MODEL`)                                                | <https://platform.minimax.io/docs/m-plan/claude-code>                                       | <https://platform.minimax.io/docs/token-plan/claude-code> (MiniMax, ugyanaz a kiadó); független harmadik nem található: **a kliens azonosító egy kiadótól, két lapról**                     |
+| Kontextus ablak                                              | 1 000 000                                                                                                                          | text-anthropic-api ("Supported Models")                                                     | text-generation guide, 7minai                                                                                                                                                               |
+| Kimenő token, ajánlott / felső                               | 131 072 / 524 288                                                                                                                  | <https://platform.minimax.io/docs/api-reference/text-chat-openai> (`max_completion_tokens`) | <https://platform.minimax.cn/docs/api-reference/text-chat-openai>, 7minai, wokey                                                                                                            |
+| Thinking                                                     | mindig gondolkodik; `thinking` elhagyva és `{"type":"adaptive"}` mellett be, `{"type":"disabled"}` mellett `400`, a hibakód `2013` | text-anthropic-api ("Thinking Control" tábla és a hibaszöveg)                               | <https://platform.minimax.io/docs/api-reference/text-openai-api>, m-plan/claude-code ("always enables thinking and cannot turn it off"), 7minai                                             |
+| `MAX_THINKING_TOKENS=0`                                      | a Flash-re nincs hatása, a modell gondolkodik                                                                                      | m-plan/claude-code ("How to adjust thinking depth")                                         | nincs második forrás: **nem ellenőrzött** a "nincs hatása" rész, a 400 kockázat a 6. szekcióban                                                                                             |
+| Effort                                                       | `output_config.effort`: `low`, `medium`, `high`, `xhigh`, `max`; elhagyva `max`; `none` `400`                                      | text-anthropic-api ("Thinking Depth Control")                                               | text-generation guide (protokollonkénti mezőtábla), text-openai-api (`reasoning_effort`), 7minai                                                                                            |
+| Claude Code alap effort, ha `CLAUDE_CODE_EFFORT_LEVEL` nincs | `high`                                                                                                                             | m-plan/claude-code                                                                          | nincs második forrás: **nem ellenőrzött**, a pinelt CLI-n nem mérve                                                                                                                         |
+| `service_tier`                                               | a Flash nem támogatja                                                                                                              | text-anthropic-api                                                                          | text-openai-api, 7minai                                                                                                                                                                     |
+| `tool_choice`                                                | az Anthropic kompatibilis lap paraméter táblája "Fully supported" jelölést ad                                                      | text-anthropic-api                                                                          | **ellentmondás:** a feladat bemenete szerint a "mai doksi szerint csak `auto`"; ezt az olvasott lapokon nem találtam. A leíró mezője mindkét esetben `unknown` (SPEC-013 3.2), a mérés dönt |
+| Kép és videó bemenet                                         | a lap szerint `M3.1-Flash / M3 only` támogatott                                                                                    | text-anthropic-api ("Messages Field Support")                                               | 7minai, typingmind. **A repó saját M-23 mérése az M3-ra az ellenkezőjét adta** (a kép kimegy, a szolgáltatás eldobja), tehát a dokumentáció és a mérés ütközik; a Flash mezője `unknown`    |
+| Rate limit                                                   | 200 RPM, 10 000 000 TPM, egy sorban az M3-mal                                                                                      | <https://platform.minimax.io/docs/guides/rate-limits>                                       | nincs második forrás a közös sorra: a számok a lapról, a leíró `known` mezője erre az egy forrásra épül, mint az M3 bejegyzése is (`RESEARCH_MINIMAX`)                                      |
+| Ár (USD / 1M token)                                          | 0.15 bemenet, 0.60 kimenet                                                                                                         | 7minai (a MiniMax árlapjára hivatkozva)                                                     | wokey, typingmind. Az ár a leíróban nem szerepel, csak a "legolcsóbb" kérdéshez tájékoztató                                                                                                 |
+| Az Anthropic kompatibilis kulcs neve                         | a Claude Code lapok `ANTHROPIC_AUTH_TOKEN`-t írnak, az SDK lap `ANTHROPIC_API_KEY`-t                                               | m-plan/claude-code, token-plan/claude-code                                                  | text-anthropic-api ("Configure Environment Variables"); a curl példa `Authorization: Bearer` fejlécet használ                                                                               |
+
+---
+
+## 3. claude-haiku-5-5
+
+| Tény                   | Érték                                                                                                                  | Elsődleges forrás                                                          | Megerősítés                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| API azonosító          | `claude-haiku-5-5`, dátum utótag és külön alias nélkül                                                                 | <https://platform.claude.com/docs/en/models/haiku-5-5/overview>            | <https://platform.claude.com/docs/en/models/overview>, <https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide> |
+| Megjelenés             | 2026-10-07                                                                                                             | haiku-5-5 overview                                                         | models overview (retirement sor: "Not sooner than October 7, 2027")                                                           |
+| Kontextus / max output | 1M / 128K                                                                                                              | haiku-5-5 overview                                                         | models overview, <https://platform.claude.com/docs/en/build-with-claude/context-windows>                                      |
+| Kép bemenet            | igen ("Text and images → text")                                                                                        | haiku-5-5 overview                                                         | models overview ("All current models support text and image input")                                                           |
+| Thinking               | adaptív, alapból be; `disabled` `high` effort vagy alatta megengedett                                                  | <https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5> | haiku-5-5 overview, models overview                                                                                           |
+| Alap effort            | `medium`                                                                                                               | haiku-5-5 overview                                                         | models overview                                                                                                               |
+| Ár (USD / 1M token)    | "From $0.10" bemenet, "From $0.50" kimenet                                                                             | haiku-5-5 overview                                                         | models overview. A katalógus többi modelljének árát ez a fájl nem ellenőrizte; a "legolcsóbb" a user döntése                  |
+| Claude Code minimum    | "Use v2.1.293 or later with Haiku 5.5"                                                                                 | <https://code.claude.com/docs/en/model-config>                             | lásd 4. szekció                                                                                                               |
+| `[1m]` utótag          | nincs: a lap szerint a natív 1M ablakos modelleknél az `[1m]` alias hatástalan, a Haiku 5.5 azonosítója utótag nélküli | model-config, migration-guide                                              | context-windows ("1M is the default: you don't need a beta header")                                                           |
+
+---
+
+## 4. A pinelt SDK által csomagolt Claude Code verzió (blokkoló a claude-haiku-5-5-re)
+
+**Telepített forrás olvasása (2026-10-27).** A repó a `@anthropic-ai/claude-agent-sdk@0.3.245`-öt pineli.
+A telepített csomag `manifest.json` fájljának `version` mezője `2.1.245`, a natív bináris
+(`@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.245`) beágyazott `VERSION` konstansa szintén `2.1.245`.
+A bináris karakterláncai között a `claude-haiku-` előtagú azonosítók közül csak a `claude-haiku-4-5`
+család szerepel, a `claude-haiku-5-5` nem.
+
+**npm registry (2026-10-27).** A `https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk` dokumentum
+`claudeCodeVersion` mezője a `0.3.245`-nél `2.1.245`, a `0.3.293`-nál `2.1.293` (megjelent
+2026-10-07). Megerősítés: a `0.3.293` csomag `manifest.json` fájlja `"version": "2.1.293"` mind az
+`unpkg.com`, mind a `cdn.jsdelivr.net` tükrön. A `latest` dist-tag a lekérdezéskor `0.3.311`.
+
+**A szerver elutasít.** A Claude Code hibareferenciája szerint a túl régi kliens kérését az API `400`
+válasszal, `claude_code_version_too_old` hibakóddal utasítja el, a modellenként a szerver által ellenőrzött
+minimum alapján (<https://code.claude.com/docs/en/errors>, "Claude Code does not support this model").
+Megerősítés: <https://koromo.io/blog/claude-code-does-not-support-this-model/>,
+<https://claude-media.com/articles/claude-code-does-not-support-this-model> (mindkettő kimondja, hogy az
+Agent SDK csomagba ágyazott CLI-t az SDK csomag frissítése cseréli).
+
+**Következmény.** A pinelt `0.3.245` mellett egy `claude-haiku-5-5` lépés a szerver oldali `400`
+miatt nem futhat le. A legkisebb SDK verzió, ami legalább `2.1.293`-as Claude Code-ot csomagol, a
+`0.3.293`. A szabálykönyv 9. szekciója szerint SDK frissítés előtt a SPEC-000 mérései regresszióként
+futnak, ami valódi MiniMax hívás. Ez user döntés (SPEC-013 O-1).
+
+---
+
+## 5. A két kulcsnév a Claude Code-ban
+
+- `ANTHROPIC_API_KEY`: `X-Api-Key` fejléc; beállítva felülírja a Claude előfizetést
+  (<https://code.claude.com/docs/en/env-vars>).
+- `ANTHROPIC_AUTH_TOKEN`: az `Authorization` fejléc értéke `Bearer ` előtaggal (env-vars).
+- Hitelesítési sorrend: 2. `ANTHROPIC_AUTH_TOKEN`, 3. `ANTHROPIC_API_KEY`
+  (<https://code.claude.com/docs/en/authentication>, "Authentication precedence"). Megerősítés: a
+  repó korábbi forrásolt összefoglalója (`RESEARCH_AUTH_PRECEDENCE`, SPEC-012 2.2) és a MiniMax Claude
+  Code lapja, ami a beállítás előtt mindkét változó törlését kéri, mert "They take priority over the
+  settings file".
+- A repó saját M-34 és M-35 mérése `x-api-key` fejléccel közvetlen hívásra `200` választ kapott a MiniMax
+  ellen (`2026-08-26-spec000-kiertekeles.md` 6.9, 6.10). **A CLI-n át `ANTHROPIC_API_KEY`-vel a MiniMax
+  felé nincs mérés.** A projekt minden eddigi CLI-s MiniMax futása `ANTHROPIC_AUTH_TOKEN`-nel ment
+  (SPEC-012 O-1, a wire-probe O-20).
+- Mindkettő beállítva: a CLI viselkedése (melyik fejléc megy ki, van-e figyelmeztetés) **nem mérve**.
+  SPEC-013 4.2 ezért úgy dönt, hogy a kimenő környezetben csak egy név áll.
+
+---
+
+## 6. A thinking út a pinelt SDK-ban (telepített forrás olvasása, nem mérés)
+
+1. **Az SDK a `thinking` opciót objektumként olvassa.** A `sdk.mjs` a `thinking` opcióra
+   `switch(thinking.type)` ágakat futtat (`adaptive`, `enabled`, `disabled`), és ebből képez CLI kapcsolót
+   (`--thinking adaptive|disabled`, `--max-thinking-tokens`). A `sdk.d.ts` szerint a típus `ThinkingConfig`
+   objektum (`{ type: 'adaptive' }` stb.).
+2. **Mellékes lelet: a motor szöveget ad át.** A `packages/engine` `AgentStepOptions.thinking` mezője
+   `ThinkingMode` szöveg (`'adaptive'`), amit a `build-agent-step-options.ts` változatlanul tesz az
+   `Options.thinking` mezőbe. Egy szöveg `.type` mezője `undefined`, tehát az SDK egyik ágba sem lép, és
+   a lépés thinking beállítása **nem jut el a CLI-ig**. Ez a SPEC-013 hatókörén kívüli hiba (SPEC-013
+   O-5); a valódi próbát nem érinti, mert ott a lépés `thinking` mezője `null`.
+3. **A CLI alapértéke.** A natív bináris beágyazott forrása szerint thinking beállítás nélkül a CLI
+   `{type:"adaptive"}` konfigurációval indul; egy beállítás hamis értékénél `disabled`-del (a minifikált
+   kódból a beállítás neve nem állapítható meg; a MiniMax lap az `alwaysThinkingEnabled`-et nevezi meg,
+   **nem ellenőrzött**, hogy ez az). A kéréshez `{type:"disabled"}` csak akkor kerül, ha a konfiguráció `disabled`, a provider
+   first party, és a modell a CLI szerint thinking képes; ha a modell a CLI szerint nem thinking képes, a
+   mező elmarad. A Flash a 2. szekció szerint elhagyott mezővel és `adaptive` értékkel is gondolkodik,
+   tehát az alapút nem ad `400`-at. Hogy a CLI a `MiniMax-M3.1-Flash[1m]` azonosítót thinking képesnek
+   tekinti-e, **nem mérve**: az M3-ra az M-01 az `adaptive` alakot mérte.
+4. **Ami `disabled`-et válthat ki:** a lépés `disabled` beállítása (ma a 2. pont hibája miatt el sem
+   jut), a `MAX_THINKING_TOKENS=0` (a `minimax` tiltott listáján áll), és az `alwaysThinkingEnabled: false`
+   felhasználói beállítás (a szerver környezetén kívüli Claude Code beállítás, a projekt nem állítja).
+
+---
+
+## 7. A motor viselkedése `unknown` mezővel (a repó forrása)
+
+Egy eszköz nélküli, strukturált kimenet nélküli `agent_step` lépésnél (a próba lépése) a
+`validateAgentStepCapabilities` sorrendje: modellválasztás (`requireModelSelection`), modellazonosító
+(`validateModelId`), thinking (`resolveThinkingMode`: a lépés `null` értékénél `omit`), effort
+(`resolveEffortInclusion`: `null`-nál `omit`), kényszerített `tool_choice` kockázat (`unknown` mezőknél
+nincs hiba), strukturált kimenet (nem kért). Egyik `unknown` mező sem buktatja a lépést; a hatásuk:
+
+| Leíró mező `unknown`                     | Hatás                                                                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `models[].clientModelIdentifier`         | a wire azonosító megy a kliensnek (`[1m]` nélkül), `modelIdentifierUnproven: true`       |
+| `streaming.sse`                          | `includePartialMessages: false`: az élő nézet nem kap delta eseményt ettől a providertől |
+| `serverTools`                            | nincs tiltás, `serverToolAvailabilityUnproven: true`                                     |
+| `concurrency.measuredMaxConcurrentSteps` | nincs párhuzamossági javaslat                                                            |
+| `modelsEndpoint.calledBySdk`             | a kapcsolat teszt `minimal_query` módon fut                                              |
+| `thinking.byModelFamily[család]`         | a lépés thinking beállítása elmarad, hiba nélkül                                         |
+| `effort.accepted`                        | a lépés effort beállítása elmarad                                                        |
+
+A modell szintű leíró mezőket (`contextWindow`, `maxOutputTokens*`, `imageInput`, `videoInput`,
+`listedByModelsEndpoint`) a motor nem olvassa (a `packages/engine/src` alatt nincs rájuk hivatkozás).
+
+---
+
+## 8. Az ártábla
+
+A pinelt natív bináris karakterláncai között a `minimax` szó csak egy szolgáltatónév listában
+(reguláris kifejezés) fordul elő, modell ártábla bejegyzésként nem; a `2026-09-23-sdk-koltseg-becsles.md`
+2.2 szekciójában leírt tartalék ág tehát a `MiniMax-M3.1-Flash`-re is érvényes. Ez a `RunEventRow`
+magyarázó mondatának cseréjét támasztja alá (SPEC-013 3.5).
+
+---
+
+## 9. Nem ellenőrzött pontok összesítve
+
+1. A pinelt CLI a `MiniMax-M3.1-Flash[1m]` azonosítóból a dróton utótag nélküli azonosítót küld-e
+   (az M3-ra M-11 mérte).
+2. A pinelt CLI a Flash-nél küld-e `thinking` mezőt, és milyen alakban (6. szekció 3. pont).
+3. A `tool_choice`, a strukturált kimenet, a cache, a streaming, a szerver eszközök, a béta fejlécek és a
+   párhuzamosság a Flash-nél (az M3 mérései nem vihetők át, SPEC-013 3.2).
+4. A CLI viselkedése, ha `ANTHROPIC_API_KEY` és `ANTHROPIC_AUTH_TOKEN` egyszerre áll a környezetében.
+5. A Claude Code alap effort értéke a pinelt CLI-n (a MiniMax lap `high`-ot ír).

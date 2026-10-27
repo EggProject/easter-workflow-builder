@@ -525,10 +525,13 @@ mérési eset azonosítójával. A nem üres lista típusszintű követelmény, 
 `known` mező **nem fordul le**. Képességet megtippelni tilos: minden mező mögött mérés vagy
 hivatkozott hivatalos doksi áll, különben `unknown` (SPEC-000 5., gyökér `CLAUDE.md`).
 
-**Hatókör: kizárólag a `MiniMax-M3`.** A többi MiniMax modellt tilos említeni dokumentumban,
-kódban, kommentben és a usernek szóló jelentésben is. Ha egy hivatkozott GitHub issue mégis másik
-modellről szól, a mondat ne nevezze meg a modellt, csak a kockázatot és a saját M3 mérésünk
-eredményét (gyökér `CLAUDE.md`).
+**Hatókör: kizárólag a `MiniMax-M3.1-Flash`** (user döntés 2026-10-27: a `MiniMax-M3` helyére lép,
+SPEC-013). A többi MiniMax modellt tilos említeni dokumentumban, kódban, kommentben és a usernek szóló
+jelentésben is. Kivétel: a `MiniMax-M3` a lecserélt modellként a SPEC-013-ban és a research fájljában,
+valamint történeti tényként a 2026-10-27 előtti research, spec és terv dokumentumokban, a commitolt v1
+pillanatkép fixtúrában és a `tools/wire-probe` mérési eseteiben állhat (SPEC-013 3.6, O-2). Ha egy
+hivatkozott GitHub issue mégis másik modellről szól, a mondat ne nevezze meg a modellt, csak a
+kockázatot és a saját mérésünk eredményét (gyökér `CLAUDE.md`).
 
 **SDK verzió frissítés előtt** a SPEC-000 mérései regresszióként futtatandók (gyökér `CLAUDE.md`).
 
