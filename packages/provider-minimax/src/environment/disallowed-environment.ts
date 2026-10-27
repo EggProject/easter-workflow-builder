@@ -20,7 +20,7 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING',
     reason:
-      'Fix budget alakú thinking mezőt kényszerít ki, a MiniMax-M3.1-Flash viszont csak az adaptív vagy elhagyott thinking mezőt fogadja el, budget_tokens kulcs nélkül.',
+      'Fix budget alakú thinking mezőt kényszerít ki; a MiniMax-M3.1-Flash dokumentációja csak az elhagyott és az adaptív thinking mezőt írja le működőként, a fix budget alakot nem.',
     evidence: [
       { kind: 'research', section: RESEARCH_GATEWAY },
       { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },

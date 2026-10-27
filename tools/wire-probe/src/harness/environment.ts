@@ -1,7 +1,8 @@
 /**
 A MiniMax kulcs betöltése (SPEC-012 O-20 (b), SPEC-013 4.7): a kulcs az ANTHROPIC_AUTH_TOKEN vagy az ANTHROPIC_API_KEY néven
 állhat, ha mindkettő áll, az ANTHROPIC_AUTH_TOKEN nyer. Egy néven belül a process.env nyer a repo gyökér .env fájlja fölött,
-ahogy a szerver `node --env-file-if-exists=.env` betöltésénél is.
+ahogy a szerver `node --env-file-if-exists=.env` betöltésénél is. Eltérés a szervertől (SPEC-013 4.7): az üres érték itt
+hiányzónak számít (a mérő eszköz korábbi viselkedése), a szerver viszont a beállított üres értéket veszi.
 */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';

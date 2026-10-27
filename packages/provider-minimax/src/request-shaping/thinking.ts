@@ -22,11 +22,6 @@ export const minimaxThinking: ThinkingCapability<MiniMaxFamilyId> = {
   },
   wireShape: notMeasuredOnFlash(['M-01', 'M-05']),
   sendsBudgetTokens: notMeasuredOnFlash(['M-05', 'M-06']),
-  // A thinking blokkot a későbbi körökben változatlanul vissza kell adni.
-  interleavedSignatureRequired: {
-    state: 'known',
-    value: true,
-    evidence: [{ kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API }],
-  },
+  interleavedSignatureRequired: notMeasuredOnFlash(['M-05']),
   streamEventTypes: notMeasuredOnFlash(['M-05']),
 };

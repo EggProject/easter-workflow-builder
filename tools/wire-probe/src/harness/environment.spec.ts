@@ -48,6 +48,12 @@ describe('a wire-probe a MiniMax kulcsot a két elfogadott néven olvassa', () =
     expect(source).not.toContain(OLD_NAME);
   });
 
+  it('a harness a CLI környezetéből mindkét nevet kiveszi, és mindkét név értékét maszkolja a meta.json-ban', () => {
+    const source = readSource('harness', 'runner.ts');
+    expect(source).toContain('!MINIMAX_KEY_NAME_SET.has(name)');
+    expect(source).toContain('...minimaxKeyValues');
+  });
+
   it('a régi név a wire-probe egyetlen kódfájljában sem áll', () => {
     const offenders = listTypeScriptFiles(sourceDirectory).filter((file) =>
       readFileSync(file, 'utf8').includes(OLD_NAME),

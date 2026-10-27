@@ -235,3 +235,47 @@ A motor leképezése ezért: `adaptive` -> `{ type: 'adaptive' }`, `disabled` ->
 
 - A branch `feat/spec-013-flash-es-haiku`, a kiinduló fej `cbd9583`, ami a friss `origin/main`
   (`986399a`) leszármazottja; a munkakönyvtár tiszta.
+- A kilenc kapu a kiinduló fejen (a spec átvezetésével együtt) nulla kilépési kóddal futott; a `test`
+  kapu 616 tesztfájl, 6452 teszt, 100 százalék lefedettség mind a négy metrikán.
+
+---
+
+## 12. Adverzariális átvizsgálás és kritérium tábla (PLAN-014 T-014-11)
+
+Független átvizsgálás (`opus`, `medium`) a `fa0502e..8fab0e5` commitokon, a SPEC-013 ellen. Talált és
+javított tételek:
+
+| Tétel                                                                                                                                                                 | Kezelés                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| A `thinking.interleavedSignatureRequired` `known` értékének nincs forrásolt sora a 2. szekcióban                                                                      | `unknown` lett (M-05), a SPEC-013 3.2 sora átvezetve                                                                             |
+| A `tools/wire-probe` harness a teljes `process.env`-et adta a CLI-nek, így egy `ANTHROPIC_API_KEY` is kimehetett, és a `meta.json` maszkolása ezt a nevet nem ismerte | a CLI környezetéből mindkét név kikerül, a `meta.json` mindkét név értékét maszkolja; greppes teszt az `environment.spec.ts`-ben |
+| A `tools/wire-probe` az üres értéket hiányzónak veszi, a szerver beállítottnak                                                                                        | az eltérés kimondva a SPEC-013 4.7-ben, a kódban és a csomag `CLAUDE.md`-jében                                                   |
+| A szabálykönyv 9. szekciójának képesség mondata és titok mondata az előző modell és egy kulcsnév szerint állt                                                         | átírva a SPEC-013 3.2, 3.3, 4. szerint                                                                                           |
+| A `packages/engine` `CLAUDE.md` típusfájl száma és a `provider-environment` sor elavult                                                                               | javítva                                                                                                                          |
+| A `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` indoklása a forrásnál többet állított (a `budget_tokens` elutasítása)                                                       | a mondat a dokumentált részre szűkítve                                                                                           |
+| A `promptCaching.mode` blokkoló listája eltért a spec sorától                                                                                                         | a spec mondja ki, hogy a már `unknown` mező a saját listáját tartja                                                              |
+| A `disallowedEnv` és `requiredEnv` M-xx bizonyítékai                                                                                                                  | a SPEC-013 3.3 kimondja: CLI viselkedést mértek, modelltől független tényként maradnak                                           |
+| A `clientModelIdentifier` és a rate limit egy kiadó lapjain áll                                                                                                       | **nyitott, a user dönt** (SPEC-013 9.)                                                                                           |
+
+**Kritérium tábla.**
+
+| AC         | Bizonyíték                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1        | `git grep -n "MiniMax-M3" -- packages apps tooling`: a `MiniMax-M3.1-Flash`-en kívül egyetlen találat, a v1 pillanatkép fixtúra (3.6 kivétel)                    |
+| AC2        | `packages/provider-minimax/src/descriptor/descriptor.spec.ts` "pontosan egy modell, a Flash azonosítóval és családdal"                                           |
+| AC3        | `descriptor.spec.ts` known és unknown blokkja; `packages/provider-registry` `provider-registry.spec.ts` (bizonyíték kényszer, mérési azonosító nélküli `reason`) |
+| AC4        | `apps/server/src/minimax-flash-capabilities/minimax-flash-capabilities.spec.ts` (AC4)                                                                            |
+| AC5        | ugyanott (AC5); `apps/server/measurement/run-probe.spec.ts` minimax kérés: `MiniMax-M3.1-Flash[1m]`                                                              |
+| AC6        | `provider-outgoing-environment.spec.ts` (AC6); `build-outgoing-environment.spec.ts` alternatív név eset                                                          |
+| AC7        | `provider-outgoing-environment.spec.ts` (AC7); `resolve-required-environment-value.spec.ts` "mindkettő áll: a name nyer"                                         |
+| AC8        | `provider-outgoing-environment.spec.ts` (AC8); `resolve-required-environment-value.spec.ts` "egyik sem áll"                                                      |
+| AC9        | `provider-outgoing-environment.spec.ts` claude-subscription tiltott nevek                                                                                        |
+| AC10       | `collect-secret-environment-values.spec.ts` két új esete                                                                                                         |
+| AC11       | `provider-environment-drift-protection.spec.ts` (AC11)                                                                                                           |
+| AC12       | `create-workflow-modal.spec.tsx`, `list-providers.spec.ts`, `provider-summary.spec.ts`, `apps/web/e2e/workflow-list.spec.ts`                                     |
+| AC13       | `build-agent-step-options.spec.ts` (a régi kódon bukott), `apps/server/src/engine-assembly/build-agent-query-runner.spec.ts` (`Options['thinking']` típus)       |
+| AC14       | `build-probe-graph.spec.ts`, `run-probe.spec.ts`                                                                                                                 |
+| AC15       | `.claude/CLAUDE.md` 9. szekció                                                                                                                                   |
+| AC16       | ez a fájl, `README.md`, a két `.env.example`, a csomag `CLAUDE.md`-k                                                                                             |
+| AC17       | a merge kapu a PR leírásában                                                                                                                                     |
+| AC18, AC19 | a valódi próba, a merge után, külön lépés                                                                                                                        |

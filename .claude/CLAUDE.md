@@ -516,10 +516,11 @@ CRUD felület**, csak választani lehet közülük: `claude-subscription` (Claud
 globális alapértelmezés, workflow felülírás, lépés felülírás. A provider választó komponens része
 a "Kapcsolat teszt" gomb. Forrás: gyökér `CLAUDE.md`.
 
-**A képesség leíró és a bizonyíték kényszer.** A MiniMax képességei szűkebbek az Anthropicénál:
-nincs strukturált kimenet, a `tool_choice` csak `auto`/`none` lehet, a `thinking` csak
-`adaptive`/`disabled`, az `effort` `output_config`-ként megy ki, amit a MiniMax elutasít. Ezért van
-`ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
+**A képesség leíró és a bizonyíték kényszer.** A MiniMax képességei eltérnek az Anthropicétól, és
+modellenként mások: a korábbi modellre mért korlátok (strukturált kimenet, `tool_choice`, `effort`) a
+`MiniMax-M3.1-Flash`-re nem vihetők át, a Flash leírójában ezek `unknown` mezők a megismétlendő
+méréssel, a Flash `thinking` módja csak `adaptive` (a `disabled` 400 választ kap), az `effort`
+dokumentáltan elfogadott (SPEC-013 3.2, 3.3). Ezért van `ProviderCapabilityDescriptor`. Minden képességmező háromállapotú `Fact<T>` burkolóban
 áll: vagy `known` egy **nem üres** bizonyítéklistával, vagy `unknown` indoklással és a blokkoló
 mérési eset azonosítójával. A nem üres lista típusszintű követelmény, tehát bizonyíték nélküli
 `known` mező **nem fordul le**. Képességet megtippelni tilos: minden mező mögött mérés vagy
@@ -535,8 +536,8 @@ kockázatot és a saját mérésünk eredményét (gyökér `CLAUDE.md`).
 
 **SDK verzió frissítés előtt** a SPEC-000 mérései regresszióként futtatandók (gyökér `CLAUDE.md`).
 
-**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként. A megadott `Options.env` az alfolyamat teljes környezete (SPEC-012 2.1, M-143), ezért a lépés és a kapcsolat teszt kimenő környezete a szerver folyamat teljes környezete a provider tiltott neveinek levételével és a kötelező blokk ráírásával; a termék oldali titok az `ANTHROPIC_AUTH_TOKEN` (SPEC-012 3.1, O-1).
-Az `authorization` és `x-api-key` header maszkolt, az `ANTHROPIC_AUTH_TOKEN` értékének minden
+**Titok kezelés.** A kulcs csak env változóból jön, a mérési configban sem szerepel literálként. A megadott `Options.env` az alfolyamat teljes környezete (SPEC-012 2.1, M-143), ezért a lépés és a kapcsolat teszt kimenő környezete a szerver folyamat teljes környezete a provider tiltott neveinek levételével és a kötelező blokk ráírásával; a termék oldali titok az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` néven érkező MiniMax kulcs, ami kifelé mindig `ANTHROPIC_AUTH_TOKEN` néven megy (SPEC-012 3.1, O-1, SPEC-013 4.).
+Az `authorization` és `x-api-key` header maszkolt, a két kulcsnév értékének minden
 előfordulása `REDACTED`-re cserélődik még a lemezre írás előtt, memóriában. Nyers, maszkolatlan
 artefaktum sosem íródik lemezre. Commit előtt kötelező ellenőrzés: a kulcs értékére futtatott
 keresés nulla találatot ad (SPEC-000 3., `tools/wire-probe` CLAUDE.md).

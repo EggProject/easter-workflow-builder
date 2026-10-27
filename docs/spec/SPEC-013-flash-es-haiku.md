@@ -88,35 +88,35 @@ az előző modellre mérték, a Flash-re nem (a `reason` szöveg mérési azonos
 `provider-registry` tesztje ezt őrzi), a `blockedBy` mezőben az eredeti M-xx azonosítókkal (ezek a
 megismétlendő mérések).
 
-| Mező                                                           | Új állapot                                                                           | Bizonyíték vagy blokkoló                                      |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `models[0].clientModelIdentifier`                              | `known` `'MiniMax-M3.1-Flash[1m]'`                                                   | MiniMax m-plan és token-plan Claude Code lap                  |
-| `models[0].contextWindow`                                      | `known` `1_000_000`                                                                  | text-anthropic-api, text-generation guide                     |
-| `models[0].maxOutputTokensRecommended` / `maxOutputTokensHard` | `known` `131_072` / `524_288`                                                        | text-chat-openai (`max_completion_tokens`)                    |
-| `models[0].effectiveContextWindowOnWire`                       | `unknown`                                                                            | M-20                                                          |
-| `models[0].maxOutputTokensWireCeiling`                         | `unknown`                                                                            | M-22                                                          |
-| `models[0].imageInput`                                         | `unknown` (a doksi és az M3 mérés ütközik, research 2.)                              | M-23, M-16                                                    |
-| `models[0].videoInput`                                         | `unknown`, változatlan indokkal                                                      | M-16, M-23                                                    |
-| `models[0].listedByModelsEndpoint`                             | `unknown`                                                                            | M-35                                                          |
-| `thinking.byModelFamily['M3.1-Flash']`                         | `known` `['adaptive']` (3.3)                                                         | text-anthropic-api, text-openai-api, m-plan Claude Code lap   |
-| `thinking.interleavedSignatureRequired`                        | `known` `true`                                                                       | text-anthropic-api ("preserve them unchanged in later turns") |
-| `thinking.wireShape`, `sendsBudgetTokens`, `streamEventTypes`  | `unknown`                                                                            | M-01, M-05, M-06                                              |
-| `effort.accepted`                                              | `known` `true`                                                                       | text-anthropic-api, text-generation guide                     |
-| `effort.wireField`                                             | `known` `'output_config.effort'`                                                     | text-anthropic-api, text-generation guide                     |
-| `structuredOutput` minden `known` mezője                       | `unknown`                                                                            | M-01, M-02, M-03, M-04, M-19, M-26                            |
-| `toolChoice` mindhárom mezője                                  | `unknown` (a doksi ellentmondásos, research 2.)                                      | M-03, M-17, M-34                                              |
-| `promptCaching` minden `known` mezője                          | `unknown` (a `RESEARCH_MINIMAX` a M3 kori doksi kivonata)                            | M-08, M-15, M-24, M-33                                        |
-| `streaming` mezői, a `fineGrainedToolStreaming` kivételével    | `unknown`                                                                            | M-05, M-09, M-24                                              |
-| `streaming.fineGrainedToolStreaming`                           | `known` `false`, csak a `RESEARCH_GATEWAY` bizonyítékkal                             | Claude Code gateway dokumentáció (modelltől független)        |
-| `serverTools`                                                  | `unknown`                                                                            | M-17, M-25                                                    |
-| `modelsEndpoint.directHttpReachable`, `listedModelCount`       | `unknown`                                                                            | M-35                                                          |
-| `modelsEndpoint.calledBySdk`                                   | `unknown` (a kapcsolat teszt módja ettől nem változik: `minimal_query`, research 7.) | M-12, M-36                                                    |
-| `rateLimits.buckets[0]`                                        | `appliesTo: ['MiniMax-M3.1-Flash']`, `known` 200 / 10 000 000                        | rate-limits lap                                               |
-| `rateLimits.retryAfterHeader`, `rateLimitHeaders`              | `unknown`, változatlan                                                               | M-18, M-36                                                    |
-| `concurrency.subagentCapEnvVar`                                | `known`, csak a `DOC_ENV_VARS` bizonyítékkal                                         | Claude Code env-vars                                          |
-| `concurrency` többi mezője                                     | `unknown`                                                                            | M-31, M-39                                                    |
-| `anthropicBetaHeaders`                                         | `unknown`                                                                            | M-01, M-11, M-14, M-32                                        |
-| `requiredEnv`, `disallowedEnv`                                 | a 4. szekció szerint                                                                 | 4.                                                            |
+| Mező                                                           | Új állapot                                                                                                                                  | Bizonyíték vagy blokkoló                                    |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `models[0].clientModelIdentifier`                              | `known` `'MiniMax-M3.1-Flash[1m]'`                                                                                                          | MiniMax m-plan és token-plan Claude Code lap                |
+| `models[0].contextWindow`                                      | `known` `1_000_000`                                                                                                                         | text-anthropic-api, text-generation guide                   |
+| `models[0].maxOutputTokensRecommended` / `maxOutputTokensHard` | `known` `131_072` / `524_288`                                                                                                               | text-chat-openai (`max_completion_tokens`)                  |
+| `models[0].effectiveContextWindowOnWire`                       | `unknown`                                                                                                                                   | M-20                                                        |
+| `models[0].maxOutputTokensWireCeiling`                         | `unknown`                                                                                                                                   | M-22                                                        |
+| `models[0].imageInput`                                         | `unknown` (a doksi és az M3 mérés ütközik, research 2.)                                                                                     | M-23, M-16                                                  |
+| `models[0].videoInput`                                         | `unknown`, változatlan indokkal                                                                                                             | M-16, M-23                                                  |
+| `models[0].listedByModelsEndpoint`                             | `unknown`                                                                                                                                   | M-35                                                        |
+| `thinking.byModelFamily['M3.1-Flash']`                         | `known` `['adaptive']` (3.3)                                                                                                                | text-anthropic-api, text-openai-api, m-plan Claude Code lap |
+| `thinking.interleavedSignatureRequired`                        | `unknown` (a research 2. szekciójában erre nincs forrásolt sor; adverzariális átvizsgálás, T-014-11)                                        | M-05                                                        |
+| `thinking.wireShape`, `sendsBudgetTokens`, `streamEventTypes`  | `unknown`                                                                                                                                   | M-01, M-05, M-06                                            |
+| `effort.accepted`                                              | `known` `true`                                                                                                                              | text-anthropic-api, text-generation guide                   |
+| `effort.wireField`                                             | `known` `'output_config.effort'`                                                                                                            | text-anthropic-api, text-generation guide                   |
+| `structuredOutput` minden `known` mezője                       | `unknown`                                                                                                                                   | M-01, M-02, M-03, M-04, M-19, M-26                          |
+| `toolChoice` mindhárom mezője                                  | `unknown` (a doksi ellentmondásos, research 2.)                                                                                             | M-03, M-17, M-34                                            |
+| `promptCaching` minden `known` mezője                          | `unknown` (a `RESEARCH_MINIMAX` a M3 kori doksi kivonata); a már `unknown` `mode` a saját blokkoló listáját tartja (M-15, M-20, M-24, M-33) | M-08, M-15, M-24, M-33                                      |
+| `streaming` mezői, a `fineGrainedToolStreaming` kivételével    | `unknown`                                                                                                                                   | M-05, M-09, M-24                                            |
+| `streaming.fineGrainedToolStreaming`                           | `known` `false`, csak a `RESEARCH_GATEWAY` bizonyítékkal                                                                                    | Claude Code gateway dokumentáció (modelltől független)      |
+| `serverTools`                                                  | `unknown`                                                                                                                                   | M-17, M-25                                                  |
+| `modelsEndpoint.directHttpReachable`, `listedModelCount`       | `unknown`                                                                                                                                   | M-35                                                        |
+| `modelsEndpoint.calledBySdk`                                   | `unknown` (a kapcsolat teszt módja ettől nem változik: `minimal_query`, research 7.)                                                        | M-12, M-36                                                  |
+| `rateLimits.buckets[0]`                                        | `appliesTo: ['MiniMax-M3.1-Flash']`, `known` 200 / 10 000 000                                                                               | rate-limits lap                                             |
+| `rateLimits.retryAfterHeader`, `rateLimitHeaders`              | `unknown`, változatlan                                                                                                                      | M-18, M-36                                                  |
+| `concurrency.subagentCapEnvVar`                                | `known`, csak a `DOC_ENV_VARS` bizonyítékkal                                                                                                | Claude Code env-vars                                        |
+| `concurrency` többi mezője                                     | `unknown`                                                                                                                                   | M-31, M-39                                                  |
+| `anthropicBetaHeaders`                                         | `unknown`                                                                                                                                   | M-01, M-11, M-14, M-32                                      |
+| `requiredEnv`, `disallowedEnv`                                 | a 4. szekció szerint                                                                                                                        | 4.                                                          |
 
 **A forrás konstansok.** A MiniMax dokumentum URL-ek új, nevesített konstansként a
 `provider-capability` `document-url.ts` fájljába kerülnek (a meglévő `DOC_*` mintájára), a research
@@ -136,7 +136,10 @@ szekció egy új `RESEARCH_*` konstansba. Kitalált URL nincs: csak a research 2
   hibája dönti el.
 - A `minimax` tiltott listáján a `MAX_THINKING_TOKENS` és a `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING`
   marad; az indoklás szövegéből az "M3" szó kikerül, a tartalom a Flash forrására áll (research 2.: a
-  `disabled` `400`).
+  `disabled` `400`). A `disallowedEnv` és a `requiredEnv` bejegyzések M-xx bizonyítékai (például a
+  `MAX_THINKING_TOKENS` M-06, M-08 és a `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` M-07, M-08, M-21)
+  a CLI viselkedését mérték, nem a modellét, ezért modelltől független tényként maradnak; ezek nem
+  `Fact` mezők.
 
 ### 3.4 A motor
 
@@ -261,9 +264,11 @@ is `REDACTED` legyen a naplóban és a próba kimenetében.
 - `README.md`: a `minimax` sor mindkét nevet megnevezi.
 - `turbo.json` `globalPassThroughEnv`: az `ANTHROPIC_API_KEY` felvétele, hogy a `turbo` alatt futó
   `dev` task is megkapja.
-- `tools/wire-probe`: a kulcs olvasása (`harness/environment.ts`) és a proxy titok maszkolása
-  (`proxy.ts`) mindkét nevet fogadja, ugyanazzal az elsőbbséggel (az `ANTHROPIC_AUTH_TOKEN` nyer); a
-  mérő a CLI-nek továbbra is `ANTHROPIC_AUTH_TOKEN` néven adja (user döntés 2026-10-27, a 2. döntés
+- `tools/wire-probe`: a kulcs olvasása (`harness/environment.ts`), a proxy és a `meta.json` titok
+  maszkolása (`proxy.ts`, `harness/runner.ts`) mindkét nevet fogadja, ugyanazzal az elsőbbséggel (az
+  `ANTHROPIC_AUTH_TOKEN` nyer); egy eltéréssel: az üres érték a mérő eszközben hiányzónak számít (a
+  korábbi viselkedése), a szerverben beállítottnak (4.3). A mérő a CLI környezetéből mindkét nevet
+  kiveszi, és a kulcsot csak `ANTHROPIC_AUTH_TOKEN` néven adja (user döntés 2026-10-27, a 2. döntés
   következménye, mert a `tools/wire-probe` is a gyökér `.env` fájlból olvas).
 
 ### 4.8 A létrehozó ablak kijelzése (O-4, lezárva: (a))
@@ -295,7 +300,8 @@ mezője `undefined`, tehát a lépés `thinking` beállítása egyik providerné
 - Az `AgentStepOptions.thinking` típusa az SDK alak két ága: `{ readonly type: 'adaptive' } |
 { readonly type: 'disabled' }`. A motor csomag az SDK-tól nem függ, ezért a típus a motorban áll, a
   kompatibilitást az 5.3 típusszintű teszt őrzi.
-- A leképezés egy tiszta függvény az `agent-step` témában: `adaptive` -> `{ type: 'adaptive' }`,
+- A leképezés a `buildAgentStepOptions` modulon belüli segédfüggvénye (`thinkingFields`), a többi mező
+  segédfüggvényének mintájára: `adaptive` -> `{ type: 'adaptive' }`,
   `disabled` -> `{ type: 'disabled' }`, `always_on` -> nincs mező. Az `always_on`-nak nincs SDK ága
   (`ThinkingConfig`), és egyik valódi leíró sem engedi (a `resolveThinkingMode` előbb elutasítja); ha egy
   leíró egyszer engedné, a "mindig gondolkodik" modellnél a mező elhagyása a modell saját alapértékét

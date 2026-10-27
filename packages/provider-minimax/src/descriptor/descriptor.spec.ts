@@ -66,12 +66,6 @@ describe('a known mezők a Flash forrásaira épülnek (SPEC-013 3.2)', () => {
       [DOC_MINIMAX_ANTHROPIC_API, DOC_MINIMAX_OPENAI_API, DOC_MINIMAX_CLAUDE_CODE_M_PLAN],
     ],
     [
-      'thinking.interleavedSignatureRequired',
-      minimaxProvider.thinking.interleavedSignatureRequired,
-      true,
-      [DOC_MINIMAX_ANTHROPIC_API],
-    ],
-    [
       'effort.accepted',
       minimaxProvider.effort.accepted,
       true,
@@ -136,6 +130,7 @@ describe('az előző modellre mért mezők unknown állapotúak, a megismétlend
     ['thinking.wireShape', minimaxProvider.thinking.wireShape, ['M-01', 'M-05']],
     ['thinking.sendsBudgetTokens', minimaxProvider.thinking.sendsBudgetTokens, ['M-05', 'M-06']],
     ['thinking.streamEventTypes', minimaxProvider.thinking.streamEventTypes, ['M-05']],
+    ['thinking.interleavedSignatureRequired', minimaxProvider.thinking.interleavedSignatureRequired, ['M-05']],
     ['structuredOutput usable', strategy?.usable, ['M-02', 'M-03']],
     ['structuredOutput blockingWireDetail', strategy?.blockingWireDetail, ['M-03']],
     ['structuredOutput observedRoundTrips', strategy?.observedRoundTrips, ['M-03']],
