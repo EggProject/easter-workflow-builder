@@ -200,6 +200,7 @@ export type { SessionBearingInstance } from './agent-step/session-bearing-instan
 export type { SessionSourceNodes } from './agent-step/session-source-nodes.ts';
 export type { SessionBinding } from './agent-step/session-binding.ts';
 export type { AgentStepOptions } from './agent-step/agent-step-options.ts';
+export type { SdkThinkingConfig } from './agent-step/sdk-thinking-config.ts';
 export type { AgentStepCapabilityDecisions } from './agent-step/agent-step-capability-decisions.ts';
 export type { AgentStepOutcome } from './agent-step/agent-step-outcome.ts';
 export type { AgentStepExecution } from './agent-step/agent-step-execution.ts';

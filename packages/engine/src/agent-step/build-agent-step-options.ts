@@ -1,5 +1,6 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
 import type { AgentStepCapabilityDecisions } from './agent-step-capability-decisions.ts';
+import type { ThinkingMode } from '@easter-workflow-builder/provider-capability';
 import type { AgentStepOptions } from './agent-step-options.ts';
 import type { SessionBinding } from './session-binding.ts';
 
@@ -48,6 +49,29 @@ function structuredOutputFields(
 }
 
 /**
+ * A `thinking` mező (SPEC-004 11.3 táblázat 8. sora, SPEC-013 5.2): a motor `ThinkingMode` értékét
+ * az SDK objektum alakjára képezi, mert az SDK a mezőt objektumként olvassa (`thinking.type`). Az
+ * `always_on` módnak nincs SDK ága, ezért a mező elmarad, és a modell saját alapértéke érvényes;
+ * egyik valódi leíró sem engedi ezt a módot. Ha a döntés `undefined`, a mező szintén elmarad.
+ */
+function thinkingFields(
+  mode: ThinkingMode | undefined,
+): Record<string, never> | { readonly thinking: NonNullable<AgentStepOptions['thinking']> } {
+  switch (mode) {
+    case 'adaptive': {
+      return { thinking: { type: 'adaptive' } };
+    }
+    case 'disabled': {
+      return { thinking: { type: 'disabled' } };
+    }
+    case 'always_on':
+    case undefined: {
+      return {};
+    }
+  }
+}
+
+/**
  * A kimenő Agent SDK `Options` objektum összeállítása (SPEC-004 5.2 4. pont).
  *
  * Három csoportból áll:
@@ -82,7 +106,7 @@ export function buildAgentStepOptions(input: BuildAgentStepOptionsInput): AgentS
     env: input.environmentBlock,
     includePartialMessages: decisions.includePartialMessages,
     persistSession: true,
-    ...(decisions.thinking !== undefined && { thinking: decisions.thinking }),
+    ...thinkingFields(decisions.thinking),
     ...(decisions.effort !== undefined && { effort: decisions.effort }),
     ...(config.permissionMode !== null && { permissionMode: config.permissionMode }),
     ...(config.maxTurns !== null && { maxTurns: config.maxTurns }),

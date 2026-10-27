@@ -565,7 +565,7 @@ flowchart TD
     SLOT1 --> PROVIDER
     SLOT2 --> PROVIDER
     SLOT3 --> PROVIDER
-    PROVIDER["MiniMax M3, dokumentált 200 kérés per perc"]
+    PROVIDER["MiniMax-M3.1-Flash, a kérés per perc korlát nem ellenőrzött"]
     SLOT1 -->|"a lépés terminális állapotba ért"| RELEASE
     RELEASE["A hely felszabadul, a sor következő eleme indul"] --> GATE
     BYPASS["human_approval, sub_workflow, branch, fan_out, join merge, loop"] -->|"nem foglal helyet"| DIRECT

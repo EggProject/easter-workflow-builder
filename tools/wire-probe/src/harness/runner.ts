@@ -8,6 +8,9 @@ import path from 'node:path';
 import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { redactKnownSecrets } from '../proxy/mask.ts';
 import type { CaseContext, CaseRunOutcome } from './types.ts';
+import { MINIMAX_KEY_NAMES } from './minimax-key-names.ts';
+
+const MINIMAX_KEY_NAME_SET: ReadonlySet<string> = new Set(MINIMAX_KEY_NAMES);
 
 const DEFAULT_TIMEOUT_MS = Number(process.env['WIRE_PROBE_TIMEOUT_MS'] ?? 60_000);
 
@@ -120,7 +123,16 @@ export async function executeQuery(parameters: ExecuteQueryParameters): Promise<
   const otherKnownSecrets = [process.env['GITHUB_TOKEN'], process.env['GH_TOKEN']].filter(
     (value): value is string => typeof value === 'string' && value.length > 0,
   );
-  const metaJson = redactKnownSecrets(JSON.stringify(meta, undefined, 2), [ctx.minimaxApiKey, ...otherKnownSecrets]);
+  // A kulcs mindkét elfogadott neve alatt álló érték maszkolandó (SPEC-013 4.7).
+  const minimaxKeyValues = MINIMAX_KEY_NAMES.flatMap((name) => {
+    const value = process.env[name];
+    return value ? [value] : [];
+  });
+  const metaJson = redactKnownSecrets(JSON.stringify(meta, undefined, 2), [
+    ctx.minimaxApiKey,
+    ...minimaxKeyValues,
+    ...otherKnownSecrets,
+  ]);
   writeFileSync(metaPath, metaJson, 'utf8');
 
   const isOk = harnessError === undefined;
@@ -146,8 +158,9 @@ export function buildBaseOptions(context: CaseContext): Options {
     maxTurns: 1,
     includePartialMessages: true,
     persistSession: false,
+    // A kulcs mindkét bemeneti neve kikerül, a CLI csak ANTHROPIC_AUTH_TOKEN néven kapja (SPEC-013 4.2, 4.7).
     env: {
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !MINIMAX_KEY_NAME_SET.has(name))),
       ANTHROPIC_BASE_URL: context.proxyBaseUrl,
       ANTHROPIC_AUTH_TOKEN: context.minimaxApiKey,
     },

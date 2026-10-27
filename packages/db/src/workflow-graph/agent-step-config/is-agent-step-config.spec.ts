@@ -31,7 +31,7 @@ const minimalConfig: AgentStepConfig = {
 const fullConfig: AgentStepConfig = {
   promptTemplate: 'Elemezd: {{input}}',
   providerId: 'minimax',
-  modelId: 'MiniMax-M3',
+  modelId: 'MiniMax-M3.1-Flash',
   effort: 'high',
   thinking: 'adaptive',
   allowedTools: ['Bash'],

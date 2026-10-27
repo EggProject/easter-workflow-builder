@@ -122,8 +122,32 @@ describe('buildAgentStepOptions', () => {
     expect(options.additionalDirectories).toStrictEqual(['/adat']);
     expect(options.agents).toStrictEqual({ elemzo: {} });
     expect(options.sandbox?.enabled).toBe(true);
-    expect(options.thinking).toBe('adaptive');
+    expect(options.thinking).toStrictEqual({ type: 'adaptive' });
     expect(options.effort).toBe('high');
+  });
+
+  // SPEC-013 5. (O-5): az SDK a `thinking` opciót objektumként olvassa (`ThinkingConfig`,
+  // `sdk.mjs` `switch(thinking.type)`); a korábbi szöveg érték a CLI-ig nem jutott el.
+  it('a disabled thinking az SDK objektum alakjában megy ki', () => {
+    const options = buildAgentStepOptions({
+      config: agentStepConfig(),
+      decisions: decisions({ thinking: 'disabled' }),
+      environmentBlock: {},
+      sessionBinding: isolated,
+    });
+
+    expect(options.thinking).toStrictEqual({ type: 'disabled' });
+  });
+
+  it('az always_on módnak nincs SDK alakja: a thinking mező elmarad', () => {
+    const options = buildAgentStepOptions({
+      config: agentStepConfig(),
+      decisions: decisions({ thinking: 'always_on' }),
+      environmentBlock: {},
+      sessionBinding: isolated,
+    });
+
+    expect(Object.hasOwn(options, 'thinking')).toBe(false);
   });
 
   it('a leíró szerint nem működő szerver oldali tool kliens neve a lépés tiltólistája mellé kerül', () => {

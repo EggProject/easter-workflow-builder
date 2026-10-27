@@ -1,7 +1,8 @@
 import {
+  DOC_MINIMAX_ANTHROPIC_API,
+  DOC_MINIMAX_CLAUDE_CODE_M_PLAN,
   RESEARCH_AUTH_PRECEDENCE,
   RESEARCH_GATEWAY,
-  RESEARCH_MINIMAX,
   type DisallowedEnvironmentRequirement,
 } from '@easter-workflow-builder/provider-capability';
 
@@ -19,17 +20,19 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING',
     reason:
-      'Fix budget alakú thinking mezőt kényszerít ki, a MiniMax sémája viszont csak disabled és adaptive értéket ismer, budget_tokens kulcs nélkül.',
+      'Fix budget alakú thinking mezőt kényszerít ki; a MiniMax-M3.1-Flash dokumentációja csak az elhagyott és az adaptív thinking mezőt írja le működőként, a fix budget alakot nem.',
     evidence: [
       { kind: 'research', section: RESEARCH_GATEWAY },
-      { kind: 'research', section: RESEARCH_MINIMAX },
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
     ],
   },
   {
     name: 'MAX_THINKING_TOKENS',
     reason:
-      'A 0 érték leveszi a thinking és context_management body mezőket, de a hozzájuk tartozó anthropic-beta headereket a headerben hagyja, és kikapcsolja az M3 adaptív thinkingjét.',
+      'A 0 érték a thinking kikapcsolását kéri, a MiniMax-M3.1-Flash a kikapcsolt thinkinget a dokumentáció szerint 400 hibával elutasítja. Az M-06 és M-08 mérés az előző modellre (M3) vonatkozik: ott a 0 érték a thinking és context_management body mezőket levette, a hozzájuk tartozó anthropic-beta headereket a headerben hagyta. A MAX_THINKING_TOKENS=0 hatása a Flash-re nem ellenőrzött (a MiniMax Claude Code lapja szerint nincs hatása, második forrás nincs); a tiltás óvatossági.',
     evidence: [
+      { kind: 'doc', url: DOC_MINIMAX_ANTHROPIC_API },
+      { kind: 'doc', url: DOC_MINIMAX_CLAUDE_CODE_M_PLAN },
       { kind: 'measurement', id: 'M-06' },
       { kind: 'measurement', id: 'M-08' },
     ],
@@ -67,7 +70,7 @@ export const minimaxDisallowedEnvironment: readonly DisallowedEnvironmentRequire
   {
     name: 'ANTHROPIC_API_KEY',
     reason:
-      'A hitelesítési sorrend 3. szintje, az ANTHROPIC_AUTH_TOKEN alatt: óvatossági tiltás, hogy Anthropic hitelesítő ne kerüljön a MiniMax endpointhoz. Hogy a CLI elküldené-e, nem ellenőrzött.',
+      'A kulcs elfogadott bemeneti neve (SPEC-013 4.1), de a kimenő környezetbe nem kerül: a kimenő név az ANTHROPIC_AUTH_TOKEN, így X-Api-Key fejléc nem megy a MiniMax felé, és a CLI kettős beállítás esete sosem áll elő.',
     evidence: AUTH_PRECEDENCE_EVIDENCE,
   },
   {

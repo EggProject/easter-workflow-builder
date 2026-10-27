@@ -1,57 +1,16 @@
 import type { StructuredOutputCapability } from '@easter-workflow-builder/provider-capability';
+import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 
 export const minimaxStructuredOutput: StructuredOutputCapability = {
   strategies: [
     {
       id: 'sdk_output_format',
-      usable: {
-        state: 'known',
-        value: true,
-        evidence: [
-          { kind: 'measurement', id: 'M-02' },
-          { kind: 'measurement', id: 'M-03' },
-        ],
-      },
-      blockingWireDetail: {
-        state: 'known',
-        // Tipusosan ertelmezett "nincs blokkolo" ertek (Fact<string | null>), nem placeholder.
-        // eslint-disable-next-line unicorn/no-null -- lasd structured-output-strategy.ts dokumentaciojat
-        value: null,
-        evidence: [{ kind: 'measurement', id: 'M-03' }],
-      },
-      observedRoundTrips: {
-        state: 'known',
-        value: [4],
-        evidence: [{ kind: 'measurement', id: 'M-03' }],
-      },
+      usable: notMeasuredOnFlash(['M-02', 'M-03']),
+      blockingWireDetail: notMeasuredOnFlash(['M-03']),
+      observedRoundTrips: notMeasuredOnFlash(['M-03']),
     },
   ],
-  // Az egyetlen stratégia az sdk_output_format (M-19 bizonyíték), ezért ez az alapértelmezés is.
-  defaultStrategy: {
-    state: 'known',
-    value: 'sdk_output_format',
-    evidence: [
-      { kind: 'measurement', id: 'M-02' },
-      { kind: 'measurement', id: 'M-03' },
-      { kind: 'measurement', id: 'M-19' },
-    ],
-  },
-  // Minden kérés output_config mezőt hordoz, effort beállítás nélkül is.
-  outputConfigAlwaysSent: {
-    state: 'known',
-    value: true,
-    evidence: [
-      { kind: 'measurement', id: 'M-01' },
-      { kind: 'measurement', id: 'M-04' },
-      { kind: 'measurement', id: 'M-26' },
-    ],
-  },
-  outputConfigWireField: {
-    state: 'known',
-    value: 'output_config.effort',
-    evidence: [
-      { kind: 'measurement', id: 'M-01' },
-      { kind: 'measurement', id: 'M-04' },
-    ],
-  },
+  defaultStrategy: notMeasuredOnFlash(['M-02', 'M-03', 'M-19']),
+  outputConfigAlwaysSent: notMeasuredOnFlash(['M-01', 'M-04', 'M-26']),
+  outputConfigWireField: notMeasuredOnFlash(['M-01', 'M-04']),
 };

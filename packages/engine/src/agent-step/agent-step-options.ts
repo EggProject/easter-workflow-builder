@@ -1,5 +1,5 @@
 import type { AgentStepConfig } from '@easter-workflow-builder/db';
-import type { ThinkingMode } from '@easter-workflow-builder/provider-capability';
+import type { SdkThinkingConfig } from './sdk-thinking-config.ts';
 
 /**
  * A kimenő Agent SDK `Options` objektum **típusos** alakja, amit a motor
@@ -38,7 +38,7 @@ export type AgentStepOptions = {
   readonly env: Readonly<Record<string, string>>;
   readonly includePartialMessages: boolean;
   readonly persistSession: true;
-  readonly thinking?: ThinkingMode;
+  readonly thinking?: SdkThinkingConfig;
   readonly effort?: string;
   readonly permissionMode?: string;
   readonly maxTurns?: number;

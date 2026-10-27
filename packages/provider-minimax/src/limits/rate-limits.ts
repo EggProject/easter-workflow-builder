@@ -1,19 +1,22 @@
-import { RESEARCH_MINIMAX, type RateLimitCapability } from '@easter-workflow-builder/provider-capability';
+import type { RateLimitCapability } from '@easter-workflow-builder/provider-capability';
 import type { MiniMaxModelId } from '../model-catalog/model-id.ts';
 
 export const minimaxRateLimits: RateLimitCapability<MiniMaxModelId> = {
   buckets: [
     {
-      appliesTo: ['MiniMax-M3'],
+      appliesTo: ['MiniMax-M3.1-Flash'],
+      // A számokat csak a MiniMax saját lapjai állítják, a Flash-re független megerősítés nincs (research 2. szekció).
       requestsPerMinute: {
-        state: 'known',
-        value: 200,
-        evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+        state: 'unknown',
+        reason:
+          'A Flash limitjét csak a MiniMax lapjai állítják, független forrás hiányzik, és nincs olyan mérési eset, ami a limit értékét lezárná (SPEC-013 3.2).',
+        blockedBy: [],
       },
       tokensPerMinute: {
-        state: 'known',
-        value: 10_000_000,
-        evidence: [{ kind: 'research', section: RESEARCH_MINIMAX }],
+        state: 'unknown',
+        reason:
+          'A Flash limitjét csak a MiniMax lapjai állítják, független forrás hiányzik, és nincs olyan mérési eset, ami a limit értékét lezárná (SPEC-013 3.2).',
+        blockedBy: [],
       },
     },
   ],

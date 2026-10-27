@@ -88,4 +88,23 @@ describe('buildOutgoingEnvironment', () => {
   it('üres környezetre és üres leíróra üres objektumot ad', () => {
     expect(buildOutgoingEnvironment([], [], buildProcessEnvironment({}))).toStrictEqual({ kind: 'ok', value: {} });
   });
+
+  it('alternatív bemeneti névből a kimenetben csak a name áll, a tiltott alternatív név nem (SPEC-013 4.2)', () => {
+    const result = buildOutgoingEnvironment(
+      [
+        {
+          name: 'ANTHROPIC_AUTH_TOKEN',
+          source: 'process_env_alternatives',
+          alternativeNames: ['ANTHROPIC_API_KEY'],
+          secret: true,
+          purpose: 'fake',
+          evidence: FAKE_EVIDENCE,
+        },
+      ],
+      [buildDisallowed('ANTHROPIC_API_KEY')],
+      buildProcessEnvironment({ PATH: '/usr/bin', ANTHROPIC_API_KEY: 'kulcs-ertek' }),
+    );
+
+    expect(result).toStrictEqual({ kind: 'ok', value: { PATH: '/usr/bin', ANTHROPIC_AUTH_TOKEN: 'kulcs-ertek' } });
+  });
 });

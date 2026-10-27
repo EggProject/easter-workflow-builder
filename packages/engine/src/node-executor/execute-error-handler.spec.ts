@@ -116,7 +116,7 @@ function retryInput(runId: string): CreateStepRunInput {
     iteration: 0,
     attempt: 1,
     providerId: 'minimax',
-    modelId: 'MiniMax-M3',
+    modelId: 'MiniMax-M3.1-Flash',
     sessionMode: 'isolated',
     structuredOutputStrategy: null,
     subWorkflowRunId: null,

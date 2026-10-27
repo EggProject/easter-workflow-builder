@@ -81,22 +81,26 @@ describe('runProbe a hamis ágenses szerver ellen', () => {
     const request = readRequest();
     expect(request['maxTurns']).toBe(1);
     // A leíró `clientModelIdentifier` mezője a kliensnek átadott alak (M-11, M-29, M-32).
-    expect(request['model']).toBe('MiniMax-M3[1m]');
+    expect(request['model']).toBe('MiniMax-M3.1-Flash[1m]');
+    expect(request['effort']).toBe('low');
     expect(request['hasMaxBudgetUsd']).toBe(false);
     expect(JSON.stringify(summary)).not.toContain(FAKE_SECRET);
   });
 
-  it('claude-subscription: modell nélkül a motor model_not_selected hibával elutasítja a futást (nincs hívás)', async () => {
-    await expect(probe('claude-subscription')).rejects.toThrow(/model_not_selected/);
-  });
-
-  it('claude-subscription: a megadott modellel fut', async () => {
-    const summary = await probe('claude-subscription', {}, new AbortController().signal, 'claude-haiku-4-5');
+  it('claude-subscription: modell megadása nélkül az alapmodellel (claude-haiku-4-5) fut, effort nélkül', async () => {
+    const summary = await probe('claude-subscription');
     expect(summary.runStatus).toBe('succeeded');
     const request = readRequest();
     expect(request['maxTurns']).toBe(1);
     expect(request['model']).toBe('claude-haiku-4-5');
+    expect(Object.hasOwn(request, 'effort')).toBe(false);
     expect(request['hasMaxBudgetUsd']).toBe(false);
+  });
+
+  it('claude-subscription: a megadott modell felülírja az alapmodellt', async () => {
+    const summary = await probe('claude-subscription', {}, new AbortController().signal, 'claude-sonnet-5');
+    expect(summary.runStatus).toBe('succeeded');
+    expect(readRequest()['model']).toBe('claude-sonnet-5');
   });
 
   it('a szerver ideiglenes adatbázissal és napló útvonallal fut, ami a futás végén törlődik', async () => {

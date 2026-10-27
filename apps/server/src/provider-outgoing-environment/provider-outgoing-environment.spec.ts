@@ -126,7 +126,36 @@ describe('a minimax kimenő env szabálya', () => {
     });
   });
 
-  it('a kulcs hiányára missing_provider_env hiba, kizárólag a névvel', () => {
+  it('csak ANTHROPIC_API_KEY mellett a kulcs ANTHROPIC_AUTH_TOKEN néven megy ki, az ANTHROPIC_API_KEY nem (SPEC-013 AC6)', () => {
+    const result = buildOutgoingEnvironment(
+      descriptor.requiredEnv,
+      descriptor.disallowedEnv,
+      processEnvironmentOf({ ANTHROPIC_API_KEY: 'masik-nev-kulcs', PATH: '/usr/bin' }),
+    );
+
+    expect(result).toStrictEqual({
+      kind: 'ok',
+      value: {
+        ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
+        ANTHROPIC_AUTH_TOKEN: 'masik-nev-kulcs',
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        PATH: '/usr/bin',
+      },
+    });
+  });
+
+  it('mindkét név mellett az ANTHROPIC_AUTH_TOKEN értéke megy ki (SPEC-013 AC7)', () => {
+    const result = buildOutgoingEnvironment(
+      descriptor.requiredEnv,
+      descriptor.disallowedEnv,
+      processEnvironmentOf({ ANTHROPIC_AUTH_TOKEN: 'elso', ANTHROPIC_API_KEY: 'masodik' }),
+    );
+
+    expect(result.kind === 'ok' ? result.value['ANTHROPIC_AUTH_TOKEN'] : undefined).toBe('elso');
+    expect(result.kind === 'ok' ? Object.hasOwn(result.value, 'ANTHROPIC_API_KEY') : undefined).toBe(false);
+  });
+
+  it('a kulcs hiányára missing_provider_env hiba, kizárólag a nevekkel (SPEC-013 AC8)', () => {
     const result = buildOutgoingEnvironment(
       descriptor.requiredEnv,
       descriptor.disallowedEnv,
@@ -135,7 +164,8 @@ describe('a minimax kimenő env szabálya', () => {
 
     expect(result).toStrictEqual({
       kind: 'error',
-      message: 'A(z) ANTHROPIC_AUTH_TOKEN kötelező provider env változó nincs beállítva (missing_provider_env).',
+      message:
+        'A(z) ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY kötelező provider env változó nincs beállítva (missing_provider_env).',
     });
   });
 });

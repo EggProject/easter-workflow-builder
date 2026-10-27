@@ -21,15 +21,15 @@ fától teljesen független, a SPEC-001 3. szekció csomagtérképe nem is sorol
 
 ## Fájlok
 
-| Fájl                                  | Tartalom                                                                                                                                           |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package.json`                        | csomag manifeszt: `proxy`/`probe`/`summary`/`typecheck`/`lint` script, nincs `test` script                                                         |
-| `tsconfig.json`                       | a `tooling/tsconfig/node.json` kiterjesztése                                                                                                       |
-| `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                                                                                     |
-| `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                                                                         |
-| `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                                                                                       |
-| `src/no-shadowed-path-import.spec.ts` | regressziós Vitest teszt, lásd Szabályok                                                                                                           |
-| `src/harness/environment.spec.ts`     | greppes regressziós Vitest teszt: a kulcs az `ANTHROPIC_AUTH_TOKEN` néven olvasott, a régi `MINIMAX_API_KEY` név sehol nem áll (SPEC-012 O-20 (b)) |
+| Fájl                                  | Tartalom                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json`                        | csomag manifeszt: `proxy`/`probe`/`summary`/`typecheck`/`lint` script, nincs `test` script                                                                                                                                                                                                                                                                                                                                            |
+| `tsconfig.json`                       | a `tooling/tsconfig/node.json` kiterjesztése                                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/proxy.ts`                        | a proxy belépési pontja (CLI: `bun run proxy`)                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/probe.ts`                        | a harness belépési pontja (CLI: `bun run probe <eset...>`)                                                                                                                                                                                                                                                                                                                                                                            |
+| `src/summary.ts`                      | token-takarékos összefoglaló script (CLI: `bun run summary`)                                                                                                                                                                                                                                                                                                                                                                          |
+| `src/no-shadowed-path-import.spec.ts` | regressziós Vitest teszt, lásd Szabályok                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src/harness/environment.spec.ts`     | greppes regressziós Vitest teszt: a kulcs az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` néven olvasott (az előbbi nyer, a `minimax-key-names.ts` sorrendje), a proxy és a `meta.json` mindkét név értékét maszkolja, a harness a CLI-nek csak `ANTHROPIC_AUTH_TOKEN` néven adja (az üres érték itt is hiányzónak számít, a szerverrel egyezően), a régi `MINIMAX_API_KEY` név sehol nem áll (SPEC-012 O-20 (b), SPEC-013 4.7) |
 
 Az `src/` alatti három mappa felelőssége:
 
@@ -74,7 +74,7 @@ gráf tagja, de más csomag nem importál innen semmit.
   `package.json`-ban és a `docs/research/2026-08-26-toolchain.md` "Rögzített verziók"
   táblázatában van. Ez a fájl csak a csomag nevére hivatkozik, számra nem: egy
   verzióemelésnél így csak egy helyen kell a számot módosítani.
-- **Futtatás.** Előfeltétel: az `ANTHROPIC_AUTH_TOKEN` elérhető a repo gyökér `.env` fájljában,
+- **Futtatás.** Előfeltétel: az `ANTHROPIC_AUTH_TOKEN` vagy az `ANTHROPIC_API_KEY` (ha mindkettő áll, az előbbi nyer) elérhető a repo gyökér `.env` fájljában,
   vagy a `process.env`-ben.
 
   ```bash

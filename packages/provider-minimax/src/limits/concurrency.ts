@@ -1,31 +1,14 @@
 import { DOC_ENV_VARS, type ConcurrencyCapability } from '@easter-workflow-builder/provider-capability';
+import { notMeasuredOnFlash } from '../measurement-gap/not-measured-on-flash.ts';
 
-// A megfigyelt kérésszám csúcsa a subagent korlát plusz egy, az orchestrátor kérésével együtt.
 export const minimaxConcurrency: ConcurrencyCapability = {
+  // A Claude Code env változója, modelltől független.
   subagentCapEnvVar: {
     state: 'known',
     value: 'CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS',
-    evidence: [
-      { kind: 'measurement', id: 'M-31' },
-      { kind: 'doc', url: DOC_ENV_VARS },
-    ],
+    evidence: [{ kind: 'doc', url: DOC_ENV_VARS }],
   },
-  measuredSubagentCap: {
-    state: 'known',
-    value: 3,
-    evidence: [{ kind: 'measurement', id: 'M-31' }],
-  },
-  observedMaxConcurrentRequests: {
-    state: 'known',
-    value: 4,
-    evidence: [{ kind: 'measurement', id: 'M-31' }],
-  },
-  measuredMaxConcurrentSteps: {
-    state: 'known',
-    value: 20,
-    evidence: [
-      { kind: 'measurement', id: 'M-39' },
-      { kind: 'research', section: '2026-08-28-parhuzamossagi-korlat.md 2.2 szekció' },
-    ],
-  },
+  measuredSubagentCap: notMeasuredOnFlash(['M-31']),
+  observedMaxConcurrentRequests: notMeasuredOnFlash(['M-31']),
+  measuredMaxConcurrentSteps: notMeasuredOnFlash(['M-39']),
 };

@@ -11,10 +11,10 @@
 // FUTTATÁS a repó gyökeréből (a `.env` fájl betöltésével):
 //
 //   bun run probe:real-provider -- minimax
-//   bun run probe:real-provider -- claude-subscription <modelId>
+//   bun run probe:real-provider -- claude-subscription [modelId]
 //
-// A `modelId` opcionális: a `claude-subscription` leírója több modellt ír le,
-// a motor modell nélkül `model_not_selected` hibával elutasítja a futást.
+// A `modelId` opcionális: alapból `minimax` mellett `MiniMax-M3.1-Flash`,
+// `claude-subscription` mellett `claude-haiku-4-5` (SPEC-013 6.).
 //
 // A kimenet csak összegzés; a titkok értéke `REDACTED`. A megszakítás
 // (`Ctrl-C`) a gyermek szervert is leállítja és az ideiglenes könyvtárat
