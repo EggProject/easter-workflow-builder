@@ -133,11 +133,19 @@ Forrás: gyökér `CLAUDE.md` 2., 3., 7., SPEC-001 7., SPEC-002 6.
 - **A `protocol` a motor hibaosztályainak részhalmazát is duplikálhatja, ugyanezzel a
   védelemmel.** A `ProtocolErrorClass` zárt szótár (SPEC-005 8.5) a motor `EngineErrorKind`
   uniójának szándékos részhalmaza, plusz a `db` `already_decided` ága; mivel részhalmaz, a
-  típusszintű ág egyirányú (`Exclude<ProtocolErrorClass, EngineErrorKind>` pontosan
+  típusszintű ág egyirányú (`Exclude<ProtocolErrorClass, EngineErrorKind>` ma pontosan
   `'already_decided'`), a futásidejű ág a motor `isEngineErrorKind` guardja. Helye az
   `apps/server` `error-class-drift-protection` témája (user döntés 2026-09-26, "Ismert okokra
   saját mondat"). A szótár a SPEC-010 `template_render_failed` és `expression_evaluation_failed`
-  osztályával bővült (user döntés 2026-10-25, SPEC-010 9.6).
+  osztályával bővült (user döntés 2026-10-25, SPEC-010 9.6). **A SPEC-009 osztályaival bővül**
+  (user döntés 2026-10-28, SPEC-009 5.4 és 6.4, O-41 és O-43; végrehajtás: PLAN-012 T-012-8,
+  T-012-9, T-012-11, T-012-24): a motor oldali `skill_not_found`, `mcp_server_not_found` és
+  `missing_mcp_server_env` a részhalmaz szabály alá esik; a skill feltöltés tizenöt elutasítási
+  osztálya (a SPEC-009 5.4 táblája) viszont **szerver oldali** (`apps/server` `skill-endpoint`, egyetlen
+  `as const` táblában), nem `EngineErrorKind` tag, ezért az `already_decided` mintájára a típusszintű
+  `Exclude` ág és a futásidejű lista ezzel a táblával bővül. A feltöltési osztályok kódja
+  `unprocessable` (a SPEC-005 8.3 "a tárolt vagy a küldött dokumentum nem dolgozható fel" sorának
+  mintája); a mentés mezőútja (SPEC-005 8.5) továbbra sem kap strukturált mezőt.
 - **A `protocol` a `db` írás oldali "kötelező szöveg mező" szabályát is duplikálhatja, ugyanezzel a
   védelemmel.** A kötelező (nem nullázható, a beállítás panelen szerkesztett) szöveg mezők listája a
   `protocol` mentési sémájában és a `db` `replaceGraph` ellenőrzésében is áll, mindkét oldalon
@@ -819,7 +827,9 @@ alapeset**, egyetlen, mérten körülhatárolt kivétellel.
   határok: SPEC-007 8.4. **Ismert okokra saját mondat** (user döntés 2026-09-26, SPEC-007 O-10
   lezárva): a SPEC-005 8.5 zárt szótárába eső hibaosztályt a szerver a törzs `errorClass`
   mezőjében adja, a kliens ehhez saját magyar mondatot rendel (2026-10-25 óta a futás indításának
-  sablon és kifejezés hibájára is, SPEC-010 9.6), és a `message` szövegét nem elemzi;
+  sablon és kifejezés hibájára is, SPEC-010 9.6; a user 2026-10-28-i döntése szerint a skill feltöltés
+  elutasítási okaira, a hiányzó skillre, a hiányzó MCP definícióra és a hiányzó MCP env változóra is,
+  SPEC-009 5.4 és 6.4), és a `message` szövegét nem elemzi;
   hiányzó mezőnél a kód mondata marad, a mentés mezőútja nem kap mondatot. Az
   akciósáv magassága 1440x600-on a kérdés szövegét levágja, a szöveg a törzsben görgethető
   (SPEC-008 14.1 O-17, user döntés 2026-09-26: elfogadva). Védelem:

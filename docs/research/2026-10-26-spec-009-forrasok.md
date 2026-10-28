@@ -180,6 +180,99 @@ leírása szerint készült zip feltölthető.
 | A változó jelentése                                                           | megerősítés 1: <https://code.claude.com/docs/en/env-vars>                                                                                | "Set to `1` to disable auto memory. ... When disabled, Claude does not create or load auto memory files" |
 | ugyanez                                                                       | megerősítés 2: <https://code.claude.com/docs/en/memory>                                                                                  | "To disable auto memory via environment variable, set `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`."              |
 
+## 9. O-42: a lépés MCP mezőjének tárolt alakja (PLAN-012 T-012-5a, 2026-10-28)
+
+**Kérdés.** A központi MCP lista (SPEC-009 O-31) mellett a lépés hivatkozása (a) a meglévő
+`mcpServers` mező értékének cseréjével, vagy (b) új mezővel álljon, úgy, hogy a régi gráf és
+pillanatkép olvasható maradjon (`.claude/CLAUDE.md` 10. szekció 2. pont), és ne keletkezzen halott ág
+(100 százalékos lefedettség, `.claude/CLAUDE.md` 5. szekció).
+
+**Döntés: (b).** A lépés configja egy új, elhagyható mezőt kap a hivatkozásnak (munkanév:
+`mcpServerReferences`; kulcsa a központi definíció neve, értéke a lépés felülírása, kizárólag nevekkel).
+A meglévő `mcpServers` mező típusa, guardja és protokoll sémája változatlan; a felület csak olvashatóan
+mutatja, a motor továbbra sem adja át. Módszer: a `feat/spec-009-beallitasok` ág `7228ca3` fejének
+olvasása (`sed`, `grep`), valódi futás nélkül.
+
+### 9.1 A kódból olvasott tények
+
+| #      | Tény                                                                                                                                                                                                     | Hely                                                                                                                                                      |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 9.1.1  | A lépés `mcpServers` mezője `Readonly<Record<string, StorableMcpServer>>`; a három ág értéket nem, csak env változó nevet hordoz                                                                         | `packages/db/src/workflow-graph/agent-step-config/agent-step-config.ts:72`; `storable-mcp-server.ts:21-49`                                                |
+| 9.1.2  | Az `isAgentStepConfig` guard zárt kulcslistával dolgozik: ismeretlen kulcs elutasítva; az `mcpServers` minden értéke az `isStorableMcpServer` hármas ágán megy át, az ágak is zárt kulcslistásak         | `packages/db/src/workflow-graph/agent-step-config/is-agent-step-config.ts:48-68, 95-112, 167-198, 244-267`                                                |
+| 9.1.3  | A zárt kulcslista guard a hiányzó kulcsot nem vizsgálja, csak az ismeretlent tiltja ("A hiányzó kulcsot nem vizsgálja")                                                                                  | `packages/typeguards/src/is-record-with-known-keys/is-record-with-known-keys.ts:3-16`                                                                     |
+| 9.1.4  | A protokoll párja ugyanez az alak (`z.record(z.string(), StorableMcpServerSchema)`, `z.strictObject` ágak); az olvasó és a mentési séma közös alapja                                                     | `packages/protocol/src/node-config/agent-step-config.ts:67`; `packages/protocol/src/node-config/storable-mcp-server.ts:9-46`                              |
+| 9.1.5  | A két oldal `NodeConfig` típusa kétirányban egyenlő a `typecheck` kapun, és a protokoll szerint érvényes érték a `db` guardon is átmegy                                                                  | `apps/server/src/node-config-drift-protection/node-config-drift-protection.spec.ts:49-58, 147-157`                                                        |
+| 9.1.6  | A pillanatkép a node configot változatlanul (`unknown`) másolja, a szűkítés az `isNodeConfig` guarddal történik; a motor a futás indításakor ugyanezzel szűkít, különben `malformed_node_config`         | `packages/db/src/graph-snapshot/snapshot-document/graph-snapshot-document.ts:29-41`; `packages/engine/src/run-validation/validate-node-configs.ts:2, 33`  |
+| 9.1.7  | A `readGraph` is ezzel a guarddal olvas (`corrupt_node_config`), és a `replaceGraph` írás előtt is futtatja                                                                                              | `packages/db/src/workflow-graph/workflow/workflow-repository.ts:247-266, 329`; `packages/db/CLAUDE.md:98-110, 142`                                        |
+| 9.1.8  | A felület az `mcpServers` mezőbe soha nem írt nem üres értéket: az új lépés kezdő configja `{}`, a beállítás panel csak olvashatóan mutatja, az agent definíció sora `readonly` vezérlő                  | `apps/web/src/node-inspector/default-agent-step-settings.ts:26`; `AgentStepConfigFields.tsx:21, 280-291`; `agent-definition-field-table.ts:11-13, 97-102` |
+| 9.1.9  | A REST út nem üres értéket is elfogad: a `PUT .../graph` mentési sémája ugyanezt a rekord sémát használja, tehát egy nem a felületről küldött kérés ilyet menthetett, és az pillanatképbe is kerülhetett | `packages/protocol/src/node-config/agent-step-config.ts:67`; `apps/server/src/workflow-endpoint/replace-workflow-graph.ts:16`                             |
+| 9.1.10 | A motor az `mcpServers` mezőt kihagyja, tehát egy tárolt nem üres érték ma hatástalan                                                                                                                    | `packages/engine/src/agent-step/build-agent-step-options.ts:91-94, 98-120`                                                                                |
+| 9.1.11 | Az SDK agent definíciójának `mcpServers` mezője `AgentMcpServerSpec[]`, az elem név vagy rekord; az `agents` mező a `db` és a `protocol` oldalán `Record<string, unknown>`, a guard nem szűkíti          | telepített `sdk.d.ts:59, 120`; `agent-step-config.ts:70`; `.claude/CLAUDE.md` 5. szekció                                                                  |
+| 9.1.12 | A kanonikus pillanatkép lenyomatát egy commitolt fixtúra és a rá épülő teszt őrzi                                                                                                                        | `packages/db/src/graph-snapshot/snapshot-hash/graph-snapshot-document-v1-fixture.json` és `graph-snapshot-document-v1-fixture.spec.ts`                    |
+| 9.1.13 | A TypeScript `exactOptionalPropertyTypes` kapcsolója be van kapcsolva                                                                                                                                    | `tooling/tsconfig/base.json:10`                                                                                                                           |
+
+### 9.2 Az (a) alak
+
+Az (a) a meglévő `mcpServers` értékének típusát cserélné (`StorableMcpServer` helyett hivatkozás). A
+pillanatkép megváltoztathatatlan, és a 9.1.9 szerint régi, nem üres érték a REST úton keletkezhetett,
+tehát a 9.1.6 és 9.1.7 guardjának a régi ágat is el kellene fogadnia, különben egy ilyen régi futás
+újraindítása `malformed_node_config`, a gráf olvasása `corrupt_node_config` hibát adna. Az érték típusa
+így a régi definíció és az új hivatkozás uniója lenne a `db`, a `protocol` (olvasó séma) és a felület
+oldalán is, és a motornak (a régi ág leképezése vagy elutasítása) és a szerkesztőnek (a régi érték
+megjelenítése és mentése) ágenként kellene kezelnie. Ha a mentési séma csak az új alakot fogadná, egy
+régi értékű gráf a felületről nem lenne változatlanul menthető, ami új termékkérdést nyitna. A régi
+ág nem lenne halott (régi sorral elérhető), de minden rétegben új kódot hoz. Ha a felület soha nem írt
+nem üres értéket (9.1.8), az csak a felületi útra igaz; a REST utat a kód nem zárja ki, tehát a régi
+ág nem hagyható el.
+
+### 9.3 A (b) alak
+
+A (b)-ben a `mcpServers` típusa, guardja és protokoll sémája bájtra változatlan, tehát minden régi gráf
+és pillanatkép a mai úton olvasható, és a meglévő sodródás védelem rá változatlanul érvényes. Az új
+mező elhagyható: a hiánya a régi sorokon a természetes állapot, és a zárt kulcslista guard (9.1.3) a
+hiányzó kulcsot eleve elfogadja; a guard új ága "hiányzik" vagy "érvényes hivatkozás rekord", és
+mindkettő régi, illetve új sorral elérhető, tehát halott ág nincs. Az új mező a kanonikus
+dokumentumban csak akkor jelenik meg, ha a config hordozza, tehát a régi pillanatképek bájtjai és
+lenyomata nem változik (9.1.12). A régi mező nem üres értéke ma hatástalan (9.1.10), és az is marad:
+ez a mai viselkedés megtartása, nem új döntés.
+
+### 9.4 Következmények (átvezetve a SPEC-009 6.1, 6.2, 6.4 szekciójába)
+
+1. A központi definíció saját tárolt alakot kap (új tábla, régi sora nincs): a három ág, a `stdio`
+   ágon kötelező `envBindings` mezővel. A `StorableMcpServer` nem bővül, tehát az `envBindings`
+   hiányának olvasási kérdése nem áll fenn.
+2. A lépés új mezőjének kulcsa a központi definíció neve, értéke a lépés felülírása, kizárólag
+   nevekkel (a `stdio` ágon deklarált név -> szerver oldali név, a `sse` és `http` ágon az
+   `authEnvName` felülírása); a pontos mezőket és a végleges nevet a T-012-10 rögzíti. A `db` és a
+   `protocol` oldalon ugyanaz a típus, a `node-config-drift-protection` kétirányú egyenlőségével; a
+   9.1.13 kapcsoló mellett az elhagyható mező pontos deklarációját (a `db` oldali `?:` és a zod
+   `.optional()` egyezését) a `typecheck` kapu dönti el, nem ez a jegyzet.
+3. A régi `mcpServers` mező: a felület csak olvashatóan mutatja (a `SPEC_009_SCOPE_REASON` szöveg
+   helyett a régi, a futás által nem használt alakot megnevező szöveggel), a motor nem képezi le, a
+   mentési séma változatlanul elfogadja.
+4. Az agent definíció `mcpServers` bejegyzése az `agents` szűkítetlen rekordjában marad (9.1.11), tehát
+   a döntés a guardot és a sodródás védelmet nem érinti.
+
+### 9.5 A T-012-10 régi gráf tesztjének terve
+
+1. `packages/db` `is-agent-step-config.spec.ts`: a guard átengedi (i) az új mező nélküli configot üres
+   `mcpServers` értékkel, (ii) az új mező nélküli configot nem üres régi `mcpServers` értékkel mindhárom
+   ágon, (iii) az új mezővel; elutasítja az új mező ismeretlen kulcsú vagy nem név értékű bejegyzését.
+2. `packages/db`, valós `:memory:` adatbázison a commitolt migrációkkal: egy régi alakú node config
+   nyers SQL beszúrással a `workflow_node` táblába, a `readGraph` sikeres; egy régi alakú pillanatkép
+   dokumentum a `graph_snapshot` táblába, a pillanatkép olvasása sikeres; a v1 fixtúra és a lenyomat
+   teszt változatlanul zöld.
+3. `packages/protocol`: a `NodeConfigSchema`, a `WorkflowGraphDocumentSchema` és a
+   `NodeConfigSaveSchema` a régi alakot (új mező nélkül, nem üres régi értékkel) elfogadja.
+4. `apps/server` `node-config-drift-protection`: a típusszintű egyenlőség az új mezővel; futásidejű ág
+   a régi és az új alakra (mindkét oldalon átmegy) és az új mező ismeretlen kulcsára (mindkét oldalon
+   elbukik), a meglévő "ismeretlen kulcs" és "szabadon maradó mezők" csoport mintájára.
+5. `packages/engine`: régi pillanatképből (új mező nélkül, nem üres régi `mcpServers` értékkel) a futás
+   indítási ellenőrzése nem ad `malformed_node_config` hibát, és a kimenő `Options`-ban a régi érték nem
+   jelenik meg; az új mező hiánya és az üres rekord ugyanazt az `Options` objektumot adja.
+6. e2e: a `GET .../graph` mock régi alakú configgal (új mező nélkül, nem üres régi értékkel) betölt, és
+   a mentés `PUT` törzse a régi `mcpServers` értéket változatlanul visszaküldi.
+
 ## 6. Amit nem tudtunk megerősíteni (nem ellenőrzött)
 
 - A plugin skill neve, ha a `.claude-plugin/plugin.json` hiányzik (a plugin neve a könyvtárnévből jön-e): az M-136.
