@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import process from 'node:process';
 import { isOkOutcome, type Outcome } from '@easter-workflow-builder/core';
 import { openDatabase, type DatabaseContext } from '@easter-workflow-builder/db';
@@ -97,6 +101,26 @@ describe('continueStartupWithDatabase', () => {
 
     expect(lines.some((line) => line.includes('A szerver elindult'))).toBe(true);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('a kapcsolatok fogadása előtt törli a skill könyvtár gyökerének .staging-* maradékait (ZIP 8. találat)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skill-indulas-'));
+    await mkdir(path.join(root, '.staging-maradek', 'ref'), { recursive: true });
+    await mkdir(path.join(root, 'skills', 'jelentes'), { recursive: true });
+    const database = openMemoryDatabase();
+    const { sink, lines } = collectingSink();
+    const logger = createServerLogger({ secretValues: [] }, sink);
+
+    await continueStartupWithDatabase(
+      database,
+      { ...baseConfig(await findFreePort()), skillLibraryDirectory: root },
+      logger,
+    );
+
+    expect(lines.some((line) => line.includes('A szerver elindult'))).toBe(true);
+    expect(existsSync(path.join(root, '.staging-maradek'))).toBe(false);
+    expect(existsSync(path.join(root, 'skills', 'jelentes'))).toBe(true);
+    await rm(root, { recursive: true, force: true });
   });
 
   it('a helyreállítás hibaágán fatal naplóz, zárja az adatbázist, és 1-re állítja a kilépési kódot', async () => {

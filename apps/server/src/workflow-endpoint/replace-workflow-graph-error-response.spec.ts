@@ -33,7 +33,10 @@ import { createReplaceWorkflowGraphHandler } from './replace-workflow-graph.ts';
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
 const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
   maxBodyBytes: 0,
-  handle: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  accept: () => ({
+    kind: 'ok',
+    value: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  }),
 };
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {

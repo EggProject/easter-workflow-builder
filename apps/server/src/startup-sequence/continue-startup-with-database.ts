@@ -11,6 +11,7 @@ import { createHttpServer } from '../http-server/create-http-server.ts';
 import { createStreamRegistry } from '../stream-registry/create-stream-registry.ts';
 import { registerShutdownSignalHandlers } from '../shutdown-sequence/register-shutdown-signal-handlers.ts';
 import type { ServerConfig } from '../server-config/server-config.ts';
+import { removeStagingLeftovers } from '../skill-endpoint/remove-staging-leftovers.ts';
 import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
 
 /**
@@ -59,6 +60,9 @@ export async function continueStartupWithDatabase(
       maxEntryCount: config.skillMaxEntryCount,
     },
   };
+  // A megszakadt feltöltések ideiglenes mappái a kapcsolatok fogadása előtt
+  // törlődnek (PLAN-012 T-012-27, ZIP 8. találat).
+  await removeStagingLeftovers(skillLibrary.rootDirectory);
   const engine = createEngine(
     buildEngineDependencies(database, streamRegistry, clock, logger, skillLibrary.rootDirectory),
   );

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDeleteSkillHandler } from './delete-skill.ts';
+import { createSkillNameLock } from './skill-name-lock.ts';
 import { TEST_SKILL_LIBRARY } from './test-skill-library.ts';
 
 const workspace = { root: '' };
@@ -17,7 +18,10 @@ afterEach(async () => {
 });
 
 function remove(parameters: Readonly<Record<string, string>>) {
-  const handler = createDeleteSkillHandler({ ...TEST_SKILL_LIBRARY, rootDirectory: workspace.root });
+  const handler = createDeleteSkillHandler(
+    { ...TEST_SKILL_LIBRARY, rootDirectory: workspace.root },
+    createSkillNameLock(),
+  );
   return handler({ parameters, query: new URLSearchParams(), body: undefined });
 }
 

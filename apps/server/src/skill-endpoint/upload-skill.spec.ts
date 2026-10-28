@@ -15,6 +15,8 @@ import { createStreamRegistry } from '../stream-registry/create-stream-registry.
 import { buildTestZipArchive, type TestZipEntry } from './build-test-zip-archive.ts';
 import type { SkillUploadErrorClass } from './skill-upload-error-class.ts';
 import { TEST_SKILL_LIBRARY } from './test-skill-library.ts';
+import type { BinaryBodyProcessor, BinaryRouteHandler } from '../route-dispatch/binary-route-handler.ts';
+import { createSkillNameLock, type SkillNameLock } from './skill-name-lock.ts';
 import { createUploadSkillHandler } from './upload-skill.ts';
 import { testZipDirectoryEntry } from './test-zip-directory-entry.ts';
 import { testZipFileEntry } from './test-zip-file-entry.ts';
@@ -279,15 +281,92 @@ describe('PUT /api/skills/:name: minden elutasítás a saját hibaosztályával,
   });
 });
 
+function directHandler(lock: SkillNameLock = createSkillNameLock()): BinaryRouteHandler {
+  return createUploadSkillHandler({ ...TEST_SKILL_LIBRARY, rootDirectory: server.root }, lock);
+}
+
+function processorOf(handler: BinaryRouteHandler, name: string): BinaryBodyProcessor {
+  return okOrThrow(handler.accept({ name }));
+}
+
 describe('createUploadSkillHandler: a kezelő közvetlen hívása', () => {
-  it('hiányzó név paraméterre skill_name_invalid, fájlrendszer érintése nélkül', async () => {
-    const handler = createUploadSkillHandler({ ...TEST_SKILL_LIBRARY, rootDirectory: server.root });
-    const outcome = await handler.handle({ parameters: {}, body: { kind: 'complete', bytes: Buffer.alloc(0) } });
-    expect(outcome.kind === 'error' && outcome.message).toMatch(/\(skill_name_invalid\)\.$/u);
-    expect(await readdir(server.root)).toStrictEqual([]);
+  it('a névszabálynak meg nem felelő vagy hiányzó névre az accept a törzs nélkül skill_name_invalid, fájlrendszer érintése nélkül (ZIP 9. találat)', () => {
+    const handler = directHandler();
+    for (const parameters of [{}, { name: 'Rossz_Nev' }]) {
+      const outcome = handler.accept(parameters);
+      expect(outcome.kind === 'error' && outcome.message).toMatch(/\(skill_name_invalid\)\.$/u);
+    }
+    expect(existsSync(path.join(server.root, 'skills'))).toBe(false);
   });
 
   it('a korlátot az archívum korlátjából veszi', () => {
-    expect(createUploadSkillHandler(TEST_SKILL_LIBRARY).maxBodyBytes).toBe(30_000_000);
+    expect(createUploadSkillHandler(TEST_SKILL_LIBRARY, createSkillNameLock()).maxBodyBytes).toBe(30_000_000);
+  });
+});
+
+function archive(): Buffer {
+  return buildTestZipArchive([manifestEntry(), testZipFileEntry('a.md', 'a')]);
+}
+
+async function skillFiles(name: string): Promise<ReadonlySet<string>> {
+  return new Set(await readSkill(name));
+}
+
+describe('createUploadSkillHandler: egyidejű írások ugyanarra a névre (ZIP 1. találat)', () => {
+  it('a csere a név zárján fut: amíg a zár foglalt, a régi skill a helyén marad', async () => {
+    await upload('pdf-tools', buildTestZipArchive([manifestEntry(), testZipFileEntry('regi.md', 'r')]));
+    const gate = { release: (): void => undefined };
+    const held = new Promise<void>((resolve) => {
+      gate.release = resolve;
+    });
+    const realLock = createSkillNameLock();
+    const seenNames: string[] = [];
+    const gatedLock: SkillNameLock = {
+      run: (name, task) => {
+        seenNames.push(name);
+        return realLock.run(name, async () => {
+          await held;
+          return task();
+        });
+      },
+    };
+
+    const pending = processorOf(directHandler(gatedLock), 'pdf-tools')({ kind: 'complete', bytes: archive() });
+    await expect.poll(() => seenNames).toStrictEqual(['pdf-tools']);
+    expect(await skillFiles('pdf-tools')).toStrictEqual(new Set(['SKILL.md', 'regi.md']));
+
+    gate.release();
+    expect(await pending).toMatchObject({ kind: 'ok' });
+    expect(await skillFiles('pdf-tools')).toStrictEqual(new Set(['SKILL.md', 'a.md']));
+    expect(await stagingLeftovers()).toStrictEqual([]);
+  });
+
+  it('nyolc párhuzamos felülírás mind sikeres, és nem marad .staging-* könyvtár', async () => {
+    const handler = directHandler();
+    await processorOf(handler, 'pdf-tools')({ kind: 'complete', bytes: archive() });
+    for (let round = 0; round < 5; round += 1) {
+      const outcomes = await Promise.all(
+        Array.from({ length: 8 }, () => processorOf(handler, 'pdf-tools')({ kind: 'complete', bytes: archive() })),
+      );
+      expect(outcomes.map((outcome) => outcome.kind)).toStrictEqual(Array.from({ length: 8 }, () => 'ok'));
+      expect(await stagingLeftovers()).toStrictEqual([]);
+      expect(await skillFiles('pdf-tools')).toStrictEqual(new Set(['SKILL.md', 'a.md']));
+    }
+  });
+
+  it('egyidejű feltöltés és törlés a HTTP úton: egyik sem ad 500-at, és nem marad .staging-* könyvtár', async () => {
+    await upload('pdf-tools', archive());
+    for (let round = 0; round < 5; round += 1) {
+      const responses = await Promise.all([
+        upload('pdf-tools', archive()),
+        fetch(`${server.baseUrl}/api/skills/pdf-tools`, { method: 'DELETE' }),
+        upload('pdf-tools', archive()),
+        fetch(`${server.baseUrl}/api/skills/pdf-tools`, { method: 'DELETE' }),
+      ]);
+      expect(responses.map((response) => response.status).every((status) => [200, 204, 404].includes(status))).toBe(
+        true,
+      );
+      expect(await stagingLeftovers()).toStrictEqual([]);
+    }
   });
 });

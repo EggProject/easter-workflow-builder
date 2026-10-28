@@ -31,6 +31,7 @@ import { createClearConcurrencyLimitHandler } from '../settings-endpoint/clear-c
 import { createDeleteSkillHandler } from '../skill-endpoint/delete-skill.ts';
 import { createListSkillsHandler } from '../skill-endpoint/list-skills.ts';
 import type { SkillLibrary } from '../skill-endpoint/skill-library.ts';
+import { createSkillNameLock } from '../skill-endpoint/skill-name-lock.ts';
 import { createUploadSkillHandler } from '../skill-endpoint/upload-skill.ts';
 import { createDeleteMcpServerDefinitionHandler } from '../mcp-server-definition-endpoint/delete-mcp-server-definition.ts';
 import { createListMcpServerDefinitionsHandler } from '../mcp-server-definition-endpoint/list-mcp-server-definitions.ts';
@@ -44,7 +45,8 @@ import { createListServerEnvironmentNamesHandler } from '../server-environment-e
  * `RouteHandlers` visszatérési típus miatt egy kimaradó `RouteId` (vagy a
  * nyers ZIP törzsű végpont nem bináris kezelője) fordítási hibát ad, nem
  * futásidejű "nincs kezelő" ágat. A `skillLibrary` a skill könyvtár gyökere és
- * a feltöltés korlátai (SPEC-009 5.1, 5.4 6. pont).
+ * a feltöltés korlátai (SPEC-009 5.1, 5.4 6. pont); a feltöltés és a törlés
+ * ugyanazon a név záron osztozik (PLAN-012 T-012-27).
  */
 export function buildRouteHandlers(
   database: DatabaseContext,
@@ -52,6 +54,7 @@ export function buildRouteHandlers(
   streamRegistry: StreamRegistry,
   skillLibrary: SkillLibrary,
 ): RouteHandlers {
+  const skillNameLock = createSkillNameLock();
   return {
     // A. Workflow (8 végpont)
     listWorkflows: createListWorkflowsHandler(database),
@@ -93,8 +96,8 @@ export function buildRouteHandlers(
 
     // G. Skill könyvtár (3 végpont, SPEC-009 5.1)
     listSkills: createListSkillsHandler(skillLibrary),
-    uploadSkill: createUploadSkillHandler(skillLibrary),
-    deleteSkill: createDeleteSkillHandler(skillLibrary),
+    uploadSkill: createUploadSkillHandler(skillLibrary, skillNameLock),
+    deleteSkill: createDeleteSkillHandler(skillLibrary, skillNameLock),
 
     // H. Központi MCP szerver lista (3 végpont, SPEC-009 6.2)
     listMcpServerDefinitions: createListMcpServerDefinitionsHandler(database),

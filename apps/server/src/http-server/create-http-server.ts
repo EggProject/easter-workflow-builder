@@ -66,8 +66,9 @@ function writeJson(
 
 /**
  * A kezelő hívása a végpont törzs fajtája szerint: a nyers ZIP törzsű végpont
- * (SPEC-009 5.1, O-36) a kezelő saját korlátjáig olvasott bináris törzset
- * kapja, minden más a JSON törzset. A JSON törzs hibája `invalid_request`
+ * (SPEC-009 5.1, O-36) előbb az útvonal paramétereit fogadtatja el, és csak
+ * utána kapja a saját korlátjáig olvasott bináris törzset; minden más a JSON
+ * törzset. A JSON törzs hibája `invalid_request`
  * hibaágat ad, ugyanazzal az üzenettel, mint eddig (SPEC-006 16. kritérium).
  */
 async function invokeHandler(
@@ -79,8 +80,15 @@ async function invokeHandler(
 ): Promise<Outcome<RouteHandlerResult>> {
   if (isZipBodyRouteId(routeId)) {
     const handler = handlers[routeId];
-    const body = await readBinaryRequestBody(request, handler.maxBodyBytes);
-    return handler.handle({ parameters, body });
+    const accepted = handler.accept(parameters);
+    if (accepted.kind === 'error') {
+      // A paraméter hiba a törzs feldolgozása nélkül dől el; a törzset nulla
+      // bájtos korláttal (semmit nem megtartva) végigolvassuk, hogy a kliens a
+      // választ egy félbeszakított kapcsolat helyett megkapja.
+      await readBinaryRequestBody(request, 0);
+      return accepted;
+    }
+    return accepted.value(await readBinaryRequestBody(request, handler.maxBodyBytes));
   }
   const bodyOutcome = await readJsonRequestBody(request);
   if (bodyOutcome.kind === 'error') {

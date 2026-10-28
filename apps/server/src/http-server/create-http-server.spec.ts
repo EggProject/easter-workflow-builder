@@ -4,7 +4,7 @@ import { openDatabase, type DatabaseContext, type WorkflowEdgeInput } from '@eas
 import { createEngine } from '@easter-workflow-builder/engine';
 import { createServerLogger, type DestinationStream, type ServerLogger } from '@easter-workflow-builder/logger';
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
-import type { BinaryRouteHandler, BinaryRouteHandlerContext } from '../route-dispatch/binary-route-handler.ts';
+import type { BinaryRequestBody, BinaryRouteHandler } from '../route-dispatch/binary-route-handler.ts';
 import type { RouteHandler, RouteHandlerContext } from '../route-dispatch/route-handler.ts';
 import type { RouteHandlers } from '../route-dispatch/route-handlers.ts';
 import { createRandomUuidIdGenerator } from '../engine-assembly/create-random-uuid-id-generator.ts';
@@ -19,7 +19,10 @@ import { TEST_SKILL_LIBRARY } from '../skill-endpoint/test-skill-library.ts';
 const DEFAULT_HANDLER: RouteHandler = () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } });
 const DEFAULT_BINARY_HANDLER: BinaryRouteHandler = {
   maxBodyBytes: 0,
-  handle: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  accept: () => ({
+    kind: 'ok',
+    value: () => Promise.resolve({ kind: 'ok', value: { status: 200, body: { ok: true } } }),
+  }),
 };
 
 function okOrThrow<TValue>(outcome: Outcome<TValue>): TValue {
@@ -580,13 +583,21 @@ describe('createHttpServer', () => {
   });
 });
 
-function recordingBinaryHandler(maxBodyBytes: number, seen: BinaryRouteHandlerContext[]): BinaryRouteHandler {
+interface SeenBinaryCall {
+  readonly parameters: Readonly<Record<string, string>>;
+  readonly body: BinaryRequestBody;
+}
+
+function recordingBinaryHandler(maxBodyBytes: number, seen: SeenBinaryCall[]): BinaryRouteHandler {
   return {
     maxBodyBytes,
-    handle: (context) => {
-      seen.push(context);
-      return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
-    },
+    accept: (parameters) => ({
+      kind: 'ok',
+      value: (body) => {
+        seen.push({ parameters, body });
+        return Promise.resolve({ kind: 'ok', value: { status: 200, body: { received: true } } });
+      },
+    }),
   };
 }
 
@@ -602,7 +613,7 @@ describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', (
   });
 
   it('a korlátig érkező bináris törzset JSON értelmezés nélkül, az útvonal paraméterrel adja a kezelőnek', async () => {
-    const seen: BinaryRouteHandlerContext[] = [];
+    const seen: SeenBinaryCall[] = [];
     const { baseUrl, close } = await startTestServer(
       buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
     );
@@ -621,7 +632,7 @@ describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', (
   });
 
   it('a kezelő korlátját túllépő törzsből csak a túllépés ténye jut el a kezelőhöz', async () => {
-    const seen: BinaryRouteHandlerContext[] = [];
+    const seen: SeenBinaryCall[] = [];
     const { baseUrl, close } = await startTestServer(
       buildOptions({ uploadSkill: recordingBinaryHandler(4, seen) }, undefined),
     );
@@ -636,7 +647,7 @@ describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', (
     const message = 'A csomag túl nagy (skill_archive_too_large).';
     const failing: BinaryRouteHandler = {
       maxBodyBytes: 1,
-      handle: () => Promise.resolve({ kind: 'error', message }),
+      accept: () => ({ kind: 'ok', value: () => Promise.resolve({ kind: 'error', message }) }),
     };
     const { baseUrl, close } = await startTestServer(buildOptions({ uploadSkill: failing }, undefined));
     closeServer = close;
@@ -649,6 +660,18 @@ describe('createHttpServer: nyers ZIP törzsű végpont (SPEC-009 5.1, O-36)', (
       message,
       errorClass: 'skill_archive_too_large',
     });
+  });
+
+  it('a paraméterek elutasításakor a hibaválasz a törzs feldolgozása nélkül jön, a korlát fölötti törzsre is (ZIP 9. találat)', async () => {
+    const message = 'A(z) "Rossz" skill név nem felel meg a névszabálynak (skill_name_invalid).';
+    const rejecting: BinaryRouteHandler = { maxBodyBytes: 4, accept: () => ({ kind: 'error', message }) };
+    const { baseUrl, close } = await startTestServer(buildOptions({ uploadSkill: rejecting }, undefined));
+    closeServer = close;
+
+    const response = await fetch(`${baseUrl}/api/skills/Rossz`, { method: 'PUT', body: Buffer.alloc(1_000_000) });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toStrictEqual({ code: 'unprocessable', message, errorClass: 'skill_name_invalid' });
   });
 });
 

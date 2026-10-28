@@ -463,7 +463,13 @@ bejegyzést), megnevezett hibával, és semmi nem marad a skill könyvtárban.
    jogosultsággal hozza létre.
 9. **Atomi csere.** A kicsomagolás egy ideiglenes könyvtárba megy, az ellenőrzések után kerül a végleges
    helyre, felülíráskor a régi skill teljes cseréjével; hiba esetén a régi skill érintetlen, és nem marad
-   félig kicsomagolt könyvtár.
+   félig kicsomagolt könyvtár. A csere és a törlés névenként sorosan fut (folyamaton belüli zár a névre,
+   `skill-name-lock.ts`), mert két egyidejű csere ugyanarra a névre egymás félrerakott (`previous`)
+   könyvtárát mozgatta el (`ENOTEMPTY`, `ENOENT`, árva `.staging-*` könyvtár; PLAN-012 T-012-27). Az
+   ideiglenes és a félrerakott könyvtár minden kimenetel után törlődik, a folyamat leállása után maradt
+   `.staging-*` példányokat a szerver induláskor, a kapcsolatok fogadása előtt törli
+   (`remove-staging-leftovers.ts`). A `PUT` útvonal neve a törzs feldolgozása előtt dől el (a
+   `BinaryRouteHandler` `accept` lépése); a névhibára a törzset a szerver megtartás nélkül végigolvassa.
 10. **Törlés.** A skill törlése a skill könyvtárát teljesen eltávolítja; a név nem tartalmazhat útvonal
     elemet (a 5. pont szabálya miatt a törlő végpont sem léphet ki a gyökérből).
 
