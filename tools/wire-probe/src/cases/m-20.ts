@@ -9,6 +9,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { CaseContext, CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
 import { buildBaseOptions, executeQuery } from '../harness/runner.ts';
+import { MINIMAX_CLIENT_MODEL } from '../harness/minimax-model.ts';
 
 /**
 Legfeljebb ennyi kérést küldünk -- a feladatleírás szerinti kemény korlát.
@@ -329,7 +330,7 @@ export const M20: MeasurementCase = {
       // [1m] suffix, hogy a kliens oldali 200K-s feltételezett kontextusablak
       // ne akadályozza a nagy prompt tényleges kiküldését (Q9 mérés szerint a
       // suffix nem jelenik meg a dróton, csak a kliens oldali tervezést hatja).
-      model: 'MiniMax-M3[1m]',
+      model: MINIMAX_CLIENT_MODEL,
       env: { ...base.env, CLAUDE_CODE_MAX_OUTPUT_TOKENS: MINIMAL_MAX_OUTPUT_TOKENS },
     };
 

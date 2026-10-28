@@ -9,6 +9,8 @@ import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-a
 import { redactKnownSecrets } from '../proxy/mask.ts';
 import type { CaseContext, CaseRunOutcome } from './types.ts';
 import { MINIMAX_KEY_NAMES } from './minimax-key-names.ts';
+import { MINIMAX_WIRE_MODEL } from './minimax-model.ts';
+import { EFFORT_LOWEST } from './sdk-constants.ts';
 
 const MINIMAX_KEY_NAME_SET: ReadonlySet<string> = new Set(MINIMAX_KEY_NAMES);
 
@@ -149,11 +151,12 @@ export async function executeQuery(parameters: ExecuteQueryParameters): Promise<
 }
 
 /**
-A SPEC-000 4. szekció "Közös alapbeállítása", a ctx-ből feltöltve.
-*/
-export function buildBaseOptions(context: CaseContext): Options {
+ * A SPEC-000 4. szekció "Közös alapbeállítása", a ctx-ből feltöltve, `effort` nélkül. Csak az az
+ * eset használja közvetlenül, aminek a tárgya az effort beállítás hiánya (M-26).
+ */
+export function buildBaseOptionsWithoutEffort(context: CaseContext): Options {
   return {
-    model: 'MiniMax-M3',
+    model: MINIMAX_WIRE_MODEL,
     systemPrompt: { type: 'preset', preset: 'claude_code' },
     maxTurns: 1,
     includePartialMessages: true,
@@ -165,6 +168,15 @@ export function buildBaseOptions(context: CaseContext): Options {
       ANTHROPIC_AUTH_TOKEN: context.minimaxApiKey,
     },
   };
+}
+
+/**
+ * A közös alapbeállítás a legalacsonyabb efforttal: a Flash effort nélkül a legmagasabb szinten
+ * gondolkodik (docs/research/2026-10-27-flash-es-haiku.md 2. szekció), a mérés tárgya viszont nem a
+ * kimenet hossza (user korlát 2026-10-28, docs/research/2026-10-28-flash-meresek.md 1. szekció).
+ */
+export function buildBaseOptions(context: CaseContext): Options {
+  return { ...buildBaseOptionsWithoutEffort(context), effort: EFFORT_LOWEST };
 }
 
 /**

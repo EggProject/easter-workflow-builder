@@ -9,6 +9,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { CaseRunOutcome, MeasurementCase } from '../harness/types.ts';
+import { MINIMAX_WIRE_MODEL } from '../harness/minimax-model.ts';
 
 interface DirectCallResult {
   readonly status: number;
@@ -32,6 +33,13 @@ async function callMessages(
   return { status: response.status, bodyText };
 }
 
+/**
+ * A Flash mindig gondolkodik (docs/research/2026-10-27-flash-es-haiku.md 2. szekció): egy 16 tokenes
+ * keretet a gondolkodás teljesen elfogyaszt, és a válaszban sosem jelenik meg tool_use blokk
+ * (docs/research/2026-10-28-flash-meresek.md 3. szekció, M-34). A keret ezért nagyobb.
+ */
+const MAX_TOKENS = 512;
+
 const NOOP_TOOL = {
   name: 'noop',
   description: 'Nem csinál semmit, csak a tool_choice kikényszerítéshez kell.',
@@ -47,8 +55,8 @@ export const M34: MeasurementCase = {
     mkdirSync(caseDirectory, { recursive: true });
 
     const anyResult = await callMessages(context, {
-      model: 'MiniMax-M3',
-      max_tokens: 16,
+      model: MINIMAX_WIRE_MODEL,
+      max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: 'Mondj egy szót.' }],
       tools: [NOOP_TOOL],
       tool_choice: { type: 'any' },
@@ -56,8 +64,8 @@ export const M34: MeasurementCase = {
     writeFileSync(path.join(caseDirectory, 'a-tool-choice-any.json'), JSON.stringify(anyResult, undefined, 2), 'utf8');
 
     const toolResult = await callMessages(context, {
-      model: 'MiniMax-M3',
-      max_tokens: 16,
+      model: MINIMAX_WIRE_MODEL,
+      max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: 'Mondj egy szót.' }],
       tools: [NOOP_TOOL],
       tool_choice: { type: 'tool', name: 'noop' },
