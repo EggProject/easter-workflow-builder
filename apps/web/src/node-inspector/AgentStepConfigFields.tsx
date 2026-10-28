@@ -7,6 +7,8 @@ import {
 import { Accordion, AccordionItem, SelectField, TextAreaField, TextField } from '@easter-workflow-builder/ui';
 import { useContext, type ChangeEvent, type ReactElement } from 'react';
 import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
+import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
+import { McpServerReferencesField } from './McpServerReferencesField.tsx';
 import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
@@ -19,8 +21,6 @@ import { fromTextFieldValue, toTextFieldValue } from './nullable-text-field-valu
 import { fromStringListFieldValue, toStringListFieldValue } from './string-list-field-value.ts';
 import { useFieldError } from './use-field-error.ts';
 import './node-inspector.css';
-
-const SPEC_009_SCOPE_REASON = 'a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható';
 
 export interface AgentStepConfigFieldsProperties {
   readonly config: AgentStepConfig;
@@ -46,8 +46,10 @@ export interface AgentStepConfigFieldsProperties {
 /**
  * Az `AgentStepConfig` teljes szerkesztő felülete: az `agent_step` node és a
  * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` mező a
- * `SkillsField` vezérlőjén szerkeszthető (SPEC-009 5.2, AC15); az `mcpServers`
- * mező olvasható, nem szerkeszthető - a panel ezt ki is mondja (AC16). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
+ * `SkillsField` vezérlőjén szerkeszthető (SPEC-009 5.2, AC15); az MCP
+ * hivatkozás (`mcpServerReferences`) a `McpServerReferencesField` vezérlőjén
+ * (SPEC-009 6.2, AC16), a régi `mcpServers` mező olvasható, a régi alakot
+ * megnevező szöveggel (AC26). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
  * szerkesztőjén megy.
  *
  * CSOPORTOSÍTÁS (SPEC-008 5.2, felhasználói kérés 2026-09-09). Ez az
@@ -70,8 +72,9 @@ export interface AgentStepConfigFieldsProperties {
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
  * - "Skillek" panel: a módválasztó és a könyvtár skilljeinek jelölőnégyzetei,
  *   alapesetben "nincs beállítva", tehát nem tartozik elöl.
- * - "MCP szerverek (csak olvasható)" panel: itt semmit nem lehet
- *   szerkeszteni (SPEC-009 hatóköre), tehát a legkevésbé sem tartozik elöl.
+ * - "MCP szerverek" panel: a központi listából választott szerverek és a
+ *   hozzárendelés felülírása, alatta a régi `mcpServers` mező csak
+ *   olvashatóan; alapesetben üres, tehát nem tartozik elöl.
  */
 export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFieldsProperties>): ReactElement {
   const { config, onChange, inheritedProviderDescription, fieldPathPrefix } = properties;
@@ -289,12 +292,18 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           />
         </AccordionItem>
 
-        <AccordionItem title="MCP szerverek (csak olvasható)">
+        <AccordionItem title="MCP szerverek">
+          <McpServerReferencesField
+            value={config.mcpServerReferences}
+            onChange={(nextValue) => {
+              setField('mcpServerReferences', nextValue);
+            }}
+          />
           <div className="node-inspector__group">
             <div className="field">
-              <span className="field__label">MCP szerverek</span>
+              <span className="field__label">Régi mcpServers mező</span>
               <p>{describeUnknownValue(config.mcpServers)}</p>
-              <p className="node-inspector__reason">{SPEC_009_SCOPE_REASON}</p>
+              <p className="node-inspector__reason">{LEGACY_MCP_SERVERS_REASON}</p>
             </div>
           </div>
         </AccordionItem>

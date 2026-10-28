@@ -134,6 +134,8 @@ async function openEditor(
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('listSkills', listSkills),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
     mockRoute('replaceWorkflowGraph', async (route) => {
       const body: unknown = route.request().postDataJSON();
       putBodies.push(body);

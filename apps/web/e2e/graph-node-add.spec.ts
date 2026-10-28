@@ -77,6 +77,8 @@ test.beforeEach(async ({ page }) => {
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
   ]);
   await page.setViewportSize({ width: 1440, height: 900 });
 });
@@ -87,7 +89,7 @@ test('a "Hozzáadás" gomb menüje kilenc típust ad, és mindegyik felvett csom
   const apiRequests = recordApiRequests(page);
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId('rf__node-n1')).toBeVisible();
-  await expect.poll(() => apiRequests.length).toBe(5);
+  await expect.poll(() => apiRequests.length).toBe(7);
 
   const menuTrigger = page.getByRole('button', { name: 'Hozzáadás', exact: true });
   const menu = page.getByRole('menu', { name: 'Hozzáadás' });
@@ -104,7 +106,7 @@ test('a "Hozzáadás" gomb menüje kilenc típust ad, és mindegyik felvett csom
   }
 
   await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
-  expect(apiRequests).toHaveLength(5);
+  expect(apiRequests).toHaveLength(7);
 });
 
 test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, és a választott csomópont kiválasztva, nyitott panellel kerül fel, kérés nélkül', async ({
@@ -113,7 +115,7 @@ test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, é
   const apiRequests = recordApiRequests(page);
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId('rf__node-n1')).toBeVisible();
-  await expect.poll(() => apiRequests.length).toBe(5);
+  await expect.poll(() => apiRequests.length).toBe(7);
 
   const wrapperBox = await page.getByTestId('rf__wrapper').boundingBox();
   if (wrapperBox === null) {
@@ -129,7 +131,7 @@ test('a vászon üres területén jobb klikkre a "Hozzáadás" menü nyílik, é
   await expect(menu).toBeHidden();
   await expect(page.getByRole('complementary', { name: 'Elágazás beállításai' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Mentetlen változtatások' })).toBeVisible();
-  expect(apiRequests).toHaveLength(5);
+  expect(apiRequests).toHaveLength(7);
 });
 
 // A "Hozzáadás" a lábléc akciósávjában, közvetlenül a "Mentés" split button

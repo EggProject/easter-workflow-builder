@@ -246,6 +246,8 @@ test.beforeEach(async ({ page }) => {
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
     mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listMcpServerDefinitions', async (route) => route.fulfill(jsonBody([]))),
+    mockRoute('listServerEnvironmentNames', async (route) => route.fulfill(jsonBody([]))),
   ]);
   await page.goto(EDITOR_URL);
   await expect(nodeLocator(page, 'n-start')).toBeVisible();
@@ -367,7 +369,7 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
       'Eszközök és környezet',
       'Al-agentek (agents)',
       'Skillek',
-      'MCP szerverek (csak olvasható)',
+      'MCP szerverek',
     ]) {
       await expect(panel.getByRole('button', { name: title, exact: true })).toHaveAttribute('aria-expanded', 'false');
     }
@@ -833,14 +835,12 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
   });
 });
 
-test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mező', () => {
-  test('az MCP szerverek mező olvashatóan, ok megnevezéssel jelenik meg', async ({ page }) => {
+test.describe('agent_step node: a régi `mcpServers` mező csak olvasható', () => {
+  test('a régi mező olvashatóan, a régi alakot megnevező szöveggel jelenik meg (SPEC-009 AC26)', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    const group = await openAccordion(panel, 'MCP szerverek (csak olvasható)');
+    const group = await openAccordion(panel, 'MCP szerverek');
     await expect(group.getByText('{}', { exact: true })).toBeVisible();
-    await expect(
-      group.getByText('a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható'),
-    ).toHaveCount(1);
+    await expect(group.getByText('a régi, lépésenkénti alak', { exact: false })).toHaveCount(1);
   });
 });
 
@@ -889,7 +889,7 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await expect(kutatoSkills.getByRole('combobox', { name: 'Skillek használata' })).toHaveText(
       'minden feltöltött skill',
     );
-    const kutatoReadOnly = await openAccordion(kutatoGroup, 'MCP szerverek (csak olvasható)');
+    const kutatoReadOnly = await openAccordion(kutatoGroup, 'MCP szerverek');
     await expect(
       kutatoReadOnly.getByText(
         'nem megerősített mező: csak a telepített .d.ts fájlban szerepel, hivatalos dokumentáció nem fedi (M-90)',

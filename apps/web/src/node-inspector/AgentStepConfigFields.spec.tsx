@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentStepConfigFields } from './AgentStepConfigFields.tsx';
 import type { ProviderConnectionTester } from '../provider-select/provider-connection-tester.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
+import { McpServerLibraryContext } from './mcp-server-library-context.ts';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 
 function typeInto(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
@@ -98,6 +99,10 @@ const BASE_CONFIG: AgentStepConfig = {
   sandbox: null,
   sessionMode: 'isolated',
   structuredOutput: null,
+};
+
+const LEGACY_MCP_SERVERS: AgentStepConfig['mcpServers'] = {
+  regi: { type: 'stdio', command: 'regi-parancs', args: [], envNames: [] },
 };
 
 describe('AgentStepConfigFields', () => {
@@ -352,10 +357,49 @@ describe('AgentStepConfigFields', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...BASE_CONFIG, skills: 'all' });
   });
 
-  it('az `mcpServers` mező olvasható, megnevezi a SPEC-009 okot', () => {
+  it('a régi `mcpServers` mező olvasható, és a régi alakot nevezi meg', () => {
     render({ ...BASE_CONFIG, mcpServers: {} }, vi.fn());
+    expect(container.textContent).toContain('Régi mcpServers mező');
     expect(container.textContent).toContain('{}');
-    expect(container.textContent).toContain('SPEC-009');
+    expect(container.textContent).toContain('a régi, lépésenkénti alak');
+    expect(container.textContent).not.toContain('SPEC-009');
+  });
+
+  it('az MCP hivatkozás a központi listából választ, és a teljes konfigot frissíti, a régi `mcpServers` változatlanul', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <McpServerLibraryContext.Provider
+          value={{
+            servers: {
+              status: 'success',
+              value: [
+                {
+                  name: 'github',
+                  definition: { type: 'stdio', command: 'npx', args: [], envNames: [], envBindings: {} },
+                },
+              ],
+            },
+            environmentNames: { status: 'success', value: [] },
+          }}
+        >
+          <AgentStepConfigFields
+            fieldPathPrefix=""
+            config={{ ...BASE_CONFIG, mcpServers: LEGACY_MCP_SERVERS }}
+            onChange={onChange}
+            inheritedProviderDescription="nincs"
+          />
+        </McpServerLibraryContext.Provider>,
+      );
+    });
+    act(() => {
+      checkboxByLabel(container, 'github').click();
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...BASE_CONFIG,
+      mcpServers: LEGACY_MCP_SERVERS,
+      mcpServerReferences: { github: { envBindings: {}, authEnvName: null } },
+    });
   });
 
   it('az `agents` szerkesztő jelen van, és a szerkesztése a teljes konfigot frissíti', () => {

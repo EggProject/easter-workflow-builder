@@ -187,3 +187,13 @@
   gap: var(--ep-space-3);
   min-width: 0;
 }
+
+/* SAJÁT KIEGÉSZÍTÉS (SPEC-009 6.2): a beállítás panel MCP hivatkozás
+   mezőjében a bejelölt szerver felülírásai a jelölőnégyzet alatt, kis
+   behúzással állnak, doboz nélkül (card in card tilos). */
+.node-inspector__mcp-overrides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-2);
+  padding-left: var(--ep-space-6);
+}

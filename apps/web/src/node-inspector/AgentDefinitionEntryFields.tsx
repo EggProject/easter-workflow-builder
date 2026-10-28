@@ -8,6 +8,7 @@ import {
   type AgentDefinitionFieldDescriptor,
   type AgentDefinitionFieldGroup,
 } from './agent-definition-field-table.ts';
+import { McpServerReferencesField } from './McpServerReferencesField.tsx';
 import { SkillsField } from './SkillsField.tsx';
 import { describeUnknownValue } from './describe-unknown-value.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
@@ -23,14 +24,15 @@ import './node-inspector.css';
  * mind opcionális felülírás vagy csak olvasható érték - a `modell és
  * korlátok`, illetve az `eszközök`+`környezet` páros egy-egy panelt kap
  * (utóbbi kettő ugyanannak a futtatási környezetnek a két oldala), a
- * `skillek` csoport saját panelt kap, a `SPEC-009 hatókör` pedig a nem
- * megerősített mezőkkel együtt egyetlen, csak olvasható panelbe.
+ * `skillek` csoport saját panelt kap, az `MCP szerverek` csoport pedig az
+ * MCP hivatkozás vezérlőjével, a régi `mcpServers` olvasható mezőjével és a
+ * nem megerősített mezőkkel együtt egyetlen panelbe.
  */
 const ACCORDION_PANELS: readonly { readonly title: string; readonly groups: readonly AgentDefinitionFieldGroup[] }[] = [
   { title: 'Modell és korlátok', groups: ['modell és korlátok'] },
   { title: 'Eszközök és környezet', groups: ['eszközök', 'környezet'] },
   { title: 'Skillek', groups: ['skillek'] },
-  { title: 'MCP szerverek (csak olvasható)', groups: ['SPEC-009 hatókör'] },
+  { title: 'MCP szerverek', groups: ['MCP szerverek'] },
 ];
 
 export interface AgentDefinitionEntryFieldsProperties {
@@ -211,12 +213,20 @@ export function AgentDefinitionEntryFields(properties: Readonly<AgentDefinitionE
         {ACCORDION_PANELS.map((panel) => (
           <AccordionItem key={panel.title} title={panel.title}>
             <div className="node-inspector__group">
+              {panel.groups.includes('MCP szerverek') && (
+                <McpServerReferencesField
+                  value={record['mcpServerReferences']}
+                  onChange={(nextValue) => {
+                    setField('mcpServerReferences', nextValue);
+                  }}
+                />
+              )}
               {AGENT_DEFINITION_FIELD_TABLE.filter((field) => panel.groups.includes(field.group)).map((field) => (
                 <div key={field.key}>
                   {renderFieldControl(field, record, setField, fieldErrors.get(`${fieldPathPrefix}${field.key}`))}
                 </div>
               ))}
-              {panel.groups.includes('SPEC-009 hatókör') && (
+              {panel.groups.includes('MCP szerverek') && (
                 <>
                   <p className="node-inspector__reason">{UNCONFIRMED_AGENT_DEFINITION_FIELD_REASON}</p>
                   {UNCONFIRMED_AGENT_DEFINITION_FIELD_KEYS.map((key) => (

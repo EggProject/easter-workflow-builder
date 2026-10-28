@@ -14,14 +14,15 @@ describe('AGENT_DEFINITION_FIELD_TABLE', () => {
     expect(required).toStrictEqual(['description', 'prompt']);
   });
 
-  it('a `skills` sor a `skillek` csoport szerkeszthető vezérlője, az `mcpServers` sor olvasható és megnevezi az okot', () => {
+  it('a `skills` sor a `skillek` csoport szerkeszthető vezérlője, az `mcpServers` sor olvasható és a régi alakot nevezi meg', () => {
     const skills = AGENT_DEFINITION_FIELD_TABLE.find((field) => field.key === 'skills');
     const mcpServers = AGENT_DEFINITION_FIELD_TABLE.find((field) => field.key === 'mcpServers');
     expect(skills?.group).toBe('skillek');
     expect(skills?.control.kind).toBe('skills');
     expect(mcpServers?.control.kind).toBe('readonly');
     if (mcpServers?.control.kind === 'readonly') {
-      expect(mcpServers.control.reason).toContain('SPEC-009');
+      expect(mcpServers.control.reason).toContain('a régi, lépésenkénti alak');
+      expect(mcpServers.group).toBe('MCP szerverek');
     }
   });
 

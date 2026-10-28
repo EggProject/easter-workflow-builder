@@ -1,3 +1,5 @@
+import { LEGACY_MCP_SERVERS_REASON } from './legacy-mcp-servers-reason.ts';
+
 /**
  * Az `agents` mező egy bejegyzésének (`AgentDefinition`-szerű `unknown`
  * érték) szerkesztett mezőlistája - a `docs/research/
@@ -10,10 +12,12 @@
  *
  * A `skills` sor a `SkillsField` vezérlőn szerkeszthető, a lépés szintű
  * mezővel azonos tárolt alakkal (SPEC-009 5.2). Az `mcpServers` sor olvasható,
- * de nem szerkeszthető, mert a SPEC-009 hatóköre (MCP konfiguráció).
+ * a régi alakot megnevező szöveggel (SPEC-009 6.2, AC26); az MCP hivatkozás
+ * (`mcpServerReferences`) NEM sora a táblának, mert nem SDK mező, a bejegyzés
+ * panelje külön rajzolja a `McpServerReferencesField` vezérlőjével.
  */
 export type AgentDefinitionFieldGroup =
-  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'skillek' | 'SPEC-009 hatókör';
+  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'skillek' | 'MCP szerverek';
 
 export type AgentDefinitionFieldControl =
   | { readonly kind: 'text' }
@@ -32,8 +36,6 @@ export interface AgentDefinitionFieldDescriptor {
   readonly control: AgentDefinitionFieldControl;
   readonly required: boolean;
 }
-
-const SPEC_009_SCOPE_REASON = 'a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható';
 
 export const AGENT_DEFINITION_FIELD_TABLE = [
   { key: 'description', label: 'Leírás', group: 'kötelező', control: { kind: 'textarea' }, required: true },
@@ -99,8 +101,8 @@ export const AGENT_DEFINITION_FIELD_TABLE = [
   {
     key: 'mcpServers',
     label: 'MCP szerverek',
-    group: 'SPEC-009 hatókör',
-    control: { kind: 'readonly', reason: SPEC_009_SCOPE_REASON },
+    group: 'MCP szerverek',
+    control: { kind: 'readonly', reason: LEGACY_MCP_SERVERS_REASON },
     required: false,
   },
 ] as const satisfies readonly AgentDefinitionFieldDescriptor[];

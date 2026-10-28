@@ -33,8 +33,11 @@ import type { ClientRouteId } from '../client-route/client-route-table.ts';
 import { layoutGraph } from '../graph-auto-layout/layout-graph.ts';
 import { SCRIPT_UNIMPLEMENTED_ERROR_CLASS } from '../graph-node-card/script-unimplemented-error-class.ts';
 import type { UseClientRouteResult } from '../history-navigation/use-client-route.ts';
+import { useMcpServerLibrary } from '../mcp-server-config/use-mcp-server-library.ts';
+import { useServerEnvironmentNames } from '../mcp-server-config/use-server-environment-names.ts';
 import { NodeInspector } from '../node-inspector/NodeInspector.tsx';
 import { describeInheritedProvider } from '../node-inspector/describe-inherited-provider.ts';
+import { McpServerLibraryContext } from '../node-inspector/mcp-server-library-context.ts';
 import type { ProviderOptions } from '../node-inspector/provider-options.ts';
 import { ProviderOptionsContext } from '../node-inspector/provider-options-context.ts';
 import { SkillLibraryContext } from '../node-inspector/skill-library-context.ts';
@@ -379,6 +382,15 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
   // A skill könyvtár a `skills` mező listás módjának jelölőnégyzeteihez
   // (SPEC-009 5.2); a feltöltés és a törlés a Beállítások dolga.
   const { state: skillLibraryState } = useSkillLibrary(apiOrigin, fetchFunction);
+  // A központi MCP szerver lista és a szerver környezeti változóinak nevei az
+  // `mcpServerReferences` mezőhöz (SPEC-009 6.2); a szerkesztés a Beállítások
+  // dolga.
+  const { state: mcpServersState } = useMcpServerLibrary(apiOrigin, fetchFunction);
+  const environmentNamesState = useServerEnvironmentNames(apiOrigin, fetchFunction);
+  const mcpServerLibrary = useMemo(
+    () => ({ servers: mcpServersState, environmentNames: environmentNamesState }),
+    [mcpServersState, environmentNamesState],
+  );
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const isCompactFooter = useIsFooterCompact();
   const isSaving = saveState.state.status === 'pending';
@@ -795,19 +807,21 @@ function GraphEditorScreenContent(properties: Readonly<GraphEditorScreenProperti
                 <ResizablePanel index={1}>
                   <ProviderOptionsContext.Provider value={providerOptions}>
                     <SkillLibraryContext.Provider value={skillLibraryState}>
-                      <NodeInspector
-                        node={selectedNode}
-                        onChange={handleUpdateNode}
-                        onClose={() => {
-                          setSelectedNodeId(undefined);
-                        }}
-                        onDelete={() => {
-                          handleDeleteNode(selectedNode.id);
-                        }}
-                        onFieldBlur={handleFieldBlur}
-                        inheritedProviderDescription={inheritedProviderDescription}
-                        isSaveAttempted={isSaveAttempted}
-                      />
+                      <McpServerLibraryContext.Provider value={mcpServerLibrary}>
+                        <NodeInspector
+                          node={selectedNode}
+                          onChange={handleUpdateNode}
+                          onClose={() => {
+                            setSelectedNodeId(undefined);
+                          }}
+                          onDelete={() => {
+                            handleDeleteNode(selectedNode.id);
+                          }}
+                          onFieldBlur={handleFieldBlur}
+                          inheritedProviderDescription={inheritedProviderDescription}
+                          isSaveAttempted={isSaveAttempted}
+                        />
+                      </McpServerLibraryContext.Provider>
                     </SkillLibraryContext.Provider>
                   </ProviderOptionsContext.Provider>
                 </ResizablePanel>
