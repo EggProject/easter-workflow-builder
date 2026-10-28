@@ -76,9 +76,39 @@ export const M34: MeasurementCase = {
       'utf8',
     );
 
+    // A none eset olyan promptot kap, ami az eszköz hívását kéri: ha a none betartott, nincs tool_use blokk.
+    const noneResult = await callMessages(context, {
+      model: MINIMAX_WIRE_MODEL,
+      max_tokens: MAX_TOKENS,
+      messages: [{ role: 'user', content: 'Hívd meg a noop eszközt.' }],
+      tools: [NOOP_TOOL],
+      tool_choice: { type: 'none' },
+    });
+    writeFileSync(
+      path.join(caseDirectory, 'c-tool-choice-none.json'),
+      JSON.stringify(noneResult, undefined, 2),
+      'utf8',
+    );
+
+    // Kontroll az any esethez: ugyanaz a kérés auto választással, hogy a modell saját döntése elválasztható legyen.
+    const autoResult = await callMessages(context, {
+      model: MINIMAX_WIRE_MODEL,
+      max_tokens: MAX_TOKENS,
+      messages: [{ role: 'user', content: 'Mondj egy szót.' }],
+      tools: [NOOP_TOOL],
+      tool_choice: { type: 'auto' },
+    });
+    writeFileSync(
+      path.join(caseDirectory, 'd-tool-choice-auto.json'),
+      JSON.stringify(autoResult, undefined, 2),
+      'utf8',
+    );
+
     const outcomes: CaseRunOutcome[] = [
       { runId: 'a-tool-choice-any', ok: true, note: `HTTP ${String(anyResult.status)}` },
       { runId: 'b-tool-choice-tool', ok: true, note: `HTTP ${String(toolResult.status)}` },
+      { runId: 'c-tool-choice-none', ok: true, note: `HTTP ${String(noneResult.status)}` },
+      { runId: 'd-tool-choice-auto', ok: true, note: `HTTP ${String(autoResult.status)}` },
     ];
     return outcomes;
   },

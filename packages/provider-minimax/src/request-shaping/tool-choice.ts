@@ -4,7 +4,7 @@ export const minimaxToolChoice: ToolChoiceCapability = {
   accepted: {
     state: 'unknown',
     reason:
-      'Egyetlen közvetlen hívásból a kényszerített any érték betartása nem választható el a modell saját döntésétől, a none érték nem mért.',
+      'Az M-34-flash két any mintája ellentmond (tool_use, majd szöveg), a none egy mintája auto kontroll nélkül nem választható el a modell saját döntésétől.',
     blockedBy: ['M-34'],
   },
   // A tool típusú kényszerítést a Flash 200 válasszal, tool_use blokk nélkül csendben eldobja.

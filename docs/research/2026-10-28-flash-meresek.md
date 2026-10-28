@@ -23,6 +23,8 @@ szekciója.
 - **A user korábbi korlátja:** "ugy hajtsd meg a minimax api-t hogy nincs vegtelen tokenem!". Ezért minden
   eset egyszer futott, a közös alapbeállítás `effort: 'low'` (a harness `buildBaseOptions` függvénye), a
   prompt a SPEC-000 rövid alapkérdése, és a nagy token igényű esetek nem futottak (5. szekció).
+- **Második engedély (2026-10-28):** a `toolChoice.accepted` lezárására egy `any` és egy `none` eset ("Igen,
+  futhatnak", alacsony tokennel); eredménye a 3. szekció M-34-flash pontjában.
 - **Újrapróbálkozás** csak egyértelmű saját hibánál történt (3. szekció M-01 és M-34).
 
 ---
@@ -46,7 +48,7 @@ A futtatott esetek a leíró azon mezőit célozzák, amiket a motor olvas (`str
 | M-17  | igen | `serverTools`, `toolChoice.sdkSendsForcedChoice`                                                 |                                                                                                |
 | M-23  | igen | `models[0].imageInput`                                                                           |                                                                                                |
 | M-26  | igen | `structuredOutput.outputConfigAlwaysSent` (effort nélkül), a kliens alap effortja                |                                                                                                |
-| M-34  | igen | `toolChoice.rejectionBehaviour`                                                                  |                                                                                                |
+| M-34  | igen | `toolChoice.rejectionBehaviour`, `toolChoice.accepted` (második kör)                             |                                                                                                |
 | M-35  | igen | `modelsEndpoint.directHttpReachable`, `listedModelCount`, `models[0].listedByModelsEndpoint`     |                                                                                                |
 | M-36  | igen | passzív leltár a kör artefaktumain (`calledBySdk`, rate limit headerek)                          |                                                                                                |
 | többi | nem  |                                                                                                  | 5. szekció, becsült token igénnyel                                                             |
@@ -142,12 +144,29 @@ az előtagon belül a második kérés bemenete túlnyomórészt `cache_read_inp
 - **Első kísérlet, saját hiba:** `max_tokens: 16` mellett mindkét válasz (HTTP 200) csak `thinking` blokkot
   tartalmazott, `stop_reason: max_tokens`, mert a Flash mindig gondolkodik; a kérdés így nem dőlt el. A keret 512
   lett (`tools/wire-probe/src/cases/m-34.ts`).
-- (a) `tool_choice: {"type":"any"}`: HTTP 200, a válasz egy `noop` `tool_use` blokk, `stop_reason: tool_use`.
-- (b) `tool_choice: {"type":"tool","name":"noop"}`: HTTP 200, a válasz szöveg, `tool_use` blokk nélkül,
-  `stop_reason: end_turn`. A kényszerítést a szolgáltatás nem utasította el és nem is tartotta be: csendben
-  eldobta.
-- Egy mintából az (a) betartása nem választható el attól, hogy a modell `auto` mellett is az eszközt választotta
-  volna; a `none` érték nem mért. A `toolChoice.accepted` ezért `unknown` marad.
+- **Első kör (512 tokenes keret).** (a) `tool_choice: {"type":"any"}`: HTTP 200, a válasz egy `noop` `tool_use`
+  blokk, `stop_reason: tool_use`. (b) `tool_choice: {"type":"tool","name":"noop"}`: HTTP 200, a válasz szöveg,
+  `tool_use` blokk nélkül, `stop_reason: end_turn`. A kényszerítést a szolgáltatás nem utasította el és nem is
+  tartotta be: csendben eldobta.
+- **Második kör (user engedély 2026-10-28, ugyanaz a keret, ugyanaz az `any` kérés, egy futás).** A `m-34.ts` két
+  új kérést kapott: (c) `tool_choice: {"type":"none"}` az eszköz hívását kérő prompttal (`Hívd meg a noop eszközt.`),
+  és (d) `tool_choice: {"type":"auto"}` kontrollként az (a) promptjával (`Mondj egy szót.`), hogy a modell saját
+  döntése elválasztható legyen. Mind a négy kérés HTTP 200; a (b) is újra futott.
+
+  | Kérés                 | `stop_reason` | Tartalom blokkok                                                    | Be/ki token |
+  | --------------------- | ------------- | ------------------------------------------------------------------- | ----------- |
+  | (a) `any`             | `end_turn`    | `thinking`, `text` ("Alma."), **nincs `tool_use`**                  | 433 / 70    |
+  | (b) `tool`            | `end_turn`    | `thinking`, `text` ("Béke."), nincs `tool_use`                      | 177 / 279   |
+  | (c) `none`            | `end_turn`    | `thinking`, `text` (a `noop` eszköz nem elérhető, nincs `tool_use`) | 214 / 482   |
+  | (d) `auto` (kontroll) | `end_turn`    | `thinking`, `text` ("Fény."), nincs `tool_use`                      | 177 / 147   |
+
+- **Értékelés.** Az `any` kérés ugyanazzal a törzzsel az első körben `tool_use` blokkot adott, a másodikban
+  szöveget: a kikényszerítés tehát nem determinisztikus, a második minta szerint nem betartott (a `tool` értékkel
+  együtt: a `rejectionBehaviour` `silently_dropped` állítást a (b) második mintája is erősíti). A `none` kérésben
+  nincs `tool_use`, de a prompt kifejezetten az eszközt kérte és a modell azt írta, hogy az eszköz nem elérhető; erre
+  az ágra nincs `auto` kontroll (ugyanazzal a prompttal), tehát egy mintából a betartás nem választható el a modell
+  saját döntésétől. A `toolChoice.accepted` ezért `unknown` marad, a `reason` mező a fentieket rögzíti. További
+  futás nem volt (user korlát).
 
 ### M-35-flash `GET /v1/models` közvetlen HTTP hívással
 
@@ -203,7 +222,8 @@ korlátja 3 (`insufficient_max_turns` alatta). Védelem: `apps/server/src/minima
 
 - `thinking.interleavedSignatureRequired`: a stream `signature_delta` eseményt ad, de hogy a thinking blokkot
   signature-rel vissza kell-e küldeni, egyik futásból sem dönthető el (blokkoló: M-05, kiterjesztett alakban).
-- `toolChoice.accepted`: 3. szekció M-34-flash (blokkoló: M-34).
+- `toolChoice.accepted`: 3. szekció M-34-flash, két kör: az `any` két mintája ellentmond, a `none` egy mintája kontroll
+  nélkül nem dönt (blokkoló: M-34).
 
 **Nem futott, változatlanul `unknown`:** `effectiveContextWindowOnWire` (M-20), `maxOutputTokensWireCeiling`
 (M-22), `videoInput` (SDK típusfelület), `structuredOutput.defaultStrategy` (M-19), a `promptCaching` minden
@@ -213,6 +233,9 @@ nélkül; RPM és TPM: nincs mérési eset), a `concurrency` mért mezői (M-31,
 ---
 
 ## 5. Nem futtatott esetek, becsült token igénnyel
+
+**Döntés (koordinátor, a user korlátja alapján):** ezek az esetek nem futnak: "ugy hajtsd meg a minimax api-t hogy
+nincs vegtelen tokenem" (user). A hozzájuk tartozó mezők `unknown` maradnak, a költség alább becsült, nem mért.
 
 A becslés a 3. szekció mért kérés méretéből (fő kérés körülbelül 74 000 bemenő token, a második kérés ugyanazon
 előtagon túlnyomórészt cache olvasás) és az eset SPEC-000 leírásából számolt nagyságrend, **nem mért** érték.
@@ -238,13 +261,17 @@ nem zárhatók le, ehhez a Flash-re vonatkozó forrás kell.
 ## 6. Token felhasználás és titok keresés
 
 **Felhasználás (a `usage` mezőkből, a 9 lekérdezéses eset fő és háttér kéréseivel):** 749 524 nem cache-elt
-bemenő token, 375 854 cache olvasott bemenő token, 2 420 kimenő token. A két M-34 kísérlet közvetlen hívásai
-ehhez kérésenként néhány száz tokent adnak. Az M-12 és az M-35 nem küldött Messages kérést.
+bemenő token, 375 854 cache olvasott bemenő token, 2 420 kimenő token. Az első kör két M-34 kísérletének
+közvetlen hívásai ehhez kérésenként néhány száz tokent adnak. Az M-12 és az M-35 nem küldött Messages kérést.
+
+**A második M-34 kör (3. szekció):** négy közvetlen hívás, összesen 1 001 bemenő és 978 kimenő token, cache nélkül
+(a 3. szekció táblája a kérésenkénti számokkal). A teljes új felhasználás tehát kb. ezer bemenő és ezer kimenő token.
 
 **Titok keresés a futás után** (a kulcs értékét a `node --env-file` töltötte be, a keresés csak darabszámot
 írt ki, pozitív kontrollal igazolva, hogy a módszer egy beírt értéket megtalál): az artefaktumokban 0 fájl, a
 worktree-ben (`node_modules` és `.git` nélkül) 0 fájl, a proxy naplójában 0 sor, a git történetben a `main`-hez
-képest 0 commit.
+képest 0 commit. A keresés a második M-34 kör után, a commit után is lefutott, ugyanezekkel a számokkal (0, 0, 0,
+0; a pozitív kontroll 1).
 
 ---
 
@@ -254,16 +281,21 @@ képest 0 commit.
   `MiniMax-M3.1-Flash[1m]`), minden eset ezt használja (SPEC-013 O-2: a mérő eszköz most áll át).
 - A közös alapbeállítás `effort: 'low'` (`buildBaseOptions`); az effort hiányát mérő M-26 a
   `buildBaseOptionsWithoutEffort` függvényt használja.
-- Az M-34 közvetlen hívásainak `max_tokens` kerete 512 (3. szekció M-34-flash).
+- Az M-34 közvetlen hívásainak `max_tokens` kerete 512 (3. szekció M-34-flash); a második körben két új kérést
+  kapott: `none` (az eszköz hívását kérő prompttal) és `auto` kontroll.
 
 ---
 
-## 8. Nyitott kérdések a usernek
+## 8. A user kérdései és a döntések
 
-1. **A `disabled` thinking elutasítása.** A motor egy `disabled` beállítású Flash lépést a dokumentáció alapján
-   `thinking_mode_unsupported` hibával elutasít, a mérés szerint viszont a kliens ilyenkor a mezőt el sem küldi,
-   a hívás sikeres, és a modell a saját alapértéke szerint fut (M-06-flash). Maradjon az elutasítás, vagy
-   engedjük a `disabled` értéket azzal, hogy a Flash ettől még gondolkodik?
-2. **A `toolChoice.accepted` lezárása.** Egy olcsó, ismételt M-34 (hívásonként néhány száz token) és egy `none`
-   eset eldöntené. Futhat?
-3. **A nem futott esetek** (5. szekció) közül fusson-e valamelyik.
+1. **A `disabled` thinking elutasítása: marad.** A user soha nem kapcsolja ki a thinkinget ("soha nem kapcsoljuk
+   ki", 2026-10-27). A motor viselkedése változatlan: egy `disabled` beállítású Flash lépést a futás indításakor
+   `thinking_mode_unsupported` hibával elutasít. Az M-06-flash megfigyelése (a kliens ilyenkor a mezőt el sem
+   küldi) a döntést nem érinti, a leíró `byModelFamily` értéke `['adaptive']` marad.
+2. **A `toolChoice.accepted` lezárása: futott, nem döntött.** A 3. szekció M-34-flash második köre után a mező
+   `unknown` marad (az `any` két mintája ellentmond, a `none` kontroll nélkül nem dönt); a user korlátja miatt
+   további futás nincs.
+3. **A nem futott esetek (5. szekció): nem futnak** a user token korlátja miatt, a mezőik `unknown` maradnak, a
+   becsült költség az 5. szekcióban áll.
+4. **Az `M-xx-flash` bizonyíték azonosító konvenció elfogadva** (az eredeti eset száma plusz `-flash`, horgony:
+   ennek a fájlnak a 3. szekciója, `measurement-document.ts`).
