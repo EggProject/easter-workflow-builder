@@ -22,6 +22,14 @@ describe('parseAgentDefinition', () => {
     });
   });
 
+  it('a név alakú authEnvName felülírás átmegy', () => {
+    const reference = { envBindings: {}, authEnvName: 'AUTH_CEG' };
+
+    expect(parseAgentDefinition({ mcpServerReferences: { remote: reference } })?.mcpServerReferences).toStrictEqual({
+      remote: reference,
+    });
+  });
+
   it("a hiányzó skills kulcs null, a hiányzó hivatkozás mező üres rekord, az 'all' és a null megmarad", () => {
     expect(parseAgentDefinition({ description: 'd', prompt: 'p' })).toStrictEqual({
       rest: { description: 'd', prompt: 'p' },
@@ -41,6 +49,11 @@ describe('parseAgentDefinition', () => {
     ['nem rekord hivatkozás mező', { mcpServerReferences: ['github'] }],
     ['hibás alakú hivatkozás', { mcpServerReferences: { github: { envBindings: {} } } }],
     ['nem lista régi mcpServers', { mcpServers: { regi: {} } }],
+    [
+      'nem név alakú envBindings érték (T-012-27)',
+      { mcpServerReferences: { github: { envBindings: { TOKEN: 'ghp-titok' }, authEnvName: null } } },
+    ],
+    ['nem név alakú authEnvName (T-012-27)', { mcpServerReferences: { github: { envBindings: {}, authEnvName: '' } } }],
   ])('érvénytelen alakra undefined: %s', (_name, value) => {
     expect(parseAgentDefinition(value)).toBeUndefined();
   });

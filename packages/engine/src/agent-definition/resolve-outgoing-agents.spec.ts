@@ -127,6 +127,24 @@ describe('resolveOutgoingAgents', () => {
     });
   });
 
+  it('a nem név alakú szerver oldali név malformed_node_config, és az érték nem jelenik meg az üzenetben (T-012-27)', () => {
+    const outcome = resolveOutgoingAgents(
+      'a1',
+      {
+        segito: { mcpServerReferences: { github: { envBindings: { GITHUB_TOKEN: 'ghp-titok' }, authEnvName: null } } },
+      },
+      LIBRARY,
+      [],
+      environmentOf({}),
+    );
+
+    expect(outcome).toStrictEqual({
+      kind: 'error',
+      errorKind: 'malformed_node_config',
+      message: 'A(z) a1 csomópont "segito" agent definíciója érvénytelen alakú (malformed_node_config).',
+    });
+  });
+
   it('a feloldás hibáját az agent definíció alanyával adja tovább', () => {
     expect(
       resolveOutgoingAgents(

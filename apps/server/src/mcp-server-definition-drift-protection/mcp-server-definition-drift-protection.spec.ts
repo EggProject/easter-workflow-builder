@@ -55,6 +55,10 @@ const SHAPE_ERROR_DEFINITIONS: readonly unknown[] = [
   { type: 'stdio', command: 'node', args: [], envNames: [] },
   { type: 'sse', url: 'https://x.test/sse', authEnvName: null, headers: { Authorization: 'titok' } },
   { type: 'http', url: 1, authEnvName: null },
+  { type: 'stdio', command: 'node', args: [], envNames: ['A'], envBindings: { A: 1 } },
+  { type: 'stdio', command: 'node', args: [1], envNames: [], envBindings: {} },
+  { type: 'sse', url: 'https://x.test/sse', authEnvName: 7 },
+  { type: 'http', url: 'https://x.test/mcp', authEnvName: { name: 'A' } },
 ];
 
 describe('a protokoll és a db futásidőben is ugyanúgy dönt', () => {

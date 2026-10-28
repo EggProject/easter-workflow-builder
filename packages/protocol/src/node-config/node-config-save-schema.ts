@@ -1,6 +1,7 @@
 import { isRecord, isString } from '@easter-workflow-builder/typeguards';
 import { BLANK_FIELD_MESSAGE } from './blank-field-message.ts';
 import { findBlankTextFields } from './find-blank-text-fields.ts';
+import { findInvalidMcpServerReferenceEnvironmentNames } from './find-invalid-mcp-server-reference-environment-names.ts';
 import { findNonPositiveIntegerFields } from './find-non-positive-integer-fields.ts';
 import { NodeConfigSchema, type NodeConfig } from './node-config.ts';
 import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
@@ -11,6 +12,30 @@ import { REQUIRED_TEXT_FIELD_PATHS } from './required-text-field-paths.ts';
  * 6. szekció).
  */
 const NOT_POSITIVE_INTEGER_MESSAGE = 'A mező értéke nem pozitív egész szám.';
+
+/**
+ * A szerver oldali env változó név hibaüzenete (SPEC-009 6.1, T-012-27), a
+ * Beállítások MCP űrlapjának mondatával egyezően.
+ */
+const INVALID_ENV_NAME_MESSAGE =
+  'A változó név betűvel vagy aláhúzással kezdődik, és csak betűt, számot és aláhúzást tartalmaz.';
+
+/**
+ * A lépés alakú konfig a node-on belül (az `mcpServerReferences` helye): az
+ * `agent_step` maga, a `join` `ai_synthesis` módja a `settings` mezőben
+ * (SPEC-004 5. szekció). Más típusnak nincs MCP hivatkozása.
+ */
+function agentStepPathOf(
+  config: NodeConfig,
+): { readonly prefix: readonly string[]; readonly value: unknown } | undefined {
+  if (config.type === 'agent_step') {
+    return { prefix: [], value: config };
+  }
+  if (config.type === 'join' && config.mode === 'ai_synthesis') {
+    return { prefix: ['settings'], value: config.settings };
+  }
+  return undefined;
+}
 
 /**
  * A pozitív egész szám mezők node típusonként (SPEC-008 5.4, O-37): ponttal
@@ -65,7 +90,11 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * 2. az `onUnhandledError` mind a tíz típusnál nem `null` (O-29);
  * 3. a `join` `mode` mezője nem `null` (O-33);
  * 4. a `loop` `maxIterations`, az `error_handler` `maxAttempts` mezője és a
- *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37).
+ *    `backoffMs` minden eleme pozitív egész (user döntés 2026-10-17, O-37);
+ * 5. a lépés `mcpServerReferences` hivatkozásainak `envBindings` értéke és nem
+ *    `null` `authEnvName` mezője env változó név alakú (SPEC-009 6.1,
+ *    T-012-27); az agent definíciók azonos mezőjét a motor indításkori
+ *    validációja ellenőrzi, mert az `agents` rekord itt szűkítetlen.
  *
  * **A szabályok a konfig típushibája mellett is lefutnak** (user döntés
  * 2026-10-16, "Egyszerre látsszon mind", SPEC-008 81. kritérium): a zod
@@ -101,7 +130,10 @@ function hasKnownDiscriminators({ value }: { readonly value: unknown }): boolean
  * oldali párja: a `db` `replaceGraph` mindkét `null` értéket elfogadja, mert
  * a workflow létrehozásakor írt Start `onUnhandledError: null` értékkel áll
  * (SPEC-008 5.4, 5.8). A 4. szabály párja a `db` `isNodeConfig` guardja; az
- * olvasó sémák a nem pozitív egész számot változatlanul elfogadják.
+ * olvasó sémák a nem pozitív egész számot változatlanul elfogadják. Az 5.
+ * szabálynak nincs `db` oldali párja, a központi MCP definíció env név
+ * szabályának mintájára (SPEC-009 6.1: a `db` alakot ellenőriz, a név alakot
+ * a `protocol` mentési sémája).
  */
 export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
   (config, context) => {
@@ -120,6 +152,16 @@ export const NodeConfigSaveSchema = NodeConfigSchema.superRefine(
     for (const path of positiveIntegerFieldPaths) {
       for (const fieldPath of findNonPositiveIntegerFields(config, path)) {
         context.addIssue({ code: 'custom', path: [...fieldPath], message: NOT_POSITIVE_INTEGER_MESSAGE });
+      }
+    }
+    const agentStep = agentStepPathOf(config);
+    if (agentStep !== undefined) {
+      for (const fieldPath of findInvalidMcpServerReferenceEnvironmentNames(agentStep.value)) {
+        context.addIssue({
+          code: 'custom',
+          path: [...agentStep.prefix, ...fieldPath],
+          message: INVALID_ENV_NAME_MESSAGE,
+        });
       }
     }
   },

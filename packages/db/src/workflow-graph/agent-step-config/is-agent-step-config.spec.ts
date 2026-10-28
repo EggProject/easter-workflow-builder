@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { AgentStepConfig } from './agent-step-config.ts';
 import { isAgentStepConfig } from './is-agent-step-config.ts';
 
+// A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
+const OWN_PROTO_KEY_1: unknown = JSON.parse('{"__proto__":{"envBindings":{},"authEnvName":null}}');
+
 // Minden nullázható mező üres: ez fedi a guard `null` ágait.
 const minimalConfig: AgentStepConfig = {
   promptTemplate: '',
@@ -350,6 +353,7 @@ describe('isAgentStepConfig', () => {
       ['nem név értékű envBindings', { s: { envBindings: { GITHUB_TOKEN: 1 }, authEnvName: null } }],
       ['nem név értékű authEnvName', { s: { envBindings: {}, authEnvName: 1 } }],
       ['érték rekordot hordozó env mező', { s: { envBindings: {}, authEnvName: null, env: { A: 'titok' } } }],
+      ['saját __proto__ kulcs (T-012-27)', OWN_PROTO_KEY_1],
     ])('elutasítja: %s', (_label, value) => {
       expect(isAgentStepConfig({ ...fullConfig, mcpServerReferences: value })).toBe(false);
     });

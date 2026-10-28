@@ -580,7 +580,14 @@ kölcsönös értékadhatóságát az `apps/server` `node-config-drift-protectio
 nevek az alkalmazásoké, ezért nem tiltottak), forrás: POSIX XBD 3.235 és 8.1, megerősítés: GNU Bash
 kézikönyv "Definitions" (`protocol` `EnvironmentVariableNameSchema`, T-012-10). A szabály a központi
 definíció mentésén áll (`envNames`, az `envBindings` kulcsa és értéke, `authEnvName`), és az
-`envBindings` kulcsa csak deklarált név lehet. Az MCP szerver **neve** (a `mcpServers` kulcsa) az eszköznév előtagja
+`envBindings` kulcsa csak deklarált név lehet. A lépés hivatkozásának szerver oldali nevei (az `envBindings`
+értéke és a nem `null` `authEnvName`) ugyanezen a szabályon mennek át: a lépésen a `protocol` mentési
+sémája (`NodeConfigSaveSchema`, a hiba a mező útvonalán, az érték nélkül), az agent definíción (az `agents`
+rekord ott szűkítetlen) a motor indításkori validációja (`malformed_node_config`), T-012-27. Ok: egy REST
+úton beírt érték (például egy titok) a `missing_mcp_server_env` üzenetben visszaíródna. Korlát: egy név
+alakú titok (például betűvel kezdődő, csak betűt, számot és aláhúzást tartalmazó token) a szabályon átmegy.
+Az olvasó séma és a `db` guard nem szigorodik. A hivatkozás rekord és az `envBindings` saját `__proto__`
+kulcsa a `protocol` és a `db` oldalon egyaránt elbukik (a `z.record` csendben eldobná). Az MCP szerver **neve** (a `mcpServers` kulcsa) az eszköznév előtagja
 (`mcp__<szerver>__<eszköz>`), és az SDK a `[a-zA-Z0-9_-]` halmazon kívüli jeleket `_`-re cseréli (2.2);
 a mentési szabály ezért szűk: a név kizárólag ASCII betűből, számból, `_` és
 `-` jelből áll, ami a cserét kizárja, és két különböző név sem ütközhet cserével. A `__proto__`, a

@@ -1496,6 +1496,14 @@ Ezek valós, drágán megtanult hibák. Mindegyik mellett ott a védelem, ami vi
   CLAUDE.md). Védelem: a `node-config-save-schema.spec.ts` típushibás esetei és a
   `graph-node-required-fields.spec.ts` kilenc típusos e2e-je (research
   `2026-10-14-csomopont-felvetel.md` 45.5, user döntés 2026-10-16).
+- **A `z.record` a bemenet saját `__proto__` kulcsát csendben eldobja** (a `JSON.parse` saját
+  tulajdonságként hozza létre), a kulcs sémája le sem fut rá; a `db` guardja (`isStringRecord`,
+  `isRecord`) viszont megtartja, tehát a két oldal eltérően dönt (saját mérés, zod 4.4.3, PLAN-012
+  T-012-27). Ahol a `protocol` rekordja a `db` guardjával egyezik, a saját `__proto__` kulcsot mindkét
+  oldal elutasítja (`packages/protocol` `recordWithoutPrototypeKey`). Védelem: az `apps/server`
+  `node-config-drift-protection` `__proto__` esetei. Ugyanezért a nevet kulcsként olvasó kód
+  `Object.hasOwn` szerint olvas (a `process.env` olvasó is, mert a puszta indexelés a prototípus lánc
+  `constructor`, `toString` tagját adná vissza).
 
 ---
 

@@ -204,7 +204,8 @@ function isMcpServerRecord(value: unknown): value is Readonly<Record<string, Sto
  * kulcs hiánya érvényes (a régi gráf és pillanatkép így áll); ha a kulcs
  * jelen van, a rekord minden értéke hivatkozás. A név szabályt a központi
  * definíció mentése kényszeríti ki: egy szabálytalan kulcs egyetlen
- * definícióval sem egyezhet.
+ * definícióval sem egyezhet. A saját `__proto__` kulcsot elutasítja, mert a
+ * `protocol` `z.record` sémája csendben eldobná (T-012-27).
  */
 function hasValidMcpServerReferences(value: Readonly<Record<string, unknown>>): boolean {
   if (!Object.hasOwn(value, 'mcpServerReferences')) {
@@ -212,7 +213,9 @@ function hasValidMcpServerReferences(value: Readonly<Record<string, unknown>>): 
   }
   const references = value['mcpServerReferences'];
   return (
-    isRecord(references) && Object.values(references).every((reference: unknown) => isMcpServerReference(reference))
+    isRecord(references) &&
+    !Object.hasOwn(references, '__proto__') &&
+    Object.values(references).every((reference: unknown) => isMcpServerReference(reference))
   );
 }
 

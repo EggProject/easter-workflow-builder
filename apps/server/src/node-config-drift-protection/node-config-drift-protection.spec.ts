@@ -19,6 +19,10 @@ import {
   type NodeConfig as ProtocolNodeConfig,
 } from '@easter-workflow-builder/protocol';
 
+// A `JSON.parse` saját `__proto__` tulajdonságot hoz létre (egy objektum literál a prototípust állítaná).
+const OWN_PROTO_KEY_1: unknown = JSON.parse('{"s":{"envBindings":{"__proto__":"X"},"authEnvName":null}}');
+const OWN_PROTO_KEY_2: unknown = JSON.parse('{"__proto__":{"envBindings":{},"authEnvName":null}}');
+
 /**
  * A `workflow_node.config` tíz ágú `NodeConfig` uniójának sodródás elleni
  * védelme (PLAN-009 T-009-13, SPEC-005 7.7 szekció, `.claude/CLAUDE.md` 5.
@@ -791,6 +795,36 @@ describe('a lépés mcpServerReferences mezője kétirányban és futásidőben 
     expect(NodeConfigSchema.safeParse(config).success).toBe(true);
     expect(NodeConfigSaveSchema.safeParse(config).success).toBe(true);
     expect(isNodeConfig(config)).toBe(true);
+  });
+
+  // A db `isMcpServerReference` minden ágát egy-egy eset buktatja: egy rontás (például
+  // `isStringRecord` helyett `isRecord`, vagy az `authEnvName` ellenőrzése helyett `true`)
+  // itt eltérést ad a két oldal között (T-012-27).
+  it.each([
+    ['nem szöveg értékű envBindings', { s: { envBindings: { GITHUB_TOKEN: 1 }, authEnvName: null } }],
+    ['nem rekord envBindings', { s: { envBindings: ['GITHUB_TOKEN'], authEnvName: null } }],
+    ['szám authEnvName', { s: { envBindings: {}, authEnvName: 7 } }],
+    ['objektum authEnvName', { s: { envBindings: {}, authEnvName: { name: 'A' } } }],
+    ['hiányzó authEnvName', { s: { envBindings: {} } }],
+    ['saját __proto__ kulcsú envBindings', OWN_PROTO_KEY_1],
+    ['saját __proto__ kulcsú hivatkozás rekord', OWN_PROTO_KEY_2],
+  ])('az alakhiba mindkét oldalon elbukik: %s', (_label, mcpServerReferences) => {
+    const config = { ...SAVABLE_AGENT_STEP, mcpServerReferences };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(false);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
+    expect(isNodeConfig(config)).toBe(false);
+  });
+
+  // Az env változó név szabálya (SPEC-009 6.1) kizárólag a protokoll mentési sémáján áll, a
+  // központi MCP definíció mintájára: az olvasó séma és a db guard a régi alakot elfogadja.
+  it.each([
+    ['nem név alakú envBindings érték', { s: { envBindings: { GITHUB_TOKEN: 'ghp-titok' }, authEnvName: null } }],
+    ['üres authEnvName', { s: { envBindings: {}, authEnvName: '' } }],
+  ])('a név szabály csak a mentési sémán bukik: %s', (_label, mcpServerReferences) => {
+    const config = { ...SAVABLE_AGENT_STEP, mcpServerReferences };
+    expect(NodeConfigSchema.safeParse(config).success).toBe(true);
+    expect(isNodeConfig(config)).toBe(true);
+    expect(NodeConfigSaveSchema.safeParse(config).success).toBe(false);
   });
 
   it('egy ismeretlen kulcsú hivatkozás bejegyzés mindkét oldalon elbukik', () => {

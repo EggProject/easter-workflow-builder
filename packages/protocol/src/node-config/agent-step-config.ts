@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { recordWithoutPrototypeKey } from './record-without-prototype-key.ts';
 import { McpServerReferenceSchema } from './mcp-server-reference.ts';
 import { ProviderIdSchema } from './provider-id.ts';
 import { SandboxConfigSchema } from './sandbox-config.ts';
@@ -50,6 +51,8 @@ const SkillsListSchema = z.array(z.string()).readonly();
  * típusszintű egyenlősége megbukna (`.claude/CLAUDE.md` 5. szekció,
  * SPEC-005 7.7).
  */
+const McpServerReferencesSchema = z.record(z.string(), McpServerReferenceSchema).readonly();
+
 export const AgentStepConfigSchema = z
   .strictObject({
     promptTemplate: z.string(),
@@ -68,7 +71,7 @@ export const AgentStepConfigSchema = z
     mcpServers: z.record(z.string(), StorableMcpServerSchema).readonly(),
     // Elhagyható (SPEC-009 6.2, O-42 (b)): a régi gráf és pillanatkép nem hordozza. Az
     // `exactOptional` a `db` oldali `?:` mező pontos párja (`exactOptionalPropertyTypes`).
-    mcpServerReferences: z.record(z.string(), McpServerReferenceSchema).readonly().exactOptional(),
+    mcpServerReferences: recordWithoutPrototypeKey(McpServerReferencesSchema).exactOptional(),
     cwd: z.string().nullable(),
     additionalDirectories: z.array(z.string()).readonly(),
     sandbox: SandboxConfigSchema.nullable(),
