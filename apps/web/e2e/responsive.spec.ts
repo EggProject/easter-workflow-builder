@@ -555,6 +555,10 @@ test('a Beállítások sorának felirata és választója minden támogatott sz�
       await page.goto('/settings');
       const title = page.getByText('Visszavonás/újra billentyű módosítója', { exact: true });
       const select = page.getByLabel('Visszavonás/újra billentyű módosítója');
+      // A sor a kártyák sorában az utolsó (Gráf szerkesztő), keskeny kijelzőn a
+      // nézetablak alatt áll: a mért állítás vízszintes, ezért előbb látótérbe
+      // görgetjük (SPEC-009 3.1: a kártyák egymás alatt állnak).
+      await page.getByRole('region', { name: 'Gráf szerkesztő' }).scrollIntoViewIfNeeded();
       await expect(title).toBeInViewport({ ratio: 1 });
       await expect(select).toBeInViewport({ ratio: 1 });
 

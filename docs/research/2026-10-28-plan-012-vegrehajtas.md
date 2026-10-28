@@ -83,3 +83,82 @@ playwright test --shard=$i/8 > /tmp/e$i.log 2>&1; echo shard$i exit=$?; done`, m
    gyorsítótár ezt nem érinti.
 6. A nehéz kapuk `flock /tmp/kapu-gep.lock` alatt, a `test` egy hívásba belefér (78 s), a typecheck
    `TURBO_CONCURRENCY=1`, a lint `--concurrency=1`.
+
+## 2. T-012-19: e2e a T-012-14 ... T-012-18 forgatókönyveire
+
+Mérés és munka a `feat/spec-009-beallitasok` ágon, a `c0a4266` fejről indulva. A termékkód nem változott, a
+rontások mind visszaállítva.
+
+### 2.1 Mi készült
+
+- `apps/web/e2e/settings-screen.spec.ts`: a Provider kártya (Kapcsolat teszt gomb, eredmény, hiba), a
+  Párhuzamossági korlát kártya (soronkénti Mentés `PUT` és Korlát törlése `DELETE`, mező alatti hiba nem pozitív
+  egészre, `PUT` nélkül), a Futás napló kártya (Switch, mentés alatti tiltás, szerver válaszából vezérelt érték,
+  hiba), a betöltési hibák és a kártyák tér/téma mátrixa (light/dark x 320/1440 pixel). Kiegészítés, nem
+  duplikáció: a meglévő Provider kártya tesztek érintetlenek.
+- `apps/web/e2e/workflow-list.spec.ts`: a "Workflow szerkesztése" modális (név, leírás, provider, `PATCH`
+  törzs, "Nincs megadva" = `providerId: null`, Kapcsolat teszt, betöltés és hiba, mentés alatti állapot,
+  téma x szélesség mátrix).
+- `apps/web/e2e/node-inspector.spec.ts`: a lépés felülírás provider választójának Kapcsolat teszt gombja.
+- Új segédek: `e2e/request-gate.ts` (tartott kérés, hogy a függő állapot időzítő nélkül állítható legyen) és
+  `e2e/expect-horizontally-inside.ts` (vízszintes beférés a viewportba).
+- Minden REST hívás `page.route()` mockon megy (`installApiMocks`, `mockRoute`).
+
+### 2.2 Egy meglévő teszt módosítása és oka
+
+A `responsive.spec.ts` "a Beállítások sorának felirata és választója minden támogatott szélességen a
+viewporton belül van" tesztje az új három kártya miatt a Gráf szerkesztő kártyát a nézetablak alá szorította
+(`toBeInViewport({ ratio: 1 })` bukott a 5. shardon). A teszt az állítás előtt a kártya régiójára görget
+(`scrollIntoViewIfNeeded`). Az állítás tárgya nem változott.
+
+### 2.3 A lefedettségi fixtúra csapdája
+
+A `coverage-fixture.ts` a `window.__coverage__` értéket a teszt végén nyitott lapból írja ki. Egy teszten belüli
+`page.reload()` vagy navigáció a korábbi lap lefedettségét elveszíti. Két betöltési hiba teszt ezért először
+újratöltést tartalmazott, és a `ConcurrencyLimitsSettingsCard.tsx` 33. sora fedetlen maradt. A javítás: egy
+teszt egy betöltési hiba, újratöltés nélkül (négy teszt két helyett).
+
+### 2.4 Szándékos rontások
+
+Minden rontás egy ideiglenes termékkód hiba, a megfelelő spec futtatásával; az ép kódon a teszt zöld volt, a
+rontásra legalább egy új teszt elbukott, utána a fájl visszaállt.
+
+| Csoport              | Rontások                     | Mit rontottunk (példák)                                                                                   | Eredmény                         |
+| -------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Korlát sor           | R1 ... R6, R20, R21          | a szám mező alapértéke `'5'`, a vázlat elfogadja a `0`-t, a Mentés/Törlés hívás és a mező alatti hiba ága | mindegyikre bukott új teszt      |
+| Futás napló kártya   | R7, R8, R19b, R27, R28       | a kapcsoló érték, a mentés alatti tiltás, a hiba ág                                                       | mindegyikre bukott új teszt      |
+| Provider és választó | R9, R10, R11, R24, R25, R33  | a Kapcsolat teszt gomb tiltása, az eredmény megjelenítése, a hiba ág                                      | mindegyikre bukott új teszt      |
+| Szerkesztő modális   | R12, R13, R29, R30, R31, R32 | a `providerId: null` küldése, a mentés alatti állapot, a Kapcsolat teszt hatóköre                         | mindegyikre bukott új teszt      |
+| Korlát kártya        | R14, R23, R26                | a betöltés és a hiba ág                                                                                   | mindegyikre bukott új teszt      |
+| Üres válasz (204)    | R34                          | `emptyResponseSchema` hibaága                                                                             | bukott a törzsel válaszoló teszt |
+| Elrendezés mátrix    | R15, R16, R17b, R18, R19     | `.provider-select` szélesség, átfedés, sötét téma `Alert` festés                                          | a mátrix tesztek bukták          |
+
+Megjegyzés a `.provider-select { min-width: 500px }` rontásról: 320 pixelen nem bukott, mert a választó fix 200
+pixeles. A rontás `width: 500px; flex: none` alakra cserélve már bukott a 320 pixeles mátrix teszteken.
+
+### 2.5 Lefedettség és ratchet
+
+Teljes futás: 8 shard, tiszta nyers könyvtár, `bun run coverage:e2e:report` kilépési kód 0. E2E tesztek száma:
+688 (kiinduló 649, +39). A pontos számok `nyc report --reporter=json-summary` kimenetéből:
+
+| Metrika    | Kiinduló (fedett/összes) | Kiinduló fedetlen | Most (fedett/összes) | Most fedetlen |
+| ---------- | ------------------------ | ----------------- | -------------------- | ------------- |
+| statements | 2156/2166                | 10                | 2323/2334            | 11            |
+| branches   | 1034/1044                | 10                | 1123/1133            | 10            |
+| functions  | 751/752                  | 1                 | 806/808              | 2             |
+| lines      | 2071/2081                | 10                | 2228/2239            | 11            |
+
+A fedetlen tételek száma három metrikán eggyel nő (statements, functions, lines), pontosan egy forrásból:
+`apps/web/src/provider-select/unavailable-provider-connection-tester.ts` 11. sora (1 utasítás, 1 függvény, 1
+sor). Ez a `ProviderOptionsContext` alapértéke. E2E-vel nem érhető el: az `AgentStepConfigFields` csak a
+`GraphEditorScreen` alatt renderelődik, ami mindig megadja a kontextust, tehát az alapértékhez felhasználói
+úton nincs út. Unit teszt fedi. A küszöb nem változott (99.35 / 98.94 / 99.73 / 99.32), a százalékok felette
+állnak (99.52 / 99.11 / 99.75 / 99.50).
+
+A T-012-14 további két új fedetlen tételét e2e teszt zárta le: `ProviderSelect.tsx` `errorMessage ?? undefined`
+ága (Kapcsolat teszt hiba üzenet nélkül) és az `empty-response-schema.ts` hibaága (a `DELETE` 204 helyett
+törzsel válaszol).
+
+Döntés kérdés: az egy fennmaradó tétel elfogadása e2e-vel nem elérhető tételként, vagy a T-012-14 alapérték
+átalakítása (termékkód terv döntés). A szabálykönyv 8. szekciója ilyen kategóriát ismer, de a fedetlen darabszám
+növekedése itt tényleges, ezért a döntést nem hoztam meg.

@@ -6,10 +6,13 @@
 // Minden REST hívás `page.route()` mockon megy (rest-mock.ts), az SSE
 // csatorna egyetlen `stream_ready` kerettel (sse-mock.ts), hogy az AppShell
 // mindig nyitva tartott kapcsolata ne szóljon valódi hálózat felé.
-import type { WorkflowSummary } from '@easter-workflow-builder/protocol';
+import type { ProviderSummary, WorkflowSummary } from '@easter-workflow-builder/protocol';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './coverage-fixture.ts';
+import { expectHorizontallyInside } from './expect-horizontally-inside.ts';
+import { createRequestGate } from './request-gate.ts';
 import { installApiMocks, jsonBody, mockRoute } from './rest-mock.ts';
-import { chooseSelectOption } from './select-field.ts';
+import { chooseSelectOption, expectSelectedLabel } from './select-field.ts';
 import { mockIdleStream } from './sse-mock.ts';
 
 const ALFA: WorkflowSummary = {
@@ -378,6 +381,250 @@ test('a szerkesztés hibájára a modálison belül riasztás jelenik meg', asyn
   await expect(dialog).not.toContainText('(not_found)');
   await expect(dialog).not.toContainText('"w-alfa"');
 });
+
+// A "Workflow szerkesztése" modális provider választója (SPEC-009 3.3, O-3, AC8):
+// a `PATCH` törzse a `providerId` mezőt hordozza, az "örökölt" választás `null`
+// értékkel; a "Kapcsolat teszt" gomb a választó része (AC4).
+const EDIT_PROVIDERS: readonly ProviderSummary[] = [
+  { id: 'claude-subscription', displayName: 'Claude Code', models: [], requiredEnvNames: [] },
+  {
+    id: 'minimax',
+    displayName: 'MiniMax',
+    models: [],
+    requiredEnvNames: [['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'], ['ANTHROPIC_BASE_URL']],
+  },
+];
+
+interface EditMockOptions {
+  readonly workflow: WorkflowSummary;
+  /**
+   * A providerek listájának válasza előtt megvárt kapu.
+   */
+  readonly providersGate?: Promise<undefined>;
+  /**
+   * A `PATCH` válasza előtt megvárt kapu.
+   */
+  readonly updateGate?: Promise<undefined>;
+  readonly isProvidersFailing?: boolean;
+}
+
+interface EditMockCalls {
+  readonly updates: { readonly pathname: string; readonly body: unknown }[];
+  readonly connectionTests: string[];
+}
+
+async function installEditMocks(page: Page, options: EditMockOptions): Promise<EditMockCalls> {
+  const calls: EditMockCalls = { updates: [], connectionTests: [] };
+  // A szerkesztés után a lista újratölt: a mock a legutóbb mentett providert adja vissza.
+  let current: WorkflowSummary = options.workflow;
+  await installApiMocks(page, [
+    mockRoute('listWorkflows', async (route) => route.fulfill(jsonBody([current]))),
+    mockRoute('listProviders', async (route) => {
+      await options.providersGate;
+      await route.fulfill(
+        options.isProvidersFailing === true
+          ? jsonBody({ code: 'internal', message: 'belső hiba' }, 500)
+          : jsonBody(EDIT_PROVIDERS),
+      );
+    }),
+    mockRoute('updateWorkflow', async (route, url) => {
+      await options.updateGate;
+      const body: unknown = route.request().postDataJSON();
+      calls.updates.push({ pathname: url.pathname, body });
+      const patch = body !== null && typeof body === 'object' && 'providerId' in body ? body.providerId : undefined;
+      current = { ...current, providerId: typeof patch === 'string' ? patch : current.providerId };
+      await route.fulfill(jsonBody(current));
+    }),
+    mockRoute('testProviderConnection', async (route, url) => {
+      calls.connectionTests.push(url.pathname);
+      await route.fulfill(jsonBody({ succeeded: true, errorMessage: null }));
+    }),
+  ]);
+  return calls;
+}
+
+async function openEditModal(page: Page, workflowName: RegExp): Promise<Locator> {
+  await page.goto('/');
+  const row = page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: workflowName });
+  await row.getByRole('button', { name: /^Műveletek/ }).click();
+  await page.getByRole('menuitem', { name: 'Szerkesztés' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Workflow szerkesztése' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test('a szerkesztő modális a workflow providerét mutatja, a választás a PATCH törzsébe kerül, a lista az új providert mutatja', async ({
+  page,
+}) => {
+  const calls = await installEditMocks(page, { workflow: ALFA });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+  const providerSelect = dialog.getByRole('combobox', { name: 'Provider' });
+
+  await expectSelectedLabel(providerSelect, 'Claude Code');
+  await expect(dialog.getByText('Ehhez a providerhez nem kell környezeti változó.')).toBeVisible();
+
+  await chooseSelectOption(page, providerSelect, 'MiniMax');
+  await expect(
+    dialog.getByText('Szükséges környezeti változók: ANTHROPIC_AUTH_TOKEN vagy ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL'),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+
+  await expect(dialog).toBeHidden();
+  expect(calls.updates).toEqual([
+    {
+      pathname: '/api/workflows/w-alfa',
+      body: { name: 'Alfa workflow', description: 'Az első teszt workflow', providerId: 'minimax' },
+    },
+  ]);
+  await expect(
+    page.getByRole('table', { name: 'Workflow-k' }).getByRole('row', { name: /Alfa workflow/ }),
+  ).toContainText('minimax');
+});
+
+test('a "Nincs megadva" választás a PATCH törzsében null providerId, az örökölt állapotban nincs env mondat', async ({
+  page,
+}) => {
+  const calls = await installEditMocks(page, { workflow: ALFA });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+  const providerSelect = dialog.getByRole('combobox', { name: 'Provider' });
+  await expectSelectedLabel(providerSelect, 'Claude Code');
+
+  await chooseSelectOption(page, providerSelect, 'Nincs megadva');
+  await expectSelectedLabel(providerSelect, 'Nincs megadva');
+  await expect(dialog.getByText('Ehhez a providerhez nem kell környezeti változó.')).toBeHidden();
+  await dialog.getByRole('button', { name: 'Mentés' }).click();
+
+  await expect(dialog).toBeHidden();
+  expect(calls.updates.map((update) => update.body)).toEqual([
+    { name: 'Alfa workflow', description: 'Az első teszt workflow', providerId: null },
+  ]);
+});
+
+test('a szerkesztő modális Kapcsolat teszt gombja örökölt providernél tiltott és megindokolt, választás után a provider tesztjét futtatja, váltás elrejti az eredményt', async ({
+  page,
+}) => {
+  const calls = await installEditMocks(page, { workflow: BETA });
+  const dialog = await openEditModal(page, /Béta workflow/);
+  const providerSelect = dialog.getByRole('combobox', { name: 'Provider' });
+  const testButton = dialog.getByRole('button', { name: 'Kapcsolat teszt' });
+
+  await expectSelectedLabel(providerSelect, 'Nincs megadva');
+  await expect(testButton).toBeDisabled();
+  await expect(dialog.getByText('A kapcsolat teszthez válassz ki egy providert.')).toBeVisible();
+
+  await chooseSelectOption(page, providerSelect, 'MiniMax');
+  await expect(testButton).toBeEnabled();
+  await expect(dialog.getByText('A kapcsolat teszthez válassz ki egy providert.')).toBeHidden();
+  await testButton.click();
+
+  const result = dialog.getByRole('status');
+  await expect(result).toHaveText('A kapcsolat teszt sikeres.');
+  await expect(result).toHaveClass(/\balert--success\b/);
+  expect(calls.connectionTests).toEqual(['/api/providers/minimax/connection-test']);
+
+  await chooseSelectOption(page, providerSelect, 'Claude Code');
+  await expect(result).toBeHidden();
+  expect(calls.updates).toEqual([]);
+});
+
+test('a provider lista betöltése alatt a választó "betöltés" feliratú és tiltott', async ({ page }) => {
+  const providersGate = createRequestGate();
+  await installEditMocks(page, { workflow: ALFA, providersGate: providersGate.passed });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+  const providerSelect = dialog.getByRole('combobox', { name: 'Provider' });
+
+  await expect(providerSelect).toHaveText('betöltés');
+  await expect(providerSelect).toBeDisabled();
+  providersGate.open();
+  await expectSelectedLabel(providerSelect, 'Claude Code');
+  await expect(providerSelect).toBeEnabled();
+});
+
+test('a provider lista betöltési hibája danger Alert a modálison belül', async ({ page }) => {
+  await installEditMocks(page, { workflow: ALFA, isProvidersFailing: true });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+
+  await expect(dialog.getByRole('alert')).toHaveText('Váratlan szerver hiba történt.');
+  await expect(dialog.getByRole('alert')).toHaveClass(/\balert--danger\b/);
+});
+
+test('a szerkesztés mentése alatt a Mentés gomb "Mentés..." feliratú és tiltott, a Mégse is tiltott; üres névvel a Mentés tiltott', async ({
+  page,
+}) => {
+  const updateGate = createRequestGate();
+  const calls = await installEditMocks(page, { workflow: ALFA, updateGate: updateGate.passed });
+  const dialog = await openEditModal(page, /Alfa workflow/);
+  const nameField = dialog.getByLabel('Név');
+
+  await nameField.fill('');
+  await expect(dialog.getByRole('button', { name: 'Mentés', exact: true })).toBeDisabled();
+  await nameField.fill('Alfa módosítva');
+  await dialog.getByRole('button', { name: 'Mentés', exact: true }).click();
+
+  await expect(dialog.getByRole('button', { name: 'Mentés...', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Mégse' })).toBeDisabled();
+  expect(calls.updates).toEqual([]);
+
+  updateGate.open();
+  await expect(dialog).toBeHidden();
+  expect(calls.updates).toHaveLength(1);
+});
+
+// A szerkesztő modális elrendezése és festése mindkét témában, 320 és 1440
+// pixelen (SPEC-009 10. szekció, AC4, AC8).
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 1440] as const) {
+    test.describe(`a szerkesztő modális, ${theme} téma, ${String(width)} pixel`, () => {
+      test.use({ colorScheme: theme });
+
+      test.beforeEach(async ({ page }) => {
+        await page.addInitScript((mode: string) => {
+          globalThis.localStorage.setItem('eggTheme', mode);
+        }, theme);
+        await page.setViewportSize({ width, height: 900 });
+      });
+
+      test('a modális és minden vezérlője a nézetablakban áll, túllógás nélkül, kifestve, a kapcsolat teszt eredménye is', async ({
+        page,
+      }) => {
+        await installEditMocks(page, { workflow: BETA });
+        const dialog = await openEditModal(page, /Béta workflow/);
+        if (theme === 'dark') {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+        } else {
+          await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+        }
+
+        const providerSelect = dialog.getByRole('combobox', { name: 'Provider' });
+        await chooseSelectOption(page, providerSelect, 'MiniMax');
+        await dialog.getByRole('button', { name: 'Kapcsolat teszt' }).click();
+        const result = dialog.getByRole('status');
+        await expect(result).toHaveText('A kapcsolat teszt sikeres.');
+
+        for (const control of [
+          dialog,
+          dialog.getByLabel('Név'),
+          dialog.getByLabel('Leírás'),
+          providerSelect,
+          dialog.getByRole('button', { name: 'Kapcsolat teszt' }),
+          result,
+          dialog.getByText('Szükséges környezeti változók', { exact: false }),
+          dialog.getByRole('button', { name: 'Mégse' }),
+          dialog.getByRole('button', { name: 'Mentés', exact: true }),
+        ]) {
+          await expectHorizontallyInside(page, control);
+        }
+        expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+        expect(await dialog.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor)).not.toBe(
+          'rgba(0, 0, 0, 0)',
+        );
+        expect(await result.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor)).not.toBe(
+          'rgba(0, 0, 0, 0)',
+        );
+      });
+    });
+  }
+}
 
 test('a törlési összegzés hibájára riasztás jelenik meg, és a törlés gomb tiltott marad', async ({ page }) => {
   await installApiMocks(page, [

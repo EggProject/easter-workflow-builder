@@ -654,6 +654,51 @@ test.describe('agent_step node: prompt, provider öröklés, rendszer prompt', (
   });
 });
 
+test.describe('agent_step node: provider felülírás Kapcsolat teszt gombja', () => {
+  test('örökölt választásnál tiltott és megindokolt, felülírásnál a provider tesztjét futtatja, a váltás elrejti az eredményt', async ({
+    page,
+  }) => {
+    const testedPaths: string[] = [];
+    const connectionResult = { succeeded: false };
+    await installApiMocks(page, [
+      mockRoute('testProviderConnection', async (route, url) => {
+        testedPaths.push(url.pathname);
+        await route.fulfill(
+          jsonBody({
+            succeeded: connectionResult.succeeded,
+            // eslint-disable-next-line unicorn/no-null -- a ConnectionTestResponse.errorMessage a dróton `null`, ha a teszt sikeres (packages/protocol).
+            errorMessage: connectionResult.succeeded ? null : 'Hiányzik az ANTHROPIC_AUTH_TOKEN',
+          }),
+        );
+      }),
+    ]);
+    const panel = await openNode(page, 'n-agent');
+    const providerSelect = panel.getByRole('combobox', { name: 'Provider felülírás' });
+    const testButton = panel.getByRole('button', { name: 'Kapcsolat teszt' });
+
+    await expectSelectedLabel(providerSelect, 'nincs felülírás (öröklés)');
+    await expect(testButton).toBeDisabled();
+    await expect(panel.getByText('A kapcsolat teszthez válassz ki egy providert.')).toBeVisible();
+
+    await chooseSelectOption(page, providerSelect, 'minimax');
+    await expect(testButton).toBeEnabled();
+    await testButton.click();
+    const failure = panel.getByRole('alert').filter({ hasText: 'A kapcsolat teszt sikertelen' });
+    await expect(failure).toContainText('Hiányzik az ANTHROPIC_AUTH_TOKEN');
+    await expect(failure).toHaveClass(/\balert--danger\b/);
+
+    connectionResult.succeeded = true;
+    await testButton.click();
+    const success = panel.getByRole('status').filter({ hasText: 'A kapcsolat teszt sikeres.' });
+    await expect(success).toHaveClass(/\balert--success\b/);
+    expect(testedPaths).toEqual(['/api/providers/minimax/connection-test', '/api/providers/minimax/connection-test']);
+
+    await chooseSelectOption(page, providerSelect, 'nincs felülírás (öröklés)');
+    await expect(success).toBeHidden();
+    await expect(testButton).toBeDisabled();
+  });
+});
+
 test.describe('agent_step node: futási korlátok', () => {
   test('a modell, a session mód és a számláló mezők szerkeszthetők és megmaradnak, motor hook csoport nincs', async ({
     page,
