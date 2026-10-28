@@ -175,6 +175,15 @@ describe('AgentStepConfigFields', () => {
     expect(container.querySelector('.alert--danger')?.textContent).toContain('Hiányzik a kulcs');
   });
 
+  it('szolgáltató nélkül (a kontextus alapértéke) megadott providernél is tiltott a Kapcsolat teszt gomb', () => {
+    render({ ...BASE_CONFIG, providerId: 'minimax' }, vi.fn());
+
+    const button = [...container.querySelectorAll('button')].find((candidate) =>
+      candidate.textContent.includes('Kapcsolat teszt'),
+    );
+    expect(button?.disabled).toBe(true);
+  });
+
   it('egy megadott `providerId`-ra nem jelenik meg az öröklés leírása', () => {
     render({ ...BASE_CONFIG, providerId: 'minimax' }, vi.fn(), 'sosem látszik');
     expect(container.textContent).not.toContain('sosem látszik');

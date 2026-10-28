@@ -11,7 +11,7 @@ import type { ProviderConnectionTester } from '../provider-select/provider-conne
  *   konstansa (a kettő ugyanazt az azonosító készletet írja le).
  * - `testConnection`: a mező "Kapcsolat teszt" gombjának hívása (SPEC-009
  *   3.2, O-2); a `GraphEditorScreen` az API origin és a `fetch` kötésével
- *   állítja elő.
+ *   állítja elő. `undefined`, ha nincs szolgáltató: a gomb ilyenkor tiltott.
  *
  * **Típus-only fájl, nincs `.spec.ts` párja** (`apps/web/CLAUDE.md` ## Fájlok
  * konvenció).
@@ -19,5 +19,5 @@ import type { ProviderConnectionTester } from '../provider-select/provider-conne
 export interface ProviderOptions {
   readonly isLoading: boolean;
   readonly providerIds: readonly string[];
-  readonly testConnection: ProviderConnectionTester;
+  readonly testConnection: ProviderConnectionTester | undefined;
 }

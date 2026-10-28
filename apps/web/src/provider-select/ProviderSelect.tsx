@@ -27,7 +27,11 @@ export interface ProviderSelectProperties extends Pick<
    * meg, mert ott nincs "nincs" opció (SPEC-009 O-4).
    */
   readonly emptyOptionLabel?: string;
-  readonly testConnection: ProviderConnectionTester;
+  /**
+   * A teszt hívása; `undefined`, ha nincs szolgáltató (a `ProviderOptionsContext`
+   * alapértéke): a gomb ilyenkor tiltott.
+   */
+  readonly testConnection: ProviderConnectionTester | undefined;
 }
 
 /**
@@ -61,7 +65,8 @@ function renderTestResult(state: RequestState<ConnectionTestResponse>): ReactEle
  * látszik. A teszt futása alatt a gomb `isLoading` állapotú; az eredmény
  * csak ahhoz a providerhez tartozik, amelyiken a teszt futott, a választás
  * váltása elrejti. A futó teszt alatt a gomb tiltott, tehát két teszt nem
- * versenyezhet egymással.
+ * versenyezhet egymással. Tesztelő nélkül (`testConnection` `undefined`) a
+ * gomb szintén tiltott.
  */
 export function ProviderSelect(properties: Readonly<ProviderSelectProperties>): ReactElement {
   const { providers, value, onChange, emptyOptionLabel, testConnection, ...selectProperties } = properties;
@@ -73,10 +78,14 @@ export function ProviderSelect(properties: Readonly<ProviderSelectProperties>): 
   const isTesting = testRequest.state.status === 'pending';
   const isTestOfSelection = testedProviderId === value;
 
-  function handleTest(): void {
-    setTestedProviderId(value);
-    void testRequest.run(() => testConnection(value));
-  }
+  // A `&&` szűkíti a tesztelőt, ág nélkül: tesztelő nélkül nincs kezelő, és a
+  // gomb a `disabled` miatt úgysem kattintható.
+  const handleTest =
+    testConnection &&
+    ((): void => {
+      setTestedProviderId(value);
+      void testRequest.run(() => testConnection(value));
+    });
 
   const options = providers.map((provider) => ({ value: provider.id, label: provider.displayName }));
 
@@ -93,7 +102,7 @@ export function ProviderSelect(properties: Readonly<ProviderSelectProperties>): 
           type="button"
           size="sm"
           variant="secondary"
-          disabled={isInherited || isTesting || selectProperties.loading === true}
+          disabled={isInherited || isTesting || selectProperties.loading === true || handleTest === undefined}
           isLoading={isTesting && isTestOfSelection}
           {...(isInherited && { 'aria-describedby': reasonId })}
           onClick={handleTest}

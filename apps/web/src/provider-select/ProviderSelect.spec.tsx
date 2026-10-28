@@ -175,6 +175,14 @@ describe('ProviderSelect', () => {
     expect(trigger().textContent).toBe('Betöltés…');
   });
 
+  it('tesztelő nélkül (testConnection undefined) kiválasztott providernél is tiltott a gomb, tiltási ok szöveg nélkül', () => {
+    render({ value: 'minimax', testConnection: undefined });
+
+    expect(testButton().disabled).toBe(true);
+    expect(testButton().hasAttribute('aria-describedby')).toBe(false);
+    expect(container.querySelector('.provider-select__reason')).toBeNull();
+  });
+
   it('a teszt futása alatt a gomb isLoading és tiltott, siker után success Alert jelenik meg', async () => {
     const { tester, resolve, calls } = deferredTester();
     render({ value: 'minimax', testConnection: tester });
