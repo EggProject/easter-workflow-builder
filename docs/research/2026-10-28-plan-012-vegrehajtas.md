@@ -555,3 +555,60 @@ nyelődhetett el. A régi kódon az e2e teszt az új szerver sorát nem találta
 (statements 10/2692, branches 10/1327, functions 1/942, lines 10/2577), egyik metrikán sem nőtt. A kritérium tábla
 lépés (T-012-28) egy további e2e tesztet hozott, a teljes futás utána 741 teszt, a fedetlen tételek változatlanok
 (`docs/research/2026-10-28-spec-009-kriterium-tabla.md` 3. szekció).
+
+## 5. Merge kapu (`.claude/CLAUDE.md` 8. szekció, a CI kikapcsolt állapotában)
+
+**A merge.** `git fetch` után a friss `origin/main` (`6d17889`, PR #65, csak doksi és komment) bemergelve
+(`git merge origin/main`, merge commit `48e075e`, nem rebase). Egyetlen ütközés volt, a
+`docs/spec/SPEC-001-monorepo-toolchain.md` 15. szekciója (a V-19 lezárása mindkét oldalon, az ág `ce3eff0`, a `main`
+PR #65). A feloldás mindkét oldal tényét megtartja: az ág V-20 sorát és a "20-ból 19 lezárva, 1 nyitva (V-14)"
+számot, a `main` V-19 lezáró bekezdését, a V-19 sorában a két oldal mondatait együtt (`libXdamage.so.1`, csomag
+`libxdamage1`; a smoke teszt és a `bun run test:e2e` valódi Chromiumon zöld), a 41. kritériumban a 20 pontot. A
+merge utáni igazítás (`32e6f3b`): a hiányleltár H-23, H-25 sora és 8. szekciója a PR #65 bemergelésével
+(`git merge-base --is-ancestor 6d17889 HEAD` igaz), és az `apps/web/CLAUDE.md` téma mappa száma, amit a PR #65 a
+`main` 34 mappájára írt át, az ág három új témájával (`provider-select`, `skill-upload`, `mcp-server-config`; a
+`ls -d apps/web/src/*/ | wc -l` kimenete 37).
+
+**A teljes kapu a `32e6f3b` fejen futott.** Futtatási mód: `~/wt/s09`, a nehéz parancsok `flock /tmp/kapu-gep.lock`
+alatt, a Playwright `flock /tmp/playwright-gep.lock` alatt, 3 workerrel (minden shard fejléce: `using 3 workers`).
+
+| Parancs                                                                    | Kilépési kód | Összegzés                                                    |
+| -------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------ |
+| `bun run format:check`                                                     | 0            | minden fájl formázott                                        |
+| `TURBO_CONCURRENCY=1 bun run typecheck`                                    | 0            | 19/19 sikeres                                                |
+| `bun x turbo run lint --concurrency=1`                                     | 0            | 32/32 task sikeres                                           |
+| `bun run test`                                                             | 0            | 727 tesztfájl, 7643 teszt, mind zöld                         |
+| `bun run build`                                                            | 0            | 1/1 sikeres                                                  |
+| `bun run docs:check`                                                       | 0            | 20/20 kötelező helyen van `CLAUDE.md`                        |
+| `bun run check:casing`                                                     | 0            | 0 eltérés                                                    |
+| `bun run check:graph`                                                      | 0            | 0 eltérés                                                    |
+| `bun run check:db-drift`                                                   | 0            | a séma és a migrációk szinkronban                            |
+| `bun x playwright test --shard=<i>/8` (i = 1 ... 8, tiszta nyers könyvtár) | mind 0       | 93 + 93 + 93 + 93 + 93 + 92 + 92 + 92 = 741 teszt, mind zöld |
+| `bun run coverage:e2e:report`                                              | 0            | a küszöb (99.35 / 98.94 / 99.73 / 99.32) felett, lásd lent   |
+
+A shardok előtt `rm -rf apps/web/e2e/.nyc_output apps/web/coverage-e2e apps/web/test-results`, a nyolc shard sorban,
+ugyanabba a nyers könyvtárba, megszakítás nélkül.
+
+**Unit lefedettség** (`coverage/coverage-summary.json`): statements 8392/8392, branches 5164/5164, functions
+2265/2265, lines 8168/8168, mind 100 százalék.
+
+**E2e lefedettség** (a nyers adatból újra előállított `json-summary` riport, a functions és a lines az `lcov.info`
+összesítésével egyezik):
+
+| Metrika    | Fedett | Összes | Százalék | Fedetlen |
+| ---------- | ------ | ------ | -------- | -------- |
+| statements | 2682   | 2692   | 99.62    | 10       |
+| branches   | 1317   | 1327   | 99.24    | 10       |
+| functions  | 941    | 942    | 99.89    | 1        |
+| lines      | 2567   | 2577   | 99.61    | 10       |
+
+A fedetlen tételek fájlonként: `app-mount/mount-app.tsx` (3/2/0/3), `frontend-config/read-frontend-config.ts`
+(4/6/0/4), `graph-editor/is-valid-connection.ts` (1/1/0/1), `rest-client/perform-route-request.ts` (1/1/0/1),
+`stream-client/use-stream-connection.ts` (1/0/1/1).
+
+**Ratchet.** A fedetlen tételek száma (10 / 10 / 1 / 10) egyik metrikán sem nőtt sem az ág kiindulásához (1.3
+szekció: 10 / 10 / 1 / 10), sem a `main` mai értékéhez képest (a PR #65 sem a küszöböt, sem az e2e-vel mért kódot
+nem változtatta: az `apps/web/package.json` és az `apps/web/src` a `main` két fején azonos). A küszöb változatlan.
+**Feljegyzés, nem lépés:** a mért százalék mind a négy metrikán a küszöb felett van, a fedetlen darabszám nem nőtt,
+tehát a 8. szekció ratchet szabálya szerint a küszöb felfelé követhetné a mért értéket; ez ebben a PR-ban nem
+történt meg.
