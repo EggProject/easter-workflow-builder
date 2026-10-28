@@ -45,7 +45,12 @@ const AGENT_STEP_CONFIG: NodeConfig = {
   maxBudgetUsd: null,
   systemPrompt: null,
   agents: {
-    kutato: { description: 'Kutat a weben.', prompt: 'Kutass alaposan.', skills: 'all' },
+    kutato: {
+      description: 'Kutat a weben.',
+      prompt: 'Kutass alaposan.',
+      skills: 'all',
+      observer: 'megfigyelo-ertek',
+    },
     legacy: 'régi, nem objektum alakú bejegyzés',
   },
   skills: null,
@@ -240,6 +245,7 @@ test.beforeEach(async ({ page }) => {
     mockRoute('readWorkflowGraph', async (route) => route.fulfill(jsonBody(GRAPH))),
     mockRoute('getWorkflow', async (route) => route.fulfill(jsonBody(WORKFLOW))),
     mockRoute('readSettings', async (route) => route.fulfill(jsonBody(SETTINGS))),
+    mockRoute('listSkills', async (route) => route.fulfill(jsonBody([]))),
   ]);
   await page.goto(EDITOR_URL);
   await expect(nodeLocator(page, 'n-start')).toBeVisible();
@@ -360,7 +366,8 @@ test.describe('a panel dokkolt sáv alakja és a mezőnkénti hibajelzés', () =
       'Modell és futási korlátok',
       'Eszközök és környezet',
       'Al-agentek (agents)',
-      'Skillek és MCP szerverek (csak olvasható)',
+      'Skillek',
+      'MCP szerverek (csak olvasható)',
     ]) {
       await expect(panel.getByRole('button', { name: title, exact: true })).toHaveAttribute('aria-expanded', 'false');
     }
@@ -826,17 +833,14 @@ test.describe('agent_step node: eszközök, környezet, sandbox, strukturált ki
   });
 });
 
-test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mezők', () => {
-  test('a skillek és az MCP szerverek mező olvashatóan, ok megnevezéssel jelenik meg', async ({ page }) => {
+test.describe('agent_step node: SPEC-009 hatókörű, csak olvasható mező', () => {
+  test('az MCP szerverek mező olvashatóan, ok megnevezéssel jelenik meg', async ({ page }) => {
     const panel = await openNode(page, 'n-agent');
-    const group = await openAccordion(panel, 'Skillek és MCP szerverek (csak olvasható)');
-    // A `skills` mező `null`, a `describeUnknownValue` a JSON.stringify ágon
-    // fut le (nem a `(nincs megadva)` ágon, mert `null !== undefined`).
-    await expect(group.getByText('null', { exact: true })).toBeVisible();
+    const group = await openAccordion(panel, 'MCP szerverek (csak olvasható)');
     await expect(group.getByText('{}', { exact: true })).toBeVisible();
     await expect(
       group.getByText('a SPEC-009 hatóköre (skill feltöltés / MCP konfiguráció), itt csak olvasható'),
-    ).toHaveCount(2);
+    ).toHaveCount(1);
   });
 });
 
@@ -880,15 +884,20 @@ test.describe('agents mező szerkesztő (AgentsFieldEditor + AgentDefinitionEntr
     await chooseSelectOption(page, kutatoTools.getByRole('combobox', { name: 'Memória hatóköre' }), 'project');
     await kutatoTools.getByLabel('Kezdő üzenet').fill('Szia!');
 
-    const kutatoReadOnly = await openAccordion(kutatoGroup, 'Skillek és MCP szerverek (csak olvasható)');
-    // A `skills` mező sztring (`'all'`) -> a `describeUnknownValue` sztring ága.
-    await expect(kutatoReadOnly.getByText('all', { exact: true })).toBeVisible();
+    // A `skills` mező `'all'` értéke a módválasztón "minden feltöltött skill".
+    const kutatoSkills = await openAccordion(kutatoGroup, 'Skillek');
+    await expect(kutatoSkills.getByRole('combobox', { name: 'Skillek használata' })).toHaveText(
+      'minden feltöltött skill',
+    );
+    const kutatoReadOnly = await openAccordion(kutatoGroup, 'MCP szerverek (csak olvasható)');
     await expect(
       kutatoReadOnly.getByText(
         'nem megerősített mező: csak a telepített .d.ts fájlban szerepel, hivatalos dokumentáció nem fedi (M-90)',
       ),
     ).toBeVisible();
     await expect(kutatoReadOnly.getByText('criticalSystemReminder_EXPERIMENTAL')).toBeVisible();
+    // A szöveg értékű nem megerősített mező a sztringet változatlanul mutatja.
+    await expect(kutatoReadOnly.getByText('megfigyelo-ertek')).toBeVisible();
 
     await closePanel(page);
     const reopened = await openNode(page, 'n-agent');

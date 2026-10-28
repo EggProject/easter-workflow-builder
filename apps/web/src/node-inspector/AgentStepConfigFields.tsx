@@ -10,6 +10,7 @@ import { AgentsFieldEditor } from './AgentsFieldEditor.tsx';
 import { ProviderSelect } from '../provider-select/ProviderSelect.tsx';
 import { ProviderOptionsContext } from './provider-options-context.ts';
 import { SandboxField } from './SandboxField.tsx';
+import { SkillsField } from './SkillsField.tsx';
 import { StructuredOutputField } from './StructuredOutputField.tsx';
 import { SystemPromptField } from './SystemPromptField.tsx';
 import { describeUnknownValue } from './describe-unknown-value.ts';
@@ -44,9 +45,9 @@ export interface AgentStepConfigFieldsProperties {
 
 /**
  * Az `AgentStepConfig` teljes szerkesztő felülete: az `agent_step` node és a
- * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` és az
- * `mcpServers` mező olvasható, nem szerkeszthető - a panel ezt ki is mondja
- * (AC16). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
+ * `join` `ai_synthesis` módja egyaránt ezt használja. A `skills` mező a
+ * `SkillsField` vezérlőjén szerkeszthető (SPEC-009 5.2, AC15); az `mcpServers`
+ * mező olvasható, nem szerkeszthető - a panel ezt ki is mondja (AC16). Az `agents` mező a `AgentsFieldEditor` saját, kulcsonkénti
  * szerkesztőjén megy.
  *
  * CSOPORTOSÍTÁS (SPEC-008 5.2, felhasználói kérés 2026-09-09). Ez az
@@ -67,7 +68,9 @@ export interface AgentStepConfigFieldsProperties {
  *   (sandbox, kimenet séma) különösen ritkán nyúlt.
  * - "Al-agentek (agents)" panel: saját, kulcsonkénti szerkesztő, ami
  *   nyitva sok helyet foglal, miközben a legtöbb lépésen üres.
- * - "Skillek és MCP szerverek (csak olvasható)" panel: itt semmit nem lehet
+ * - "Skillek" panel: a módválasztó és a könyvtár skilljeinek jelölőnégyzetei,
+ *   alapesetben "nincs beállítva", tehát nem tartozik elöl.
+ * - "MCP szerverek (csak olvasható)" panel: itt semmit nem lehet
  *   szerkeszteni (SPEC-009 hatóköre), tehát a legkevésbé sem tartozik elöl.
  */
 export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFieldsProperties>): ReactElement {
@@ -277,13 +280,17 @@ export function AgentStepConfigFields(properties: Readonly<AgentStepConfigFields
           />
         </AccordionItem>
 
-        <AccordionItem title="Skillek és MCP szerverek (csak olvasható)">
+        <AccordionItem title="Skillek">
+          <SkillsField
+            value={config.skills}
+            onChange={(nextValue) => {
+              setField('skills', nextValue);
+            }}
+          />
+        </AccordionItem>
+
+        <AccordionItem title="MCP szerverek (csak olvasható)">
           <div className="node-inspector__group">
-            <div className="field">
-              <span className="field__label">Skillek</span>
-              <p>{describeUnknownValue(config.skills)}</p>
-              <p className="node-inspector__reason">{SPEC_009_SCOPE_REASON}</p>
-            </div>
             <div className="field">
               <span className="field__label">MCP szerverek</span>
               <p>{describeUnknownValue(config.mcpServers)}</p>

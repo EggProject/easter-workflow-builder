@@ -203,6 +203,12 @@ function withPendingProviders(fetchFunction: FetchFunction): FetchFunction {
       : fetchFunction(input, init);
 }
 
+function skillCheckbox(container: HTMLElement, label: string): HTMLInputElement | undefined {
+  return [...container.querySelectorAll<HTMLInputElement>(':scope .node-inspector input[type="checkbox"]')].find(
+    (candidate) => candidate.parentElement?.textContent.includes(label) === true,
+  );
+}
+
 function openAgentPanel(): void {
   act(() => {
     lastCanvasProperties().onSelectNode('n-2');
@@ -1251,6 +1257,64 @@ describe('GraphEditorScreen', () => {
         expect(optionLabels[0]).toBe('nincs felülírás (öröklés)');
         expect(optionLabels.length).toBeGreaterThan(1);
       });
+    });
+  });
+
+  describe('a skill könyvtár a beállítás panelen (SPEC-009 5.2, AC15)', () => {
+    const SKILL_SUMMARIES = [
+      { name: 'alfa', description: 'Alfa leírás', sizeBytes: 10, modifiedAtMs: 1 },
+      { name: 'beta', description: 'Beta leírás', sizeBytes: 20, modifiedAtMs: 2 },
+    ];
+    const SKILL_GRAPH = {
+      nodes: [
+        { ...START_NODE, createdAtMs: 0, updatedAtMs: 0 },
+        { ...AGENT_NODE, config: { ...AGENT_NODE.config, skills: ['alfa', 'törölt'] }, createdAtMs: 0, updatedAtMs: 0 },
+      ],
+      edges: GRAPH_DOCUMENT.edges,
+    };
+
+    function withSkillsResponse(respond: () => Promise<Response>): FetchFunction {
+      const delegate = createGraphFetchFunction({ putBodies: [], graphGetCount: 0 }, SKILL_GRAPH);
+      return (input, init) => (new URL(input).pathname === '/api/skills' ? respond() : delegate(input, init));
+    }
+
+    it('a szerver listájából épülő jelölőnégyzetek, a tárolt nevek bejelölve, a törölt név "hiányzik" jelzéssel', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        withSkillsResponse(() => Promise.resolve(jsonResponse(SKILL_SUMMARIES))),
+      );
+      openAgentPanel();
+
+      expect(skillCheckbox(container, 'alfa')?.checked).toBe(true);
+      expect(skillCheckbox(container, 'beta')?.checked).toBe(false);
+      expect(skillCheckbox(container, 'törölt (hiányzik a könyvtárból)')?.checked).toBe(true);
+    });
+
+    it('a könyvtár betöltésének hibája danger Alert, jelölőnégyzetek nélkül', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        withSkillsResponse(() => Promise.resolve(new Response('hiba', { status: 500 }))),
+      );
+      openAgentPanel();
+
+      expect(container.querySelector(':scope .node-inspector [role="alert"]')).not.toBeNull();
+      expect(skillCheckbox(container, 'alfa')).toBeUndefined();
+    });
+
+    it('a könyvtár betöltése alatt csontváz áll, jelölőnégyzetek nélkül', async () => {
+      await renderScreen(
+        '?workflowId=wf-1',
+        withSkillsResponse(
+          () =>
+            new Promise<Response>(() => {
+              // szándékosan sosem oldódik fel
+            }),
+        ),
+      );
+      openAgentPanel();
+
+      expect(container.querySelector(':scope .node-inspector [aria-busy="true"]')).not.toBeNull();
+      expect(skillCheckbox(container, 'alfa')).toBeUndefined();
     });
   });
 

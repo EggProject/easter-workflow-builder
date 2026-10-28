@@ -8,12 +8,12 @@
  * tehát ehhez a tábla ad felületi típusbiztonságot, nem egy második
  * séma forrás.
  *
- * A `skills` és az `mcpServers` sor a lépés szintű beállítással azonos
- * határvonalat követi: olvasható, de nem szerkeszthető, mert a SPEC-009
- * hatóköre (skill feltöltés, MCP konfiguráció).
+ * A `skills` sor a `SkillsField` vezérlőn szerkeszthető, a lépés szintű
+ * mezővel azonos tárolt alakkal (SPEC-009 5.2). Az `mcpServers` sor olvasható,
+ * de nem szerkeszthető, mert a SPEC-009 hatóköre (MCP konfiguráció).
  */
 export type AgentDefinitionFieldGroup =
-  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'SPEC-009 hatókör';
+  'kötelező' | 'modell és korlátok' | 'eszközök' | 'környezet' | 'skillek' | 'SPEC-009 hatókör';
 
 export type AgentDefinitionFieldControl =
   | { readonly kind: 'text' }
@@ -22,6 +22,7 @@ export type AgentDefinitionFieldControl =
   | { readonly kind: 'boolean' }
   | { readonly kind: 'string-list' }
   | { readonly kind: 'select'; readonly options: readonly string[] }
+  | { readonly kind: 'skills' }
   | { readonly kind: 'readonly'; readonly reason: string };
 
 export interface AgentDefinitionFieldDescriptor {
@@ -91,8 +92,8 @@ export const AGENT_DEFINITION_FIELD_TABLE = [
   {
     key: 'skills',
     label: 'Skillek',
-    group: 'SPEC-009 hatókör',
-    control: { kind: 'readonly', reason: SPEC_009_SCOPE_REASON },
+    group: 'skillek',
+    control: { kind: 'skills' },
     required: false,
   },
   {

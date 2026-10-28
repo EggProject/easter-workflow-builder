@@ -8,6 +8,7 @@ import {
   type AgentDefinitionFieldDescriptor,
   type AgentDefinitionFieldGroup,
 } from './agent-definition-field-table.ts';
+import { SkillsField } from './SkillsField.tsx';
 import { describeUnknownValue } from './describe-unknown-value.ts';
 import { FieldErrorsContext } from './field-errors-context.ts';
 import { fromNumberFieldValue, toNumberFieldValue } from './nullable-number-field-value.ts';
@@ -15,20 +16,21 @@ import { fromStringListFieldValue, toStringListFieldValue } from './string-list-
 import './node-inspector.css';
 
 /**
- * A tábla öt csoportja két szintre oszlik. ELÖL, panel nélkül a `kötelező`
+ * A tábla hat csoportja két szintre oszlik. ELÖL, panel nélkül a `kötelező`
  * csoport áll (a leírás és a prompt: e kettő nélkül az agent bejegyzésnek
  * nincs értelme, és mérten ez az a két mező, amit minden bejegyzésen ki
- * kell tölteni). A többi négy csoport összecsukható panelbe kerül, mert
+ * kell tölteni). A többi öt csoport összecsukható panelbe kerül, mert
  * mind opcionális felülírás vagy csak olvasható érték - a `modell és
  * korlátok`, illetve az `eszközök`+`környezet` páros egy-egy panelt kap
  * (utóbbi kettő ugyanannak a futtatási környezetnek a két oldala), a
- * `SPEC-009 hatókör` pedig a nem megerősített mezőkkel együtt egyetlen,
- * csak olvasható panelbe.
+ * `skillek` csoport saját panelt kap, a `SPEC-009 hatókör` pedig a nem
+ * megerősített mezőkkel együtt egyetlen, csak olvasható panelbe.
  */
 const ACCORDION_PANELS: readonly { readonly title: string; readonly groups: readonly AgentDefinitionFieldGroup[] }[] = [
   { title: 'Modell és korlátok', groups: ['modell és korlátok'] },
   { title: 'Eszközök és környezet', groups: ['eszközök', 'környezet'] },
-  { title: 'Skillek és MCP szerverek (csak olvasható)', groups: ['SPEC-009 hatókör'] },
+  { title: 'Skillek', groups: ['skillek'] },
+  { title: 'MCP szerverek (csak olvasható)', groups: ['SPEC-009 hatókör'] },
 ];
 
 export interface AgentDefinitionEntryFieldsProperties {
@@ -138,6 +140,16 @@ function renderFieldControl(
           ]}
           placeholder="nincs megadva"
           value={isString(rawValue) ? rawValue : ''}
+          onChange={(nextValue) => {
+            setField(field.key, nextValue);
+          }}
+        />
+      );
+    }
+    case 'skills': {
+      return (
+        <SkillsField
+          value={rawValue}
           onChange={(nextValue) => {
             setField(field.key, nextValue);
           }}

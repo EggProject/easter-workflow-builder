@@ -344,9 +344,17 @@ describe('AgentStepConfigFields', () => {
     );
   });
 
-  it('a `skills` és az `mcpServers` mező olvasható, megnevezi a SPEC-009 okot', () => {
-    render({ ...BASE_CONFIG, skills: ['a', 'b'] }, vi.fn());
-    expect(container.textContent).toContain('["a","b"]');
+  it('a `skills` mező a módválasztón szerkeszthető, és a teljes konfigot frissíti', () => {
+    const onChange = vi.fn();
+    render({ ...BASE_CONFIG, skills: ['a', 'b'] }, onChange);
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('kiválasztott skillek');
+    chooseOption(container, 'Skillek használata', 'minden feltöltött skill');
+    expect(onChange).toHaveBeenLastCalledWith({ ...BASE_CONFIG, skills: 'all' });
+  });
+
+  it('az `mcpServers` mező olvasható, megnevezi a SPEC-009 okot', () => {
+    render({ ...BASE_CONFIG, mcpServers: {} }, vi.fn());
+    expect(container.textContent).toContain('{}');
     expect(container.textContent).toContain('SPEC-009');
   });
 

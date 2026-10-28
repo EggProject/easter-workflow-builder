@@ -282,13 +282,38 @@ describe('AgentDefinitionEntryFields', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memory: '' }));
   });
 
-  it('a `skills` és az `mcpServers` mező olvasható, és megnevezi a SPEC-009 okot', () => {
+  it('az `mcpServers` mező olvasható, és megnevezi a SPEC-009 okot', () => {
     act(() => {
       root.render(
         <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={vi.fn()} />,
       );
     });
     expect(container.textContent).toContain('SPEC-009');
+  });
+
+  it('a `skills` mező a módválasztón szerkeszthető, a többi kulcs változatlanul megmarad', () => {
+    const onChange = vi.fn();
+    act(() => {
+      root.render(
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={FULL_ENTRY} onChange={onChange} />,
+      );
+    });
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('kiválasztott skillek');
+    chooseOption(container, 'Skillek használata', 'minden feltöltött skill');
+    expect(onChange).toHaveBeenLastCalledWith({ ...FULL_ENTRY, skills: 'all' });
+  });
+
+  it('a hiányzó `skills` kulcs "nincs beállítva", és a listás módra váltás üres listát ír a kulcsba', () => {
+    const onChange = vi.fn();
+    const withoutSkills = Object.fromEntries(Object.entries(FULL_ENTRY).filter(([key]) => key !== 'skills'));
+    act(() => {
+      root.render(
+        <AgentDefinitionEntryFields fieldPathPrefix="agents.kutato." value={withoutSkills} onChange={onChange} />,
+      );
+    });
+    expect(selectTrigger(container, 'Skillek használata').textContent).toBe('nincs beállítva');
+    chooseOption(container, 'Skillek használata', 'kiválasztott skillek');
+    expect(onChange).toHaveBeenLastCalledWith({ ...withoutSkills, skills: [] });
   });
 
   it('a három nem megerősített mező (M-90) értékkel is csak olvasható szöveg, vezérlő nélkül', () => {
