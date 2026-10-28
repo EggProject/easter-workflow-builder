@@ -29,7 +29,9 @@ Keychain, `CLAUDE_CONFIG_DIR`) betöltését, vagy csak a beállítás fájlokat
 **Besorolás.** Az 1.1 és 1.2 három-három forrással áll. **Korlát:** a hivatalos doksi nem mondja ki szó
 szerint, hogy az előfizetéses bejelentkezés `settingSources: []` mellett is él; a kimondott mondat
 (1.2, entireio) harmadik fél forrás. A SPEC-009 ezt "forrásból eldöntött, korlátozott megerősítéssel"
-jelöli, a döntés (az M-138 mérés kikerül) a user O-38 válaszára vár.
+jelöli. **2026-10-28:** az O-38 technikai döntésként lezárva (SPEC-009 14.7): az 1.1 és az 1.2 egy-egy
+elsődleges forrással és két-két megerősítéssel áll, ez a bizonyíték szabálynak megfelel; a maradék korlátot a
+PLAN-012 T-012-12a valódi próbája zárja, a user engedélyével.
 
 **A `settingSources` által NEM vezérelt bemenetek** (ugyanaz az elsődleges oldal, "What settingSources does
 not control"): a managed policy beállítás, a `~/.claude.json` globális konfig, az auto memory
@@ -82,10 +84,101 @@ Ezt az M-136 második esete méri; a szabály, ami az eltérést kizárja, az O-
 | 5.4 | A `yauzl` 3.2.0 verzióját érinti a `CVE-2026-31988` (a `getLastModDate()` NTFS mező olvasásának egy-eggyel elcsúszott határa, szolgáltatásmegtagadás); javítva a 3.2.1-ben                                                                                                                                                                                                                                                                                                               | <https://api.github.com/advisories?ecosystem=npm&affects=yauzl> (GHSA-gmq8-994r-jv83)                                                                                                                                                                                                                                                                                                                               |
 | 5.5 | Más jelöltek (nem ajánlott, csak a teljesség miatt): `fflate` `0.8.3` (<https://registry.npmjs.org/fflate/latest>, <https://unpkg.com/fflate@0.8.3/package.json>), `adm-zip` `0.6.1`, `@zip.js/zip.js` `2.24.0` (mindkettő egy forrás: registry); az útvonal ellenőrzés a hívó dolga vagy nem dokumentált                                                                                                                                                                                |                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 5.6 | A szerver kérés törzs olvasója (`readJsonRequestBody`) ma korlát nélkül gyűjti a törzset, és JSON-ként értelmezi                                                                                                                                                                                                                                                                                                                                                                         | saját olvasás: `apps/server/src/http-server/read-json-request-body.ts`                                                                                                                                                                                                                                                                                                                                              |
-| 5.7 | Zip méret és fájlszám korlátra a Claude Code / Agent SDK dokumentációban **nincs** szám: az SDK lokális skilljére nincs dokumentált feltöltési korlát                                                                                                                                                                                                                                                                                                                                    | a 3. szekció oldalai; nem ellenőrzött, hogy máshol van-e                                                                                                                                                                                                                                                                                                                                                            |
+| 5.7 | Zip méret és fájlszám korlátra a Claude Code / Agent SDK dokumentációban **nincs** szám (az SDK lokális skilljére). **2026-10-28:** az Anthropic Skills API doksija ad számot, és a zip bomba védelemre iparági ajánlás van: a 7. szekció                                                                                                                                                                                                                                                | a 3. szekció oldalai; a 7. szekció                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Az 5.3 és 5.5 verziószámok jelöltek, nem rögzítettek: a döntés után a rögzített verzió a
 `docs/research/2026-08-26-toolchain.md` fájlba kerül (`.claude/CLAUDE.md` 4. szekció 4. pont).
+
+## 7. O-33 ... O-37: a zip kezelés forrásai (2026-10-28)
+
+Módszer: Exa (`web_search_exa`, `web_fetch_exa`), élő npm registry és jsDelivr lekérdezés `curl`-lel, a
+GitHub API tag listája. Valódi API hívás nem futott. A user kifejezett elvárása szerint ahol a termékre
+szabott forrás nincs, az iparági ajánlás az alapérték, a forrás megnevezésével.
+
+### 7.1 A kicsomagolt összméret: 30 MB
+
+| Állítás                                                                | Forrás                                                                                                                                                                                                                       | Idézet                                                                                                                        |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Az Anthropic Skills API egy skill feltöltésének összméretét korlátozza | elsődleges: <https://platform.claude.com/docs/en/build-with-claude/skills-guide> ("Limits and constraints")                                                                                                                  | "Maximum Skill upload size: 30 MB (all files combined, uncompressed)"; "Total upload size must be under 30 MB (uncompressed)" |
+| ugyanez                                                                | megerősítés 1: <https://changelogs.core-directive.com/docs/change/1497> (a doksi változásnapló, 2026-08-19)                                                                                                                  | "Total upload size must be under 30 MB (uncompressed)" (a korábbi 8 MB helyett)                                               |
+| ugyanez                                                                | megerősítés 2: <https://www.developersdigest.tech/blog/claude-files-api-agent-skills>; <https://apidog.com/blog/claude-skills-api-ga/>                                                                                       | "Total upload must be under 30 MB uncompressed"; "The whole upload must stay under 30 MB uncompressed"                        |
+| A "MB" decimális vagy bináris volta                                    | nem ellenőrzött: a doksi nem mondja ki; egy harmadik fél kliens `30 * 1024 * 1024` értéket használ (<https://github.com/modus-agendi/terraform-provider-anthropic-claude-managed-agents/blob/main/internal/client/skill.go>) |                                                                                                                               |
+
+**Alkalmazás:** 30 000 000 bájt, a decimális (szigorúbb) olvasat, ami a bináris olvasat mellett is a
+korláton belül marad. Az Anthropic a saját korlátját az API-ra mondja, nem a helyi SDK skillre; a
+projekt a legközelebbi, termékre szabott hivatalos számként alkalmazza.
+
+### 7.2 A bejegyzések száma: 1024
+
+| Állítás                                                                                      | Forrás                                                                                                           | Idézet                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A zip kicsomagolás fájlszám korlátja a CERT megfelelő megoldásában 1024, az összméret 100 MB | elsődleges: <https://wiki.sei.cmu.edu/confluence/display/java/IDS04-J.+Safely+extract+files+from+ZipInputStream> | "the code also counts the number of file entries in the archive and throws an exception if there are more than 1024 entries"; `static final int TOOMANY = 1024; // Max number of files`; "The actual limit depends on the capabilities of the platform and expected usage." |
+| A bejegyzés szám korlátja kötelező védelem, a minta értéke 10000                             | <https://rules.sonarsource.com/javascript/rspec-5042/>, <https://rules.sonarsource.com/csharp/rspec-5042/>       | "Count the number of file entries extracted from the archive and abort the extraction if their number is greater than a predefined threshold"; `const MAX_FILES = 10000;`                                                                                                   |
+| A minta számai önkényesek                                                                    | <https://community.sonarsource.com/t/incorrect-security-remedy-for-adm-zip/97929> (Sonar munkatárs)              | "the threshold is picked rather arbitrarily as different situations require different limits"                                                                                                                                                                               |
+
+**Alkalmazás:** 1024, a két iparági minta közül a szigorúbb (CERT), mert egy skill a doksi szerint egy
+`SKILL.md` plusz néhány `references/`, `assets/`, `scripts/` fájl (<https://claude.com/docs/skills/how-to>).
+A konkrét szám két független megerősítése nincs: a két forrás eltérő számot ad, a választás a
+szigorúbb, kimondott indokkal.
+
+### 7.3 Tömörítési arány: nincs külön korlát
+
+| Állítás                                                                                                                                    | Forrás                                                                                               | Idézet                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A kicsomagolás közben, a ténylegesen olvasott bájtokon számolt összméret megállítja a zip bombát; a fejléc deklarált mérete nem megbízható | <https://wiki.sei.cmu.edu/confluence/display/java/IDS04-J.+Safely+extract+files+from+ZipInputStream> | "a malicious attacker can forge the field in the ZIP file that purports to show the uncompressed size"; "tracks the uncompressed file size of each entry ... while extracting the entry" |
+| A `yauzl` alapból ellenőrzi a deklarált és a tényleges méret egyezését                                                                     | <https://github.com/thejoshwolfe/yauzl> (README, `open()`)                                           | "`validateEntrySizes` is the default and ensures that an entry's reported uncompressed size matches its actual uncompressed size"                                                        |
+| Az arány küszöb (Sonar: 10) ép fájlokat is blokkol                                                                                         | <https://community.sonarsource.com/t/incorrect-security-remedy-for-adm-zip/97929>                    | "This blocked valid and innocuous zip files for us."; a válasz: "picked rather arbitrarily"                                                                                              |
+
+**Alkalmazás:** nincs külön arány korlát; a 30 MB összméret a kicsomagolás közben, kiírt bájtokon
+számolva korlátoz (CERT módszer), a `yauzl` `validateEntrySizes` pedig a hazudó fejlécet fogja.
+
+### 7.4 A feltöltött törzs: 30 000 000 bájt (levezetett)
+
+Közvetlen forrás nincs (a claude.ai súgója csak annyit mond: "ZIP file exceeds size limits",
+<https://support.claude.com/en/articles/12512180-use-skills-in-claude>). Levezetés: a törzs korlát
+nélkül a szerver korlát nélkül olvasna (5.6), tehát kell; a zip a tartalmon felül csak fejléceket
+hordoz, tehát egy 7.1 szerint elfogadható skill zipje a gyakorlatban ugyanekkora vagy kisebb. A
+határeset (tömörítés nélküli, a korlátot kitöltő tartalom) a fejlécek miatt elbukhat: kimondott,
+elfogadott következmény, mert ugyanaz a skill tömörítve átmegy.
+
+### 7.5 A `yauzl` verziója
+
+| Csomag         | Verzió                                                                        | Forrás 1                                                | Forrás 2                                                                                                                                                          |
+| -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `yauzl`        | 3.4.0 (közzétéve 2026-06-07; függőség `pend` `~1.2.0`; `engines.node` `>=12`) | <https://registry.npmjs.org/yauzl> (`dist-tags.latest`) | <https://data.jsdelivr.com/v1/packages/npm/yauzl> (`tags.latest`); a GitHub tag lista (<https://api.github.com/repos/thejoshwolfe/yauzl/tags>) első eleme `3.4.0` |
+| `@types/yauzl` | 3.4.0 (közzétéve 2026-06-13; `ts6.0` tag: 3.4.0)                              | <https://registry.npmjs.org/@types/yauzl>               | <https://data.jsdelivr.com/v1/packages/npm/@types/yauzl>                                                                                                          |
+
+A `docs/research/2026-08-26-toolchain.md` fájlba a bevezetés commitjában kerül (`.claude/CLAUDE.md` 4.
+szekció 4. pont). A használt opciók a README szerint: `lazyEntries: true` ("will keep memory usage under
+control for zip files with many entries"), `validateEntrySizes: true`, `strictFileNames: true` ("entries
+with backslashes in their file names will result in an error"), `fromBuffer` (a törzs pufferből).
+
+### 7.6 O-35: a zip belső elrendezése
+
+| Állítás                                                                  | Forrás                                                                                                                                                         | Idézet                                                                                                                                                |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Az API a gyökérben álló és az egy mappába zárt `SKILL.md`-t is elfogadja | elsődleges: <https://platform.claude.com/docs/en/build-with-claude/skills-guide>                                                                               | "Must include a `SKILL.md` file at the upload root (or at the top of a single enclosing folder)"                                                      |
+| ugyanez, a változás ténye                                                | megerősítés 1: <https://changelogs.core-directive.com/docs/change/1497>; megerősítés 2: <https://www.developersdigest.tech/blog/claude-files-api-agent-skills> | a régi "A zip archive must contain the skill directory as its single top-level entry" helyén az új mondat; "Root placement is new with the GA shape." |
+| A claude.ai feltöltés a mappás alakot írja elő                           | <https://support.claude.com/en/articles/12512198-how-to-create-custom-skills>; <https://claude.com/docs/skills/how-to>                                         | "The ZIP should contain the skill folder as its root"; "a `SKILL.md` sitting at the root of the ZIP isn't recognized as a skill"                      |
+
+**Alkalmazás:** mindkét alak elfogadott (SPEC-009 5.4 4. pont): így minden, az Anthropic bármelyik
+leírása szerint készült zip feltölthető.
+
+### 7.7 O-36: az átviteli alak
+
+| Állítás                                                                | Forrás                                                                                                                                  | Idézet                                                                                                           |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A base64 minden 3 bájtot 4 karakterrel ír, a méret kb. egyharmaddal nő | elsődleges: <https://www.rfc-editor.org/rfc/rfc4648#section-4>; megerősítés: <https://developer.mozilla.org/en-US/docs/Glossary/Base64> | "three 8-bit bytes ... can be represented by four 6-bit Base64 digits"; "roughly a third larger than its source" |
+| Az Anthropic Skills API bináris multipart feltöltést használ           | <https://platform.claude.com/docs/en/api/skills>                                                                                        | "Body parameters (form-data)"; `-H 'Content-Type: multipart/form-data'`, `-F 'files[]=@...'`                     |
+| A `yauzl` pufferből olvas                                              | <https://github.com/thejoshwolfe/yauzl>                                                                                                 | "`fromBuffer(buffer, [options], [callback])` Like `fromFd()`, but reads from a RAM buffer"                       |
+
+## 8. O-39: az auto memory kikapcsolása (2026-10-28)
+
+| Állítás                                                                       | Forrás                                                                                                                                   | Idézet                                                                                                   |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| A hivatalos izolációs recept a `settingSources: []` mellé a változót írja elő | elsődleges: <https://code.claude.com/docs/en/agent-sdk/claude-code-features> (1. szekció, a "What settingSources does not control" rész) | "set `settingSources: []` plus `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in `env`"                             |
+| A változó jelentése                                                           | megerősítés 1: <https://code.claude.com/docs/en/env-vars>                                                                                | "Set to `1` to disable auto memory. ... When disabled, Claude does not create or load auto memory files" |
+| ugyanez                                                                       | megerősítés 2: <https://code.claude.com/docs/en/memory>                                                                                  | "To disable auto memory via environment variable, set `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`."              |
 
 ## 6. Amit nem tudtunk megerősíteni (nem ellenőrzött)
 
