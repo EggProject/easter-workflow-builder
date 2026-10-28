@@ -59,7 +59,7 @@ A 18 `.spec.ts` közül 17 a `packages/typeguards` csomag bemásolt kódja, 1 az
 
 ## 3. Névtér
 
-Minden workspace csomag neve `@easter-workflow-builder/` névtér prefixet kap. Ez érinti a jelenlegi 16 csomagot is. A prefix a user döntése, és a repo nevével egyezik.
+Minden workspace csomag neve `@easter-workflow-builder/` névtér prefixet kap. Ez érintette az akkori 16 csomagot is (ma 19). A prefix a user döntése, és a repo nevével egyezik.
 
 Indok, hivatalos forrással: a Turborepo dokumentációja szó szerint ezt írja a belső csomagok `name` mezőjéről: _"It's best practice to use a namespace prefix for your Internal Packages to avoid conflicts with other packages on the npm registry"_ ([structuring a repository](https://turborepo.dev/docs/crafting-your-repository/structuring-a-repository)). A jelen migráció és a SPEC-011 törlése után 19 workspace csomag van, köztük olyan nevekkel, amik az npm registryben is léteznek (`core`, `logger`, `protocol`). A prefix nélkül egy jövőbeli `bun add` vagy egy elgépelt import csendben registry csomagra oldódhat fel.
 
